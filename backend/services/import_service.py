@@ -195,8 +195,10 @@ def _spki(public_key):
 def _record_identity(record):
     """The record's current certificate and public key: (x509 or None, SPKI or None).
 
-    The key comes from the certificate when the record holds one, else from
-    the stored private key (a record still waiting for its certificate).
+    The key comes from the certificate when the record holds one; a record
+    still waiting for its certificate is known by its stored private key,
+    its signing request, or the cached public key of its HSM key (read as
+    stored: nothing here may reach the HSM or commit).
     """
     stored_cert = None
     if record.crt:
@@ -213,6 +215,23 @@ def _record_identity(record):
             return stored_cert, _spki(key.public_key())
         except Exception:
             pass
+    csr_stored = getattr(record, 'csr', None)
+    if csr_stored:
+        try:
+            csr_pem = csr_stored.encode('utf-8') if csr_stored.startswith('-----BEGIN') else base64.b64decode(csr_stored)
+            csr = x509.load_pem_x509_csr(csr_pem, default_backend())
+            return stored_cert, _spki(csr.public_key())
+        except Exception:
+            pass
+    hsm_key = getattr(record, 'hsm_key', None)
+    cached = getattr(hsm_key, 'public_key_pem', None) if hsm_key is not None else None
+    if cached:
+        try:
+            public_key = serialization.load_pem_public_key(
+                cached.encode() if isinstance(cached, str) else cached)
+            return stored_cert, _spki(public_key)
+        except Exception:
+            pass
     return stored_cert, None
 
 
@@ -220,37 +239,62 @@ def _select_existing(candidates, cert, kind):
     """Among *candidates*, the records sharing the certificate's names, the
     one the certificate belongs to; None when there is none (#347 review).
 
-    The record holding the certificate's key wins, the very same certificate
-    first: a renewed certificate lands on its own record, not on a homonym
-    that happened to come first. Without a key link a single candidate is
-    the record being re-keyed; several cannot be told apart, and the import
-    is refused rather than applied to whichever the database returned.
+    The record holding the certificate's key wins: the very same certificate
+    first, then the one whose certificate has the same issuer (a cross-signed
+    CA holds the same key under several issuers), then the single record
+    holding the key. A renewed certificate thus lands on its own record, not
+    on a homonym that happened to come first. Without a key link a single
+    candidate is the record being re-keyed; several cannot be told apart,
+    and the import is refused rather than applied to whichever the database
+    returned.
     """
     if not candidates:
         return None
     wanted = _spki(cert.public_key())
-    same_key, exact = [], []
+    same_key, same_issuer, exact = [], [], []
     for record in candidates:
         stored_cert, spki = _record_identity(record)
         if spki != wanted:
             continue
         same_key.append(record)
-        if stored_cert is not None and stored_cert.serial_number == cert.serial_number \
-                and stored_cert.issuer == cert.issuer:
+        if stored_cert is None or stored_cert.issuer != cert.issuer:
+            continue
+        same_issuer.append(record)
+        if stored_cert.serial_number == cert.serial_number:
             exact.append(record)
     if exact:
         return exact[0]
+    if len(same_issuer) == 1:
+        return same_issuer[0]
     if len(same_key) == 1:
         return same_key[0]
     if same_key:
         raise AmbiguousImportTarget(
             f"{len(same_key)} existing {kind}s share this subject and hold this "
-            f"certificate's key; the record to update cannot be determined")
+            f"certificate's key, none under this certificate's issuer; the record "
+            f"to update cannot be determined")
     if len(candidates) == 1:
         return candidates[0]
     raise AmbiguousImportTarget(
         f"{len(candidates)} existing {kind}s share this subject and none holds this "
         f"certificate's key; the record to update cannot be determined")
+
+
+def install_on_pending_ca(ca, cert_pem, username):
+    """Install *cert_pem* on a CA still waiting for its certificate, through
+    the same path as the dedicated upload (key match, validity, chain to the
+    issuer, activation), and emit the lifecycle event.
+
+    Returns (ca_dict, warnings); raises ValueError with a user-safe message
+    when the certificate is refused (#347 review).
+    """
+    from services.ca_service import CAService
+    from services.webhook_service import emit_ca_updated
+    ca, warnings, _superseded = CAService.complete_external_ca(ca, cert_pem, username=username)
+    # Snapshot before emit: subscribers may commit and expire the instance
+    ca_dict = ca.to_dict()
+    emit_ca_updated(ca_dict, actor=username, changes={'certificate': 'installed'})
+    return ca_dict, warnings
 
 
 def find_existing_ca(cert_info, cert):

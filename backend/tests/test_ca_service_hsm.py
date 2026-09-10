@@ -415,3 +415,71 @@ class TestHsmCaReimport:
             db.session.expire_all()
             row = db.session.get(CA, ca_id)
             assert (row.crt, row.descr, row.hsm_key_id, row.valid_to) == before
+
+    @pytest.mark.parametrize('path', ['/api/v2/cas/import', '/api/v2/certificates/import'])
+    def test_pending_hsm_ca_next_to_a_homonym_is_completed(self, app, auth_client, hsm_provider_and_key, path):
+        """Tenth review of #347: a pending HSM CA (no certificate, no key
+        column) is known by its request's key and completed through the
+        dedicated path instead of being refused as ambiguous."""
+        import base64, json
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        fx = hsm_provider_and_key
+        tag = path.split('/')[3]
+        cn = f'Pending HSM Homonym {tag}'
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+        homonym = self._selfsigned(cn, rsa.generate_private_key(65537, 2048))
+        with app.app_context():
+            from models import db, CA
+            row1 = CA(refid=f'hsm-homonym-{tag}', descr=cn, serial=0, prv=None,
+                      crt=base64.b64encode(homonym.public_bytes(serialization.Encoding.PEM)).decode(),
+                      subject=homonym.subject.rfc4514_string(), issuer=homonym.issuer.rfc4514_string())
+            csr = x509.CertificateSigningRequestBuilder().subject_name(name).sign(fx['real_key'], hashes.SHA256())
+            row2 = CA(refid=f'hsm-pending-{tag}', descr=cn, serial=0, crt='', prv=None,
+                      csr=base64.b64encode(csr.public_bytes(serialization.Encoding.PEM)).decode(),
+                      hsm_key_id=fx['hsm_key_id'], subject=name.rfc4514_string(), imported_from='external_csr')
+            db.session.add_all([row1, row2]); db.session.commit()
+            id1, id2, crt1 = row1.id, row2.id, row1.crt
+        from datetime import datetime, timedelta, timezone
+        ext_key = rsa.generate_private_key(65537, 2048)
+        now = datetime.now(timezone.utc)
+        signed = (x509.CertificateBuilder().subject_name(name)
+                  .issuer_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'External Root HSM 347')]))
+                  .public_key(fx['real_key'].public_key()).serial_number(x509.random_serial_number())
+                  .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=365))
+                  .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                  .sign(ext_key, hashes.SHA256()))
+        patches = _patch_hsm(fx['real_key'], fx['pub_pem'])
+        for p in patches: p.start()
+        try:
+            r = auth_client.post(path, data={'pem_content': signed.public_bytes(serialization.Encoding.PEM).decode()},
+                                 content_type='multipart/form-data')
+        finally:
+            for p in patches: p.stop()
+        assert r.status_code == 200, r.data
+        body = json.loads(r.data)
+        assert body['data']['id'] == id2, (body['data']['id'], id1, id2)
+        assert body['data']['uses_hsm'] and body['data']['hsm_key_id'] == fx['hsm_key_id']
+        assert 'installed' in body['message']
+        with app.app_context():
+            from models import db, CA
+            db.session.expire_all()
+            assert db.session.get(CA, id1).crt == crt1
+            row = db.session.get(CA, id2)
+            assert row.crt and not row.is_pending and row.hsm_key_id == fx['hsm_key_id']
+
+    def test_record_identity_falls_back_to_the_cached_hsm_public_key(self, app, hsm_provider_and_key):
+        """Without certificate, key column or request, the cached public key of
+        the bound HSM key still identifies the record, without reaching the HSM."""
+        from cryptography.hazmat.primitives import serialization as ser
+        from services.import_service import _record_identity
+        fx = hsm_provider_and_key
+        with app.app_context():
+            from models import db, CA
+            row = CA(refid='hsm-identity-only', descr='HSM identity', serial=0, crt='', prv=None, csr=None,
+                     hsm_key_id=fx['hsm_key_id'], subject='CN=HSM identity')
+            db.session.add(row); db.session.commit()
+            with patch('services.hsm.HsmService.get_public_key', side_effect=AssertionError('must not reach the HSM')):
+                stored_cert, spki = _record_identity(row)
+            assert stored_cert is None
+            assert spki == fx['real_key'].public_key().public_bytes(ser.Encoding.DER, ser.PublicFormat.SubjectPublicKeyInfo)

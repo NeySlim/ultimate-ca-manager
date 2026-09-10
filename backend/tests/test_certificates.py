@@ -1690,3 +1690,76 @@ class TestHomonymsOnReimport:
         body = json.loads(r.data)
         assert body['data']['id'] == id1 and body['data']['has_private_key'] is False
         assert 'did not match' in body['message']
+
+    def test_cross_signed_ca_is_told_apart_by_issuer(self, app, auth_client):
+        """Tenth review of #347: the same CA key under two issuers is two
+        records; the issuer says which one a renewed certificate belongs to."""
+        from cryptography import x509
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+        from models import CA
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        roots = {label: (x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, label)]),
+                         rsa.generate_private_key(public_exponent=65537, key_size=2048))
+                 for label in ('Root A 347', 'Root B 347', 'Root C 347')}
+        cross = lambda label: self._cert('Cross Signed CA', key, issuer=roots[label][0], signer=roots[label][1], ca=True)
+        ida, crta = self._store(app, CA, cross('Root A 347'), key, serial=0)
+        idb, crtb = self._store(app, CA, cross('Root B 347'), key, serial=0)
+        # Renewed under Root B (same key, new serial): the issuer tells the records apart
+        r = self._import(auth_client, cross('Root B 347'), '/api/v2/cas/import')
+        assert r.status_code == 200, r.data
+        body = json.loads(r.data)
+        assert body['data']['id'] == idb and body['data']['has_private_key'] is True
+        assert self._state(app, CA, ida) == (crta, True)
+        new_b, has_b = self._state(app, CA, idb)
+        assert new_b != crtb and has_b
+        # The same key under a third issuer belongs to neither record: refused, both untouched
+        r = self._import(auth_client, cross('Root C 347'), '/api/v2/cas/import')
+        assert r.status_code == 409, r.data
+        assert 'cannot be determined' in json.loads(r.data)['message']
+        assert self._state(app, CA, ida) == (crta, True)
+        assert self._state(app, CA, idb) == (new_b, True)
+
+    @pytest.mark.parametrize('path', ['/api/v2/cas/import', f'{BASE}/import'])
+    def test_pending_ca_next_to_a_homonym_is_completed_through_its_request(self, app, auth_client, path):
+        """Tenth review of #347: a CA waiting for its certificate is known by
+        its request's key, and completed the way the dedicated upload
+        completes it, not patched in place nor refused as ambiguous."""
+        import base64, uuid
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+        from models import CA
+        from security.encryption import encrypt_private_key
+        from services.import_service import extract_cert_info
+        cn = f"Pending Homonym CA {path.split('/')[3]}"
+        k1 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        k2 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        ext_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'External Root 347')])
+        ext_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        id1, crt1 = self._store(app, CA, self._cert(cn, k1, ca=True), k1, serial=0)
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+        csr = x509.CertificateSigningRequestBuilder().subject_name(name).sign(k2, hashes.SHA256())
+        signed = self._cert(cn, k2, issuer=ext_name, signer=ext_key, ca=True)
+        kpem = k2.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                serialization.NoEncryption())
+        with app.app_context():
+            from models import db
+            row = CA(refid=str(uuid.uuid4()), descr=cn, crt='', serial=0,
+                     csr=base64.b64encode(csr.public_bytes(serialization.Encoding.PEM)).decode(),
+                     prv=encrypt_private_key(base64.b64encode(kpem).decode()),
+                     subject=extract_cert_info(signed)['subject'], imported_from='external_csr')
+            db.session.add(row); db.session.commit(); id2 = row.id
+        r = self._import(auth_client, signed, path)
+        assert r.status_code == 200, r.data
+        body = json.loads(r.data)
+        assert body['data']['id'] == id2 and body['data']['has_private_key'] is True
+        assert 'installed' in body['message']
+        assert self._state(app, CA, id1) == (crt1, True)
+        with app.app_context():
+            from models import db
+            db.session.expire_all()
+            row = db.session.get(CA, id2)
+            assert row.crt and not row.is_pending
+            assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == signed.serial_number

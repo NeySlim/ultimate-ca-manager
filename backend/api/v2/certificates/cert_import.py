@@ -15,7 +15,7 @@ from utils.cert_issuer import private_key_matches, stored_private_key_matches, h
 from services.import_service import (
     parse_certificate_file, is_ca_certificate, extract_cert_info,
     find_existing_ca, find_existing_certificate, find_pending_csr_for_certificate,
-    AmbiguousImportTarget,
+    AmbiguousImportTarget, install_on_pending_ca,
     serialize_cert_to_pem, serialize_key_to_pem
 )
 from services.cert_service import CertificateService
@@ -129,6 +129,20 @@ def import_certificate():
                         f'CA with subject "{cert_info["cn"]}" already exists (ID: {existing_ca.id})',
                         409
                     )
+
+                if existing_ca.is_pending:
+                    # A CA still waiting for its certificate is completed the way
+                    # the dedicated upload completes it, not patched in place
+                    username = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
+                    try:
+                        ca_dict, warnings = install_on_pending_ca(existing_ca, cert_pem, username)
+                    except ValueError as e:
+                        db.session.rollback()
+                        return error_response(str(e), 400)
+                    message = f'CA "{ca_dict["descr"]}" certificate installed'
+                    if warnings:
+                        message += '; ' + '; '.join(warnings)
+                    return success_response(data={**ca_dict, 'warnings': warnings}, message=message)
 
                 # Decide what becomes of the stored key before touching the record:
                 # the HSM lookup may commit its public key cache, and a record already
