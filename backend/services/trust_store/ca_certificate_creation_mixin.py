@@ -19,6 +19,7 @@ from utils.ca_profile import (
 )
 from .constants import HASH_ALGORITHMS
 from .constraints_mixin import ConstraintsMixin
+from utils.key_codec import private_key_to_pem
 
 
 class CACertificateCreationMixin:
@@ -240,10 +241,6 @@ class CACertificateCreationMixin:
         if is_hsm_private_key(private_key):
             key_pem = None
         else:
-            key_pem = private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption()
-            )
+            key_pem = private_key_to_pem(private_key)
 
         return cert_pem, key_pem

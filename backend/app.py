@@ -25,6 +25,7 @@ from config.https_manager import HTTPSManager
 from models import db, User, SystemConfig
 from websocket import socketio, init_websocket
 from utils.datetime_utils import utc_now
+from utils.key_codec import private_key_to_pem
 
 # Initialize cache globally
 cache = Cache()
@@ -1476,11 +1477,7 @@ def init_database(app):
             
             # Write cert and key
             https_cert_path.write_bytes(certificate.public_bytes(serialization.Encoding.PEM))
-            https_key_path.write_bytes(private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption()
-            ))
+            https_key_path.write_bytes(private_key_to_pem(private_key))
             
             # Set permissions
             os.chmod(https_key_path, 0o600)

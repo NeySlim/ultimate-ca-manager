@@ -868,10 +868,16 @@ class OCSPService:
             
             # Sign response (with CA key or delegated responder key)
             # For delegated responder, include responder cert chain
-            if use_delegated:
-                response = builder.sign(signing_key, hashes.SHA256())
-            else:
-                response = builder.sign(signing_key, hashes.SHA256())
+            # Ed25519/Ed448 take no digest choice; the multi-response path
+            # already knew that, this one handed them SHA-256 and every answer
+            # from such a responder came back as an error (#347 review)
+            signing_public = signing_key.public_key()
+            sign_algorithm = (
+                None
+                if isinstance(signing_public, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey))
+                else hashes.SHA256()
+            )
+            response = builder.sign(signing_key, sign_algorithm)
             response_der = response.public_bytes(serialization.Encoding.DER)
             
             # Cache response — key includes the hash algorithm because a SHA-1

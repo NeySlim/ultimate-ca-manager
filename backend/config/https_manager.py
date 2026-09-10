@@ -14,6 +14,7 @@ import socket
 import ipaddress
 import logging
 from utils.datetime_utils import utc_now
+from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
 
@@ -123,11 +124,7 @@ class HTTPSManager:
         # Write private key
         key_path.parent.mkdir(parents=True, exist_ok=True)
         with open(key_path, "wb") as f:
-            f.write(private_key.private_bytes(
-                encoding=serialization.Encoding.PEM,
-                format=serialization.PrivateFormat.TraditionalOpenSSL,
-                encryption_algorithm=serialization.NoEncryption()
-            ))
+            f.write(private_key_to_pem(private_key))
         key_path.chmod(0o600)
         
         # Write certificate

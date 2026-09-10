@@ -13,7 +13,7 @@ from auth.unified import require_auth
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
-from utils.cert_issuer import private_key_matches
+from utils.cert_issuer import private_key_matches, stored_private_key_matches
 from services.import_service import (
     parse_certificate_file, extract_cert_info, find_existing_ca,
     serialize_cert_to_pem, serialize_key_to_pem
@@ -108,8 +108,15 @@ def import_ca():
             # Update existing CA
             existing_ca.descr = name or cert_info['cn'] or existing_ca.descr
             existing_ca.crt = base64.b64encode(cert_pem).decode('utf-8')
+            key_dropped = False
             if key_pem:
                 existing_ca.prv = encrypted_prv
+            elif stored_private_key_matches(existing_ca.prv, cert, context=f"CA {existing_ca.id}") is False:
+                # The new certificate is not the stored key's: keeping the key
+                # would leave a pair that signs nothing verifiable (re-keyed
+                # certificate imported without its key, #347 review)
+                existing_ca.prv = None
+                key_dropped = True
             existing_ca.issuer = cert_info['issuer']
             existing_ca.valid_from = cert_info['valid_from']
             existing_ca.valid_to = cert_info['valid_to']
@@ -126,10 +133,10 @@ def import_ca():
                 success=True
             )
 
-            return success_response(
-                data=existing_ca.to_dict(),
-                message=f'CA "{existing_ca.descr}" updated (already existed)'
-            )
+            message = f'CA "{existing_ca.descr}" updated (already existed)'
+            if key_dropped:
+                message += '; the stored private key did not match the new certificate and was removed'
+            return success_response(data=existing_ca.to_dict(), message=message)
 
         # Create new CA record
         refid = str(uuid.uuid4())

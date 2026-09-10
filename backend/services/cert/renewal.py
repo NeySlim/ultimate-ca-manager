@@ -46,6 +46,7 @@ from utils.datetime_utils import utc_now
 from utils.db_transaction import commit_or_rollback
 from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
+from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
 
@@ -393,11 +394,7 @@ def renew_certificate_in_place(
     new_cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
     new_key_pem = None
     if rekey:
-        new_key_pem = new_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption(),
-        ).decode('utf-8')
+        new_key_pem = private_key_to_pem(new_key).decode('utf-8')
 
     cert_id = cert.id
     old_serial = cert.serial_number

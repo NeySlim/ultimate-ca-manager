@@ -12,6 +12,7 @@ from cryptography.x509 import load_pem_x509_certificate
 from services.audit_service import AuditService
 from security.encryption import encrypt_private_key
 from . import bp
+from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
 
@@ -94,11 +95,7 @@ def upload_private_key(cert_id):
                 return error_response('Failed to verify key matches certificate', 400)
 
         # Store key (decrypt if needed, re-encode without password)
-        unencrypted_key = private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption()
-        )
+        unencrypted_key = private_key_to_pem(private_key)
 
         # Encrypt with our key encryption if configured
         key_encoded = base64.b64encode(unencrypted_key).decode('utf-8')

@@ -19,6 +19,7 @@ from utils.leaf_key_usage import key_usage_for_key
 from services.audit_service import AuditService
 from security.encryption import encrypt_private_key
 from services.template_service import compute_template_overrides
+from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
 
@@ -344,7 +345,7 @@ def _issue_approved_certificate(approval):
         sign_hash = HASH_ALGORITHMS.get(template.digest.lower().strip(), hashes.SHA256())
     new_cert = builder.sign(ca_key, sign_hash, default_backend())
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
-    key_pem = new_key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL, serialization.NoEncryption()).decode('utf-8')
+    key_pem = private_key_to_pem(new_key).decode('utf-8')
     
     # Extract SKI/AKI
     cert_ski, cert_aki = None, None

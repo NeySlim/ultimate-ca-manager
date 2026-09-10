@@ -6,6 +6,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 import re
 import base64
+from utils.key_codec import private_key_to_pem
 
 
 def parse_certificate_file(file_data, filename, password=None, import_key=True):
@@ -243,8 +244,4 @@ def serialize_key_to_pem(private_key):
     """Serialize private key to PEM format (unencrypted)"""
     if not private_key:
         return None
-    return private_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption()
-    )
+    return private_key_to_pem(private_key)

@@ -21,6 +21,7 @@ from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
+from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
 
@@ -183,11 +184,7 @@ def regenerate_https_cert():
 
         # Write new cert and key
         cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
-        key_path.write_bytes(private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption()
-        ))
+        key_path.write_bytes(private_key_to_pem(private_key))
         os.chmod(key_path, 0o600)
 
         # Set ownership to the ucm service user (POSIX only; skipped elsewhere / if absent)

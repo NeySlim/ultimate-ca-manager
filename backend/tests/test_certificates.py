@@ -1418,3 +1418,99 @@ class TestImportRefusesForeignKey:
         r = auth_client.post('/api/v2/cas/import', data={'pem_content': bad}, content_type='multipart/form-data')
         assert r.status_code == 400, r.data
         assert 'does not match' in json.loads(r.data)['message']
+
+
+class TestUpdateExistingKeepsOnlyAMatchingKey:
+    """Fifth review of #347: re-importing a re-keyed certificate without its
+    key must not leave the old key next to it."""
+
+    @staticmethod
+    def _pair(cn, ca=False, key=None):
+        from datetime import datetime, timedelta, timezone
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+        key = key or rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+        now = datetime.now(timezone.utc)
+        b = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+             .public_key(key.public_key()).serial_number(x509.random_serial_number())
+             .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30)))
+        if ca:
+            b = b.add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        cert = b.sign(key, hashes.SHA256())
+        cpem = cert.public_bytes(serialization.Encoding.PEM).decode()
+        kpem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL,
+                                 serialization.NoEncryption()).decode()
+        return cpem, kpem, key
+
+    def _import(self, auth_client, pem, path=None):
+        return auth_client.post(path or f'{BASE}/import', data={'pem_content': pem},
+                                content_type='multipart/form-data')
+
+    def test_rekeyed_certificate_drops_the_stale_key(self, auth_client):
+        cpem, kpem, _ = self._pair('rekey-cert.example.com')
+        r = self._import(auth_client, cpem + kpem)
+        assert r.status_code in (200, 201), r.data
+        first = json.loads(r.data)['data']; assert first['has_private_key'] is True
+        # A new certificate, same subject and issuer, new key, imported alone
+        cpem2, _, _ = self._pair('rekey-cert.example.com')
+        r = self._import(auth_client, cpem2)
+        assert r.status_code == 200, r.data
+        body = json.loads(r.data)
+        assert body['data']['id'] == first['id']
+        assert body['data']['has_private_key'] is False
+        assert 'did not match' in body['message']
+
+    def test_same_key_certificate_keeps_the_key(self, auth_client):
+        cpem, kpem, key = self._pair('samekey-cert.example.com')
+        r = self._import(auth_client, cpem + kpem); first = json.loads(r.data)['data']
+        cpem2, _, _ = self._pair('samekey-cert.example.com', key=key)   # renewed, same key
+        r = self._import(auth_client, cpem2)
+        body = json.loads(r.data)
+        assert body['data']['id'] == first['id']
+        assert body['data']['has_private_key'] is True
+        assert 'did not match' not in body['message']
+
+    def test_rekeyed_ca_drops_the_stale_key(self, auth_client):
+        cpem, kpem, _ = self._pair('Rekey CA', ca=True)
+        r = self._import(auth_client, cpem + kpem, '/api/v2/cas/import')
+        assert r.status_code in (200, 201), r.data
+        first = json.loads(r.data)['data']; assert first['has_private_key'] is True
+        cpem2, _, _ = self._pair('Rekey CA', ca=True)
+        r = self._import(auth_client, cpem2, '/api/v2/cas/import')
+        assert r.status_code == 200, r.data
+        body = json.loads(r.data)
+        assert body['data']['id'] == first['id']
+        assert body['data']['has_private_key'] is False
+        assert 'did not match' in body['message']
+
+
+class TestEd25519KeyImport:
+    """A certificate with an Ed25519 key imports like any other (#347 review):
+    such keys have no traditional OpenSSL form and were refused as invalid."""
+
+    def test_import_certificate_with_ed25519_key(self, auth_client):
+        from datetime import datetime, timedelta, timezone
+        from cryptography import x509
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ed25519
+        from cryptography.x509.oid import NameOID
+        key = ed25519.Ed25519PrivateKey.generate()
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'ed25519-import.example.com')])
+        now = datetime.now(timezone.utc)
+        cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+                .serial_number(x509.random_serial_number()).not_valid_before(now - timedelta(days=1))
+                .not_valid_after(now + timedelta(days=30)).sign(key, None))
+        pem = cert.public_bytes(serialization.Encoding.PEM) + key.private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+        r = auth_client.post(f'{BASE}/import', data={'pem_content': pem.decode()}, content_type='multipart/form-data')
+        assert r.status_code in (200, 201), r.data
+        data = json.loads(r.data)['data']
+        assert data['has_private_key'] is True
+        # and the stored key is usable: export it back
+        r = auth_client.get(f"{BASE}/{data['id']}/export?format=key")
+        assert r.status_code == 200, r.data
+        loaded = serialization.load_pem_private_key(r.data, password=None)
+        assert isinstance(loaded, ed25519.Ed25519PrivateKey)

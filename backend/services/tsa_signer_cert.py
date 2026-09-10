@@ -33,6 +33,7 @@ from services.trust_store.constraints_mixin import validate_name_constraints
 from utils.datetime_utils import cert_not_before, utc_now
 from utils.db_transaction import safe_commit
 from utils.key_type import parse_issue_key_type
+from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
 
@@ -237,11 +238,7 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
     new_cert = builder.sign(ca_key, sign_hash, default_backend())
 
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
-    key_pem = new_key.private_bytes(
-        encoding=serialization.Encoding.PEM,
-        format=serialization.PrivateFormat.TraditionalOpenSSL,
-        encryption_algorithm=serialization.NoEncryption(),
-    ).decode('utf-8')
+    key_pem = private_key_to_pem(new_key).decode('utf-8')
 
     ski = aki = None
     try:

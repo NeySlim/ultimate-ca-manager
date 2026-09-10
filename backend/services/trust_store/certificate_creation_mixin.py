@@ -17,6 +17,7 @@ from utils.leaf_key_usage import key_usage_for_key
 from .constants import HASH_ALGORITHMS
 from .constraints_mixin import ConstraintsMixin
 from .key_operations_mixin import KeyOperationsMixin
+from utils.key_codec import private_key_to_pem
 
 
 class CertificateCreationMixin:
@@ -227,10 +228,6 @@ class CertificateCreationMixin:
 
         # Serialize
         cert_pem = certificate.public_bytes(serialization.Encoding.PEM)
-        key_pem = private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption()
-        )
+        key_pem = private_key_to_pem(private_key)
 
         return cert_pem, key_pem

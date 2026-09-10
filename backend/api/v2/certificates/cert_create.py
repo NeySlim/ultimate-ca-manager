@@ -27,6 +27,7 @@ from websocket.emitters import on_certificate_issued
 from utils.datetime_utils import utc_now, utc_isoformat, cert_not_before
 from utils.db_transaction import safe_commit
 from . import bp
+from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
 
@@ -527,11 +528,7 @@ def create_certificate():
 
         # Serialize
         cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
-        key_pem = new_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption()
-        ).decode('utf-8')
+        key_pem = private_key_to_pem(new_key).decode('utf-8')
 
         # Save to database
         # Extract SKI/AKI from issued cert

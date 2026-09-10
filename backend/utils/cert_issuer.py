@@ -90,3 +90,22 @@ def private_key_matches(private_key, cert: x509.Certificate) -> bool:
         return spki(private_key.public_key()) == spki(cert.public_key())
     except Exception:
         return False
+
+
+def stored_private_key_matches(prv_column, cert: x509.Certificate, *, context: str = 'record'):
+    """Whether the key stored in *prv_column* is *cert*'s key.
+
+    None when the column holds no key. A stored key that cannot be loaded
+    counts as not matching: keeping it next to a certificate it may not
+    belong to is the failure this guards against (#347 review).
+    """
+    if not prv_column:
+        return None
+    try:
+        from cryptography.hazmat.primitives import serialization
+        from utils.key_codec import load_pem_bytes
+        pem = load_pem_bytes(prv_column, context=context)
+        key = serialization.load_pem_private_key(pem, password=None)
+    except Exception:
+        return False
+    return private_key_matches(key, cert)

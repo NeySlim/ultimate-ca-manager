@@ -18,6 +18,7 @@ from utils.leaf_key_usage import constrain_builder_key_usage
 from .constants import HASH_ALGORITHMS
 from .key_operations_mixin import KeyOperationsMixin
 from .constraints_mixin import ConstraintsMixin
+from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
 
@@ -494,11 +495,7 @@ class CSROperationsMixin:
 
         # Serialize
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)
-        key_pem = private_key.private_bytes(
-            encoding=serialization.Encoding.PEM,
-            format=serialization.PrivateFormat.TraditionalOpenSSL,
-            encryption_algorithm=serialization.NoEncryption()
-        )
+        key_pem = private_key_to_pem(private_key)
 
         return csr_pem, key_pem
 

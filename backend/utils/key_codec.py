@@ -104,3 +104,27 @@ def store_pem_bytes(pem_bytes: Union[str, bytes]) -> str:
 
 
 __all__ = ['load_pem_bytes', 'store_pem_bytes']
+
+
+def private_key_to_pem(private_key) -> bytes:
+    """Unencrypted PEM for a private key of any type UCM handles.
+
+    RSA, EC and DSA keys keep the OpenSSL "traditional" form every existing
+    consumer reads; Ed25519 and Ed448 have no such form and are written as
+    PKCS#8, which load_pem_private_key reads the same way. Serialising them
+    as traditional raised "format is invalid with this key" and turned an
+    import of such a key into a generic refusal (#347 review).
+    """
+    from cryptography.hazmat.primitives import serialization
+    try:
+        return private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.TraditionalOpenSSL,
+            encryption_algorithm=serialization.NoEncryption(),
+        )
+    except ValueError:
+        return private_key.private_bytes(
+            encoding=serialization.Encoding.PEM,
+            format=serialization.PrivateFormat.PKCS8,
+            encryption_algorithm=serialization.NoEncryption(),
+        )

@@ -11,7 +11,7 @@ from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from models import Certificate, CA, db
 from services.audit_service import AuditService
-from utils.cert_issuer import private_key_matches
+from utils.cert_issuer import private_key_matches, stored_private_key_matches
 from services.import_service import (
     parse_certificate_file, is_ca_certificate, extract_cert_info,
     find_existing_ca, find_existing_certificate, find_pending_csr_for_certificate,
@@ -129,8 +129,14 @@ def import_certificate():
                 # Update existing CA
                 existing_ca.descr = name or cert_info['cn'] or existing_ca.descr
                 existing_ca.crt = base64.b64encode(cert_pem).decode('utf-8')
+                key_dropped = False
                 if key_pem:
                     existing_ca.prv = encrypted_prv
+                elif stored_private_key_matches(existing_ca.prv, cert, context=f"CA {existing_ca.id}") is False:
+                    # A re-keyed certificate imported without its key: the
+                    # stored key is not this certificate's (#347 review)
+                    existing_ca.prv = None
+                    key_dropped = True
                 existing_ca.issuer = cert_info['issuer']
                 existing_ca.valid_from = cert_info['valid_from']
                 existing_ca.valid_to = cert_info['valid_to']
@@ -149,10 +155,10 @@ def import_certificate():
                     success=True
                 )
 
-                return success_response(
-                    data=existing_ca.to_dict(),
-                    message=f'CA certificate "{existing_ca.descr}" updated (already existed)'
-                )
+                message = f'CA certificate "{existing_ca.descr}" updated (already existed)'
+                if key_dropped:
+                    message += '; the stored private key did not match the new certificate and was removed'
+                return success_response(data=existing_ca.to_dict(), message=message)
 
             # Create new CA
             refid = str(uuid.uuid4())
@@ -228,8 +234,12 @@ def import_certificate():
             first_san = (cert_info.get('san_dns') or [None])[0]
             existing_cert.descr = name or cert_info['cn'] or first_san or existing_cert.descr
             existing_cert.crt = base64.b64encode(cert_pem).decode('utf-8')
+            key_dropped = False
             if key_pem:
                 existing_cert.prv = encrypted_prv
+            elif stored_private_key_matches(existing_cert.prv, cert, context=f"certificate {existing_cert.id}") is False:
+                existing_cert.prv = None
+                key_dropped = True
             existing_cert.valid_from = cert_info['valid_from']
             existing_cert.valid_to = cert_info['valid_to']
             existing_cert.aki = cert_info.get('aki')
@@ -263,10 +273,10 @@ def import_certificate():
                 success=True
             )
 
-            return success_response(
-                data=existing_cert.to_dict(),
-                message=f'Certificate "{existing_cert.descr}" updated (already existed)'
-            )
+            message = f'Certificate "{existing_cert.descr}" updated (already existed)'
+            if key_dropped:
+                message += '; the stored private key did not match the new certificate and was removed'
+            return success_response(data=existing_cert.to_dict(), message=message)
 
         # Regular certificate - find parent CA
         caref = _resolve_caref(ca_id, cert_info)
