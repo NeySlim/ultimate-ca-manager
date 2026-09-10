@@ -7,7 +7,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [Unreleased]
+## [2.227] - 2026-09-10
 
 ### Added
 - A CA that holds only its certificate, as one created by signing an external CA request (a Windows sub-CA signed by a UCM root), is flagged as such in the list and its details, and its private key can be imported afterwards (`POST /api/v2/cas/<id>/key`, key checked against the certificate) so it can sign; taking it offline is refused until then (#348, reported by @j2r2k2)
