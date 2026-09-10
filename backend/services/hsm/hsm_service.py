@@ -435,9 +435,11 @@ class HsmService:
             with hsm:
                 pem = hsm.get_public_key(key.key_identifier)
             
-            # Cache it
+            # Cache it. Flushed, not committed: the lookup runs inside the
+            # caller's transaction (issuance, import) and a commit here would
+            # persist that caller's half-done work (self-review of #347)
             key.public_key_pem = pem
-            db.session.commit()
+            db.session.flush()
             
             return pem
             

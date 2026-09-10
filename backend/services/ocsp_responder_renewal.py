@@ -7,8 +7,9 @@ action (issue #226 follow-up).
 
 The renewal reuses the responder's existing key pair and copies the old
 certificate's extensions verbatim (KU, OCSPSigning EKU, id-pkix-ocsp-nocheck),
-so the renewed certificate always passes the delegated-responder checks in
-OCSPService._get_delegated_responder.
+so the renewed certificate always passes the delegated-responder rule,
+OCSPService.check_delegated_responder; a responder issued before the
+extension was emitted gets it here.
 """
 import base64
 import logging
@@ -199,6 +200,12 @@ def run_ocsp_responder_renewal():
                 ),
             ))
             db.session.commit()
+            # The CA's cached answers embed the old responder certificate
+            try:
+                from services.ocsp_service import OCSPService
+                OCSPService.invalidate_ca_cache(ca_id)
+            except Exception as e:
+                logger.warning("OCSP cache not dropped for CA %s after responder renewal: %s", ca_id, e)
             stats['renewed'] += 1
             logger.info(
                 "OCSP responder renewed for CA %s: cert %s -> %s",

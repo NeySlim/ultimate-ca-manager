@@ -20,7 +20,9 @@ from services.audit_service import AuditService
 from security.encryption import encrypt_private_key
 from services.template_service import compute_template_overrides
 from utils.key_codec import private_key_to_pem
-from utils.eku_validation import add_ocsp_nocheck_if_responder
+from utils.eku_validation import (add_ocsp_nocheck_if_responder, normalize_extra_ekus,
+                                  to_object_identifiers, merge_eku_lists)
+from utils.cert_profiles import profile_for
 
 logger = logging.getLogger(__name__)
 
@@ -243,16 +245,11 @@ def _issue_approved_certificate(approval):
         'crlsign': 'crl_sign',
     }
 
-    if cert_type == 'client':
-        ku_flags = dict(digital_signature=True, key_encipherment=False, content_commitment=False,
-            data_encipherment=False, key_agreement=False, key_cert_sign=False, crl_sign=False, encipher_only=False, decipher_only=False)
-        base_ekus = [ExtendedKeyUsageOID.CLIENT_AUTH]
-    else:
-        ku_flags = dict(digital_signature=True, key_encipherment=True, content_commitment=False,
-            data_encipherment=False, key_agreement=False, key_cert_sign=False, crl_sign=False, encipher_only=False, decipher_only=False)
-        base_ekus = [ExtendedKeyUsageOID.SERVER_AUTH]
-        if cert_type == 'combined':
-            base_ekus.append(ExtendedKeyUsageOID.CLIENT_AUTH)
+    # The same profiles as the direct issue path, so an approved request
+    # yields the certificate the requester asked for (self-review of #347)
+    profile = profile_for(cert_type)
+    ku_flags = profile['ku']
+    base_ekus = profile['eku']
 
     tpl_ku = tpl_ext.get('key_usage')
     if isinstance(tpl_ku, list) and tpl_ku:
@@ -266,11 +263,16 @@ def _issue_approved_certificate(approval):
 
     tpl_eku = tpl_ext.get('extended_key_usage')
     if isinstance(tpl_eku, list) and tpl_eku:
-        from utils.eku_validation import normalize_extra_ekus, to_object_identifiers
         tpl_oid_strs, tpl_err = normalize_extra_ekus(tpl_eku)
         if tpl_err:
             raise ValueError(f'Invalid template EKUs: {tpl_err}')
         base_ekus = to_object_identifiers(tpl_oid_strs)
+
+    # extra_ekus of the request, merged on top like the direct path does
+    extra_oid_strs, extra_err = normalize_extra_ekus(data.get('extra_ekus'))
+    if extra_err:
+        raise ValueError(f'Invalid extra_ekus: {extra_err}')
+    base_ekus = merge_eku_lists(base_ekus, to_object_identifiers(extra_oid_strs))
 
     # Same key-type clamp as the direct issue path (#327): no keyEncipherment
     # on an EC key, keyAgreement instead for an S/MIME one.
@@ -398,7 +400,8 @@ def _issue_approved_certificate(approval):
     )
     db.session.add(db_cert)
     
-    # Link approval to issued cert
+    # Link approval to issued cert: the id exists only once flushed
+    db.session.flush()
     approval.certificate_id = db_cert.id
     ok, _err = safe_commit(logger, "Failed to link approval to certificate")
     if not ok:

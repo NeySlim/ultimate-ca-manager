@@ -11,6 +11,7 @@ from utils.response import success_response, error_response, created_response
 from utils.dn_validation import validate_dn_field
 from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 from utils.eku_validation import add_ocsp_nocheck_if_responder
+from utils.cert_profiles import profile_for
 from utils.leaf_key_usage import key_usage_for_key
 from models import Certificate, CertificateTemplate, CA, db
 from services.trust_store.constants import HASH_ALGORITHMS
@@ -25,6 +26,11 @@ from services.audit_service import AuditService
 from services.notification_service import NotificationService
 from websocket.emitters import on_certificate_issued
 from utils.datetime_utils import utc_now, utc_isoformat, cert_not_before
+try:
+    from security.encryption import encrypt_private_key
+except ImportError:  # pragma: no cover
+    def encrypt_private_key(data):
+        return data
 from utils.db_transaction import safe_commit
 from . import bp
 from utils.key_codec import private_key_to_pem
@@ -265,48 +271,7 @@ def create_certificate():
         # Key Usage & Extended Key Usage based on cert_type
         cert_type = data.get('cert_type', 'server')
 
-        # Define profiles for each certificate type
-        cert_profiles = {
-            'server': {
-                'ku': dict(digital_signature=True, key_encipherment=True, content_commitment=False,
-                           data_encipherment=False, key_agreement=False, key_cert_sign=False,
-                           crl_sign=False, encipher_only=False, decipher_only=False),
-                'eku': [ExtendedKeyUsageOID.SERVER_AUTH],
-            },
-            'client': {
-                'ku': dict(digital_signature=True, key_encipherment=False, content_commitment=False,
-                           data_encipherment=False, key_agreement=False, key_cert_sign=False,
-                           crl_sign=False, encipher_only=False, decipher_only=False),
-                'eku': [ExtendedKeyUsageOID.CLIENT_AUTH],
-            },
-            'combined': {
-                'ku': dict(digital_signature=True, key_encipherment=True, content_commitment=False,
-                           data_encipherment=False, key_agreement=False, key_cert_sign=False,
-                           crl_sign=False, encipher_only=False, decipher_only=False),
-                'eku': [ExtendedKeyUsageOID.SERVER_AUTH, ExtendedKeyUsageOID.CLIENT_AUTH],
-            },
-            'code_signing': {
-                'ku': dict(digital_signature=True, key_encipherment=False, content_commitment=False,
-                           data_encipherment=False, key_agreement=False, key_cert_sign=False,
-                           crl_sign=False, encipher_only=False, decipher_only=False),
-                'eku': [ExtendedKeyUsageOID.CODE_SIGNING],
-            },
-            'email': {
-                'ku': dict(digital_signature=True, key_encipherment=True, content_commitment=True,
-                           data_encipherment=False, key_agreement=False, key_cert_sign=False,
-                           crl_sign=False, encipher_only=False, decipher_only=False),
-                'eku': [ExtendedKeyUsageOID.EMAIL_PROTECTION],
-            },
-            # No implied EKU: only extra_ekus / template EKUs end up in the cert
-            'custom': {
-                'ku': dict(digital_signature=True, key_encipherment=False, content_commitment=False,
-                           data_encipherment=False, key_agreement=False, key_cert_sign=False,
-                           crl_sign=False, encipher_only=False, decipher_only=False),
-                'eku': [],
-            },
-        }
-
-        profile = cert_profiles.get(cert_type, cert_profiles['server'])
+        profile = profile_for(cert_type)
 
         # When issuing from a template, its extensions_template overrides the
         # cert_type profile for KU/EKU (issue #226) — the template is the
@@ -551,7 +516,7 @@ def create_certificate():
             descr=data.get('description') or data['cn'] or (final_san_dns[0] if final_san_dns else ''),
             caref=ca.refid,
             crt=base64.b64encode(cert_pem.encode()).decode(),
-            prv=base64.b64encode(key_pem.encode()).decode(),
+            prv=encrypt_private_key(base64.b64encode(key_pem.encode()).decode()),
             cert_type=cert_type,
             subject=new_cert.subject.rfc4514_string(),
             issuer=new_cert.issuer.rfc4514_string(),

@@ -44,7 +44,11 @@ def get_ocsp_responder(ca_id):
         'serial_number': cert.serial_number,
         'valid_to': utc_isoformat(cert.valid_to),
         'issuer_name': cert.issuer_name,
-        'revoked': cert.revoked
+        'revoked': cert.revoked,
+        # Why the responder would be refused at answer time, if it would:
+        # a configured responder can stop passing the rule (expiry, hold,
+        # unreadable key) and the CA then signs itself
+        'refusal_reason': OCSPService().check_delegated_responder(ca, cert),
     }})
 
 
@@ -139,7 +143,11 @@ def delete_ocsp_responder(ca_id):
 @require_auth(['read:cas'])
 def list_eligible_ocsp_responders(ca_id):
     """List certificates eligible as OCSP delegated responder for a CA.
-    Eligible = issued by this CA, has OCSPSigning EKU, has private key, not revoked/expired.
+
+    Eligible = passes OCSPService.check_delegated_responder: issued and
+    signed by this CA, currently valid, not revoked, OCSPSigning EKU, a Key
+    Usage permitting digitalSignature, id-pkix-ocsp-nocheck, and a readable
+    private key that is the certificate's own.
     """
     ca = db.session.get(CA, ca_id)
     if not ca:

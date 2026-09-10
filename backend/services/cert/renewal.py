@@ -455,6 +455,16 @@ def renew_certificate_in_place(
 
     _write_cert_files(cert, new_cert_pem, new_key_pem)
 
+    # A renewed delegated responder signs with a new certificate: the answers
+    # cached under the old one would be served, old certificate embedded,
+    # until they expired (self-review of #347)
+    try:
+        from services.ocsp_service import OCSPService
+        for bound_ca_id in OCSPService.responder_cas_for_certificate(cert.id):
+            OCSPService.invalidate_ca_cache(bound_ca_id)
+    except Exception as e:
+        logger.warning(f"OCSP cache not dropped after renewing certificate {cert.id}: {e}")
+
     # The old serial is now superseded; cached OCSP responses still say "good".
     try:
         OCSPService.invalidate_cached_responses(old_serial, ca_id=ca.id)

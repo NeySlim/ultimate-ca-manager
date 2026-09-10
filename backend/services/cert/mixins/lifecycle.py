@@ -575,6 +575,14 @@ class LifecycleMixin:
             from services.audit_service import AuditService
             AuditService.log_certificate('cert_deleted', certificate, f'Deleted certificate: {certificate.descr}')
 
+        # A responder binding must not outlive its certificate: the next
+        # certificate to reuse the id would become the responder unseen
+        # (self-review of #347)
+        from services.ocsp_service import OCSPService
+        for bound_ca_id in OCSPService.responder_cas_for_certificate(cert_id):
+            SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{bound_ca_id}').delete()
+            OCSPService.invalidate_ca_cache(bound_ca_id)
+
         # Delete from database
         try:
             db.session.delete(certificate)

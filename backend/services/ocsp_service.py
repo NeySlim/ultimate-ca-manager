@@ -62,55 +62,58 @@ class ParsedOCSPRequest:
     has_unsupported_critical_extension: bool
 
 
-class _HsmPrivateKeyWrapper:
-    """
-    Wraps an HSM key to work with cryptography's builder.sign() API.
-    Delegates actual signing to the HSM provider.
-    """
-    
-    def __init__(self, hsm_key_id: int, public_key):
-        self._hsm_key_id = hsm_key_id
-        self._public_key = public_key
-        self.key_size = getattr(public_key, 'key_size', 2048)
-    
-    def sign(self, data: bytes, signature_algorithm, algorithm=None):
-        """Sign data via HSM — compatible with cryptography's private key interface"""
-        from services.hsm.hsm_signer import sign_with_hsm
-        
-        # For EC keys, the cryptography lib passes (data, ECDSA(hash))
-        # For RSA keys, it passes (data, PKCS1v15(), hash)
-        if isinstance(signature_algorithm, ec.ECDSA):
-            return sign_with_hsm(data, self._hsm_key_id)
-        elif isinstance(signature_algorithm, padding.PKCS1v15):
-            return sign_with_hsm(data, self._hsm_key_id)
-        else:
-            return sign_with_hsm(data, self._hsm_key_id)
-    
-    def public_key(self):
-        return self._public_key
-
 # Map revoke_reason strings to X.509 ReasonFlags
+def _record_holds_serial(record, cert_serial: int):
+    """Whether the certificate a record stores carries *cert_serial*: True,
+    False, or None when the record holds no readable certificate.
+
+    The serial_number column mixes decimal and hexadecimal writers, and the
+    lookup by variants cannot tell "10" (decimal ten) from "10" (hex sixteen);
+    the stored certificate can (self-review of #347)."""
+    if not record.crt:
+        return None
+    try:
+        return x509.load_pem_x509_certificate(base64.b64decode(record.crt)).serial_number == cert_serial
+    except Exception:
+        return None
+
+
 def _child_ca_for_serial(issuer: CA, cert_serial: int, variants) -> Optional[CA]:
     """The CA signed by *issuer* whose certificate carries *cert_serial*.
 
     The serial_number column is filled at creation since 2.226; older rows
     (and imports) may have it empty, so the children's certificates are
-    parsed when the column does not match."""
-    child = CA.query.filter(
+    parsed when the column does not match. A child whose caref no longer
+    names its real issuer (renewed or cross-signed under another record) is
+    found by its certificate: same serial, issued by and verifying against
+    this issuer, as revocation resolves the issuer (self-review of #347)."""
+    for child in CA.query.filter(
         CA.caref == issuer.refid,
         CA.serial_number.in_(variants),
-    ).first()
-    if child is not None:
-        return child
-    for candidate in CA.query.filter(CA.caref == issuer.refid).all():
+    ).all():
+        if _record_holds_serial(child, cert_serial) is not False:
+            return child
+    try:
+        issuer_cert = x509.load_pem_x509_certificate(base64.b64decode(issuer.crt))
+    except Exception:
+        return None
+    from utils.cert_issuer import certificate_signed_by
+    for candidate in CA.query.filter(CA.id != issuer.id).all():
         if not candidate.crt:
             continue
         try:
             cert = x509.load_pem_x509_certificate(base64.b64decode(candidate.crt))
         except Exception:
             continue
-        if cert.serial_number == cert_serial:
+        if cert.serial_number != cert_serial or cert.issuer != issuer_cert.subject:
+            continue
+        if candidate.caref == issuer.refid:
             return candidate
+        try:
+            if certificate_signed_by(cert, issuer_cert):
+                return candidate
+        except Exception:
+            continue
     return None
 
 
@@ -279,51 +282,45 @@ class OCSPService:
         # Signing-freeze invariant: an offline CA never signs with its own key
         # — a password-protected offline CA still holds an (encrypted) key,
         # but using it is exactly what taking the CA offline forbids.
+        # A configured responder that failed the rule is named in the message:
+        # "no delegated responder" alone misdescribed that state
+        refused = getattr(self, '_refusal_reason', None)
+        responder_state = (
+            f"its delegated responder was refused ({refused})" if refused
+            else "has no delegated responder"
+        )
         if ca.offline:
             raise OCSPSigningUnavailable(
-                f"CA {ca.descr} is offline and has no delegated responder"
+                f"CA {ca.descr} is offline and {responder_state}"
             )
         if not ca.has_private_key:
             raise OCSPSigningUnavailable(
-                f"CA {ca.descr} has no private key and no delegated responder"
+                f"CA {ca.descr} has no private key and {responder_state}"
             )
         return ca_cert, self._load_ca_key(ca), False
 
     def _load_ca_key(self, ca: CA):
-        """Load CA private key, supporting both local and HSM storage"""
-        if ca.uses_hsm:
-            try:
-                from services.hsm import HsmService
-                from services.hsm.hsm_signer import get_hsm_public_key
-                # Get public key to determine algorithm, then create a wrapper
-                pub_pem = get_hsm_public_key(ca.hsm_key_id)
-                pub_key = serialization.load_pem_public_key(
-                    pub_pem.encode() if isinstance(pub_pem, str) else pub_pem,
-                    backend=self.backend
-                )
-                # Return an HSM signing wrapper
-                return _HsmPrivateKeyWrapper(ca.hsm_key_id, pub_key)
-            except Exception as e:
-                logger.warning(f"HSM signing unavailable for CA {ca.descr}: {e}")
-                raise ValueError(f"HSM signing failed for CA {ca.descr}: {e}")
-        
-        if not ca.prv:
-            raise ValueError(f"CA {ca.descr} has no private key")
-        
-        # Decrypt private key (stored encrypted in DB)
-        try:
-            from security.encryption import decrypt_private_key
-            prv_decrypted = decrypt_private_key(ca.prv)
-        except ImportError:
-            prv_decrypted = ca.prv
-        
-        ca_key_pem = base64.b64decode(prv_decrypted).decode('utf-8')
-        return serialization.load_pem_private_key(
-            ca_key_pem.encode(),
-            password=None,
-            backend=self.backend
-        )
-    
+        """The CA's signing key: a software key, or the HSM wrapper registered
+        as an RSA/EC private key, which cryptography's builders accept. A local
+        wrapper that was not registered made the single-CertID path fail with
+        internalError for every HSM-backed CA while the multi-CertID path,
+        duck-typed, answered (self-review of #347)."""
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        return get_ca_signing_key(ca, allow_revoked=True)
+
+    @staticmethod
+    def _bound_next_update(next_update, signing_cert, use_delegated):
+        """A response must not claim currency beyond its signer's life: a
+        delegated responder's nextUpdate is capped at its notAfter. The
+        cache lives until nextUpdate, and a client rejects a response whose
+        signer has expired (self-review of #347)."""
+        if not use_delegated or signing_cert is None:
+            return next_update
+        not_after = signing_cert.not_valid_after_utc
+        if next_update.tzinfo is None:
+            not_after = not_after.replace(tzinfo=None)
+        return min(next_update, not_after)
+
     def _load_cert(self, certificate: Certificate) -> Optional[x509.Certificate]:
         """Safely load a certificate's X.509 object, returning None if unavailable"""
         if not certificate or not certificate.crt:
@@ -417,6 +414,7 @@ class OCSPService:
         A configured certificate that fails check_delegated_responder is
         refused with a warning and the CA signs itself.
         """
+        self._refusal_reason = None
         config_row = SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{ca.id}').first()
         responder_cert_id = config_row.value if config_row else ''
         if not responder_cert_id:
@@ -430,6 +428,7 @@ class OCSPService:
                     f"Delegated OCSP responder cert {responder_cert_id} for CA {ca.id} "
                     f"refused: {reason}; signing with the CA key"
                 )
+                self._refusal_reason = reason
                 return None, None
             resp_cert = self._load_cert(responder_record)
             resp_key = self._load_responder_key(responder_record)
@@ -518,10 +517,14 @@ class OCSPService:
     @staticmethod
     def _status_for_serial(ca: CA, cert_serial: int):
         variants = serial_variants(cert_serial)
-        certificate = Certificate.query.filter(
+        certificate = None
+        for row in Certificate.query.filter(
             Certificate.caref == ca.refid,
             Certificate.serial_number.in_(variants),
-        ).first()
+        ).all():
+            if _record_holds_serial(row, cert_serial) is not False:
+                certificate = row
+                break
         if certificate and certificate.revoked:
             return (
                 certificate,
@@ -641,6 +644,7 @@ class OCSPService:
             next_update = this_update + timedelta(
                 hours=self._response_validity_hours()
             )
+            next_update = self._bound_next_update(next_update, signing_cert, use_delegated)
             single_responses = []
             statuses = []
             for item in request_items:
@@ -781,6 +785,7 @@ class OCSPService:
             next_update = this_update + timedelta(
                 hours=self._response_validity_hours()
             )
+            next_update = self._bound_next_update(next_update, signing_cert, use_delegated)
             
             builder = ocsp.OCSPResponseBuilder()
             
