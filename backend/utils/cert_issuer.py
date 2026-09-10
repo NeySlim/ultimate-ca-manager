@@ -75,3 +75,18 @@ def authority_key_identifier_hex(cert: x509.Certificate):
     if not aki.key_identifier:
         return None
     return aki.key_identifier.hex(':').upper()
+
+
+def private_key_matches(private_key, cert: x509.Certificate) -> bool:
+    """Whether *private_key* is the key of *cert*: same SubjectPublicKeyInfo.
+
+    A key stored next to a certificate it does not belong to signs answers
+    nobody can verify; the pair is checked wherever one arrives (#347 review).
+    """
+    from cryptography.hazmat.primitives import serialization
+    try:
+        spki = lambda pub: pub.public_bytes(  # noqa: E731
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+        return spki(private_key.public_key()) == spki(cert.public_key())
+    except Exception:
+        return False

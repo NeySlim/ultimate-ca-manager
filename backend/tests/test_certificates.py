@@ -1373,3 +1373,48 @@ class TestOverviewCounts:
         assert r.status_code in (200, 201)
         after = json.loads(auth_client.get('/api/v2/stats/overview').data)['data']['total_certs']
         assert after == before
+
+
+class TestImportRefusesForeignKey:
+    """A PEM carrying a certificate and a key that is not its own is refused,
+    for a certificate and for a CA alike (#347 review)."""
+
+    @staticmethod
+    def _cert_and_foreign_key(ca=False):
+        from datetime import datetime, timedelta, timezone
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+        real = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        other = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'foreign-key.example.com')])
+        now = datetime.now(timezone.utc)
+        b = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+             .public_key(real.public_key()).serial_number(x509.random_serial_number())
+             .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30)))
+        if ca:
+            b = b.add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        cert = b.sign(real, hashes.SHA256())
+        pem = cert.public_bytes(serialization.Encoding.PEM) + other.private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL,
+            serialization.NoEncryption())
+        good = cert.public_bytes(serialization.Encoding.PEM) + real.private_bytes(
+            serialization.Encoding.PEM, serialization.PrivateFormat.TraditionalOpenSSL,
+            serialization.NoEncryption())
+        return pem.decode(), good.decode()
+
+    def test_certificate_import_refuses_a_foreign_key(self, auth_client):
+        bad, good = self._cert_and_foreign_key()
+        r = auth_client.post(f'{BASE}/import', data={'pem_content': bad}, content_type='multipart/form-data')
+        assert r.status_code == 400, r.data
+        assert 'does not match' in json.loads(r.data)['message']
+        r = auth_client.post(f'{BASE}/import', data={'pem_content': good}, content_type='multipart/form-data')
+        assert r.status_code in (200, 201), r.data
+        assert json.loads(r.data)['data']['has_private_key'] is True
+
+    def test_ca_import_refuses_a_foreign_key(self, auth_client):
+        bad, _ = self._cert_and_foreign_key(ca=True)
+        r = auth_client.post('/api/v2/cas/import', data={'pem_content': bad}, content_type='multipart/form-data')
+        assert r.status_code == 400, r.data
+        assert 'does not match' in json.loads(r.data)['message']

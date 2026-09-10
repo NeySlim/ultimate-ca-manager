@@ -381,7 +381,26 @@ class OCSPService:
             resp_cert.extensions.get_extension_for_oid(x509.oid.ExtensionOID.OCSP_NO_CHECK)
         except x509.ExtensionNotFound:
             return 'certificate lacks the id-pkix-ocsp-nocheck extension (RFC 6960)'
+        # The key must be loadable and be this certificate's key: a stored
+        # key that belongs to another certificate signs answers no client
+        # can verify (#347 review)
+        try:
+            key = self._load_responder_key(responder_record)
+        except Exception:
+            return 'private key could not be loaded'
+        from utils.cert_issuer import private_key_matches
+        if not private_key_matches(key, resp_cert):
+            return 'private key does not match the certificate'
         return None
+
+    def _load_responder_key(self, responder_record):
+        try:
+            from security.encryption import decrypt_private_key
+            prv_decrypted = decrypt_private_key(responder_record.prv)
+        except ImportError:
+            prv_decrypted = responder_record.prv
+        pem = base64.b64decode(prv_decrypted).decode('utf-8')
+        return serialization.load_pem_private_key(pem.encode(), password=None, backend=self.backend)
 
     def _get_delegated_responder(self, ca: CA):
         """The configured delegated responder as (cert, key), or (None, None).
@@ -404,18 +423,7 @@ class OCSPService:
                 )
                 return None, None
             resp_cert = self._load_cert(responder_record)
-
-            try:
-                from security.encryption import decrypt_private_key
-                prv_decrypted = decrypt_private_key(responder_record.prv)
-            except ImportError:
-                prv_decrypted = responder_record.prv
-
-            resp_key_pem = base64.b64decode(prv_decrypted).decode('utf-8')
-            resp_key = serialization.load_pem_private_key(
-                resp_key_pem.encode(), password=None, backend=self.backend
-            )
-
+            resp_key = self._load_responder_key(responder_record)
             logger.debug(f"Using delegated OCSP responder for CA {ca.descr}")
             return resp_cert, resp_key
 

@@ -1152,3 +1152,76 @@ class TestDelegatedResponderStrictness:
             assert OCSPResponse.query.filter_by(ca_id=ca['id']).count() == 0
             der, _ = OCSPService().generate_response(ca_obj, serial)
             assert ocsp.load_der_ocsp_response(der).responder_key_hash == TestResponderIdRfc6960._key_hash(responder_cert)
+
+
+class TestResponderKeyOwnership:
+    """Fourth review of #347: the responder's key has to be the certificate's."""
+
+    @staticmethod
+    def _stored(ca_obj, cert, key, refid):
+        row = Certificate(
+            refid=refid, descr=refid, caref=ca_obj.refid,
+            crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode(),
+            prv=base64.b64encode(key.private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                serialization.NoEncryption())).decode(),
+            serial_number=str(cert.serial_number),
+        )
+        db.session.add(row); db.session.commit()
+        return row
+
+    def test_a_foreign_key_is_refused_everywhere(self, app, auth_client, create_ca, create_cert):
+        with app.app_context():
+            ca = create_ca(cn='Key Ownership CA')
+            leaf = create_cert(cn='leaf-keyown.example.com', ca_id=ca['id'])
+            ca_obj = _ca_model(ca); ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca_key = get_ca_signing_key(ca_obj)
+            real_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            other_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            cert = _delegated_certificate(ca_cert, ca_key, real_key)
+            row = self._stored(ca_obj, cert, other_key, 'keyown-foreign')
+
+            reason = OCSPService().check_delegated_responder(ca_obj, row)
+            assert reason and 'does not match' in reason
+            r = auth_client.get(f"/api/v2/cas/{ca['id']}/eligible-ocsp-responders")
+            assert row.id not in {c['id'] for c in json.loads(r.data)['data']}
+            r = auth_client.post(f"/api/v2/cas/{ca['id']}/ocsp-responder",
+                                 data=json.dumps({'certificate_id': row.id}), content_type='application/json')
+            assert r.status_code == 400, r.data
+            assert 'does not match' in json.loads(r.data)['message']
+
+            # Forced into the configuration anyway: the responder still refuses it
+            db.session.add(SystemConfig(key=f"ocsp_responder_cert_{ca['id']}", value=str(row.id)))
+            db.session.commit()
+            serial = int(_cert_model(leaf).serial_number, 16)
+            der, status = OCSPService().generate_response(ca_obj, serial)
+            assert status == 'good'
+            resp = ocsp.load_der_ocsp_response(der)
+            assert resp.responder_key_hash == TestResponderIdRfc6960._key_hash(ca_cert)
+            # and a client verifies that answer against the CA
+            ca_cert.public_key().verify(resp.signature, resp.tbs_response_bytes,
+                                        __import__('cryptography.hazmat.primitives.asymmetric.padding', fromlist=['PKCS1v15']).PKCS1v15(),
+                                        resp.signature_hash_algorithm)
+
+    def test_the_right_key_passes(self, app, create_ca):
+        with app.app_context():
+            ca = create_ca(cn='Key Ownership OK CA')
+            ca_obj = _ca_model(ca); ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            cert = _delegated_certificate(ca_cert, get_ca_signing_key(ca_obj), key)
+            row = self._stored(ca_obj, cert, key, 'keyown-right')
+            assert OCSPService().check_delegated_responder(ca_obj, row) is None
+
+    def test_an_unloadable_key_is_a_reason(self, app, create_ca):
+        with app.app_context():
+            ca = create_ca(cn='Key Ownership Broken CA')
+            ca_obj = _ca_model(ca); ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+            cert = _delegated_certificate(ca_cert, get_ca_signing_key(ca_obj), key)
+            row = self._stored(ca_obj, cert, key, 'keyown-broken')
+            row.prv = base64.b64encode(b'not a key').decode(); db.session.commit()
+            reason = OCSPService().check_delegated_responder(ca_obj, row)
+            assert reason and 'could not be loaded' in reason
