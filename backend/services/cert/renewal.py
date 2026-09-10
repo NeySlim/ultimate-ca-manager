@@ -36,7 +36,7 @@ from datetime import timedelta
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
 from cryptography.x509.oid import ExtensionOID
 
 from models import CA, Certificate, RevokedSerial, db
@@ -116,6 +116,10 @@ def _generate_matching_key(orig_pub_key):
         )
     if isinstance(orig_pub_key, ec.EllipticCurvePublicKey):
         return ec.generate_private_key(orig_pub_key.curve, default_backend())
+    if isinstance(orig_pub_key, ed25519.Ed25519PublicKey):
+        return ed25519.Ed25519PrivateKey.generate()
+    if isinstance(orig_pub_key, ed448.Ed448PublicKey):
+        return ed448.Ed448PrivateKey.generate()
     return rsa.generate_private_key(
         public_exponent=65537, key_size=2048, backend=default_backend()
     )
@@ -126,6 +130,10 @@ def _key_algo_label(public_key) -> str:
         return f'RSA {public_key.key_size}'
     if isinstance(public_key, ec.EllipticCurvePublicKey):
         return f'EC {public_key.curve.name}'
+    if isinstance(public_key, ed25519.Ed25519PublicKey):
+        return 'Ed25519'
+    if isinstance(public_key, ed448.Ed448PublicKey):
+        return 'Ed448'
     return 'Unknown'
 
 

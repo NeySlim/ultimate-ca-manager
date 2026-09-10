@@ -1,6 +1,7 @@
 """Certificate import route"""
 import logging
 import base64
+from cryptography.hazmat.primitives.asymmetric import ed25519, ed448
 import uuid
 import json
 import traceback
@@ -15,7 +16,8 @@ from utils.cert_issuer import private_key_matches, stored_private_key_matches, h
 from services.import_service import (
     parse_certificate_file, is_ca_certificate, extract_cert_info,
     find_existing_ca, find_existing_certificate, find_pending_csr_for_certificate,
-    AmbiguousImportTarget, install_on_pending_ca,
+    AmbiguousImportTarget, install_on_pending_ca, stored_certificate_serial,
+    relink_parent_caref, path_length_of,
     serialize_cert_to_pem, serialize_key_to_pem
 )
 from services.cert_service import CertificateService
@@ -101,6 +103,9 @@ def import_certificate():
         # it would sign nothing anyone can verify (#347 review)
         if private_key is not None and not private_key_matches(private_key, cert):
             return error_response('Private key does not match the certificate', 400)
+        if is_ca_certificate(cert) and isinstance(private_key, (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)):
+            return error_response('Ed25519 and Ed448 CA keys are not supported: '
+                                  'such a CA could sign neither certificates nor CRLs', 400)
 
         # Extract certificate info
         cert_info = extract_cert_info(cert)
@@ -130,19 +135,25 @@ def import_certificate():
                         409
                     )
 
-                if existing_ca.is_pending:
-                    # A CA still waiting for its certificate is completed the way
-                    # the dedicated upload completes it, not patched in place
+                if existing_ca.is_pending or existing_ca.csr:
+                    # A CA still waiting for its certificate, or holding a renewal
+                    # request, is completed the way the dedicated upload completes
+                    # it (key match, chain, request fulfilled), not patched in place
                     username = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
                     try:
-                        ca_dict, warnings = install_on_pending_ca(existing_ca, cert_pem, username)
+                        ca_dict, warnings, superseded = install_on_pending_ca(
+                            existing_ca, cert_pem, username, encrypted_prv=encrypted_prv, name=name or None)
                     except ValueError as e:
                         db.session.rollback()
                         return error_response(str(e), 400)
                     message = f'CA "{ca_dict["descr"]}" certificate installed'
                     if warnings:
                         message += '; ' + '; '.join(warnings)
-                    return success_response(data={**ca_dict, 'warnings': warnings}, message=message)
+                    data = {**ca_dict, 'warnings': warnings}
+                    if superseded:
+                        data['superseded_serial'] = superseded['serial']
+                        data['superseded_valid_to'] = superseded['valid_to']
+                    return success_response(data=data, message=message)
 
                 # Decide what becomes of the stored key before touching the record:
                 # the HSM lookup may commit its public key cache, and a record already
@@ -177,6 +188,7 @@ def import_certificate():
                     key_dropped = matches is False
 
                 # Update existing CA
+                old_serial = stored_certificate_serial(existing_ca)
                 existing_ca.descr = name or cert_info['cn'] or existing_ca.descr
                 existing_ca.crt = base64.b64encode(cert_pem).decode('utf-8')
                 if key_pem:
@@ -189,7 +201,16 @@ def import_certificate():
                 existing_ca.valid_from = cert_info['valid_from']
                 existing_ca.valid_to = cert_info['valid_to']
                 existing_ca.ski = cert_info.get('ski')
+                if old_serial is not None and old_serial != cert.serial_number:
+                    # Revocation is per certificate (RFC 5280): a new certificate is
+                    # not the revoked one, whose serial stays on the parent's list
+                    existing_ca.revoked = False
+                    existing_ca.revoked_at = None
+                    existing_ca.revoke_reason = None
+                    existing_ca.invalidity_at = None
                 existing_ca.serial_number = str(cert.serial_number)
+                existing_ca.caref = relink_parent_caref(cert, existing_ca.caref, exclude_ca_id=existing_ca.id)
+                existing_ca.path_length = path_length_of(cert)
                 CAService.apply_persisted_revocation(existing_ca)
 
                 ok, err = safe_commit(logger, "Failed to update CA")
@@ -211,6 +232,12 @@ def import_certificate():
 
             # Create new CA
             refid = str(uuid.uuid4())
+            # A CA certificate issued elsewhere for a request pending in the
+            # certificates table (an intermediate requested here, signed outside):
+            # the request's key becomes the CA's and the request is fulfilled
+            pending_request = find_pending_csr_for_certificate(cert)
+            if pending_request is not None and not encrypted_prv:
+                encrypted_prv = pending_request.prv
             ca = CA(
                 refid=refid,
                 descr=name or cert_info['cn'] or filename,
@@ -228,6 +255,10 @@ def import_certificate():
             # Deleted after its revocation and imported again: still revoked (#343)
             CAService.apply_persisted_revocation(ca)
 
+            fulfilled = None
+            if pending_request is not None:
+                fulfilled = pending_request.descr or f'request {pending_request.id}'
+                db.session.delete(pending_request)
             db.session.add(ca)
             ok, err = safe_commit(logger, "Failed to import CA")
             if not ok:
@@ -241,10 +272,10 @@ def import_certificate():
                 success=True
             )
 
-            return created_response(
-                data=ca.to_dict(),
-                message=f'CA certificate "{ca.descr}" imported successfully (detected as CA)'
-            )
+            message = f'CA certificate "{ca.descr}" imported successfully (detected as CA)'
+            if fulfilled:
+                message += f'; pending request "{fulfilled}" fulfilled, its key is now the CA\'s'
+            return created_response(data=ca.to_dict(), message=message)
 
         # A certificate issued elsewhere for a CSR pending here completes
         # that record instead of creating a keyless duplicate (#341)
@@ -296,9 +327,18 @@ def import_certificate():
                 key_dropped = matches is False
 
             # Update existing certificate
+            old_serial = stored_certificate_serial(existing_cert)
             first_san = (cert_info.get('san_dns') or [None])[0]
             existing_cert.descr = name or cert_info['cn'] or first_san or existing_cert.descr
             existing_cert.crt = base64.b64encode(cert_pem).decode('utf-8')
+            if old_serial is not None and old_serial != cert.serial_number:
+                # Revocation is per certificate (RFC 5280): a renewed certificate
+                # is not the revoked one, whose serial stays on the CRL
+                existing_cert.revoked = False
+                existing_cert.revoked_at = None
+                existing_cert.revoke_reason = None
+                existing_cert.invalidity_at = None
+                existing_cert.archived = False
             if key_pem:
                 existing_cert.prv = encrypted_prv
             elif key_dropped:
@@ -318,11 +358,13 @@ def import_certificate():
             if cert_info.get('san_uri'):
                 existing_cert.san_uri = json.dumps(cert_info['san_uri'])
 
-            # Update CA link if provided
+            # The issuing CA: the one named, else the one the certificate points to
             if ca_id:
                 ca = db.session.get(CA, ca_id)
                 if ca:
                     existing_cert.caref = ca.refid
+            else:
+                existing_cert.caref = _resolve_caref(None, cert_info) or existing_cert.caref
 
             ok, err = safe_commit(logger, "Failed to update certificate")
             if not ok:

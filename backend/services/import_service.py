@@ -232,7 +232,63 @@ def _record_identity(record):
             return stored_cert, _spki(public_key)
         except Exception:
             pass
+    if getattr(record, 'hsm_key_id', None):
+        # Last resort, the HSM itself: the lookup caches the public key and
+        # commits, which is why every caller runs before touching any record
+        try:
+            from services.hsm import HsmService
+            pem = HsmService.get_public_key(record.hsm_key_id)
+            if pem:
+                public_key = serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)
+                return stored_cert, _spki(public_key)
+        except Exception:
+            pass
     return stored_cert, None
+
+
+def stored_certificate_serial(record):
+    """The serial number of the certificate a record holds, or None."""
+    if not record.crt:
+        return None
+    try:
+        return x509.load_pem_x509_certificate(base64.b64decode(record.crt), default_backend()).serial_number
+    except Exception:
+        return None
+
+
+def path_length_of(cert):
+    """The pathLenConstraint of a CA certificate, or None."""
+    try:
+        return cert.extensions.get_extension_for_class(x509.BasicConstraints).value.path_length
+    except x509.ExtensionNotFound:
+        return None
+
+
+def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
+    """The caref a CA record should hold once *cert* is its certificate.
+
+    None for a self-signed certificate; the CA whose key verifies the
+    signature, found by AKI then by issuer name; *current_caref* when UCM
+    holds no such CA (an external root imported later relinks it).
+    """
+    from models import CA
+    from utils.cert_issuer import certificate_signed_by, authority_key_identifier_hex, is_self_signed
+    if is_self_signed(cert):
+        return None
+    aki = authority_key_identifier_hex(cert)
+    candidates = CA.query.filter(CA.ski == aki).all() if aki else []
+    if not candidates:
+        candidates = CA.query.filter(CA.subject == cert.issuer.rfc4514_string()).all()
+    for parent in candidates:
+        if exclude_ca_id is not None and parent.id == exclude_ca_id or not parent.crt:
+            continue
+        try:
+            parent_cert = x509.load_pem_x509_certificate(base64.b64decode(parent.crt), default_backend())
+            if certificate_signed_by(cert, parent_cert):
+                return parent.refid
+        except Exception:
+            continue
+    return current_caref
 
 
 def _issuer_identity(cert, parents_by_name):
@@ -306,11 +362,16 @@ def _select_existing(candidates, cert, kind):
     """
     if not candidates:
         return None
-    wanted = _spki(cert.public_key())
+    try:
+        wanted = _spki(cert.public_key())
+    except Exception:
+        raise ValueError('Unsupported public key algorithm in the certificate')
     parents_by_name = {}
-    same_key, same_issuer, exact = [], [], []
+    same_key, same_issuer, exact, full = [], [], [], []
     for record in candidates:
         stored_cert, spki = _record_identity(record)
+        if stored_cert is not None:
+            full.append(record)
         if spki != wanted:
             continue
         same_key.append(record)
@@ -335,35 +396,49 @@ def _select_existing(candidates, cert, kind):
             f"{len(same_key)} existing {kind}s share this subject and hold this "
             f"certificate's key, none under this certificate's issuer; the record "
             f"to update cannot be determined")
-    if len(candidates) == 1:
-        return candidates[0]
+    # No record holds this key. A single record holding a certificate is the
+    # one being re-keyed; a record still waiting for its certificate is known
+    # by its key alone and cannot be re-keyed, so the certificate is a new one
+    if not full:
+        return None
+    if len(full) == 1:
+        return full[0]
     raise AmbiguousImportTarget(
-        f"{len(candidates)} existing {kind}s share this subject and none holds this "
+        f"{len(full)} existing {kind}s share this subject and none holds this "
         f"certificate's key; the record to update cannot be determined")
 
 
-def install_on_pending_ca(ca, cert_pem, username):
-    """Install *cert_pem* on a CA still waiting for its certificate, through
-    the same path as the dedicated upload (key match, validity, chain to the
-    issuer, activation), and emit the lifecycle event.
+def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=None):
+    """Install *cert_pem* on a CA waiting for its certificate, or holding an
+    outstanding renewal request, through the same path as the dedicated
+    upload (key match, validity, chain to the issuer, activation, the
+    request fulfilled), and emit the lifecycle event.
 
-    Returns (ca_dict, warnings); raises ValueError with a user-safe message
-    when the certificate is refused (#347 review).
+    A key that arrived with the certificate (already checked to be its own)
+    becomes the record's when it holds none, as after a restore without
+    keys. Returns (ca_dict, warnings, superseded); raises ValueError with a
+    user-safe message when the certificate is refused (#347 review).
     """
+    from models import db
     from services.ca_service import CAService
     from services.webhook_service import emit_ca_updated
-    ca, warnings, _superseded = CAService.complete_external_ca(ca, cert_pem, username=username)
+    if encrypted_prv and not ca.prv and not ca.hsm_key_id:
+        ca.prv = encrypted_prv
+    ca, warnings, superseded = CAService.complete_external_ca(ca, cert_pem, username=username)
+    if name and name != ca.descr:
+        ca.descr = name
+        db.session.commit()
     # Snapshot before emit: subscribers may commit and expire the instance
     ca_dict = ca.to_dict()
     emit_ca_updated(ca_dict, actor=username, changes={'certificate': 'installed'})
-    return ca_dict, warnings
+    return ca_dict, warnings, superseded
 
 
 def find_existing_ca(cert_info, cert):
     """
     The existing CA record *cert* belongs to, by subject, or None.
     Raises AmbiguousImportTarget when several CAs share the subject and
-    none holds the certificate's key.
+    the certificate's key does not single one out.
     """
     from models import CA
     candidates = CA.query.filter_by(subject=cert_info['subject']).order_by(CA.id).all()
@@ -374,7 +449,7 @@ def find_existing_certificate(cert_info, cert):
     """
     The existing certificate record *cert* belongs to, by subject + issuer,
     or None. Raises AmbiguousImportTarget when several records share them
-    and none holds the certificate's key.
+    and the certificate's key does not single one out.
     """
     from models import Certificate
     candidates = Certificate.query.filter_by(

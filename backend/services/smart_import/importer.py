@@ -22,6 +22,17 @@ from cryptography.hazmat.primitives import serialization
 from models import db, Certificate, CA, AuditLog
 from .parser import ParsedObject, ObjectType, SmartParser
 from .chain_builder import ChainBuilder, ChainInfo
+try:
+    from security.encryption import encrypt_private_key
+except ImportError:  # pragma: no cover
+    def encrypt_private_key(data):
+        return data
+
+
+def _encrypt_prv(raw_pem: str) -> str:
+    """The stored form of a private key: base64 of the PEM, encrypted at rest
+    like every other import path."""
+    return encrypt_private_key(base64.b64encode(raw_pem.encode()).decode())
 from .matcher import KeyMatcher
 from .validator import ImportValidator, ValidationResult
 from utils.datetime_utils import utc_now
@@ -296,7 +307,7 @@ class SmartImporter:
             for key_idx, cert_idx in matching.get("matched_pairs", []):
                 if objects[cert_idx] == ca_obj:
                     key_obj = objects[key_idx]
-                    prv = base64.b64encode(key_obj.raw_pem.encode()).decode()
+                    prv = _encrypt_prv(key_obj.raw_pem)
                     result.keys_matched += 1
                     break
             
@@ -377,7 +388,7 @@ class SmartImporter:
                 if objects[cert_idx] == cert_obj:
                     key_obj = objects[key_idx]
                     key_pem = key_obj.raw_pem.encode()
-                    prv = base64.b64encode(key_pem).decode()
+                    prv = encrypt_private_key(base64.b64encode(key_pem).decode())
                     result.keys_matched += 1
                     break
 
@@ -456,7 +467,7 @@ class SmartImporter:
             for csr_idx, key_idx in matching.get("csr_key_pairs", []):
                 if objects[csr_idx] == csr_obj:
                     key_obj = objects[key_idx]
-                    prv = base64.b64encode(key_obj.raw_pem.encode()).decode()
+                    prv = _encrypt_prv(key_obj.raw_pem)
                     result.keys_matched += 1
                     break
             
