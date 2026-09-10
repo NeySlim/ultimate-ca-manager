@@ -381,3 +381,37 @@ class TestHsmCaReimport:
         with app.app_context():
             from models import db, CA
             assert db.session.get(CA, ca_id).hsm_key_id == fx['hsm_key_id']  # untouched
+
+    @staticmethod
+    def _garbage_provider():
+        """A provider whose public key is unusable: the lookup caches it, and
+        commits, before the binding check finds it invalid."""
+        fake = MagicMock()
+        fake.__enter__.return_value = fake
+        fake.get_public_key.return_value = 'not a public key'
+        return patch('services.hsm.hsm_service.HsmService._get_provider_instance', return_value=fake)
+
+    @pytest.mark.parametrize('path', ['/api/v2/cas/import', '/api/v2/certificates/import'])
+    def test_refused_update_persists_nothing_even_when_the_lookup_commits(self, app, auth_client, hsm_provider_and_key, path):
+        """Eighth review of #347: the record must not be touched before the
+        HSM check, since that check may commit on its way."""
+        fx = hsm_provider_and_key
+        cn = f"HSM Atomic CA {path.split('/')[3]}"
+        ca_id = self._bound_ca(app, fx, cn)
+        with app.app_context():
+            from models import db, CA
+            from models.hsm import HsmKey
+            HsmKey.query.filter_by(id=fx['hsm_key_id']).update({'public_key_pem': None}); db.session.commit()
+            row = db.session.get(CA, ca_id)
+            before = (row.crt, row.descr, row.hsm_key_id, row.valid_to)
+        rekeyed = self._selfsigned(cn, rsa.generate_private_key(65537, 2048))
+        pem = rekeyed.public_bytes(serialization.Encoding.PEM).decode()
+        with self._garbage_provider():
+            r = auth_client.post(path, data={'pem_content': pem, 'name': 'renamed on the way'},
+                                 content_type='multipart/form-data')
+        assert r.status_code == 409, r.data
+        with app.app_context():
+            from models import db, CA
+            db.session.expire_all()
+            row = db.session.get(CA, ca_id)
+            assert (row.crt, row.descr, row.hsm_key_id, row.valid_to) == before
