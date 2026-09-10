@@ -180,27 +180,102 @@ def extract_cert_info(cert):
     }
 
 
-def find_existing_ca(cert_info):
+class AmbiguousImportTarget(ValueError):
+    """Several records share the certificate's names and none can be told
+    to be the one it belongs to."""
+
+
+def _spki(public_key):
+    return public_key.public_bytes(
+        encoding=serialization.Encoding.DER,
+        format=serialization.PublicFormat.SubjectPublicKeyInfo,
+    )
+
+
+def _record_identity(record):
+    """The record's current certificate and public key: (x509 or None, SPKI or None).
+
+    The key comes from the certificate when the record holds one, else from
+    the stored private key (a record still waiting for its certificate).
     """
-    Find existing CA by subject match.
-    Returns: CA object or None
+    stored_cert = None
+    if record.crt:
+        try:
+            stored_cert = x509.load_pem_x509_certificate(base64.b64decode(record.crt), default_backend())
+            return stored_cert, _spki(stored_cert.public_key())
+        except Exception:
+            stored_cert = None
+    if record.prv:
+        try:
+            from utils.key_codec import load_pem_bytes
+            key = serialization.load_pem_private_key(
+                load_pem_bytes(record.prv, context=f"{type(record).__name__} {record.id}"), password=None)
+            return stored_cert, _spki(key.public_key())
+        except Exception:
+            pass
+    return stored_cert, None
+
+
+def _select_existing(candidates, cert, kind):
+    """Among *candidates*, the records sharing the certificate's names, the
+    one the certificate belongs to; None when there is none (#347 review).
+
+    The record holding the certificate's key wins, the very same certificate
+    first: a renewed certificate lands on its own record, not on a homonym
+    that happened to come first. Without a key link a single candidate is
+    the record being re-keyed; several cannot be told apart, and the import
+    is refused rather than applied to whichever the database returned.
+    """
+    if not candidates:
+        return None
+    wanted = _spki(cert.public_key())
+    same_key, exact = [], []
+    for record in candidates:
+        stored_cert, spki = _record_identity(record)
+        if spki != wanted:
+            continue
+        same_key.append(record)
+        if stored_cert is not None and stored_cert.serial_number == cert.serial_number \
+                and stored_cert.issuer == cert.issuer:
+            exact.append(record)
+    if exact:
+        return exact[0]
+    if len(same_key) == 1:
+        return same_key[0]
+    if same_key:
+        raise AmbiguousImportTarget(
+            f"{len(same_key)} existing {kind}s share this subject and hold this "
+            f"certificate's key; the record to update cannot be determined")
+    if len(candidates) == 1:
+        return candidates[0]
+    raise AmbiguousImportTarget(
+        f"{len(candidates)} existing {kind}s share this subject and none holds this "
+        f"certificate's key; the record to update cannot be determined")
+
+
+def find_existing_ca(cert_info, cert):
+    """
+    The existing CA record *cert* belongs to, by subject, or None.
+    Raises AmbiguousImportTarget when several CAs share the subject and
+    none holds the certificate's key.
     """
     from models import CA
-    # Match by subject (unique identifier for a CA)
-    return CA.query.filter_by(subject=cert_info['subject']).first()
+    candidates = CA.query.filter_by(subject=cert_info['subject']).order_by(CA.id).all()
+    return _select_existing(candidates, cert, 'CA')
 
 
-def find_existing_certificate(cert_info):
+def find_existing_certificate(cert_info, cert):
     """
-    Find existing certificate by subject + issuer match.
-    Returns: Certificate object or None
+    The existing certificate record *cert* belongs to, by subject + issuer,
+    or None. Raises AmbiguousImportTarget when several records share them
+    and none holds the certificate's key.
     """
     from models import Certificate
-    # Match by subject AND issuer (together they identify a cert)
-    return Certificate.query.filter_by(
+    candidates = Certificate.query.filter_by(
         subject=cert_info['subject'],
         issuer=cert_info['issuer']
-    ).first()
+    ).order_by(Certificate.id).all()
+    return _select_existing(candidates, cert, 'certificate')
 
 
 def find_pending_csr_for_certificate(cert):

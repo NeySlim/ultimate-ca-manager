@@ -15,7 +15,7 @@ from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.cert_issuer import private_key_matches, stored_private_key_matches, hsm_key_binding_matches
 from services.import_service import (
-    parse_certificate_file, extract_cert_info, find_existing_ca,
+    parse_certificate_file, extract_cert_info, find_existing_ca, AmbiguousImportTarget,
     serialize_cert_to_pem, serialize_key_to_pem
 )
 try:
@@ -96,7 +96,10 @@ def import_ca():
         )
 
         # Check for existing CA with same subject
-        existing_ca = find_existing_ca(cert_info)
+        try:
+            existing_ca = find_existing_ca(cert_info, cert)
+        except AmbiguousImportTarget as e:
+            return error_response(str(e), 409)
 
         if existing_ca:
             if not update_existing:

@@ -15,6 +15,7 @@ from utils.cert_issuer import private_key_matches, stored_private_key_matches, h
 from services.import_service import (
     parse_certificate_file, is_ca_certificate, extract_cert_info,
     find_existing_ca, find_existing_certificate, find_pending_csr_for_certificate,
+    AmbiguousImportTarget,
     serialize_cert_to_pem, serialize_key_to_pem
 )
 from services.cert_service import CertificateService
@@ -117,7 +118,10 @@ def import_certificate():
         # Check if this is a CA certificate - auto-route to CA table
         if is_ca_certificate(cert):
             # Check for existing CA
-            existing_ca = find_existing_ca(cert_info)
+            try:
+                existing_ca = find_existing_ca(cert_info, cert)
+            except AmbiguousImportTarget as e:
+                return error_response(str(e), 409)
 
             if existing_ca:
                 if not update_existing:
@@ -251,7 +255,10 @@ def import_certificate():
             )
 
         # Check for existing certificate
-        existing_cert = find_existing_certificate(cert_info)
+        try:
+            existing_cert = find_existing_certificate(cert_info, cert)
+        except AmbiguousImportTarget as e:
+            return error_response(str(e), 409)
 
         if existing_cert:
             if not update_existing:

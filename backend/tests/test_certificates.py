@@ -1566,3 +1566,127 @@ class TestUnreadableStoredKeyRefusesUpdate:
         assert r.status_code == 409, r.data
         assert 'could not be read' in json.loads(r.data)['message']
         assert self._row(app, CA, first['id']) == before
+
+
+class TestHomonymsOnReimport:
+    """Ninth review of #347: with two records sharing a subject, a re-import
+    lands on the record holding the certificate's key, and is refused when no
+    key links it to one of them, instead of updating whichever came first."""
+
+    @staticmethod
+    def _cert(cn, key, *, issuer=None, signer=None, ca=False):
+        from datetime import datetime, timedelta, timezone
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.x509.oid import NameOID
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+        now = datetime.now(timezone.utc)
+        b = (x509.CertificateBuilder().subject_name(name).issuer_name(issuer or name)
+             .public_key(key.public_key()).serial_number(x509.random_serial_number())
+             .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30)))
+        if ca:
+            b = b.add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+        return b.sign(signer or key, hashes.SHA256())
+
+    @staticmethod
+    def _store(app, model, cert, key, **extra):
+        import base64, uuid
+        from cryptography.hazmat.primitives import serialization
+        from security.encryption import encrypt_private_key
+        from services.import_service import extract_cert_info
+        info = extract_cert_info(cert)
+        kpem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                 serialization.NoEncryption())
+        with app.app_context():
+            from models import db
+            row = model(refid=str(uuid.uuid4()), descr=info['cn'],
+                        crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode(),
+                        prv=encrypt_private_key(base64.b64encode(kpem).decode()),
+                        subject=info['subject'], issuer=info['issuer'], **extra)
+            db.session.add(row); db.session.commit()
+            return row.id, row.crt
+
+    @staticmethod
+    def _state(app, model, row_id):
+        with app.app_context():
+            from models import db
+            db.session.expire_all()
+            row = db.session.get(model, row_id)
+            return row.crt, bool(row.prv)
+
+    @staticmethod
+    def _import(auth_client, cert, path):
+        from cryptography.hazmat.primitives import serialization
+        return auth_client.post(path, data={'pem_content': cert.public_bytes(serialization.Encoding.PEM).decode()},
+                                content_type='multipart/form-data')
+
+    def test_ca_reimport_lands_on_the_record_holding_the_key(self, app, auth_client):
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from models import CA
+        k1 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        k2 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        id1, crt1 = self._store(app, CA, self._cert('Homonym CA', k1, ca=True), k1, serial=0)
+        id2, crt2 = self._store(app, CA, self._cert('Homonym CA', k2, ca=True), k2, serial=0)
+        # Renewed certificate of the second CA (same key, new serial), imported alone
+        r = self._import(auth_client, self._cert('Homonym CA', k2, ca=True), '/api/v2/cas/import')
+        assert r.status_code == 200, r.data
+        body = json.loads(r.data)
+        assert body['data']['id'] == id2
+        assert body['data']['has_private_key'] is True
+        assert 'did not match' not in body['message']
+        assert self._state(app, CA, id1) == (crt1, True)        # the homonym is untouched
+        new_crt2, has_key2 = self._state(app, CA, id2)
+        assert new_crt2 != crt2 and has_key2
+        # A certificate with a fresh key links to neither: refused, both untouched
+        stranger = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        r = self._import(auth_client, self._cert('Homonym CA', stranger, ca=True), '/api/v2/cas/import')
+        assert r.status_code == 409, r.data
+        assert 'cannot be determined' in json.loads(r.data)['message']
+        assert self._state(app, CA, id1) == (crt1, True)
+        assert self._state(app, CA, id2) == (new_crt2, True)
+
+    def test_certificate_reimport_lands_on_the_record_holding_the_key(self, app, auth_client, create_ca):
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from models import Certificate, CA
+        ca = create_ca(cn='Homonym Issuer CA')
+        with app.app_context():
+            from models import db
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca_obj = db.session.get(CA, ca['id'])
+            ca_key = get_ca_signing_key(ca_obj)
+            from cryptography import x509
+            import base64
+            issuer = x509.load_pem_x509_certificate(base64.b64decode(ca_obj.crt)).subject
+            caref = ca_obj.refid
+        issued = lambda key: self._cert('homonym.example.com', key, issuer=issuer, signer=ca_key)
+        k1 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        k2 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        id1, crt1 = self._store(app, Certificate, issued(k1), k1, caref=caref)
+        id2, crt2 = self._store(app, Certificate, issued(k2), k2, caref=caref)
+        r = self._import(auth_client, issued(k2), f'{BASE}/import')
+        assert r.status_code == 200, r.data
+        body = json.loads(r.data)
+        assert body['data']['id'] == id2
+        assert body['data']['has_private_key'] is True
+        assert self._state(app, Certificate, id1) == (crt1, True)
+        new_crt2, has_key2 = self._state(app, Certificate, id2)
+        assert new_crt2 != crt2 and has_key2
+        stranger = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        r = self._import(auth_client, issued(stranger), f'{BASE}/import')
+        assert r.status_code == 409, r.data
+        assert 'cannot be determined' in json.loads(r.data)['message']
+        assert self._state(app, Certificate, id1) == (crt1, True)
+        assert self._state(app, Certificate, id2) == (new_crt2, True)
+
+    def test_a_single_homonym_free_record_is_still_rekeyed(self, app, auth_client):
+        """One record, a new key: the re-key path of the fifth review stays."""
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from models import CA
+        k1 = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        id1, crt1 = self._store(app, CA, self._cert('Lone Rekey CA', k1, ca=True), k1, serial=0)
+        stranger = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        r = self._import(auth_client, self._cert('Lone Rekey CA', stranger, ca=True), '/api/v2/cas/import')
+        assert r.status_code == 200, r.data
+        body = json.loads(r.data)
+        assert body['data']['id'] == id1 and body['data']['has_private_key'] is False
+        assert 'did not match' in body['message']
