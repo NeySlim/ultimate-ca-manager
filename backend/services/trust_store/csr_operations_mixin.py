@@ -104,6 +104,25 @@ _LEAF_CA_ONLY_EXTENSION_OIDS = frozenset({
     ExtensionOID.INHIBIT_ANY_POLICY,
 })
 
+# The only extensions a leaf CSR may contribute to the issued certificate.
+# Everything else on a leaf is the issuer's to set: CRL Distribution Points,
+# AIA and Certificate Policies come from the CA configuration below, the
+# Microsoft template and SID security extensions only from the WSTEP kwargs,
+# SKI/AKI from the keys. Copying unknown extensions verbatim let an enrollee
+# that reached this trunk through ACME, EST or WSTEP choose the revocation
+# endpoints of its own certificate, or carry a szOID_NTDS_CA_SECURITY_EXT of
+# its choosing -- the strong-mapping bypass KB5014754 closes. The SCEP
+# builder has always applied the same allow-list; sub-CA CSRs (an operator
+# holding write:cas signs those deliberately) keep the wider behaviour.
+_LEAF_CSR_COPYABLE_EXTENSION_OIDS = frozenset({
+    ExtensionOID.SUBJECT_ALTERNATIVE_NAME,
+    ExtensionOID.KEY_USAGE,
+    ExtensionOID.EXTENDED_KEY_USAGE,
+    ExtensionOID.BASIC_CONSTRAINTS,
+    ExtensionOID.TLS_FEATURE,
+    ExtensionOID.OCSP_NO_CHECK,
+})
+
 # EKUs a leaf cert signed from a CSR must never carry: an OCSPSigning leaf that
 # chains to the CA is trusted by validators as a delegated OCSP responder for
 # the whole CA (it can sign "good" for revoked certs), and timeStamping grants
@@ -708,6 +727,13 @@ class CSROperationsMixin:
                 continue
             if not issuing_ca and extension.oid in _LEAF_CA_ONLY_EXTENSION_OIDS:
                 continue
+            if not issuing_ca and extension.oid not in _LEAF_CSR_COPYABLE_EXTENSION_OIDS:
+                logger.info(
+                    "sign_csr: ignoring CSR extension %s -- not one a leaf "
+                    "request may set (issuer-controlled or unknown)",
+                    extension.oid.dotted_string,
+                )
+                continue
             if extension.oid == ExtensionOID.BASIC_CONSTRAINTS:
                 if issuing_ca:
                     constraints = _capped_basic_constraints(
@@ -723,10 +749,9 @@ class CSROperationsMixin:
                 usage = _key_usage_with_ca_signing(
                     extension.value, enabled=issuing_ca
                 )
-                builder = builder.add_extension(
-                    usage,
-                    critical=True if issuing_ca else extension.critical,
-                )
+                # RFC 5280 §4.2.1.3: conforming CAs mark Key Usage critical;
+                # the CSR's own flag is not what decides it on a leaf either.
+                builder = builder.add_extension(usage, critical=True)
                 continue
             if extension.oid == ExtensionOID.EXTENDED_KEY_USAGE and not issuing_ca:
                 if tpl_ekus is not None:
@@ -754,6 +779,13 @@ class CSROperationsMixin:
                 # Already added next to the OCSPSigning EKU above: a request
                 # built the right way carries it too (#347 review)
                 continue
+            if extension.oid == ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
+                # RFC 5280 §4.2.1.6: SAN MUST be critical when the subject
+                # is empty -- the CSR's flag cannot override that.
+                builder = builder.add_extension(
+                    extension.value, extension.critical or len(subject) == 0
+                )
+                continue
             builder = builder.add_extension(extension.value, extension.critical)
 
         # Auto-add SAN from CN if the CSR had no SAN extension -- reuses
@@ -763,7 +795,7 @@ class CSROperationsMixin:
         if not has_csr_san and effective_sans:
             builder = builder.add_extension(
                 x509.SubjectAlternativeName(effective_sans),
-                critical=False,
+                critical=len(subject) == 0,
             )
 
         # Add basic extensions if not in CSR
@@ -922,12 +954,21 @@ class CSROperationsMixin:
             # encryption intent as keyAgreement instead of losing it.
             builder = constrain_builder_key_usage(builder)
 
+        def _sub_ca_csr_supplied(oid) -> bool:
+            # A leaf never gets these from its CSR (dropped by the allow-list
+            # above), so the CA's own configuration always applies to it.
+            if not issuing_ca:
+                return False
+            try:
+                csr.extensions.get_extension_for_oid(oid)
+                return True
+            except x509.ExtensionNotFound:
+                return False
+
         # CRL Distribution Points
         all_cdp = cdp_urls or ([cdp_url] if cdp_url else [])
         if all_cdp:
-            try:
-                csr.extensions.get_extension_for_oid(ExtensionOID.CRL_DISTRIBUTION_POINTS)
-            except x509.ExtensionNotFound:
+            if not _sub_ca_csr_supplied(ExtensionOID.CRL_DISTRIBUTION_POINTS):
                 dist_points = [
                     x509.DistributionPoint(
                         full_name=[x509.UniformResourceIdentifier(url)],
@@ -959,9 +1000,7 @@ class CSROperationsMixin:
                 )
             )
         if aia_descriptions:
-            try:
-                csr.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_INFORMATION_ACCESS)
-            except x509.ExtensionNotFound:
+            if not _sub_ca_csr_supplied(ExtensionOID.AUTHORITY_INFORMATION_ACCESS):
                 builder = builder.add_extension(
                     x509.AuthorityInformationAccess(aia_descriptions),
                     critical=False
@@ -969,9 +1008,7 @@ class CSROperationsMixin:
 
         # Certificate Policies
         if cps_uri:
-            try:
-                csr.extensions.get_extension_for_oid(ExtensionOID.CERTIFICATE_POLICIES)
-            except x509.ExtensionNotFound:
+            if not _sub_ca_csr_supplied(ExtensionOID.CERTIFICATE_POLICIES):
                 policy_oid_obj = x509.ObjectIdentifier(cps_oid or '2.5.29.32.0')
                 builder = builder.add_extension(
                     x509.CertificatePolicies([
@@ -995,8 +1032,10 @@ class CSROperationsMixin:
             critical=False
         )
 
-        # OCSP Must-Staple
-        if ocsp_must_staple:
+        # OCSP Must-Staple (a CSR that already asked for it was copied above)
+        if ocsp_must_staple and not any(
+            e.oid == ExtensionOID.TLS_FEATURE for e in builder._extensions
+        ):
             builder = builder.add_extension(
                 x509.TLSFeature([x509.TLSFeatureType.status_request]),
                 critical=False,
