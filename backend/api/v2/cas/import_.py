@@ -13,7 +13,7 @@ from auth.unified import require_auth
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
-from utils.cert_issuer import private_key_matches, stored_private_key_matches
+from utils.cert_issuer import private_key_matches, stored_private_key_matches, hsm_key_binding_matches
 from services.import_service import (
     parse_certificate_file, extract_cert_info, find_existing_ca,
     serialize_cert_to_pem, serialize_key_to_pem
@@ -110,7 +110,22 @@ def import_ca():
             existing_ca.crt = base64.b64encode(cert_pem).decode('utf-8')
             key_dropped = False
             if key_pem:
+                # The new certificate's key arrived with it: it replaces whatever
+                # the record held, an HSM binding included
                 existing_ca.prv = encrypted_prv
+                existing_ca.hsm_key_id = None
+            elif existing_ca.hsm_key_id:
+                # An HSM-backed CA holds no key column: the binding is checked
+                # against the HSM key's public key, and left untouched when that
+                # key cannot be reached rather than kept or dropped on a guess
+                bound = hsm_key_binding_matches(existing_ca.hsm_key_id, cert)
+                if bound is None:
+                    return error_response(
+                        'Cannot verify the HSM key bound to this CA against the new '
+                        'certificate; the HSM key is unreachable', 409)
+                if bound is False:
+                    existing_ca.hsm_key_id = None
+                    key_dropped = True
             elif stored_private_key_matches(existing_ca.prv, cert, context=f"CA {existing_ca.id}") is False:
                 # The new certificate is not the stored key's: keeping the key
                 # would leave a pair that signs nothing verifiable (re-keyed
@@ -135,7 +150,7 @@ def import_ca():
 
             message = f'CA "{existing_ca.descr}" updated (already existed)'
             if key_dropped:
-                message += '; the stored private key did not match the new certificate and was removed'
+                message += '; the stored key did not match the new certificate and was unbound'
             return success_response(data=existing_ca.to_dict(), message=message)
 
         # Create new CA record

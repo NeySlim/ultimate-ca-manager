@@ -607,6 +607,11 @@ class OCSPService:
             return signing_key.sign(response_data_der), 'ed25519'
         if isinstance(public_key, ed448.Ed448PublicKey):
             return signing_key.sign(response_data_der), 'ed448'
+        if isinstance(public_key, dsa.DSAPublicKey):
+            # Accepted as a responder like any other key type, so it has to
+            # sign the multi-CertID answer too (#347 review)
+            signature = signing_key.sign(response_data_der, hashes.SHA256())
+            return signature, 'sha256_dsa'
         raise ValueError('Unsupported OCSP response signing key type')
 
     def generate_multi_response(

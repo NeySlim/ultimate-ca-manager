@@ -109,3 +109,26 @@ def stored_private_key_matches(prv_column, cert: x509.Certificate, *, context: s
     except Exception:
         return False
     return private_key_matches(key, cert)
+
+
+def hsm_key_binding_matches(hsm_key_id, cert: x509.Certificate):
+    """Whether the HSM key bound to a record is *cert*'s key.
+
+    True or False from the HSM key's public key; None when that public key
+    cannot be obtained, in which case nothing can be asserted and the
+    caller must not keep or drop the binding on a guess (#347 review).
+    """
+    if not hsm_key_id:
+        return None
+    try:
+        from services.hsm import HsmService
+        from cryptography.hazmat.primitives import serialization
+        pem = HsmService.get_public_key(hsm_key_id)
+        if not pem:
+            return None
+        public_key = serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)
+        spki = lambda pub: pub.public_bytes(  # noqa: E731
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+        return spki(public_key) == spki(cert.public_key())
+    except Exception:
+        return None

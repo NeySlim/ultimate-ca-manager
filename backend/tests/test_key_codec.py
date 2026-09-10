@@ -102,3 +102,16 @@ class TestEquivalenceWithLegacyPattern:
         inline = base64.b64decode(decrypt_private_key(stored))
         helper = load_pem_bytes(stored)
         assert inline == helper == SAMPLE_PEM
+
+
+def test_private_key_to_pem_is_exported():
+    import utils.key_codec as kc
+    assert 'private_key_to_pem' in kc.__all__
+    from cryptography.hazmat.primitives.asymmetric import ed25519, rsa
+    from cryptography.hazmat.primitives import serialization
+    ed = kc.private_key_to_pem(ed25519.Ed25519PrivateKey.generate())
+    assert b'BEGIN PRIVATE KEY' in ed
+    r = kc.private_key_to_pem(rsa.generate_private_key(65537, 2048))
+    assert b'BEGIN RSA PRIVATE KEY' in r
+    for pem in (ed, r):
+        serialization.load_pem_private_key(pem, password=None)

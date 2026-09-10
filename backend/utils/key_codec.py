@@ -103,7 +103,7 @@ def store_pem_bytes(pem_bytes: Union[str, bytes]) -> str:
     return encrypt_private_key(b64)
 
 
-__all__ = ['load_pem_bytes', 'store_pem_bytes']
+__all__ = ['load_pem_bytes', 'store_pem_bytes', 'private_key_to_pem']
 
 
 def private_key_to_pem(private_key) -> bytes:

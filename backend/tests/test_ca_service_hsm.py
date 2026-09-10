@@ -290,3 +290,94 @@ class TestCaToDictHsmFields:
             assert d['hsm_provider_id'] is None
             assert d['hsm_provider_name'] is None
             assert d['hsm_key_label'] is None
+
+
+class TestHsmCaReimport:
+    """Sixth review of #347: re-importing a re-keyed certificate onto an
+    HSM-backed CA must not keep an HSM binding that is no longer its key."""
+
+    @staticmethod
+    def _selfsigned(cn, key, signer=None):
+        from datetime import datetime, timedelta, timezone
+        from cryptography import x509
+        from cryptography.x509.oid import NameOID
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+        now = datetime.now(timezone.utc)
+        return (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+                .public_key(key.public_key()).serial_number(x509.random_serial_number())
+                .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=365))
+                .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+                .sign(signer or key, hashes.SHA256()))
+
+    def _bound_ca(self, app, fx, cn):
+        import base64
+        with app.app_context():
+            from models import db, CA
+            cert = self._selfsigned(cn, fx['real_key'])
+            ca = CA(refid=f'hsm-reimport-{cn}', descr=cn, serial=0,
+                    crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode(),
+                    prv=None, hsm_key_id=fx['hsm_key_id'],
+                    subject=cert.subject.rfc4514_string(), issuer=cert.issuer.rfc4514_string())
+            db.session.add(ca); db.session.commit()
+            return ca.id
+
+    @staticmethod
+    def _import(auth_client, cert):
+        pem = cert.public_bytes(serialization.Encoding.PEM).decode()
+        return auth_client.post('/api/v2/cas/import', data={'pem_content': pem},
+                                content_type='multipart/form-data')
+
+    def test_rekeyed_certificate_unbinds_the_hsm_key(self, app, auth_client, hsm_provider_and_key):
+        import json
+        fx = hsm_provider_and_key
+        ca_id = self._bound_ca(app, fx, 'HSM Rekey CA')
+        other = rsa.generate_private_key(65537, 2048)
+        rekeyed = self._selfsigned('HSM Rekey CA', other)
+        patches = _patch_hsm(fx['real_key'], fx['pub_pem'])
+        for p in patches: p.start()
+        try:
+            r = self._import(auth_client, rekeyed)
+        finally:
+            for p in patches: p.stop()
+        assert r.status_code == 200, r.data
+        body = json.loads(r.data)
+        assert body['data']['id'] == ca_id
+        assert 'unbound' in body['message']
+        with app.app_context():
+            from models import db, CA
+            row = db.session.get(CA, ca_id)
+            assert row.hsm_key_id is None
+            assert row.has_private_key is False
+
+    def test_renewed_certificate_keeps_the_hsm_key(self, app, auth_client, hsm_provider_and_key):
+        import json
+        fx = hsm_provider_and_key
+        ca_id = self._bound_ca(app, fx, 'HSM Renew CA')
+        renewed = self._selfsigned('HSM Renew CA', fx['real_key'])
+        patches = _patch_hsm(fx['real_key'], fx['pub_pem'])
+        for p in patches: p.start()
+        try:
+            r = self._import(auth_client, renewed)
+        finally:
+            for p in patches: p.stop()
+        assert r.status_code == 200, r.data
+        assert 'unbound' not in json.loads(r.data)['message']
+        with app.app_context():
+            from models import db, CA
+            assert db.session.get(CA, ca_id).hsm_key_id == fx['hsm_key_id']
+
+    def test_unreachable_hsm_refuses_the_update(self, app, auth_client, hsm_provider_and_key):
+        fx = hsm_provider_and_key
+        ca_id = self._bound_ca(app, fx, 'HSM Down CA')
+        other = rsa.generate_private_key(65537, 2048)
+        rekeyed = self._selfsigned('HSM Down CA', other)
+        with app.app_context():
+            from models.hsm import HsmKey
+            HsmKey.query.filter_by(id=fx['hsm_key_id']).update({'public_key_pem': None})
+            from models import db; db.session.commit()
+        with patch('services.hsm.HsmService.get_public_key', side_effect=RuntimeError('hsm down')):
+            r = self._import(auth_client, rekeyed)
+        assert r.status_code == 409, r.data
+        with app.app_context():
+            from models import db, CA
+            assert db.session.get(CA, ca_id).hsm_key_id == fx['hsm_key_id']  # untouched

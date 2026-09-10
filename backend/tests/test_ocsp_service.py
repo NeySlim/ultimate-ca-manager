@@ -1269,3 +1269,44 @@ class TestEd25519Responder:
             resp2 = ocsp.load_der_ocsp_response(der2)
             assert resp2.response_status == ocsp.OCSPResponseStatus.SUCCESSFUL
             key.public_key().verify(resp2.signature, resp2.tbs_response_bytes)
+
+
+class TestDsaResponder:
+    """Sixth review of #347: a DSA responder signs the multi-CertID answer too."""
+
+    def test_dsa_responder_signs_single_and_multi(self, app, auth_client, create_ca, create_cert):
+        with app.app_context():
+            from cryptography.hazmat.primitives.asymmetric import dsa as _dsa
+            ca = create_ca(cn='DSA Responder CA')
+            leaf = create_cert(cn='leaf-dsa.example.com', ca_id=ca['id'])
+            ca_obj = _ca_model(ca); ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            key = _dsa.generate_private_key(key_size=2048)
+            cert = _delegated_certificate(ca_cert, get_ca_signing_key(ca_obj), key)
+            row = Certificate(
+                refid='dsa-responder', descr='dsa', caref=ca_obj.refid,
+                crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode(),
+                prv=base64.b64encode(key.private_bytes(
+                    serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                    serialization.NoEncryption())).decode(),
+                serial_number=str(cert.serial_number),
+            )
+            db.session.add(row); db.session.commit()
+            assert OCSPService().check_delegated_responder(ca_obj, row) is None
+            r = auth_client.post(f"/api/v2/cas/{ca['id']}/ocsp-responder",
+                                 data=json.dumps({'certificate_id': row.id}), content_type='application/json')
+            assert r.status_code == 200, r.data
+
+            serial = int(_cert_model(leaf).serial_number, 16)
+            der, status = OCSPService().generate_response(ca_obj, serial)
+            assert status == 'good'
+            resp = ocsp.load_der_ocsp_response(der)
+            key.public_key().verify(resp.signature, resp.tbs_response_bytes, hashes.SHA256())
+
+            ids = [_cert_id(_load_x509(_cert_model(leaf)), ca_cert, hashes.SHA1())]
+            parsed = OCSPService().parse_request_details(_build_asn1_request(ids * 2))
+            der2, statuses = OCSPService().generate_multi_response(ca=ca_obj, request_items=parsed.requests)
+            assert statuses == ('good', 'good'), statuses
+            resp2 = ocsp.load_der_ocsp_response(der2)
+            assert resp2.response_status == ocsp.OCSPResponseStatus.SUCCESSFUL
+            key.public_key().verify(resp2.signature, resp2.tbs_response_bytes, hashes.SHA256())
