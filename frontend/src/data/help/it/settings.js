@@ -135,6 +135,14 @@ export default {
           { label: 'Soggetti derivati da AD', text: "I modelli possono scegliere di derivare il proprio soggetto/SAN da Active Directory (tramite il connettore AD) per l'iscrizione non presidiata" },
         ]
       },
+      {
+        title: 'Rinnovo automatico',
+        items: [
+          { label: 'Origini', text: 'Lo scheduler rinnova i certificati la cui chiave privata è detenuta dal server: per impostazione predefinita quelli emessi dal modulo o da una richiesta firmata ("manual"), e le iscrizioni SCEP, ACME ed EST con chiave generata dal server. I dispositivi che detengono la propria chiave si rinnovano tramite il loro protocollo' },
+          { label: 'In attesa di approvazione', text: 'Un certificato il cui rinnovo è in coda per l\'approvazione viene lasciato a quella decisione, purché possa arrivare prima della scadenza del certificato' },
+          { label: 'Rinnovato nel frattempo', text: 'Un certificato rinnovato da un operatore durante il batch non viene rinnovato una seconda volta; uno eliminato durante il batch viene saltato' },
+        ]
+      },
 
     ],
     tips: [
@@ -162,6 +170,7 @@ Configurazione a livello di sistema organizzata in schede. Le modifiche hanno ef
 - **Hostname** — Il nome di dominio completo del server
 - **Validità predefinita** — Periodo di validità predefinito del certificato in giorni
 - **Soglia avviso scadenza** — Giorni prima della scadenza per attivare gli avvisi
+- **Vhost ACME pubblico** — Hostname concreto negli URL del directory ACME (es. \`acme.ucm.example.com\` — non \`*.ucm.example.com\`). Un **SAN del certificato TLS** wildcard \`*.ucm.example.com\` copre sia \`admin.ucm.example.com\` sia \`acme.ucm.example.com\`. Configura DNS e TLS per il vhost ACME **prima** di salvare — i client che rileggono il directory cambiano subito gli URL.
 
 ## Aspetto
 
@@ -380,6 +389,12 @@ Impostazioni › Sistema mostra le attività in background.
 - Elenco attività con **stato**, **ultima esecuzione**, **durata** ed **errori**
 - **Esegui ora** su qualsiasi attività
 - Copre scadenza, CRL, consegna webhook, backup, rinnovo automatico…
+
+## Rinnovo automatico
+Le impostazioni di rinnovo automatico guidano lo scheduler dei rinnovi.
+- **Origini** — lo scheduler rinnova i certificati la cui chiave privata è detenuta dal server: per impostazione predefinita quelli emessi dal modulo o da una richiesta firmata ("manual"), e le iscrizioni SCEP, ACME ed EST con chiave generata dal server. I dispositivi che detengono la propria chiave si rinnovano tramite il loro protocollo
+- **In attesa di approvazione** — un certificato il cui rinnovo è in coda per l'approvazione viene lasciato a quella decisione, purché possa arrivare prima della scadenza del certificato
+- **Rinnovato nel frattempo** — un certificato rinnovato da un operatore durante il batch non viene rinnovato una seconda volta; uno eliminato durante il batch viene saltato
 
 ## Backup pianificati
 

@@ -71,6 +71,7 @@ Der private Schlüssel der signierenden CA wird zum Signieren jedes Zeitstempel-
 - Verwenden Sie eine **dedizierte Sub-CA** für Zeitstempel anstelle Ihrer Root-CA
 - Das CA-Zertifikat sollte die **id-kp-timeStamping** Extended Key Usage (OID 1.3.6.1.5.5.7.3.8) enthalten
 - Stellen Sie sicher, dass das CA-Zertifikat eine **ausreichende Gültigkeit** hat — Zeitstempel müssen über Jahre hinweg verifizierbar bleiben
+- Aktivieren Sie **Dediziertes Zeitstempelzertifikat erforderlich**, um dies beim Signieren zu erzwingen, statt sich auf Konvention zu verlassen
 
 ### Richtlinien-OID
 

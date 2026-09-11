@@ -217,6 +217,7 @@ Ao solicitar um certificado, escolha de onde vem a chave privada:
 Configure provedores de desafio DNS-01 para validação de domínio. Provedores suportados incluem:
 - Cloudflare
 - AWS Route 53
+- Azure DNS
 - Google Cloud DNS
 - DigitalOcean
 - OVH

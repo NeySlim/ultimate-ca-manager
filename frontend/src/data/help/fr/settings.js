@@ -135,6 +135,14 @@ export default {
           { label: "Sujets dérivés d'AD", text: "Les modèles peuvent choisir de dériver leur sujet/SAN depuis Active Directory (via le connecteur AD) pour l'inscription sans surveillance" },
         ]
       },
+      {
+        title: 'Renouvellement automatique',
+        items: [
+          { label: 'Sources', text: 'Le planificateur renouvelle les certificats dont le serveur détient la clé privée : par défaut ceux émis depuis le formulaire ou une requête signée (« manual »), ainsi que les enrôlements SCEP, ACME et EST à clé générée par le serveur. Les appareils qui détiennent leur propre clé se renouvellent via leur protocole' },
+          { label: 'En attente d\'approbation', text: 'Un certificat dont le renouvellement est en file d\'approbation est laissé à cette décision, tant qu\'elle peut intervenir avant l\'expiration du certificat' },
+          { label: 'Renouvelé entre-temps', text: 'Un certificat qu\'un opérateur a renouvelé pendant le lot n\'est pas renouvelé une seconde fois ; un certificat supprimé pendant le lot est ignoré' },
+        ]
+      },
 
     ],
     tips: [
@@ -162,6 +170,7 @@ Configuration à l'échelle du système organisée en onglets. Les modifications
 - **Nom d'hôte** — Le nom de domaine pleinement qualifié du serveur
 - **Validité par défaut** — Période de validité par défaut des certificats en jours
 - **Seuil d'alerte d'expiration** — Jours avant l'expiration pour déclencher des avertissements
+- **Vhost ACME public** — Nom d'hôte concret dans les URL du directory ACME (ex. \`acme.ucm.example.com\`, pas \`*.ucm.example.com\`). Un **SAN de certificat TLS** wildcard \`*.ucm.example.com\` couvre à la fois \`admin.ucm.example.com\` et \`acme.ucm.example.com\`. Configurez le DNS et le TLS du vhost ACME **avant** d'enregistrer : les clients qui relisent le directory basculent immédiatement d'URL.
 
 ## Apparence
 
@@ -380,6 +389,14 @@ Paramètres › Système expose les tâches d'arrière-plan.
 - Liste des tâches avec **statut**, **dernière exécution**, **durée** et **échecs**
 - **Exécuter maintenant** sur n'importe quelle tâche
 - Couvre expiration, CRL, livraison webhooks, sauvegardes, renouvellement auto…
+
+## Renouvellement automatique
+
+Les paramètres de renouvellement automatique pilotent le planificateur de renouvellement.
+
+- **Sources** — le planificateur renouvelle les certificats dont le serveur détient la clé privée : par défaut ceux émis depuis le formulaire ou une requête signée (« manual »), ainsi que les enrôlements SCEP, ACME et EST à clé générée par le serveur. Les appareils qui détiennent leur propre clé se renouvellent via leur protocole
+- **En attente d'approbation** — un certificat dont le renouvellement est en file d'approbation est laissé à cette décision, tant qu'elle peut intervenir avant l'expiration du certificat
+- **Renouvelé entre-temps** — un certificat qu'un opérateur a renouvelé pendant le lot n'est pas renouvelé une seconde fois ; un certificat supprimé pendant le lot est ignoré
 
 ## Sauvegardes planifiées
 

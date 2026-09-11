@@ -57,6 +57,7 @@ Una volta approvata, la chiave archiviata viene rilasciata come pacchetto **PKCS
 
 - **read:key_recovery** — Richiedere un recupero e consultare le richieste
 - **admin** — Approvare o rifiutare una richiesta di recupero in attesa
+- **read:private_keys** — Permesso riservato agli admin, richiesto per l'esportazione *diretta* della chiave privata dalla pagina Certificati (bypassando questo flusso)
 
 ## Cos'è (e cosa non è)
 

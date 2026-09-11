@@ -30,6 +30,8 @@ export default {
           { label: 'Challenge pro Profil', text: 'Jedes Profil hat ein eigenes, verschlüsselt gespeichertes Challenge-Passwort mit demselben Ablauffenster wie die globale Challenge' },
           { label: 'Standard-Endpunkt', text: 'Der Endpunkt /scep/pkiclient.exe ohne Segment bedient weiterhin die globale Konfiguration' },
           { label: 'Microsoft Intune-Validierung', text: 'Ein Profil kann anstelle eines statischen Passworts gegen Intunes eigene gerätespezifische SCEP-Challenge validieren — erfordert eine Entra-App-Registrierung (Berechtigungen SCEP challenge validation + Application.Read.All) und aktivierte Auto-Genehmigung' },
+          { label: 'Manuelle Genehmigung', text: 'Eine über ein Profil eingegangene Anfrage wird mit der Vorlage dieses Profils (Gültigkeit, Key Usages) genehmigt, genau wie die Auto-Genehmigung sie ausstellen würde' },
+          { label: 'Zwecke, die kein Antragsteller erhalten darf', text: 'Eine an ein Profil gebundene Vorlage darf weder OCSP-Signierung, Zeitstempelung, „Any Purpose" noch Smartcard-Anmeldung tragen, und eine SCEP-Erneuerung übernimmt sie nie; Smartcard-Anmeldung ist erlaubt, wenn das Profil gegen Intune validiert, das für die Identität bürgt' },
         ]
       },
     ],
@@ -75,6 +77,7 @@ https://ihr-server:8443/scep/<profil>/pkiclient.exe
 Jedes Profil ist gebunden an:
 - **Seine eigene CA** — verschiedene Geräteflotten können sich gegen verschiedene CAs registrieren
 - **Eine optionale Zertifikatsvorlage** — ist eine Vorlage gebunden, bestimmen deren Key Usage, Extended Key Usage und Gültigkeit jedes über das Profil ausgestellte Zertifikat
+- **Zwecke, die kein Antragsteller erhalten darf** — eine an ein Profil gebundene Vorlage darf weder OCSP-Signierung, Zeitstempelung, „Any Purpose" noch Smartcard-Anmeldung tragen, und eine SCEP-Erneuerung übernimmt sie nie; Smartcard-Anmeldung ist erlaubt, wenn das Profil gegen Intune validiert, das für die Identität bürgt
 - **Ein Challenge-Passwort pro Profil** — verschlüsselt gespeichert, mit demselben Ablauffenster wie die globale Challenge
 - **Eine Genehmigungsrichtlinie** — Auto-Genehmigung oder manuelle Prüfung pro Profil
 
@@ -113,6 +116,8 @@ Für ausstehende Anfragen (Auto-Genehmigung deaktiviert):
 1. Prüfen Sie die Anfragedetails (Betreff, Schlüsseltyp, Challenge)
 2. Klicken Sie auf **Genehmigen**, um das Zertifikat zu signieren und auszustellen
 3. Oder klicken Sie auf **Ablehnen** mit einem Grund
+
+Eine über ein Profil eingegangene Anfrage wird mit der Vorlage dieses Profils (Gültigkeit, Key Usages) ausgestellt, genau wie bei der Auto-Genehmigung.
 
 > ⚠ Challenge-Passwörter werden in der SCEP-Anfrage übertragen. Verwenden Sie immer HTTPS für den SCEP-Endpunkt.
 

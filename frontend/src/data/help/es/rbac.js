@@ -56,7 +56,8 @@ Cuatro roles integrados que no se pueden modificar ni eliminar:
 ### Matriz de permisos
 Los permisos están organizados por categoría:
 - **CA** — Crear, leer, actualizar, eliminar, importar, exportar
-- **Certificados** — Emitir, leer, revocar, renovar, exportar, eliminar
+- **Certificados** — Emitir, leer, revocar, renovar, eliminar, exportar (solo el certificado — véase Claves privadas)
+- **Claves privadas** — Exportación directa de la clave privada (\`read:private_keys\`), solo administradores: ningún rol integrado salvo Admin la posee. Los roles sin ella pasan por la Recuperación de claves
 - **CSR** — Crear, leer, firmar, eliminar
 - **Plantillas** — Crear, leer, actualizar, eliminar
 - **Usuarios** — Crear, leer, actualizar, eliminar
@@ -67,6 +68,10 @@ Los permisos están organizados por categoría:
 - **SCEP** — Configurar, aprobar solicitudes
 - **Almacén de confianza** — Gestionar certificados de confianza
 - **HSM** — Gestionar proveedores y claves
+- **SSH** — Gestionar CA SSH y certificados SSH
+- **Políticas** — Ver políticas de certificados
+- **Aprobaciones** — Ver y decidir solicitudes de aprobación
+- **Recuperación de claves** — Solicitar recuperaciones y ver solicitudes (la aprobación es solo para administradores)
 - **Respaldo** — Crear, restaurar
 
 ### Alternar categorías

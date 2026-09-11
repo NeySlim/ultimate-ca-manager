@@ -217,6 +217,7 @@ Quando richiedi un certificato, scegli da dove proviene la chiave privata:
 Configura i provider di sfida DNS-01 per la validazione del dominio. I provider supportati includono:
 - Cloudflare
 - AWS Route 53
+- Azure DNS
 - Google Cloud DNS
 - DigitalOcean
 - OVH

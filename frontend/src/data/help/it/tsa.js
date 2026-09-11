@@ -71,6 +71,7 @@ La chiave privata della CA firmataria viene usata per firmare ogni token timesta
 - Usa una **sotto-CA dedicata** per le marche temporali piuttosto che la CA root
 - Il certificato della CA dovrebbe includere l'Extended Key Usage **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8)
 - Assicurati che il certificato della CA abbia una **validità sufficiente** — le marche temporali devono rimanere verificabili per anni
+- Abilita **Richiedi un certificato TSA dedicato** per imporlo al momento della firma invece di affidarti alla convenzione
 
 ### Policy OID
 

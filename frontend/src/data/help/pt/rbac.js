@@ -56,7 +56,8 @@ Quatro funções integradas que não podem ser modificadas ou excluídas:
 ### Matriz de Permissões
 As permissões são organizadas por categoria:
 - **CAs** — Criar, ler, atualizar, excluir, importar, exportar
-- **Certificados** — Emitir, ler, revogar, renovar, exportar, excluir
+- **Certificados** — Emitir, ler, revogar, renovar, excluir, exportar (somente o certificado — ver Chaves Privadas)
+- **Chaves Privadas** — Exportação direta da chave privada (\`read:private_keys\`), somente admin: nenhuma função integrada além de Admin a possui. As funções sem ela passam pela Recuperação de chaves
 - **CSRs** — Criar, ler, assinar, excluir
 - **Modelos** — Criar, ler, atualizar, excluir
 - **Usuários** — Criar, ler, atualizar, excluir
@@ -67,6 +68,10 @@ As permissões são organizadas por categoria:
 - **SCEP** — Configurar, aprovar solicitações
 - **Armazenamento de Confiança** — Gerenciar certificados confiáveis
 - **HSM** — Gerenciar provedores e chaves
+- **SSH** — Gerenciar CAs e certificados SSH
+- **Políticas** — Ver políticas de certificado
+- **Aprovações** — Ver e decidir solicitações de aprovação
+- **Recuperação de Chaves** — Solicitar recuperações e ver solicitações (a aprovação é somente admin)
 - **Backup** — Criar, restaurar
 
 ### Alternância de Categorias

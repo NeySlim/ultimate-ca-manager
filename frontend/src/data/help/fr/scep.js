@@ -30,6 +30,8 @@ export default {
           { label: 'Challenge par profil', text: 'Chaque profil a son propre mot de passe de défi, stocké chiffré, avec la même fenêtre d\'expiration que le challenge global' },
           { label: 'Endpoint par défaut', text: 'L\'endpoint /scep/pkiclient.exe sans segment continue de servir la configuration globale' },
           { label: 'Validation Microsoft Intune', text: 'Un profil peut se valider face au challenge SCEP propre à Intune par appareil au lieu d\'un mot de passe statique — nécessite une inscription d\'application Entra (permissions SCEP challenge validation + Application.Read.All) et l\'approbation automatique activée' },
+          { label: 'Approbation manuelle', text: 'Une requête arrivée via un profil est approuvée avec le template de ce profil (validité, usages de clé), exactement comme l\'approbation automatique l\'émettrait' },
+          { label: 'Usages interdits aux enrôlés', text: 'Un template lié à un profil ne peut pas porter la signature OCSP, l\'horodatage, « any purpose » ou Smartcard Logon, et un renouvellement SCEP ne les reporte jamais ; Smartcard Logon est autorisé quand le profil se valide face à Intune, qui se porte garant de l\'identité' },
         ]
       },
     ],
@@ -75,6 +77,7 @@ https://votre-serveur:8443/scep/<profil>/pkiclient.exe
 Chaque profil est lié à :
 - **Sa propre CA** — différentes flottes d'appareils peuvent s'enrôler auprès de CAs différentes
 - **Un template de certificat optionnel** — quand un template est lié, ses usages de clé (KU/EKU) et sa validité gouvernent chaque certificat émis via le profil
+- **Usages interdits aux enrôlés** — un template lié à un profil ne peut pas porter la signature OCSP, l'horodatage, « any purpose » ou Smartcard Logon, et un renouvellement SCEP ne les reporte jamais ; Smartcard Logon est autorisé quand le profil se valide face à Intune, qui se porte garant de l'identité
 - **Un mot de passe de défi par profil** — stocké chiffré, avec la même fenêtre d'expiration que le challenge global
 - **Une politique d'approbation** — approbation automatique ou revue manuelle par profil
 
@@ -113,6 +116,8 @@ Pour les requêtes en attente (approbation automatique désactivée) :
 1. Examinez les détails de la requête (sujet, type de clé, défi)
 2. Cliquez sur **Approuver** pour signer et émettre le certificat
 3. Ou cliquez sur **Rejeter** avec un motif
+
+Une requête arrivée via un profil est émise avec le template de ce profil (validité, usages de clé), exactement comme le ferait l'approbation automatique.
 
 > ⚠ Les mots de passe de défi sont transmis dans la requête SCEP. Utilisez toujours HTTPS pour le point de terminaison SCEP.
 

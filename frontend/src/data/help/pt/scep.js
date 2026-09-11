@@ -30,6 +30,8 @@ export default {
           { label: 'Desafio por perfil', text: 'Cada perfil tem sua própria senha de desafio, armazenada criptografada, com a mesma janela de expiração do desafio global' },
           { label: 'Endpoint padrão', text: 'O endpoint /scep/pkiclient.exe sem segmento continua servindo a configuração global' },
           { label: 'Validação Microsoft Intune', text: 'Um perfil pode validar contra o desafio SCEP próprio do Intune por dispositivo em vez de uma senha estática — requer um registro de aplicativo no Entra (permissões SCEP challenge validation + Application.Read.All) e auto-aprovação ativada' },
+          { label: 'Aprovação manual', text: 'Uma solicitação que chegou por um perfil é aprovada com o modelo desse perfil (validade, key usages), exatamente como a auto-aprovação a emitiria' },
+          { label: 'Finalidades que nenhum inscrito pode ter', text: 'Um modelo vinculado a um perfil não pode conter assinatura OCSP, carimbo de tempo, qualquer finalidade ou Smartcard Logon, e uma renovação SCEP nunca os transfere; Smartcard Logon é permitido quando o perfil valida contra o Intune, que atesta a identidade' },
         ]
       },
     ],
@@ -75,6 +77,7 @@ https://seu-servidor:8443/scep/<perfil>/pkiclient.exe
 Cada perfil está vinculado a:
 - **Sua própria CA** — frotas de dispositivos diferentes podem se inscrever em CAs diferentes
 - **Um modelo de certificado opcional** — quando vinculado, o key usage, extended key usage e validade do modelo governam cada certificado emitido pelo perfil
+- **Finalidades que nenhum inscrito pode ter** — um modelo vinculado a um perfil não pode conter assinatura OCSP, carimbo de tempo, qualquer finalidade ou Smartcard Logon, e uma renovação SCEP nunca os transfere; Smartcard Logon é permitido quando o perfil valida contra o Intune, que atesta a identidade
 - **Uma senha de desafio por perfil** — armazenada criptografada, com a mesma janela de expiração do desafio global
 - **Uma política de aprovação** — auto-aprovação ou revisão manual por perfil
 
@@ -113,6 +116,8 @@ Para solicitações pendentes (auto-aprovação desativada):
 1. Revise os detalhes da solicitação (sujeito, tipo de chave, desafio)
 2. Clique em **Aprovar** para assinar e emitir o certificado
 3. Ou clique em **Rejeitar** com um motivo
+
+Uma solicitação que chegou por um perfil é emitida com o modelo desse perfil (validade, key usages), exatamente como a auto-aprovação faria.
 
 > ⚠ Senhas de desafio são transmitidas na solicitação SCEP. Sempre use HTTPS para o endpoint SCEP.
 

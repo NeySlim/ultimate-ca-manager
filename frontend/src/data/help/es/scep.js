@@ -30,6 +30,8 @@ export default {
           { label: 'Desafío por perfil', text: 'Cada perfil tiene su propia contraseña de desafío, almacenada cifrada, con la misma ventana de expiración que el desafío global' },
           { label: 'Endpoint por defecto', text: 'El endpoint /scep/pkiclient.exe sin segmento sigue sirviendo la configuración global' },
           { label: 'Validación de Microsoft Intune', text: 'Un perfil puede validarse contra el desafío SCEP propio de Intune por dispositivo en lugar de una contraseña estática — requiere un registro de aplicación en Entra (permisos SCEP challenge validation + Application.Read.All) y aprobación automática activada' },
+          { label: 'Aprobación manual', text: 'Una solicitud que llegó a través de un perfil se aprueba con la plantilla de ese perfil (validez, usos de clave), exactamente como la emitiría la aprobación automática' },
+          { label: 'Propósitos que ningún inscrito puede tener', text: 'Una plantilla vinculada a un perfil no puede llevar firma OCSP, sellado de tiempo, cualquier uso ni Smartcard Logon, y una renovación SCEP nunca los traslada; Smartcard Logon se permite cuando el perfil valida contra Intune, que avala la identidad' },
         ]
       },
     ],
@@ -75,6 +77,7 @@ https://su-servidor:8443/scep/<profile>/pkiclient.exe
 Cada perfil está vinculado a:
 - **Su propia CA** — distintas flotas de dispositivos pueden inscribirse contra CAs diferentes
 - **Una plantilla de certificado opcional** — cuando está vinculada, el uso de clave, el uso extendido de clave y la validez de la plantilla gobiernan cada certificado emitido a través del perfil
+- **Propósitos que ningún inscrito puede tener** — una plantilla vinculada a un perfil no puede llevar firma OCSP, sellado de tiempo, cualquier uso ni Smartcard Logon, y una renovación SCEP nunca los traslada; Smartcard Logon se permite cuando el perfil valida contra Intune, que avala la identidad
 - **Una contraseña de desafío por perfil** — almacenada cifrada, con la misma ventana de expiración que el desafío global
 - **Una política de aprobación** — aprobación automática o revisión manual por perfil
 
@@ -113,6 +116,8 @@ Para solicitudes pendientes (aprobación automática desactivada):
 1. Revise los detalles de la solicitud (asunto, tipo de clave, desafío)
 2. Haga clic en **Aprobar** para firmar y emitir el certificado
 3. O haga clic en **Rechazar** con un motivo
+
+Una solicitud que llegó a través de un perfil se emite con la plantilla de ese perfil (validez, usos de clave), exactamente como lo haría la aprobación automática.
 
 > ⚠ Las contraseñas de desafío se transmiten en la solicitud SCEP. Siempre use HTTPS para el endpoint SCEP.
 

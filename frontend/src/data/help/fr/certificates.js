@@ -22,6 +22,7 @@ export default {
           { term: 'Expiré', description: 'Après la date « Not After »' },
           { term: 'Révoqué', description: 'Explicitement révoqué (publié dans la CRL)' },
           { term: 'Orphelin', description: 'La CA émettrice n\'existe plus dans le système' },
+          { term: 'Archivé', description: 'Remplacé par un renouvellement ou un ré-enrôlement qui a conservé l\'ancien enregistrement pour l\'historique (SCEP, EST, WSTEP, ACME, répondeur OCSP) ; listé avec le filtre de statut « Archivé »' },
         ]
       },
       {
@@ -97,6 +98,7 @@ Gestion centralisée de tous les certificats X.509. Émettez de nouveaux certifi
 - **Expiré** — Après la date « Not After »
 - **Révoqué** — Explicitement révoqué, publié dans la CRL
 - **Orphelin** — La CA émettrice n'existe plus dans UCM
+- **Archivé** — Remplacé par un renouvellement ou un ré-enrôlement qui a conservé l'ancien enregistrement pour l'historique (SCEP, EST, WSTEP, ACME, répondeur OCSP)
 
 ## Émettre un certificat
 
@@ -174,8 +176,10 @@ Sélectionnez deux certificats et cliquez sur **Comparer** pour voir une compara
 
 ## Filtrage et recherche
 
-- **Filtre par statut** — Valide, Expirant, Expiré, Révoqué, Orphelin
+- **Filtre par statut** — Valide, Expirant, Expiré, Révoqué, Orphelin, Archivé
 - **Filtre par CA** — Afficher les certificats d'une CA spécifique
+- **Filtre par source** — Filtrer selon la manière dont le certificat est entré dans UCM (émis, importé, ACME, SCEP, etc.)
+- **Filtre par modèle** — Trouver les certificats **modifiés depuis le modèle** : émis depuis un modèle mais avec le type de clé, la validité ou l'algorithme de hachage explicitement remplacés au moment de la demande. Les champs divergents sont listés sur le détail du certificat ; l'enregistrement est figé à l'émission
 - **Recherche textuelle** — Recherche par CN, numéro de série ou SAN
 - **Tri** — Par nom, date d'expiration, date de création, statut
 ## Linting de conformité

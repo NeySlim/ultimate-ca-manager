@@ -71,6 +71,7 @@ La clé privée de la CA de signature est utilisée pour signer chaque jeton d'h
 - Utilisez une **sous-CA dédiée** pour l'horodatage plutôt que votre CA racine
 - Le certificat de la CA devrait inclure l'utilisation étendue de la clé **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8)
 - Assurez-vous que le certificat de la CA a une **validité suffisante** — les horodatages doivent rester vérifiables pendant des années
+- Activez **Exiger un certificat dédié** pour l'imposer au moment de la signature plutôt que de s'en remettre à la convention
 
 ### OID de politique
 

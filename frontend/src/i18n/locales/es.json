@@ -688,7 +688,7 @@
     "sourceWeb": "Interfaz web",
     "orphanDescription": "CA no encontrada",
     "archived": "Archivado",
-    "archivedDescription": "Sustituido por una nueva inscripción, conservado como historial",
+    "archivedDescription": "Sustituido por una renovación o reinscripción, conservado como historial",
     "noCertificates": "No se encontraron certificados",
     "confirmRevoke": "¿Está seguro de que desea revocar este certificado?",
     "confirmRenew": "¿Está seguro de que desea renovar este certificado?",

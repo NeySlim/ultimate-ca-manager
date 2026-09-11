@@ -22,6 +22,7 @@ export default {
           { term: 'Expirado', description: 'Posterior a la fecha «Not After»' },
           { term: 'Revocado', description: 'Revocado explícitamente (publicado en la CRL)' },
           { term: 'Huérfano', description: 'La CA emisora ya no existe en el sistema' },
+          { term: 'Archivado', description: 'Sustituido por una renovación o reinscripción que conservó el registro antiguo como historial (SCEP, EST, WSTEP, ACME, respondedor OCSP); se lista con el filtro de estado «Archivado»' },
         ]
       },
       {
@@ -97,6 +98,7 @@ Gestión centralizada de todos los certificados X.509. Emita nuevos certificados
 - **Expirado** — Posterior a la fecha «Not After»
 - **Revocado** — Revocado explícitamente, publicado en la CRL
 - **Huérfano** — La CA emisora ya no existe en UCM
+- **Archivado** — Sustituido por una renovación o reinscripción que conservó el registro antiguo como historial (SCEP, EST, WSTEP, ACME, respondedor OCSP)
 
 ## Emitir un certificado
 
@@ -174,8 +176,10 @@ Seleccione dos certificados y haga clic en **Comparar** para ver una comparació
 
 ## Filtrado y búsqueda
 
-- **Filtro por estado** — Válido, Por expirar, Expirado, Revocado, Huérfano
+- **Filtro por estado** — Válido, Por expirar, Expirado, Revocado, Huérfano, Archivado
 - **Filtro por CA** — Mostrar certificados de una CA específica
+- **Filtro por origen** — Filtrar por cómo entró el certificado en UCM (emitido, importado, ACME, SCEP, etc.)
+- **Filtro por plantilla** — Encontrar certificados **modificados respecto a la plantilla**: emitidos desde una plantilla pero con el tipo de clave, la validez o el digest sobrescritos explícitamente al solicitarlos. Los campos divergentes se listan en el detalle del certificado; el registro queda congelado en la emisión
 - **Búsqueda de texto** — Buscar por CN, número de serie o SAN
 - **Ordenación** — Por nombre, fecha de expiración, fecha de creación, estado
 ## Análisis de conformidad

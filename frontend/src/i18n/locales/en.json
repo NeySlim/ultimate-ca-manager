@@ -688,7 +688,7 @@
     "sourceWeb": "Web UI",
     "orphanDescription": "CA not found",
     "archived": "Archived",
-    "archivedDescription": "Superseded by a re-enrolment, kept for history",
+    "archivedDescription": "Superseded by a renewal or re-enrolment, kept for history",
     "noCertificates": "No certificates found",
     "confirmRevoke": "Are you sure you want to revoke this certificate?",
     "revokeWarning": "Revoking a certificate is permanent and cannot be undone. The certificate will be added to the CRL and will no longer be trusted by any client that checks revocation status. Only proceed if you are certain this certificate should be permanently invalidated.",

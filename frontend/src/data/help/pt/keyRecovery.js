@@ -57,6 +57,7 @@ Uma vez aprovada, a chave arquivada é disponibilizada como um pacote **PKCS#12 
 
 - **read:key_recovery** — Pedir uma recuperação e consultar os pedidos
 - **admin** — Aprovar ou recusar um pedido de recuperação pendente
+- **read:private_keys** — Âmbito exclusivo de admin, necessário para a exportação *direta* da chave privada a partir da página Certificados (contornando este fluxo de trabalho)
 
 ## O que é (e o que não é)
 

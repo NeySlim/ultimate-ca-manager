@@ -22,6 +22,7 @@ export default {
           { term: 'Scaduto', description: 'Oltre la data "Non dopo"' },
           { term: 'Revocato', description: 'Esplicitamente revocato (pubblicato nella CRL)' },
           { term: 'Orfano', description: 'La CA emittente non esiste più nel sistema' },
+          { term: 'Archiviato', description: 'Sostituito da un rinnovo o da una re-iscrizione che ha conservato il vecchio record per la cronologia (SCEP, EST, WSTEP, ACME, responder OCSP); elencato con il filtro di stato "Archiviato"' },
         ]
       },
       {
@@ -97,6 +98,7 @@ Gestione centralizzata di tutti i certificati X.509. Emetti nuovi certificati, i
 - **Scaduto** — Oltre la data "Non dopo"
 - **Revocato** — Esplicitamente revocato, pubblicato nella CRL
 - **Orfano** — La CA emittente non esiste più in UCM
+- **Archiviato** — Sostituito da un rinnovo o da una re-iscrizione che ha conservato il vecchio record per la cronologia (SCEP, EST, WSTEP, ACME, responder OCSP)
 
 ## Emissione di un certificato
 
@@ -174,8 +176,10 @@ Seleziona due certificati e clicca **Confronta** per vedere un confronto affianc
 
 ## Filtri e ricerca
 
-- **Filtro per stato** — Valido, In scadenza, Scaduto, Revocato, Orfano
+- **Filtro per stato** — Valido, In scadenza, Scaduto, Revocato, Orfano, Archiviato
 - **Filtro per CA** — Mostra i certificati di una CA specifica
+- **Filtro per origine** — Filtra in base a come il certificato è entrato in UCM (emesso, importato, ACME, SCEP, ecc.)
+- **Filtro per template** — Trova i certificati **modificati dal template**: emessi da un template ma con tipo di chiave, validità o digest esplicitamente sovrascritti al momento della richiesta. I campi divergenti sono elencati nel dettaglio del certificato; il record è congelato all'emissione
 - **Ricerca testuale** — Cerca per CN, numero di serie o SAN
 - **Ordinamento** — Per nome, data di scadenza, data di creazione, stato
 ## Analisi di conformità

@@ -217,6 +217,7 @@ Lors d'une demande de certificat, choisissez d'où vient la clé privée :
 Configurez les fournisseurs de défi DNS-01 pour la validation de domaine. Les fournisseurs pris en charge incluent :
 - Cloudflare
 - AWS Route 53
+- Azure DNS
 - Google Cloud DNS
 - DigitalOcean
 - OVH

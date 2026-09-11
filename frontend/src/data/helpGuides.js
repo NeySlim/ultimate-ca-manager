@@ -283,6 +283,7 @@ Central management for all X.509 certificates. Issue new certificates, import ex
 - **Expired** — Past the "Not After" date
 - **Revoked** — Explicitly revoked, published in CRL
 - **Orphan** — Issuing CA no longer exists in UCM
+- **Archived** — Superseded by a renewal or re-enrolment that kept the old record for history (SCEP, EST, WSTEP, ACME, OCSP responder)
 
 ## Issuing a Certificate
 
@@ -362,7 +363,7 @@ Select two certificates and click **Compare** to see a side-by-side diff of thei
 
 ## Filtering & Search
 
-- **Status filter** — Valid, Expiring, Expired, Revoked, Orphan
+- **Status filter** — Valid, Expiring, Expired, Revoked, Orphan, Archived
 - **CA filter** — Show certificates from a specific CA
 - **Source filter** — Filter by how the certificate entered UCM (issued, imported, ACME, SCEP, etc.)
 - **Template filter** — Find certificates **modified from template**: issued from a template but with the key type, validity, or digest explicitly overridden at request time. The divergent fields are listed on the certificate detail; the record is frozen at issuance
@@ -785,6 +786,7 @@ https://your-server:8443/scep/<profile>/pkiclient.exe
 Each profile is bound to:
 - **Its own CA** — different device fleets can enroll against different CAs
 - **An optional certificate template** — when bound, the template's key usage, extended key usage and validity govern every certificate issued through the profile
+- **Purposes no enrollee may hold** — a template bound to a profile cannot carry OCSP signing, timestamping, any purpose or Smartcard Logon, and a SCEP renewal never carries them over; Smartcard Logon is allowed when the profile validates against Intune, which vouches for the identity
 - **A per-profile challenge password** — stored encrypted, with the same expiry window as the global challenge (or Microsoft Intune validation, see below)
 - **An approval policy** — auto-approve or manual review per profile
 
@@ -823,6 +825,8 @@ For pending requests (auto-approve disabled):
 1. Review the request details (subject, key type, challenge)
 2. Click **Approve** to sign and issue the certificate
 3. Or click **Reject** with a reason
+
+A request that came through a profile is issued with that profile's template (validity, key usages), exactly as auto-approval would.
 
 > ⚠ Challenge passwords are transmitted in the SCEP request. Always use HTTPS for the SCEP endpoint.
 
@@ -1231,6 +1235,7 @@ The client presents a certificate during the TLS handshake. UCM validates the ce
 
 - **Strongest method** — cryptographic client identity
 - **Required for** \`/simplereenroll\` — the client must present its current certificate
+- **Presented certificate** — for \`/simpleenroll\` and \`/serverkeygen\`, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2); a certificate from another trusted authority is still accepted
 - **Depends on** proper TLS termination config (reverse proxy must pass \`SSL_CLIENT_CERT\` to UCM)
 
 ### HTTP Basic Auth — Fallback
@@ -1967,6 +1972,12 @@ Settings › System surfaces the background tasks.
 - **Run now** on any task
 - Covers expiry, CRL, webhook delivery, backups, auto-renewal…
 
+## Auto-renewal
+The auto-renewal settings drive the renewal scheduler.
+- **Sources** — the scheduler renews certificates whose private key the server holds: by default those issued from the form or a signed request ("manual"), and SCEP, ACME and EST enrolments with a server-generated key. Devices holding their own key renew through their protocol
+- **Awaiting approval** — a certificate whose renewal is queued for approval is left to that decision, as long as it can come before the certificate expires
+- **Renewed meanwhile** — a certificate an operator renewed during the batch is not renewed a second time; one deleted during the batch is skipped
+
 ## Scheduled backups
 
 Settings › Backup enables automatic backups.
@@ -2696,7 +2707,25 @@ All required approvals have been received. The certificate will be issued automa
 Any single rejection immediately stops the request. The certificate will not be issued. A rejection comment is required to explain the reason.
 
 ### Expired
-The request was not reviewed before the deadline. Expired requests must be re-submitted.
+The request was not decided within seven days. Expired requests must be re-submitted.
+
+## Where requests come from
+Beyond the issue form, a policy that requires approval also queues:
+- **Sign CSR** and **bulk signing** from Operations: the approval performs the signing
+- **Renew** and **bulk renew**: the approval performs the renewal; a renewal that could not be honoured (revoked certificate, key not held by the server) is refused at once instead of queued
+
+Administrators bypass the queue on every path.
+
+## Requests closed for you
+- A queued request whose target an administrator **signed or renewed directly** meanwhile is closed as approved by that action and linked to the certificate
+- A request whose target was **deleted or revoked** is closed as rejected; a certificate hold keeps the renewal request waiting for the unhold
+- Approving a request **already satisfied** closes it on the existing certificate; approving one of several requests for the same target closes the others as approved by you
+- Approving a request whose stored request, certificate or CA **no longer exists** closes it as rejected
+
+Webhooks are told of these closures as for a rejection.
+
+## Deadline
+A request waits **seven days** for a decision. Past that it is closed as expired, is never counted as pending, and the renewal scheduler resumes for its certificate. While a renewal awaits approval, the scheduler leaves the certificate to that decision, as long as it can come before the certificate expires.
 
 ## Approving a Request
 

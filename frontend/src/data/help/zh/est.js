@@ -16,6 +16,7 @@ export default {
         items: [
           { label: 'mTLS（双向 TLS）', text: '客户端在 TLS 握手期间提供证书——最强的认证方式' },
           { label: 'HTTP Basic Auth', text: '在 mTLS 不可用时的用户名/密码回退方式' },
+          { label: '出示的证书', text: '对于通过 mTLS 访问的 /simpleenroll 和 /serverkeygen，由 EST CA 签发的证书必须是该 CA 仍持有的证书：已吊销、已被取代或已删除的证书会被拒绝（RFC 7030 §3.3.2）；由 TLS 层信任的其他颁发机构签发的证书仍会被接受' },
         ]
       },
       {
@@ -70,6 +71,7 @@ EST 支持两种认证方式：
 
 - **最强方式** — 加密的客户端身份
 - **必须用于** \`/simplereenroll\` — 客户端必须提供当前证书
+- **出示的证书** — 对于 \`/simpleenroll\` 和 \`/serverkeygen\`，由 EST CA 签发的证书必须是该 CA 仍持有的证书：已吊销、已被取代或已删除的证书会被拒绝（RFC 7030 §3.3.2）；其他受信任颁发机构签发的证书仍会被接受
 - **依赖于** 正确的 TLS 终止配置（反向代理必须将 \`SSL_CLIENT_CERT\` 传递给 UCM）
 
 ### HTTP Basic Auth——备用

@@ -217,6 +217,7 @@ UCM підтримує ACME (Automated Certificate Management Environment) у д
 Налаштуйте провайдерів DNS-01 виклику для перевірки доменів. Підтримувані провайдери:
 - Cloudflare
 - AWS Route 53
+- Azure DNS
 - Google Cloud DNS
 - DigitalOcean
 - OVH
@@ -389,44 +390,6 @@ https://your-server:8443/acme/directory
 - Використаний CA для підпису
 - Мітка часу видачі
 
-## Використання certbot
-
-\`\`\`
-# Реєстрація облікового запису (Let's Encrypt — за замовчуванням)
-certbot register --agree-tos --email admin@example.com
-
-# Реєстрація з власним ACME CA + EAB
-certbot register \\
-  --server 'https://acme.zerossl.com/v2/DV90' \\
-  --eab-kid 'your-key-id' \\
-  --eab-hmac-key 'your-hmac-key' \\
-  --agree-tos --email admin@example.com
-
-# Запит сертифіката з ключем ECDSA
-certbot certonly --server https://your-server:8443/acme/directory \\
-  --standalone -d myserver.internal.corp \\
-  --key-type ecdsa --elliptic-curve secp256r1
-
-# Оновлення
-certbot renew --server https://your-server:8443/acme/directory
-\`\`\`
-
-## Використання acme.sh
-
-\`\`\`
-# За замовчуванням (Let's Encrypt)
-acme.sh --issue -d example.com --standalone
-
-# Власний ACME CA з EAB та ECDSA
-acme.sh --issue \\
-  --server 'https://acme-v02.harica.gr/acme/TOKEN/directory' \\
-  --eab-kid 'your-key-id' \\
-  --eab-hmac-key 'your-hmac-key' \\
-  --keylength ec-256 \\
-  -d example.com --standalone
-\`\`\`
-
-> ⚠ Для внутрішнього ACME клієнти повинні довіряти CA UCM. Встановіть кореневий сертифікат CA у сховище довіри клієнта.
 ## Сертифікати для IP-адрес (RFC 8738)
 
 Локальний сервер ACME може видавати сертифікати для **IP-адрес** (IPv4 та IPv6), а не лише для DNS-імен. Корисно для внутрішніх служб, пристроїв і хостів, що адресуються безпосередньо за IP.
@@ -470,6 +433,45 @@ _validation-persist.app.example.com. IN TXT "ca.example.com; accounturi=https://
 - \`persistUntil=<unix-мітка часу>\` — зупиняє нові валідації після цього часу
 
 > ⚠️ Запис надає ключу облікового запису ACME право випуску, доки існує — видаліть TXT-запис, щоб відкликати його.
+
+## Використання certbot
+
+\`\`\`
+# Реєстрація облікового запису (Let's Encrypt — за замовчуванням)
+certbot register --agree-tos --email admin@example.com
+
+# Реєстрація з власним ACME CA + EAB
+certbot register \\
+  --server 'https://acme.zerossl.com/v2/DV90' \\
+  --eab-kid 'your-key-id' \\
+  --eab-hmac-key 'your-hmac-key' \\
+  --agree-tos --email admin@example.com
+
+# Запит сертифіката з ключем ECDSA
+certbot certonly --server https://your-server:8443/acme/directory \\
+  --standalone -d myserver.internal.corp \\
+  --key-type ecdsa --elliptic-curve secp256r1
+
+# Оновлення
+certbot renew --server https://your-server:8443/acme/directory
+\`\`\`
+
+## Використання acme.sh
+
+\`\`\`
+# За замовчуванням (Let's Encrypt)
+acme.sh --issue -d example.com --standalone
+
+# Власний ACME CA з EAB та ECDSA
+acme.sh --issue \\
+  --server 'https://acme-v02.harica.gr/acme/TOKEN/directory' \\
+  --eab-kid 'your-key-id' \\
+  --eab-hmac-key 'your-hmac-key' \\
+  --keylength ec-256 \\
+  -d example.com --standalone
+\`\`\`
+
+> ⚠ Для внутрішнього ACME клієнти повинні довіряти CA UCM. Встановіть кореневий сертифікат CA у сховище довіри клієнта.
 
 ## Renewal Information (ARI, RFC 9773)
 

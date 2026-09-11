@@ -16,6 +16,7 @@ export default {
         items: [
           { label: 'mTLS (TLS mutuel)', text: 'Le client présente un certificat lors de la poignée de main TLS — méthode d\'authentification la plus forte' },
           { label: 'HTTP Basic Auth', text: 'Repli par nom d\'utilisateur/mot de passe lorsque mTLS n\'est pas disponible' },
+          { label: 'Certificat présenté', text: 'Pour /simpleenroll et /serverkeygen en mTLS, un certificat signé par la CA EST doit être un certificat qu\'elle détient encore : les certificats révoqués, remplacés ou supprimés sont refusés (RFC 7030 §3.3.2) ; un certificat d\'une autre autorité à laquelle la couche TLS fait confiance reste accepté' },
         ]
       },
       {
@@ -70,6 +71,7 @@ Le client présente un certificat lors de la poignée de main TLS. UCM valide le
 
 - **Méthode la plus forte** — identité client cryptographique
 - **Requis pour** \`/simplereenroll\` — le client doit présenter son certificat actuel
+- **Certificat présenté** — pour \`/simpleenroll\` et \`/serverkeygen\`, un certificat signé par la CA EST doit être un certificat qu'elle détient encore : les certificats révoqués, remplacés ou supprimés sont refusés (RFC 7030 §3.3.2) ; un certificat d'une autre autorité de confiance reste accepté
 - **Dépend de** la configuration correcte de la terminaison TLS (le proxy inverse doit transmettre \`SSL_CLIENT_CERT\` à UCM)
 
 ### HTTP Basic Auth — Repli

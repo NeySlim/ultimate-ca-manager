@@ -688,7 +688,7 @@
     "sourceWeb": "Web-Oberfläche",
     "orphanDescription": "CA nicht gefunden",
     "archived": "Archiviert",
-    "archivedDescription": "Durch eine erneute Registrierung ersetzt, zur Historie aufbewahrt",
+    "archivedDescription": "Durch eine Erneuerung oder erneute Registrierung ersetzt, zur Historie aufbewahrt",
     "noCertificates": "Keine Zertifikate gefunden",
     "confirmRevoke": "Möchten Sie dieses Zertifikat wirklich widerrufen?",
     "confirmRenew": "Möchten Sie dieses Zertifikat wirklich erneuern?",

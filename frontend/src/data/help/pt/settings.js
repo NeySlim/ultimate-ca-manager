@@ -135,6 +135,14 @@ export default {
           { label: 'Assuntos derivados do AD', text: 'Os modelos podem optar por derivar seu assunto/SAN do Active Directory (via conector AD) para a inscrição não assistida' },
         ]
       },
+      {
+        title: 'Renovação automática',
+        items: [
+          { label: 'Fontes', text: 'O agendador renova os certificados cuja chave privada o servidor detém: por padrão os emitidos pelo formulário ou por uma solicitação assinada ("manual") e as inscrições SCEP, ACME e EST com chave gerada pelo servidor. Os dispositivos que detêm a própria chave renovam pelo seu protocolo' },
+          { label: 'Aguardando aprovação', text: 'Um certificado cuja renovação está na fila de aprovação é deixado a essa decisão, desde que ela possa ocorrer antes de o certificado expirar' },
+          { label: 'Renovado entretanto', text: 'Um certificado que um operador renovou durante o lote não é renovado uma segunda vez; um excluído durante o lote é ignorado' },
+        ]
+      },
 
     ],
     tips: [
@@ -162,6 +170,7 @@ Configuração de todo o sistema organizada em abas. As alterações entram em v
 - **Hostname** — O nome de domínio totalmente qualificado do servidor
 - **Validade Padrão** — Período de validade padrão do certificado em dias
 - **Limite de Aviso de Expiração** — Dias antes da expiração para acionar avisos
+- **Vhost ACME público** — Hostname concreto nas URLs do diretório ACME (ex.: \`acme.ucm.example.com\` — não \`*.ucm.example.com\`). Um **SAN do certificado TLS** curinga \`*.ucm.example.com\` cobre tanto \`admin.ucm.example.com\` quanto \`acme.ucm.example.com\`. Configure o DNS e o TLS para o vhost ACME **antes** de salvar — os clientes que releem o diretório mudam de URL imediatamente.
 
 ## Aparência
 
@@ -381,6 +390,12 @@ Definições › Sistema mostra as tarefas em segundo plano.
 - Lista de tarefas com **estado**, **última execução**, **duração** e **falhas**
 - **Executar agora** em qualquer tarefa
 - Cobre expiração, CRL, entrega de webhooks, backups, renovação automática…
+
+## Renovação automática
+As definições de renovação automática comandam o agendador de renovação.
+- **Fontes** — o agendador renova os certificados cuja chave privada o servidor detém: por padrão os emitidos pelo formulário ou por uma solicitação assinada ("manual") e as inscrições SCEP, ACME e EST com chave gerada pelo servidor. Os dispositivos que detêm a própria chave renovam pelo seu protocolo
+- **Aguardando aprovação** — um certificado cuja renovação está na fila de aprovação é deixado a essa decisão, desde que ela possa ocorrer antes de o certificado expirar
+- **Renovado entretanto** — um certificado que um operador renovou durante o lote não é renovado uma segunda vez; um excluído durante o lote é ignorado
 
 ## Backups agendados
 

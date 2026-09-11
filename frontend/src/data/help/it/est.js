@@ -16,6 +16,7 @@ export default {
         items: [
           { label: 'mTLS (TLS reciproco)', text: 'Il client presenta un certificato durante l\'handshake TLS — metodo di autenticazione più sicuro' },
           { label: 'HTTP Basic Auth', text: 'Fallback con nome utente/password quando mTLS non è disponibile' },
+          { label: 'Certificato presentato', text: 'Per /simpleenroll e /serverkeygen via mTLS, un certificato firmato dalla CA EST deve essere uno che essa detiene ancora: i certificati revocati, sostituiti o eliminati vengono rifiutati (RFC 7030 §3.3.2); un certificato di un\'altra autorità considerata attendibile dal livello TLS viene comunque accettato' },
         ]
       },
       {
@@ -70,6 +71,7 @@ Il client presenta un certificato durante l'handshake TLS. UCM valida il certifi
 
 - **Metodo più sicuro** — identità crittografica del client
 - **Obbligatorio per** \`/simplereenroll\` — il client deve presentare il suo certificato attuale
+- **Certificato presentato** — per \`/simpleenroll\` e \`/serverkeygen\`, un certificato firmato dalla CA EST deve essere uno che essa detiene ancora: i certificati revocati, sostituiti o eliminati vengono rifiutati (RFC 7030 §3.3.2); un certificato di un'altra autorità attendibile viene comunque accettato
 - **Dipende da** una corretta configurazione della terminazione TLS (il reverse proxy deve passare \`SSL_CLIENT_CERT\` a UCM)
 
 ### HTTP Basic Auth — Fallback

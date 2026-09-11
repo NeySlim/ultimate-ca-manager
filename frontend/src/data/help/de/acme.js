@@ -217,6 +217,7 @@ Wählen Sie bei einer Zertifikatsanforderung, woher der private Schlüssel stamm
 Konfigurieren Sie DNS-01-Challenge-Anbieter für die Domänenvalidierung. Unterstützte Anbieter umfassen:
 - Cloudflare
 - AWS Route 53
+- Azure DNS
 - Google Cloud DNS
 - DigitalOcean
 - OVH

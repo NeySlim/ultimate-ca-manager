@@ -135,6 +135,14 @@ export default {
           { label: 'AD-abgeleitete Betreffe', text: 'Vorlagen können sich für die Ableitung ihres Betreffs/SAN aus Active Directory (über den AD-Connector) für die unbeaufsichtigte Registrierung entscheiden' },
         ]
       },
+      {
+        title: 'Auto-Erneuerung',
+        items: [
+          { label: 'Quellen', text: 'Der Planer erneuert Zertifikate, deren privaten Schlüssel der Server hält: standardmäßig die über das Formular oder eine signierte Anfrage ausgestellten („manuell") sowie SCEP-, ACME- und EST-Registrierungen mit servergeneriertem Schlüssel. Geräte, die ihren eigenen Schlüssel halten, erneuern über ihr Protokoll' },
+          { label: 'Genehmigung ausstehend', text: 'Ein Zertifikat, dessen Erneuerung zur Genehmigung eingereiht ist, bleibt dieser Entscheidung überlassen, solange sie vor dem Ablauf des Zertifikats fallen kann' },
+          { label: 'Inzwischen erneuert', text: 'Ein Zertifikat, das ein Operator während des Durchlaufs erneuert hat, wird nicht ein zweites Mal erneuert; ein während des Durchlaufs gelöschtes wird übersprungen' },
+        ]
+      },
 
     ],
     tips: [
@@ -162,6 +170,7 @@ Systemweite Konfiguration in Tabs organisiert. Änderungen werden sofort wirksam
 - **Hostname** — Der vollqualifizierte Domänenname des Servers
 - **Standardgültigkeit** — Standard-Zertifikatsgültigkeitsdauer in Tagen
 - **Ablaufwarnung-Schwellenwert** — Tage vor Ablauf zur Auslösung von Warnungen
+- **Öffentlicher ACME-Vhost** — Konkreter Hostname in den ACME-Directory-URLs (z. B. \`acme.ucm.example.com\` — nicht \`*.ucm.example.com\`). Ein Wildcard-**TLS-Zertifikat-SAN** \`*.ucm.example.com\` deckt sowohl \`admin.ucm.example.com\` als auch \`acme.ucm.example.com\` ab. Konfigurieren Sie DNS und TLS für den ACME-Vhost **vor** dem Speichern — Clients, die das Directory neu lesen, wechseln die URLs sofort.
 
 ## Darstellung
 
@@ -379,6 +388,14 @@ Einstellungen › System zeigt die Hintergrundaufgaben.
 - Aufgabenliste mit **Status**, **letzter Ausführung**, **Dauer** und **Fehlern**
 - **Jetzt ausführen** für jede Aufgabe
 - Umfasst Ablauf, CRL, Webhook-Zustellung, Backups, Auto-Erneuerung…
+
+## Auto-Erneuerung
+
+Die Einstellungen zur Auto-Erneuerung steuern den Erneuerungsplaner.
+
+- **Quellen** — der Planer erneuert Zertifikate, deren privaten Schlüssel der Server hält: standardmäßig die über das Formular oder eine signierte Anfrage ausgestellten („manuell") sowie SCEP-, ACME- und EST-Registrierungen mit servergeneriertem Schlüssel. Geräte, die ihren eigenen Schlüssel halten, erneuern über ihr Protokoll
+- **Genehmigung ausstehend** — ein Zertifikat, dessen Erneuerung zur Genehmigung eingereiht ist, bleibt dieser Entscheidung überlassen, solange sie vor dem Ablauf des Zertifikats fallen kann
+- **Inzwischen erneuert** — ein Zertifikat, das ein Operator während des Durchlaufs erneuert hat, wird nicht ein zweites Mal erneuert; ein während des Durchlaufs gelöschtes wird übersprungen
 
 ## Geplante Backups
 

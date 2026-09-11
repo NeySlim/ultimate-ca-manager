@@ -71,6 +71,7 @@ La clave privada de la CA firmante se usa para firmar cada token de marca de tie
 - Use una **sub-CA dedicada** para marcas de tiempo en lugar de su CA raíz
 - El certificado de la CA debe incluir el uso extendido de clave **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8)
 - Asegúrese de que el certificado de la CA tenga **validez suficiente** — las marcas de tiempo deben permanecer verificables durante años
+- Active **Requerir un certificado de marca de tiempo dedicado** para exigirlo en el momento de la firma en lugar de confiar en la convención
 
 ### OID de política
 

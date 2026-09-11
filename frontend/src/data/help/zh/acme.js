@@ -217,6 +217,7 @@ ECDSA 密钥推荐用于现代部署——更小、更快且同样安全。
 配置 DNS-01 挑战提供商以进行域名验证。支持的提供商包括：
 - Cloudflare
 - AWS Route 53
+- Azure DNS
 - Google Cloud DNS
 - DigitalOcean
 - OVH
@@ -389,44 +390,6 @@ certbot、acme.sh 或 Caddy 等客户端使用此 URL 来发现 ACME 端点。
 - 使用的签名 CA
 - 签发时间戳
 
-## 使用 certbot
-
-\`\`\`
-# 注册账户（Let's Encrypt——默认）
-certbot register --agree-tos --email admin@example.com
-
-# 使用自定义 ACME CA + EAB 注册
-certbot register \\
-  --server 'https://acme.zerossl.com/v2/DV90' \\
-  --eab-kid 'your-key-id' \\
-  --eab-hmac-key 'your-hmac-key' \\
-  --agree-tos --email admin@example.com
-
-# 使用 ECDSA 密钥请求证书
-certbot certonly --server https://your-server:8443/acme/directory \\
-  --standalone -d myserver.internal.corp \\
-  --key-type ecdsa --elliptic-curve secp256r1
-
-# 续期
-certbot renew --server https://your-server:8443/acme/directory
-\`\`\`
-
-## 使用 acme.sh
-
-\`\`\`
-# 默认（Let's Encrypt）
-acme.sh --issue -d example.com --standalone
-
-# 使用自定义 ACME CA + EAB 和 ECDSA
-acme.sh --issue \\
-  --server 'https://acme-v02.harica.gr/acme/TOKEN/directory' \\
-  --eab-kid 'your-key-id' \\
-  --eab-hmac-key 'your-hmac-key' \\
-  --keylength ec-256 \\
-  -d example.com --standalone
-\`\`\`
-
-> ⚠ 对于内部 ACME，客户端必须信任 UCM CA。在客户端的信任存储中安装根 CA 证书。
 ## IP 地址证书 (RFC 8738)
 
 本地 ACME 服务器不仅可以为 DNS 名称签发证书，还可以为 **IP 地址**（IPv4 和 IPv6）签发证书。适用于内部服务、设备以及直接通过 IP 寻址的主机。
@@ -470,6 +433,45 @@ challenge 对象会公布期望的 \`accounturi\` 和 \`issuer-domain-names\`。
 - \`persistUntil=<unix 时间戳>\` — 在该时间之后阻止新的验证
 
 > ⚠️ 只要记录存在，ACME 账户密钥即拥有签发能力——删除 TXT 记录即可撤销。
+
+## 使用 certbot
+
+\`\`\`
+# 注册账户（Let's Encrypt——默认）
+certbot register --agree-tos --email admin@example.com
+
+# 使用自定义 ACME CA + EAB 注册
+certbot register \\
+  --server 'https://acme.zerossl.com/v2/DV90' \\
+  --eab-kid 'your-key-id' \\
+  --eab-hmac-key 'your-hmac-key' \\
+  --agree-tos --email admin@example.com
+
+# 使用 ECDSA 密钥请求证书
+certbot certonly --server https://your-server:8443/acme/directory \\
+  --standalone -d myserver.internal.corp \\
+  --key-type ecdsa --elliptic-curve secp256r1
+
+# 续期
+certbot renew --server https://your-server:8443/acme/directory
+\`\`\`
+
+## 使用 acme.sh
+
+\`\`\`
+# 默认（Let's Encrypt）
+acme.sh --issue -d example.com --standalone
+
+# 使用自定义 ACME CA + EAB 和 ECDSA
+acme.sh --issue \\
+  --server 'https://acme-v02.harica.gr/acme/TOKEN/directory' \\
+  --eab-kid 'your-key-id' \\
+  --eab-hmac-key 'your-hmac-key' \\
+  --keylength ec-256 \\
+  -d example.com --standalone
+\`\`\`
+
+> ⚠ 对于内部 ACME，客户端必须信任 UCM CA。在客户端的信任存储中安装根 CA 证书。
 
 ## Renewal Information (ARI, RFC 9773)
 

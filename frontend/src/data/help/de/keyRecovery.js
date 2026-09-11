@@ -57,6 +57,7 @@ Nach der Genehmigung wird der archivierte Schlüssel als **passwortgeschütztes 
 
 - **read:key_recovery** — Eine Wiederherstellung beantragen und Anfragen einsehen
 - **admin** — Eine ausstehende Wiederherstellungsanfrage genehmigen oder ablehnen
+- **read:private_keys** — Nur Admins vorbehaltener Scope, der für den *direkten* Export privater Schlüssel von der Zertifikatsseite (unter Umgehung dieses Workflows) erforderlich ist
 
 ## Was es ist (und was nicht)
 

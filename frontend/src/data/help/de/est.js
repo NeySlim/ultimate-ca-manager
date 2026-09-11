@@ -16,6 +16,7 @@ export default {
         items: [
           { label: 'mTLS (Mutual TLS)', text: 'Client präsentiert ein Zertifikat beim TLS-Handshake — stärkste Authentifizierungsmethode' },
           { label: 'HTTP Basic Auth', text: 'Benutzername/Passwort-Fallback, wenn mTLS nicht verfügbar ist' },
+          { label: 'Präsentiertes Zertifikat', text: 'Für /simpleenroll und /serverkeygen über mTLS muss ein von der EST-CA signiertes Zertifikat eines sein, das sie noch hält: widerrufene, ersetzte oder gelöschte Zertifikate werden abgelehnt (RFC 7030 §3.3.2); ein Zertifikat einer anderen Stelle, der die TLS-Schicht vertraut, wird weiterhin akzeptiert' },
         ]
       },
       {
@@ -70,6 +71,7 @@ Der Client präsentiert ein Zertifikat beim TLS-Handshake. UCM validiert das Zer
 
 - **Stärkste Methode** — kryptografische Client-Identität
 - **Erforderlich für** \`/simplereenroll\` — der Client muss sein aktuelles Zertifikat präsentieren
+- **Präsentiertes Zertifikat** — für \`/simpleenroll\` und \`/serverkeygen\` muss ein von der EST-CA signiertes Zertifikat eines sein, das sie noch hält: widerrufene, ersetzte oder gelöschte Zertifikate werden abgelehnt (RFC 7030 §3.3.2); ein Zertifikat einer anderen vertrauenswürdigen Stelle wird weiterhin akzeptiert
 - **Abhängig von** korrekter TLS-Terminierungskonfiguration (Reverse Proxy muss \`SSL_CLIENT_CERT\` an UCM weiterleiten)
 
 ### HTTP Basic Auth — Fallback

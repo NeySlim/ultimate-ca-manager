@@ -30,6 +30,8 @@ export default {
           { label: '按配置文件的质询', text: '每个配置文件都有自己的质询密码，加密存储，过期窗口与全局质询相同' },
           { label: '默认端点', text: '不带片段的 /scep/pkiclient.exe 端点继续使用全局配置' },
           { label: 'Microsoft Intune 验证', text: '配置文件可以针对 Intune 自己的按设备 SCEP 质询进行验证，而不使用静态密码 —— 需要 Entra 应用注册（SCEP challenge validation 和 Application.Read.All 权限）并启用自动批准' },
+          { label: '手动审批', text: '通过配置文件提交的请求会以该配置文件的模板（有效期、密钥用法）批准，与自动批准签发的结果完全一致' },
+          { label: '注册者不得持有的用途', text: '绑定到配置文件的模板不能包含 OCSP 签名、时间戳、任意用途或智能卡登录，SCEP 续期也绝不会沿用这些用途；当配置文件针对 Intune 验证时允许智能卡登录，因为 Intune 为身份作担保' },
         ]
       },
     ],
@@ -60,6 +62,7 @@ export default {
 
 ### 配置
 配置 SCEP 服务器设置：
+- **启用/禁用** — 开启或关闭 SCEP 服务
 - **签名 CA** — 选择哪个 CA 签署证书
 - **CA 标识符** — SCEP CA 标识符字符串
 - **自动批准** — 启用/禁用带有有效质询密码的请求的自动批准
@@ -74,6 +77,7 @@ https://your-server:8443/scep/<profile>/pkiclient.exe
 每个配置文件绑定：
 - **自己的 CA** — 不同的设备群可针对不同的 CA 注册
 - **可选的证书模板** — 绑定后，模板的密钥用法、扩展密钥用法和有效期将决定通过该配置文件签发的每个证书
+- **注册者不得持有的用途** — 绑定到配置文件的模板不能包含 OCSP 签名、时间戳、任意用途或智能卡登录，SCEP 续期也绝不会沿用这些用途；当配置文件针对 Intune 验证时允许智能卡登录，因为 Intune 为身份作担保
 - **按配置文件的质询密码** — 加密存储，过期窗口与全局质询相同
 - **审批策略** — 每个配置文件可自动批准或手动审核
 
@@ -113,6 +117,8 @@ https://your-server:8443/scep/<profile>/pkiclient.exe  (按配置文件端点)
 3. 检查主题、密钥类型和质询
 4. 点击**批准**或**拒绝**
 
+通过配置文件提交的请求会以该配置文件的模板（有效期、密钥用法）签发，与自动批准的结果完全一致。
+
 ## 设备集成
 
 ### Cisco IOS
@@ -126,7 +132,9 @@ crypto pki enroll UCM-CA
 \`\`\`
 
 ### JAMF
-在 MDM 配置文件中配置 SCEP URL、质询密码和证书主题。MDM 平台会自动处理注册。
+在 SCEP 配置文件中配置：
+- 服务器 URL：\`https://your-server:8443/scep\`
+- 质询：来自 UCM 的密码
 
 ### Microsoft Intune
 Intune 不支持静态质询密码 —— 它会为每台设备签发自己的加密质询，只有 Intune 的 API 才能验证。在 SCEP **配置文件**（而非全局端点）上启用 **Microsoft Intune SCEP 质询验证**，并提供 Entra 应用注册的租户 ID、客户端 ID 和客户端密钥：

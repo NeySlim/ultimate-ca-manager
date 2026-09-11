@@ -10,12 +10,32 @@ export default {
           { label: 'Pendiente', text: 'En espera de revisión — el certificado aún no puede ser emitido' },
           { label: 'Aprobada', text: 'Todas las aprobaciones requeridas recibidas — el certificado puede ser emitido' },
           { label: 'Rechazada', text: 'Cualquier rechazo detiene inmediatamente la solicitud' },
-          { label: 'Expirada', text: 'La solicitud no fue revisada antes de la fecha límite' },
+          { label: 'Expirada', text: 'No decidida en siete días; cerrada como expirada y nunca contada como pendiente' },
+        ]
+      },
+      {
+        title: 'De dónde vienen las solicitudes',
+        items: [
+          { label: 'Formulario de emisión', text: 'Una solicitud de certificado que coincide con una política que requiere aprobación' },
+          { label: 'Firmar CSR y firma masiva', text: 'Firmar una solicitud almacenada, sola o desde Operaciones, se encola del mismo modo; la aprobación realiza la firma' },
+          { label: 'Renovación', text: 'Renovar un certificado, solo o de forma masiva, también se encola; una renovación que no podría atenderse (revocado, clave no en poder del servidor) se rechaza de inmediato' },
+          { label: 'Administradores', text: 'Omiten la cola en todas las rutas, como en el formulario de emisión' },
+        ]
+      },
+      {
+        title: 'Solicitudes cerradas en tu lugar',
+        items: [
+          { label: 'Firmada o renovada directamente', text: 'Una solicitud en cola cuyo objetivo un administrador firmó o renovó entretanto se cierra como aprobada por esa acción y se vincula al certificado' },
+          { label: 'Eliminado o revocado', text: 'Una solicitud cuyo objetivo fue eliminado o revocado se cierra como rechazada; una suspensión de certificado mantiene la solicitud de renovación en espera hasta que se levante la suspensión' },
+          { label: 'Ya satisfecha', text: 'Aprobar una solicitud ya atendida la cierra sobre el certificado existente; aprobar una de varias solicitudes para el mismo objetivo cierra las demás como aprobadas por ti' },
+          { label: 'Objetivo desaparecido', text: 'Aprobar una solicitud cuya solicitud almacenada, certificado o CA ya no existe la cierra como rechazada' },
+          { label: 'Fecha límite', text: 'Una solicitud espera siete días; pasado ese plazo se cierra como expirada, nunca se cuenta como pendiente y el planificador de renovaciones se reanuda para su certificado' },
         ]
       },
     ],
     tips: [
       'Cualquier rechazo individual detiene inmediatamente la aprobación — esto es intencional por seguridad.',
+      'Mientras una renovación espera aprobación, el planificador deja el certificado a esa decisión, siempre que pueda llegar antes de que expire el certificado.',
       'Los comentarios de aprobación se registran en la pista de auditoría para cumplimiento normativo.',
     ],
   },
@@ -38,7 +58,25 @@ Todas las aprobaciones requeridas han sido recibidas. El certificado se emitirá
 Cualquier rechazo individual detiene inmediatamente la solicitud. El certificado no será emitido. Se requiere un comentario de rechazo para explicar el motivo.
 
 ### Expirada
-La solicitud no fue revisada antes de la fecha límite. Las solicitudes expiradas deben ser reenviadas.
+La solicitud no fue decidida en siete días. Las solicitudes expiradas deben ser reenviadas.
+
+## De dónde vienen las solicitudes
+Más allá del formulario de emisión, una política que requiere aprobación también encola:
+- **Firmar CSR** y **firma masiva** desde Operaciones: la aprobación realiza la firma
+- **Renovar** y **renovación masiva**: la aprobación realiza la renovación; una renovación que no podría atenderse (certificado revocado, clave no en poder del servidor) se rechaza de inmediato en lugar de encolarse
+
+Los administradores omiten la cola en todas las rutas.
+
+## Solicitudes cerradas en tu lugar
+- Una solicitud en cola cuyo objetivo un administrador **firmó o renovó directamente** entretanto se cierra como aprobada por esa acción y se vincula al certificado
+- Una solicitud cuyo objetivo fue **eliminado o revocado** se cierra como rechazada; una suspensión de certificado mantiene la solicitud de renovación en espera hasta que se levante la suspensión
+- Aprobar una solicitud **ya satisfecha** la cierra sobre el certificado existente; aprobar una de varias solicitudes para el mismo objetivo cierra las demás como aprobadas por ti
+- Aprobar una solicitud cuya solicitud almacenada, certificado o CA **ya no existe** la cierra como rechazada
+
+Los webhooks reciben aviso de estos cierres igual que de un rechazo.
+
+## Fecha límite
+Una solicitud espera **siete días** una decisión. Pasado ese plazo se cierra como expirada, nunca se cuenta como pendiente y el planificador de renovaciones se reanuda para su certificado. Mientras una renovación espera aprobación, el planificador deja el certificado a esa decisión, siempre que pueda llegar antes de que expire el certificado.
 
 ## Aprobar una solicitud
 

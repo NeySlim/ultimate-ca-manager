@@ -16,6 +16,7 @@ export default {
         items: [
           { label: 'mTLS (TLS Mútuo)', text: 'Cliente apresenta um certificado durante o handshake TLS — método de autenticação mais forte' },
           { label: 'HTTP Basic Auth', text: 'Fallback com usuário/senha quando mTLS não está disponível' },
+          { label: 'Certificado apresentado', text: 'Para /simpleenroll e /serverkeygen via mTLS, um certificado assinado pela CA do EST deve ser um que ela ainda detém: certificados revogados, substituídos ou excluídos são recusados (RFC 7030 §3.3.2); um certificado de outra autoridade em que a camada TLS confia continua sendo aceito' },
         ]
       },
       {
@@ -70,6 +71,7 @@ O cliente apresenta um certificado durante o handshake TLS. O UCM valida o certi
 
 - **Método mais forte** — identidade criptográfica do cliente
 - **Obrigatório para** \`/simplereenroll\` — o cliente deve apresentar seu certificado atual
+- **Certificado apresentado** — para \`/simpleenroll\` e \`/serverkeygen\`, um certificado assinado pela CA do EST deve ser um que ela ainda detém: certificados revogados, substituídos ou excluídos são recusados (RFC 7030 §3.3.2); um certificado de outra autoridade confiável continua sendo aceito
 - **Depende de** configuração adequada de terminação TLS (proxy reverso deve passar \`SSL_CLIENT_CERT\` para o UCM)
 
 ### HTTP Basic Auth — Fallback

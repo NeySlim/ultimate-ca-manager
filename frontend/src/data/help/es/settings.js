@@ -135,6 +135,14 @@ export default {
           { label: 'Sujetos derivados de AD', text: 'Las plantillas pueden optar por derivar su sujeto/SAN de Active Directory (mediante el conector de AD) para la inscripción desatendida' },
         ]
       },
+      {
+        title: 'Autorrenovación',
+        items: [
+          { label: 'Fuentes', text: 'El planificador renueva los certificados cuya clave privada posee el servidor: por defecto los emitidos desde el formulario o desde una solicitud firmada («manual»), y las inscripciones SCEP, ACME y EST con clave generada por el servidor. Los dispositivos que poseen su propia clave se renuevan a través de su protocolo' },
+          { label: 'En espera de aprobación', text: 'Un certificado cuya renovación está en cola de aprobación se deja a esa decisión, siempre que pueda llegar antes de que expire el certificado' },
+          { label: 'Renovado entretanto', text: 'Un certificado que un operador renovó durante el lote no se renueva una segunda vez; uno eliminado durante el lote se omite' },
+        ]
+      },
 
     ],
     tips: [
@@ -381,6 +389,12 @@ Ajustes › Sistema muestra las tareas en segundo plano.
 - Lista de tareas con **estado**, **última ejecución**, **duración** y **fallos**
 - **Ejecutar ahora** en cualquier tarea
 - Cubre expiración, CRL, entrega de webhooks, copias, autorrenovación…
+
+## Autorrenovación
+Los ajustes de autorrenovación gobiernan el planificador de renovaciones.
+- **Fuentes** — el planificador renueva los certificados cuya clave privada posee el servidor: por defecto los emitidos desde el formulario o desde una solicitud firmada («manual»), y las inscripciones SCEP, ACME y EST con clave generada por el servidor. Los dispositivos que poseen su propia clave se renuevan a través de su protocolo
+- **En espera de aprobación** — un certificado cuya renovación está en cola de aprobación se deja a esa decisión, siempre que pueda llegar antes de que expire el certificado
+- **Renovado entretanto** — un certificado que un operador renovó durante el lote no se renueva una segunda vez; uno eliminado durante el lote se omite
 
 ## Copias de seguridad programadas
 

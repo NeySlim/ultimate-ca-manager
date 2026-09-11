@@ -57,6 +57,7 @@ Una vez aprobada, la clave archivada se entrega como un paquete **PKCS#12 proteg
 
 - **read:key_recovery** — Solicitar una recuperación y ver las solicitudes
 - **admin** — Aprobar o denegar una solicitud de recuperación pendiente
+- **read:private_keys** — Ámbito solo para administradores, necesario para la exportación *directa* de la clave privada desde la página Certificados (omitiendo este flujo de trabajo)
 
 ## Qué es (y qué no es)
 

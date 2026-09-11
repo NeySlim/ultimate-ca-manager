@@ -56,7 +56,8 @@ Quattro ruoli integrati che non possono essere modificati o eliminati:
 ### Matrice dei permessi
 I permessi sono organizzati per categoria:
 - **CA** — Creazione, lettura, aggiornamento, eliminazione, importazione, esportazione
-- **Certificati** — Emissione, lettura, revoca, rinnovo, esportazione, eliminazione
+- **Certificati** — Emissione, lettura, revoca, rinnovo, esportazione, eliminazione (solo certificato — vedi Chiavi private)
+- **Chiavi private** — Esportazione diretta della chiave privata (\`read:private_keys\`), riservata agli admin: nessun ruolo predefinito la possiede tranne Admin. I ruoli che ne sono privi passano dal Recupero delle chiavi
 - **CSR** — Creazione, lettura, firma, eliminazione
 - **Template** — Creazione, lettura, aggiornamento, eliminazione
 - **Utenti** — Creazione, lettura, aggiornamento, eliminazione
@@ -67,6 +68,10 @@ I permessi sono organizzati per categoria:
 - **SCEP** — Configurazione, approvazione richieste
 - **Trust Store** — Gestione certificati di fiducia
 - **HSM** — Gestione provider e chiavi
+- **SSH** — Gestione delle CA e dei certificati SSH
+- **Politiche** — Visualizzazione delle politiche dei certificati
+- **Approvazioni** — Visualizzazione e decisione delle richieste di approvazione
+- **Recupero delle chiavi** — Richiesta di recuperi e consultazione delle richieste (l'approvazione è riservata agli admin)
 - **Backup** — Creazione, ripristino
 
 ### Attivazione per categoria

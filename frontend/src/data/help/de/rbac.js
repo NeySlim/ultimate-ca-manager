@@ -56,7 +56,8 @@ Vier integrierte Rollen, die nicht geändert oder gelöscht werden können:
 ### Berechtigungsmatrix
 Berechtigungen sind nach Kategorie organisiert:
 - **CAs** — Erstellen, Lesen, Aktualisieren, Löschen, Importieren, Exportieren
-- **Zertifikate** — Ausstellen, Lesen, Widerrufen, Erneuern, Exportieren, Löschen
+- **Zertifikate** — Ausstellen, Lesen, Widerrufen, Erneuern, Löschen, Exportieren (nur Zertifikat — siehe Private Schlüssel)
+- **Private Schlüssel** — Direkter Export privater Schlüssel (\`read:private_keys\`), nur für Admins: keine eingebaute Rolle außer Admin besitzt sie. Rollen ohne diese Berechtigung gehen über die Schlüsselwiederherstellung
 - **CSRs** — Erstellen, Lesen, Signieren, Löschen
 - **Templates** — Erstellen, Lesen, Aktualisieren, Löschen
 - **Benutzer** — Erstellen, Lesen, Aktualisieren, Löschen
@@ -67,6 +68,10 @@ Berechtigungen sind nach Kategorie organisiert:
 - **SCEP** — Konfigurieren, Anfragen genehmigen
 - **Vertrauensspeicher** — Vertrauenswürdige Zertifikate verwalten
 - **HSM** — Anbieter und Schlüssel verwalten
+- **SSH** — SSH-CAs und -Zertifikate verwalten
+- **Richtlinien** — Zertifikatsrichtlinien anzeigen
+- **Genehmigungen** — Genehmigungsanfragen anzeigen und entscheiden
+- **Schlüsselwiederherstellung** — Wiederherstellungen beantragen und Anfragen einsehen (Genehmigung nur durch Admins)
 - **Sicherung** — Erstellen, Wiederherstellen
 
 ### Kategorie-Schalter

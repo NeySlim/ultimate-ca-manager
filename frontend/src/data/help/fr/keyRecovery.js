@@ -57,6 +57,7 @@ Une fois approuvée, la clé archivée est délivrée sous forme d'archive **PKC
 
 - **read:key_recovery** — Demander une récupération et consulter les demandes
 - **admin** — Approuver ou refuser une demande de récupération en attente
+- **read:private_keys** — Portée réservée aux administrateurs, requise pour l'export *direct* de clé privée depuis la page Certificats (en contournant ce flux)
 
 ## Ce que c'est (et ce que ce n'est pas)
 

@@ -22,6 +22,7 @@ export default {
           { term: 'Abgelaufen', description: 'Nach dem „Nicht nach"-Datum' },
           { term: 'Widerrufen', description: 'Explizit widerrufen (in CRL veröffentlicht)' },
           { term: 'Verwaist', description: 'Die ausstellende CA existiert nicht mehr im System' },
+          { term: 'Archiviert', description: 'Durch eine Erneuerung oder erneute Registrierung ersetzt, die den alten Datensatz zur Historie aufbewahrt hat (SCEP, EST, WSTEP, ACME, OCSP-Responder); wird mit dem Statusfilter „Archiviert" aufgelistet' },
         ]
       },
       {
@@ -97,6 +98,7 @@ Zentrale Verwaltung aller X.509-Zertifikate. Stellen Sie neue Zertifikate aus, i
 - **Abgelaufen** — Nach dem „Nicht nach"-Datum
 - **Widerrufen** — Explizit widerrufen, in CRL veröffentlicht
 - **Verwaist** — Ausstellende CA existiert nicht mehr in UCM
+- **Archiviert** — Durch eine Erneuerung oder erneute Registrierung ersetzt, die den alten Datensatz zur Historie aufbewahrt hat (SCEP, EST, WSTEP, ACME, OCSP-Responder)
 
 ## Zertifikat ausstellen
 
@@ -174,8 +176,10 @@ Wählen Sie zwei Zertifikate aus und klicken Sie auf **Vergleichen**, um einen V
 
 ## Filtern & Suchen
 
-- **Statusfilter** — Gültig, Ablaufend, Abgelaufen, Widerrufen, Verwaist
+- **Statusfilter** — Gültig, Ablaufend, Abgelaufen, Widerrufen, Verwaist, Archiviert
 - **CA-Filter** — Zertifikate einer bestimmten CA anzeigen
+- **Quellenfilter** — Nach der Art filtern, wie das Zertifikat in UCM gelangt ist (ausgestellt, importiert, ACME, SCEP usw.)
+- **Vorlagenfilter** — Zertifikate finden, die **von der Vorlage abweichen**: aus einer Vorlage ausgestellt, aber mit bei der Anfrage explizit überschriebenem Schlüsseltyp, Gültigkeit oder Digest. Die abweichenden Felder werden in den Zertifikatdetails aufgelistet; der Datensatz ist ab der Ausstellung eingefroren
 - **Textsuche** — Nach CN, Seriennummer oder SAN suchen
 - **Sortierung** — Nach Name, Ablaufdatum, Erstellungsdatum, Status
 ## Konformitätsprüfung

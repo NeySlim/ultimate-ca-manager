@@ -71,6 +71,7 @@ A chave privada da CA assinante é usada para assinar cada token de carimbo de t
 - Use uma **sub-CA dedicada** para carimbos de tempo em vez da sua CA raiz
 - O certificado da CA deve incluir o Extended Key Usage **id-kp-timeStamping** (OID 1.3.6.1.5.5.7.3.8)
 - Garanta que o certificado da CA tenha **validade suficiente** — carimbos de tempo devem permanecer verificáveis por anos
+- Ative **Exigir um certificado de carimbo de tempo dedicado** para impor isso no momento da assinatura em vez de depender de convenção
 
 ### OID da Política
 

@@ -217,6 +217,7 @@ ECDSAキーは最新のデプロイに推奨されます — より小さく、�
 ドメイン検証用のDNS-01チャレンジプロバイダーを設定します。対応プロバイダー：
 - Cloudflare
 - AWS Route 53
+- Azure DNS
 - Google Cloud DNS
 - DigitalOcean
 - OVH

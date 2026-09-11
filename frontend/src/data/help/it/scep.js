@@ -30,6 +30,8 @@ export default {
           { label: 'Challenge per profilo', text: 'Ogni profilo ha la propria password di challenge, memorizzata cifrata, con la stessa finestra di scadenza della challenge globale' },
           { label: 'Endpoint predefinito', text: 'L\'endpoint /scep/pkiclient.exe senza segmento continua a servire la configurazione globale' },
           { label: 'Validazione Microsoft Intune', text: 'Un profilo può validarsi contro la challenge SCEP propria di Intune per dispositivo invece di una password statica — richiede una registrazione app Entra (permessi SCEP challenge validation + Application.Read.All) e l\'approvazione automatica attiva' },
+          { label: 'Approvazione manuale', text: 'Una richiesta arrivata tramite un profilo viene approvata con il modello di quel profilo (validità, key usage), esattamente come la emetterebbe l\'approvazione automatica' },
+          { label: 'Scopi preclusi a chi si iscrive', text: 'Un modello associato a un profilo non può includere firma OCSP, marca temporale, "qualsiasi scopo" (any purpose) o Smartcard Logon, e un rinnovo SCEP non li riporta mai; Smartcard Logon è consentito quando il profilo si valida contro Intune, che garantisce l\'identità' },
         ]
       },
     ],
@@ -75,6 +77,7 @@ https://your-server:8443/scep/<profile>/pkiclient.exe
 Ogni profilo è associato a:
 - **La propria CA** — flotte di dispositivi diverse possono iscriversi presso CA diverse
 - **Un modello di certificato opzionale** — quando associato, key usage, extended key usage e validità del modello governano ogni certificato emesso tramite il profilo
+- **Scopi preclusi a chi si iscrive** — un modello associato a un profilo non può includere firma OCSP, marca temporale, "qualsiasi scopo" (any purpose) o Smartcard Logon, e un rinnovo SCEP non li riporta mai; Smartcard Logon è consentito quando il profilo si valida contro Intune, che garantisce l'identità
 - **Una challenge password per profilo** — memorizzata cifrata, con la stessa finestra di scadenza della challenge globale
 - **Una politica di approvazione** — approvazione automatica o revisione manuale per profilo
 
@@ -113,6 +116,8 @@ Per le richieste in attesa (approvazione automatica disattivata):
 1. Rivedi i dettagli della richiesta (soggetto, tipo di chiave, challenge)
 2. Clicca **Approva** per firmare ed emettere il certificato
 3. Oppure clicca **Rifiuta** con una motivazione
+
+Una richiesta arrivata tramite un profilo viene emessa con il modello di quel profilo (validità, key usage), esattamente come farebbe l'approvazione automatica.
 
 > ⚠ Le challenge password vengono trasmesse nella richiesta SCEP. Usa sempre HTTPS per l'endpoint SCEP.
 

@@ -163,6 +163,7 @@ export const helpContent = {
           { term: 'Expired', description: 'Past the "Not After" date' },
           { term: 'Revoked', description: 'Explicitly revoked (published in CRL)' },
           { term: 'Orphan', description: 'Issuing CA no longer exists in the system' },
+          { term: 'Archived', description: 'Superseded by a renewal or re-enrolment that kept the old record for history (SCEP, EST, WSTEP, ACME, OCSP responder); listed with the "Archived" status filter' },
         ]
       },
       {
@@ -434,6 +435,8 @@ export const helpContent = {
           { label: 'Per-profile challenge', text: 'Each profile has its own challenge password, stored encrypted, with the same expiry window as the global challenge' },
           { label: 'Default endpoint', text: 'The unlabelled /scep/pkiclient.exe endpoint keeps serving the global configuration' },
           { label: 'Microsoft Intune validation', text: 'A profile can validate against Intune\'s own per-device SCEP challenge instead of a static password — requires an Entra app registration (SCEP challenge validation + Application.Read.All permissions) and Auto-Approve enabled' },
+          { label: 'Manual approval', text: 'A request that came through a profile is approved with that profile\'s template (validity, key usages), exactly as auto-approval would issue it' },
+          { label: 'Purposes no enrollee may hold', text: 'A template bound to a profile cannot carry OCSP signing, timestamping, any purpose or Smartcard Logon, and a SCEP renewal never carries them over; Smartcard Logon is allowed when the profile validates against Intune, which vouches for the identity' },
         ]
       },
     ],
@@ -469,6 +472,7 @@ export const helpContent = {
         items: [
           { label: 'mTLS (Mutual TLS)', text: 'Client presents a certificate during TLS handshake — strongest authentication method' },
           { label: 'HTTP Basic Auth', text: 'Username/password fallback when mTLS is not available' },
+          { label: 'Presented certificate', text: 'For /simpleenroll and /serverkeygen over mTLS, a certificate signed by the EST CA must be one it still holds: revoked, superseded or deleted certificates are refused (RFC 7030 §3.3.2); a certificate from another authority the TLS layer trusts is still accepted' },
         ]
       },
       {
@@ -982,6 +986,15 @@ export const helpContent = {
           { label: 'AD-derived subjects', text: 'Templates can opt into deriving their subject/SAN from Active Directory (via the AD Connector) for unattended enrollment' },
         ]
       },
+      {
+        title: 'Auto-renewal',
+        icon: ArrowClockwise,
+        items: [
+          { label: 'Sources', text: 'The scheduler renews certificates whose private key the server holds: by default those issued from the form or a signed request ("manual"), and SCEP, ACME and EST enrolments with a server-generated key. Devices holding their own key renew through their protocol' },
+          { label: 'Awaiting approval', text: 'A certificate whose renewal is queued for approval is left to that decision, as long as it can come before the certificate expires' },
+          { label: 'Renewed meanwhile', text: 'A certificate an operator renewed during the batch is not renewed a second time; one deleted during the batch is skipped' },
+        ]
+      },
     ],
     tips: [
       'Use the System Status widget at the top to quickly check service health',
@@ -1399,12 +1412,34 @@ export const helpContent = {
           { label: 'Pending', text: 'Awaiting review — certificate cannot be issued yet' },
           { label: 'Approved', text: 'All required approvals received — certificate can be issued' },
           { label: 'Rejected', text: 'Any rejection immediately stops the request' },
-          { label: 'Expired', text: 'Request was not reviewed before the deadline' },
+          { label: 'Expired', text: 'Not decided within seven days; closed as expired and never counted as pending' },
+        ]
+      },
+      {
+        title: 'Where requests come from',
+        icon: ListChecks,
+        items: [
+          { label: 'Issue form', text: 'A certificate request matching a policy that requires approval' },
+          { label: 'Sign CSR and bulk signing', text: 'Signing a stored request, alone or from Operations, is queued the same way; the approval performs the signing' },
+          { label: 'Renewal', text: 'Renewing a certificate, alone or in bulk, is queued too; a renewal that could not be honoured (revoked, key not held by the server) is refused at once' },
+          { label: 'Administrators', text: 'Bypass the queue on every path, as on the issue form' },
+        ]
+      },
+      {
+        title: 'Requests closed for you',
+        icon: ClockCounterClockwise,
+        items: [
+          { label: 'Signed or renewed directly', text: 'A queued request whose target an administrator signed or renewed meanwhile is closed as approved by that action and linked to the certificate' },
+          { label: 'Deleted or revoked', text: 'A request whose target was deleted or revoked is closed as rejected; a certificate hold keeps the renewal request waiting for the unhold' },
+          { label: 'Already satisfied', text: 'Approving a request already fulfilled closes it on the existing certificate; approving one of several requests for the same target closes the others as approved by you' },
+          { label: 'Target gone', text: 'Approving a request whose stored request, certificate or CA no longer exists closes it as rejected' },
+          { label: 'Deadline', text: 'A request waits seven days; past that it is closed as expired, never counted as pending, and the renewal scheduler resumes for its certificate' },
         ]
       },
     ],
     tips: [
       'Any single rejection immediately stops the approval — this is intentional for security.',
+      'While a renewal awaits approval, the scheduler leaves the certificate to that decision, as long as it can come before the certificate expires.',
       'Approval comments are logged in the audit trail for compliance.',
     ],
     related: ['Policies', 'Certificates', 'Audit Logs']
