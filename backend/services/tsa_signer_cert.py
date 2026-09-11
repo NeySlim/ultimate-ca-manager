@@ -58,6 +58,7 @@ except ImportError:  # encryption module unavailable — store as-is
 
 
 from utils.signing_hash import signing_hash_for
+from utils.x509_aki import authority_key_identifier_from_issuer
 
 
 class TsaSignerIssueError(Exception):
@@ -222,7 +223,7 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
             critical=False,
         )
         .add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
+            authority_key_identifier_from_issuer(ca_cert),
             critical=False,
         )
     )

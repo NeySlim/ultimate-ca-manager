@@ -35,6 +35,7 @@ except ImportError:  # pragma: no cover
 from utils.db_transaction import safe_commit
 from . import bp
 from utils.key_codec import private_key_to_pem
+from utils.x509_aki import authority_key_identifier_from_issuer
 
 logger = logging.getLogger(__name__)
 
@@ -434,9 +435,9 @@ def create_certificate():
             critical=False
         )
 
-        # Authority Key Identifier
+        # Authority Key Identifier: the issuer's own SKI (RFC 5280 §4.2.1.1)
         builder = builder.add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
+            authority_key_identifier_from_issuer(ca_cert),
             critical=False
         )
 

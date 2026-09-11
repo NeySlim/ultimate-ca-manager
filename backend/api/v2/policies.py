@@ -34,6 +34,7 @@ _MAX_VALIDITY_DAYS = 3650
 
 
 from utils.signing_hash import signing_hash_for
+from utils.x509_aki import authority_key_identifier_from_issuer
 
 
 def _user_can_act_on_approval(user, approval):
@@ -323,7 +324,7 @@ def _issue_approved_certificate(approval):
 
     # SKI/AKI
     builder = builder.add_extension(x509.SubjectKeyIdentifier.from_public_key(new_key.public_key()), critical=False)
-    builder = builder.add_extension(x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()), critical=False)
+    builder = builder.add_extension(authority_key_identifier_from_issuer(ca_cert), critical=False)
     
     # CDP/OCSP/CPS
     if ca.cdp_enabled:

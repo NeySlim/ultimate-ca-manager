@@ -34,6 +34,7 @@ DEFAULT_RENEW_DAYS = 30
 
 
 from utils.signing_hash import signing_hash_for
+from utils.x509_aki import authority_key_identifier_from_issuer
 
 
 def _get_config(key, default=None):
@@ -104,7 +105,7 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
         old_ekus = []
     builder = add_ocsp_nocheck_if_responder(builder, old_ekus)
     builder = builder.add_extension(
-        x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_cert.public_key()),
+        authority_key_identifier_from_issuer(ca_cert),
         critical=False,
     )
 

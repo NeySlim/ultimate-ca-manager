@@ -64,6 +64,7 @@ DEFAULT_RENEWAL_DAYS = 365
 
 
 from utils.signing_hash import signing_hash_for
+from utils.x509_aki import authority_key_identifier_from_issuer
 
 
 class RenewalError(Exception):
@@ -404,13 +405,12 @@ def renew_certificate_in_place(
     builder = builder.add_extension(
         x509.SubjectKeyIdentifier.from_public_key(public_key), critical=False
     )
-    try:
-        builder = builder.add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_public_key(ca_key.public_key()),
-            critical=False,
-        )
-    except Exception:
-        pass
+    # The issuer's own SKI, as on every issuance path (RFC 5280 §4.2.1.1);
+    # an AKI derived from the key differs from it for an imported or
+    # HSM-generated CA and breaks chain building
+    builder = builder.add_extension(
+        authority_key_identifier_from_issuer(ca_cert), critical=False
+    )
 
     new_cert = builder.sign(ca_key, signing_hash_for(ca_key), default_backend())
 

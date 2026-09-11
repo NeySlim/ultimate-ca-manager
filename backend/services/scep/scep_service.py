@@ -59,6 +59,7 @@ logger = logging.getLogger(__name__)
 
 
 from utils.signing_hash import signing_hash_for
+from utils.x509_aki import authority_key_identifier_from_issuer
 
 
 def _scep_allow_no_challenge() -> bool:
@@ -1308,7 +1309,7 @@ class SCEPService:
             x509.SubjectKeyIdentifier.from_public_key(public_key), critical=False
         )
         builder = builder.add_extension(
-            x509.AuthorityKeyIdentifier.from_issuer_public_key(self.ca_cert.public_key()),
+            authority_key_identifier_from_issuer(self.ca_cert),
             critical=False,
         )
 
