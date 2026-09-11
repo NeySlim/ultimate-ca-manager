@@ -162,7 +162,9 @@ class AutoRenewalService:
                 a certificate renewed by someone else meanwhile is refused.
 
         Returns:
-            (success: bool, cert_id or error_message: int|str)
+            (success, cert_id or message): success is True, False for a
+            failure worth reporting, None when there was nothing to renew
+            (the row went away between the batch's read and the lock).
         """
         # Identity kept aside: after a refused renewal the session is rolled
         # back and the instance expired; the row may be gone (deleted
@@ -182,6 +184,11 @@ class AutoRenewalService:
 
         except RenewalError as e:
             db.session.rollback()
+            if e.status == 404:
+                # Gone between the batch's read and the renewal's lock:
+                # nothing to renew, nothing to report as a failure
+                logger.info(f"Auto-renewal skipped cert {cert_id}: {e.message}")
+                return None, e.message
             logger.warning(f"Auto-renewal refused for cert {cert_id}: {e.message}")
             AutoRenewalService._log_failure(cert_id, common_name, e.message)
             return False, e.message
@@ -274,6 +281,8 @@ class AutoRenewalService:
                 # CRL is the one carrying the superseded serial
                 if cert.caref:
                     renewed_carefs.add(cert.caref)
+            elif success is None:
+                stats['skipped'] += 1
             else:
                 stats['failed'] += 1
                 stats['errors'].append({

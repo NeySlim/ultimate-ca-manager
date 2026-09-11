@@ -994,3 +994,75 @@ class TestFourthReviewFollowUps:
         finally:
             _drop_policy(app, pid)
             _drop_rows(app, csr_id)
+
+
+class TestLastFollowUps:
+
+    def test_row_gone_between_reread_and_lock_is_skipped_without_failure_audit(self, app, create_ca, monkeypatch):
+        from sqlalchemy import text
+        from models import AuditLog
+        from services.auto_renewal_service import AutoRenewalService
+        ca = create_ca(cn='fu5-gone CA')
+        cert_id = _cert_row(app, ca['id'], 'fu5-gone.example.test')
+        try:
+            with app.app_context():
+                cert = db.session.get(Certificate, cert_id)
+                before = AuditLog.query.filter_by(action='certificate.auto_renewal_failed', resource_id=str(cert_id)).count()
+                # gone after the batch read it, before the renewal locked it
+                db.session.execute(text('DELETE FROM certificates WHERE id = :id'), {'id': cert_id})
+                success, message = AutoRenewalService.renew_certificate(cert, regenerate_crl=False)
+                db.session.rollback()
+                assert success is None and 'no longer exists' in message
+                after = AuditLog.query.filter_by(action='certificate.auto_renewal_failed', resource_id=str(cert_id)).count()
+                assert after == before
+        finally:
+            _drop_rows(app, cert_id)
+
+    def test_batch_counts_a_vanished_certificate_as_skipped(self, app, create_ca, monkeypatch):
+        from services.auto_renewal_service import AutoRenewalService
+        ca = create_ca(cn='fu5-skip CA')
+        cert_id = _cert_row(app, ca['id'], 'fu5-skip.example.test')
+        try:
+            with app.app_context():
+                config = AutoRenewalService.get_renewal_config()
+                previous = dict(config)
+                AutoRenewalService.set_renewal_config({**config, 'enabled': True, 'days_before_expiry': 60,
+                                                       'renewal_sources': ['manual']})
+                try:
+                    cert = db.session.get(Certificate, cert_id)
+                    monkeypatch.setattr(AutoRenewalService, 'get_certificates_for_renewal', staticmethod(lambda: [cert]))
+                    monkeypatch.setattr(AutoRenewalService, 'renew_certificate',
+                                        staticmethod(lambda c, regenerate_crl=True, known_serial=None: (None, 'Certificate no longer exists')))
+                    stats = AutoRenewalService.run_auto_renewal()
+                finally:
+                    AutoRenewalService.set_renewal_config(previous)
+                assert stats == {'renewed': 0, 'failed': 0, 'skipped': 1, 'errors': []}, stats
+        finally:
+            _drop_rows(app, cert_id)
+
+    def test_a_failing_resolution_after_the_commit_does_not_fail_the_signing(self, app, auth_client, create_ca, monkeypatch):
+        ca = create_ca(cn='fu5-robust CA')
+        csr_id = _csr_row(app, 'fu5-robust.example.test')
+        try:
+            def broken(*_a, **_k):
+                raise RuntimeError('database is locked')
+            monkeypatch.setattr('services.approval_gate.pending_requests_naming', broken)
+            r = _json(auth_client, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 30})
+            assert r.status_code == 200, r.get_json()
+            with app.app_context():
+                assert db.session.get(Certificate, csr_id).crt
+        finally:
+            _drop_rows(app, csr_id)
+
+    def test_a_failing_resolution_inside_a_transaction_still_propagates(self, app, create_ca, create_user, monkeypatch):
+        """With commit=False the caller owns the transaction: it must learn
+        about the failure (the deletion is then rolled back by the caller)."""
+        from services.approval_gate import resolve_moot_requests
+
+        def broken(*_a, **_k):
+            raise RuntimeError('database is locked')
+        monkeypatch.setattr('services.approval_gate.pending_requests_naming', broken)
+        with app.app_context():
+            with pytest.raises(RuntimeError):
+                resolve_moot_requests('csr', 'csr_id', 1, outcome='rejected', username='admin',
+                                      reason='Request deleted', commit=False)

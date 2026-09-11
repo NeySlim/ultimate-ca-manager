@@ -195,7 +195,7 @@ def notify_rejected(snapshots: list, *, reason: str, actor: str) -> None:
         emit_csr_rejected(snapshot, reason=reason, actor=actor)
 
 
-def resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: str,
+def _resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: str,
                           username: str, user_id=None, certificate_id=None,
                           reason: str, commit: bool = True) -> list:
     """Resolve the pending requests a direct action made moot.
@@ -234,3 +234,24 @@ def resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: st
         from utils.db_transaction import safe_commit
         safe_commit(logger, "Failed to resolve superseded approval requests")
     return resolved
+
+
+def resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: str,
+                          username: str, user_id=None, certificate_id=None,
+                          reason: str, commit: bool = True) -> list:
+    """See ``_resolve_moot_requests``. With ``commit`` the action itself is
+    already committed: a failure here is logged and never fails or undoes
+    it. Without it the caller owns the transaction and must learn about
+    the failure, so it propagates."""
+    if not commit:
+        return _resolve_moot_requests(request_type, key, target_id, outcome=outcome,
+                                      username=username, user_id=user_id,
+                                      certificate_id=certificate_id, reason=reason, commit=False)
+    try:
+        return _resolve_moot_requests(request_type, key, target_id, outcome=outcome,
+                                      username=username, user_id=user_id,
+                                      certificate_id=certificate_id, reason=reason, commit=True)
+    except Exception:
+        db.session.rollback()
+        logger.exception("Failed to resolve superseded approval requests for %s %s", request_type, target_id)
+        return []
