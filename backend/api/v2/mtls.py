@@ -38,6 +38,19 @@ logger = logging.getLogger(__name__)
 bp = Blueprint('mtls', __name__, url_prefix='/api/v2/mtls')
 
 
+def _serial_forms(raw) -> set:
+    """Every stored form of a serial (decimal, hex): one certificate is one
+    enrolment whatever route recorded it."""
+    from utils.serial_format import serial_variants
+    forms = {str(raw)}
+    for base in (10, 16):
+        try:
+            forms |= serial_variants(int(str(raw), base))
+        except (TypeError, ValueError):
+            continue
+    return forms
+
+
 def _get_mtls_config(key, default=None):
     config = SystemConfig.query.filter_by(key=key).first()
     return config.value if config else default
@@ -511,7 +524,9 @@ def enroll_presented_certificate():
             return error_response('Cannot enroll certificate that is not yet valid', 400)
 
     # Check if already enrolled
-    existing = AuthCertificate.query.filter_by(cert_serial=cert_info['serial']).first()
+    existing = AuthCertificate.query.filter(
+        AuthCertificate.cert_serial.in_(_serial_forms(cert_info['serial']))
+    ).first()
     if existing:
         return error_response('This certificate is already enrolled', 409)
 
@@ -614,6 +629,10 @@ def enroll_import_certificate():
     # (possession is proven through /enroll, over TLS). A certificate this
     # server issued but no longer records is an administrator's call.
     if existing_cert is not None and existing_cert.revoked:
+        return error_response('This certificate has been revoked', 400)
+    # A certificate revoked and then deleted keeps its persistent record
+    from services.cert.issued_lookup import REVOKED, issued_certificate_status
+    if issued_certificate_status(issuing_ca, cert_obj)[1] == REVOKED:
         return error_response('This certificate has been revoked', 400)
     if user.role != 'admin':
         if existing_cert is None:
@@ -778,7 +797,9 @@ def assign_certificate():
 
     # Check duplicate enrollment
     serial = certificate.serial_number
-    existing = AuthCertificate.query.filter_by(cert_serial=serial).first()
+    existing = AuthCertificate.query.filter(
+        AuthCertificate.cert_serial.in_(_serial_forms(serial))
+    ).first()
     if existing:
         if existing.user_id == enroll_user_id:
             return error_response('This certificate is already assigned to this account', 409)

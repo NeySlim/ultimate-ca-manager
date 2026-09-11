@@ -92,10 +92,20 @@ def find_certificate(aki_hex: str, serial_int: int) -> Optional[Certificate]:
 def has_valid_replacement(certid: str) -> bool:
     """Return whether a completed ACME order replaced ``certid``."""
     # RFC 9773 §5: any order that is not invalid counts as the replacement
+    # (an expired order is invalid in fact, even before its lazy expiry)
+    from sqlalchemy import or_
+    now = utc_now()
     return AcmeOrder.query.filter(
         AcmeOrder.replaces == certid,
         AcmeOrder.status != 'invalid',
+        or_(AcmeOrder.status == 'valid', AcmeOrder.expires.is_(None), AcmeOrder.expires > now),
     ).first() is not None
+
+
+def has_issued_replacement(certid: str) -> bool:
+    """Whether a completed order (certificate issued) replaced ``certid``:
+    what moves the renewal window of the replaced certificate."""
+    return AcmeOrder.query.filter_by(replaces=certid, status='valid').first() is not None
 
 
 def certid_is_owned_by_account(certid: str, account_id: str) -> bool:

@@ -2054,7 +2054,7 @@ def renewal_info(certid: str):
     data = ari.build_renewal_info(
         cert,
         renew_before_days,
-        replaced=ari.has_valid_replacement(certid),
+        replaced=ari.has_issued_replacement(certid),
     )
     response = make_response(jsonify(data), 200)
     response.headers['Content-Type'] = 'application/json'

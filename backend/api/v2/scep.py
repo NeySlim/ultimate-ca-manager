@@ -416,7 +416,7 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
         data['ca_refid'] = ca.refid
 
     template_ref = data.get('template_id') if 'template_id' in data else None
-    if template_ref is None and partial and profile_id and 'intune_enabled' in data:
+    if 'template_id' not in data and partial and profile_id and 'intune_enabled' in data:
         # Turning Intune validation off re-validates the bound template
         # (Smartcard Logon is only tolerated with it)
         saved_profile = db.session.get(ScepProfile, profile_id)
