@@ -566,7 +566,7 @@ GET /api/v2/certificates?search=example.com
 **Query Parameters:**
 | Parameter | Type | Description |
 |-----------|------|-------------|
-| `status` | string | Filter: `active`, `expired`, `revoked`, `expiring` |
+| `status` | string | Filter, repeatable: `valid`, `expiring`, `expired`, `revoked`, `orphan`, `archived` |
 | `ca_id` | integer | Filter by issuing CA |
 | `search` | string | Search in CN, SANs |
 | `page` | integer | Page number (default: 1) |

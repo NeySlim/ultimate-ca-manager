@@ -370,6 +370,8 @@ class ExportExtendedMixin:
                 'cert_refid': r.cert_refid,
                 'subject': r.subject,
                 'client_ip': r.client_ip,
+                'profile_id': getattr(r, 'profile_id', None),
+                'renewal': bool(getattr(r, 'renewal_of', None)),
                 'created_at': r.created_at.isoformat() if getattr(r, 'created_at', None) else None,
             })
         return items

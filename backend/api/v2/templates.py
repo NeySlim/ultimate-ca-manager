@@ -457,6 +457,14 @@ def delete_template(template_id):
         return error_response(
             f'Cannot delete: template is used by {policy_count} policy/policies', 409
         )
+    # SCEP profiles keep only the numeric id too: a binding left behind
+    # would apply the next template created under that id
+    from models.scep import ScepProfile
+    scep_count = ScepProfile.query.filter_by(template_id=template_id).count()
+    if scep_count > 0:
+        return error_response(
+            f'Cannot delete: template is bound to {scep_count} SCEP profile(s); unbind it first', 409
+        )
     # ACME profiles keep only the numeric id; SQLite reuses it for the next
     # template, so a binding left behind would silently apply a foreign
     # template's KU/EKU. Unbind first (ACME settings), then delete.

@@ -575,6 +575,10 @@ class SCEPService:
                 subject=csr.subject.rfc4514_string(),
                 client_ip=client_ip,
                 profile_id=self.profile_id,
+                # A RenewalReq keeps the certificate it was signed with, so
+                # that a manual approval renews it (archives it) too
+                renewal_of=(base64.b64encode(signer_cert.public_bytes(serialization.Encoding.PEM)).decode("utf-8")
+                            if message_type == self.MSG_TYPE_RENEWAL_REQ and signer_cert is not None else None),
             )
             db.session.add(scep_req)
 
@@ -895,7 +899,15 @@ class SCEPService:
             return None
 
         csr = x509.load_der_x509_csr(base64.b64decode(scep_req.csr), default_backend())
-        cert_refid = self._auto_approve_request(scep_req, csr, validity_days)
+        renewal_of = None
+        if scep_req.renewal_of:
+            try:
+                renewal_of = x509.load_pem_x509_certificate(
+                    base64.b64decode(scep_req.renewal_of), default_backend())
+            except Exception as e:
+                logger.warning(f"SCEP approve_request: stored renewal certificate unreadable, "
+                               f"approving as an initial enrolment: {e}")
+        cert_refid = self._auto_approve_request(scep_req, csr, validity_days, renewal_of=renewal_of)
 
         scep_req.status = "approved"
         scep_req.cert_refid = cert_refid

@@ -138,19 +138,21 @@ def _issuing_service(scep_req):
     """The service that issues for a stored request: with the template of
     the profile the request came through (its validity and key usages
     govern, as on auto-approval), the CA defaults for the global endpoint.
-    Raises ValueError when that profile or its template no longer exists."""
+    A profile disabled meanwhile still governs the requests it received:
+    the operator approving is the authority here. Raises LookupError when
+    that profile or its template no longer exists."""
     from services.scep.scep_service import SCEPService
     template = None
     if scep_req.profile_id:
         from models.scep import ScepProfile
         profile = db.session.get(ScepProfile, scep_req.profile_id)
         if profile is None:
-            raise ValueError('The SCEP profile this request came through no longer exists')
+            raise LookupError('The SCEP profile this request came through no longer exists')
         if profile.template_id:
             from models import CertificateTemplate
             template = db.session.get(CertificateTemplate, profile.template_id)
             if template is None:
-                raise ValueError('The template bound to the SCEP profile no longer exists')
+                raise LookupError('The template bound to the SCEP profile no longer exists')
     return SCEPService(ca_refid=scep_req.ca_refid, template=template, profile_id=scep_req.profile_id)
 
 
@@ -177,9 +179,16 @@ def approve_scep_request(request_id):
         cert_refid = _issuing_service(scep_req).approve_request(
             scep_req.transaction_id, username,
         )
-    except ValueError as e:
+    except LookupError as e:
         # The profile or template the request was made under is gone
         db.session.rollback()
+        logger.warning(f"SCEP approve: request {request_id} cannot be issued: {e}")
+        return error_response(str(e), 409)
+    except ValueError as e:
+        # The CA refused (offline, revoked, outside its signing window, name
+        # constraints...): the approver needs the reason
+        db.session.rollback()
+        logger.warning(f"SCEP approve: issuance refused for request {request_id}: {e}")
         return error_response(str(e), 409)
     except Exception as e:
         logger.error(f"SCEP approve: issuance failed for request {request_id}: {e}", exc_info=True)
@@ -702,6 +711,14 @@ def delete_scep_profile(profile_id):
     profile = db.session.get(ScepProfile, profile_id)
     if not profile:
         return error_response('Profile not found', 404)
+
+    # A pending request is approved with its profile's template: the
+    # profile stays until those requests are decided
+    pending = SCEPRequest.query.filter_by(profile_id=profile_id, status='pending').count()
+    if pending:
+        return error_response(
+            f'Cannot delete: {pending} pending request(s) came through this profile; '
+            f'approve or reject them first', 409)
 
     name = profile.name
     try:

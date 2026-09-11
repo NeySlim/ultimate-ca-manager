@@ -158,3 +158,103 @@ def test_manual_approval_refuses_when_the_profile_is_gone(app, auth_client, crea
             assert db.session.get(SCEPRequest, req_id).status == 'pending'
     finally:
         _cleanup(app, req_id)
+
+
+def test_manual_approval_reports_a_refusing_ca_as_a_conflict(app, auth_client, create_ca):
+    ca = create_ca(cn='SCEP offline approve CA')
+    req_id = _request(app, ca['id'], 'offline.example.test')
+    try:
+        with app.app_context():
+            row = db.session.get(CA, ca['id'])
+            row.offline = True
+            row.offline_reason = 'maintenance'
+            db.session.commit()
+        r = auth_client.post(f'/api/v2/scep/{req_id}/approve', data='{}', content_type='application/json')
+        assert r.status_code == 409, r.get_json()
+        assert 'offline' in (r.get_json().get('detail') or r.get_json().get('message') or '').lower()
+        with app.app_context():
+            assert db.session.get(SCEPRequest, req_id).status == 'pending'
+    finally:
+        with app.app_context():
+            row = db.session.get(CA, ca['id'])
+            row.offline = False
+            db.session.commit()
+        _cleanup(app, req_id)
+
+
+def test_a_profile_with_pending_requests_cannot_be_deleted(app, auth_client, create_ca):
+    ca = create_ca(cn='SCEP delete profile CA')
+    profile_id = _profile(app, ca['id'], 'scep-delete')
+    req_id = _request(app, ca['id'], 'delete.example.test', profile_id)
+    try:
+        r = auth_client.delete(f'/api/v2/scep/profiles/{profile_id}')
+        assert r.status_code == 409, r.get_json()
+        r = auth_client.post(f'/api/v2/scep/{req_id}/reject', data=json.dumps({'reason': 'no'}),
+                             content_type='application/json')
+        assert r.status_code == 200, r.get_json()
+        r = auth_client.delete(f'/api/v2/scep/profiles/{profile_id}')
+        assert r.status_code == 200, r.get_json()
+        with app.app_context():
+            assert db.session.get(ScepProfile, profile_id) is None
+    finally:
+        _cleanup(app, req_id, profile_id)
+
+
+def test_a_template_bound_to_a_scep_profile_cannot_be_deleted(app, auth_client, create_ca):
+    ca = create_ca(cn='SCEP delete template CA')
+    template_id = _template(app, 'scep-bound-tpl')
+    profile_id = _profile(app, ca['id'], 'scep-bound', template_id)
+    try:
+        r = auth_client.delete(f'/api/v2/templates/{template_id}')
+        assert r.status_code == 409, r.get_json()
+        with app.app_context():
+            assert db.session.get(CertificateTemplate, template_id) is not None
+    finally:
+        _cleanup(app, -1, profile_id, template_id)
+
+
+def test_manual_approval_of_a_renewal_archives_the_renewed_certificate(app, auth_client, create_ca):
+    from services.cert_service import CertificateService
+    ca = create_ca(cn='SCEP renewal approve CA')
+    with app.app_context():
+        ca_row = db.session.get(CA, ca['id'])
+        old = CertificateService.create_certificate(
+            descr='renew.example.test', caref=ca_row.refid, dn={'CN': 'renew.example.test'},
+            cert_type='server_cert', key_type='2048', validity_days=30, username='admin')
+        db.session.commit()
+        old_id, old_crt = old.id, old.crt
+    csr = _csr('renew.example.test')
+    with app.app_context():
+        ca_row = db.session.get(CA, ca['id'])
+        req = SCEPRequest(transaction_id='txn-renewal', ca_refid=ca_row.refid,
+                          csr=base64.b64encode(csr.public_bytes(serialization.Encoding.DER)).decode(),
+                          status='pending', subject='CN=renew.example.test', renewal_of=old_crt)
+        db.session.add(req)
+        db.session.commit()
+        req_id = req.id
+    try:
+        r = auth_client.post(f'/api/v2/scep/{req_id}/approve', data='{}', content_type='application/json')
+        assert r.status_code == 200, r.get_json()
+        with app.app_context():
+            assert db.session.get(Certificate, old_id).archived is True
+    finally:
+        _cleanup(app, req_id)
+        with app.app_context():
+            row = db.session.get(Certificate, old_id)
+            if row:
+                db.session.delete(row)
+            db.session.commit()
+
+
+def test_scep_history_export_carries_the_profile(app, create_ca):
+    from services.backup.export_extended import ExportExtendedMixin
+    ca = create_ca(cn='SCEP export CA')
+    profile_id = _profile(app, ca['id'], 'scep-export')
+    req_id = _request(app, ca['id'], 'export.example.test', profile_id)
+    try:
+        with app.app_context():
+            items = ExportExtendedMixin()._export_scep_requests(True)
+            mine = [i for i in items if i['transaction_id'] == 'txn-export.example.test']
+            assert mine and mine[0]['profile_id'] == profile_id and mine[0]['renewal'] is False
+    finally:
+        _cleanup(app, req_id, profile_id)

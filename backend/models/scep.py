@@ -145,6 +145,10 @@ class SCEPRequest(db.Model):
     # the request is approved by hand, as it does on auto-approval. NULL for
     # the global endpoint and for rows older than migration 085.
     profile_id = db.Column(db.Integer, nullable=True)
+    # The certificate a RenewalReq was signed with (base64 PEM), so that a
+    # manual approval renews it (archives it) as auto-approval does. NULL
+    # for an initial enrolment and for rows older than migration 086.
+    renewal_of = db.Column(db.Text, nullable=True)
 
     created_at = db.Column(db.DateTime, default=utc_now)
 
@@ -158,6 +162,7 @@ class SCEPRequest(db.Model):
             "subject": self.subject,
             "client_ip": self.client_ip,
             "profile_id": self.profile_id,
+            "renewal": bool(self.renewal_of),
             "approved_by": self.approved_by,
             "approved_at": utc_isoformat(self.approved_at),
             "rejection_reason": self.rejection_reason,
