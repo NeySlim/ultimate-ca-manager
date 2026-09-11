@@ -268,6 +268,13 @@ proc_name = 'ucm'
 preload_app = True
 
 # Server mechanics
+# Gunicorn 25 opens a control socket in the working directory by default. The
+# service runs from /opt/ucm/backend, which ProtectSystem=strict keeps
+# read-only, so the socket could never be created and an error was logged at
+# every start (#349). UCM never uses the control interface, so it stays off.
+# The key is control_socket_disable; the command-line flag is
+# --no-control-socket and gunicorn ignores an unknown key here in silence.
+control_socket_disable = True
 daemon = False
 pidfile = None
 umask = 0o027
