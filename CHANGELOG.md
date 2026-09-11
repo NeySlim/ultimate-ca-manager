@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 - The service logged two errors at every start, `Control server error: [Errno 30] Read-only file system` then `Control server error: no running event loop`, without any other effect. The bundled gunicorn opens a control socket in the working directory by default, and the unit keeps that directory read-only. UCM never uses that interface, so it is now disabled in the gunicorn configuration shared by the Debian package, the RPM and the container image (#349, reported by @JoseGoncalves)
+- The container image carried the whole frontend source tree, its build-time dependencies included, close to 340 MB the server never reads: it serves the built interface only, which is what the image now holds. The image also created its data directories from a brace pattern the shell of its base image does not expand, leaving one oddly named directory that the entrypoint worked around at every start. A package or an image built from a working copy no longer carries what that copy holds outside version control either, the database, the sessions and the private keys under the backend data directory among them
 
 ## [2.228] - 2026-09-11
 

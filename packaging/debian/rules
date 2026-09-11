@@ -20,6 +20,10 @@ override_dh_auto_install:
 	
 	# Copy application files
 	cp -r backend/* debian/ucm/opt/ucm/backend/
+	# A working checkout also holds the database, the sessions and the
+	# private keys under backend/data, plus a virtual environment and
+	# caches. Shared with the local RPM build so the two cannot drift.
+	sh packaging/scripts/prune-runtime-state.sh debian/ucm/opt/ucm/backend
 	# Only copy built frontend (dist/), not node_modules or source
 	cp -r frontend/dist debian/ucm/opt/ucm/frontend/
 	

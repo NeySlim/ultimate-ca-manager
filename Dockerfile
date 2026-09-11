@@ -65,12 +65,20 @@ WORKDIR /opt/ucm
 # Copy application files with proper ownership (same layout as packages)
 COPY --chown=ucm:ucm VERSION /opt/ucm/VERSION
 COPY --chown=ucm:ucm backend/ /opt/ucm/backend/
-COPY --chown=ucm:ucm frontend/ /opt/ucm/frontend/
+# Only the built interface: the server serves frontend/dist, while frontend/
+# as a whole carries the sources and node_modules, several hundred megabytes
+# of build-time dependencies that have no place in a runtime image
+COPY --chown=ucm:ucm frontend/dist/ /opt/ucm/frontend/dist/
 COPY --chown=ucm:ucm wsgi.py /opt/ucm/wsgi.py
 COPY --chown=ucm:ucm .env.docker.example /opt/ucm/.env.example
 
 # Create data + log directories
-RUN mkdir -p /opt/ucm/data/{ca,certs,private,crl,scep,backups,sessions,logs,temp} && \
+# Listed one by one: this runs under /bin/sh, which does not expand braces on
+# a Debian base image, and a single directory named after the whole list
+# would be created instead of the nine wanted here
+RUN for d in ca certs private crl scep backups sessions logs temp; do \
+        mkdir -p "/opt/ucm/data/$d"; \
+    done && \
     mkdir -p /var/log/ucm && \
     mkdir -p /etc/ucm && \
     chown -R ucm:ucm /opt/ucm /var/log/ucm /etc/ucm

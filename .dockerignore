@@ -5,17 +5,24 @@
 .gitignore
 .gitattributes
 
-# Python
-__pycache__/
-*.py[cod]
+# Python. A pattern without a slash is anchored at the context root, unlike
+# git: **/ is what reaches backend/venv and the like.
+**/__pycache__/
+**/*.py[cod]
 *$py.class
-*.so
+**/*.so
 .Python
-env/
-venv/
-ENV/
-build/
+**/env/
+**/venv/
+**/.venv/
+**/ENV/
+**/coverage_html/
+**/.ruff_cache/
+**/.mypy_cache/
+**/build/
 develop-eggs/
+# Root-anchored on purpose: **/dist/ would exclude frontend/dist, the built
+# interface the image serves, and the image would come out without a UI
 dist/
 downloads/
 eggs/
@@ -26,15 +33,15 @@ parts/
 sdist/
 var/
 wheels/
-*.egg-info/
+**/*.egg-info/
 .installed.cfg
 *.egg
 
 # Testing
-.pytest_cache/
-.coverage
+**/.pytest_cache/
+**/.coverage
 .tox/
-htmlcov/
+**/htmlcov/
 test*.py
 *_test.py
 
@@ -51,19 +58,22 @@ docs/
 *.md
 !README.md
 
+# Node dependencies: the image serves frontend/dist, never the sources
+**/node_modules/
+
 # Data directories (mounted as volumes)
 backend/data/
 data/
-*.db
-*.db-journal
+**/*.db
+**/*.db-journal
 
 # Logs
-*.log
-logs/
+**/*.log
+**/logs/
 
 # Temporary files
-tmp/
-temp/
+**/tmp/
+**/temp/
 *.tmp
 
 # Backup files
@@ -93,8 +103,8 @@ docker-compose*.yml
 *.zip
 
 # Environment files with secrets
-.env
-.env.local
+**/.env
+**/.env.local
 
 # Keep .env.example for container initialization
 !.env.example

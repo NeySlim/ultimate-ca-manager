@@ -345,7 +345,6 @@ DNS.1 = ${UCM_FQDN}
 DNS.2 = localhost
 DNS.3 = ${CONTAINER_HOSTNAME}
 DNS.4 = *.local
-DNS.5 = pve
 IP.1 = 127.0.0.1
 IP.2 = ${CONTAINER_IP}
 EOF

@@ -68,6 +68,8 @@ backend/data/*.pem
 # Build artifacts
 *.deb
 *.rpm
+*.rpm.md5
+*.rpm.sha256
 *.tar.gz
 *.zip
 dist/

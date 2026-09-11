@@ -34,7 +34,12 @@ install -d %{buildroot}%{ucm_home}
 install -d %{buildroot}%{ucm_home}/backend
 install -d %{buildroot}%{ucm_home}/frontend
 install -d %{buildroot}%{ucm_home}/scripts
-install -d %{buildroot}%{ucm_data}/{ca,certs,private,crl,scep,backups,sessions}
+# Listed one by one on purpose: %install runs under /bin/sh, and a shell
+# without brace expansion would create a single directory named after the
+# whole list instead of the seven wanted here
+for d in ca certs private crl scep backups sessions; do
+    install -d %{buildroot}%{ucm_data}/$d
+done
 install -d %{buildroot}%{_sysconfdir}/%{name}
 install -d %{buildroot}%{_localstatedir}/log/%{name}
 install -d %{buildroot}%{_unitdir}
@@ -85,7 +90,11 @@ UCM_HOME=%{ucm_home}
 UCM_DATA=%{ucm_data}
 UCM_CONFIG=/etc/%{name}
 
-mkdir -p $UCM_DATA/{ca,certs,private,crl,scep,backups,sessions}
+# Listed one by one for the same reason as in %install: this scriptlet
+# runs under /bin/sh, which does not always expand braces
+for d in ca certs private crl scep backups sessions; do
+    mkdir -p $UCM_DATA/$d
+done
 mkdir -p /var/log/%{name}
 
 # SoftHSM setup: add ucm user to softhsm/ods group and prepare token directory
