@@ -207,6 +207,9 @@ class CACreationMixin:
                 parent_cert_pem, default_backend()
             )
             issuer = parent_cert.subject
+            # The parent can only vouch inside its own validity window
+            from utils.ca_signing_window import check_issuer_window
+            check_issuer_window(parent_cert)
             parent_not_after = to_naive_utc(parent_cert.not_valid_after_utc)
 
             # Clamp the requested pathLenConstraint to what the parent permits

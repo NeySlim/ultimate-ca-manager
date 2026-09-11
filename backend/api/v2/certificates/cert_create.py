@@ -101,6 +101,15 @@ def create_certificate():
 
     if ca.revoked_in_chain:
         return error_response('CA is revoked and can no longer issue certificates', 400)
+    # The CA must be inside its own validity window, refused here with the
+    # other state checks rather than after the approval workflow queued a
+    # request no CA can honour
+    from utils.ca_signing_window import check_issuer_window
+    try:
+        check_issuer_window(x509.load_pem_x509_certificate(
+            base64.b64decode(ca.crt), default_backend()))
+    except ValueError as e:
+        return error_response(str(e), 400)
 
     # Policy evaluation — check if approval is required (admins bypass).
     # Fail closed: an error while evaluating the policies must never turn
@@ -158,11 +167,6 @@ def create_certificate():
         # Load CA certificate and key
         ca_cert_pem = base64.b64decode(ca.crt)
         ca_cert = x509.load_pem_x509_certificate(ca_cert_pem, default_backend())
-        from utils.ca_signing_window import check_issuer_window
-        try:
-            check_issuer_window(ca_cert)
-        except ValueError as e:
-            return error_response(str(e), 400)
         from services.hsm.ca_key_loader import get_ca_signing_key
         ca_key = get_ca_signing_key(ca)
 

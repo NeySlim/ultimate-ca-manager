@@ -360,12 +360,15 @@ def create_ca():
                 return error_response('Parent CA is awaiting its certificate', 400)
             if parent_ca.revoked_in_chain:
                 return error_response('Parent CA is revoked and can no longer sign', 400)
-            # Check parent CA is not expired
+            # The parent must be inside its own validity window
             parent_cert = x509.load_pem_x509_certificate(
                 base64.b64decode(parent_ca.crt), default_backend()
             )
-            if datetime.now(timezone.utc) > parent_cert.not_valid_after_utc:
-                return error_response('Parent CA certificate has expired', 400)
+            from utils.ca_signing_window import check_issuer_window
+            try:
+                check_issuer_window(parent_cert)
+            except ValueError as e:
+                return error_response(f'Parent CA certificate cannot sign: {e}', 400)
             caref = parent_ca.refid
 
         username = g.user.username if hasattr(g, 'user') else (g.current_user.username if hasattr(g, 'current_user') else 'system')

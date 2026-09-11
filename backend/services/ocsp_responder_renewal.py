@@ -69,6 +69,8 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
     ca_cert = x509.load_pem_x509_certificate(
         base64.b64decode(ca.crt), default_backend()
     )
+    from utils.ca_signing_window import check_issuer_window, clamp_not_after
+    check_issuer_window(ca_cert)
     from services.hsm.ca_key_loader import get_ca_signing_key
     ca_key = get_ca_signing_key(ca)
 
@@ -76,10 +78,7 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
         if cert.valid_from and cert.valid_to else 90
 
     not_before = cert_not_before()
-    not_after = utc_now() + timedelta(days=lifetime_days)
-    ca_not_after = ca_cert.not_valid_after_utc.replace(tzinfo=None)
-    if not_after > ca_not_after:
-        not_after = ca_not_after
+    not_after = clamp_not_after(utc_now() + timedelta(days=lifetime_days), ca_cert)
 
     builder = (
         x509.CertificateBuilder()

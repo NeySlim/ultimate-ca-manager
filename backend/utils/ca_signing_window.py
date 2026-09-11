@@ -49,7 +49,7 @@ def check_issuer_window(ca_cert: x509.Certificate, now: Optional[datetime] = Non
         )
     if moment >= not_after:
         raise IssuerWindowError(
-            f'Issuing CA certificate has expired (expired {not_after.isoformat()}Z)'
+            f'Issuing CA certificate has expired (since {not_after.isoformat()}Z)'
         )
 
 

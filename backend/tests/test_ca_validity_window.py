@@ -210,3 +210,82 @@ class TestOperatorPaths:
             db.session.rollback()
             db.session.delete(db.session.get(Certificate, row_id))
             db.session.commit()
+
+
+class TestRemainingIssuers:
+    """Follow-up: the issuers the first pass left out."""
+
+    def test_issue_form_refuses_before_queueing_an_approval(self, app, create_ca, create_user):
+        from models.policy import ApprovalRequest, CertificatePolicy
+        ca_data = create_ca(cn='Window approval queue CA')
+        cert, key = _expired()
+        _install(app, ca_data['id'], cert, key)
+        with app.app_context():
+            pol = CertificatePolicy(name=f'window-queue-{ca_data["id"]}', policy_type='issuance',
+                                    ca_id=ca_data['id'], requires_approval=True, min_approvers=1,
+                                    is_active=True, priority=100)
+            pol.set_rules({})
+            db.session.add(pol)
+            db.session.commit()
+            pol_id = pol.id
+        user = create_user(role='operator')
+        operator = app.test_client()
+        r = operator.post('/api/v2/auth/login', data=json.dumps(
+            {'username': user['username'], 'password': 'TestPass123!'}), content_type='application/json')
+        assert r.status_code == 200
+        try:
+            r = operator.post('/api/v2/certificates', data=json.dumps(
+                {'cn': 'queued.example.test', 'ca_id': ca_data['id'], 'validity_days': 30}),
+                content_type='application/json')
+            assert r.status_code == 400, (r.status_code, r.get_json())
+            with app.app_context():
+                assert ApprovalRequest.query.filter_by(policy_id=pol_id).count() == 0
+        finally:
+            with app.app_context():
+                ApprovalRequest.query.filter_by(policy_id=pol_id).delete()
+                db.session.delete(db.session.get(CertificatePolicy, pol_id))
+                db.session.commit()
+
+    def test_sub_ca_refuses_a_not_yet_valid_parent(self, app, auth_client, create_ca):
+        ca_data = create_ca(cn='Window parent future')
+        cert, key = _future()
+        _install(app, ca_data['id'], cert, key)
+        r = auth_client.post('/api/v2/cas', data=json.dumps({
+            'type': 'intermediate', 'parentCAId': ca_data['id'],
+            'commonName': 'Window child', 'keyType': 'RSA', 'keySize': 2048,
+            'validityYears': 1, 'hashAlgorithm': 'sha256',
+        }), content_type='application/json')
+        assert r.status_code == 400, (r.status_code, r.get_json())
+
+    def test_tsa_signer_refuses_a_not_yet_valid_ca(self, app, create_ca):
+        from services import tsa_signer_cert
+        ca_data = create_ca(cn='Window TSA future')
+        cert, key = _future()
+        _install(app, ca_data['id'], cert, key)
+        with app.app_context():
+            ca = db.session.get(CA, ca_data['id'])
+            with pytest.raises(tsa_signer_cert.TsaSignerIssueError, match='not yet valid'):
+                tsa_signer_cert.issue_tsa_signer_certificate(ca=ca, cn='window-tsa.example.test')
+
+    def test_ocsp_responder_renewal_refuses_an_expired_ca(self, app, create_ca):
+        from services.cert_service import CertificateService
+        from services import ocsp_responder_renewal
+        ca_data = create_ca(cn='Window responder expired')
+        with app.app_context():
+            ca = db.session.get(CA, ca_data['id'])
+            row = CertificateService.create_certificate(
+                descr='responder', caref=ca.refid, dn={'CN': 'responder.example.test'},
+                cert_type='server_cert', key_type='2048', validity_days=30, username='admin',
+            )
+            db.session.commit()
+            row_id = row.id
+        cert, key = _expired()
+        _install(app, ca_data['id'], cert, key)
+        with app.app_context():
+            ca = db.session.get(CA, ca_data['id'])
+            row = db.session.get(Certificate, row_id)
+            with pytest.raises(ValueError, match='expired'):
+                ocsp_responder_renewal._renew_responder_cert(ca, row)
+            db.session.rollback()
+            db.session.delete(db.session.get(Certificate, row_id))
+            db.session.commit()

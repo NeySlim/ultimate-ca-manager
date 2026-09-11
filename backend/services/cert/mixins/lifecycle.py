@@ -158,12 +158,8 @@ class LifecycleMixin:
         cps_uri = ca.cps_uri if ca.cps_enabled and ca.cps_uri else None
         cps_oid = ca.cps_oid if cps_uri else None
 
-        # Clamp certificate validity to CA's expiry
-        ca_not_after = ca_cert.not_valid_after_utc
-        cert_not_after = datetime.now(_tz.utc) + timedelta(days=validity_days)
-        if cert_not_after > ca_not_after:
-            validity_days = max(1, (ca_not_after - datetime.now(_tz.utc)).days)
-            logger.warning(f"Certificate validity clamped to {validity_days} days (CA expires sooner)")
+        # The leaf's expiry is clamped to the CA's own by
+        # TrustStoreService.create_certificate (to the instant, not the day)
 
         # Create certificate
         cert_pem, key_pem = TrustStoreService.create_certificate(

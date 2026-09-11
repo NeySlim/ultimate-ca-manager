@@ -181,12 +181,14 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
 
     now = utc_now()
     not_before = cert_not_before()
-    ca_not_after = ca_cert.not_valid_after_utc.replace(tzinfo=None)
-    if ca_not_after <= now:
-        raise TsaSignerIssueError('Issuing CA certificate has expired', 400)
+    from utils.ca_signing_window import check_issuer_window, clamp_not_after
+    try:
+        check_issuer_window(ca_cert, now)
+    except ValueError as exc:
+        raise TsaSignerIssueError(str(exc), 400)
     # The operator did not choose the validity in the one-click flow, so clamp
     # to the CA's own expiry instead of refusing (cert_create.py 400s here).
-    not_after = min(now + timedelta(days=validity_days), ca_not_after)
+    not_after = clamp_not_after(now + timedelta(days=validity_days), ca_cert)
 
     subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
     try:

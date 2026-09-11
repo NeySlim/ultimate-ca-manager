@@ -52,12 +52,13 @@ class CertificateCreationMixin:
         """Create a certificate signed by a CA."""
         from cryptography.hazmat.primitives import hashes
 
-        # Generate private key for certificate
-        private_key = KeyOperationsMixin.generate_private_key(key_type)
-
-        # Same issuer-window rule as the CSR trunk (RFC 5280 §6.1)
+        # Same issuer-window rule as the CSR trunk (RFC 5280 §6.1), checked
+        # before the key pair is generated
         from utils.ca_signing_window import check_issuer_window, clamp_not_after
         check_issuer_window(ca_cert)
+
+        # Generate private key for certificate
+        private_key = KeyOperationsMixin.generate_private_key(key_type)
 
         # Build certificate
         builder = x509.CertificateBuilder()
