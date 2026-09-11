@@ -163,15 +163,22 @@ def validate_name_constraints(ca_cert, subject, san_names=None, renewal_of=None)
     """
     names_to_check = []
     try:
-        cn_attrs = subject.get_attributes_for_oid(NameOID.COMMON_NAME)
-        if cn_attrs:
-            cn_value = cn_attrs[0].value
+        # Every CN (a subject may carry several; only the first used to be
+        # checked, so a second CN in an excluded subtree went through)
+        for attr in subject.get_attributes_for_oid(NameOID.COMMON_NAME):
+            cn_value = attr.value
             if '@' in cn_value:
                 names_to_check.append(x509.RFC822Name(cn_value))
             elif _DNS_LIKE_CN.match(cn_value or ''):
                 names_to_check.append(x509.DNSName(cn_value))
             # Non-hostname CNs ("John Doe") carry no DNS/email identity —
             # RFC 5280 name constraints do not apply to them.
+    except Exception:
+        pass
+    try:
+        # RFC 5280 §4.2.1.10: directoryName subtrees constrain the subject
+        if len(subject):
+            names_to_check.append(x509.DirectoryName(subject))
     except Exception:
         pass
 

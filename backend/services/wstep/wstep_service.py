@@ -287,7 +287,7 @@ def _match_template(ca, csr):
         import json
 
         from models import CertificateTemplate
-        from services.xcep.policy_builder import _EKU_OIDS, _resolve_templates_for_ca
+        from services.xcep.policy_builder import _resolve_templates_for_ca
     except Exception:
         return None
 
@@ -311,9 +311,9 @@ def _match_template(ca, csr):
         except (TypeError, ValueError):
             parsed = {}
         names = parsed.get('extended_key_usage') if isinstance(parsed, dict) else None
-        template_eku = {
-            _EKU_OIDS[name] for name in (names or []) if name in _EKU_OIDS
-        }
+        # Same resolver as issuance: the template is scored on the purposes
+        # it will really issue, whatever spelling it uses
+        template_eku = set(_template_extra_ekus(template))
         score = len(csr_eku & template_eku) - len(template_eku - csr_eku)
         if score > best_score or (score == best_score and best is not None and template.id < best.id):
             best, best_score = template, score
@@ -340,7 +340,6 @@ def _template_extra_ekus(template):
     """
     import json
 
-    from services.xcep.policy_builder import _EKU_OIDS
 
     if template is None:
         return []
@@ -351,7 +350,22 @@ def _template_extra_ekus(template):
     names = parsed.get('extended_key_usage') if isinstance(parsed, dict) else None
     if not isinstance(names, list):
         return []
-    return [_EKU_OIDS[name] for name in names if name in _EKU_OIDS]
+    # One resolver for every spelling (the UI writes msSmartcardLogin, the
+    # XCEP policy smartcardLogon): a template that issued correctly on the
+    # issue form issues the same purposes over WSTEP
+    from utils.eku_validation import normalize_extra_ekus
+    oids = []
+    for name in names:
+        if not isinstance(name, str):
+            continue
+        resolved, err = normalize_extra_ekus([name])
+        if err or not resolved:
+            # An unknown name is dropped, the others still apply
+            logger.warning('WSTEP: template %s EKU %r ignored (%s)', template.id, name, err)
+            continue
+        if resolved[0] not in oids:
+            oids.append(resolved[0])
+    return oids
 
 
 def _required_enroll_acl_groups(ca, matched_template):

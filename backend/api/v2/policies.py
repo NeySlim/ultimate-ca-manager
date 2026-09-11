@@ -14,7 +14,7 @@ import json
 import logging
 import base64
 import uuid
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import cert_not_before, utc_now
 from utils.leaf_key_usage import key_usage_for_key
 from services.audit_service import AuditService
 from security.encryption import encrypt_private_key
@@ -197,7 +197,8 @@ def _issue_approved_certificate(approval):
     # Build subject
     subject_attrs = [x509.NameAttribute(NameOID.COMMON_NAME, data['cn'])]
     for field, oid in [('organization', NameOID.ORGANIZATION_NAME), ('organizational_unit', NameOID.ORGANIZATIONAL_UNIT_NAME),
-                       ('country', NameOID.COUNTRY_NAME), ('state', NameOID.STATE_OR_PROVINCE_NAME), ('locality', NameOID.LOCALITY_NAME)]:
+                       ('country', NameOID.COUNTRY_NAME), ('state', NameOID.STATE_OR_PROVINCE_NAME), ('locality', NameOID.LOCALITY_NAME),
+                       ('email', NameOID.EMAIL_ADDRESS)]:
         if data.get(field):
             val = data[field].upper() if field == 'country' else data[field]
             subject_attrs.append(x509.NameAttribute(oid, val))
@@ -218,7 +219,7 @@ def _issue_approved_certificate(approval):
     builder = builder.issuer_name(ca_cert.subject)
     builder = builder.public_key(new_key.public_key())
     builder = builder.serial_number(x509.random_serial_number())
-    builder = builder.not_valid_before(now)
+    builder = builder.not_valid_before(cert_not_before())
     builder = builder.not_valid_after(now + timedelta(days=validity_days))
     
     builder = builder.add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
@@ -299,6 +300,14 @@ def _issue_approved_certificate(approval):
         san_list.append(x509.IPAddress(ip_address(ip)))
     for email in data.get('san_email', []):
         san_list.append(x509.RFC822Name(email))
+    for uri in data.get('san_uri', []) or []:
+        san_list.append(x509.UniformResourceIdentifier(uri))
+    if data.get('san_upn'):
+        from utils.upn_san import build_upn_other_name, is_valid_upn
+        for upn in data['san_upn']:
+            if not is_valid_upn(upn):
+                raise ValueError(f'Invalid UPN format: {upn}')
+            san_list.append(build_upn_other_name(upn))
     
     cn = data['cn']
     from utils.san_parse import auto_san_buckets_from_cn
@@ -316,6 +325,10 @@ def _issue_approved_certificate(approval):
     
     if san_list:
         builder = builder.add_extension(x509.SubjectAlternativeName(san_list), critical=False)
+    if data.get('ocsp_must_staple'):
+        builder = builder.add_extension(
+            x509.TLSFeature([x509.TLSFeatureType.status_request]), critical=False,
+        )
 
     # Enforce the CA chain's NameConstraints (RFC 5280 §4.2.1.10) on the
     # approved subject + SANs before signing.
@@ -403,6 +416,9 @@ def _issue_approved_certificate(approval):
         san_dns=json.dumps(data.get('san_dns', [])),
         san_ip=json.dumps(data.get('san_ip', [])),
         san_email=json.dumps(data.get('san_email', [])),
+        san_uri=json.dumps(data.get('san_uri', []) or []),
+        san_upn=json.dumps(data.get('san_upn', []) or []),
+        ocsp_must_staple=bool(data.get('ocsp_must_staple')),
         source='approval',
         template_id=template.id if template else None,
         template_overrides=template_overrides,

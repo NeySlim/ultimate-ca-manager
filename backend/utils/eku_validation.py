@@ -52,6 +52,13 @@ def validate_oid(oid: str) -> Optional[str]:
     return None
 
 
+_EKU_NAME_ALIASES = {
+    'smartcardlogon': '1.3.6.1.4.1.311.20.2.2',
+    'mssmartcardlogon': '1.3.6.1.4.1.311.20.2.2',
+    'ocspsigning': '1.3.6.1.5.5.7.3.9',
+}
+
+
 def normalize_extra_ekus(items) -> Tuple[List[str], Optional[str]]:
     """
     Normalize and validate a list of EKU entries.
@@ -72,6 +79,9 @@ def normalize_extra_ekus(items) -> Tuple[List[str], Optional[str]]:
 
     # Build reverse name → oid lookup (case-insensitive)
     name_to_oid = {name.lower(): oid for oid, name in EKU_NAMES.items()}
+    # Spellings in use across the UI, the seeded templates and the XCEP
+    # policy: they must all resolve to the same purposes
+    name_to_oid.update(_EKU_NAME_ALIASES)
 
     seen = set()
     out = []

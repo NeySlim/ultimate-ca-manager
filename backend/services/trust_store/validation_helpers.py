@@ -2,6 +2,7 @@
 Name validation helpers for TrustStoreService
 """
 import ipaddress
+from urllib.parse import urlsplit
 from cryptography import x509
 
 
@@ -14,6 +15,38 @@ def _name_value(name):
     elif isinstance(name, x509.IPAddress):
         return str(name.value)
     return str(name)
+
+
+_UPN_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.20.2.3')
+
+
+def _dns_matches(name_val: str, constraint_val: str) -> bool:
+    """DNS subtree rule: "example.com" covers itself and its subdomains,
+    ".example.com" the subdomains only."""
+    name_val = name_val.lower()
+    constraint_val = constraint_val.lower()
+    if name_val == constraint_val:
+        return True
+    if constraint_val.startswith('.'):
+        return name_val.endswith(constraint_val) or name_val == constraint_val[1:]
+    return name_val.endswith('.' + constraint_val)
+
+
+def _der_utf8(value) -> str:
+    """The text of a DER UTF8String (an otherName value), tolerant of a
+    raw string."""
+    if isinstance(value, str):
+        return value
+    data = bytes(value)
+    if len(data) >= 2 and data[0] == 0x0C:
+        length = data[1]
+        offset = 2
+        if length & 0x80:
+            n = length & 0x7F
+            length = int.from_bytes(data[2:2 + n], 'big')
+            offset = 2 + n
+        return data[offset:offset + length].decode('utf-8', errors='replace')
+    return data.decode('utf-8', errors='replace')
 
 
 def _name_matches_subtree(name, subtree):
@@ -29,13 +62,30 @@ def _name_matches_subtree(name, subtree):
         return False
 
     if isinstance(name, x509.DNSName):
-        name_val = name.value.lower()
-        constraint_val = subtree.value.lower()
-        if name_val == constraint_val:
-            return True
-        if constraint_val.startswith('.'):
-            return name_val.endswith(constraint_val) or name_val == constraint_val[1:]
-        return name_val == constraint_val or name_val.endswith('.' + constraint_val)
+        return _dns_matches(name.value, subtree.value)
+    elif isinstance(name, x509.UniformResourceIdentifier):
+        # RFC 5280 §4.2.1.10: a URI constraint names a host or a domain
+        # (leading dot); it applies to the URI's host part
+        host = urlsplit(name.value).hostname or ''
+        return bool(host) and _dns_matches(host, subtree.value)
+    elif isinstance(name, x509.DirectoryName):
+        # The subtree is a prefix of the name (RDN by RDN)
+        prefix = list(subtree.value.rdns)
+        return list(name.value.rdns)[:len(prefix)] == prefix
+    elif isinstance(name, x509.OtherName):
+        if name.type_id != subtree.type_id:
+            return False
+        if name.type_id == _UPN_OID:
+            # A UPN (user@realm) is constrained like an e-mail address
+            upn = _der_utf8(name.value).lower()
+            constraint_val = _der_utf8(subtree.value).lower()
+            domain = upn.rpartition('@')[2] if '@' in upn else upn
+            if '@' in constraint_val:
+                return upn == constraint_val
+            if constraint_val.startswith('.'):
+                return domain.endswith(constraint_val)
+            return domain == constraint_val
+        return name.value == subtree.value
 
     elif isinstance(name, x509.RFC822Name):
         name_val = name.value.lower()

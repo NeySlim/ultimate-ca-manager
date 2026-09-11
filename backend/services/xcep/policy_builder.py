@@ -70,20 +70,6 @@ _GROUP_EXTENSION = 6  # "Certificate extension or attribute identifier"
 _EXT_KEY_USAGE_OID = '2.5.29.15'
 _EXT_EXTENDED_KEY_USAGE_OID = '2.5.29.37'
 
-# RFC 5280 / PKIX extended key usage OIDs for the EKU names UCM's
-# CertificateTemplate.extensions_template already stores.
-_EKU_OIDS = {
-    'serverAuth': '1.3.6.1.5.5.7.3.1',
-    'clientAuth': '1.3.6.1.5.5.7.3.2',
-    'codeSigning': '1.3.6.1.5.5.7.3.3',
-    'emailProtection': '1.3.6.1.5.5.7.3.4',
-    'timeStamping': '1.3.6.1.5.5.7.3.8',
-    'ocspSigning': '1.3.6.1.5.5.7.3.9',
-    'ipsecEndSystem': '1.3.6.1.5.5.7.3.5',
-    'ipsecTunnel': '1.3.6.1.5.5.7.3.6',
-    'ipsecUser': '1.3.6.1.5.5.7.3.7',
-    'smartcardLogon': '1.3.6.1.4.1.311.20.2.2',
-}
 
 # UCM's extensions_template.key_usage entries (camelCase, matching X.509
 # naming) -> asn1crypto.x509.KeyUsage's NamedBitList set names.
@@ -283,10 +269,10 @@ def _build_extensions_element(attributes, extensions, oids):
     eku_list = extensions.get('extended_key_usage')
     if not isinstance(eku_list, list):
         eku_list = []
-    eku_oids = [
-        _EKU_OIDS[name] for name in eku_list
-        if isinstance(name, str) and name in _EKU_OIDS
-    ]
+    # Same resolver as issuance, so the policy advertises exactly what the
+    # template will issue whatever spelling the template uses
+    from utils.eku_validation import normalize_extra_ekus
+    eku_oids, _err = normalize_extra_ekus([n for n in eku_list if isinstance(n, str)])
     if eku_oids:
         der = asn1_x509.ExtKeyUsageSyntax(eku_oids).dump()
         entries.append((_EXT_EXTENDED_KEY_USAGE_OID, False, der))

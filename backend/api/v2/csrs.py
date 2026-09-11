@@ -763,6 +763,34 @@ def sign_csr(csr_id):
     if ca.revoked_in_chain:
         return error_response('CA is revoked and can no longer sign', 400)
 
+    # Issuance policy rules (#335) bind a signed request as they bind the
+    # issue form: key type, number of DNS names, maximum validity
+    try:
+        from cryptography import x509 as _x509
+        from cryptography.hazmat.primitives.asymmetric import ec as _ec, rsa as _rsa
+        from cryptography.x509.oid import ExtensionOID as _ExtOID, NameOID as _NameOID
+        from services.policy_service import PolicyEvaluationService
+        csr_obj = _x509.load_pem_x509_csr(base64.b64decode(cert.csr))
+        cn_attrs = csr_obj.subject.get_attributes_for_oid(_NameOID.COMMON_NAME)
+        csr_cn = cn_attrs[0].value if cn_attrs else None
+        try:
+            csr_dns = list(csr_obj.extensions.get_extension_for_oid(
+                _ExtOID.SUBJECT_ALTERNATIVE_NAME).value.get_values_for_type(_x509.DNSName))
+        except _x509.ExtensionNotFound:
+            csr_dns = []
+        pub = csr_obj.public_key()
+        key_label = (str(pub.key_size) if isinstance(pub, _rsa.RSAPublicKey)
+                     else pub.curve.name if isinstance(pub, _ec.EllipticCurvePublicKey) else None)
+        policies = PolicyEvaluationService.applicable_policies(
+            ca.id, data.get('template_id'), csr_cn, csr_dns)
+        violations, validity_days = PolicyEvaluationService.enforce_rules(
+            policies, key_type=key_label, dns_name_count=len(set(csr_dns)),
+            validity_days=validity_days)
+    except (ValueError, TypeError) as e:
+        return error_response(f'Invalid CSR: {e}', 400)
+    if violations:
+        return error_response('Policy violation: ' + '; '.join(violations), 400)
+
     # Clamp validity to CA expiration
     try:
         from cryptography import x509 as _x509

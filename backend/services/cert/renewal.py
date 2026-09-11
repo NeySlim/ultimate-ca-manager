@@ -37,7 +37,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
-from cryptography.x509.oid import ExtensionOID
+from cryptography.x509.oid import ExtensionOID, NameOID
 
 from models import CA, Certificate, RevokedSerial, db
 from services.file_regen_service import mirror_private_key
@@ -381,6 +381,24 @@ def renew_certificate_in_place(
     orig_duration = orig_cert.not_valid_after_utc - orig_cert.not_valid_before_utc
     validity_days = orig_duration.days if orig_duration.days > 0 else DEFAULT_RENEWAL_DAYS
     validity_days = min(validity_days, MAX_RENEWAL_DAYS)
+    # Issuance policy rules (#335) bind a renewal as they bind an issuance
+    from services.policy_service import PolicyEvaluationService
+    cn_attrs = orig_cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+    try:
+        orig_dns = list(orig_cert.extensions.get_extension_for_oid(
+            ExtensionOID.SUBJECT_ALTERNATIVE_NAME).value.get_values_for_type(x509.DNSName))
+    except x509.ExtensionNotFound:
+        orig_dns = []
+    key_label = (str(public_key.key_size) if isinstance(public_key, rsa.RSAPublicKey)
+                 else public_key.curve.name if isinstance(public_key, ec.EllipticCurvePublicKey)
+                 else None)
+    violations, validity_days = PolicyEvaluationService.enforce_rules(
+        PolicyEvaluationService.applicable_policies(
+            ca.id, getattr(cert, 'template_id', None),
+            cn_attrs[0].value if cn_attrs else None, orig_dns),
+        key_type=key_label, dns_name_count=len(set(orig_dns)), validity_days=validity_days)
+    if violations:
+        raise RenewalError('Policy violation: ' + '; '.join(violations), 400)
     not_before = cert_not_before()
     not_after = min(now + timedelta(days=validity_days), ca_not_after)
 
