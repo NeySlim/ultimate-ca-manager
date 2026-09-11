@@ -60,6 +60,29 @@ class MTLSAuthService:
         if not auth_cert:
             logger.warning(f"Certificate not enrolled: serial={serial}, fingerprint={fingerprint}")
             return None, None, "Certificate not enrolled"
+
+        # The enrolment found by serial must be THIS certificate: another
+        # certificate enrolled under the same serial number (a forged one
+        # imported to squat it) must not open the enrolled account
+        from services.mtls_enrollment import normalized_fingerprint
+        presented = normalized_fingerprint(fingerprint)
+        stored = normalized_fingerprint(auth_cert.cert_fingerprint)
+        if presented and stored and presented[0] == stored[0] and presented[1] != stored[1]:
+            logger.warning(f"Certificate fingerprint does not match enrolment: serial={serial}")
+            return None, None, "Certificate not enrolled"
+        if cert_info.get('cert_pem') and auth_cert.cert_pem:
+            try:
+                from cryptography import x509 as _x509
+                from cryptography.hazmat.primitives import serialization as _ser
+                presented_der = _x509.load_pem_x509_certificate(
+                    cert_info['cert_pem'].encode('utf-8')).public_bytes(_ser.Encoding.DER)
+                enrolled_der = _x509.load_pem_x509_certificate(
+                    bytes(auth_cert.cert_pem)).public_bytes(_ser.Encoding.DER)
+            except Exception:
+                presented_der = enrolled_der = None
+            if presented_der is not None and presented_der != enrolled_der:
+                logger.warning(f"Certificate does not match enrolment: serial={serial}")
+                return None, None, "Certificate not enrolled"
         
         # Check if certificate is enabled
         if not auth_cert.enabled:

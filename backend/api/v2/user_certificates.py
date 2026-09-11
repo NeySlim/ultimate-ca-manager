@@ -48,10 +48,10 @@ def _can_access_cert(user, auth_cert):
 
 
 def _get_certificate_for_auth_cert(auth_cert):
-    """Find the Certificate record linked to an AuthCertificate."""
-    return Certificate.query.filter(
-        Certificate.serial_number == auth_cert.cert_serial
-    ).first()
+    """The Certificate record an enrolment is bound to (never merely one
+    sharing its serial number: see services.mtls_enrollment)."""
+    from services.mtls_enrollment import certificate_row_for
+    return certificate_row_for(auth_cert)
 
 
 def _build_cert_response(auth_cert, certificate, owner_user=None):

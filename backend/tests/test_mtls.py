@@ -8,6 +8,7 @@ Uses shared fixtures from conftest.py:
   - app, client (unauthenticated), auth_client (admin session)
 """
 import pytest
+import base64
 import json
 from tests.conftest import get_json
 
@@ -65,7 +66,7 @@ class TestMTLSAuthRequired:
         r = _post(app.test_client(), '/api/v2/mtls/enroll-import')
         assert r.status_code == 401
 
-    def test_enroll_import_valid_pem_succeeds(self, auth_client):
+    def test_enroll_import_valid_pem_succeeds(self, app, auth_client, create_ca):
         """Regression: enroll-import 500ed with NameError (cert_pem undefined)
         on every valid non-duplicate PEM."""
         from datetime import datetime, timedelta, timezone
@@ -74,22 +75,19 @@ class TestMTLSAuthRequired:
         from cryptography.hazmat.primitives.asymmetric import ec
         from cryptography.x509.oid import NameOID
 
-        key = ec.generate_private_key(ec.SECP256R1())
-        subject = x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, 'enroll-import.example.com'),
-        ])
-        now = datetime.now(timezone.utc)
-        cert = (
-            x509.CertificateBuilder()
-            .subject_name(subject)
-            .issuer_name(subject)
-            .public_key(key.public_key())
-            .serial_number(x509.random_serial_number())
-            .not_valid_before(now - timedelta(minutes=5))
-            .not_valid_after(now + timedelta(days=30))
-            .sign(key, hashes.SHA256())
-        )
-        pem = cert.public_bytes(serialization.Encoding.PEM).decode()
+        # Only a certificate issued by one of the server's CAs can be enrolled
+        from models import CA, db
+        from services.cert_service import CertificateService
+        ca_data = create_ca(cn='enroll-import regression CA')
+        with app.app_context():
+            ca = db.session.get(CA, ca_data['id'])
+            row = CertificateService.create_certificate(
+                descr='enroll-import-regression', caref=ca.refid,
+                dn={'CN': 'enroll-import.example.com'}, cert_type='usr_cert',
+                key_type='2048', validity_days=30, username='admin',
+            )
+            db.session.commit()
+            pem = base64.b64decode(row.crt).decode()
 
         r = _post(auth_client, '/api/v2/mtls/enroll-import',
                   {'pem': pem, 'name': 'enroll-import-regression'})

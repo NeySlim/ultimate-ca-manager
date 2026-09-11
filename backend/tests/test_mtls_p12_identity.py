@@ -92,16 +92,13 @@ class TestPkcs12ExportIdentity:
     def test_forged_serial_does_not_unlock_another_records_key(self, app, viewer_client, victim):
         forged = _forged_cert_with_serial(_serial_int(victim['serial']))
         r = _post(viewer_client, '/api/v2/mtls/enroll-import', {'pem': forged, 'name': 'forged'})
-        assert r.status_code == 201, r.get_json()
-        auth_id = r.get_json()['data']['id']
-        try:
-            r = _download_p12(viewer_client, auth_id)
-            assert r.status_code == 400, (r.status_code, r.data[:200])
-            assert b'PKCS12' not in r.data or b'Private key not available' in r.data
-        finally:
-            with app.app_context():
-                AuthCertificate.query.filter_by(id=auth_id).delete()
-                db.session.commit()
+        # A forged certificate no CA of this server issued cannot even be
+        # enrolled; and were a row bound to it, the export would resolve the
+        # enrolled certificate itself, never the victim's (see
+        # test_mtls_enrollment_identity for the legacy-row rule)
+        assert r.status_code == 400, (r.status_code, r.get_json())
+        with app.app_context():
+            assert AuthCertificate.query.filter_by(cert_serial=victim['serial']).count() == 0
 
     def test_importing_someone_elses_public_certificate_is_refused(self, app, viewer_client, victim):
         r = _post(viewer_client, '/api/v2/mtls/enroll-import',

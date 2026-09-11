@@ -19,6 +19,7 @@ from utils.db_transaction import safe_commit
 from models import db, User, Certificate, CA
 from services.audit_service import AuditService
 from utils.key_codec import load_pem_bytes
+from services.mtls_enrollment import parse_validity_days
 
 logger = logging.getLogger(__name__)
 
@@ -144,11 +145,8 @@ def create_user_mtls_certificate(user_id):
         ca_id = data.get('ca_id')
         validity_days = data.get('validity_days', 365)
 
-        try:
-            validity_days = int(validity_days)
-        except (TypeError, ValueError):
-            return error_response('validity_days must be an integer between 1 and 3650', 400)
-        if not 1 <= validity_days <= 3650:
+        validity_days = parse_validity_days(validity_days)
+        if validity_days is None:
             return error_response('validity_days must be an integer between 1 and 3650', 400)
 
         # Find CA: a numeric id or a refid, never compared against the
@@ -160,7 +158,7 @@ def create_user_mtls_certificate(user_id):
             if ca is None:
                 ca = CA.query.filter_by(refid=str(ca_id)).first()
         if not ca:
-            config = SystemConfig.query.filter_by(key='mtls_trusted_ca').first()
+            config = SystemConfig.query.filter_by(key='mtls_trusted_ca_id').first()
             if config:
                 ca = CA.query.filter_by(refid=config.value).first()
         if not ca:
@@ -176,7 +174,14 @@ def create_user_mtls_certificate(user_id):
                 validity_days=validity_days,
                 username=target_user.username,
             )
+        except ValueError as e:
+            logger.warning(f"mTLS cert generation refused for user {user_id}: {e}")
+            return error_response(str(e), 400)
+        except Exception as e:
+            logger.error(f"Failed to generate mTLS cert for user {user_id}: {e}")
+            return error_response('Failed to generate certificate', 500)
 
+        try:
             cert_pem = base64.b64decode(result.crt) if result.crt else b''
             cert_obj = cx509.load_pem_x509_certificate(cert_pem, default_backend())
             serial = str(cert_obj.serial_number)
@@ -219,9 +224,6 @@ def create_user_mtls_certificate(user_id):
             resp['cert_id'] = result.id
             return created_response(data=resp, message='Certificate generated')
 
-        except ValueError as e:
-            logger.warning(f"mTLS cert generation refused for user {user_id}: {e}")
-            return error_response(str(e), 400)
         except Exception as e:
             logger.error(f"Failed to generate mTLS cert for user {user_id}: {e}")
             return error_response('Failed to generate certificate', 500)

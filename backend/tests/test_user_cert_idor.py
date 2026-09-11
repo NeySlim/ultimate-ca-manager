@@ -44,7 +44,7 @@ def mtls_ca(app, create_ca):
     """Create a CA and configure it as the trusted mTLS CA.
 
     Self-contained: creates its own CA via the API factory, saves and
-    restores the original mtls_trusted_ca value, and cleans up the
+    restores the original mtls_trusted_ca_id value, and cleans up the
     AuthCertificate rows created by these tests on teardown.
     """
     ca = create_ca(cn='mTLS IDOR Test CA')
@@ -52,20 +52,20 @@ def mtls_ca(app, create_ca):
     from models import AuthCertificate
     with app.app_context():
         # Save original mtls_trusted_ca to restore later
-        row = SystemConfig.query.filter_by(key='mtls_trusted_ca').first()
+        row = SystemConfig.query.filter_by(key='mtls_trusted_ca_id').first()
         orig_value = row.value if row else None
         if not row:
-            row = SystemConfig(key='mtls_trusted_ca')
+            row = SystemConfig(key='mtls_trusted_ca_id')
             db.session.add(row)
         row.value = ca['refid']
         db.session.commit()
     yield ca
     with app.app_context():
-        # Restore original mtls_trusted_ca value (don't just delete it)
-        SystemConfig.query.filter_by(key='mtls_trusted_ca').delete()
+        # Restore original mtls_trusted_ca_id value (don't just delete it)
+        SystemConfig.query.filter_by(key='mtls_trusted_ca_id').delete()
         if orig_value is not None:
             db.session.add(SystemConfig(
-                key='mtls_trusted_ca',
+                key='mtls_trusted_ca_id',
                 value=orig_value,
             ))
         # Delete only the AuthCertificate rows created by these tests
