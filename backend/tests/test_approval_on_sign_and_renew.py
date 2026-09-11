@@ -330,3 +330,146 @@ class TestMootRequestsAreResolved:
         finally:
             _drop_policy(app, pid)
             _drop_rows(app, cert_id)
+
+
+class TestDuplicateRequestsFollowTheApprover:
+    """Two operators may queue the same target. Approving one request closes
+    the other as approved by that same approver, not by the requester of the
+    first, and links it to the certificate."""
+
+    def test_duplicate_sign_requests_are_approved_by_the_approver(self, app, auth_client, create_ca, create_user):
+        ca = create_ca(cn='dup-sign CA')
+        pid = _policy(app, ca['id'], 'dup-sign')
+        csr_id = _csr_row(app, 'dup-sign.example.test')
+        try:
+            ids = []
+            for _ in range(2):
+                operator = _operator(app, create_user)
+                r = _json(operator, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 30})
+                assert r.status_code == 200 and r.get_json()['data'].get('approval_required'), r.get_json()
+                ids.append(r.get_json()['data']['approval_id'])
+            first, second = ids
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{first}/approve', {'comment': 'ok'})
+            assert r.status_code == 200 and r.get_json()['data']['certificate_issued'] is True, r.get_json()
+            with app.app_context():
+                dup = db.session.get(ApprovalRequest, second)
+                assert dup.status == 'approved' and dup.certificate_id == csr_id
+                vote = dup.get_approvals()[-1]
+                assert vote['username'] == 'admin' and vote['user_id'] is not None
+                assert vote['comment'] == f'Approved with request #{first}'
+                assert db.session.get(ApprovalRequest, first).certificate_id == csr_id
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)
+
+    def test_duplicate_renewal_requests_are_approved_by_the_approver(self, app, auth_client, create_ca, create_user):
+        ca = create_ca(cn='dup-renew CA')
+        pid = _policy(app, ca['id'], 'dup-renew')
+        cert_id = _cert_row(app, ca['id'], 'dup-renew.example.test')
+        try:
+            ids = []
+            for _ in range(2):
+                operator = _operator(app, create_user)
+                r = _json(operator, 'post', f'/api/v2/certificates/{cert_id}/renew')
+                assert r.status_code == 200 and r.get_json()['data'].get('approval_required'), r.get_json()
+                ids.append(r.get_json()['data']['approval_id'])
+            first, second = ids
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{first}/approve', {'comment': 'ok'})
+            assert r.status_code == 200 and r.get_json()['data']['certificate_issued'] is True, r.get_json()
+            with app.app_context():
+                dup = db.session.get(ApprovalRequest, second)
+                assert dup.status == 'approved' and dup.certificate_id == cert_id
+                vote = dup.get_approvals()[-1]
+                assert vote['username'] == 'admin' and vote['user_id'] is not None
+                assert vote['comment'] == f'Approved with request #{first}'
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, cert_id)
+
+    def test_failed_issuance_leaves_the_duplicate_pending(self, app, auth_client, create_ca, create_user, monkeypatch):
+        ca = create_ca(cn='dup-fail CA')
+        pid = _policy(app, ca['id'], 'dup-fail')
+        csr_id = _csr_row(app, 'dup-fail.example.test')
+        try:
+            ids = []
+            for _ in range(2):
+                operator = _operator(app, create_user)
+                r = _json(operator, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 30})
+                ids.append(r.get_json()['data']['approval_id'])
+            first, second = ids
+            from services.cert_service import CertificateService
+
+            def boom(*_a, **_k):
+                raise ValueError('CA is offline')
+            monkeypatch.setattr(CertificateService, 'sign_csr', staticmethod(boom))
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{first}/approve', {'comment': 'ok'})
+            assert r.status_code == 200 and r.get_json()['data']['certificate_issued'] is False, r.get_json()
+            with app.app_context():
+                assert db.session.get(ApprovalRequest, first).status == 'pending'
+                assert db.session.get(ApprovalRequest, second).status == 'pending'
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)
+
+
+class TestMootScanIsRobust:
+
+    def test_non_object_request_data_is_skipped(self, app, create_ca, create_user):
+        from services.approval_gate import pending_requests_naming, resolve_moot_requests
+        ca = create_ca(cn='moot-robust CA')
+        pid = _policy(app, ca['id'], 'moot-robust')
+        with app.app_context():
+            from models.policy import CertificatePolicy
+            operator = create_user(role='operator')
+            rows = []
+            for payload in ('[1, 2]', '"oops"', 'not json', '{"csr_id": 4242}'):
+                ap = ApprovalRequest(policy_id=pid, requester_id=operator['id'], request_type='csr',
+                                     request_data=payload, status='pending', required_approvals=1)
+                db.session.add(ap)
+                rows.append(ap)
+            db.session.commit()
+            try:
+                assert pending_requests_naming('csr', 'csr_id', None) == []
+                found = pending_requests_naming('csr', 'csr_id', 4242)
+                assert [a.id for a in found] == [rows[-1].id]
+                assert len(resolve_moot_requests('csr', 'csr_id', 4242, outcome='rejected',
+                                                 username='admin', reason='gone')) == 1
+            finally:
+                _drop_policy(app, pid)
+
+    def test_external_completion_closes_the_request(self, app, auth_client, create_ca, create_user):
+        """A pending CSR completed with a certificate issued elsewhere (#341)
+        is closed as approved, like a direct signing."""
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from cryptography.x509.oid import NameOID
+        import base64
+        import datetime
+        ca = create_ca(cn='moot-ext CA')
+        pid = _policy(app, ca['id'], 'moot-ext')
+        csr_id = _csr_row(app, 'moot-ext.example.test')
+        try:
+            operator = _operator(app, create_user)
+            r = _json(operator, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 30})
+            approval_id = r.get_json()['data']['approval_id']
+            with app.app_context():
+                from services.cert_service import CertificateService
+                row = db.session.get(Certificate, csr_id)
+                csr = x509.load_pem_x509_csr(base64.b64decode(row.csr))
+                issuer_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+                now = datetime.datetime.now(datetime.timezone.utc)
+                cert = (x509.CertificateBuilder()
+                        .subject_name(csr.subject)
+                        .issuer_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'External CA')]))
+                        .public_key(csr.public_key()).serial_number(x509.random_serial_number())
+                        .not_valid_before(now).not_valid_after(now + datetime.timedelta(days=30))
+                        .sign(issuer_key, hashes.SHA256()))
+                CertificateService.complete_external_csr(
+                    row, cert, cert.public_bytes(serialization.Encoding.PEM), username='admin')
+                ap = db.session.get(ApprovalRequest, approval_id)
+                assert ap.status == 'approved' and ap.certificate_id == csr_id
+                assert ap.get_approvals()[-1]['comment'] == 'Certificate imported'
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)

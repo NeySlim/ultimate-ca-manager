@@ -96,6 +96,32 @@ def _link_approval(approval, certificate_id):
         raise RuntimeError('Failed to link approval to certificate')
 
 
+def _close_duplicate_requests(approval, key, target_id):
+    """The other pending requests for the same target (another operator
+    queued the same signing or renewal) are approved along with this one,
+    by this approver. They ride the issuance transaction, so a failed
+    issuance leaves them pending, and are linked to the certificate by
+    ``_link_duplicates`` once it exists. Returns their ids."""
+    from services.approval_gate import resolve_moot_requests
+    user = getattr(g, 'current_user', None)
+    duplicates = resolve_moot_requests(
+        approval.request_type, key, target_id, outcome='approved',
+        username=getattr(user, 'username', None) or 'system', user_id=getattr(user, 'id', None),
+        reason=f'Approved with request #{approval.id}', commit=False)
+    return [dup.id for dup in duplicates]
+
+
+def _link_duplicates(duplicate_ids, certificate_id):
+    """Link the duplicate requests closed with an approval to the
+    certificate it produced; committed with the approval's own link."""
+    if not duplicate_ids:
+        return
+    db.session.query(ApprovalRequest).filter(
+        ApprovalRequest.id.in_(duplicate_ids),
+        ApprovalRequest.certificate_id.is_(None),
+    ).update({ApprovalRequest.certificate_id: certificate_id}, synchronize_session=False)
+
+
 def _issue_approved_csr(approval, data):
     """Sign the stored request an approved 'csr' request names, exactly as
     the Sign CSR route would have."""
@@ -116,6 +142,7 @@ def _issue_approved_csr(approval, data):
           else CA.query.filter_by(refid=str(ca_ref)).first())
     if ca is None:
         raise ValueError('The signing CA no longer exists')
+    duplicate_ids = _close_duplicate_requests(approval, 'csr_id', cert.id)
     signed = CertificateService.sign_csr(
         cert_id=cert.id, caref=ca.refid,
         validity_days=int(data.get('validity_days') or 365),
@@ -130,6 +157,7 @@ def _issue_approved_csr(approval, data):
         logger.info(f"CSR {cert.id} signed as CA {signed.id} via approval #{approval.id}")
         return {'id': None, 'ca_id': signed.id, 'cn': data.get('cn'),
                 'serial_number': signed.serial_number if hasattr(signed, 'serial_number') else None}
+    _link_duplicates(duplicate_ids, signed.id)
     _link_approval(approval, signed.id)
     logger.info(f"CSR {cert.id} signed via approval #{approval.id}")
     return {
@@ -155,12 +183,14 @@ def _issue_approved_renewal(approval, data):
         return {'id': cert.id, 'cn': data.get('cn'), 'serial_number': cert.serial_number,
                 'valid_from': utc_isoformat(cert.valid_from), 'valid_to': utc_isoformat(cert.valid_to),
                 'already_issued': True}
+    duplicate_ids = _close_duplicate_requests(approval, 'certificate_id', cert.id)
     renew_certificate_in_place(
         cert,
         username=approval.requester.username if approval.requester else 'system',
         actor_user_id=approval.requester_id,
         rekey=True, regenerate_crl=True, trigger='manual',
     )
+    _link_duplicates(duplicate_ids, cert.id)
     _link_approval(approval, cert.id)
     logger.info(f"Certificate {cert.id} renewed via approval #{approval.id}")
     return {

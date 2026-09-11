@@ -1052,6 +1052,13 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
         if not ok:
             raise
         logger.info(f"Imported MS CA signed certificate: {cn} (id={cert.id})")
+        if csr is not None:
+            # A request queued for approval and signed through the Microsoft
+            # CA meanwhile is closed as approved by that action
+            from services.approval_gate import resolve_moot_requests
+            actor = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
+            resolve_moot_requests('csr', 'csr_id', csr.id, outcome='approved', username=actor,
+                                  certificate_id=cert.id, reason='Signed by the Microsoft CA')
 
     except Exception as e:
         logger.error(f"Failed to import MS CA signed certificate: {e}", exc_info=True)

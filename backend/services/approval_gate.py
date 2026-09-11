@@ -74,31 +74,34 @@ def pending_requests_naming(request_type: str, key: str, target_id) -> list:
     """Pending approval requests of ``request_type`` whose stored request
     names ``target_id`` under ``key`` (``csr_id`` or ``certificate_id``)."""
     import json
+    if target_id is None:
+        return []
     found = []
     for approval in ApprovalRequest.query.filter_by(status='pending', request_type=request_type).all():
         try:
             rd = json.loads(approval.request_data or '{}')
         except Exception:
             continue
-        if str(rd.get(key)) == str(target_id):
+        if isinstance(rd, dict) and key in rd and str(rd.get(key)) == str(target_id):
             found.append(approval)
     return found
 
 
 def resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: str,
                           username: str, user_id=None, certificate_id=None,
-                          reason: str, commit: bool = True) -> int:
+                          reason: str, commit: bool = True) -> list:
     """Resolve the pending requests a direct action made moot.
 
     ``outcome`` ``'approved'``: the action itself was the approval (an
-    administrator signed the request or renewed the certificate directly);
-    the request is closed as approved, the actor recorded as its approver,
-    and linked to the certificate. ``'rejected'``: the target is gone or
+    administrator signed the request or renewed the certificate directly,
+    or approved another request for the same target); the request is closed
+    as approved, ``username`` recorded as its approver, and linked to the
+    certificate when one is given. ``'rejected'``: the target is gone or
     revoked; the request is closed as rejected with the reason. Returns the
-    number of requests resolved; the caller commits when ``commit`` is False
-    (the resolution then rides the caller's own transaction)."""
+    requests resolved; the caller commits when ``commit`` is False (the
+    resolution then rides the caller's own transaction)."""
     from utils.datetime_utils import utc_now
-    resolved = 0
+    resolved = []
     for approval in pending_requests_naming(request_type, key, target_id):
         approval.add_approval(user_id=user_id, username=username,
                               action='approve' if outcome == 'approved' else 'reject',
@@ -107,7 +110,7 @@ def resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: st
         approval.resolved_at = utc_now()
         if outcome == 'approved' and certificate_id is not None:
             approval.certificate_id = certificate_id
-        resolved += 1
+        resolved.append(approval)
         logger.info("Approval request #%s resolved as %s: %s", approval.id, outcome, reason)
     if resolved and commit:
         from utils.db_transaction import safe_commit

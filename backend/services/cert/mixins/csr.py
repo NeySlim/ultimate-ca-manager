@@ -578,6 +578,12 @@ class CSRMixin:
                 )
                 raise
 
+        # A request queued for approval and answered by a certificate issued
+        # elsewhere is closed as approved by the import
+        from services.approval_gate import resolve_moot_requests
+        resolve_moot_requests('csr', 'csr_id', certificate.id, outcome='approved', username=username,
+                              certificate_id=certificate.id, reason='Certificate imported', commit=commit)
+
         with open(cert_cert_path(certificate), 'wb') as f:
             f.write(cert_pem)
 
