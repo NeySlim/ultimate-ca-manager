@@ -247,7 +247,28 @@ class TestDeviceHeldKeys:
                 AutoRenewalService.set_renewal_config({**config, 'enabled': True, 'days_before_expiry': 30,
                                                        'renewal_sources': ['scep', 'acme', 'est']})
                 try:
-                    assert rid not in [c.id for c in AutoRenewalService.get_certificates_for_renewal()]
+                    selected = [c.id for c in AutoRenewalService.get_certificates_for_renewal()]
+                    assert rid not in selected
+                finally:
+                    AutoRenewalService.set_renewal_config(previous)
+        finally:
+            _drop(app, rid)
+
+    def test_scheduler_selects_a_certificate_whose_key_it_holds(self, app, create_ca):
+        from services.auto_renewal_service import AutoRenewalService
+        ca = create_ca(cn='Renewal scheduler keyed CA')
+        rid = _craft_row(app, ca['id'], rsa.generate_private_key(65537, 2048), 'keyed.example.test',
+                         key_usage=_ku(digital_signature=True, key_encipherment=True),
+                         with_key=True, source='manual', days=5)
+        try:
+            with app.app_context():
+                previous = dict(AutoRenewalService.get_renewal_config())
+                AutoRenewalService.set_renewal_config({**previous, 'enabled': True, 'days_before_expiry': 30,
+                                                       'renewal_sources': ['manual']})
+                try:
+                    config = AutoRenewalService.get_renewal_config()
+                    assert config['renewal_sources'] == ['manual'] and config['days_before_expiry'] == 30
+                    assert rid in [c.id for c in AutoRenewalService.get_certificates_for_renewal()]
                 finally:
                     AutoRenewalService.set_renewal_config(previous)
         finally:

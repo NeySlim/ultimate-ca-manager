@@ -353,7 +353,10 @@ def _template_extra_ekus(template):
     # One resolver for every spelling (the UI writes msSmartcardLogin, the
     # XCEP policy smartcardLogon): a template that issued correctly on the
     # issue form issues the same purposes over WSTEP
-    from utils.eku_validation import normalize_extra_ekus
+    from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS, normalize_extra_ekus
+    # Same cap as the other protocol endpoints, Smartcard Logon excepted:
+    # issuing it is what WSTEP templates are for (AD-bound identities)
+    capped = PROTOCOL_UNBINDABLE_EKU_OIDS - {'1.3.6.1.4.1.311.20.2.2'}
     oids = []
     for name in names:
         if not isinstance(name, str):
@@ -362,6 +365,10 @@ def _template_extra_ekus(template):
         if err or not resolved:
             # An unknown name is dropped, the others still apply
             logger.warning('WSTEP: template %s EKU %r ignored (%s)', template.id, name, err)
+            continue
+        if resolved[0] in capped:
+            logger.warning('WSTEP: template %s EKU %r is never issued to an enrollee; dropped',
+                           template.id, name)
             continue
         if resolved[0] not in oids:
             oids.append(resolved[0])
@@ -806,13 +813,14 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
     # renew under a victim's identity. Require a byte-for-byte match against
     # a certificate UCM itself issued from this same CA.
     from services.cert.issued_lookup import (
-        OK, REVOKED, EXPIRED, issued_certificate_status,
+        OK, REVOKED, EXPIRED, NOT_YET_VALID, issued_certificate_status,
     )
     db_cert, status = issued_certificate_status(ca, signing_cert)
     if status != OK:
         return None, {
             REVOKED: 'Signing certificate has been revoked',
             EXPIRED: 'Signing certificate has expired',
+            NOT_YET_VALID: 'Signing certificate is not yet valid',
         }.get(status, 'Signing certificate is not recognized')
 
     csr, err = _load_csr(csr_der)

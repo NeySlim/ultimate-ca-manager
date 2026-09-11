@@ -17,16 +17,14 @@ Every renewal therefore behaves identically:
 3. the on-disk cert/key files, the OCSP response cache, the CRL, the audit
    trail and the ``cert_renewed`` webhook are all refreshed the same way.
 
-The only intentional difference between callers is the key strategy:
+Only a certificate whose private key the server holds can be renewed here
+(a device-held key renews through its enrollment protocol). The callers
+differ in the key strategy:
 
 ``rekey=True``   UCM generates a fresh key pair matching the original's
-                 algorithm and size. Used for certificates whose private key
-                 UCM holds (manual and bulk renewal).
-``rekey=False``  the existing public key is re-signed. Used for
-                 protocol-enrolled certificates (SCEP / EST / ACME) where the
-                 private key lives on the client and UCM has no way to deliver
-                 a new one — issuing a fresh key pair there would hand the
-                 device a certificate it cannot use.
+                 algorithm and size (manual and bulk renewal).
+``rekey=False``  the held key pair is re-signed (scheduled auto-renewal),
+                 so exports made from the previous certificate keep working.
 """
 import base64
 import json
@@ -112,20 +110,35 @@ def resolve_issuing_ca(cert: Certificate):
         leaf = x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend())
     except Exception:
         return None
-    from utils.cert_issuer import certificate_signed_by
+    from utils.cert_issuer import authority_key_identifier_hex, certificate_signed_by
     named = CA.query.filter(CA.subject == cert.issuer).all() if cert.issuer else []
     others = [c for c in CA.query.all() if c not in named]
+    leaf_aki = authority_key_identifier_hex(leaf)
+    verified = []
     for candidate in named + others:
         if not candidate.crt:
             continue
         try:
             ca_cert = x509.load_pem_x509_certificate(
                 base64.b64decode(candidate.crt), default_backend())
+            if certificate_signed_by(leaf, ca_cert):
+                verified.append((candidate, ca_cert))
         except Exception:
             continue
-        if certificate_signed_by(leaf, ca_cert):
-            return candidate
-    return None
+    if not verified:
+        return None
+    # Several CA records for one key (a cross-signed or re-issued CA): the
+    # one whose SKI the certificate names as its AKI is the real issuer
+    if leaf_aki:
+        for candidate, ca_cert in verified:
+            try:
+                ski = ca_cert.extensions.get_extension_for_oid(
+                    ExtensionOID.SUBJECT_KEY_IDENTIFIER).value.key_identifier
+            except x509.ExtensionNotFound:
+                continue
+            if ski.hex(':').upper() == str(leaf_aki).upper():
+                return candidate
+    return verified[0][0]
 
 
 def _generate_matching_key(orig_pub_key):
@@ -284,8 +297,8 @@ def renew_certificate_in_place(
         ca: the issuing CA; resolved from the certificate when omitted.
         username: actor recorded in the audit trail and webhook.
         actor_user_id: numeric user id for the audit entry (API callers).
-        rekey: generate a new key pair (True) or re-sign the existing public
-            key (False — protocol enrollments keep the client's key).
+        rekey: generate a new key pair (True) or re-sign the held key pair
+            (False, scheduled auto-renewal).
         regenerate_crl: publish a fresh CRL when the CA has CDP enabled.
             Bulk callers pass False and regenerate once per CA afterwards.
         trigger: 'manual' | 'bulk' | 'auto', recorded in the audit details.
@@ -322,8 +335,9 @@ def renew_certificate_in_place(
         # here could never reach it, and superseding the serial the device
         # still presents only got that device refused by OCSP and the CRL
         raise RenewalError(
-            'The private key of this certificate is not held by the server; '
-            'renew it through its enrollment protocol or issue a new certificate',
+            'The server does not hold the private key of this certificate; '
+            'renew it through its enrollment protocol, sign a new request or '
+            'issue a new certificate',
             409,
         )
     ca = ca or resolve_issuing_ca(cert)
@@ -489,8 +503,9 @@ def renew_certificate_in_place(
     old_serial = cert.serial_number
     old_valid_to = cert.valid_to
     # The serial being superseded belongs to the CA that really signed the
-    # certificate, resolved above even when the row did not name it
-    old_caref = cert.caref or ca.refid
+    # certificate (resolved above; a row naming a CA record that no longer
+    # exists is re-linked to the real one)
+    old_caref = ca.refid
     new_serial_hex = format(new_cert.serial_number, 'x')
 
     # Two workers renewing the same row would each supersede the serial

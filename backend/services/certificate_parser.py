@@ -4,6 +4,7 @@ Parse X.509 certificates and extract information
 """
 from typing import Dict, Optional
 from cryptography import x509
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 import re
@@ -104,6 +105,7 @@ class CertificateParser:
             'subject_dn': subject_dn,
             'issuer_dn': issuer_dn,
             'serial': serial,
+            'cert_pem': cert.public_bytes(serialization.Encoding.PEM).decode('utf-8'),
             'fingerprint_sha256': fingerprint,
             'fingerprint': fingerprint,  # Backward compatibility
             'common_name': cn,

@@ -595,24 +595,36 @@ def enroll_import_certificate():
     existing_cert = find_existing_cert_by_identity(
         Certificate, serial, issuer_dn, pem_str
     )
-    existing_auth = AuthCertificate.query.filter_by(cert_serial=serial).first()
+    # The serial may be stored decimal (this route, assign) or hexadecimal
+    # (/enroll from a proxy): the same certificate is one enrolment
+    from utils.serial_format import serial_variants
+    existing_auth = AuthCertificate.query.filter(
+        AuthCertificate.cert_serial.in_(serial_variants(cert_obj.serial_number))
+    ).first()
     if existing_auth:
         if existing_auth.user_id == user.id:
             return error_response('This certificate is already enrolled to your account', 409)
         return error_response('This certificate is already enrolled to another user', 409)
 
-    # Importing a certificate whose private key UCM already holds would bind
-    # that key to the importer's account (PKCS#12 export). A public
-    # certificate proves nothing about who holds the key: only the record's
-    # creator, or an administrator, may enrol it.
-    if (existing_cert is not None and existing_cert.prv
-            and user.role != 'admin'
-            and (existing_cert.created_by != user.username
-                 or existing_cert.cert_type != 'usr_cert')):
-        return error_response(
-            'This certificate is held by another account; ask an administrator to assign it',
-            403,
-        )
+    # A public certificate proves nothing about who holds its key. Binding
+    # it to an account maps its holder's TLS logins onto that account and
+    # blocks the real holder from enrolling it: only the record's creator,
+    # or an administrator, may enrol it, whether or not UCM holds the key
+    # (possession is proven through /enroll, over TLS). A certificate this
+    # server issued but no longer records is an administrator's call.
+    if existing_cert is not None and existing_cert.revoked:
+        return error_response('This certificate has been revoked', 400)
+    if user.role != 'admin':
+        if existing_cert is None:
+            return error_response(
+                'This certificate is not recorded on this server; ask an administrator to enroll it',
+                403,
+            )
+        if existing_cert.created_by != user.username or existing_cert.cert_type != 'usr_cert':
+            return error_response(
+                'This certificate belongs to another record; ask an administrator to assign it',
+                403,
+            )
 
     cn = ''
     for attr in cert_obj.subject:

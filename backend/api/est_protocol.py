@@ -440,6 +440,37 @@ def _trusted_client_cert():
     return presented
 
 
+def _presented_certificate_refusal(ca):
+    """A 403 when the certificate the TLS layer presented is not one ``ca``
+    issued and still holds (revoked, expired, unknown): the TLS layer only
+    proved the client holds a key, not that the certificate may still act."""
+    client_cert = _trusted_client_cert()
+    if not client_cert:
+        return None
+    from cryptography import x509
+    from cryptography.hazmat.backends import default_backend
+    try:
+        cert = x509.load_pem_x509_certificate(
+            client_cert.encode() if isinstance(client_cert, str) else client_cert,
+            default_backend(),
+        )
+    except Exception as exc:
+        logger.warning('EST: presented client certificate unreadable: %s', exc)
+        return Response('Invalid client certificate', status=400)
+    from services.cert.issued_lookup import (
+        OK, REVOKED, EXPIRED, NOT_YET_VALID, issued_certificate_status,
+    )
+    _row, status = issued_certificate_status(ca, cert)
+    if status == OK:
+        return None
+    logger.warning('EST: client certificate refused (%s), serial=%s', status, cert.serial_number)
+    return Response({
+        REVOKED: 'Client certificate has been revoked',
+        EXPIRED: 'Client certificate has expired',
+        NOT_YET_VALID: 'Client certificate is not yet valid',
+    }.get(status, 'Client certificate was not issued by this CA'), status=403)
+
+
 def _authenticate_est_client():
     """
     Authenticate EST client via mTLS or HTTP Basic Auth.
@@ -616,6 +647,10 @@ def simple_enroll(label=None):
         )
     
     ca, ca_error = _resolve_est_ca(label)
+    if ca is not None and username == 'mtls-client':
+        refused = _presented_certificate_refusal(ca)
+        if refused is not None:
+            return refused
     if ca_error:
         return ca_error
     
@@ -738,7 +773,7 @@ def simple_reenroll(label=None):
             # (a revoked one, or one from another CA sharing the names,
             # used to be re-enrolled and even graced its EKUs and names)
             from services.cert.issued_lookup import (
-                OK, REVOKED, EXPIRED, issued_certificate_status,
+                OK, REVOKED, EXPIRED, NOT_YET_VALID, issued_certificate_status,
             )
             renewed_row, status = issued_certificate_status(ca, client_cert_obj)
             if status != OK:
@@ -749,6 +784,7 @@ def simple_reenroll(label=None):
                 return Response({
                     REVOKED: 'Client certificate has been revoked',
                     EXPIRED: 'Client certificate has expired',
+                    NOT_YET_VALID: 'Client certificate is not yet valid',
                 }.get(status, 'Client certificate was not issued by this CA'), status=403)
         except Exception as e:
             logger.error(f"EST reenroll: failed to parse client cert: {e}")
@@ -837,6 +873,10 @@ def server_keygen(label=None):
         )
 
     ca, ca_error = _resolve_est_ca(label)
+    if ca is not None and username == 'mtls-client':
+        refused = _presented_certificate_refusal(ca)
+        if refused is not None:
+            return refused
     if ca_error:
         return ca_error
 

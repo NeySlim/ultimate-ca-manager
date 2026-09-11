@@ -327,7 +327,16 @@ class TestServerKeygen:
 
     def test_mtls_ignores_invalid_csr_pop_preserves_san_and_returns_cms(self, client,
                                                                        est_config):
-        client_cert, client_key, client_pem = _make_client_certificate('transport.example.test')
+        # The transport certificate must be one the EST CA issued and still
+        # holds (a self-signed one is refused since the presented-certificate
+        # rule): enrol it first
+        first_csr, client_key = _make_csr(common_name='transport.example.test')
+        enrolled = _post_csr(client, 'simpleenroll', first_csr, headers=_basic_auth())
+        assert enrolled.status_code == 200, enrolled.data
+        client_cert = [c for c in pkcs7.load_der_pkcs7_certificates(base64.b64decode(enrolled.data))
+                       if not c.extensions.get_extension_for_oid(
+                           x509.ExtensionOID.BASIC_CONSTRAINTS).value.ca][0]
+        client_pem = client_cert.public_bytes(serialization.Encoding.PEM).decode()
         key_identifier = x509.SubjectKeyIdentifier.from_public_key(
             client_cert.public_key()
         ).digest

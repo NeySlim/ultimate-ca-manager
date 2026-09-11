@@ -151,14 +151,21 @@ def approve_scep_request(request_id):
     if not (hasattr(g, 'current_user') and g.current_user):
         return error_response('Authentication context required', 401)
     username = g.current_user.username
-
-    scep_req.status = 'approved'
-    scep_req.approved_by = username
-    scep_req.approved_at = datetime.now(timezone.utc)
-    
-    ok, _err = safe_commit(logger, "Failed to approve SCEP request")
-    if not ok:
-        return _err
+    # Approving means issuing: the client polls for the certificate, and a
+    # request flipped to "approved" without one stayed PENDING for it forever
+    from services.scep.scep_service import SCEPService
+    try:
+        cert_refid = SCEPService(ca_refid=scep_req.ca_refid).approve_request(
+            scep_req.transaction_id, username,
+        )
+    except Exception as e:
+        logger.error(f"SCEP approve: issuance failed for request {request_id}: {e}", exc_info=True)
+        db.session.rollback()
+        return error_response('Failed to issue the certificate for this request', 500)
+    if not cert_refid:
+        db.session.rollback()
+        return error_response('Failed to issue the certificate for this request', 500)
+    db.session.refresh(scep_req)
     
     AuditService.log_action(
         action='scep_approve',
@@ -416,10 +423,17 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
             oids, err = normalize_extra_ekus(ekus)
             if err:
                 return False, f'Template has invalid EKUs: {err}'
-            refused = sorted(set(oids) & PROTOCOL_UNBINDABLE_EKU_OIDS)
+            # Smartcard Logon is tolerated when Intune validates the
+            # requester (resulting state of the profile)
+            saved = db.session.get(ScepProfile, profile_id) if (partial and profile_id) else None
+            intune_on = (bool(data.get('intune_enabled')) if 'intune_enabled' in data
+                         else bool(saved and saved.intune_enabled))
+            tolerated = {'1.3.6.1.4.1.311.20.2.2'} if intune_on else set()
+            refused = sorted((set(oids) & PROTOCOL_UNBINDABLE_EKU_OIDS) - tolerated)
             if refused:
                 return False, (
                     f"Template EKU {', '.join(refused)} cannot be issued over SCEP"
+                    + ('' if intune_on else ' (Smartcard Logon requires Intune validation)')
                 )
 
     # Intune SCEP challenge validation (issue #228 part 2): validate against

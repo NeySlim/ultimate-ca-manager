@@ -4,7 +4,7 @@ import { ArrowsClockwise, FloppyDisk, ClockClockwise, Plus, X, Lightning } from 
 import { Button, Input, DetailHeader, DetailSection, DetailContent } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 
-const SOURCES = ['scep', 'acme', 'est']
+const SOURCES = ['manual', 'scep', 'acme', 'est']
 
 export default function AutoRenewalSection({
   arSettings,

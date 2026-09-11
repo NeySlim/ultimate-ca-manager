@@ -11,11 +11,11 @@ and answers ``revoked`` over OCSP, the row is updated in place (``id``,
 ``refid`` and ``created_at`` preserved, ``renewed_at`` / ``renewed_times``
 maintained), and the same audit entry and ``cert_renewed`` webhook fire.
 
-The one deliberate difference: auto-renewal does **not** re-key. These
-certificates come from SCEP / EST / ACME enrollments where the private key was
-generated on the client and UCM only ever saw the public half — issuing a new
-key pair would hand the device a certificate it cannot use. The existing public
-key is re-signed instead; a device that wants a fresh key must re-enroll.
+Only certificates whose private key the server holds are candidates: a
+certificate enrolled through SCEP, EST, WSTEP or ACME keeps its key on the
+device, which renews through its protocol, and a certificate re-signed here
+could never reach it. Auto-renewal does not re-key: the existing key pair is
+re-signed, so exports made from the previous certificate keep working.
 """
 import json
 from datetime import timedelta
@@ -53,7 +53,10 @@ class AutoRenewalService:
         config = {
             'enabled': False,
             'days_before_expiry': 30,
-            'renewal_sources': ['scep', 'acme', 'est'],  # Which sources to auto-renew
+            # Sources to auto-renew: manual covers the issue form and signed
+            # requests; the protocol sources only match certificates whose
+            # key the server holds (EST server-side key generation)
+            'renewal_sources': ['manual', 'scep', 'acme', 'est'],
             'notify_on_renewal': True,
             'notify_on_failure': True,
         }
@@ -90,8 +93,11 @@ class AutoRenewalService:
     @staticmethod
     def set_renewal_config(config: dict):
         """Update auto-renewal configuration"""
+        # The stored keys get_renewal_config reads back
+        db_keys = {'renewal_sources': 'auto_renewal_sources',
+                   'days_before_expiry': 'auto_renewal_days'}
         for key, value in config.items():
-            db_key = f'auto_renewal_{key}'
+            db_key = db_keys.get(key, f'auto_renewal_{key}')
             if key in ('enabled', 'notify_on_renewal', 'notify_on_failure'):
                 db_value = 'true' if value else 'false'
             elif key == 'renewal_sources':
@@ -160,8 +166,7 @@ class AutoRenewalService:
             renew_certificate_in_place(
                 cert,
                 username=AUTO_RENEWAL_ACTOR,
-                # Protocol-enrolled certificates keep their key — see the
-                # module docstring.
+                # The held key pair is re-signed, not replaced (module docstring)
                 rekey=False,
                 regenerate_crl=regenerate_crl,
                 trigger='auto',
@@ -223,15 +228,17 @@ class AutoRenewalService:
                 stats['skipped'] += 1
                 continue
 
-            caref = cert.caref
             success, result = AutoRenewalService.renew_certificate(
                 cert, regenerate_crl=False
             )
 
             if success:
                 stats['renewed'] += 1
-                if caref:
-                    renewed_carefs.add(caref)
+                # The renewal links the row to the CA that really signed it
+                # (resolved by signature when the row named none): that CA's
+                # CRL is the one carrying the superseded serial
+                if cert.caref:
+                    renewed_carefs.add(cert.caref)
             else:
                 stats['failed'] += 1
                 stats['errors'].append({

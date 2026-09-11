@@ -7,6 +7,7 @@ from datetime import datetime, timezone
 from models import db, User
 from models.auth_certificate import AuthCertificate
 from services.certificate_parser import CertificateParser
+import base64
 import logging
 from utils.datetime_utils import utc_now
 from utils.db_transaction import commit_or_rollback
@@ -84,6 +85,27 @@ class MTLSAuthService:
                 logger.warning(f"Certificate does not match enrolment: serial={serial}")
                 return None, None, "Certificate not enrolled"
         
+        # A revoked certificate opens no session, whatever the proxy checked:
+        # the enrolment's own row (or its persistent revocation record)
+        from services.mtls_enrollment import certificate_row_for
+        row = certificate_row_for(auth_cert)
+        if row is not None:
+            revoked = bool(row.revoked)
+            if not revoked and row.caref and row.crt:
+                try:
+                    from cryptography import x509 as _x509
+                    from models import CA as _CA
+                    from services.cert.issued_lookup import REVOKED, issued_certificate_status
+                    issuer = _CA.query.filter_by(refid=row.caref).first()
+                    if issuer is not None:
+                        stored = _x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+                        revoked = issued_certificate_status(issuer, stored)[1] == REVOKED
+                except Exception as exc:
+                    logger.warning(f"mTLS: revocation check skipped for serial={serial}: {exc}")
+            if revoked:
+                logger.warning(f"Certificate revoked: serial={serial}, user_id={auth_cert.user_id}")
+                return None, None, "Certificate has been revoked"
+
         # Check if certificate is enabled
         if not auth_cert.enabled:
             logger.warning(f"Certificate disabled: serial={serial}, user_id={auth_cert.user_id}")

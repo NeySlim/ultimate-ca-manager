@@ -742,11 +742,13 @@ def approve_request(request_id):
             from services.policy_service import PolicyViolation
             if isinstance(e, PolicyViolation):
                 issue_error = f'Policy violation: {e}'
-            elif isinstance(e, ValueError):
-                # The issuance service's own refusals (CA offline, no key,
-                # validity past the CA, template gone...): the approver
-                # needs the reason to know what to fix before retrying,
-                # exactly as the direct route returns them
+            elif isinstance(e, ValueError) and not any(
+                marker in str(e) for marker in ('signing key', 'KEY_ENCRYPTION_KEY', 'HSM', 'hsm')
+            ):
+                # The issuance service's own refusals (CA offline, validity
+                # past the CA, template gone...): the approver needs the
+                # reason to know what to fix before retrying. Key-material
+                # failures stay generic, as on the direct route.
                 issue_error = str(e)
             else:
                 issue_error = 'Certificate issuance failed. Check server logs.'

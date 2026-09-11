@@ -660,9 +660,12 @@ class SCEPService:
                     ), 200
 
                 try:
-                    from services.webhook_service import emit_cert_issued
+                    from services.webhook_service import emit_cert_issued, emit_cert_renewed
                     if cert:
-                        emit_cert_issued(cert.to_dict(), ca_refid=cert.caref)
+                        if message_type == self.MSG_TYPE_RENEWAL_REQ:
+                            emit_cert_renewed(cert.to_dict(), ca_refid=cert.caref)
+                        else:
+                            emit_cert_issued(cert.to_dict(), ca_refid=cert.caref)
                 except Exception as e:
                     logger.error(f"Webhook emit (SCEP issuance) failed: {e}")
                 logger.debug("SCEP: Returning SUCCESS response")
@@ -1211,7 +1214,15 @@ class SCEPService:
                 old_eku = renewal_of.extensions.get_extension_for_oid(
                     ExtensionOID.EXTENDED_KEY_USAGE
                 )
-                extra = set(old_eku.value) - _ALLOWED_EKU_OIDS
+                from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS
+                extra = {
+                    oid for oid in set(old_eku.value) - _ALLOWED_EKU_OIDS
+                    # As on the CSR trunk: a delegated responder, a timestamp
+                    # authority, an unrestricted or a logon certificate is
+                    # never renewed by an enrollee over SCEP, whatever the
+                    # previous certificate carried
+                    if oid.dotted_string not in PROTOCOL_UNBINDABLE_EKU_OIDS
+                }
                 if extra:
                     logger.info(
                         "SCEP renewal: preserving existing EKUs %s",
@@ -1253,7 +1264,11 @@ class SCEPService:
             if tpl_err:
                 raise ValueError(f"Invalid template EKUs: {tpl_err}")
             from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS
-            refused = [o for o in tpl_oids if o in PROTOCOL_UNBINDABLE_EKU_OIDS]
+            # Smartcard Logon is the one purpose a SCEP profile may still
+            # issue, when Intune validates the requester's identity (the
+            # subject and names are then Intune's, not the enrollee's)
+            tolerated = {'1.3.6.1.4.1.311.20.2.2'} if self.intune_client is not None else set()
+            refused = [o for o in tpl_oids if o in PROTOCOL_UNBINDABLE_EKU_OIDS and o not in tolerated]
             if refused:
                 # A binding saved before the rule existed: never issued to a
                 # SCEP enrollee, whatever the template says (same as ACME)
@@ -1261,7 +1276,7 @@ class SCEPService:
                     "SCEP: template EKU(s) %s are not issuable to a SCEP "
                     "enrollee; dropped", refused,
                 )
-                tpl_oids = [o for o in tpl_oids if o not in PROTOCOL_UNBINDABLE_EKU_OIDS]
+                tpl_oids = [o for o in tpl_oids if o not in refused]
             if tpl_oids:
                 tpl_eku_oids = to_object_identifiers(tpl_oids)
                 builder = builder.add_extension(

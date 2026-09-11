@@ -26,24 +26,33 @@ OK = 'ok'
 UNKNOWN = 'unknown'
 REVOKED = 'revoked'
 EXPIRED = 'expired'
+NOT_YET_VALID = 'not_yet_valid'
 
 
-def find_issued_row(ca: CA, cert: x509.Certificate) -> Optional[Certificate]:
-    """The row under ``ca`` holding exactly ``cert``, or None."""
+def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
+    """Every row under ``ca`` holding exactly ``cert`` (normally one; a
+    duplicate left by an inconsistent restore still counts)."""
     presented = cert.public_bytes(Encoding.DER)
     candidates = Certificate.query.filter(
         Certificate.caref == ca.refid,
         Certificate.serial_number.in_(serial_variants(cert.serial_number)),
         Certificate.crt.isnot(None),
     ).all()
+    rows = []
     for row in candidates:
         try:
             stored = x509.load_pem_x509_certificate(base64.b64decode(row.crt), default_backend())
         except Exception:
             continue
         if stored.public_bytes(Encoding.DER) == presented:
-            return row
-    return None
+            rows.append(row)
+    return rows
+
+
+def find_issued_row(ca: CA, cert: x509.Certificate) -> Optional[Certificate]:
+    """The row under ``ca`` holding exactly ``cert``, or None."""
+    rows = find_issued_rows(ca, cert)
+    return rows[0] if rows else None
 
 
 def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[Certificate], str]:
@@ -51,7 +60,8 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
 
     A certificate revoked and then deleted keeps its persistent revocation
     record, and answers REVOKED rather than UNKNOWN."""
-    row = find_issued_row(ca, cert)
+    rows = find_issued_rows(ca, cert)
+    row = rows[0] if rows else None
     variants = serial_variants(cert.serial_number)
     persistent = RevokedSerial.query.filter(
         RevokedSerial.caref == ca.refid,
@@ -59,9 +69,11 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
     ).first()
     if row is None:
         return None, (REVOKED if persistent is not None else UNKNOWN)
-    if row.revoked or persistent is not None:
+    if any(r.revoked for r in rows) or persistent is not None:
         return row, REVOKED
     now = utc_now()
+    if cert.not_valid_before_utc.replace(tzinfo=None) > now:
+        return row, NOT_YET_VALID
     not_after = cert.not_valid_after_utc.replace(tzinfo=None)
     if not_after <= now or (row.valid_to and row.valid_to < now):
         return row, EXPIRED

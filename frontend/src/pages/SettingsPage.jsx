@@ -268,7 +268,7 @@ export default function SettingsPage() {
   const [arSettings, setArSettings] = useState({
     enabled: false,
     days_before_expiry: 30,
-    renewal_sources: ['scep', 'acme', 'est'],
+    renewal_sources: ['manual', 'scep', 'acme', 'est'],
     notify_on_renewal: true,
     notify_on_failure: true,
     notify_emails: [],
