@@ -555,6 +555,18 @@ def create_app(config_name=None):
         except ImportError:
             pass
 
+        # Expire stale approval requests (hourly)
+        try:
+            from services.approval_gate import scheduled_expiry
+            scheduler.register_task(
+                name="approval_expiry",
+                func=scheduled_expiry,
+                interval=3600,
+                description="Expire approval requests past their expiry"
+            )
+        except ImportError:
+            pass
+
         # Register audit log cleanup task (runs daily)
         try:
             from services.retention_service import scheduled_audit_cleanup

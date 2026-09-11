@@ -473,3 +473,122 @@ class TestMootScanIsRobust:
         finally:
             _drop_policy(app, pid)
             _drop_rows(app, csr_id)
+
+
+class TestRemainingEdges:
+    """A hold is temporary: the renewal request waits for the unhold. An
+    expired request is closed as expired, never as approved, by a direct
+    action. The scheduler leaves a certificate whose renewal awaits a human
+    decision alone. Stale pending requests are expired by a task."""
+
+    def _queue_renew(self, app, create_ca, create_user, name):
+        ca = create_ca(cn=f'{name} CA')
+        pid = _policy(app, ca['id'], name)
+        cert_id = _cert_row(app, ca['id'], f'{name}.example.test')
+        operator = _operator(app, create_user)
+        r = _json(operator, 'post', f'/api/v2/certificates/{cert_id}/renew')
+        assert r.status_code == 200 and r.get_json()['data'].get('approval_required'), r.get_json()
+        return ca, pid, cert_id, r.get_json()['data']['approval_id']
+
+    def test_hold_keeps_the_renewal_request_pending_until_unhold(self, app, auth_client, create_ca, create_user):
+        ca, pid, cert_id, approval_id = self._queue_renew(app, create_ca, create_user, 'edge-hold')
+        try:
+            r = _json(auth_client, 'post', f'/api/v2/certificates/{cert_id}/revoke', {'reason': 'certificateHold'})
+            assert r.status_code in (200, 201), r.get_json()
+            with app.app_context():
+                assert db.session.get(ApprovalRequest, approval_id).status == 'pending'
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {'comment': 'held'})
+            assert r.status_code == 200 and r.get_json()['data']['certificate_issued'] is False, r.get_json()
+            r = _json(auth_client, 'post', f'/api/v2/certificates/{cert_id}/unhold')
+            assert r.status_code == 200, r.get_json()
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {'comment': 'ok'})
+            assert r.status_code == 200 and r.get_json()['data']['certificate_issued'] is True, r.get_json()
+            with app.app_context():
+                assert db.session.get(Certificate, cert_id).renewed_times == 1
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, cert_id)
+
+    def test_expired_request_is_closed_as_expired_by_a_direct_action(self, app, auth_client, create_ca, create_user):
+        from datetime import timedelta
+        from utils.datetime_utils import utc_now
+        ca = create_ca(cn='edge-expired CA')
+        pid = _policy(app, ca['id'], 'edge-expired')
+        csr_id = _csr_row(app, 'edge-expired.example.test')
+        try:
+            operator = _operator(app, create_user)
+            r = _json(operator, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 30})
+            approval_id = r.get_json()['data']['approval_id']
+            with app.app_context():
+                ap = db.session.get(ApprovalRequest, approval_id)
+                ap.expires_at = utc_now() - timedelta(hours=1)
+                db.session.commit()
+            r = _json(auth_client, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 30})
+            assert r.status_code == 200, r.get_json()
+            with app.app_context():
+                ap = db.session.get(ApprovalRequest, approval_id)
+                assert ap.status == 'expired' and ap.resolved_at is not None
+                assert ap.get_approvals() == [] and ap.certificate_id is None
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)
+
+    def test_scheduler_skips_a_certificate_whose_renewal_awaits_approval(self, app, create_ca, create_user, monkeypatch):
+        from services.auto_renewal_service import AutoRenewalService
+        ca, pid, cert_id, approval_id = self._queue_renew(app, create_ca, create_user, 'edge-sched')
+        try:
+            with app.app_context():
+                config = AutoRenewalService.get_renewal_config()
+                previous = dict(config)
+                AutoRenewalService.set_renewal_config({**config, 'enabled': True, 'days_before_expiry': 60,
+                                                       'renewal_sources': ['manual']})
+                try:
+                    cert = db.session.get(Certificate, cert_id)
+                    monkeypatch.setattr(AutoRenewalService, 'get_certificates_for_renewal',
+                                        staticmethod(lambda: [cert]))
+                    stats = AutoRenewalService.run_auto_renewal()
+                finally:
+                    AutoRenewalService.set_renewal_config(previous)
+                assert stats['skipped'] == 1 and stats['renewed'] == 0, stats
+                assert (db.session.get(Certificate, cert_id).renewed_times or 0) == 0
+                assert db.session.get(ApprovalRequest, approval_id).status == 'pending'
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, cert_id)
+
+    def test_stale_pending_requests_are_expired(self, app, auth_client, create_ca, create_user):
+        from datetime import timedelta
+        from services.approval_gate import expire_stale_requests
+        from utils.datetime_utils import utc_now
+        ca = create_ca(cn='edge-stale CA')
+        pid = _policy(app, ca['id'], 'edge-stale')
+        with app.app_context():
+            operator = create_user(role='operator')
+            stale = ApprovalRequest(policy_id=pid, requester_id=operator['id'], request_type='csr',
+                                    request_data='{"csr_id": 1}', status='pending', required_approvals=1,
+                                    expires_at=utc_now() - timedelta(days=1))
+            fresh = ApprovalRequest(policy_id=pid, requester_id=operator['id'], request_type='csr',
+                                    request_data='{"csr_id": 2}', status='pending', required_approvals=1,
+                                    expires_at=utc_now() + timedelta(days=1))
+            db.session.add_all([stale, fresh])
+            db.session.commit()
+            stale_id, fresh_id = stale.id, fresh.id
+        try:
+            with app.app_context():
+                assert expire_stale_requests() == 1
+                assert expire_stale_requests() == 0
+                s = db.session.get(ApprovalRequest, stale_id)
+                assert s.status == 'expired' and s.resolved_at is not None
+                assert db.session.get(ApprovalRequest, fresh_id).status == 'pending'
+            # the pending list never shows a request past its expiry
+            with app.app_context():
+                db.session.get(ApprovalRequest, stale_id).status = 'pending'
+                db.session.commit()
+            r = auth_client.get('/api/v2/approvals?status=pending')
+            assert r.status_code == 200
+            assert stale_id not in [a['id'] for a in r.get_json()['data']]
+            assert fresh_id in [a['id'] for a in r.get_json()['data']]
+            with app.app_context():
+                assert db.session.get(ApprovalRequest, stale_id).status == 'expired'
+        finally:
+            _drop_policy(app, pid)

@@ -16,6 +16,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID, NameOID
 
+from models import db
 from models.policy import ApprovalRequest, CertificatePolicy
 from services.policy_service import PolicyEvaluationService
 
@@ -70,21 +71,89 @@ def approval_payload(policy: CertificatePolicy, approval: ApprovalRequest) -> di
     }
 
 
-def pending_requests_naming(request_type: str, key: str, target_id) -> list:
+def approval_is_expired(approval) -> bool:
+    """True when the request has an ``expires_at`` in the past."""
+    from utils.datetime_utils import utc_now
+    if not approval.expires_at:
+        return False
+    exp = approval.expires_at
+    if exp.tzinfo is not None:
+        exp = exp.replace(tzinfo=None)
+    return exp < utc_now().replace(tzinfo=None)
+
+
+def _pending_query(request_type: str, key: str, lock: bool = False):
+    """The pending requests of ``request_type`` whose stored request carries
+    ``key`` (SQL prefilter on the JSON text; the caller parses it). With
+    ``lock`` the rows are taken FOR UPDATE SKIP LOCKED on PostgreSQL, so a
+    request an approver is acting on at that moment is left to them (its
+    votes are never overwritten); SQLite serialises writers and ignores the
+    clause."""
+    query = ApprovalRequest.query.filter_by(status='pending', request_type=request_type).filter(
+        ApprovalRequest.request_data.like(f'%"{key}"%'))
+    if lock:
+        query = query.with_for_update(skip_locked=True)
+    return query
+
+
+def _named_target(approval, key):
+    import json
+    try:
+        rd = json.loads(approval.request_data or '{}')
+    except Exception:
+        return None
+    if not isinstance(rd, dict) or key not in rd:
+        return None
+    return str(rd.get(key))
+
+
+def pending_requests_naming(request_type: str, key: str, target_id, *, lock: bool = False) -> list:
     """Pending approval requests of ``request_type`` whose stored request
     names ``target_id`` under ``key`` (``csr_id`` or ``certificate_id``)."""
-    import json
     if target_id is None:
         return []
-    found = []
-    for approval in ApprovalRequest.query.filter_by(status='pending', request_type=request_type).all():
-        try:
-            rd = json.loads(approval.request_data or '{}')
-        except Exception:
-            continue
-        if isinstance(rd, dict) and key in rd and str(rd.get(key)) == str(target_id):
-            found.append(approval)
-    return found
+    return [approval for approval in _pending_query(request_type, key, lock=lock).all()
+            if _named_target(approval, key) == str(target_id)]
+
+
+def pending_target_ids(request_type: str, key: str) -> set:
+    """The targets (as strings) named by the pending requests of
+    ``request_type``, for callers that must leave them alone (the renewal
+    scheduler does not override a renewal awaiting a human decision)."""
+    targets = set()
+    for approval in _pending_query(request_type, key).all():
+        target = _named_target(approval, key)
+        if target is not None:
+            targets.add(target)
+    return targets
+
+
+def expire_stale_requests(commit: bool = True) -> int:
+    """Close the pending requests past their expiry as ``expired``. The
+    approve and reject routes did so one request at a time when it was
+    acted on; the pending list and the hourly task do it for all of them,
+    so they neither accumulate nor pass for pending."""
+    from utils.datetime_utils import utc_now
+    now = utc_now().replace(tzinfo=None)
+    count = db.session.query(ApprovalRequest).filter(
+        ApprovalRequest.status == 'pending',
+        ApprovalRequest.expires_at.isnot(None),
+        ApprovalRequest.expires_at < now,
+    ).update({ApprovalRequest.status: 'expired', ApprovalRequest.resolved_at: now},
+             synchronize_session=False)
+    if count and commit:
+        from utils.db_transaction import safe_commit
+        ok, _err = safe_commit(logger, "Failed to expire stale approval requests")
+        if not ok:
+            return 0
+    if count:
+        logger.info("Expired %s stale approval request(s)", count)
+    return count
+
+
+def scheduled_expiry():
+    """Scheduler entry point."""
+    return expire_stale_requests()
 
 
 def resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: str,
@@ -97,12 +166,22 @@ def resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: st
     or approved another request for the same target); the request is closed
     as approved, ``username`` recorded as its approver, and linked to the
     certificate when one is given. ``'rejected'``: the target is gone or
-    revoked; the request is closed as rejected with the reason. Returns the
-    requests resolved; the caller commits when ``commit`` is False (the
-    resolution then rides the caller's own transaction)."""
+    revoked; the request is closed as rejected with the reason. A request
+    past its expiry is closed as expired instead, without a vote. Returns
+    the requests approved or rejected; the caller commits when ``commit``
+    is False (the resolution then rides the caller's own transaction)."""
     from utils.datetime_utils import utc_now
     resolved = []
-    for approval in pending_requests_naming(request_type, key, target_id):
+    touched = 0
+    for approval in pending_requests_naming(request_type, key, target_id, lock=True):
+        touched += 1
+        if approval_is_expired(approval):
+            # Past its expiry and not yet noticed: it expired, the action
+            # neither approved nor rejected it
+            approval.status = 'expired'
+            approval.resolved_at = utc_now()
+            logger.info("Approval request #%s expired before %s", approval.id, reason.lower())
+            continue
         approval.add_approval(user_id=user_id, username=username,
                               action='approve' if outcome == 'approved' else 'reject',
                               comment=reason)
@@ -112,7 +191,7 @@ def resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: st
             approval.certificate_id = certificate_id
         resolved.append(approval)
         logger.info("Approval request #%s resolved as %s: %s", approval.id, outcome, reason)
-    if resolved and commit:
+    if touched and commit:
         from utils.db_transaction import safe_commit
         safe_commit(logger, "Failed to resolve superseded approval requests")
     return resolved

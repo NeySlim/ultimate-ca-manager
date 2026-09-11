@@ -72,12 +72,8 @@ def _user_can_act_on_approval(user, approval):
 
 def _approval_is_expired(approval):
     """True if the request has an expires_at in the past."""
-    if not approval.expires_at:
-        return False
-    exp = approval.expires_at
-    if exp.tzinfo is not None:
-        exp = exp.replace(tzinfo=None)
-    return exp < utc_now().replace(tzinfo=None)
+    from services.approval_gate import approval_is_expired
+    return approval_is_expired(approval)
 
 
 def _link_approval(approval, certificate_id):
@@ -774,7 +770,12 @@ def toggle_policy(policy_id):
 def list_approvals():
     """List approval requests"""
     status = request.args.get('status', 'pending')
-    
+
+    if status in ('pending', 'all'):
+        # A request past its expiry is shown as expired, not pending
+        from services.approval_gate import expire_stale_requests
+        expire_stale_requests()
+
     query = ApprovalRequest.query
     if status != 'all':
         query = query.filter_by(status=status)

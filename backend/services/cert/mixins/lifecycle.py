@@ -427,10 +427,13 @@ class LifecycleMixin:
                 db.session.add(revoked_record)
 
         # A renewal still waiting for approval is closed: a revoked
-        # certificate is not renewed (same transaction as the revocation)
-        from services.approval_gate import resolve_moot_requests
-        resolve_moot_requests('renewal', 'certificate_id', certificate.id, outcome='rejected',
-                              username=username, reason='Certificate revoked', commit=False)
+        # certificate is not renewed (same transaction as the revocation).
+        # A hold is temporary: the request waits for the unhold (approving
+        # it meanwhile is refused, the certificate being revoked)
+        if reason not in ('certificateHold', 'certificate_hold'):
+            from services.approval_gate import resolve_moot_requests
+            resolve_moot_requests('renewal', 'certificate_id', certificate.id, outcome='rejected',
+                                  username=username, reason='Certificate revoked', commit=False)
 
         # Single atomic commit — certificate revocation + RevokedSerial
         # either both persist or both roll back.

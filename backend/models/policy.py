@@ -101,9 +101,14 @@ class ApprovalRequest(db.Model):
     Tracks certificate approval requests for workflow compliance.
     """
     __tablename__ = "approval_requests"
-    
+    __table_args__ = (
+        # The pending requests of a type are looked up on every direct
+        # signing, renewal, revocation and deletion (migration 084)
+        db.Index('ix_approval_requests_status_type', 'status', 'request_type'),
+    )
+
     id = db.Column(db.Integer, primary_key=True)
-    request_type = db.Column(db.String(50), nullable=False)  # certificate, csr, revocation
+    request_type = db.Column(db.String(50), nullable=False)  # certificate, csr, renewal
     
     # What needs approval (certificate ID, which can be a CSR or issued cert)
     certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'), nullable=True)

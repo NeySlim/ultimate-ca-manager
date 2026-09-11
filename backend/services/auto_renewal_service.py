@@ -222,9 +222,19 @@ class AutoRenewalService:
         # superseded serial that only reaches relying parties through a CRL.
         renewed_carefs = set()
 
+        # A renewal an operator queued for approval is a human decision the
+        # scheduler does not pre-empt; the certificate is picked up again
+        # once the request is resolved or expired
+        from services.approval_gate import pending_target_ids
+        awaiting_approval = pending_target_ids('renewal', 'certificate_id')
+
         for cert in certs:
             # Skip already-archived (superseded by a pre-in-place-renewal run)
             if cert.archived:
+                stats['skipped'] += 1
+                continue
+            if str(cert.id) in awaiting_approval:
+                logger.info(f"Auto-renewal skipped cert {cert.id}: renewal awaiting approval")
                 stats['skipped'] += 1
                 continue
 
