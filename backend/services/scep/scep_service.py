@@ -1252,6 +1252,16 @@ class SCEPService:
             tpl_oids, tpl_err = normalize_extra_ekus(tpl_eku_names)
             if tpl_err:
                 raise ValueError(f"Invalid template EKUs: {tpl_err}")
+            from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS
+            refused = [o for o in tpl_oids if o in PROTOCOL_UNBINDABLE_EKU_OIDS]
+            if refused:
+                # A binding saved before the rule existed: never issued to a
+                # SCEP enrollee, whatever the template says (same as ACME)
+                logger.warning(
+                    "SCEP: template EKU(s) %s are not issuable to a SCEP "
+                    "enrollee; dropped", refused,
+                )
+                tpl_oids = [o for o in tpl_oids if o not in PROTOCOL_UNBINDABLE_EKU_OIDS]
             if tpl_oids:
                 tpl_eku_oids = to_object_identifiers(tpl_oids)
                 builder = builder.add_extension(
@@ -1263,7 +1273,10 @@ class SCEPService:
         try:
             for ext in csr.extensions:
                 if ext.oid == ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
-                    builder = builder.add_extension(ext.value, critical=False)
+                    # RFC 5280 §4.2.1.6: critical when the subject is empty
+                    builder = builder.add_extension(
+                        ext.value, critical=(len(csr.subject) == 0)
+                    )
                 elif ext.oid == ExtensionOID.KEY_USAGE:
                     if tpl_ku_names:
                         continue  # template governs Key Usage
@@ -1314,6 +1327,28 @@ class SCEPService:
         except x509.ExtensionNotFound:
             pass
 
+        # A CSR that asked for neither gets the same defaults as the CSR
+        # trunk: a leaf without Key Usage is unrestricted (RFC 5280
+        # §4.2.1.3) and one without EKU is usable for anything
+        present = {e.oid for e in builder._extensions}
+        if ExtensionOID.KEY_USAGE not in present:
+            builder = builder.add_extension(
+                x509.KeyUsage(
+                    digital_signature=True, key_encipherment=True,
+                    content_commitment=False, data_encipherment=False,
+                    key_agreement=False, key_cert_sign=False, crl_sign=False,
+                    encipher_only=False, decipher_only=False,
+                ),
+                critical=True,
+            )
+        if ExtensionOID.EXTENDED_KEY_USAGE not in present:
+            builder = builder.add_extension(
+                x509.ExtendedKeyUsage([
+                    x509.ExtendedKeyUsageOID.SERVER_AUTH,
+                    x509.ExtendedKeyUsageOID.CLIENT_AUTH,
+                ]),
+                critical=False,
+            )
         # Whether the KeyUsage came from the template or the CSR, bits the
         # enrollee's key type cannot honour (keyEncipherment on an EC key)
         # are cleared here, as on every other leaf path (#327).

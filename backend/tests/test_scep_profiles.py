@@ -323,7 +323,11 @@ class TestScepResponderTemplate:
 
     _issue_via_service = TestScepProfileTemplateIssuance._issue_via_service
 
-    def test_template_with_ocsp_signing_gets_nocheck(self, app, auth_client, create_ca):
+    def test_template_with_ocsp_signing_is_not_issued_over_scep(self, app, auth_client, create_ca):
+        """A delegated OCSP responder is issued through the dedicated path,
+        never to a SCEP enrollee: the template's OCSPSigning is dropped (a
+        binding saved before the refusal existed), no id-pkix-ocsp-nocheck
+        follows, and the leaf falls back to the TLS defaults."""
         from cryptography import x509
         from cryptography.x509.oid import ExtensionOID, ExtendedKeyUsageOID
         ca = create_ca(cn='SCEP Responder Template CA')
@@ -331,5 +335,7 @@ class TestScepResponderTemplate:
                                extensions_template={'extended_key_usage': ['OCSPSigning']})
         cert = self._issue_via_service(app, ca['id'], tpl['id'])
         eku = cert.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value
-        assert ExtendedKeyUsageOID.OCSP_SIGNING in eku
-        cert.extensions.get_extension_for_oid(ExtensionOID.OCSP_NO_CHECK)
+        assert ExtendedKeyUsageOID.OCSP_SIGNING not in eku
+        assert set(eku) == {ExtendedKeyUsageOID.SERVER_AUTH, ExtendedKeyUsageOID.CLIENT_AUTH}
+        with pytest.raises(x509.ExtensionNotFound):
+            cert.extensions.get_extension_for_oid(ExtensionOID.OCSP_NO_CHECK)

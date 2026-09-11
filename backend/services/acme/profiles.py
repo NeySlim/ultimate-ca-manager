@@ -51,12 +51,7 @@ _MAX_NAME_LEN = 64
 # enrollees (its _LEAF_FORBIDDEN_EKU_OIDS and friends). Refusing them when
 # the binding is saved tells the operator, instead of silently stripping
 # them at finalize.
-_UNBINDABLE_EKU_OIDS = frozenset({
-    '1.3.6.1.5.5.7.3.9',       # OCSPSigning
-    '1.3.6.1.5.5.7.3.8',       # timeStamping
-    '2.5.29.37.0',             # anyExtendedKeyUsage
-    '1.3.6.1.4.1.311.20.2.2',  # Microsoft Smartcard Logon
-})
+from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS as _UNBINDABLE_EKU_OIDS
 _ALLOWED_DIGESTS = ('sha256', 'sha384', 'sha512')
 # Same hard cap as every other issuance path (see the validity-cap rule).
 _MAX_VALIDITY_DAYS = 3650

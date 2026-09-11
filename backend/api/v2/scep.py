@@ -406,6 +406,21 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
             return False, 'Template not found'
         if tpl.template_type == 'ca':
             return False, 'CA templates cannot be used for SCEP profiles'
+        # Same rule as ACME profiles: a template must not hand a SCEP
+        # enrollee (a challenge password, at most an Intune check) an EKU
+        # that grants authority over the PKI or an identity of its choosing
+        from services.template_service import template_extensions
+        from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS, normalize_extra_ekus
+        ekus = template_extensions(tpl).get('extended_key_usage')
+        if isinstance(ekus, list) and ekus:
+            oids, err = normalize_extra_ekus(ekus)
+            if err:
+                return False, f'Template has invalid EKUs: {err}'
+            refused = sorted(set(oids) & PROTOCOL_UNBINDABLE_EKU_OIDS)
+            if refused:
+                return False, (
+                    f"Template EKU {', '.join(refused)} cannot be issued over SCEP"
+                )
 
     # Intune SCEP challenge validation (issue #228 part 2): validate against
     # the RESULTING state, not just what this payload touches — a partial

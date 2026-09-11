@@ -137,3 +137,16 @@ def add_ocsp_nocheck_if_responder(builder, ekus):
     if already:
         return builder
     return builder.add_extension(_x509.OCSPNoCheck(), critical=False)
+
+
+# EKUs a template bound to a protocol endpoint (ACME profile, SCEP profile)
+# must never grant: an enrollee that only proved control of a name or a
+# challenge password would otherwise obtain a delegated OCSP responder, a
+# timestamp authority, an unrestricted certificate or a Smartcard Logon
+# identity of its choosing. Refused when the binding is saved.
+PROTOCOL_UNBINDABLE_EKU_OIDS = frozenset({
+    '1.3.6.1.5.5.7.3.9',       # OCSPSigning
+    '1.3.6.1.5.5.7.3.8',       # timeStamping
+    '2.5.29.37.0',             # anyExtendedKeyUsage
+    '1.3.6.1.4.1.311.20.2.2',  # Microsoft Smartcard Logon
+})
