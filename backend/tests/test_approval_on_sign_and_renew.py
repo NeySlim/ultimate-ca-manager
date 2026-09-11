@@ -723,7 +723,7 @@ class TestReviewFollowUps:
             finally:
                 _drop_policy(app, pid)
 
-    def test_approving_a_request_whose_target_is_gone_closes_it(self, app, auth_client, create_ca, create_user):
+    def test_approving_a_request_whose_target_is_gone_closes_it(self, app, auth_client, create_ca, create_user, monkeypatch):
         ca = create_ca(cn='fu-gone CA')
         pid = _policy(app, ca['id'], 'fu-gone')
         csr_id = _csr_row(app, 'fu-gone.example.test')
@@ -736,12 +736,22 @@ class TestReviewFollowUps:
                 ap = db.session.get(ApprovalRequest, approval_id)
                 ap.request_data = ap.request_data.replace(str(csr_id), '999999')
                 db.session.commit()
+            import api.v2.policies as policies_module
+            emitted = []
+            monkeypatch.setattr('services.webhook_service.emit_csr_rejected',
+                                lambda payload, reason=None, actor=None: emitted.append((payload, reason)))
             r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {'comment': 'ok'})
-            assert r.status_code == 200 and r.get_json()['data']['certificate_issued'] is False, r.get_json()
+            body = r.get_json()['data']
+            assert r.status_code == 200 and body['certificate_issued'] is False, r.get_json()
+            assert body.get('request_closed') is True and 'no longer exists' in body['issue_error']
+            assert emitted and emitted[0][0]['id'] == approval_id and 'no longer exists' in emitted[0][1]
             with app.app_context():
                 ap = db.session.get(ApprovalRequest, approval_id)
                 assert ap.status == 'rejected' and ap.resolved_at is not None
                 assert 'no longer exists' in ap.get_approvals()[-1]['comment']
+                from models import AuditLog
+                last = AuditLog.query.filter_by(resource_type='approval', resource_id=str(approval_id)).order_by(AuditLog.id.desc()).first()
+                assert last.action == 'approval_closed'
         finally:
             _drop_policy(app, pid)
             _drop_rows(app, csr_id)
@@ -757,9 +767,104 @@ class TestReviewFollowUps:
             with app.app_context():
                 cert = db.session.get(Certificate, cert_id)
                 assert cert.revoked is False
-                db.session.execute(text('UPDATE certificates SET revoked = 1 WHERE id = :id'), {'id': cert_id})
+                db.session.execute(text('UPDATE certificates SET revoked = :flag WHERE id = :id'),
+                                   {'id': cert_id, 'flag': True})
                 with pytest.raises(RenewalError):
                     renew_certificate_in_place(cert, username='admin')
                 db.session.rollback()
         finally:
             _drop_rows(app, cert_id)
+
+
+class TestSecondReviewFollowUps:
+
+    def test_first_of_two_votes_closes_a_request_whose_target_is_gone(self, app, auth_client, create_ca, create_user):
+        ca = create_ca(cn='fu2-two CA')
+        with app.app_context():
+            pol = CertificatePolicy(name=f'fu2-two-{ca["id"]}', policy_type='issuance', ca_id=ca['id'],
+                                    requires_approval=True, min_approvers=2, is_active=True, priority=100)
+            pol.set_rules({})
+            db.session.add(pol)
+            db.session.commit()
+            pid = pol.id
+        csr_id = _csr_row(app, 'fu2-two.example.test')
+        try:
+            operator = _operator(app, create_user)
+            r = _json(operator, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 30})
+            approval_id = r.get_json()['data']['approval_id']
+            with app.app_context():
+                ap = db.session.get(ApprovalRequest, approval_id)
+                ap.request_data = ap.request_data.replace(str(csr_id), '999999')
+                db.session.commit()
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {'comment': 'ok'})
+            assert r.status_code == 200 and r.get_json()['data'].get('request_closed') is True, r.get_json()
+            with app.app_context():
+                assert db.session.get(ApprovalRequest, approval_id).status == 'rejected'
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)
+
+    def test_scheduler_does_not_renew_twice_a_certificate_renewed_during_its_batch(self, app, create_ca, create_user, monkeypatch):
+        from services.auto_renewal_service import AutoRenewalService
+        ca = create_ca(cn='fu2-batch CA')
+        cert_id = _cert_row(app, ca['id'], 'fu2-batch.example.test')
+        try:
+            with app.app_context():
+                config = AutoRenewalService.get_renewal_config()
+                previous = dict(config)
+                AutoRenewalService.set_renewal_config({**config, 'enabled': True, 'days_before_expiry': 60,
+                                                       'renewal_sources': ['manual']})
+                try:
+                    cert = db.session.get(Certificate, cert_id)
+                    monkeypatch.setattr(AutoRenewalService, 'get_certificates_for_renewal', staticmethod(lambda: [cert]))
+                    import services.auto_renewal_service as ars
+
+                    def renewed_by_an_operator_meanwhile(*_a, **_k):
+                        db.session.query(Certificate).filter(Certificate.id == cert_id).update(
+                            {Certificate.serial_number: 'deadbeef'}, synchronize_session=False)
+                        db.session.commit()
+                        return {}
+                    monkeypatch.setattr('services.approval_gate.pending_target_ids', renewed_by_an_operator_meanwhile)
+                    stats = AutoRenewalService.run_auto_renewal()
+                finally:
+                    AutoRenewalService.set_renewal_config(previous)
+                assert stats['renewed'] == 0 and stats['failed'] == 1, stats
+                assert 'another request' in stats['errors'][0]['error']
+                assert db.session.get(Certificate, cert_id).serial_number == 'deadbeef'
+        finally:
+            _drop_rows(app, cert_id)
+
+    def test_stale_request_does_not_block_policy_deletion_and_reads_as_expired(self, app, auth_client, create_ca, create_user):
+        from datetime import timedelta
+        from utils.datetime_utils import utc_now
+        ca = create_ca(cn='fu2-policy CA')
+        pid = _policy(app, ca['id'], 'fu2-policy')
+        with app.app_context():
+            operator = create_user(role='operator')
+            stale = ApprovalRequest(policy_id=pid, requester_id=operator['id'], request_type='csr',
+                                    request_data='{"csr_id": 1}', status='pending', required_approvals=1,
+                                    expires_at=utc_now() - timedelta(days=1))
+            db.session.add(stale)
+            db.session.commit()
+            stale_id = stale.id
+        try:
+            r = auth_client.get(f'/api/v2/approvals/{stale_id}')
+            assert r.status_code == 200 and r.get_json()['data']['status'] == 'expired'
+            with app.app_context():
+                db.session.get(ApprovalRequest, stale_id).status = 'pending'
+                db.session.commit()
+            r = auth_client.get('/api/v2/approvals?status=expired')
+            assert stale_id in [a['id'] for a in r.get_json()['data']]
+            with app.app_context():
+                db.session.get(ApprovalRequest, stale_id).status = 'pending'
+                db.session.commit()
+            r = auth_client.delete(f'/api/v2/policies/{pid}')
+            assert r.status_code in (200, 204), r.get_json()
+        finally:
+            _drop_policy(app, pid)
+
+    def test_deadline_converts_aware_times_to_utc(self):
+        from datetime import datetime, timedelta, timezone
+        from services.approval_gate import request_deadline
+        ap = ApprovalRequest(expires_at=datetime(2026, 9, 11, 12, 0, tzinfo=timezone(timedelta(hours=2))))
+        assert request_deadline(ap) == datetime(2026, 9, 11, 10, 0)

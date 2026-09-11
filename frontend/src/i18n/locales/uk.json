@@ -3680,6 +3680,7 @@
     "approved": "Затверджені",
     "approvedSuccess": "Запит затверджено",
     "issuanceFailed": "Сертифікат не видано, запит залишається в очікуванні: {{reason}}",
+    "requestClosed": "Запит закрито, його більше неможливо виконати: {{reason}}",
     "certificateId": "ID сертифіката",
     "summaryTarget": "Ціль",
     "summaryValidity": "Термін дії (днів)",

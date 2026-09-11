@@ -3680,6 +3680,7 @@
     "approved": "承認済み",
     "approvedSuccess": "リクエストが承認されました",
     "issuanceFailed": "証明書は発行されず、リクエストは保留のままです: {{reason}}",
+    "requestClosed": "リクエストは終了しました。もはや処理できません: {{reason}}",
     "certificateId": "証明書ID",
     "summaryTarget": "対象",
     "summaryValidity": "有効期間（日）",

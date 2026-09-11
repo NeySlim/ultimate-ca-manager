@@ -119,12 +119,77 @@ def _link_duplicates(duplicate_ids, certificate_id):
     ).update({ApprovalRequest.certificate_id: certificate_id}, synchronize_session=False)
 
 
+def _row(model, ref):
+    """The row ``ref`` names, None when absent or not an id."""
+    if ref is None or not str(ref).isdecimal():
+        return None
+    return db.session.get(model, int(ref))
+
+
+def _ca_for_request(data):
+    """The signing CA a stored request names, by id or reference."""
+    ca_ref = data.get('ca_id')
+    if ca_ref is None:
+        return None
+    if isinstance(ca_ref, int) or str(ca_ref).isdecimal():
+        return db.session.get(CA, int(ca_ref))
+    return CA.query.filter_by(refid=str(ca_ref)).first()
+
+
+def _approval_target_gone(approval):
+    """The reason nothing can satisfy a stored-request approval any more
+    (its request row, certificate or signing CA is gone), else None."""
+    from services.policy_service import PolicyEvaluationService
+    if approval.request_type not in ('csr', 'renewal'):
+        return None
+    data = PolicyEvaluationService.get_request_data(approval) or {}
+    if approval.request_type == 'csr':
+        cert = _row(Certificate, data.get('csr_id'))
+        if cert is None or not cert.csr:
+            return 'The request to sign no longer exists'
+        if _ca_for_request(data) is None:
+            return 'The signing CA no longer exists'
+        return None
+    cert = _row(Certificate, data.get('certificate_id'))
+    if cert is None or not cert.crt:
+        return 'The certificate to renew no longer exists'
+    return None
+
+
+def _close_request_target_gone(approval, reason, user_id, username):
+    """Close a request nothing can satisfy any more as rejected by the
+    approver who found out, with the reason; webhooks are told as for a
+    rejection. Whatever the number of approvals required, the first vote
+    that finds the target gone closes the request."""
+    approval.add_approval(user_id=user_id, username=username, action='reject', comment=reason)
+    approval.status = 'rejected'
+    approval.resolved_at = utc_now()
+    ok, _err = safe_commit(logger, "Failed to close approval request")
+    if not ok:
+        return _err
+    AuditService.log_action(
+        action='approval_closed',
+        resource_type='approval',
+        resource_id=str(approval.id),
+        resource_name=f'Approval #{approval.id}',
+        details=f'Closed by {username}: {reason}',
+        success=True,
+    )
+    result = approval.to_dict()
+    from services.webhook_service import emit_csr_rejected
+    emit_csr_rejected(result, reason=reason, actor=username)
+    result['certificate_issued'] = False
+    result['request_closed'] = True
+    result['issue_error'] = reason
+    return success_response(data=result, message="Request closed")
+
+
 def _issue_approved_csr(approval, data):
     """Sign the stored request an approved 'csr' request names, exactly as
     the Sign CSR route would have."""
     from services.cert_service import CertificateService
     from utils.datetime_utils import utc_isoformat
-    cert = db.session.get(Certificate, data.get('csr_id'))
+    cert = _row(Certificate, data.get('csr_id'))
     if cert is None or not cert.csr:
         raise ValueError('The request to sign no longer exists')
     if cert.crt:
@@ -134,9 +199,7 @@ def _issue_approved_csr(approval, data):
         return {'id': cert.id, 'cn': data.get('cn'), 'serial_number': cert.serial_number,
                 'valid_from': utc_isoformat(cert.valid_from), 'valid_to': utc_isoformat(cert.valid_to),
                 'already_issued': True}
-    ca_ref = data.get('ca_id')
-    ca = (db.session.get(CA, int(ca_ref)) if isinstance(ca_ref, int) or str(ca_ref).isdecimal()
-          else CA.query.filter_by(refid=str(ca_ref)).first())
+    ca = _ca_for_request(data)
     if ca is None:
         raise ValueError('The signing CA no longer exists')
     duplicate_ids = _close_duplicate_requests(approval, 'csr_id', cert.id)
@@ -171,7 +234,7 @@ def _issue_approved_renewal(approval, data):
     the renew route would have."""
     from services.cert.renewal import renew_certificate_in_place
     from utils.datetime_utils import utc_isoformat
-    cert = db.session.get(Certificate, data.get('certificate_id'))
+    cert = _row(Certificate, data.get('certificate_id'))
     if cert is None or not cert.crt:
         raise ValueError('The certificate to renew no longer exists')
     if cert.renewed_at and approval.created_at and cert.renewed_at > approval.created_at:
@@ -715,7 +778,9 @@ def delete_policy(policy_id):
     """Delete certificate policy"""
     policy = db.get_or_404(CertificatePolicy, policy_id)
     
-    # Check for pending requests
+    # Check for pending requests (one past its expiry does not count)
+    from services.approval_gate import expire_stale_requests
+    expire_stale_requests()
     pending = ApprovalRequest.query.filter_by(
         policy_id=policy_id,
         status='pending'
@@ -772,10 +837,9 @@ def list_approvals():
     """List approval requests"""
     status = request.args.get('status', 'pending')
 
-    if status in ('pending', 'all'):
-        # A request past its expiry is shown as expired, not pending
-        from services.approval_gate import expire_stale_requests
-        expire_stale_requests()
+    # A request past its expiry is listed as expired, not pending
+    from services.approval_gate import expire_stale_requests
+    expire_stale_requests()
 
     query = ApprovalRequest.query
     if status != 'all':
@@ -790,6 +854,10 @@ def list_approvals():
 def get_approval(request_id):
     """Get approval request details"""
     approval = db.get_or_404(ApprovalRequest, request_id)
+    if approval.status == 'pending' and _approval_is_expired(approval):
+        approval.status = 'expired'
+        approval.resolved_at = utc_now()
+        safe_commit(logger, "Failed to expire request")
     return success_response(data=approval.to_dict())
 
 
@@ -849,6 +917,12 @@ def approve_request(request_id):
         if any(v.get('user_id') == user_id for v in existing_votes):
             return error_response('You have already voted on this request', 409)
 
+    gone = _approval_target_gone(approval)
+    if gone:
+        # Nothing will ever satisfy the request (its target or CA is gone):
+        # closed by this vote rather than left pending until it expires
+        return _close_request_target_gone(approval, gone, user_id, username)
+
     approval.add_approval(
         user_id=user_id,
         username=username,
@@ -897,12 +971,11 @@ def approve_request(request_id):
             approval = ApprovalRequest.query.filter_by(id=request_id).first()
             if approval is None:
                 return error_response('Approval request not found', 404)
-            if isinstance(e, ValueError) and 'no longer exists' in str(e):
-                # Nothing will ever satisfy the request (its target or CA
-                # is gone): closed now rather than left pending until it
-                # expires
-                approval.add_approval(user_id=user_id, username=username,
-                                      action='reject', comment=issue_error)
+            if (isinstance(e, ValueError) and 'no longer exists' in str(e)
+                    and approval.status == 'pending'):
+                # The target went away during the vote: closed now rather
+                # than left pending until it expires
+                return _close_request_target_gone(approval, issue_error, user_id, username)
 
     ok, _err = safe_commit(logger, "Failed to approve request")
     if not ok:

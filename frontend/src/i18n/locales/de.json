@@ -3680,6 +3680,7 @@
     "approved": "Genehmigt",
     "approvedSuccess": "Anfrage genehmigt",
     "issuanceFailed": "Zertifikat nicht ausgestellt, die Anfrage bleibt ausstehend: {{reason}}",
+    "requestClosed": "Anfrage geschlossen, sie kann nicht mehr erfüllt werden: {{reason}}",
     "certificateId": "Zertifikat-ID",
     "summaryTarget": "Ziel",
     "summaryValidity": "Gültigkeit (Tage)",

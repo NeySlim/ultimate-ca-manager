@@ -326,6 +326,7 @@ def renew_certificate_in_place(
     rekey: bool = True,
     regenerate_crl: bool = True,
     trigger: str = 'manual',
+    known_serial=None,
 ) -> dict:
     """Re-issue ``cert`` on the same database row.
 
@@ -339,6 +340,9 @@ def renew_certificate_in_place(
         regenerate_crl: publish a fresh CRL when the CA has CDP enabled.
             Bulk callers pass False and regenerate once per CA afterwards.
         trigger: 'manual' | 'bulk' | 'auto', recorded in the audit details.
+        known_serial: the serial the caller knows the certificate by (a batch
+            snapshot); by default the one the instance carries. A row that
+            no longer bears it was renewed meanwhile and is refused (409).
 
     Returns:
         dict with cert_id, old_serial, new_serial, valid_from, valid_to,
@@ -351,8 +355,19 @@ def renew_certificate_in_place(
     # The instance was read before the decision (by the route, the scheduler
     # or an approval): the row is read again, and kept locked on PostgreSQL
     # until the renewal commits, so a revocation committed meanwhile is
-    # seen and one in progress waits for the renewal
-    db.session.refresh(cert, with_for_update=True)
+    # seen and one in progress waits for the renewal. The serial the caller
+    # knows stays the reference: a row renewed meanwhile is refused, never
+    # renewed a second time (the deployed certificate would be superseded)
+    from sqlalchemy.exc import InvalidRequestError
+    try:
+        known_serial = known_serial or cert.serial_number
+        db.session.refresh(cert, with_for_update=True)
+    except InvalidRequestError:
+        db.session.rollback()
+        raise RenewalError('Certificate no longer exists', 404)
+    if cert.serial_number != known_serial:
+        db.session.rollback()
+        raise RenewalError('Certificate was renewed by another request; reload it and retry', 409)
     check_renewable(cert)
     ca = ca or resolve_issuing_ca(cert)
     if not ca:

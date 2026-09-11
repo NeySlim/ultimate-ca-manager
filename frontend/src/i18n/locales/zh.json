@@ -3680,6 +3680,7 @@
     "approved": "已批准",
     "approvedSuccess": "请求已批准",
     "issuanceFailed": "证书未签发，请求仍处于待处理状态：{{reason}}",
+    "requestClosed": "请求已关闭，已无法再处理：{{reason}}",
     "certificateId": "证书 ID",
     "summaryTarget": "目标",
     "summaryValidity": "有效期（天）",

@@ -3680,6 +3680,7 @@
     "approved": "Aprobadas",
     "approvedSuccess": "Solicitud aprobada",
     "issuanceFailed": "Certificado no emitido, la solicitud sigue pendiente: {{reason}}",
+    "requestClosed": "Solicitud cerrada, ya nada puede satisfacerla: {{reason}}",
     "certificateId": "ID de certificado",
     "summaryTarget": "Objetivo",
     "summaryValidity": "Validez (días)",

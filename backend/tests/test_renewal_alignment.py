@@ -277,7 +277,46 @@ class TestDeviceHeldKeys:
 
 class TestConcurrentRenewal:
 
-    def test_second_renewal_of_a_stale_row_is_refused(self, app, create_ca, monkeypatch):
+    def test_second_renewal_of_a_stale_row_is_refused(self, app, create_ca):
+        """The caller holds a row another worker renewed meanwhile: the
+        serial it knows is the reference, the re-read only checks it."""
+        ca = create_ca(cn='Renewal stale row CA')
+        rid = _craft_row(app, ca['id'], rsa.generate_private_key(65537, 2048), 'stale-row.example.test',
+                         key_usage=_ku(digital_signature=True, key_encipherment=True),
+                         with_key=True, source='manual', days=5)
+        try:
+            with app.app_context():
+                row = db.session.get(Certificate, rid)
+                stale_serial = row.serial_number
+                db.session.query(Certificate).filter(Certificate.id == rid).update(
+                    {Certificate.serial_number: 'deadbeef'}, synchronize_session=False)
+                db.session.commit()
+                row = db.session.get(Certificate, rid)
+                from sqlalchemy.orm.attributes import set_committed_value
+                set_committed_value(row, 'serial_number', stale_serial)
+                with pytest.raises(RenewalError) as exc:
+                    renew_certificate_in_place(row, username='admin')
+                assert exc.value.status == 409
+                db.session.rollback()
+                assert db.session.get(Certificate, rid).serial_number == 'deadbeef'
+        finally:
+            _drop(app, rid)
+
+    def test_renewal_of_a_deleted_row_is_refused_cleanly(self, app, create_ca):
+        ca = create_ca(cn='Renewal deleted row CA')
+        rid = _craft_row(app, ca['id'], rsa.generate_private_key(65537, 2048), 'deleted-row.example.test',
+                         key_usage=_ku(digital_signature=True, key_encipherment=True),
+                         with_key=True, source='manual', days=5)
+        with app.app_context():
+            row = db.session.get(Certificate, rid)
+            db.session.query(Certificate).filter(Certificate.id == rid).delete(synchronize_session=False)
+            db.session.commit()
+            with pytest.raises(RenewalError) as exc:
+                renew_certificate_in_place(row, username='admin')
+            assert exc.value.status == 404
+            db.session.rollback()
+
+    def test_renewal_after_the_reread_race_is_refused(self, app, create_ca, monkeypatch):
         ca = create_ca(cn='Renewal race CA')
         rid = _craft_row(app, ca['id'], rsa.generate_private_key(65537, 2048), 'race.example.test',
                          key_usage=_ku(digital_signature=True, key_encipherment=True))

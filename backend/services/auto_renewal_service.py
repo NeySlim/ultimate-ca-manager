@@ -22,7 +22,7 @@ from datetime import timedelta
 from models import db, Certificate, CA, SystemConfig, AuditLog
 from services.cert.renewal import RenewalError, renew_certificate_in_place
 import logging
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import to_naive_utc, utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -146,7 +146,7 @@ class AutoRenewalService:
         return certs
 
     @staticmethod
-    def renew_certificate(cert: Certificate, regenerate_crl: bool = True) -> tuple:
+    def renew_certificate(cert: Certificate, regenerate_crl: bool = True, known_serial=None) -> tuple:
         """
         Renew a single certificate in place.
 
@@ -158,6 +158,8 @@ class AutoRenewalService:
             cert: the certificate to renew.
             regenerate_crl: publish a fresh CRL immediately. `run_auto_renewal`
                 passes False and regenerates once per CA after the batch.
+            known_serial: the serial the batch listed the certificate with;
+                a certificate renewed by someone else meanwhile is refused.
 
         Returns:
             (success: bool, cert_id or error_message: int|str)
@@ -170,6 +172,7 @@ class AutoRenewalService:
                 rekey=False,
                 regenerate_crl=regenerate_crl,
                 trigger='auto',
+                known_serial=known_serial,
             )
             return True, cert.id
 
@@ -216,6 +219,9 @@ class AutoRenewalService:
             return {'renewed': 0, 'failed': 0, 'skipped': 0}
 
         certs = AutoRenewalService.get_certificates_for_renewal()
+        # The serials as listed: a certificate an operator renews during
+        # the batch (and deploys) is not renewed a second time
+        listed_serials = {c.id: c.serial_number for c in certs}
 
         stats = {'renewed': 0, 'failed': 0, 'skipped': 0, 'errors': []}
         # CRLs are published once per CA after the batch — every renewal adds a
@@ -236,14 +242,14 @@ class AutoRenewalService:
                 stats['skipped'] += 1
                 continue
             deadline = awaiting_approval.get(str(cert.id))
-            valid_to = cert.valid_to.replace(tzinfo=None) if cert.valid_to and cert.valid_to.tzinfo else cert.valid_to
+            valid_to = to_naive_utc(cert.valid_to)
             if deadline is not None and valid_to is not None and deadline < valid_to:
                 logger.info(f"Auto-renewal skipped cert {cert.id}: renewal awaiting approval")
                 stats['skipped'] += 1
                 continue
 
             success, result = AutoRenewalService.renew_certificate(
-                cert, regenerate_crl=False
+                cert, regenerate_crl=False, known_serial=listed_serials.get(cert.id)
             )
 
             if success:

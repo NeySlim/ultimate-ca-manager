@@ -71,17 +71,14 @@ def approval_payload(policy: CertificatePolicy, approval: ApprovalRequest) -> di
     }
 
 
-def _naive(value):
-    return value.replace(tzinfo=None) if value is not None and value.tzinfo is not None else value
-
-
 def request_deadline(approval):
     """When the request expires (naive UTC): its ``expires_at``, else the
     standard lifetime from its creation; None when neither is known."""
+    from utils.datetime_utils import to_naive_utc
     if approval.expires_at:
-        return _naive(approval.expires_at)
+        return to_naive_utc(approval.expires_at)
     if approval.created_at:
-        return _naive(approval.created_at) + APPROVAL_REQUEST_LIFETIME
+        return to_naive_utc(approval.created_at) + APPROVAL_REQUEST_LIFETIME
     return None
 
 

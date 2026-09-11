@@ -3745,6 +3745,7 @@
     "rejectConfirm": "Reject request #{{id}}?",
     "approvedSuccess": "Request approved",
     "issuanceFailed": "Certificate not issued, the request stays pending: {{reason}}",
+    "requestClosed": "Request closed, nothing can satisfy it any more: {{reason}}",
     "rejectedSuccess": "Request rejected",
     "actionFailed": "Action failed",
     "noRequests": "No approval requests",
