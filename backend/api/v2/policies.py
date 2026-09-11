@@ -119,6 +119,12 @@ def _issue_approved_csr(approval, data):
         allow_sensitive_ekus=True,
         username=approval.requester.username if approval.requester else 'system',
     )
+    if isinstance(signed, CA):
+        # An intermediate CA request: the result lives in the CA table, the
+        # approval keeps no certificate link
+        logger.info(f"CSR {cert.id} signed as CA {signed.id} via approval #{approval.id}")
+        return {'id': None, 'ca_id': signed.id, 'cn': data.get('cn'),
+                'serial_number': signed.serial_number if hasattr(signed, 'serial_number') else None}
     _link_approval(approval, signed.id)
     logger.info(f"CSR {cert.id} signed via approval #{approval.id}")
     return {
@@ -821,8 +827,11 @@ def approve_request(request_id):
             logger.error(f"Failed to issue certificate for approval #{approval.id}: {e}",
                          exc_info=True)
             from services.policy_service import PolicyViolation
+            from services.cert.renewal import RenewalError
             if isinstance(e, PolicyViolation):
                 issue_error = f'Policy violation: {e}'
+            elif isinstance(e, RenewalError):
+                issue_error = e.message
             elif isinstance(e, RuntimeError) and 'already issued' in str(e):
                 issue_error = 'A certificate was already issued for this request by another approver; reload it'
             elif isinstance(e, ValueError) and not any(

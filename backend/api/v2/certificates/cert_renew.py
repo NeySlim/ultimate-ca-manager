@@ -5,7 +5,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import Certificate, db
 from services.audit_service import AuditService
-from services.cert.renewal import RenewalError, renew_certificate_in_place
+from services.cert.renewal import RenewalError, renew_certificate_in_place, check_renewable
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -53,8 +53,13 @@ def renew_certificate(cert_id):
     # original CSR through the connector instead.
     if cert.source == 'msca':
         return _renew_msca_certificate(cert)
-    # An issuance policy that requires approval binds a renewal as it binds
+    # Refused outright when no renewal could honour the request; only then
+    # an issuance policy that requires approval binds a renewal as it binds
     # the issue form (administrators bypass). Fail closed on any error.
+    try:
+        check_renewable(cert)
+    except RenewalError as e:
+        return error_response(e.message, e.status)
     try:
         policy, approval = _approval_for_renewal(g.current_user, cert, request.get_json(silent=True) or {})
     except Exception as e:

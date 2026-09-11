@@ -66,5 +66,5 @@ def approval_payload(policy: CertificatePolicy, approval: ApprovalRequest) -> di
         'approval_id': approval.id,
         'policy_name': policy.name,
         'status': 'pending_approval',
-        'message': f'Request requires approval per policy "{policy.name}"',
+        'message': f'Certificate request requires approval per policy "{policy.name}"',
     }

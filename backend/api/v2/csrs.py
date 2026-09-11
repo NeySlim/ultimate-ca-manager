@@ -824,7 +824,7 @@ def sign_csr(csr_id):
     # the issue form (administrators bypass). Fail closed on any error.
     try:
         policy, approval = _approval_for_csr(
-            g.current_user, ca, cert, data, validity_days, cert_type, extra_ekus)
+            g.current_user, ca, cert, data, validity_days, backend_cert_type, extra_ekus)
     except Exception as e:
         logger.error(f"Policy evaluation failed for CSR {csr_id}; refusing to sign: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the request was not signed', 500)
@@ -948,7 +948,7 @@ def bulk_sign_csrs():
             if cert.crt:
                 results['failed'].append({'id': csr_id, 'error': 'Already signed'})
                 continue
-            refusal, item_validity = _policy_rule_refusal(ca, cert, None, validity_days)
+            refusal, item_validity = _policy_rule_refusal(ca, cert, data.get('template_id'), validity_days)
             if refusal:
                 results['failed'].append({'id': csr_id, 'error': refusal})
                 continue

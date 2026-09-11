@@ -280,6 +280,43 @@ def _write_cert_files(cert: Certificate, cert_pem: str, key_pem):
         logger.warning(f"Failed to write cert/key files for renewed cert {cert.id}: {e}")
 
 
+def check_renewable(cert: Certificate) -> None:
+    """Raise :class:`RenewalError` when ``cert`` cannot be renewed at all
+    (no certificate, revoked, issued by a Microsoft CA, key not held by the
+    server). Shared by the renewal itself and by the routes, which check it
+    before queueing a renewal for approval: a request no renewal could honour
+    must not wait for an approver."""
+    if not cert.crt:
+        raise RenewalError('Certificate data not available', 400)
+
+    if cert.revoked:
+        raise RenewalError(
+            'Cannot renew a revoked certificate. Issue a new certificate instead.',
+            409,
+        )
+
+    # Certificates issued by a Microsoft AD CS connection can't be re-signed
+    # locally (the issuing CA's key lives on the Windows CA) — the caller must
+    # resubmit the original CSR through the connector instead.
+    if cert.source == 'msca':
+        raise RenewalError(
+            'Microsoft CA certificates must be renewed through the AD CS connector',
+            400,
+        )
+
+    if not cert.prv:
+        # The key lives on the device (SCEP, EST, WSTEP, ACME enrolment,
+        # certificate imported without its key): a certificate re-signed
+        # here could never reach it, and superseding the serial the device
+        # still presents only got that device refused by OCSP and the CRL
+        raise RenewalError(
+            'The server does not hold the private key of this certificate; '
+            'renew it through its enrollment protocol, sign a new request or '
+            'issue a new certificate',
+            409,
+        )
+
+
 def renew_certificate_in_place(
     cert: Certificate,
     ca=None,
@@ -311,35 +348,7 @@ def renew_certificate_in_place(
         RenewalError: renewal was refused or could not be persisted. The
             session is left clean (rolled back) in every failure path.
     """
-    if not cert.crt:
-        raise RenewalError('Certificate data not available', 400)
-
-    if cert.revoked:
-        raise RenewalError(
-            'Cannot renew a revoked certificate. Issue a new certificate instead.',
-            409,
-        )
-
-    # Certificates issued by a Microsoft AD CS connection can't be re-signed
-    # locally (the issuing CA's key lives on the Windows CA) — the caller must
-    # resubmit the original CSR through the connector instead.
-    if cert.source == 'msca':
-        raise RenewalError(
-            'Microsoft CA certificates must be renewed through the AD CS connector',
-            400,
-        )
-
-    if not cert.prv:
-        # The key lives on the device (SCEP, EST, WSTEP, ACME enrolment,
-        # certificate imported without its key): a certificate re-signed
-        # here could never reach it, and superseding the serial the device
-        # still presents only got that device refused by OCSP and the CRL
-        raise RenewalError(
-            'The server does not hold the private key of this certificate; '
-            'renew it through its enrollment protocol, sign a new request or '
-            'issue a new certificate',
-            409,
-        )
+    check_renewable(cert)
     ca = ca or resolve_issuing_ca(cert)
     if not ca:
         raise RenewalError(

@@ -15,7 +15,7 @@ from sqlalchemy import or_
 from models import Certificate, CA, db
 from utils.cert_status import issued_certificates
 from services.cert_service import CertificateService
-from services.cert.renewal import RenewalError, renew_certificate_in_place
+from services.cert.renewal import RenewalError, check_renewable, renew_certificate_in_place
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
 from utils.datetime_utils import utc_now
@@ -94,6 +94,7 @@ def bulk_renew_certificates():
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
                 continue
 
+            check_renewable(cert)  # RenewalError → reported per item below
             try:
                 from api.v2.certificates.cert_renew import _approval_for_renewal
                 policy, approval = _approval_for_renewal(g.current_user, cert, data)

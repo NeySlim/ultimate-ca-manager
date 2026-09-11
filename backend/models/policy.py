@@ -192,6 +192,7 @@ class ApprovalRequest(db.Model):
                     'validity_days': rd.get('validity_days'),
                     'csr_id': rd.get('csr_id'),
                     'certificate_id': rd.get('certificate_id'),
+                    'extra_ekus': rd.get('extra_ekus') or [],
                 }
             except Exception:
                 pass

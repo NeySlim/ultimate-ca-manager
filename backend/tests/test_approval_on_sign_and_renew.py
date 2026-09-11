@@ -197,3 +197,38 @@ class TestRenew:
         finally:
             _drop_policy(app, pid)
             _drop_rows(app, cert_id)
+
+
+class TestRenewStateBeforeGate:
+
+    def test_revoked_certificate_is_refused_not_queued(self, app, create_ca, create_user):
+        ca = create_ca(cn='Approval renew revoked CA')
+        pid = _policy(app, ca['id'], 'approval-renew-revoked')
+        cert_id = _cert_row(app, ca['id'], 'approval-renew-revoked.example.test')
+        operator = _operator(app, create_user)
+        try:
+            with app.app_context():
+                db.session.get(Certificate, cert_id).revoked = True
+                db.session.commit()
+            r = _json(operator, 'post', f'/api/v2/certificates/{cert_id}/renew')
+            assert r.status_code == 409, (r.status_code, r.get_json())
+            with app.app_context():
+                assert ApprovalRequest.query.filter_by(policy_id=pid).count() == 0
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, cert_id)
+
+    def test_bulk_renew_of_a_request_row_fails_per_item(self, app, create_ca, create_user):
+        ca = create_ca(cn='Approval bulk renew CSR CA')
+        pid = _policy(app, ca['id'], 'approval-bulk-renew-csr')
+        csr_id = _csr_row(app, 'approval-bulk-renew-csr.example.test')
+        operator = _operator(app, create_user)
+        try:
+            r = _json(operator, 'post', '/api/v2/certificates/bulk/renew', {'ids': [csr_id]})
+            assert r.status_code == 200, r.get_json()
+            body = r.get_json()['data']
+            assert body.get('pending_approval', []) == []
+            assert body['failed'] and 'not available' in body['failed'][0]['error'].lower()
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)

@@ -249,6 +249,32 @@ export default function ApprovalsPage() {
           <div className="text-text-primary">{selectedRequest.requester_username || '—'}</div>
           <div className="text-text-muted">{t('approvals.policy')}</div>
           <div className="text-text-primary">{selectedRequest.policy_name || '—'}</div>
+          {selectedRequest.request_summary && (
+            <>
+              <div className="text-text-muted">{t('approvals.summaryTarget')}</div>
+              <div className="text-text-primary font-mono">
+                {selectedRequest.request_summary.csr_id
+                  ? `CSR #${selectedRequest.request_summary.csr_id}`
+                  : selectedRequest.request_summary.certificate_id
+                    ? `#${selectedRequest.request_summary.certificate_id}`
+                    : (selectedRequest.request_summary.cn || '—')}
+                {selectedRequest.request_summary.cn && (selectedRequest.request_summary.csr_id || selectedRequest.request_summary.certificate_id)
+                  ? ` (${selectedRequest.request_summary.cn})` : ''}
+              </div>
+              {selectedRequest.request_summary.validity_days && (
+                <>
+                  <div className="text-text-muted">{t('approvals.summaryValidity')}</div>
+                  <div className="text-text-primary">{selectedRequest.request_summary.validity_days}</div>
+                </>
+              )}
+              {selectedRequest.request_summary.extra_ekus?.length > 0 && (
+                <>
+                  <div className="text-text-muted">{t('approvals.summaryExtraEkus')}</div>
+                  <div className="text-text-primary font-mono break-all">{selectedRequest.request_summary.extra_ekus.join(', ')}</div>
+                </>
+              )}
+            </>
+          )}
           {selectedRequest.certificate_id && (
             <>
               <div className="text-text-muted">{t('approvals.certificateId')}</div>

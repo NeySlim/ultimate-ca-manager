@@ -185,7 +185,9 @@ class PolicyEvaluationService:
             request_type=request_type,
             policy_id=policy.id,
             requester_id=requester_id,
-            requester_comment=comment or f"Certificate request: {request_data.get('cn', 'unknown')}",
+            requester_comment=comment or (
+                f"{'Renewal' if request_type == 'renewal' else 'Certificate'} request: "
+                f"{request_data.get('cn', 'unknown')}"),
             request_data=json.dumps(request_data),
             required_approvals=policy.min_approvers or 1,
             expires_at=utc_now() + timedelta(days=7),
