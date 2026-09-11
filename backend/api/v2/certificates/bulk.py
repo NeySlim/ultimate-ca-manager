@@ -94,6 +94,17 @@ def bulk_renew_certificates():
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
                 continue
 
+            try:
+                from api.v2.certificates.cert_renew import _approval_for_renewal
+                policy, approval = _approval_for_renewal(g.current_user, cert, data)
+            except Exception as e:
+                logger.error(f"Policy evaluation failed for renewal of {cert_id}: {e}", exc_info=True)
+                results['failed'].append({'id': cert_id, 'error': 'Policy evaluation failed'})
+                continue
+            if approval is not None:
+                results.setdefault('pending_approval', []).append(
+                    {'id': cert_id, 'approval_id': approval.id, 'policy_name': policy.name})
+                continue
             # Identical semantics to POST /<id>/renew — same shared routine,
             # so the superseded serial, renewed_at/renewed_times, on-disk
             # files, OCSP cache, audit entry and webhook all behave the same.

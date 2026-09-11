@@ -297,6 +297,13 @@ export default function CertificatesPage() {
     try {
       muteToasts()
       const res = await certificatesService.renew(id)
+      if (res?.data?.approval_required) {
+        // An issuance policy queued the renewal for approval
+        showWarning(t('certificates.approvalRequired', { policy: res.data.policy_name }))
+        loadData()
+        setSelectedCert(null)
+        return
+      }
       if (res?.meta?.msca_status === 'pending') {
         showSuccess(t('certificates.renewPendingMsca', 'Renewal submitted to the Microsoft CA — pending approval'))
       } else {

@@ -80,6 +80,81 @@ def _approval_is_expired(approval):
     return exp < utc_now().replace(tzinfo=None)
 
 
+def _link_approval(approval, certificate_id):
+    """Link the approval to the certificate it produced. Only the request
+    that finds the sentinel still empty keeps its certificate."""
+    claimed = db.session.query(ApprovalRequest).filter(
+        ApprovalRequest.id == approval.id,
+        ApprovalRequest.certificate_id.is_(None),
+    ).update({ApprovalRequest.certificate_id: certificate_id}, synchronize_session=False)
+    if claimed != 1:
+        db.session.rollback()
+        raise RuntimeError('A certificate was already issued for this approval')
+    approval.certificate_id = certificate_id
+    ok, _err = safe_commit(logger, "Failed to link approval to certificate")
+    if not ok:
+        raise RuntimeError('Failed to link approval to certificate')
+
+
+def _issue_approved_csr(approval, data):
+    """Sign the stored request an approved 'csr' request names, exactly as
+    the Sign CSR route would have."""
+    from services.cert_service import CertificateService
+    from utils.datetime_utils import utc_isoformat
+    cert = db.session.get(Certificate, data.get('csr_id'))
+    if cert is None or not cert.csr:
+        raise ValueError('The request to sign no longer exists')
+    if cert.crt:
+        raise ValueError('The request was already signed')
+    ca_ref = data.get('ca_id')
+    ca = (db.session.get(CA, int(ca_ref)) if isinstance(ca_ref, int) or str(ca_ref).isdecimal()
+          else CA.query.filter_by(refid=str(ca_ref)).first())
+    if ca is None:
+        raise ValueError('The signing CA no longer exists')
+    signed = CertificateService.sign_csr(
+        cert_id=cert.id, caref=ca.refid,
+        validity_days=int(data.get('validity_days') or 365),
+        cert_type=data.get('cert_type') or 'server_cert',
+        extra_ekus=data.get('extra_ekus'),
+        allow_sensitive_ekus=True,
+        username=approval.requester.username if approval.requester else 'system',
+    )
+    _link_approval(approval, signed.id)
+    logger.info(f"CSR {cert.id} signed via approval #{approval.id}")
+    return {
+        'id': signed.id,
+        'cn': data.get('cn'),
+        'serial_number': signed.serial_number,
+        'valid_from': utc_isoformat(signed.valid_from),
+        'valid_to': utc_isoformat(signed.valid_to),
+    }
+
+
+def _issue_approved_renewal(approval, data):
+    """Renew the certificate an approved 'renewal' request names, exactly as
+    the renew route would have."""
+    from services.cert.renewal import renew_certificate_in_place
+    from utils.datetime_utils import utc_isoformat
+    cert = db.session.get(Certificate, data.get('certificate_id'))
+    if cert is None or not cert.crt:
+        raise ValueError('The certificate to renew no longer exists')
+    renew_certificate_in_place(
+        cert,
+        username=approval.requester.username if approval.requester else 'system',
+        actor_user_id=approval.requester_id,
+        rekey=True, regenerate_crl=True, trigger='manual',
+    )
+    _link_approval(approval, cert.id)
+    logger.info(f"Certificate {cert.id} renewed via approval #{approval.id}")
+    return {
+        'id': cert.id,
+        'cn': data.get('cn'),
+        'serial_number': cert.serial_number,
+        'valid_from': utc_isoformat(cert.valid_from),
+        'valid_to': utc_isoformat(cert.valid_to),
+    }
+
+
 def _issue_approved_certificate(approval):
     """Issue a certificate from an approved request's stored data.
     
@@ -97,6 +172,10 @@ def _issue_approved_certificate(approval):
     data = PolicyEvaluationService.get_request_data(approval)
     if not data:
         raise ValueError("No request data stored in approval")
+    if approval.request_type == 'csr':
+        return _issue_approved_csr(approval, data)
+    if approval.request_type == 'renewal':
+        return _issue_approved_renewal(approval, data)
 
     # Resolve the template the request was made against (issue #226 semantics:
     # templates govern issuance — KU/EKU, digest, and the defaults for key

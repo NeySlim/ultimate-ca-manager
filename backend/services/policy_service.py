@@ -166,7 +166,8 @@ class PolicyEvaluationService:
         policy: CertificatePolicy,
         request_data: dict,
         requester_id: int,
-        comment: str = None
+        comment: str = None,
+        request_type: str = 'certificate',
     ) -> ApprovalRequest:
         """
         Create an approval request for deferred certificate issuance.
@@ -181,7 +182,7 @@ class PolicyEvaluationService:
             The created ApprovalRequest
         """
         approval = ApprovalRequest(
-            request_type='certificate',
+            request_type=request_type,
             policy_id=policy.id,
             requester_id=requester_id,
             requester_comment=comment or f"Certificate request: {request_data.get('cn', 'unknown')}",

@@ -202,6 +202,14 @@ export default function CSRsPage() {
       }
       try {
         const signed = await csrsService.sign(selectedCSR.id, signCA, validityDays, signCertType, signExtraEkus)
+        if (signed?.data?.approval_required) {
+          // An issuance policy queued the signing for approval
+          showWarning(t('certificates.approvalRequired', { policy: signed.data.policy_name }))
+          closeModal('sign')
+          loadData()
+          setSelectedCSR(null)
+          return
+        }
         showSuccess(t('messages.success.other.signed'))
         // A CA signed from an external request holds no key (#348)
         if ((signed?.data || signed)?.certificate_only) showWarning(t('cas.certificateOnlyBanner'))

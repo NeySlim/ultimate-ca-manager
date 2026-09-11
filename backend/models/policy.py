@@ -190,6 +190,8 @@ class ApprovalRequest(db.Model):
                     'ca_id': rd.get('ca_id'),
                     'cert_type': rd.get('cert_type'),
                     'validity_days': rd.get('validity_days'),
+                    'csr_id': rd.get('csr_id'),
+                    'certificate_id': rd.get('certificate_id'),
                 }
             except Exception:
                 pass

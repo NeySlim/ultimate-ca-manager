@@ -466,6 +466,7 @@
     "loadFailed": "読み込みに失敗しました",
     "bulkSuccess": "{{action}}: {{count}} 件成功",
     "bulkPartialFail": "{{count}} 件失敗",
+    "bulkPendingApproval": "{{count}} 件を承認に提出しました",
     "bulkFailed": "一括操作に失敗しました",
     "confirmBulk": "一括操作の確認",
     "confirmRevoke": "{{count}} 件の証明書を失効しますか？この操作は元に戻せません。",

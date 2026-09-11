@@ -95,26 +95,32 @@ def list_csrs():
             'pages': pagination.pages
         }
     )
+def _csr_identity(cert):
+    """``(cn, dns_names, key_label)`` of a stored request, or raises ValueError."""
+    from cryptography import x509 as _x509
+    from cryptography.hazmat.primitives.asymmetric import ec as _ec, rsa as _rsa
+    from cryptography.x509.oid import ExtensionOID as _ExtOID, NameOID as _NameOID
+    csr_obj = _x509.load_pem_x509_csr(base64.b64decode(cert.csr))
+    cn_attrs = csr_obj.subject.get_attributes_for_oid(_NameOID.COMMON_NAME)
+    csr_cn = cn_attrs[0].value if cn_attrs else None
+    try:
+        csr_dns = list(csr_obj.extensions.get_extension_for_oid(
+            _ExtOID.SUBJECT_ALTERNATIVE_NAME).value.get_values_for_type(_x509.DNSName))
+    except _x509.ExtensionNotFound:
+        csr_dns = []
+    pub = csr_obj.public_key()
+    key_label = (str(pub.key_size) if isinstance(pub, _rsa.RSAPublicKey)
+                 else pub.curve.name if isinstance(pub, _ec.EllipticCurvePublicKey) else None)
+    return csr_cn, csr_dns, key_label
+
+
 def _policy_rule_refusal(ca, cert, template_id, validity_days):
     """Issuance policy rules (#335) applied to a stored request: returns
     ``(refusal_message_or_None, validity_days)`` with the validity capped by
     the applicable policies. Shared by the unit and bulk Sign CSR routes."""
     try:
-        from cryptography import x509 as _x509
-        from cryptography.hazmat.primitives.asymmetric import ec as _ec, rsa as _rsa
-        from cryptography.x509.oid import ExtensionOID as _ExtOID, NameOID as _NameOID
         from services.policy_service import PolicyEvaluationService
-        csr_obj = _x509.load_pem_x509_csr(base64.b64decode(cert.csr))
-        cn_attrs = csr_obj.subject.get_attributes_for_oid(_NameOID.COMMON_NAME)
-        csr_cn = cn_attrs[0].value if cn_attrs else None
-        try:
-            csr_dns = list(csr_obj.extensions.get_extension_for_oid(
-                _ExtOID.SUBJECT_ALTERNATIVE_NAME).value.get_values_for_type(_x509.DNSName))
-        except _x509.ExtensionNotFound:
-            csr_dns = []
-        pub = csr_obj.public_key()
-        key_label = (str(pub.key_size) if isinstance(pub, _rsa.RSAPublicKey)
-                     else pub.curve.name if isinstance(pub, _ec.EllipticCurvePublicKey) else None)
+        csr_cn, csr_dns, key_label = _csr_identity(cert)
         policies = PolicyEvaluationService.applicable_policies(ca.id, template_id, csr_cn, csr_dns)
         violations, validity_days = PolicyEvaluationService.enforce_rules(
             policies, key_type=key_label, dns_name_count=len(set(csr_dns)),
@@ -124,6 +130,23 @@ def _policy_rule_refusal(ca, cert, template_id, validity_days):
     if violations:
         return 'Policy violation: ' + '; '.join(violations), validity_days
     return None, validity_days
+
+
+def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus):
+    """Queue the signing for approval when a policy requires it: ``(policy,
+    approval)`` or ``(None, None)``. Raises on evaluation error."""
+    from services.approval_gate import queue_if_approval_required
+    csr_cn, csr_dns, _key = _csr_identity(cert)
+    return queue_if_approval_required(
+        user, ca_id=ca.id, template_id=data.get('template_id'), cn=csr_cn, san_list=csr_dns,
+        request_type='csr',
+        request_data={
+            'csr_id': cert.id, 'ca_id': ca.id, 'cn': csr_cn, 'cert_type': cert_type,
+            'validity_days': validity_days, 'extra_ekus': extra_ekus,
+            'template_id': data.get('template_id'),
+        },
+        comment=data.get('approval_comment'),
+    )
 
 
 
@@ -797,6 +820,18 @@ def sign_csr(csr_id):
     refusal, validity_days = _policy_rule_refusal(ca, cert, data.get('template_id'), validity_days)
     if refusal:
         return error_response(refusal, 400)
+    # An issuance policy that requires approval binds this path as it binds
+    # the issue form (administrators bypass). Fail closed on any error.
+    try:
+        policy, approval = _approval_for_csr(
+            g.current_user, ca, cert, data, validity_days, cert_type, extra_ekus)
+    except Exception as e:
+        logger.error(f"Policy evaluation failed for CSR {csr_id}; refusing to sign: {e}", exc_info=True)
+        return error_response('Policy evaluation failed; the request was not signed', 500)
+    if approval is not None:
+        from services.approval_gate import approval_payload
+        return success_response(data=approval_payload(policy, approval),
+                                message='CSR signing submitted for approval')
 
     # Clamp validity to CA expiration
     try:
@@ -916,6 +951,17 @@ def bulk_sign_csrs():
             refusal, item_validity = _policy_rule_refusal(ca, cert, None, validity_days)
             if refusal:
                 results['failed'].append({'id': csr_id, 'error': refusal})
+                continue
+            try:
+                policy, approval = _approval_for_csr(
+                    g.current_user, ca, cert, data, item_validity, 'server_cert', None)
+            except Exception as e:
+                logger.error(f"Policy evaluation failed for CSR {csr_id}: {e}", exc_info=True)
+                results['failed'].append({'id': csr_id, 'error': 'Policy evaluation failed'})
+                continue
+            if approval is not None:
+                results.setdefault('pending_approval', []).append(
+                    {'id': csr_id, 'approval_id': approval.id, 'policy_name': policy.name})
                 continue
 
             signed_cert = CertificateService.sign_csr(

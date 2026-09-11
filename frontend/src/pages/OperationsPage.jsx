@@ -255,7 +255,7 @@ function useResourceTypes(t) {
 
 export default function OperationsPage() {
   const { t } = useTranslation()
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showWarning } = useNotification()
   const { isMobile } = useMobile()
   const { isAdmin } = usePermission()
   const navigate = useNavigate()
@@ -551,6 +551,13 @@ export default function OperationsPage() {
         showError(t('operations.bulkPartialFail', {
           count: failedCount,
           defaultValue: `${failedCount} items failed`
+        }))
+      }
+      const pendingCount = data?.pending_approval?.length || 0
+      if (pendingCount > 0) {
+        showWarning(t('operations.bulkPendingApproval', {
+          count: pendingCount,
+          defaultValue: `${pendingCount} items submitted for approval`
         }))
       }
       setBulkAction(null)

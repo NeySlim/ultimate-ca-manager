@@ -466,6 +466,7 @@
     "loadFailed": "Laden fehlgeschlagen",
     "bulkSuccess": "{{action}}: {{count}} erfolgreich",
     "bulkPartialFail": "{{count}} Einträge fehlgeschlagen",
+    "bulkPendingApproval": "{{count}} Einträge zur Genehmigung eingereicht",
     "bulkFailed": "Massenaktion fehlgeschlagen",
     "confirmBulk": "Massenaktion bestätigen",
     "confirmRevoke": "{{count}} Zertifikat(e) widerrufen? Dies kann nicht rückgängig gemacht werden.",

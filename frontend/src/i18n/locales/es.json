@@ -466,6 +466,7 @@
     "loadFailed": "Error al cargar",
     "bulkSuccess": "{{action}}: {{count}} exitoso(s)",
     "bulkPartialFail": "{{count}} elementos fallidos",
+    "bulkPendingApproval": "{{count}} elementos enviados para aprobación",
     "bulkFailed": "La operación masiva falló",
     "confirmBulk": "Confirmar operación masiva",
     "confirmRevoke": "¿Revocar {{count}} certificado(s)? Esta acción no se puede deshacer.",

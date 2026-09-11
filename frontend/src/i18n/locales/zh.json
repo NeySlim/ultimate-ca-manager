@@ -466,6 +466,7 @@
     "loadFailed": "加载失败",
     "bulkSuccess": "{{action}}：{{count}} 个成功",
     "bulkPartialFail": "{{count}} 个项目失败",
+    "bulkPendingApproval": "{{count}} 个项目已提交审批",
     "bulkFailed": "批量操作失败",
     "confirmBulk": "确认批量操作",
     "confirmRevoke": "吊销 {{count}} 个证书？此操作不可撤销。",

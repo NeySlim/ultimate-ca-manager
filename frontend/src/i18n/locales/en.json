@@ -466,6 +466,7 @@
     "loadFailed": "Failed to load data",
     "bulkSuccess": "{{action}}: {{count}} succeeded",
     "bulkPartialFail": "{{count}} items failed",
+    "bulkPendingApproval": "{{count}} items submitted for approval",
     "bulkFailed": "Bulk operation failed",
     "confirmBulk": "Confirm Bulk Operation",
     "confirmRevoke": "Revoke {{count}} certificate(s)? This cannot be undone.",

@@ -2157,6 +2157,7 @@
     "loadFailed": "Échec du chargement",
     "bulkSuccess": "{{action}} : {{count}} réussi(s)",
     "bulkPartialFail": "{{count}} éléments échoués",
+    "bulkPendingApproval": "{{count}} éléments soumis pour approbation",
     "bulkFailed": "L'opération en masse a échoué",
     "confirmBulk": "Confirmer l'opération en masse",
     "confirmRevoke": "Révoquer {{count}} certificat(s) ? Cette action est irréversible.",

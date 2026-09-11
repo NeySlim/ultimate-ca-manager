@@ -1,6 +1,6 @@
 """Certificate renewal route"""
 import logging
-from flask import g
+from flask import request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import Certificate, db
@@ -9,6 +9,22 @@ from services.cert.renewal import RenewalError, renew_certificate_in_place
 from . import bp
 
 logger = logging.getLogger(__name__)
+
+
+def _approval_for_renewal(user, cert, data):
+    """Queue the renewal for approval when a policy requires it: ``(policy,
+    approval)`` or ``(None, None)``. Raises on evaluation error."""
+    from services.approval_gate import certificate_identity, queue_if_approval_required
+    from services.cert.renewal import resolve_issuing_ca
+    ca = resolve_issuing_ca(cert)
+    cn, dns = certificate_identity(cert.crt)
+    return queue_if_approval_required(
+        user, ca_id=ca.id if ca else None, template_id=getattr(cert, 'template_id', None),
+        cn=cn, san_list=dns, request_type='renewal',
+        request_data={'certificate_id': cert.id, 'ca_id': ca.id if ca else None, 'cn': cn,
+                      'cert_type': cert.cert_type},
+        comment=(data or {}).get('approval_comment'),
+    )
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>/renew', methods=['POST'])
@@ -37,6 +53,17 @@ def renew_certificate(cert_id):
     # original CSR through the connector instead.
     if cert.source == 'msca':
         return _renew_msca_certificate(cert)
+    # An issuance policy that requires approval binds a renewal as it binds
+    # the issue form (administrators bypass). Fail closed on any error.
+    try:
+        policy, approval = _approval_for_renewal(g.current_user, cert, request.get_json(silent=True) or {})
+    except Exception as e:
+        logger.error(f"Policy evaluation failed for renewal of {cert_id}: {e}", exc_info=True)
+        return error_response('Policy evaluation failed; the certificate was not renewed', 500)
+    if approval is not None:
+        from services.approval_gate import approval_payload
+        return success_response(data=approval_payload(policy, approval),
+                                message='Certificate renewal submitted for approval')
 
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
     actor_user_id = g.current_user.id if hasattr(g, 'current_user') else None

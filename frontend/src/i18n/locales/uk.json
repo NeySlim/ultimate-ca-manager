@@ -466,6 +466,7 @@
     "loadFailed": "Не вдалося завантажити",
     "bulkSuccess": "{{action}}: {{count}} успішно",
     "bulkPartialFail": "{{count}} елементів не вдалося",
+    "bulkPendingApproval": "{{count}} елементів надіслано на затвердження",
     "bulkFailed": "Масова операція не вдалася",
     "confirmBulk": "Підтвердити масову операцію",
     "confirmRevoke": "Відкликати {{count}} сертифікат(ів)? Цю дію не можна скасувати.",

@@ -236,7 +236,7 @@ export default function ApprovalsPage() {
         <Badge variant={STATUS_VARIANTS[selectedRequest.status]} size="lg">
           {selectedRequest.status}
         </Badge>
-        <Badge variant={selectedRequest.request_type === 'certificate' ? 'info' : 'danger'}>
+        <Badge variant={['certificate', 'csr', 'renewal'].includes(selectedRequest.request_type) ? 'info' : 'danger'}>
           {selectedRequest.request_type}
         </Badge>
       </div>

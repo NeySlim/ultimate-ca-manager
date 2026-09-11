@@ -466,6 +466,7 @@
     "loadFailed": "Caricamento fallito",
     "bulkSuccess": "{{action}}: {{count}} riuscito/i",
     "bulkPartialFail": "{{count}} elementi falliti",
+    "bulkPendingApproval": "{{count}} elementi inviati per approvazione",
     "bulkFailed": "Operazione in blocco fallita",
     "confirmBulk": "Conferma operazione in blocco",
     "confirmRevoke": "Revocare {{count}} certificato/i? Questa azione non può essere annullata.",
