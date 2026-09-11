@@ -71,7 +71,8 @@ def _user_can_act_on_approval(user, approval):
 
 
 def _approval_is_expired(approval):
-    """True if the request has an expires_at in the past."""
+    """True if the request is past its deadline (its expires_at, else the
+    standard lifetime from its creation)."""
     from services.approval_gate import approval_is_expired
     return approval_is_expired(approval)
 
@@ -968,11 +969,13 @@ def approve_request(request_id):
             # unreachable, policy rule) is dealt with. Re-recording the vote
             # used to flip the request to `approved` with no certificate and
             # no way to ever issue it.
-            approval = ApprovalRequest.query.filter_by(id=request_id).first()
+            approval = ApprovalRequest.query.with_for_update().filter_by(id=request_id).first()
             if approval is None:
                 return error_response('Approval request not found', 404)
-            if (isinstance(e, ValueError) and 'no longer exists' in str(e)
-                    and approval.status == 'pending'):
+            if approval.status != 'pending':
+                # Closed by someone else while the issuance was attempted
+                return error_response(f"Request is already {approval.status}", 400)
+            if isinstance(e, ValueError) and 'no longer exists' in str(e):
                 # The target went away during the vote: closed now rather
                 # than left pending until it expires
                 return _close_request_target_gone(approval, issue_error, user_id, username)

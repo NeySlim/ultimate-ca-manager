@@ -20,7 +20,7 @@ re-signed, so exports made from the previous certificate keep working.
 import json
 from datetime import timedelta
 from models import db, Certificate, CA, SystemConfig, AuditLog
-from services.cert.renewal import RenewalError, renew_certificate_in_place
+from services.cert.renewal import RenewalError, SERIAL_UNSET, renew_certificate_in_place
 import logging
 from utils.datetime_utils import to_naive_utc, utc_now
 
@@ -146,7 +146,7 @@ class AutoRenewalService:
         return certs
 
     @staticmethod
-    def renew_certificate(cert: Certificate, regenerate_crl: bool = True, known_serial=None) -> tuple:
+    def renew_certificate(cert: Certificate, regenerate_crl: bool = True, known_serial=SERIAL_UNSET) -> tuple:
         """
         Renew a single certificate in place.
 
@@ -164,6 +164,10 @@ class AutoRenewalService:
         Returns:
             (success: bool, cert_id or error_message: int|str)
         """
+        # Identity kept aside: after a refused renewal the session is rolled
+        # back and the instance expired; the row may be gone (deleted
+        # meanwhile), and reading it again would raise
+        cert_id, common_name = cert.id, cert.common_name
         try:
             renew_certificate_in_place(
                 cert,
@@ -174,22 +178,22 @@ class AutoRenewalService:
                 trigger='auto',
                 known_serial=known_serial,
             )
-            return True, cert.id
+            return True, cert_id
 
         except RenewalError as e:
             db.session.rollback()
-            logger.warning(f"Auto-renewal refused for cert {cert.id}: {e.message}")
-            AutoRenewalService._log_failure(cert, e.message)
+            logger.warning(f"Auto-renewal refused for cert {cert_id}: {e.message}")
+            AutoRenewalService._log_failure(cert_id, common_name, e.message)
             return False, e.message
 
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Auto-renewal failed for cert {cert.id}: {e}", exc_info=True)
-            AutoRenewalService._log_failure(cert, str(e))
+            logger.error(f"Auto-renewal failed for cert {cert_id}: {e}", exc_info=True)
+            AutoRenewalService._log_failure(cert_id, common_name, str(e))
             return False, "Renewal failed"
 
     @staticmethod
-    def _log_failure(cert: Certificate, reason: str):
+    def _log_failure(cert_id, common_name, reason: str):
         """Surface a renewal failure in the audit trail.
 
         A silently-swallowed failure means the certificate expires without
@@ -199,8 +203,8 @@ class AutoRenewalService:
             db.session.add(AuditLog(
                 action='certificate.auto_renewal_failed',
                 resource_type='certificate',
-                resource_id=cert.id,
-                resource_name=cert.common_name,
+                resource_id=cert_id,
+                resource_name=common_name,
                 details=f'Auto-renewal failed: {reason}',
             ))
             db.session.commit()
@@ -219,9 +223,11 @@ class AutoRenewalService:
             return {'renewed': 0, 'failed': 0, 'skipped': 0}
 
         certs = AutoRenewalService.get_certificates_for_renewal()
-        # The serials as listed: a certificate an operator renews during
-        # the batch (and deploys) is not renewed a second time
-        listed_serials = {c.id: c.serial_number for c in certs}
+        # The batch works from the listing (id, serial): each commit in the
+        # batch expires the listed instances, so every row is read again
+        # before its turn (an operator may have renewed it, which is then
+        # refused, or deleted it, which is then skipped)
+        listed = [(c.id, c.serial_number) for c in certs]
 
         stats = {'renewed': 0, 'failed': 0, 'skipped': 0, 'errors': []}
         # CRLs are published once per CA after the batch — every renewal adds a
@@ -236,11 +242,17 @@ class AutoRenewalService:
         expire_stale_requests()
         awaiting_approval = pending_target_ids('renewal', 'certificate_id')
 
-        for cert in certs:
+        for cert_id, listed_serial in listed:
+            cert = db.session.get(Certificate, cert_id)
+            if cert is None:
+                logger.info(f"Auto-renewal skipped cert {cert_id}: deleted meanwhile")
+                stats['skipped'] += 1
+                continue
             # Skip already-archived (superseded by a pre-in-place-renewal run)
             if cert.archived:
                 stats['skipped'] += 1
                 continue
+            common_name = cert.common_name
             deadline = awaiting_approval.get(str(cert.id))
             valid_to = to_naive_utc(cert.valid_to)
             if deadline is not None and valid_to is not None and deadline < valid_to:
@@ -249,7 +261,7 @@ class AutoRenewalService:
                 continue
 
             success, result = AutoRenewalService.renew_certificate(
-                cert, regenerate_crl=False, known_serial=listed_serials.get(cert.id)
+                cert, regenerate_crl=False, known_serial=listed_serial
             )
 
             if success:
@@ -262,8 +274,8 @@ class AutoRenewalService:
             else:
                 stats['failed'] += 1
                 stats['errors'].append({
-                    'cert_id': cert.id,
-                    'common_name': cert.common_name,
+                    'cert_id': cert_id,
+                    'common_name': common_name,
                     'error': result
                 })
 

@@ -178,6 +178,23 @@ def scheduled_expiry():
     return expire_stale_requests()
 
 
+def request_snapshots(resolved: list) -> list:
+    """``to_dict()`` of resolved requests, taken before the caller commits
+    (a bus subscriber's commit would expire them)."""
+    return [approval.to_dict() for approval in resolved]
+
+
+def notify_rejected(snapshots: list, *, reason: str, actor: str) -> None:
+    """Tell the webhooks about requests closed as rejected by an action
+    (deletion, revocation), as the reject route does; after the caller's
+    commit, since subscribers may commit."""
+    if not snapshots:
+        return
+    from services.webhook_service import emit_csr_rejected
+    for snapshot in snapshots:
+        emit_csr_rejected(snapshot, reason=reason, actor=actor)
+
+
 def resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: str,
                           username: str, user_id=None, certificate_id=None,
                           reason: str, commit: bool = True) -> list:

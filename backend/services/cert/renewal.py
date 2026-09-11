@@ -79,6 +79,19 @@ _ISSUER_OWNED_EXTENSION_OIDS = frozenset({
 })
 
 
+# ``known_serial`` default: the caller passes nothing, the instance's own
+# serial is the reference (None is a real value: a row that gained a serial
+# meanwhile was renewed)
+SERIAL_UNSET = object()
+
+
+def _renewed_meanwhile_message(trigger: str) -> str:
+    """The 409 message: the retry advice is for an operator, not a batch."""
+    if trigger == 'auto':
+        return 'Certificate was renewed by another request'
+    return 'Certificate was renewed by another request; reload it and retry'
+
+
 class RenewalError(Exception):
     """Renewal could not be completed.
 
@@ -326,7 +339,7 @@ def renew_certificate_in_place(
     rekey: bool = True,
     regenerate_crl: bool = True,
     trigger: str = 'manual',
-    known_serial=None,
+    known_serial=SERIAL_UNSET,
 ) -> dict:
     """Re-issue ``cert`` on the same database row.
 
@@ -341,8 +354,9 @@ def renew_certificate_in_place(
             Bulk callers pass False and regenerate once per CA afterwards.
         trigger: 'manual' | 'bulk' | 'auto', recorded in the audit details.
         known_serial: the serial the caller knows the certificate by (a batch
-            snapshot); by default the one the instance carries. A row that
-            no longer bears it was renewed meanwhile and is refused (409).
+            snapshot, None included); by default the one the instance
+            carries. A row that no longer bears it was renewed meanwhile and
+            is refused (409).
 
     Returns:
         dict with cert_id, old_serial, new_serial, valid_from, valid_to,
@@ -360,14 +374,15 @@ def renew_certificate_in_place(
     # renewed a second time (the deployed certificate would be superseded)
     from sqlalchemy.exc import InvalidRequestError
     try:
-        known_serial = known_serial or cert.serial_number
+        if known_serial is SERIAL_UNSET:
+            known_serial = cert.serial_number
         db.session.refresh(cert, with_for_update=True)
     except InvalidRequestError:
         db.session.rollback()
         raise RenewalError('Certificate no longer exists', 404)
     if cert.serial_number != known_serial:
         db.session.rollback()
-        raise RenewalError('Certificate was renewed by another request; reload it and retry', 409)
+        raise RenewalError(_renewed_meanwhile_message(trigger), 409)
     check_renewable(cert)
     ca = ca or resolve_issuing_ca(cert)
     if not ca:
@@ -547,9 +562,7 @@ def renew_certificate_in_place(
     ).update({Certificate.serial_number: new_serial_hex}, synchronize_session=False)
     if claimed != 1:
         db.session.rollback()
-        raise RenewalError(
-            'Certificate was renewed by another request; reload it and retry', 409,
-        )
+        raise RenewalError(_renewed_meanwhile_message(trigger), 409)
 
     # --- Stage the superseded serial, then the in-place row update ---
     _record_superseded_serial(cert, old_serial, old_caref, old_valid_to, now)

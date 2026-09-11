@@ -830,6 +830,7 @@ class TestSecondReviewFollowUps:
                     AutoRenewalService.set_renewal_config(previous)
                 assert stats['renewed'] == 0 and stats['failed'] == 1, stats
                 assert 'another request' in stats['errors'][0]['error']
+                assert 'reload' not in stats['errors'][0]['error']  # nobody to retry in a batch
                 assert db.session.get(Certificate, cert_id).serial_number == 'deadbeef'
         finally:
             _drop_rows(app, cert_id)
@@ -868,3 +869,79 @@ class TestSecondReviewFollowUps:
         from services.approval_gate import request_deadline
         ap = ApprovalRequest(expires_at=datetime(2026, 9, 11, 12, 0, tzinfo=timezone(timedelta(hours=2))))
         assert request_deadline(ap) == datetime(2026, 9, 11, 10, 0)
+
+
+class TestThirdReviewFollowUps:
+
+    def test_scheduler_batch_survives_a_row_deleted_meanwhile(self, app, create_ca, monkeypatch):
+        from services.auto_renewal_service import AutoRenewalService
+        ca = create_ca(cn='fu3-batch CA')
+        gone_id = _cert_row(app, ca['id'], 'fu3-gone.example.test')
+        kept_id = _cert_row(app, ca['id'], 'fu3-kept.example.test')
+        try:
+            with app.app_context():
+                config = AutoRenewalService.get_renewal_config()
+                previous = dict(config)
+                AutoRenewalService.set_renewal_config({**config, 'enabled': True, 'days_before_expiry': 60,
+                                                       'renewal_sources': ['manual']})
+                try:
+                    listed = [db.session.get(Certificate, gone_id), db.session.get(Certificate, kept_id)]
+                    monkeypatch.setattr(AutoRenewalService, 'get_certificates_for_renewal', staticmethod(lambda: listed))
+
+                    def deleted_by_an_operator_meanwhile(*_a, **_k):
+                        db.session.query(Certificate).filter(Certificate.id == gone_id).delete(synchronize_session=False)
+                        db.session.commit()
+                        return {}
+                    monkeypatch.setattr('services.approval_gate.pending_target_ids', deleted_by_an_operator_meanwhile)
+                    stats = AutoRenewalService.run_auto_renewal()
+                finally:
+                    AutoRenewalService.set_renewal_config(previous)
+                assert stats['renewed'] == 1 and stats['skipped'] == 1 and stats['failed'] == 0, stats
+                assert db.session.get(Certificate, kept_id).renewed_times == 1
+        finally:
+            _drop_rows(app, gone_id, kept_id)
+
+    def test_certificate_without_serial_renewed_meanwhile_is_refused(self, app, create_ca):
+        from services.cert.renewal import RenewalError, renew_certificate_in_place
+        ca = create_ca(cn='fu3-noserial CA')
+        cert_id = _cert_row(app, ca['id'], 'fu3-noserial.example.test')
+        try:
+            with app.app_context():
+                db.session.query(Certificate).filter(Certificate.id == cert_id).update(
+                    {Certificate.serial_number: None}, synchronize_session=False)
+                db.session.commit()
+                cert = db.session.get(Certificate, cert_id)
+                assert cert.serial_number is None
+                db.session.query(Certificate).filter(Certificate.id == cert_id).update(
+                    {Certificate.serial_number: 'renewed01'}, synchronize_session=False)
+                db.session.expire(cert)  # as after a commit earlier in the batch
+                with pytest.raises(RenewalError) as exc:
+                    renew_certificate_in_place(cert, username='admin', known_serial=None)
+                assert exc.value.status == 409
+                db.session.rollback()
+        finally:
+            _drop_rows(app, cert_id)
+
+    def test_closure_by_revocation_or_deletion_notifies_webhooks(self, app, auth_client, create_ca, create_user, monkeypatch):
+        emitted = []
+        monkeypatch.setattr('services.webhook_service.emit_csr_rejected',
+                            lambda payload, reason=None, actor=None: emitted.append((payload['id'], reason)))
+        ca = create_ca(cn='fu3-notify CA')
+        pid = _policy(app, ca['id'], 'fu3-notify')
+        cert_id = _cert_row(app, ca['id'], 'fu3-notify.example.test')
+        csr_id = _csr_row(app, 'fu3-notify-csr.example.test')
+        try:
+            operator = _operator(app, create_user)
+            r = _json(operator, 'post', f'/api/v2/certificates/{cert_id}/renew')
+            renewal_id = r.get_json()['data']['approval_id']
+            r = _json(operator, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 30})
+            sign_id = r.get_json()['data']['approval_id']
+            r = _json(auth_client, 'post', f'/api/v2/certificates/{cert_id}/revoke', {'reason': 'keyCompromise'})
+            assert r.status_code in (200, 201), r.get_json()
+            r = auth_client.delete(f'/api/v2/csrs/{csr_id}')
+            assert r.status_code in (200, 204), r.data
+            assert (renewal_id, 'Certificate revoked') in emitted, emitted
+            assert (sign_id, 'Request deleted') in emitted, emitted
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, cert_id, csr_id)

@@ -430,10 +430,12 @@ class LifecycleMixin:
         # certificate is not renewed (same transaction as the revocation).
         # A hold is temporary: the request waits for the unhold (approving
         # it meanwhile is refused, the certificate being revoked)
+        closed_requests = []
         if reason not in ('certificateHold', 'certificate_hold'):
-            from services.approval_gate import resolve_moot_requests
-            resolve_moot_requests('renewal', 'certificate_id', certificate.id, outcome='rejected',
-                                  username=username, reason='Certificate revoked', commit=False)
+            from services.approval_gate import request_snapshots, resolve_moot_requests
+            closed_requests = request_snapshots(resolve_moot_requests(
+                'renewal', 'certificate_id', certificate.id, outcome='rejected',
+                username=username, reason='Certificate revoked', commit=False))
 
         # Single atomic commit — certificate revocation + RevokedSerial
         # either both persist or both roll back.
@@ -486,6 +488,8 @@ class LifecycleMixin:
 
             from services.webhook_service import emit_cert_revoked
             emit_cert_revoked(certificate.to_dict(), reason=reason, ca_refid=certificate.caref, actor=username)
+            from services.approval_gate import notify_rejected
+            notify_rejected(closed_requests, reason='Certificate revoked', actor=username)
         else:
             # Even in suppressed mode, invalidate OCSP cache so the old
             # serial is immediately reported as revoked.
@@ -519,15 +523,18 @@ class LifecycleMixin:
         _cert_caref = certificate.caref
 
         # Clean up FK dependencies (ApprovalRequest.certificate_id has no cascade)
+        closed_sign_requests, closed_renewal_requests = [], []
         try:
             from models import ApprovalRequest
             # Requests still waiting to sign or renew this record are closed
             # (the target is gone), in the same transaction as the deletion
-            from services.approval_gate import resolve_moot_requests
-            resolve_moot_requests('csr', 'csr_id', cert_id, outcome='rejected', username=username,
-                                  reason='Request deleted', commit=False)
-            resolve_moot_requests('renewal', 'certificate_id', cert_id, outcome='rejected',
-                                  username=username, reason='Certificate deleted', commit=False)
+            from services.approval_gate import request_snapshots, resolve_moot_requests
+            closed_sign_requests = request_snapshots(resolve_moot_requests(
+                'csr', 'csr_id', cert_id, outcome='rejected', username=username,
+                reason='Request deleted', commit=False))
+            closed_renewal_requests = request_snapshots(resolve_moot_requests(
+                'renewal', 'certificate_id', cert_id, outcome='rejected',
+                username=username, reason='Certificate deleted', commit=False))
             ApprovalRequest.query.filter_by(certificate_id=cert_id).delete()
         except Exception as e:
             logger.error(f"Failed to clean approval requests for cert {cert_id}: {e}")
@@ -613,5 +620,8 @@ class LifecycleMixin:
         if not _suppress_events:
             from services.webhook_service import emit_cert_deleted
             emit_cert_deleted(_cert_snapshot, ca_refid=_cert_caref, actor=username)
+            from services.approval_gate import notify_rejected
+            notify_rejected(closed_sign_requests, reason='Request deleted', actor=username)
+            notify_rejected(closed_renewal_requests, reason='Certificate deleted', actor=username)
 
         return True
