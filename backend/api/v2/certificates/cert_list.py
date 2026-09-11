@@ -89,6 +89,9 @@ def list_certificates():
                 status_conditions.append(orphan_condition())
             elif status == 'expiring':
                 status_conditions.append(expiring_condition())
+            elif status == 'archived':
+                # Superseded by a protocol re-enrolment, kept for history
+                status_conditions.append(Certificate.archived == True)  # noqa: E712
         if status_conditions:
             query = query.filter(or_(*status_conditions))
 

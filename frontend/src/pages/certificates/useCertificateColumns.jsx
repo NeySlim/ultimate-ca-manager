@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import {
-  Certificate, X, Info, CheckCircle, Clock, XCircle, LinkBreak
+  Certificate, X, Info, CheckCircle, Clock, XCircle, LinkBreak, Archive
 } from '@phosphor-icons/react'
 import { Badge, KeyIndicator } from '../../components'
 import { formatDate, extractCN, cn } from '../../lib/utils'
@@ -52,6 +52,7 @@ export function useCertificateColumns(t) {
           <span className="font-medium truncate">{val}</span>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
           {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak} title={t('certificates.orphanDescription')}>{t('certificates.orphan')}</Badge>}
+          {row.archived && <Badge variant="secondary" size="sm" icon={Archive} title={t('certificates.archivedDescription')}>{t('certificates.archived')}</Badge>}
           {getSourceBadge(row, 'sm')}
         </div>
       ),

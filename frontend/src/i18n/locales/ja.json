@@ -687,6 +687,8 @@
     "sourceApproval": "承認ワークフロー",
     "sourceWeb": "Web UI",
     "orphanDescription": "CAが見つかりません",
+    "archived": "アーカイブ済み",
+    "archivedDescription": "再登録により置き換えられ、履歴として保持されています",
     "noCertificates": "証明書が見つかりません",
     "confirmRevoke": "この証明書を失効させますか？",
     "confirmRenew": "この証明書を更新しますか？",

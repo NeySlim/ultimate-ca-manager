@@ -115,6 +115,7 @@ class SCEPService:
         challenge_expired: bool = False,
         template=None,
         intune_client=None,
+        profile_id=None,
     ):
         """
         Initialize SCEP service for a specific CA.
@@ -147,6 +148,9 @@ class SCEPService:
         self.challenge_expired = challenge_expired
         self.template = template
         self.intune_client = intune_client
+        # Recorded on every request this endpoint stores, so that a manual
+        # approval later finds the profile (and its template) again
+        self.profile_id = profile_id
 
         self.ca = CA.query.filter_by(refid=ca_refid).first()
         if not self.ca:
@@ -570,6 +574,7 @@ class SCEPService:
                 status="pending",
                 subject=csr.subject.rfc4514_string(),
                 client_ip=client_ip,
+                profile_id=self.profile_id,
             )
             db.session.add(scep_req)
 

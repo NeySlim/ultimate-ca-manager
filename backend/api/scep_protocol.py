@@ -191,6 +191,7 @@ def get_scep_service(profile_slug=None):
             challenge_expired=challenge_expired,
             template=template,
             intune_client=intune_client,
+            profile_id=profile.id if profile is not None else None,
         )
         return service, None
     except Exception as e:

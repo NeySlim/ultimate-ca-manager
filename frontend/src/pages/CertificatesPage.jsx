@@ -494,7 +494,8 @@ export default function CertificatesPage() {
         { value: 'valid', label: t('common.valid') },
         { value: 'expiring', label: t('common.expiring') },
         { value: 'expired', label: t('common.expired') },
-        { value: 'revoked', label: t('common.revoked') }
+        { value: 'revoked', label: t('common.revoked') },
+        { value: 'archived', label: t('certificates.archived') }
       ]
     },
     {

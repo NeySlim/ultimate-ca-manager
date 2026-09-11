@@ -687,6 +687,8 @@
     "sourceApproval": "Flusso di approvazione",
     "sourceWeb": "Interfaccia web",
     "orphanDescription": "CA non trovata",
+    "archived": "Archiviato",
+    "archivedDescription": "Sostituito da una nuova registrazione, conservato per lo storico",
     "noCertificates": "Nessun certificato trovato",
     "confirmRevoke": "Sei sicuro di voler revocare questo certificato?",
     "confirmRenew": "Sei sicuro di voler rinnovare questo certificato?",

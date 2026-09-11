@@ -140,6 +140,11 @@ class SCEPRequest(db.Model):
     # Request details
     subject = db.Column(db.Text)
     client_ip = db.Column(db.String(45))
+    # The profile the request came through (plain integer, as
+    # ScepProfile.template_id): its template governs the certificate when
+    # the request is approved by hand, as it does on auto-approval. NULL for
+    # the global endpoint and for rows older than migration 085.
+    profile_id = db.Column(db.Integer, nullable=True)
 
     created_at = db.Column(db.DateTime, default=utc_now)
 
@@ -152,6 +157,7 @@ class SCEPRequest(db.Model):
             "status": self.status,
             "subject": self.subject,
             "client_ip": self.client_ip,
+            "profile_id": self.profile_id,
             "approved_by": self.approved_by,
             "approved_at": utc_isoformat(self.approved_at),
             "rejection_reason": self.rejection_reason,

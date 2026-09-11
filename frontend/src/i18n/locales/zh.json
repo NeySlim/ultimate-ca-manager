@@ -687,6 +687,8 @@
     "sourceApproval": "审批流程",
     "sourceWeb": "Web 界面",
     "orphanDescription": "未找到CA",
+    "archived": "已归档",
+    "archivedDescription": "已被重新注册取代，保留作为历史记录",
     "noCertificates": "未找到证书",
     "confirmRevoke": "确定要吊销此证书吗？",
     "confirmRenew": "确定要续期此证书吗？",

@@ -134,6 +134,26 @@ def list_scep_requests():
     return success_response(data=data)
 
 
+def _issuing_service(scep_req):
+    """The service that issues for a stored request: with the template of
+    the profile the request came through (its validity and key usages
+    govern, as on auto-approval), the CA defaults for the global endpoint.
+    Raises ValueError when that profile or its template no longer exists."""
+    from services.scep.scep_service import SCEPService
+    template = None
+    if scep_req.profile_id:
+        from models.scep import ScepProfile
+        profile = db.session.get(ScepProfile, scep_req.profile_id)
+        if profile is None:
+            raise ValueError('The SCEP profile this request came through no longer exists')
+        if profile.template_id:
+            from models import CertificateTemplate
+            template = db.session.get(CertificateTemplate, profile.template_id)
+            if template is None:
+                raise ValueError('The template bound to the SCEP profile no longer exists')
+    return SCEPService(ca_refid=scep_req.ca_refid, template=template, profile_id=scep_req.profile_id)
+
+
 @bp.route('/api/v2/scep/<int:request_id>/approve', methods=['POST'])
 @require_auth(['write:scep'])
 def approve_scep_request(request_id):
@@ -153,11 +173,14 @@ def approve_scep_request(request_id):
     username = g.current_user.username
     # Approving means issuing: the client polls for the certificate, and a
     # request flipped to "approved" without one stayed PENDING for it forever
-    from services.scep.scep_service import SCEPService
     try:
-        cert_refid = SCEPService(ca_refid=scep_req.ca_refid).approve_request(
+        cert_refid = _issuing_service(scep_req).approve_request(
             scep_req.transaction_id, username,
         )
+    except ValueError as e:
+        # The profile or template the request was made under is gone
+        db.session.rollback()
+        return error_response(str(e), 409)
     except Exception as e:
         logger.error(f"SCEP approve: issuance failed for request {request_id}: {e}", exc_info=True)
         db.session.rollback()
