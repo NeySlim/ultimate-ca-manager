@@ -426,6 +426,12 @@ class LifecycleMixin:
                 )
                 db.session.add(revoked_record)
 
+        # A renewal still waiting for approval is closed: a revoked
+        # certificate is not renewed (same transaction as the revocation)
+        from services.approval_gate import resolve_moot_requests
+        resolve_moot_requests('renewal', 'certificate_id', certificate.id, outcome='rejected',
+                              username=username, reason='Certificate revoked', commit=False)
+
         # Single atomic commit — certificate revocation + RevokedSerial
         # either both persist or both roll back.
         try:
@@ -512,6 +518,13 @@ class LifecycleMixin:
         # Clean up FK dependencies (ApprovalRequest.certificate_id has no cascade)
         try:
             from models import ApprovalRequest
+            # Requests still waiting to sign or renew this record are closed
+            # (the target is gone), in the same transaction as the deletion
+            from services.approval_gate import resolve_moot_requests
+            resolve_moot_requests('csr', 'csr_id', cert_id, outcome='rejected', username=username,
+                                  reason='Request deleted', commit=False)
+            resolve_moot_requests('renewal', 'certificate_id', cert_id, outcome='rejected',
+                                  username=username, reason='Certificate deleted', commit=False)
             ApprovalRequest.query.filter_by(certificate_id=cert_id).delete()
         except Exception as e:
             logger.error(f"Failed to clean approval requests for cert {cert_id}: {e}")

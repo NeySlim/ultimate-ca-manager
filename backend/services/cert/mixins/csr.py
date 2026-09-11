@@ -440,6 +440,12 @@ class CSRMixin:
             logger.error(f"Commit failed in services/cert/mixins/csr.py:303: {_commit_err}", exc_info=True)
             raise
 
+        # A request queued for approval and then signed directly is closed
+        # as approved by the signer (no other approver could do more)
+        from services.approval_gate import resolve_moot_requests
+        resolve_moot_requests('csr', 'csr_id', cert_id, outcome='approved', username=username,
+                              certificate_id=None if new_ca else certificate.id,
+                              reason='Signed directly')
         # Audit log with centralized service
         from services.audit_service import AuditService
         if new_ca:

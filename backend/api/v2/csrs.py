@@ -860,6 +860,7 @@ def sign_csr(csr_id):
             # OCSP/timestamping certs (the documented responder workflow);
             # protocol enrollees (ACME/EST) never get these EKUs
             allow_sensitive_ekus=True,
+            username=getattr(g.current_user, 'username', 'system'),
         )
         
         # Determine if result is a CA or Certificate
@@ -966,7 +967,8 @@ def bulk_sign_csrs():
 
             signed_cert = CertificateService.sign_csr(
                 cert_id=csr_id, caref=ca.refid, validity_days=item_validity,
-                allow_sensitive_ekus=True)
+                allow_sensitive_ekus=True,
+                username=getattr(g.current_user, 'username', 'system'))
             results['success'].append(csr_id)
         except Exception as e:
             results['failed'].append({'id': csr_id, 'error': 'Signing failed'})

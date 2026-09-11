@@ -105,7 +105,12 @@ def _issue_approved_csr(approval, data):
     if cert is None or not cert.csr:
         raise ValueError('The request to sign no longer exists')
     if cert.crt:
-        raise ValueError('The request was already signed')
+        # Signed meanwhile (directly, or through another approval): the
+        # approval is closed on the certificate that exists
+        _link_approval(approval, cert.id)
+        return {'id': cert.id, 'cn': data.get('cn'), 'serial_number': cert.serial_number,
+                'valid_from': utc_isoformat(cert.valid_from), 'valid_to': utc_isoformat(cert.valid_to),
+                'already_issued': True}
     ca_ref = data.get('ca_id')
     ca = (db.session.get(CA, int(ca_ref)) if isinstance(ca_ref, int) or str(ca_ref).isdecimal()
           else CA.query.filter_by(refid=str(ca_ref)).first())
@@ -144,6 +149,12 @@ def _issue_approved_renewal(approval, data):
     cert = db.session.get(Certificate, data.get('certificate_id'))
     if cert is None or not cert.crt:
         raise ValueError('The certificate to renew no longer exists')
+    if cert.renewed_at and approval.created_at and cert.renewed_at > approval.created_at:
+        # Renewed meanwhile: the approval is closed on the renewed certificate
+        _link_approval(approval, cert.id)
+        return {'id': cert.id, 'cn': data.get('cn'), 'serial_number': cert.serial_number,
+                'valid_from': utc_isoformat(cert.valid_from), 'valid_to': utc_isoformat(cert.valid_to),
+                'already_issued': True}
     renew_certificate_in_place(
         cert,
         username=approval.requester.username if approval.requester else 'system',
@@ -879,6 +890,10 @@ def approve_request(request_id):
     if issued_cert is not None:
         result['certificate'] = issued_cert
         result['certificate_issued'] = True
+        if issued_cert.get('already_issued'):
+            # Closed on a certificate that already existed (signed or
+            # renewed directly meanwhile)
+            result['already_issued'] = True
     elif issue_error is not None:
         result['certificate_issued'] = False
         result['issue_error'] = issue_error

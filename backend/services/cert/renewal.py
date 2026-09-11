@@ -567,6 +567,13 @@ def renew_certificate_in_place(
     if not commit_or_rollback(logger, f"Failed to renew certificate {cert_id}"):
         raise RenewalError('Failed to renew certificate', 500)
 
+    # A renewal queued for approval and then performed directly is closed
+    # as approved by the actor
+    from services.approval_gate import resolve_moot_requests
+    resolve_moot_requests('renewal', 'certificate_id', cert_id, outcome='approved',
+                          username=username, user_id=actor_user_id, certificate_id=cert_id,
+                          reason='Renewed directly')
+
     _write_cert_files(cert, new_cert_pem, new_key_pem)
 
     # A renewed delegated responder signs with a new certificate: the answers

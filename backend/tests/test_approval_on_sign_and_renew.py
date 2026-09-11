@@ -232,3 +232,101 @@ class TestRenewStateBeforeGate:
         finally:
             _drop_policy(app, pid)
             _drop_rows(app, csr_id)
+
+
+class TestMootRequestsAreResolved:
+    """A request queued for approval whose target was signed, renewed,
+    deleted or revoked meanwhile is closed instead of waiting for expiry."""
+
+    def _queue_sign(self, app, auth_client, create_ca, create_user, name):
+        ca = create_ca(cn=f'{name} CA')
+        pid = _policy(app, ca['id'], name)
+        csr_id = _csr_row(app, f'{name}.example.test')
+        operator = _operator(app, create_user)
+        r = _json(operator, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 30})
+        assert r.status_code == 200 and r.get_json()['data'].get('approval_required'), r.get_json()
+        return ca, pid, csr_id, r.get_json()['data']['approval_id']
+
+    def test_direct_signing_closes_the_request_as_approved(self, app, auth_client, create_ca, create_user):
+        ca, pid, csr_id, approval_id = self._queue_sign(app, auth_client, create_ca, create_user, 'moot-sign')
+        try:
+            r = _json(auth_client, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 30})
+            assert r.status_code == 200, r.get_json()
+            with app.app_context():
+                ap = db.session.get(ApprovalRequest, approval_id)
+                assert ap.status == 'approved' and ap.certificate_id == csr_id
+                assert ap.get_approvals()[-1]['username'] == 'admin'
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {'comment': 'late'})
+            assert r.status_code == 400
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)
+
+    def test_deleting_the_request_closes_it_as_rejected(self, app, auth_client, create_ca, create_user):
+        ca, pid, csr_id, approval_id = self._queue_sign(app, auth_client, create_ca, create_user, 'moot-delete')
+        try:
+            r = auth_client.delete(f'/api/v2/csrs/{csr_id}')
+            assert r.status_code in (200, 204), r.data
+            with app.app_context():
+                ap = db.session.get(ApprovalRequest, approval_id)
+                assert ap.status == 'rejected' and 'deleted' in (ap.get_approvals()[-1]['comment'] or '').lower()
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)
+
+    def test_approving_an_already_signed_request_closes_on_the_certificate(self, app, auth_client, create_ca, create_user):
+        ca, pid, csr_id, approval_id = self._queue_sign(app, auth_client, create_ca, create_user, 'moot-stale')
+        try:
+            # signed by a path that did not resolve the request (older code, restore)
+            from services.cert_service import CertificateService
+            with app.app_context():
+                ca_row = db.session.get(CA, ca['id'])
+                CertificateService.sign_csr(cert_id=csr_id, caref=ca_row.refid, validity_days=30)
+                db.session.commit()
+                ap = db.session.get(ApprovalRequest, approval_id)
+                ap.status = 'pending'  # undo the automatic resolution to simulate a stale request
+                ap.certificate_id = None
+                ap.approvals = '[]'
+                db.session.commit()
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {'comment': 'ok'})
+            assert r.status_code == 200, r.get_json()
+            body = r.get_json()['data']
+            assert body['certificate_issued'] is True and body.get('already_issued') is True
+            with app.app_context():
+                assert db.session.get(ApprovalRequest, approval_id).certificate_id == csr_id
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)
+
+    def _queue_renew(self, app, create_ca, create_user, name):
+        ca = create_ca(cn=f'{name} CA')
+        pid = _policy(app, ca['id'], name)
+        cert_id = _cert_row(app, ca['id'], f'{name}.example.test')
+        operator = _operator(app, create_user)
+        r = _json(operator, 'post', f'/api/v2/certificates/{cert_id}/renew')
+        assert r.status_code == 200 and r.get_json()['data'].get('approval_required'), r.get_json()
+        return ca, pid, cert_id, r.get_json()['data']['approval_id']
+
+    def test_direct_renewal_closes_the_request_as_approved(self, app, auth_client, create_ca, create_user):
+        ca, pid, cert_id, approval_id = self._queue_renew(app, create_ca, create_user, 'moot-renew')
+        try:
+            r = _json(auth_client, 'post', f'/api/v2/certificates/{cert_id}/renew')
+            assert r.status_code == 200, r.get_json()
+            with app.app_context():
+                ap = db.session.get(ApprovalRequest, approval_id)
+                assert ap.status == 'approved' and ap.certificate_id == cert_id
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, cert_id)
+
+    def test_revocation_closes_the_renewal_request_as_rejected(self, app, auth_client, create_ca, create_user):
+        ca, pid, cert_id, approval_id = self._queue_renew(app, create_ca, create_user, 'moot-revoke')
+        try:
+            r = _json(auth_client, 'post', f'/api/v2/certificates/{cert_id}/revoke', {'reason': 'keyCompromise'})
+            assert r.status_code in (200, 201), r.get_json()
+            with app.app_context():
+                ap = db.session.get(ApprovalRequest, approval_id)
+                assert ap.status == 'rejected' and 'revoked' in (ap.get_approvals()[-1]['comment'] or '').lower()
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, cert_id)
