@@ -1008,8 +1008,15 @@ class TestLastFollowUps:
             with app.app_context():
                 cert = db.session.get(Certificate, cert_id)
                 before = AuditLog.query.filter_by(action='certificate.auto_renewal_failed', resource_id=str(cert_id)).count()
-                # gone after the batch read it, before the renewal locked it
+                # gone for good (another connection) after the batch read it,
+                # the listed instance still holding what it read
                 db.session.execute(text('DELETE FROM certificates WHERE id = :id'), {'id': cert_id})
+                session = db.session()
+                session.expire_on_commit = False
+                try:
+                    db.session.commit()
+                finally:
+                    session.expire_on_commit = True
                 success, message = AutoRenewalService.renew_certificate(cert, regenerate_crl=False)
                 db.session.rollback()
                 assert success is None and 'no longer exists' in message
@@ -1066,3 +1073,20 @@ class TestLastFollowUps:
             with pytest.raises(RuntimeError):
                 resolve_moot_requests('csr', 'csr_id', 1, outcome='rejected', username='admin',
                                       reason='Request deleted', commit=False)
+
+    def test_a_missing_issuing_ca_is_still_a_reported_failure(self, app, create_ca, monkeypatch):
+        from models import AuditLog
+        from services.auto_renewal_service import AutoRenewalService
+        ca = create_ca(cn='fu5-noca CA')
+        cert_id = _cert_row(app, ca['id'], 'fu5-noca.example.test')
+        try:
+            with app.app_context():
+                monkeypatch.setattr('services.cert.renewal.resolve_issuing_ca', lambda cert: None)
+                cert = db.session.get(Certificate, cert_id)
+                before = AuditLog.query.filter_by(action='certificate.auto_renewal_failed', resource_id=str(cert_id)).count()
+                success, message = AutoRenewalService.renew_certificate(cert, regenerate_crl=False)
+                assert success is False and 'Issuing CA not found' in message
+                after = AuditLog.query.filter_by(action='certificate.auto_renewal_failed', resource_id=str(cert_id)).count()
+                assert after == before + 1
+        finally:
+            _drop_rows(app, cert_id)

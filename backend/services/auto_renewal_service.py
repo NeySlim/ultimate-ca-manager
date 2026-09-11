@@ -184,9 +184,10 @@ class AutoRenewalService:
 
         except RenewalError as e:
             db.session.rollback()
-            if e.status == 404:
+            if db.session.get(Certificate, cert_id, populate_existing=True) is None:
                 # Gone between the batch's read and the renewal's lock:
-                # nothing to renew, nothing to report as a failure
+                # nothing to renew, nothing to report as a failure (any
+                # other refusal, a missing issuing CA included, is one)
                 logger.info(f"Auto-renewal skipped cert {cert_id}: {e.message}")
                 return None, e.message
             logger.warning(f"Auto-renewal refused for cert {cert_id}: {e.message}")

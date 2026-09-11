@@ -1050,7 +1050,7 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
 
         ok, err = safe_commit(logger, "Failed to import MS CA signed certificate")
         if not ok:
-            raise
+            raise RuntimeError('Failed to import MS CA signed certificate')
         logger.info(f"Imported MS CA signed certificate: {cn} (id={cert.id})")
         if csr is not None:
             # A request queued for approval and signed through the Microsoft
