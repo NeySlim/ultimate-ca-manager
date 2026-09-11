@@ -45,7 +45,7 @@ def _cleanup(app, policy_id, cn):
     with app.app_context():
         for ap in ApprovalRequest.query.filter_by(policy_id=policy_id).all():
             db.session.delete(ap)
-        for row in Certificate.query.filter_by(subject_cn=cn).all():
+        for row in Certificate.query.filter(Certificate.subject.contains(f'CN={cn}')).all():
             db.session.delete(row)
         pol = db.session.get(CertificatePolicy, policy_id)
         if pol:
@@ -69,7 +69,8 @@ class TestPolicyEvaluationFailsClosed:
                 r = _json(operator, 'post', '/api/v2/certificates', {**base, 'san': bad})
                 assert r.status_code != 201, (bad, r.status_code, r.get_json())
                 with app.app_context():
-                    assert Certificate.query.filter_by(subject_cn=cn).count() == 0, bad
+                    assert Certificate.query.filter(
+                        Certificate.subject.contains(f'CN={cn}')).count() == 0, bad
         finally:
             _cleanup(app, pid, cn)
 

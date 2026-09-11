@@ -707,10 +707,19 @@ def approve_request(request_id):
             if issued_cert:
                 logger.info(f"Certificate issued for approval #{approval.id}")
         except Exception as e:
-            logger.error(f"Failed to issue certificate for approval #{approval.id}: {e}")
+            logger.error(f"Failed to issue certificate for approval #{approval.id}: {e}",
+                         exc_info=True)
             from services.policy_service import PolicyViolation
-            issue_error = (f'Policy violation: {e}' if isinstance(e, PolicyViolation)
-                           else 'Certificate issuance failed. Check server logs.')
+            if isinstance(e, PolicyViolation):
+                issue_error = f'Policy violation: {e}'
+            elif isinstance(e, ValueError):
+                # The issuance service's own refusals (CA offline, no key,
+                # validity past the CA, template gone...): the approver
+                # needs the reason to know what to fix before retrying,
+                # exactly as the direct route returns them
+                issue_error = str(e)
+            else:
+                issue_error = 'Certificate issuance failed. Check server logs.'
             db.session.rollback()
             # The rollback discarded the vote along with the failed
             # issuance, and that is the point: the request stays pending so
@@ -725,6 +734,16 @@ def approve_request(request_id):
     ok, _err = safe_commit(logger, "Failed to approve request")
     if not ok:
         return _err
+
+    AuditService.log_action(
+        action='approval_issue_failed' if issue_error else 'approval_approved',
+        resource_type='approval',
+        resource_id=str(request_id),
+        resource_name=f'Approval #{request_id}',
+        details=(f'Approval vote by {username} not kept: {issue_error}' if issue_error
+                 else f'Approved by {username} (status: {approval.status})'),
+        success=not issue_error,
+    )
 
     # Snapshot before emitting: bus subscribers may commit and expire the
     # ORM instance, so re-reading approval afterwards could raise.

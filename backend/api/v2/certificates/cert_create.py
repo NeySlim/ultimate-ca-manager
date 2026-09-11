@@ -1,6 +1,7 @@
 """Certificate create route"""
 import logging
 import base64
+import re
 import uuid
 import json
 from datetime import timedelta
@@ -105,9 +106,11 @@ def create_certificate():
     # Fail closed: an error while evaluating the policies must never turn
     # into an issuance without approval. A malformed `san` was enough to
     # raise inside the evaluation and skip the approval workflow.
-    raw_san = data.get('san', [])
+    raw_san = data.get('san')
+    if raw_san is None:
+        raw_san = []
     if isinstance(raw_san, str):
-        raw_san = [s.strip() for s in raw_san.split(',') if s.strip()]
+        raw_san = [s.strip() for s in re.split(r'[,\n;]+', raw_san) if s.strip()]
     if not isinstance(raw_san, list) or not all(isinstance(s, str) for s in raw_san):
         return error_response('san must be a list of names', 400)
     try:
