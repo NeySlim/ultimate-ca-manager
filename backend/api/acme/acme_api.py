@@ -1374,6 +1374,10 @@ def finalize_order(order_id: str):
                 # order was invalidated, serverInternal when it went back to
                 # ready for a retry); never badCSR for a server-side fault
                 error_type = getattr(service, '_last_finalize_error_type', None) or 'badCSR'
+            if error_type == 'serverInternal':
+                # The cause (key material, HSM, CA state) is for the logs,
+                # not for the client
+                error = 'Certificate signing failed on the server; retry later'
             return acme_error(error_type, error, 500 if error_type == 'serverInternal' else 400)
 
         # Return updated order

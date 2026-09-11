@@ -128,7 +128,9 @@ def _issue_approved_certificate(approval):
     validity_days = min(requested_validity, effective_max)
     data['validity_days'] = validity_days  # propagate clamp to the rest of the function
     
-    ca = db.session.get(CA, data['ca_id'])
+    ca_ref = data['ca_id']
+    ca = (db.session.get(CA, int(ca_ref)) if isinstance(ca_ref, int) or str(ca_ref).isdecimal()
+          else CA.query.filter_by(refid=str(ca_ref)).first())
     if not ca:
         raise ValueError(f"CA {data['ca_id']} not found")
     if not ca.has_private_key:
@@ -742,8 +744,10 @@ def approve_request(request_id):
             from services.policy_service import PolicyViolation
             if isinstance(e, PolicyViolation):
                 issue_error = f'Policy violation: {e}'
+            elif isinstance(e, RuntimeError) and 'already issued' in str(e):
+                issue_error = 'A certificate was already issued for this request by another approver; reload it'
             elif isinstance(e, ValueError) and not any(
-                marker in str(e) for marker in ('signing key', 'KEY_ENCRYPTION_KEY', 'HSM', 'hsm')
+                marker in str(e) for marker in ('signing key', 'KEY_ENCRYPTION_KEY', 'HSM')
             ):
                 # The issuance service's own refusals (CA offline, validity
                 # past the CA, template gone...): the approver needs the
@@ -780,7 +784,7 @@ def approve_request(request_id):
     # Snapshot before emitting: bus subscribers may commit and expire the
     # ORM instance, so re-reading approval afterwards could raise.
     result = approval.to_dict()
-    if approval.status == 'approved':
+    if approval.status == 'approved' and not issue_error:
         from services.webhook_service import emit_csr_approved
         emit_csr_approved(result)
 

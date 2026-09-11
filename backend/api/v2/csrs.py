@@ -37,7 +37,7 @@ def _ca_by_id_or_refid(ca_id):
     integer column (PostgreSQL refuses it where SQLite finds nothing)."""
     if ca_id is None or ca_id == '':
         return None
-    if isinstance(ca_id, int) or str(ca_id).isdigit():
+    if isinstance(ca_id, int) or str(ca_id).isdecimal():
         return db.session.get(CA, int(ca_id))
     return CA.query.filter_by(refid=str(ca_id)).first()
 
@@ -95,6 +95,37 @@ def list_csrs():
             'pages': pagination.pages
         }
     )
+def _policy_rule_refusal(ca, cert, template_id, validity_days):
+    """Issuance policy rules (#335) applied to a stored request: returns
+    ``(refusal_message_or_None, validity_days)`` with the validity capped by
+    the applicable policies. Shared by the unit and bulk Sign CSR routes."""
+    try:
+        from cryptography import x509 as _x509
+        from cryptography.hazmat.primitives.asymmetric import ec as _ec, rsa as _rsa
+        from cryptography.x509.oid import ExtensionOID as _ExtOID, NameOID as _NameOID
+        from services.policy_service import PolicyEvaluationService
+        csr_obj = _x509.load_pem_x509_csr(base64.b64decode(cert.csr))
+        cn_attrs = csr_obj.subject.get_attributes_for_oid(_NameOID.COMMON_NAME)
+        csr_cn = cn_attrs[0].value if cn_attrs else None
+        try:
+            csr_dns = list(csr_obj.extensions.get_extension_for_oid(
+                _ExtOID.SUBJECT_ALTERNATIVE_NAME).value.get_values_for_type(_x509.DNSName))
+        except _x509.ExtensionNotFound:
+            csr_dns = []
+        pub = csr_obj.public_key()
+        key_label = (str(pub.key_size) if isinstance(pub, _rsa.RSAPublicKey)
+                     else pub.curve.name if isinstance(pub, _ec.EllipticCurvePublicKey) else None)
+        policies = PolicyEvaluationService.applicable_policies(ca.id, template_id, csr_cn, csr_dns)
+        violations, validity_days = PolicyEvaluationService.enforce_rules(
+            policies, key_type=key_label, dns_name_count=len(set(csr_dns)),
+            validity_days=validity_days)
+    except (ValueError, TypeError) as e:
+        return f'Invalid CSR: {e}', validity_days
+    if violations:
+        return 'Policy violation: ' + '; '.join(violations), validity_days
+    return None, validity_days
+
+
 
 
 @bp.route('/api/v2/csrs/history', methods=['GET'])
@@ -763,33 +794,9 @@ def sign_csr(csr_id):
     if ca.revoked_in_chain:
         return error_response('CA is revoked and can no longer sign', 400)
 
-    # Issuance policy rules (#335) bind a signed request as they bind the
-    # issue form: key type, number of DNS names, maximum validity
-    try:
-        from cryptography import x509 as _x509
-        from cryptography.hazmat.primitives.asymmetric import ec as _ec, rsa as _rsa
-        from cryptography.x509.oid import ExtensionOID as _ExtOID, NameOID as _NameOID
-        from services.policy_service import PolicyEvaluationService
-        csr_obj = _x509.load_pem_x509_csr(base64.b64decode(cert.csr))
-        cn_attrs = csr_obj.subject.get_attributes_for_oid(_NameOID.COMMON_NAME)
-        csr_cn = cn_attrs[0].value if cn_attrs else None
-        try:
-            csr_dns = list(csr_obj.extensions.get_extension_for_oid(
-                _ExtOID.SUBJECT_ALTERNATIVE_NAME).value.get_values_for_type(_x509.DNSName))
-        except _x509.ExtensionNotFound:
-            csr_dns = []
-        pub = csr_obj.public_key()
-        key_label = (str(pub.key_size) if isinstance(pub, _rsa.RSAPublicKey)
-                     else pub.curve.name if isinstance(pub, _ec.EllipticCurvePublicKey) else None)
-        policies = PolicyEvaluationService.applicable_policies(
-            ca.id, data.get('template_id'), csr_cn, csr_dns)
-        violations, validity_days = PolicyEvaluationService.enforce_rules(
-            policies, key_type=key_label, dns_name_count=len(set(csr_dns)),
-            validity_days=validity_days)
-    except (ValueError, TypeError) as e:
-        return error_response(f'Invalid CSR: {e}', 400)
-    if violations:
-        return error_response('Policy violation: ' + '; '.join(violations), 400)
+    refusal, validity_days = _policy_rule_refusal(ca, cert, data.get('template_id'), validity_days)
+    if refusal:
+        return error_response(refusal, 400)
 
     # Clamp validity to CA expiration
     try:
@@ -840,6 +847,11 @@ def sign_csr(csr_id):
             data=signed_result.to_dict(),
             message=msg
         )
+    except ValueError as e:
+        if 'another request' in str(e):
+            return error_response('CSR was signed by another request; reload it', 409)
+        logger.error(f"CSR Sign Error: {e}", exc_info=True)
+        return error_response("Failed to sign CSR", 500)
     except Exception as e:
         logger.error(f"CSR Sign Error: {e}", exc_info=True)
         return error_response("Failed to sign CSR", 500)
@@ -901,9 +913,13 @@ def bulk_sign_csrs():
             if cert.crt:
                 results['failed'].append({'id': csr_id, 'error': 'Already signed'})
                 continue
+            refusal, item_validity = _policy_rule_refusal(ca, cert, None, validity_days)
+            if refusal:
+                results['failed'].append({'id': csr_id, 'error': refusal})
+                continue
 
             signed_cert = CertificateService.sign_csr(
-                cert_id=csr_id, caref=ca.refid, validity_days=validity_days,
+                cert_id=csr_id, caref=ca.refid, validity_days=item_validity,
                 allow_sensitive_ekus=True)
             results['success'].append(csr_id)
         except Exception as e:

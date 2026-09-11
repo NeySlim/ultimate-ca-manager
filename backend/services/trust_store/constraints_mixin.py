@@ -54,7 +54,10 @@ def _validate_against_cert(ca_cert, names_to_check):
             continue
 
         same_type_permitted = [
-            subtree for subtree in permitted if type(subtree) is type(name)
+            subtree for subtree in permitted
+            if type(subtree) is type(name)
+            # an otherName subtree only constrains names of its own type-id
+            and (not isinstance(name, x509.OtherName) or subtree.type_id == name.type_id)
         ]
         if same_type_permitted and not any(
             _name_matches_subtree(name, subtree) for subtree in same_type_permitted
@@ -136,6 +139,12 @@ def _cert_name_values(cert):
         # matches it the same way it matches a SAN rfc822Name.
         for attr in cert.subject.get_attributes_for_oid(NameOID.EMAIL_ADDRESS):
             values.add(('RFC822Name', str(attr.value).lower()))
+    except Exception:
+        pass
+    try:
+        # The subject itself, as checked against directoryName subtrees
+        if len(cert.subject):
+            values.add(('DirectoryName', str(_name_value(x509.DirectoryName(cert.subject))).lower()))
     except Exception:
         pass
     try:

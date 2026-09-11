@@ -193,7 +193,7 @@ def create_mtls_certificate():
     if ca_id:
         # A numeric id or a refid, never a string compared against the
         # integer column (PostgreSQL refuses it)
-        if isinstance(ca_id, int) or str(ca_id).isdigit():
+        if isinstance(ca_id, int) or str(ca_id).isdecimal():
             ca = db.session.get(CA, int(ca_id))
         if ca is None:
             ca = CA.query.filter_by(refid=str(ca_id)).first()
@@ -571,7 +571,8 @@ def enroll_import_certificate():
         logger.error(f"Failed to parse imported PEM: {e}")
         return error_response('Invalid PEM certificate data', 400)
 
-    if issuing_ca_for(cert_obj) is None:
+    issuing_ca = issuing_ca_for(cert_obj)
+    if issuing_ca is None:
         return error_response(
             'Certificate was not issued by a CA of this server and cannot be enrolled',
             400,
@@ -645,11 +646,8 @@ def enroll_import_certificate():
 
     # Create Certificate record if not exists
     if not existing_cert:
-        # Find issuing CA by issuer DN match
-        ca_ref = None
-        issuer_ca = CA.query.filter(CA.subject == issuer_dn).first()
-        if issuer_ca:
-            ca_ref = issuer_ca.refid
+        # The CA resolved by signature above (never a namesake by DN)
+        ca_ref = issuing_ca.refid
 
         existing_cert = Certificate(
             refid=str(uuid.uuid4()),
@@ -762,6 +760,8 @@ def assign_certificate():
 
     if certificate.cert_type != 'usr_cert':
         return error_response('Only user certificates can be assigned for mTLS', 400)
+    if certificate.revoked:
+        return error_response('This certificate has been revoked', 400)
 
     # Security: non-admin can only assign their own certs
     enroll_user_id = user.id

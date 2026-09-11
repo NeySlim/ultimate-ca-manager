@@ -79,10 +79,12 @@ def create_certificate():
 
     # Get the CA
     ca_ref = data['ca_id']
-    ca = (db.session.get(CA, int(ca_ref)) if isinstance(ca_ref, int) or str(ca_ref).isdigit()
+    ca = (db.session.get(CA, int(ca_ref)) if isinstance(ca_ref, int) or str(ca_ref).isdecimal()
           else CA.query.filter_by(refid=str(ca_ref)).first())
     if not ca:
         return error_response('CA not found', 404)
+    # The stored request (approval workflow) replays the numeric id
+    data['ca_id'] = ca.id
 
     # Resolve template: its digest is honored at signing and the link is
     # persisted on the issued row (usage counting, "template used" display)

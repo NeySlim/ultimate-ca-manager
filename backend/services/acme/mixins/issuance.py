@@ -187,6 +187,7 @@ class IssuanceMixin:
             ca_refid = self._resolve_ca_for_domains(order_domains)
         
         # Sign certificate with UCM CA
+        self._last_signing_exception = None
         success, cert_id, error = self._sign_certificate_with_ca(
             order=order,
             csr_pem=csr_pem,
@@ -491,9 +492,12 @@ class IssuanceMixin:
             CAOfflineError = ()
         if isinstance(exc, (IssuerWindowError, CAOfflineError)):
             return False
-        text = str(exc).lower()
-        if any(word in text for word in ('signing key', 'hsm', 'offline', 'no ca available',
-                                         'awaiting its certificate', 'key_encryption_key')):
+        # Only messages our own CA/key code emits, never a name or a subject
+        # the client chose (a name constraint refusal quoting "hsm.example")
+        text = str(exc)
+        if any(word in text for word in ('signing key', 'HSM', 'No CA available',
+                                         'awaiting its certificate', 'has no private key',
+                                         'KEY_ENCRYPTION_KEY')):
             return False
         return isinstance(exc, ValueError)
 
@@ -537,12 +541,15 @@ class IssuanceMixin:
                 )
         
         if not ca:
+            self._last_signing_exception = RuntimeError("No CA available for signing")
             return False, None, "No CA available for signing"
         
         if not ca.has_private_key:
+            self._last_signing_exception = RuntimeError("CA has no private key")
             return False, None, f"CA {ca.refid} has no private key"
         
         if not ca.crt:
+            self._last_signing_exception = RuntimeError("CA is awaiting its certificate")
             return False, None, f"CA {ca.refid} is awaiting its certificate"
         
         # Extract CN from CSR for better description

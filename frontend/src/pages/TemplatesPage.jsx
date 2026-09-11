@@ -664,7 +664,7 @@ const KEY_TYPE_OPTIONS = ['RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P38
 const DIGEST_OPTIONS = ['sha256', 'sha384', 'sha512']
 const KEY_USAGE_OPTIONS = [
   'digitalSignature', 'keyEncipherment', 'contentCommitment',
-  'dataEncipherment', 'keyAgreement', 'keyCertSign', 'crlSign'
+  'dataEncipherment', 'keyAgreement'
 ]
 const EXT_KEY_USAGE_OPTIONS = [
   'serverAuth', 'clientAuth', 'codeSigning',

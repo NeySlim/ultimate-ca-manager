@@ -53,7 +53,7 @@ def _load():
     return {
         'enabled': bool(cfg.get('enabled', False)),
         'days_before_expiry': int(cfg.get('days_before_expiry', 30)),
-        'renewal_sources': list(cfg.get('renewal_sources', ['scep', 'acme', 'est'])),
+        'renewal_sources': list(cfg.get('renewal_sources', ['manual', 'scep', 'acme', 'est'])),
         'notify_on_renewal': _bool(notify_on_renewal_raw, True),
         'notify_on_failure': _bool(notify_on_failure_raw, True),
         'notify_emails': [str(e).strip() for e in emails if str(e).strip()],

@@ -87,24 +87,48 @@ class MTLSAuthService:
         
         # A revoked certificate opens no session, whatever the proxy checked:
         # the enrolment's own row (or its persistent revocation record)
-        from services.mtls_enrollment import certificate_row_for
+        from services.mtls_enrollment import certificate_row_for, issuing_ca_for
         row = certificate_row_for(auth_cert)
-        if row is not None:
-            revoked = bool(row.revoked)
-            if not revoked and row.caref and row.crt:
-                try:
-                    from cryptography import x509 as _x509
-                    from models import CA as _CA
-                    from services.cert.issued_lookup import REVOKED, issued_certificate_status
+        revoked = bool(row is not None and row.revoked)
+        if not revoked:
+            try:
+                from cryptography import x509 as _x509
+                from models import CA as _CA
+                from services.cert.issued_lookup import REVOKED, issued_certificate_status
+                enrolled = None
+                if row is not None and row.crt:
+                    enrolled = _x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+                elif auth_cert.cert_pem:
+                    enrolled = _x509.load_pem_x509_certificate(bytes(auth_cert.cert_pem))
+                issuer = None
+                if row is not None and row.caref:
                     issuer = _CA.query.filter_by(refid=row.caref).first()
-                    if issuer is not None:
-                        stored = _x509.load_pem_x509_certificate(base64.b64decode(row.crt))
-                        revoked = issued_certificate_status(issuer, stored)[1] == REVOKED
-                except Exception as exc:
-                    logger.warning(f"mTLS: revocation check skipped for serial={serial}: {exc}")
-            if revoked:
-                logger.warning(f"Certificate revoked: serial={serial}, user_id={auth_cert.user_id}")
-                return None, None, "Certificate has been revoked"
+                if issuer is None and enrolled is not None:
+                    issuer = issuing_ca_for(enrolled)
+                if issuer is None and auth_cert.cert_issuer:
+                    issuer = _CA.query.filter(_CA.subject == auth_cert.cert_issuer).first()
+                if issuer is not None and enrolled is not None:
+                    # The row may be gone (certificate deleted after its
+                    # revocation): the persistent revocation record remains
+                    revoked = issued_certificate_status(issuer, enrolled)[1] == REVOKED
+                elif issuer is not None:
+                    from models import RevokedSerial as _RevokedSerial
+                    from utils.serial_format import serial_variants
+                    variants = set()
+                    for base in (10, 16):
+                        try:
+                            variants |= serial_variants(int(str(auth_cert.cert_serial), base))
+                        except ValueError:
+                            continue
+                    revoked = bool(variants) and _RevokedSerial.query.filter(
+                        _RevokedSerial.caref == issuer.refid,
+                        _RevokedSerial.serial_number.in_(variants),
+                    ).first() is not None
+            except Exception as exc:
+                logger.warning(f"mTLS: revocation check skipped for serial={serial}: {exc}")
+        if revoked:
+            logger.warning(f"Certificate revoked: serial={serial}, user_id={auth_cert.user_id}")
+            return None, None, "Certificate has been revoked"
 
         # Check if certificate is enabled
         if not auth_cert.enabled:

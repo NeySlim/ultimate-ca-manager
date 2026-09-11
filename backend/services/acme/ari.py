@@ -91,9 +91,10 @@ def find_certificate(aki_hex: str, serial_int: int) -> Optional[Certificate]:
 
 def has_valid_replacement(certid: str) -> bool:
     """Return whether a completed ACME order replaced ``certid``."""
-    return AcmeOrder.query.filter_by(
-        replaces=certid,
-        status='valid',
+    # RFC 9773 §5: any order that is not invalid counts as the replacement
+    return AcmeOrder.query.filter(
+        AcmeOrder.replaces == certid,
+        AcmeOrder.status != 'invalid',
     ).first() is not None
 
 

@@ -116,12 +116,13 @@ def _validate_template_payload(data, *, partial=False):
         # CA key usages belong to CA templates only: on a leaf they would be
         # ignored by some issuance paths and honoured by others
         ku = data['extensions_template'].get('key_usage')
-        if isinstance(ku, list) and data.get('template_type', 'custom') != 'ca':
-            ca_bits = [k for k in ku if str(k).lower() in ('keycertsign', 'crlsign')]
-            if ca_bits:
-                return False, (
-                    f"key_usage {', '.join(str(k) for k in ca_bits)} is only valid on a CA template"
-                )
+        if isinstance(ku, list):
+            # Certificate templates describe end-entity certificates: the CA
+            # key usages are dropped (no issuance path honours them)
+            kept = [k for k in ku if str(k).lower() not in ('keycertsign', 'crlsign')]
+            if len(kept) != len(ku):
+                logger.warning("template payload: CA key usages dropped from key_usage")
+                data['extensions_template']['key_usage'] = kept
     return True, None
 
 

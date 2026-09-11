@@ -272,7 +272,15 @@ def _build_extensions_element(attributes, extensions, oids):
     # Same resolver as issuance, so the policy advertises exactly what the
     # template will issue whatever spelling the template uses
     from utils.eku_validation import normalize_extra_ekus
-    eku_oids, _err = normalize_extra_ekus([n for n in eku_list if isinstance(n, str)])
+    eku_oids = []
+    for name in eku_list:
+        if not isinstance(name, str):
+            continue
+        resolved, err = normalize_extra_ekus([name])
+        if err or not resolved:
+            continue  # an unknown name is ignored, the others still apply
+        if resolved[0] not in eku_oids:
+            eku_oids.append(resolved[0])
     if eku_oids:
         der = asn1_x509.ExtKeyUsageSyntax(eku_oids).dump()
         entries.append((_EXT_EXTENDED_KEY_USAGE_OID, False, der))

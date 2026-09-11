@@ -70,13 +70,19 @@ class TestRestoreKeyMustMatch:
 
 class TestTemplateCaBits:
 
-    def test_leaf_template_with_ca_bits_is_refused(self, auth_client):
+    def test_leaf_template_drops_the_ca_bits(self, app, auth_client):
         r = _post(auth_client, '/api/v2/templates', {
             'name': 'ca-bits-leaf', 'template_type': 'custom', 'key_type': 'RSA-2048',
             'validity_days': 30, 'digest': 'sha256',
             'extensions_template': {'key_usage': ['digitalSignature', 'keyCertSign', 'cRLSign']},
         })
-        assert r.status_code == 400, (r.status_code, r.get_json())
+        assert r.status_code == 201, (r.status_code, r.get_json())
+        tpl_id = r.get_json()['data']['id']
+        with app.app_context():
+            tpl = db.session.get(CertificateTemplate, tpl_id)
+            assert json.loads(tpl.extensions_template)['key_usage'] == ['digitalSignature']
+            db.session.delete(tpl)
+            db.session.commit()
 
     def test_existing_template_ca_bits_never_land_on_a_leaf(self, app, auth_client, create_ca):
         ca = create_ca(cn='Template CA bits CA')

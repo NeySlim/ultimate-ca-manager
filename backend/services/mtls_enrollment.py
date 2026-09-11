@@ -63,7 +63,7 @@ def parse_validity_days(value, default: int = 365) -> Optional[int]:
         value = int(value)
     if isinstance(value, str):
         value = value.strip()
-        if not value.isdigit():
+        if not value.isdecimal():
             return None
         value = int(value)
     if not isinstance(value, int) or not 1 <= value <= 3650:

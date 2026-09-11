@@ -1011,7 +1011,7 @@ class SCEPService:
             # serial column mixing decimal and hexadecimal forms), not
             # expired -- the one rule shared with EST and WSTEP.
             from services.cert.issued_lookup import (
-                OK, REVOKED, EXPIRED, issued_certificate_status,
+                OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
             )
             _row, status = issued_certificate_status(self.ca, signer_cert)
             if status != OK:
@@ -1023,7 +1023,9 @@ class SCEPService:
                     self.FAIL_BAD_MESSAGE_CHECK,
                     {
                         REVOKED: "Renewal: signer certificate has been revoked",
-                        EXPIRED: "Renewal: signer certificate is expired or not yet valid",
+                        EXPIRED: "Renewal: signer certificate is expired",
+                        NOT_YET_VALID: "Renewal: signer certificate is not yet valid",
+                        SUPERSEDED: "Renewal: signer certificate has been superseded by a newer one",
                     }.get(status, "Renewal: signer certificate is not recognized"),
                 )
             # RFC 8894 §2.5: a renewal keeps the identity -- the SAN set

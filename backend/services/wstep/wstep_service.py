@@ -813,7 +813,7 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
     # renew under a victim's identity. Require a byte-for-byte match against
     # a certificate UCM itself issued from this same CA.
     from services.cert.issued_lookup import (
-        OK, REVOKED, EXPIRED, NOT_YET_VALID, issued_certificate_status,
+        OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
     )
     db_cert, status = issued_certificate_status(ca, signing_cert)
     if status != OK:
@@ -821,6 +821,7 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
             REVOKED: 'Signing certificate has been revoked',
             EXPIRED: 'Signing certificate has expired',
             NOT_YET_VALID: 'Signing certificate is not yet valid',
+            SUPERSEDED: 'Signing certificate has been superseded by a newer one',
         }.get(status, 'Signing certificate is not recognized')
 
     csr, err = _load_csr(csr_der)

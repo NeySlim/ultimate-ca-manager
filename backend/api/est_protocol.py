@@ -13,6 +13,8 @@ import base64
 import hmac
 import json
 import logging
+from cryptography import x509
+from cryptography.hazmat.backends import default_backend
 import re
 
 from cryptography.hazmat.primitives import serialization as _crypto_serialization
@@ -457,8 +459,21 @@ def _presented_certificate_refusal(ca):
     except Exception as exc:
         logger.warning('EST: presented client certificate unreadable: %s', exc)
         return Response('Invalid client certificate', status=400)
+    # RFC 7030 §3.3.2: the TLS layer may accept a certificate from another
+    # authority (a manufacturer certificate for bootstrap); that decision
+    # stands. Only a certificate this CA signed is held to this CA's
+    # records: revoked, expired, not yet valid, superseded or deleted, it
+    # may not enroll again
+    from utils.cert_issuer import certificate_signed_by
+    try:
+        ca_cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend())
+        signed_here = certificate_signed_by(cert, ca_cert)
+    except Exception:
+        signed_here = False
+    if not signed_here:
+        return None
     from services.cert.issued_lookup import (
-        OK, REVOKED, EXPIRED, NOT_YET_VALID, issued_certificate_status,
+        OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
     )
     _row, status = issued_certificate_status(ca, cert)
     if status == OK:
@@ -468,7 +483,8 @@ def _presented_certificate_refusal(ca):
         REVOKED: 'Client certificate has been revoked',
         EXPIRED: 'Client certificate has expired',
         NOT_YET_VALID: 'Client certificate is not yet valid',
-    }.get(status, 'Client certificate was not issued by this CA'), status=403)
+        SUPERSEDED: 'Client certificate has been superseded by a newer one',
+    }.get(status, 'Client certificate is no longer recorded by this CA'), status=403)
 
 
 def _authenticate_est_client():
@@ -773,7 +789,7 @@ def simple_reenroll(label=None):
             # (a revoked one, or one from another CA sharing the names,
             # used to be re-enrolled and even graced its EKUs and names)
             from services.cert.issued_lookup import (
-                OK, REVOKED, EXPIRED, NOT_YET_VALID, issued_certificate_status,
+                OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
             )
             renewed_row, status = issued_certificate_status(ca, client_cert_obj)
             if status != OK:
@@ -785,6 +801,7 @@ def simple_reenroll(label=None):
                     REVOKED: 'Client certificate has been revoked',
                     EXPIRED: 'Client certificate has expired',
                     NOT_YET_VALID: 'Client certificate is not yet valid',
+                    SUPERSEDED: 'Client certificate has been superseded by a newer one',
                 }.get(status, 'Client certificate was not issued by this CA'), status=403)
         except Exception as e:
             logger.error(f"EST reenroll: failed to parse client cert: {e}")

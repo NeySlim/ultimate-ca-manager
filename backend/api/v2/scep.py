@@ -166,6 +166,14 @@ def approve_scep_request(request_id):
         db.session.rollback()
         return error_response('Failed to issue the certificate for this request', 500)
     db.session.refresh(scep_req)
+    try:
+        from models import Certificate as _Certificate
+        from services.webhook_service import emit_cert_issued
+        issued = _Certificate.query.filter_by(refid=cert_refid).first()
+        if issued is not None:
+            emit_cert_issued(issued.to_dict(), ca_refid=issued.caref)
+    except Exception as e:
+        logger.error(f"Webhook emit (SCEP approval) failed: {e}")
     
     AuditService.log_action(
         action='scep_approve',
@@ -407,8 +415,14 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
                            'envelope decryption, unavailable for HSM keys')
         data['ca_refid'] = ca.refid
 
-    if 'template_id' in data and data['template_id']:
-        tpl = db.session.get(CertificateTemplate, data['template_id'])
+    template_ref = data.get('template_id') if 'template_id' in data else None
+    if template_ref is None and partial and profile_id and 'intune_enabled' in data:
+        # Turning Intune validation off re-validates the bound template
+        # (Smartcard Logon is only tolerated with it)
+        saved_profile = db.session.get(ScepProfile, profile_id)
+        template_ref = saved_profile.template_id if saved_profile else None
+    if template_ref:
+        tpl = db.session.get(CertificateTemplate, template_ref)
         if not tpl:
             return False, 'Template not found'
         if tpl.template_type == 'ca':

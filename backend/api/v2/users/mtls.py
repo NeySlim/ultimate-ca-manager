@@ -153,7 +153,7 @@ def create_user_mtls_certificate(user_id):
         # wrong column type (PostgreSQL refuses a string against an integer)
         ca = None
         if ca_id:
-            if isinstance(ca_id, int) or str(ca_id).isdigit():
+            if isinstance(ca_id, int) or str(ca_id).isdecimal():
                 ca = db.session.get(CA, int(ca_id))
             if ca is None:
                 ca = CA.query.filter_by(refid=str(ca_id)).first()

@@ -27,6 +27,7 @@ UNKNOWN = 'unknown'
 REVOKED = 'revoked'
 EXPIRED = 'expired'
 NOT_YET_VALID = 'not_yet_valid'
+SUPERSEDED = 'superseded'
 
 
 def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
@@ -71,6 +72,10 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
         return None, (REVOKED if persistent is not None else UNKNOWN)
     if any(r.revoked for r in rows) or persistent is not None:
         return row, REVOKED
+    if all(r.archived for r in rows):
+        # Replaced by a renewal: the holder presents the newer certificate,
+        # the replaced one must not go on producing certificates
+        return row, SUPERSEDED
     now = utc_now()
     if cert.not_valid_before_utc.replace(tzinfo=None) > now:
         return row, NOT_YET_VALID

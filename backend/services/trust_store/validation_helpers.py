@@ -14,6 +14,12 @@ def _name_value(name):
         return name.value
     elif isinstance(name, x509.IPAddress):
         return str(name.value)
+    elif isinstance(name, x509.UniformResourceIdentifier):
+        return name.value
+    elif isinstance(name, x509.DirectoryName):
+        return name.value.rfc4514_string()
+    elif isinstance(name, x509.OtherName):
+        return _der_utf8(name.value)
     return str(name)
 
 
@@ -38,7 +44,7 @@ def _der_utf8(value) -> str:
     if isinstance(value, str):
         return value
     data = bytes(value)
-    if len(data) >= 2 and data[0] == 0x0C:
+    if len(data) >= 2 and data[0] in (0x0C, 0x16):  # UTF8String or IA5String
         length = data[1]
         offset = 2
         if length & 0x80:
@@ -66,8 +72,15 @@ def _name_matches_subtree(name, subtree):
     elif isinstance(name, x509.UniformResourceIdentifier):
         # RFC 5280 §4.2.1.10: a URI constraint names a host or a domain
         # (leading dot); it applies to the URI's host part
-        host = urlsplit(name.value).hostname or ''
-        return bool(host) and _dns_matches(host, subtree.value)
+        host = (urlsplit(name.value).hostname or '').lower()
+        constraint_val = subtree.value.lower()
+        if not host:
+            return False
+        if constraint_val.startswith('.'):
+            # RFC 5280 §4.2.1.10: ".example.com" is not satisfied by
+            # "example.com" itself
+            return host.endswith(constraint_val)
+        return host == constraint_val
     elif isinstance(name, x509.DirectoryName):
         # The subtree is a prefix of the name (RDN by RDN)
         prefix = list(subtree.value.rdns)
