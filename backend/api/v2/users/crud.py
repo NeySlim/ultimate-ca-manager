@@ -31,6 +31,8 @@ def _pending_approvals_count(user_id):
     """Number of pending approval requests owned by this user (blocks hard delete)."""
     try:
         from models import ApprovalRequest
+        from services.approval_gate import expire_stale_requests
+        expire_stale_requests()
         return ApprovalRequest.query.filter_by(
             requester_id=user_id, status='pending'
         ).count()

@@ -13,6 +13,10 @@ from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
+# A request waits this long for a decision (a stored request without an
+# expiry, from a restored backup, is given the same lifetime)
+APPROVAL_REQUEST_LIFETIME = timedelta(days=7)
+
 
 class PolicyViolation(ValueError):
     """A request breaks a policy Rule (#335); the message names the rule."""
@@ -190,7 +194,7 @@ class PolicyEvaluationService:
                 f"{request_data.get('cn', 'unknown')}"),
             request_data=json.dumps(request_data),
             required_approvals=policy.min_approvers or 1,
-            expires_at=utc_now() + timedelta(days=7),
+            expires_at=utc_now() + APPROVAL_REQUEST_LIFETIME,
         )
         db.session.add(approval)
         try:

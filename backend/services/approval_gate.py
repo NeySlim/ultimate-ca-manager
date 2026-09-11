@@ -18,7 +18,7 @@ from cryptography.x509.oid import ExtensionOID, NameOID
 
 from models import db
 from models.policy import ApprovalRequest, CertificatePolicy
-from services.policy_service import PolicyEvaluationService
+from services.policy_service import APPROVAL_REQUEST_LIFETIME, PolicyEvaluationService
 
 logger = logging.getLogger(__name__)
 
@@ -71,15 +71,25 @@ def approval_payload(policy: CertificatePolicy, approval: ApprovalRequest) -> di
     }
 
 
+def _naive(value):
+    return value.replace(tzinfo=None) if value is not None and value.tzinfo is not None else value
+
+
+def request_deadline(approval):
+    """When the request expires (naive UTC): its ``expires_at``, else the
+    standard lifetime from its creation; None when neither is known."""
+    if approval.expires_at:
+        return _naive(approval.expires_at)
+    if approval.created_at:
+        return _naive(approval.created_at) + APPROVAL_REQUEST_LIFETIME
+    return None
+
+
 def approval_is_expired(approval) -> bool:
-    """True when the request has an ``expires_at`` in the past."""
+    """True when the request is past its deadline."""
     from utils.datetime_utils import utc_now
-    if not approval.expires_at:
-        return False
-    exp = approval.expires_at
-    if exp.tzinfo is not None:
-        exp = exp.replace(tzinfo=None)
-    return exp < utc_now().replace(tzinfo=None)
+    deadline = request_deadline(approval)
+    return deadline is not None and deadline < utc_now().replace(tzinfo=None)
 
 
 def _pending_query(request_type: str, key: str, lock: bool = False):
@@ -109,38 +119,53 @@ def _named_target(approval, key):
 
 def pending_requests_naming(request_type: str, key: str, target_id, *, lock: bool = False) -> list:
     """Pending approval requests of ``request_type`` whose stored request
-    names ``target_id`` under ``key`` (``csr_id`` or ``certificate_id``)."""
+    names ``target_id`` under ``key`` (``csr_id`` or ``certificate_id``);
+    with ``lock`` they are taken for update (see ``_pending_query``)."""
     if target_id is None:
         return []
     return [approval for approval in _pending_query(request_type, key, lock=lock).all()
             if _named_target(approval, key) == str(target_id)]
 
 
-def pending_target_ids(request_type: str, key: str) -> set:
+def pending_target_ids(request_type: str, key: str) -> dict:
     """The targets (as strings) named by the pending requests of
-    ``request_type``, for callers that must leave them alone (the renewal
-    scheduler does not override a renewal awaiting a human decision)."""
-    targets = set()
+    ``request_type`` still awaiting a decision, each with the deadline of
+    its request (naive UTC, None when unknown), for callers that must
+    leave them alone (the renewal scheduler does not override a renewal
+    awaiting a human decision). A request past its deadline holds nothing
+    back, whether or not it has been marked expired yet."""
+    targets = {}
     for approval in _pending_query(request_type, key).all():
+        if approval_is_expired(approval):
+            continue
         target = _named_target(approval, key)
         if target is not None:
-            targets.add(target)
+            targets[target] = request_deadline(approval)
     return targets
 
 
 def expire_stale_requests(commit: bool = True) -> int:
-    """Close the pending requests past their expiry as ``expired``. The
+    """Close the pending requests past their deadline as ``expired``. The
     approve and reject routes did so one request at a time when it was
-    acted on; the pending list and the hourly task do it for all of them,
-    so they neither accumulate nor pass for pending."""
+    acted on; the pending list, the counters and the hourly task do it for
+    all of them, so they neither accumulate nor pass for pending. Nothing
+    is written when there is nothing to expire (the list is a read); a
+    request an approver is acting on at that moment is left to them."""
+    from sqlalchemy import and_, or_
     from utils.datetime_utils import utc_now
     now = utc_now().replace(tzinfo=None)
-    count = db.session.query(ApprovalRequest).filter(
+    stale_ids = [row[0] for row in db.session.query(ApprovalRequest.id).filter(
         ApprovalRequest.status == 'pending',
-        ApprovalRequest.expires_at.isnot(None),
-        ApprovalRequest.expires_at < now,
+        or_(ApprovalRequest.expires_at < now,
+            and_(ApprovalRequest.expires_at.is_(None),
+                 ApprovalRequest.created_at < now - APPROVAL_REQUEST_LIFETIME)),
+    ).with_for_update(skip_locked=True).all()]
+    if not stale_ids:
+        return 0
+    count = db.session.query(ApprovalRequest).filter(
+        ApprovalRequest.id.in_(stale_ids), ApprovalRequest.status == 'pending',
     ).update({ApprovalRequest.status: 'expired', ApprovalRequest.resolved_at: now},
-             synchronize_session=False)
+             synchronize_session='fetch')
     if count and commit:
         from utils.db_transaction import safe_commit
         ok, _err = safe_commit(logger, "Failed to expire stale approval requests")

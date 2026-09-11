@@ -95,9 +95,10 @@ def _link_approval(approval, certificate_id):
 def _close_duplicate_requests(approval, key, target_id):
     """The other pending requests for the same target (another operator
     queued the same signing or renewal) are approved along with this one,
-    by this approver. They ride the issuance transaction, so a failed
-    issuance leaves them pending, and are linked to the certificate by
-    ``_link_duplicates`` once it exists. Returns their ids."""
+    by this approver (one past its deadline is closed as expired instead).
+    They ride the issuance transaction, so a failed issuance leaves them
+    pending, and are linked to the certificate by ``_link_duplicates`` once
+    it exists. Returns the ids of the approved ones."""
     from services.approval_gate import resolve_moot_requests
     user = getattr(g, 'current_user', None)
     duplicates = resolve_moot_requests(
@@ -896,6 +897,12 @@ def approve_request(request_id):
             approval = ApprovalRequest.query.filter_by(id=request_id).first()
             if approval is None:
                 return error_response('Approval request not found', 404)
+            if isinstance(e, ValueError) and 'no longer exists' in str(e):
+                # Nothing will ever satisfy the request (its target or CA
+                # is gone): closed now rather than left pending until it
+                # expires
+                approval.add_approval(user_id=user_id, username=username,
+                                      action='reject', comment=issue_error)
 
     ok, _err = safe_commit(logger, "Failed to approve request")
     if not ok:
@@ -995,6 +1002,8 @@ def reject_request(request_id):
 @require_auth(['read:approvals'])
 def approval_stats():
     """Get approval statistics"""
+    from services.approval_gate import expire_stale_requests
+    expire_stale_requests()
     pending = ApprovalRequest.query.filter_by(status='pending').count()
     approved = ApprovalRequest.query.filter_by(status='approved').count()
     rejected = ApprovalRequest.query.filter_by(status='rejected').count()

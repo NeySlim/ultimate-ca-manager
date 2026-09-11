@@ -348,6 +348,11 @@ def renew_certificate_in_place(
         RenewalError: renewal was refused or could not be persisted. The
             session is left clean (rolled back) in every failure path.
     """
+    # The instance was read before the decision (by the route, the scheduler
+    # or an approval): the row is read again, and kept locked on PostgreSQL
+    # until the renewal commits, so a revocation committed meanwhile is
+    # seen and one in progress waits for the renewal
+    db.session.refresh(cert, with_for_update=True)
     check_renewable(cert)
     ca = ca or resolve_issuing_ca(cert)
     if not ca:

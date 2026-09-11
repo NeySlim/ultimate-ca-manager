@@ -64,7 +64,20 @@ def _cert_row(app, ca_id, cn):
 
 
 def _drop_rows(app, *ids):
+    """Delete the rows and every approval request about them. A request
+    may have been attributed to a policy left behind by another test file
+    (the gate picks the highest-priority match), and SQLite reuses the id
+    of a deleted row: a request left pending would name the next row."""
     with app.app_context():
+        wanted = {str(rid) for rid in ids}
+        for ap in ApprovalRequest.query.all():
+            try:
+                rd = json.loads(ap.request_data or '{}')
+            except Exception:
+                rd = {}
+            names = {str(rd.get('csr_id')), str(rd.get('certificate_id')), str(ap.certificate_id)} if isinstance(rd, dict) else {str(ap.certificate_id)}
+            if names & wanted:
+                db.session.delete(ap)
         for rid in ids:
             row = db.session.get(Certificate, rid)
             if row:
@@ -592,3 +605,161 @@ class TestRemainingEdges:
                 assert db.session.get(ApprovalRequest, stale_id).status == 'expired'
         finally:
             _drop_policy(app, pid)
+
+
+class TestReviewFollowUps:
+    """A request past its expiry never holds anything back, wherever it is
+    counted; a request without an expiry has the standard lifetime; the
+    scheduler steps aside only while the decision can come before the
+    certificate expires; a request whose target is gone is closed."""
+
+    def _queue_renew(self, app, create_ca, create_user, name):
+        ca = create_ca(cn=f'{name} CA')
+        pid = _policy(app, ca['id'], name)
+        cert_id = _cert_row(app, ca['id'], f'{name}.example.test')
+        user = create_user(role='operator')
+        client = app.test_client()
+        r = _json(client, 'post', '/api/v2/auth/login', {'username': user['username'], 'password': 'TestPass123!'})
+        assert r.status_code == 200
+        r = _json(client, 'post', f'/api/v2/certificates/{cert_id}/renew')
+        assert r.status_code == 200 and r.get_json()['data'].get('approval_required'), r.get_json()
+        return ca, pid, cert_id, r.get_json()['data']['approval_id'], user
+
+    def _run_scheduler_on(self, app, cert_id, monkeypatch):
+        from services.auto_renewal_service import AutoRenewalService
+        config = AutoRenewalService.get_renewal_config()
+        previous = dict(config)
+        AutoRenewalService.set_renewal_config({**config, 'enabled': True, 'days_before_expiry': 60,
+                                               'renewal_sources': ['manual']})
+        try:
+            cert = db.session.get(Certificate, cert_id)
+            monkeypatch.setattr(AutoRenewalService, 'get_certificates_for_renewal', staticmethod(lambda: [cert]))
+            return AutoRenewalService.run_auto_renewal()
+        finally:
+            AutoRenewalService.set_renewal_config(previous)
+
+    def test_scheduler_renews_when_the_pending_request_has_expired(self, app, create_ca, create_user, monkeypatch):
+        from datetime import timedelta
+        from utils.datetime_utils import utc_now
+        ca, pid, cert_id, approval_id, _user = self._queue_renew(app, create_ca, create_user, 'fu-expired')
+        try:
+            with app.app_context():
+                ap = db.session.get(ApprovalRequest, approval_id)
+                ap.expires_at = utc_now() - timedelta(hours=2)
+                db.session.commit()
+                stats = self._run_scheduler_on(app, cert_id, monkeypatch)
+                assert stats['renewed'] == 1 and stats['skipped'] == 0, stats
+                assert db.session.get(ApprovalRequest, approval_id).status == 'expired'
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, cert_id)
+
+    def test_scheduler_renews_when_the_certificate_would_expire_first(self, app, create_ca, create_user, monkeypatch):
+        from datetime import timedelta
+        ca, pid, cert_id, approval_id, _user = self._queue_renew(app, create_ca, create_user, 'fu-deadline')
+        try:
+            with app.app_context():
+                cert = db.session.get(Certificate, cert_id)
+                ap = db.session.get(ApprovalRequest, approval_id)
+                ap.expires_at = cert.valid_to + timedelta(days=1)
+                db.session.commit()
+                stats = self._run_scheduler_on(app, cert_id, monkeypatch)
+                assert stats['renewed'] == 1 and stats['skipped'] == 0, stats
+                ap = db.session.get(ApprovalRequest, approval_id)
+                assert ap.status == 'approved' and ap.get_approvals()[-1]['comment'] == 'Renewed by the scheduler'
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, cert_id)
+
+    def test_stale_requests_are_not_counted_anywhere(self, app, auth_client, create_ca, create_user):
+        from datetime import timedelta
+        from utils.datetime_utils import utc_now
+        ca = create_ca(cn='fu-count CA')
+        pid = _policy(app, ca['id'], 'fu-count')
+        with app.app_context():
+            operator = create_user(role='operator')
+            stale = ApprovalRequest(policy_id=pid, requester_id=operator['id'], request_type='csr',
+                                    request_data='{"csr_id": 1}', status='pending', required_approvals=1,
+                                    expires_at=utc_now() - timedelta(days=1))
+            db.session.add(stale)
+            db.session.commit()
+            stale_id = stale.id
+        try:
+            r = auth_client.get('/api/v2/approvals/stats')
+            assert r.status_code == 200
+            with app.app_context():
+                assert db.session.get(ApprovalRequest, stale_id).status == 'expired'
+                db.session.get(ApprovalRequest, stale_id).status = 'pending'
+                db.session.commit()
+            r = auth_client.delete(f"/api/v2/users/{operator['id']}")
+            assert r.status_code in (200, 204), r.get_json()
+        finally:
+            _drop_policy(app, pid)
+
+    def test_request_without_expiry_has_the_standard_lifetime(self, app, create_ca, create_user):
+        from datetime import timedelta
+        from services.approval_gate import approval_is_expired, expire_stale_requests, pending_target_ids
+        from utils.datetime_utils import utc_now
+        ca = create_ca(cn='fu-noexp CA')
+        pid = _policy(app, ca['id'], 'fu-noexp')
+        with app.app_context():
+            operator = create_user(role='operator')
+            old = ApprovalRequest(policy_id=pid, requester_id=operator['id'], request_type='renewal',
+                                  request_data='{"certificate_id": 777001}', status='pending',
+                                  required_approvals=1, expires_at=None,
+                                  created_at=utc_now() - timedelta(days=8))
+            recent = ApprovalRequest(policy_id=pid, requester_id=operator['id'], request_type='renewal',
+                                     request_data='{"certificate_id": 777002}', status='pending',
+                                     required_approvals=1, expires_at=None,
+                                     created_at=utc_now() - timedelta(days=1))
+            db.session.add_all([old, recent])
+            db.session.commit()
+            try:
+                assert approval_is_expired(old) is True and approval_is_expired(recent) is False
+                assert pending_target_ids('renewal', 'certificate_id').keys() >= {'777002'}
+                assert '777001' not in pending_target_ids('renewal', 'certificate_id')
+                assert expire_stale_requests() == 1
+                assert old.status == 'expired' and recent.status == 'pending'
+            finally:
+                _drop_policy(app, pid)
+
+    def test_approving_a_request_whose_target_is_gone_closes_it(self, app, auth_client, create_ca, create_user):
+        ca = create_ca(cn='fu-gone CA')
+        pid = _policy(app, ca['id'], 'fu-gone')
+        csr_id = _csr_row(app, 'fu-gone.example.test')
+        try:
+            operator = _operator(app, create_user)
+            r = _json(operator, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 30})
+            approval_id = r.get_json()['data']['approval_id']
+            with app.app_context():
+                # gone without the service noticing (older code, restore)
+                ap = db.session.get(ApprovalRequest, approval_id)
+                ap.request_data = ap.request_data.replace(str(csr_id), '999999')
+                db.session.commit()
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {'comment': 'ok'})
+            assert r.status_code == 200 and r.get_json()['data']['certificate_issued'] is False, r.get_json()
+            with app.app_context():
+                ap = db.session.get(ApprovalRequest, approval_id)
+                assert ap.status == 'rejected' and ap.resolved_at is not None
+                assert 'no longer exists' in ap.get_approvals()[-1]['comment']
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)
+
+    def test_renewal_rereads_the_certificate_before_deciding(self, app, create_ca):
+        """The instance handed to the renewal may be stale: the row is read
+        again (locked on PostgreSQL) before the revocation check."""
+        from sqlalchemy import text
+        from services.cert.renewal import RenewalError, renew_certificate_in_place
+        ca = create_ca(cn='fu-stale CA')
+        cert_id = _cert_row(app, ca['id'], 'fu-stale.example.test')
+        try:
+            with app.app_context():
+                cert = db.session.get(Certificate, cert_id)
+                assert cert.revoked is False
+                db.session.execute(text('UPDATE certificates SET revoked = 1 WHERE id = :id'), {'id': cert_id})
+                with pytest.raises(RenewalError):
+                    renew_certificate_in_place(cert, username='admin')
+                db.session.rollback()
+        finally:
+            _drop_rows(app, cert_id)

@@ -223,9 +223,11 @@ class AutoRenewalService:
         renewed_carefs = set()
 
         # A renewal an operator queued for approval is a human decision the
-        # scheduler does not pre-empt; the certificate is picked up again
-        # once the request is resolved or expired
-        from services.approval_gate import pending_target_ids
+        # scheduler does not pre-empt, as long as that decision (or the
+        # request's expiry) comes before the certificate expires; the
+        # certificate is picked up again once the request is resolved
+        from services.approval_gate import expire_stale_requests, pending_target_ids
+        expire_stale_requests()
         awaiting_approval = pending_target_ids('renewal', 'certificate_id')
 
         for cert in certs:
@@ -233,7 +235,9 @@ class AutoRenewalService:
             if cert.archived:
                 stats['skipped'] += 1
                 continue
-            if str(cert.id) in awaiting_approval:
+            deadline = awaiting_approval.get(str(cert.id))
+            valid_to = cert.valid_to.replace(tzinfo=None) if cert.valid_to and cert.valid_to.tzinfo else cert.valid_to
+            if deadline is not None and valid_to is not None and deadline < valid_to:
                 logger.info(f"Auto-renewal skipped cert {cert.id}: renewal awaiting approval")
                 stats['skipped'] += 1
                 continue

@@ -277,22 +277,25 @@ class TestDeviceHeldKeys:
 
 class TestConcurrentRenewal:
 
-    def test_second_renewal_of_a_stale_row_is_refused(self, app, create_ca):
+    def test_second_renewal_of_a_stale_row_is_refused(self, app, create_ca, monkeypatch):
         ca = create_ca(cn='Renewal race CA')
         rid = _craft_row(app, ca['id'], rsa.generate_private_key(65537, 2048), 'race.example.test',
                          key_usage=_ku(digital_signature=True, key_encipherment=True))
         try:
             with app.app_context():
                 row = db.session.get(Certificate, rid)
-                stale_serial = row.serial_number
-                # Another worker renewed the row meanwhile: its serial changed
-                db.session.query(Certificate).filter(Certificate.id == rid).update(
-                    {Certificate.serial_number: 'deadbeef'}, synchronize_session=False)
-                db.session.commit()
-                row = db.session.get(Certificate, rid)
-                # what this worker still believes, without marking it dirty
-                from sqlalchemy.orm.attributes import set_committed_value
-                set_committed_value(row, 'serial_number', stale_serial)
+                # The renewal re-reads the row first (locked on PostgreSQL;
+                # SQLite takes no row lock): another worker renews it right
+                # after that read, so the serial this worker holds is stale
+                # by the time it writes
+                import services.cert.renewal as renewal_module
+                original_resolve = renewal_module.resolve_issuing_ca
+
+                def resolve_after_concurrent_renewal(cert):
+                    db.session.query(Certificate).filter(Certificate.id == rid).update(
+                        {Certificate.serial_number: 'deadbeef'}, synchronize_session=False)
+                    return original_resolve(cert)
+                monkeypatch.setattr(renewal_module, 'resolve_issuing_ca', resolve_after_concurrent_renewal)
                 with pytest.raises(RenewalError) as exc:
                     renew_certificate_in_place(row, username='admin')
                 assert exc.value.status == 409
