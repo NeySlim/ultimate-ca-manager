@@ -7,7 +7,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [Unreleased]
+## [2.228] - 2026-09-11
 
 ### Security
 - A certificate request signed through ACME, EST, WSTEP or the Sign CSR action could carry extensions only the issuer may set: its own CRL Distribution Points, Authority Information Access and Certificate Policies replaced the CA's, and a Microsoft SID security extension chosen by the requester was copied onto the certificate (the strong certificate mapping bypass KB5014754 closes). The shared signing path now takes only Subject Alternative Name, Key Usage, Extended Key Usage, Basic Constraints, TLS Feature and OCSP No Check from a leaf request and sets everything else itself, as the SCEP path already did with a stricter list; sub-CA requests signed by an operator are unchanged. A request that already carries the Microsoft template extension or a Must-Staple flag no longer fails with a duplicate extension; Key Usage on a leaf is always critical and Subject Alternative Name is critical when the subject is empty (RFC 5280)
