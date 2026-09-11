@@ -131,6 +131,14 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
 
     ca_cert = x509.load_pem_x509_certificate(
         base64.b64decode(ca.crt), default_backend())
+    now = utc_now()
+    not_before = cert_not_before()
+    from utils.ca_signing_window import check_issuer_window, clamp_not_after
+    try:
+        # Refused before the CA key is loaded (HSM included) or a key generated
+        check_issuer_window(ca_cert, now)
+    except ValueError as exc:
+        raise TsaSignerIssueError(str(exc), 400)
     from services.hsm.ca_key_loader import get_ca_signing_key
     try:
         ca_key = get_ca_signing_key(ca)
@@ -138,14 +146,6 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
         raise TsaSignerIssueError(f'Failed to load CA signing key: {exc}', 500)
 
     new_key = _generate_key(key_type, key_size, curve)
-
-    now = utc_now()
-    not_before = cert_not_before()
-    from utils.ca_signing_window import check_issuer_window, clamp_not_after
-    try:
-        check_issuer_window(ca_cert, now)
-    except ValueError as exc:
-        raise TsaSignerIssueError(str(exc), 400)
     # The operator did not choose the validity in the one-click flow, so clamp
     # to the CA's own expiry instead of refusing (cert_create.py 400s here).
     not_after = clamp_not_after(now + timedelta(days=validity_days), ca_cert)

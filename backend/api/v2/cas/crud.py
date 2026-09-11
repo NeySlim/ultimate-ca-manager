@@ -368,7 +368,7 @@ def create_ca():
             try:
                 check_issuer_window(parent_cert)
             except ValueError as e:
-                return error_response(f'Parent CA certificate cannot sign: {e}', 400)
+                return error_response(str(e).replace('Issuing CA certificate', 'Parent CA certificate'), 400)
             caref = parent_ca.refid
 
         username = g.user.username if hasattr(g, 'user') else (g.current_user.username if hasattr(g, 'current_user') else 'system')

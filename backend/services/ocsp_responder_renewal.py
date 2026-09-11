@@ -35,6 +35,7 @@ DEFAULT_RENEW_DAYS = 30
 
 from utils.signing_hash import signing_hash_for
 from utils.x509_aki import authority_key_identifier_from_issuer
+from utils.cert_issuer import authority_key_identifier_hex
 
 
 def _get_config(key, default=None):
@@ -123,7 +124,7 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
         subject_cn=cert.subject_cn,
         issuer=new_cert.issuer.rfc4514_string(),
         serial_number=str(new_cert.serial_number),
-        aki=cert.aki,
+        aki=authority_key_identifier_hex(new_cert),
         ski=cert.ski,
         key_algo=cert.key_algo,
         valid_from=not_before,
@@ -182,6 +183,16 @@ def run_ocsp_responder_renewal():
                 "OCSP responder renewal: CA %s unavailable for cert %s; skipping",
                 ca_id, cert_id,
             )
+            stats['skipped'] += 1
+            continue
+        try:
+            from utils.ca_signing_window import check_issuer_window
+            check_issuer_window(x509.load_pem_x509_certificate(
+                base64.b64decode(ca.crt), default_backend()))
+        except ValueError as e:
+            # Outside its window the CA cannot sign: skipped like an offline
+            # CA rather than counted as a failure at every run
+            logger.warning("OCSP responder renewal: CA %s cannot sign (%s); skipping", ca_id, e)
             stats['skipped'] += 1
             continue
 

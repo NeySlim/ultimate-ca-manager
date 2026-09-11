@@ -3,7 +3,7 @@ import base64
 import uuid
 import json
 import logging
-from datetime import datetime, timedelta, timezone as _tz
+from datetime import timedelta
 from typing import Dict, List, Optional
 
 from cryptography import x509

@@ -99,6 +99,8 @@ def _ad_security_extension(sid_string):
     return x509.UnrecognizedExtension(_SID_SECURITY_EXT_OID, der)
 
 
+# CA-only constraints a leaf never carries; the allow-list below is what
+# actually decides, this set documents the intent
 _LEAF_CA_ONLY_EXTENSION_OIDS = frozenset({
     ExtensionOID.NAME_CONSTRAINTS,
     ExtensionOID.POLICY_CONSTRAINTS,
@@ -792,7 +794,9 @@ class CSROperationsMixin:
                 features = list(extension.value)
                 if ocsp_must_staple and x509.TLSFeatureType.status_request not in features:
                     features.append(x509.TLSFeatureType.status_request)
-                builder = builder.add_extension(x509.TLSFeature(features), extension.critical)
+                # RFC 7633 §4: never critical, clients unaware of it would
+                # reject the certificate
+                builder = builder.add_extension(x509.TLSFeature(features), critical=False)
                 continue
             if extension.oid == ExtensionOID.SUBJECT_ALTERNATIVE_NAME:
                 # RFC 5280 §4.2.1.6: SAN MUST be critical when the subject
