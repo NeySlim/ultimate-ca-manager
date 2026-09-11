@@ -225,7 +225,10 @@ export default function ApprovalsPage() {
       setComment('')
       loadData()
     } catch (err) {
-      showError(t('approvals.actionFailed'))
+      // The server says why (already closed by someone else, expired...);
+      // the list is reloaded so the request shows its real state
+      showError(err?.message || t('approvals.actionFailed'))
+      loadData()
     } finally {
       setActionLoading(false)
     }

@@ -283,6 +283,7 @@ class TestMootRequestsAreResolved:
             with app.app_context():
                 ap = db.session.get(ApprovalRequest, approval_id)
                 assert ap.status == 'rejected' and 'deleted' in (ap.get_approvals()[-1]['comment'] or '').lower()
+                assert ap.get_approvals()[-1]['username'] == 'admin'  # the admin who deleted it
         finally:
             _drop_policy(app, pid)
             _drop_rows(app, csr_id)
@@ -945,3 +946,51 @@ class TestThirdReviewFollowUps:
         finally:
             _drop_policy(app, pid)
             _drop_rows(app, cert_id, csr_id)
+
+
+class TestFourthReviewFollowUps:
+
+    def test_first_row_of_the_batch_deleted_before_any_commit_is_skipped(self, app, create_ca, monkeypatch):
+        from services.auto_renewal_service import AutoRenewalService
+        ca = create_ca(cn='fu4-batch CA')
+        gone_id = _cert_row(app, ca['id'], 'fu4-gone.example.test')
+        try:
+            with app.app_context():
+                config = AutoRenewalService.get_renewal_config()
+                previous = dict(config)
+                AutoRenewalService.set_renewal_config({**config, 'enabled': True, 'days_before_expiry': 60,
+                                                       'renewal_sources': ['manual']})
+                try:
+                    listed = [db.session.get(Certificate, gone_id)]
+                    monkeypatch.setattr(AutoRenewalService, 'get_certificates_for_renewal', staticmethod(lambda: listed))
+
+                    def deleted_without_expiring_the_instance(*_a, **_k):
+                        # flushed in the same transaction: the listed instance is not expired
+                        db.session.query(Certificate).filter(Certificate.id == gone_id).delete(synchronize_session=False)
+                        return {}
+                    monkeypatch.setattr('services.approval_gate.pending_target_ids', deleted_without_expiring_the_instance)
+                    stats = AutoRenewalService.run_auto_renewal()
+                    db.session.rollback()
+                finally:
+                    AutoRenewalService.set_renewal_config(previous)
+                assert stats['skipped'] == 1 and stats['failed'] == 0 and stats['renewed'] == 0, stats
+        finally:
+            _drop_rows(app, gone_id)
+
+    def test_reject_route_names_the_actor_to_webhooks(self, app, auth_client, create_ca, create_user, monkeypatch):
+        emitted = []
+        monkeypatch.setattr('services.webhook_service.emit_csr_rejected',
+                            lambda payload, reason=None, actor=None: emitted.append((payload['id'], reason, actor)))
+        ca = create_ca(cn='fu4-reject CA')
+        pid = _policy(app, ca['id'], 'fu4-reject')
+        csr_id = _csr_row(app, 'fu4-reject.example.test')
+        try:
+            operator = _operator(app, create_user)
+            r = _json(operator, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 30})
+            approval_id = r.get_json()['data']['approval_id']
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/reject', {'comment': 'no'})
+            assert r.status_code == 200, r.get_json()
+            assert emitted == [(approval_id, 'no', 'admin')], emitted
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)

@@ -610,7 +610,7 @@ def export_csr(csr_id):
 def delete_csr(csr_id):
     """Delete a CSR"""
     try:
-        if CertificateService.delete_certificate(csr_id):
+        if CertificateService.delete_certificate(csr_id, username=getattr(g.current_user, 'username', 'system')):
             AuditService.log_action(
                 action='csr_delete',
                 resource_type='csr',
@@ -999,7 +999,7 @@ def bulk_delete_csrs():
 
     for csr_id in ids:
         try:
-            if CertificateService.delete_certificate(csr_id):
+            if CertificateService.delete_certificate(csr_id, username=getattr(g.current_user, 'username', 'system')):
                 results['success'].append(csr_id)
             else:
                 results['failed'].append({'id': csr_id, 'error': 'Not found'})

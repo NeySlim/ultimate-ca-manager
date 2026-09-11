@@ -243,7 +243,10 @@ class AutoRenewalService:
         awaiting_approval = pending_target_ids('renewal', 'certificate_id')
 
         for cert_id, listed_serial in listed:
-            cert = db.session.get(Certificate, cert_id)
+            # Read again from the database, not from the identity map: the
+            # first row of the batch is not expired yet, and a row deleted
+            # meanwhile would otherwise be found as listed
+            cert = db.session.get(Certificate, cert_id, populate_existing=True)
             if cert is None:
                 logger.info(f"Auto-renewal skipped cert {cert_id}: deleted meanwhile")
                 stats['skipped'] += 1

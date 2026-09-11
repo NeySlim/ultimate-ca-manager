@@ -974,6 +974,14 @@ def approve_request(request_id):
                 return error_response('Approval request not found', 404)
             if approval.status != 'pending':
                 # Closed by someone else while the issuance was attempted
+                AuditService.log_action(
+                    action='approval_issue_failed',
+                    resource_type='approval',
+                    resource_id=str(request_id),
+                    resource_name=f'Approval #{request_id}',
+                    details=f'Approval vote by {username} not kept: request already {approval.status}',
+                    success=False,
+                )
                 return error_response(f"Request is already {approval.status}", 400)
             if isinstance(e, ValueError) and 'no longer exists' in str(e):
                 # The target went away during the vote: closed now rather
@@ -1069,7 +1077,7 @@ def reject_request(request_id):
     result = approval.to_dict()
     if approval.status == 'rejected':
         from services.webhook_service import emit_csr_rejected
-        emit_csr_rejected(result, reason=data.get('comment'))
+        emit_csr_rejected(result, reason=data.get('comment'), actor=username)
 
     return success_response(data=result, message="Request rejected")
 
