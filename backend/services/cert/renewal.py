@@ -65,6 +65,20 @@ DEFAULT_RENEWAL_DAYS = 365
 
 from utils.signing_hash import signing_hash_for
 from utils.x509_aki import authority_key_identifier_from_issuer
+from utils.ca_pointer_extensions import add_ca_pointer_extensions
+from utils.leaf_key_usage import constrain_builder_key_usage
+from utils.datetime_utils import cert_not_before
+
+
+_SCT_LIST_OID = x509.ObjectIdentifier('1.3.6.1.4.1.11129.2.4.2')
+_ISSUER_OWNED_EXTENSION_OIDS = frozenset({
+    ExtensionOID.AUTHORITY_KEY_IDENTIFIER,
+    ExtensionOID.SUBJECT_KEY_IDENTIFIER,
+    ExtensionOID.CRL_DISTRIBUTION_POINTS,
+    ExtensionOID.AUTHORITY_INFORMATION_ACCESS,
+    ExtensionOID.CERTIFICATE_POLICIES,
+    _SCT_LIST_OID,
+})
 
 
 class RenewalError(Exception):
@@ -80,33 +94,37 @@ class RenewalError(Exception):
         self.status = status
 
 
-def _cn_of(dn: str):
-    """CN component of an RFC 4514 DN string, or None."""
-    if not dn or 'CN=' not in dn:
-        return None
-    return dn.split('CN=')[1].split(',')[0]
-
-
 def resolve_issuing_ca(cert: Certificate):
-    """Find the CA that signed ``cert``: by refid, then subject, then CN."""
+    """Find the CA that signed ``cert``: by refid, else by signature.
+
+    Names alone used to decide (subject, then the issuer's Common Name
+    among every CA): a homonymous CA after a rotation, or a local CA merely
+    sharing the CN of an external issuer, re-signed the certificate. The
+    CAs carrying the issuer's name are tried first, then every other, and
+    only the one whose key verifies the certificate's signature qualifies.
+    """
     ca = CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
     if ca:
         return ca
-    if not cert.issuer:
+    if not cert.crt:
         return None
-
-    ca = CA.query.filter(CA.subject == cert.issuer).first()
-    if ca:
-        return ca
-
-    # Last resort: the issuer string may be formatted differently than the
-    # CA's stored subject — compare Common Names only.
-    cert_issuer_cn = _cn_of(cert.issuer)
-    if not cert_issuer_cn:
+    try:
+        leaf = x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend())
+    except Exception:
         return None
-    for potential_ca in CA.query.all():
-        if potential_ca.subject and _cn_of(potential_ca.subject) == cert_issuer_cn:
-            return potential_ca
+    from utils.cert_issuer import certificate_signed_by
+    named = CA.query.filter(CA.subject == cert.issuer).all() if cert.issuer else []
+    others = [c for c in CA.query.all() if c not in named]
+    for candidate in named + others:
+        if not candidate.crt:
+            continue
+        try:
+            ca_cert = x509.load_pem_x509_certificate(
+                base64.b64decode(candidate.crt), default_backend())
+        except Exception:
+            continue
+        if certificate_signed_by(leaf, ca_cert):
+            return candidate
     return None
 
 
@@ -298,6 +316,16 @@ def renew_certificate_in_place(
             400,
         )
 
+    if not cert.prv:
+        # The key lives on the device (SCEP, EST, WSTEP, ACME enrolment,
+        # certificate imported without its key): a certificate re-signed
+        # here could never reach it, and superseding the serial the device
+        # still presents only got that device refused by OCSP and the CRL
+        raise RenewalError(
+            'The private key of this certificate is not held by the server; '
+            'renew it through its enrollment protocol or issue a new certificate',
+            409,
+        )
     ca = ca or resolve_issuing_ca(cert)
     if not ca:
         raise RenewalError(
@@ -342,13 +370,18 @@ def renew_certificate_in_place(
     orig_pub_key = orig_cert.public_key()
     new_key = _generate_matching_key(orig_pub_key) if rekey else None
     public_key = new_key.public_key() if rekey else orig_pub_key
+    # Same floor as issuance (a re-signed RSA-1024 is still RSA-1024)
+    from utils.key_type import validate_enrollment_public_key
+    key_error = validate_enrollment_public_key(public_key)
+    if key_error:
+        raise RenewalError(f'Cannot renew: {key_error}', 400)
 
     # Same duration as the original, starting now, clamped to 1..3650 days and
     # to the CA's own expiry.
     orig_duration = orig_cert.not_valid_after_utc - orig_cert.not_valid_before_utc
     validity_days = orig_duration.days if orig_duration.days > 0 else DEFAULT_RENEWAL_DAYS
     validity_days = min(validity_days, MAX_RENEWAL_DAYS)
-    not_before = now
+    not_before = cert_not_before()
     not_after = min(now + timedelta(days=validity_days), ca_not_after)
 
     # Re-validate the subject/SANs against the CA chain's NameConstraints
@@ -384,16 +417,26 @@ def renew_certificate_in_place(
         .not_valid_after(not_after)
     )
 
-    # Carry the original extensions across; SKI/AKI are regenerated below.
+    # Carry the original extensions across, except those the issuer sets:
+    # SKI/AKI (regenerated below), CDP/AIA/CPS (rebuilt from the CA's
+    # current configuration, as on issuance -- a changed public URL or a
+    # disabled CRL must not stay frozen in renewed certificates) and the
+    # embedded SCTs (signed for the old certificate's bytes, meaningless on
+    # the new one; the CT policy below embeds fresh ones when configured).
     for ext in orig_cert.extensions:
-        if ext.oid in (ExtensionOID.AUTHORITY_KEY_IDENTIFIER,
-                       ExtensionOID.SUBJECT_KEY_IDENTIFIER):
+        if ext.oid in _ISSUER_OWNED_EXTENSION_OIDS:
             continue
         try:
             builder = builder.add_extension(ext.value, ext.critical)
-        except Exception:
-            # Skip extensions that can't be copied
-            pass
+        except Exception as exc:
+            raise RenewalError(
+                f'Cannot carry extension {ext.oid.dotted_string} over to the '
+                f'renewed certificate: {exc}', 400,
+            ) from exc
+    builder = add_ca_pointer_extensions(builder, ca)
+    # A Key Usage the key type cannot honour (#327) is corrected here as it
+    # is on every issuance path, whatever the original certificate carried
+    builder = constrain_builder_key_usage(builder)
     # A responder certificate issued before id-pkix-ocsp-nocheck was emitted
     # gets it on renewal (idempotent when the original already carries it)
     try:
@@ -413,6 +456,11 @@ def renew_certificate_in_place(
     )
 
     new_cert = builder.sign(ca_key, signing_hash_for(ca_key), default_backend())
+    try:
+        from utils.ct_client import apply_ct_policy
+        new_cert, _ = apply_ct_policy(new_cert, ca_cert, ca_key)
+    except ValueError as exc:
+        raise RenewalError(f'Cannot renew: {exc}', 400) from exc
 
     new_cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
     new_key_pem = None
@@ -422,11 +470,28 @@ def renew_certificate_in_place(
     cert_id = cert.id
     old_serial = cert.serial_number
     old_valid_to = cert.valid_to
-    old_caref = cert.caref
+    # The serial being superseded belongs to the CA that really signed the
+    # certificate, resolved above even when the row did not name it
+    old_caref = cert.caref or ca.refid
     new_serial_hex = format(new_cert.serial_number, 'x')
+
+    # Two workers renewing the same row would each supersede the serial
+    # they read and the second would overwrite the first's certificate,
+    # leaving a signed certificate neither stored nor revocable: only the
+    # worker that still sees the serial it started from may proceed
+    claimed = db.session.query(Certificate).filter(
+        Certificate.id == cert_id,
+        Certificate.serial_number == old_serial,
+    ).update({Certificate.serial_number: new_serial_hex}, synchronize_session=False)
+    if claimed != 1:
+        db.session.rollback()
+        raise RenewalError(
+            'Certificate was renewed by another request; reload it and retry', 409,
+        )
 
     # --- Stage the superseded serial, then the in-place row update ---
     _record_superseded_serial(cert, old_serial, old_caref, old_valid_to, now)
+    cert.caref = ca.refid
 
     new_ski, new_aki = _extract_key_ids(new_cert)
     cert.crt = base64.b64encode(new_cert_pem.encode()).decode()

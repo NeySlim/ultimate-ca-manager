@@ -93,47 +93,7 @@ def _key_algo_label(public_key) -> str:
     return 'Unknown'
 
 
-def _copy_ca_pointer_extensions(builder, ca):
-    """Embed the CA's CDP / AIA / CPS URLs, matching cert_create.py."""
-    if ca.cdp_enabled:
-        cdp_urls = [u.replace('{ca_refid}', ca.url_ref) for u in ca.get_cdp_urls()]
-        if cdp_urls:
-            builder = builder.add_extension(
-                x509.CRLDistributionPoints([
-                    x509.DistributionPoint(
-                        full_name=[x509.UniformResourceIdentifier(u)],
-                        relative_name=None, reasons=None, crl_issuer=None,
-                    ) for u in cdp_urls
-                ]),
-                critical=False,
-            )
-
-    aia = []
-    if ca.ocsp_enabled:
-        for uri in ca.get_ocsp_urls():
-            aia.append(x509.AccessDescription(
-                x509.oid.AuthorityInformationAccessOID.OCSP,
-                x509.UniformResourceIdentifier(uri)))
-    if ca.aia_ca_issuers_enabled:
-        for url in ca.get_aia_urls():
-            aia.append(x509.AccessDescription(
-                x509.oid.AuthorityInformationAccessOID.CA_ISSUERS,
-                x509.UniformResourceIdentifier(url.replace('{ca_refid}', ca.url_ref))))
-    if aia:
-        builder = builder.add_extension(
-            x509.AuthorityInformationAccess(aia), critical=False)
-
-    if ca.cps_enabled and ca.cps_uri:
-        builder = builder.add_extension(
-            x509.CertificatePolicies([
-                x509.PolicyInformation(
-                    policy_identifier=x509.ObjectIdentifier(ca.cps_oid or '2.5.29.32.0'),
-                    policy_qualifiers=[ca.cps_uri],
-                )
-            ]),
-            critical=False,
-        )
-    return builder
+from utils.ca_pointer_extensions import add_ca_pointer_extensions as _copy_ca_pointer_extensions
 
 
 def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,

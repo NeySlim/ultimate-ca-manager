@@ -130,6 +130,10 @@ class AutoRenewalService:
             Certificate.valid_to <= threshold,
             Certificate.valid_to >= utc_now(),  # don't try to renew already-expired
             Certificate.crt.isnot(None),  # only issued certs, not CSRs
+            # A certificate whose key the device holds cannot be delivered by
+            # the scheduler; the device renews through its protocol
+            Certificate.prv.isnot(None),
+            Certificate.prv != '',
             Certificate.source.in_(config['renewal_sources'])
         ).all()
 
