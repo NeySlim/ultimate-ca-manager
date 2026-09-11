@@ -1424,6 +1424,10 @@ class SCEPService:
             )
 
         cert = builder.sign(self.ca_key, signing_hash_for(self.ca_key), default_backend())
+        # Same CT policy as every other leaf path (a ValueError here is a
+        # refusal the SCEP layer reports as a failure)
+        from utils.ct_client import apply_ct_policy
+        cert, _ = apply_ct_policy(cert, self.ca_cert, self.ca_key)
         cert_pem = cert.public_bytes(serialization.Encoding.PEM)
 
         # Extract SANs

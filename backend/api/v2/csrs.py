@@ -31,6 +31,16 @@ from utils.key_codec import private_key_to_pem
 bp = Blueprint('csrs_v2', __name__)
 logger = logging.getLogger(__name__)
 
+
+def _ca_by_id_or_refid(ca_id):
+    """A CA by numeric id or refid; a string is never compared against the
+    integer column (PostgreSQL refuses it where SQLite finds nothing)."""
+    if ca_id is None or ca_id == '':
+        return None
+    if isinstance(ca_id, int) or str(ca_id).isdigit():
+        return db.session.get(CA, int(ca_id))
+    return CA.query.filter_by(refid=str(ca_id)).first()
+
 # Backend cert_type values that produce a CA record with signing authority.
 # Signing one of these is a CA-management action and requires 'write:cas'.
 _CA_CERT_TYPES = frozenset({'intermediate_ca'})
@@ -737,7 +747,7 @@ def sign_csr(csr_id):
         return error_response('CA ID required', 400)
     
     # Get the CA from CA table (not Certificate table)
-    ca = db.session.get(CA, ca_id)
+    ca = _ca_by_id_or_refid(ca_id)
     if not ca:
         return error_response('CA not found', 404)
     
@@ -831,7 +841,7 @@ def bulk_sign_csrs():
     if not ca_id:
         return error_response('ca_id required', 400)
 
-    ca = db.session.get(CA, ca_id)
+    ca = _ca_by_id_or_refid(ca_id)
     if not ca or not ca.crt or not ca.has_private_key:
         return error_response('CA not found or not valid for signing', 404)
 

@@ -343,6 +343,17 @@ class CSRMixin:
 
         # Update certificate record
         certificate.caref = caref
+        # Only the request that still sees the row unsigned may store the
+        # certificate: two workers signing the same CSR would otherwise both
+        # issue, the second overwriting the first's certificate
+        claimed = db.session.query(Certificate).filter(
+            Certificate.id == certificate.id,
+            (Certificate.crt.is_(None)) | (Certificate.crt == ''),
+        ).update({Certificate.crt: base64.b64encode(cert_pem).decode('utf-8')},
+                 synchronize_session=False)
+        if claimed != 1:
+            db.session.rollback()
+            raise ValueError('CSR was signed by another request')
         certificate.crt = base64.b64encode(cert_pem).decode('utf-8')
         certificate.cert_type = cert_type
         certificate.descr = settle_csr_descr(certificate.descr, cn_value)
@@ -516,6 +527,17 @@ class CSRMixin:
         except x509.ExtensionNotFound:
             pass
 
+        # Only the request that still sees the row unsigned may store the
+        # certificate: two workers signing the same CSR would otherwise both
+        # issue, the second overwriting the first's certificate
+        claimed = db.session.query(Certificate).filter(
+            Certificate.id == certificate.id,
+            (Certificate.crt.is_(None)) | (Certificate.crt == ''),
+        ).update({Certificate.crt: base64.b64encode(cert_pem).decode('utf-8')},
+                 synchronize_session=False)
+        if claimed != 1:
+            db.session.rollback()
+            raise ValueError('CSR was signed by another request')
         certificate.crt = base64.b64encode(cert_pem).decode('utf-8')
         certificate.caref = caref
         certificate.descr = descr or settle_csr_descr(certificate.descr, cn_value)

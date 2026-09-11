@@ -78,7 +78,9 @@ def create_certificate():
             data[key] = values
 
     # Get the CA
-    ca = db.session.get(CA, data['ca_id'])
+    ca_ref = data['ca_id']
+    ca = (db.session.get(CA, int(ca_ref)) if isinstance(ca_ref, int) or str(ca_ref).isdigit()
+          else CA.query.filter_by(refid=str(ca_ref)).first())
     if not ca:
         return error_response('CA not found', 404)
 
@@ -324,8 +326,8 @@ def create_certificate():
                 'nonrepudiation': 'content_commitment',
                 'dataencipherment': 'data_encipherment',
                 'keyagreement': 'key_agreement',
-                'keycertsign': 'key_cert_sign',
-                'crlsign': 'crl_sign',
+                # keyCertSign / cRLSign are CA bits: never taken from a
+                # template onto a leaf (the CSR trunk and SCEP never did)
             }
             ku_flags = dict.fromkeys(profile['ku'], False)
             for name in tpl_ku:
@@ -515,6 +517,13 @@ def create_certificate():
         if template and template.digest:
             sign_hash = HASH_ALGORITHMS.get(template.digest.lower().strip(), hashes.SHA256())
         new_cert = builder.sign(ca_key, signing_hash_for(ca_key, sign_hash), default_backend())
+        # The CT policy (embed SCTs, ct_required) applies to this builder as
+        # it does to the CSR trunk and the lifecycle service
+        from utils.ct_client import apply_ct_policy
+        try:
+            new_cert, _ = apply_ct_policy(new_cert, ca_cert, ca_key)
+        except ValueError as e:
+            return error_response(str(e), 400)
 
         # Serialize
         cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')

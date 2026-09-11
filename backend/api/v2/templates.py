@@ -112,6 +112,16 @@ def _validate_template_payload(data, *, partial=False):
     if 'template_type' in data and data['template_type']:
         if data['template_type'] not in _VALID_TEMPLATE_TYPES:
             return False, f'Invalid template type. Must be one of: {", ".join(sorted(_VALID_TEMPLATE_TYPES))}'
+    if 'extensions_template' in data and isinstance(data['extensions_template'], dict):
+        # CA key usages belong to CA templates only: on a leaf they would be
+        # ignored by some issuance paths and honoured by others
+        ku = data['extensions_template'].get('key_usage')
+        if isinstance(ku, list) and data.get('template_type', 'custom') != 'ca':
+            ca_bits = [k for k in ku if str(k).lower() in ('keycertsign', 'crlsign')]
+            if ca_bits:
+                return False, (
+                    f"key_usage {', '.join(str(k) for k in ca_bits)} is only valid on a CA template"
+                )
     return True, None
 
 

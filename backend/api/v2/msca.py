@@ -741,6 +741,11 @@ def sign_csr(msca_id, csr_id):
     csr = db.session.get(Certificate, csr_id)
     if not csr or not csr.csr:
         return error_response("CSR not found", 404)
+    if csr.crt:
+        # Same rule as the local Sign CSR action: the row already holds a
+        # certificate, overwriting it would drop that certificate from the
+        # inventory (and from revocation) while a second one lives on
+        return error_response("CSR already signed", 400)
 
     # EOBO (Enroll On Behalf Of): the requester is impersonating another
     # principal. This bypasses the normal "user signs their own CSR" boundary,

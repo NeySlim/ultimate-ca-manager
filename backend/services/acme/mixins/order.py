@@ -600,10 +600,21 @@ class OrderMixin:
             logger.error(f'Failed to {context}: {e}')
             raise
 
-    def begin_order_processing(self, order: AcmeOrder) -> None:
-        """Persist the ready-to-processing transition before issuance."""
+    def begin_order_processing(self, order: AcmeOrder) -> bool:
+        """Persist the ready-to-processing transition before issuance.
+
+        Returns False when another request took the order first: only the
+        one that flips `ready` to `processing` may finalize it."""
+        claimed = db.session.query(AcmeOrder).filter(
+            AcmeOrder.id == order.id, AcmeOrder.status == 'ready',
+        ).update({AcmeOrder.status: 'processing'}, synchronize_session=False)
+        if claimed != 1:
+            db.session.rollback()
+            db.session.refresh(order)
+            return False
         order.status = 'processing'
         self._commit_state_change('mark ACME order processing')
+        return True
 
     def restore_processing_order(self, order_id: str) -> None:
         """Restore retryable finalize failures that did not invalidate the order."""

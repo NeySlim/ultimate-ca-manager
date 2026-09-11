@@ -247,8 +247,8 @@ def _issue_approved_certificate(approval):
         'nonrepudiation': 'content_commitment',
         'dataencipherment': 'data_encipherment',
         'keyagreement': 'key_agreement',
-        'keycertsign': 'key_cert_sign',
-        'crlsign': 'crl_sign',
+        # keyCertSign / cRLSign are CA bits: never taken from a template
+        # onto a leaf (the CSR trunk and SCEP never did)
     }
 
     # The same profiles as the direct issue path, so an approved request
@@ -354,6 +354,10 @@ def _issue_approved_certificate(approval):
     if template and template.digest:
         sign_hash = HASH_ALGORITHMS.get(template.digest.lower().strip(), hashes.SHA256())
     new_cert = builder.sign(ca_key, signing_hash_for(ca_key, sign_hash), default_backend())
+    # Same CT policy as the direct issue form (raises ValueError when
+    # ct_required cannot be met: the approval stays pending with the reason)
+    from utils.ct_client import apply_ct_policy
+    new_cert, _ = apply_ct_policy(new_cert, ca_cert, ca_key)
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
     key_pem = private_key_to_pem(new_key).decode('utf-8')
     
@@ -406,8 +410,18 @@ def _issue_approved_certificate(approval):
     )
     db.session.add(db_cert)
     
-    # Link approval to issued cert: the id exists only once flushed
+    # Link approval to issued cert: the id exists only once flushed. Only the
+    # request that finds the sentinel still empty may link (and keep) its
+    # certificate: two approvers racing on SQLite, which serialises writes
+    # but not read-check-write, would otherwise both issue
     db.session.flush()
+    claimed = db.session.query(ApprovalRequest).filter(
+        ApprovalRequest.id == approval.id,
+        ApprovalRequest.certificate_id.is_(None),
+    ).update({ApprovalRequest.certificate_id: db_cert.id}, synchronize_session=False)
+    if claimed != 1:
+        db.session.rollback()
+        raise RuntimeError('A certificate was already issued for this approval')
     approval.certificate_id = db_cert.id
     ok, _err = safe_commit(logger, "Failed to link approval to certificate")
     if not ok:

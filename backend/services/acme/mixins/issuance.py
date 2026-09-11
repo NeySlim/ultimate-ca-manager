@@ -194,9 +194,17 @@ class IssuanceMixin:
         )
         
         if not success:
+            if not self._is_request_failure(getattr(self, '_last_signing_exception', None)):
+                # Nothing wrong with the request (CA offline or outside its
+                # window, signing key unavailable...): the order goes back to
+                # `ready` (restore_processing_order) so the client may retry,
+                # and the error is reported as serverInternal, not badCSR
+                self._last_finalize_error_type = 'serverInternal'
+                return False, error
+            self._last_finalize_error_type = 'badCSR'
             order.status = "invalid"
             order.error = json.dumps({
-                "type": "urn:ietf:params:acme:error:serverInternal",
+                "type": "urn:ietf:params:acme:error:badCSR",
                 "detail": error
             })
             try:
@@ -222,14 +230,9 @@ class IssuanceMixin:
         # Auto-supersede: revoke previous certs for same domains if enabled
         self._auto_supersede(order, cert_id)
 
-        try:
-            from models import Certificate
-            from services.webhook_service import emit_cert_issued
-            issued = db.session.get(Certificate, cert_id)
-            if issued:
-                emit_cert_issued(issued.to_dict(), ca_refid=issued.caref)
-        except Exception as e:
-            logger.error(f"Webhook emit (ACME issuance) failed: {e}")
+        # The certificate.issued webhook was emitted by the certificate
+        # service when it stored the row (a second emission from here sent
+        # every ACME issuance twice)
 
         return True, None
     
@@ -475,6 +478,25 @@ class IssuanceMixin:
         
         return None
     
+    @staticmethod
+    def _is_request_failure(exc) -> bool:
+        """Whether a signing failure is the request's fault (badCSR, order
+        invalid) rather than the server's (order retryable)."""
+        if exc is None:
+            return True
+        from utils.ca_signing_window import IssuerWindowError
+        try:
+            from services.ca.ca_signing import CAOfflineError
+        except Exception:  # pragma: no cover - defensive import
+            CAOfflineError = ()
+        if isinstance(exc, (IssuerWindowError, CAOfflineError)):
+            return False
+        text = str(exc).lower()
+        if any(word in text for word in ('signing key', 'hsm', 'offline', 'no ca available',
+                                         'awaiting its certificate', 'key_encryption_key')):
+            return False
+        return isinstance(exc, ValueError)
+
     def _sign_certificate_with_ca(
         self,
         order: AcmeOrder,
@@ -499,11 +521,20 @@ class IssuanceMixin:
         if ca_refid:
             ca = CA.query.filter_by(refid=ca_refid).first()
         else:
-            # Find first CA with a usable signing key (local or HSM)
-            ca = CA.query.filter(
-                (CA.prv.isnot(None) | CA.hsm_key_id.isnot(None)),
-                CA.crt != '',
-            ).first()
+            # No issuing CA configured: the fallback must be a CA able to
+            # sign (a key that is not an empty sentinel, not offline), chosen
+            # deterministically rather than in database order
+            candidates = CA.query.filter(
+                ((CA.prv.isnot(None) & (CA.prv != '')) | CA.hsm_key_id.isnot(None)),
+                CA.crt.isnot(None), CA.crt != '',
+                CA.offline.is_(False),
+            ).order_by(CA.id.asc()).all()
+            ca = next((c for c in candidates if not c.revoked_in_chain), None)
+            if ca is not None:
+                logger.warning(
+                    "ACME: no issuing CA configured, falling back to CA %s (%s)",
+                    ca.id, ca.descr,
+                )
         
         if not ca:
             return False, None, "No CA available for signing"
@@ -586,4 +617,5 @@ class IssuanceMixin:
             
         except Exception as e:
             db.session.rollback()
+            self._last_signing_exception = e
             return False, None, f"Certificate signing failed: {str(e)}"

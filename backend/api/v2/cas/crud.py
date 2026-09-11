@@ -1148,6 +1148,19 @@ def restore_ca(ca_id):
         logger.error(f"restore_ca: unexpected error decrypting key for CA {ca_id}: {e}")
         return error_response('Failed to decrypt CA key', 500)
 
+    # The uploaded key must be the CA certificate's own, as the import
+    # route already requires: a foreign key would put the CA back online
+    # signing certificates nothing can verify
+    if ca.crt:
+        from utils.cert_issuer import private_key_matches
+        try:
+            ca_cert_obj = x509.load_pem_x509_certificate(
+                base64.b64decode(ca.crt), default_backend())
+        except Exception:
+            ca_cert_obj = None
+        if ca_cert_obj is not None and not private_key_matches(priv, ca_cert_obj):
+            return error_response('The key file is not the private key of this CA certificate', 400)
+
     # Re-serialize unencrypted, re-wrap with master key, store
     try:
         plain_pem = priv.private_bytes(

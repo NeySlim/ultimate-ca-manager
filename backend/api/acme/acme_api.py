@@ -1118,6 +1118,13 @@ def new_order():
                     f"account {account_id}"
                 )
                 replaces = None
+            elif ari.has_valid_replacement(replaces):
+                # RFC 9773 §5: a certificate may be replaced once
+                return acme_error(
+                    'alreadyReplaced',
+                    'The certificate named by "replaces" has already been replaced',
+                    409,
+                )
 
         # RFC 9773 §5 allows replacement orders to bypass rate limits. UCM
         # currently has no ACME new-order rate limit; storing ``replaces``
@@ -1316,8 +1323,14 @@ def finalize_order(order_id: str):
                 403,
             )
 
-        # Persist the RFC 8555 processing transition before signing begins.
-        service.begin_order_processing(existing_order)
+        # Persist the RFC 8555 processing transition before signing begins;
+        # a concurrent finalize of the same order loses here
+        if not service.begin_order_processing(existing_order):
+            return acme_error(
+                'orderNotReady',
+                f'Order status is {existing_order.status}, must be ready',
+                403,
+            )
         service._finalizing_order_id = order_id
         try:
             success, error = service.finalize_order(order_id, csr_pem)
@@ -1354,8 +1367,14 @@ def finalize_order(order_id: str):
                 details=f"failed: {error}",
                 success=False,
             )
-            error_type = 'caa' if is_caa_failure else 'badCSR'
-            return acme_error(error_type, error)
+            if is_caa_failure:
+                error_type = 'caa'
+            else:
+                # The type the service recorded on the order (badCSR when the
+                # order was invalidated, serverInternal when it went back to
+                # ready for a retry); never badCSR for a server-side fault
+                error_type = getattr(service, '_last_finalize_error_type', None) or 'badCSR'
+            return acme_error(error_type, error, 500 if error_type == 'serverInternal' else 400)
 
         # Return updated order
         order = service.get_order(order_id)
