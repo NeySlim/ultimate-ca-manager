@@ -60,6 +60,7 @@ logger = logging.getLogger(__name__)
 
 from utils.signing_hash import signing_hash_for
 from utils.x509_aki import authority_key_identifier_from_issuer
+from services.cert.issued_lookup import find_issued_row, san_identity_matches
 
 
 def _scep_allow_no_challenge() -> bool:
@@ -1002,19 +1003,35 @@ class SCEPService:
                     "Renewal: signer certificate is expired or not yet valid",
                 )
 
-            # The signer cert must not be revoked.
-            existing = Certificate.query.filter_by(
-                caref=self.ca_refid,
-                serial_number=str(signer_cert.serial_number),
-            ).first()
-            if existing is not None and getattr(existing, "revoked", False):
+            # The signer must be a certificate this CA issued and still
+            # holds, not revoked (row or persistent revocation record, the
+            # serial column mixing decimal and hexadecimal forms), not
+            # expired -- the one rule shared with EST and WSTEP.
+            from services.cert.issued_lookup import (
+                OK, REVOKED, EXPIRED, issued_certificate_status,
+            )
+            _row, status = issued_certificate_status(self.ca, signer_cert)
+            if status != OK:
                 logger.warning(
-                    f"SCEP renewal: signer cert is revoked "
+                    f"SCEP renewal: signer cert refused ({status}) "
                     f"(serial={signer_cert.serial_number}, ca={self.ca_refid})"
                 )
                 return (
                     self.FAIL_BAD_MESSAGE_CHECK,
-                    "Renewal: signer certificate has been revoked",
+                    {
+                        REVOKED: "Renewal: signer certificate has been revoked",
+                        EXPIRED: "Renewal: signer certificate is expired or not yet valid",
+                    }.get(status, "Renewal: signer certificate is not recognized"),
+                )
+            # RFC 8894 §2.5: a renewal keeps the identity -- the SAN set
+            # as well as the subject (EST and WSTEP already compared both)
+            if not san_identity_matches(signer_cert, csr):
+                logger.warning(
+                    f"SCEP renewal: SAN mismatch (serial={signer_cert.serial_number})"
+                )
+                return (
+                    self.FAIL_BAD_MESSAGE_CHECK,
+                    "Renewal: CSR SubjectAltName must match existing certificate",
                 )
 
         except Exception as e:
@@ -1417,6 +1434,12 @@ class SCEPService:
             created_by="scep",
         )
         db.session.add(cert_obj)
+        if renewal_of is not None:
+            # Archive the renewed row in the same transaction so it is not
+            # renewed in place again by the scheduler with the old key
+            renewed_row = find_issued_row(self.ca, renewal_of)
+            if renewed_row is not None:
+                renewed_row.archived = True
 
         Config.CERT_DIR.mkdir(parents=True, exist_ok=True)
         with open(cert_cert_path(cert_obj), "wb") as f:

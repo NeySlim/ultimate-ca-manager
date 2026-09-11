@@ -791,31 +791,15 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
     # (as this used to) lets an attacker forge a self-signed lookalike and
     # renew under a victim's identity. Require a byte-for-byte match against
     # a certificate UCM itself issued from this same CA.
-    db_cert = None
-    candidates = Certificate.query.filter(
-        Certificate.caref == ca.refid,
-        Certificate.serial_number.in_(serial_variants(signing_cert.serial_number)),
-        Certificate.crt.isnot(None),
-    ).all()
-    signing_der = signing_cert.public_bytes(Encoding.DER)
-    for candidate in candidates:
-        try:
-            stored_cert = x509.load_pem_x509_certificate(base64.b64decode(candidate.crt))
-        except Exception:
-            logger.warning(
-                'WSTEP renew: could not decode stored cert id=%s while matching '
-                'signing certificate serial=%s', candidate.id, signing_cert.serial_number
-            )
-            continue
-        if stored_cert.public_bytes(Encoding.DER) == signing_der:
-            db_cert = candidate
-            break
-    if not db_cert:
-        return None, 'Signing certificate is not recognized'
-    if db_cert.revoked:
-        return None, 'Signing certificate has been revoked'
-    if db_cert.valid_to and db_cert.valid_to < utc_now():
-        return None, 'Signing certificate has expired'
+    from services.cert.issued_lookup import (
+        OK, REVOKED, EXPIRED, issued_certificate_status,
+    )
+    db_cert, status = issued_certificate_status(ca, signing_cert)
+    if status != OK:
+        return None, {
+            REVOKED: 'Signing certificate has been revoked',
+            EXPIRED: 'Signing certificate has expired',
+        }.get(status, 'Signing certificate is not recognized')
 
     csr, err = _load_csr(csr_der)
     if err:
@@ -840,6 +824,7 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
         cert_pem, _serial = CAService.sign_csr_from_crypto(
             ca=ca, csr=csr, validity_days=validity_days, source=source,
             renewal_of=signing_cert, require_pop=require_pop,
+            supersedes=db_cert,
             ms_certificate_template_oid=template_oid,
             # See issue()'s matching kwarg for why.
             extra_ekus=_template_extra_ekus(matched_template),

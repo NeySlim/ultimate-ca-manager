@@ -246,8 +246,18 @@ class TestSimpleReenroll:
 
     def test_matching_subject_and_san_returns_only_issued_certificate(self, client, est_config):
         names = ('device.example.test', 'alias.example.test')
-        _, _, client_pem = _make_client_certificate(san_names=names)
-        csr, _ = _make_csr(san_names=names)
+        # Re-enrolment authenticates with a certificate THIS CA issued and
+        # still holds: enrol first, then renew with that certificate
+        first_csr, key = _make_csr(san_names=names)
+        enrolled = _post_csr(client, 'simpleenroll', first_csr, headers=_basic_auth())
+        assert enrolled.status_code == 200, enrolled.data
+        issued = pkcs7.load_der_pkcs7_certificates(base64.b64decode(enrolled.data))
+        leaf = [c for c in issued if not c.extensions.get_extension_for_oid(
+            x509.ExtensionOID.BASIC_CONSTRAINTS).value.ca][0]
+        client_pem = leaf.public_bytes(serialization.Encoding.PEM).decode()
+        csr = x509.CertificateSigningRequestBuilder().subject_name(leaf.subject).add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(name) for name in names]), critical=False,
+        ).sign(key, hashes.SHA256())
         response = _post_csr(
             client, 'simplereenroll', csr, client_cert_pem=client_pem,
         )

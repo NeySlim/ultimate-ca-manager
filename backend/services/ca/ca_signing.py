@@ -55,6 +55,7 @@ class CASigningMixin:
         requester_sid: str = None,
         cert_type: str = 'server_cert',
         extra_ekus: list = None,
+        supersedes=None,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -212,6 +213,11 @@ class CASigningMixin:
             source=source,
         )
         db.session.add(new_cert)
+        if supersedes is not None:
+            # The renewed certificate's row is archived in the same commit:
+            # left as is, it stayed eligible for automatic renewal and was
+            # renewed in place again and again with the device's old key
+            supersedes.archived = True
 
         # Increment CA serial
         ca.serial = (ca.serial or 0) + 1
@@ -227,7 +233,7 @@ class CASigningMixin:
         # Renewal flows pass source like '<orig>-renewal'; everything else
         # (EST enrollment, etc.) is a fresh issuance.
         from services.webhook_service import emit_cert_renewed, emit_cert_issued
-        if 'renewal' in (source or ''):
+        if renewal_of is not None or 'renewal' in (source or ''):
             emit_cert_renewed(new_cert.to_dict(), ca_refid=ca.refid)
         else:
             emit_cert_issued(new_cert.to_dict(), ca_refid=ca.refid)

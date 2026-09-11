@@ -659,8 +659,9 @@ def simple_enroll(label=None):
             details=f'EST enrollment from {client_ip()}'
         )
         db.session.add(log)
-        if not safe_commit(logger, "EST enrollment commit failed"):
-            pass
+        ok, _err = safe_commit(logger, "EST enrollment commit failed")
+        if not ok:
+            return Response("EST enrollment commit failed", status=500)
         
         # RFC 7030 §4.2.3 requires only the newly issued certificate.
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
@@ -731,6 +732,24 @@ def simple_reenroll(label=None):
                     'CSR SubjectAltName does not match client certificate',
                     status=403,
                 )
+            # The presented certificate must be one THIS CA issued and still
+            # holds, not revoked, not expired: the TLS layer only proved the
+            # client holds its key, not that the certificate may still act
+            # (a revoked one, or one from another CA sharing the names,
+            # used to be re-enrolled and even graced its EKUs and names)
+            from services.cert.issued_lookup import (
+                OK, REVOKED, EXPIRED, issued_certificate_status,
+            )
+            renewed_row, status = issued_certificate_status(ca, client_cert_obj)
+            if status != OK:
+                logger.warning(
+                    'EST reenroll: client certificate refused (%s), serial=%s',
+                    status, client_cert_obj.serial_number,
+                )
+                return Response({
+                    REVOKED: 'Client certificate has been revoked',
+                    EXPIRED: 'Client certificate has expired',
+                }.get(status, 'Client certificate was not issued by this CA'), status=403)
         except Exception as e:
             logger.error(f"EST reenroll: failed to parse client cert: {e}")
             return Response('Invalid client certificate', status=400)
@@ -742,19 +761,21 @@ def simple_reenroll(label=None):
         cert_pem, serial = CAService.sign_csr_from_crypto(
             ca=ca, csr=csr, validity_days=days, source='est',
             renewal_of=client_cert_obj, cert_type='device_cert',
+            supersedes=renewed_row,
         )
 
         from models import AuditLog
         log = AuditLog(
-            action='certificate.renewed',
+            action='certificate_renewed',
             resource_type='certificate',
             resource_name=csr.subject.rfc4514_string(),
             username='mtls-client',
             details=f'EST re-enrollment via mTLS from {client_ip()}'
         )
         db.session.add(log)
-        if not safe_commit(logger, "EST re-enrollment commit failed"):
-            pass
+        ok, _err = safe_commit(logger, "EST re-enrollment commit failed")
+        if not ok:
+            return Response("EST re-enrollment commit failed", status=500)
         
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
         return _certs_only_response(cert, ca=ca)
