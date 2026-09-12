@@ -7,7 +7,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [Unreleased]
+## [2.229] - 2026-09-12
 
 ### Fixed
 - The service logged two errors at every start, `Control server error: [Errno 30] Read-only file system` then `Control server error: no running event loop`, without any other effect. The bundled gunicorn opens a control socket in the working directory by default, and the unit keeps that directory read-only. UCM never uses that interface, so it is now disabled in the gunicorn configuration shared by the Debian package, the RPM and the container image (#349, reported by @JoseGoncalves)
