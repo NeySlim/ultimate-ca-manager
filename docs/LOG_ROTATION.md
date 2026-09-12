@@ -115,7 +115,7 @@ The reopening did not happen. Check the service, then send the signal by hand.
 systemctl status ucm
 
 # Ask gunicorn to reopen its files, master only
-kill -USR1 "$(systemctl show -p MainPID --value ucm.service)"
+systemctl kill --kill-whom=main --signal=USR1 ucm.service
 ```
 
 ### Disk space issues

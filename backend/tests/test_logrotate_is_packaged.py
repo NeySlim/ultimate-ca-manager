@@ -30,8 +30,12 @@ def test_it_reopens_the_logs_without_restarting_the_worker():
     gracefully restarts the worker and drops every open WebSocket, so the
     rotation must never ask for one."""
     body = CONFIG.read_text(encoding='utf-8')
-    assert 'USR1' in body
     directives = [line.split('#')[0] for line in body.splitlines()]
+    commands = '\n'.join(directives)
+    assert re.search(r'\bsystemctl\s+kill\b', commands)
+    assert '--kill-whom=main' in commands
+    assert re.search(r'--signal=USR1\b', commands)
+    assert not any(re.search(r'^\s*kill\b', line) for line in directives)
     assert not any(re.search(r'\bsystemctl\s+reload\b', line) for line in directives)
     assert not any(re.search(r'-HUP\b|SIGHUP\b', line) for line in directives)
 
@@ -41,3 +45,18 @@ def test_each_recipe_installs_it(recipe):
     body = (ROOT / recipe).read_text(encoding='utf-8')
     assert 'packaging/logrotate/ucm' in body, f'{recipe} does not install the rotation config'
     assert 'logrotate.d' in body, f'{recipe} does not name the logrotate directory'
+
+
+def test_native_packages_depend_on_logrotate():
+    debian = (ROOT / 'packaging/debian/control').read_text(encoding='utf-8')
+    depends = re.search(r'^Depends:.*?(?=^[A-Z][A-Za-z-]*:)', debian, re.M | re.S)
+    assert depends and re.search(r'^\s*logrotate(?:\s*,?\s*)$', depends.group(), re.M)
+
+    rpm = (ROOT / 'packaging/rpm/ucm.spec').read_text(encoding='utf-8')
+    assert re.search(r'^Requires:\s+logrotate\s*$', rpm, re.M)
+
+
+def test_documented_manual_signal_targets_the_master_through_systemd():
+    docs = (ROOT / 'docs/LOG_ROTATION.md').read_text(encoding='utf-8')
+    command = 'systemctl kill --kill-whom=main --signal=USR1 ucm.service'
+    assert command in docs

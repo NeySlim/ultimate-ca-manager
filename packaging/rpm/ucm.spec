@@ -13,6 +13,7 @@ AutoReqProv:    no
 Requires:       python3 >= 3.12
 Requires:       systemd
 Requires:       openssl >= 1.1.1
+Requires:       logrotate
 Recommends:     softhsm
 Suggests:       openldap-clients
 

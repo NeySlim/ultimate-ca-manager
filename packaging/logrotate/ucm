@@ -24,13 +24,10 @@
         # here. A reload would map to HUP, gracefully restarting the worker and
         # dropping every open WebSocket at each rotation.
         #
-        # The signal goes to the master alone, which relays it to its workers.
-        # Sending it to the whole unit would also reach whatever the server has
-        # spawned, a DNS hook waiting on propagation for instance, and the
-        # default disposition of USR1 is to terminate.
-        pid=$(systemctl show -p MainPID --value ucm.service 2>/dev/null) || pid=
-        if [ -n "$pid" ] && [ "$pid" != 0 ]; then
-            kill -USR1 "$pid" || true
-        fi
+        # The signal goes atomically to the master alone, which relays it to
+        # its workers. Targeting the whole unit would also reach whatever the
+        # server has spawned, a DNS hook waiting on propagation for instance,
+        # and the default disposition of USR1 is to terminate.
+        systemctl kill --kill-whom=main --signal=USR1 ucm.service 2>/dev/null || true
     endscript
 }

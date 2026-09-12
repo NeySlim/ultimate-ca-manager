@@ -19,7 +19,8 @@ Depends: ${misc:Depends},
          python3-venv,
          openssl (>= 1.1.1),
          adduser,
-         systemd
+         systemd,
+         logrotate
 Recommends: softhsm2
 Suggests: ldap-utils
 Description: Ultimate CA Manager - Certificate Authority Management System
