@@ -4,6 +4,18 @@
 
 set -e
 
+# The rotation configuration became a package file in 2.230. Where an operator
+# had written one by hand, following documentation that promised the packages
+# shipped it, dpkg would stop and ask what to do, and an unattended upgrade
+# would fail on the question. Take the file over instead.
+LOGROTATE_CONF=/etc/logrotate.d/ucm
+if [ "$1" = install ] || [ "$1" = upgrade ]; then
+    if [ -e "$LOGROTATE_CONF" ] && ! dpkg-query -S "$LOGROTATE_CONF" >/dev/null 2>&1; then
+        mv -f "$LOGROTATE_CONF" "$LOGROTATE_CONF.dpkg-bak"
+        echo "Kept the previous log rotation config as $LOGROTATE_CONF.dpkg-bak"
+    fi
+fi
+
 case "$1" in
     install|upgrade)
         # Check Python version

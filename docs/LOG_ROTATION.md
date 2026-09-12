@@ -27,7 +27,7 @@ neither compressed nor aged out by date.
 
 ## How It Works
 
-1. **Daily at ~3 AM**: Logrotate runs (via system cron)
+1. **Once a day**: `logrotate.timer` fires, around midnight give or take an hour of jitter
 2. **Rotation**: Moves current log to dated file (e.g., `access.log-20260112`)
 3. **Compression**: Yesterday's log gets compressed (e.g., `access.log-20260111.gz`)
 4. **Reopening**: gunicorn is sent `USR1`, which makes it reopen its files. It
@@ -114,8 +114,8 @@ The reopening did not happen. Check the service, then send the signal by hand.
 # Check UCM service
 systemctl status ucm
 
-# Ask gunicorn to reopen its files
-systemctl kill -s USR1 ucm.service
+# Ask gunicorn to reopen its files, master only
+kill -USR1 "$(systemctl show -p MainPID --value ucm.service)"
 ```
 
 ### Disk space issues

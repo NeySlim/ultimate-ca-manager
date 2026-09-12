@@ -10,7 +10,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Fixed
-- The gunicorn access and error logs were never rotated on a Debian or RPM install and grew until the filesystem filled, the access log first on a server answering ACME and SCEP polling. Both packages now install a rotation configuration at `/etc/logrotate.d/ucm`, daily over fourteen compressed generations, which asks gunicorn to reopen its files rather than reload it: a reload restarts the worker and drops every open WebSocket. The application log keeps rotating itself as before, on every kind of install, and a container is unaffected since it writes to standard output. The documentation described this file, a retention policy and a database optimiser log that no package had ever shipped (#350, reported by @JoseGoncalves)
+- The gunicorn access and error logs were never rotated on a Debian or RPM install and grew until the filesystem filled, the access log first on a server answering ACME and SCEP polling. Both packages now install a rotation configuration at `/etc/logrotate.d/ucm`, daily over fourteen generations, all compressed but the most recent, which asks gunicorn to reopen its files rather than reload it: a reload restarts the worker and drops every open WebSocket. The application log keeps rotating itself as before, on every kind of install, and a container is unaffected since it writes to standard output. The documentation described this file, a retention policy and a database optimiser log that no package had ever shipped (#350, reported by @JoseGoncalves)
 
 ## [2.229] - 2026-09-12
 
