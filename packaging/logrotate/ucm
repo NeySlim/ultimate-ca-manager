@@ -1,0 +1,28 @@
+# Rotation of the gunicorn streams for a native install.
+#
+# The application rotates its own /var/log/ucm/ucm.log, ten megabytes over
+# five generations, and keeps doing so: a source install has no file here and
+# would otherwise be left with nothing bounding it. The two streams below are
+# gunicorn's, and nothing bounded them before.
+#
+# Containers are not concerned: there, both streams go to standard output.
+
+/var/log/ucm/access.log
+/var/log/ucm/error.log {
+    daily
+    rotate 14
+    compress
+    delaycompress
+    notifempty
+    missingok
+    create 0640 ucm ucm
+    dateext
+    dateformat -%Y%m%d
+    sharedscripts
+    postrotate
+        # USR1 tells gunicorn to reopen its files, which is all that is needed
+        # here. A reload would map to HUP, gracefully restarting the worker and
+        # dropping every open WebSocket at each rotation.
+        systemctl kill -s USR1 ucm.service 2>/dev/null || true
+    endscript
+}

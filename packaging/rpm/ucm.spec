@@ -58,6 +58,9 @@ install -m 755 packaging/debian/start-ucm.sh %{buildroot}%{ucm_home}/start-ucm.s
 install -m 755 packaging/scripts/configure-firewall.sh %{buildroot}%{ucm_home}/scripts/
 install -m 755 packaging/scripts/ucm-watcher.sh %{buildroot}%{ucm_home}/scripts/
 install -m 644 packaging/firewall/ucm.xml %{buildroot}/usr/lib/firewalld/services/
+# Log rotation for the gunicorn streams (#350)
+install -d %{buildroot}%{_sysconfdir}/logrotate.d
+install -m 644 packaging/logrotate/ucm %{buildroot}%{_sysconfdir}/logrotate.d/%{name}
 install -m 644 packaging/rpm/ucm.service %{buildroot}%{_unitdir}/%{name}.service
 install -m 644 packaging/systemd/ucm-watcher.path %{buildroot}%{_unitdir}/%{name}-watcher.path
 install -m 644 packaging/systemd/ucm-watcher.service %{buildroot}%{_unitdir}/%{name}-watcher.service
@@ -283,6 +286,7 @@ fi
 %files
 %{ucm_home}/
 %dir %{_sysconfdir}/%{name}/
+%config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 %dir %{_localstatedir}/log/%{name}/
 %{_unitdir}/%{name}.service
 %{_unitdir}/%{name}-watcher.path

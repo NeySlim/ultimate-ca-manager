@@ -2,28 +2,37 @@
 
 ## Configuration
 
-**Location:** `/etc/logrotate.d/ucm`
+**Location:** `/etc/logrotate.d/ucm`, installed by the Debian package and by the RPM.
+
+A container writes both streams to standard output and needs none of this. A
+source install has no file here either: bound its `access.log` and `error.log`
+yourself, or copy `packaging/logrotate/ucm` into place.
 
 ## Rotation Schedule
 
-### Application Logs (access.log, error.log)
+### The gunicorn streams (access.log, error.log)
 - **Frequency:** Daily
 - **Retention:** 14 days
 - **Compression:** Yes (gzip)
 - **Total disk usage:** ~10-50 MB (depending on traffic)
 
-### DB Optimizer Log (db-optimizer.log)
-- **Frequency:** Weekly
-- **Retention:** 8 weeks
-- **Compression:** Yes (gzip)
-- **Total disk usage:** < 1 MB
+`access.log` is the loudest file on a server answering ACME and SCEP polling,
+and it is the one this configuration exists for.
+
+### The application log (ucm.log)
+
+Not handled here. The application rotates it itself, ten megabytes over five
+generations, roughly sixty megabytes in all, on every kind of install. It is
+neither compressed nor aged out by date.
 
 ## How It Works
 
 1. **Daily at ~3 AM**: Logrotate runs (via system cron)
 2. **Rotation**: Moves current log to dated file (e.g., `access.log-20260112`)
 3. **Compression**: Yesterday's log gets compressed (e.g., `access.log-20260111.gz`)
-4. **Service Reload**: UCM service reloaded to open new log files
+4. **Reopening**: gunicorn is sent `USR1`, which makes it reopen its files. It
+   is not reloaded: a reload maps to `HUP`, which gracefully restarts the
+   worker and would drop every open WebSocket at each rotation.
 5. **Cleanup**: Logs older than retention period are deleted
 
 ## Log Files
@@ -36,7 +45,8 @@
 ├── access.log-20260110.gz # ...
 ├── error.log # Current error log
 ├── error.log-20260112 # Yesterday
-├── db-optimizer.log # DB optimization log
+├── ucm.log # Application log, rotated by the application
+├── ucm.log.1 # ... over five generations
 ```
 
 ## Manual Operations
@@ -80,6 +90,8 @@ notifempty # Don't rotate empty logs
 missingok # Don't error if log missing
 dateext # Use date extension (not .1, .2)
 sharedscripts # Run postrotate once for all logs
+create 0640 ucm ucm # Owner and mode of the fresh file
+postrotate # Send USR1 so gunicorn reopens, never a reload
 ```
 
 ## Troubleshooting
@@ -96,13 +108,14 @@ sudo journalctl -u logrotate -n 50
 sudo logrotate -f /etc/logrotate.d/ucm
 ```
 
-### Service not reloading
+### Logs still going to the rotated file
+The reopening did not happen. Check the service, then send the signal by hand.
 ```bash
 # Check UCM service
 systemctl status ucm
 
-# Manual reload
-systemctl reload ucm
+# Ask gunicorn to reopen its files
+systemctl kill -s USR1 ucm.service
 ```
 
 ### Disk space issues
@@ -119,9 +132,11 @@ find /var/log/ucm/ -name "*.gz" -mtime +7 -delete
 
 ## Integration with Installer
 
-The logrotate configuration is automatically deployed by the UCM installer to `/etc/logrotate.d/ucm` during installation.
+The Debian package and the RPM install the configuration at
+`/etc/logrotate.d/ucm`, as a configuration file: an edit of your own survives
+an upgrade.
 
 ---
 
-**Last Updated:** 2026-02-12
-**UCM Version:** 2.x
+**Last Updated:** 2026-09-12
+**UCM Version:** 2.230 and later

@@ -49,10 +49,15 @@ The service runs as user `ucm` with restricted permissions (NoNewPrivileges, Pro
 
 ### Log Rotation
 
-Logs are rotated automatically via logrotate:
+The gunicorn access and error logs are rotated by logrotate, from a file the
+Debian package and the RPM install:
 - Location: `/etc/logrotate.d/ucm`
 - Rotation: Daily, 14 copies kept
 - Compression: gzip
+
+The application log, `ucm.log`, is rotated by the application itself, ten
+megabytes over five generations, on every kind of install. A container writes
+everything to standard output instead.
 
 See [LOG_ROTATION.md](LOG_ROTATION.md) for details.
 

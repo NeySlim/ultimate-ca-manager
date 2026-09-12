@@ -33,6 +33,10 @@ override_dh_auto_install:
 	# Remove .env files (configuration is created by postinst)
 	rm -f debian/ucm/opt/ucm/.env* debian/ucm/opt/ucm/backend/.env* 2>/dev/null || true
 	
+	# Log rotation for the gunicorn streams (#350). Debhelper registers
+	# anything under /etc as a conffile, so a local edit survives an upgrade.
+	install -D -m 644 packaging/logrotate/ucm debian/ucm/etc/logrotate.d/ucm
+
 	# Install start script
 	install -m 755 packaging/debian/start-ucm.sh debian/ucm/opt/ucm/start-ucm.sh
 	
