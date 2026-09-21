@@ -808,6 +808,23 @@ def create_app(config_name=None):
         except ImportError:
             pass
 
+        # Register AD Connector domain controller health probe.
+        # Registered at the scheduler's own cadence; the real period comes
+        # from the connector row on each wake (see health._is_due), so an
+        # interval change takes effect without a restart and without the
+        # web worker having to reach the process holding the scheduler lock.
+        try:
+            from services.ad_connector.health import run_health_probe
+            scheduler.register_task(
+                name="ad_connector_health",
+                func=run_health_probe,
+                interval=60,
+                description="Probe Active Directory domain controllers and skip unreachable ones"
+            )
+            app.logger.info("Registered AD Connector health probe task")
+        except ImportError:
+            pass
+
         # Wire email + WebSocket notifications onto the event bus so lifecycle
         # code emits one event instead of calling three notification systems.
         try:

@@ -423,3 +423,400 @@ class TestIsMemberOfGroup:
         )
         with app.app_context():
             assert lookup.is_member_of_group('WIN11$', 'Enroll-Machines') is True
+
+
+class TestSplitServers:
+    """The one field now names every DC to fail over between. The bare
+    domain name that used to be the natural thing to type is exactly what
+    breaks LDAPS on a multi-DC domain (each DC's certificate carries only
+    its own FQDN), so the list has to survive round-tripping intact."""
+
+    def test_single_hostname(self):
+        assert lookup.split_servers('dc1.corp.local') == ['dc1.corp.local']
+
+    def test_list_input(self):
+        assert lookup.split_servers(['dc1.corp.local', 'dc2.corp.local']) == \
+            ['dc1.corp.local', 'dc2.corp.local']
+
+    def test_newline_separated_is_what_the_column_stores(self):
+        assert lookup.split_servers('dc1.corp.local\ndc2.corp.local') == \
+            ['dc1.corp.local', 'dc2.corp.local']
+
+    def test_comma_separated_with_whitespace(self):
+        assert lookup.split_servers(' dc1.corp.local ,dc2.corp.local ') == \
+            ['dc1.corp.local', 'dc2.corp.local']
+
+    def test_blank_rows_are_dropped(self):
+        assert lookup.split_servers(['dc1.corp.local', '', '  ', None]) == ['dc1.corp.local']
+
+    def test_duplicates_collapse_keeping_first_position(self):
+        assert lookup.split_servers(['dc2.corp.local', 'dc1.corp.local', 'dc2.corp.local']) == \
+            ['dc2.corp.local', 'dc1.corp.local']
+
+    def test_empty_and_none(self):
+        assert lookup.split_servers('') == []
+        assert lookup.split_servers(None) == []
+        assert lookup.split_servers([]) == []
+
+    def test_round_trips_through_join(self):
+        servers = ['dc1.corp.local', 'dc2.corp.local', 'dc3.corp.local']
+        assert lookup.split_servers(lookup.join_servers(servers)) == servers
+
+
+class _RecordingConnector:
+    """Stands in for ``_connect_to``, recording every host tried and
+    failing the ones named in ``fail``."""
+
+    def __init__(self, fail=()):
+        self.fail = dict(fail) if isinstance(fail, dict) else {h: 'refused' for h in fail}
+        self.attempted = []
+
+    def __call__(self, config, host, tls):
+        self.attempted.append(host)
+        if host in self.fail:
+            raise RuntimeError(self.fail[host])
+        return _FakeConnection()
+
+
+class TestConnectFailover:
+    def _config(self, server):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            server=server, port=636, use_ssl=True, verify_ssl=True,
+            ca_bundle=None, bind_dn='svc-ucm', bind_password='irrelevant',
+        )
+
+    def test_first_server_wins_and_the_rest_are_left_alone(self, monkeypatch):
+        connector = _RecordingConnector()
+        monkeypatch.setattr(lookup, '_connect_to', connector)
+        conn = lookup._connect(self._config(['dc1.corp.local', 'dc2.corp.local']))
+        assert isinstance(conn, _FakeConnection)
+        assert connector.attempted == ['dc1.corp.local']
+
+    def test_falls_over_to_the_next_server(self, monkeypatch):
+        connector = _RecordingConnector(fail=['dc1.corp.local'])
+        monkeypatch.setattr(lookup, '_connect_to', connector)
+        conn = lookup._connect(self._config(['dc1.corp.local', 'dc2.corp.local']))
+        assert isinstance(conn, _FakeConnection)
+        assert connector.attempted == ['dc1.corp.local', 'dc2.corp.local']
+
+    def test_every_server_failing_names_each_one(self, monkeypatch):
+        connector = _RecordingConnector(fail={
+            'dc1.corp.local': 'certificate SAN mismatch',
+            'dc2.corp.local': 'connection refused',
+        })
+        monkeypatch.setattr(lookup, '_connect_to', connector)
+        with pytest.raises(lookup.ADConnectorConnectionError) as excinfo:
+            lookup._connect(self._config(['dc1.corp.local', 'dc2.corp.local']))
+        message = str(excinfo.value)
+        assert 'dc1.corp.local: certificate SAN mismatch' in message
+        assert 'dc2.corp.local: connection refused' in message
+
+    def test_no_server_configured_raises(self, monkeypatch):
+        monkeypatch.setattr(lookup, '_connect_to', _RecordingConnector())
+        with pytest.raises(ValueError):
+            lookup._connect(self._config(''))
+
+    def test_ca_bundle_survives_every_attempt(self, monkeypatch):
+        """The temp CA file used to be unlinked the moment the connection
+        call returned. With failover there are several attempts, and each
+        later one has to still find the bundle on disk."""
+        import os
+
+        seen = []
+
+        def _spy(config, host, tls):
+            seen.append((host, os.path.exists(tls.ca_certs_file)))
+            raise RuntimeError('refused')
+
+        monkeypatch.setattr(lookup, '_connect_to', _spy)
+        config = self._config(['dc1.corp.local', 'dc2.corp.local'])
+        config.ca_bundle = '-----BEGIN CERTIFICATE-----\nnot-a-real-cert\n-----END CERTIFICATE-----'
+        with pytest.raises(lookup.ADConnectorConnectionError):
+            lookup._connect(config)
+        assert seen == [('dc1.corp.local', True), ('dc2.corp.local', True)]
+
+    def test_ca_bundle_is_removed_afterwards(self, monkeypatch):
+        captured = {}
+
+        def _spy(config, host, tls):
+            captured['path'] = tls.ca_certs_file
+            return _FakeConnection()
+
+        monkeypatch.setattr(lookup, '_connect_to', _spy)
+        config = self._config(['dc1.corp.local'])
+        config.ca_bundle = '-----BEGIN CERTIFICATE-----\nnot-a-real-cert\n-----END CERTIFICATE-----'
+        lookup._connect(config)
+        import os
+        assert not os.path.exists(captured['path'])
+
+
+class TestTestConnection:
+    """Every DC is probed, not just enough of them to reach a verdict: a
+    second DC that is down stays invisible until the first one fails in
+    production otherwise."""
+
+    def _config(self, server):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            server=server, port=636, use_ssl=True, verify_ssl=True,
+            ca_bundle=None, bind_dn='svc-ucm', bind_password='irrelevant',
+        )
+
+    def test_no_server(self):
+        result = lookup.test_connection(self._config(''))
+        assert result['success'] is False
+        assert result['servers'] == []
+
+    def test_single_server_success(self, monkeypatch):
+        monkeypatch.setattr(lookup, '_connect_to', _RecordingConnector())
+        result = lookup.test_connection(self._config(['dc1.corp.local']))
+        assert result['success'] is True
+        assert result['partial'] is False
+        assert result['message'] == 'Connected and bound successfully'
+        assert [r['server'] for r in result['servers']] == ['dc1.corp.local']
+
+    def test_all_servers_probed_even_after_one_succeeds(self, monkeypatch):
+        connector = _RecordingConnector()
+        monkeypatch.setattr(lookup, '_connect_to', connector)
+        result = lookup.test_connection(self._config(['dc1.corp.local', 'dc2.corp.local']))
+        assert connector.attempted == ['dc1.corp.local', 'dc2.corp.local']
+        assert result['success'] is True
+        assert result['partial'] is False
+        assert all(r['success'] for r in result['servers'])
+
+    def test_partial_failure_is_flagged_not_reported_as_clean(self, monkeypatch):
+        connector = _RecordingConnector(fail={'dc2.corp.local': 'certificate SAN mismatch'})
+        monkeypatch.setattr(lookup, '_connect_to', connector)
+        result = lookup.test_connection(self._config(['dc1.corp.local', 'dc2.corp.local']))
+        assert result['success'] is True
+        assert result['partial'] is True
+        assert 'certificate SAN mismatch' in result['message']
+        by_host = {r['server']: r for r in result['servers']}
+        assert by_host['dc1.corp.local']['success'] is True
+        assert by_host['dc2.corp.local']['success'] is False
+        assert by_host['dc2.corp.local']['message'] == 'certificate SAN mismatch'
+
+    def test_total_failure(self, monkeypatch):
+        connector = _RecordingConnector(fail={
+            'dc1.corp.local': 'certificate SAN mismatch',
+            'dc2.corp.local': 'connection refused',
+        })
+        monkeypatch.setattr(lookup, '_connect_to', connector)
+        result = lookup.test_connection(self._config(['dc1.corp.local', 'dc2.corp.local']))
+        assert result['success'] is False
+        assert result['partial'] is False
+        assert result['message'].startswith('Connection failed: ')
+        assert 'dc1.corp.local: certificate SAN mismatch' in result['message']
+        assert 'dc2.corp.local: connection refused' in result['message']
+
+    def test_connections_are_unbound(self, monkeypatch):
+        opened = []
+
+        def _spy(config, host, tls):
+            conn = _FakeConnection()
+            opened.append(conn)
+            return conn
+
+        monkeypatch.setattr(lookup, '_connect_to', _spy)
+        lookup.test_connection(self._config(['dc1.corp.local', 'dc2.corp.local']))
+        assert len(opened) == 2
+        assert all(c.unbound for c in opened)
+
+
+class TestServersProperty:
+    def test_single_hostname_config_reads_as_one_element(self, app):
+        """A config saved before this field accepted more than one DC holds
+        a bare hostname and must keep working untouched."""
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            db.session.commit()
+            config = ADConnectorConfig(server='dc1.hagland.domain')
+            assert config.servers == ['dc1.hagland.domain']
+
+    def test_setter_round_trips(self, app):
+        with app.app_context():
+            config = ADConnectorConfig()
+            config.servers = ['dc1.corp.local', 'dc2.corp.local']
+            assert config.servers == ['dc1.corp.local', 'dc2.corp.local']
+            assert config.to_dict()['servers'] == ['dc1.corp.local', 'dc2.corp.local']
+
+    def test_setter_clears_to_none(self, app):
+        with app.app_context():
+            config = ADConnectorConfig(server='dc1.corp.local')
+            config.servers = []
+            assert config.server is None
+            assert config.servers == []
+
+
+class TestHealthState:
+    """The probe's verdict is advisory: it may reorder and thin the DC list
+    that _connect walks, never empty it, and it expires. A stale or wrong
+    verdict must degrade to "no opinion", not to a refused enrollment."""
+
+    @staticmethod
+    def _blob(servers, state='degraded', age_seconds=0):
+        from datetime import timedelta
+        from services.ad_connector import health as h
+        from utils.datetime_utils import utc_now, utc_isoformat
+        checked = utc_isoformat(utc_now() - timedelta(seconds=age_seconds))
+        return {
+            'state': state,
+            'checked_at': checked,
+            'servers': {
+                host: {'healthy': ok, 'message': '', 'checked_at': checked, 'since': checked}
+                for host, ok in servers.items()
+            },
+        }
+
+    def test_unhealthy_server_is_dropped(self):
+        from services.ad_connector import health as h
+        blob = self._blob({'dc1.corp.local': False, 'dc2.corp.local': True})
+        assert h.prioritise(['dc1.corp.local', 'dc2.corp.local'], blob) == ['dc2.corp.local']
+
+    def test_healthy_server_is_promoted_ahead_of_unknown(self):
+        from services.ad_connector import health as h
+        blob = self._blob({'dc2.corp.local': True})
+        assert h.prioritise(['dc1.corp.local', 'dc2.corp.local'], blob) == \
+            ['dc2.corp.local', 'dc1.corp.local']
+
+    def test_never_returns_empty_when_everything_is_down(self):
+        """Trusting an all-down verdict would turn a UCM-side probe failure
+        into a total enrollment outage. The bind gets to decide instead."""
+        from services.ad_connector import health as h
+        blob = self._blob({'dc1.corp.local': False, 'dc2.corp.local': False}, state='down')
+        assert h.prioritise(['dc1.corp.local', 'dc2.corp.local'], blob) == \
+            ['dc1.corp.local', 'dc2.corp.local']
+
+    def test_stale_verdict_is_ignored(self):
+        from services.ad_connector import health as h
+        blob = self._blob({'dc1.corp.local': False}, age_seconds=h._HEALTH_STALE_AFTER_SECONDS + 60)
+        assert h.prioritise(['dc1.corp.local', 'dc2.corp.local'], blob) == \
+            ['dc1.corp.local', 'dc2.corp.local']
+
+    def test_no_health_at_all_is_a_passthrough(self):
+        from services.ad_connector import health as h
+        assert h.prioritise(['dc1.corp.local'], None) == ['dc1.corp.local']
+        assert h.prioritise(['dc1.corp.local'], {}) == ['dc1.corp.local']
+
+    def test_corrupt_json_degrades_to_no_opinion(self):
+        from services.ad_connector import health as h
+        assert h.prioritise(['dc1.corp.local'], 'not json at all') == ['dc1.corp.local']
+        assert h.state_of('not json at all') == h.STATE_UNKNOWN
+
+
+class TestBuildState:
+    def test_all_healthy_is_up(self):
+        from services.ad_connector import health as h
+        state = h._build_state([('dc1', True, 'ok'), ('dc2', True, 'ok')], None)
+        assert state['state'] == h.STATE_UP
+        assert (state['healthy'], state['total']) == (2, 2)
+
+    def test_one_healthy_is_degraded(self):
+        from services.ad_connector import health as h
+        state = h._build_state([('dc1', True, 'ok'), ('dc2', False, 'refused')], None)
+        assert state['state'] == h.STATE_DEGRADED
+
+    def test_none_healthy_is_down(self):
+        from services.ad_connector import health as h
+        state = h._build_state([('dc1', False, 'refused'), ('dc2', False, 'refused')], None)
+        assert state['state'] == h.STATE_DOWN
+
+    def test_since_is_carried_forward_while_the_verdict_holds(self):
+        """A DC down for an hour should report when it went down, not when
+        it was last checked."""
+        from services.ad_connector import health as h
+        first = h._build_state([('dc1', False, 'refused')], None)
+        went_down_at = first['servers']['dc1']['since']
+        second = h._build_state([('dc1', False, 'refused')], first)
+        assert second['servers']['dc1']['since'] == went_down_at
+
+    def test_since_moves_when_the_verdict_flips(self):
+        from services.ad_connector import health as h
+        down = h._build_state([('dc1', False, 'refused')], None)
+        up = h._build_state([('dc1', True, 'ok')], down)
+        assert up['servers']['dc1']['since'] != down['servers']['dc1']['since']
+
+
+class TestProbeIsDue:
+    @staticmethod
+    def _config(interval):
+        from types import SimpleNamespace
+        return SimpleNamespace(health_probe_interval=interval)
+
+    def test_never_probed_is_due(self):
+        from services.ad_connector import health as h
+        assert h._is_due(self._config(120), None) is True
+
+    def test_within_the_interval_is_not_due(self):
+        from services.ad_connector import health as h
+        blob = TestHealthState._blob({'dc1': True}, age_seconds=10)
+        assert h._is_due(self._config(120), blob) is False
+
+    def test_past_the_interval_is_due(self):
+        from services.ad_connector import health as h
+        blob = TestHealthState._blob({'dc1': True}, age_seconds=200)
+        assert h._is_due(self._config(120), blob) is True
+
+    def test_a_shortened_interval_takes_effect_without_restart(self):
+        """The period is read from the row on every wake, not baked into the
+        scheduler registration, so lowering it applies immediately."""
+        from services.ad_connector import health as h
+        blob = TestHealthState._blob({'dc1': True}, age_seconds=90)
+        assert h._is_due(self._config(120), blob) is False
+        assert h._is_due(self._config(60), blob) is True
+
+
+class TestConnectSkipsUnhealthy:
+    def _config(self, servers, health_blob):
+        from types import SimpleNamespace
+        return SimpleNamespace(
+            server=servers, port=636, use_ssl=True, verify_ssl=True,
+            ca_bundle=None, bind_dn='svc-ucm', bind_password='irrelevant',
+            health=health_blob,
+        )
+
+    def test_known_bad_dc_is_not_dialled(self, monkeypatch):
+        """The point of the probe: an enrollment must not pay dc1's connect
+        timeout to rediscover what the probe already knows."""
+        connector = _RecordingConnector()
+        monkeypatch.setattr(lookup, '_connect_to', connector)
+        blob = TestHealthState._blob({'dc1.corp.local': False, 'dc2.corp.local': True})
+        lookup._connect(self._config(['dc1.corp.local', 'dc2.corp.local'], blob))
+        assert connector.attempted == ['dc2.corp.local']
+
+    def test_without_health_the_order_is_as_configured(self, monkeypatch):
+        connector = _RecordingConnector()
+        monkeypatch.setattr(lookup, '_connect_to', connector)
+        lookup._connect(self._config(['dc1.corp.local', 'dc2.corp.local'], None))
+        assert connector.attempted == ['dc1.corp.local']
+
+
+class TestRunHealthProbe:
+    def test_disabled_connector_is_skipped(self, app):
+        from services.ad_connector import health as h
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            config = ADConnectorConfig(server='dc1.corp.local', enabled=False)
+            db.session.add(config)
+            db.session.commit()
+            assert 'skipped' in h.run_health_probe()
+
+    def test_probe_stores_its_verdict(self, app, monkeypatch):
+        from services.ad_connector import health as h
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            config = ADConnectorConfig(
+                server='dc1.corp.local\ndc2.corp.local', enabled=True,
+                base_dn='DC=corp,DC=local')
+            db.session.add(config)
+            db.session.commit()
+            monkeypatch.setattr(
+                h, 'probe',
+                lambda cfg: [('dc1.corp.local', False, 'refused'),
+                             ('dc2.corp.local', True, 'ok')])
+            result = h.run_health_probe()
+            assert result['state'] == h.STATE_DEGRADED
+            stored = ADConnectorConfig.get_singleton().health
+            assert stored['servers']['dc1.corp.local']['healthy'] is False
+            assert stored['servers']['dc2.corp.local']['healthy'] is True
