@@ -34,7 +34,7 @@ export function ResponsiveDataTable({
   bulkActions,          // ReactNode: shown when items selected
   
   // Row actions (dropdown menu)
-  rowActions, // (row) => [{ label, icon, onClick, variant }]
+  rowActions, // (row) => [{ label, icon, onClick, variant, disabled, disabledReason }]
   
   // Search
   searchable = false,
@@ -44,7 +44,8 @@ export function ResponsiveDataTable({
   onSearchChange,
   
   // Toolbar (filters + actions next to search)
-  toolbarFilters, // Array of { key, value, onChange, placeholder, options: [{value, label}] }
+  toolbarFilters, // Array of { key, type, value, onChange, placeholder, options: [{value, label}] }
+                  // type 'toggle': { label, value: bool, onChange, disabled, disabledReason }
   toolbarActions, // ReactNode - buttons to show on right side of toolbar
   
   // Column customization
@@ -270,6 +271,7 @@ export function ResponsiveDataTable({
     if (!toolbarFilters) return false
     return toolbarFilters.some(f => {
       if (f.type === 'dateRange') return f.from || f.to
+      if (f.type === 'toggle') return false
       if (f.type === 'multiSelect') return Array.isArray(f.value) && f.value.length > 0
       return f.value
     })
@@ -280,6 +282,7 @@ export function ResponsiveDataTable({
     if (!toolbarFilters) return []
     return toolbarFilters
       .filter(f => {
+        if (f.type === 'toggle') return false
         if (f.type === 'multiSelect') return Array.isArray(f.value) && f.value.length > 0
         if (f.type === 'dateRange') return f.from || f.to
         return f.value !== '' && f.value !== null && f.value !== undefined
@@ -870,6 +873,42 @@ function SearchBar({
         {!isMobile && filters && filters.length > 0 && (
           <div className="flex items-center gap-2 shrink-0">
             {filters.map((filter) => {
+              // Boolean toggle filter -- a checkbox-style pill for the
+              // "show/hide this class of row" case, where a multiSelect with
+              // one option would read as a filter the user must unset rather
+              // than a switch. `disabled` covers the case where turning it
+              // off would empty the table.
+              if (filter.type === 'toggle') {
+                const checked = Boolean(filter.value)
+                return (
+                  <button
+                    key={filter.key}
+                    type="button"
+                    role="switch"
+                    aria-checked={checked}
+                    disabled={filter.disabled}
+                    onClick={() => { if (!filter.disabled) filter.onChange?.(!checked) }}
+                    title={filter.disabled ? (filter.disabledReason || filter.label) : filter.label}
+                    className={cn(
+                      'h-7 px-2.5 inline-flex items-center gap-1.5 shrink-0',
+                      'text-xs rounded-md border transition-colors',
+                      filter.disabled
+                        ? 'border-border text-text-tertiary opacity-50 cursor-not-allowed'
+                        : checked
+                          ? 'border-accent-primary-op50 bg-accent-primary-op10 text-text-primary'
+                          : 'border-border text-text-secondary hover:text-text-primary'
+                    )}
+                  >
+                    <span className={cn(
+                      'w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0',
+                      checked ? 'bg-accent-primary border-accent-primary' : 'border-text-tertiary'
+                    )}>
+                      {checked && <Check size={10} weight="bold" className="text-white" />}
+                    </span>
+                    {filter.label}
+                  </button>
+                )
+              }
               // Date range filter
               if (filter.type === 'dateRange') {
                 return (
@@ -1496,17 +1535,25 @@ function RowActionMenu({ row, idx, actions, isOpen, onToggle, menuRef }) {
         return (
           <button
             key={i}
+            disabled={action.disabled}
             onClick={(e) => {
               e.stopPropagation()
+              if (action.disabled) return
               action.onClick?.()
             }}
-            title={action.label}
+            // An action the server will refuse is shown greyed with the
+            // reason on hover, rather than hidden: a row that silently
+            // loses its delete button reads as a rendering glitch, while
+            // one that explains why it cannot be deleted is an answer.
+            title={action.disabled ? (action.disabledReason || action.label) : action.label}
             className={cn(
               'w-6 h-6 rounded-lg flex items-center justify-center',
               'transition-all duration-150',
-              action.variant === 'danger'
-                ? 'text-text-tertiary hover:text-status-danger hover:bg-status-danger-op10'
-                : 'text-text-tertiary hover:text-accent-primary hover:bg-accent-primary-op10'
+              action.disabled
+                ? 'text-text-tertiary opacity-40 cursor-not-allowed'
+                : action.variant === 'danger'
+                  ? 'text-text-tertiary hover:text-status-danger hover:bg-status-danger-op10'
+                  : 'text-text-tertiary hover:text-accent-primary hover:bg-accent-primary-op10'
             )}
           >
             {Icon && <Icon size={15} weight="duotone" />}
@@ -1682,17 +1729,22 @@ function MobileCardRow({
             return (
               <button
                 key={i}
+                disabled={action.disabled}
                 onClick={(e) => {
                   e.stopPropagation()
+                  if (action.disabled) return
                   action.onClick?.()
                   setShowActions(false)
                 }}
+                title={action.disabled ? (action.disabledReason || action.label) : undefined}
                 className={cn(
                   'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium',
                   'border border-border transition-colors',
-                  action.variant === 'danger'
-                    ? 'status-danger-text hover:status-danger-bg'
-                    : 'text-text-primary hover:bg-bg-tertiary'
+                  action.disabled
+                    ? 'text-text-tertiary opacity-40 cursor-not-allowed'
+                    : action.variant === 'danger'
+                      ? 'status-danger-text hover:status-danger-bg'
+                      : 'text-text-primary hover:bg-bg-tertiary'
                 )}
               >
                 {Icon && <Icon size={16} />}
