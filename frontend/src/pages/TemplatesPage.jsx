@@ -326,35 +326,6 @@ export default function TemplatesPage() {
     else setFilterType([])
   }, [])
 
-  const rowActions = useCallback((row) => [
-    // Edit and Duplicate both end at write:templates, which is what the detail
-    // panel already asks for; only this menu offered them to every reader.
-    ...(canWrite('templates') ? [
-      {
-        label: t('common.edit'),
-        icon: PencilSimple,
-        disabled: row.is_system,
-        disabledReason: t('templates.systemNotEditable'),
-        onClick: () => { setEditingTemplate(row); setShowTemplateModal(true) },
-      },
-      // Duplicate stays available on a system template on purpose: the copy
-      // is created with is_system false, which is the supported way to base
-      // a custom template on a built-in one.
-      { label: t('templates.duplicateTemplate'), icon: Copy, onClick: () => handleDuplicateTemplate(row) },
-    ] : []),
-    { label: t('common.export'), icon: Download, onClick: () => handleExportTemplate(row) },
-    ...(canDelete('templates') ? [
-      {
-        label: t('common.delete'),
-        icon: Trash,
-        variant: 'danger',
-        disabled: row.is_system,
-        disabledReason: t('templates.systemNotDeletable'),
-        onClick: () => handleDeleteTemplate(row),
-      }
-    ] : [])
-  ], [canWrite, canDelete, t])
-
   // ============= HELP CONTENT =============
   
   const helpContent = (
