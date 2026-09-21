@@ -10,7 +10,7 @@ export default {
           { label: '请求', text: '待处理、已批准和已拒绝的 SCEP 注册请求' },
           { label: '配置', text: 'SCEP 服务器设置：CA 选择、CA 标识符、自动批准' },
           { label: '配置文件', text: '命名注册端点，每个都有自己的 URL、CA、模板和质询' },
-          { label: 'Intune 应用', text: '由验证 Intune 质询的配置文件共享的 Entra 应用注册（租户 ID、客户端 ID、客户端密钥）；编辑时密钥留空则保留当前密钥，测试连接仅获取令牌并发现服务，不消耗任何质询，仍被配置文件使用的应用无法删除' },
+          { label: 'Intune 应用注册', text: '由验证 Intune 质询的配置文件共享的 Entra 应用注册（租户 ID、客户端 ID、客户端密钥）；编辑时密钥留空则保留当前密钥，测试连接仅获取令牌并发现服务，不消耗任何质询，仍被配置文件使用的应用无法删除' },
           { label: '质询密码', text: '管理每个 CA 的设备注册质询密码' },
           { label: '信息', text: 'SCEP 端点 URL 和集成说明' },
         ]
@@ -30,7 +30,7 @@ export default {
           { label: '证书模板', text: '绑定模板后，其密钥用法（KU/EKU）和有效期将决定通过该配置文件签发的每个证书' },
           { label: '按配置文件的质询', text: '每个配置文件都有自己的质询密码，加密存储，过期窗口与全局质询相同' },
           { label: '默认端点', text: '不带片段的 /scep/pkiclient.exe 端点继续使用全局配置' },
-          { label: 'Microsoft Intune 验证', text: '配置文件可以针对 Intune 自己的按设备 SCEP 质询进行验证，而不使用静态密码：在配置文件中从 Intune 应用选项卡选择一个应用注册（SCEP challenge validation 和 Application.Read.All 权限），自动批准仍为必需；升级时，每个现有配置文件会自动获得一个以其命名的应用，按租户和客户端去重' },
+          { label: 'Microsoft Intune 验证', text: '配置文件可以针对 Intune 自己的按设备 SCEP 质询进行验证，而不使用静态密码：在配置文件中从 Intune 应用注册选项卡选择一个应用注册（SCEP challenge validation 和 Application.Read.All 权限），自动批准仍为必需；升级时，每个现有配置文件会自动获得一个以其命名的应用，按租户和客户端去重' },
           { label: '手动审批', text: '通过配置文件提交的请求会以该配置文件的模板（有效期、密钥用法）批准，与自动批准签发的结果完全一致' },
           { label: '注册者不得持有的用途', text: '绑定到配置文件的模板不能包含 OCSP 签名、时间戳、任意用途或智能卡登录，SCEP 续期也绝不会沿用这些用途；当配置文件针对 Intune 验证时允许智能卡登录，因为 Intune 为身份作担保' },
         ]
@@ -141,7 +141,7 @@ crypto pki enroll UCM-CA
 Intune 不支持静态质询密码:, 它会为每台设备签发自己的加密质询，只有 Intune 的 API 才能验证。在 SCEP **配置文件**（而非全局端点）上启用 **Microsoft Intune SCEP 质询验证**，并提供 Entra 应用注册的租户 ID、客户端 ID 和客户端密钥：
 
 1. 在 Microsoft Entra ID 中注册一个应用，并授予其 **Intune API → SCEP challenge validation**（\`scep_challenge_provider\`）和 **Microsoft Graph → Application.Read.All** 应用程序权限，两者均需管理员同意
-2. 在 **Intune 应用** 中添加一次应用注册（名称、租户 ID、客户端 ID、客户端密钥），然后点击**测试连接**，确认 UCM 能够连接到 Intune；随后在配置文件的 **应用注册** 选择器中选择它。同一租户的配置文件共享该应用注册，因此密钥只需在一处轮换
+2. 在 **Intune 应用注册** 中添加一次应用注册（名称、租户 ID、客户端 ID、客户端密钥），然后点击**测试连接**，确认 UCM 能够连接到 Intune；随后在配置文件的 **应用注册** 选择器中选择它。同一租户的配置文件共享该应用注册，因此密钥只需在一处轮换
 3. 在 Intune 中，将设备 SCEP 配置文件的服务器 URL 指向此配置文件的 \`/scep/<segment>/pkiclient.exe\` 端点
 
 启用了 Intune 的配置文件必须启用**自动批准**:, Intune 的注册是同步的验证并签发往返过程，Intune 一侧没有供人工审核的队列。

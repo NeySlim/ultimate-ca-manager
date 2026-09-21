@@ -10,7 +10,7 @@ export default {
           { label: 'Requêtes', text: 'Requêtes d\'inscription SCEP en attente, approuvées et rejetées' },
           { label: 'Configuration', text: 'Paramètres du serveur SCEP : sélection de CA, identifiant CA, approbation automatique' },
           { label: 'Profils', text: 'Endpoints d\'enrôlement nommés, chacun avec sa propre URL, CA, template et challenge' },
-          { label: 'Apps Intune', text: 'Inscriptions d\'application Entra (ID de locataire, ID client, secret client) partagées par les profils qui valident les challenges Intune ; un secret vide à l\'édition conserve l\'actuel, Tester la connexion demande un jeton et découvre le service sans consommer de challenge, et une app encore utilisée par un profil ne peut pas être supprimée' },
+          { label: 'Inscriptions d\'application Intune', text: 'Inscriptions d\'application Entra (ID de locataire, ID client, secret client) partagées par les profils qui valident les challenges Intune ; un secret vide à l\'édition conserve l\'actuel, Tester la connexion demande un jeton et découvre le service sans consommer de challenge, et une app encore utilisée par un profil ne peut pas être supprimée' },
           { label: 'Mots de passe de défi', text: 'Gérer les mots de passe de défi par CA pour l\'inscription des appareils' },
           { label: 'Informations', text: 'URL des points de terminaison SCEP et instructions d\'intégration' },
         ]
@@ -30,7 +30,7 @@ export default {
           { label: 'Template de certificat', text: 'Quand un template est lié, ses usages de clé (KU/EKU) et sa validité gouvernent chaque certificat émis via le profil' },
           { label: 'Challenge par profil', text: 'Chaque profil a son propre mot de passe de défi, stocké chiffré, avec la même fenêtre d\'expiration que le challenge global' },
           { label: 'Endpoint par défaut', text: 'L\'endpoint /scep/pkiclient.exe sans segment continue de servir la configuration globale' },
-          { label: 'Validation Microsoft Intune', text: 'Un profil peut se valider face au challenge SCEP propre à Intune par appareil au lieu d\'un mot de passe statique : choisissez une inscription d\'application dans l\'onglet Apps Intune (permissions SCEP challenge validation + Application.Read.All), l\'approbation automatique reste obligatoire ; à la mise à niveau, chaque profil existant reçoit une app nommée d\'après lui, dédupliquée par locataire et client' },
+          { label: 'Validation Microsoft Intune', text: 'Un profil peut se valider face au challenge SCEP propre à Intune par appareil au lieu d\'un mot de passe statique : choisissez une inscription d\'application dans l\'onglet Inscriptions d\'application Intune (permissions SCEP challenge validation + Application.Read.All), l\'approbation automatique reste obligatoire ; à la mise à niveau, chaque profil existant reçoit une app nommée d\'après lui, dédupliquée par locataire et client' },
           { label: 'Approbation manuelle', text: 'Une requête arrivée via un profil est approuvée avec le template de ce profil (validité, usages de clé), exactement comme l\'approbation automatique l\'émettrait' },
           { label: 'Usages interdits aux enrôlés', text: 'Un template lié à un profil ne peut pas porter la signature OCSP, l\'horodatage, « any purpose » ou Smartcard Logon, et un renouvellement SCEP ne les reporte jamais ; Smartcard Logon est autorisé quand le profil se valide face à Intune, qui se porte garant de l\'identité' },
         ]
@@ -140,7 +140,7 @@ Configurez le profil SCEP avec :
 Intune ne prend pas en charge un mot de passe de défi statique : il émet son propre défi chiffré par appareil que seule l'API Intune peut valider. Sur un **profil** SCEP (pas le point de terminaison global), activez **Validation du challenge SCEP Microsoft Intune** et fournissez l'ID de locataire, l'ID client et le secret client d'une inscription d'application Entra :
 
 1. Dans Microsoft Entra ID, inscrivez une application et accordez-lui les autorisations d'application **Intune API → SCEP challenge validation** (\`scep_challenge_provider\`) et **Microsoft Graph → Application.Read.All**, toutes deux avec consentement administrateur
-2. Dans **Apps Intune**, ajoutez l'inscription d'application une seule fois (nom, ID de locataire, ID client, secret client) et cliquez sur **Tester la connexion** pour confirmer que UCM peut joindre Intune ; choisissez-la ensuite dans le sélecteur **Inscription d'application** du profil. Les profils d'un même locataire la partagent, le secret se renouvelle donc à un seul endroit
+2. Dans **Inscriptions d'application Intune**, ajoutez l'inscription d'application une seule fois (nom, ID de locataire, ID client, secret client) et cliquez sur **Tester la connexion** pour confirmer que UCM peut joindre Intune ; choisissez-la ensuite dans le sélecteur **Inscription d'application** du profil. Les profils d'un même locataire la partagent, le secret se renouvelle donc à un seul endroit
 3. Dans Intune, pointez l'URL du serveur du profil SCEP de l'appareil vers le point de terminaison \`/scep/<segment>/pkiclient.exe\` de ce profil
 
 Les profils avec Intune activé doivent avoir l'**approbation automatique** activée : l'inscription Intune est un aller-retour synchrone de validation puis émission, sans file d'attente côté Intune pour une revue manuelle.

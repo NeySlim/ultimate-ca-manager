@@ -58,7 +58,7 @@ describe('ScepProfilesTab picks an Intune app registration', () => {
     mocks.testIntuneApp.mockResolvedValue({ data: { message: 'ok' } })
   })
 
-  it('offers the registrations and submits the chosen id, never the credentials', async () => {
+  it('offers the registrations, no test button, and submits the chosen id, never the credentials', async () => {
     const onManage = vi.fn()
     render(<ScepProfilesTab profiles={[]} cas={CAS} templates={[]} canWrite
                             onChanged={vi.fn()} onManageIntuneApps={onManage} />)
@@ -75,8 +75,9 @@ describe('ScepProfilesTab picks an Intune app registration', () => {
     expect(screen.queryByLabelText('scep.intuneClientSecret')).not.toBeInTheDocument()
 
     fireEvent.change(picker, { target: { value: '7' } })
-    fireEvent.click(screen.getByText('scep.intuneTestConnection'))
-    await waitFor(() => expect(mocks.testIntuneApp).toHaveBeenCalledWith({ app_id: 7 }))
+    // The connection test lives on the registrations tab, not here
+    expect(screen.queryByText('scep.intuneTestConnection')).not.toBeInTheDocument()
+    expect(mocks.testIntuneApp).not.toHaveBeenCalled()
 
     fireEvent.submit(document.querySelector('form'))
     await waitFor(() => expect(mocks.createProfile).toHaveBeenCalled())

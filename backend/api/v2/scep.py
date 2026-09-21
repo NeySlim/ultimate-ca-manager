@@ -558,7 +558,7 @@ def _intune_app_for(data, existing, dry_run=False):
             raise IntuneAppConflict(
                 f"An app registration for this tenant and client ID already exists "
                 f"({candidates[0].name}) with a different secret: pick it with "
-                f"intune_app_id, or update its secret under SCEP > Intune apps")
+                f"intune_app_id, or update its secret under SCEP > Intune app registrations")
     elif len(candidates) > 1:
         raise IntuneAppConflict(
             "Several app registrations exist for this tenant and client ID: pick one "

@@ -848,7 +848,7 @@ Configure the SCEP profile with:
 Intune doesn't support a static challenge password: it issues its own encrypted, per-device challenge that only Intune's API can validate. On a SCEP **profile** (not the global endpoint), enable **Microsoft Intune SCEP challenge validation** and provide an Entra app registration's tenant ID, client ID and client secret:
 
 1. In Microsoft Entra ID, register an app and grant it **Intune API → SCEP challenge validation** (\`scep_challenge_provider\`) and **Microsoft Graph → Application.Read.All**, both application permissions, admin-consented
-2. Under **Intune apps**, add the app registration once (name, tenant ID, client ID, client secret) and **Test Connection** to confirm UCM can reach Intune; then pick it in the profile's **App registration** selector. Profiles of the same tenant share it, so the secret is rotated in one place
+2. Under **Intune app registrations**, add the app registration once (name, tenant ID, client ID, client secret) and **Test Connection** to confirm UCM can reach Intune; then pick it in the profile's **App registration** selector. Profiles of the same tenant share it, so the secret is rotated in one place
 3. In Intune, point the device SCEP profile's server URL at this profile's \`/scep/<segment>/pkiclient.exe\` endpoint
 
 Intune-enabled profiles must have **Auto-Approve** on. Intune's enrollment flow is a synchronous validate-then-issue round trip, with no queue on Intune's side for a human to review.

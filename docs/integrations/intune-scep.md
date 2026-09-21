@@ -65,7 +65,7 @@ in the form:
   validate-then-issue round trip, not a manual approval queue."*
 - An **App registration** selector appears, with a **Test connection** button
   and a **Manage app registrations** link. The Entra app is defined once, under
-  **Protocols → SCEP → Intune apps**, and every profile that validates with the
+  **Protocols → SCEP → Intune app registrations**, and every profile that validates with the
   same tenant picks it from this list.
 
 ![Intune validation enabled on the profile](img/intune-scep-profile-intune.png)
@@ -176,7 +176,7 @@ rows turn to a green **Granted** status.
 
 ## Step 3 — Register the app in UCM, pick it in the profile, test
 
-**Protocols → SCEP → Intune apps → New app registration**. Give it a name
+**Protocols → SCEP → Intune app registrations → New app registration**. Give it a name
 (e.g. `Corp tenant`) and fill in the three values from Step 2:
 
 | Field | Enter |
@@ -213,7 +213,7 @@ secret is used instead.
 > real Intune challenge is consumed, so it is safe to run repeatedly.
 
 The outcome is recorded on the registration as the last-test timestamp and
-result, shown in the Intune apps list.
+result, shown in the Intune app registrations list.
 
 A green toast confirms UCM acquired a token and reached your tenant's Intune
 validation service:

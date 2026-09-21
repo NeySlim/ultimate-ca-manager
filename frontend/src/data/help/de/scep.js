@@ -10,7 +10,7 @@ export default {
           { label: 'Anfragen', text: 'Ausstehende, genehmigte und abgelehnte SCEP-Registrierungsanfragen' },
           { label: 'Konfiguration', text: 'SCEP-Servereinstellungen: CA-Auswahl, CA-Kennung, Auto-Genehmigung' },
           { label: 'Profile', text: 'Benannte Enrollment-Endpunkte, jeder mit eigener URL, CA, Vorlage und Challenge' },
-          { label: 'Intune-Apps', text: 'Entra-App-Registrierungen (Mandanten-ID, Client-ID, Client-Secret), die sich die Profile teilen, die Intune-Challenges validieren; ein leeres Secret beim Bearbeiten behält das bisherige, Verbindung testen fordert ein Token an und ermittelt den Dienst, ohne eine Challenge zu verbrauchen, und eine noch von einem Profil verwendete App kann nicht gelöscht werden' },
+          { label: 'Intune-App-Registrierungen', text: 'Entra-App-Registrierungen (Mandanten-ID, Client-ID, Client-Secret), die sich die Profile teilen, die Intune-Challenges validieren; ein leeres Secret beim Bearbeiten behält das bisherige, Verbindung testen fordert ein Token an und ermittelt den Dienst, ohne eine Challenge zu verbrauchen, und eine noch von einem Profil verwendete App kann nicht gelöscht werden' },
           { label: 'Challenge-Passwörter', text: 'Pro-CA-Challenge-Passwörter für die Geräteregistrierung verwalten' },
           { label: 'Information', text: 'SCEP-Endpunkt-URLs und Integrationsanweisungen' },
         ]
@@ -30,7 +30,7 @@ export default {
           { label: 'Zertifikatsvorlage', text: 'Ist eine Vorlage gebunden, bestimmen deren KU/EKU und Gültigkeit jedes über das Profil ausgestellte Zertifikat' },
           { label: 'Challenge pro Profil', text: 'Jedes Profil hat ein eigenes, verschlüsselt gespeichertes Challenge-Passwort mit demselben Ablauffenster wie die globale Challenge' },
           { label: 'Standard-Endpunkt', text: 'Der Endpunkt /scep/pkiclient.exe ohne Segment bedient weiterhin die globale Konfiguration' },
-          { label: 'Microsoft Intune-Validierung', text: 'Ein Profil kann anstelle eines statischen Passworts gegen Intunes eigene gerätespezifische SCEP-Challenge validieren: im Profil eine App-Registrierung aus dem Tab Intune-Apps auswählen (Berechtigungen SCEP challenge validation + Application.Read.All), Auto-Genehmigung bleibt Pflicht; beim Upgrade erhält jedes bestehende Profil eine nach ihm benannte App, dedupliziert nach Mandant und Client' },
+          { label: 'Microsoft Intune-Validierung', text: 'Ein Profil kann anstelle eines statischen Passworts gegen Intunes eigene gerätespezifische SCEP-Challenge validieren: im Profil eine App-Registrierung aus dem Tab Intune-App-Registrierungen auswählen (Berechtigungen SCEP challenge validation + Application.Read.All), Auto-Genehmigung bleibt Pflicht; beim Upgrade erhält jedes bestehende Profil eine nach ihm benannte App, dedupliziert nach Mandant und Client' },
           { label: 'Manuelle Genehmigung', text: 'Eine über ein Profil eingegangene Anfrage wird mit der Vorlage dieses Profils (Gültigkeit, Key Usages) genehmigt, genau wie die Auto-Genehmigung sie ausstellen würde' },
           { label: 'Zwecke, die kein Antragsteller erhalten darf', text: 'Eine an ein Profil gebundene Vorlage darf weder OCSP-Signierung, Zeitstempelung, „Any Purpose" noch Smartcard-Anmeldung tragen, und eine SCEP-Erneuerung übernimmt sie nie; Smartcard-Anmeldung ist erlaubt, wenn das Profil gegen Intune validiert, das für die Identität bürgt' },
         ]
@@ -140,7 +140,7 @@ Konfigurieren Sie das SCEP-Profil mit:
 Intune unterstützt kein statisches Challenge-Passwort: es stellt eine eigene verschlüsselte, gerätespezifische Challenge aus, die nur die Intune-API validieren kann. Aktivieren Sie auf einem SCEP-**Profil** (nicht dem globalen Endpunkt) **Microsoft Intune SCEP-Challenge-Validierung** und geben Sie Mandanten-ID, Client-ID und Client-Secret einer Entra-App-Registrierung an:
 
 1. Registrieren Sie in Microsoft Entra ID eine App und erteilen Sie ihr die Anwendungsberechtigungen **Intune API → SCEP challenge validation** (\`scep_challenge_provider\`) und **Microsoft Graph → Application.Read.All**, beide mit Administratorzustimmung
-2. Legen Sie unter **Intune-Apps** die App-Registrierung einmalig an (Name, Mandanten-ID, Client-ID, Client-Secret) und klicken Sie auf **Verbindung testen**, um zu bestätigen, dass UCM Intune erreichen kann; wählen Sie sie dann im Profil im Selektor **App-Registrierung** aus. Profile desselben Mandanten teilen sie sich, das Secret wird also an einer einzigen Stelle rotiert
+2. Legen Sie unter **Intune-App-Registrierungen** die App-Registrierung einmalig an (Name, Mandanten-ID, Client-ID, Client-Secret) und klicken Sie auf **Verbindung testen**, um zu bestätigen, dass UCM Intune erreichen kann; wählen Sie sie dann im Profil im Selektor **App-Registrierung** aus. Profile desselben Mandanten teilen sie sich, das Secret wird also an einer einzigen Stelle rotiert
 3. Zeigen Sie in Intune die Server-URL des Geräte-SCEP-Profils auf den Endpunkt \`/scep/<segment>/pkiclient.exe\` dieses Profils
 
 Intune-Profile müssen **Auto-Genehmigung** aktiviert haben: die Registrierung bei Intune ist ein synchroner Validierungs- und Ausstellungsvorgang, ohne Warteschlange auf Intune-Seite für eine manuelle Prüfung.

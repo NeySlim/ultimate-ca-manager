@@ -414,7 +414,7 @@ export const helpContent = {
           { label: 'Requests', text: 'Pending, approved, and rejected SCEP enrollment requests' },
           { label: 'Configuration', text: 'SCEP server settings: CA selection, CA identifier, auto-approve' },
           { label: 'Profiles', text: 'Named enrollment endpoints, each with its own URL, CA, template and challenge' },
-          { label: 'Intune apps', text: 'Entra app registrations (tenant ID, client ID, client secret) shared by the profiles that validate Intune challenges; an empty secret on edit keeps the current one, Test connection requests a token and discovers the service without consuming any challenge, and an app still used by a profile cannot be deleted' },
+          { label: 'Intune app registrations', text: 'Entra app registrations (tenant ID, client ID, client secret) shared by the profiles that validate Intune challenges; an empty secret on edit keeps the current one, Test connection requests a token and discovers the service without consuming any challenge, and an app still used by a profile cannot be deleted' },
           { label: 'Challenge Passwords', text: 'Manage per-CA challenge passwords for device enrollment' },
           { label: 'Information', text: 'SCEP endpoint URLs and integration instructions' },
         ]
@@ -436,7 +436,7 @@ export const helpContent = {
           { label: 'Certificate template', text: 'When a template is bound, its key usage, extended key usage and validity govern every certificate issued through the profile' },
           { label: 'Per-profile challenge', text: 'Each profile has its own challenge password, stored encrypted, with the same expiry window as the global challenge' },
           { label: 'Default endpoint', text: 'The unlabelled /scep/pkiclient.exe endpoint keeps serving the global configuration' },
-          { label: 'Microsoft Intune validation', text: 'A profile can validate against Intune\'s own per-device SCEP challenge instead of a static password: pick an app registration from the Intune apps tab (SCEP challenge validation + Application.Read.All permissions), Auto-Approve stays required; on upgrade each existing profile gets an app named after it, deduplicated by tenant and client' },
+          { label: 'Microsoft Intune validation', text: 'A profile can validate against Intune\'s own per-device SCEP challenge instead of a static password: pick an app registration from the Intune app registrations tab (SCEP challenge validation + Application.Read.All permissions), Auto-Approve stays required; on upgrade each existing profile gets an app named after it, deduplicated by tenant and client' },
           { label: 'Manual approval', text: 'A request that came through a profile is approved with that profile\'s template (validity, key usages), exactly as auto-approval would issue it' },
           { label: 'Purposes no enrollee may hold', text: 'A template bound to a profile cannot carry OCSP signing, timestamping, any purpose or Smartcard Logon, and a SCEP renewal never carries them over; Smartcard Logon is allowed when the profile validates against Intune, which vouches for the identity' },
         ]

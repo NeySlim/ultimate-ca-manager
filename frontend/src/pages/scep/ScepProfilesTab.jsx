@@ -1,6 +1,6 @@
 import { useState, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Plus, PencilSimple, Trash, Copy, ArrowsClockwise, LinkSimple, TestTube, Cloud } from '@phosphor-icons/react'
+import { Plus, PencilSimple, Trash, Copy, ArrowsClockwise, LinkSimple, Cloud } from '@phosphor-icons/react'
 import { Button, Input, Select, Card, Badge, Modal, EmptyState } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { scepService } from '../../services'
@@ -26,7 +26,6 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
   const [formData, setFormData] = useState(EMPTY_FORM)
   const [saving, setSaving] = useState(false)
   const [slugTouched, setSlugTouched] = useState(false)
-  const [testingIntune, setTestingIntune] = useState(false)
   const [intuneApps, setIntuneApps] = useState([])
 
   // The app registrations to pick from, fetched when the form opens
@@ -148,19 +147,6 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
       onChanged()
     } catch (error) {
       showError(error.message)
-    }
-  }
-
-  const handleTestIntuneConnection = async () => {
-    if (!formData.intune_app_id) return
-    setTestingIntune(true)
-    try {
-      const response = await scepService.testIntuneApp({ app_id: parseInt(formData.intune_app_id) })
-      showSuccess(response.data?.message || t('scep.intuneTestSuccess'))
-    } catch (error) {
-      showError(error.message || t('scep.intuneTestFailed'))
-    } finally {
-      setTestingIntune(false)
     }
   }
 
@@ -320,16 +306,6 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
                   <p className="text-xs text-text-tertiary -mt-2">{t('scep.noIntuneAppsYet')}</p>
                 )}
                 <div className="flex items-center gap-2">
-                  <Button
-                    type="button"
-                    variant="secondary"
-                    size="sm"
-                    onClick={handleTestIntuneConnection}
-                    disabled={!formData.intune_app_id || testingIntune}
-                  >
-                    <TestTube size={14} />
-                    {testingIntune ? t('common.testing') : t('scep.intuneTestConnection')}
-                  </Button>
                   {onManageIntuneApps && (
                     <Button type="button" variant="ghost" size="sm"
                             onClick={() => { setShowModal(false); onManageIntuneApps() }}>

@@ -99,7 +99,7 @@ def _carry_over(rows, existing_apps, insert_app, bind_profile, clear_profile):
                 logger.warning(
                     "Migration 092: SCEP profile %r uses tenant %s / client %s with a "
                     "secret that differs from another profile's; a separate app "
-                    "registration is created, merge them by hand under SCEP > Intune apps",
+                    "registration is created, merge them by hand under SCEP > Intune app registrations",
                     pname, tenant, client)
             app_id = insert_app(_unique_name(taken, pname), tenant, client, secret,
                                 tested_at, tested)

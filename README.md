@@ -41,7 +41,7 @@
 
 ### Integrations
 - **Microsoft ADCS** -- Full lifecycle over AD CS: CSR signing, template discovery, EOBO (Enroll On Behalf Of), renew/revoke through the connector, and an optional WinRM admin channel for CRL revocation sync, CA inventory import, and pending-request approve/deny with a CA health panel
-- **Microsoft Intune** -- SCEP challenge validation for Intune-managed devices, Entra app registrations defined once under SCEP › Intune apps and picked per profile, with a step-by-step guide in `docs/integrations/intune-scep.md`
+- **Microsoft Intune** -- SCEP challenge validation for Intune-managed devices, Entra app registrations defined once under SCEP › Intune app registrations and picked per profile, with a step-by-step guide in `docs/integrations/intune-scep.md`
 - **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS, OpenBao/Vault Transit; **HSM-backed CAs** with non-exportable signing keys
 - **Kubernetes / cert-manager** -- Reference manifests for ClusterIssuer (HTTP-01 + DNS-01 with EAB), sample Certificate, Secret template under `examples/kubernetes/cert-manager/`
 - **DNS Providers** -- Cloudflare, Route53, Azure DNS and more for ACME DNS-01 challenges
