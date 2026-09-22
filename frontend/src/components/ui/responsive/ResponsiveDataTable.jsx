@@ -254,6 +254,11 @@ export function ResponsiveDataTable({
     if (!toolbarFilters) return {}
     const values = {}
     toolbarFilters.forEach(filter => {
+      if (filter.type === 'toggle') {
+        // A toggle is a view switch, not a filter: saving it would put its
+        // value into every preset and restore it behind the user's back.
+        return
+      }
       if (filter.type === 'dateRange') {
         if (filter.from) values[`${filter.key}_from`] = filter.from
         if (filter.to) values[`${filter.key}_to`] = filter.to
@@ -316,16 +321,21 @@ export function ResponsiveDataTable({
     }
   }, [toolbarFilters])
 
+  // Clearing sets each filter back to its own empty value. A toggle has none:
+  // onChange('') would switch it off and persist the empty string, so it is
+  // left alone -- it is not counted as an active filter either. Both Clear
+  // filters buttons, the chip row's and the empty state's, come through here.
   const handleClearAllChips = useCallback(() => {
     setSearchValue('')
     toolbarFilters?.forEach(f => {
+      if (f.type === 'toggle') return
       if (f.type === 'dateRange') {
         f.onFromChange?.('')
         f.onToChange?.('')
       } else if (f.type === 'multiSelect') {
-        f.onChange([])
+        f.onChange?.([])
       } else {
-        f.onChange('')
+        f.onChange?.('')
       }
     })
   }, [toolbarFilters])
@@ -620,19 +630,7 @@ export function ResponsiveDataTable({
           </p>
           {hasActiveFilters ? (
             <button
-              onClick={() => {
-                setSearchValue('')
-                toolbarFilters?.forEach(f => {
-                  if (f.type === 'dateRange') {
-                    f.onFromChange?.('')
-                    f.onToChange?.('')
-                  } else if (f.type === 'multiSelect') {
-                    f.onChange?.([])
-                  } else {
-                    f.onChange?.('')
-                  }
-                })
-              }}
+              onClick={handleClearAllChips}
               className="text-sm text-accent-primary hover:text-accent-primary-op80 font-medium"
             >
               {t('table.clearFilters')}

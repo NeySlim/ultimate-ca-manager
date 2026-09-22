@@ -17,6 +17,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - A SCEP profile names its Intune app registration instead of carrying the credentials; migration 092 gives every existing Intune profile a registration named after it, shared by the profiles that used the same tenant, client ID and secret. A different secret for the same tenant keeps a registration of its own, reported in the log for a merge by hand; two registrations for one tenant and client ID cannot be created through the API. The pre-092 profile fields stay accepted for one release.
 - Deployment target settings now contain only the reusable SSH/SFTP connection. Destination paths, file options and reload commands are configured on each certificate or CRL binding; migration 091 copies existing target reload commands to existing bindings.
 
+### Fixed
+- The templates list called a template Certificate or CA from the letters "ca" in its name, so the seeded Email Certificate (S/MIME), Client Authentication and Smartcard Logon were each shown as a certificate authority. The column reads the `is_system` flag the API already returns and says System or Custom.
+- The detail pane of a system template offered an Edit and a Delete the server answers 403 to. Both are greyed with the reason now, Duplicate and Export stay available, and a Show system toggle hides the built-in templates, remembered across visits and forced on while no custom template exists.
+
 ---
 
 ## [2.232] - 2026-09-21
@@ -32,8 +36,6 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Attaching a deployment target now offers the Include Root CA box of the export dialog for the full chain file. New bindings ship the leaf and the intermediates only, which is what a TLS server should send; bindings created before this release keep the root as they always did, and the binding row says so (#357, by @B0F1B0).
 
 ### Fixed
-- The templates list labelled templates as Certificate or CA by looking for the letters "ca" in their name, so anything called "Web Server Certificate", "Smartcard Logon" or "Client Certificate" was shown as a certificate authority, with the authority icon and a detail pane reading "Certificate Authority". Nothing in the database said so: no template carries `keyCertSign`, and the built-in CA template was removed by an earlier migration, on the grounds that certificate authorities are created from the CAs page. The column now reads the `is_system` flag the API already returns and says System or Custom, which is the difference between those templates that is real.
-- System templates offered Edit and Delete and then failed the request: the server has always answered 403 to both. Those buttons are now greyed with the reason, in the row and in the detail pane alike, while Duplicate and Export stay available, duplicating being the supported way to base a custom template on a built-in one. A Show system toggle hides the built-in templates for anyone who only works with their own; it remembers the choice, and forces itself on while no custom template exists so the list is never empty for want of a filter.
 - Redacting a private key from the logs could take tens of seconds on a log seeded with unclosed `BEGIN` markers, which anyone could plant through the SCEP User-Agent. The block is now found in one pass and the User-Agent is logged bounded.
 - Restoring a backup written before 2.232 gave every deployment binding the new default and dropped the root from its full chain. A column the archive does not name takes the value its version implied, so those bindings keep the root as they did.
 - In the log viewer, an end bound given to the minute excluded that minute but for its first second, and a copied line of the access, error or journal source was rewritten in the application log's shape. The end bound now closes its minute or day, and a copy is the line as the log wrote it.

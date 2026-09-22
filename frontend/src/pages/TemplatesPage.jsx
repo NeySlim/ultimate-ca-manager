@@ -13,7 +13,7 @@ import {
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select, Textarea,
-  HelpCard, LoadingSpinner, TemplatePreviewModal,
+  LoadingSpinner, TemplatePreviewModal,
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
 import { templatesService } from '../services'
@@ -54,7 +54,7 @@ export default function TemplatesPage() {
   const [perPage, setPerPage] = useState(25)
 
   // Filters
-  const [filterType, setFilterType] = usePersistedState('ucm-filter-templates-type', [])
+  const [filterSource, setFilterSource] = usePersistedState('ucm-filter-templates-source', [])
 
   // Import state
   const [importFile, setImportFile] = useState(null)
@@ -172,6 +172,12 @@ export default function TemplatesPage() {
   const hasCustomTemplates = useMemo(() => templates.some(t => !t.is_system), [templates])
   const systemVisible = showSystem || !hasCustomTemplates
 
+  // Switching the toggle off while a system template is open would leave the
+  // panel showing a row that is no longer in the list.
+  useEffect(() => {
+    if (!systemVisible && selectedTemplate?.is_system) setSelectedTemplate(null)
+  }, [systemVisible, selectedTemplate, setSelectedTemplate])
+
   const filteredTemplates = useMemo(() => {
     let result = templates.map(t => ({
       ...t,
@@ -180,11 +186,11 @@ export default function TemplatesPage() {
     if (!systemVisible) {
       result = result.filter(t => !t.is_system)
     }
-    if (filterType.length > 0) {
-      result = result.filter(t => filterType.includes(t.source))
+    if (filterSource.length > 0) {
+      result = result.filter(t => filterSource.includes(t.source))
     }
     return result
-  }, [templates, filterType, systemVisible])
+  }, [templates, filterSource, systemVisible])
 
   // ============= STATS =============
   
@@ -319,37 +325,15 @@ export default function TemplatesPage() {
     }
   ], [t])
 
-  // ============= ROW ACTIONS =============
+  // ============= FILTER PRESETS =============
 
   const handleApplyFilterPreset = useCallback((filters) => {
-    if (filters.type) setFilterType(Array.isArray(filters.type) ? filters.type : [filters.type])
-    else setFilterType([])
-  }, [])
-
-  // ============= HELP CONTENT =============
-  
-  const helpContent = (
-    <div className="space-y-3">
-      <HelpCard title={t('common.aboutTemplates')} variant="info">
-        {t('templates.aboutTemplatesDescription')}
-      </HelpCard>
-      <HelpCard title={t('templates.templateTypes')} variant="tip">
-        <div className="space-y-1 mt-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="primary" size="sm">{t('common.certificate')}</Badge>
-            <span className="text-xs">{t('templates.endEntityCerts')}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm">{t('common.ca')}</Badge>
-            <span className="text-xs">{t('templates.intermediateCAs')}</span>
-          </div>
-        </div>
-      </HelpCard>
-      <HelpCard title={t('common.keyUsage')} variant="warning">
-        {t('templates.keyUsageWarning')}
-      </HelpCard>
-    </div>
-  )
+    // A preset saved before the column became Source carries filters.type,
+    // whose values ('certificate', 'ca') match no row. Applying it clears the
+    // filter rather than emptying the table.
+    if (filters.source) setFilterSource(Array.isArray(filters.source) ? filters.source : [filters.source])
+    else setFilterSource([])
+  }, [setFilterSource])
 
   // ============= DETAIL PANEL =============
   
@@ -558,8 +542,8 @@ export default function TemplatesPage() {
               key: 'source',
               type: 'multiSelect',
               label: t('templates.source'),
-              value: filterType,
-              onChange: setFilterType,
+              value: filterSource,
+              onChange: setFilterSource,
               placeholder: t('templates.allSources'),
               options: [
                 { value: 'system', label: t('templates.system') },

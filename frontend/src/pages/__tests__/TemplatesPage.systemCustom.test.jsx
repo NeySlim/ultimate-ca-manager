@@ -1,21 +1,25 @@
 /**
- * TemplatesPage — Source is read, not guessed.
+ * TemplatesPage: Source is read, not guessed.
  *
  * The list used to label a template "Certificate" or "CA" from a substring
- * match on its name: `name.includes('ca')`. Because "certificate",
- * "smartcard" and "authentication" all contain those two letters, ordinary
- * leaf templates were shown as certificate authorities, with the authority
- * icon and a detail pane that spelled out "Certificate Authority". Nothing
- * in the database ever said so.
+ * match on its name: `name.includes('ca')`. Three of the eight seeded
+ * templates contain those two letters ("Email Certificate (S/MIME)",
+ * "Client Authentication" and "Smartcard Logon"), so three ordinary leaf
+ * templates were shown as certificate authorities, with the authority icon
+ * and a detail pane that spelled out "Certificate Authority". Nothing in the
+ * database ever said so.
  *
  * What replaced it is `is_system`, which the API already returns. These
  * tests pin that contract: if `is_system` stops arriving, or stops driving
  * the column, every row silently reads Custom and every system template
- * gets its Edit and Delete buttons back — which the server answers 403 to.
+ * gets its Edit and Delete buttons back, which the server answers 403 to.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
+
+// Permissions are a variable so a test can render the page as a reader.
+const perms = vi.hoisted(() => ({ write: true, delete: true }))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -45,7 +49,8 @@ vi.mock('../../hooks', async () => {
     usePersistedState: persisted.usePersistedState,
     useCRUDPage: crud.useCRUDPage,
     usePermission: () => ({
-      canWrite: () => true, canDelete: () => true, hasPermission: () => true, canRead: () => true,
+      canWrite: () => perms.write, canDelete: () => perms.delete,
+      hasPermission: () => true, canRead: () => true,
     }),
     useRecentHistory: () => ({ addToHistory: vi.fn(), history: [] }),
     useFavorites: () => ({ favorites: [], toggleFavorite: vi.fn(), isFavorite: () => false }),
@@ -69,16 +74,17 @@ vi.mock('../../services/eku.service', () => ({
 
 import TemplatesPage from '../TemplatesPage'
 
-// The names here are the point: every one of them contains the letters
-// "ca", and every one of them is an ordinary leaf template.
+// These are the seeded names the bug actually hit: every one of them contains
+// the letters "ca", and every one of them is an ordinary leaf template.
 const SYSTEM_TEMPLATES = [
-  { id: 1, name: 'Web Server Certificate', template_type: 'web_server', is_system: true, validity_days: 397 },
+  { id: 1, name: 'Email Certificate (S/MIME)', template_type: 'email', is_system: true, validity_days: 397 },
   { id: 2, name: 'Smartcard Logon', template_type: 'smartcard_logon', is_system: true, validity_days: 397 },
-  { id: 3, name: 'Client Certificate', template_type: 'client_auth', is_system: true, validity_days: 365 },
+  { id: 3, name: 'Client Authentication', template_type: 'client_auth', is_system: true, validity_days: 365 },
 ]
-const CUSTOM_TEMPLATE = { id: 4, name: 'Test Certificate 123', template_type: 'web_server', is_system: false, validity_days: 397 }
+const CUSTOM_TEMPLATE = { id: 4, name: 'Wi-Fi Client Certificate', template_type: 'client_auth', is_system: false, validity_days: 397 }
 
 const SHOW_SYSTEM_KEY = 'ucm-templates-show-system'
+const PRESETS_KEY = 'ucm-templates-presets'
 
 const renderPage = () => render(<MemoryRouter><TemplatesPage /></MemoryRouter>)
 
@@ -87,11 +93,15 @@ const rowFor = async (name) => {
   return cell.closest('tr')
 }
 
-describe('TemplatesPage — Source comes from is_system', () => {
-  beforeEach(() => {
-    window.localStorage.clear()
-    getAll.mockReset()
-  })
+const reset = () => {
+  window.localStorage.clear()
+  getAll.mockReset()
+  perms.write = true
+  perms.delete = true
+}
+
+describe('TemplatesPage: Source comes from is_system', () => {
+  beforeEach(reset)
 
   it('does not call a leaf template a CA because its name contains "ca"', async () => {
     getAll.mockResolvedValue({ data: [...SYSTEM_TEMPLATES, CUSTOM_TEMPLATE] })
@@ -110,7 +120,7 @@ describe('TemplatesPage — Source comes from is_system', () => {
 
   it('reads is_system rather than the name: same name, both verdicts', async () => {
     // One name, two rows, differing only by the flag. Nothing about the
-    // text can decide this — only the field can.
+    // text can decide this, only the field can.
     getAll.mockResolvedValue({ data: [
       { id: 1, name: 'Identical Certificate A', is_system: true, template_type: 'web_server', validity_days: 365 },
       { id: 2, name: 'Identical Certificate B', is_system: false, template_type: 'web_server', validity_days: 365 },
@@ -122,60 +132,121 @@ describe('TemplatesPage — Source comes from is_system', () => {
   })
 })
 
-describe('TemplatesPage — system templates cannot be edited or deleted', () => {
-  // The page's own `rowActions` are never passed to the table (true on dev
-  // too, so it is long-standing dead code rather than a regression). The
-  // buttons a user actually reaches are the detail panel's, opened by
-  // clicking the row, so that is what these assert on.
+describe('TemplatesPage: system templates cannot be edited or deleted', () => {
+  // The page's own `rowActions` were never passed to the table (true on dev
+  // too, so long-standing dead code rather than a regression) and have since
+  // been removed. The buttons a user actually reaches are the detail panel's,
+  // opened by clicking the row, so that is what these assert on.
   const openPanelFor = async (name) => {
     fireEvent.click(await screen.findByText(name))
-    return await screen.findByRole('button', { name: /common.delete/i })
+    return await screen.findByRole('button', { name: /common.export/i })
   }
 
   beforeEach(() => {
-    window.localStorage.clear()
-    getAll.mockReset()
+    reset()
     getAll.mockResolvedValue({ data: [SYSTEM_TEMPLATES[0], CUSTOM_TEMPLATE] })
   })
 
   it('disables Edit and Delete for a system template, leaving Copy and Export', async () => {
     renderPage()
-    await openPanelFor('Web Server Certificate')
+    await openPanelFor('Email Certificate (S/MIME)')
 
-    // The server answers 403 to both of these.
-    expect(screen.getByRole('button', { name: /common.edit/i }).disabled).toBe(true)
-    expect(screen.getByRole('button', { name: /common.delete/i }).disabled).toBe(true)
+    // The server answers 403 to both of these, and the button says so on
+    // hover rather than disappearing, which reads as a rendering glitch.
+    const edit = screen.getByRole('button', { name: /common.edit/i })
+    const del = screen.getByRole('button', { name: /common.delete/i })
+    expect(edit.disabled).toBe(true)
+    expect(del.disabled).toBe(true)
+    expect(edit.getAttribute('title')).toBe('templates.systemNotEditable')
+    expect(del.getAttribute('title')).toBe('templates.systemNotDeletable')
     // Duplicating a system template is the supported way to base a custom
     // one on a built-in, so it must stay reachable.
     expect(screen.getByRole('button', { name: /common.copy/i }).disabled).toBe(false)
     expect(screen.getByRole('button', { name: /common.export/i }).disabled).toBe(false)
   })
 
-  it('leaves a custom template fully actionable', async () => {
+  it('leaves a custom template fully actionable, and says why the other is not', async () => {
     renderPage()
-    await openPanelFor('Test Certificate 123')
+    await openPanelFor(CUSTOM_TEMPLATE.name)
 
-    expect(screen.getByRole('button', { name: /common.edit/i }).disabled).toBe(false)
-    expect(screen.getByRole('button', { name: /common.delete/i }).disabled).toBe(false)
+    const edit = screen.getByRole('button', { name: /common.edit/i })
+    const del = screen.getByRole('button', { name: /common.delete/i })
+    expect(edit.disabled).toBe(false)
+    expect(del.disabled).toBe(false)
+    // A custom template carries no refusal to explain, and the panel names
+    // the source rather than the "Certificate Authority" it used to print.
+    expect(edit.getAttribute('title')).toBeNull()
+    expect(del.getAttribute('title')).toBeNull()
+    expect(screen.getByText('templates.customDescription')).toBeTruthy()
+    expect(screen.queryByText('common.certificateAuthority')).toBeNull()
+  })
+
+  it('offers template edit and duplicate only on write:templates', async () => {
+    // PUT /api/v2/templates/<id> and the duplicate's POST both require
+    // write:templates. Dropping the canWrite guard from the panel fails here,
+    // which the source-reading test this replaced could never prove.
+    perms.write = false
+    getAll.mockResolvedValue({ data: [CUSTOM_TEMPLATE] })
+    renderPage()
+    await openPanelFor(CUSTOM_TEMPLATE.name)
+
+    expect(screen.queryByRole('button', { name: /common.edit/i })).toBeNull()
+    expect(screen.queryByRole('button', { name: /common.copy/i })).toBeNull()
+    // Export asks for nothing beyond read, and Delete has its own permission.
+    expect(screen.getByRole('button', { name: /common.export/i })).toBeTruthy()
+    expect(screen.getByRole('button', { name: /common.delete/i })).toBeTruthy()
+  })
+
+  it('withholds the panel delete without delete:templates', async () => {
+    perms.delete = false
+    getAll.mockResolvedValue({ data: [CUSTOM_TEMPLATE] })
+    renderPage()
+    await openPanelFor(CUSTOM_TEMPLATE.name)
+
+    expect(screen.queryByRole('button', { name: /common.delete/i })).toBeNull()
+    expect(screen.getByRole('button', { name: /common.edit/i })).toBeTruthy()
   })
 })
 
-describe('TemplatesPage — the Show system toggle', () => {
-  beforeEach(() => {
-    window.localStorage.clear()
-    getAll.mockReset()
-  })
+describe('TemplatesPage: the Show system toggle', () => {
+  beforeEach(reset)
+
+  const toggle = () => screen.getByRole('switch', { name: /templates.showSystem/i })
 
   it('hides system templates when switched off, and remembers it', async () => {
     getAll.mockResolvedValue({ data: [...SYSTEM_TEMPLATES, CUSTOM_TEMPLATE] })
     renderPage()
-    await screen.findByText('Web Server Certificate')
+    await screen.findByText('Smartcard Logon')
 
-    fireEvent.click(screen.getByRole('switch', { name: /templates.showSystem/i }))
+    fireEvent.click(toggle())
 
-    await waitFor(() => expect(screen.queryByText('Web Server Certificate')).toBeNull())
-    expect(screen.getByText('Test Certificate 123')).toBeTruthy()
+    await waitFor(() => expect(screen.queryByText('Smartcard Logon')).toBeNull())
+    expect(screen.getByText(CUSTOM_TEMPLATE.name)).toBeTruthy()
     expect(window.localStorage.getItem(SHOW_SYSTEM_KEY)).toBe('false')
+  })
+
+  it('closes the detail panel on a template it has just hidden', async () => {
+    // Otherwise the panel goes on describing a row that left the list.
+    getAll.mockResolvedValue({ data: [...SYSTEM_TEMPLATES, CUSTOM_TEMPLATE] })
+    renderPage()
+    fireEvent.click(await screen.findByText('Smartcard Logon'))
+    await screen.findByRole('button', { name: /common.export/i })
+
+    fireEvent.click(toggle())
+
+    await waitFor(() => expect(screen.queryByRole('button', { name: /common.export/i })).toBeNull())
+  })
+
+  it('leaves the panel open on a custom template when system rows are hidden', async () => {
+    getAll.mockResolvedValue({ data: [...SYSTEM_TEMPLATES, CUSTOM_TEMPLATE] })
+    renderPage()
+    fireEvent.click(await screen.findByText(CUSTOM_TEMPLATE.name))
+    await screen.findByRole('button', { name: /common.export/i })
+
+    fireEvent.click(toggle())
+
+    await waitFor(() => expect(screen.queryByText('Smartcard Logon')).toBeNull())
+    expect(screen.getByRole('button', { name: /common.export/i })).toBeTruthy()
   })
 
   it('starts off when that is the stored preference', async () => {
@@ -183,8 +254,8 @@ describe('TemplatesPage — the Show system toggle', () => {
     getAll.mockResolvedValue({ data: [...SYSTEM_TEMPLATES, CUSTOM_TEMPLATE] })
     renderPage()
 
-    await screen.findByText('Test Certificate 123')
-    expect(screen.queryByText('Web Server Certificate')).toBeNull()
+    await screen.findByText(CUSTOM_TEMPLATE.name)
+    expect(screen.queryByText('Smartcard Logon')).toBeNull()
   })
 
   it('forces itself on and disables when no custom template exists', async () => {
@@ -194,21 +265,73 @@ describe('TemplatesPage — the Show system toggle', () => {
     getAll.mockResolvedValue({ data: SYSTEM_TEMPLATES })
     renderPage()
 
-    await screen.findByText('Web Server Certificate')
-    const toggle = screen.getByRole('switch', { name: /templates.showSystem/i })
-    expect(toggle.getAttribute('aria-checked')).toBe('true')
-    expect(toggle.disabled).toBe(true)
+    await screen.findByText('Smartcard Logon')
+    expect(toggle().getAttribute('aria-checked')).toBe('true')
+    expect(toggle().disabled).toBe(true)
   })
 
   it('does not overwrite the stored preference when it forces itself on', async () => {
     // The whole point of the override being applied on top rather than
-    // written back: create a custom template again and the user's own
-    // choice is still there.
+    // written back: once a custom template exists, the user's own choice is
+    // still there and still hides the system rows.
     window.localStorage.setItem(SHOW_SYSTEM_KEY, 'false')
     getAll.mockResolvedValue({ data: SYSTEM_TEMPLATES })
+    const { unmount } = renderPage()
+
+    await screen.findByText('Smartcard Logon')
+    expect(window.localStorage.getItem(SHOW_SYSTEM_KEY)).toBe('false')
+    unmount()
+
+    getAll.mockResolvedValue({ data: [...SYSTEM_TEMPLATES, CUSTOM_TEMPLATE] })
     renderPage()
 
-    await screen.findByText('Web Server Certificate')
-    expect(window.localStorage.getItem(SHOW_SYSTEM_KEY)).toBe('false')
+    await screen.findByText(CUSTOM_TEMPLATE.name)
+    expect(screen.queryByText('Smartcard Logon')).toBeNull()
+  })
+})
+
+describe('TemplatesPage: saved filter presets', () => {
+  beforeEach(reset)
+
+  const applyPreset = async (name) => {
+    fireEvent.click(screen.getByTitle('table.filterPresets'))
+    fireEvent.click(await screen.findByText(name))
+  }
+
+  it('applies a preset saved on the Source filter', async () => {
+    // The filter key is `source`; a preset read under the old `type` key
+    // silently did nothing.
+    window.localStorage.setItem(PRESETS_KEY, JSON.stringify([
+      { id: 1, name: 'Mine only', filters: { source: ['custom'] } },
+    ]))
+    getAll.mockResolvedValue({ data: [...SYSTEM_TEMPLATES, CUSTOM_TEMPLATE] })
+    renderPage()
+    await screen.findByText('Smartcard Logon')
+
+    await applyPreset('Mine only')
+
+    await waitFor(() => expect(screen.queryByText('Smartcard Logon')).toBeNull())
+    expect(screen.getByText(CUSTOM_TEMPLATE.name)).toBeTruthy()
+  })
+
+  it('clears the filter for a preset saved before the column became Source', async () => {
+    // {type: ['ca']} matches no row now, so applying it must show everything
+    // rather than empty the table. Applied over a narrower preset, so that a
+    // handler which ignored it would leave the table filtered and be caught.
+    window.localStorage.setItem(PRESETS_KEY, JSON.stringify([
+      { id: 1, name: 'Mine only', filters: { source: ['custom'] } },
+      { id: 2, name: 'Old CA preset', filters: { type: ['ca'] } },
+    ]))
+    getAll.mockResolvedValue({ data: [...SYSTEM_TEMPLATES, CUSTOM_TEMPLATE] })
+    renderPage()
+    await screen.findByText('Smartcard Logon')
+
+    await applyPreset('Mine only')
+    await waitFor(() => expect(screen.queryByText('Smartcard Logon')).toBeNull())
+
+    await applyPreset('Old CA preset')
+
+    expect(await screen.findByText('Smartcard Logon')).toBeTruthy()
+    expect(screen.getByText(CUSTOM_TEMPLATE.name)).toBeTruthy()
   })
 })
