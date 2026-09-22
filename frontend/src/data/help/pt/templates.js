@@ -5,20 +5,22 @@ export default {
     overview: 'Defina perfis de certificado reutilizáveis com campos de sujeito, key usage, extended key usage, períodos de validade e outras extensões pré-configurados. Aplique modelos ao emitir ou assinar certificados.',
     sections: [
       {
-        title: 'Tipos de Modelo',
+        title: 'Origem',
         definitions: [
-          { term: 'Entidade Final', description: 'Para certificados de servidor, cliente, assinatura de código e e-mail' },
-          { term: 'CA', description: 'Para criar Autoridades Certificadoras intermediárias' },
+          { term: 'Sistema', description: 'Incluído na instalação. Duplique-o para obter uma cópia editável: ele próprio não pode ser editado nem excluído' },
+          { term: 'Personalizado', description: 'Criado ou importado aqui, e o único tipo que pode ser editado ou excluído' },
         ]
       },
       {
         title: 'Recursos',
         items: [
+          { label: 'Tipo', text: 'Web Server, Email, VPN Server ou Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Define os padrões de Key Usage, EKU e SAN' },
           { label: 'Padrões de Sujeito', text: 'Pré-preencher Organização, OU, País, Estado, Cidade' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, etc.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
           { label: 'Validade', text: 'Período de validade padrão em dias' },
           { label: 'Duplicar', text: 'Clonar um modelo existente e modificá-lo' },
+          { label: 'Mostrar sistema', text: 'Oculte os modelos incluídos para trabalhar apenas com os seus. Lembrado por navegador' },
           { label: 'Importar/Exportar', text: 'Compartilhar modelos como arquivos JSON entre instâncias UCM' },
         ]
       },
@@ -34,7 +36,7 @@ export default {
     ],
     tips: [
       'Crie modelos separados para servidores TLS, clientes e assinatura de código',
-      'Use a ação Duplicar para criar variações rapidamente de um modelo',
+      'Use a ação Duplicar para criar variações rapidamente de um modelo, inclusive de um modelo do sistema',
       'Modelos com flags de autoinscrição mostram os selos AD / Auto / ACL / Fixado na lista',
     ],
   },
@@ -45,23 +47,25 @@ export default {
 
 Modelos definem perfis de certificado reutilizáveis. Em vez de configurar manualmente Key Usage, Extended Key Usage, validade e campos de sujeito toda vez, aplique um modelo para pré-preencher tudo.
 
-## Tipos de Modelo
+## Sistema e Personalizado
 
-### Modelos de Entidade Final
-Para certificados de servidor, certificados de cliente, assinatura de código e proteção de e-mail. Esses modelos tipicamente definem:
-- **Key Usage**: Digital Signature, Key Encipherment
-- **Extended Key Usage**: Server Auth, Client Auth, Code Signing, Email Protection
+Todo modelo é de um tipo ou do outro, indicado na coluna **Origem**.
 
-### Modelos de CA
-Para criar CAs Intermediárias. Esses definem:
-- **Key Usage**: Certificate Sign, CRL Sign
-- **Basic Constraints**: CA:TRUE, comprimento de caminho opcional
+### Sistema
+Os modelos incluídos na instalação: Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication e Smartcard Logon. Editar e Excluir são recusados para eles, na interface e pela API. **Duplicar** fornece uma cópia editável para servir de base.
+
+### Personalizado
+Tudo o que é criado ou importado aqui. Esses podem ser editados e excluídos livremente.
+
+Desative **Mostrar sistema** na barra de ferramentas para ocultar os modelos incluídos e trabalhar apenas com os seus. A escolha é lembrada, a menos que você ainda não tenha modelos personalizados, caso em que os modelos incluídos permanecem visíveis.
+
+Autoridades certificadoras não são criadas a partir de modelos: crie-as na página **CAs**.
 
 ## Criando um Modelo
 
 1. Clique em **Criar Modelo**
 2. Insira um **nome** e descrição opcional
-3. Selecione o **tipo** do modelo (Entidade Final ou CA)
+3. Selecione o **tipo** do modelo: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Ele define os padrões de Key Usage, Extended Key Usage e SAN, que você pode alterar em seguida
 4. Configure **padrões de Sujeito** (O, OU, C, ST, L)
 5. Selecione flags de **Key Usage**
 6. Selecione valores de **Extended Key Usage**
