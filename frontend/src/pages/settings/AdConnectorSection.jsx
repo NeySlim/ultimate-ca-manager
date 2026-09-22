@@ -15,20 +15,13 @@ export default function AdConnectorSection({ adConnectorConfig, adConnectorLoadi
     ? t('adConnector.serverSummary', { server: servers[0], port: adConnectorConfig.port, count: servers.length - 1 })
     : `${adConnectorConfig?.server}:${adConnectorConfig?.port}`
   const testMark = { success: '✓', partial: '!' }[adConnectorConfig?.last_test_result] || '✗'
-  // The probe's verdict sits next to the enabled/disabled switch: a
-  // connector that is enabled but cannot reach a single DC is not "on" in
-  // any useful sense, and that is exactly what an operator needs to see
-  // without opening the dialog.
-  //
-  // Only while that verdict is still the one lookups are acting on, though.
-  // health_stale_after is the same window the backend applies before
-  // reordering the DC list (services/ad_connector/health.py's stale_after),
-  // so a probe that stopped running drops the badge instead of leaving
-  // Degraded on screen for a connector nothing is skipping a DC for.
-  const checkedAt = Date.parse(adConnectorConfig?.health?.checked_at ?? '')
-  const staleAfterMs = (adConnectorConfig?.health_stale_after || 900) * 1000
-  const healthFresh = !Number.isNaN(checkedAt) && Date.now() - checkedAt <= staleAfterMs
-  const healthState = healthFresh ? adConnectorConfig?.health?.state : null
+  // The probe's verdict next to the enabled switch: an enabled connector
+  // that reaches no DC is not "on" in any useful sense. Shown only while
+  // lookups are still acting on it, which the server decides (health_fresh)
+  // so a wrong browser clock cannot hide or keep the badge.
+  const healthState = adConnectorConfig?.health_fresh
+    ? adConnectorConfig?.health?.state
+    : null
   const healthBadge = {
     down: { variant: 'danger', label: t('adConnector.healthStateDown') },
     degraded: { variant: 'warning', label: t('adConnector.healthStateDegraded') },

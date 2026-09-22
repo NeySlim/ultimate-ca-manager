@@ -136,22 +136,15 @@ def update_config():
     if 'enabled' in data:
         config.enabled = bool(data['enabled'])
 
-    # No credential means an unauthenticated bind: ldap3 binds anonymously
-    # whenever either half is missing, and this connector reads computer and
-    # user objects to derive the subject of a certificate it is about to
-    # issue. A directory that allows the anonymous read makes that identity
-    # attacker-influenced; one that does not turns every lookup into a silent
-    # failure. Neither is a state to save, and the form has always asked for
-    # both, so this is the same rule enforced where it cannot be skipped by
-    # talking to the API directly. A blank password on a connector that
-    # already has one means "unchanged" (the form never re-sends it), so that
-    # case is not a save with no credential and is not refused here.
-    if not config.bind_dn:
+    # An enabled connector must never bind anonymously, which is what ldap3
+    # does whenever either half is missing. Only while enabled: switching a
+    # connector off, or filling it in field by field, binds nothing.
+    if config.enabled and not config.bind_dn:
         db.session.rollback()
-        return error_response('bind_dn is required', 400)
-    if not config.bind_password:
+        return error_response('bind_dn is required while the connector is enabled', 400)
+    if config.enabled and not config.bind_password:
         db.session.rollback()
-        return error_response('bind_password is required', 400)
+        return error_response('bind_password is required while the connector is enabled', 400)
 
     config.updated_at = utc_now()
 
@@ -234,16 +227,10 @@ def test_connection_saved():
         return error_response('AD Connector is not configured', 400)
 
     result = lookup.test_connection(config)
-    # Same per-DC bind the scheduled probe performs, so it counts as one:
-    # the connector's health badge reflects the test the operator just ran
-    # instead of waiting out the probe interval to agree with it.
-    #
-    # Only while the connector is enabled, though. A disabled connector
-    # serves no lookup, so recording a verdict for it would put a Degraded
-    # badge on something that is off, and losing every DC would log the
-    # "Kerberos autoenrollment will fail" error for enrollments that are
-    # not happening. The response still carries the full per-DC result.
-    if config.enabled:
+    # The badge reflects the test just run, which is the same per-DC bind the
+    # probe performs. Only for an enabled connector (a disabled one serves no
+    # lookup), and only when DCs were tried: a refused bind reached none.
+    if config.enabled and result.get('servers'):
         health.record(config, [
             (s['server'], s['success'], s['message']) for s in result.get('servers', [])
         ])

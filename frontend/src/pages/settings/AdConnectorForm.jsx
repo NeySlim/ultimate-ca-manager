@@ -209,11 +209,8 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
         placeholder={t('adConnector.bindDnPlaceholder')}
         required
       />
-      {/* Required until there is one stored: an empty password is an
-          anonymous bind, which the API refuses to save. Once stored, a blank
-          field means "unchanged" (handleSubmit drops it from the payload),
-          so demanding it again on every edit would be asking for a
-          credential the save does not need. */}
+      {/* Required until one is stored; afterwards blank means "unchanged"
+          and handleSubmit drops it from the payload. */}
       <Input
         label={t('adConnector.bindPassword')}
         type="password"

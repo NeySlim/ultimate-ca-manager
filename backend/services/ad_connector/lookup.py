@@ -146,6 +146,17 @@ def _build_tls(config):
     return ldap3.Tls(validate=ssl.CERT_REQUIRED), cleanup
 
 
+# ldap3 binds anonymously whenever either half of the credential is missing,
+# and this connector reads the objects a certificate's subject is derived
+# from. Every bind path refuses that rather than making it.
+BIND_CREDENTIAL_MISSING = 'bind credentials missing, refusing anonymous bind'
+
+
+def has_bind_credentials(config):
+    """Whether a config-like object carries both halves of the bind credential."""
+    return bool(getattr(config, 'bind_dn', None) and getattr(config, 'bind_password', None))
+
+
 class ADConnectorConnectionError(Exception):
     """Every configured DC refused or failed. Carries the per-server reason
     list so a caller can show *why each one* failed rather than only the
@@ -245,6 +256,8 @@ def _connect(config):
     servers = config_servers(config)
     if not servers:
         raise ValueError('AD Connector has no server configured')
+    if not has_bind_credentials(config):
+        raise ValueError(BIND_CREDENTIAL_MISSING)
 
     # A DC the scheduled probe has already found unreachable is moved out of
     # the way, so an enrollment doesn't pay its connect timeout to rediscover
@@ -581,6 +594,10 @@ def test_connection(config):
     if not servers:
         return {'success': False, 'partial': False,
                 'message': 'Server is required', 'servers': []}
+    if not has_bind_credentials(config):
+        logger.warning('AD Connector: %s', BIND_CREDENTIAL_MISSING)
+        return {'success': False, 'partial': False,
+                'message': 'Bind DN and password are required', 'servers': []}
 
     tls, cleanup = _build_tls(config)
     results = []

@@ -568,6 +568,80 @@ class TestConnectFailover:
         assert not os.path.exists(captured['path'])
 
 
+class TestAnonymousBindIsRefusedEverywhere:
+    """One rule, applied at every point that binds.
+
+    The API refuses to save an enabled connector without both halves of the
+    credential, but rows saved before that rule existed still have none, and
+    ldap3 binds anonymously whenever either half is missing. So the bind
+    paths refuse it themselves rather than trusting the save to have.
+    """
+
+    @staticmethod
+    def _config(**overrides):
+        from types import SimpleNamespace
+        fields = dict(
+            server=['dc1.corp.local'], port=636, use_ssl=True, verify_ssl=True,
+            ca_bundle=None, bind_dn='svc-ucm', bind_password='irrelevant',
+        )
+        fields.update(overrides)
+        return SimpleNamespace(**fields)
+
+    @pytest.mark.parametrize('missing', ['bind_dn', 'bind_password'])
+    def test_connect_refuses_before_reaching_a_dc(self, monkeypatch, missing):
+        connector = _RecordingConnector()
+        monkeypatch.setattr(lookup, '_connect_to', connector)
+        with pytest.raises(ValueError) as excinfo:
+            lookup._connect(self._config(**{missing: None}))
+        assert 'anonymous bind' in str(excinfo.value)
+        # Refused, not attempted and failed: no DC was contacted at all.
+        assert connector.attempted == []
+
+    @pytest.mark.parametrize('missing', ['bind_dn', 'bind_password'])
+    def test_test_connection_refuses_without_binding(self, monkeypatch, missing):
+        connector = _RecordingConnector()
+        monkeypatch.setattr(lookup, '_connect_to', connector)
+        result = lookup.test_connection(self._config(**{missing: None}))
+        assert result['success'] is False
+        assert result['servers'] == []
+        assert connector.attempted == []
+
+    @pytest.mark.parametrize('missing', ['bind_dn', 'bind_password'])
+    def test_probe_refuses_without_binding(self, monkeypatch, missing):
+        from services.ad_connector import health as h
+        connector = _RecordingConnector()
+        monkeypatch.setattr(lookup, '_connect_to', connector)
+        assert h.probe(self._config(**{missing: None})) == []
+        assert connector.attempted == []
+
+    def test_a_full_credential_still_binds(self, monkeypatch):
+        """The guard refuses the missing half, not every bind."""
+        connector = _RecordingConnector()
+        monkeypatch.setattr(lookup, '_connect_to', connector)
+        assert lookup._connect(self._config()) is not None
+        assert connector.attempted == ['dc1.corp.local']
+
+
+class TestProbeNeverRaises:
+    """probe() runs on the scheduler's thread. Anything escaping it is a
+    failed run on every wake, whatever the probe interval says."""
+
+    def test_a_tls_build_that_raises_is_not_an_exception(self, monkeypatch):
+        from types import SimpleNamespace
+        from services.ad_connector import health as h
+
+        def _explode(config):
+            raise OSError('no space left on device')
+
+        monkeypatch.setattr(lookup, '_build_tls', _explode)
+        config = SimpleNamespace(
+            server=['dc1.corp.local'], port=636, use_ssl=True, verify_ssl=True,
+            ca_bundle='-----BEGIN CERTIFICATE-----', bind_dn='svc-ucm',
+            bind_password='irrelevant',
+        )
+        assert h.probe(config) == []
+
+
 class TestTestConnection:
     """Every DC is probed, not just enough of them to reach a verdict: a
     second DC that is down stays invisible until the first one fails in
@@ -843,7 +917,8 @@ class TestRunHealthProbe:
             ADConnectorConfig.query.delete()
             config = ADConnectorConfig(
                 server='dc1.corp.local\ndc2.corp.local', enabled=True,
-                base_dn='DC=corp,DC=local')
+                base_dn='DC=corp,DC=local', bind_dn='svc-ucm')
+            config.bind_password = 'irrelevant'
             db.session.add(config)
             db.session.commit()
             monkeypatch.setattr(
@@ -863,8 +938,11 @@ class TestRunHealthProbe:
         from services.ad_connector import health as h
         with app.app_context():
             ADConnectorConfig.query.delete()
-            db.session.add(ADConnectorConfig(
-                server='dc1.corp.local', enabled=True, base_dn='DC=corp,DC=local'))
+            config = ADConnectorConfig(
+                server='dc1.corp.local', enabled=True, base_dn='DC=corp,DC=local',
+                bind_dn='svc-ucm')
+            config.bind_password = 'irrelevant'
+            db.session.add(config)
             db.session.commit()
 
             def _explode(cfg):
@@ -883,10 +961,29 @@ class TestRunHealthProbe:
             ADConnectorConfig.query.delete()
             config = ADConnectorConfig(
                 server='dc1.corp.local', enabled=True, base_dn='DC=corp,DC=local',
-                health_probe_interval=3600)
+                bind_dn='svc-ucm', health_probe_interval=3600)
+            config.bind_password = 'irrelevant'
             config.health = TestHealthState._blob({'dc1.corp.local': True},
                                                   state='up', age_seconds=10)
             db.session.add(config)
             db.session.commit()
             monkeypatch.setattr(h, 'probe', lambda cfg: pytest.fail('should not probe'))
             assert h.run_health_probe()['status'] == 'skipped'
+
+    def test_a_connector_without_a_credential_is_skipped(self, app, monkeypatch):
+        """An enabled row saved before the credential was required. The
+        probe would otherwise bind anonymously every interval and record a
+        health verdict for a connector no lookup can use."""
+        from services.ad_connector import health as h
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            db.session.add(ADConnectorConfig(
+                server='dc1.corp.local', enabled=True, base_dn='DC=corp,DC=local',
+                bind_dn='svc-ucm'))
+            db.session.commit()
+            monkeypatch.setattr(h, 'probe', lambda cfg: pytest.fail('should not probe'))
+            result = h.run_health_probe()
+            assert result['status'] == 'skipped'
+            assert 'credential' in result['reason']
+            # Nothing probed means nothing recorded: no verdict is invented.
+            assert ADConnectorConfig.get_singleton().health == {}

@@ -119,9 +119,10 @@ def stale_after(interval=None):
     generous enough that an interval change, a slow probe or a scheduler
     that missed a tick doesn't make the connector start ignoring good data,
     and tied to the interval so a daily probe's verdict isn't expired for
-    all but the first fifteen minutes of its own cycle. The settings badge
-    reads the same window (``health_stale_after`` in the config payload) so
-    it can't disagree with what ``_connect`` is acting on.
+    all but the first fifteen minutes of its own cycle. ``to_dict`` applies
+    this same window to the stored verdict (``health_fresh``, next to
+    ``health_stale_after``) so the settings badge can't disagree with what
+    ``_connect`` is acting on, or with a browser clock.
     """
     try:
         interval = int(interval or DEFAULT_PROBE_INTERVAL_SECONDS)
@@ -244,14 +245,28 @@ def record(config, results):
 
 def probe(config):
     """Bind to each configured DC in turn and return
-    ``[(host, ok, message), ...]``. Never raises."""
+    ``[(host, ok, message), ...]``. Never raises: this runs on the
+    scheduler's thread, where anything escaping is a failed run on every
+    wake whatever the interval, so every step is inside the contract."""
     from services.ad_connector import lookup
 
     servers = lookup.config_servers(config)
     if not servers:
         return []
+    # The same rule the lookups and the save apply: an anonymous bind is
+    # not a connection this connector makes, so nothing is probed either.
+    if not lookup.has_bind_credentials(config):
+        logger.warning('AD Connector: %s', lookup.BIND_CREDENTIAL_MISSING)
+        return []
 
-    tls, cleanup = lookup._build_tls(config)
+    try:
+        tls, cleanup = lookup._build_tls(config)
+    except Exception as e:
+        # Writing the temp CA bundle can fail. That is a probe that did not
+        # run, not an exception for the scheduler to report.
+        logger.warning('AD Connector: could not prepare the health probe: %s', e)
+        return []
+
     results = []
     try:
         for host in servers:
@@ -302,11 +317,16 @@ def run_health_probe():
     whole loop with it, and must not leave a stale verdict looking fresh.
     """
     from models import ADConnectorConfig
+    from services.ad_connector import lookup
     from utils.db_transaction import safe_commit
 
     config = ADConnectorConfig.get_singleton()
     if config is None or not config.enabled or not config.server:
         return {'status': 'skipped', 'reason': 'not configured or disabled'}
+    # A skip, not a warning: the scheduler wakes every minute, and the fix
+    # for this is in the settings dialog, not in the log.
+    if not lookup.has_bind_credentials(config):
+        return {'status': 'skipped', 'reason': 'bind credentials missing'}
 
     previous = config.health
     previous_state = state_of(previous)
@@ -317,7 +337,8 @@ def run_health_probe():
     try:
         results = probe(config)
     except Exception as e:
-        logger.error('AD Connector: health probe failed to run: %s', e)
+        # Not logged here: the scheduler logs a failed run, and probe has
+        # already said whatever it could not do.
         return {'status': 'failed', 'reason': str(e)}
 
     new = record(config, results)
