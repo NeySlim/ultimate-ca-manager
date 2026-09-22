@@ -57,4 +57,12 @@ describe('certificate pickers name a certificate by its CN (#365)', () => {
     const plainCell = (await screen.findByText('plain.example.com')).closest('td')
     expect(within(plainCell).getAllByText('plain.example.com')).toHaveLength(1)
   })
+
+  it('the picker dialog counts the SANs of a certificate that has several', async () => {
+    getAll.mockResolvedValue({ data: [{ ...renamed, san_count: 2 }, { ...plain, san_count: 1 }], meta: { total: 2 } })
+    render(<CertificatePickerModal isOpen onClose={vi.fn()} onSelect={vi.fn()} />)
+    expect(await screen.findByText('2 details.sans')).toBeInTheDocument()
+    const plainCell = (await screen.findByText('plain.example.com')).closest('td')
+    expect(plainCell).not.toHaveTextContent('details.sans')
+  })
 })

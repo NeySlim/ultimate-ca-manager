@@ -149,9 +149,9 @@ export default function CertificatePickerModal({ isOpen, onClose, onSelect, filt
                         {subtitle && (
                           <div className="text-xs text-text-secondary truncate max-w-[250px]" title={subtitle}>{subtitle}</div>
                         )}
-                        {cert.san_count > 0 && (
+                        {cert.san_count > 1 && (
                           <div className="text-xs text-text-secondary">
-                            +{cert.san_count} SAN{cert.san_count > 1 ? 's' : ''}
+                            {cert.san_count} {t('details.sans')}
                           </div>
                         )}
                       </td>

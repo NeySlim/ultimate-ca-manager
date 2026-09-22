@@ -382,46 +382,25 @@ class Certificate(db.Model):
         return _days_remaining(self.valid_to)
     
     @property
+    def san_entries(self) -> list:
+        """Every SAN as a "TYPE:value" string, in DNS, IP, Email, URI, UPN order."""
+        sans = []
+        for prefix, raw in (('DNS', self.san_dns), ('IP', self.san_ip), ('Email', self.san_email),
+                            ('URI', self.san_uri), ('UPN', self.san_upn)):
+            if not raw:
+                continue
+            try:
+                values = json.loads(raw) if raw.startswith('[') else [raw]
+                sans.extend([f"{prefix}:{v}" for v in values])
+            except Exception:
+                sans.append(f"{prefix}:{raw}")
+        return sans
+
+    @property
     def san_combined(self) -> str:
         """Combined SAN string for display"""
-        sans = []
-        if self.san_dns:
-            try:
-                import json
-                dns_list = json.loads(self.san_dns) if self.san_dns.startswith('[') else [self.san_dns]
-                sans.extend([f"DNS:{d}" for d in dns_list])
-            except Exception:
-                sans.append(f"DNS:{self.san_dns}")
-        if self.san_ip:
-            try:
-                import json
-                ip_list = json.loads(self.san_ip) if self.san_ip.startswith('[') else [self.san_ip]
-                sans.extend([f"IP:{ip}" for ip in ip_list])
-            except Exception:
-                sans.append(f"IP:{self.san_ip}")
-        if self.san_email:
-            try:
-                import json
-                email_list = json.loads(self.san_email) if self.san_email.startswith('[') else [self.san_email]
-                sans.extend([f"Email:{e}" for e in email_list])
-            except Exception:
-                sans.append(f"Email:{self.san_email}")
-        if self.san_uri:
-            try:
-                import json
-                uri_list = json.loads(self.san_uri) if self.san_uri.startswith('[') else [self.san_uri]
-                sans.extend([f"URI:{u}" for u in uri_list])
-            except Exception:
-                sans.append(f"URI:{self.san_uri}")
-        if self.san_upn:
-            try:
-                import json
-                upn_list = json.loads(self.san_upn) if self.san_upn.startswith('[') else [self.san_upn]
-                sans.extend([f"UPN:{u}" for u in upn_list])
-            except Exception:
-                sans.append(f"UPN:{self.san_upn}")
-        return ', '.join(sans) if sans else ""
-    
+        return ', '.join(self.san_entries)
+
     @property
     def not_valid_before(self) -> str:
         """Formatted valid from date"""
@@ -451,6 +430,7 @@ class Certificate(db.Model):
             elif self.valid_to < now + timedelta(days=30):
                 status = "expiring"
         
+        san_entries = self.san_entries
         data = {
             "id": self.id,
             "refid": self.refid,
@@ -510,7 +490,8 @@ class Certificate(db.Model):
             "thumbprint_sha256": self.thumbprint_sha256,
             # Computed
             "days_remaining": self.days_remaining,
-            "san_combined": self.san_combined,
+            "san_combined": ', '.join(san_entries),
+            "san_count": len(san_entries),
             # Ownership (Pro feature)
             "owner_group_id": self.owner_group_id,
             "owner_group_name": self.owner_group.name if self.owner_group else None,

@@ -18,6 +18,7 @@ import { Button } from './Button'
 import { Textarea } from './Textarea'
 import { SelectComponent as Select } from './Select'
 import { cn, certificateLabel } from '../lib/utils'
+import { fetchAllPages } from '../lib/fetchAllPages'
 import { apiClient as api, certificatesService } from '../services'
 
 const ACCEPT_FORMATS = '.pem,.crt,.cer,.key,.csr,.der,.p12,.pfx,.p7b,.p7c'
@@ -66,18 +67,7 @@ export function CertificateInput({
       // capped at 100, so asking for 500 returned the default 20. `has_key` is
       // not read either, so the key filter stays here rather than being sent
       // and silently ignored.
-      const query = { per_page: MANAGED_PER_PAGE }
-      const first = await certificatesService.getAll({ ...query, page: 1 })
-      let certs = first.data || []
-      const total = Math.min(first.meta?.total ?? certs.length, MANAGED_MAX_CERTS)
-      const pages = Math.ceil(total / MANAGED_PER_PAGE)
-      if (pages > 1) {
-        const rest = await Promise.all(
-          Array.from({ length: pages - 1 }, (_, k) =>
-            certificatesService.getAll({ ...query, page: k + 2 }))
-        )
-        certs = rest.reduce((acc, r) => acc.concat(r.data || []), certs)
-      }
+      const certs = await fetchAllPages(certificatesService.getAll, { perPage: MANAGED_PER_PAGE, max: MANAGED_MAX_CERTS })
       setManagedCerts(requireKey ? certs.filter(c => c.has_private_key) : certs)
     } catch {
       setManagedCerts([])
