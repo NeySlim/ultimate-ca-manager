@@ -406,12 +406,18 @@ export default function CertificatesPage() {
   const filteredCerts = useMemo(() => {
     const caRefIds = new Set(cas.map(ca => ca.refid))
     
-    let result = certificates.map(cert => ({
-      ...cert,
-      status: cert.revoked ? 'revoked' : cert.status,
-      cn: cert.cn || cert.common_name || extractCN(cert.subject) || (cert.san_dns ? JSON.parse(cert.san_dns)[0] : null) || 'Certificate',
-      isOrphan: cert.caref && !caRefIds.has(cert.caref)
-    }))
+    let result = certificates.map(cert => {
+      // The CN names the row and the description (Rename) sits under it. The
+      // API already names a certificate without a CN by its first SAN, then its description.
+      const name = cert.cn || cert.common_name || extractCN(cert.subject) || (cert.san_dns ? JSON.parse(cert.san_dns)[0] : null) || 'Certificate'
+      return {
+        ...cert,
+        status: cert.revoked ? 'revoked' : cert.status,
+        cn: name,
+        subtitle: cert.descr && cert.descr !== name ? cert.descr : null,
+        isOrphan: cert.caref && !caRefIds.has(cert.caref)
+      }
+    })
     
     // No second pass on the status here: the server already applied the
     // filter, over the whole set rather than the current page. Re-filtering
@@ -465,7 +471,6 @@ export default function CertificatesPage() {
       const keyMap = {
         'cn': 'subject',
         'common_name': 'subject',
-        'descr': 'descr',
         'status': 'status', // Backend handles with CASE (groups by type)
         'issuer': 'issuer',
         'expires': 'valid_to',

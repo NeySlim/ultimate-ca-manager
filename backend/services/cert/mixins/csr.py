@@ -39,7 +39,7 @@ _LEGACY_CSR_DESCR_PREFIX = 'CSR for '
 def settle_csr_descr(descr, cn):
     """The name a CSR record keeps once it holds a certificate.
 
-    The certificates list shows a record by its description, so a CSR
+    The certificate pickers show a record by its description, so a CSR
     described as "CSR for <CN>" appeared under that wording once signed
     (#342). Drop the prefix; fall back to the CN when nothing is left."""
     if descr and descr.startswith(_LEGACY_CSR_DESCR_PREFIX):

@@ -41,6 +41,7 @@ export function useCertificateColumns(t) {
       header: t('common.commonName'),
       priority: 1,
       sortable: true,
+      accessor: (row) => (row.subtitle ? `${row.cn} (${row.subtitle})` : row.cn),
       render: (val, row) => (
         <div className="flex items-center gap-2">
           <div className={cn(
@@ -49,7 +50,10 @@ export function useCertificateColumns(t) {
           )}>
             <Certificate size={14} weight="duotone" />
           </div>
-          <span className="font-medium truncate">{val}</span>
+          <div className="flex flex-col min-w-0">
+            <span className="font-medium truncate">{val}</span>
+            {row.subtitle && <span className="text-xs text-text-secondary truncate" title={row.subtitle}>{row.subtitle}</span>}
+          </div>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
           {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak} title={t('certificates.orphanDescription')}>{t('certificates.orphan')}</Badge>}
           {row.archived && <Badge variant="secondary" size="sm" icon={Archive} title={t('certificates.archivedDescription')}>{t('certificates.archived')}</Badge>}
@@ -66,24 +70,16 @@ export function useCertificateColumns(t) {
             )}>
               <Certificate size={14} weight="duotone" />
             </div>
-            <span className="font-medium truncate">{val || row.cn || row.common_name || t('common.certificate')}</span>
+            <div className="flex flex-col min-w-0">
+              <span className="font-medium truncate">{val || row.cn || row.common_name || t('common.certificate')}</span>
+              {row.subtitle && <span className="text-xs text-text-secondary truncate">{row.subtitle}</span>}
+            </div>
             <KeyIndicator hasKey={row.has_private_key} size={12} />
           </div>
           <div className="shrink-0">
             {getStatusBadge(row)}
           </div>
         </div>
-      )
-    },
-    {
-      key: 'descr',
-      header: t('common.description'),
-      priority: 2,
-      sortable: true,
-      render: (val) => (
-        <span className="text-text-secondary truncate" title={val || undefined}>
-          {val || '—'}
-        </span>
       )
     },
     {

@@ -9,7 +9,7 @@
  * screen while the list showed everything.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
+import { render, renderHook, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
@@ -21,12 +21,14 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
+let mockIsMobile = false
+
 vi.mock('../../contexts', () => ({
   useNotification: () => ({
     showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn(),
     showConfirm: vi.fn().mockResolvedValue(false), showPrompt: vi.fn().mockResolvedValue(null),
   }),
-  useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
+  useMobile: () => ({ isMobile: mockIsMobile, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useWindowManager: () => ({
     openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
     prefs: { sameWindow: true, closeOnNav: true }, updatePrefs: vi.fn(),
@@ -58,6 +60,7 @@ vi.mock('../../services', () => ({
 }))
 
 import CertificatesPage from '../CertificatesPage'
+import { useCertificateColumns } from '../certificates/useCertificateColumns'
 
 const renderPage = () => render(
   <MemoryRouter><CertificatesPage /></MemoryRouter>
@@ -68,6 +71,7 @@ const lastParams = () => getAll.mock.calls[getAll.mock.calls.length - 1][0]
 describe('CertificatesPage — filter survives an external action (#345)', () => {
   beforeEach(() => {
     window.localStorage.clear()
+    mockIsMobile = false
     getAll.mockReset()
     getAll.mockResolvedValue({ data: [], meta: { total: 0 } })
   })
@@ -90,30 +94,41 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
     expect(lastParams().status).toEqual(['valid'])
   })
 
-  it('keeps Common Name and Description separate and sorts by description', async () => {
+  it('names a row by its Common Name and shows the description under it (#365)', async () => {
     getAll.mockResolvedValue({ data: [{
-      id: 42, cn: 'this-is-the-common-name.lan', common_name: 'this-is-the-common-name.lan',
-      descr: 'THIS-IS-THE-DESCRIPTION', status: 'valid', caref: 'ca-1',
+      id: 42, cn: 'host.example.com', common_name: 'host.example.com',
+      descr: 'Renamed by an operator', status: 'valid', caref: 'ca-1',
     }], meta: { total: 1 } })
     renderPage()
-    const row = await screen.findByRole('row', { name: /this-is-the-common-name.lan/ })
-    const cells = within(row).getAllByRole('cell')
-    const cnCell = cells.find(cell => cell.textContent.includes('this-is-the-common-name.lan'))
-    expect(cnCell).not.toHaveTextContent('THIS-IS-THE-DESCRIPTION')
-    expect(cells.some(cell => cell.textContent === 'THIS-IS-THE-DESCRIPTION')).toBe(true)
-    fireEvent.click(screen.getByRole('columnheader', { name: /common.description/ }))
-    await waitFor(() => expect(lastParams().sort_by).toBe('descr'))
+    const row = await screen.findByRole('row', { name: /host\.example\.com/ })
+    const name = within(row).getByText('host.example.com')
+    expect(name.parentElement).toHaveTextContent(/^host\.example\.comRenamed by an operator$/)
   })
 
-  it('allows Description to be hidden without hiding the Common Name', async () => {
-    window.localStorage.setItem('ucm-certs-columns', JSON.stringify(['descr']))
+  it('shows the description under the Common Name on mobile too', async () => {
+    mockIsMobile = true
     getAll.mockResolvedValue({ data: [{
-      id: 42, cn: 'host.example.com', descr: 'Hidden description', status: 'valid',
+      id: 43, cn: 'phone.example.com', descr: 'Renamed on mobile', status: 'valid', caref: 'ca-1',
     }], meta: { total: 1 } })
     renderPage()
-    await screen.findByText('host.example.com')
-    expect(screen.queryByText('Hidden description')).not.toBeInTheDocument()
-    expect(screen.queryByRole('columnheader', { name: /common.description/ })).not.toBeInTheDocument()
+    const name = await screen.findByText('phone.example.com')
+    expect(name.parentElement).toHaveTextContent(/^phone\.example\.comRenamed on mobile$/)
+  })
+
+  it('exports the description with the Common Name', () => {
+    const { result } = renderHook(() => useCertificateColumns((key) => key))
+    const column = result.current.find(col => col.key === 'cn')
+    expect(column.accessor({ cn: 'host.example.com', subtitle: 'Renamed' })).toBe('host.example.com (Renamed)')
+    expect(column.accessor({ cn: 'host.example.com', subtitle: null })).toBe('host.example.com')
+  })
+
+  it('does not repeat a description that is the CN', async () => {
+    getAll.mockResolvedValue({ data: [{
+      id: 44, cn: 'same.example.com', descr: 'same.example.com', status: 'valid', caref: 'ca-1',
+    }], meta: { total: 1 } })
+    renderPage()
+    const row = await screen.findByRole('row', { name: /same\.example\.com/ })
+    expect(within(row).getAllByText('same.example.com')).toHaveLength(1)
   })
 
   it('ignores an event for another entity type', async () => {
