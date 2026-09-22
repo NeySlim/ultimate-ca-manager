@@ -202,21 +202,23 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
         placeholder={t('adConnector.baseDnPlaceholder')}
         required
       />
+      {/* Both are what the connector binds with, so the switch is what
+          asks for them, the same rule update_config applies. A blank
+          password on one already stored means "unchanged", and
+          handleSubmit drops it from the payload. */}
       <Input
         label={t('adConnector.bindDn')}
         value={formData.bind_dn}
         onChange={(e) => updateField('bind_dn', e.target.value)}
         placeholder={t('adConnector.bindDnPlaceholder')}
-        required
+        required={formData.enabled}
       />
-      {/* Required until one is stored; afterwards blank means "unchanged"
-          and handleSubmit drops it from the payload. */}
       <Input
         label={t('adConnector.bindPassword')}
         type="password"
         value={formData.bind_password}
         onChange={(e) => updateField('bind_password', e.target.value)}
-        required={!config?.bind_password}
+        required={formData.enabled && !config?.bind_password}
         hasExistingValue={Boolean(config?.bind_password)}
       />
 
