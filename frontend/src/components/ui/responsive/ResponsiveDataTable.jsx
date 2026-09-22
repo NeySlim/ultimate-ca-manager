@@ -34,7 +34,7 @@ export function ResponsiveDataTable({
   bulkActions,          // ReactNode: shown when items selected
   
   // Row actions (dropdown menu)
-  rowActions, // (row) => [{ label, icon, onClick, variant, disabled, disabledReason }]
+  rowActions, // (row) => [{ label, icon, onClick, variant }]
   
   // Search
   searchable = false,
@@ -1535,25 +1535,17 @@ function RowActionMenu({ row, idx, actions, isOpen, onToggle, menuRef }) {
         return (
           <button
             key={i}
-            disabled={action.disabled}
             onClick={(e) => {
               e.stopPropagation()
-              if (action.disabled) return
               action.onClick?.()
             }}
-            // An action the server will refuse is shown greyed with the
-            // reason on hover, rather than hidden: a row that silently
-            // loses its delete button reads as a rendering glitch, while
-            // one that explains why it cannot be deleted is an answer.
-            title={action.disabled ? (action.disabledReason || action.label) : action.label}
+            title={action.label}
             className={cn(
               'w-6 h-6 rounded-lg flex items-center justify-center',
               'transition-all duration-150',
-              action.disabled
-                ? 'text-text-tertiary opacity-40 cursor-not-allowed'
-                : action.variant === 'danger'
-                  ? 'text-text-tertiary hover:text-status-danger hover:bg-status-danger-op10'
-                  : 'text-text-tertiary hover:text-accent-primary hover:bg-accent-primary-op10'
+              action.variant === 'danger'
+                ? 'text-text-tertiary hover:text-status-danger hover:bg-status-danger-op10'
+                : 'text-text-tertiary hover:text-accent-primary hover:bg-accent-primary-op10'
             )}
           >
             {Icon && <Icon size={15} weight="duotone" />}
@@ -1729,22 +1721,17 @@ function MobileCardRow({
             return (
               <button
                 key={i}
-                disabled={action.disabled}
                 onClick={(e) => {
                   e.stopPropagation()
-                  if (action.disabled) return
                   action.onClick?.()
                   setShowActions(false)
                 }}
-                title={action.disabled ? (action.disabledReason || action.label) : undefined}
                 className={cn(
                   'flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium',
                   'border border-border transition-colors',
-                  action.disabled
-                    ? 'text-text-tertiary opacity-40 cursor-not-allowed'
-                    : action.variant === 'danger'
-                      ? 'status-danger-text hover:status-danger-bg'
-                      : 'text-text-primary hover:bg-bg-tertiary'
+                  action.variant === 'danger'
+                    ? 'status-danger-text hover:status-danger-bg'
+                    : 'text-text-primary hover:bg-bg-tertiary'
                 )}
               >
                 {Icon && <Icon size={16} />}
