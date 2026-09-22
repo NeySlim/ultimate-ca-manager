@@ -409,7 +409,7 @@ export default function CertificatesPage() {
     let result = certificates.map(cert => ({
       ...cert,
       status: cert.revoked ? 'revoked' : cert.status,
-      cn: cert.descr || cert.cn || cert.common_name || extractCN(cert.subject) || (cert.san_dns ? JSON.parse(cert.san_dns)[0] : null) || 'Certificate',
+      cn: cert.cn || cert.common_name || extractCN(cert.subject) || (cert.san_dns ? JSON.parse(cert.san_dns)[0] : null) || 'Certificate',
       isOrphan: cert.caref && !caRefIds.has(cert.caref)
     }))
     
@@ -465,6 +465,7 @@ export default function CertificatesPage() {
       const keyMap = {
         'cn': 'subject',
         'common_name': 'subject',
+        'descr': 'descr',
         'status': 'status', // Backend handles with CASE (groups by type)
         'issuer': 'issuer',
         'expires': 'valid_to',

@@ -76,6 +76,17 @@ export function useCertificateColumns(t) {
       )
     },
     {
+      key: 'descr',
+      header: t('common.description'),
+      priority: 2,
+      sortable: true,
+      render: (val) => (
+        <span className="text-text-secondary truncate" title={val || undefined}>
+          {val || '—'}
+        </span>
+      )
+    },
+    {
       key: 'status',
       header: t('common.status'),
       priority: 2,

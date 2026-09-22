@@ -9,7 +9,7 @@
  * screen while the list showed everything.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor, act } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
@@ -88,6 +88,32 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
     await waitFor(() => expect(getAll.mock.calls.length).toBeGreaterThan(before))
     // The reload triggered by the action keeps the filter
     expect(lastParams().status).toEqual(['valid'])
+  })
+
+  it('keeps Common Name and Description separate and sorts by description', async () => {
+    getAll.mockResolvedValue({ data: [{
+      id: 42, cn: 'this-is-the-common-name.lan', common_name: 'this-is-the-common-name.lan',
+      descr: 'THIS-IS-THE-DESCRIPTION', status: 'valid', caref: 'ca-1',
+    }], meta: { total: 1 } })
+    renderPage()
+    const row = await screen.findByRole('row', { name: /this-is-the-common-name.lan/ })
+    const cells = within(row).getAllByRole('cell')
+    const cnCell = cells.find(cell => cell.textContent.includes('this-is-the-common-name.lan'))
+    expect(cnCell).not.toHaveTextContent('THIS-IS-THE-DESCRIPTION')
+    expect(cells.some(cell => cell.textContent === 'THIS-IS-THE-DESCRIPTION')).toBe(true)
+    fireEvent.click(screen.getByRole('columnheader', { name: /common.description/ }))
+    await waitFor(() => expect(lastParams().sort_by).toBe('descr'))
+  })
+
+  it('allows Description to be hidden without hiding the Common Name', async () => {
+    window.localStorage.setItem('ucm-certs-columns', JSON.stringify(['descr']))
+    getAll.mockResolvedValue({ data: [{
+      id: 42, cn: 'host.example.com', descr: 'Hidden description', status: 'valid',
+    }], meta: { total: 1 } })
+    renderPage()
+    await screen.findByText('host.example.com')
+    expect(screen.queryByText('Hidden description')).not.toBeInTheDocument()
+    expect(screen.queryByRole('columnheader', { name: /common.description/ })).not.toBeInTheDocument()
   })
 
   it('ignores an event for another entity type', async () => {
