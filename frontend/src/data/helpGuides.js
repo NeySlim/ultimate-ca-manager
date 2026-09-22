@@ -569,25 +569,23 @@ Delete removes the CSR from UCM. If the CSR was already signed, the resulting ce
 
 Templates define reusable certificate profiles. Instead of manually configuring Key Usage, Extended Key Usage, validity, and subject fields each time, apply a template to pre-fill everything.
 
-## System and Custom
+## Template Types
 
-Every template is one or the other, shown in the **Source** column.
+### End-Entity Templates
+For server certificates, client certificates, code signing, and email protection. These templates typically set:
+- **Key Usage**: Digital Signature, Key Encipherment
+- **Extended Key Usage**: Server Auth, Client Auth, Code Signing, Email Protection
 
-### System
-The templates seeded at install: Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication and Smartcard Logon. Edit and Delete are refused for them, in the interface and by the API. **Duplicate** gives you an editable copy to build on.
-
-### Custom
-Everything created or imported here. These can be edited and deleted freely.
-
-Switch **Show system** off in the toolbar to hide the built-in templates and work with your own only. The choice is remembered, unless you have no custom templates yet, in which case the built-in ones stay visible.
-
-Certificate authorities are not made from templates: create them on the **CAs** page.
+### CA Templates
+For creating Intermediate CAs. These set:
+- **Key Usage**: Certificate Sign, CRL Sign
+- **Basic Constraints**: CA:TRUE, optional path length
 
 ## Creating a Template
 
 1. Click **Create Template**
 2. Enter a **name** and optional description
-3. Select the template **type**: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon or Custom. It sets the Key Usage, Extended Key Usage and SAN defaults, which you can then change
+3. Select the template **type** (End-Entity or CA)
 4. Configure **Subject defaults** (O, OU, C, ST, L)
 5. Select **Key Usage** flags
 6. Select **Extended Key Usage** values

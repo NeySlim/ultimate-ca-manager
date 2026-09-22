@@ -323,24 +323,22 @@ export const helpContent = {
     overview: 'Define reusable certificate profiles with pre-configured subject fields, key usage, extended key usage, validity periods, and other extensions. Apply templates when issuing or signing certificates.',
     sections: [
       {
-        title: 'Source',
+        title: 'Template Types',
         icon: FileText,
         definitions: [
-          { term: 'System', description: 'Seeded at install. Duplicate one for an editable copy: it cannot be edited or deleted itself' },
-          { term: 'Custom', description: 'Created or imported here, and the only kind that can be edited or deleted' },
+          { term: 'End-Entity', description: 'For server, client, code signing, and email certificates' },
+          { term: 'CA', description: 'For creating intermediate Certificate Authorities' },
         ]
       },
       {
         title: 'Features',
         icon: Gear,
         items: [
-          { label: 'Type', text: 'Web Server, Email, VPN Server or Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon or Custom. Sets the Key Usage, EKU and SAN defaults' },
           { label: 'Subject Defaults', text: 'Pre-fill Organization, OU, Country, State, City' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, etc.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
           { label: 'Validity', text: 'Default validity period in days' },
           { label: 'Duplicate', text: 'Clone an existing template and modify it' },
-          { label: 'Show system', text: 'Hide the built-in templates to work with your own only. Remembered per browser' },
           { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances' },
         ]
       },
@@ -357,7 +355,7 @@ export const helpContent = {
     ],
     tips: [
       'Create separate templates for TLS servers, clients, and code signing',
-      'Use the Duplicate action to quickly create variations of a template, including of a system one',
+      'Use the Duplicate action to quickly create variations of a template',
       'Templates with autoenrollment flags show AD / Auto / ACL / Pinned badges in the list',
     ],
     related: ['Certificates', 'CSRs', 'CAs']
