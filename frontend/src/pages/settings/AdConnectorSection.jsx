@@ -8,6 +8,24 @@ export default function AdConnectorSection({ adConnectorConfig, adConnectorLoadi
   const { t } = useTranslation()
   const configured = Boolean(adConnectorConfig?.server)
   const baseUrl = typeof window !== 'undefined' ? window.location.origin : ''
+  // Summarise rather than list: the row is one line, and a domain with
+  // four DCs would push the enabled/disabled badge off it.
+  const servers = adConnectorConfig?.servers || []
+  const summary = servers.length > 1
+    ? t('adConnector.serverSummary', { server: servers[0], port: adConnectorConfig.port, count: servers.length - 1 })
+    : `${adConnectorConfig?.server}:${adConnectorConfig?.port}`
+  const testMark = { success: '✓', partial: '!' }[adConnectorConfig?.last_test_result] || '✗'
+  // The probe's verdict next to the enabled switch: an enabled connector
+  // that reaches no DC is not "on" in any useful sense. Shown only while
+  // lookups are still acting on it, which the server decides (health_fresh)
+  // so a wrong browser clock cannot hide or keep the badge.
+  const healthState = adConnectorConfig?.health_fresh
+    ? adConnectorConfig?.health?.state
+    : null
+  const healthBadge = {
+    down: { variant: 'danger', label: t('adConnector.healthStateDown') },
+    degraded: { variant: 'warning', label: t('adConnector.healthStateDegraded') },
+  }[healthState]
 
   return (
     <DetailContent>
@@ -51,19 +69,24 @@ export default function AdConnectorSection({ adConnectorConfig, adConnectorLoadi
               <div className="flex items-center gap-2">
                 <span className="font-medium text-text-primary">{t('adConnector.title')}</span>
                 {configured ? (
-                  <Badge variant={adConnectorConfig.enabled ? 'success' : 'secondary'} size="sm">
-                    {adConnectorConfig.enabled ? t('common.enabled') : t('common.disabled')}
-                  </Badge>
+                  <>
+                    <Badge variant={adConnectorConfig.enabled ? 'success' : 'secondary'} size="sm">
+                      {adConnectorConfig.enabled ? t('common.enabled') : t('common.disabled')}
+                    </Badge>
+                    {adConnectorConfig.enabled && healthBadge && (
+                      <Badge variant={healthBadge.variant} size="sm">{healthBadge.label}</Badge>
+                    )}
+                  </>
                 ) : (
                   <Badge variant="secondary" size="sm">{t('adConnector.notConfigured')}</Badge>
                 )}
               </div>
               <p className="text-xs text-text-secondary">
-                {configured ? `${adConnectorConfig.server}:${adConnectorConfig.port}` : t('adConnector.notConfiguredDesc')}
+                {configured ? summary : t('adConnector.notConfiguredDesc')}
               </p>
               {adConnectorConfig?.last_test_at && (
                 <p className="text-xs text-text-tertiary">
-                  {t('adConnector.testConnection')}: {adConnectorConfig.last_test_result === 'success' ? '✓' : '✗'} {formatDate(adConnectorConfig.last_test_at)}
+                  {t('adConnector.testConnection')}: {testMark} {formatDate(adConnectorConfig.last_test_at)}
                 </p>
               )}
             </div>

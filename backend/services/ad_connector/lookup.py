@@ -35,6 +35,7 @@ failure result, never an exception: a broken AD Connector must degrade to
 """
 import logging
 import os
+import re
 import ssl
 import tempfile
 
@@ -145,6 +146,77 @@ def _build_tls(config):
     return ldap3.Tls(validate=ssl.CERT_REQUIRED), cleanup
 
 
+# ldap3 binds anonymously whenever either half of the credential is missing,
+# and this connector reads the objects a certificate's subject is derived
+# from. Every bind path refuses that rather than making it.
+BIND_CREDENTIAL_MISSING = 'bind credentials missing, refusing anonymous bind'
+
+
+def has_bind_credentials(config):
+    """Whether a config-like object carries both halves of the bind credential."""
+    return bool(getattr(config, 'bind_dn', None) and getattr(config, 'bind_password', None))
+
+
+class ADConnectorConnectionError(Exception):
+    """Every configured DC refused or failed. Carries the per-server reason
+    list so a caller can show *why each one* failed rather than only the
+    last error -- with several DCs the failures are often different
+    (one down, one with a cert whose SAN doesn't match)."""
+
+    def __init__(self, failures):
+        self.failures = list(failures)
+        super().__init__('; '.join(f'{host}: {err}' for host, err in self.failures))
+
+
+def split_servers(raw):
+    """A ``server`` field -> the domain controllers it names, in failover
+    order, de-duplicated with first-occurrence order preserved.
+
+    Accepts a list (what the settings form now sends) or a single string
+    -- the string form keeps every config saved before this field became a
+    list readable. Every entry is itself split on commas/newlines, list or
+    not, so a pasted ``"dc1.corp.local, dc2.corp.local"`` does the obvious
+    thing in a row of the form just as it does in the older single field,
+    and what is stored matches what is read back.
+
+    Never raises: it is called on the enrollment path and on a column that
+    could have been hand-edited, so anything that is not a string -- a
+    number in the list, a dict where the list should be -- is skipped
+    rather than blowing up a lookup. The API rejects those shapes with a
+    400 before they can be stored (``api/v2/ad_connector.py``).
+
+    Each entry must be the DC's **own** hostname, not the domain name: a
+    bare domain (``corp.local``) round-robins across every DC while TLS
+    still verifies the certificate against the domain name, and a DC
+    certificate issued from the stock Domain Controller template carries
+    only that DC's own FQDN in its SAN -- so verification fails against
+    whichever DC answers. Listing the DCs individually is what makes
+    ``verify_ssl`` usable at all on a multi-DC domain.
+    """
+    if not raw:
+        return []
+    entries = raw if isinstance(raw, (list, tuple)) else [raw]
+    servers = []
+    for entry in entries:
+        if not isinstance(entry, str):
+            continue
+        for part in re.split(r'[,\n]', entry):
+            host = part.strip()
+            if host and host not in servers:
+                servers.append(host)
+    return servers
+
+
+def join_servers(servers):
+    """``split_servers``' inverse, for the single ``server`` text column."""
+    return '\n'.join(split_servers(servers))
+
+
+def config_servers(config):
+    """The DCs on a config-like object (saved row or form ``SimpleNamespace``)."""
+    return split_servers(getattr(config, 'server', None))
+
+
 # Every lookup here runs synchronously inside a WSTEP/XCEP request handler
 # (gevent-cooperative, but still blocking that greenlet) -- a black-holed
 # or firewall-dropped DC with no timeout would stall the enrollment request
@@ -153,25 +225,66 @@ _LDAP_CONNECT_TIMEOUT_SECONDS = 10
 _LDAP_RECEIVE_TIMEOUT_SECONDS = 10
 
 
+def _connect_to(config, host, tls):
+    """Bind as the connector's service account against one DC. Raises on
+    any failure. ``tls`` is built once by the caller and shared across
+    every host -- it carries no per-host state, and rebuilding it per
+    attempt would re-write the temp CA file for each DC."""
+    import ldap3
+
+    server = ldap3.Server(
+        host, port=config.port, use_ssl=config.use_ssl,
+        tls=tls, get_info=ldap3.ALL, connect_timeout=_LDAP_CONNECT_TIMEOUT_SECONDS,
+    )
+    return ldap3.Connection(
+        server, user=config.bind_dn, password=config.bind_password,
+        auto_bind=True, check_names=False, receive_timeout=_LDAP_RECEIVE_TIMEOUT_SECONDS,
+    )
+
+
 def _connect(config):
     """Bind as the connector's service account. Returns an open, bound
-    ``ldap3.Connection``. Raises on any failure -- callers translate that
-    into their own fail-safe behavior."""
-    import ldap3
+    ``ldap3.Connection`` to the first configured DC that accepts it, so a
+    single DC being down or presenting a certificate this connector won't
+    verify does not take certificate enrollment down with it.
+
+    Raises ``ADConnectorConnectionError`` (naming every DC and its own
+    failure) if none of them bind, or ``ValueError`` if none are
+    configured -- callers translate that into their own fail-safe
+    behavior.
+    """
+    servers = config_servers(config)
+    if not servers:
+        raise ValueError('AD Connector has no server configured')
+    if not has_bind_credentials(config):
+        raise ValueError(BIND_CREDENTIAL_MISSING)
+
+    # A DC the scheduled probe has already found unreachable is moved out of
+    # the way, so an enrollment doesn't pay its connect timeout to rediscover
+    # that. Advisory only: see services/ad_connector/health.py's prioritise,
+    # which never returns an empty list and ignores a stale verdict.
+    from services.ad_connector import health
+    servers = health.prioritise(servers, getattr(config, 'health', None),
+                                getattr(config, 'health_probe_interval', None))
 
     tls, cleanup = _build_tls(config)
     try:
-        server = ldap3.Server(
-            config.server, port=config.port, use_ssl=config.use_ssl,
-            tls=tls, get_info=ldap3.ALL, connect_timeout=_LDAP_CONNECT_TIMEOUT_SECONDS,
-        )
-        return ldap3.Connection(
-            server, user=config.bind_dn, password=config.bind_password,
-            auto_bind=True, check_names=False, receive_timeout=_LDAP_RECEIVE_TIMEOUT_SECONDS,
-        )
+        failures = []
+        for host in servers:
+            try:
+                return _connect_to(config, host, tls)
+            except Exception as e:
+                # Info, not warning: with several DCs configured, one
+                # refusing is the normal case this failover exists for.
+                # Only exhausting every DC is worth a warning, and the
+                # callers below already log that.
+                logger.info('AD Connector: %s did not accept the bind: %s', host, e)
+                failures.append((host, str(e)))
+        raise ADConnectorConnectionError(failures)
     finally:
-        # auto_bind=True performs the TLS handshake synchronously above, so
-        # the temp CA file (if any) is no longer needed once this returns.
+        # Deferred to here, not to the first successful bind: every
+        # attempt above needs the CA bundle, and auto_bind=True has
+        # completed each handshake synchronously by the time we arrive.
         cleanup()
 
 
@@ -461,17 +574,63 @@ def test_connection(config):
     """Test connectivity + bind for a config-like object -- either the
     saved ``ADConnectorConfig`` row or an unsaved ``SimpleNamespace`` built
     from a settings form (mirrors ``MicrosoftCAConnectionMixin``'s
-    inline-vs-saved test pattern). Returns ``{'success': bool, 'message': str}``,
-    never raises.
+    inline-vs-saved test pattern). Never raises.
+
+    Every configured DC is tried, not just enough of them to reach a
+    verdict: ``_connect`` stops at the first DC that binds, which would
+    leave a second DC that is down -- or presenting a certificate this
+    connector can't verify -- silently untested until the first one fails
+    in production. Returns::
+
+        {'success': bool, 'partial': bool, 'message': str,
+         'servers': [{'server': str, 'success': bool, 'message': str}, ...]}
+
+    ``success`` is "at least one DC bound", because that is exactly the
+    condition under which lookups work. ``partial`` distinguishes that
+    from "all of them bound" so the caller can warn rather than report a
+    clean pass.
     """
-    if not config.server:
-        return {'success': False, 'message': 'Server is required'}
+    servers = config_servers(config)
+    if not servers:
+        return {'success': False, 'partial': False,
+                'message': 'Server is required', 'servers': []}
+    if not has_bind_credentials(config):
+        logger.warning('AD Connector: %s', BIND_CREDENTIAL_MISSING)
+        return {'success': False, 'partial': False,
+                'message': 'Bind DN and password are required', 'servers': []}
+
+    tls, cleanup = _build_tls(config)
+    results = []
     try:
-        conn = _connect(config)
-    except Exception as e:
-        return {'success': False, 'message': f'Connection failed: {e}'}
-    try:
-        conn.unbind()
-    except Exception:
-        pass
-    return {'success': True, 'message': 'Connected and bound successfully'}
+        for host in servers:
+            try:
+                conn = _connect_to(config, host, tls)
+            except Exception as e:
+                results.append({'server': host, 'success': False, 'message': str(e)})
+                continue
+            results.append({'server': host, 'success': True,
+                            'message': 'Connected and bound successfully'})
+            try:
+                conn.unbind()
+            except Exception:
+                pass
+    finally:
+        cleanup()
+
+    failed = [r for r in results if not r['success']]
+    ok_count = len(results) - len(failed)
+    detail = '; '.join(f"{r['server']}: {r['message']}" for r in failed)
+
+    if not ok_count:
+        return {'success': False, 'partial': False,
+                'message': f'Connection failed: {detail}', 'servers': results}
+    if failed:
+        return {'success': True, 'partial': True,
+                'message': f'{ok_count} of {len(results)} servers connected -- {detail}',
+                'servers': results}
+    if len(results) == 1:
+        return {'success': True, 'partial': False,
+                'message': 'Connected and bound successfully', 'servers': results}
+    return {'success': True, 'partial': False,
+            'message': f'All {len(results)} servers connected and bound successfully',
+            'servers': results}
