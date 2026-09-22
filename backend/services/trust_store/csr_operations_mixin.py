@@ -563,7 +563,7 @@ class CSROperationsMixin:
         )
 
         hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
-        csr = builder.sign(private_key, hash_algo, default_backend())
+        csr = builder.sign(private_key, signing_hash_for(private_key, hash_algo), default_backend())
         return csr.public_bytes(serialization.Encoding.PEM)
 
     @staticmethod

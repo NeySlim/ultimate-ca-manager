@@ -5,6 +5,7 @@ Supports SoftHSM, Thales, nCipher, AWS CloudHSM (via PKCS#11 library)
 Based on python-pkcs11 library and PKCS#11 v3.0 standard (OASIS)
 """
 
+import hashlib
 import logging
 from typing import Dict, List, Optional, Any
 from pathlib import Path
@@ -50,6 +51,13 @@ try:
         'EC-P256': Mechanism.ECDSA_SHA256,
         'EC-P384': Mechanism.ECDSA_SHA384,
         'EC-P521': Mechanism.ECDSA_SHA512,
+    }
+
+    # Digest to apply locally when a token lacks the hashed ECDSA mechanism
+    _ECDSA_DIGEST = {
+        Mechanism.ECDSA_SHA256: 'sha256',
+        Mechanism.ECDSA_SHA384: 'sha384',
+        Mechanism.ECDSA_SHA512: 'sha512',
     }
 except ImportError:
     pkcs11 = None
@@ -478,8 +486,17 @@ class Pkcs11Provider(BaseHsmProvider):
                     raise HsmOperationError(f"Unsupported key type for signing: {key_type}")
             
             # Sign
-            signature = priv_key.sign(data, mechanism=mechanism)
-            
+            try:
+                signature = priv_key.sign(data, mechanism=mechanism)
+            except pkcs11.exceptions.MechanismInvalid:
+                # SoftHSM and some tokens offer only raw ECDSA: hash here and
+                # sign the digest, which is the same signature.
+                digest_name = _ECDSA_DIGEST.get(mechanism)
+                if digest_name is None:
+                    raise
+                signature = priv_key.sign(getattr(hashlib, digest_name)(data).digest(),
+                                          mechanism=Mechanism.ECDSA)
+
             logger.debug(f"Signed {len(data)} bytes with key {key_identifier}")
             return signature
             

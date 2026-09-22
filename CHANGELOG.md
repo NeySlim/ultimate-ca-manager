@@ -17,6 +17,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - A SCEP profile names its Intune app registration instead of carrying the credentials; migration 092 gives every existing Intune profile a registration named after it, shared by the profiles that used the same tenant, client ID and secret. A different secret for the same tenant keeps a registration of its own, reported in the log for a merge by hand; two registrations for one tenant and client ID cannot be created through the API. The pre-092 profile fields stay accepted for one release.
 - Deployment target settings now contain only the reusable SSH/SFTP connection. Destination paths, file options and reload commands are configured on each certificate or CRL binding; migration 091 copies existing target reload commands to existing bindings.
 
+### Fixed
+- A CSR, certificate or CRL signed by an EC key held in a PKCS#11 or Azure Key Vault HSM carried the raw `r || s` signature the HSM returns, so OpenSSL and every external signer rejected it. The signature is now DER-encoded as X.509 requires on every path, the generic key signing endpoint included, and a CA created or renewed on an HSM key keeps the digest matching its curve (#366).
+
 ---
 
 ## [2.232] - 2026-09-21
