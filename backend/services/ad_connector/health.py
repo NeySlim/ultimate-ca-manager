@@ -245,9 +245,17 @@ def record(config, results):
 
 def probe(config):
     """Bind to each configured DC in turn and return
-    ``[(host, ok, message), ...]``. Never raises: this runs on the
-    scheduler's thread, where anything escaping is a failed run on every
-    wake whatever the interval, so every step is inside the contract."""
+    ``[(host, ok, message), ...]``.
+
+    ``None`` when the probe could not run at all, which is not the same as
+    the empty list: ``[]`` is "there was nothing to probe", ``None`` is "no
+    DC was reached, and nothing here is a verdict about one". The caller
+    must keep ``None`` out of ``record``, or a verdict about nothing would
+    replace the real one.
+
+    Never raises: this runs on the scheduler's thread, where anything
+    escaping is a failed run on every wake whatever the interval.
+    """
     from services.ad_connector import lookup
 
     servers = lookup.config_servers(config)
@@ -257,15 +265,13 @@ def probe(config):
     # not a connection this connector makes, so nothing is probed either.
     if not lookup.has_bind_credentials(config):
         logger.warning('AD Connector: %s', lookup.BIND_CREDENTIAL_MISSING)
-        return []
+        return None
 
     try:
         tls, cleanup = lookup._build_tls(config)
     except Exception as e:
-        # Writing the temp CA bundle can fail. That is a probe that did not
-        # run, not an exception for the scheduler to report.
         logger.warning('AD Connector: could not prepare the health probe: %s', e)
-        return []
+        return None
 
     results = []
     try:
@@ -340,6 +346,11 @@ def run_health_probe():
         # Not logged here: the scheduler logs a failed run, and probe has
         # already said whatever it could not do.
         return {'status': 'failed', 'reason': str(e)}
+    if results is None:
+        # No DC was reached. Recording that would store a verdict about
+        # nothing over the real one, losing every DC's `since` with it, and
+        # would count a green run that never touched a domain controller.
+        return {'status': 'failed', 'reason': 'the probe could not run'}
 
     new = record(config, results)
     ok, _err = safe_commit(logger, 'Failed to store AD Connector health')

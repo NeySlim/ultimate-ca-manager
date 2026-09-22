@@ -611,7 +611,9 @@ class TestAnonymousBindIsRefusedEverywhere:
         from services.ad_connector import health as h
         connector = _RecordingConnector()
         monkeypatch.setattr(lookup, '_connect_to', connector)
-        assert h.probe(self._config(**{missing: None})) == []
+        # None, not []: "no DC was reached", which the caller must not
+        # record as a verdict.
+        assert h.probe(self._config(**{missing: None})) is None
         assert connector.attempted == []
 
     def test_a_full_credential_still_binds(self, monkeypatch):
@@ -639,7 +641,8 @@ class TestProbeNeverRaises:
             ca_bundle='-----BEGIN CERTIFICATE-----', bind_dn='svc-ucm',
             bind_password='irrelevant',
         )
-        assert h.probe(config) == []
+        # None rather than [], which record() would turn into a verdict.
+        assert h.probe(config) is None
 
 
 class TestTestConnection:
@@ -969,6 +972,38 @@ class TestRunHealthProbe:
             db.session.commit()
             monkeypatch.setattr(h, 'probe', lambda cfg: pytest.fail('should not probe'))
             assert h.run_health_probe()['status'] == 'skipped'
+
+    def test_a_probe_that_could_not_run_keeps_the_stored_verdict(self, app, monkeypatch):
+        """A _build_tls that raises is a failed run, not a verdict. Recording
+        it would put state "unknown" and an empty server map over the real
+        one, losing every DC's `since`, blanking the dialog and the badge,
+        and counting a green run that never reached a domain controller. On
+        a host whose temp directory is read-only that repeats every
+        interval."""
+        from services.ad_connector import health as h
+        from services.ad_connector import lookup as lookup_mod
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            config = ADConnectorConfig(
+                server='dc1.corp.local', enabled=True, base_dn='DC=corp,DC=local',
+                bind_dn='svc-ucm')
+            config.bind_password = 'irrelevant'
+            # Older than the 120s default interval, so the probe is due
+            # and actually runs rather than skipping as not due.
+            config.health = TestHealthState._blob({'dc1.corp.local': False},
+                                                  state='degraded', age_seconds=600)
+            db.session.add(config)
+            db.session.commit()
+
+            def _explode(cfg):
+                raise OSError('read-only file system')
+
+            monkeypatch.setattr(lookup_mod, '_build_tls', _explode)
+            result = h.run_health_probe()
+            assert result['status'] == 'failed'
+            stored = ADConnectorConfig.get_singleton().health
+            assert stored['state'] == 'degraded'
+            assert stored['servers']['dc1.corp.local']['healthy'] is False
 
     def test_a_connector_without_a_credential_is_skipped(self, app, monkeypatch):
         """An enabled row saved before the credential was required. The
