@@ -136,10 +136,15 @@ def _build_tls(config):
     if ca_bundle:
         fd, ca_path = tempfile.mkstemp(suffix='.pem', prefix='ucm_ad_connector_ca_')
         try:
-            os.write(fd, ca_bundle.encode('utf-8') if isinstance(ca_bundle, str) else ca_bundle)
-        finally:
-            os.close(fd)
-        return ldap3.Tls(ca_certs_file=ca_path, validate=ssl.CERT_REQUIRED), cleanup
+            try:
+                os.write(fd, ca_bundle.encode('utf-8') if isinstance(ca_bundle, str) else ca_bundle)
+            finally:
+                os.close(fd)
+            return ldap3.Tls(ca_certs_file=ca_path, validate=ssl.CERT_REQUIRED), cleanup
+        except Exception:
+            # The caller never gets cleanup when this raises, so remove the file here.
+            cleanup()
+            raise
 
     # Verify requested, no explicit bundle: validate against the system
     # trust store rather than leaving ldap3 on its unvalidated default.
@@ -599,7 +604,15 @@ def test_connection(config):
         return {'success': False, 'partial': False,
                 'message': 'Bind DN and password are required', 'servers': []}
 
-    tls, cleanup = _build_tls(config)
+    try:
+        tls, cleanup = _build_tls(config)
+    except Exception as e:
+        # Writing the temp CA bundle can fail; a test that raises here would
+        # be a 500 on a route whose whole job is to report what went wrong.
+        logger.warning('AD Connector: could not prepare the connection test: %s', e)
+        return {'success': False, 'partial': False,
+                'message': 'Connection failed: could not prepare the TLS settings', 'servers': []}
+
     results = []
     try:
         for host in servers:

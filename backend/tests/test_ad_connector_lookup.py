@@ -657,6 +657,34 @@ class TestTestConnection:
             ca_bundle=None, bind_dn='svc-ucm', bind_password='irrelevant',
         )
 
+    def test_a_tls_build_that_raises_is_reported_not_raised(self, monkeypatch):
+        """The route has no try of its own, so an exception here is a 500 on
+        the one page whose job is to say what went wrong."""
+        def _explode(config):
+            raise OSError('read-only file system')
+
+        monkeypatch.setattr(lookup, '_build_tls', _explode)
+        result = lookup.test_connection(self._config(['dc1.corp.local']))
+        assert result['success'] is False
+        assert result['message'] == 'Connection failed: could not prepare the TLS settings'
+        assert result['servers'] == []
+
+    def test_a_failed_ca_bundle_write_leaves_no_temp_file(self, monkeypatch, tmp_path):
+        monkeypatch.setattr(lookup.tempfile, 'tempdir', str(tmp_path))
+
+        def _enospc(fd, data):
+            raise OSError(28, 'No space left on device')
+
+        monkeypatch.setattr(lookup.os, 'write', _enospc)
+        config = self._config(['dc1.corp.local'])
+        config.use_ssl = True
+        config.verify_ssl = True
+        config.ca_bundle = '-----BEGIN CERTIFICATE-----'
+        result = lookup.test_connection(config)
+        assert result['success'] is False
+        assert str(tmp_path) not in result['message']
+        assert list(tmp_path.iterdir()) == []
+
     def test_no_server(self):
         result = lookup.test_connection(self._config(''))
         assert result['success'] is False

@@ -248,10 +248,10 @@ def probe(config):
     ``[(host, ok, message), ...]``.
 
     ``None`` when the probe could not run at all, which is not the same as
-    the empty list: ``[]`` is "there was nothing to probe", ``None`` is "no
-    DC was reached, and nothing here is a verdict about one". The caller
-    must keep ``None`` out of ``record``, or a verdict about nothing would
-    replace the real one.
+    the empty list: ``[]`` is "there was nothing to probe", ``None`` is "the
+    probe could not run, so nothing here is a verdict". The caller must keep
+    ``None`` out of ``record``, or a verdict about nothing would replace the
+    real one.
 
     Never raises: this runs on the scheduler's thread, where anything
     escaping is a failed run on every wake whatever the interval.
@@ -347,7 +347,7 @@ def run_health_probe():
         # already said whatever it could not do.
         return {'status': 'failed', 'reason': str(e)}
     if results is None:
-        # No DC was reached. Recording that would store a verdict about
+        # The probe could not run. Recording that would store a verdict about
         # nothing over the real one, losing every DC's `since` with it, and
         # would count a green run that never touched a domain controller.
         return {'status': 'failed', 'reason': 'the probe could not run'}

@@ -202,10 +202,9 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
         placeholder={t('adConnector.baseDnPlaceholder')}
         required
       />
-      {/* Both are what the connector binds with, so the switch is what
-          asks for them, the same rule update_config applies. A blank
-          password on one already stored means "unchanged", and
-          handleSubmit drops it from the payload. */}
+      {/* The switch asks for both, the same rule update_config applies. A
+          blank password on a stored one means "unchanged", and handleSubmit
+          drops it from the payload. */}
       <Input
         label={t('adConnector.bindDn')}
         value={formData.bind_dn}
