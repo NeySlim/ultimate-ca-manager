@@ -30,11 +30,19 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
+// The real NotificationContext memoises what it hands out, so `showError`
+// keeps its identity across renders. Returning fresh spies instead would give
+// useCRUDPage's `loadData` a new identity every render, its effect would
+// refetch in a loop, and the table would keep dropping back to its "Loading..."
+// state, where every row is absent for reasons that have nothing to do with a
+// filter.
+const notification = vi.hoisted(() => ({
+  showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn(),
+  showConfirm: vi.fn().mockResolvedValue(false), showPrompt: vi.fn().mockResolvedValue(null),
+}))
+
 vi.mock('../../contexts', () => ({
-  useNotification: () => ({
-    showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn(),
-    showConfirm: vi.fn().mockResolvedValue(false), showPrompt: vi.fn().mockResolvedValue(null),
-  }),
+  useNotification: () => notification,
   useMobile: () => ({ isMobile: false, isDesktop: true, isTouch: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useWindowManager: () => ({
     openWindow: vi.fn(), closeWindow: vi.fn(), windows: [],
@@ -92,6 +100,19 @@ const rowFor = async (name) => {
   const cell = await screen.findByText(name)
   return cell.closest('tr')
 }
+
+// A row's absence is only evidence in a render that has rows in it: a table
+// that is loading draws "Loading..." and no rows at all, which satisfies a
+// bare `queryByText(...)` null check on the first tick, before the filtered
+// rows are back. So every assertion that the system rows were hidden waits for
+// the custom row and reads the system one out of that same render. Both
+// queries are scoped to the table, which is what a filter acts on, and where
+// the open detail panel would otherwise be a second match for the name.
+const expectOnlyCustomRows = () => waitFor(() => {
+  const table = screen.getByRole('table')
+  expect(within(table).getByText(CUSTOM_TEMPLATE.name)).toBeTruthy()
+  expect(within(table).queryByText('Smartcard Logon')).toBeNull()
+})
 
 const reset = () => {
   window.localStorage.clear()
@@ -220,8 +241,7 @@ describe('TemplatesPage: the Show system toggle', () => {
 
     fireEvent.click(toggle())
 
-    await waitFor(() => expect(screen.queryByText('Smartcard Logon')).toBeNull())
-    expect(screen.getByText(CUSTOM_TEMPLATE.name)).toBeTruthy()
+    await expectOnlyCustomRows()
     expect(window.localStorage.getItem(SHOW_SYSTEM_KEY)).toBe('false')
   })
 
@@ -234,7 +254,10 @@ describe('TemplatesPage: the Show system toggle', () => {
 
     fireEvent.click(toggle())
 
-    await waitFor(() => expect(screen.queryByRole('button', { name: /common.export/i })).toBeNull())
+    await waitFor(() => {
+      expect(within(screen.getByRole('table')).getByText(CUSTOM_TEMPLATE.name)).toBeTruthy()
+      expect(screen.queryByRole('button', { name: /common.export/i })).toBeNull()
+    })
   })
 
   it('leaves the panel open on a custom template when system rows are hidden', async () => {
@@ -245,7 +268,7 @@ describe('TemplatesPage: the Show system toggle', () => {
 
     fireEvent.click(toggle())
 
-    await waitFor(() => expect(screen.queryByText('Smartcard Logon')).toBeNull())
+    await expectOnlyCustomRows()
     expect(screen.getByRole('button', { name: /common.export/i })).toBeTruthy()
   })
 
@@ -310,8 +333,7 @@ describe('TemplatesPage: saved filter presets', () => {
 
     await applyPreset('Mine only')
 
-    await waitFor(() => expect(screen.queryByText('Smartcard Logon')).toBeNull())
-    expect(screen.getByText(CUSTOM_TEMPLATE.name)).toBeTruthy()
+    await expectOnlyCustomRows()
   })
 
   it('clears the filter for a preset saved before the column became Source', async () => {
@@ -327,7 +349,7 @@ describe('TemplatesPage: saved filter presets', () => {
     await screen.findByText('Smartcard Logon')
 
     await applyPreset('Mine only')
-    await waitFor(() => expect(screen.queryByText('Smartcard Logon')).toBeNull())
+    await expectOnlyCustomRows()
 
     await applyPreset('Old CA preset')
 
