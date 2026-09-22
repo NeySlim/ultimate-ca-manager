@@ -4709,7 +4709,6 @@
     "subtitle": "UCM's own connection to Active Directory, independent of SSO login",
     "helpTitle": "Active Directory Connector",
     "helpDescription": "Lets UCM query Active Directory directly -- currently used to resolve a Kerberos machine account's computer object when GPO autoenrollment submits a certificate request with no subject, so UCM can derive one from AD the same way a real Windows CA would. Separate from any LDAP provider configured under SSO: that's for logging into UCM, this is for certificate-related AD lookups, and works independently of whether SSO is set up at all.",
-    "server": "Server",
     "serverPlaceholder": "dc1.corp.local",
     "servers": "Domain Controllers",
     "serversHint": "One domain controller per row, each by its own hostname, tried in order. A bare domain name round-robins across every DC and fails certificate verification, because a domain controller certificate names only its own host.",

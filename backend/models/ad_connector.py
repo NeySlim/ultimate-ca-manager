@@ -120,6 +120,7 @@ class ADConnectorConfig(db.Model):
         return cls.query.first()
 
     def to_dict(self, include_secrets=False):
+        from services.ad_connector.health import stale_after
         data = {
             'id': self.id,
             'server': self.server or '',
@@ -136,6 +137,11 @@ class ADConnectorConfig(db.Model):
             'last_test_result': self.last_test_result,
             'health': self.health,
             'health_probe_interval': self.health_probe_interval or 120,
+            # The window the settings badge must apply to `health` before
+            # trusting its state, derived from the interval exactly as
+            # _connect derives it -- a badge on its own constant would
+            # contradict what the connector is acting on.
+            'health_stale_after': stale_after(self.health_probe_interval),
             'created_at': utc_isoformat(self.created_at),
             'updated_at': utc_isoformat(self.updated_at),
             'created_by': self.created_by,

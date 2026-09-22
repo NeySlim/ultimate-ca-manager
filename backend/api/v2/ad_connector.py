@@ -26,6 +26,12 @@ bp = Blueprint('ad_connector_v2', __name__)
 
 MAX_SERVER_LEN = 500
 MAX_DN_LEN = 500
+# Every configured DC is bound to in turn by the health probe, which runs on
+# the scheduler's single thread and waits out _LDAP_CONNECT_TIMEOUT_SECONDS
+# on each black-holed one. A long list would delay CRL generation, backups
+# and discovery behind it every cycle, so the list is capped at more DCs
+# than a domain realistically fails over between.
+MAX_SERVERS = 8
 
 
 def _parse_servers(data):
@@ -37,10 +43,20 @@ def _parse_servers(data):
     is ever meaningful.
     """
     raw = data['servers'] if 'servers' in data else data.get('server')
+    if raw is not None and not isinstance(raw, (str, list, tuple)):
+        return None, error_response('servers must be a hostname or a list of hostnames', 400)
+    if isinstance(raw, (list, tuple)) and not all(isinstance(entry, str) for entry in raw):
+        # split_servers skips these rather than raising (it also reads a
+        # column that could have been hand-edited), so the shape has to be
+        # refused here or a client would get a silent 200 having stored
+        # fewer servers than it sent.
+        return None, error_response('each server must be a hostname string', 400)
     servers = lookup.split_servers(raw)
     for host in servers:
         if len(host) > MAX_SERVER_LEN:
             return None, error_response('server is too long', 400)
+    if len(servers) > MAX_SERVERS:
+        return None, error_response(f'at most {MAX_SERVERS} servers are supported', 400)
     joined = lookup.join_servers(servers)
     if len(joined) > MAX_SERVER_LEN:
         return None, error_response('too many servers', 400)
@@ -120,6 +136,23 @@ def update_config():
     if 'enabled' in data:
         config.enabled = bool(data['enabled'])
 
+    # No credential means an unauthenticated bind: ldap3 binds anonymously
+    # whenever either half is missing, and this connector reads computer and
+    # user objects to derive the subject of a certificate it is about to
+    # issue. A directory that allows the anonymous read makes that identity
+    # attacker-influenced; one that does not turns every lookup into a silent
+    # failure. Neither is a state to save, and the form has always asked for
+    # both, so this is the same rule enforced where it cannot be skipped by
+    # talking to the API directly. A blank password on a connector that
+    # already has one means "unchanged" (the form never re-sends it), so that
+    # case is not a save with no credential and is not refused here.
+    if not config.bind_dn:
+        db.session.rollback()
+        return error_response('bind_dn is required', 400)
+    if not config.bind_password:
+        db.session.rollback()
+        return error_response('bind_password is required', 400)
+
     config.updated_at = utc_now()
 
     try:
@@ -159,11 +192,19 @@ def test_connection_inline():
 
     # Blank password means "unchanged" (form never re-sends the saved one),
     # not "use an empty password".
+    if not (data.get('bind_dn') or '').strip():
+        return error_response('bind_dn is required', 400)
+
     bind_password = data.get('bind_password')
     if not bind_password:
         saved = ADConnectorConfig.get_singleton()
         if saved and saved.bind_password:
             bind_password = saved.bind_password
+    if not bind_password:
+        # Same rule as the save: an anonymous bind is not a connection this
+        # connector is allowed to make, so testing one would report a
+        # success it will never be configured to repeat.
+        return error_response('bind_password is required', 400)
 
     cfg = SimpleNamespace(
         server=joined,
@@ -196,9 +237,16 @@ def test_connection_saved():
     # Same per-DC bind the scheduled probe performs, so it counts as one:
     # the connector's health badge reflects the test the operator just ran
     # instead of waiting out the probe interval to agree with it.
-    health.record(config, [
-        (s['server'], s['success'], s['message']) for s in result.get('servers', [])
-    ])
+    #
+    # Only while the connector is enabled, though. A disabled connector
+    # serves no lookup, so recording a verdict for it would put a Degraded
+    # badge on something that is off, and losing every DC would log the
+    # "Kerberos autoenrollment will fail" error for enrollments that are
+    # not happening. The response still carries the full per-DC result.
+    if config.enabled:
+        health.record(config, [
+            (s['server'], s['success'], s['message']) for s in result.get('servers', [])
+        ])
     config.last_test_at = utc_now()
     # last_test_result is a String(500) and a multi-DC failure detail can
     # run far past that -- store the verdict, the full per-server breakdown

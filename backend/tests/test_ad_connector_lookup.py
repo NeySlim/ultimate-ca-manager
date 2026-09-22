@@ -449,6 +449,23 @@ class TestSplitServers:
     def test_blank_rows_are_dropped(self):
         assert lookup.split_servers(['dc1.corp.local', '', '  ', None]) == ['dc1.corp.local']
 
+    def test_a_pasted_row_is_split_like_the_old_single_field(self):
+        """Storing a comma-joined row whole would read back as two servers
+        the next time, so the inline test's key (the joined string) and the
+        probe's (each host) would disagree, and re-saving the same form
+        would look like a change and clear health."""
+        assert lookup.split_servers(['dc1.corp.local,dc2.corp.local']) == \
+            ['dc1.corp.local', 'dc2.corp.local']
+        assert lookup.split_servers(['dc1.corp.local\ndc2.corp.local', 'dc3.corp.local']) == \
+            ['dc1.corp.local', 'dc2.corp.local', 'dc3.corp.local']
+
+    def test_a_row_that_is_not_a_string_is_skipped_not_raised(self):
+        """Read on the enrollment path and off a column that could have been
+        hand-edited: it must degrade to "no DCs", never raise."""
+        assert lookup.split_servers([123, 'dc1.corp.local']) == ['dc1.corp.local']
+        assert lookup.split_servers(5) == []
+        assert lookup.split_servers({'a': 1}) == []
+
     def test_duplicates_collapse_keeping_first_position(self):
         assert lookup.split_servers(['dc2.corp.local', 'dc1.corp.local', 'dc2.corp.local']) == \
             ['dc2.corp.local', 'dc1.corp.local']
@@ -690,9 +707,27 @@ class TestHealthState:
 
     def test_stale_verdict_is_ignored(self):
         from services.ad_connector import health as h
-        blob = self._blob({'dc1.corp.local': False}, age_seconds=h._HEALTH_STALE_AFTER_SECONDS + 60)
+        blob = self._blob({'dc1.corp.local': False}, age_seconds=h._HEALTH_STALE_FLOOR_SECONDS + 60)
         assert h.prioritise(['dc1.corp.local', 'dc2.corp.local'], blob) == \
             ['dc1.corp.local', 'dc2.corp.local']
+
+    def test_the_window_follows_the_probe_interval(self):
+        """A fixed window would expire every verdict long before the next
+        probe on any interval above it, so _connect would be permanently
+        without an opinion exactly where a slow probe needs one."""
+        from services.ad_connector import health as h
+        blob = self._blob({'dc1.corp.local': False}, age_seconds=3600)
+        assert h.prioritise(['dc1.corp.local', 'dc2.corp.local'], blob) == \
+            ['dc1.corp.local', 'dc2.corp.local']
+        assert h.prioritise(['dc1.corp.local', 'dc2.corp.local'], blob, 7200) == \
+            ['dc2.corp.local']
+
+    def test_the_window_never_falls_below_the_floor(self):
+        from services.ad_connector import health as h
+        assert h.stale_after(60) == h._HEALTH_STALE_FLOOR_SECONDS
+        assert h.stale_after(None) == h._HEALTH_STALE_FLOOR_SECONDS
+        assert h.stale_after('nonsense') == h._HEALTH_STALE_FLOOR_SECONDS
+        assert h.stale_after(h.MAX_PROBE_INTERVAL_SECONDS) == 2 * h.MAX_PROBE_INTERVAL_SECONDS
 
     def test_no_health_at_all_is_a_passthrough(self):
         from services.ad_connector import health as h
@@ -800,7 +835,7 @@ class TestRunHealthProbe:
             config = ADConnectorConfig(server='dc1.corp.local', enabled=False)
             db.session.add(config)
             db.session.commit()
-            assert 'skipped' in h.run_health_probe()
+            assert h.run_health_probe()['status'] == 'skipped'
 
     def test_probe_stores_its_verdict(self, app, monkeypatch):
         from services.ad_connector import health as h
@@ -816,7 +851,42 @@ class TestRunHealthProbe:
                 lambda cfg: [('dc1.corp.local', False, 'refused'),
                              ('dc2.corp.local', True, 'ok')])
             result = h.run_health_probe()
-            assert result['state'] == h.STATE_DEGRADED
+            assert (result['status'], result['state']) == ('ok', h.STATE_DEGRADED)
             stored = ADConnectorConfig.get_singleton().health
             assert stored['servers']['dc1.corp.local']['healthy'] is False
             assert stored['servers']['dc2.corp.local']['healthy'] is True
+
+    def test_a_probe_that_raised_is_a_failed_run(self, app, monkeypatch):
+        """The scheduler reads 'status' and nothing else: anything it does
+        not recognise counts as a successful run, so a probe that blew up
+        would be logged and counted green in the admin view."""
+        from services.ad_connector import health as h
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            db.session.add(ADConnectorConfig(
+                server='dc1.corp.local', enabled=True, base_dn='DC=corp,DC=local'))
+            db.session.commit()
+
+            def _explode(cfg):
+                raise RuntimeError('DNS is down')
+
+            monkeypatch.setattr(h, 'probe', _explode)
+            result = h.run_health_probe()
+            assert result['status'] == 'failed'
+            assert 'DNS is down' in result['reason']
+
+    def test_not_due_yet_is_a_skip_not_a_run(self, app, monkeypatch):
+        """Registered at the scheduler's one-minute cadence, so most wakes
+        do nothing -- reported as runs they would bury the real ones."""
+        from services.ad_connector import health as h
+        with app.app_context():
+            ADConnectorConfig.query.delete()
+            config = ADConnectorConfig(
+                server='dc1.corp.local', enabled=True, base_dn='DC=corp,DC=local',
+                health_probe_interval=3600)
+            config.health = TestHealthState._blob({'dc1.corp.local': True},
+                                                  state='up', age_seconds=10)
+            db.session.add(config)
+            db.session.commit()
+            monkeypatch.setattr(h, 'probe', lambda cfg: pytest.fail('should not probe'))
+            assert h.run_health_probe()['status'] == 'skipped'

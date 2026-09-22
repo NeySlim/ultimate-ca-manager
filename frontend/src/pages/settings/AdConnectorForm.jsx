@@ -209,12 +209,17 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
         placeholder={t('adConnector.bindDnPlaceholder')}
         required
       />
+      {/* Required until there is one stored: an empty password is an
+          anonymous bind, which the API refuses to save. Once stored, a blank
+          field means "unchanged" (handleSubmit drops it from the payload),
+          so demanding it again on every edit would be asking for a
+          credential the save does not need. */}
       <Input
         label={t('adConnector.bindPassword')}
         type="password"
         value={formData.bind_password}
         onChange={(e) => updateField('bind_password', e.target.value)}
-        required
+        required={!config?.bind_password}
         hasExistingValue={Boolean(config?.bind_password)}
       />
 

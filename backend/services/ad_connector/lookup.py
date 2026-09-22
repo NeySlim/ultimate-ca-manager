@@ -162,9 +162,17 @@ def split_servers(raw):
     order, de-duplicated with first-occurrence order preserved.
 
     Accepts a list (what the settings form now sends) or a single string
-    split on commas/newlines -- the string form keeps every config saved
-    before this field became a list readable, and means a pasted
-    ``"dc1.corp.local, dc2.corp.local"`` does the obvious thing.
+    -- the string form keeps every config saved before this field became a
+    list readable. Every entry is itself split on commas/newlines, list or
+    not, so a pasted ``"dc1.corp.local, dc2.corp.local"`` does the obvious
+    thing in a row of the form just as it does in the older single field,
+    and what is stored matches what is read back.
+
+    Never raises: it is called on the enrollment path and on a column that
+    could have been hand-edited, so anything that is not a string -- a
+    number in the list, a dict where the list should be -- is skipped
+    rather than blowing up a lookup. The API rejects those shapes with a
+    400 before they can be stored (``api/v2/ad_connector.py``).
 
     Each entry must be the DC's **own** hostname, not the domain name: a
     bare domain (``corp.local``) round-robins across every DC while TLS
@@ -176,12 +184,15 @@ def split_servers(raw):
     """
     if not raw:
         return []
-    parts = raw if isinstance(raw, (list, tuple)) else re.split(r'[,\n]', raw)
+    entries = raw if isinstance(raw, (list, tuple)) else [raw]
     servers = []
-    for part in parts:
-        host = (part or '').strip()
-        if host and host not in servers:
-            servers.append(host)
+    for entry in entries:
+        if not isinstance(entry, str):
+            continue
+        for part in re.split(r'[,\n]', entry):
+            host = part.strip()
+            if host and host not in servers:
+                servers.append(host)
     return servers
 
 
@@ -240,7 +251,8 @@ def _connect(config):
     # that. Advisory only: see services/ad_connector/health.py's prioritise,
     # which never returns an empty list and ignores a stale verdict.
     from services.ad_connector import health
-    servers = health.prioritise(servers, getattr(config, 'health', None))
+    servers = health.prioritise(servers, getattr(config, 'health', None),
+                                getattr(config, 'health_probe_interval', None))
 
     tls, cleanup = _build_tls(config)
     try:

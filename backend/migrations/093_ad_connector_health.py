@@ -53,25 +53,21 @@ def _upgrade_sqlite(conn):
 def _upgrade_pg(conn):
     from sqlalchemy import inspect, text
 
-    inspector = inspect(conn)
-    if 'ad_connector_config' not in inspector.get_table_names():
+    # Migrations run before create_all, so on an installation that predates
+    # the connector the table is not there yet and its own model will build
+    # it with these columns already present.
+    if 'ad_connector_config' not in inspect(conn).get_table_names():
         logger.info("093: no ad_connector_config table, nothing to do (PostgreSQL)")
         return
-    cols = {column['name'] for column in inspector.get_columns('ad_connector_config')}
-    changed = False
-    if 'health' not in cols:
-        conn.execute(text("ALTER TABLE ad_connector_config ADD COLUMN health TEXT"))
-        changed = True
-    if 'health_probe_interval' not in cols:
-        conn.execute(text(
-            "ALTER TABLE ad_connector_config ADD COLUMN health_probe_interval "
-            f"INTEGER DEFAULT {DEFAULT_PROBE_INTERVAL}"))
-        conn.execute(text(
-            "UPDATE ad_connector_config SET health_probe_interval = "
-            f"{DEFAULT_PROBE_INTERVAL} WHERE health_probe_interval IS NULL"))
-        changed = True
-    if changed:
-        logger.info("093: added ad_connector_config health columns (PostgreSQL)")
+    conn.execute(text(
+        "ALTER TABLE ad_connector_config ADD COLUMN IF NOT EXISTS health TEXT"))
+    conn.execute(text(
+        "ALTER TABLE ad_connector_config ADD COLUMN IF NOT EXISTS "
+        f"health_probe_interval INTEGER DEFAULT {DEFAULT_PROBE_INTERVAL}"))
+    conn.execute(text(
+        "UPDATE ad_connector_config SET health_probe_interval = "
+        f"{DEFAULT_PROBE_INTERVAL} WHERE health_probe_interval IS NULL"))
+    logger.info("093: ad_connector_config health columns present (PostgreSQL)")
 
 
 def upgrade(conn):

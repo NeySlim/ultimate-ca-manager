@@ -28,7 +28,7 @@ Three deliberate choices:
    standing), coming back logs the recovery, and steady state is silent.
 
 3. **The state is advisory and expires.** ``_connect`` ignores it once it
-   is older than ``_HEALTH_STALE_AFTER_SECONDS`` and never lets it rule out
+   is older than ``stale_after(interval)`` and never lets it rule out
    every DC: if the probe stopped running, or its verdict is simply wrong,
    the connector must still try rather than refuse enrollment on the word
    of a stale record. Health can only ever reorder and thin the candidate
@@ -41,11 +41,12 @@ from utils.datetime_utils import utc_now, utc_isoformat
 
 logger = logging.getLogger(__name__)
 
-# How long a verdict is trusted by _connect. Generous next to the probe
-# interval so an interval change, a slow probe or a scheduler that missed a
-# tick doesn't make the connector start ignoring good data -- the state only
-# has to be *recent*, not fresh.
-_HEALTH_STALE_AFTER_SECONDS = 900
+# The floor under how long a verdict is trusted by _connect. The window
+# itself is derived from the connector's own probe interval (stale_after):
+# a fixed 15 minutes would expire every verdict long before the next probe
+# on any interval above it, leaving _connect permanently without an opinion
+# on the installations that probe least often.
+_HEALTH_STALE_FLOOR_SECONDS = 900
 
 DEFAULT_PROBE_INTERVAL_SECONDS = 120
 # The scheduler's own loop wakes once a minute, so anything below that is
@@ -110,13 +111,32 @@ def servers_health(raw_health):
     return servers if isinstance(servers, dict) else {}
 
 
-def is_fresh(raw_health):
+def stale_after(interval=None):
+    """How long a verdict stays actionable, for a connector probing every
+    ``interval`` seconds.
+
+    Two probe periods, never less than ``_HEALTH_STALE_FLOOR_SECONDS``:
+    generous enough that an interval change, a slow probe or a scheduler
+    that missed a tick doesn't make the connector start ignoring good data,
+    and tied to the interval so a daily probe's verdict isn't expired for
+    all but the first fifteen minutes of its own cycle. The settings badge
+    reads the same window (``health_stale_after`` in the config payload) so
+    it can't disagree with what ``_connect`` is acting on.
+    """
+    try:
+        interval = int(interval or DEFAULT_PROBE_INTERVAL_SECONDS)
+    except (TypeError, ValueError):
+        interval = DEFAULT_PROBE_INTERVAL_SECONDS
+    return max(_HEALTH_STALE_FLOOR_SECONDS, 2 * interval)
+
+
+def is_fresh(raw_health, interval=None):
     """Whether the stored verdict is recent enough for ``_connect`` to act on."""
     age = _age_seconds(parse_health(raw_health).get('checked_at'))
-    return age is not None and age <= _HEALTH_STALE_AFTER_SECONDS
+    return age is not None and age <= stale_after(interval)
 
 
-def prioritise(servers, raw_health):
+def prioritise(servers, raw_health, interval=None):
     """The configured DCs, reordered so the ones known to be up come first
     and the ones known to be down are dropped.
 
@@ -126,7 +146,7 @@ def prioritise(servers, raw_health):
     no opinion on (just added, never yet probed) keeps its place ahead of
     the known-bad ones rather than being treated as either.
     """
-    if not servers or not is_fresh(raw_health):
+    if not servers or not is_fresh(raw_health, interval):
         return servers
     known = servers_health(raw_health)
     healthy, unknown, unhealthy = [], [], []
@@ -268,35 +288,47 @@ def _is_due(config, previous):
 
 def run_health_probe():
     """The scheduled task. Probes the connector's DCs, logs what changed and
-    stores the verdict. Returns a summary dict for the scheduler's log.
+    stores the verdict.
+
+    Returns the scheduler's outcome contract -- ``{'status': 'ok' |
+    'skipped' | 'failed', 'reason': ...}``, as ``services/backup/
+    schedule.py`` does (see ``scheduler_service._outcome_of``). The task is
+    registered at the scheduler's own one-minute cadence and does nothing on
+    most wakes, so reporting that as a successful run would fill the admin
+    view with green runs that never touched a domain controller, and would
+    count a probe that failed among them.
 
     Never raises -- a probe that blows up must not take the scheduler's
     whole loop with it, and must not leave a stale verdict looking fresh.
     """
-    from models import db, ADConnectorConfig
+    from models import ADConnectorConfig
     from utils.db_transaction import safe_commit
 
     config = ADConnectorConfig.get_singleton()
     if config is None or not config.enabled or not config.server:
-        return {'skipped': 'AD Connector not configured or disabled'}
+        return {'status': 'skipped', 'reason': 'not configured or disabled'}
 
     previous = config.health
     previous_state = state_of(previous)
 
     if not _is_due(config, previous):
-        return {'skipped': 'not due yet', 'state': previous_state}
+        return {'status': 'skipped', 'reason': 'not due yet', 'state': previous_state}
 
     try:
         results = probe(config)
     except Exception as e:
         logger.error('AD Connector: health probe failed to run: %s', e)
-        return {'error': str(e)}
+        return {'status': 'failed', 'reason': str(e)}
 
     new = record(config, results)
     ok, _err = safe_commit(logger, 'Failed to store AD Connector health')
     if not ok:
-        db.session.rollback()
+        # safe_commit has already rolled back, so nothing was stored: the
+        # verdict in hand is not the one _connect will read, and reporting
+        # it as this run's result would claim a probe that did not land.
+        return {'status': 'failed', 'reason': 'could not store the health verdict'}
     return {
+        'status': 'ok',
         'state': new['state'],
         'healthy': new['healthy'],
         'total': new['total'],

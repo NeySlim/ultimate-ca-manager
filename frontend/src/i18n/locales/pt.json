@@ -4706,7 +4706,6 @@
     "subtitle": "Conexão própria do UCM ao Active Directory, independente do login SSO",
     "helpTitle": "Conector do Active Directory",
     "helpDescription": "Permite que o UCM consulte diretamente o Active Directory -- atualmente usado para resolver o objeto de computador de uma conta de máquina Kerberos quando a autoinscrição GPO envia uma solicitação de certificado sem assunto, para que o UCM possa derivar um a partir do AD, da mesma forma que uma CA Windows real faria. Separado de qualquer provedor LDAP configurado em SSO: aquele serve para fazer login no UCM, este para consultas de AD relacionadas a certificados, e funciona independentemente de o SSO estar configurado ou não.",
-    "server": "Servidor",
     "serverPlaceholder": "dc1.empresa.local",
     "servers": "Controladores de domínio",
     "serversHint": "Um controlador de domínio por linha, cada um pelo seu próprio nome de host, testados nessa ordem. Informar apenas o nome do domínio alterna entre todos os DCs e falha na verificação do certificado, porque um certificado de controlador de domínio contém apenas o próprio host.",
