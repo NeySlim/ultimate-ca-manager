@@ -152,23 +152,17 @@ describe('deleting a trust store entry from the floating window', () => {
   })
 })
 
-// Two more row menus disagreed with their own detail panel. Reading the source
-// is enough to catch the guard going away again.
+// One more row menu disagreed with its own detail panel. Reading the source is
+// enough to catch the guard going away again.
+//
+// TemplatesPage used to be checked here the same way, against a `rowActions`
+// callback the table was never given. The menu it built was never rendered, so
+// the assertion could not fail for the reason that mattered; the guard that a
+// user actually meets is the detail panel's, and it is asserted by rendering
+// the page in pages/__tests__/TemplatesPage.systemCustom.test.jsx.
 const readPage = (rel) => readFileSync(join(__dirname, '..', '..', 'pages', rel), 'utf8')
 
 describe('row menus agree with the panel beside them', () => {
-  it('offers template edit and duplicate only on write:templates', () => {
-    const source = readPage('TemplatesPage.jsx')
-    const start = source.indexOf('const rowActions =')
-    const actions = source.slice(start, source.indexOf('}, [', start))
-    // PUT /api/v2/templates/<id> and its duplicate both require write:templates,
-    // which is what the detail panel already asks for.
-    const guard = actions.indexOf("canWrite('templates')")
-    expect(guard, 'rowActions does not gate on write:templates').toBeGreaterThan(-1)
-    expect(guard).toBeLessThan(actions.indexOf("t('common.edit')"))
-    expect(guard).toBeLessThan(actions.indexOf("t('templates.duplicateTemplate')"))
-  })
-
   it('gates the discovered-row delete on delete:certificates', () => {
     const source = readPage('DiscoveryPage.jsx')
     const marker = source.indexOf("setDeleteConfirm({ type: 'discovered'")

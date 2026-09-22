@@ -19,6 +19,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 - A CSR, certificate or CRL signed by an EC key held in a PKCS#11 or Azure Key Vault HSM carried the raw `r || s` signature the HSM returns, so OpenSSL and every external signer rejected it. The signature is now DER-encoded as X.509 requires on every path, the generic key signing endpoint included, and a CA created or renewed on an HSM key keeps the digest matching its curve (#366).
+- The templates list called a template Certificate or CA from the letters "ca" in its name, so the seeded Email Certificate (S/MIME), Client Authentication and Smartcard Logon were each shown as a certificate authority. The column reads the `is_system` flag the API already returns and says System or Custom (#364, by @stefanelul2000).
+- The detail pane of a system template offered an Edit and a Delete the server answers 403 to. Both are greyed with the reason now, Duplicate and Export stay available, and a Show system toggle hides the built-in templates, remembered across visits and forced on while no custom template exists (#364, by @stefanelul2000).
 
 ---
 
