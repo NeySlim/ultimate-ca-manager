@@ -45,6 +45,14 @@ describe('HttpsSection bound certificate indicator (#303 follow-up)', () => {
     expect(onUnbind).toHaveBeenCalled()
   })
 
+  it('names the bound certificate by its CN with the description alongside (#365)', () => {
+    renderSection({
+      type: 'CA-Signed',
+      bound_certificate: { refid: 'ref-1', common_name: 'ucm.example.com', descr: 'Web UI cert', exists: true },
+    })
+    expect(screen.getByText('settings.httpsBound: ucm.example.com · Web UI cert')).toBeInTheDocument()
+  })
+
   it('makes the unbound state explicit', () => {
     renderSection({ type: 'Self-Signed' })
     expect(screen.getByText('settings.httpsNotBound')).toBeInTheDocument()

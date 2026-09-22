@@ -5,6 +5,7 @@ import { Button, Input, Select, Badge, DetailHeader, DetailSection, DetailGrid, 
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { useNotification } from '../../contexts'
 import { certificatesService, settingsService } from '../../services'
+import { certificateLabel } from '../../lib/utils'
 import ServiceStatusWidget from './ServiceStatusWidget'
 import PublicEndpointsPanel from './PublicEndpointsPanel'
 
@@ -27,7 +28,7 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
         const certs = (res.data || []).filter((c) => c.has_private_key && !c.revoked)
         setTlsCertOptions(certs.map((c) => ({
           value: String(c.id),
-          label: `${c.descr || c.subject_cn || c.refid} (#${c.id})`,
+          label: `${certificateLabel(c) || c.refid} (#${c.id})`,
         })))
       })
       .catch(() => {})

@@ -17,7 +17,7 @@ import {
 import { Button } from './Button'
 import { Textarea } from './Textarea'
 import { SelectComponent as Select } from './Select'
-import { cn } from '../lib/utils'
+import { cn, certificateLabel } from '../lib/utils'
 import { apiClient as api, certificatesService } from '../services'
 
 const ACCEPT_FORMATS = '.pem,.crt,.cer,.key,.csr,.der,.p12,.pfx,.p7b,.p7c'
@@ -353,7 +353,7 @@ export function CertificateInput({
               { value: '', label: t('certInput.chooseCertificate') },
               ...(managedCerts || []).map(c => ({
                 value: String(c.id),
-                label: `${c.descr || c.common_name || c.subject || `#${c.id}`}${c.key_type ? ` (${c.key_type})` : ''}${c.has_private_key ? ' 🔑' : ''}`,
+                label: `${certificateLabel(c) || c.subject || `#${c.id}`}${c.key_type ? ` (${c.key_type})` : ''}${c.has_private_key ? ' 🔑' : ''}`,
               }))
             ]}
             disabled={loadingCerts}

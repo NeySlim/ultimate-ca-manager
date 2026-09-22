@@ -7,7 +7,7 @@ import { X, Certificate, ArrowsLeftRight } from '@phosphor-icons/react'
 import { Modal } from './Modal'
 import { Badge } from './Badge'
 import { Select } from './ui/Select'
-import { cn, formatDate } from '../lib/utils'
+import { cn, formatDate, certificateLabel } from '../lib/utils'
 
 // Field comparison helper
 function CompareField({ label, value1, value2, mono = false }) {
@@ -51,7 +51,7 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
     { value: '', label: t('compare.selectCertificate') },
     ...certificates.map(c => ({
       value: String(c.id),
-      label: `${c.descr || c.common_name || c.subject || `${t('common.certificate')} #${c.id}`}${c.key_type ? ` (${c.key_type})` : ''}`
+      label: `${certificateLabel(c) || c.subject || `${t('common.certificate')} #${c.id}`}${c.key_type ? ` (${c.key_type})` : ''}`
     }))
   ], [certificates, t])
   

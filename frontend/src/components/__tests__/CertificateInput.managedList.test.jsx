@@ -98,6 +98,15 @@ describe('DUP-FE-014b — managed certificate dropdown', () => {
     expect(await screen.findByText('certInput.noCertsWithKey')).toBeTruthy()
   })
 
+  it('names a certificate by its CN with the description alongside (#365)', async () => {
+    getAll.mockResolvedValue({
+      data: [{ id: 9, common_name: 'host.example.com', descr: 'Renamed', has_private_key: true }],
+      meta: { total: 1 },
+    })
+    await openManagedMode({ requireKey: true })
+    await waitFor(() => expect(optionLabels()).toContain('host.example.com · Renamed 🔑'))
+  })
+
   it('lists every certificate when no private key is required', async () => {
     getAll.mockResolvedValue({ data: [cert(1, true), cert(2, false)], meta: { total: 2 } })
     await openManagedMode({ requireKey: false })

@@ -3,7 +3,7 @@ import {
   Certificate, X, Info, CheckCircle, Clock, XCircle, LinkBreak, Archive
 } from '@phosphor-icons/react'
 import { Badge, KeyIndicator } from '../../components'
-import { formatDate, extractCN, cn } from '../../lib/utils'
+import { formatDate, extractCN, cn, joinCertificateName } from '../../lib/utils'
 
 export function useCertificateColumns(t) {
   const getStatusBadge = (row) => {
@@ -41,7 +41,7 @@ export function useCertificateColumns(t) {
       header: t('common.commonName'),
       priority: 1,
       sortable: true,
-      accessor: (row) => (row.subtitle ? `${row.cn} (${row.subtitle})` : row.cn),
+      accessor: (row) => joinCertificateName(row.cn, row.subtitle),
       render: (val, row) => (
         <div className="flex items-center gap-2">
           <div className={cn(

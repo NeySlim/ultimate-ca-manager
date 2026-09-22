@@ -118,7 +118,7 @@ describe('CertificatesPage — filter survives an external action (#345)', () =>
   it('exports the description with the Common Name', () => {
     const { result } = renderHook(() => useCertificateColumns((key) => key))
     const column = result.current.find(col => col.key === 'cn')
-    expect(column.accessor({ cn: 'host.example.com', subtitle: 'Renamed' })).toBe('host.example.com (Renamed)')
+    expect(column.accessor({ cn: 'host.example.com', subtitle: 'Renamed' })).toBe('host.example.com · Renamed')
     expect(column.accessor({ cn: 'host.example.com', subtitle: null })).toBe('host.example.com')
   })
 

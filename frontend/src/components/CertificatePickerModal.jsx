@@ -9,7 +9,7 @@ import {
 } from '@phosphor-icons/react'
 import { Modal, Button, Input, Badge, EmptyState, LoadingSpinner } from '../components'
 import { certificatesService } from '../services'
-import { daysRemaining, formatDate } from '../lib/utils'
+import { daysRemaining, formatDate, certificateNames } from '../lib/utils'
 
 export default function CertificatePickerModal({ isOpen, onClose, onSelect, filters = {} }) {
   const { t } = useTranslation()
@@ -128,6 +128,7 @@ export default function CertificatePickerModal({ isOpen, onClose, onSelect, filt
                 {certificates.map(cert => {
                   const isSelected = selectedId === cert.id
                   const daysLeft = daysRemaining(cert.valid_to)
+                  const { name, subtitle } = certificateNames(cert)
                   return (
                     <tr
                       key={cert.id}
@@ -143,8 +144,11 @@ export default function CertificatePickerModal({ isOpen, onClose, onSelect, filt
                       </td>
                       <td className="px-3 py-2.5">
                         <div className="font-medium text-text-primary truncate max-w-[250px]">
-                          {cert.descr || cert.common_name || t('common.certificate')}
+                          {name || t('common.certificate')}
                         </div>
+                        {subtitle && (
+                          <div className="text-xs text-text-secondary truncate max-w-[250px]" title={subtitle}>{subtitle}</div>
+                        )}
                         {cert.san_count > 0 && (
                           <div className="text-xs text-text-secondary">
                             +{cert.san_count} SAN{cert.san_count > 1 ? 's' : ''}

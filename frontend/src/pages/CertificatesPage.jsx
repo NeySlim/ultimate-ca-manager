@@ -23,7 +23,7 @@ import { showNotices } from '../lib/notices'
 import { certificatesService, casService, truststoreService } from '../services'
 import { useNotification, useMobile, useWindowManager } from '../contexts'
 import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
-import { extractCN, cn } from '../lib/utils'
+import { extractCN, cn, certificateNames } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { IssueCertificateForm } from './certificates/IssueCertificateForm'
@@ -407,14 +407,12 @@ export default function CertificatesPage() {
     const caRefIds = new Set(cas.map(ca => ca.refid))
     
     let result = certificates.map(cert => {
-      // The CN names the row and the description (Rename) sits under it. The
-      // API already names a certificate without a CN by its first SAN, then its description.
-      const name = cert.cn || cert.common_name || extractCN(cert.subject) || (cert.san_dns ? JSON.parse(cert.san_dns)[0] : null) || 'Certificate'
+      const { name, subtitle } = certificateNames(cert)
       return {
         ...cert,
         status: cert.revoked ? 'revoked' : cert.status,
-        cn: name,
-        subtitle: cert.descr && cert.descr !== name ? cert.descr : null,
+        cn: name || extractCN(cert.subject) || (cert.san_dns ? JSON.parse(cert.san_dns)[0] : null) || 'Certificate',
+        subtitle,
         isOrphan: cert.caref && !caRefIds.has(cert.caref)
       }
     })

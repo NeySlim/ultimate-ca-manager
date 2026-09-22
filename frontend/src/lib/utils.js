@@ -30,6 +30,24 @@ export function extractCN(subject) {
 }
 
 /**
+ * A certificate is named by its CN, with its description (Rename) alongside when it
+ * says something else. The API's `common_name` already falls back to the SAN, then the description.
+ */
+export function certificateNames(cert) {
+  const name = cert?.common_name || cert?.cn || cert?.subject_cn || ''
+  if (!name) return { name: cert?.descr || '', subtitle: null }
+  return { name, subtitle: cert.descr && cert.descr !== name ? cert.descr : null }
+}
+
+export const joinCertificateName = (name, subtitle) => (subtitle ? `${name} · ${subtitle}` : name)
+
+/** One-line certificateNames, for selects and exports. */
+export function certificateLabel(cert) {
+  const { name, subtitle } = certificateNames(cert)
+  return joinCertificateName(name, subtitle)
+}
+
+/**
  * Extract data from API response
  * If key is provided, extracts that key. Otherwise extracts .data field.
  */
