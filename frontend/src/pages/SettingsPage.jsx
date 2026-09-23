@@ -721,7 +721,12 @@ export default function SettingsPage() {
     setAdConnectorTesting(true)
     try {
       const response = await adConnectorService.testSaved()
-      showSuccess(response.data?.message || t('adConnector.testSuccess'))
+      const message = response.data?.message || t('adConnector.testSuccess')
+      // A partial pass is not a pass -- the connector works today only
+      // because the reachable DC happens to be up. Same call the dialog's
+      // own Test Connection makes, so it says the same thing.
+      if (response.data?.partial) showWarning(message)
+      else showSuccess(message)
     } catch (error) {
       showError(error.message || t('adConnector.testFailed'))
     } finally {

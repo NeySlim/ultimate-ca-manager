@@ -189,3 +189,25 @@ class TestUnbindEndpoint:
         assert r.status_code == 200
         with app.app_context():
             assert get_bound_refid() == ''
+
+
+class TestCertInfoNamesTheBoundCertificate:
+    def test_bound_certificate_carries_its_common_name(
+        self, app, auth_client, clean_binding, monkeypatch, tmp_path, create_cert,
+    ):
+        cert_data = create_cert(cn='bound-https.example.com')
+        cert_path = tmp_path / 'https_cert.pem'
+        with app.app_context():
+            from models import Certificate, db
+            row = db.session.get(Certificate, cert_data['id'])
+            row.descr = 'Renamed web UI'
+            db.session.commit()
+            cert_path.write_bytes(base64.b64decode(row.crt))
+            set_bound_refid(cert_data['refid'])
+        monkeypatch.setenv('HTTPS_CERT_PATH', str(cert_path))
+
+        r = auth_client.get('/api/v2/system/https/cert-info')
+        assert r.status_code == 200
+        bound = r.get_json()['data']['bound_certificate']
+        assert bound['common_name'] == 'bound-https.example.com'
+        assert bound['descr'] == 'Renamed web UI'

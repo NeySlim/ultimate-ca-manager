@@ -5,20 +5,22 @@ export default {
     overview: 'Defina perfiles de certificados reutilizables con campos de sujeto, uso de clave, uso extendido de clave, períodos de validez y otras extensiones preconfiguradas. Aplique plantillas al emitir o firmar certificados.',
     sections: [
       {
-        title: 'Tipos de plantilla',
+        title: 'Origen',
         definitions: [
-          { term: 'End-Entity', description: 'Para certificados de servidor, cliente, firma de código y correo electrónico' },
-          { term: 'CA', description: 'Para crear Autoridades de Certificación intermedias' },
+          { term: 'Sistema', description: 'Creadas en la instalación. Duplique una para obtener una copia editable: la plantilla en sí no puede editarse ni eliminarse' },
+          { term: 'Personalizada', description: 'Creadas o importadas aquí, y las únicas que pueden editarse o eliminarse' },
         ]
       },
       {
         title: 'Características',
         items: [
+          { label: 'Tipo', text: 'Web Server, Email, VPN Server o Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon o Custom. Define los valores predeterminados de uso de clave, EKU y SAN' },
           { label: 'Valores predeterminados del sujeto', text: 'Prellenar Organización, OU, País, Estado, Ciudad' },
           { label: 'Uso de clave', text: 'Firma digital, cifrado de clave, etc.' },
           { label: 'Uso extendido de clave', text: 'Autenticación de servidor, autenticación de cliente, firma de código, protección de correo' },
           { label: 'Validez', text: 'Período de validez predeterminado en días' },
           { label: 'Duplicar', text: 'Clonar una plantilla existente y modificarla' },
+          { label: 'Mostrar sistema', text: 'Oculte las plantillas integradas para trabajar solo con las suyas. Se recuerda por navegador' },
           { label: 'Importar/Exportar', text: 'Compartir plantillas como archivos JSON entre instancias de UCM' },
         ]
       },
@@ -34,7 +36,7 @@ export default {
     ],
     tips: [
       'Cree plantillas separadas para servidores TLS, clientes y firma de código',
-      'Use la acción Duplicar para crear rápidamente variaciones de una plantilla',
+      'Use la acción Duplicar para crear rápidamente variaciones de una plantilla, incluida una de sistema',
       'Las plantillas con indicadores de autoinscripción muestran las insignias AD / Auto / ACL / Pinned en la lista',
     ],
   },
@@ -45,23 +47,25 @@ export default {
 
 Las plantillas definen perfiles de certificados reutilizables. En lugar de configurar manualmente el uso de clave, uso extendido de clave, validez y campos de sujeto cada vez, aplique una plantilla para prellenar todo.
 
-## Tipos de plantilla
+## Sistema y personalizadas
 
-### Plantillas End-Entity
-Para certificados de servidor, certificados de cliente, firma de código y protección de correo. Estas plantillas típicamente establecen:
-- **Uso de clave**: Firma digital, cifrado de clave
-- **Uso extendido de clave**: Autenticación de servidor, autenticación de cliente, firma de código, protección de correo
+Cada plantilla es de un tipo u otro, como muestra la columna **Origen**.
 
-### Plantillas CA
-Para crear CAs intermedias. Estas establecen:
-- **Uso de clave**: Firma de certificado, firma de CRL
-- **Restricciones básicas**: CA:TRUE, longitud de ruta opcional
+### Sistema
+Las plantillas creadas en la instalación: Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication y Smartcard Logon. Editar y Eliminar se rechazan para ellas, tanto en la interfaz como en la API. **Duplicar** le da una copia editable sobre la que trabajar.
+
+### Personalizadas
+Todo lo creado o importado aquí. Estas pueden editarse y eliminarse libremente.
+
+Desactive **Mostrar sistema** en la barra de herramientas para ocultar las plantillas integradas y trabajar solo con las suyas. La elección se recuerda, salvo que aún no tenga plantillas personalizadas, en cuyo caso las integradas permanecen visibles.
+
+Las autoridades de certificación no se crean a partir de plantillas: créelas en la página **CAs**.
 
 ## Crear una plantilla
 
 1. Haga clic en **Crear plantilla**
 2. Ingrese un **nombre** y una descripción opcional
-3. Seleccione el **tipo** de plantilla (End-Entity o CA)
+3. Seleccione el **tipo** de plantilla: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon o Custom. Define los valores predeterminados de uso de clave, uso extendido de clave y SAN, que luego puede cambiar
 4. Configure los **valores predeterminados del sujeto** (O, OU, C, ST, L)
 5. Seleccione las opciones de **uso de clave**
 6. Seleccione los valores de **uso extendido de clave**

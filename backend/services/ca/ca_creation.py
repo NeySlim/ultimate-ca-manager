@@ -23,6 +23,16 @@ from .helpers import save_ca_files, save_ca_key_file
 logger = logging.getLogger(__name__)
 
 
+def _key_default_digest(private_key) -> str:
+    """The digest 'auto' picks for this key: its curve's for EC, SHA-256 otherwise (#366)."""
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from utils.ca_profile import default_digest_for_key_type
+    public_key = private_key.public_key()
+    if isinstance(public_key, ec.EllipticCurvePublicKey):
+        return default_digest_for_key_type(public_key.curve.name)
+    return 'sha256'
+
+
 class CACreationMixin:
     """CA creation and import operations"""
 
@@ -732,7 +742,7 @@ class CACreationMixin:
             raise ValueError("CA has neither a certificate nor a CSR to derive the subject from")
 
         csr_pem = TrustStoreService.generate_ca_csr(
-            subject, private_key, digest=digest or 'sha256',
+            subject, private_key, digest=digest or _key_default_digest(private_key),
             path_length=path_length, key_usage=key_usage,
         )
         ca.csr = base64.b64encode(csr_pem).decode('utf-8')

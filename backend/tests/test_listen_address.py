@@ -108,7 +108,30 @@ class TestDualStackTrustedProxy:
         assert body == '127.0.0.1 True'
 
 
-@pytest.mark.skipif(not socket.has_ipv6, reason='no IPv6 support on this host')
+def _has_ipv6_loopback():
+    """Whether ``::1`` is actually usable on this host.
+
+    ``socket.has_ipv6`` only says the interpreter was built with IPv6, and
+    stays True on a kernel that has it switched off -- the shape several
+    WSL2 images ship with. There, creating and binding an ``AF_INET6``
+    socket still succeeds, so neither that flag nor the bind of ``[::]``
+    below tells the test anything: the failure arrives later, as
+    ``EADDRNOTAVAIL`` on the client's connect to ``::1``, which reads as a
+    broken dual-stack listener rather than a host without IPv6. Binding the
+    exact address the client will dial is the question worth asking.
+    """
+    if not socket.has_ipv6:
+        return False
+    try:
+        with socket.socket(socket.AF_INET6, socket.SOCK_STREAM) as probe:
+            probe.bind(('::1', 0))
+    except OSError:
+        return False
+    return True
+
+
+@pytest.mark.skipif(not _has_ipv6_loopback(),
+                    reason='no usable IPv6 loopback (::1) on this host')
 def test_dual_stack_listener_accepts_ipv4_and_ipv6():
     """HOST=:: must serve both address families on one socket (Linux default
     bindv6only=0), which is what makes the option useful. The gevent server

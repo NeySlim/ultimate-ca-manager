@@ -59,6 +59,16 @@ jobs:
           }
           at_ref "$SIGNATURES" "refs/pull/$PR/head" > sig-pr.txt
           at_ref "$SIGNATURES" "$BASE_REF"          > sig-base.txt
+          # What the pull request changed is measured from where it branched, not
+          # from the base tip: a signature merged into the base after that point is
+          # absent from an older branch without having been removed by it.
+          MERGE_BASE=$(gh api "repos/$REPO/compare/$BASE_REF...refs/pull/$PR/head" \
+            --jq '.merge_base_commit.sha' 2>/dev/null || true)
+          if [ -n "$MERGE_BASE" ]; then
+            at_ref "$SIGNATURES" "$MERGE_BASE" > sig-fork.txt
+          else
+            cp sig-base.txt sig-fork.txt
+          fi
           fail=0
 
           # An agreement is immutable once published: changing its terms means a new
@@ -68,7 +78,7 @@ jobs:
           # signed it.
           for doc in $FROZEN; do
             at_ref "$doc" "refs/pull/$PR/head" > cla-pr.txt
-            at_ref "$doc" "$BASE_REF"          > cla-base.txt
+            at_ref "$doc" "${MERGE_BASE:-$BASE_REF}" > cla-base.txt
             if [ -s cla-base.txt ] && ! cmp -s cla-base.txt cla-pr.txt; then
               echo "::error::$doc is modified by this pull request. A published"\
                    "agreement cannot change: add a new version with its own signature file."
@@ -89,11 +99,12 @@ jobs:
               }' "$1" | sort -u
           }
           signatories sig-base.txt > signed-base.txt
+          signatories sig-fork.txt > signed-fork.txt
           { signatories sig-pr.txt; cat signed-base.txt; } | sort -u > signed.txt
 
           # An existing signature is never removed or reworded by someone else.
-          if [ -s signed-base.txt ]; then
-            dropped=$(comm -23 signed-base.txt <(signatories sig-pr.txt) | tr '\n' ' ')
+          if [ -s signed-fork.txt ]; then
+            dropped=$(comm -23 signed-fork.txt <(signatories sig-pr.txt) | tr '\n' ' ')
             if [ -n "${dropped// /}" ]; then
               echo "::error::This pull request removes signatures on file: $dropped"
               fail=1
@@ -111,7 +122,7 @@ jobs:
                    "is $author. Each contributor signs in a pull request of their own."
               fail=1
             fi
-          done < <(comm -13 signed-base.txt <(signatories sig-pr.txt))
+          done < <(comm -13 signed-fork.txt <(signatories sig-pr.txt))
           # A signature on file is kept byte for byte: its date and statement are
           # the signatory's, not the next contributor's to touch.
           while IFS= read -r row; do
@@ -120,7 +131,7 @@ jobs:
               echo "::error::A signature on file was altered by this pull request: $row"
               fail=1
             fi
-          done < <(grep -F -- "$STATEMENT" sig-base.txt || true)
+          done < <(grep -F -- "$STATEMENT" sig-fork.txt || true)
 
           echo "Signatories on file: $(wc -l < signed.txt)"
 

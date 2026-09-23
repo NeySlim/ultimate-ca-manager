@@ -81,6 +81,7 @@ def get_https_cert_info():
                 bound = {
                     'refid': bound_refid,
                     'descr': row.descr if row else None,
+                    'common_name': row.common_name if row else None,
                     'exists': bool(row and row.crt and row.prv),
                 }
         except Exception as e:

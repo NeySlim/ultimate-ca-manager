@@ -372,6 +372,8 @@ SECTIONS: Dict[str, Section] = {
         exclude={
             'last_test_at': 'live connection state',
             'last_test_result': 'live connection state',
+            'health': 'live connection state: this installation\'s view of '
+                      'which domain controllers answered, meaningless on another',
         },
         secrets=('bind_password',),
     ),

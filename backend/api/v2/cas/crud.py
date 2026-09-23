@@ -29,6 +29,7 @@ from utils.ca_profile import (
     default_key_usage_for_ca,
 )
 from models import Certificate, CA, db
+from models.hsm import HsmKey
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from websocket.emitters import on_ca_created, on_ca_updated, on_ca_deleted
@@ -51,6 +52,11 @@ _MAX_URL_LEN = 2048
 _MAX_URLS_PER_FIELD = 8
 _MAX_DESCR_LEN = 255
 _MAX_DESCRIPTION_LEN = 1024
+# HSM key algorithm -> the key_type resolve_digest picks 'auto' from
+_HSM_ALGORITHM_KEY_TYPE = {
+    'RSA-2048': '2048', 'RSA-3072': '3072', 'RSA-4096': '4096',
+    'EC-P256': 'prime256v1', 'EC-P384': 'secp384r1', 'EC-P521': 'secp521r1',
+}
 _MAX_OID_LEN = 100
 _MAX_NAME_CONSTRAINTS = 32
 _MAX_NAME_CONSTRAINT_LEN = 255
@@ -457,7 +463,15 @@ def create_ca():
 
         is_root = not caref
         raw_digest = data.get('digest') or data.get('hashAlgorithm')
-        digest, digest_err = resolve_digest(raw_digest, key_type)
+        # 'auto' follows the key: for an HSM key that is the HSM algorithm,
+        # not the local key_type default (#366).
+        if hsm_key_id:
+            hsm_key = db.session.get(HsmKey, int(hsm_key_id)) if str(hsm_key_id).isdigit() else None
+            hsm_key_algorithm_for_digest = hsm_key.algorithm if hsm_key else None
+        else:
+            hsm_key_algorithm_for_digest = hsm_key_algorithm
+        digest_key_type = _HSM_ALGORITHM_KEY_TYPE.get(hsm_key_algorithm_for_digest, key_type)
+        digest, digest_err = resolve_digest(raw_digest, digest_key_type)
         if digest_err:
             return error_response(digest_err, 400)
 

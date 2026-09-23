@@ -23,7 +23,7 @@ import { showNotices } from '../lib/notices'
 import { certificatesService, casService, truststoreService } from '../services'
 import { useNotification, useMobile, useWindowManager } from '../contexts'
 import { usePermission, useRecentHistory, useFavorites, useWebSocket, usePersistedState } from '../hooks'
-import { extractCN, cn } from '../lib/utils'
+import { extractCN, cn, certificateNames } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { IssueCertificateForm } from './certificates/IssueCertificateForm'
@@ -406,12 +406,16 @@ export default function CertificatesPage() {
   const filteredCerts = useMemo(() => {
     const caRefIds = new Set(cas.map(ca => ca.refid))
     
-    let result = certificates.map(cert => ({
-      ...cert,
-      status: cert.revoked ? 'revoked' : cert.status,
-      cn: cert.descr || cert.cn || cert.common_name || extractCN(cert.subject) || (cert.san_dns ? JSON.parse(cert.san_dns)[0] : null) || 'Certificate',
-      isOrphan: cert.caref && !caRefIds.has(cert.caref)
-    }))
+    let result = certificates.map(cert => {
+      const { name, subtitle } = certificateNames(cert)
+      return {
+        ...cert,
+        status: cert.revoked ? 'revoked' : cert.status,
+        cn: name || extractCN(cert.subject) || (cert.san_dns ? JSON.parse(cert.san_dns)[0] : null) || 'Certificate',
+        subtitle,
+        isOrphan: cert.caref && !caRefIds.has(cert.caref)
+      }
+    })
     
     // No second pass on the status here: the server already applied the
     // filter, over the whole set rather than the current page. Re-filtering

@@ -3,7 +3,7 @@ import {
   Certificate, X, Info, CheckCircle, Clock, XCircle, LinkBreak, Archive
 } from '@phosphor-icons/react'
 import { Badge, KeyIndicator } from '../../components'
-import { formatDate, extractCN, cn } from '../../lib/utils'
+import { formatDate, extractCN, cn, joinCertificateName } from '../../lib/utils'
 
 export function useCertificateColumns(t) {
   const getStatusBadge = (row) => {
@@ -41,6 +41,7 @@ export function useCertificateColumns(t) {
       header: t('common.commonName'),
       priority: 1,
       sortable: true,
+      accessor: (row) => joinCertificateName(row.cn, row.subtitle),
       render: (val, row) => (
         <div className="flex items-center gap-2">
           <div className={cn(
@@ -49,7 +50,10 @@ export function useCertificateColumns(t) {
           )}>
             <Certificate size={14} weight="duotone" />
           </div>
-          <span className="font-medium truncate">{val}</span>
+          <div className="flex flex-col min-w-0">
+            <span className="font-medium truncate">{val}</span>
+            {row.subtitle && <span className="text-xs text-text-secondary truncate" title={row.subtitle}>{row.subtitle}</span>}
+          </div>
           <KeyIndicator hasKey={row.has_private_key} size={14} />
           {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak} title={t('certificates.orphanDescription')}>{t('certificates.orphan')}</Badge>}
           {row.archived && <Badge variant="secondary" size="sm" icon={Archive} title={t('certificates.archivedDescription')}>{t('certificates.archived')}</Badge>}
@@ -66,7 +70,10 @@ export function useCertificateColumns(t) {
             )}>
               <Certificate size={14} weight="duotone" />
             </div>
-            <span className="font-medium truncate">{val || row.cn || row.common_name || t('common.certificate')}</span>
+            <div className="flex flex-col min-w-0">
+              <span className="font-medium truncate">{val || row.cn || row.common_name || t('common.certificate')}</span>
+              {row.subtitle && <span className="text-xs text-text-secondary truncate">{row.subtitle}</span>}
+            </div>
             <KeyIndicator hasKey={row.has_private_key} size={12} />
           </div>
           <div className="shrink-0">

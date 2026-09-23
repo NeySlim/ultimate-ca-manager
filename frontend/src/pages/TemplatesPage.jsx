@@ -13,7 +13,7 @@ import {
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select, Textarea,
-  HelpCard, LoadingSpinner, TemplatePreviewModal,
+  LoadingSpinner, TemplatePreviewModal,
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
 import { templatesService } from '../services'
@@ -22,6 +22,8 @@ import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { VALIDITY } from '../constants/config'
 import { ekuService } from '../services/eku.service'
+const SHOW_SYSTEM_KEY = 'ucm-templates-show-system'
+
 export default function TemplatesPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
@@ -52,21 +54,21 @@ export default function TemplatesPage() {
   const [perPage, setPerPage] = useState(25)
 
   // Filters
-  const [filterType, setFilterType] = usePersistedState('ucm-filter-templates-type', [])
+  const [filterSource, setFilterSource] = usePersistedState('ucm-filter-templates-source', [])
 
   // Import state
   const [importFile, setImportFile] = useState(null)
   const [importJson, setImportJson] = useState('')
   const [importing, setImporting] = useState(false)
+  const [showSystem, setShowSystem] = useState(() => {
+    try {
+      return localStorage.getItem(SHOW_SYSTEM_KEY) !== 'false'
+    } catch { return true }
+  })
 
-  // Get template type
-  const getTemplateType = useCallback((t) => {
-    if (t.type) return t.type
-    const name = (t.name || '').toLowerCase()
-    if (name.includes('ca') || name.includes('authority') || t.is_ca || t.basic_constraints?.ca) {
-      return 'ca'
-    }
-    return 'certificate'
+  const setShowSystemPersisted = useCallback((next) => {
+    setShowSystem(next)
+    try { localStorage.setItem(SHOW_SYSTEM_KEY, String(next)) } catch { /* private mode */ }
   }, [])
 
   // ============= ACTIONS =============
@@ -164,28 +166,42 @@ export default function TemplatesPage() {
 
   // ============= FILTERED DATA =============
   
+  // Hiding system templates when nothing else exists would leave an empty
+  // table that looks broken, so the toggle is forced on and disabled there.
+  // The stored preference is deliberately left untouched by that override.
+  const hasCustomTemplates = useMemo(() => templates.some(t => !t.is_system), [templates])
+  const systemVisible = showSystem || !hasCustomTemplates
+
+  // Switching the toggle off while a system template is open would leave the
+  // panel showing a row that is no longer in the list.
+  useEffect(() => {
+    if (!systemVisible && selectedTemplate?.is_system) setSelectedTemplate(null)
+  }, [systemVisible, selectedTemplate, setSelectedTemplate])
+
   const filteredTemplates = useMemo(() => {
     let result = templates.map(t => ({
       ...t,
-      type: getTemplateType(t)
+      source: t.is_system ? 'system' : 'custom'
     }))
-    if (filterType.length > 0) {
-      result = result.filter(t => filterType.includes(t.type))
+    if (!systemVisible) {
+      result = result.filter(t => !t.is_system)
+    }
+    if (filterSource.length > 0) {
+      result = result.filter(t => filterSource.includes(t.source))
     }
     return result
-  }, [templates, filterType, getTemplateType])
+  }, [templates, filterSource, systemVisible])
 
   // ============= STATS =============
   
   const stats = useMemo(() => {
-    const certTemplates = templates.filter(t => getTemplateType(t) === 'certificate').length
-    const caTemplates = templates.filter(t => getTemplateType(t) === 'ca').length
+    const systemTemplates = templates.filter(t => t.is_system).length
     return [
-      { icon: Certificate, label: t('common.certificate'), value: certTemplates, variant: 'primary' },
-      { icon: ShieldCheck, label: t('common.ca'), value: caTemplates, variant: 'violet' },
+      { icon: ShieldCheck, label: t('templates.systemTemplates'), value: systemTemplates, variant: 'violet' },
+      { icon: Certificate, label: t('templates.customTemplates'), value: templates.length - systemTemplates, variant: 'primary' },
       { icon: FileText, label: t('common.total'), value: templates.length, variant: 'default' }
     ]
-  }, [templates, getTemplateType, t])
+  }, [templates, t])
 
   // ============= COLUMNS =============
   
@@ -196,14 +212,11 @@ export default function TemplatesPage() {
       priority: 1,
       sortable: true,
       render: (val, row) => {
-        const type = getTemplateType(row)
-        const iconClass = type === 'ca' 
-          ? 'icon-bg-amber' 
-          : 'icon-bg-blue'
+        const iconClass = row.is_system ? 'icon-bg-violet' : 'icon-bg-blue'
         return (
           <div className="flex items-center gap-2">
             <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
-              {type === 'ca' ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
+              {row.is_system ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
             </div>
             <span className="font-medium truncate">{val || t('common.unnamed')}</span>
             {row.ad_derived_subject && (
@@ -230,13 +243,12 @@ export default function TemplatesPage() {
         )
       },
       mobileRender: (val, row) => {
-        const type = getTemplateType(row)
-        const iconClass = type === 'ca' ? 'icon-bg-amber' : 'icon-bg-blue'
+        const iconClass = row.is_system ? 'icon-bg-violet' : 'icon-bg-blue'
         return (
           <div className="flex items-center justify-between gap-2 w-full">
             <div className="flex items-center gap-2 min-w-0 flex-1">
               <div className={`w-6 h-6 rounded-lg flex items-center justify-center shrink-0 ${iconClass}`}>
-                {type === 'ca' ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
+                {row.is_system ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
               </div>
               <span className="font-medium truncate">{val || t('common.unnamed')}</span>
             </div>
@@ -251,8 +263,8 @@ export default function TemplatesPage() {
                   {t('templates.autoenrollBadge')}
                 </Badge>
               )}
-              <Badge variant={type === 'ca' ? 'amber' : 'primary'} size="sm" dot>
-                {type === 'ca' ? t('common.ca') : t('templates.cert')}
+              <Badge variant={row.is_system ? 'violet' : 'primary'} size="sm" dot>
+                {row.is_system ? t('templates.system') : t('templates.custom')}
               </Badge>
             </div>
           </div>
@@ -260,14 +272,14 @@ export default function TemplatesPage() {
       }
     },
     {
-      key: 'type',
-      header: t('common.type'),
+      key: 'source',
+      header: t('templates.source'),
       priority: 2,
       sortable: true,
       hideOnMobile: true,
       render: (val) => (
-        <Badge variant={val === 'ca' ? 'amber' : 'primary'} size="sm" dot>
-          {val === 'ca' ? t('common.ca') : t('common.certificate')}
+        <Badge variant={val === 'system' ? 'violet' : 'primary'} size="sm" dot>
+          {val === 'system' ? t('templates.system') : t('templates.custom')}
         </Badge>
       )
     },
@@ -313,50 +325,15 @@ export default function TemplatesPage() {
     }
   ], [t])
 
-  // ============= ROW ACTIONS =============
+  // ============= FILTER PRESETS =============
 
   const handleApplyFilterPreset = useCallback((filters) => {
-    if (filters.type) setFilterType(Array.isArray(filters.type) ? filters.type : [filters.type])
-    else setFilterType([])
-  }, [])
-
-  const rowActions = useCallback((row) => [
-    // Edit and Duplicate both end at write:templates, which is what the detail
-    // panel already asks for; only this menu offered them to every reader.
-    ...(canWrite('templates') ? [
-      { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingTemplate(row); setShowTemplateModal(true) } },
-      { label: t('templates.duplicateTemplate'), icon: Copy, onClick: () => handleDuplicateTemplate(row) },
-    ] : []),
-    { label: t('common.export'), icon: Download, onClick: () => handleExportTemplate(row) },
-    ...(canDelete('templates') ? [
-      { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDeleteTemplate(row) }
-    ] : [])
-  ], [canWrite, canDelete, t])
-
-  // ============= HELP CONTENT =============
-  
-  const helpContent = (
-    <div className="space-y-3">
-      <HelpCard title={t('common.aboutTemplates')} variant="info">
-        {t('templates.aboutTemplatesDescription')}
-      </HelpCard>
-      <HelpCard title={t('templates.templateTypes')} variant="tip">
-        <div className="space-y-1 mt-2">
-          <div className="flex items-center gap-2">
-            <Badge variant="primary" size="sm">{t('common.certificate')}</Badge>
-            <span className="text-xs">{t('templates.endEntityCerts')}</span>
-          </div>
-          <div className="flex items-center gap-2">
-            <Badge variant="warning" size="sm">{t('common.ca')}</Badge>
-            <span className="text-xs">{t('templates.intermediateCAs')}</span>
-          </div>
-        </div>
-      </HelpCard>
-      <HelpCard title={t('common.keyUsage')} variant="warning">
-        {t('templates.keyUsageWarning')}
-      </HelpCard>
-    </div>
-  )
+    // A preset saved before the column became Source carries filters.type,
+    // whose values ('certificate', 'ca') match no row. Applying it clears the
+    // filter rather than emptying the table.
+    if (filters.source) setFilterSource(Array.isArray(filters.source) ? filters.source : [filters.source])
+    else setFilterSource([])
+  }, [setFilterSource])
 
   // ============= DETAIL PANEL =============
   
@@ -364,13 +341,13 @@ export default function TemplatesPage() {
     <div className="p-3 space-y-4">
       <CompactHeader
         icon={FileText}
-        iconClass={selectedTemplate.type === 'ca' ? "bg-accent-warning-op20" : "bg-accent-primary-op20"}
+        iconClass={selectedTemplate.is_system ? "icon-bg-violet" : "bg-accent-primary-op20"}
         title={selectedTemplate.name}
         subtitle={t('templates.certificatesIssued', { count: selectedTemplate.usage_count || 0 })}
         badge={
           <div className="flex items-center gap-1.5">
-            <Badge variant={selectedTemplate.type === 'ca' ? 'warning' : 'primary'} size="sm">
-              {selectedTemplate.type === 'ca' ? t('common.ca') : t('common.certificate')}
+            <Badge variant={selectedTemplate.is_system ? 'violet' : 'primary'} size="sm">
+              {selectedTemplate.is_system ? t('templates.system') : t('templates.custom')}
             </Badge>
             {selectedTemplate.ad_derived_subject && (
               <Badge variant="violet" size="sm" title={t('templates.adDerivedBadgeTooltip')}>
@@ -403,7 +380,14 @@ export default function TemplatesPage() {
         </Button>
         {canWrite('templates') && (
           <>
-            <Button type="button" size="sm" variant="secondary" onClick={() => { setEditingTemplate(selectedTemplate); setShowTemplateModal(true) }}>
+            <Button
+              type="button"
+              size="sm"
+              variant="secondary"
+              disabled={selectedTemplate.is_system}
+              title={selectedTemplate.is_system ? t('templates.systemNotEditable') : undefined}
+              onClick={() => { setEditingTemplate(selectedTemplate); setShowTemplateModal(true) }}
+            >
               <PencilSimple size={14} /> {t('common.edit')}
             </Button>
             <Button type="button" size="sm" variant="secondary" onClick={() => handleDuplicateTemplate(selectedTemplate)}>
@@ -415,7 +399,14 @@ export default function TemplatesPage() {
           <Download size={14} /> {t('common.export')}
         </Button>
         {canDelete('templates') && (
-          <Button type="button" size="sm" variant="danger" onClick={() => handleDeleteTemplate(selectedTemplate)}>
+          <Button
+            type="button"
+            size="sm"
+            variant="danger"
+            disabled={selectedTemplate.is_system}
+            title={selectedTemplate.is_system ? t('templates.systemNotDeletable') : undefined}
+            onClick={() => handleDeleteTemplate(selectedTemplate)}
+          >
             <Trash size={14} /> {t('common.delete')}
           </Button>
         )}
@@ -424,7 +415,7 @@ export default function TemplatesPage() {
       <CompactSection title={t('templates.basicInfo')} icon={Globe}>
         <CompactGrid columns={1}>
           <CompactField autoIcon="name" label={t('common.name')} value={selectedTemplate.name} />
-          <CompactField autoIcon="type" label={t('common.type')} value={selectedTemplate.type === 'ca' ? t('common.certificateAuthority') : t('common.certificate')} />
+          <CompactField autoIcon="type" label={t('templates.source')} value={selectedTemplate.is_system ? t('templates.systemDescription') : t('templates.customDescription')} />
           <CompactField autoIcon="description" label={t('common.description')} value={selectedTemplate.description || '—'} />
         </CompactGrid>
       </CompactSection>
@@ -536,18 +527,27 @@ export default function TemplatesPage() {
           selectedId={selectedTemplate?.id}
           searchable
           searchPlaceholder={t('templates.searchPlaceholder')}
-          searchKeys={['name', 'description', 'type']}
+          searchKeys={['name', 'description', 'source']}
           toolbarFilters={[
             {
-              key: 'type',
+              key: 'showSystem',
+              type: 'toggle',
+              label: t('templates.showSystem'),
+              value: systemVisible,
+              onChange: setShowSystemPersisted,
+              disabled: !hasCustomTemplates,
+              disabledReason: t('templates.showSystemForced'),
+            },
+            {
+              key: 'source',
               type: 'multiSelect',
-              label: t('common.type'),
-              value: filterType,
-              onChange: setFilterType,
-              placeholder: t('common.allTypes'),
+              label: t('templates.source'),
+              value: filterSource,
+              onChange: setFilterSource,
+              placeholder: t('templates.allSources'),
               options: [
-                { value: 'certificate', label: t('common.certificate') },
-                { value: 'ca', label: t('common.ca') }
+                { value: 'system', label: t('templates.system') },
+                { value: 'custom', label: t('templates.custom') }
               ]
             }
           ]}

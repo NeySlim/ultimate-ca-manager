@@ -44,7 +44,8 @@ export function ResponsiveDataTable({
   onSearchChange,
   
   // Toolbar (filters + actions next to search)
-  toolbarFilters, // Array of { key, value, onChange, placeholder, options: [{value, label}] }
+  toolbarFilters, // Array of { key, type, value, onChange, placeholder, options: [{value, label}] }
+                  // type 'toggle': { label, value: bool, onChange, disabled, disabledReason }
   toolbarActions, // ReactNode - buttons to show on right side of toolbar
   
   // Column customization
@@ -253,6 +254,11 @@ export function ResponsiveDataTable({
     if (!toolbarFilters) return {}
     const values = {}
     toolbarFilters.forEach(filter => {
+      if (filter.type === 'toggle') {
+        // A toggle is a view switch, not a filter: saving it would put its
+        // value into every preset and restore it behind the user's back.
+        return
+      }
       if (filter.type === 'dateRange') {
         if (filter.from) values[`${filter.key}_from`] = filter.from
         if (filter.to) values[`${filter.key}_to`] = filter.to
@@ -270,6 +276,7 @@ export function ResponsiveDataTable({
     if (!toolbarFilters) return false
     return toolbarFilters.some(f => {
       if (f.type === 'dateRange') return f.from || f.to
+      if (f.type === 'toggle') return false
       if (f.type === 'multiSelect') return Array.isArray(f.value) && f.value.length > 0
       return f.value
     })
@@ -280,6 +287,7 @@ export function ResponsiveDataTable({
     if (!toolbarFilters) return []
     return toolbarFilters
       .filter(f => {
+        if (f.type === 'toggle') return false
         if (f.type === 'multiSelect') return Array.isArray(f.value) && f.value.length > 0
         if (f.type === 'dateRange') return f.from || f.to
         return f.value !== '' && f.value !== null && f.value !== undefined
@@ -313,16 +321,21 @@ export function ResponsiveDataTable({
     }
   }, [toolbarFilters])
 
+  // Clearing sets each filter back to its own empty value. A toggle has none:
+  // onChange('') would switch it off and persist the empty string, so it is
+  // left alone -- it is not counted as an active filter either. Both Clear
+  // filters buttons, the chip row's and the empty state's, come through here.
   const handleClearAllChips = useCallback(() => {
     setSearchValue('')
     toolbarFilters?.forEach(f => {
+      if (f.type === 'toggle') return
       if (f.type === 'dateRange') {
         f.onFromChange?.('')
         f.onToChange?.('')
       } else if (f.type === 'multiSelect') {
-        f.onChange([])
+        f.onChange?.([])
       } else {
-        f.onChange('')
+        f.onChange?.('')
       }
     })
   }, [toolbarFilters])
@@ -617,19 +630,7 @@ export function ResponsiveDataTable({
           </p>
           {hasActiveFilters ? (
             <button
-              onClick={() => {
-                setSearchValue('')
-                toolbarFilters?.forEach(f => {
-                  if (f.type === 'dateRange') {
-                    f.onFromChange?.('')
-                    f.onToChange?.('')
-                  } else if (f.type === 'multiSelect') {
-                    f.onChange?.([])
-                  } else {
-                    f.onChange?.('')
-                  }
-                })
-              }}
+              onClick={handleClearAllChips}
               className="text-sm text-accent-primary hover:text-accent-primary-op80 font-medium"
             >
               {t('table.clearFilters')}
@@ -870,6 +871,42 @@ function SearchBar({
         {!isMobile && filters && filters.length > 0 && (
           <div className="flex items-center gap-2 shrink-0">
             {filters.map((filter) => {
+              // Boolean toggle filter -- a checkbox-style pill for the
+              // "show/hide this class of row" case, where a multiSelect with
+              // one option would read as a filter the user must unset rather
+              // than a switch. `disabled` covers the case where turning it
+              // off would empty the table.
+              if (filter.type === 'toggle') {
+                const checked = Boolean(filter.value)
+                return (
+                  <button
+                    key={filter.key}
+                    type="button"
+                    role="switch"
+                    aria-checked={checked}
+                    disabled={filter.disabled}
+                    onClick={() => { if (!filter.disabled) filter.onChange?.(!checked) }}
+                    title={filter.disabled ? (filter.disabledReason || filter.label) : filter.label}
+                    className={cn(
+                      'h-7 px-2.5 inline-flex items-center gap-1.5 shrink-0',
+                      'text-xs rounded-md border transition-colors',
+                      filter.disabled
+                        ? 'border-border text-text-tertiary opacity-50 cursor-not-allowed'
+                        : checked
+                          ? 'border-accent-primary-op50 bg-accent-primary-op10 text-text-primary'
+                          : 'border-border text-text-secondary hover:text-text-primary'
+                    )}
+                  >
+                    <span className={cn(
+                      'w-3.5 h-3.5 rounded-sm border flex items-center justify-center shrink-0',
+                      checked ? 'bg-accent-primary border-accent-primary' : 'border-text-tertiary'
+                    )}>
+                      {checked && <Check size={10} weight="bold" className="text-white" />}
+                    </span>
+                    {filter.label}
+                  </button>
+                )
+              }
               // Date range filter
               if (filter.type === 'dateRange') {
                 return (

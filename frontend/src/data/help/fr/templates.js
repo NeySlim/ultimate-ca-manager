@@ -5,20 +5,22 @@ export default {
     overview: 'Définissez des profils de certificat réutilisables avec des champs de sujet préconfigurés, l\'utilisation de la clé, l\'utilisation étendue de la clé, les périodes de validité et d\'autres extensions. Appliquez les modèles lors de l\'émission ou de la signature de certificats.',
     sections: [
       {
-        title: 'Types de modèles',
+        title: 'Origine',
         definitions: [
-          { term: 'Entité finale', description: 'Pour les certificats serveur, client, signature de code et e-mail' },
-          { term: 'CA', description: 'Pour créer des autorités de certification intermédiaires' },
+          { term: 'Système', description: 'Fournis à l\'installation. Dupliquez-en un pour obtenir une copie modifiable : lui-même ne peut être ni modifié ni supprimé' },
+          { term: 'Personnalisé', description: 'Créés ou importés ici, et les seuls qui peuvent être modifiés ou supprimés' },
         ]
       },
       {
         title: 'Fonctionnalités',
         items: [
+          { label: 'Type', text: 'Web Server, Email, VPN Server ou Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Définit les valeurs par défaut d\'utilisation de la clé, d\'EKU et de SAN' },
           { label: 'Valeurs par défaut du sujet', text: 'Préremplir Organisation, OU, Pays, État, Ville' },
           { label: 'Utilisation de la clé', text: 'Signature numérique, chiffrement de clé, etc.' },
           { label: 'Utilisation étendue de la clé', text: 'Authentification serveur, authentification client, signature de code, protection e-mail' },
           { label: 'Validité', text: 'Période de validité par défaut en jours' },
           { label: 'Dupliquer', text: 'Cloner un modèle existant et le modifier' },
+          { label: 'Afficher système', text: 'Masquer les modèles intégrés pour ne travailler qu\'avec les vôtres. Mémorisé par navigateur' },
           { label: 'Importer/Exporter', text: 'Partager des modèles sous forme de fichiers JSON entre instances UCM' },
         ]
       },
@@ -34,7 +36,7 @@ export default {
     ],
     tips: [
       'Créez des modèles séparés pour les serveurs TLS, les clients et la signature de code',
-      'Utilisez l\'action Dupliquer pour créer rapidement des variantes d\'un modèle',
+      'Utilisez l\'action Dupliquer pour créer rapidement des variantes d\'un modèle, y compris d\'un modèle système',
       'Les modèles avec indicateurs d\'autoenrollment affichent des badges AD / Auto / ACL / Épinglé dans la liste',
     ],
   },
@@ -45,23 +47,25 @@ export default {
 
 Les modèles définissent des profils de certificat réutilisables. Au lieu de configurer manuellement l'utilisation de la clé, l'utilisation étendue de la clé, la validité et les champs du sujet à chaque fois, appliquez un modèle pour tout préremplir.
 
-## Types de modèles
+## Système et personnalisé
 
-### Modèles d'entité finale
-Pour les certificats serveur, les certificats client, la signature de code et la protection e-mail. Ces modèles définissent généralement :
-- **Utilisation de la clé** : Signature numérique, chiffrement de clé
-- **Utilisation étendue de la clé** : Authentification serveur, authentification client, signature de code, protection e-mail
+Chaque modèle est l'un ou l'autre, comme l'indique la colonne **Origine**.
 
-### Modèles de CA
-Pour créer des CA intermédiaires. Ceux-ci définissent :
-- **Utilisation de la clé** : Signature de certificat, signature de CRL
-- **Contraintes de base** : CA:TRUE, longueur de chemin optionnelle
+### Système
+Les modèles fournis à l'installation : Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication et Smartcard Logon. Modifier et Supprimer leur sont refusés, dans l'interface comme par l'API. **Dupliquer** vous donne une copie modifiable comme point de départ.
+
+### Personnalisé
+Tout ce qui est créé ou importé ici. Ces modèles peuvent être modifiés et supprimés librement.
+
+Désactivez **Afficher système** dans la barre d'outils pour masquer les modèles intégrés et ne travailler qu'avec les vôtres. Le choix est mémorisé, sauf si vous n'avez encore aucun modèle personnalisé, auquel cas les modèles intégrés restent visibles.
+
+Les autorités de certification ne se créent pas à partir de modèles : créez-les sur la page **Autorités de certification**.
 
 ## Créer un modèle
 
 1. Cliquez sur **Créer un modèle**
 2. Entrez un **nom** et une description optionnelle
-3. Sélectionnez le **type** de modèle (entité finale ou CA)
+3. Sélectionnez le **type** de modèle : Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Il définit les valeurs par défaut d'utilisation de la clé, d'utilisation étendue de la clé et de SAN, que vous pouvez ensuite modifier
 4. Configurez les **valeurs par défaut du sujet** (O, OU, C, ST, L)
 5. Sélectionnez les indicateurs d'**utilisation de la clé**
 6. Sélectionnez les valeurs d'**utilisation étendue de la clé**

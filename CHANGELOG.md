@@ -10,12 +10,22 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Added
+- The Active Directory Connector takes several domain controllers, one per row, and lookups fail over between them, so one DC being down no longer stops certificate enrollment. Naming each DC by its own hostname is also what makes `Verify SSL Certificate` usable on a multi-DC domain, where a domain controller certificate carries only its own host in the SAN (#363, by @stefanelul2000).
+- A scheduled health check binds to each of the connector's domain controllers on a configurable interval, so an unreachable one is skipped at enrollment time instead of being rediscovered by a request that waits out its connect timeout. The verdict shows on the settings row and against each DC in the dialog; it expires, and it can never rule out every DC (#363, by @stefanelul2000).
 - Intune app registrations are defined once, under SCEP › Intune app registrations, and picked per SCEP profile: one tenant, client ID and secret shared by the profiles that validate with it, tested and rotated in one place. (#358)
 - CRLs can be deployed over SSH/SFTP whenever they change, with durable per-target delivery, PEM parent-CRL bundles or a single DER CRL, on-demand deployment, and editable certificate and CRL bindings. Reload commands now belong to each binding so one SSH target can safely serve different services. Pending retries show their last error and a live countdown to the next attempt, refresh automatically while waiting, and bindings can be enabled or disabled from their edit dialog.
 
 ### Changed
+- The Active Directory Connector requires a bind DN and a bind password while it is enabled, in the settings form as well as in the API, and will not bind without both anywhere it binds: lookups, the scheduled health probe and either connection test. On upgrade, an enabled connector saved without a password stops answering lookups until credentials are entered in the settings dialog, and an API client must send both when it enables one (#363, by @stefanelul2000).
 - A SCEP profile names its Intune app registration instead of carrying the credentials; migration 092 gives every existing Intune profile a registration named after it, shared by the profiles that used the same tenant, client ID and secret. A different secret for the same tenant keeps a registration of its own, reported in the log for a merge by hand; two registrations for one tenant and client ID cannot be created through the API. The pre-092 profile fields stay accepted for one release.
 - Deployment target settings now contain only the reusable SSH/SFTP connection. Destination paths, file options and reload commands are configured on each certificate or CRL binding; migration 091 copies existing target reload commands to existing bindings.
+
+### Fixed
+- The Certificates table and the certificate pickers named a certificate by its description, which hid its Common Name. The Common Name now comes first with the description alongside, in the list, its CSV export, the certificate pickers and the bound HTTPS certificate (#365, by @B0F1B0).
+- The TLS certificate selector of the public ACME endpoint offered only the first 20 certificates, and the certificate picker never showed how many SANs a certificate carries. The selector now lists every certificate, and the picker counts the SANs of a certificate that has several.
+- A CSR, certificate or CRL signed by an EC key held in a PKCS#11 or Azure Key Vault HSM carried the raw `r || s` signature the HSM returns, so OpenSSL and every external signer rejected it. The signature is now DER-encoded as X.509 requires on every path, the generic key signing endpoint included, and a CA created or renewed on an HSM key keeps the digest matching its curve (#366).
+- The templates list called a template Certificate or CA from the letters "ca" in its name, so the seeded Email Certificate (S/MIME), Client Authentication and Smartcard Logon were each shown as a certificate authority. The column reads the `is_system` flag the API already returns and says System or Custom (#364, by @stefanelul2000).
+- The detail pane of a system template offered an Edit and a Delete the server answers 403 to. Both are greyed with the reason now, Duplicate and Export stay available, and a Show system toggle hides the built-in templates, remembered across visits and forced on while no custom template exists (#364, by @stefanelul2000).
 
 ---
 

@@ -10,6 +10,7 @@ import logging
 
 from models import db
 from models.hsm import HsmProvider, HsmKey
+from services.hsm.ecdsa_signature import coordinate_bytes, ecdsa_to_der
 from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo,
     HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
@@ -399,6 +400,7 @@ class HsmService:
             # Delete from database
             db.session.delete(key)
             db.session.commit()
+            cls.forget_signing_hash(key_id)
             
             logger.info(f"Deleted HSM key: {label} from {provider.name}")
             return True
@@ -452,6 +454,12 @@ class HsmService:
     _signing_hash_cache: dict = {}
 
     @classmethod
+    def forget_signing_hash(cls, key_id: int) -> None:
+        """Drop the cached digest of a deleted key: SQLite may reuse its id."""
+        for cache_key in [k for k in cls._signing_hash_cache if k[0] == key_id]:
+            del cls._signing_hash_cache[cache_key]
+
+    @classmethod
     def signing_hash(cls, key_id: int, key_algorithm: Optional[str], requested: str = 'sha256') -> str:
         """The digest the key's provider signs with when *requested* is asked
         for. Providers that hash with any digest return the request; those
@@ -503,7 +511,11 @@ class HsmService:
             with hsm:
                 signature = hsm.sign(key.key_identifier, data, algorithm,
                                      hash_algorithm=hash_algorithm)
-            
+
+            # PKCS#11 and Azure return ECDSA as raw r || s; X.509 needs DER (#366).
+            signature = ecdsa_to_der(
+                signature, coordinate_bytes(key.algorithm, key.public_key_pem))
+
             logger.debug(f"Signed data with HSM key: {key.label}")
             return signature
             

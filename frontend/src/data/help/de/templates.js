@@ -5,20 +5,22 @@ export default {
     overview: 'Definieren Sie wiederverwendbare Zertifikatsprofile mit vorkonfigurierten Betreffsfeldern, Key Usage, Extended Key Usage, Gültigkeitszeiträumen und anderen Erweiterungen. Wenden Sie Templates bei der Ausstellung oder Signierung von Zertifikaten an.',
     sections: [
       {
-        title: 'Template-Typen',
+        title: 'Herkunft',
         definitions: [
-          { term: 'Endentität', description: 'Für Server-, Client-, Code-Signierungs- und E-Mail-Zertifikate' },
-          { term: 'CA', description: 'Zum Erstellen von Intermediate-Zertifizierungsstellen' },
+          { term: 'System', description: 'Bei der Installation mitgeliefert. Duplizieren Sie eines für eine bearbeitbare Kopie: es selbst kann weder bearbeitet noch gelöscht werden' },
+          { term: 'Benutzerdefiniert', description: 'Hier erstellt oder importiert, und die einzige Art, die bearbeitet oder gelöscht werden kann' },
         ]
       },
       {
         title: 'Funktionen',
         items: [
+          { label: 'Typ', text: 'Web Server, Email, VPN Server oder Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon oder Custom. Legt die Standardwerte für Key Usage, EKU und SAN fest' },
           { label: 'Betreffsstandards', text: 'Organisation, OU, Land, Bundesland, Stadt vorausfüllen' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, usw.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
           { label: 'Gültigkeit', text: 'Standard-Gültigkeitsdauer in Tagen' },
           { label: 'Duplizieren', text: 'Ein vorhandenes Template klonen und modifizieren' },
+          { label: 'System anzeigen', text: 'Die mitgelieferten Templates ausblenden, um nur mit Ihren eigenen zu arbeiten. Wird pro Browser gespeichert' },
           { label: 'Import/Export', text: 'Templates als JSON-Dateien zwischen UCM-Instanzen teilen' },
         ]
       },
@@ -34,7 +36,7 @@ export default {
     ],
     tips: [
       'Erstellen Sie separate Templates für TLS-Server, Clients und Code-Signierung',
-      'Verwenden Sie die Duplizieren-Aktion, um schnell Varianten eines Templates zu erstellen',
+      'Verwenden Sie die Duplizieren-Aktion, um schnell Varianten eines Templates zu erstellen, auch von einem System-Template',
       'Templates mit Autoregistrierungs-Flags zeigen AD- / Auto- / ACL- / Pinned-Badges in der Liste',
     ],
   },
@@ -45,23 +47,25 @@ export default {
 
 Templates definieren wiederverwendbare Zertifikatsprofile. Anstatt Key Usage, Extended Key Usage, Gültigkeit und Betreffsfelder jedes Mal manuell zu konfigurieren, wenden Sie ein Template an, um alles vorzufüllen.
 
-## Template-Typen
+## System und Benutzerdefiniert
 
-### Endentitäts-Templates
-Für Serverzertifikate, Client-Zertifikate, Code-Signierung und E-Mail-Schutz. Diese Templates setzen typischerweise:
-- **Key Usage**: Digital Signature, Key Encipherment
-- **Extended Key Usage**: Server Auth, Client Auth, Code Signing, Email Protection
+Jedes Template gehört zu einer der beiden Arten, angezeigt in der Spalte **Herkunft**.
 
-### CA-Templates
-Zum Erstellen von Intermediate-CAs. Diese setzen:
-- **Key Usage**: Certificate Sign, CRL Sign
-- **Basic Constraints**: CA:TRUE, optionale Pfadlänge
+### System
+Die bei der Installation mitgelieferten Templates: Web Server (TLS/SSL), Email Certificate (S/MIME), VPN Server, VPN Client, Code Signing, OCSP Signing, Client Authentication und Smartcard Logon. Bearbeiten und Löschen werden für sie abgelehnt, in der Oberfläche wie über die API. **Duplizieren** liefert Ihnen eine bearbeitbare Kopie als Ausgangsbasis.
+
+### Benutzerdefiniert
+Alles, was hier erstellt oder importiert wurde. Diese Templates können frei bearbeitet und gelöscht werden.
+
+Schalten Sie **System anzeigen** in der Werkzeugleiste aus, um die mitgelieferten Templates auszublenden und nur mit Ihren eigenen zu arbeiten. Die Wahl wird gespeichert, es sei denn, Sie haben noch keine benutzerdefinierten Templates; in diesem Fall bleiben die mitgelieferten sichtbar.
+
+Zertifizierungsstellen werden nicht aus Templates erstellt: legen Sie sie auf der Seite **Zertifizierungsstellen** an.
 
 ## Template erstellen
 
 1. Klicken Sie auf **Template erstellen**
 2. Geben Sie einen **Namen** und eine optionale Beschreibung ein
-3. Wählen Sie den Template-**Typ** (Endentität oder CA)
+3. Wählen Sie den Template-**Typ**: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon oder Custom. Er legt die Standardwerte für Key Usage, Extended Key Usage und SAN fest, die Sie anschließend ändern können
 4. Konfigurieren Sie **Betreffsstandards** (O, OU, C, ST, L)
 5. Wählen Sie **Key Usage**-Flags
 6. Wählen Sie **Extended Key Usage**-Werte

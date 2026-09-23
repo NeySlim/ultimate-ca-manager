@@ -111,6 +111,15 @@ describe('TSAPage — dedicated signer certificate (#312)', () => {
     await waitFor(() => expect(tsaService.getSignerCandidates).toHaveBeenCalled())
   })
 
+  it('names the signer by its CN with the description alongside (#365)', async () => {
+    tsaService.getSignerCandidates.mockResolvedValue({ data: [
+      { ...CANDIDATES[0], subject_cn: 'ts.example.com', descr: 'Renamed signer', eku_critical_exclusive: false },
+    ] })
+    setConfig({ signer_cert_refid: 'cert-ts-1' })
+    await openSettingsTab()
+    expect(await screen.findByText('ts.example.com · Renamed signer (RSA 2048)')).toBeInTheDocument()
+  })
+
   it('keeps the strict toggle disabled until a usable signer is saved', async () => {
     await openSettingsTab()
     const label = await screen.findByText('tsa.requireDedicatedCert')

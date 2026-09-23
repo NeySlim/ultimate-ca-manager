@@ -7,7 +7,9 @@ import {
   formatDate,
   formatSerialNumberHex,
   exportToCSV,
-  exportToJSON
+  exportToJSON,
+  certificateNames,
+  certificateLabel
 } from '../utils'
 
 describe('utils', () => {
@@ -250,6 +252,25 @@ describe('utils', () => {
       
       expect(mockClick).toHaveBeenCalled()
       expect(mockLink.download).toMatch(/test-export-.*\.json/)
+    })
+  })
+
+  describe('certificateNames', () => {
+    it('names a certificate by its CN with a different description as subtitle', () => {
+      expect(certificateNames({ common_name: 'host.example.com', descr: 'Renamed' }))
+        .toEqual({ name: 'host.example.com', subtitle: 'Renamed' })
+      expect(certificateLabel({ common_name: 'host.example.com', descr: 'Renamed' })).toBe('host.example.com · Renamed')
+    })
+
+    it('does not repeat a description equal to the CN', () => {
+      expect(certificateNames({ common_name: 'a.example.com', descr: 'a.example.com' }))
+        .toEqual({ name: 'a.example.com', subtitle: null })
+    })
+
+    it('falls back to the description, then to nothing', () => {
+      expect(certificateNames({ common_name: '', descr: 'Device key' })).toEqual({ name: 'Device key', subtitle: null })
+      expect(certificateLabel({})).toBe('')
+      expect(certificateLabel(null)).toBe('')
     })
   })
 })

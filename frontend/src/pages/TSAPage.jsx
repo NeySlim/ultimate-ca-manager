@@ -19,6 +19,7 @@ import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { pickerCas } from '../lib/caSelection'
+import { certificateLabel } from '../lib/utils'
 
 export default function TSAPage() {
   const { t } = useTranslation()
@@ -245,7 +246,7 @@ export default function TSAPage() {
                 { value: '', label: t('tsa.signingCertCa') },
                 ...signerCandidates.map(c => ({
                   value: c.refid,
-                  label: `${c.subject_cn || c.descr || c.subject}`
+                  label: `${certificateLabel(c) || c.subject}`
                     + `${c.key_type ? ` (${c.key_type})` : ''}`
                     + `${c.eku_critical_exclusive ? `: ${t('tsa.signerStrictBadge')}` : ''}`
                 }))
