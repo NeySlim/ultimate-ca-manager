@@ -19,7 +19,7 @@ except ImportError:
 # fields whose names happen to contain a sensitive substring (e.g.
 # pkcs11 "token_label", gcp "key_ring") are NOT inadvertently encrypted.
 _SENSITIVE_KEYS = frozenset({
-    'pin', 'user_pin',
+    'pin', 'user_pin', 'previous_user_pin',
     'password', 'hsm_password',
     'secret', 'client_secret',
     'token',                       # openbao token (NOT token_label)

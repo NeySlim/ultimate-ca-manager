@@ -9,6 +9,8 @@ services:
       - 8080:8080
     volumes:
       - ucm-data:/opt/ucm/data
+      # SoftHSM tokens live in the data volume since 2.233. This older volume is
+      # read once, at the first start of 2.233, to carry its tokens over.
       - ucm-hsm-tokens:/var/lib/softhsm/tokens
 volumes:
   ucm-data:

@@ -8,7 +8,7 @@ UCM includes SoftHSM2 in its Docker image. HSM features work out of the box, no 
 docker compose -f docker-compose.hsm.yml up -d
 ```
 
-On first start, a default SoftHSM token (`UCM-Default`) is automatically initialized. The PIN is printed in the container logs.
+On first start, a default SoftHSM token (`UCM-Default`) is automatically initialized, with a random PIN unless `HSM_PIN` is set. UCM keeps the PIN in the `SoftHSM-Default` provider.
 
 **Auto-registration:** UCM automatically creates an `SoftHSM-Default` provider in the database when it detects the Docker entrypoint initialized a token (`HSM_DEFAULT_PIN` env var). The provider appears immediately in the HSM page, no manual setup needed.
 
@@ -30,14 +30,19 @@ Normalization runs at three levels:
 
 ## Persistent Tokens
 
-Mount a volume for `/var/lib/softhsm/tokens` to keep HSM keys across container restarts:
+Since 2.233, SoftHSM tokens are stored in the data volume, under `/opt/ucm/data/softhsm/tokens`, so they survive a recreated container (an upgrade) with no extra volume:
 
 ```bash
 docker run -d --name ucm -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
-  -v ucm-hsm:/var/lib/softhsm/tokens \
   neyslim/ultimate-ca-manager:latest
 ```
+
+**Upgrading from a volume at `/var/lib/softhsm/tokens`:** keep that volume mounted for the first start of 2.233. The entrypoint copies its tokens into the data volume when the data volume holds none yet, and the `SoftHSM-Default` provider keeps its PIN. The old volume can be removed afterwards.
+
+If 2.233 first started without that volume, it created a new `UCM-Default` in the data volume and the provider switched to it, keeping the previous PIN. To go back to the old token: stop the container, empty `softhsm/tokens` in the data volume, mount the old volume again and start. The tokens are carried over and the provider opens them with its previous PIN. Do not sync the provider keys before that: a sync against the new, empty token removes their records.
+
+Before 2.233, a container started without that volume kept its tokens inside the container and created a new one at every recreation: keys made there were lost with the old container. When the entrypoint has to create `UCM-Default` anew, it points an existing `SoftHSM-Default` provider aimed at `UCM-Default` to the new token and logs a warning; a provider edited to open another token is left alone.
 
 ## Environment Variables
 
@@ -137,16 +142,17 @@ Configure cloud HSM providers via the UCM web UI (Settings → HSM):
 
 ```bash
 # Backup tokens
-docker cp ucm:/var/lib/softhsm/tokens ./hsm-backup/
+docker cp ucm:/opt/ucm/data/softhsm/tokens ./hsm-backup/
 
-# Restore tokens
-docker cp ./hsm-backup/. ucm:/var/lib/softhsm/tokens/
+# Restore tokens: docker cp writes as root, so hand them back to ucm, then restart
+docker cp ./hsm-backup/. ucm:/opt/ucm/data/softhsm/tokens/
+docker exec -u root ucm chown -R ucm:ucm /opt/ucm/data/softhsm
+docker restart ucm
 ```
 
-Or use Docker volumes:
+Or archive them from the data volume:
 
 ```bash
-# Create backup archive
-docker run --rm -v ucm-hsm:/data -v $(pwd):/backup \
-  alpine tar czf /backup/hsm-tokens.tar.gz -C /data .
+docker run --rm -v ucm-data:/data -v $(pwd):/backup \
+  alpine tar czf /backup/hsm-tokens.tar.gz -C /data/softhsm/tokens .
 ```

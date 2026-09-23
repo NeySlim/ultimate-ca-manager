@@ -615,7 +615,7 @@ export default function HSMPage() {
   )
 }
 
-function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
+export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
   const { t } = useTranslation()
   const [formData, setFormData] = useState({
     name: provider?.name || '',
@@ -624,24 +624,24 @@ function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
     connection_timeout: provider?.connection_timeout || 30,
     pkcs11_library_path: provider?.pkcs11_library_path || '',
     pkcs11_slot_id: provider?.pkcs11_slot_id ?? '',
-    pkcs11_pin: '',
+    pkcs11_pin: provider?.pkcs11_pin || '',
     pkcs11_token_label: provider?.pkcs11_token_label || '',
     aws_cluster_id: provider?.aws_cluster_id || '',
     aws_region: provider?.aws_region || 'us-east-1',
     aws_access_key: provider?.aws_access_key || '',
     aws_secret_key: '',
     aws_crypto_user: provider?.aws_crypto_user || '',
-    aws_crypto_password: '',
+    aws_crypto_password: provider?.aws_crypto_password || '',
     azure_vault_url: provider?.azure_vault_url || '',
     azure_tenant_id: provider?.azure_tenant_id || '',
     azure_client_id: provider?.azure_client_id || '',
-    azure_client_secret: '',
+    azure_client_secret: provider?.azure_client_secret || '',
     gcp_project_id: provider?.gcp_project_id || '',
     gcp_location: provider?.gcp_location || 'global',
     gcp_keyring: provider?.gcp_keyring || '',
     gcp_credentials_json: '',
     openbao_url: provider?.openbao_url || '',
-    openbao_token: '',
+    openbao_token: provider?.openbao_token || '',
     openbao_mount_path: provider?.openbao_mount_path || 'transit',
     openbao_namespace: provider?.openbao_namespace || '',
     openbao_tls_skip_verify: provider?.openbao_tls_skip_verify ?? false,

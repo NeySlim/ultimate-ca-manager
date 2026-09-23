@@ -35,6 +35,8 @@ PrivateTmp=true
 ProtectSystem=strict
 ProtectHome=true
 ReadWritePaths=/opt/ucm/data /var/log/ucm /etc/ucm
+# SoftHSM writes its tokens here; "-" keeps the unit starting where SoftHSM is absent.
+ReadWritePaths=-/var/lib/softhsm/tokens
 ProtectKernelTunables=true
 ProtectControlGroups=true
 RestrictRealtime=true

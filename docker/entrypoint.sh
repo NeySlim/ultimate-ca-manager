@@ -200,10 +200,29 @@ done
 
 # Create necessary directories (must match backend/config/settings.py)
 mkdir -p "$DATA_PATH"/{ca,certs,private,crl,scep,backups,sessions,logs,temp} 2>/dev/null || true
+mkdir -p "$DATA_PATH"/softhsm/tokens 2>/dev/null || true
+# SoftHSM tokens moved into the data volume: carry over those a volume at the old path still holds.
+# The copy lands beside the target and is renamed into place, so a failed copy leaves nothing half done.
+if [ -n "$(ls -A /var/lib/softhsm/tokens 2>/dev/null)" ]; then
+    if [ -z "$(ls -A "$DATA_PATH"/softhsm/tokens 2>/dev/null)" ]; then
+        rm -rf "$DATA_PATH"/softhsm/tokens.moving
+        if cp -a /var/lib/softhsm/tokens "$DATA_PATH"/softhsm/tokens.moving \
+            && rmdir "$DATA_PATH"/softhsm/tokens \
+            && mv "$DATA_PATH"/softhsm/tokens.moving "$DATA_PATH"/softhsm/tokens; then
+            echo -e "${GREEN}🔐 SoftHSM tokens moved from /var/lib/softhsm/tokens into the data volume${NC}"
+            export HSM_TOKENS_MOVED=1
+        else
+            echo -e "${RED}❌ Could not move the SoftHSM tokens from /var/lib/softhsm/tokens into the data volume${NC}"
+            exit 1
+        fi
+    else
+        echo -e "${YELLOW}🔐 SoftHSM tokens are read from the data volume; the volume at /var/lib/softhsm/tokens is no longer used${NC}"
+    fi
+fi
 mkdir -p /var/log/ucm 2>/dev/null || true
 mkdir -p /etc/ucm 2>/dev/null || true
 chmod 755 "$DATA_PATH" 2>/dev/null || true
-chmod 700 "$DATA_PATH"/{ca,certs,private,backups} 2>/dev/null || true
+chmod 700 "$DATA_PATH"/{ca,certs,private,backups,softhsm} 2>/dev/null || true
 
 # Fix permissions to ensure UCM user can write
 echo -e "${BLUE}🔧 Checking file permissions...${NC}"
@@ -479,19 +498,23 @@ export ACME_ENABLED="${UCM_ACME_ENABLED}"
 # HSM / SoftHSM AUTO-INIT
 # =============================================================================
 if command -v softhsm2-util >/dev/null 2>&1; then
-    # Check if any token exists
-    TOKEN_COUNT=$(softhsm2-util --show-slots 2>/dev/null | grep -c "Label:" || true)
-    if [ "$TOKEN_COUNT" -eq 0 ] || [ "${HSM_AUTO_INIT:-true}" = "true" ] && ! softhsm2-util --show-slots 2>/dev/null | grep -q "UCM-Default"; then
+    if softhsm2-util --show-slots 2>/dev/null | grep -qE '^ *Label: +UCM-Default *$'; then
+        echo -e "${GREEN}🔐 SoftHSM tokens found${NC}"
+    elif [ "${HSM_AUTO_INIT:-true}" = "true" ]; then
         echo -e "${CYAN}🔐 Initializing SoftHSM default token...${NC}"
         HSM_PIN="${HSM_PIN:-$(openssl rand -hex 8)}"
         HSM_SO_PIN="${HSM_SO_PIN:-$(openssl rand -hex 8)}"
-        softhsm2-util --init-token --free --label "UCM-Default" \
-            --pin "$HSM_PIN" --so-pin "$HSM_SO_PIN" 2>/dev/null && \
-        echo -e "${GREEN}   ✅ SoftHSM token 'UCM-Default' initialized${NC}" || \
-        echo -e "${YELLOW}   ⚠️  SoftHSM token init skipped (may already exist)${NC}"
-        export HSM_DEFAULT_PIN="$HSM_PIN"
+        # The PIN is handed to the app only for a token that now exists.
+        if softhsm2-util --init-token --free --label "UCM-Default" \
+            --pin "$HSM_PIN" --so-pin "$HSM_SO_PIN" >/dev/null 2>&1; then
+            echo -e "${GREEN}   ✅ SoftHSM token 'UCM-Default' initialized${NC}"
+            export HSM_DEFAULT_PIN="$HSM_PIN"
+            export HSM_TOKEN_CREATED=1
+        else
+            echo -e "${YELLOW}   ⚠️  SoftHSM token init failed${NC}"
+        fi
     else
-        echo -e "${GREEN}🔐 SoftHSM tokens found${NC}"
+        echo -e "${YELLOW}🔐 No SoftHSM token 'UCM-Default' and HSM_AUTO_INIT is off${NC}"
     fi
 else
     echo -e "${YELLOW}⚠️  SoftHSM not available - HSM features disabled${NC}"

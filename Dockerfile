@@ -51,10 +51,9 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
 RUN useradd -r -u 1000 -s /bin/false -d /opt/ucm ucm && \
     usermod -aG softhsm ucm
 
-# Prepare SoftHSM token directory
-RUN mkdir -p /var/lib/softhsm/tokens && \
-    chown root:softhsm /var/lib/softhsm/tokens && \
-    chmod 1770 /var/lib/softhsm/tokens
+# SoftHSM tokens live in the data volume, so a recreated container keeps its keys
+RUN sed -i 's#^directories.tokendir.*#directories.tokendir = /opt/ucm/data/softhsm/tokens/#' /etc/softhsm/softhsm2.conf && \
+    grep -q '^directories.tokendir = /opt/ucm/data/softhsm/tokens/$' /etc/softhsm/softhsm2.conf
 
 # Copy virtual environment from builder
 COPY --from=builder /opt/ucm/venv /opt/ucm/venv
