@@ -7,7 +7,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [Unreleased]
+## [2.233] - 2026-09-23
 
 ### Added
 - The Active Directory Connector takes several domain controllers, one per row, and lookups fail over between them, so one DC being down no longer stops certificate enrollment. Naming each DC by its own hostname is also what makes `Verify SSL Certificate` usable on a multi-DC domain, where a domain controller certificate carries only its own host in the SAN (#363, by @stefanelul2000).
