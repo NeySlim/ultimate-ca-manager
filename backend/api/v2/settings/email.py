@@ -267,7 +267,7 @@ def smtp_oauth_callback():
     Renders a tiny HTML page (popup-friendly) instead of JSON so the
     provider redirect lands cleanly in the browser.
     """
-    from flask import session, make_response
+    from flask import session, make_response, Response
     from models.email_notification import SMTPConfig
     from services import smtp_oauth as oauth_helper
 
@@ -275,7 +275,7 @@ def smtp_oauth_callback():
     state = request.args.get('state')
     err = request.args.get('error')
 
-    def _html(title: str, message: str, ok: bool = True) -> 'flask.Response':
+    def _html(title: str, message: str, ok: bool = True) -> Response:
         body = f"""<!doctype html><html><head><meta charset=utf-8>
 <title>{title}</title><style>body{{font-family:system-ui,sans-serif;padding:2rem;text-align:center}}
 .ok{{color:#16a34a}}.err{{color:#dc2626}}</style></head>
