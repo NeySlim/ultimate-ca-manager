@@ -41,8 +41,10 @@ Library path (Debian 13 amd64):
 
 ## 2. Token directory (writable by `ucm`)
 
-Default `/var/lib/softhsm/tokens` is root:softhsm — the `ucm` service cannot write there
-under `ProtectSystem=strict`. Store tokens under `DATA_DIR` instead:
+Since 2.233 the DEB and RPM units open the default `/var/lib/softhsm/tokens` to the service
+(`ReadWritePaths=-/var/lib/softhsm/tokens`), and the packages put `ucm` in the `softhsm`
+(or `ods`) group, so the default directory works as is. If SoftHSM was installed after UCM, add the
+group by hand: `sudo usermod -aG softhsm ucm`, then restart the service. Tokens can still live under `DATA_DIR`:
 
 ```bash
 sudo mkdir -p /opt/ucm/data/softhsm/tokens

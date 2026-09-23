@@ -127,6 +127,119 @@ class TestAutoRegisterSofthsm:
             assert 'pin' not in cfg
 
 
+    @staticmethod
+    def _seed_row(config, status='connected', error_message=None):
+        from models import db
+
+        HsmProvider.query.filter_by(name='SoftHSM-Default').delete()
+        db.session.commit()
+        row = HsmProvider(name='SoftHSM-Default', type='pkcs11', config='{}', status=status,
+                          error_message=error_message)
+        row.set_config({'module_path': '/usr/lib/softhsm/libsofthsm2.so', **config})
+        db.session.add(row)
+        db.session.commit()
+        return row
+
+    @staticmethod
+    def _run(env):
+        from services.hsm.hsm_service import HsmService
+
+        with patch.dict(os.environ, env):
+            for name in ('HSM_DEFAULT_PIN', 'HSM_TOKEN_CREATED', 'HSM_TOKENS_MOVED'):
+                if name not in env:
+                    os.environ.pop(name, None)
+            HsmService.auto_register_softhsm()
+
+    @pytest.mark.parametrize('label', [{'token_label': 'UCM-Default'}, {}], ids=['label-set', 'label-absent'])
+    def test_a_new_token_takes_over_the_existing_row(self, app, caplog, label):
+        """The entrypoint only creates UCM-Default when it is missing: the stored PIN opened a token that is gone."""
+        with app.app_context():
+            from models import db
+
+            row = self._seed_row({**label, 'user_pin': 'stale-pin'}, status='error',
+                                 error_message='PKCS#11 connection failed')
+            self._run({'HSM_DEFAULT_PIN': 'fresh-pin', 'HSM_TOKEN_CREATED': '1'})
+
+            db.session.refresh(row)
+            cfg = row.get_config()
+            assert cfg['user_pin'] == 'fresh-pin'
+            assert cfg['previous_user_pin'] == 'stale-pin'
+            assert cfg['token_label'] == 'UCM-Default'
+            assert cfg['module_path'] == '/usr/lib/softhsm/libsofthsm2.so'
+            assert HsmProvider.query.filter_by(name='SoftHSM-Default').count() == 1
+            assert row.status == 'unknown'
+            assert row.error_message is None
+            assert 'created anew' in caplog.text
+            assert 'Repaired PKCS#11 config keys' not in caplog.text
+            assert 'stale-pin' not in row.config
+            assert row.to_dict(include_config=True)['config']['previous_user_pin'] == '********'
+
+    def test_a_second_takeover_keeps_the_oldest_pin(self, app):
+        """The token a moved volume brings back is the first one, not the one created in between."""
+        with app.app_context():
+            from models import db
+
+            row = self._seed_row({'token_label': 'UCM-Default', 'user_pin': 'second-pin',
+                                  'previous_user_pin': 'first-pin'})
+            self._run({'HSM_DEFAULT_PIN': 'third-pin', 'HSM_TOKEN_CREATED': '1'})
+
+            db.session.refresh(row)
+            assert row.get_config()['user_pin'] == 'third-pin'
+            assert row.get_config()['previous_user_pin'] == 'first-pin'
+
+    def test_editing_the_provider_keeps_the_previous_pin(self, app):
+        """The form sends only its own fields; the kept PIN is not one of them."""
+        with app.app_context():
+            from services.hsm.hsm_service import HsmService
+
+            row = self._seed_row({'token_label': 'UCM-Default', 'user_pin': 'fresh-pin',
+                                  'previous_user_pin': 'stale-pin'})
+            HsmService.update_provider(row.id, config={
+                'module_path': '/usr/lib/softhsm/libsofthsm2.so', 'token_label': 'UCM-Default', 'user_pin': '***'})
+
+            row = HsmProvider.query.filter_by(name='SoftHSM-Default').one()
+            assert row.get_config()['user_pin'] == 'fresh-pin'
+            assert row.get_config()['previous_user_pin'] == 'stale-pin'
+
+    def test_tokens_carried_over_get_their_old_pin_back(self, app, caplog):
+        """Started once without the old volume, then with it: the old token is back, so is its PIN."""
+        with app.app_context():
+            from models import db
+
+            row = self._seed_row({'token_label': 'UCM-Default', 'user_pin': 'fresh-pin',
+                                  'previous_user_pin': 'stale-pin'})
+            self._run({'HSM_TOKENS_MOVED': '1'})
+
+            db.session.refresh(row)
+            cfg = row.get_config()
+            assert cfg['user_pin'] == 'stale-pin'
+            assert 'previous_user_pin' not in cfg
+            assert row.status == 'unknown'
+            assert 'carried over' in caplog.text
+
+    @pytest.mark.parametrize('env, config', [
+        ({'HSM_DEFAULT_PIN': 'env-pin'}, {'token_label': 'UCM-Default'}),
+        ({'HSM_DEFAULT_PIN': 'env-pin', 'HSM_TOKEN_CREATED': '1'}, {'token_label': 'MyToken'}),
+        ({'HSM_TOKENS_MOVED': '1'}, {'token_label': 'UCM-Default'}),
+        ({'HSM_TOKENS_MOVED': '1'}, {'token_label': 'MyToken', 'previous_user_pin': 'other-pin'}),
+    ], ids=['pin-kept-in-ucm-env', 'row-aimed-at-another-token', 'moved-without-previous-pin',
+            'moved-row-aimed-at-another-token'])
+    def test_an_existing_row_is_left_alone(self, app, caplog, env, config):
+        """A native install keeps HSM_DEFAULT_PIN in ucm.env for good, and an admin may aim the row elsewhere."""
+        with app.app_context():
+            from models import db
+
+            row = self._seed_row({**config, 'user_pin': 'admin-pin'})
+            self._run(env)
+
+            db.session.refresh(row)
+            assert row.get_config()['user_pin'] == 'admin-pin'
+            assert row.get_config()['token_label'] == config['token_label']
+            assert row.status == 'connected'
+            assert 'created anew' not in caplog.text
+            assert 'carried over' not in caplog.text
+
+
 class TestMigration057:
     def test_sqlite_rewrites_legacy_config(self, tmp_path):
         import importlib.util

@@ -175,6 +175,10 @@ class HsmService:
             provider.name = name
         
         if config is not None:
+            # The form never carries the PIN kept when a new SoftHSM token took over.
+            previous_pin = provider.get_config().get('previous_user_pin')
+            if previous_pin and 'previous_user_pin' not in config:
+                config = {**config, 'previous_user_pin': previous_pin}
             # set_config encrypts sensitive fields and drops mask sentinels
             # ('***'/'********') so an operator updating non-secret fields
             # via the UI doesn't wipe stored credentials.
@@ -615,23 +619,54 @@ class HsmService:
           - SoftHSM library is available on disk
 
         Also repairs legacy config keys on an existing SoftHSM-Default row
-        (library_path/pin → module_path/user_pin).
+        (library_path/pin → module_path/user_pin). When the entrypoint has just
+        created UCM-Default (HSM_TOKEN_CREATED), a row aimed at it takes the new PIN
+        and keeps the old one; when it has carried tokens over from the old path
+        (HSM_TOKENS_MOVED), the row opens them with that old PIN again.
         """
         import os
 
         pin = os.environ.get('HSM_DEFAULT_PIN')
         existing = HsmProvider.query.filter_by(name='SoftHSM-Default').first()
         if existing:
-            if HsmService.repair_pkcs11_provider_config(existing):
+            config = existing.get_config()
+            aimed_at_default = config.get('token_label', 'UCM-Default') == 'UCM-Default'
+            takeover = bool(pin and os.environ.get('HSM_TOKEN_CREATED') == '1' and aimed_at_default)
+            restore = bool(
+                not takeover and os.environ.get('HSM_TOKENS_MOVED') == '1'
+                and aimed_at_default and config.get('previous_user_pin')
+            )
+            if takeover:
+                # The oldest PIN is kept: it opens the token a moved volume would bring back.
+                if config.get('user_pin') and config['user_pin'] != pin:
+                    config.setdefault('previous_user_pin', config['user_pin'])
+                config['user_pin'] = pin
+                config['token_label'] = 'UCM-Default'
+            elif restore:
+                config['user_pin'] = config.pop('previous_user_pin')
+            if takeover or restore:
+                existing.set_config(config)
+                existing.status = 'unknown'
+                existing.error_message = None
+            repaired = HsmService.repair_pkcs11_provider_config(existing)
+            if repaired or takeover or restore:
                 try:
                     db.session.commit()
-                    logger.info(
-                        "Repaired PKCS#11 config keys for SoftHSM-Default provider"
-                    )
                 except Exception as e:
                     db.session.rollback()
+                    logger.warning("Failed to update the SoftHSM-Default provider: %s", e)
+                    return
+                if repaired:
+                    logger.info("Repaired PKCS#11 config keys for SoftHSM-Default provider")
+                if takeover:
                     logger.warning(
-                        "Failed to repair SoftHSM-Default provider config: %s", e
+                        "SoftHSM token 'UCM-Default' was created anew: SoftHSM-Default now opens it, "
+                        "keys of the previous token are gone; its PIN is kept in case that token is restored"
+                    )
+                if restore:
+                    logger.warning(
+                        "SoftHSM tokens were carried over from /var/lib/softhsm/tokens: "
+                        "SoftHSM-Default opens them with the PIN it had before"
                     )
             return
 
