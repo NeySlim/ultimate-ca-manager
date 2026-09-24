@@ -345,11 +345,11 @@ def update_general_settings():
             return error_response(
                 'date_format must be one of: ' + ', '.join(DATE_FORMATS), 400)
 
-    # The password is never sent back, so the screen holds an empty field and
-    # every save of any section sends `backup_password: ''`. Storing that
-    # erased the password the administrator had just set; blank now means
-    # "keep current", and clearing it takes this explicit flag.
-    clear_backup_password = data.pop('clear_backup_password', False) is True
+    # The password is never sent back, so a blank one keeps the stored value;
+    # clearing it takes this explicit flag.
+    clear_backup_password = data.pop('clear_backup_password', False)
+    if not isinstance(clear_backup_password, bool):
+        return error_response('clear_backup_password must be a boolean', 400)
     if clear_backup_password:
         if data.get('backup_password'):
             return error_response(
@@ -398,7 +398,8 @@ def update_general_settings():
         action='settings_update',
         resource_type='settings',
         resource_name='General Settings',
-        details='Updated general settings',
+        details='Updated general settings'
+        + ('; backup password cleared' if clear_backup_password else ''),
         success=True
     )
 

@@ -90,3 +90,27 @@ def test_clear_flag_with_a_new_password_is_refused(app, auth_client):
 
     with app.app_context():
         assert _stored() == stored
+
+
+@pytest.mark.parametrize('flag', ['true', 1, None])
+def test_clear_flag_must_be_a_boolean(app, auth_client, flag):
+    assert _patch(auth_client, {'backup_password': PASSWORD}).status_code == 200
+    with app.app_context():
+        stored = _stored()
+
+    response = _patch(auth_client, {'clear_backup_password': flag})
+    assert response.status_code == 400, response.data
+
+    with app.app_context():
+        assert _stored() == stored
+
+
+def test_clearing_the_password_is_audited(app, auth_client):
+    from models import AuditLog
+    assert _patch(auth_client, {'backup_password': PASSWORD}).status_code == 200
+    assert _patch(auth_client, {'clear_backup_password': True}).status_code == 200
+
+    with app.app_context():
+        entry = (AuditLog.query.filter_by(action='settings_update')
+                 .order_by(AuditLog.id.desc()).first())
+        assert 'backup password cleared' in entry.details

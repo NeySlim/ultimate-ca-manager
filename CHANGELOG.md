@@ -10,11 +10,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Added
-- Settings › Security offers Encrypt remaining keys while private key encryption is enabled and some stored keys are still unencrypted. It encrypts only those keys and leaves the others as they are, where the only way before was to disable encryption and enable it again.
+- Settings › Security offers Encrypt remaining keys while private key encryption is enabled and some keys are still stored unencrypted, where the only way before was to disable encryption and enable it again (#367, by @stefanelul2000).
 
 ### Fixed
-- A certificate stored by the ACME client kept its private key unencrypted in the database while private key encryption was enabled, so every issuance and renewal added to the unencrypted count. The key is now encrypted like every other stored key. Keys stored before this fix are encrypted with Settings › Security › Encrypt remaining keys.
-- The automatic backup password was erased by the next save of any settings section, although saving it had reported success: the password is never sent back to the screen, so every later save sent it empty and the empty value was stored. A blank password now keeps the stored one, and Settings › Backup shows whether a password is set and offers to clear it. An API client clears it with `"clear_backup_password": true` on `PATCH /api/v2/settings/general`.
+- Certificates stored by the ACME client kept their private key unencrypted while private key encryption was enabled. The key is now encrypted like every other, and keys stored before are encrypted with Encrypt remaining keys (#367, by @stefanelul2000).
+- Saving any settings section erased the automatic backup password, which the screen never gets back and sent empty. A blank password now keeps the stored one, Settings › Backup shows whether one is set, and an API client clears it with `"clear_backup_password": true` (#367, by @stefanelul2000).
 
 ## [2.233] - 2026-09-23
 

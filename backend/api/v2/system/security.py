@@ -42,13 +42,15 @@ def get_encryption_status():
         encrypted = 0
         unencrypted = 0
 
-        for ca in CA.query.filter(CA.prv.isnot(None)).all():
+        # An empty column means no key, as in encrypt_all_keys
+        for ca in CA.query.filter(CA.prv.isnot(None), CA.prv != '').all():
             if key_encryption.is_encrypted(ca.prv):
                 encrypted += 1
             else:
                 unencrypted += 1
 
-        for cert in Certificate.query.filter(Certificate.prv.isnot(None)).all():
+        for cert in Certificate.query.filter(
+                Certificate.prv.isnot(None), Certificate.prv != '').all():
             if key_encryption.is_encrypted(cert.prv):
                 encrypted += 1
             else:

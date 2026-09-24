@@ -110,9 +110,7 @@ class ImportExportMixin:
             refid=__import__('uuid').uuid4().__str__(),
             descr=descr,
             crt=base64.b64encode(full_cert.encode() if isinstance(full_cert, str) else full_cert).decode('utf-8'),
-            # Encrypted like every other key write: this path stored the key
-            # in the clear, so each ACME-issued or renewed certificate showed
-            # up as unencrypted while private key encryption was enabled.
+            # Encrypted at rest like every other key write
             prv=store_pem_bytes(
                 key_pem.encode() if isinstance(key_pem, str) else key_pem
             ) if key_pem else None,
