@@ -327,6 +327,9 @@ MASTER_KEY_CONFIG_KEYS = (
     'acme.client.eab_hmac_key',
     'acme.proxy.eab_hmac_key',
     'acme.account.*.private_key',
+    # Pre-031 account keys: no reader left, but still encrypted on old installs
+    'acme.client.*.account_key',
+    'acme.proxy.account_key',
 )
 
 

@@ -105,3 +105,24 @@ describe('SecuritySection encrypting the remaining keys', () => {
     expect(screen.queryByText('settings.encryptRemainingKeys')).not.toBeInTheDocument()
   })
 })
+
+describe('SecuritySection disabling encryption', () => {
+  const status = {
+    enabled: true,
+    key_file_path: '/etc/ucm/master.key',
+    total_keys: 1,
+    encrypted_count: 1,
+    unencrypted_count: 0,
+    key_files_on_disk: 0,
+  }
+
+  it('is offered when the key comes from the key file', () => {
+    renderSection({ ...status, key_source: 'file' })
+    expect(screen.getByText('settings.disableEncryption')).toBeInTheDocument()
+  })
+
+  it('is not offered when the key comes from the environment', () => {
+    renderSection({ ...status, key_source: 'env' })
+    expect(screen.queryByText('settings.disableEncryption')).not.toBeInTheDocument()
+  })
+})

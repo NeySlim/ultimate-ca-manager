@@ -81,13 +81,16 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                         {t('settings.encryptRemainingKeys', { count: encryptionStatus.unencrypted_count })}
                       </Button>
                     )}
-                    <Button
-                      onClick={() => setShowDisableEncryptionModal(true)}
-                      variant="outline"
-                    >
-                      <Lock size={16} />
-                      {t('settings.disableEncryption')}
-                    </Button>
+                    {/* An environment key would come back after the file is removed */}
+                    {encryptionStatus.key_source === 'file' && (
+                      <Button
+                        onClick={() => setShowDisableEncryptionModal(true)}
+                        variant="outline"
+                      >
+                        <Lock size={16} />
+                        {t('settings.disableEncryption')}
+                      </Button>
+                    )}
                   </div>
                 )}
               </div>

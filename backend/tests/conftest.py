@@ -203,7 +203,7 @@ def _drop_unreadable_key_material(app):
             try:
                 decrypt_master_key_value(value, fmt)
             except Exception:
-                # prv may be NULL; the other columns are NOT NULL: '' is "none"
+                # '' is what the readers treat as no secret; prv keeps NULL
                 setattr(row, attribute, None if attribute == 'prv' else '')
                 changed = True
         if changed:

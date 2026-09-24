@@ -15,8 +15,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 - Certificates stored by the ACME client kept their private key unencrypted while private key encryption was enabled. The key is now encrypted like every other, and keys stored before are encrypted with Encrypt remaining keys (#367, by @stefanelul2000).
 - Disabling private key encryption decrypted only CA and certificate keys before removing the master key, which left SSH CA keys, deployment target keys, ACME account and EAB keys, SCEP challenges and LDAP bind passwords unreadable. Every secret under the master key is now decrypted first, with nothing changed if one fails, and the encryption status, Encrypt remaining keys and the startup check for a missing master key cover them all.
-- The ACME EAB HMAC keys stored in settings travelled in a backup as the source installation's ciphertext and came back under the database key, which their readers do not decrypt. They are now exported in the clear, protected by the archive, and restored under the master key.
-- Disabling private key encryption while the key comes from the `KEY_ENCRYPTION_KEY` environment variable decrypted the keys and reported success, then reloaded the key and left encryption on. It is now refused.
+- ACME EAB HMAC keys and ACME account keys stored in settings travelled in a backup as the source installation's ciphertext, which the target cannot read. They are now exported in the clear, protected by the archive, and restored under the master key.
+- Disabling private key encryption while the `KEY_ENCRYPTION_KEY` environment variable is set decrypted the keys and reported success, then reloaded the variable's key and left encryption on. It is now refused, and Settings › Security no longer offers it when the key comes from that variable.
 - Saving any settings section erased the automatic backup password, which the screen never gets back and sent empty. A blank password now keeps the stored one, Settings › Backup shows whether one is set, and an API client clears it with `"clear_backup_password": true` (#367, by @stefanelul2000).
 
 ## [2.233] - 2026-09-23

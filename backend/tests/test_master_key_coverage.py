@@ -42,13 +42,16 @@ def secrets(app, create_ca):
         provider = SSOProvider(name=f'ldap {tag}', provider_type='ldap')
         provider.ldap_bind_password = 'bind-secret'
         config = SystemConfig(key=f'acme.account.{tag}.private_key', value=PEM)
-        rows = [ssh, target, account, profile, provider, config]
+        # Written before migration 031 and never removed since
+        legacy = SystemConfig(key=f'acme.client.{tag}.account_key', value=PEM)
+        rows = [ssh, target, account, profile, provider, config, legacy]
         db.session.add_all(rows)
         db.session.commit()
         ids = [(type(row), row.id) for row in rows]
     yield {
         'ssh': ids[0], 'target': ids[1], 'account': ids[2],
         'profile': ids[3], 'provider': ids[4], 'config': ids[5],
+        'legacy': ids[6],
     }
     with app.app_context():
         for model, row_id in ids:
@@ -71,13 +74,14 @@ def _stored(secrets):
         # The database layer wraps it; the property takes that layer off
         'bind': get('provider').ldap_bind_password,
         'config': get('config').value,
+        'legacy': get('legacy').value,
     }
 
 
 PLAINTEXT = {
     'ssh': SSH_KEY, 'target': PEM, 'account_key': PEM,
     'eab_hmac': 'eab-hmac-secret', 'challenge': 'challenge-secret',
-    'bind': 'bind-secret', 'config': PEM,
+    'bind': 'bind-secret', 'config': PEM, 'legacy': PEM,
 }
 
 
@@ -114,6 +118,7 @@ def test_the_status_and_encrypt_all_count_every_secret(
         get('profile').challenge_password = encrypt_text('challenge-secret')
         get('provider').ldap_bind_password = encrypt_text('bind-secret')
         get('config').value = encrypt_text(PEM)
+        get('legacy').value = encrypt_text(PEM)
         db.session.commit()
 
     after = counts()
@@ -190,5 +195,25 @@ def test_disabling_is_refused_while_the_key_comes_from_the_environment(
     # The key would be reloaded from the environment: nothing to disable
     assert response.status_code == 409, response.data
     assert key_encryption.is_enabled
+    with app.app_context():
+        assert key_encryption.is_encrypted(db.session.get(*secrets['target']).private_key)
+
+
+def test_disabling_is_refused_while_the_environment_would_supply_a_key(
+        app, auth_client, secrets, only_these):
+    from security import encryption
+    from security.encryption import KeyEncryption, encrypt_text, key_encryption
+
+    # The key file wins over the variable; removing the file reloads the variable
+    KeyEncryption.write_key_file(Fernet.generate_key().decode())
+    key_encryption.reload()
+    assert key_encryption.key_source == 'file'
+    with app.app_context():
+        db.session.get(*secrets['target']).private_key = encrypt_text(PEM)
+        db.session.commit()
+
+    response = auth_client.post('/api/v2/system/security/disable-encryption')
+    assert response.status_code == 409, response.data
+    assert encryption.MASTER_KEY_PATH.exists()
     with app.app_context():
         assert key_encryption.is_encrypted(db.session.get(*secrets['target']).private_key)
