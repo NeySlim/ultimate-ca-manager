@@ -12,6 +12,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Added
 - Settings › Security offers Encrypt remaining keys while private key encryption is enabled and some stored keys are still unencrypted. It encrypts only those keys and leaves the others as they are, where the only way before was to disable encryption and enable it again.
 
+### Fixed
+- A certificate stored by the ACME client kept its private key unencrypted in the database while private key encryption was enabled, so every issuance and renewal added to the unencrypted count. The key is now encrypted like every other stored key. Keys stored before this fix are encrypted with Settings › Security › Encrypt remaining keys.
+
 ## [2.233] - 2026-09-23
 
 ### Added
