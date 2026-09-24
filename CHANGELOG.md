@@ -18,6 +18,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME EAB HMAC keys and ACME account keys stored in settings travelled in a backup as the source installation's ciphertext, which the target cannot read. They are now exported in the clear, protected by the archive, and restored under the master key.
 - Disabling private key encryption while the `KEY_ENCRYPTION_KEY` environment variable is set decrypted the keys and reported success, then reloaded the variable's key and left encryption on. It is now refused, and Settings › Security no longer offers it when the key comes from that variable.
 - Saving any settings section erased the automatic backup password, which the screen never gets back and sent empty. A blank password now keeps the stored one, Settings › Backup shows whether one is set, and an API client clears it with `"clear_backup_password": true` (#367, by @stefanelul2000).
+- Importing a template from Templates › Import lost its subject fields (C, ST, L, O, OU, CN) and its key usage and extended key usage: the dialog sent the export file to the create endpoint, which stored the file's JSON-string settings double-encoded. Import now goes through the import endpoint, which also accepts an Export all file and reports skipped templates, and create and update accept these settings as objects or JSON strings. Export and import also carry AD-derived subject, autoenrollment, the allowed AD group and pinned subject fields, which a round-trip used to drop.
 
 ## [2.233] - 2026-09-23
 

@@ -889,3 +889,163 @@ class TestTemplateLifecycle:
         restored = [t for t in templates if t['name'] == 'Roundtrip Tpl']
         assert len(restored) == 1
         assert restored[0]['validity_days'] == 500
+
+
+# ============================================================
+# Export/import round-trip fidelity
+# ============================================================
+
+class TestExportImportFidelity:
+    """Export -> import must preserve every portable template field, and
+    import must accept dn/extensions templates as objects or JSON strings."""
+
+    FULL = dict(
+        dn_template={'C': 'US', 'O': 'Round Trip Org', 'emailAddress': 'pki@example.com'},
+        ad_derived_subject=True,
+        autoenroll_enabled=True,
+        allowed_ad_group='CN=PKI Enrollers,DC=example,DC=com',
+        pinned_subject_fields={'O': 'Round Trip Org', 'C': 'US'},
+    )
+    FIELDS = ('description', 'template_type', 'key_type', 'validity_days', 'digest',
+              'dn_template', 'extensions_template', 'is_active', 'ad_derived_subject',
+              'autoenroll_enabled', 'allowed_ad_group', 'pinned_subject_fields')
+
+    def _by_name(self, auth_client, name):
+        r = auth_client.get('/api/v2/templates?per_page=1000')
+        return next(t for t in get_json(r)['data'] if t['name'] == name)
+
+    def _import(self, auth_client, payload, update_existing=False):
+        return auth_client.post('/api/v2/templates/import',
+                                data={'json_content': payload,
+                                      'update_existing': 'true' if update_existing else 'false'},
+                                content_type='multipart/form-data')
+
+    def test_export_includes_all_portable_fields(self, auth_client):
+        _, created = _create_template(auth_client, name='Fidelity Export', **self.FULL)
+        export = json.loads(auth_client.get(f"/api/v2/templates/{created['id']}/export").data)
+        assert export['ad_derived_subject'] is True
+        assert export['autoenroll_enabled'] is True
+        assert export['allowed_ad_group'] == self.FULL['allowed_ad_group']
+        assert export['pinned_subject_fields'] == self.FULL['pinned_subject_fields']
+
+    def test_single_roundtrip_preserves_fields(self, auth_client):
+        name = 'Fidelity Single'
+        _, created = _create_template(auth_client, name=name, **self.FULL)
+        before = self._by_name(auth_client, name)
+        exported = auth_client.get(f"/api/v2/templates/{created['id']}/export").data.decode()
+        auth_client.delete(f"/api/v2/templates/{created['id']}")
+
+        r = self._import(auth_client, exported)
+        assert r.status_code == 200
+        assert get_json(r)['data']['imported'] == 1
+        after = self._by_name(auth_client, name)
+        for field in self.FIELDS:
+            assert after[field] == before[field], f'{field} changed on round-trip'
+
+    def test_export_all_roundtrip_update_existing(self, auth_client):
+        name = 'Fidelity Bulk'
+        _create_template(auth_client, name=name, **self.FULL)
+        before = self._by_name(auth_client, name)
+        exported = json.loads(auth_client.get('/api/v2/templates/export').data)
+        mine = [t for t in exported if t['name'] == name]
+        assert len(mine) == 1
+
+        # Clobber the fields, then restore them from the export
+        auth_client.put(f"/api/v2/templates/{before['id']}",
+                        data=json.dumps({'ad_derived_subject': False, 'autoenroll_enabled': False,
+                                         'allowed_ad_group': '', 'pinned_subject_fields': {},
+                                         'dn_template': {}}),
+                        content_type='application/json')
+        r = self._import(auth_client, json.dumps(mine), update_existing=True)
+        assert r.status_code == 200
+        assert get_json(r)['data']['updated'] == 1
+        after = self._by_name(auth_client, name)
+        for field in self.FIELDS:
+            assert after[field] == before[field], f'{field} not restored by import'
+
+    def test_import_accepts_object_form_json_fields(self, auth_client):
+        tpl = {
+            'name': 'Fidelity Object Form',
+            'template_type': 'web_server',
+            'dn_template': {'O': 'Obj Org', 'emailAddress': 'obj@example.com'},
+            'extensions_template': {'key_usage': ['digitalSignature'],
+                                    'extended_key_usage': ['serverAuth']},
+        }
+        r = self._import(auth_client, json.dumps(tpl))
+        assert r.status_code == 200
+        assert get_json(r)['data']['imported'] == 1
+        after = self._by_name(auth_client, tpl['name'])
+        assert after['dn_template'] == tpl['dn_template']
+        assert after['extensions_template'] == tpl['extensions_template']
+
+    def test_import_strips_ca_key_usages_from_string_extensions(self, auth_client):
+        tpl = {
+            'name': 'Fidelity String KU',
+            'template_type': 'custom',
+            'extensions_template': json.dumps({'key_usage': ['digitalSignature', 'keyCertSign']}),
+        }
+        r = self._import(auth_client, json.dumps(tpl))
+        assert r.status_code == 200
+        after = self._by_name(auth_client, tpl['name'])
+        assert after['extensions_template']['key_usage'] == ['digitalSignature']
+
+    def test_import_skips_invalid_json_string_field(self, auth_client):
+        tpl = {'name': 'Fidelity Bad JSON', 'template_type': 'custom',
+               'dn_template': '{not json'}
+        r = self._import(auth_client, json.dumps(tpl))
+        assert r.status_code == 200
+        data = get_json(r)['data']
+        assert data['imported'] == 0 and data['skipped'] == 1
+
+    def test_import_rejects_invalid_pinned_field(self, auth_client):
+        tpl = {'name': 'Fidelity Bad Pin', 'template_type': 'custom',
+               'pinned_subject_fields': {'CN': 'nope'}}
+        r = self._import(auth_client, json.dumps(tpl))
+        assert r.status_code == 200
+        assert get_json(r)['data']['skipped'] == 1
+
+    # Shape of a real export file: dn/extensions templates as JSON strings
+    EXPORT_SHAPED = {
+        'description': 'Standard HTTPS/TLS web server certificate',
+        'template_type': 'web_server',
+        'key_type': 'RSA-4096',
+        'validity_days': 397,
+        'digest': 'sha256',
+        'dn_template': json.dumps({'C': 'US', 'ST': 'California', 'L': 'Marina',
+                                   'O': 'Example Org', 'OU': 'PKI', 'CN': '{hostname}'}),
+        'extensions_template': json.dumps({'key_usage': ['digitalSignature', 'keyEncipherment'],
+                                           'extended_key_usage': ['serverAuth'],
+                                           'basic_constraints': {'ca': False},
+                                           'san_types': ['dns', 'ip']}),
+        'is_system': False,
+        'is_active': True,
+    }
+
+    def _assert_not_double_encoded(self, tpl):
+        assert tpl['dn_template'] == json.loads(self.EXPORT_SHAPED['dn_template'])
+        assert tpl['extensions_template'] == json.loads(self.EXPORT_SHAPED['extensions_template'])
+
+    def test_create_accepts_export_shaped_payload(self, auth_client):
+        payload = {**self.EXPORT_SHAPED, 'name': 'Fidelity Create Export Shape'}
+        r = auth_client.post('/api/v2/templates', data=json.dumps(payload),
+                             content_type='application/json')
+        assert r.status_code == 201
+        self._assert_not_double_encoded(self._by_name(auth_client, payload['name']))
+
+    def test_update_accepts_string_dn_template(self, auth_client):
+        _, created = _create_template(auth_client, name='Fidelity Update String DN')
+        r = auth_client.put(f"/api/v2/templates/{created['id']}",
+                            data=json.dumps({'dn_template': self.EXPORT_SHAPED['dn_template']}),
+                            content_type='application/json')
+        assert r.status_code == 200
+        after = self._by_name(auth_client, 'Fidelity Update String DN')
+        assert after['dn_template'] == json.loads(self.EXPORT_SHAPED['dn_template'])
+
+    def test_import_export_shaped_file_upload(self, auth_client):
+        payload = {**self.EXPORT_SHAPED, 'name': 'Fidelity File Upload'}
+        r = auth_client.post('/api/v2/templates/import',
+                             data={'file': (io.BytesIO(json.dumps(payload).encode()), 'tpl.json')},
+                             content_type='multipart/form-data')
+        assert r.status_code == 200
+        assert get_json(r)['data']['imported'] == 1
+        self._assert_not_double_encoded(self._by_name(auth_client, payload['name']))
