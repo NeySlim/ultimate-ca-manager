@@ -27,6 +27,12 @@ def secrets(app, create_ca):
     ca_refid = create_ca()['refid']
     tag = uuid.uuid4().hex[:8]
     with app.app_context():
+        # A fixed key: set aside what the shared database holds under it
+        existing = SystemConfig.query.filter_by(key='acme.proxy.account_key').first()
+        kept = None if existing is None else existing.value
+        if existing is not None:
+            db.session.delete(existing)
+            db.session.commit()
         ssh = SSHCertificateAuthority(
             descr=f'ssh {tag}', ca_type='user', public_key='ssh-ed25519 AAAA',
             private_key=SSH_KEY, key_type='ed25519', fingerprint=f'SHA256:{tag}')
@@ -44,14 +50,15 @@ def secrets(app, create_ca):
         config = SystemConfig(key=f'acme.account.{tag}.private_key', value=PEM)
         # Written before migration 031 and never removed since
         legacy = SystemConfig(key=f'acme.client.{tag}.account_key', value=PEM)
-        rows = [ssh, target, account, profile, provider, config, legacy]
+        proxy = SystemConfig(key='acme.proxy.account_key', value=PEM)
+        rows = [ssh, target, account, profile, provider, config, legacy, proxy]
         db.session.add_all(rows)
         db.session.commit()
         ids = [(type(row), row.id) for row in rows]
     yield {
         'ssh': ids[0], 'target': ids[1], 'account': ids[2],
         'profile': ids[3], 'provider': ids[4], 'config': ids[5],
-        'legacy': ids[6],
+        'legacy': ids[6], 'proxy': ids[7],
     }
     with app.app_context():
         for model, row_id in ids:
@@ -59,6 +66,9 @@ def secrets(app, create_ca):
             if row is not None:
                 db.session.delete(row)
         db.session.commit()
+        if kept is not None:
+            db.session.add(SystemConfig(key='acme.proxy.account_key', value=kept))
+            db.session.commit()
 
 
 def _stored(secrets):
@@ -75,13 +85,14 @@ def _stored(secrets):
         'bind': get('provider').ldap_bind_password,
         'config': get('config').value,
         'legacy': get('legacy').value,
+        'proxy': get('proxy').value,
     }
 
 
 PLAINTEXT = {
     'ssh': SSH_KEY, 'target': PEM, 'account_key': PEM,
     'eab_hmac': 'eab-hmac-secret', 'challenge': 'challenge-secret',
-    'bind': 'bind-secret', 'config': PEM, 'legacy': PEM,
+    'bind': 'bind-secret', 'config': PEM, 'legacy': PEM, 'proxy': PEM,
 }
 
 
@@ -119,6 +130,7 @@ def test_the_status_and_encrypt_all_count_every_secret(
         get('provider').ldap_bind_password = encrypt_text('bind-secret')
         get('config').value = encrypt_text(PEM)
         get('legacy').value = encrypt_text(PEM)
+        get('proxy').value = encrypt_text(PEM)
         db.session.commit()
 
     after = counts()
