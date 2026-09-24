@@ -9,7 +9,7 @@ export default function BackupSection({
   selectedBackups = [], toggleSelectBackup, toggleSelectAllBackups,
   handleBulkDeleteBackups, handleRunRetention, backupBusy,
   setShowBackupModal, setShowRestoreModal, setRestoreFile,
-  handleDownloadBackup, handleDeleteBackup,
+  handleDownloadBackup, handleDeleteBackup, handleClearBackupPassword,
 }) {
   const { t } = useTranslation()
   const isAdmin = hasPermission('admin:system')
@@ -69,10 +69,26 @@ export default function BackupSection({
                 value={settings.backup_password || ''}
                 onChange={(e) => updateSetting('backup_password', e.target.value)}
                 placeholder={t('settings.min12Characters')}
-                helperText={t('settings.autoBackupPasswordHelper')}
+                helperText={settings.backup_password_set
+                  ? t('settings.backupPasswordKeepHelper')
+                  : t('settings.autoBackupPasswordHelper')}
                 showStrength
                 disabled={!canAdminSettings}
               />
+              {/* Status only: the stored password is never sent to the browser */}
+              <div className="flex items-center gap-2">
+                <Badge variant={settings.backup_password_set ? 'success' : 'warning'}>
+                  {settings.backup_password_set
+                    ? t('settings.backupPasswordSet')
+                    : t('settings.backupPasswordNotSet')}
+                </Badge>
+                {settings.backup_password_set && canAdminSettings && handleClearBackupPassword && (
+                  <Button type="button" variant="danger-soft" size="sm" onClick={handleClearBackupPassword} disabled={saving}>
+                    <Trash size={14} />
+                    {t('settings.clearBackupPassword')}
+                  </Button>
+                )}
+              </div>
             </>
           )}
 

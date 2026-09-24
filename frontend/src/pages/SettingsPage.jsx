@@ -458,6 +458,25 @@ export default function SettingsPage() {
     }
   }
 
+  const handleClearBackupPassword = async () => {
+    const confirmed = await showConfirm(t('settings.clearBackupPasswordConfirm'), {
+      title: t('settings.clearBackupPassword'),
+      confirmText: t('settings.clearBackupPassword'),
+      variant: 'danger',
+    })
+    if (!confirmed) return
+    setSaving(true)
+    try {
+      await settingsService.updateBulk({ clear_backup_password: true })
+      showSuccess(t('settings.backupPasswordCleared'))
+      await loadSettings()
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.settings'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const loadHttpsInfo = async () => {
     try {
       const data = await systemService.getHttpsCertInfo()
@@ -1552,6 +1571,7 @@ export default function SettingsPage() {
             setRestoreFile={setRestoreFile}
             handleDownloadBackup={handleDownloadBackup}
             handleDeleteBackup={handleDeleteBackup}
+            handleClearBackupPassword={handleClearBackupPassword}
           />
         )
       case 'audit':

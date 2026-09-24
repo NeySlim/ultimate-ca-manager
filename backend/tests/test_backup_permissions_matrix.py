@@ -390,8 +390,11 @@ class TestBackupSettingsAreAdminOnlyEverywhere:
 
         response = auth_client.get('/api/v2/settings/general')
         assert response.status_code == 200, response.data
+        # Status the screen reads but nobody writes: the flag that a password
+        # is stored, since the password itself is never returned
+        read_only = {'backup_password_set'}
         exposed = {key for key in response.get_json()['data']
-                   if 'backup' in key}
+                   if 'backup' in key} - read_only
 
         assert exposed == set(BACKUP_SETTINGS), (
             'General settings exposes backup settings this matrix does not '
@@ -399,6 +402,8 @@ class TestBackupSettingsAreAdminOnlyEverywhere:
         for key in BACKUP_SETTINGS:
             assert key in _ADMIN_ONLY_SETTINGS, \
                 f'{key} can be written with write:settings alone'
+        # Clearing the password stops every scheduled backup just as surely
+        assert 'clear_backup_password' in _ADMIN_ONLY_SETTINGS
 
     @pytest.mark.parametrize('key', sorted(BACKUP_SETTINGS))
     @pytest.mark.parametrize('role', ('operator', 'viewer'))
