@@ -7,6 +7,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Added
+- Settings › Security offers Encrypt remaining keys while private key encryption is enabled and some stored keys are still unencrypted. It encrypts only those keys and leaves the others as they are, where the only way before was to disable encryption and enable it again.
+
 ## [2.233] - 2026-09-23
 
 ### Added

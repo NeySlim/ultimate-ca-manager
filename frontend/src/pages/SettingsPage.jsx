@@ -900,6 +900,30 @@ export default function SettingsPage() {
     }
   }
 
+  const handleEncryptRemainingKeys = async () => {
+    const count = encryptionStatus?.unencrypted_count ?? 0
+    const confirmed = await showConfirm(t('settings.encryptRemainingKeysConfirm', { count }), {
+      title: t('settings.encryptRemainingKeys', { count }),
+      confirmText: t('settings.encryptRemainingKeys', { count }),
+    })
+    if (!confirmed) return
+    setEncryptionLoading(true)
+    try {
+      const res = await settingsService.encryptAllKeys()
+      const data = res.data || res
+      if (data.errors?.length) {
+        showWarning(data.errors.join('\n'))
+      } else {
+        showSuccess(t('settings.encryptRemainingKeysDone', { count: data.encrypted ?? 0 }))
+      }
+      await loadEncryptionStatus()
+    } catch (error) {
+      showError(error.message || t('common.error'))
+    } finally {
+      setEncryptionLoading(false)
+    }
+  }
+
   // Anomaly detection
   const loadAnomalies = async () => {
     setAnomaliesLoading(true)
@@ -1478,6 +1502,8 @@ export default function SettingsPage() {
             setShowEnableEncryptionModal={setShowEnableEncryptionModal}
             setShowDisableEncryptionModal={setShowDisableEncryptionModal}
             handleDownloadExistingMasterKey={handleDownloadExistingMasterKey}
+            handleEncryptRemainingKeys={handleEncryptRemainingKeys}
+            encryptionLoading={encryptionLoading}
             anomalies={anomalies}
             anomaliesLoading={anomaliesLoading}
             loadAnomalies={loadAnomalies}
