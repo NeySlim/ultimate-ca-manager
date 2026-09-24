@@ -181,8 +181,11 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
       if (dn.C) updates.country = dn.C
       if (dn.ST) updates.state = dn.ST
       if (dn.L) updates.locality = dn.L
+      // Skip placeholder values like "{email}" used by built-in templates
+      const templateEmail = dn.emailAddress && !/[{}]/.test(dn.emailAddress) ? dn.emailAddress.trim() : ''
+      if (templateEmail) updates.email = templateEmail
       // Show subject section if template has DN fields
-      if (dn.O || dn.OU || dn.C || dn.ST || dn.L) setShowSubject(true)
+      if (dn.O || dn.OU || dn.C || dn.ST || dn.L || templateEmail) setShowSubject(true)
     }
 
     setFormData(prev => ({ ...prev, ...updates }))
