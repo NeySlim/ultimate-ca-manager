@@ -180,7 +180,7 @@ def _reset_acme_proxy_caches():
 def _drop_unreadable_key_material(app):
     """Forget key material that was written under a now-discarded key.
 
-    The test database is shared by the whole session, so a CA or certificate
+    The test database is shared by the whole session, so a key or secret
     written while `encryption_enabled` held an ephemeral key stays there after
     the key is gone — and its key material can no longer be read by anything.
     Since the backup service refuses to export a key it cannot decrypt, one
@@ -189,18 +189,23 @@ def _drop_unreadable_key_material(app):
     the column is cleared rather than the row deleted, which would take its
     certificates and approvals with it.
     """
-    from models import db, CA, Certificate
-    from security.encryption import decrypt_private_key
+    from models import db
+    from security.encryption import (
+        decrypt_master_key_value, key_encryption, master_key_values,
+    )
 
     with app.app_context():
         changed = False
-        for model in (CA, Certificate):
-            for row in model.query.filter(model.prv.isnot(None)).all():
-                try:
-                    decrypt_private_key(row.prv)
-                except Exception:
-                    row.prv = None
-                    changed = True
+        for _, row, attribute, fmt in list(master_key_values()):
+            value = getattr(row, attribute)
+            if not key_encryption.is_encrypted(value):
+                continue
+            try:
+                decrypt_master_key_value(value, fmt)
+            except Exception:
+                # prv may be NULL; the other columns are NOT NULL: '' is "none"
+                setattr(row, attribute, None if attribute == 'prv' else '')
+                changed = True
         if changed:
             db.session.commit()
 

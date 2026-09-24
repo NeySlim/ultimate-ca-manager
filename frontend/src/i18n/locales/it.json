@@ -2508,7 +2508,7 @@
     "backupMasterKey": "Backup chiave principale",
     "masterKeyBackupTitle": "Esegui il backup della tua chiave principale",
     "masterKeyBackupCritical": "Critico: esegui ORA il backup di questa chiave",
-    "masterKeyBackupDesc": "Senza questo file, tutte le chiavi private cifrate (CA, certificati, account ACME, CA SSH, segreti webhook) diventano irrecuperabili. Perderlo significa perdere la tua PKI.",
+    "masterKeyBackupDesc": "Senza questo file, tutte le chiavi private e i segreti cifrati (CA, certificati, CA SSH, account ACME, destinazioni di distribuzione, password di challenge SCEP, password Bind LDAP) diventano irrecuperabili. Perderlo significa perdere la tua PKI.",
     "masterKeyBackupInstructions": "Scarica la chiave principale e conservala in almeno due luoghi sicuri, come:",
     "masterKeyBackupTip1": "Un gestore di password (1Password, Bitwarden, KeePass)",
     "masterKeyBackupTip2": "Una chiavetta USB cifrata offline conservata in cassaforte",

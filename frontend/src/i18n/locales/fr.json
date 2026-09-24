@@ -2603,7 +2603,7 @@
     "backupMasterKey": "Sauvegarder la clé maître",
     "masterKeyBackupTitle": "Sauvegardez votre clé maître",
     "masterKeyBackupCritical": "Critique : sauvegardez cette clé MAINTENANT",
-    "masterKeyBackupDesc": "Sans ce fichier, toutes les clés privées chiffrées (AC, certificats, comptes ACME, AC SSH, secrets de webhook) deviennent irrécupérables. La perdre signifie perdre votre PKI.",
+    "masterKeyBackupDesc": "Sans ce fichier, toutes les clés privées et tous les secrets chiffrés (AC, certificats, AC SSH, comptes ACME, cibles de déploiement, challenges SCEP, mots de passe Bind LDAP) deviennent irrécupérables. Le perdre signifie perdre votre PKI.",
     "masterKeyBackupInstructions": "Téléchargez la clé maître et conservez-la dans au moins deux endroits sûrs, par exemple :",
     "masterKeyBackupTip1": "Un gestionnaire de mots de passe (1Password, Bitwarden, KeePass)",
     "masterKeyBackupTip2": "Une clé USB chiffrée hors ligne conservée dans un coffre",

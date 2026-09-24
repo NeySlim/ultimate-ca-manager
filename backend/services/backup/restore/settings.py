@@ -16,6 +16,8 @@ logger = logging.getLogger(__name__)
 def restore_encrypted_settings(configuration: Dict[str, Any],
                                keys: Iterable[str]) -> int:
     """Re-encrypt the settings the archive marked as secret. Returns a count."""
+    from fnmatch import fnmatchcase
+    from security.encryption import MASTER_KEY_CONFIG_KEYS, encrypt_text
     from utils.encryption import encrypt_if_needed
 
     settings = configuration.get('settings') or {}
@@ -30,7 +32,11 @@ def restore_encrypted_settings(configuration: Dict[str, Any],
         if row is None:
             row = SystemConfig(key=key)
             db.session.add(row)
-        row.value = encrypt_if_needed(str(value))
+        # Written back under the layer its readers decrypt
+        if any(fnmatchcase(key, pattern) for pattern in MASTER_KEY_CONFIG_KEYS):
+            row.value = encrypt_text(str(value))
+        else:
+            row.value = encrypt_if_needed(str(value))
         row.encrypted = True
         restored += 1
 

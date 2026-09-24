@@ -240,6 +240,14 @@ def disable_encryption():
         if not key_encryption.is_enabled:
             return error_response("Encryption is not enabled", 400)
 
+        # The key would be reloaded from the environment after decrypting
+        if key_encryption.key_source == 'env':
+            return error_response(
+                "The encryption key comes from the KEY_ENCRYPTION_KEY "
+                "environment variable, so encryption cannot be disabled "
+                "from here.", 409
+            )
+
         # Decrypt all keys first (while we still have the key)
         decrypted, skipped, errors = do_decrypt(dry_run=False)
 

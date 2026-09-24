@@ -64,7 +64,9 @@ class ExportCoreMixin:
             # it: the first was skipped outright, the second travelled as
             # ciphertext bound to a database key the target does not have.
             from utils.encryption import is_encrypted
-            if sc.encrypted or (isinstance(val, str) and is_encrypted(val)):
+            from security.encryption import key_encryption
+            if sc.encrypted or (isinstance(val, str) and (
+                    is_encrypted(val) or key_encryption.is_string_encrypted(val))):
                 val = decrypt_stored_secret(val, label=f"setting {sc.key}")
                 encrypted_keys.append(sc.key)
             if isinstance(val, bytes):

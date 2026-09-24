@@ -2508,7 +2508,7 @@
     "backupMasterKey": "Backup da chave mestra",
     "masterKeyBackupTitle": "Faça backup da sua chave mestra",
     "masterKeyBackupCritical": "Crítico: faça backup desta chave AGORA",
-    "masterKeyBackupDesc": "Sem este arquivo, todas as chaves privadas criptografadas (ACs, certificados, contas ACME, AC SSH, segredos de webhook) se tornam irrecuperáveis. Perdê-lo significa perder sua PKI.",
+    "masterKeyBackupDesc": "Sem este arquivo, todas as chaves privadas e segredos criptografados (ACs, certificados, ACs SSH, contas ACME, alvos de implantação, desafios SCEP, senhas de bind LDAP) se tornam irrecuperáveis. Perdê-lo significa perder sua PKI.",
     "masterKeyBackupInstructions": "Baixe a chave mestra e armazene-a em pelo menos dois locais seguros, como:",
     "masterKeyBackupTip1": "Um gerenciador de senhas (1Password, Bitwarden, KeePass)",
     "masterKeyBackupTip2": "Uma unidade USB criptografada offline guardada em um cofre",

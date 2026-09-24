@@ -887,7 +887,7 @@ def create_app(config_name=None):
                 app.config['SAFE_MODE'] = False
     except Exception as e:
         app.config['SAFE_MODE'] = False
-        app.logger.debug(f"Safe mode check skipped: {e}")
+        app.logger.warning(f"Safe mode check skipped: {e}")
     
     # HSM availability check at startup
     try:

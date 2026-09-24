@@ -2508,7 +2508,7 @@
     "backupMasterKey": "マスターキーをバックアップ",
     "masterKeyBackupTitle": "マスターキーをバックアップしてください",
     "masterKeyBackupCritical": "重要: 今すぐこのキーをバックアップしてください",
-    "masterKeyBackupDesc": "このファイルがないと、暗号化されたすべての秘密鍵 (CA、証明書、ACMEアカウント、SSH CA、Webhook シークレット) は復元不可能になります。失うことは PKI を失うことを意味します。",
+    "masterKeyBackupDesc": "このファイルがないと、暗号化されたすべての秘密鍵とシークレット (CA、証明書、SSH CA、ACMEアカウント、デプロイターゲット、SCEPチャレンジ、LDAPバインドパスワード) は復元不可能になります。失うことは PKI を失うことを意味します。",
     "masterKeyBackupInstructions": "マスターキーをダウンロードし、少なくとも2か所の安全な場所に保管してください。例:",
     "masterKeyBackupTip1": "パスワードマネージャー (1Password、Bitwarden、KeePass)",
     "masterKeyBackupTip2": "金庫に保管されたオフラインの暗号化 USB ドライブ",

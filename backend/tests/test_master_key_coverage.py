@@ -175,3 +175,20 @@ def test_decrypting_is_all_or_nothing(app, secrets, only_these):
         db.session.expire_all()
         # The key is kept when anything fails, so nothing may be left decrypted
         assert key_encryption.is_encrypted(db.session.get(*secrets['target']).private_key)
+
+
+def test_disabling_is_refused_while_the_key_comes_from_the_environment(
+        app, auth_client, secrets, only_these):
+    from security.encryption import encrypt_text, key_encryption
+
+    assert key_encryption.key_source == 'env'
+    with app.app_context():
+        db.session.get(*secrets['target']).private_key = encrypt_text(PEM)
+        db.session.commit()
+
+    response = auth_client.post('/api/v2/system/security/disable-encryption')
+    # The key would be reloaded from the environment: nothing to disable
+    assert response.status_code == 409, response.data
+    assert key_encryption.is_enabled
+    with app.app_context():
+        assert key_encryption.is_encrypted(db.session.get(*secrets['target']).private_key)
