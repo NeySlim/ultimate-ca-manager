@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 - Settings › Security offers Encrypt remaining keys while private key encryption is enabled and some keys are still stored unencrypted, where the only way from the screen before was to disable encryption and enable it again (#367, by @stefanelul2000).
+- Certificate templates take an Email under Subject Template, stored as the subject `emailAddress`. Choosing the template in Issue Certificate fills in the subject Email, so an address that goes on every certificate no longer has to be typed each time; placeholders such as `{email}` in the built-in templates are left out.
 
 ### Fixed
 - Certificates stored by the ACME client kept their private key unencrypted while private key encryption was enabled. The key is now encrypted like every other, and keys stored before are encrypted with Encrypt remaining keys (#367, by @stefanelul2000).
