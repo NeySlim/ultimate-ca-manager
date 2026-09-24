@@ -1,5 +1,5 @@
 """An empty private key column means "no key": it is neither counted as an
-unencrypted key nor reported as encrypted by encrypt-all-keys."""
+unencrypted key nor handled by encrypt-all-keys or decrypt-all-keys."""
 import uuid
 
 from models import db, Certificate
@@ -19,8 +19,15 @@ def _dry_run(client):
     return response.get_json()['data']
 
 
+def _decrypt_dry_run(app):
+    from security.encryption import decrypt_all_keys
+    with app.app_context():
+        return decrypt_all_keys(dry_run=True)[:2]
+
+
 def test_an_empty_key_is_not_counted(app, auth_client, encryption_enabled):
     before_status, before_run = _status(auth_client), _dry_run(auth_client)
+    before_decrypt = _decrypt_dry_run(app)
     with app.app_context():
         row = Certificate(refid=str(uuid.uuid4()), descr='empty key', crt='', prv='')
         db.session.add(row)
@@ -32,6 +39,7 @@ def test_an_empty_key_is_not_counted(app, auth_client, encryption_enabled):
         assert status['total_keys'] == before_status['total_keys']
         assert run['encrypted'] == before_run['encrypted']
         assert run['skipped'] == before_run['skipped']
+        assert _decrypt_dry_run(app) == before_decrypt
     finally:
         with app.app_context():
             db.session.delete(db.session.get(Certificate, row_id))

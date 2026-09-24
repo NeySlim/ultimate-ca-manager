@@ -323,7 +323,7 @@ def decrypt_all_keys(dry_run: bool = True) -> tuple:
     skipped = 0
     errors = []
     
-    for ca in CA.query.filter(CA.prv.isnot(None)).all():
+    for ca in CA.query.filter(CA.prv.isnot(None), CA.prv != '').all():
         try:
             if key_encryption.is_encrypted(ca.prv):
                 if not dry_run:
@@ -334,7 +334,8 @@ def decrypt_all_keys(dry_run: bool = True) -> tuple:
         except Exception as e:
             errors.append(f"CA {ca.refid}: {e}")
     
-    for cert in Certificate.query.filter(Certificate.prv.isnot(None)).all():
+    for cert in Certificate.query.filter(
+            Certificate.prv.isnot(None), Certificate.prv != '').all():
         try:
             if key_encryption.is_encrypted(cert.prv):
                 if not dry_run:
