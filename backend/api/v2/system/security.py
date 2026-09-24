@@ -37,24 +37,11 @@ logger = logging.getLogger(__name__)
 def get_encryption_status():
     """Get private key encryption status"""
     try:
-        from security.encryption import key_encryption, MASTER_KEY_PATH
+        from security.encryption import (
+            key_encryption, MASTER_KEY_PATH, count_master_key_values,
+        )
 
-        encrypted = 0
-        unencrypted = 0
-
-        # An empty column means no key, as in encrypt_all_keys
-        for ca in CA.query.filter(CA.prv.isnot(None), CA.prv != '').all():
-            if key_encryption.is_encrypted(ca.prv):
-                encrypted += 1
-            else:
-                unencrypted += 1
-
-        for cert in Certificate.query.filter(
-                Certificate.prv.isnot(None), Certificate.prv != '').all():
-            if key_encryption.is_encrypted(cert.prv):
-                encrypted += 1
-            else:
-                unencrypted += 1
+        encrypted, unencrypted = count_master_key_values()
 
         return success_response(data={
             'enabled': key_encryption.is_enabled,

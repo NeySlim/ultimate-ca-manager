@@ -309,106 +309,159 @@ def decrypt_text(data: str) -> str:
     return key_encryption.decrypt_string(data)
 
 
+# Every value stored under the master key: (module, model, attribute, format).
+# 'b64' holds base64 key material (encrypt_private_key), 'text' anything else
+# (encrypt_text). SSOProvider's property takes off its database-layer wrapping.
+MASTER_KEY_COLUMNS = (
+    ('models.ca', 'CA', 'prv', 'b64'),
+    ('models.certificate', 'Certificate', 'prv', 'b64'),
+    ('models.ssh', 'SSHCertificateAuthority', 'private_key', 'b64'),
+    ('models.deploy', 'DeployTarget', 'private_key', 'text'),
+    ('models.acme_client_account', 'AcmeClientAccount', 'account_key', 'text'),
+    ('models.acme_client_account', 'AcmeClientAccount', '_eab_hmac_key', 'text'),
+    ('models.scep', 'ScepProfile', 'challenge_password', 'text'),
+    ('models.sso', 'SSOProvider', 'ldap_bind_password', 'text'),
+)
+# SystemConfig values stored under the master key, as fnmatch patterns
+MASTER_KEY_CONFIG_KEYS = (
+    'acme.client.eab_hmac_key',
+    'acme.proxy.eab_hmac_key',
+    'acme.account.*.private_key',
+)
+
+
+def master_key_values():
+    """Yield (label, row, attribute, format) for every non-empty value stored
+    under the master key. An empty column means no secret."""
+    import importlib
+    from fnmatch import fnmatchcase
+    from sqlalchemy.orm.attributes import InstrumentedAttribute
+    from models import SystemConfig
+
+    for module, name, attribute, fmt in MASTER_KEY_COLUMNS:
+        model = getattr(importlib.import_module(module), name)
+        query = model.query
+        column = getattr(model, attribute)
+        if isinstance(column, InstrumentedAttribute):
+            query = query.filter(column.isnot(None), column != '')
+        for row in query.all():
+            if getattr(row, attribute):
+                label = getattr(row, 'refid', None) or row.id
+                yield f"{name} {label}", row, attribute, fmt
+
+    for row in SystemConfig.query.filter(SystemConfig.key.like('acme.%')).all():
+        if row.value and any(fnmatchcase(row.key, pattern)
+                             for pattern in MASTER_KEY_CONFIG_KEYS):
+            yield f"SystemConfig {row.key}", row, 'value', 'text'
+
+
+def encrypt_master_key_value(value: str, fmt: str) -> str:
+    """Encrypt one value of MASTER_KEY_COLUMNS; raises instead of passing through."""
+    if fmt == 'b64':
+        return key_encryption.encrypt(value)
+    encrypted = key_encryption.encrypt_string(value)
+    if not key_encryption.is_encrypted(encrypted):
+        raise RuntimeError("Encryption failed")
+    return encrypted
+
+
+def decrypt_master_key_value(value: str, fmt: str) -> str:
+    """Decrypt one value of MASTER_KEY_COLUMNS; raises instead of passing through."""
+    if fmt == 'b64':
+        return key_encryption.decrypt(value)
+    if not key_encryption.is_enabled:
+        raise ValueError("Encryption key not configured")
+    token = base64.b64decode(value)[len(ENCRYPTED_MARKER):]
+    try:
+        return key_encryption._fernet.decrypt(token).decode('utf-8')
+    except InvalidToken:
+        raise ValueError("Failed to decrypt - wrong encryption key")
+
+
+def count_master_key_values() -> Tuple[int, int]:
+    """Return (encrypted, unencrypted) counts of the values under the master key."""
+    encrypted = unencrypted = 0
+    for _, row, attribute, _ in master_key_values():
+        if key_encryption.is_encrypted(getattr(row, attribute)):
+            encrypted += 1
+        else:
+            unencrypted += 1
+    return encrypted, unencrypted
+
+
 def decrypt_all_keys(dry_run: bool = True) -> tuple:
     """
-    Decrypt all encrypted private keys in database.
+    Decrypt every value stored under the master key. Nothing is written when
+    one of them fails, since the caller then keeps the key.
     Returns: (decrypted_count, skipped_count, errors)
     """
     if not key_encryption.is_enabled:
         return 0, 0, ["Encryption not enabled"]
-    
-    from models import db, CA, Certificate
-    
+
+    from models import db
+
     decrypted = 0
     skipped = 0
     errors = []
-    
-    for ca in CA.query.filter(CA.prv.isnot(None), CA.prv != '').all():
+
+    for label, row, attribute, fmt in master_key_values():
+        value = getattr(row, attribute)
+        if not key_encryption.is_encrypted(value):
+            skipped += 1
+            continue
         try:
-            if key_encryption.is_encrypted(ca.prv):
-                if not dry_run:
-                    ca.prv = key_encryption.decrypt(ca.prv)
-                decrypted += 1
-            else:
-                skipped += 1
+            plaintext = decrypt_master_key_value(value, fmt)
+            if not dry_run:
+                setattr(row, attribute, plaintext)
+            decrypted += 1
         except Exception as e:
-            errors.append(f"CA {ca.refid}: {e}")
-    
-    for cert in Certificate.query.filter(
-            Certificate.prv.isnot(None), Certificate.prv != '').all():
-        try:
-            if key_encryption.is_encrypted(cert.prv):
-                if not dry_run:
-                    cert.prv = key_encryption.decrypt(cert.prv)
-                decrypted += 1
-            else:
-                skipped += 1
-        except Exception as e:
-            errors.append(f"Certificate {cert.refid}: {e}")
-    
+            errors.append(f"{label}: {e}")
+
     if not dry_run:
-        db.session.commit()
-    
+        if errors:
+            db.session.rollback()
+        else:
+            db.session.commit()
+
     return decrypted, skipped, errors
 
 
 def encrypt_all_keys(dry_run: bool = True) -> tuple:
     """
-    Encrypt all unencrypted private keys in database.
+    Encrypt every value still stored unencrypted under the master key.
     Returns: (encrypted_count, skipped_count, errors)
     """
     if not key_encryption.is_enabled:
         return 0, 0, ["Encryption not enabled"]
-    
-    from models import db, CA, Certificate
-    
+
+    from models import db
+
     encrypted = 0
     skipped = 0
     errors = []
-    
-    # An empty column means no key: nothing to encrypt, nothing to count
-    for ca in CA.query.filter(CA.prv.isnot(None), CA.prv != '').all():
+
+    for label, row, attribute, fmt in master_key_values():
+        value = getattr(row, attribute)
+        if key_encryption.is_encrypted(value):
+            skipped += 1
+            continue
         try:
-            if not key_encryption.is_encrypted(ca.prv):
-                if not dry_run:
-                    ca.prv = key_encryption.encrypt(ca.prv)
-                encrypted += 1
-            else:
-                skipped += 1
+            if not dry_run:
+                setattr(row, attribute, encrypt_master_key_value(value, fmt))
+            encrypted += 1
         except Exception as e:
-            errors.append(f"CA {ca.refid}: {e}")
-    
-    for cert in Certificate.query.filter(
-            Certificate.prv.isnot(None), Certificate.prv != '').all():
-        try:
-            if not key_encryption.is_encrypted(cert.prv):
-                if not dry_run:
-                    cert.prv = key_encryption.encrypt(cert.prv)
-                encrypted += 1
-            else:
-                skipped += 1
-        except Exception as e:
-            errors.append(f"Certificate {cert.refid}: {e}")
-    
+            errors.append(f"{label}: {e}")
+
     if not dry_run:
         db.session.commit()
-    
+
     return encrypted, skipped, errors
 
 
 def has_encrypted_keys_in_db() -> bool:
-    """Check if any private keys in DB are encrypted (have ENC: marker)"""
-    from models import CA, Certificate
-    
-    for ca in CA.query.filter(CA.prv.isnot(None)).all():
-        if key_encryption.is_encrypted(ca.prv):
-            return True
-    
-    for cert in Certificate.query.filter(Certificate.prv.isnot(None)).all():
-        if key_encryption.is_encrypted(cert.prv):
-            return True
-    
-    return False
+    """Check if any value stored under the master key is encrypted (ENC: marker)"""
+    return any(key_encryption.is_encrypted(getattr(row, attribute))
+               for _, row, attribute, _ in master_key_values())
 
 
 # Singleton instance

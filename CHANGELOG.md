@@ -14,6 +14,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 - Certificates stored by the ACME client kept their private key unencrypted while private key encryption was enabled. The key is now encrypted like every other, and keys stored before are encrypted with Encrypt remaining keys (#367, by @stefanelul2000).
+- Disabling private key encryption decrypted only CA and certificate keys before removing the master key, which left SSH CA keys, deployment target keys, ACME account and EAB keys, SCEP challenges and LDAP bind passwords unreadable. Every secret under the master key is now decrypted first, with nothing changed if one fails, and the encryption status, Encrypt remaining keys and the startup check for a missing master key cover them all.
 - Saving any settings section erased the automatic backup password, which the screen never gets back and sent empty. A blank password now keeps the stored one, Settings › Backup shows whether one is set, and an API client clears it with `"clear_backup_password": true` (#367, by @stefanelul2000).
 
 ## [2.233] - 2026-09-23
