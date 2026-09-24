@@ -279,6 +279,11 @@ def test_renew_import_csr_and_restore_do_not_recreate_encrypted_key_mirrors(
                 f'Imported encrypted certificate {suffix}', cert_pem, key_pem
             )
             cert_ids.append(imported.id)
+            # The ACME client stores its certificates through this call; the
+            # key was written in the clear while encryption was enabled
+            from security.encryption import key_encryption
+            assert key_encryption.is_encrypted(imported.prv)
+            assert load_pem_bytes(imported.prv).decode() == key_pem
             assert cert_cert_path(imported).exists()
             assert not cert_key_path(imported).exists()
 

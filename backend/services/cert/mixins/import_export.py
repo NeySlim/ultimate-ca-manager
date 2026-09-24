@@ -16,7 +16,7 @@ from utils.file_naming import cert_cert_path, cert_key_path
 logger = logging.getLogger(__name__)
 
 from security.encryption import decrypt_private_key, encrypt_private_key
-from utils.key_codec import load_pem_bytes
+from utils.key_codec import load_pem_bytes, store_pem_bytes
 
 class ImportExportMixin:
 
@@ -110,7 +110,12 @@ class ImportExportMixin:
             refid=__import__('uuid').uuid4().__str__(),
             descr=descr,
             crt=base64.b64encode(full_cert.encode() if isinstance(full_cert, str) else full_cert).decode('utf-8'),
-            prv=base64.b64encode(key_pem.encode()).decode('utf-8') if key_pem else None,
+            # Encrypted like every other key write: this path stored the key
+            # in the clear, so each ACME-issued or renewed certificate showed
+            # up as unencrypted while private key encryption was enabled.
+            prv=store_pem_bytes(
+                key_pem.encode() if isinstance(key_pem, str) else key_pem
+            ) if key_pem else None,
             subject=cert.subject.rfc4514_string(),
             subject_cn=subject_cn,
             issuer=cert.issuer.rfc4514_string(),

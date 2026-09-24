@@ -458,6 +458,25 @@ export default function SettingsPage() {
     }
   }
 
+  const handleClearBackupPassword = async () => {
+    const confirmed = await showConfirm(t('settings.clearBackupPasswordConfirm'), {
+      title: t('settings.clearBackupPassword'),
+      confirmText: t('settings.clearBackupPassword'),
+      variant: 'danger',
+    })
+    if (!confirmed) return
+    setSaving(true)
+    try {
+      await settingsService.updateBulk({ clear_backup_password: true })
+      showSuccess(t('settings.backupPasswordCleared'))
+      await loadSettings()
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.settings'))
+    } finally {
+      setSaving(false)
+    }
+  }
+
   const loadHttpsInfo = async () => {
     try {
       const data = await systemService.getHttpsCertInfo()
@@ -895,6 +914,30 @@ export default function SettingsPage() {
       await loadEncryptionStatus()
     } catch (error) {
       showError(error.message || t('settings.encryptionDisableFailed'))
+    } finally {
+      setEncryptionLoading(false)
+    }
+  }
+
+  const handleEncryptRemainingKeys = async () => {
+    const count = encryptionStatus?.unencrypted_count ?? 0
+    const confirmed = await showConfirm(t('settings.encryptRemainingKeysConfirm', { count }), {
+      title: t('settings.encryptRemainingKeys', { count }),
+      confirmText: t('settings.encryptRemainingKeys', { count }),
+    })
+    if (!confirmed) return
+    setEncryptionLoading(true)
+    try {
+      const res = await settingsService.encryptAllKeys()
+      const data = res.data || res
+      if (data.errors?.length) {
+        showWarning(data.errors.join('\n'))
+      } else {
+        showSuccess(t('settings.encryptRemainingKeysDone', { count: data.encrypted ?? 0 }))
+      }
+      await loadEncryptionStatus()
+    } catch (error) {
+      showError(error.message || t('common.error'))
     } finally {
       setEncryptionLoading(false)
     }
@@ -1478,6 +1521,8 @@ export default function SettingsPage() {
             setShowEnableEncryptionModal={setShowEnableEncryptionModal}
             setShowDisableEncryptionModal={setShowDisableEncryptionModal}
             handleDownloadExistingMasterKey={handleDownloadExistingMasterKey}
+            handleEncryptRemainingKeys={handleEncryptRemainingKeys}
+            encryptionLoading={encryptionLoading}
             anomalies={anomalies}
             anomaliesLoading={anomaliesLoading}
             loadAnomalies={loadAnomalies}
@@ -1526,6 +1571,7 @@ export default function SettingsPage() {
             setRestoreFile={setRestoreFile}
             handleDownloadBackup={handleDownloadBackup}
             handleDeleteBackup={handleDeleteBackup}
+            handleClearBackupPassword={handleClearBackupPassword}
           />
         )
       case 'audit':

@@ -106,6 +106,11 @@ export const settingsService = {
     return apiClient.post('/system/security/disable-encryption')
   },
 
+  // Encrypts only the keys still stored in the clear; encrypted ones are skipped
+  async encryptAllKeys() {
+    return apiClient.post('/system/security/encrypt-all-keys', { dry_run: false })
+  },
+
   async downloadMasterKey() {
     return apiClient.get('/system/security/master-key/download', {
       responseType: 'blob'

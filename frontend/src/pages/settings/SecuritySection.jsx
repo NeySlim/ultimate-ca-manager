@@ -4,7 +4,7 @@ import { Button, Input, Select, Badge, LoadingSpinner, ExperimentalBadge, Detail
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { formatDate } from '../../lib/utils'
 
-export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
+export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, encryptionLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
   const { t } = useTranslation()
   const canAdminSettings = hasPermission('admin:settings')
   const canWriteSettings = hasPermission('write:settings')
@@ -69,6 +69,16 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                       >
                         <Download size={16} />
                         {t('settings.backupMasterKey')}
+                      </Button>
+                    )}
+                    {encryptionStatus.unencrypted_count > 0 && handleEncryptRemainingKeys && (
+                      <Button
+                        onClick={handleEncryptRemainingKeys}
+                        variant="primary"
+                        disabled={encryptionLoading}
+                      >
+                        <LockKey size={16} />
+                        {t('settings.encryptRemainingKeys', { count: encryptionStatus.unencrypted_count })}
                       </Button>
                     )}
                     <Button

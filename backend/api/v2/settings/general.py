@@ -63,6 +63,7 @@ _ADMIN_ONLY_SETTINGS = frozenset({
     'backup_frequency',
     'backup_retention_days',
     'backup_password',
+    'clear_backup_password',
     'crl_auto_delete_expired_revoked',
     'crl_auto_purge_stale_serials',
 })
@@ -88,6 +89,8 @@ def get_general_settings():
         'backup_frequency': get_config('backup_frequency', 'daily'),
         'backup_retention_days': int(get_config('backup_retention_days', '30')),
         'backup_password': '',  # Never return password
+        # Whether one is stored, so the screen can say so without the value
+        'backup_password_set': bool(get_config('backup_password', '')),
         'metrics_token': '',  # Never return the token
         'metrics_enabled': bool(get_config('metrics_token', '')),
         'session_timeout': int(get_config('session_timeout', '28800')),
@@ -342,9 +345,24 @@ def update_general_settings():
             return error_response(
                 'date_format must be one of: ' + ', '.join(DATE_FORMATS), 400)
 
+    # The password is never sent back, so the screen holds an empty field and
+    # every save of any section sends `backup_password: ''`. Storing that
+    # erased the password the administrator had just set; blank now means
+    # "keep current", and clearing it takes this explicit flag.
+    clear_backup_password = data.pop('clear_backup_password', False) is True
+    if clear_backup_password:
+        if data.get('backup_password'):
+            return error_response(
+                'Send either a new backup_password or clear_backup_password, '
+                'not both', 400)
+        data.pop('backup_password', None)
+        set_config('backup_password', '')
+
     for key in allowed_keys:
         if key in data:
             value = data[key]
+            if key == 'backup_password' and not value:
+                continue
             # Prometheus metrics token: the API never returns the current token,
             # so a blank value means "keep current" (avoids wiping it when other
             # general settings are saved). A sentinel disables it explicitly.
