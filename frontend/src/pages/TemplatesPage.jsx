@@ -450,6 +450,7 @@ export default function TemplatesPage() {
           <CompactField autoIcon="locality" label={t('common.locality')} value={selectedTemplate.dn_template?.L || '—'} />
           <CompactField autoIcon="organization" label={t('templates.organization')} value={selectedTemplate.dn_template?.O || '—'} />
           <CompactField autoIcon="commonName" label={t('templates.commonName')} value={selectedTemplate.dn_template?.CN || '—'} />
+          <CompactField autoIcon="email" label={t('common.email')} value={selectedTemplate.dn_template?.emailAddress || '—'} />
           <CompactField autoIcon="default" label={t('templates.adDerivedSubject')} value={selectedTemplate.ad_derived_subject ? t('common.enabled') : t('common.disabled')} />
         </CompactGrid>
       </CompactSection>
@@ -721,7 +722,7 @@ function buildInitialState(template) {
       name: '', description: '', template_type: 'web_server',
       key_type: 'RSA-2048', digest: 'sha256',
       validity_days: VALIDITY.TEMPLATE_DEFAULT_DAYS, max_validity_days: VALIDITY.MAX_DAYS,
-      subject: { C: '', ST: '', L: '', O: '', OU: '', CN: '' },
+      subject: { C: '', ST: '', L: '', O: '', OU: '', CN: '', emailAddress: '' },
       key_usage: ['digitalSignature', 'keyEncipherment'],
       extended_key_usage: ['serverAuth'],
       san_types: ['dns', 'ip'],
@@ -744,7 +745,8 @@ function buildInitialState(template) {
     max_validity_days: template.max_validity_days || VALIDITY.MAX_DAYS,
     subject: {
       C: dn.C || '', ST: dn.ST || '', L: dn.L || '',
-      O: dn.O || '', OU: dn.OU || '', CN: dn.CN || ''
+      O: dn.O || '', OU: dn.OU || '', CN: dn.CN || '',
+      emailAddress: dn.emailAddress || ''
     },
     key_usage: ext.key_usage || [],
     extended_key_usage: ext.extended_key_usage || [],
@@ -904,6 +906,9 @@ function TemplateForm({ template, onSubmit, onCancel }) {
           <Input label={t('templates.organization')} value={formData.subject.O} onChange={(e) => updateSubject('O', e.target.value)} placeholder={t('templates.orgPlaceholder')} />
           <Input label="OU" value={formData.subject.OU} onChange={(e) => updateSubject('OU', e.target.value)} placeholder="IT Department" />
           <Input label={t('templates.commonName')} value={formData.subject.CN} onChange={(e) => updateSubject('CN', e.target.value)} placeholder={t('templates.cnPlaceholder')} />
+          <div className="col-span-3">
+            <Input label={t('common.email')} type="email" value={formData.subject.emailAddress} onChange={(e) => updateSubject('emailAddress', e.target.value)} placeholder={t('certificates.emailPlaceholder')} />
+          </div>
         </div>
         <label className={`${checkboxCls} mt-3`}>
           <input
