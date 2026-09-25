@@ -7,7 +7,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [Unreleased]
+## [2.234] - 2026-09-25
 
 ### Added
 - The certificate list has a sortable Created column, the date the entry was added to UCM (#368).
