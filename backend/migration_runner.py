@@ -52,7 +52,7 @@ from pathlib import Path
 
 from sqlalchemy import create_engine, text, inspect
 
-from utils.db_url import sqlalchemy_url
+from utils.db_url import is_postgres_url, sqlalchemy_url
 
 
 def say(*args, **kwargs):
@@ -82,7 +82,7 @@ def _get_db_url() -> str:
 
 
 def _is_postgres(db_url: str) -> bool:
-    return db_url.startswith(("postgresql://", "postgres://"))
+    return is_postgres_url(db_url)
 
 
 def _list_migration_names() -> list[str]:

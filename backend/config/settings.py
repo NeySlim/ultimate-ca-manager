@@ -10,6 +10,8 @@ from typing import Optional
 from datetime import timedelta
 from dotenv import load_dotenv
 
+from utils.db_url import is_postgres_url, sqlalchemy_url
+
 # Load environment variables FIRST (before using them)
 # Try multiple locations for .env files
 load_dotenv("/etc/ucm/ucm.env")  # System config (DEB/RPM)
@@ -149,9 +151,8 @@ class Config:
     if _db_url:
         # PostgreSQL or external database (HA mode)
         # Format: postgresql://user:password@host:port/dbname
-        from utils.db_url import sqlalchemy_url
         SQLALCHEMY_DATABASE_URI = sqlalchemy_url(_db_url)
-        DATABASE_TYPE = "postgresql" if "postgresql" in _db_url else "external"
+        DATABASE_TYPE = "postgresql" if is_postgres_url(_db_url) else "external"
     else:
         # SQLite (standalone mode)
         SQLALCHEMY_DATABASE_URI = f"sqlite:///{DATABASE_PATH}"

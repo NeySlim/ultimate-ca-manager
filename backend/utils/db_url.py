@@ -13,3 +13,8 @@ def sqlalchemy_url(url: str) -> str:
         if url.startswith(prefix):
             return 'postgresql+psycopg2://' + url[len(prefix):]
     return url
+
+
+def is_postgres_url(url: str) -> bool:
+    """True for every PostgreSQL spelling: postgres://, postgresql://, postgresql+driver://."""
+    return sqlalchemy_url(url or '').startswith(('postgresql://', 'postgresql+'))

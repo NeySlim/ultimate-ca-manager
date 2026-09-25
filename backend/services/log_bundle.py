@@ -199,8 +199,8 @@ def _system_diagnostic() -> str:
     except Exception:  # noqa: BLE001
         pass
     try:
-        url = os.getenv('DATABASE_URL', '')
-        backend = 'postgresql' if url.startswith('postgresql') else 'sqlite'
+        from utils.db_url import is_postgres_url
+        backend = 'postgresql' if is_postgres_url(os.getenv('DATABASE_URL', '')) else 'sqlite'
         lines.append(f'DB backend: {backend}')
     except Exception:  # noqa: BLE001
         pass
