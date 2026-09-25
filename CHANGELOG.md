@@ -10,7 +10,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Added
-- The certificate list has a sortable Created column, the date a certificate reached UCM, and issuing a certificate opens it straight away instead of leaving it to be found in the list (#368).
+- The certificate list has a sortable Created column, the date the entry was added to UCM, and issuing a certificate opens it straight away instead of leaving it to be found in the list (#368).
 - Settings › Security offers Encrypt remaining keys while private key encryption is enabled and some keys are still stored unencrypted, where the only way from the screen before was to disable encryption and enable it again (#367, by @stefanelul2000).
 
 ### Fixed

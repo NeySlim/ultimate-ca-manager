@@ -173,7 +173,7 @@ export function useCertificateColumns(t) {
       )
     },
     {
-      // When the certificate reached UCM, which a new or imported one is sorted by
+      // When the entry was added to UCM; an in-place renewal keeps it
       key: 'created_at',
       header: t('common.created'),
       hideOnMobile: true,
