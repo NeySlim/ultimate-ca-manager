@@ -15,7 +15,7 @@ export default {
         title: 'Funzionalità',
         items: [
           { label: 'Tipo', text: 'Web Server, Email, VPN Server o Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon o Personalizzato. Imposta i valori predefiniti di Key Usage, EKU e SAN' },
-          { label: 'Valori predefiniti soggetto', text: 'Precompila Organizzazione, OU, Paese, Stato, Città ed Email. Sui certificati Email e combinati l\'Email diventa anche un SAN' },
+          { label: 'Valori predefiniti soggetto', text: 'Precompila Organizzazione, OU, Paese, Stato, Città ed Email. Sui certificati Email (S/MIME) e Server + Client (Combinato) l\'Email diventa anche un SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, ecc.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
           { label: 'Validità', text: 'Periodo di validità predefinito in giorni' },
@@ -66,7 +66,7 @@ Le autorità di certificazione non si creano dai modelli: creale nella pagina **
 1. Clicca **Crea modello**
 2. Inserisci un **nome** e una descrizione opzionale
 3. Seleziona il **tipo** di modello: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon o Personalizzato. Imposta i valori predefiniti di Key Usage, Extended Key Usage e SAN, che puoi poi modificare
-4. Configura i **valori predefiniti del soggetto** (O, OU, C, ST, L, CN, Email). Sui certificati Email e combinati, l'Email diventa anche un SAN email
+4. Configura i **valori predefiniti del soggetto** (O, OU, C, ST, L, CN, Email). Sui certificati Email (S/MIME) e Server + Client (Combinato), l'Email diventa anche un SAN email
 5. Seleziona i flag **Key Usage**
 6. Seleziona i valori **Extended Key Usage**
 7. Imposta il **periodo di validità predefinito** in giorni

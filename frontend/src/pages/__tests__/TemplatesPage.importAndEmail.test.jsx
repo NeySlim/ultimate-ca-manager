@@ -124,8 +124,8 @@ describe('TemplatesPage import: warns on skip or on nothing imported/updated', (
 
     await waitFor(() => expect(notification.showWarning).toHaveBeenCalledTimes(1))
     const [message] = notification.showWarning.mock.calls[0]
-    expect(message).toContain('templates.importSummary')
-    expect(message).toContain('A (already exists)')
+    // One skipped template per line under the counts
+    expect(message).toBe('templates.importSummary\nA (already exists)')
     expect(notification.showSuccess).not.toHaveBeenCalled()
     // Nothing landed, so the modal is still there for the user to retry.
     expect(document.querySelector('input[type="file"]')).not.toBeNull()

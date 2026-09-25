@@ -15,7 +15,7 @@ export default {
         title: 'Функції',
         items: [
           { label: 'Тип', text: 'Web Server, Email, VPN Server або VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon або Власний. Задає значення Key Usage, EKU та SAN за замовчуванням' },
-          { label: 'Значення суб\'єкта за замовчуванням', text: 'Попереднє заповнення O, OU, C, ST, L та Email. У сертифікатах «Електронна пошта» та комбінованих Email також стає SAN' },
+          { label: 'Значення суб\'єкта за замовчуванням', text: 'Попереднє заповнення Організація, OU, Країна, Штат/Область, Населений пункт та Email. У сертифікатах «Електронна пошта (S/MIME)» та «Сервер + Клієнт (Комбінований)» Email також стає SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment тощо' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
           { label: 'Дійсність', text: 'Період дійсності за замовчуванням у днях' },
@@ -66,7 +66,7 @@ export default {
 1. Натисніть **Створити шаблон**
 2. Введіть **назву** та необов'язковий опис
 3. Виберіть **тип** шаблону: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon або Власний. Він задає значення Key Usage, Extended Key Usage та SAN за замовчуванням, які потім можна змінити
-4. Налаштуйте **значення суб'єкта за замовчуванням** (O, OU, C, ST, L, CN, Email). У сертифікатах «Електронна пошта» та комбінованих Email також стає SAN електронної пошти
+4. Налаштуйте **значення суб'єкта за замовчуванням** (O, OU, C, ST, L, CN, Email). У сертифікатах «Електронна пошта (S/MIME)» та «Сервер + Клієнт (Комбінований)» Email також стає SAN електронної пошти
 5. Виберіть прапорці **Key Usage**
 6. Виберіть значення **Extended Key Usage**
 7. Встановіть **період дійсності за замовчуванням** у днях
