@@ -787,6 +787,10 @@ export default function CertificatesPage() {
               setShowIssueModal(false)
               setIssueInitialData(null)
               loadData()
+              // Straight to what was just issued; a request awaiting approval has no id
+              if (response?.data?.id) {
+                handleSelectCert(response.data)
+              }
             } catch (error) {
               showError(error.message || t('common.operationFailed'))
             }

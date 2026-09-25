@@ -173,6 +173,19 @@ export function useCertificateColumns(t) {
       )
     },
     {
+      // When the certificate reached UCM, which a new or imported one is sorted by
+      key: 'created_at',
+      header: t('common.created'),
+      hideOnMobile: true,
+      sortable: true,
+      mono: true,
+      render: (val) => (
+        <span className="text-xs text-text-secondary whitespace-nowrap">
+          {formatDate(val)}
+        </span>
+      )
+    },
+    {
       key: 'key_type',
       header: t('common.keyType'),
       hideOnMobile: true,
