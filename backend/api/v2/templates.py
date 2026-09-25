@@ -88,8 +88,35 @@ def _clean_pinned_subject_fields(raw):
     return cleaned, None
 
 
+def _coerce_json_object_fields(tpl_data):
+    """Returns err_msg or None. Coerces dn_template / extensions_template /
+    pinned_subject_fields to dicts in place. Exports carry the first two as
+    JSON strings while API payloads carry objects; storing a string as-is
+    would double-encode it (json.dumps of a str) and the template would
+    silently lose its subject/extension settings."""
+    for key in ('dn_template', 'extensions_template', 'pinned_subject_fields'):
+        if key not in tpl_data or tpl_data[key] is None:
+            continue
+        value = tpl_data[key]
+        if isinstance(value, str):
+            if not value.strip():
+                tpl_data[key] = {}
+                continue
+            try:
+                value = json.loads(value)
+            except (TypeError, ValueError):
+                return f'{key} is not valid JSON'
+        if not isinstance(value, dict):
+            return f'{key} must be an object'
+        tpl_data[key] = value
+    return None
+
+
 def _validate_template_payload(data, *, partial=False):
     """Returns (ok, err_msg). Sanitises validity_days/key_type/digest/template_type."""
+    err = _coerce_json_object_fields(data)
+    if err:
+        return False, err
     if 'pinned_subject_fields' in data:
         cleaned, err = _clean_pinned_subject_fields(data['pinned_subject_fields'])
         if err:
@@ -580,6 +607,33 @@ def duplicate_template(template_id):
         return error_response('Failed to duplicate template', 500)
 
 
+def _template_export_dict(template):
+    """Portable representation of a template for export/import.
+
+    dn_template / extensions_template stay JSON strings (the historical
+    export format) so files remain importable by older UCM versions; the
+    importer accepts either strings or objects for them."""
+    return {
+        'name': template.name,
+        'description': template.description,
+        'template_type': template.template_type,
+        'key_type': template.key_type,
+        'validity_days': template.validity_days,
+        'digest': template.digest,
+        'dn_template': template.dn_template,
+        'extensions_template': template.extensions_template,
+        'is_system': False,  # Exported templates are not system
+        'is_active': template.is_active,
+        'ad_derived_subject': bool(template.ad_derived_subject),
+        'autoenroll_enabled': bool(template.autoenroll_enabled),
+        'allowed_ad_group': template.allowed_ad_group,
+        'pinned_subject_fields': (
+            json.loads(template.pinned_subject_fields)
+            if template.pinned_subject_fields else {}
+        ),
+    }
+
+
 @bp.route('/api/v2/templates/<int:template_id>/export', methods=['GET'])
 @require_auth(['read:templates'])
 def export_template(template_id):
@@ -593,18 +647,7 @@ def export_template(template_id):
     if not template:
         return error_response('Template not found', 404)
     
-    export_data = {
-        'name': template.name,
-        'description': template.description,
-        'template_type': template.template_type,
-        'key_type': template.key_type,
-        'validity_days': template.validity_days,
-        'digest': template.digest,
-        'dn_template': template.dn_template,
-        'extensions_template': template.extensions_template,
-        'is_system': False,  # Exported templates are not system
-        'is_active': template.is_active,
-    }
+    export_data = _template_export_dict(template)
     
     return Response(
         json.dumps(export_data, indent=2),
@@ -624,20 +667,7 @@ def export_all_templates():
     
     templates = CertificateTemplate.query.filter_by(is_system=False).all()
     
-    export_data = []
-    for template in templates:
-        export_data.append({
-            'name': template.name,
-            'description': template.description,
-            'template_type': template.template_type,
-            'key_type': template.key_type,
-            'validity_days': template.validity_days,
-            'digest': template.digest,
-            'dn_template': template.dn_template,
-            'extensions_template': template.extensions_template,
-            'is_system': False,
-            'is_active': template.is_active,
-        })
+    export_data = [_template_export_dict(template) for template in templates]
     
     return Response(
         json.dumps(export_data, indent=2),
@@ -715,9 +745,19 @@ def import_template():
                 existing.key_type = tpl_data.get('key_type', existing.key_type)
                 existing.validity_days = tpl_data.get('validity_days', existing.validity_days)
                 existing.digest = tpl_data.get('digest', existing.digest)
-                existing.dn_template = tpl_data.get('dn_template', existing.dn_template)
-                existing.extensions_template = tpl_data.get('extensions_template', existing.extensions_template)
+                if tpl_data.get('dn_template') is not None:
+                    existing.dn_template = json.dumps(tpl_data['dn_template'])
+                if tpl_data.get('extensions_template') is not None:
+                    existing.extensions_template = json.dumps(tpl_data['extensions_template'])
                 existing.is_active = tpl_data.get('is_active', existing.is_active)
+                if 'ad_derived_subject' in tpl_data:
+                    existing.ad_derived_subject = bool(tpl_data['ad_derived_subject'])
+                if 'autoenroll_enabled' in tpl_data:
+                    existing.autoenroll_enabled = bool(tpl_data['autoenroll_enabled'])
+                if 'allowed_ad_group' in tpl_data:
+                    existing.allowed_ad_group = (tpl_data['allowed_ad_group'] or '').strip()[:255] or None
+                if 'pinned_subject_fields' in tpl_data:
+                    existing.pinned_subject_fields = json.dumps(tpl_data['pinned_subject_fields'] or {})
                 updated.append(existing.name)
             else:
                 # Create new — _validate_template_payload already enforced enums + bounds.
@@ -730,10 +770,14 @@ def import_template():
                     validity_days=tpl_data.get(
                         'validity_days', DEFAULT_TEMPLATE_VALIDITY_DAYS),
                     digest=tpl_data.get('digest', 'sha256'),
-                    dn_template=tpl_data.get('dn_template') or '{}',
-                    extensions_template=tpl_data.get('extensions_template') or '{}',
+                    dn_template=json.dumps(tpl_data.get('dn_template') or {}),
+                    extensions_template=json.dumps(tpl_data.get('extensions_template') or {}),
                     is_system=False,
                     is_active=tpl_data.get('is_active', True),
+                    ad_derived_subject=bool(tpl_data.get('ad_derived_subject', False)),
+                    autoenroll_enabled=bool(tpl_data.get('autoenroll_enabled', False)),
+                    allowed_ad_group=(tpl_data.get('allowed_ad_group') or '').strip()[:255] or None,
+                    pinned_subject_fields=json.dumps(tpl_data.get('pinned_subject_fields') or {}),
                 )
                 db.session.add(template)
                 imported.append(template.name)

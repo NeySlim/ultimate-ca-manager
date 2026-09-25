@@ -27,7 +27,7 @@ const SHOW_SYSTEM_KEY = 'ucm-templates-show-system'
 export default function TemplatesPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
-  const { showSuccess, showError, showConfirm } = useNotification()
+  const { showSuccess, showError, showWarning, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const fileRef = useRef(null)
   
@@ -144,19 +144,28 @@ export default function TemplatesPage() {
     if (!importFile && !importJson.trim()) return
     setImporting(true)
     try {
-      let templateData
+      // Use the dedicated import endpoint: it understands the export format
+      // (JSON-string dn/extensions templates, single object or array) and
+      // reports per-template imported/updated/skipped results.
+      const formData = new FormData()
       if (importFile) {
-        const text = await importFile.text()
-        templateData = JSON.parse(text)
+        formData.append('file', importFile)
       } else {
-        templateData = JSON.parse(importJson)
+        formData.append('json_content', importJson)
       }
-      await templatesService.create(templateData)
-      showSuccess(t('messages.success.import.template'))
-      setShowImportModal(false)
-      setImportFile(null)
-      setImportJson('')
-      loadData()
+      const res = await templatesService.import(formData)
+      const { imported = 0, updated = 0, skipped = 0 } = res?.data || {}
+      if (skipped > 0) {
+        showWarning(res?.message || t('messages.errors.importFailed.template'))
+      } else {
+        showSuccess(t('messages.success.import.template'))
+      }
+      if (imported + updated > 0) {
+        setShowImportModal(false)
+        setImportFile(null)
+        setImportJson('')
+        loadData()
+      }
     } catch (error) {
       showError(error.message || t('messages.errors.importFailed.template'))
     } finally {
