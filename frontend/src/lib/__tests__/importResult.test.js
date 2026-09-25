@@ -15,6 +15,10 @@ describe('soleImported', () => {
     expect(soleImported(result({ certificates: [2, 3] }))).toBeNull()
   })
 
+  it('names none when the import failed and was rolled back', () => {
+    expect(soleImported({ ...result({ cas: [4] }), success: false })).toBeNull()
+  })
+
   it('names none when nothing was created', () => {
     expect(soleImported(result({}))).toBeNull()
     expect(soleImported({ keys_matched: 1 })).toBeNull()

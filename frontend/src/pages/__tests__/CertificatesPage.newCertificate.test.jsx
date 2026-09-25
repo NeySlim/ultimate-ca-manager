@@ -3,7 +3,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, renderHook, screen, fireEvent, waitFor, act, within } from '@testing-library/react'
-import { MemoryRouter } from 'react-router-dom'
+import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -44,12 +44,14 @@ vi.mock('../../hooks', async () => {
 })
 
 const getAll = vi.fn()
+const getById = vi.fn()
 vi.mock('../../services', () => ({
   certificatesService: {
     getAll: (...args) => getAll(...args),
     getStats: vi.fn().mockResolvedValue({ data: { valid: 3, expiring: 0, expired: 0, revoked: 1, total: 4 } }),
     revoke: vi.fn().mockResolvedValue({ data: {} }),
     create: (...args) => create(...args),
+    getById: (...args) => getById(...args),
   },
   casService: { getAll: vi.fn().mockResolvedValue({ data: [{ id: 1, refid: 'ca-1', descr: 'CA 1' }] }) },
   truststoreService: { addFromCA: vi.fn().mockResolvedValue({ data: {} }) },
@@ -146,5 +148,17 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
     fireEvent.click(await screen.findByText('fire-import-complete'))
     await waitFor(() => expect(screen.queryByText('fire-import-complete')).not.toBeInTheDocument())
     expect(openWindow).not.toHaveBeenCalled()
+  })
+
+  it('a deep link opens the certificate even when filters hide its row', async () => {
+    // Mobile follows /certificates/:id after a creation made on another page
+    mockIsMobile = true
+    getById.mockResolvedValue({ data: { id: 401, subject: 'CN=hidden' } })
+    render(
+      <MemoryRouter initialEntries={['/certificates/401']}>
+        <Routes><Route path="/certificates/:id" element={<CertificatesPage />} /></Routes>
+      </MemoryRouter>
+    )
+    await waitFor(() => expect(getById).toHaveBeenCalledWith(401))
   })
 })

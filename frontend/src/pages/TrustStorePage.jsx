@@ -124,7 +124,8 @@ export default function TrustStorePage() {
 
   // Deep-link: auto-select cert from URL param /truststore/:id
   useEffect(() => {
-    if (urlCertId && !loading && certificates.length > 0) {
+    // The row may be filtered out of the list: the detail is fetched by id
+    if (urlCertId && !loading) {
       const id = parseInt(urlCertId, 10)
       if (!isNaN(id)) {
         if (!isMobile) {
@@ -135,7 +136,7 @@ export default function TrustStorePage() {
         navigate('/truststore', { replace: true })
       }
     }
-  }, [urlCertId, loading, certificates.length])
+  }, [urlCertId, loading])
 
   const loadManagedCAs = async () => {
     setLoadingCAs(true)

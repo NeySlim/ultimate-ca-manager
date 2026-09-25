@@ -485,9 +485,8 @@ export default function OperationsPage() {
   }
 
   const handleImportComplete = (result) => {
-    // A request has no detail window
     const sole = soleImported(result)
-    if (sole && sole.type !== 'csr') openEntity(sole.type, sole.id)
+    if (sole) openEntity(sole.type, sole.id)
   }
 
   // ===== EXPORT HANDLERS =====

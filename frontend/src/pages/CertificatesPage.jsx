@@ -240,7 +240,8 @@ export default function CertificatesPage() {
 
   // Deep-link: auto-select certificate from URL param
   useEffect(() => {
-    if (urlCertId && !loading && certificates.length > 0) {
+    // The row may be filtered out of the list: the detail is fetched by id
+    if (urlCertId && !loading) {
       const id = parseInt(urlCertId, 10)
       if (!isNaN(id)) {
         if (!isMobile) {
@@ -251,7 +252,7 @@ export default function CertificatesPage() {
         navigate('/certificates', { replace: true })
       }
     }
-  }, [urlCertId, loading, certificates.length])
+  }, [urlCertId, loading])
 
   // Export certificate
   const handleExport = async (format, options = {}) => {

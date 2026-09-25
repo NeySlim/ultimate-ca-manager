@@ -148,7 +148,8 @@ export default function CAsPage() {
 
   // Deep-link: auto-select CA from URL param /cas/:id
   useEffect(() => {
-    if (urlCAId && !loading && cas.length > 0) {
+    // The row may be filtered out of the list: the detail is fetched by id
+    if (urlCAId && !loading) {
       const id = parseInt(urlCAId, 10)
       if (!isNaN(id)) {
         if (!isMobile) {
@@ -159,7 +160,7 @@ export default function CAsPage() {
         navigate('/cas', { replace: true })
       }
     }
-  }, [urlCAId, loading, cas.length])
+  }, [urlCAId, loading])
 
   // Expand all nodes that have children by default
   useEffect(() => {
