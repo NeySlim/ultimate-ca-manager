@@ -22,7 +22,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Disabling private key encryption while the `KEY_ENCRYPTION_KEY` environment variable is set decrypted the keys and reported success, then reloaded the variable's key and left encryption on. It is now refused, and Settings › Security no longer offers it when the key comes from that variable.
 - A PostgreSQL installation stopped starting once pip installed SQLAlchemy 2.1, which resolves a `postgresql://` URL to the psycopg 3 driver UCM does not ship. A PostgreSQL URL without a driver now uses psycopg2, and SQLAlchemy is held below 2.1.
 - Saving any settings section erased the automatic backup password, which the screen never gets back and sent empty. A blank password now keeps the stored one, Settings › Backup shows whether one is set, and an API client clears it with `"clear_backup_password": true` (#367, by @stefanelul2000).
-- Importing a template lost its subject fields, key usage and extended key usage, and a round-trip dropped the AD-derived subject, autoenrollment, allowed AD group and pinned subject fields. All of them now survive export and import, and Templates › Import also takes an Export All file (#369, #371, by @seanpdiaz).
+- Importing a template lost its subject fields, key usage and extended key usage, and a round-trip dropped the AD-derived subject, autoenrollment, allowed AD group and pinned subject fields. All of them now survive export and import, and Templates › Import also takes a file holding several templates (#369, #371, by @seanpdiaz).
 
 ## [2.233] - 2026-09-23
 

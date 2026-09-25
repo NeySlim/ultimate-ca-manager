@@ -15,13 +15,13 @@ export default {
         title: 'Funktionen',
         items: [
           { label: 'Typ', text: 'Web Server, Email, VPN Server oder Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon oder Custom. Legt die Standardwerte für Key Usage, EKU und SAN fest' },
-          { label: 'Betreffsstandards', text: 'Organisation, OU, Land, Bundesland, Stadt und Email vorausfüllen. Bei Email- und kombinierten Zertifikaten wird die Email zusätzlich zum SAN' },
+          { label: 'Betreffsstandards', text: 'Organisation, OU, Land, Bundesland, Stadt und E-Mail vorausfüllen. Bei „E-Mail"- und „Server + Client (Kombiniert)"-Zertifikaten wird die E-Mail zusätzlich zum SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, usw.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
           { label: 'Gültigkeit', text: 'Standard-Gültigkeitsdauer in Tagen' },
           { label: 'Duplizieren', text: 'Ein vorhandenes Template klonen und modifizieren' },
           { label: 'System anzeigen', text: 'Die mitgelieferten Templates ausblenden, um nur mit Ihren eigenen zu arbeiten. Wird pro Browser gespeichert' },
-          { label: 'Import/Export', text: 'Templates als JSON-Dateien zwischen UCM-Instanzen teilen, ein Template oder eine Datei von Alle exportieren' },
+          { label: 'Import/Export', text: 'Templates als JSON-Dateien zwischen UCM-Instanzen teilen, ein Template oder mehrere in einer Datei' },
         ]
       },
       {
@@ -66,7 +66,7 @@ Zertifizierungsstellen werden nicht aus Templates erstellt: legen Sie sie auf de
 1. Klicken Sie auf **Template erstellen**
 2. Geben Sie einen **Namen** und eine optionale Beschreibung ein
 3. Wählen Sie den Template-**Typ**: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon oder Custom. Er legt die Standardwerte für Key Usage, Extended Key Usage und SAN fest, die Sie anschließend ändern können
-4. Konfigurieren Sie **Betreffsstandards** (O, OU, C, ST, L, CN, Email). Bei Email- und kombinierten Zertifikaten wird die Email zusätzlich zu einem Email-SAN
+4. Konfigurieren Sie **Betreffsstandards** (O, OU, C, ST, L, CN, E-Mail). Bei „E-Mail"- und „Server + Client (Kombiniert)"-Zertifikaten wird die E-Mail zusätzlich zu einem E-Mail-SAN
 5. Wählen Sie **Key Usage**-Flags
 6. Wählen Sie **Extended Key Usage**-Werte
 7. Legen Sie die **Standard-Gültigkeitsdauer** in Tagen fest
@@ -110,7 +110,7 @@ Exportieren Sie Templates als JSON zum Teilen zwischen UCM-Instanzen.
 
 ### Import
 Importieren Sie aus:
-- **JSON-Datei**: Template-JSON-Datei hochladen, ein Template oder eine Datei von **Alle exportieren**
+- **JSON-Datei**: Template-JSON-Datei hochladen, ein Template oder mehrere in einer Datei
 - **JSON einfügen**: JSON direkt in den Textbereich einfügen
 
 Ein Template, dessen Name bereits existiert, wird übersprungen, und der Import gibt an, welche das waren.

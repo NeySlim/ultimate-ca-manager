@@ -632,7 +632,7 @@ Export templates as JSON for sharing between UCM instances.
 
 ### Import
 Import from:
-- **JSON file**: Upload a template JSON file, one template or an **Export All** file
+- **JSON file**: Upload a template JSON file, one template or several in one file
 - **JSON paste**: Paste JSON directly into the text area
 
 A template whose name already exists is skipped, and the import says which ones were.

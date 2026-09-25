@@ -155,7 +155,8 @@ export default function TemplatesPage() {
       const { imported = 0, updated = 0, skipped = 0, skipped_items: items = [] } = res?.data || {}
       if (skipped > 0 || imported + updated === 0) {
         const summary = t('templates.importSummary', { imported, updated, skipped })
-        showWarning(items.length ? `${summary}: ${items.join(', ')}` : summary)
+        // One skipped template per line, under the translated counts
+        showWarning([summary, ...items].join('\n'))
       } else {
         showSuccess(t('messages.success.import.template'))
       }

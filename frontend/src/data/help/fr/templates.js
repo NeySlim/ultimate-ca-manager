@@ -15,13 +15,13 @@ export default {
         title: 'Fonctionnalités',
         items: [
           { label: 'Type', text: 'Web Server, Email, VPN Server ou Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Définit les valeurs par défaut d\'utilisation de la clé, d\'EKU et de SAN' },
-          { label: 'Valeurs par défaut du sujet', text: 'Préremplir Organisation, OU, Pays, État, Ville et e-mail. Sur les certificats Email et combinés, l\'e-mail devient aussi un SAN' },
+          { label: 'Valeurs par défaut du sujet', text: 'Préremplir Organisation, OU, Pays, État, Ville et Email. Sur les certificats Email et combinés, l\'Email devient aussi un SAN' },
           { label: 'Utilisation de la clé', text: 'Signature numérique, chiffrement de clé, etc.' },
           { label: 'Utilisation étendue de la clé', text: 'Authentification serveur, authentification client, signature de code, protection e-mail' },
           { label: 'Validité', text: 'Période de validité par défaut en jours' },
           { label: 'Dupliquer', text: 'Cloner un modèle existant et le modifier' },
           { label: 'Afficher système', text: 'Masquer les modèles intégrés pour ne travailler qu\'avec les vôtres. Mémorisé par navigateur' },
-          { label: 'Importer/Exporter', text: 'Partager des modèles sous forme de fichiers JSON entre instances UCM, un modèle ou un fichier « Tout exporter »' },
+          { label: 'Importer/Exporter', text: 'Partager des modèles sous forme de fichiers JSON entre instances UCM, un modèle ou plusieurs dans un fichier' },
         ]
       },
       {
@@ -66,7 +66,7 @@ Les autorités de certification ne se créent pas à partir de modèles : créez
 1. Cliquez sur **Créer un modèle**
 2. Entrez un **nom** et une description optionnelle
 3. Sélectionnez le **type** de modèle : Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Il définit les valeurs par défaut d'utilisation de la clé, d'utilisation étendue de la clé et de SAN, que vous pouvez ensuite modifier
-4. Configurez les **valeurs par défaut du sujet** (O, OU, C, ST, L, CN, E-mail). Sur les certificats Email et combinés, l'e-mail devient aussi un SAN e-mail
+4. Configurez les **valeurs par défaut du sujet** (O, OU, C, ST, L, CN, Email). Sur les certificats Email et combinés, l'Email devient aussi un SAN
 5. Sélectionnez les indicateurs d'**utilisation de la clé**
 6. Sélectionnez les valeurs d'**utilisation étendue de la clé**
 7. Définissez la **période de validité par défaut** en jours
@@ -110,7 +110,7 @@ Exportez les modèles au format JSON pour les partager entre instances UCM.
 
 ### Importer
 Importez depuis :
-- **Fichier JSON** : Téléversez un fichier JSON de modèle, un modèle ou un fichier **Tout exporter**
+- **Fichier JSON** : Téléversez un fichier JSON de modèle, un modèle ou plusieurs dans un fichier
 - **Coller du JSON** : Collez le JSON directement dans la zone de texte
 
 Un modèle dont le nom existe déjà est ignoré, et l'import indique lesquels.

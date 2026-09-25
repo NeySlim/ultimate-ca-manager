@@ -21,7 +21,7 @@ export default {
           { label: 'Validità', text: 'Periodo di validità predefinito in giorni' },
           { label: 'Duplica', text: 'Clona un modello esistente e modificalo' },
           { label: 'Mostra sistema', text: 'Nascondi i modelli integrati per lavorare solo con i tuoi. Memorizzato per browser' },
-          { label: 'Importa/Esporta', text: 'Condividi modelli come file JSON tra istanze UCM, un modello o un file Esporta tutto' },
+          { label: 'Importa/Esporta', text: 'Condividi modelli come file JSON tra istanze UCM, un modello o più in un file' },
         ]
       },
       {
@@ -110,7 +110,7 @@ Esporta i modelli come JSON per condividerli tra istanze UCM.
 
 ### Importa
 Importa da:
-- **File JSON**: Carica un file JSON del modello, un modello o un file **Esporta tutto**
+- **File JSON**: Carica un file JSON del modello, un modello o più in un file
 - **Incolla JSON**: Incolla il JSON direttamente nell'area di testo
 
 Un modello il cui nome esiste già viene saltato, e l'importazione indica quali sono stati saltati.

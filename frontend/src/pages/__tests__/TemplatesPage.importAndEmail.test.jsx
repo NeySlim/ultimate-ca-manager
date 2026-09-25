@@ -1,15 +1,6 @@
 /**
- * #371 (import summary) and #373 (Email field type) follow-ups.
- *
- * Import: the handler used to warn only when the server reported `skipped`,
- * so an import that silently touched nothing (empty array, or an unparsable
- * upload the server dropped without an error) reported success. It now warns
- * whenever nothing was imported/updated, and includes the summary + skipped
- * item names; the modal only auto-closes once something actually landed.
- *
- * Email: the subject Email field lost `type="email"` because copies of
- * built-in templates carry the literal placeholder `{email}`, which native
- * email validation rejects and would block editing or saving them.
+ * TemplatesPage: an import that lands nothing warns with the counts and the
+ * skipped templates, and the Email field accepts the {email} placeholder.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'

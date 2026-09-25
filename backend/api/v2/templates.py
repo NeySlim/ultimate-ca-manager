@@ -745,9 +745,9 @@ def import_template():
                 existing.key_type = tpl_data.get('key_type', existing.key_type)
                 existing.validity_days = tpl_data.get('validity_days', existing.validity_days)
                 existing.digest = tpl_data.get('digest', existing.digest)
-                if tpl_data.get('dn_template') is not None:
+                if 'dn_template' in tpl_data:
                     existing.dn_template = json.dumps(tpl_data['dn_template'])
-                if tpl_data.get('extensions_template') is not None:
+                if 'extensions_template' in tpl_data:
                     existing.extensions_template = json.dumps(tpl_data['extensions_template'])
                 existing.is_active = tpl_data.get('is_active', existing.is_active)
                 if 'ad_derived_subject' in tpl_data:

@@ -15,13 +15,13 @@ export default {
         title: '機能',
         items: [
           { label: 'タイプ', text: 'Web Server、Email、VPN ServerまたはVPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon、Custom。Key Usage、EKU、SANのデフォルトを設定します' },
-          { label: 'サブジェクトデフォルト', text: '組織、OU、国、都道府県、市区町村、Emailを事前入力。EmailおよびCombined証明書では、EmailはSANにもなります' },
+          { label: 'サブジェクトデフォルト', text: '組織、OU、国、都道府県、市区町村、Emailを事前入力。メールおよび複合証明書では、EmailはSANにもなります' },
           { label: 'Key Usage', text: 'Digital Signature、Key Enciphermentなど' },
           { label: 'Extended Key Usage', text: 'Server Auth、Client Auth、Code Signing、Email Protection' },
           { label: '有効期間', text: 'デフォルトの有効期間（日数）' },
           { label: '複製', text: '既存のテンプレートをクローンして修正' },
           { label: 'システムを表示', text: '組み込みテンプレートを非表示にして、自分のテンプレートだけを扱います。ブラウザごとに記憶されます' },
-          { label: 'インポート/エクスポート', text: 'UCMインスタンス間でテンプレートをJSONファイルとして共有。テンプレート1件、またはすべてエクスポートファイル' },
+          { label: 'インポート/エクスポート', text: 'UCMインスタンス間でテンプレートをJSONファイルとして共有。テンプレート1件、または複数件をまとめた1つのファイル' },
         ]
       },
       {
@@ -66,7 +66,7 @@ export default {
 1. **テンプレートを作成**をクリック
 2. **名前**とオプションの説明を入力
 3. テンプレート**タイプ**を選択：Web Server、Email、VPN Server、VPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon、Custom。Key Usage、Extended Key Usage、SANのデフォルトが設定され、その後変更できます
-4. **サブジェクトデフォルト**を設定（O、OU、C、ST、L、CN、Email）。EmailおよびCombined証明書では、Emailはメール用SANにもなります
+4. **サブジェクトデフォルト**を設定（O、OU、C、ST、L、CN、Email）。メールおよび複合証明書では、Emailはメール用SANにもなります
 5. **Key Usage**フラグを選択
 6. **Extended Key Usage**値を選択
 7. **デフォルト有効期間**を日数で設定
@@ -110,7 +110,7 @@ UCMインスタンス間で共有するためにテンプレートをJSONとし�
 
 ### インポート
 以下からインポート：
-- **JSONファイル**: テンプレートJSONファイルをアップロード。テンプレート1件、または**すべてエクスポート**ファイル
+- **JSONファイル**: テンプレートJSONファイルをアップロード。テンプレート1件、または複数件をまとめた1つのファイル
 - **JSON貼り付け**: テキストエリアにJSONを直接貼り付け
 
 名前が既に存在するテンプレートはスキップされ、インポート結果でどのテンプレートがスキップされたかが表示されます。

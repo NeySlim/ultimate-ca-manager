@@ -129,7 +129,7 @@ export function NotificationProvider({ children }) {
               <div className="flex-shrink-0 mt-0.5">
                 {getIcon(toast.type)}
               </div>
-              <Toast.Description className="flex-1 min-w-0 text-sm text-text-primary break-words">
+              <Toast.Description className="flex-1 min-w-0 text-sm text-text-primary break-words whitespace-pre-line">
                 {toast.message}
               </Toast.Description>
               <Toast.Close className="flex-shrink-0">

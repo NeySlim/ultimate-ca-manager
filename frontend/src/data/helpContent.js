@@ -341,7 +341,7 @@ export const helpContent = {
           { label: 'Validity', text: 'Default validity period in days' },
           { label: 'Duplicate', text: 'Clone an existing template and modify it' },
           { label: 'Show system', text: 'Hide the built-in templates to work with your own only. Remembered per browser' },
-          { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances, one template or an Export All file' },
+          { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances, one template or several in one file' },
         ]
       },
       {
