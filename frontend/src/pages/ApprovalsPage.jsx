@@ -15,6 +15,7 @@ import {
 import { approvalsService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
+import { useOpenEntity } from '../hooks/useOpenEntity'
 import { formatDate, cn } from '../lib/utils'
 
 const STATUS_VARIANTS = {
@@ -35,6 +36,7 @@ export default function ApprovalsPage() {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const { canWrite } = usePermission()
+  const openEntity = useOpenEntity()
 
   // Data
   const [requests, setRequests] = useState([])
@@ -204,8 +206,9 @@ export default function ApprovalsPage() {
 
     try {
       setActionLoading(true)
+      let result
       if (type === 'approve') {
-        const result = await approvalsService.approve(req.id, comment || undefined)
+        result = await approvalsService.approve(req.id, comment || undefined)
         if (result?.data?.certificate_issued) {
           showSuccess(t('approvals.certificateIssued'))
         } else if (result?.data?.request_closed) {
@@ -224,6 +227,10 @@ export default function ApprovalsPage() {
       setActionModal(null)
       setComment('')
       loadData()
+      // What the approval issued: a certificate, or a CA for an intermediate request
+      const issued = type === 'approve' && result?.data?.certificate_issued ? result.data.certificate : null
+      if (issued?.id) openEntity('certificate', issued.id)
+      else if (issued?.ca_id) openEntity('ca', issued.ca_id)
     } catch (err) {
       // The server says why (already closed by someone else, expired...);
       // the list is reloaded so the request shows its real state

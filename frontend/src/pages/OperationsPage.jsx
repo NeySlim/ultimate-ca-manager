@@ -3,7 +3,6 @@
  * Replaces ImportExportPage with unified operations center
  */
 import { useState, useEffect, useCallback, useMemo, useRef } from 'react'
-import { useNavigate } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { 
   UploadSimple, DownloadSimple, CloudArrowUp, Lightning,
@@ -24,6 +23,8 @@ import { REVOCATION_REASONS } from '../components/RevokeCertificateModal'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, extractCN, cn , downloadBlob} from '../lib/utils'
+import { soleImported } from '../lib/importResult'
+import { useOpenEntity } from '../hooks/useOpenEntity'
 
 const STORAGE_KEY = 'opnsense_config'
 
@@ -258,7 +259,7 @@ export default function OperationsPage() {
   const { showSuccess, showError, showWarning } = useNotification()
   const { isMobile } = useMobile()
   const { isAdmin } = usePermission()
-  const navigate = useNavigate()
+  const openEntity = useOpenEntity()
   const RESOURCE_TYPES = useResourceTypes(t)
   
   const TABS = [
@@ -484,14 +485,9 @@ export default function OperationsPage() {
   }
 
   const handleImportComplete = (result) => {
-    if (result?.imported?.length > 0) {
-      const first = result.imported[0]
-      if (first.type === 'ca' || first.type === 'ca_certificate') {
-        navigate(`/cas?selected=${first.id}`)
-      } else if (first.type === 'certificate') {
-        navigate(`/certificates?selected=${first.id}`)
-      }
-    }
+    // A request has no detail window
+    const sole = soleImported(result)
+    if (sole && sole.type !== 'csr') openEntity(sole.type, sole.id)
   }
 
   // ===== EXPORT HANDLERS =====

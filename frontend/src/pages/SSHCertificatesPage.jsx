@@ -268,6 +268,8 @@ export default function SSHCertificatesPage() {
       }
       showSuccess(t('messages.success.create.sshCertificate'))
       loadData()
+      // Behind the modal, which shows a generated key only once
+      if (res?.data?.id) handleSelectCert(res.data)
       return res
     } catch (error) {
       showError(error.message || t('common.operationFailed'))
@@ -280,7 +282,7 @@ export default function SSHCertificatesPage() {
     const formData = new FormData(e.target)
     try {
       muteToasts()
-      await sshCertificatesService.importCertificate({
+      const response = await sshCertificatesService.importCertificate({
         certificate: importCertData,
         descr: formData.get('descr'),
       })
@@ -288,6 +290,7 @@ export default function SSHCertificatesPage() {
       setShowImportModal(false)
       setImportCertData('')
       loadData()
+      if (response?.data?.id) handleSelectCert(response.data)
     } catch (error) {
       showError(error.message || t('common.operationFailed'))
     }

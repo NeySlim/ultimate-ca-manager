@@ -24,6 +24,8 @@ import { CADetailsPanel } from './cas/CADetailsPanel'
 import { ManageTemplatePinsModal } from '../components/cas/ManageTemplatePinsModal'
 import { ChainRepairBar } from './cas/ChainRepairBar'
 import { CreateCAModal } from './cas/CreateCAModal'
+import { soleImported } from '../lib/importResult'
+import { useOpenEntity } from '../hooks/useOpenEntity'
 
 export default function CAsPage() {
   const { t } = useTranslation()
@@ -31,6 +33,7 @@ export default function CAsPage() {
   const navigate = useNavigate()
   const { isMobile } = useMobile()
   const { openWindow } = useWindowManager()
+  const openEntity = useOpenEntity()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const { muteToasts } = useWebSocket()
@@ -589,16 +592,22 @@ export default function CAsPage() {
         open={modals.create}
         onClose={() => closeModal('create')}
         cas={cas}
-        onSuccess={loadCAs}
+        onSuccess={(created) => {
+          loadCAs()
+          if (created?.id) loadCADetails(created)
+        }}
       />
 
       {/* Smart Import Modal */}
       <SmartImportModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
-        onImportComplete={() => {
+        onImportComplete={(result) => {
           setShowImportModal(false)
           loadCAs()
+          const sole = soleImported(result)
+          if (sole?.type === 'ca') loadCADetails({ id: sole.id })
+          else if (sole) openEntity(sole.type, sole.id)
         }}
       />
 

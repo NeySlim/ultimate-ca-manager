@@ -29,6 +29,8 @@ import { downloadExport } from '../lib/exportDownload'
 import { IssueCertificateForm } from './certificates/IssueCertificateForm'
 import { useCertificateColumns } from './certificates/useCertificateColumns'
 import { UploadKeyModal } from './certificates/UploadKeyModal'
+import { soleImported } from '../lib/importResult'
+import { useOpenEntity } from '../hooks/useOpenEntity'
 
 // i18n keys for known certificate issuance sources (labelKey pattern: store the
 // KEY at module level, resolve with t() in the component). Options are built
@@ -59,6 +61,7 @@ export default function CertificatesPage() {
   const location = useLocation()
   const { isMobile } = useMobile()
   const { openWindow } = useWindowManager()
+  const openEntity = useOpenEntity()
   const { addToHistory } = useRecentHistory('certificates')
   const { isFavorite, toggleFavorite } = useFavorites('certificates')
   
@@ -824,9 +827,12 @@ export default function CertificatesPage() {
       <SmartImportModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
-        onImportComplete={() => {
+        onImportComplete={(result) => {
           setShowImportModal(false)
           loadData()
+          const sole = soleImported(result)
+          if (sole?.type === 'certificate') handleSelectCert({ id: sole.id })
+          else if (sole) openEntity(sole.type, sole.id)
         }}
       />
 

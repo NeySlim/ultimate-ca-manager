@@ -27,10 +27,13 @@ import { getSanValidationError } from '../lib/sanValidate'
 import { daysSinceExpiry, expiryVariant, hasExpiry } from '../lib/expiry'
 import { VALIDITY } from '../constants/config'
 import { signingCas } from '../lib/caSelection'
+import { soleImported } from '../lib/importResult'
+import { useOpenEntity } from '../hooks/useOpenEntity'
 export default function CSRsPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
   const navigate = useNavigate()
+  const openEntity = useOpenEntity()
   const { showSuccess, showError, showConfirm, showWarning } = useNotification()
   const { canWrite, canDelete, hasPermission } = usePermission()
   // Direct private-key export is the admin-only read:private_keys scope,
@@ -174,14 +177,23 @@ export default function CSRsPage() {
     }
   }
 
+  // A new request lands in the pending tab: show it there
+  const openCreatedCSR = (response) => {
+    const csr = extractData(response)
+    if (!csr?.id) return
+    handleTabChange('pending')
+    loadCSRDetails(csr)
+  }
+
   const handleUpload = async (files) => {
     try {
       const file = files[0]
       const text = await file.text()
-      await csrsService.upload(text)
+      const created = await csrsService.upload(text)
       showSuccess(t('messages.success.create.csr'))
       closeModal('upload')
       loadData()
+      openCreatedCSR(created)
     } catch (error) {
       showError(error.message || t('csrs.uploadFailed'))
     }
@@ -197,12 +209,13 @@ export default function CSRsPage() {
       return
     }
     try {
-      await csrsService.upload(pastedPEM.trim())
+      const created = await csrsService.upload(pastedPEM.trim())
       showSuccess(t('messages.success.create.csr'))
       closeModal('upload')
       setPastedPEM('')
       setUploadMode('file')
       loadData()
+      openCreatedCSR(created)
     } catch (error) {
       showError(error.message || t('csrs.uploadFailed'))
     }
@@ -231,6 +244,9 @@ export default function CSRsPage() {
         closeModal('sign')
         loadData()
         setSelectedCSR(null)
+        // Signing as an intermediate CA creates a CA, not a certificate
+        const result = signed?.data
+        openEntity(signCertType === 'intermediate_ca' ? 'ca' : 'certificate', result?.id)
       } catch (error) {
         showError(error.message || t('csrs.signFailed'))
       }
@@ -255,6 +271,7 @@ export default function CSRsPage() {
           if (enrolleeUpn) signData.enrollee_upn = enrolleeUpn
         }
         const result = await mscaService.signCSR(selectedMsca, selectedCSR.id, signData)
+        const csrId = selectedCSR.id
         if (result.data?.status === 'issued') {
           showSuccess(t('messages.success.other.signed'))
         } else if (result.data?.status === 'pending') {
@@ -263,6 +280,8 @@ export default function CSRsPage() {
         closeModal('sign')
         loadData()
         setSelectedCSR(null)
+        // The issued certificate is stored on the request's own row
+        if (result.data?.status === 'issued') openEntity('certificate', csrId)
       } catch (error) {
         showError(error.message || t('csrs.signFailed'))
       }
@@ -304,7 +323,7 @@ export default function CSRsPage() {
     setGenerating(true)
     try {
       const sans = genSans.filter(s => s.value.trim()).map(s => `${s.type}:${s.value.trim()}`)
-      await csrsService.create({
+      const created = await csrsService.create({
         cn: genCN.trim(),
         organization: genOrg.trim() || undefined,
         department: genOU.trim() || undefined,
@@ -318,6 +337,7 @@ export default function CSRsPage() {
       closeModal('generate')
       resetGenerateForm()
       loadData()
+      openCreatedCSR(created)
     } catch (error) {
       showError(error.message || t('csrs.generateFailed'))
     } finally {
@@ -1224,9 +1244,12 @@ MIIEvgIBADANBgkqhkiG9w0BAQE...
       <SmartImportModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
-        onImportComplete={() => {
+        onImportComplete={(result) => {
           setShowImportModal(false)
           loadData()
+          const sole = soleImported(result)
+          if (sole?.type === 'csr') openCreatedCSR({ id: sole.id })
+          else if (sole) openEntity(sole.type, sole.id)
         }}
       />
 

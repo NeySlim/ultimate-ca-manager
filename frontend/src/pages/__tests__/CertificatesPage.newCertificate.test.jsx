@@ -63,6 +63,13 @@ vi.mock('../certificates/IssueCertificateForm', () => ({
   ),
 }))
 
+// Stub Smart Import: a button that fires onImportComplete with a given result
+let importResult = null
+vi.mock('../../components/SmartImport', () => ({
+  SmartImportModal: ({ isOpen, onImportComplete }) =>
+    isOpen ? <button onClick={() => onImportComplete(importResult)}>fire-import-complete</button> : null,
+}))
+
 import CertificatesPage from '../CertificatesPage'
 import { useCertificateColumns } from '../certificates/useCertificateColumns'
 
@@ -85,6 +92,7 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
     create.mockReset()
     getAll.mockReset()
     getAll.mockResolvedValue({ data: [], meta: { total: 0 } })
+    importResult = null
   })
 
   it('offers a sortable creation date column', () => {
@@ -109,6 +117,34 @@ describe('CertificatesPage — finding a new certificate (#368)', () => {
     renderPage()
     await issue()
     await waitFor(() => expect(create).toHaveBeenCalled())
+    expect(openWindow).not.toHaveBeenCalled()
+  })
+
+  it('Smart Import of a single certificate opens it', async () => {
+    importResult = { imported_ids: { cas: [], certificates: [13], csrs: [] } }
+    renderPage()
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    fireEvent.click(screen.getAllByText('common.import')[0])
+    fireEvent.click(await screen.findByText('fire-import-complete'))
+    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('certificate', 13))
+  })
+
+  it('Smart Import of a single CA opens it', async () => {
+    importResult = { imported_ids: { cas: [21], certificates: [], csrs: [] } }
+    renderPage()
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    fireEvent.click(screen.getAllByText('common.import')[0])
+    fireEvent.click(await screen.findByText('fire-import-complete'))
+    await waitFor(() => expect(openWindow).toHaveBeenCalledWith('ca', 21))
+  })
+
+  it('Smart Import of several objects opens nothing', async () => {
+    importResult = { imported_ids: { cas: [21], certificates: [13], csrs: [] } }
+    renderPage()
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    fireEvent.click(screen.getAllByText('common.import')[0])
+    fireEvent.click(await screen.findByText('fire-import-complete'))
+    await waitFor(() => expect(screen.queryByText('fire-import-complete')).not.toBeInTheDocument())
     expect(openWindow).not.toHaveBeenCalled()
   })
 })

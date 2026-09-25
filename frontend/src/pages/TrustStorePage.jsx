@@ -23,12 +23,15 @@ import { useWindowManager } from '../contexts/WindowManagerContext'
 import { useMobile } from '../contexts/MobileContext'
 import { usePermission, useModals, usePersistedState } from '../hooks'
 import { formatDate, cn, daysRemaining, downloadBlob } from '../lib/utils'
+import { soleImported } from '../lib/importResult'
+import { useOpenEntity } from '../hooks/useOpenEntity'
 export default function TrustStorePage() {
   const { t } = useTranslation()
   const { id: urlCertId } = useParams()
   const navigate = useNavigate()
   const { isMobile } = useMobile()
   const { openWindow } = useWindowManager()
+  const openEntity = useOpenEntity()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canWrite, canDelete } = usePermission()
   const { modals, open: openModal, close: closeModal } = useModals(['add', 'sync'])
@@ -166,6 +169,7 @@ export default function TrustStorePage() {
     if (selectedCAIds.length === 0) return
     setAdding(true)
     let added = 0
+    let lastAdded = null
     try {
       for (const caId of selectedCAIds) {
         try {
@@ -175,7 +179,7 @@ export default function TrustStorePage() {
             exportRes?.data instanceof Blob ? await exportRes.data.text() :
             typeof exportRes?.data === 'string' ? exportRes.data : ''
           const ca = managedCAs.find(c => c.id === caId)
-          await truststoreService.add({
+          const response = await truststoreService.add({
             name: ca?.descr || ca?.common_name || `CA-${caId}`,
             description: ca?.organization || '',
             certificate_pem: pemText,
@@ -183,6 +187,7 @@ export default function TrustStorePage() {
             notes: t('trustStore.addedFromManaged')
           })
           added++
+          lastAdded = response?.data
         } catch (err) {
           // Skip duplicates (409)
           if (!err.message?.includes('already')) {
@@ -195,6 +200,8 @@ export default function TrustStorePage() {
         loadCertificates()
       }
       closeModal('add')
+      // Several entries at once leave the list to show them
+      if (added === 1 && lastAdded?.id) handleSelectCert(lastAdded)
     } finally {
       setAdding(false)
     }
@@ -729,9 +736,12 @@ export default function TrustStorePage() {
       <SmartImportModal
         isOpen={showImportModal}
         onClose={() => setShowImportModal(false)}
-        onImportComplete={() => {
+        onImportComplete={(result) => {
           setShowImportModal(false)
           loadCertificates()
+          // Smart Import adds CAs and certificates, not trust store entries
+          const sole = soleImported(result)
+          if (sole) openEntity(sole.type, sole.id)
         }}
       />
     </>

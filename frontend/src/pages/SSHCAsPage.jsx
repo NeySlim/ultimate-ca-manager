@@ -84,11 +84,12 @@ export default function SSHCAsPage() {
 
   const handleCreate = async (data) => {
     try {
-      await sshCasService.create(data)
+      const response = await sshCasService.create(data)
       showSuccess(t('messages.success.create.sshCa'))
       setShowModal(false)
       setEditingCA(null)
       loadData()
+      if (response?.data?.id) setSelectedCA(response.data)
     } catch (error) {
       showError(error.message || t('messages.errors.createFailed.sshCa'))
     }
@@ -113,7 +114,7 @@ export default function SSHCAsPage() {
     e.preventDefault()
     const formData = new FormData(e.target)
     try {
-      await sshCasService.importCA({
+      const response = await sshCasService.importCA({
         descr: formData.get('descr'),
         ca_type: importCaType,
         private_key: importPrivateKey,
@@ -124,6 +125,7 @@ export default function SSHCAsPage() {
       setImportCaType('user')
       setImportPrivateKey('')
       loadData()
+      if (response?.data?.id) setSelectedCA(response.data)
     } catch (error) {
       setImportPrivateKey('')
       showError(error.message || t('messages.errors.createFailed.sshCa'))

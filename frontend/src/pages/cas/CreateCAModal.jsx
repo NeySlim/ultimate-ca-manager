@@ -5,7 +5,7 @@
  *   open       — boolean, whether modal is open
  *   onClose    — called when modal should close
  *   cas        — array of existing CAs (for parent CA select dropdown)
- *   onSuccess  — called after CA is successfully created
+ *   onSuccess  — called with the new CA after it is created
  */
 import { useState, useEffect, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
@@ -274,7 +274,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         showSuccess(t('messages.success.create.ca'))
       }
       onClose()
-      onSuccess()
+      onSuccess(created)
     } catch (error) {
       showError(error.message || t('cas.createFailed'))
     } finally {
