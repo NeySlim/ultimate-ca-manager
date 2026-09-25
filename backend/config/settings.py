@@ -149,7 +149,8 @@ class Config:
     if _db_url:
         # PostgreSQL or external database (HA mode)
         # Format: postgresql://user:password@host:port/dbname
-        SQLALCHEMY_DATABASE_URI = _db_url
+        from utils.db_url import sqlalchemy_url
+        SQLALCHEMY_DATABASE_URI = sqlalchemy_url(_db_url)
         DATABASE_TYPE = "postgresql" if "postgresql" in _db_url else "external"
     else:
         # SQLite (standalone mode)

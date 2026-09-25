@@ -24,6 +24,8 @@ from typing import Dict, List, Tuple
 
 from sqlalchemy import create_engine, inspect, text
 
+from utils.db_url import sqlalchemy_url
+
 from .copy import (
     CopyError,
     consistent_live_source,
@@ -326,7 +328,7 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
     }
     target_engine = None
     try:
-        target_engine = create_engine(target_url, pool_pre_ping=True)
+        target_engine = create_engine(sqlalchemy_url(target_url), pool_pre_ping=True)
         target_is_pg = target_url.startswith("postgresql")
 
         if _target_has_users(target_engine):
@@ -418,7 +420,7 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
 
     target_engine = None
     try:
-        target_engine = create_engine(target_url, pool_pre_ping=True)
+        target_engine = create_engine(sqlalchemy_url(target_url), pool_pre_ping=True)
         target_is_pg = target_url.startswith("postgresql")
 
         # 1. Nothing is touched until the target is known to be empty.

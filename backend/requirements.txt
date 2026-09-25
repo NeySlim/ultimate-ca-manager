@@ -5,6 +5,8 @@
 Flask==3.1.3
 Flask-RESTX==1.3.2
 Flask-SQLAlchemy==3.1.1
+# 2.1 resolves postgresql:// to psycopg 3 and has not been validated yet
+SQLAlchemy>=2.0,<2.1
 Flask-Migrate==4.1.0
 Flask-CORS==6.0.2
 Flask-Limiter==4.1.1
