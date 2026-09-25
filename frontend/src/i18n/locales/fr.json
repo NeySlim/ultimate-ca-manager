@@ -3276,6 +3276,7 @@
     "intermediateCAs": "AC intermédiaires",
     "keyUsageWarning": "Assurez-vous que l'utilisation de la clé correspond à l'usage prévu.",
     "importDescription": "Importer un modèle de certificat depuis un fichier JSON",
+    "importSummary": "Importés : {{imported}}, mis à jour : {{updated}}, ignorés : {{skipped}}",
     "templateFile": "Fichier modèle (JSON)",
     "pasteJsonContent": "Coller le contenu JSON",
     "orPasteJson": "OU coller le contenu JSON",

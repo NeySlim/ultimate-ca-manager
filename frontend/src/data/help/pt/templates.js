@@ -15,13 +15,13 @@ export default {
         title: 'Recursos',
         items: [
           { label: 'Tipo', text: 'Web Server, Email, VPN Server ou Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Define os padrões de Key Usage, EKU e SAN' },
-          { label: 'Padrões de Sujeito', text: 'Pré-preencher Organização, OU, País, Estado, Cidade' },
+          { label: 'Padrões de Sujeito', text: 'Pré-preencher Organização, OU, País, Estado, Cidade e Email. Em certificados Email e combinados, o Email também se torna um SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, etc.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
           { label: 'Validade', text: 'Período de validade padrão em dias' },
           { label: 'Duplicar', text: 'Clonar um modelo existente e modificá-lo' },
           { label: 'Mostrar sistema', text: 'Oculte os modelos incluídos para trabalhar apenas com os seus. Lembrado por navegador' },
-          { label: 'Importar/Exportar', text: 'Compartilhar modelos como arquivos JSON entre instâncias UCM' },
+          { label: 'Importar/Exportar', text: 'Compartilhar modelos como arquivos JSON entre instâncias UCM, um modelo ou um arquivo de Exportar tudo' },
         ]
       },
       {
@@ -66,7 +66,7 @@ Autoridades certificadoras não são criadas a partir de modelos: crie-as na pá
 1. Clique em **Criar Modelo**
 2. Insira um **nome** e descrição opcional
 3. Selecione o **tipo** do modelo: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Ele define os padrões de Key Usage, Extended Key Usage e SAN, que você pode alterar em seguida
-4. Configure **padrões de Sujeito** (O, OU, C, ST, L)
+4. Configure **padrões de Sujeito** (O, OU, C, ST, L, CN, Email). Em certificados Email e combinados, o Email também se torna um SAN de email
 5. Selecione flags de **Key Usage**
 6. Selecione valores de **Extended Key Usage**
 7. Defina o **período de validade** padrão em dias
@@ -110,8 +110,10 @@ Exporte modelos como JSON para compartilhar entre instâncias UCM.
 
 ### Importar
 Importe de:
-- **Arquivo JSON**: Envie um arquivo JSON de modelo
+- **Arquivo JSON**: Envie um arquivo JSON de modelo, um modelo ou um arquivo de **Exportar tudo**
 - **Colar JSON**: Cole JSON diretamente na área de texto
+
+Um modelo cujo nome já existe é ignorado, e a importação informa quais foram.
 
 ## Exemplos Comuns de Modelos
 

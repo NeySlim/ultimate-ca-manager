@@ -1049,3 +1049,42 @@ class TestExportImportFidelity:
         assert r.status_code == 200
         assert get_json(r)['data']['imported'] == 1
         self._assert_not_double_encoded(self._by_name(auth_client, payload['name']))
+
+
+class TestImportFollowUps:
+    """What the template import reports and stores beyond a clean round-trip."""
+
+    def _import(self, auth_client, payload):
+        return auth_client.post('/api/v2/templates/import',
+                                data={'json_content': json.dumps(payload)},
+                                content_type='multipart/form-data')
+
+    def _by_name(self, auth_client, name):
+        r = auth_client.get('/api/v2/templates?per_page=1000')
+        return next(t for t in get_json(r)['data'] if t['name'] == name)
+
+    def test_a_null_setting_is_stored_as_empty(self, auth_client):
+        r, _ = _create_template(auth_client, name='Follow-up Null DN', dn_template=None,
+                                pinned_subject_fields=None)
+        assert r.status_code == 201
+        tpl = self._by_name(auth_client, 'Follow-up Null DN')
+        assert tpl['dn_template'] == {}
+        assert tpl['pinned_subject_fields'] == {}
+
+    def test_an_entry_that_is_not_a_template_is_skipped(self, auth_client):
+        r = self._import(auth_client, [['not', 'a', 'template'], {'name': 'Follow-up Beside Junk'}])
+        assert r.status_code == 200
+        data = get_json(r)['data']
+        assert (data['imported'], data['skipped']) == (1, 1)
+
+    def test_skipped_templates_are_named(self, auth_client):
+        _create_template(auth_client, name='Follow-up Existing')
+        r = self._import(auth_client, {'name': 'Follow-up Existing'})
+        assert get_json(r)['data']['skipped_items'] == ['Follow-up Existing (already exists)']
+
+    def test_the_audit_names_what_was_imported(self, app, auth_client):
+        from models import AuditLog
+        self._import(auth_client, {'name': 'Follow-up Audited', 'autoenroll_enabled': True})
+        with app.app_context():
+            entry = AuditLog.query.filter_by(action='template_import').order_by(AuditLog.id.desc()).first()
+        assert 'Follow-up Audited' in entry.details

@@ -335,13 +335,13 @@ export const helpContent = {
         icon: Gear,
         items: [
           { label: 'Type', text: 'Web Server, Email, VPN Server or Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon or Custom. Sets the Key Usage, EKU and SAN defaults' },
-          { label: 'Subject Defaults', text: 'Pre-fill Organization, OU, Country, State, City' },
+          { label: 'Subject Defaults', text: 'Pre-fill Organization, OU, Country, State, City and Email. On Email and combined certificates the Email also becomes a SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, etc.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
           { label: 'Validity', text: 'Default validity period in days' },
           { label: 'Duplicate', text: 'Clone an existing template and modify it' },
           { label: 'Show system', text: 'Hide the built-in templates to work with your own only. Remembered per browser' },
-          { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances' },
+          { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances, one template or an Export All file' },
         ]
       },
       {

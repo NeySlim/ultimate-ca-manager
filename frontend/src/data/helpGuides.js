@@ -588,7 +588,7 @@ Certificate authorities are not made from templates: create them on the **CAs** 
 1. Click **Create Template**
 2. Enter a **name** and optional description
 3. Select the template **type**: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon or Custom. It sets the Key Usage, Extended Key Usage and SAN defaults, which you can then change
-4. Configure **Subject defaults** (O, OU, C, ST, L)
+4. Configure **Subject defaults** (O, OU, C, ST, L, CN, Email). On Email and combined certificates, the Email also becomes an email SAN
 5. Select **Key Usage** flags
 6. Select **Extended Key Usage** values
 7. Set the **default validity** period in days
@@ -632,8 +632,10 @@ Export templates as JSON for sharing between UCM instances.
 
 ### Import
 Import from:
-- **JSON file**: Upload a template JSON file
+- **JSON file**: Upload a template JSON file, one template or an **Export All** file
 - **JSON paste**: Paste JSON directly into the text area
+
+A template whose name already exists is skipped, and the import says which ones were.
 
 ## Common Template Examples
 

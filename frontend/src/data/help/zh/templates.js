@@ -15,13 +15,13 @@ export default {
         title: '功能',
         items: [
           { label: '类型', text: 'Web Server、Email、VPN Server 或 Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon 或自定义。决定密钥用途、扩展密钥用途和 SAN 的默认值' },
-          { label: '主题默认值', text: '预填组织、OU、国家、省/州、城市' },
+          { label: '主题默认值', text: '预填组织、OU、国家、省/州、城市和 Email。在 Email 及组合证书上，Email 也会成为 SAN' },
           { label: '密钥用途', text: '数字签名、密钥加密等' },
           { label: '扩展密钥用途', text: '服务器认证、客户端认证、代码签名、邮件保护' },
           { label: '有效期', text: '以天为单位的默认有效期' },
           { label: '复制', text: '克隆现有模板并进行修改' },
           { label: '显示系统模板', text: '隐藏内置模板，只处理您自己的模板。每个浏览器单独记住此选择' },
-          { label: '导入/导出', text: '在 UCM 实例之间以 JSON 文件共享模板' },
+          { label: '导入/导出', text: '在 UCM 实例之间以 JSON 文件共享模板，可以是单个模板，也可以是 导出全部 文件' },
         ]
       },
       {
@@ -66,7 +66,7 @@ export default {
 1. 点击**创建模板**
 2. 输入**名称**和可选描述
 3. 选择模板**类型**：Web Server、Email、VPN Server、VPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon 或自定义。它决定密钥用途、扩展密钥用途和 SAN 的默认值，之后您可以再修改
-4. 配置**主题默认值**（组织、OU、国家等）
+4. 配置**主题默认值**（O、OU、C、ST、L、CN、Email）。在 Email 及组合证书上，Email 也会成为 email SAN
 5. 选择**密钥用途**（数字签名、密钥加密等）
 6. 选择**扩展密钥用途**（服务器认证、客户端认证等）
 7. 设置**有效期**（天数）
@@ -115,8 +115,10 @@ export default {
 
 ### 导入
 导入来源：
-- **JSON 文件**: 上传模板 JSON 文件
+- **JSON 文件**: 上传模板 JSON 文件，可以是单个模板，也可以是 **导出全部** 文件
 - **JSON 粘贴**: 直接将 JSON 粘贴到文本区域
+
+名称已存在的模板会被跳过，导入结果会说明哪些模板被跳过。
 
 ## 常用示例
 

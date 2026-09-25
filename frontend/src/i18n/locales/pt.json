@@ -1146,6 +1146,7 @@
     "intermediateCAs": "ACs Intermédias",
     "keyUsageWarning": "Certifique-se de que a utilização da chave e a utilização estendida da chave correspondem à finalidade prevista do certificado.",
     "importDescription": "Importe um modelo de certificado a partir de um ficheiro JSON ou cole conteúdo JSON",
+    "importSummary": "Importados: {{imported}}, atualizados: {{updated}}, ignorados: {{skipped}}",
     "templateFile": "Modelo Ficheiro JSONN)",
     "pasteJsonContent": "Colar JSON Content",
     "orPasteJson": "ou paste JSON content",

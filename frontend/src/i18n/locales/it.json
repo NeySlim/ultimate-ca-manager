@@ -1146,6 +1146,7 @@
     "intermediateCAs": "CA Intermedie",
     "keyUsageWarning": "Assicurati che Key Usage e Extended Key Usage corrispondano allo scopo previsto del certificato.",
     "importDescription": "Importa un template di certificato da un file JSON o incolla il contenuto JSON",
+    "importSummary": "Importati: {{imported}}, aggiornati: {{updated}}, ignorati: {{skipped}}",
     "templateFile": "File Template (JSON)",
     "pasteJsonContent": "Incolla Contenuto JSON",
     "orPasteJson": "O incolla contenuto JSON",

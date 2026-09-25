@@ -144,9 +144,7 @@ export default function TemplatesPage() {
     if (!importFile && !importJson.trim()) return
     setImporting(true)
     try {
-      // Use the dedicated import endpoint: it understands the export format
-      // (JSON-string dn/extensions templates, single object or array) and
-      // reports per-template imported/updated/skipped results.
+      // The import endpoint reads the export format, one template or an array
       const formData = new FormData()
       if (importFile) {
         formData.append('file', importFile)
@@ -154,9 +152,10 @@ export default function TemplatesPage() {
         formData.append('json_content', importJson)
       }
       const res = await templatesService.import(formData)
-      const { imported = 0, updated = 0, skipped = 0 } = res?.data || {}
-      if (skipped > 0) {
-        showWarning(res?.message || t('messages.errors.importFailed.template'))
+      const { imported = 0, updated = 0, skipped = 0, skipped_items: items = [] } = res?.data || {}
+      if (skipped > 0 || imported + updated === 0) {
+        const summary = t('templates.importSummary', { imported, updated, skipped })
+        showWarning(items.length ? `${summary}: ${items.join(', ')}` : summary)
       } else {
         showSuccess(t('messages.success.import.template'))
       }
@@ -907,7 +906,8 @@ function TemplateForm({ template, onSubmit, onCancel }) {
           <Input label="OU" value={formData.subject.OU} onChange={(e) => updateSubject('OU', e.target.value)} placeholder="IT Department" />
           <Input label={t('templates.commonName')} value={formData.subject.CN} onChange={(e) => updateSubject('CN', e.target.value)} placeholder={t('templates.cnPlaceholder')} />
           <div className="col-span-3">
-            <Input label={t('common.email')} type="email" value={formData.subject.emailAddress} onChange={(e) => updateSubject('emailAddress', e.target.value)} placeholder={t('certificates.emailPlaceholder')} />
+            {/* Not type="email": copies of built-in templates hold the {email} placeholder */}
+            <Input label={t('common.email')} value={formData.subject.emailAddress} onChange={(e) => updateSubject('emailAddress', e.target.value)} placeholder={t('certificates.emailPlaceholder')} />
           </div>
         </div>
         <label className={`${checkboxCls} mt-3`}>

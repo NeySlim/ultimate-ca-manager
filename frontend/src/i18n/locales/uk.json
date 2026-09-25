@@ -1146,6 +1146,7 @@
     "intermediateCAs": "Проміжні CA",
     "keyUsageWarning": "Переконайтеся, що використання ключа (Key Usage) та розширене використання ключа (Extended Key Usage) відповідають призначенню вашого сертифіката.",
     "importDescription": "Імпорт a certificate template from a JSON file or paste JSON content",
+    "importSummary": "Імпортовано: {{imported}}, оновлено: {{updated}}, пропущено: {{skipped}}",
     "templateFile": "Файл шаблону (JSON)",
     "pasteJsonContent": "Вставити вміст JSON",
     "orPasteJson": "АБО вставте вміст JSON",

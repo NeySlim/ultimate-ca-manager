@@ -1146,6 +1146,7 @@
     "intermediateCAs": "中間CA",
     "keyUsageWarning": "キー使用法と拡張キー使用法が証明書の意図された用途と一致していることを確認してください。",
     "importDescription": "JSONファイルから証明書テンプレートをインポートするか、JSONコンテンツを貼り付けます",
+    "importSummary": "インポート: {{imported}}、更新: {{updated}}、スキップ: {{skipped}}",
     "templateFile": "テンプレートファイル (JSON)",
     "pasteJsonContent": "JSONコンテンツを貼り付け",
     "orPasteJson": "またはJSONコンテンツを貼り付け",

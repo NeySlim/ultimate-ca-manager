@@ -1146,6 +1146,7 @@
     "intermediateCAs": "Intermediate CAs",
     "keyUsageWarning": "Ensure Key Usage and Extended Key Usage match your certificate's intended purpose.",
     "importDescription": "Import a certificate template from a JSON file or paste JSON content",
+    "importSummary": "Imported {{imported}}, updated {{updated}}, skipped {{skipped}}",
     "templateFile": "Template File (JSON)",
     "pasteJsonContent": "Paste JSON Content",
     "orPasteJson": "OR paste JSON content",

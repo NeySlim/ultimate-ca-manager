@@ -1146,6 +1146,7 @@
     "intermediateCAs": "Zwischen-CAs",
     "keyUsageWarning": "Schlüsselverwendung muss zum Zweck passen.",
     "importDescription": "Vorlage aus JSON-Datei importieren",
+    "importSummary": "Importiert: {{imported}}, aktualisiert: {{updated}}, übersprungen: {{skipped}}",
     "templateFile": "Vorlagendatei (JSON)",
     "pasteJsonContent": "JSON-Inhalt einfügen",
     "orPasteJson": "ODER JSON-Inhalt einfügen",

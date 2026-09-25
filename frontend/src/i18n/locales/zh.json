@@ -1146,6 +1146,7 @@
     "intermediateCAs": "中间 CA",
     "keyUsageWarning": "确保密钥用法和扩展密钥用法与证书的预期用途匹配。",
     "importDescription": "从 JSON 文件导入证书模板或粘贴 JSON 内容",
+    "importSummary": "已导入：{{imported}}，已更新：{{updated}}，已跳过：{{skipped}}",
     "templateFile": "模板文件 (JSON)",
     "pasteJsonContent": "粘贴 JSON 内容",
     "orPasteJson": "或粘贴 JSON 内容",

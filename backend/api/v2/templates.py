@@ -89,15 +89,15 @@ def _clean_pinned_subject_fields(raw):
 
 
 def _coerce_json_object_fields(tpl_data):
-    """Returns err_msg or None. Coerces dn_template / extensions_template /
-    pinned_subject_fields to dicts in place. Exports carry the first two as
-    JSON strings while API payloads carry objects; storing a string as-is
-    would double-encode it (json.dumps of a str) and the template would
-    silently lose its subject/extension settings."""
+    """Turn these settings into dicts in place, from an object or a JSON
+    string (the export format); returns an error message or None."""
     for key in ('dn_template', 'extensions_template', 'pinned_subject_fields'):
-        if key not in tpl_data or tpl_data[key] is None:
+        if key not in tpl_data:
             continue
         value = tpl_data[key]
+        if value is None:
+            tpl_data[key] = {}
+            continue
         if isinstance(value, str):
             if not value.strip():
                 tpl_data[key] = {}
@@ -608,11 +608,8 @@ def duplicate_template(template_id):
 
 
 def _template_export_dict(template):
-    """Portable representation of a template for export/import.
-
-    dn_template / extensions_template stay JSON strings (the historical
-    export format) so files remain importable by older UCM versions; the
-    importer accepts either strings or objects for them."""
+    """A template as exported; dn/extensions stay JSON strings so older UCM
+    versions can still import the file."""
     return {
         'name': template.name,
         'description': template.description,
@@ -717,6 +714,9 @@ def import_template():
         skipped = []
         
         for tpl_data in templates_to_import:
+            if not isinstance(tpl_data, dict):
+                skipped.append('Entry that is not a template')
+                continue
             if not tpl_data.get('name'):
                 skipped.append('Template without name')
                 continue
@@ -790,7 +790,10 @@ def import_template():
             action='template_import',
             resource_type='template',
             resource_name='Template Import',
-            details=f'Imported {len(imported)} templates, updated {len(updated)}, skipped {len(skipped)}',
+            # Names too: an import can switch autoenrollment on for a template
+            details=(f'Imported {len(imported)} templates, updated {len(updated)}, '
+                     f'skipped {len(skipped)}; imported: {", ".join(imported) or "-"}; '
+                     f'updated: {", ".join(updated) or "-"}'),
             success=True
         )
         
@@ -807,7 +810,8 @@ def import_template():
             data={
                 'imported': len(imported),
                 'updated': len(updated),
-                'skipped': len(skipped)
+                'skipped': len(skipped),
+                'skipped_items': skipped,
             },
             message=' | '.join(msg_parts) or 'No templates imported'
         )
