@@ -648,7 +648,7 @@ def create_scep_profile():
         created_by=getattr(g.current_user, 'username', None),
     )
     _apply_challenge(profile, (data.get('challenge_password') or '').strip())
-    if profile.intune_enabled or 'intune_app_id' in data:
+    if profile.intune_enabled or data.get('intune_app_id'):
         try:
             app, err = _intune_app_for(data, None)
         except IntuneAppConflict as conflict:

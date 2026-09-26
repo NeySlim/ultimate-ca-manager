@@ -56,6 +56,19 @@ class TestIntuneProfileValidation:
         assert prof['intune_client_secret_set'] is True
         assert 'intune_client_secret' not in prof
 
+    def test_create_intune_off_ignores_null_app_id(self, auth_client, create_ca):
+        # The profile form sends intune_app_id=null whenever Intune is off.
+        ca = create_ca(cn='Intune Off Null App CA')
+        r = _create_profile(
+            auth_client, name='static-challenge', ca_id=ca['id'],
+            auto_approve=False, intune_enabled=False, intune_app_id=None,
+            challenge_password='static-secret',
+        )
+        assert r.status_code == 200, r.data
+        prof = get_json(r)['data']
+        assert prof['intune_enabled'] is False
+        assert prof['intune_app_id'] is None
+
     def test_patch_enabling_intune_checks_existing_auto_approve(self, auth_client, create_ca):
         # A profile created WITHOUT auto_approve, then PATCHed to enable
         # Intune without also flipping auto_approve, must still be rejected
