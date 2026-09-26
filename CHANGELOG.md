@@ -10,7 +10,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Fixed
-- Creating a SCEP profile with a static challenge and Intune validation off failed with "Intune SCEP challenge validation requires an app registration", because the form sends an empty app registration that create treated as a request to bind one (#374, reported by @CrazyManLabs, contributed by @Hemsby).
+- Creating a SCEP profile with a static challenge and Intune validation off failed with "requires an app registration"; it now saves (#374, reported by @CrazyManLabs, by @Hemsby).
 
 ## [2.234] - 2026-09-25
 
