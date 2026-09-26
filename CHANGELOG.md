@@ -7,7 +7,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [Unreleased]
+## [2.235] - 2026-09-26
 
 ### Fixed
 - Creating a SCEP profile with a static challenge and Intune validation off failed with "requires an app registration"; it now saves (#374, reported by @CrazyManLabs, by @Hemsby).
