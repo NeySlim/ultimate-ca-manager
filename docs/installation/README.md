@@ -175,7 +175,7 @@ After installation:
 
 - [Docker Deployment Guide](docker.md)
 - [Upgrade Guide](../../UPGRADE.md)
-- [Redis for HA](../REDIS.md)
+- [Redis (future high-availability mode)](../REDIS.md)
 
 ---
 
