@@ -7,7 +7,6 @@ Comprehensive tests for all settings endpoints:
 - Email settings (GET/PATCH, test, template CRUD, preview, reset)
 - Notification settings (GET/PATCH, logs)
 - Audit logs (GET)
-- LDAP settings (GET/PATCH, test)
 - Webhooks (list, create, delete, test)
 
 Uses shared conftest fixtures: app, client, auth_client.
@@ -126,19 +125,6 @@ class TestAuthRequired:
     def test_get_audit_logs_requires_auth(self, client):
         response = client.get('/api/v2/settings/audit-logs')
         assert response.status_code == 401, response.data
-
-    # LDAP
-    def test_get_ldap_requires_auth(self, client):
-        response = client.get('/api/v2/settings/ldap')
-        assert response.status_code == 401, response.data
-
-    def test_patch_ldap_requires_auth(self, client):
-        r = patch_json(client, '/api/v2/settings/ldap', {'enabled': True})
-        assert r.status_code == 401, r.data
-
-    def test_test_ldap_requires_auth(self, client):
-        r = post_json(client, '/api/v2/settings/ldap/test', {})
-        assert r.status_code == 401, r.data
 
 
 
@@ -584,59 +570,20 @@ class TestAuditLogs:
 
 
 # ============================================================
-# LDAP Settings
+# Legacy LDAP settings endpoint (removed)
 # ============================================================
 
-class TestLDAPSettings:
-    """GET/PATCH /api/v2/settings/ldap, test connection."""
+class TestLegacyLDAPSettingsRemoved:
+    """LDAP lives on SSO providers; the old settings routes must stay gone."""
 
-    def test_get_ldap_settings(self, auth_client):
-        r = auth_client.get('/api/v2/settings/ldap')
-        data = assert_success(r)
-        assert 'enabled' in data
-        assert 'port' in data
-        assert 'base_dn' in data
-        assert 'user_filter' in data
-
-    def test_get_ldap_defaults(self, auth_client):
-        r = auth_client.get('/api/v2/settings/ldap')
-        data = assert_success(r)
-        assert data['enabled'] is False
-        assert data['port'] == 389
-        assert data['use_ssl'] is False
-
-    def test_patch_ldap_settings(self, auth_client):
-        r = patch_json(auth_client, '/api/v2/settings/ldap', {
-            'enabled': True,
-            'server': 'ldap.test.local',
-            'port': 636,
-            'use_ssl': True,
-            'base_dn': 'dc=test,dc=local',
-            'bind_dn': 'cn=admin,dc=test,dc=local',
-        })
-        assert_success(r)
-
-    def test_patch_ldap_no_data(self, auth_client):
-        r = auth_client.patch('/api/v2/settings/ldap',
-                              data=None,
-                              content_type=CONTENT_JSON)
-        assert_error(r, 400)
-
-    def test_test_ldap_connection(self, auth_client):
-        """LDAP test will fail without server — should return error, not crash."""
-        r = post_json(auth_client, '/api/v2/settings/ldap/test', {
-            'server': 'nonexistent.test.local',
-            'port': 389,
-            'bind_dn': 'cn=admin,dc=test,dc=local',
-            'bind_password': 'secret',
-        })
-        # 400 (connection failed) or 501 (ldap3 not installed) — not 500 unhandled
-        assert r.status_code in (200, 400, 501)
-
-    def test_test_ldap_no_body(self, auth_client):
-        """Test with empty body should still not crash."""
-        r = post_json(auth_client, '/api/v2/settings/ldap/test', {})
-        assert r.status_code in (200, 400, 501)
+    @pytest.mark.parametrize('method,path', [
+        ('get', '/api/v2/settings/ldap'),
+        ('patch', '/api/v2/settings/ldap'),
+        ('post', '/api/v2/settings/ldap/test'),
+    ])
+    def test_route_not_registered(self, auth_client, method, path):
+        r = getattr(auth_client, method)(path, json={'server': 'ldap.test.local'})
+        assert r.status_code in (404, 405), r.data
 
 
 class TestEmailAuthMethodNone:

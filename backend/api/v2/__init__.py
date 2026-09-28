@@ -45,7 +45,6 @@ from api.v2.settings import general  # noqa: F401
 from api.v2.settings import backup  # noqa: F401
 from api.v2.settings import email  # noqa: F401
 from api.v2.settings import notifications  # noqa: F401
-from api.v2.settings import ldap  # noqa: F401
 from api.v2.settings import auto_renewal  # noqa: F401
 from api.v2.settings import public_endpoints  # noqa: F401
 # System: import package (creates bp) then all route modules

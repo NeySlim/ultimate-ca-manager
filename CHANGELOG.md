@@ -7,6 +7,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
+## [Unreleased]
+
+### Removed
+- The `/api/v2/settings/ldap` routes, which the interface never called: they returned fixed values, saved settings nothing read, and tested a connection to any server given. LDAP is configured and tested on SSO providers.
+
 ## [2.235] - 2026-09-26
 
 ### Fixed

@@ -1806,29 +1806,6 @@ Content-Type: application/json
 }
 ```
 
-### LDAP Settings
-```http
-# Get settings
-GET /api/v2/settings/ldap
-
-# Update settings
-PATCH /api/v2/settings/ldap
-Content-Type: application/json
-
-{
-  "enabled": true,
-  "server": "ldap.example.com",
-  "port": 389,
-  "use_tls": true,
-  "base_dn": "dc=example,dc=com",
-  "bind_dn": "cn=admin,dc=example,dc=com",
-  "bind_password": "password"
-}
-
-# Test connection
-POST /api/v2/settings/ldap/test
-```
-
 ### Webhooks
 ```http
 # List webhooks
