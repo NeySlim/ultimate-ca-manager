@@ -19,6 +19,7 @@ import importlib.util
 import json
 import logging
 import re
+import socket
 import time
 from collections import deque
 from dataclasses import dataclass
@@ -152,7 +153,12 @@ def _ensure_json_serializable(value: Any) -> None:
 # Initialization
 # ---------------------------------------------------------------------------
 
-_QUEUE_SCHEMES = ("redis", "rediss", "unix", "redis+sentinel")
+_QUEUE_SCHEMES = ("redis", "rediss", "unix")
+_KEEPALIVE_OPTIONS = {
+    opt: value
+    for name, value in (("TCP_KEEPIDLE", 10), ("TCP_KEEPINTVL", 5), ("TCP_KEEPCNT", 3))
+    if (opt := getattr(socket, name, None)) is not None
+}
 
 
 def _queue_channel(url: str, key_prefix: str) -> str:
@@ -163,8 +169,6 @@ def _queue_channel(url: str, key_prefix: str) -> str:
         parts = [part for part in parsed.path.split("/") if part]
         if parsed.scheme in ("redis", "rediss") and parts:
             db = parts[0]
-        elif parsed.scheme == "redis+sentinel" and len(parts) > 1:
-            db = parts[1]
     return f"{key_prefix}socketio:{db or 0}"
 
 
@@ -179,11 +183,16 @@ def _message_queue(app) -> Optional[socketio_pkg.RedisManager]:
     if urlparse(url).scheme not in _QUEUE_SCHEMES:
         logger.warning("Unsupported Redis URL scheme, WebSocket events stay on this instance")
         return None
-    # A connect timeout bounds each emit when Redis is unreachable.
+    # Bound each emit on an unreachable or silently dead Redis; a read timeout
+    # would also hit the idle pub/sub listener, so keepalive detects dead peers.
     return socketio_pkg.RedisManager(
         url,
         channel=_queue_channel(url, app.config.get("SESSION_KEY_PREFIX", "ucm:session:")),
-        redis_options={"socket_connect_timeout": 2},
+        redis_options={
+            "socket_connect_timeout": 2,
+            "socket_keepalive": True,
+            "socket_keepalive_options": _KEEPALIVE_OPTIONS,
+        },
     )
 
 

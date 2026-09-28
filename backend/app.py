@@ -254,8 +254,9 @@ def create_app(config_name=None):
             import redis
             app.config['SESSION_REDIS'] = redis.from_url(redis_url)
             app.logger.info("✓ Redis session store enabled")
-        except ImportError:
-            app.logger.warning("⚠ redis library not installed, falling back to filesystem sessions")
+        except (ImportError, ValueError) as exc:
+            reason = "redis library not installed" if isinstance(exc, ImportError) else "unsupported Redis URL"
+            app.logger.warning(f"⚠ {reason}, falling back to filesystem sessions")
             app.config['SESSION_TYPE'] = 'filesystem'
             app.config['SESSION_FILE_DIR'] = config.DATA_DIR / 'sessions'
     

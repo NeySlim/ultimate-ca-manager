@@ -71,14 +71,15 @@ class TestMessageQueue:
         monkeypatch.setattr(importlib.util, 'find_spec', lambda name: None)
         assert events._message_queue(app) is None
 
-    def test_unsupported_scheme_stays_local(self, app, monkeypatch, redis_present, built):
-        monkeypatch.setenv('REDIS_URL', 'amqp://cache:5672/')
+    @pytest.mark.parametrize('url', ['amqp://cache:5672/', 'redis+sentinel://s1:26379/0/ucm'])
+    def test_unsupported_scheme_stays_local(self, app, monkeypatch, redis_present, built, url):
+        monkeypatch.setenv('REDIS_URL', url)
         assert events._message_queue(app) is None
         assert built == []
 
     @pytest.mark.parametrize('url', [
         'redis://cache:6379/0', 'rediss://cache:6380/0',
-        'unix:///run/redis/redis.sock', 'redis+sentinel://s1:26379/ucm/0',
+        'unix:///run/redis/redis.sock',
     ])
     def test_manager_bounds_connect_time(self, app, monkeypatch, redis_present, built, url):
         monkeypatch.setenv('REDIS_URL', url)
@@ -86,6 +87,7 @@ class TestMessageQueue:
         (seen_url, kw), = built
         assert seen_url == url
         assert kw['redis_options']['socket_connect_timeout'] == 2
+        assert kw['redis_options']['socket_keepalive'] is True
 
     def test_legacy_variable_name_is_read(self, app, monkeypatch, redis_present, built):
         monkeypatch.delenv('REDIS_URL', raising=False)
@@ -97,7 +99,6 @@ class TestMessageQueue:
         ('redis://cache:6379/1', '1'),
         ('rediss://:secret@cache:6380/4', '4'),
         ('unix:///run/redis/redis.sock?db=2', '2'),
-        ('redis+sentinel://s1:26379,s2:26379/ucm/3', '3'),
     ])
     def test_channel_follows_database(self, url, db):
         assert events._queue_channel(url, 'ucm:session:') == f'ucm:session:socketio:{db}'

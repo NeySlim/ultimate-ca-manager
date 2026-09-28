@@ -10,6 +10,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Changed
+- Upgrade note: an installation that set `UCM_REDIS_URL` now really uses Redis, so its sessions move there and users sign in again; check that the URL points to a running Redis, or remove the variable.
 - When a Redis URL is set, WebSocket events also go through Redis, so a browser connected to one instance sees changes made on another; installations sharing a Redis server stay apart by database number.
 
 ### Fixed
