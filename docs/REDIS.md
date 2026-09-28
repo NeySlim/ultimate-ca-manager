@@ -1,6 +1,6 @@
 # Redis Integration Guide
 
-UCM supports Redis for distributed caching and rate limiting. Redis is **optional** - UCM works perfectly without it using in-memory storage.
+UCM can keep its sessions and relay its real-time events through Redis. Redis is **optional**: without it, sessions are stored on disk and events stay on the instance.
 
 ## When to Use Redis
 
@@ -9,15 +9,13 @@ UCM supports Redis for distributed caching and rate limiting. Redis is **optiona
 | Single UCM instance | No |
 | Multiple UCM instances (load balanced) | Yes |
 | High availability setup | Yes |
-| Persistent rate limiting across restarts | Yes |
-| UCM with many concurrent users | Recommended |
 
 ## Features Enabled by Redis
 
-- **Distributed Rate Limiting**: Limits are shared across all workers/instances
-- **Shared Cache**: Reduces memory usage and ensures cache consistency
-- **Persistent Sessions**: Sessions survive UCM restarts
-- **Real-time events across instances**: WebSocket events go through Redis, so a browser connected to one instance sees changes made on another (requires the `redis` Python package)
+- **Shared sessions**: a session opened on one instance is valid on the others, and survives restarts
+- **Real-time events across instances**: WebSocket events go through Redis, so a browser connected to one instance sees changes made on another
+
+Both need the `redis` Python package, which UCM packages do not install: `/opt/ucm/venv/bin/pip install redis` on a DEB or RPM installation. Without it, UCM logs a warning and keeps working without Redis.
 
 ---
 
@@ -77,17 +75,16 @@ Add to `/etc/ucm/ucm.env`:
 
 ```bash
 # Local Redis
-UCM_REDIS_URL=redis://localhost:6379/0
+REDIS_URL=redis://localhost:6379/0
 
 # Redis with password
-UCM_REDIS_URL=redis://:mypassword@localhost:6379/0
+REDIS_URL=redis://:mypassword@localhost:6379/0
 
 # Remote Redis
-UCM_REDIS_URL=redis://redis.example.com:6379/0
-
-# Redis Sentinel (high availability)
-UCM_REDIS_URL=redis+sentinel://sentinel1:26379,sentinel2:26379/mymaster/0
+REDIS_URL=redis://redis.example.com:6379/0
 ```
+
+`UCM_REDIS_URL`, the name earlier versions of this guide used, is read too. Instances sharing a Redis server stay apart by database number (`/0`, `/1`, ...): give each UCM installation its own.
 
 Then restart UCM:
 ```bash
@@ -101,14 +98,12 @@ sudo systemctl restart ucm
 Check UCM logs after restart:
 
 ```bash
-# Should show "Redis" instead of "Memory"
-journalctl -u ucm --no-pager | grep -i "cache\|rate"
+journalctl -u ucm --no-pager | grep -i redis
 ```
 
 Expected output:
 ```
-✓ Cache enabled (Redis)
-✓ Rate limiting enabled (Redis - distributed)
+✓ Redis session store enabled
 ```
 
 ---
@@ -148,8 +143,9 @@ sudo systemctl restart redis
 ### UCM not using Redis
 
 1. Check Redis is running: `redis-cli ping`
-2. Check UCM_REDIS_URL is set: `grep REDIS /etc/ucm/ucm.env`
-3. Check UCM logs: `journalctl -u ucm -n 50`
+2. Check REDIS_URL is set: `grep REDIS /etc/ucm/ucm.env`
+3. Check the `redis` Python package is installed: `/opt/ucm/venv/bin/python -c 'import redis'`
+4. Check UCM logs: `journalctl -u ucm -n 50`
 
 ### Connection refused
 

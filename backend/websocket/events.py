@@ -7,7 +7,7 @@ Production-focused Socket.IO implementation with:
 - Permission-scoped server-managed rooms.
 - No unrestricted/global sensitive event broadcasts.
 - Periodic session revalidation.
-- Redis message queue when REDIS_URL is set, so events reach every instance.
+- Redis message queue when a Redis URL is configured, so events reach every instance.
 - Strict room validation, subscription limits, and rate limits.
 - JSON-safe event payload validation.
 - Mandatory room protection.
@@ -18,17 +18,20 @@ from __future__ import annotations
 import importlib.util
 import json
 import logging
-import os
 import re
 import time
 from collections import deque
 from dataclasses import dataclass
 from functools import wraps
 from typing import Any, Callable, Deque, Dict, Iterable, Optional, Set, Tuple, Union
+from urllib.parse import parse_qs, urlparse
+
+import socketio as socketio_pkg
 
 from flask import current_app, request, session
 from flask_socketio import SocketIO, disconnect, emit, join_room, leave_room
 
+from config.settings import redis_url as config_redis_url
 from .event_types import EventType
 from utils.datetime_utils import utc_now
 
@@ -149,15 +152,39 @@ def _ensure_json_serializable(value: Any) -> None:
 # Initialization
 # ---------------------------------------------------------------------------
 
-def _message_queue_url() -> Optional[str]:
-    """REDIS_URL, shared with the session store, or None without the redis library."""
-    url = os.getenv("REDIS_URL")
+_QUEUE_SCHEMES = ("redis", "rediss", "unix", "redis+sentinel")
+
+
+def _queue_channel(url: str, key_prefix: str) -> str:
+    """Pub/sub ignores the Redis database number: scope the channel like the session keys."""
+    parsed = urlparse(url)
+    db = (parse_qs(parsed.query).get("db") or [None])[0]
+    if db is None:
+        parts = [part for part in parsed.path.split("/") if part]
+        if parsed.scheme in ("redis", "rediss") and parts:
+            db = parts[0]
+        elif parsed.scheme == "redis+sentinel" and len(parts) > 1:
+            db = parts[1]
+    return f"{key_prefix}socketio:{db or 0}"
+
+
+def _message_queue(app) -> Optional[socketio_pkg.RedisManager]:
+    """A Redis manager on the session store's URL, or None to stay on this instance."""
+    url = config_redis_url()
     if not url:
         return None
     if importlib.util.find_spec("redis") is None:
         logger.warning("redis library not installed, WebSocket events stay on this instance")
         return None
-    return url
+    if urlparse(url).scheme not in _QUEUE_SCHEMES:
+        logger.warning("Unsupported Redis URL scheme, WebSocket events stay on this instance")
+        return None
+    # A connect timeout bounds each emit when Redis is unreachable.
+    return socketio_pkg.RedisManager(
+        url,
+        channel=_queue_channel(url, app.config.get("SESSION_KEY_PREFIX", "ucm:session:")),
+        redis_options={"socket_connect_timeout": 2},
+    )
 
 
 def init_websocket(app) -> SocketIO:
@@ -186,13 +213,13 @@ def init_websocket(app) -> SocketIO:
             "CORS_ORIGINS must be a list of explicit http(s) origins"
         )
 
-    message_queue = _message_queue_url()
+    message_queue = _message_queue(app)
 
     socketio.init_app(
         app,
         async_mode=app.config.get("SOCKETIO_ASYNC_MODE", "gevent"),
         cors_allowed_origins=list(cors_origins),
-        message_queue=message_queue,
+        client_manager=message_queue,
         manage_session=False,
         logger=app.config.get("SOCKETIO_LOGGER", False),
         engineio_logger=app.config.get("ENGINEIO_LOGGER", False),
@@ -267,7 +294,7 @@ def _resolve_user_from_session() -> Optional[AuthResult]:
         return None
 
 
-def _authenticate_handshake(auth: Any = None) -> Optional[AuthResult]:
+def _authenticate_handshake() -> Optional[AuthResult]:
     """Authenticate the handshake from the Flask session."""
     return _resolve_user_from_session()
 
@@ -313,12 +340,7 @@ def authenticate_socket(f: Callable) -> Callable:
 
     @wraps(f)
     def decorated(*args, **kwargs):
-        auth = kwargs.get("auth")
-
-        if auth is None and args and isinstance(args[0], dict):
-            auth = args[0]
-
-        identity = _authenticate_handshake(auth)
+        identity = _authenticate_handshake()
 
         if identity is None:
             logger.warning(

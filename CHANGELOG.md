@@ -10,7 +10,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Changed
-- When `REDIS_URL` is set, WebSocket events also go through Redis, so a browser connected to one instance sees changes made on another.
+- When a Redis URL is set, WebSocket events also go through Redis, so a browser connected to one instance sees changes made on another; installations sharing a Redis server stay apart by database number.
+
+### Fixed
+- `UCM_REDIS_URL`, the variable the Redis guide and the Docker Compose overlay set, was never read, so Redis stayed unused. It is now read along with `REDIS_URL`.
+- The readiness probe answered 503 when a Redis URL was set without the `redis` Python package installed; the Redis check is now reported as skipped.
 
 ### Removed
 - WebSocket connections authenticated by an API key in the handshake, and the `reauth` event that renewed them: no client used them, and the browser connects with its session.

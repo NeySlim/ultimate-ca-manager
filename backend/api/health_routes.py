@@ -5,6 +5,7 @@ Endpoints for load balancers, monitoring, and readiness checks.
 import time
 from flask import Blueprint, jsonify, current_app
 from models import db
+from config.settings import redis_url as config_redis_url
 import os
 
 health_bp = Blueprint('health', __name__)
@@ -60,11 +61,11 @@ def readiness():
     }
     
     # Optional: check Redis if configured
-    redis_url = os.getenv("REDIS_URL")
+    redis_url = config_redis_url()
     if redis_url:
         checks['redis'] = _check_redis(redis_url)
     
-    all_ok = all(c.get('status') == 'ok' for c in checks.values())
+    all_ok = all(c.get('status') in ('ok', 'skipped') for c in checks.values())
     
     return jsonify({
         'status': 'ready' if all_ok else 'not_ready',

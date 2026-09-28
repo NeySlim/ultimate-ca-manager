@@ -32,6 +32,11 @@ except PermissionError:
     pass  # Directory should already exist from package install
 
 
+def redis_url() -> Optional[str]:
+    """REDIS_URL, or UCM_REDIS_URL, the name the Redis guide and compose overlay used."""
+    return os.getenv("REDIS_URL") or os.getenv("UCM_REDIS_URL") or None
+
+
 def is_docker():
     """Detect if running in Docker container"""
     return os.path.exists('/.dockerenv') or os.environ.get('UCM_DOCKER') == '1'
@@ -182,7 +187,7 @@ class Config:
     
     # Session Configuration - Flask server-side sessions
     # Supports filesystem (default) or Redis (HA mode)
-    _redis_url = os.getenv("REDIS_URL")
+    _redis_url = redis_url()
     
     if _redis_url:
         # Redis session store for HA deployments

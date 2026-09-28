@@ -20,7 +20,7 @@ from flasgger import Swagger
 # Add backend to path
 sys.path.insert(0, str(Path(__file__).parent))
 
-from config.settings import get_config, BASE_DIR
+from config.settings import get_config, BASE_DIR, redis_url as config_redis_url
 from config.https_manager import HTTPSManager
 from models import db, User, SystemConfig
 from websocket import socketio, init_websocket
@@ -248,7 +248,7 @@ def create_app(config_name=None):
     
     # Initialize server-side session storage
     # If Redis URL is configured, set up Redis connection
-    redis_url = os.getenv("REDIS_URL")
+    redis_url = config_redis_url()
     if redis_url:
         try:
             import redis
