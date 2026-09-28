@@ -75,8 +75,8 @@ google-cloud-kms>=2.21.0
 # Pre-built binary wheel — no compilation toolchain needed at install time.
 psycopg2-binary>=2.9.9
 
-# Redis session store (optional, install with: pip install redis)
-# redis>=5.0.0
+# Redis session store and Socket.IO message queue, used only when REDIS_URL is set
+redis>=5.0.0
 
 # Development & Testing
 pytest==9.0.3
