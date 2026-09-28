@@ -9,7 +9,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Changed
+- When `REDIS_URL` is set, WebSocket events also go through Redis, so a browser connected to one instance sees changes made on another.
+
 ### Removed
+- WebSocket connections authenticated by an API key in the handshake, and the `reauth` event that renewed them: no client used them, and the browser connects with its session.
 - The `/api/v2/settings/ldap` routes, which the interface never called: they returned fixed values, saved settings nothing read, and tested a connection to any server given. LDAP is configured and tested on SSO providers.
 
 ## [2.235] - 2026-09-26

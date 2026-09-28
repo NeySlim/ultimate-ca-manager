@@ -3,13 +3,11 @@ WebSocket events handler and emitter.
 
 Production-focused Socket.IO implementation with:
 
-- Authenticated connections only.
-- API keys accepted only via Socket.IO `auth` payload, never query strings.
+- Authenticated connections only (Flask session).
 - Permission-scoped server-managed rooms.
 - No unrestricted/global sensitive event broadcasts.
-- Session revalidation and bounded API-key reauthentication.
-- Redis-backed Socket.IO support for multi-worker deployments.
-- Optional Redis-backed shared presence metadata.
+- Periodic session revalidation.
+- Redis message queue when REDIS_URL is set, so events reach every instance.
 - Strict room validation, subscription limits, and rate limits.
 - JSON-safe event payload validation.
 - Mandatory room protection.
@@ -17,8 +15,10 @@ Production-focused Socket.IO implementation with:
 
 from __future__ import annotations
 
+import importlib.util
 import json
 import logging
+import os
 import re
 import time
 from collections import deque
@@ -37,15 +37,8 @@ logger = logging.getLogger(__name__)
 # Socket.IO instance. Initialized in init_websocket().
 socketio = SocketIO()
 
-# Worker-local socket cache.
-#
-# This is intentionally not authoritative across workers/processes. It is used
-# for fast per-socket request handling. Shared client presence is optionally
-# stored in Redis.
+# Worker-local socket state; counts and rooms are per worker by design.
 connected_clients: Dict[str, Dict[str, Any]] = {}
-
-_presence_redis = None
-_monitor_started = False
 
 
 # ---------------------------------------------------------------------------
@@ -54,10 +47,7 @@ _monitor_started = False
 
 _SOCKET_MIN_PERMISSION = "read:certificates"
 
-DEFAULT_API_KEY_REAUTH_SECONDS = 300
 DEFAULT_SESSION_REVALIDATE_SECONDS = 60
-DEFAULT_PRESENCE_TTL_SECONDS = 120
-DEFAULT_MONITOR_INTERVAL_SECONDS = 15
 
 MAX_ROOM_NAME_LENGTH = 128
 MAX_ROOMS_PER_REQUEST = 25
@@ -102,7 +92,7 @@ class AuthResult:
     user_id: Any
     username: Optional[str]
     permissions: Tuple[str, ...]
-    auth_method: str  # "session" or "api_key"
+    auth_method: str  # "session"
 
 
 # ---------------------------------------------------------------------------
@@ -155,32 +145,23 @@ def _ensure_json_serializable(value: Any) -> None:
         ) from exc
 
 
-def _presence_key(sid: str) -> str:
-    return f"websocket:client:{sid}"
-
-
-def _presence_index_key() -> str:
-    return "websocket:clients"
-
-
 # ---------------------------------------------------------------------------
 # Initialization
 # ---------------------------------------------------------------------------
 
+def _message_queue_url() -> Optional[str]:
+    """REDIS_URL, shared with the session store, or None without the redis library."""
+    url = os.getenv("REDIS_URL")
+    if not url:
+        return None
+    if importlib.util.find_spec("redis") is None:
+        logger.warning("redis library not installed, WebSocket events stay on this instance")
+        return None
+    return url
+
+
 def init_websocket(app) -> SocketIO:
-    """
-    Initialize Flask-SocketIO.
-
-    Recommended production configuration:
-
-        CORS_ORIGINS = ["https://app.example.com"]
-        SOCKETIO_MESSAGE_QUEUE = "redis://redis:6379/2"
-        SOCKETIO_PRESENCE_REDIS_URL = "redis://redis:6379/2"
-        SOCKETIO_REQUIRE_MESSAGE_QUEUE = True
-        SOCKETIO_REQUIRE_SHARED_PRESENCE = True
-    """
-    global _presence_redis
-
+    """Initialize Flask-SocketIO."""
     cors_origins = app.config.get("CORS_ORIGINS")
 
     if not cors_origins:
@@ -205,12 +186,7 @@ def init_websocket(app) -> SocketIO:
             "CORS_ORIGINS must be a list of explicit http(s) origins"
         )
 
-    message_queue = app.config.get("SOCKETIO_MESSAGE_QUEUE")
-
-    if app.config.get("SOCKETIO_REQUIRE_MESSAGE_QUEUE", False) and not message_queue:
-        raise RuntimeError(
-            "SOCKETIO_MESSAGE_QUEUE is required in this deployment"
-        )
+    message_queue = _message_queue_url()
 
     socketio.init_app(
         app,
@@ -224,153 +200,15 @@ def init_websocket(app) -> SocketIO:
         ping_interval=int(app.config.get("SOCKETIO_PING_INTERVAL", 25)),
     )
 
-    presence_url = app.config.get(
-        "SOCKETIO_PRESENCE_REDIS_URL",
-        message_queue,
-    )
-
-    if presence_url:
-        try:
-            import redis
-
-            _presence_redis = redis.Redis.from_url(
-                presence_url,
-                decode_responses=True,
-                socket_connect_timeout=2,
-                socket_timeout=2,
-                health_check_interval=30,
-            )
-            _presence_redis.ping()
-        except Exception as exc:
-            logger.exception("WebSocket Redis presence initialization failed")
-            raise RuntimeError(
-                "Could not initialize Redis-backed WebSocket presence"
-            ) from exc
-
-    elif app.config.get("SOCKETIO_REQUIRE_SHARED_PRESENCE", False):
-        raise RuntimeError(
-            "SOCKETIO_PRESENCE_REDIS_URL is required in this deployment"
-        )
-
-    _start_monitor_once(app)
-
     logger.info(
         "WebSocket initialized",
         extra={
             "async_mode": app.config.get("SOCKETIO_ASYNC_MODE", "gevent"),
             "message_queue_enabled": bool(message_queue),
-            "shared_presence_enabled": _presence_redis is not None,
         },
     )
 
     return socketio
-
-
-# ---------------------------------------------------------------------------
-# Shared presence
-# ---------------------------------------------------------------------------
-
-def _store_presence(sid: str, client: Dict[str, Any]) -> None:
-    """
-    Store minimal non-sensitive shared client presence in Redis.
-
-    Does not store permissions, tokens, session IDs, usernames, or room names.
-    """
-    if _presence_redis is None:
-        return
-
-    try:
-        ttl = int(client["presence_ttl_seconds"])
-        expires_at = int(time.time()) + ttl
-
-        record = {
-            "sid": sid,
-            "user_id": str(client["user_id"]),
-            "connected_at": client["connected_at"],
-            "last_seen_at": utc_now().isoformat(),
-        }
-
-        pipeline = _presence_redis.pipeline()
-        pipeline.setex(_presence_key(sid), ttl, json.dumps(record))
-        pipeline.zadd(_presence_index_key(), {sid: expires_at})
-        pipeline.execute()
-
-    except Exception:
-        logger.exception(
-            "Failed to update WebSocket presence",
-            extra={"sid": sid},
-        )
-
-
-def _store_presence_batch(clients: Dict[str, Dict[str, Any]]) -> None:
-    """
-    Batch-update shared presence for all local clients in a single Redis pipeline.
-
-    This is used by the background monitor to avoid N individual pipeline round-trips
-    per monitoring cycle.
-    """
-    if _presence_redis is None or not clients:
-        return
-
-    try:
-        now = int(time.time())
-        now_iso = utc_now().isoformat()
-        pipeline = _presence_redis.pipeline()
-
-        for sid, client in clients.items():
-            ttl = int(client["presence_ttl_seconds"])
-            expires_at = now + ttl
-
-            record = {
-                "sid": sid,
-                "user_id": str(client["user_id"]),
-                "connected_at": client["connected_at"],
-                "last_seen_at": now_iso,
-            }
-
-            pipeline.setex(_presence_key(sid), ttl, json.dumps(record))
-            pipeline.zadd(_presence_index_key(), {sid: expires_at})
-
-        pipeline.execute()
-
-    except Exception:
-        logger.exception(
-            "Failed to batch-update WebSocket presence",
-            extra={"client_count": len(clients)},
-        )
-
-
-def _remove_presence(sid: str) -> None:
-    """Remove shared presence metadata for a disconnected socket."""
-    if _presence_redis is None or not sid:
-        return
-
-    try:
-        pipeline = _presence_redis.pipeline()
-        pipeline.delete(_presence_key(sid))
-        pipeline.zrem(_presence_index_key(), sid)
-        pipeline.execute()
-
-    except Exception:
-        logger.exception(
-            "Failed to remove WebSocket presence",
-            extra={"sid": sid},
-        )
-
-
-def _cleanup_stale_presence() -> None:
-    """Remove stale entries from the Redis presence index."""
-    if _presence_redis is None:
-        return
-
-    try:
-        _presence_redis.zremrangebyscore(
-            _presence_index_key(),
-            "-inf",
-            int(time.time()),
-        )
-    except Exception:
-        logger.exception("Failed to clean stale WebSocket presence")
 
 
 # ---------------------------------------------------------------------------
@@ -429,47 +267,9 @@ def _resolve_user_from_session() -> Optional[AuthResult]:
         return None
 
 
-def _extract_handshake_token(auth: Any = None) -> Optional[str]:
-    """
-    Extract an API key from the Socket.IO auth payload only.
-
-    Query-string authentication is deliberately unsupported because credentials
-    in URLs often leak through reverse proxies, access logs, analytics,
-    monitoring platforms, and browser history.
-    """
-    if not isinstance(auth, dict):
-        return None
-
-    token = auth.get("token") or auth.get("api_key")
-
-    if not isinstance(token, str):
-        return None
-
-    token = token.strip()
-    return token or None
-
-
-def _resolve_user_from_api_key(auth: Any = None) -> Optional[AuthResult]:
-    """Authenticate an API key passed through Socket.IO's auth object."""
-    token = _extract_handshake_token(auth)
-    if not token:
-        return None
-
-    try:
-        from auth.unified import AuthManager
-
-        result = AuthManager().verify_api_key(token)
-        return _result_to_auth_result(result, "api_key")
-
-    except Exception:
-        logger.exception("WebSocket API-key verification failed")
-        return None
-
-
 def _authenticate_handshake(auth: Any = None) -> Optional[AuthResult]:
-    """Authenticate with Flask session first, then Socket.IO API-key auth."""
-    identity = _resolve_user_from_session()
-    return identity or _resolve_user_from_api_key(auth)
+    """Authenticate the handshake from the Flask session."""
+    return _resolve_user_from_session()
 
 
 def _has_permission(
@@ -559,14 +359,6 @@ def _session_revalidation_due(client: Dict[str, Any]) -> bool:
     )
 
 
-def _api_key_reauth_due(client: Dict[str, Any]) -> bool:
-    """Return whether an API-key socket has passed its reauth deadline."""
-    return (
-        client["auth_method"] == "api_key"
-        and time.monotonic() >= client["auth_deadline_at"]
-    )
-
-
 def _revalidate_session_client(client: Dict[str, Any]) -> bool:
     """
     Revalidate session-backed socket authorization.
@@ -601,19 +393,7 @@ def _revalidate_session_client(client: Dict[str, Any]) -> bool:
 
 
 def _socket_auth_is_valid(sid: str, client: Dict[str, Any]) -> bool:
-    """
-    Validate cached socket authentication.
-
-    API-key clients must send a `reauth` event before their deadline.
-    Session clients are periodically revalidated against AuthManager.
-    """
-    if _api_key_reauth_due(client):
-        logger.info(
-            "WebSocket API-key reauthentication expired",
-            extra={"sid": sid, "user_id": client["user_id"]},
-        )
-        return False
-
+    """Validate cached socket authentication, revalidating the session when due."""
     if _session_revalidation_due(client):
         return _revalidate_session_client(client)
 
@@ -638,7 +418,6 @@ def require_socket_auth(f: Callable) -> Callable:
             )
 
             connected_clients.pop(sid, None)
-            _remove_presence(sid or "")
             disconnect()
             return False
 
@@ -765,17 +544,9 @@ def handle_connect(auth: Optional[Dict[str, Any]] = None):
     user_id = request.user_id
     permissions = tuple(request.permissions)
 
-    api_reauth_seconds = _config_int(
-        "SOCKETIO_API_KEY_REAUTH_SECONDS",
-        DEFAULT_API_KEY_REAUTH_SECONDS,
-    )
     session_revalidate_seconds = _config_int(
         "SOCKETIO_SESSION_REVALIDATE_SECONDS",
         DEFAULT_SESSION_REVALIDATE_SECONDS,
-    )
-    presence_ttl_seconds = _config_int(
-        "SOCKETIO_PRESENCE_TTL_SECONDS",
-        DEFAULT_PRESENCE_TTL_SECONDS,
     )
 
     client = {
@@ -788,20 +559,13 @@ def handle_connect(auth: Optional[Dict[str, Any]] = None):
         "rooms": set(),
         "subscription_history": deque(),
         "session_revalidate_seconds": session_revalidate_seconds,
-        "presence_ttl_seconds": presence_ttl_seconds,
         "next_auth_check_at": (
             time.monotonic() + session_revalidate_seconds
-        ),
-        "auth_deadline_at": (
-            time.monotonic() + api_reauth_seconds
-            if request.auth_method == "api_key"
-            else float("inf")
         ),
     }
 
     connected_clients[sid] = client
     _sync_managed_rooms(client)
-    _store_presence(sid, client)
 
     logger.info(
         "WebSocket connected",
@@ -818,88 +582,21 @@ def handle_connect(auth: Optional[Dict[str, Any]] = None):
             "status": "ok",
             "user_id": user_id,
             "timestamp": utc_now().isoformat(),
-            "reauth_required": request.auth_method == "api_key",
-            "reauth_before_seconds": (
-                api_reauth_seconds
-                if request.auth_method == "api_key"
-                else None
-            ),
         },
     )
 
 
 @socketio.on("disconnect")
 def handle_disconnect():
-    """Remove local and shared metadata when a client disconnects."""
+    """Remove local metadata when a client disconnects."""
     sid = request.sid
     client = connected_clients.pop(sid, None)
-
-    _remove_presence(sid)
 
     logger.info(
         "WebSocket disconnected",
         extra={
             "sid": sid,
             "user_id": client.get("user_id") if client else None,
-        },
-    )
-
-
-@socketio.on("reauth")
-@require_socket_auth
-def handle_reauth(data: Any):
-    """
-    Reauthenticate an API-key socket.
-
-    The client must send:
-
-        socket.emit("reauth", { token: apiKey })
-
-    before its reauthentication deadline.
-    """
-    sid = request.sid
-    client = connected_clients[sid]
-
-    if client["auth_method"] != "api_key":
-        emit("reauthenticated", {"status": "not_required"})
-        return
-
-    identity = _resolve_user_from_api_key(data)
-
-    if (
-        identity is None
-        or identity.user_id != client["user_id"]
-        or not _has_socket_permission(identity.permissions)
-    ):
-        logger.warning(
-            "WebSocket API-key reauthentication rejected",
-            extra={"sid": sid, "user_id": client["user_id"]},
-        )
-
-        connected_clients.pop(sid, None)
-        _remove_presence(sid)
-        disconnect()
-        return False
-
-    reauth_seconds = _config_int(
-        "SOCKETIO_API_KEY_REAUTH_SECONDS",
-        DEFAULT_API_KEY_REAUTH_SECONDS,
-    )
-
-    client["username"] = identity.username or str(identity.user_id)
-    client["permissions"] = identity.permissions
-    client["is_privileged"] = _is_privileged(identity.permissions)
-    client["auth_deadline_at"] = time.monotonic() + reauth_seconds
-
-    _sync_managed_rooms(client)
-    _store_presence(sid, client)
-
-    emit(
-        "reauthenticated",
-        {
-            "status": "ok",
-            "timestamp": utc_now().isoformat(),
-            "reauth_before_seconds": reauth_seconds,
         },
     )
 
@@ -969,7 +666,6 @@ def handle_subscribe(data: Any):
         current_rooms.add(room)
         joined.append(room)
 
-    _store_presence(sid, client)
     emit("subscribed", {"rooms": joined})
 
 
@@ -1017,7 +713,6 @@ def handle_unsubscribe(data: Any):
         client["rooms"].discard(room)
         left.append(room)
 
-    _store_presence(sid, client)
     emit("unsubscribed", {"rooms": left})
 
 
@@ -1030,9 +725,6 @@ def handle_ping():
     Clients should emit this periodically, for example every 30 seconds, so
     session-backed connections are revalidated promptly.
     """
-    sid = request.sid
-    _store_presence(sid, connected_clients[sid])
-
     emit("pong", {"timestamp": utc_now().isoformat()})
 
 
@@ -1213,93 +905,11 @@ def broadcast_to_scope(
 
 
 # ---------------------------------------------------------------------------
-# Background monitoring and disconnect helpers
-# ---------------------------------------------------------------------------
-
-def _disconnect_sid(sid: str, reason: str) -> None:
-    """Disconnect a socket owned by this worker."""
-    client = connected_clients.pop(sid, None)
-    _remove_presence(sid)
-
-    logger.info(
-        "Disconnecting WebSocket client",
-        extra={
-            "sid": sid,
-            "user_id": client.get("user_id") if client else None,
-            "reason": reason,
-        },
-    )
-
-    try:
-        socketio.server.disconnect(sid, namespace="/")
-    except Exception:
-        logger.exception(
-            "Failed to disconnect WebSocket client",
-            extra={"sid": sid, "reason": reason},
-        )
-
-
-def _monitor_local_connections() -> None:
-    """
-    Monitor local socket clients.
-
-    API-key connections are disconnected at reauthentication expiry.
-    Session connections are revalidated during incoming authenticated events,
-    including the application-level `ping` event.
-    """
-    while True:
-        try:
-            expired_sids = []
-            for sid, client in list(connected_clients.items()):
-                if _api_key_reauth_due(client):
-                    expired_sids.append(sid)
-                    continue
-
-            for sid in expired_sids:
-                _disconnect_sid(sid, "api_key_reauthentication_expired")
-
-            _store_presence_batch(connected_clients)
-            _cleanup_stale_presence()
-
-        except Exception:
-            logger.exception("WebSocket connection monitor iteration failed")
-
-        socketio.sleep(DEFAULT_MONITOR_INTERVAL_SECONDS)
-
-
-def _start_monitor_once(app) -> None:
-    """Start one background monitor for this worker process."""
-    global _monitor_started
-
-    if _monitor_started:
-        return
-
-    if app.config.get("SOCKETIO_DISABLE_CONNECTION_MONITOR", False):
-        logger.warning("WebSocket connection monitor is disabled")
-        return
-
-    _monitor_started = True
-    socketio.start_background_task(_monitor_local_connections)
-
-
-# ---------------------------------------------------------------------------
 # Operational helpers
 # ---------------------------------------------------------------------------
 
 def get_connected_clients_count() -> int:
-    """
-    Return connected client count.
-
-    Uses Redis shared presence when configured; otherwise returns the count for
-    the current worker only.
-    """
-    if _presence_redis is not None:
-        try:
-            _cleanup_stale_presence()
-            return int(_presence_redis.zcard(_presence_index_key()))
-        except Exception:
-            logger.exception("Failed to retrieve shared WebSocket client count")
-
+    """Return the connected client count of this worker."""
     return len(connected_clients)
 
 
@@ -1315,7 +925,6 @@ def get_connected_clients_info() -> Dict[str, Any]:
     return {
         "count": get_connected_clients_count(),
         "local_worker_count": len(local_clients),
-        "shared_presence_enabled": _presence_redis is not None,
         "clients": [
             {
                 "connected_at": client["connected_at"],
@@ -1326,37 +935,3 @@ def get_connected_clients_info() -> Dict[str, Any]:
             for client in local_clients
         ],
     }
-
-
-def disconnect_user_sockets(user_id: Union[int, str]) -> int:
-    """
-    Disconnect all sockets for a user on this worker.
-
-    For immediate multi-worker revocation, publish a revocation command through
-    Redis or your application message bus so every worker calls this function.
-    """
-    target_user_id = str(user_id)
-    disconnected = 0
-
-    for sid, client in list(connected_clients.items()):
-        if str(client.get("user_id")) != target_user_id:
-            continue
-
-        _disconnect_sid(sid, "user_access_revoked")
-        disconnected += 1
-
-    return disconnected
-
-
-def disconnect_all_local_sockets(
-    reason: str = "administrative_disconnect",
-) -> int:
-    """Disconnect every socket owned by this worker."""
-    disconnected = 0
-
-    for sid in list(connected_clients):
-        _disconnect_sid(sid, reason)
-        disconnected += 1
-
-    return disconnected
-

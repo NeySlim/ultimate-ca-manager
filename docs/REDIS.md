@@ -17,6 +17,7 @@ UCM supports Redis for distributed caching and rate limiting. Redis is **optiona
 - **Distributed Rate Limiting**: Limits are shared across all workers/instances
 - **Shared Cache**: Reduces memory usage and ensures cache consistency
 - **Persistent Sessions**: Sessions survive UCM restarts
+- **Real-time events across instances**: WebSocket events go through Redis, so a browser connected to one instance sees changes made on another (requires the `redis` Python package)
 
 ---
 

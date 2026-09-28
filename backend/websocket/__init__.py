@@ -1,12 +1,6 @@
 """
 WebSocket module for UCM real-time events.
 Uses Flask-SocketIO for bidirectional communication.
-
-Updated for new events.py adoption:
-- broadcast_to_all removed → use broadcast_to_scope
-- emit_event now requires explicit room parameter
-- New: disconnect_user_sockets, disconnect_all_local_sockets
-- New: handle_reauth event for API key reauthentication
 """
 
 from .events import (
@@ -21,8 +15,6 @@ from .events import (
     broadcast_to_scope,
     get_connected_clients_count,
     get_connected_clients_info,
-    disconnect_user_sockets,
-    disconnect_all_local_sockets,
 )
 from .event_types import EventType
 from .emitters import (
@@ -77,6 +69,4 @@ __all__ = [
     # Management functions
     'get_connected_clients_count',
     'get_connected_clients_info',
-    'disconnect_user_sockets',
-    'disconnect_all_local_sockets',
 ]
