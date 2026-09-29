@@ -1,6 +1,7 @@
 """WebSocket handshake: session only, and a Redis message queue from REDIS_URL."""
 
 import importlib.util
+import os
 
 import pytest
 
@@ -130,6 +131,19 @@ class TestRedisUrl:
         monkeypatch.delenv('REDIS_URL', raising=False)
         monkeypatch.setenv('UCM_REDIS_URL', 'redis://b:6379/0')
         assert redis_url() == 'redis://b:6379/0'
+
+    def test_env_file_cannot_turn_redis_on(self, monkeypatch, tmp_path):
+        from dotenv import load_dotenv
+        from config.settings import redis_url
+        for name in ('REDIS_URL', 'UCM_REDIS_URL'):
+            if name in os.environ:
+                monkeypatch.setenv(name, os.environ[name])
+            else:
+                monkeypatch.delenv(name, raising=False)
+        env_file = tmp_path / 'ucm.env'
+        env_file.write_text('REDIS_URL=redis://a:6379/0\nUCM_REDIS_URL=redis://b:6379/0\n')
+        load_dotenv(env_file)
+        assert redis_url() is None
 
     def test_readiness_ignores_skipped_redis_check(self, client, monkeypatch):
         import api.health_routes as health

@@ -25,9 +25,10 @@ from pathlib import Path
 # settings.py reads SECRET_KEY / JWT_SECRET_KEY at class-body load time, so they
 # must be present before the first `from app import create_app` (which can be
 # triggered by any test module's import or fixture).
-# A Redis URL from the shell would switch sessions and Socket.IO to Redis.
-os.environ.pop('REDIS_URL', None)
-os.environ.pop('UCM_REDIS_URL', None)
+# A Redis URL from the shell or /etc/ucm/ucm.env would switch sessions and Socket.IO
+# to Redis; an empty value, unlike a missing one, is never overridden by load_dotenv.
+os.environ['REDIS_URL'] = ''
+os.environ['UCM_REDIS_URL'] = ''
 os.environ.setdefault('SECRET_KEY', 'test-secret-key-for-testing')
 os.environ.setdefault('JWT_SECRET_KEY', 'test-jwt-secret-key-for-testing')
 os.environ.setdefault('UCM_ENV', 'test')
