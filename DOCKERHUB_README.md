@@ -114,7 +114,7 @@ volumes:
 |----------|---------|-------------|
 | `UCM_FQDN` | `ucm.local` | Server FQDN, used in the URLs UCM advertises |
 | `UCM_HTTPS_PORT` | `8443` | HTTPS port |
-| `UCM_HTTP_PORT` | `8080` | Plain HTTP port for CRL/CDP and OCSP |
+| `UCM_HTTP_PORT` | `8080` | Host port on which `docker-compose.yml` publishes the container's plain HTTP port (CRL/CDP and OCSP). The container side stays 8080 unless changed in Settings › General |
 | `UCM_SECRET_KEY` | generated | Session secret |
 | `DATABASE_URL` | unset | PostgreSQL DSN; SQLite is used when unset |
 | `KEY_ENCRYPTION_KEY` | unset | Encrypts private keys at rest, in place of the `master.key` file |

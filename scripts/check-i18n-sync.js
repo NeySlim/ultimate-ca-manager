@@ -23,6 +23,15 @@ function flattenKeys(obj, prefix = '') {
   return keys
 }
 
+// Plural forms a language may need beyond English's one/other (CLDR), e.g.
+// Ukrainian few/many: allowed on a key that is plural in the reference
+const EXTRA_PLURAL = /^(.*)_(zero|two|few|many)$/
+
+function isLocalePluralForm(key, refKeys) {
+  const m = key.match(EXTRA_PLURAL)
+  return Boolean(m) && (refKeys.has(`${m[1]}_one`) || refKeys.has(`${m[1]}_other`))
+}
+
 function main() {
   const files = fs.readdirSync(LOCALES_DIR).filter(f => f.endsWith('.json'))
   if (files.length === 0) {
@@ -47,7 +56,7 @@ function main() {
     const keys = new Set(flattenKeys(data))
 
     const missing = [...refKeys].filter(k => !keys.has(k))
-    const extra = [...keys].filter(k => !refKeys.has(k))
+    const extra = [...keys].filter(k => !refKeys.has(k) && !isLocalePluralForm(k, refKeys))
 
     if (missing.length === 0 && extra.length === 0) {
       console.log(`  ✅ ${file} — ${keys.size} keys (in sync)`)

@@ -882,7 +882,6 @@
     "certSupersededNotice": "以前の証明書（シリアル番号 {{serial}}）は {{date}} まで有効です。信頼すべきでない場合は、外部ルートCAで失効させてください",
     "yearsValidity": "{{count}}年",
     "yearsValidity_one": "{{count}}年",
-    "yearsValidity_few": "{{count}}年",
     "customValidityDays": "カスタム（日数）",
     "validityDays": "有効期間（日数）",
     "validityDaysHelp": "1 から {{max}} 日まで。中間 CA の有効期限が親 CA を超えることはありません。",

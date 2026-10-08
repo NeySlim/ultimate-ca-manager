@@ -882,7 +882,6 @@
     "certSupersededNotice": "Il certificato precedente (numero di serie {{serial}}) resta valido fino al {{date}}: revocalo presso la tua CA radice esterna se non deve più essere considerato attendibile",
     "yearsValidity": "{{count}} anni",
     "yearsValidity_one": "{{count}} anno",
-    "yearsValidity_few": "{{count}} anni",
     "customValidityDays": "Personalizzata (giorni)",
     "validityDays": "Validità (giorni)",
     "validityDaysHelp": "Da 1 a {{max}} giorni. Una CA intermedia non scade mai dopo la sua CA padre.",

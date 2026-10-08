@@ -28,3 +28,31 @@ describe('cas.yearsValidity plural forms', () => {
     expect(await yearsLabel(code, count)).toBe(expected)
   })
 })
+
+describe('Ukrainian plural keys', () => {
+  const flat = (obj, prefix = '') => Object.entries(obj).flatMap(([k, v]) =>
+    v && typeof v === 'object' ? flat(v, `${prefix}${k}.`) : [`${prefix}${k}`])
+  const pluralKeys = flat(load('uk')).filter(k => k.endsWith('_one')).map(k => k.slice(0, -4))
+
+  it('covers the plural keys', () => {
+    expect(pluralKeys.length).toBeGreaterThan(20)
+  })
+
+  // one (1, 21), few (2-4, 22), many (5-20): each form must exist, else the key shows
+  it.each([1, 2, 5, 11, 21, 22])('every key renders a sentence for %i', async (count) => {
+    const i18n = i18next.createInstance()
+    await i18n.init({ lng: 'uk', resources: { uk: { translation: load('uk') } } })
+    for (const key of pluralKeys) {
+      const out = i18n.t(key, { count })
+      expect(out, key).not.toBe(key)
+      expect(out, key).toContain(String(count))
+    }
+  })
+
+  it('agrees the noun with the count', async () => {
+    const i18n = i18next.createInstance()
+    await i18n.init({ lng: 'uk', resources: { uk: { translation: load('uk') } } })
+    expect([1, 2, 5].map(count => i18n.t('common.subtitle', { count })))
+      .toEqual(['1 сертифікат', '2 сертифікати', '5 сертифікатів'])
+  })
+})

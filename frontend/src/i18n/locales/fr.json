@@ -757,7 +757,6 @@
     "certSupersededNotice": "Le certificat précédent (numéro de série {{serial}}) reste valide jusqu'au {{date}} : révoquez-le auprès de votre AC racine externe s'il ne doit plus être approuvé",
     "yearsValidity": "{{count}} ans",
     "yearsValidity_one": "{{count}} an",
-    "yearsValidity_few": "{{count}} ans",
     "customValidityDays": "Personnalisée (jours)",
     "validityDays": "Validité (jours)",
     "validityDaysHelp": "De 1 à {{max}} jours. Une CA intermédiaire n'expire jamais après sa CA parente.",
