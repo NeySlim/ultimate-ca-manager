@@ -33,17 +33,20 @@ const cert = (id, status, extra = {}) => ({
 describe('CertificatePickerModal status filter', () => {
   beforeEach(() => getAll.mockReset())
 
-  it('requests and keeps every status the caller asks for', async () => {
-    getAll.mockResolvedValue({
-      data: [cert(1, 'valid'), cert(2, 'expiring'), cert(3, 'revoked'), cert(4, 'valid', { has_private_key: false })],
-      meta: { total: 4 },
-    })
+  it('asks the server for the statuses and the private key it needs', async () => {
+    getAll.mockResolvedValue({ data: [cert(1, 'valid'), cert(2, 'expiring')], meta: { total: 2 } })
     render(<CertificatePickerModal isOpen onClose={vi.fn()} onSelect={vi.fn()}
       filters={{ status: ['valid', 'expiring'], has_private_key: true }} />)
     expect(await screen.findByText('expiring.example.com')).toBeInTheDocument()
     expect(screen.getByText('valid.example.com')).toBeInTheDocument()
-    expect(screen.queryByText('revoked.example.com')).toBeNull()
-    expect(getAll.mock.calls[0][0].status).toEqual(['valid', 'expiring'])
+    expect(getAll.mock.calls[0][0]).toMatchObject({ status: ['valid', 'expiring'], has_private_key: true })
+  })
+
+  it('pages over the server total rather than the rows received', async () => {
+    getAll.mockResolvedValue({ data: [cert(1, 'valid')], meta: { total: 45 } })
+    render(<CertificatePickerModal isOpen onClose={vi.fn()} onSelect={vi.fn()}
+      filters={{ has_private_key: true }} />)
+    expect(await screen.findByText('1 / 3')).toBeInTheDocument()
   })
 
   it('a fresh array with the same statuses does not reload the list', async () => {

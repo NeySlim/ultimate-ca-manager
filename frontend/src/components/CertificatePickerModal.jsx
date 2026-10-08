@@ -34,21 +34,15 @@ export default function CertificatePickerModal({ isOpen, onClose, onSelect, filt
       if (search.trim()) {
         params.search = search.trim()
       }
+      if (filters.has_private_key) {
+        params.has_private_key = true
+      }
       const data = await certificatesService.getAll(params)
       const items = data.data || []
       const meta = data.meta || {}
 
-      // Client-side filter for private key + requested status + not expired
-      const statuses = statusKey.split(',')
-      const filtered = items.filter(cert => {
-        if (filters.has_private_key) {
-          return cert.has_private_key && statuses.includes(cert.status) && new Date(cert.valid_to) > new Date()
-        }
-        return true
-      })
-
-      setCertificates(filtered)
-      setTotal(meta.total || filtered.length)
+      setCertificates(items)
+      setTotal(meta.total ?? items.length)
     } catch {
       setCertificates([])
     } finally {

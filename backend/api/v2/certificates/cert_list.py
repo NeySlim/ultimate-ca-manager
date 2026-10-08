@@ -103,6 +103,10 @@ def list_certificates():
         if status_conditions:
             query = query.filter(or_(*status_conditions))
 
+    # Filtered here, not on the page received, so pagination and total agree
+    if request.args.get('has_private_key', '').lower() in ('1', 'true', 'yes'):
+        query = query.filter(Certificate.prv.isnot(None), Certificate.prv != '')
+
     # Certificates issued from a template but diverging from its defaults (#258)
     if template_modified:
         query = query.filter(Certificate.template_overrides.isnot(None))
