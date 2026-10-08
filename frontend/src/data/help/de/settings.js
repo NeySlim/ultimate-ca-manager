@@ -141,6 +141,7 @@ export default {
           { label: 'Quellen', text: 'Der Planer erneuert Zertifikate, deren privaten Schlüssel der Server hält: standardmäßig die über das Formular oder eine signierte Anfrage ausgestellten („manuell") sowie SCEP-, ACME- und EST-Registrierungen mit servergeneriertem Schlüssel. Geräte, die ihren eigenen Schlüssel halten, erneuern über ihr Protokoll' },
           { label: 'Genehmigung ausstehend', text: 'Ein Zertifikat, dessen Erneuerung zur Genehmigung eingereiht ist, bleibt dieser Entscheidung überlassen, solange sie vor dem Ablauf des Zertifikats fallen kann' },
           { label: 'Inzwischen erneuert', text: 'Ein Zertifikat, das ein Operator während des Durchlaufs erneuert hat, wird nicht ein zweites Mal erneuert; ein während des Durchlaufs gelöschtes wird übersprungen' },
+          { label: 'Kurzlebige Zertifikate', text: 'Ein Zertifikat, dessen Gesamtlaufzeit die eingestellte Frist nicht übersteigt, wird im letzten Drittel seiner Laufzeit erneuert, nicht schon ab der Ausstellung' },
         ]
       },
 
@@ -396,6 +397,7 @@ Die Einstellungen zur Auto-Erneuerung steuern den Erneuerungsplaner.
 - **Quellen**: der Planer erneuert Zertifikate, deren privaten Schlüssel der Server hält: standardmäßig die über das Formular oder eine signierte Anfrage ausgestellten („manuell") sowie SCEP-, ACME- und EST-Registrierungen mit servergeneriertem Schlüssel. Geräte, die ihren eigenen Schlüssel halten, erneuern über ihr Protokoll
 - **Genehmigung ausstehend**: ein Zertifikat, dessen Erneuerung zur Genehmigung eingereiht ist, bleibt dieser Entscheidung überlassen, solange sie vor dem Ablauf des Zertifikats fallen kann
 - **Inzwischen erneuert**: ein Zertifikat, das ein Operator während des Durchlaufs erneuert hat, wird nicht ein zweites Mal erneuert; ein während des Durchlaufs gelöschtes wird übersprungen
+- **Kurzlebige Zertifikate**: ein Zertifikat, dessen Gesamtlaufzeit die eingestellte Frist nicht übersteigt, wird im letzten Drittel seiner Laufzeit erneuert, nicht schon ab der Ausstellung
 
 ## Geplante Backups
 

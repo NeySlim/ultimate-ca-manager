@@ -33,7 +33,7 @@ def _ca_material(app, ca_id):
 
 
 def _craft_row(app, ca_id, key, cn, *, key_usage=None, extra=(), caref='auto', with_key=True,
-               source='manual', days=30):
+               source='manual', days=30, issued_days_ago=1):
     """A leaf signed by the CA row's key, stored the way older issuance did."""
     refid, ca_cert, ca_key = _ca_material(app, ca_id)
     now = datetime.now(timezone.utc)
@@ -42,7 +42,7 @@ def _craft_row(app, ca_id, key, cn, *, key_usage=None, extra=(), caref='auto', w
         .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]))
         .issuer_name(ca_cert.subject).public_key(key.public_key())
         .serial_number(x509.random_serial_number())
-        .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=days))
+        .not_valid_before(now - timedelta(days=issued_days_ago)).not_valid_after(now + timedelta(days=days))
         .add_extension(x509.SubjectAlternativeName([x509.DNSName(cn)]), critical=False)
         .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
     )
@@ -61,7 +61,7 @@ def _craft_row(app, ca_id, key, cn, *, key_usage=None, extra=(), caref='auto', w
                 serialization.NoEncryption())) if with_key else None,
             cert_type='server_cert', subject=cert.subject.rfc4514_string(),
             issuer=cert.issuer.rfc4514_string(), serial_number=str(cert.serial_number),
-            valid_from=(now - timedelta(days=1)).replace(tzinfo=None),
+            valid_from=(now - timedelta(days=issued_days_ago)).replace(tzinfo=None),
             valid_to=(now + timedelta(days=days)).replace(tzinfo=None),
             source=source, created_by='admin',
         )
@@ -259,7 +259,7 @@ class TestDeviceHeldKeys:
         ca = create_ca(cn='Renewal scheduler keyed CA')
         rid = _craft_row(app, ca['id'], rsa.generate_private_key(65537, 2048), 'keyed.example.test',
                          key_usage=_ku(digital_signature=True, key_encipherment=True),
-                         with_key=True, source='manual', days=5)
+                         with_key=True, source='manual', days=5, issued_days_ago=360)
         try:
             with app.app_context():
                 previous = dict(AutoRenewalService.get_renewal_config())
@@ -269,6 +269,55 @@ class TestDeviceHeldKeys:
                     config = AutoRenewalService.get_renewal_config()
                     assert config['renewal_sources'] == ['manual'] and config['days_before_expiry'] == 30
                     assert rid in [c.id for c in AutoRenewalService.get_certificates_for_renewal()]
+                finally:
+                    AutoRenewalService.set_renewal_config(previous)
+        finally:
+            _drop(app, rid)
+
+
+    @pytest.mark.parametrize('issued_days_ago, days_left, selected', [
+        (1, 26, False),    # 27-day certificate on its first day: not yet
+        (19, 8, True),     # same lifetime, last third reached
+        (60, 20, True),    # 80 days long: the 30-day window applies as before
+        (40, 35, False),   # outside the 30-day window
+    ])
+    def test_short_lived_certificate_waits_for_its_last_third(self, app, create_ca,
+                                                              issued_days_ago, days_left, selected):
+        from services.auto_renewal_service import AutoRenewalService
+        ca = create_ca(cn='Renewal window CA')
+        rid = _craft_row(app, ca['id'], rsa.generate_private_key(65537, 2048),
+                         f'window-{issued_days_ago}-{days_left}.example.test',
+                         key_usage=_ku(digital_signature=True, key_encipherment=True),
+                         source='manual', days=days_left, issued_days_ago=issued_days_ago)
+        try:
+            with app.app_context():
+                previous = dict(AutoRenewalService.get_renewal_config())
+                AutoRenewalService.set_renewal_config({**previous, 'enabled': True, 'days_before_expiry': 30,
+                                                       'renewal_sources': ['manual']})
+                try:
+                    found = rid in [c.id for c in AutoRenewalService.get_certificates_for_renewal()]
+                    assert found is selected
+                finally:
+                    AutoRenewalService.set_renewal_config(previous)
+        finally:
+            _drop(app, rid)
+
+    def test_renewed_short_lived_certificate_is_not_picked_again(self, app, create_ca):
+        """A pass renews it; the next pass must leave the fresh 27 days alone."""
+        from services.auto_renewal_service import AutoRenewalService
+        ca = create_ca(cn='Renewal loop CA')
+        rid = _craft_row(app, ca['id'], rsa.generate_private_key(65537, 2048), 'loop.example.test',
+                         key_usage=_ku(digital_signature=True, key_encipherment=True),
+                         source='manual', days=3, issued_days_ago=24)
+        try:
+            with app.app_context():
+                previous = dict(AutoRenewalService.get_renewal_config())
+                AutoRenewalService.set_renewal_config({**previous, 'enabled': True, 'days_before_expiry': 30,
+                                                       'renewal_sources': ['manual']})
+                try:
+                    assert rid in [c.id for c in AutoRenewalService.get_certificates_for_renewal()]
+                    _renew(app, rid)
+                    assert rid not in [c.id for c in AutoRenewalService.get_certificates_for_renewal()]
                 finally:
                     AutoRenewalService.set_renewal_config(previous)
         finally:

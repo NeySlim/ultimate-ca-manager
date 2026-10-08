@@ -143,7 +143,18 @@ class AutoRenewalService:
             Certificate.source.in_(config['renewal_sources'])
         ).all()
 
-        return certs
+        return [c for c in certs if AutoRenewalService._in_renewal_window(c, config['days_before_expiry'])]
+
+    @staticmethod
+    def _in_renewal_window(cert: Certificate, days_before_expiry: int) -> bool:
+        """A certificate no longer than the window is renewed in its last third,
+        or a 27-day certificate would be re-signed on every pass from day one."""
+        window = timedelta(days=days_before_expiry)
+        if cert.valid_from is not None:
+            lifetime = to_naive_utc(cert.valid_to) - to_naive_utc(cert.valid_from)
+            if lifetime <= window:
+                window = lifetime / 3
+        return to_naive_utc(cert.valid_to) <= to_naive_utc(utc_now()) + window
 
     @staticmethod
     def renew_certificate(cert: Certificate, regenerate_crl: bool = True, known_serial=SERIAL_UNSET) -> tuple:
