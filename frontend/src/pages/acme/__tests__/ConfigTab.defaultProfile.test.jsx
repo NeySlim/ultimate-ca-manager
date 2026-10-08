@@ -11,7 +11,12 @@ vi.mock('react-i18next', () => ({
 }))
 vi.mock('../ProfilesEditor', () => ({
   default: ({ onChange }) => (
-    <button onClick={() => onChange({ default: { validity_days: 90 } })}>drop-short</button>
+    <>
+      <button onClick={() => onChange({ default: { validity_days: 90 } })}>drop-short</button>
+      <button onClick={() => onChange({ default: { validity_days: 90 }, shorter: { validity_days: 27 } })}>
+        rename-short
+      </button>
+    </>
   ),
 }))
 
@@ -31,6 +36,14 @@ describe('ConfigTab default profile', () => {
     fireEvent.click(screen.getByText('drop-short'))
     expect(updateSetting).toHaveBeenCalledWith('profiles', { default: { validity_days: 90 } })
     expect(updateSetting).toHaveBeenCalledWith('default_profile', '')
+  })
+
+  it('follows a renamed default profile', () => {
+    const updateSetting = vi.fn()
+    render(<ConfigTab acmeSettings={settings({ default_profile: 'short' })} cas={[]}
+      updateSetting={updateSetting} canWrite />)
+    fireEvent.click(screen.getByText('rename-short'))
+    expect(updateSetting).toHaveBeenCalledWith('default_profile', 'shorter')
   })
 
   it('keeps a default whose profile survives', () => {

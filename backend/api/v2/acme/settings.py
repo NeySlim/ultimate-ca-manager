@@ -299,6 +299,12 @@ def update_acme_settings():
             )
             db.session.add(profiles_cfg)
         profiles_cfg.value = json.dumps(profiles_value)
+        if 'default_profile' not in data:
+            # A default left naming a removed profile would come back to life
+            # with any later profile of that name
+            stale = SystemConfig.query.filter_by(key=acme_profiles.DEFAULT_PROFILE_KEY).first()
+            if stale and stale.value and stale.value not in profiles_value:
+                stale.value = ''
 
     ok, _err = safe_commit(logger, "Failed to update ACME settings")
     if not ok:

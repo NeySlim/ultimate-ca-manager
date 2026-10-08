@@ -1113,14 +1113,19 @@ def new_order():
         # ACME Profiles Extension: an explicitly requested profile must be one
         # the directory advertises, else the order is refused (a silent
         # fallback would issue under a policy the client did not ask for).
+        from services.acme import profiles as acme_profiles
         profile = payload.get('profile')
         if profile is not None:
-            from services.acme import profiles as acme_profiles
             if not isinstance(profile, str) or not acme_profiles.is_known(profile):
                 return acme_error(
                     'invalidProfile',
                     'The requested certificate profile is not offered by this server',
                 )
+        else:
+            # The server selects the default profile and says so in the order
+            # (draft-ietf-acme-profiles), so finalize no longer depends on
+            # whatever the default is by then
+            profile = acme_profiles.get_default_profile() or None
 
         # Parse optional dates
         not_before = payload.get('notBefore')

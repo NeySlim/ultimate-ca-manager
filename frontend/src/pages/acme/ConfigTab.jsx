@@ -127,9 +127,14 @@ export default function ConfigTab({ acmeSettings, cas, templates = [], updateSet
             value={acmeSettings.profiles || {}}
             onChange={(profiles) => {
               updateSetting('profiles', profiles)
-              // A removed profile can no longer be the default
-              if (acmeSettings.default_profile && !(acmeSettings.default_profile in profiles)) {
-                updateSetting('default_profile', '')
+              // A renamed default follows its new name; a removed one is dropped
+              const previous = acmeSettings.profiles || {}
+              const current = acmeSettings.default_profile
+              if (current && !(current in profiles)) {
+                const added = Object.keys(profiles).filter(name => !(name in previous))
+                const renamed = added.length === 1
+                  && Object.keys(profiles).length === Object.keys(previous).length
+                updateSetting('default_profile', renamed ? added[0] : '')
               }
             }}
             disabled={!canWrite}

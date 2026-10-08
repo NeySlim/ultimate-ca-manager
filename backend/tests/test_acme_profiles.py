@@ -179,6 +179,23 @@ class TestNewOrderProfileSelection:
             assert order.profile is None
             assert acme_profiles.issuance_params(order.profile)['validity_days'] == 90
 
+    def test_order_without_profile_gets_the_default_profile(
+        self, app, client, acme_account, configured_profiles, restore_default_profile
+    ):
+        """The default is chosen at newOrder and announced in the order (#378)."""
+        _set_default_profile(app, 'shortlived')
+        response = self._order(client, acme_account, {
+            'identifiers': [{'type': 'dns', 'value': 'prof-default.example.com'}],
+        })
+        assert response.status_code == 201, response.data
+        assert response.get_json()['profile'] == 'shortlived'
+        order_id = response.headers['Location'].rstrip('/').split('/')[-1]
+        # A later change of default does not move an order already placed
+        _set_default_profile(app, 'default')
+        with app.app_context():
+            order = AcmeOrder.query.filter_by(order_id=order_id).first()
+            assert acme_profiles.issuance_params(order.profile)['validity_days'] == 7
+
 
 class TestDefaultDigest:
     """Server-wide fallback digest for no-profile orders (#303)."""
@@ -318,4 +335,15 @@ class TestDefaultProfile:
 
         r = auth_client.patch(url, json={'default_profile': ''})
         assert r.status_code == 200
+        assert auth_client.get(url).get_json()['data']['default_profile'] == ''
+
+    def test_saving_profiles_without_the_default_clears_it(self, app, auth_client, configured_profiles,
+                                                           restore_default_profile):
+        url = '/api/v2/acme/settings'
+        _set_default_profile(app, 'shortlived')
+        r = auth_client.patch(url, json={'profiles': {'default': PROFILES['default']}})
+        assert r.status_code == 200, r.get_json()
+        r = auth_client.patch(url, json={'profiles': PROFILES})
+        assert r.status_code == 200
+        # Recreating a profile of that name does not make it the default again
         assert auth_client.get(url).get_json()['data']['default_profile'] == ''
