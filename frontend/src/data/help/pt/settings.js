@@ -141,7 +141,7 @@ export default {
           { label: 'Fontes', text: 'O agendador renova os certificados cuja chave privada o servidor detém: por padrão os emitidos pelo formulário ou por uma solicitação assinada ("manual") e as inscrições SCEP, ACME e EST com chave gerada pelo servidor. Os dispositivos que detêm a própria chave renovam pelo seu protocolo' },
           { label: 'Aguardando aprovação', text: 'Um certificado cuja renovação está na fila de aprovação é deixado a essa decisão, desde que ela possa ocorrer antes de o certificado expirar' },
           { label: 'Renovado entretanto', text: 'Um certificado que um operador renovou durante o lote não é renovado uma segunda vez; um excluído durante o lote é ignorado' },
-          { label: 'Certificados de curta duração', text: 'Um certificado cuja validade total não excede o prazo configurado é renovado no último terço da sua validade, e não desde a emissão' },
+          { label: 'Certificados de curta duração', text: 'A renovação nunca começa antes do último terço da validade de um certificado: um certificado de 27 dias é renovado quando faltam 9, e não desde a emissão' },
         ]
       },
 
@@ -397,7 +397,7 @@ As definições de renovação automática comandam o agendador de renovação.
 - **Fontes**: o agendador renova os certificados cuja chave privada o servidor detém: por padrão os emitidos pelo formulário ou por uma solicitação assinada ("manual") e as inscrições SCEP, ACME e EST com chave gerada pelo servidor. Os dispositivos que detêm a própria chave renovam pelo seu protocolo
 - **Aguardando aprovação**: um certificado cuja renovação está na fila de aprovação é deixado a essa decisão, desde que ela possa ocorrer antes de o certificado expirar
 - **Renovado entretanto**: um certificado que um operador renovou durante o lote não é renovado uma segunda vez; um excluído durante o lote é ignorado
-- **Certificados de curta duração**: um certificado cuja validade total não excede o prazo configurado é renovado no último terço da sua validade, e não desde a emissão
+- **Certificados de curta duração**: a renovação nunca começa antes do último terço da validade de um certificado: um certificado de 27 dias é renovado quando faltam 9, e não desde a emissão
 
 ## Backups agendados
 

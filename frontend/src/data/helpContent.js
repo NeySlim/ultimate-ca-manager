@@ -1047,7 +1047,7 @@ export const helpContent = {
           { label: 'Sources', text: 'The scheduler renews certificates whose private key the server holds: by default those issued from the form or a signed request ("manual"), and SCEP, ACME and EST enrolments with a server-generated key. Devices holding their own key renew through their protocol' },
           { label: 'Awaiting approval', text: 'A certificate whose renewal is queued for approval is left to that decision, as long as it can come before the certificate expires' },
           { label: 'Renewed meanwhile', text: 'A certificate an operator renewed during the batch is not renewed a second time; one deleted during the batch is skipped' },
-          { label: 'Short-lived certificates', text: 'A certificate whose whole lifetime is no longer than the configured window is renewed in the last third of its lifetime, not from the day it is issued' },
+          { label: 'Short-lived certificates', text: 'Renewal never starts before the last third of a certificate\'s lifetime: a 27-day certificate is renewed with 9 days left, not from the day it is issued' },
         ]
       },
     ],

@@ -278,15 +278,18 @@ class TestDeviceHeldKeys:
     @pytest.mark.parametrize('issued_days_ago, days_left, selected', [
         (1, 26, False),    # 27-day certificate on its first day: not yet
         (19, 8, True),     # same lifetime, last third reached
-        (60, 20, True),    # 80 days long: the 30-day window applies as before
+        (15 / 1440, 30, False),  # 30 days plus the 15-minute notBefore skew
+        (1, 30, False),    # 31-day certificate on its first day
+        (60, 20, True),    # 80 days long, inside both the window and its last third
         (40, 35, False),   # outside the 30-day window
+        (300, 29, True),   # a year long: the 30-day window applies as before
     ])
     def test_short_lived_certificate_waits_for_its_last_third(self, app, create_ca,
                                                               issued_days_ago, days_left, selected):
         from services.auto_renewal_service import AutoRenewalService
         ca = create_ca(cn='Renewal window CA')
         rid = _craft_row(app, ca['id'], rsa.generate_private_key(65537, 2048),
-                         f'window-{issued_days_ago}-{days_left}.example.test',
+                         f'window-{round(issued_days_ago, 3)}-{days_left}.example.test',
                          key_usage=_ku(digital_signature=True, key_encipherment=True),
                          source='manual', days=days_left, issued_days_ago=issued_days_ago)
         try:

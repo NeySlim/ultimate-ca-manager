@@ -141,7 +141,7 @@ export default {
           { label: 'Fuentes', text: 'El planificador renueva los certificados cuya clave privada posee el servidor: por defecto los emitidos desde el formulario o desde una solicitud firmada («manual»), y las inscripciones SCEP, ACME y EST con clave generada por el servidor. Los dispositivos que poseen su propia clave se renuevan a través de su protocolo' },
           { label: 'En espera de aprobación', text: 'Un certificado cuya renovación está en cola de aprobación se deja a esa decisión, siempre que pueda llegar antes de que expire el certificado' },
           { label: 'Renovado entretanto', text: 'Un certificado que un operador renovó durante el lote no se renueva una segunda vez; uno eliminado durante el lote se omite' },
-          { label: 'Certificados de corta duración', text: 'Un certificado cuya vigencia total no supera el plazo configurado se renueva en el último tercio de su vigencia, no desde su emisión' },
+          { label: 'Certificados de corta duración', text: 'La renovación nunca empieza antes del último tercio de la vigencia de un certificado: uno de 27 días se renueva cuando le quedan 9, no desde su emisión' },
         ]
       },
 
@@ -396,7 +396,7 @@ Los ajustes de autorrenovación gobiernan el planificador de renovaciones.
 - **Fuentes**: el planificador renueva los certificados cuya clave privada posee el servidor: por defecto los emitidos desde el formulario o desde una solicitud firmada («manual»), y las inscripciones SCEP, ACME y EST con clave generada por el servidor. Los dispositivos que poseen su propia clave se renuevan a través de su protocolo
 - **En espera de aprobación**: un certificado cuya renovación está en cola de aprobación se deja a esa decisión, siempre que pueda llegar antes de que expire el certificado
 - **Renovado entretanto**: un certificado que un operador renovó durante el lote no se renueva una segunda vez; uno eliminado durante el lote se omite
-- **Certificados de corta duración**: un certificado cuya vigencia total no supera el plazo configurado se renueva en el último tercio de su vigencia, no desde su emisión
+- **Certificados de corta duración**: la renovación nunca empieza antes del último tercio de la vigencia de un certificado: uno de 27 días se renueva cuando le quedan 9, no desde su emisión
 
 ## Copias de seguridad programadas
 

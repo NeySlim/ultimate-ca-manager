@@ -141,7 +141,7 @@ export default {
           { label: 'Origini', text: 'Lo scheduler rinnova i certificati la cui chiave privata è detenuta dal server: per impostazione predefinita quelli emessi dal modulo o da una richiesta firmata ("manual"), e le iscrizioni SCEP, ACME ed EST con chiave generata dal server. I dispositivi che detengono la propria chiave si rinnovano tramite il loro protocollo' },
           { label: 'In attesa di approvazione', text: 'Un certificato il cui rinnovo è in coda per l\'approvazione viene lasciato a quella decisione, purché possa arrivare prima della scadenza del certificato' },
           { label: 'Rinnovato nel frattempo', text: 'Un certificato rinnovato da un operatore durante il batch non viene rinnovato una seconda volta; uno eliminato durante il batch viene saltato' },
-          { label: 'Certificati a breve durata', text: 'Un certificato la cui validità totale non supera il periodo configurato viene rinnovato nell\'ultimo terzo della sua validità, non dal momento dell\'emissione' },
+          { label: 'Certificati a breve durata', text: 'Il rinnovo non inizia mai prima dell\'ultimo terzo della validità di un certificato: uno di 27 giorni viene rinnovato quando ne mancano 9, non dal momento dell\'emissione' },
         ]
       },
 
@@ -396,7 +396,7 @@ Le impostazioni di rinnovo automatico guidano lo scheduler dei rinnovi.
 - **Origini**: lo scheduler rinnova i certificati la cui chiave privata è detenuta dal server: per impostazione predefinita quelli emessi dal modulo o da una richiesta firmata ("manual"), e le iscrizioni SCEP, ACME ed EST con chiave generata dal server. I dispositivi che detengono la propria chiave si rinnovano tramite il loro protocollo
 - **In attesa di approvazione**: un certificato il cui rinnovo è in coda per l'approvazione viene lasciato a quella decisione, purché possa arrivare prima della scadenza del certificato
 - **Rinnovato nel frattempo**: un certificato rinnovato da un operatore durante il batch non viene rinnovato una seconda volta; uno eliminato durante il batch viene saltato
-- **Certificati a breve durata**: un certificato la cui validità totale non supera il periodo configurato viene rinnovato nell'ultimo terzo della sua validità, non dal momento dell'emissione
+- **Certificati a breve durata**: il rinnovo non inizia mai prima dell'ultimo terzo della validità di un certificato: uno di 27 giorni viene rinnovato quando ne mancano 9, non dal momento dell'emissione
 
 ## Backup pianificati
 

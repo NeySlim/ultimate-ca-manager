@@ -147,13 +147,14 @@ class AutoRenewalService:
 
     @staticmethod
     def _in_renewal_window(cert: Certificate, days_before_expiry: int) -> bool:
-        """A certificate no longer than the window is renewed in its last third,
-        or a 27-day certificate would be re-signed on every pass from day one."""
+        """Never before the last third of the lifetime, as ARI and the OCSP
+        responder do: otherwise a certificate about as long as the window is
+        re-signed on every pass from the day it is issued."""
         window = timedelta(days=days_before_expiry)
         if cert.valid_from is not None:
             lifetime = to_naive_utc(cert.valid_to) - to_naive_utc(cert.valid_from)
-            if lifetime <= window:
-                window = lifetime / 3
+            if lifetime > timedelta(0):
+                window = min(window, lifetime / 3)
         return to_naive_utc(cert.valid_to) <= to_naive_utc(utc_now()) + window
 
     @staticmethod

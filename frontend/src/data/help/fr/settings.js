@@ -141,7 +141,7 @@ export default {
           { label: 'Sources', text: 'Le planificateur renouvelle les certificats dont le serveur détient la clé privée : par défaut ceux émis depuis le formulaire ou une requête signée (« manual »), ainsi que les enrôlements SCEP, ACME et EST à clé générée par le serveur. Les appareils qui détiennent leur propre clé se renouvellent via leur protocole' },
           { label: 'En attente d\'approbation', text: 'Un certificat dont le renouvellement est en file d\'approbation est laissé à cette décision, tant qu\'elle peut intervenir avant l\'expiration du certificat' },
           { label: 'Renouvelé entre-temps', text: 'Un certificat qu\'un opérateur a renouvelé pendant le lot n\'est pas renouvelé une seconde fois ; un certificat supprimé pendant le lot est ignoré' },
-          { label: 'Certificats courts', text: 'Un certificat dont la durée totale ne dépasse pas le délai configuré est renouvelé dans le dernier tiers de sa durée, et non dès son émission' },
+          { label: 'Certificats courts', text: 'Le renouvellement ne commence jamais avant le dernier tiers de la durée d\'un certificat : un certificat de 27 jours est renouvelé à 9 jours de l\'échéance, et non dès son émission' },
         ]
       },
 
@@ -398,7 +398,7 @@ Les paramètres de renouvellement automatique pilotent le planificateur de renou
 - **Sources** : le planificateur renouvelle les certificats dont le serveur détient la clé privée : par défaut ceux émis depuis le formulaire ou une requête signée (« manual »), ainsi que les enrôlements SCEP, ACME et EST à clé générée par le serveur. Les appareils qui détiennent leur propre clé se renouvellent via leur protocole
 - **En attente d'approbation** : un certificat dont le renouvellement est en file d'approbation est laissé à cette décision, tant qu'elle peut intervenir avant l'expiration du certificat
 - **Renouvelé entre-temps** : un certificat qu'un opérateur a renouvelé pendant le lot n'est pas renouvelé une seconde fois ; un certificat supprimé pendant le lot est ignoré
-- **Certificats courts** : un certificat dont la durée totale ne dépasse pas le délai configuré est renouvelé dans le dernier tiers de sa durée, et non dès son émission
+- **Certificats courts** : le renouvellement ne commence jamais avant le dernier tiers de la durée d'un certificat : un certificat de 27 jours est renouvelé à 9 jours de l'échéance, et non dès son émission
 
 ## Sauvegardes planifiées
 
