@@ -130,7 +130,8 @@ export default function ConfigTab({ acmeSettings, cas, templates = [], updateSet
               // A renamed default follows its new name; a removed one is dropped
               const previous = acmeSettings.profiles || {}
               const current = acmeSettings.default_profile
-              if (current && !(current in profiles)) {
+              // A name emptied while typing is not a removal yet
+              if (current && !(current in profiles) && !('' in profiles)) {
                 const added = Object.keys(profiles).filter(name => !(name in previous))
                 const renamed = added.length === 1
                   && Object.keys(profiles).length === Object.keys(previous).length

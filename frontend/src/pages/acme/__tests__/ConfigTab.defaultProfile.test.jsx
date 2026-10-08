@@ -16,6 +16,9 @@ vi.mock('../ProfilesEditor', () => ({
       <button onClick={() => onChange({ default: { validity_days: 90 }, shorter: { validity_days: 27 } })}>
         rename-short
       </button>
+      <button onClick={() => onChange({ default: { validity_days: 90 }, '': { validity_days: 27 } })}>
+        empty-short
+      </button>
     </>
   ),
 }))
@@ -44,6 +47,14 @@ describe('ConfigTab default profile', () => {
       updateSetting={updateSetting} canWrite />)
     fireEvent.click(screen.getByText('rename-short'))
     expect(updateSetting).toHaveBeenCalledWith('default_profile', 'shorter')
+  })
+
+  it('keeps the default while its name is emptied during typing', () => {
+    const updateSetting = vi.fn()
+    render(<ConfigTab acmeSettings={settings({ default_profile: 'short' })} cas={[]}
+      updateSetting={updateSetting} canWrite />)
+    fireEvent.click(screen.getByText('empty-short'))
+    expect(updateSetting).not.toHaveBeenCalledWith('default_profile', expect.anything())
   })
 
   it('keeps a default whose profile survives', () => {
