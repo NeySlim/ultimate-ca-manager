@@ -610,11 +610,11 @@ describe('Settings — Email', () => {
 
   it('has all required fields', () => {
     const fields = ['smtp_host', 'smtp_port', 'smtp_username', 'smtp_password',
-      'smtp_from_email', 'smtp_use_tls']
+      'smtp_from_email', 'smtp_security']
     const settings = {
       smtp_host: 'mail.example.com', smtp_port: 587,
       smtp_username: 'user', smtp_password: 'pass',
-      smtp_from_email: 'noreply@example.com', smtp_use_tls: true,
+      smtp_from_email: 'noreply@example.com', smtp_security: 'starttls',
     }
     fields.forEach(f => expect(settings).toHaveProperty(f))
   })

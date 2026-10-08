@@ -21,6 +21,20 @@ def _sanitize_header_value(value) -> str:
     return str(value).replace('\r', ' ').replace('\n', ' ').strip()
 
 
+def _smtp_connect(config: SMTPConfig, timeout: int) -> smtplib.SMTP:
+    """Open the SMTP session: implicit TLS (port 465 style) wins over STARTTLS."""
+    if config.smtp_use_ssl:
+        return smtplib.SMTP_SSL(config.smtp_host, config.smtp_port, timeout=timeout)
+    server = smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=timeout)
+    if config.smtp_use_tls:
+        try:
+            server.starttls()
+        except Exception:
+            server.close()
+            raise
+    return server
+
+
 def _smtp_authenticate(server: smtplib.SMTP, config: SMTPConfig) -> None:
     """Authenticate against SMTP using either password or XOAUTH2.
 
@@ -75,12 +89,7 @@ class EmailService:
         server = None
         try:
             # Try to connect
-            if config.smtp_use_ssl:
-                server = smtplib.SMTP_SSL(config.smtp_host, config.smtp_port, timeout=10)
-            else:
-                server = smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=10)
-                if config.smtp_use_tls:
-                    server.starttls()
+            server = _smtp_connect(config, timeout=10)
 
             # Login if credentials provided
             _smtp_authenticate(server, config)
@@ -194,12 +203,7 @@ class EmailService:
             # Connect and send
             server = None
             try:
-                if config.smtp_use_ssl:
-                    server = smtplib.SMTP_SSL(config.smtp_host, config.smtp_port, timeout=30)
-                else:
-                    server = smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=30)
-                    if config.smtp_use_tls:
-                        server.starttls()
+                server = _smtp_connect(config, timeout=30)
 
                 # Login if credentials provided
                 _smtp_authenticate(server, config)

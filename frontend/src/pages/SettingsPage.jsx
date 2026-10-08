@@ -322,7 +322,7 @@ export default function SettingsPage() {
         smtp_port: emailSettings.smtp_port,
         smtp_username: emailSettings.smtp_username,
         smtp_password: emailSettings.smtp_password,
-        smtp_use_tls: emailSettings.smtp_tls,
+        smtp_security: emailSettings.smtp_security || (emailSettings.smtp_tls ? 'starttls' : 'none'),
         smtp_from_email: emailSettings.from_email,
         smtp_from_name: emailSettings.from_name,
         smtp_auth: emailSettings.smtp_auth !== false,
@@ -1112,7 +1112,7 @@ export default function SettingsPage() {
           smtp_port: settings.smtp_port,
           smtp_username: settings.smtp_auth_method !== 'none' ? settings.smtp_username : '',
           smtp_password: settings.smtp_auth_method === 'password' ? settings.smtp_password : '',
-          smtp_tls: settings.smtp_use_tls,
+          smtp_security: settings.smtp_security || 'starttls',
           smtp_auth: settings.smtp_auth_method !== 'none',
           smtp_content_type: settings.smtp_content_type || 'html',
           from_email: settings.smtp_from_email,
@@ -1176,7 +1176,9 @@ export default function SettingsPage() {
     if (preset) {
       if (preset.smtp_host) updateSetting('smtp_host', preset.smtp_host)
       if (preset.smtp_port) updateSetting('smtp_port', preset.smtp_port)
-      if (typeof preset.smtp_use_tls === 'boolean') updateSetting('smtp_use_tls', preset.smtp_use_tls)
+      if (typeof preset.smtp_use_ssl === 'boolean' || typeof preset.smtp_use_tls === 'boolean') {
+        updateSetting('smtp_security', preset.smtp_use_ssl ? 'ssl' : (preset.smtp_use_tls ? 'starttls' : 'none'))
+      }
       // Force tenant to the right default for each Microsoft variant.
       // Personal Outlook.com → 'consumers' (the field is hidden in the UI).
       // M365 → 'common' unless the admin already set a tenant GUID.

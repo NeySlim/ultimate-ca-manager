@@ -321,12 +321,23 @@ export default function EmailSection({ settings, updateSetting, handleSave, savi
               </div>
             </DetailGrid>
             <div className="flex flex-wrap items-center gap-x-6 gap-y-3">
-              <ToggleSwitch
-                checked={settings.smtp_use_tls || false}
-                onChange={(val) => updateSetting('smtp_use_tls', val)}
-                label={t('settings.useTls')}
-                size="sm"
-              />
+              <div className="flex items-center gap-2">
+                <span className="text-sm text-text-secondary">{t('settings.smtpSecurity')}:</span>
+                {[['none', 'smtpSecurityNone'], ['starttls', 'smtpSecurityStarttls'], ['ssl', 'smtpSecuritySsl']].map(([mode, labelKey]) => (
+                  <button
+                    key={mode}
+                    type="button"
+                    onClick={() => updateSetting('smtp_security', mode)}
+                    className={`px-2.5 py-1 rounded-md text-xs font-medium transition-colors ${
+                      (settings.smtp_security || 'starttls') === mode
+                        ? 'bg-accent-primary text-white'
+                        : 'bg-bg-tertiary text-text-secondary hover:bg-bg-secondary'
+                    }`}
+                  >
+                    {t(`settings.${labelKey}`)}
+                  </button>
+                ))}
+              </div>
               <div className="flex items-center gap-2">
                 <span className="text-sm text-text-secondary">{t('settings.emailFormat')}:</span>
                 {['html', 'text', 'both'].map(fmt => (
@@ -345,6 +356,7 @@ export default function EmailSection({ settings, updateSetting, handleSave, savi
                 ))}
               </div>
             </div>
+            <p className="text-xs text-text-tertiary">{t('settings.smtpSecurityHint')}</p>
           </div>
 
           {/* Test result banner */}

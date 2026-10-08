@@ -14,6 +14,15 @@ from . import bp
 
 logger = logging.getLogger(__name__)
 
+SMTP_SECURITY_MODES = ('none', 'starttls', 'ssl')
+
+
+def _smtp_security(smtp):
+    """Transport security as one value; implicit TLS wins, as in the sender."""
+    if smtp.smtp_use_ssl:
+        return 'ssl'
+    return 'starttls' if smtp.smtp_use_tls else 'none'
+
 
 @bp.route('/api/v2/settings/email', methods=['GET'])
 @require_auth(['read:settings'])
@@ -30,6 +39,8 @@ def get_email_settings():
             'smtp_username': '',
             'smtp_password': '',
             'smtp_tls': True,
+            'smtp_ssl': False,
+            'smtp_security': 'starttls',
             'smtp_auth': True,
             'smtp_content_type': 'html',
             'from_name': 'UCM Certificate Manager',
@@ -44,6 +55,8 @@ def get_email_settings():
         'smtp_username': smtp.smtp_user or '',  # Model uses smtp_user
         'smtp_password': '********' if smtp._smtp_password else '',  # Masked
         'smtp_tls': smtp.smtp_use_tls,  # Model uses smtp_use_tls
+        'smtp_ssl': bool(smtp.smtp_use_ssl),
+        'smtp_security': _smtp_security(smtp),
         'smtp_auth': smtp.smtp_auth if smtp.smtp_auth is not None else True,
         'smtp_content_type': smtp.smtp_content_type or 'html',
         'from_name': smtp.smtp_from_name or 'UCM Certificate Manager',
@@ -73,6 +86,8 @@ def update_email_settings():
     data = request.json
     if not data:
         return error_response('No data provided', 400)
+    if 'smtp_security' in data and data['smtp_security'] not in SMTP_SECURITY_MODES:
+        return error_response('smtp_security must be one of: none, starttls, ssl', 400)
 
     smtp = SMTPConfig.query.first()
     if not smtp:
@@ -90,8 +105,15 @@ def update_email_settings():
         smtp.smtp_user = data['smtp_username']  # Model uses smtp_user
     if 'smtp_password' in data and data['smtp_password'] and data['smtp_password'] != '********':
         smtp.smtp_password = data['smtp_password']  # Uses encrypted setter
-    if 'smtp_tls' in data:
-        smtp.smtp_use_tls = bool(data['smtp_tls'])  # Model uses smtp_use_tls
+    if 'smtp_security' in data:
+        smtp.smtp_use_ssl = data['smtp_security'] == 'ssl'
+        smtp.smtp_use_tls = data['smtp_security'] == 'starttls'
+    else:
+        # Legacy booleans, kept for API clients written before smtp_security
+        if 'smtp_tls' in data:
+            smtp.smtp_use_tls = bool(data['smtp_tls'])  # Model uses smtp_use_tls
+        if 'smtp_ssl' in data:
+            smtp.smtp_use_ssl = bool(data['smtp_ssl'])
     if 'smtp_auth' in data:
         smtp.smtp_auth = bool(data['smtp_auth'])
     if 'smtp_content_type' in data and data['smtp_content_type'] in ('html', 'text', 'both'):

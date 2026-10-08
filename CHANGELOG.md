@@ -15,6 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - The DEB and RPM packages and the Docker image now include the `redis` Python package, which a Redis URL needs to take effect.
 
 ### Fixed
+- An SMTP server on port 465 (implicit TLS) timed out, because the interface could only turn on STARTTLS. Settings › Email now offers None, STARTTLS or SSL/TLS (#377, reported by @lengqing5977).
 - `UCM_REDIS_URL`, the variable the Redis guide and the Docker Compose overlay set, was never read, so Redis stayed unused. It is now read along with `REDIS_URL`.
 - The readiness probe answered 503 when a Redis URL was set without the `redis` Python package installed; the Redis check is now reported as skipped.
 
