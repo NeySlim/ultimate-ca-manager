@@ -14,7 +14,7 @@ from models.acme_models import AcmeOrder
 from services.acme import profiles as acme_profiles
 
 from tests.test_acme_security_paths import (  # reuse the JWS/account harness
-    _build_jws, _nonce, _post_jws, acme_account,  # noqa: F401
+    _build_jws, _csr_b64, _nonce, _post_jws, acme_account,  # noqa: F401
 )
 
 PROFILES = {
@@ -195,6 +195,31 @@ class TestNewOrderProfileSelection:
         with app.app_context():
             order = AcmeOrder.query.filter_by(order_id=order_id).first()
             assert acme_profiles.issuance_params(order.profile)['validity_days'] == 7
+
+
+class TestWithdrawnProfileAtFinalize:
+    def test_finalize_refuses_an_order_whose_profile_was_withdrawn(
+        self, app, client, acme_account, configured_profiles
+    ):
+        with app.app_context():
+            order = AcmeOrder(
+                account_id=acme_account['account_id'], status='ready', profile='gone',
+                identifiers=json.dumps([{'type': 'dns', 'value': 'finalize.example.com'}]),
+            )
+            db.session.add(order)
+            db.session.commit()
+            order_id = order.order_id
+        path = f'/acme/order/{order_id}/finalize'
+        jws = _build_jws(
+            f'http://localhost{path}', {'csr': _csr_b64(acme_account['key'])}, acme_account['key'],
+            kid=f'http://localhost/acme/acct/{acme_account["account_id"]}', nonce=_nonce(client),
+        )
+        response = _post_jws(client, path, jws)
+        assert response.status_code == 400
+        assert response.get_json()['type'].endswith(':invalidProfile')
+        with app.app_context():
+            refused = AcmeOrder.query.filter_by(order_id=order_id).first()
+            assert refused.status == 'ready' and refused.certificate_id is None
 
 
 class TestDefaultDigest:

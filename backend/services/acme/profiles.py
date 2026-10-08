@@ -349,10 +349,9 @@ def get_default_profile():
 def issuance_params(name):
     """Issuance parameters for a profile name.
 
-    An order that names no profile gets the default profile when one is set.
-    Otherwise, and when the named profile is gone (the order predates a
-    config change), UCM's historical defaults apply, so a finalize can never
-    fail because a profile was removed after the order.
+    A falsy name means the default profile, else UCM's historical defaults,
+    which also apply to an unknown name. Finalize refuses an order whose
+    profile was withdrawn before it gets here.
     """
     if not name:
         name = get_default_profile()

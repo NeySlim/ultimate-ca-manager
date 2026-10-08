@@ -217,7 +217,8 @@ def _issue_approved_csr(approval, data):
         # approval keeps no certificate link
         logger.info(f"CSR {cert.id} signed as CA {signed.id} via approval #{approval.id}")
         return {'id': None, 'ca_id': signed.id, 'cn': data.get('cn'),
-                'serial_number': signed.serial_number if hasattr(signed, 'serial_number') else None}
+                'serial_number': signed.serial_number if hasattr(signed, 'serial_number') else None,
+                'notices': notices_mod.collect(data.get('validity_notice'))}
     _link_duplicates(duplicate_ids, signed.id)
     _link_approval(approval, signed.id)
     logger.info(f"CSR {cert.id} signed via approval #{approval.id}")
@@ -227,6 +228,7 @@ def _issue_approved_csr(approval, data):
         'serial_number': signed.serial_number,
         'valid_from': utc_isoformat(signed.valid_from),
         'valid_to': utc_isoformat(signed.valid_to),
+        'notices': notices_mod.collect(data.get('validity_notice')),
     }
 
 

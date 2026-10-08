@@ -11,7 +11,7 @@ from cryptography import x509
 
 from models import Certificate, db
 from models.policy import ApprovalRequest, CertificatePolicy
-from tests.test_approval_on_sign_and_renew import _cert_row, _drop_policy, _drop_rows, _json, _operator
+from tests.test_approval_on_sign_and_renew import _cert_row, _csr_row, _drop_policy, _drop_rows, _json, _operator
 
 
 def _days_left(app, cert_id):
@@ -171,3 +171,23 @@ class TestIssuanceApprovalNotices:
                 for row in Certificate.query.filter(Certificate.subject.contains(f'CN={cn}')).all():
                     db.session.delete(row)
                 db.session.commit()
+
+
+class TestCsrApprovalNotices:
+    def test_a_policy_cap_is_reported_to_requester_and_approver(self, app, auth_client, create_ca, create_user):
+        ca = create_ca(cn='CSR approval notice CA')
+        pid = _policy(app, ca['id'], 'csr-approval-cap', approval=True, rules={'max_validity_days': 5})
+        csr_id = _csr_row(app, f'csr-approval-cap-{ca["id"]}.example.test')
+        operator = _operator(app, create_user)
+        try:
+            r = _json(operator, 'post', f'/api/v2/csrs/{csr_id}/sign', {'ca_id': ca['id'], 'validity_days': 20})
+            assert r.status_code == 200, r.get_json()
+            assert (r.get_json().get('meta') or {}).get('notices')
+            approval_id = r.get_json()['data']['approval_id']
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {'comment': 'ok'})
+            assert r.status_code == 200, r.get_json()
+            assert r.get_json()['data']['certificate_issued'] is True
+            assert (r.get_json().get('meta') or {}).get('notices')
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)

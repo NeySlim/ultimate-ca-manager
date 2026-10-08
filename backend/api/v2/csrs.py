@@ -147,7 +147,7 @@ def _policy_rule_refusal(ca, cert, template_id, validity_days):
     return None, validity_days, notice
 
 
-def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus):
+def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus, validity_notice=None):
     """Queue the signing for approval when a policy requires it: ``(policy,
     approval)`` or ``(None, None)``. Raises on evaluation error."""
     from services.approval_gate import queue_if_approval_required
@@ -159,6 +159,8 @@ def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus
             'csr_id': cert.id, 'ca_id': ca.id, 'cn': csr_cn, 'cert_type': cert_type,
             'validity_days': validity_days, 'extra_ekus': extra_ekus,
             'template_id': data.get('template_id'),
+            # The duration was already capped by policy: the approver is told
+            'validity_notice': validity_notice,
         },
         comment=data.get('approval_comment'),
     )
@@ -870,14 +872,16 @@ def sign_csr(csr_id):
     # the issue form (administrators bypass). Fail closed on any error.
     try:
         policy, approval = _approval_for_csr(
-            g.current_user, ca, cert, data, validity_days, backend_cert_type, extra_ekus)
+            g.current_user, ca, cert, data, validity_days, backend_cert_type, extra_ekus,
+            validity_notice=validity_notice)
     except Exception as e:
         logger.error(f"Policy evaluation failed for CSR {csr_id}; refusing to sign: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the request was not signed', 500)
     if approval is not None:
         from services.approval_gate import approval_payload
         return success_response(data=approval_payload(policy, approval),
-                                message='CSR signing submitted for approval')
+                                message='CSR signing submitted for approval',
+                                meta=notices_mod.meta_with_notices(notices_mod.collect(validity_notice)))
 
     # Clamp validity to CA expiration
     ca_clamp_notice = None

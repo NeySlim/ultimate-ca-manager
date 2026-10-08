@@ -1303,6 +1303,15 @@ def finalize_order(order_id: str):
                 403,
             )
 
+        # draft-ietf-acme-profiles: a profile withdrawn since newOrder is
+        # refused, not silently replaced by the historical defaults
+        from services.acme import profiles as acme_profiles
+        if existing_order.profile and not acme_profiles.is_known(existing_order.profile):
+            return acme_error(
+                'invalidProfile',
+                'The certificate profile of this order is no longer offered by this server',
+            )
+
         # Persist the RFC 8555 processing transition before signing begins;
         # a concurrent finalize of the same order loses here
         if not service.begin_order_processing(existing_order):
