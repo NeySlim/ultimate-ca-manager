@@ -16,6 +16,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 - An SMTP server on port 465 (implicit TLS) timed out, because the interface could only turn on STARTTLS. Settings › Email now offers None, STARTTLS or SSL/TLS (#377, reported by @lengqing5977).
+- Settings › HTTPS did not offer certificates with less than 30 days left, which excluded every short-lived certificate; they are now listed (#378, reported by @lengqing5977).
 - `UCM_REDIS_URL`, the variable the Redis guide and the Docker Compose overlay set, was never read, so Redis stayed unused. It is now read along with `REDIS_URL`.
 - The readiness probe answered 503 when a Redis URL was set without the `redis` Python package installed; the Redis check is now reported as skipped.
 - The Docker image health check and the example compose files assumed port 8443, so a container with another `UCM_HTTPS_PORT` was reported unhealthy or unreachable. Both now follow `UCM_HTTPS_PORT` (#377).

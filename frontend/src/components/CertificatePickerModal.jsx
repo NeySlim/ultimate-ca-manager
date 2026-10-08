@@ -20,12 +20,14 @@ export default function CertificatePickerModal({ isOpen, onClose, onSelect, filt
   const [total, setTotal] = useState(0)
   const [selectedId, setSelectedId] = useState(null)
   const perPage = 15
+  // A string key keeps the callback stable when the caller passes a fresh array
+  const statusKey = [].concat(filters.status || 'valid').join(',')
 
   const loadCertificates = useCallback(async () => {
     setLoading(true)
     try {
       const params = {
-        status: filters.status || 'valid',
+        status: statusKey.split(','),
         page,
         per_page: perPage,
       }
@@ -36,10 +38,11 @@ export default function CertificatePickerModal({ isOpen, onClose, onSelect, filt
       const items = data.data || []
       const meta = data.meta || {}
 
-      // Client-side filter for private key + not expired
+      // Client-side filter for private key + requested status + not expired
+      const statuses = statusKey.split(',')
       const filtered = items.filter(cert => {
         if (filters.has_private_key) {
-          return cert.has_private_key && cert.status === 'valid' && new Date(cert.valid_to) > new Date()
+          return cert.has_private_key && statuses.includes(cert.status) && new Date(cert.valid_to) > new Date()
         }
         return true
       })
@@ -51,7 +54,7 @@ export default function CertificatePickerModal({ isOpen, onClose, onSelect, filt
     } finally {
       setLoading(false)
     }
-  }, [page, search, filters?.status, filters?.has_private_key])
+  }, [page, search, statusKey, filters?.has_private_key])
 
   useEffect(() => {
     if (isOpen) {

@@ -2188,7 +2188,7 @@ export default function SettingsPage() {
           setSelectedHttpsCert(cert)
           setShowCertPicker(false)
         }}
-        filters={{ status: 'valid', has_private_key: true }}
+        filters={{ status: ['valid', 'expiring'], has_private_key: true }}
       />
     </>
   )
