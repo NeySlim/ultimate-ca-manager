@@ -881,6 +881,8 @@
     "certInstallFailed": "Не вдалося встановити сертифікат ЦС",
     "certSupersededNotice": "Попередній сертифікат (серійний номер {{serial}}) залишається дійсним до {{date}}: відкличте його у вашому зовнішньому кореневому ЦС, якщо він більше не має вважатися довіреним",
     "yearsValidity": "{{count}} років",
+    "yearsValidity_one": "{{count}} рік",
+    "yearsValidity_few": "{{count}} роки",
     "customValidityDays": "Власна (дні)",
     "validityDays": "Строк дії (дні)",
     "validityDaysHelp": "Від 1 до {{max}} днів. Проміжний ЦС ніколи не діє довше за батьківський.",

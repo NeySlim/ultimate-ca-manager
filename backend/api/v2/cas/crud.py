@@ -394,9 +394,9 @@ def create_ca():
             if raw_validity is None or raw_validity == '':
                 validity_years = 10
             else:
-                try:
-                    validity_years = int(raw_validity)
-                except (TypeError, ValueError):
+                # A boolean or a fractional year is refused, as for validityDays
+                validity_years = coerce_validity_days(raw_validity)
+                if validity_years is None:
                     return error_response('Invalid validityYears', 400)
             if not 1 <= validity_years <= 50:
                 return error_response('validityYears must be between 1 and 50', 400)

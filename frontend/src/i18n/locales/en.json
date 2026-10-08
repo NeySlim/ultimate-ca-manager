@@ -881,6 +881,8 @@
     "certInstallFailed": "Failed to install CA certificate",
     "certSupersededNotice": "The previous certificate (serial {{serial}}) remains valid until {{date}}: revoke it at your external root CA if it should no longer be trusted",
     "yearsValidity": "{{count}} years",
+    "yearsValidity_one": "{{count}} year",
+    "yearsValidity_few": "{{count}} years",
     "customValidityDays": "Custom (days)",
     "validityDays": "Validity (days)",
     "validityDaysHelp": "From 1 to {{max}} days. An intermediate CA never outlives its parent.",

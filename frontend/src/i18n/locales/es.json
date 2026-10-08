@@ -881,6 +881,8 @@
     "certInstallFailed": "Error al instalar el certificado de CA",
     "certSupersededNotice": "El certificado anterior (número de serie {{serial}}) sigue siendo válido hasta el {{date}}: revóquelo en su CA raíz externa si ya no debe ser de confianza",
     "yearsValidity": "{{count}} años",
+    "yearsValidity_one": "{{count}} año",
+    "yearsValidity_few": "{{count}} años",
     "customValidityDays": "Personalizada (días)",
     "validityDays": "Validez (días)",
     "validityDaysHelp": "De 1 a {{max}} días. Una CA intermedia nunca caduca después de su CA principal.",

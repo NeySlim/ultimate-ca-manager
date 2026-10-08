@@ -881,6 +881,8 @@
     "certInstallFailed": "安装CA证书失败",
     "certSupersededNotice": "先前的证书（序列号 {{serial}}）在 {{date}} 之前仍然有效:, 如果不应再信任它，请在您的外部根CA上将其吊销",
     "yearsValidity": "{{count}}年",
+    "yearsValidity_one": "{{count}}年",
+    "yearsValidity_few": "{{count}}年",
     "customValidityDays": "自定义（天）",
     "validityDays": "有效期（天）",
     "validityDaysHelp": "1 到 {{max}} 天。中间 CA 的到期时间不会晚于其父 CA。",

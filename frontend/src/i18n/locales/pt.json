@@ -881,6 +881,8 @@
     "certInstallFailed": "Falha ao instalar o certificado de CA",
     "certSupersededNotice": "O certificado anterior (número de série {{serial}}) permanece válido até {{date}}: revogue-o na sua CA raiz externa se ele não deve mais ser confiável",
     "yearsValidity": "{{count}} anos",
+    "yearsValidity_one": "{{count}} ano",
+    "yearsValidity_few": "{{count}} anos",
     "customValidityDays": "Personalizada (dias)",
     "validityDays": "Validade (dias)",
     "validityDaysHelp": "De 1 a {{max}} dias. Uma CA intermediária nunca expira depois da sua CA principal.",

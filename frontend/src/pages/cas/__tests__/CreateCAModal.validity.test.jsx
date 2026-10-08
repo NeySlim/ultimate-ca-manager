@@ -89,6 +89,17 @@ describe('CreateCAModal validity (#378)', () => {
     expect(payload).not.toHaveProperty('validityYears')
   })
 
+  it('reopens on the default validity after a custom one', async () => {
+    mocks.getProviders.mockResolvedValue({ data: [] })
+    const props = { onClose: vi.fn(), cas: [], onSuccess: vi.fn() }
+    const { rerender } = render(<CreateCAModal open {...props} />)
+    fireEvent.change(screen.getByLabelText('common.validityPeriod'), { target: { value: 'custom' } })
+    rerender(<CreateCAModal open={false} {...props} />)
+    rerender(<CreateCAModal open {...props} />)
+    expect(screen.getByLabelText('common.validityPeriod').value).toBe('10')
+    expect(screen.queryByLabelText('cas.validityDays')).toBeNull()
+  })
+
   it('offers short presets below five years', async () => {
     await openRoot()
     const values = Array.from(screen.getByLabelText('common.validityPeriod').options).map(o => o.value)

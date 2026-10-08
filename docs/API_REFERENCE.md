@@ -453,17 +453,22 @@ POST /api/v2/cas
 Content-Type: application/json
 
 {
-  "common_name": "My Root CA",
+  "commonName": "My Root CA",
   "organization": "My Company",
   "country": "US",
   "state": "California",
   "locality": "San Francisco",
-  "key_size": 4096,
-  "validity_days": 3650,
-  "ca_type": "root",
-  "key_algorithm": "RSA"
+  "keyAlgo": "RSA",
+  "keySize": 4096,
+  "validityYears": 10,
+  "type": "root"
 }
 ```
+
+`validityYears` takes 1 to 50 (default 10). `validityDays` (1 to 18250) sets a
+duration that is not a whole number of years and takes precedence when both
+are sent. An intermediate CA never outlives its parent. A CA of type
+`external` takes neither: its signer decides.
 
 Optional `namedUrls: true` gives the CA an immutable unique slug derived from
 its name, used instead of the random id in CDP/AIA URL paths (both forms keep
@@ -472,11 +477,12 @@ resolving). Returned as `url_slug` (null when not opted in).
 **For Intermediate CA:**
 ```json
 {
-  "common_name": "My Intermediate CA",
-  "parent_id": 1,
-  "ca_type": "intermediate",
-  "validity_days": 1825,
-  "key_size": 4096
+  "commonName": "My Intermediate CA",
+  "parentCAId": 1,
+  "type": "intermediate",
+  "validityDays": 1825,
+  "keyAlgo": "RSA",
+  "keySize": 4096
 }
 ```
 

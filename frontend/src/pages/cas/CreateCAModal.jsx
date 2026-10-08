@@ -183,6 +183,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     setCreateFormNamedUrls(false)
     setCreateFormNCPermitted([])
     setCreateFormNCExcluded([])
+    setCreateFormValidity('10')
+    setCreateFormValidityDays('')
   }, [open])
 
   // Reset HSM form state when modal closes

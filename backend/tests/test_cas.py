@@ -1047,6 +1047,14 @@ class TestCaValidityDays:
         assert_error(r, 400)
         assert 'validityDays' in r.get_json()['message']
 
+    def test_intermediate_days_below_the_parent_are_kept(self, auth_client, create_ca):
+        root = create_ca(cn='Days Keep Root', validityYears=2)
+        r = post_json(auth_client, '/api/v2/cas', {
+            **VALID_ROOT_CA, 'type': 'intermediate', 'commonName': 'Days Keep Intermediate',
+            'parentCAId': root['id'], 'validityDays': 400,
+        })
+        assert 400 <= self._lifetime_days(assert_success(r, status=201)) < 400.1
+
     def test_intermediate_days_clamped_to_parent(self, auth_client, create_ca):
         root = create_ca(cn='Days Clamp Root', validityYears=1)
         r = post_json(auth_client, '/api/v2/cas', {
@@ -1057,3 +1065,7 @@ class TestCaValidityDays:
         root_detail = assert_success(auth_client.get(f'/api/v2/cas/{root["id"]}'))
         inter_detail = assert_success(auth_client.get(f'/api/v2/cas/{inter["id"]}'))
         assert inter_detail['valid_to'] <= root_detail['valid_to']
+
+    @pytest.mark.parametrize('bad', [True, 2.5])
+    def test_validity_years_refuses_a_boolean_or_a_fraction(self, auth_client, bad):
+        assert_error(self._create(auth_client, validityYears=bad), 400)
