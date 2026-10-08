@@ -209,3 +209,45 @@ class TestOnlyAUsableCertificateIsApplied:
         assert response.status_code == 400
         assert message in response.get_json()['message']
         assert not cert_path.exists() and not key_path.exists()
+
+
+class TestBackupOfALoneKeyFile:
+    def test_apply_with_only_a_key_file_on_disk(self, app, auth_client, https_paths, no_restart):
+        """The backup suffix was set only when the certificate file existed."""
+        from datetime import timedelta
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.x509.oid import NameOID
+        from models import Certificate
+        from utils.datetime_utils import utc_now
+        from utils.key_codec import store_pem_bytes
+
+        cert_path, key_path = https_paths
+        key_path.write_text('old key')
+        key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'lone-key.example.test')])
+        now = utc_now()
+        crt = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+               .public_key(key.public_key()).serial_number(x509.random_serial_number())
+               .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=20))
+               .sign(key, hashes.SHA256()))
+        with app.app_context():
+            row = Certificate(
+                refid='https-lone-key', descr='https lone key', subject_cn='lone-key.example.test',
+                crt=base64.b64encode(crt.public_bytes(serialization.Encoding.PEM)).decode(),
+                prv=store_pem_bytes(key.private_bytes(serialization.Encoding.PEM,
+                                                      serialization.PrivateFormat.PKCS8,
+                                                      serialization.NoEncryption())),
+                valid_from=now - timedelta(days=1), valid_to=now + timedelta(days=20))
+            db.session.add(row)
+            db.session.commit()
+            cert_id = row.id
+        try:
+            response = auth_client.post('/api/v2/system/https/apply', json={'cert_id': cert_id})
+            assert response.status_code == 200, response.data
+            assert list(key_path.parent.glob('https_key.pem.backup-*'))
+        finally:
+            with app.app_context():
+                db.session.delete(db.session.get(Certificate, cert_id))
+                db.session.commit()

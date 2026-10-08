@@ -178,8 +178,8 @@ def regenerate_https_cert():
         key_path = Path(os.environ.get('HTTPS_KEY_PATH', f'{data_dir}/https_key.pem'))
 
         # Backup existing
+        backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
         if cert_path.exists():
-            backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
             shutil.copy(cert_path, f"{cert_path}.backup-{backup_suffix}")
         if key_path.exists():
             shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
@@ -269,8 +269,8 @@ def apply_https_cert():
         key_path = Path(os.environ.get('HTTPS_KEY_PATH', f'{data_dir}/https_key.pem'))
 
         # Backup existing certs
+        backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
         if cert_path.exists():
-            backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
             shutil.copy(cert_path, f"{cert_path}.backup-{backup_suffix}")
         if key_path.exists():
             shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
