@@ -10,6 +10,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ## [Unreleased]
 
 ### Added
+- The ACME server takes a default certificate profile, applied to orders whose client requests none, which is what most clients do. Those orders were always issued for 90 days whatever the profiles said (#378).
 - Renewing a certificate asks for the validity of the new one, prefilled with the current duration, where it could only repeat the original duration. Issuance policies and the CA's expiry still cap it, and a renewal queued for approval keeps the chosen duration (#378).
 
 ### Changed
