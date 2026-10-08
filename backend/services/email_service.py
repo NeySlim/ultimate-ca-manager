@@ -75,7 +75,7 @@ class EmailService:
         server = None
         try:
             # Try to connect
-            if config.smtp_use_ssl:
+            if config.smtp_use_tls and config.smtp_port == 465:
                 server = smtplib.SMTP_SSL(config.smtp_host, config.smtp_port, timeout=10)
             else:
                 server = smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=10)
@@ -194,7 +194,7 @@ class EmailService:
             # Connect and send
             server = None
             try:
-                if config.smtp_use_ssl:
+                if config.smtp_use_tls and config.smtp_port == 465:
                     server = smtplib.SMTP_SSL(config.smtp_host, config.smtp_port, timeout=30)
                 else:
                     server = smtplib.SMTP(config.smtp_host, config.smtp_port, timeout=30)
