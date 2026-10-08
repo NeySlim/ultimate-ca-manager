@@ -45,6 +45,17 @@ describe('ACME public vhost TLS certificate selector (#365)', () => {
     })
   })
 
+  it('asks the server for certificates holding a private key', async () => {
+    getAll.mockReset()
+    getAll.mockResolvedValue({ data: [] })
+    render(
+      <GeneralSection settings={{}} updateSetting={vi.fn()} handleSave={vi.fn()} saving={false}
+        canWrite={() => true} hasPermission={() => true} />
+    )
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    expect(getAll.mock.calls[0][0].has_private_key).toBe(true)
+  })
+
   it('offers certificates beyond the first page', async () => {
     const page1 = Array.from({ length: 100 }, (_, i) => ({ id: i + 1, common_name: `c${i + 1}.example.com`, has_private_key: true }))
     getAll.mockImplementation(({ page }) => Promise.resolve(page === 1

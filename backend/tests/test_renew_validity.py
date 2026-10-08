@@ -191,3 +191,21 @@ class TestCsrApprovalNotices:
         finally:
             _drop_policy(app, pid)
             _drop_rows(app, csr_id)
+
+    def test_bulk_sign_carries_the_cap_to_the_approver(self, app, auth_client, create_ca, create_user):
+        ca = create_ca(cn='CSR bulk approval notice CA')
+        pid = _policy(app, ca['id'], 'csr-bulk-approval-cap', approval=True, rules={'max_validity_days': 5})
+        csr_id = _csr_row(app, f'csr-bulk-approval-cap-{ca["id"]}.example.test')
+        operator = _operator(app, create_user)
+        try:
+            r = _json(operator, 'post', '/api/v2/csrs/bulk/sign',
+                      {'ids': [csr_id], 'ca_id': ca['id'], 'validity_days': 20})
+            assert r.status_code == 200, r.get_json()
+            pending = r.get_json()['data']['pending_approval']
+            assert pending[0]['notice']
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{pending[0]["approval_id"]}/approve', {'comment': 'ok'})
+            assert r.status_code == 200, r.get_json()
+            assert (r.get_json().get('meta') or {}).get('notices')
+        finally:
+            _drop_policy(app, pid)
+            _drop_rows(app, csr_id)

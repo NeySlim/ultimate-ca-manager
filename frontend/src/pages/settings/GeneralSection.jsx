@@ -23,10 +23,10 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
   // Certificates with a private key, for the ACME public vhost TLS selector
   useEffect(() => {
     let cancelled = false
-    fetchAllPages(certificatesService.getAll)
+    fetchAllPages((query) => certificatesService.getAll({ ...query, has_private_key: true }))
       .then((all) => {
         if (cancelled) return
-        const certs = all.filter((c) => c.has_private_key && !c.revoked)
+        const certs = all.filter((c) => !c.revoked)
         setTlsCertOptions(certs.map((c) => ({
           value: String(c.id),
           label: `${certificateLabel(c) || c.refid} (#${c.id})`,

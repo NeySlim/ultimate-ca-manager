@@ -1016,14 +1016,16 @@ def bulk_sign_csrs():
                 continue
             try:
                 policy, approval = _approval_for_csr(
-                    g.current_user, ca, cert, data, item_validity, 'server_cert', None)
+                    g.current_user, ca, cert, data, item_validity, 'server_cert', None,
+                    validity_notice=_item_notice)
             except Exception as e:
                 logger.error(f"Policy evaluation failed for CSR {csr_id}: {e}", exc_info=True)
                 results['failed'].append({'id': csr_id, 'error': 'Policy evaluation failed'})
                 continue
             if approval is not None:
                 results.setdefault('pending_approval', []).append(
-                    {'id': csr_id, 'approval_id': approval.id, 'policy_name': policy.name})
+                    {'id': csr_id, 'approval_id': approval.id, 'policy_name': policy.name,
+                     'notice': _item_notice})
                 continue
 
             signed_cert = CertificateService.sign_csr(

@@ -29,6 +29,7 @@ vi.mock('react-i18next', () => ({
 
 let mockIsMobile = false
 const openWindow = vi.fn()
+const showWarning = vi.fn()
 const navigate = vi.fn()
 
 vi.mock('react-router-dom', async () => {
@@ -38,7 +39,7 @@ vi.mock('react-router-dom', async () => {
 
 vi.mock('../../contexts', () => ({
   useNotification: () => ({
-    showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn(),
+    showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn(), showWarning,
     showConfirm: vi.fn().mockResolvedValue(false), showPrompt: vi.fn().mockResolvedValue(null),
   }),
   useMobile: () => ({
@@ -224,6 +225,20 @@ describe('CSRsPage — finding a new CSR/certificate (#368)', () => {
     clickSignSubmit()
     await waitFor(() => expect(sign).toHaveBeenCalled())
     expect(openWindow).not.toHaveBeenCalled()
+  })
+
+  it('tells the requester a queued signing was shortened by policy', async () => {
+    const user = userEvent.setup()
+    showWarning.mockReset()
+    sign.mockResolvedValue({
+      data: { approval_required: true, policy_name: 'P' },
+      meta: { notices: ['Validity shortened to 5 days'] },
+    })
+    await openSignModal()
+    await selectCA(user)
+
+    clickSignSubmit()
+    await waitFor(() => expect(showWarning).toHaveBeenCalledWith('Validity shortened to 5 days'))
   })
 
   const openMscaSignModal = async () => {

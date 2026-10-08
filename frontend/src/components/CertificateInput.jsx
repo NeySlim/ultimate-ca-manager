@@ -55,20 +55,17 @@ export function CertificateInput({
   const [isDragOver, setIsDragOver] = useState(false)
   const fileInputRef = useRef(null)
 
-  // Load managed certificates on demand.
-  // /certificates reads page/per_page (100 max) and has no "holds a private
-  // key" filter: `has_key` and `limit` were dropped silently and the list was
-  // the first 20 certificates by subject, so walk the pages and sieve here.
+  // Load managed certificates on demand, walking the pages: the listing
+  // pages on `per_page` (100 max) and filters on `has_private_key` itself.
   const loadManagedCerts = useCallback(async () => {
     if (managedCerts) return
     setLoadingCerts(true)
     try {
-      // `limit` is not a parameter this listing reads: it pages on `per_page`,
-      // capped at 100, so asking for 500 returned the default 20. `has_key` is
-      // not read either, so the key filter stays here rather than being sent
-      // and silently ignored.
-      const certs = await fetchAllPages(certificatesService.getAll, { perPage: MANAGED_PER_PAGE, max: MANAGED_MAX_CERTS })
-      setManagedCerts(requireKey ? certs.filter(c => c.has_private_key) : certs)
+      const getPage = requireKey
+        ? (query) => certificatesService.getAll({ ...query, has_private_key: true })
+        : certificatesService.getAll
+      const certs = await fetchAllPages(getPage, { perPage: MANAGED_PER_PAGE, max: MANAGED_MAX_CERTS })
+      setManagedCerts(certs)
     } catch {
       setManagedCerts([])
     } finally {

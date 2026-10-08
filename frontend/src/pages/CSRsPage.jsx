@@ -232,6 +232,7 @@ export default function CSRsPage() {
         if (signed?.data?.approval_required) {
           // An issuance policy queued the signing for approval
           showWarning(t('certificates.approvalRequired', { policy: signed.data.policy_name }))
+          showNotices(signed, showWarning)
           closeModal('sign')
           loadData()
           setSelectedCSR(null)

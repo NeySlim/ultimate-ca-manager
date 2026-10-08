@@ -22,8 +22,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 - An ACME order whose profile was withdrawn before finalize is refused with `invalidProfile` instead of being issued with the historical defaults.
 - The certificate picker filtered keyless certificates out of each page in the browser, so pages came up short and the count was wrong.
-- Ukrainian counts of 2 or more showed the translation key or a wrong form in about twenty labels.
-- Signing a CSR under an approval policy now reports a duration shortened by policy to the requester and the approver.
+- Ukrainian counts of 2 or more showed an English label or a wrong form in about twenty places.
+- Signing a CSR under an approval policy, alone or in bulk, now reports a duration shortened by policy to the requester and the approver.
 - An SMTP server on port 465 (implicit TLS) timed out, because the interface could only turn on STARTTLS. Settings › Email now offers None, STARTTLS or SSL/TLS (#377, reported by @lengqing5977).
 - The route applying a certificate to HTTPS accepted a revoked or expired one, which only the picker kept out; it now refuses them.
 - Applying or regenerating the HTTPS certificate failed with a server error when the key file existed without the certificate file, and a renewal rebinding it did not back that key up.

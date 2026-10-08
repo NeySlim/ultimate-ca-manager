@@ -8,8 +8,8 @@
  * dropdown showed the first 20 certificates by subject, private key or not,
  * with no error and no sign of truncation.
  *
- * The endpoint offers no "has a private key" filter, so the key check belongs
- * on the client, over a page size the endpoint really honours (100 max).
+ * The key filter is the endpoint's `has_private_key`, over a page size it
+ * really honours (100 max).
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
@@ -79,21 +79,19 @@ describe('DUP-FE-014b — managed certificate dropdown', () => {
     expect(params.page).toBe(1)
   })
 
-  it('keeps only the certificates that hold a private key when one is required', async () => {
-    getAll.mockResolvedValue({
-      data: [cert(1, true), cert(2, false), cert(3, true)],
-      meta: { total: 3 },
-    })
+  it('asks the server for certificates that hold a private key when one is required', async () => {
+    getAll.mockResolvedValue({ data: [cert(1, true), cert(3, true)], meta: { total: 2 } })
     await openManagedMode({ requireKey: true })
     await waitFor(() => expect(optionLabels().length).toBe(3)) // placeholder + 2
-    const labels = optionLabels().join('|')
-    expect(labels).toContain('cert-1')
-    expect(labels).toContain('cert-3')
-    expect(labels).not.toContain('cert-2')
+    expect(getAll.mock.calls[0][0].has_private_key).toBe(true)
+  })
+
+  it('does not filter on the key when none is required', async () => {
+    await openManagedMode({ requireKey: false })
+    expect('has_private_key' in (getAll.mock.calls[0][0] || {})).toBe(false)
   })
 
   it('says so when none of the certificates holds a private key', async () => {
-    getAll.mockResolvedValue({ data: [cert(1, false), cert(2, false)], meta: { total: 2 } })
     await openManagedMode({ requireKey: true })
     expect(await screen.findByText('certInput.noCertsWithKey')).toBeTruthy()
   })

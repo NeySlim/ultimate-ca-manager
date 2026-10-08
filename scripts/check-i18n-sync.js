@@ -23,13 +23,25 @@ function flattenKeys(obj, prefix = '') {
   return keys
 }
 
-// Plural forms a language may need beyond English's one/other (CLDR), e.g.
-// Ukrainian few/many: allowed on a key that is plural in the reference
+// Plural forms a language needs beyond English's one/other (CLDR), e.g.
+// Ukrainian few/many: allowed on a key plural in the reference, and only
+// when the language has that category
 const EXTRA_PLURAL = /^(.*)_(zero|two|few|many)$/
 
-function isLocalePluralForm(key, refKeys) {
+function isLocalePluralForm(key, refKeys, categories) {
   const m = key.match(EXTRA_PLURAL)
-  return Boolean(m) && (refKeys.has(`${m[1]}_one`) || refKeys.has(`${m[1]}_other`))
+  return Boolean(m) && categories.includes(m[2])
+    && (refKeys.has(`${m[1]}_one`) || refKeys.has(`${m[1]}_other`))
+}
+
+// A language with a "few" form (Slavic) must give few and many on every
+// plural key, or ordinary counts fall back to English. The "many" of French
+// or Spanish only covers millions and is not required.
+function missingPluralForms(keys, refKeys, categories) {
+  if (!categories.includes('few')) return []
+  const needed = categories.filter(c => c === 'few' || c === 'many')
+  const bases = [...refKeys].filter(k => k.endsWith('_one')).map(k => k.slice(0, -4))
+  return bases.flatMap(b => needed.map(c => `${b}_${c}`)).filter(k => !keys.has(k))
 }
 
 function main() {
@@ -55,8 +67,10 @@ function main() {
     const data = JSON.parse(fs.readFileSync(filePath, 'utf8'))
     const keys = new Set(flattenKeys(data))
 
+    const categories = new Intl.PluralRules(file.replace(/\.json$/, '')).resolvedOptions().pluralCategories
     const missing = [...refKeys].filter(k => !keys.has(k))
-    const extra = [...keys].filter(k => !refKeys.has(k) && !isLocalePluralForm(k, refKeys))
+      .concat(missingPluralForms(keys, refKeys, categories))
+    const extra = [...keys].filter(k => !refKeys.has(k) && !isLocalePluralForm(k, refKeys, categories))
 
     if (missing.length === 0 && extra.length === 0) {
       console.log(`  ✅ ${file} — ${keys.size} keys (in sync)`)
