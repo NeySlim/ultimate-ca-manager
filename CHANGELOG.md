@@ -7,7 +7,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [Unreleased]
+## [2.236] - 2026-10-08
 
 ### Added
 - A new CA can last 1, 2 or 3 years, or any number of days up to 50 years, where the form offered only 5, 10, 15 or 20 years. The API takes `validityDays` alongside `validityYears` (#378).
