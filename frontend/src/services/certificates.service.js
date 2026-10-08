@@ -33,8 +33,8 @@ export const certificatesService = {
     return apiClient.post(`/certificates/${id}/unhold`)
   },
 
-  async renew(id) {
-    return apiClient.post(`/certificates/${id}/renew`)
+  async renew(id, body = {}) {
+    return apiClient.post(`/certificates/${id}/renew`, body)
   },
 
   async export(id, format = 'pem', options = {}) {

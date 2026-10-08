@@ -30,6 +30,7 @@ import { UploadCACertModal } from '../pages/cas/UploadCACertModal'
 import { cn, downloadBlob } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
+import { askRenewal } from '../lib/renewalPrompt'
 
 const ENTITY_CONFIG = {
   certificate: {
@@ -195,13 +196,19 @@ export function FloatingDetailWindow({ windowInfo }) {
   }
 
   const handleRenew = async () => {
+    const body = await askRenewal(data, { showPrompt, showConfirm, showError, t })
+    if (!body) return
     try {
-      await certificatesService.renew(windowInfo.entityId)
-      showSuccess(t('certificates.renewed', 'Certificate renewed'))
+      const res = await certificatesService.renew(windowInfo.entityId, body)
+      if (res?.data?.approval_required) {
+        showWarning(t('certificates.approvalRequired', { policy: res.data.policy_name }))
+      } else {
+        showSuccess(t('certificates.renewed', 'Certificate renewed'))
+      }
       window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
       closeWindow(windowInfo.id)
     } catch (err) {
-      showError(t('certificates.renewFailed', 'Renew failed'))
+      showError(err?.message || t('certificates.renewFailed', 'Renew failed'))
     }
   }
 

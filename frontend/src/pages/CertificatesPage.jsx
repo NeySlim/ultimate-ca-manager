@@ -31,6 +31,7 @@ import { useCertificateColumns } from './certificates/useCertificateColumns'
 import { UploadKeyModal } from './certificates/UploadKeyModal'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
+import { askRenewal } from '../lib/renewalPrompt'
 
 // i18n keys for known certificate issuance sources (labelKey pattern: store the
 // KEY at module level, resolve with t() in the component). Options are built
@@ -309,19 +310,12 @@ export default function CertificatesPage() {
   }
 
   // Renew certificate
-  const handleRenew = async (id) => {
-    const confirmed = await showConfirm(
-      t('certificates.confirmRenew'),
-      {
-        title: t('certificates.renewCertificate'),
-        confirmText: t('common.refresh'),
-        variant: 'primary'
-      }
-    )
-    if (!confirmed) return
+  const handleRenew = async (cert) => {
+    const body = await askRenewal(cert, { showPrompt, showConfirm, showError, t })
+    if (!body) return
     try {
       muteToasts()
-      const res = await certificatesService.renew(id)
+      const res = await certificatesService.renew(cert.id, body)
       if (res?.data?.approval_required) {
         // An issuance policy queued the renewal for approval
         showWarning(t('certificates.approvalRequired', { policy: res.data.policy_name }))
@@ -503,7 +497,7 @@ export default function CertificatesPage() {
       { label: t('certificates.rename'), icon: PencilSimple, onClick: () => handleRename(row) }
     ] : []),
     ...(canWrite('certificates') && !row.revoked && (row.has_private_key || row.source === 'msca') ? [
-      { label: t('certificates.renewCertificate').split(' ')[0], icon: ArrowClockwise, onClick: () => handleRenew(row.id) }
+      { label: t('certificates.renewCertificate').split(' ')[0], icon: ArrowClockwise, onClick: () => handleRenew(row) }
     ] : []),
     ...(canWrite('certificates') && !row.revoked ? [
       { label: t('certificates.revokeCertificate').split(' ')[0], icon: X, variant: 'danger', onClick: () => handleRevoke(row.id) }
@@ -642,7 +636,7 @@ export default function CertificatesPage() {
       certificate={selectedCert}
       onExport={handleExport}
       onRevoke={() => handleRevoke(selectedCert.id)}
-      onRenew={(selectedCert.has_private_key || selectedCert.source === 'msca') && !selectedCert.revoked ? () => handleRenew(selectedCert.id) : null}
+      onRenew={(selectedCert.has_private_key || selectedCert.source === 'msca') && !selectedCert.revoked ? () => handleRenew(selectedCert) : null}
       onDelete={() => handleDelete(selectedCert.id)}
       onUploadKey={() => setShowKeyModal(true)}
       onAddToTrustStore={handleAddToTrustStore}

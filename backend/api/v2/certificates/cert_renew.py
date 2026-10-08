@@ -6,12 +6,24 @@ from utils.response import success_response, error_response
 from models import Certificate, db
 from services.audit_service import AuditService
 from services.cert.renewal import RenewalError, renew_certificate_in_place, check_renewable
+from utils.validity import MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS, coerce_validity_days, validity_days_in_range
 from . import bp
 
 logger = logging.getLogger(__name__)
 
 
-def _approval_for_renewal(user, cert, data):
+def _requested_validity(data):
+    """``(days or None, error)``: an absent or null value keeps the original duration."""
+    raw = (data or {}).get('validity_days')
+    if raw is None or raw == '':
+        return None, None
+    days = coerce_validity_days(raw)
+    if days is None or not validity_days_in_range(days):
+        return None, f'validity_days must be an integer from {MIN_VALIDITY_DAYS} to {MAX_VALIDITY_DAYS}'
+    return days, None
+
+
+def _approval_for_renewal(user, cert, data, validity_days=None):
     """Queue the renewal for approval when a policy requires it: ``(policy,
     approval)`` or ``(None, None)``. Raises on evaluation error."""
     from services.approval_gate import certificate_identity, queue_if_approval_required
@@ -22,7 +34,7 @@ def _approval_for_renewal(user, cert, data):
         user, ca_id=ca.id if ca else None, template_id=getattr(cert, 'template_id', None),
         cn=cn, san_list=dns, request_type='renewal',
         request_data={'certificate_id': cert.id, 'ca_id': ca.id if ca else None, 'cn': cn,
-                      'cert_type': cert.cert_type},
+                      'cert_type': cert.cert_type, 'validity_days': validity_days},
         comment=(data or {}).get('approval_comment'),
     )
 
@@ -48,10 +60,19 @@ def renew_certificate(cert_id):
     if not cert.crt:
         return error_response('Certificate data not available', 400)
 
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        data = {}
+    validity_days, validity_error = _requested_validity(data)
+    if validity_error:
+        return error_response(validity_error, 400)
+
     # Certificates issued by a Microsoft AD CS connection can't be re-signed
     # locally (the issuing CA's key lives on the Windows CA) — resubmit the
     # original CSR through the connector instead.
     if cert.source == 'msca':
+        if validity_days is not None:
+            return error_response('The Microsoft CA sets the duration of a certificate it renews', 400)
         return _renew_msca_certificate(cert)
     # Refused outright when no renewal could honour the request; only then
     # an issuance policy that requires approval binds a renewal as it binds
@@ -61,7 +82,7 @@ def renew_certificate(cert_id):
     except RenewalError as e:
         return error_response(e.message, e.status)
     try:
-        policy, approval = _approval_for_renewal(g.current_user, cert, request.get_json(silent=True) or {})
+        policy, approval = _approval_for_renewal(g.current_user, cert, data, validity_days)
     except Exception as e:
         logger.error(f"Policy evaluation failed for renewal of {cert_id}: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the certificate was not renewed', 500)
@@ -83,6 +104,7 @@ def renew_certificate(cert_id):
             rekey=True,
             regenerate_crl=True,
             trigger='manual',
+            validity_days=validity_days,
         )
     except RenewalError as e:
         db.session.rollback()

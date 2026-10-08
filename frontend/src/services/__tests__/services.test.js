@@ -186,7 +186,9 @@ describe('certificatesService', () => {
 
   it('renew → POST /certificates/:id/renew', async () => {
     await certificatesService.renew(5)
-    expect(mockApiClient.post).toHaveBeenCalledWith('/certificates/5/renew')
+    expect(mockApiClient.post).toHaveBeenCalledWith('/certificates/5/renew', {})
+    await certificatesService.renew(5, { validity_days: 27 })
+    expect(mockApiClient.post).toHaveBeenLastCalledWith('/certificates/5/renew', { validity_days: 27 })
   })
 
   it('delete → DELETE /certificates/:id', async () => {

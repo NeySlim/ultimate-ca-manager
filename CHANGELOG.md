@@ -9,6 +9,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+- Renewing a certificate asks for the validity of the new one, prefilled with the current duration, where it could only repeat the original duration. Issuance policies and the CA's expiry still cap it, and a renewal queued for approval keeps the chosen duration (#378).
+
 ### Changed
 - Upgrade note: an installation that set `REDIS_URL` or `UCM_REDIS_URL` now really uses Redis, so its sessions move there and users sign in again; check that the URL points to a running Redis, as sign-in fails otherwise, or remove the variable.
 - When a Redis URL is set, WebSocket events also go through Redis, in preparation for a high-availability mode; installations sharing a Redis server stay apart by database number.

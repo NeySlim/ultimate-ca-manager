@@ -249,6 +249,7 @@ def _issue_approved_renewal(approval, data):
         username=approval.requester.username if approval.requester else 'system',
         actor_user_id=approval.requester_id,
         rekey=True, regenerate_crl=True, trigger='manual',
+        validity_days=data.get('validity_days'),
     )
     _link_duplicates(duplicate_ids, cert.id)
     _link_approval(approval, cert.id)

@@ -709,6 +709,8 @@
     "revokeWarning": "La revoca di un certificato è permanente e irreversibile. Il certificato verrà aggiunto alla CRL e non sarà più considerato attendibile da nessun client che verifichi lo stato di revoca. Procedere solo se si è certi che questo certificato debba essere invalidato definitivamente.",
     "revokeMscaWarning": "Questo certificato è stato emesso da una CA Microsoft. UCM non può propagare la revoca ad AD CS: verrà contrassegnato come revocato solo in UCM. Ricordarsi di revocarlo anche sulla CA Windows.",
     "renewPendingMsca": "Rinnovo inviato alla CA Microsoft: in attesa di approvazione",
+    "renewDaysPrompt": "Validità del certificato rinnovato, in giorni. È precompilata la durata attuale.",
+    "renewDaysInvalid": "Inserisci un numero intero di giorni compreso tra {{min}} e {{max}}.",
     "certType": "Tipo di certificato",
     "certTypeServer": "Server (TLS/HTTPS)",
     "certTypeClient": "Autenticazione client",

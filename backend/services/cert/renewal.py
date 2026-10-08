@@ -337,6 +337,7 @@ def renew_certificate_in_place(
     regenerate_crl: bool = True,
     trigger: str = 'manual',
     known_serial=SERIAL_UNSET,
+    validity_days=None,
 ) -> dict:
     """Re-issue ``cert`` on the same database row.
 
@@ -354,6 +355,9 @@ def renew_certificate_in_place(
             snapshot, None included); by default the one the instance
             carries. A row that no longer bears it was renewed meanwhile and
             is refused (409).
+        validity_days: duration of the renewed certificate, already checked
+            against the issuance bounds by the caller; the original duration
+            when None. Policies and the CA's expiry still cap it.
 
     Returns:
         dict with cert_id, old_serial, new_serial, valid_from, valid_to,
@@ -431,10 +435,11 @@ def renew_certificate_in_place(
     if key_error:
         raise RenewalError(f'Cannot renew: {key_error}', 400)
 
-    # Same duration as the original, starting now, clamped to the shared
-    # issuance bounds and to the CA's own expiry.
-    orig_duration = orig_cert.not_valid_after_utc - orig_cert.not_valid_before_utc
-    validity_days = orig_duration.days if orig_duration.days > 0 else DEFAULT_RENEWAL_DAYS
+    # The requested duration, else the original's, starting now, clamped to
+    # the shared issuance bounds and to the CA's own expiry.
+    if validity_days is None:
+        orig_duration = orig_cert.not_valid_after_utc - orig_cert.not_valid_before_utc
+        validity_days = orig_duration.days if orig_duration.days > 0 else DEFAULT_RENEWAL_DAYS
     validity_days = min(validity_days, MAX_RENEWAL_DAYS)
     # Issuance policy rules (#335) bind a renewal as they bind an issuance
     from services.policy_service import PolicyEvaluationService
