@@ -110,3 +110,41 @@ class TestRenewDurationThroughApproval:
             assert 6.5 < _days_left(app, cert_id) <= 7.01
         finally:
             _drop_policy(app, pid)
+
+
+class TestRenewalNotices:
+    def test_a_shortened_duration_is_reported(self, app, auth_client, cert_30d):
+        ca, cert_id = cert_30d
+        pid = _policy(app, ca['id'], 'renew-notice', approval=False, rules={'max_validity_days': 5})
+        try:
+            r = _json(auth_client, 'post', f'/api/v2/certificates/{cert_id}/renew', {'validity_days': 20})
+            assert r.status_code == 200, r.get_json()
+            notices = (r.get_json().get('meta') or {}).get('notices') or []
+            assert notices, 'a renewal capped by policy must say so'
+        finally:
+            _drop_policy(app, pid)
+
+    def test_a_shortened_duration_is_reported_on_approval(self, app, auth_client, create_user, cert_30d):
+        ca, cert_id = cert_30d
+        cap = _policy(app, ca['id'], 'renew-notice-cap', approval=False, rules={'max_validity_days': 5})
+        gate = _policy(app, ca['id'], 'renew-notice-gate', approval=True, rules={})
+        operator = _operator(app, create_user)
+        try:
+            r = _json(operator, 'post', f'/api/v2/certificates/{cert_id}/renew', {'validity_days': 20})
+            approval_id = r.get_json()['data']['approval_id']
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {'comment': 'ok'})
+            assert r.status_code == 200, r.get_json()
+            assert r.get_json()['data']['certificate_issued'] is True
+            assert (r.get_json().get('meta') or {}).get('notices')
+        finally:
+            _drop_policy(app, gate)
+            _drop_policy(app, cap)
+
+
+class TestBulkRenewDuration:
+    def test_bulk_renewal_refuses_a_duration(self, app, auth_client, cert_30d):
+        _, cert_id = cert_30d
+        before = _serial(app, cert_id)
+        r = _json(auth_client, 'post', '/api/v2/certificates/bulk/renew', {'ids': [cert_id], 'validity_days': 10})
+        assert r.status_code == 400
+        assert _serial(app, cert_id) == before

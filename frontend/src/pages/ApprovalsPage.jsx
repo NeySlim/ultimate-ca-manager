@@ -17,6 +17,7 @@ import { useNotification } from '../contexts'
 import { usePermission } from '../hooks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { formatDate, cn } from '../lib/utils'
+import { showNotices } from '../lib/notices'
 
 const STATUS_VARIANTS = {
   pending: 'warning',
@@ -34,7 +35,7 @@ const STATUS_ICONS = {
 
 export default function ApprovalsPage() {
   const { t } = useTranslation()
-  const { showSuccess, showError } = useNotification()
+  const { showSuccess, showError, showWarning } = useNotification()
   const { canWrite } = usePermission()
   const openEntity = useOpenEntity()
 
@@ -211,6 +212,7 @@ export default function ApprovalsPage() {
         result = await approvalsService.approve(req.id, comment || undefined)
         if (result?.data?.certificate_issued) {
           showSuccess(t('approvals.certificateIssued'))
+          showNotices(result, showWarning)
         } else if (result?.data?.request_closed) {
           // Nothing can satisfy the request any more: it was closed
           showError(t('approvals.requestClosed', { reason: result.data.issue_error || '' }))

@@ -96,6 +96,10 @@ def bulk_renew_certificates():
     if ids_error:
         return ids_error
     data = request.get_json()
+    # Refused rather than ignored: a bulk renewal keeps each certificate's duration
+    if isinstance(data, dict) and data.get('validity_days') not in (None, ''):
+        return error_response('Bulk renewal keeps each certificate\'s duration; '
+                              'renew a single certificate to choose one', 400)
     results = {'success': [], 'failed': []}
     # CAs whose CRL must be regenerated once the loop finishes — every
     # renewal records the superseded serial in revoked_serials, and that

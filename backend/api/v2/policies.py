@@ -6,6 +6,7 @@ from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
+from utils import notices as notices_mod
 from models import db, CA, Certificate
 from models.policy import CertificatePolicy, ApprovalRequest
 from models.certificate_template import CertificateTemplate
@@ -244,7 +245,7 @@ def _issue_approved_renewal(approval, data):
                 'valid_from': utc_isoformat(cert.valid_from), 'valid_to': utc_isoformat(cert.valid_to),
                 'already_issued': True}
     duplicate_ids = _close_duplicate_requests(approval, 'certificate_id', cert.id)
-    renew_certificate_in_place(
+    outcome = renew_certificate_in_place(
         cert,
         username=approval.requester.username if approval.requester else 'system',
         actor_user_id=approval.requester_id,
@@ -260,6 +261,7 @@ def _issue_approved_renewal(approval, data):
         'serial_number': cert.serial_number,
         'valid_from': utc_isoformat(cert.valid_from),
         'valid_to': utc_isoformat(cert.valid_to),
+        'notices': outcome.get('notices') or [],
     }
 
 
@@ -1020,7 +1022,9 @@ def approve_request(request_id):
         result['certificate_issued'] = False
         result['issue_error'] = issue_error
 
-    return success_response(data=result, message="Approval recorded")
+    return success_response(
+        data=result, message="Approval recorded",
+        meta=notices_mod.meta_with_notices((issued_cert or {}).get('notices')))
 
 
 @bp.route('/api/v2/approvals/<int:request_id>/reject', methods=['POST'])

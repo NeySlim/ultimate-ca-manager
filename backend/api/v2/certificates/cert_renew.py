@@ -6,6 +6,7 @@ from utils.response import success_response, error_response
 from models import Certificate, db
 from services.audit_service import AuditService
 from services.cert.renewal import RenewalError, renew_certificate_in_place, check_renewable
+from utils import notices as notices_mod
 from utils.validity import MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS, coerce_validity_days, validity_days_in_range
 from . import bp
 
@@ -97,7 +98,7 @@ def renew_certificate(cert_id):
     try:
         # Manual renewal re-keys: UCM holds this certificate's private key and
         # serves the new one through the export endpoints.
-        renew_certificate_in_place(
+        outcome = renew_certificate_in_place(
             cert,
             username=username,
             actor_user_id=actor_user_id,
@@ -115,9 +116,11 @@ def renew_certificate(cert_id):
         logger.error(f"Failed to renew certificate {cert_id}: {e}", exc_info=True)
         return error_response('Failed to renew certificate', 500)
 
+    # A shortened duration (policy, CA expiry) is reported, not silent
     return success_response(
         data=cert.to_dict(),
-        message='Certificate renewed successfully'
+        message='Certificate renewed successfully',
+        meta=notices_mod.meta_with_notices(outcome.get('notices')),
     )
 
 

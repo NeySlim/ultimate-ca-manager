@@ -31,6 +31,7 @@ import { cn, downloadBlob } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { askRenewal } from '../lib/renewalPrompt'
+import { showNotices } from '../lib/notices'
 
 const ENTITY_CONFIG = {
   certificate: {
@@ -204,6 +205,7 @@ export function FloatingDetailWindow({ windowInfo }) {
         showWarning(t('certificates.approvalRequired', { policy: res.data.policy_name }))
       } else {
         showSuccess(t('certificates.renewed', 'Certificate renewed'))
+        showNotices(res, showWarning)
       }
       window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
       closeWindow(windowInfo.id)
