@@ -17,6 +17,11 @@ import { useWebSocket } from '../../hooks'
 import { extractData, cn, downloadBlob } from '../../lib/utils'
 import { signingCas } from '../../lib/caSelection'
 
+const VALIDITY_YEAR_PRESETS = [1, 2, 3, 5, 10, 15, 20]
+const CUSTOM_VALIDITY = 'custom'
+// The API ceiling: 50 years
+const MAX_CA_VALIDITY_DAYS = 18250
+
 const ROOT_KEY_USAGE = ['keyCertSign', 'cRLSign']
 const INTERMEDIATE_KEY_USAGE = ['digitalSignature', 'keyCertSign', 'cRLSign']
 const CA_KU_OPTIONS = ['digitalSignature', 'keyCertSign', 'cRLSign']
@@ -96,6 +101,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const [createFormKeyAlgo, setCreateFormKeyAlgo] = useState('RSA')
   const [createFormKeySize, setCreateFormKeySize] = useState('2048')
   const [createFormValidity, setCreateFormValidity] = useState('10')
+  const [createFormValidityDays, setCreateFormValidityDays] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
   const [createFormPathLength, setCreateFormPathLength] = useState('')
   const [createFormNamedUrls, setCreateFormNamedUrls] = useState(false)
@@ -218,7 +224,9 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         type: createFormType,
         // Validity and parent are decided by the external signer in external mode
         ...(createFormType !== 'external' && {
-          validityYears: parseInt(createFormValidity),
+          ...(createFormValidity === CUSTOM_VALIDITY
+            ? { validityDays: parseInt(createFormValidityDays) }
+            : { validityYears: parseInt(createFormValidity) }),
           parentCAId: createFormType === 'intermediate' ? createFormParentCAId : null,
         }),
         ...(createFormPathLength !== '' && { pathLength: parseInt(createFormPathLength) }),
@@ -511,14 +519,27 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
             <Select
               label={t('common.validityPeriod')}
               options={[
-                { value: '5', label: t('cas.yearsValidity', { count: 5 }) },
-                { value: '10', label: t('cas.yearsValidity', { count: 10 }) },
-                { value: '15', label: t('cas.yearsValidity', { count: 15 }) },
-                { value: '20', label: t('cas.yearsValidity', { count: 20 }) }
+                ...VALIDITY_YEAR_PRESETS.map(years => ({
+                  value: String(years), label: t('cas.yearsValidity', { count: years }),
+                })),
+                { value: CUSTOM_VALIDITY, label: t('cas.customValidityDays') },
               ]}
               value={createFormValidity}
               onChange={(value) => setCreateFormValidity(value)}
             />
+            {createFormValidity === CUSTOM_VALIDITY && (
+              <Input
+                name="validityDays"
+                type="number"
+                min={1}
+                max={MAX_CA_VALIDITY_DAYS}
+                required
+                label={t('cas.validityDays')}
+                value={createFormValidityDays}
+                onChange={(e) => setCreateFormValidityDays(e.target.value)}
+                helperText={t('cas.validityDaysHelp', { max: MAX_CA_VALIDITY_DAYS })}
+              />
+            )}
           </div>
         )}
 

@@ -1017,3 +1017,43 @@ class TestViewerPermissions:
     def test_viewer_cannot_delete_ca(self, viewer_client):
         r = viewer_client.delete('/api/v2/cas/1')
         assert r.status_code in (401, 403)
+
+
+class TestCaValidityDays:
+    """A CA can last any number of days, not only whole years (#378)."""
+
+    def _create(self, auth_client, **extra):
+        suffix = '-'.join(str(v) for v in extra.values()).replace('.', '_')
+        payload = {**VALID_ROOT_CA, 'commonName': f'Days CA {suffix}', **extra}
+        return post_json(auth_client, '/api/v2/cas', payload)
+
+    def _lifetime_days(self, data):
+        cert = _load_created_cert(data)
+        return (cert.not_valid_after_utc - cert.not_valid_before_utc).total_seconds() / 86400
+
+    def test_validity_days_sets_the_lifetime(self, auth_client):
+        data = assert_success(self._create(auth_client, validityDays=400), status=201)
+        assert 400 <= self._lifetime_days(data) < 400.1
+        auth_client.delete(f"/api/v2/cas/{data['id']}")
+
+    def test_validity_days_wins_over_years(self, auth_client):
+        data = assert_success(self._create(auth_client, validityDays=90, validityYears=10), status=201)
+        assert self._lifetime_days(data) < 90.1
+        auth_client.delete(f"/api/v2/cas/{data['id']}")
+
+    @pytest.mark.parametrize('bad', [0, -1, 18251, 'abc', True, 2.5])
+    def test_out_of_bounds_days_are_refused(self, auth_client, bad):
+        r = self._create(auth_client, validityDays=bad)
+        assert_error(r, 400)
+        assert 'validityDays' in r.get_json()['message']
+
+    def test_intermediate_days_clamped_to_parent(self, auth_client, create_ca):
+        root = create_ca(cn='Days Clamp Root', validityYears=1)
+        r = post_json(auth_client, '/api/v2/cas', {
+            **VALID_ROOT_CA, 'type': 'intermediate', 'commonName': 'Days Clamp Intermediate',
+            'parentCAId': root['id'], 'validityDays': 1000,
+        })
+        inter = assert_success(r, status=201)
+        root_detail = assert_success(auth_client.get(f'/api/v2/cas/{root["id"]}'))
+        inter_detail = assert_success(auth_client.get(f'/api/v2/cas/{inter["id"]}'))
+        assert inter_detail['valid_to'] <= root_detail['valid_to']

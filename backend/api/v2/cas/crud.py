@@ -17,6 +17,7 @@ from utils.pagination import paginate
 from utils.dn_validation import validate_dn_field, validate_dn
 from utils.protocol_url import get_protocol_base_url
 from utils.decorators import require_json_body
+from utils.validity import coerce_validity_days
 from utils.db_transaction import safe_commit
 from services.ca_service import CAService
 from services.audit_service import AuditService
@@ -52,6 +53,8 @@ _MAX_URL_LEN = 2048
 _MAX_URLS_PER_FIELD = 8
 _MAX_DESCR_LEN = 255
 _MAX_DESCRIPTION_LEN = 1024
+# Same ceiling as validityYears (50 years)
+_MAX_CA_VALIDITY_DAYS = 50 * 365
 # HSM key algorithm -> the key_type resolve_digest picks 'auto' from
 _HSM_ALGORITHM_KEY_TYPE = {
     'RSA-2048': '2048', 'RSA-3072': '3072', 'RSA-4096': '4096',
@@ -378,16 +381,26 @@ def create_ca():
         # is 25y; leave headroom for offline roots while preventing unbounded
         # values like 10000 years). Use explicit None check so 0 is rejected
         # (not silently replaced by the default).
-        raw_validity = data.get('validityYears')
-        if raw_validity is None or raw_validity == '':
-            validity_years = 10
+        # validityDays, when given, takes precedence for a CA that does not
+        # last a whole number of years (#378); same 50-year ceiling.
+        raw_days = data.get('validityDays')
+        if raw_days is not None and raw_days != '':
+            validity_days = coerce_validity_days(raw_days)
+            if validity_days is None or not 1 <= validity_days <= _MAX_CA_VALIDITY_DAYS:
+                return error_response(
+                    f'validityDays must be an integer between 1 and {_MAX_CA_VALIDITY_DAYS}', 400)
         else:
-            try:
-                validity_years = int(raw_validity)
-            except (TypeError, ValueError):
-                return error_response('Invalid validityYears', 400)
-        if not 1 <= validity_years <= 50:
-            return error_response('validityYears must be between 1 and 50', 400)
+            raw_validity = data.get('validityYears')
+            if raw_validity is None or raw_validity == '':
+                validity_years = 10
+            else:
+                try:
+                    validity_years = int(raw_validity)
+                except (TypeError, ValueError):
+                    return error_response('Invalid validityYears', 400)
+            if not 1 <= validity_years <= 50:
+                return error_response('validityYears must be between 1 and 50', 400)
+            validity_days = validity_years * 365
 
         # Cap description (stored in CA.descr, ends up in UI + audit logs)
         description = data.get('description') or data.get('commonName')
@@ -527,7 +540,7 @@ def create_ca():
             descr=description,
             dn=dn,
             key_type=key_type,
-            validity_days=validity_years * 365,
+            validity_days=validity_days,
             digest=digest,
             caref=caref,
             username=username,
