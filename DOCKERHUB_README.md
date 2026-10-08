@@ -118,8 +118,6 @@ volumes:
 | `UCM_SECRET_KEY` | generated | Session secret |
 | `DATABASE_URL` | unset | PostgreSQL DSN; SQLite is used when unset |
 | `KEY_ENCRYPTION_KEY` | unset | Encrypts private keys at rest, in place of the `master.key` file |
-| `UCM_ACME_ENABLED` | `true` | Enable the ACME server |
-| `UCM_SMTP_ENABLED` | `false` | Enable email notifications |
 
 ---
 

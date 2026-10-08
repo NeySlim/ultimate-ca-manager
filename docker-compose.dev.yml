@@ -52,20 +52,11 @@ services:
       # Flask debug mode (hot-reload)
       - FLASK_DEBUG=true
       
-      # Disable caching for development
-      - UCM_CACHE_ENABLED=false
-      
       # Disable backups for development
       - UCM_BACKUP_ENABLED=false
       
       # Verbose SQL logging
       - SQL_DEBUG=false  # Set true if needed (very verbose!)
-      
-      # Test SMTP (use Mailhog or similar)
-      - UCM_SMTP_ENABLED=false
-      - UCM_SMTP_SERVER=mailhog
-      - UCM_SMTP_PORT=1025
-      - UCM_SMTP_TLS=false
     
     # Override command to use Flask dev server with auto-reload
     command: python3 -m flask run --host=0.0.0.0 --port=8443 --cert=data/https_cert.pem --key=data/https_key.pem --reload

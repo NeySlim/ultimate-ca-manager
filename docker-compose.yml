@@ -6,7 +6,8 @@ services:
     restart: unless-stopped
     
     ports:
-      - "${UCM_HTTPS_PORT:-8443}:8443"
+      # UCM listens inside the container on UCM_HTTPS_PORT
+      - "${UCM_HTTPS_PORT:-8443}:${UCM_HTTPS_PORT:-8443}"
       - "${UCM_HTTP_PORT:-8080}:8080"
     
     volumes:
@@ -17,9 +18,6 @@ services:
       # read once, at the first start of 2.233, to carry its tokens over.
       - ucm-hsm-tokens:/var/lib/softhsm/tokens
 
-      # Optional: Custom configuration
-      # - ./.env:/opt/ucm/.env.custom:ro
-      
       # Optional: Custom HTTPS certificates
       # - ./certs/https_cert.pem:/opt/ucm/data/https_cert.pem:ro
       # - ./certs/https_key.pem:/opt/ucm/data/https_key.pem:ro
@@ -48,10 +46,6 @@ services:
       - UCM_SECRET_KEY=${UCM_SECRET_KEY:-}
       - UCM_JWT_SECRET=${UCM_JWT_SECRET:-}
       
-      # Session & Token Expiration
-      - UCM_SESSION_TIMEOUT=${UCM_SESSION_TIMEOUT:-3600}
-      - UCM_JWT_EXPIRATION=${UCM_JWT_EXPIRATION:-86400}
-      
       # ========================================
       # DATABASE
       # ========================================
@@ -59,49 +53,9 @@ services:
       - UCM_DATABASE_PATH=${UCM_DATABASE_PATH:-/opt/ucm/data/ucm.db}
       - UCM_BACKUP_ENABLED=${UCM_BACKUP_ENABLED:-true}
       - UCM_BACKUP_RETENTION_DAYS=${UCM_BACKUP_RETENTION_DAYS:-30}
-      
-      # ========================================
-      # SMTP / EMAIL (OPTIONAL)
-      # ========================================
-      
-      - UCM_SMTP_ENABLED=${UCM_SMTP_ENABLED:-false}
-      - UCM_SMTP_SERVER=${UCM_SMTP_SERVER:-}
-      - UCM_SMTP_PORT=${UCM_SMTP_PORT:-587}
-      - UCM_SMTP_USERNAME=${UCM_SMTP_USERNAME:-}
-      - UCM_SMTP_PASSWORD=${UCM_SMTP_PASSWORD:-}
-      - UCM_SMTP_FROM=${UCM_SMTP_FROM:-noreply@ucm.local}
-      - UCM_SMTP_TLS=${UCM_SMTP_TLS:-true}
-      
-      # ========================================
-      # CACHING
-      # ========================================
-      
-      - UCM_CACHE_ENABLED=${UCM_CACHE_ENABLED:-true}
-      - UCM_CACHE_TYPE=${UCM_CACHE_TYPE:-simple}
-      - UCM_CACHE_DEFAULT_TIMEOUT=${UCM_CACHE_DEFAULT_TIMEOUT:-300}
-      
-      # ========================================
-      # mTLS AUTHENTICATION (OPTIONAL)
-      # ========================================
-      
-      - UCM_MTLS_ENABLED=${UCM_MTLS_ENABLED:-false}
-      - UCM_MTLS_CA_ID=${UCM_MTLS_CA_ID:-}
-      - UCM_MTLS_REQUIRE_CERT=${UCM_MTLS_REQUIRE_CERT:-false}
-      
-      # ========================================
-      # CERTIFICATE DEFAULTS
-      # ========================================
-      
-      - UCM_DEFAULT_VALIDITY_DAYS=${UCM_DEFAULT_VALIDITY_DAYS:-365}
-      - UCM_DEFAULT_KEY_SIZE=${UCM_DEFAULT_KEY_SIZE:-4096}
-      - UCM_DEFAULT_HASH_ALGO=${UCM_DEFAULT_HASH_ALGO:-SHA256}
-      
-      # ========================================
-      # PROTOCOLS (ACME, SCEP)
-      # ========================================
-      
-      - UCM_ACME_ENABLED=${UCM_ACME_ENABLED:-true}
-      - UCM_ACME_DIRECTORY_URL=${UCM_ACME_DIRECTORY_URL:-}
+
+      # SMTP, ACME, mTLS, session timeout and certificate defaults are set
+      # in the web interface and stored in the database, not here.
       
       # ========================================
       # CUSTOM HTTPS CERTIFICATES (OPTIONAL)

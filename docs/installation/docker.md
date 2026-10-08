@@ -59,7 +59,6 @@ services:
       - ucm-data:/opt/ucm/data
     environment:
       - UCM_FQDN=ucm.example.com
-      - UCM_ACME_ENABLED=true
 
 volumes:
   ucm-data:
@@ -82,6 +81,7 @@ services:
     restart: unless-stopped
 
     ports:
+      # Container side must equal UCM_HTTPS_PORT, which is where UCM listens
       - "8443:8443"
       - "8080:8080"   # HTTP — CRL/CDP and OCSP public endpoints
 
@@ -98,23 +98,12 @@ services:
       - UCM_FQDN=ucm.example.com
       - UCM_HTTPS_PORT=8443
 
-      # Security
-      - UCM_SESSION_TIMEOUT=3600
-
-      # Features
-      - UCM_ACME_ENABLED=true
-      - UCM_CACHE_ENABLED=true
-
-      # Email notifications (optional)
-      - UCM_SMTP_ENABLED=true
-      - UCM_SMTP_SERVER=smtp.gmail.com
-      - UCM_SMTP_PORT=587
-      - UCM_SMTP_USERNAME=your@email.com
-      - UCM_SMTP_PASSWORD=yourpassword
-      - UCM_SMTP_FROM=noreply@ucm.example.com
+      # SMTP, ACME, session timeout and the other application settings are
+      # configured in the web interface, not through the environment.
 
     healthcheck:
-      test: ["CMD", "curl", "-f", "-k", "https://localhost:8443/"]
+      # Same port as UCM_HTTPS_PORT
+      test: ["CMD", "curl", "-f", "-k", "https://localhost:8443/api/health"]
       interval: 30s
       timeout: 10s
       retries: 3
@@ -154,13 +143,9 @@ volumes:
 | `UCM_LOG_MAX_BYTES` | `10485760` | Size at which `/opt/ucm/data/ucm.log` is rotated (10 MB) |
 | `UCM_LOG_BACKUPS` | `5` | Generations of `ucm.log` kept in the data volume |
 | `UCM_SECRET_KEY` | auto-generated | Session secret key |
-| `UCM_SESSION_TIMEOUT` | `3600` | Session timeout (seconds) |
-| `UCM_ACME_ENABLED` | `true` | Enable ACME protocol |
-| `UCM_CACHE_ENABLED` | `true` | Enable response caching |
-| `UCM_SMTP_ENABLED` | `false` | Enable email notifications |
 | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use an external PostgreSQL 13+ instance instead of the bundled SQLite. |
 
-See full list in [docker-compose.yml](../../docker-compose.yml)
+See full list in [docker-compose.yml](../../docker-compose.yml). SMTP, ACME, the session timeout and the other application settings are configured in the web interface.
 
 ---
 

@@ -103,9 +103,9 @@ EXPOSE 8080
 # /opt/ucm/data holds the SQLite DB, CA files, sessions, backups.
 VOLUME ["/etc/ucm", "/opt/ucm/data"]
 
-# Health check
+# Health check, on the port UCM listens on (UCM_HTTPS_PORT, 8443 by default)
 HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
-    CMD curl -f -k https://127.0.0.1:8443/health || exit 1
+    CMD curl -f -k "https://127.0.0.1:${UCM_HTTPS_PORT:-8443}/health" || exit 1
 
 # Copy entrypoint before switching user
 COPY --chown=ucm:ucm docker/entrypoint.sh /entrypoint.sh

@@ -18,10 +18,6 @@ services:
       - UCM_DEBUG=false
       - UCM_LOG_LEVEL=WARNING
       
-      # Performance
-      - UCM_CACHE_ENABLED=true
-      - UCM_CACHE_DEFAULT_TIMEOUT=600
-      
       # Backups
       - UCM_BACKUP_ENABLED=true
       - UCM_BACKUP_RETENTION_DAYS=90

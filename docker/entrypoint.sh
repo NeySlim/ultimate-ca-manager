@@ -51,15 +51,6 @@ validate_fqdn() {
     fi
 }
 
-validate_email() {
-    local email=$1
-    if [[ "$email" =~ ^[a-zA-Z0-9._%+-]+@[a-zA-Z0-9.-]+\.[a-zA-Z]{2,}$ ]]; then
-        return 0
-    else
-        return 1
-    fi
-}
-
 # =============================================================================
 # ENVIRONMENT VARIABLE DEFAULTS
 # =============================================================================
@@ -75,41 +66,12 @@ validate_email() {
 # Security
 : ${UCM_SECRET_KEY:=$(generate_secret)}
 : ${UCM_JWT_SECRET:=$(generate_secret)}
-: ${UCM_SESSION_TIMEOUT:=3600}
-: ${UCM_JWT_EXPIRATION:=86400}
 
 # Database
 : ${UCM_DATABASE_PATH:="/opt/ucm/data/ucm.db"}
+# Copy of the SQLite database taken by this script before each start
 : ${UCM_BACKUP_ENABLED:=true}
 : ${UCM_BACKUP_RETENTION_DAYS:=30}
-
-# SMTP Configuration
-: ${UCM_SMTP_ENABLED:=false}
-: ${UCM_SMTP_SERVER:=""}
-: ${UCM_SMTP_PORT:=587}
-: ${UCM_SMTP_USERNAME:=""}
-: ${UCM_SMTP_PASSWORD:=""}
-: ${UCM_SMTP_FROM:="noreply@${UCM_FQDN}"}
-: ${UCM_SMTP_TLS:=true}
-
-# Caching
-: ${UCM_CACHE_ENABLED:=true}
-: ${UCM_CACHE_TYPE:="simple"}
-: ${UCM_CACHE_DEFAULT_TIMEOUT:=300}
-
-# mTLS Configuration
-: ${UCM_MTLS_ENABLED:=false}
-: ${UCM_MTLS_CA_ID:=""}
-: ${UCM_MTLS_REQUIRE_CERT:=false}
-
-# Certificate Settings
-: ${UCM_DEFAULT_VALIDITY_DAYS:=365}
-: ${UCM_DEFAULT_KEY_SIZE:=4096}
-: ${UCM_DEFAULT_HASH_ALGO:="SHA256"}
-
-# ACME Settings
-: ${UCM_ACME_ENABLED:=true}
-: ${UCM_ACME_DIRECTORY_URL:="https://${UCM_FQDN}:${UCM_HTTPS_PORT}/acme/directory"}
 
 # Initial Admin User
 : ${UCM_INITIAL_ADMIN_USERNAME:="admin"}
@@ -141,17 +103,6 @@ fi
 if ! validate_port "$UCM_HTTP_PORT"; then
     echo -e "${RED}❌ Invalid HTTP port: $UCM_HTTP_PORT${NC}"
     exit 1
-fi
-
-# Validate SMTP settings if enabled
-if [ "$UCM_SMTP_ENABLED" = "true" ]; then
-    if [ -z "$UCM_SMTP_SERVER" ]; then
-        echo -e "${YELLOW}⚠️  SMTP enabled but no server configured${NC}"
-        UCM_SMTP_ENABLED=false
-    elif ! validate_email "$UCM_SMTP_FROM"; then
-        echo -e "${YELLOW}⚠️  Invalid SMTP FROM address: $UCM_SMTP_FROM${NC}"
-        UCM_SMTP_FROM="noreply@${UCM_FQDN}"
-    fi
 fi
 
 echo -e "${GREEN}✅ Configuration validated${NC}"
@@ -262,41 +213,9 @@ LOG_LEVEL=${UCM_LOG_LEVEL}
 # Security
 SECRET_KEY=${UCM_SECRET_KEY}
 JWT_SECRET_KEY=${UCM_JWT_SECRET}
-SESSION_TIMEOUT=${UCM_SESSION_TIMEOUT}
-JWT_EXPIRATION=${UCM_JWT_EXPIRATION}
 
 # Database
 DATABASE_PATH=${UCM_DATABASE_PATH}
-BACKUP_ENABLED=${UCM_BACKUP_ENABLED}
-BACKUP_RETENTION_DAYS=${UCM_BACKUP_RETENTION_DAYS}
-
-# SMTP Configuration
-SMTP_ENABLED=${UCM_SMTP_ENABLED}
-SMTP_SERVER=${UCM_SMTP_SERVER}
-SMTP_PORT=${UCM_SMTP_PORT}
-SMTP_USERNAME=${UCM_SMTP_USERNAME}
-SMTP_PASSWORD=${UCM_SMTP_PASSWORD}
-SMTP_FROM=${UCM_SMTP_FROM}
-SMTP_TLS=${UCM_SMTP_TLS}
-
-# Caching
-CACHE_ENABLED=${UCM_CACHE_ENABLED}
-CACHE_TYPE=${UCM_CACHE_TYPE}
-CACHE_DEFAULT_TIMEOUT=${UCM_CACHE_DEFAULT_TIMEOUT}
-
-# mTLS Configuration
-MTLS_ENABLED=${UCM_MTLS_ENABLED}
-MTLS_CA_ID=${UCM_MTLS_CA_ID}
-MTLS_REQUIRE_CERT=${UCM_MTLS_REQUIRE_CERT}
-
-# Certificate Defaults
-DEFAULT_VALIDITY_DAYS=${UCM_DEFAULT_VALIDITY_DAYS}
-DEFAULT_KEY_SIZE=${UCM_DEFAULT_KEY_SIZE}
-DEFAULT_HASH_ALGO=${UCM_DEFAULT_HASH_ALGO}
-
-# ACME Settings
-ACME_ENABLED=${UCM_ACME_ENABLED}
-ACME_DIRECTORY_URL=${UCM_ACME_DIRECTORY_URL}
 
 # Initial Admin User (used on first run)
 INITIAL_ADMIN_USERNAME=${UCM_INITIAL_ADMIN_USERNAME}
@@ -437,21 +356,9 @@ echo "   • Database:    ${UCM_DATABASE_PATH}"
 echo "   • Data Dir:    /opt/ucm/data"
 echo "   • Backup:      ${UCM_BACKUP_ENABLED}"
 echo ""
-echo -e "${GREEN}📧 Email:${NC}"
-echo "   • SMTP:        ${UCM_SMTP_ENABLED}"
-if [ "$UCM_SMTP_ENABLED" = "true" ]; then
-    echo "   • Server:      ${UCM_SMTP_SERVER}:${UCM_SMTP_PORT}"
-    echo "   • From:        ${UCM_SMTP_FROM}"
-fi
-echo ""
 echo -e "${GREEN}🔒 Security:${NC}"
-echo "   • mTLS:        ${UCM_MTLS_ENABLED}"
 echo "   • Debug:       ${UCM_DEBUG}"
 echo "   • Log Level:   ${UCM_LOG_LEVEL}"
-echo ""
-echo -e "${GREEN}🔧 Features:${NC}"
-echo "   • ACME:        ${UCM_ACME_ENABLED}"
-echo "   • Caching:     ${UCM_CACHE_ENABLED}"
 echo ""
 echo -e "${CYAN}════════════════════════════════════════${NC}"
 echo ""
@@ -471,28 +378,10 @@ export DEBUG="${UCM_DEBUG}"
 export LOG_LEVEL="${UCM_LOG_LEVEL}"
 export SECRET_KEY="${UCM_SECRET_KEY}"
 export JWT_SECRET_KEY="${UCM_JWT_SECRET}"
-export SESSION_TIMEOUT="${UCM_SESSION_TIMEOUT}"
-export JWT_EXPIRATION="${UCM_JWT_EXPIRATION}"
 export DATABASE_PATH="${UCM_DATABASE_PATH}"
-export BACKUP_ENABLED="${UCM_BACKUP_ENABLED}"
-export BACKUP_RETENTION_DAYS="${UCM_BACKUP_RETENTION_DAYS}"
-export SMTP_ENABLED="${UCM_SMTP_ENABLED}"
-export SMTP_SERVER="${UCM_SMTP_SERVER}"
-export SMTP_PORT="${UCM_SMTP_PORT}"
-export SMTP_USERNAME="${UCM_SMTP_USERNAME}"
-export SMTP_PASSWORD="${UCM_SMTP_PASSWORD}"
-export SMTP_FROM="${UCM_SMTP_FROM}"
-export SMTP_TLS="${UCM_SMTP_TLS}"
-export CACHE_ENABLED="${UCM_CACHE_ENABLED}"
-export CACHE_TYPE="${UCM_CACHE_TYPE}"
-export CACHE_DEFAULT_TIMEOUT="${UCM_CACHE_DEFAULT_TIMEOUT}"
-export MTLS_ENABLED="${UCM_MTLS_ENABLED}"
-export MTLS_CA_ID="${UCM_MTLS_CA_ID}"
-export MTLS_REQUIRE_CERT="${UCM_MTLS_REQUIRE_CERT}"
 export INITIAL_ADMIN_USERNAME="${UCM_INITIAL_ADMIN_USERNAME}"
 export INITIAL_ADMIN_EMAIL="${UCM_INITIAL_ADMIN_EMAIL}"
 export INITIAL_ADMIN_PASSWORD="${UCM_INITIAL_ADMIN_PASSWORD}"
-export ACME_ENABLED="${UCM_ACME_ENABLED}"
 
 # =============================================================================
 # HSM / SoftHSM AUTO-INIT
