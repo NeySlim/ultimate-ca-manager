@@ -154,3 +154,58 @@ class TestAColumnHoldingThePemItself:
                 if row is not None:
                     db.session.delete(row)
                     db.session.commit()
+
+
+class TestOnlyAUsableCertificateIsApplied:
+    """The picker filters, the route must too: nothing is written for a
+    certificate that clients would refuse."""
+
+    @pytest.fixture
+    def plain_certificate(self, app):
+        from datetime import timedelta
+        from models import Certificate
+        from utils.datetime_utils import utc_now
+
+        with app.app_context():
+            cert = Certificate(
+                refid='https-apply-state', descr='https apply state',
+                crt=base64.b64encode(b'-----BEGIN CERTIFICATE-----\nx\n'
+                                     b'-----END CERTIFICATE-----\n').decode(),
+                prv='unused', subject_cn='https-state.example.test',
+                valid_from=utc_now() - timedelta(days=40),
+                valid_to=utc_now() + timedelta(days=5))
+            db.session.add(cert)
+            db.session.commit()
+            cert_id = cert.id
+        yield cert_id
+        with app.app_context():
+            row = db.session.get(Certificate, cert_id)
+            if row:
+                db.session.delete(row)
+                db.session.commit()
+
+    @pytest.mark.parametrize('change, message', [
+        ({'revoked': True}, 'revoked'),
+        ({'valid_to_days': -1}, 'expired'),
+        ({'crt': None}, 'not been issued'),
+    ])
+    def test_refused_and_nothing_written(self, app, auth_client, https_paths, no_restart,
+                                         plain_certificate, change, message):
+        from datetime import timedelta
+        from models import Certificate
+        from utils.datetime_utils import utc_now
+
+        cert_path, key_path = https_paths
+        with app.app_context():
+            row = db.session.get(Certificate, plain_certificate)
+            if 'revoked' in change:
+                row.revoked = True
+            if 'valid_to_days' in change:
+                row.valid_to = utc_now() + timedelta(days=change['valid_to_days'])
+            if 'crt' in change:
+                row.crt = None
+            db.session.commit()
+        response = auth_client.post('/api/v2/system/https/apply', json={'cert_id': plain_certificate})
+        assert response.status_code == 400
+        assert message in response.get_json()['message']
+        assert not cert_path.exists() and not key_path.exists()

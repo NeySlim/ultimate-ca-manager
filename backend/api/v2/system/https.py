@@ -15,7 +15,7 @@ import shutil
 import base64
 from datetime import datetime, timedelta, timezone
 import logging
-from utils.datetime_utils import utc_now, utc_isoformat
+from utils.datetime_utils import to_naive_utc, utc_now, utc_isoformat
 from utils.key_codec import load_pem_bytes
 from config.settings import is_docker
 from cryptography import x509
@@ -255,6 +255,12 @@ def apply_https_cert():
     # Verify cert has private key
     if not cert.prv:
         return error_response("Certificate has no private key - cannot use for HTTPS", 400)
+    if not cert.crt:
+        return error_response("Certificate has not been issued - cannot use for HTTPS", 400)
+    if cert.revoked:
+        return error_response("Certificate is revoked - cannot use for HTTPS", 400)
+    if cert.valid_to is not None and to_naive_utc(cert.valid_to) <= utc_now():
+        return error_response("Certificate has expired - cannot use for HTTPS", 400)
 
     try:
         # Get cert paths dynamically - same logic as gunicorn.conf.py

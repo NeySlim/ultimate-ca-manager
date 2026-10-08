@@ -19,6 +19,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 - An SMTP server on port 465 (implicit TLS) timed out, because the interface could only turn on STARTTLS. Settings › Email now offers None, STARTTLS or SSL/TLS (#377, reported by @lengqing5977).
+- The route applying a certificate to HTTPS accepted a revoked or expired one, which only the picker kept out; it now refuses them.
 - Settings › HTTPS did not offer certificates with less than 30 days left, which excluded every short-lived certificate; they are now listed (#378, reported by @lengqing5977).
 - With auto-renewal on, a certificate about as long as the renewal window (27 or 30 days against the default 30) was re-signed on every pass from the day it was issued. Renewal now never starts before the last third of a certificate's lifetime (#378).
 - `UCM_REDIS_URL`, the variable the Redis guide and the Docker Compose overlay set, was never read, so Redis stayed unused. It is now read along with `REDIS_URL`.
