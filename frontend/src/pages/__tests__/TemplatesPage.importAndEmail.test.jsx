@@ -186,4 +186,20 @@ describe('TemplatesPage Email field: not type="email" (built-in copies carry {em
     await waitFor(() => expect(svc.create).toHaveBeenCalledTimes(1))
     expect(svc.create.mock.calls[0][0].dn_template.emailAddress).toBe('pki@example.com')
   })
+
+  it('the form offers no maximum validity, which nothing stored (#378)', async () => {
+    svc.getAll.mockResolvedValue({ data: [] })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'templates.new' }))
+    fireEvent.change(await screen.findByPlaceholderText('templates.namePlaceholder'), {
+      target: { value: 'No Max Template' },
+    })
+    expect(screen.queryByLabelText('templates.maxValidity')).toBeNull()
+    expect(screen.getByText('templates.maxValidityHint')).toBeInTheDocument()
+    fireEvent.click(screen.getByRole('button', { name: 'common.create' }))
+
+    await waitFor(() => expect(svc.create).toHaveBeenCalledTimes(1))
+    expect(svc.create.mock.calls[0][0]).not.toHaveProperty('max_validity_days')
+  })
 })

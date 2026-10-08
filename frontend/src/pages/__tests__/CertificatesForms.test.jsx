@@ -506,7 +506,6 @@ describe('Template Form — POST /templates', () => {
       type: 'certificate',
       description: 'Standard web cert',
       validity_days: 365,
-      max_validity_days: 3650,
       subject: { C: 'FR', ST: 'Paris', O: 'ACME', CN: '' },
     }
     expect(formData).toHaveProperty('name')
@@ -520,12 +519,6 @@ describe('Template Form — POST /templates', () => {
     expect(parseIntOrDefault('', 365)).toBe(365)
     expect(parseIntOrDefault('abc', 365)).toBe(365)
     expect(typeof parseIntOrDefault('365', 365)).toBe('number')
-  })
-
-  it('max_validity_days is parsed to int with fallback', () => {
-    expect(parseIntOrDefault('3650', 3650)).toBe(3650)
-    expect(parseIntOrDefault('', 3650)).toBe(3650)
-    expect(typeof parseIntOrDefault('3650', 3650)).toBe('number')
   })
 
   it('type Select options are valid', () => {

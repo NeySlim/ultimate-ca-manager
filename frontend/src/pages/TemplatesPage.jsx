@@ -439,7 +439,6 @@ export default function TemplatesPage() {
       <CompactSection title={t('common.validityPeriod')} icon={Clock}>
         <CompactGrid columns={2}>
           <CompactField autoIcon="default" label={t('common.default')} value={t('templates.validityDays', { count: selectedTemplate.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS })} />
-          <CompactField autoIcon="maximum" label={t('templates.maximum')} value={t('templates.validityDays', { count: selectedTemplate.max_validity_days || VALIDITY.MAX_DAYS })} />
         </CompactGrid>
       </CompactSection>
 
@@ -721,7 +720,7 @@ function buildInitialState(template) {
     return {
       name: '', description: '', template_type: 'web_server',
       key_type: 'RSA-2048', digest: 'sha256',
-      validity_days: VALIDITY.TEMPLATE_DEFAULT_DAYS, max_validity_days: VALIDITY.MAX_DAYS,
+      validity_days: VALIDITY.TEMPLATE_DEFAULT_DAYS,
       subject: { C: '', ST: '', L: '', O: '', OU: '', CN: '', emailAddress: '' },
       key_usage: ['digitalSignature', 'keyEncipherment'],
       extended_key_usage: ['serverAuth'],
@@ -742,7 +741,6 @@ function buildInitialState(template) {
     key_type: template.key_type || 'RSA-2048',
     digest: template.digest || 'sha256',
     validity_days: template.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS,
-    max_validity_days: template.max_validity_days || VALIDITY.MAX_DAYS,
     subject: {
       C: dn.C || '', ST: dn.ST || '', L: dn.L || '',
       O: dn.O || '', OU: dn.OU || '', CN: dn.CN || '',
@@ -809,7 +807,6 @@ function TemplateForm({ template, onSubmit, onCancel }) {
         key_type: formData.key_type,
         digest: formData.digest,
         validity_days: formData.validity_days,
-        max_validity_days: formData.max_validity_days,
         dn_template: { ...formData.subject },
         extensions_template: {
           key_usage: formData.key_usage,
@@ -888,12 +885,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
           value={formData.validity_days}
           onChange={(e) => set('validity_days', parseInt(e.target.value) || VALIDITY.TEMPLATE_DEFAULT_DAYS)}
         />
-        <Input
-          label={t('templates.maxValidity')}
-          type="number"
-          value={formData.max_validity_days}
-          onChange={(e) => set('max_validity_days', parseInt(e.target.value) || 3650)}
-        />
+        <p className="text-xs text-text-tertiary self-end">{t('templates.maxValidityHint')}</p>
       </div>
 
       {/* Subject Template */}

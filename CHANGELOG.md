@@ -27,6 +27,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - The Docker image health check and the example compose files assumed port 8443, so a container with another `UCM_HTTPS_PORT` was reported unhealthy or unreachable. Both now follow `UCM_HTTPS_PORT` (#377).
 
 ### Removed
+- The Maximum validity field of certificate templates: nothing stored it, so it read 3650 again after every save. A maximum is set on an issuance policy, which caps both issuance and renewal (#378).
 - Upgrade note: the Docker variables `UCM_SMTP_*`, `UCM_ACME_*`, `UCM_CACHE_*`, `UCM_MTLS_*`, `UCM_DEFAULT_*`, `UCM_SESSION_TIMEOUT` and `UCM_JWT_EXPIRATION` had no effect and are gone from the documentation and compose files; these settings live in the web interface (#377, reported by @lengqing5977).
 - The `docker-compose.redis.yml` overlay: UCM runs as a single instance, where Redis brings nothing. The Redis guide now says what Redis is kept for.
 - WebSocket connections authenticated by an API key in the handshake, and the `reauth` event that renewed them: no client used them, and the browser connects with its session.
