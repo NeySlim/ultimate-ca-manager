@@ -90,7 +90,7 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
             <Select
               label={t('settings.syslogProtocol')}
               value={syslogConfig.protocol}
-              onChange={(e) => updateSyslogConfig('protocol', e.target.value)}
+              onChange={(value) => updateSyslogConfig('protocol', value)}
               options={[
                 { value: 'udp', label: 'UDP' },
                 { value: 'tcp', label: 'TCP' },
@@ -150,7 +150,7 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
               <Select
                 label={t('settings.syslogFraming')}
                 value={syslogConfig.framing || 'line'}
-                onChange={(e) => updateSyslogConfig('framing', e.target.value)}
+                onChange={(value) => updateSyslogConfig('framing', value)}
                 options={[
                   { value: 'line', label: t('settings.syslogFramingLine') },
                   { value: 'octet', label: t('settings.syslogFramingOctet') },
