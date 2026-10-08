@@ -322,7 +322,9 @@ export default function SettingsPage() {
         smtp_port: emailSettings.smtp_port,
         smtp_username: emailSettings.smtp_username,
         smtp_password: emailSettings.smtp_password,
-        smtp_security: emailSettings.smtp_security || (emailSettings.smtp_tls ? 'starttls' : 'none'),
+        // Left undefined when the API said nothing, so a save does not overwrite it
+        smtp_security: emailSettings.smtp_security
+          ?? (emailSettings.smtp_tls == null ? undefined : (emailSettings.smtp_tls ? 'starttls' : 'none')),
         smtp_from_email: emailSettings.from_email,
         smtp_from_name: emailSettings.from_name,
         smtp_auth: emailSettings.smtp_auth !== false,
@@ -1112,7 +1114,7 @@ export default function SettingsPage() {
           smtp_port: settings.smtp_port,
           smtp_username: settings.smtp_auth_method !== 'none' ? settings.smtp_username : '',
           smtp_password: settings.smtp_auth_method === 'password' ? settings.smtp_password : '',
-          smtp_security: settings.smtp_security || 'starttls',
+          smtp_security: settings.smtp_security,
           smtp_auth: settings.smtp_auth_method !== 'none',
           smtp_content_type: settings.smtp_content_type || 'html',
           from_email: settings.smtp_from_email,

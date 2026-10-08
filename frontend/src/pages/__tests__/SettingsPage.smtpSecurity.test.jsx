@@ -67,6 +67,16 @@ describe('SettingsPage: SMTP transport security', () => {
     expect(body).not.toHaveProperty('smtp_tls')
   })
 
+  it('a failed settings read does not reset the stored mode on save', async () => {
+    mockEmailApi({})
+    settingsService.getEmailSettings = vi.fn().mockRejectedValue(new Error('boom'))
+    renderSettings()
+    await waitFor(() => expect(settingsService.getEmailSettings).toHaveBeenCalled())
+    await act(async () => { screen.getByText('save-email').click() })
+    await waitFor(() => expect(settingsService.updateEmailSettings).toHaveBeenCalled())
+    expect(settingsService.updateEmailSettings.mock.calls[0][0].smtp_security).toBeUndefined()
+  })
+
   it('an OAuth preset with implicit TLS selects ssl', async () => {
     mockEmailApi({ smtp_security: 'none' }, {
       implicit: { smtp_host: 'smtp.example.com', smtp_port: 465, smtp_use_tls: false, smtp_use_ssl: true },

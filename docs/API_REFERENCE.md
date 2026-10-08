@@ -1791,10 +1791,10 @@ Content-Type: application/json
   "enabled": true,
   "smtp_host": "smtp.example.com",
   "smtp_port": 587,
-  "smtp_user": "alerts@example.com",
+  "smtp_username": "alerts@example.com",
   "smtp_password": "password",
-  "smtp_tls": true,
-  "from_address": "alerts@example.com"
+  "smtp_security": "starttls",
+  "from_email": "alerts@example.com"
 }
 
 # Test email
@@ -1802,9 +1802,11 @@ POST /api/v2/settings/email/test
 Content-Type: application/json
 
 {
-  "to": "test@example.com"
+  "email": "test@example.com"
 }
 ```
+
+`smtp_security` is `none`, `starttls` or `ssl` (implicit TLS, usually port 465). The older booleans `smtp_tls` and `smtp_ssl` are still accepted and are ignored when `smtp_security` is present.
 
 ### Webhooks
 ```http

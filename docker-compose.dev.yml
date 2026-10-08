@@ -59,7 +59,7 @@ services:
       - SQL_DEBUG=false  # Set true if needed (very verbose!)
     
     # Override command to use Flask dev server with auto-reload
-    command: python3 -m flask run --host=0.0.0.0 --port=8443 --cert=data/https_cert.pem --key=data/https_key.pem --reload
+    command: python3 -m flask run --host=0.0.0.0 --port=${UCM_HTTPS_PORT:-8443} --cert=data/https_cert.pem --key=data/https_key.pem --reload
     
     # Expose the dev server and debugger, loopback-only by default.
     # `!override` REPLACES the base file's port list instead of merging with
@@ -70,7 +70,7 @@ services:
     # Docker-in-a-VM escape hatch: set UCM_DEV_BIND to the VM-internal
     # interface (see the banner above before doing so).
     ports: !override
-      - "${UCM_DEV_BIND:-127.0.0.1}:${UCM_HTTPS_PORT:-8443}:8443"
+      - "${UCM_DEV_BIND:-127.0.0.1}:${UCM_HTTPS_PORT:-8443}:${UCM_HTTPS_PORT:-8443}"
       - "${UCM_DEV_BIND:-127.0.0.1}:${UCM_HTTP_PORT:-8080}:8080"
       # The unauthenticated Python debugger stays loopback-only
       # unconditionally — tunnel (`ssh -L 5678:127.0.0.1:5678 <vm>`) if you
