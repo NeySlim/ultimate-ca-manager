@@ -44,11 +44,11 @@ def materialize_https_cert(cert) -> None:
 
     cert_path, key_path = _paths()
 
+    backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
     if cert_path.exists():
-        backup_suffix = utc_now().strftime('%Y%m%d_%H%M%S')
         shutil.copy(cert_path, f"{cert_path}.backup-{backup_suffix}")
-        if key_path.exists():
-            shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
+    if key_path.exists():
+        shutil.copy(key_path, f"{key_path}.backup-{backup_suffix}")
 
     cert_data = _decode(cert.crt)
     key_data = load_pem_bytes(

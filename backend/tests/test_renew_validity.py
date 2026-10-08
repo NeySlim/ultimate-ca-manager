@@ -148,3 +148,26 @@ class TestBulkRenewDuration:
         r = _json(auth_client, 'post', '/api/v2/certificates/bulk/renew', {'ids': [cert_id], 'validity_days': 10})
         assert r.status_code == 400
         assert _serial(app, cert_id) == before
+
+
+class TestIssuanceApprovalNotices:
+    def test_a_policy_cap_is_reported_to_the_approver(self, app, auth_client, create_ca, create_user):
+        ca = create_ca(cn='Issue approval notice CA')
+        pid = _policy(app, ca['id'], 'issue-approval-cap', approval=True, rules={'max_validity_days': 5})
+        operator = _operator(app, create_user)
+        cn = f'issue-approval-cap-{ca["id"]}.example.test'
+        try:
+            r = _json(operator, 'post', '/api/v2/certificates',
+                      {'cn': cn, 'ca_id': ca['id'], 'san_dns': [cn], 'validity_days': 20})
+            assert r.status_code == 200, r.get_json()
+            approval_id = r.get_json()['data']['approval_id']
+            r = _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {'comment': 'ok'})
+            assert r.status_code == 200, r.get_json()
+            assert r.get_json()['data']['certificate_issued'] is True
+            assert (r.get_json().get('meta') or {}).get('notices')
+        finally:
+            _drop_policy(app, pid)
+            with app.app_context():
+                for row in Certificate.query.filter(Certificate.subject.contains(f'CN={cn}')).all():
+                    db.session.delete(row)
+                db.session.commit()

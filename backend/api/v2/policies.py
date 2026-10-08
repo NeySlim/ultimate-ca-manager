@@ -375,6 +375,13 @@ def _issue_approved_certificate(approval):
     if _violations:
         raise PolicyViolation('; '.join(_violations))
     data['validity_days'] = validity_days
+    # Reported to the approver like the issue form reports it to the requester
+    _notices = []
+    _capper = _capped_by or (approval.policy.name if approval.policy and effective_max < requested_validity else None)
+    if _capper and validity_days < requested_validity:
+        _notices.append(notices_mod.validity_shortened(
+            requested_validity, validity_days,
+            notices_mod.policy_validity_reason(_capper, validity_days)))
     EC_CURVES = {
         'prime256v1': ec.SECP256R1(),
         'secp384r1': ec.SECP384R1(),
@@ -645,6 +652,7 @@ def _issue_approved_certificate(approval):
         'serial_number': db_cert.serial_number,
         'valid_from': now.isoformat(),
         'valid_to': (now + timedelta(days=validity_days)).isoformat(),
+        'notices': _notices,
     }
 
 

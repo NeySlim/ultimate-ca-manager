@@ -123,6 +123,24 @@ class TestMaterialization:
         load_key.assert_called_once_with(stored_key, context='certificate 7')
         assert key_path.read_bytes() == key_pem
 
+    def test_a_lone_key_file_is_backed_up(self, monkeypatch, tmp_path):
+        cert_path = tmp_path / 'https_cert.pem'
+        key_path = tmp_path / 'https_key.pem'
+        key_path.write_text('previous key')
+        monkeypatch.setattr(https_binding, '_paths', lambda: (cert_path, key_path))
+        monkeypatch.setattr(https_binding, 'load_pem_bytes', MagicMock(return_value=b'new key'),
+                            raising=False)
+        cert = SimpleNamespace(
+            id=8, prv='x', caref=None,
+            crt=base64.b64encode(
+                b'-----BEGIN CERTIFICATE-----\ntest-cert\n-----END CERTIFICATE-----\n').decode(),
+        )
+
+        https_binding.materialize_https_cert(cert)
+
+        backups = list(tmp_path.glob('https_key.pem.backup-*'))
+        assert backups and backups[0].read_text() == 'previous key'
+
 
 class TestRenewalSubscriber:
     def _payload(self, refid):
