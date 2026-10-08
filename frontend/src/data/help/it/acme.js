@@ -38,6 +38,7 @@ export default {
           { label: 'Cronologia', text: 'Traccia tutti gli ordini di emissione certificati ACME' },
                   { label: 'Ordini locali (v2.217)', text: 'La scheda Local orders elenca gli ordini del server integrato con filtro di stato, eliminazione singola e pulizia; gli ordini scaduti non emessi vengono eliminati automaticamente ogni 6 ore, e un digest di firma predefinito si applica agli ordini senza profilo. Dalla v2.218 la pulizia rimuove anche le sfide sorelle rimaste in attesa delle autorizzazioni già convalidate' },
                   { label: 'Profili e modelli (v2.221)', text: 'I profili di certificato (draft-ietf-acme-profiles) sono pubblicati nella directory e scelti dal client per ogni ordine. Ogni profilo fissa validità e digest e può associare un modello di certificato, i cui KU/EKU governano quindi il certificato emesso' },
+                  { label: 'Profilo predefinito', text: 'La maggior parte dei client non richiede alcun profilo. Il profilo predefinito, scelto sotto i profili, si applica ai loro ordini; senza di esso ricevono 90 giorni e il digest predefinito' },
         ]
       },
       {

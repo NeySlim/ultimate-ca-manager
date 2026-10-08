@@ -154,6 +154,8 @@ def get_acme_settings():
         'profiles': acme_profiles.get_profiles(),
         # Fallback signing digest for orders without a profile (#303)
         'default_digest': acme_profiles.get_default_digest(),
+        # Profile for orders that name none; '' keeps the historical defaults
+        'default_profile': acme_profiles.get_default_profile(),
         # dns-persist-01 (draft-ietf-acme-dns-persist) — opt-in persistent
         # TXT validation, issuer domains derive from the CAA identifiers
         # (or the public ACME hostname when unset)
@@ -263,6 +265,24 @@ def update_acme_settings():
             )
             db.session.add(digest_cfg)
         digest_cfg.value = digest.lower()
+
+    # Profile for orders that name none, checked against the profiles this
+    # request saves when it saves any (#378)
+    if 'default_profile' in data:
+        default_profile = data.get('default_profile') or ''
+        known = (data.get('profiles') or {}) if 'profiles' in data else acme_profiles.get_profiles()
+        if not isinstance(default_profile, str) or (
+                default_profile and (not isinstance(known, dict) or default_profile not in known)):
+            return error_response('default_profile must name a configured profile', 400)
+        profile_cfg = SystemConfig.query.filter_by(
+            key=acme_profiles.DEFAULT_PROFILE_KEY).first()
+        if not profile_cfg:
+            profile_cfg = SystemConfig(
+                key=acme_profiles.DEFAULT_PROFILE_KEY,
+                description='ACME profile applied to orders that name none',
+            )
+            db.session.add(profile_cfg)
+        profile_cfg.value = default_profile
 
     # Update certificate profiles (draft-ietf-acme-profiles)
     if 'profiles' in data:

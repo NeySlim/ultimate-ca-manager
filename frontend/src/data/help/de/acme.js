@@ -38,6 +38,7 @@ export default {
           { label: 'Verlauf', text: 'Alle ACME-Zertifikatsausstellungsaufträge verfolgen' },
                   { label: 'Lokale Orders (v2.217)', text: 'Der Tab Local orders listet die Orders des eingebauten Servers mit Statusfilter, Einzellöschung und Bereinigung; abgelaufene, nicht ausgestellte Orders werden alle 6 Stunden automatisch bereinigt, und ein Standard-Signatur-Digest gilt für Orders ohne Profil. Seit v2.218 entfernt die Bereinigung auch übrig gebliebene ausstehende Geschwister-Challenges bereits validierter Autorisierungen' },
                   { label: 'Profile und Vorlagen (v2.221)', text: 'Zertifikatsprofile (draft-ietf-acme-profiles) werden im Directory veröffentlicht und vom Client pro Order gewählt. Jedes Profil legt Gültigkeit und Digest fest und kann eine Zertifikatsvorlage binden, deren KU/EKU dann das ausgestellte Zertifikat bestimmen' },
+                  { label: 'Standardprofil', text: 'Die meisten Clients fordern kein Profil an. Das unter den Profilen gewählte Standardprofil gilt für ihre Bestellungen; ohne Standardprofil erhalten sie 90 Tage und den Standard-Digest' },
         ]
       },
       {

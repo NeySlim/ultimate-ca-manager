@@ -38,6 +38,7 @@ export default {
           { label: 'Histórico', text: 'Rastrear todos os pedidos de emissão de certificados ACME' },
                   { label: 'Pedidos locais (v2.217)', text: 'O separador Local orders lista os pedidos do servidor integrado com filtro de estado, eliminação unitária e purga; os pedidos expirados não emitidos são purgados automaticamente a cada 6 horas, e um digest de assinatura predefinido aplica-se aos pedidos sem perfil. Desde a v2.218, a purga também remove os desafios irmãos pendentes remanescentes de autorizações já validadas' },
                   { label: 'Perfis e modelos (v2.221)', text: 'Os perfis de certificado (draft-ietf-acme-profiles) são publicados no diretório e escolhidos pelo cliente em cada pedido. Cada perfil fixa validade e digest e pode vincular um modelo de certificado, cujos KU/EKU governam então o certificado emitido' },
+                  { label: 'Perfil predefinido', text: 'A maioria dos clientes não solicita nenhum perfil. O perfil predefinido, escolhido abaixo dos perfis, aplica-se aos seus pedidos; sem ele recebem 90 dias e o digest predefinido' },
         ]
       },
       {

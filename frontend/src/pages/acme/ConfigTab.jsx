@@ -125,11 +125,28 @@ export default function ConfigTab({ acmeSettings, cas, templates = [], updateSet
           <p className="text-xs text-text-secondary">{t('acme.profilesDesc')}</p>
           <ProfilesEditor
             value={acmeSettings.profiles || {}}
-            onChange={(profiles) => updateSetting('profiles', profiles)}
+            onChange={(profiles) => {
+              updateSetting('profiles', profiles)
+              // A removed profile can no longer be the default
+              if (acmeSettings.default_profile && !(acmeSettings.default_profile in profiles)) {
+                updateSetting('default_profile', '')
+              }
+            }}
             disabled={!canWrite}
             templates={templates}
           />
           <p className="text-xs text-text-tertiary">{t('acme.profileTemplateHelp')}</p>
+          <Select
+            label={t('acme.defaultProfile')}
+            value={acmeSettings.default_profile || ''}
+            onChange={(val) => updateSetting('default_profile', val)}
+            disabled={!canWrite}
+            options={[
+              { value: '', label: t('acme.defaultProfileNone') },
+              ...Object.keys(acmeSettings.profiles || {}).map(name => ({ value: name, label: name })),
+            ]}
+          />
+          <p className="text-xs text-text-tertiary">{t('acme.defaultProfileDesc')}</p>
           <Select
             label={t('acme.defaultDigest')}
             value={acmeSettings.default_digest || 'sha256'}

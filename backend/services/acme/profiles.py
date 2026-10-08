@@ -38,6 +38,7 @@ logger = logging.getLogger(__name__)
 
 CONFIG_KEY = 'acme_profiles'
 DEFAULT_DIGEST_KEY = 'acme_default_digest'  # server-wide fallback digest (#303)
+DEFAULT_PROFILE_KEY = 'acme_default_profile'  # profile for orders that name none (#378)
 
 # Issuance defaults applied when a profile omits them (and when no profile is
 # selected at all) — these mirror UCM's historical ACME behaviour.
@@ -335,13 +336,26 @@ def is_known(name):
     return isinstance(name, str) and name in get_profiles()
 
 
+def get_default_profile():
+    """The profile applied to orders that name none, or '' when unset or no
+    longer advertised (a removed profile must not break finalize)."""
+    from models import SystemConfig
+
+    row = SystemConfig.query.filter_by(key=DEFAULT_PROFILE_KEY).first()
+    name = (row.value or '').strip() if row and row.value else ''
+    return name if is_known(name) else ''
+
+
 def issuance_params(name):
     """Issuance parameters for a profile name.
 
-    Falls back to UCM's historical defaults when the profile is absent (e.g.
-    the order predates a config change, or no profile was selected), so a
-    finalize can never fail because a profile was removed after the order.
+    An order that names no profile gets the default profile when one is set.
+    Otherwise, and when the named profile is gone (the order predates a
+    config change), UCM's historical defaults apply, so a finalize can never
+    fail because a profile was removed after the order.
     """
+    if not name:
+        name = get_default_profile()
     profile = get_profiles().get(name) if name else None
     if not profile:
         return {

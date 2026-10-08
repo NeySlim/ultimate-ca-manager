@@ -255,3 +255,67 @@ class TestDefaultDigest:
             assert r.status_code == 400
         finally:
             self._clear(app)
+
+
+@pytest.fixture
+def restore_default_profile(app):
+    yield
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key=acme_profiles.DEFAULT_PROFILE_KEY).first()
+        if row:
+            db.session.delete(row)
+            db.session.commit()
+
+
+def _set_default_profile(app, name):
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key=acme_profiles.DEFAULT_PROFILE_KEY).first()
+        if not row:
+            row = SystemConfig(key=acme_profiles.DEFAULT_PROFILE_KEY)
+            db.session.add(row)
+        row.value = name
+        db.session.commit()
+
+
+class TestDefaultProfile:
+    """Most clients request no profile (#378): the default profile is what
+    they get, and an explicit profile still wins."""
+
+    def test_without_a_default_no_profile_means_historical_defaults(self, app, configured_profiles,
+                                                                     restore_default_profile):
+        with app.app_context():
+            assert acme_profiles.issuance_params(None)['validity_days'] == 90
+
+    def test_default_profile_applies_to_orders_that_name_none(self, app, configured_profiles,
+                                                              restore_default_profile):
+        _set_default_profile(app, 'shortlived')
+        with app.app_context():
+            assert acme_profiles.issuance_params(None) == {
+                'validity_days': 7, 'digest': 'sha384', 'template_id': None}
+            assert acme_profiles.issuance_params('')['validity_days'] == 7
+            assert acme_profiles.issuance_params('default')['validity_days'] == 90
+
+    def test_removed_default_profile_falls_back(self, app, configured_profiles, restore_default_profile):
+        _set_default_profile(app, 'gone')
+        with app.app_context():
+            assert acme_profiles.get_default_profile() == ''
+            assert acme_profiles.issuance_params(None)['validity_days'] == 90
+
+    def test_settings_round_trip_and_validation(self, app, auth_client, configured_profiles,
+                                                restore_default_profile):
+        url = '/api/v2/acme/settings'
+        r = auth_client.patch(url, json={'default_profile': 'shortlived'})
+        assert r.status_code == 200, r.get_json()
+        assert auth_client.get(url).get_json()['data']['default_profile'] == 'shortlived'
+
+        r = auth_client.patch(url, json={'default_profile': 'nope'})
+        assert r.status_code == 400
+        # Checked against the profiles saved by the same request
+        r = auth_client.patch(url, json={'default_profile': 'shortlived',
+                                         'profiles': {'default': PROFILES['default']}})
+        assert r.status_code == 400
+        assert auth_client.get(url).get_json()['data']['default_profile'] == 'shortlived'
+
+        r = auth_client.patch(url, json={'default_profile': ''})
+        assert r.status_code == 200
+        assert auth_client.get(url).get_json()['data']['default_profile'] == ''
