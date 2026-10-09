@@ -35,6 +35,8 @@ export function AuthProvider({ children }) {
       const response = await authService.getCurrentUser()
 
       const userData = response.data || response
+      // A 200 that is not the API (captive portal, proxy maintenance page)
+      if (!userData || typeof userData !== 'object') return null
 
       if (!userData.authenticated) {
         debug('ℹ️ Not authenticated')

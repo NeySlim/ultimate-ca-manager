@@ -13,6 +13,7 @@ import { authService } from '../services'
 
 const WARNING_BEFORE = 5 * 60 * 1000 // Show warning 5 minutes before expiry
 const UNKNOWN_RECHECK = 30 * 1000 // Server unreachable: ask again after this
+const UNKNOWN_MAX = 5 * 60 * 1000 // ...and lock the tab locally after this long
 const FALLBACK_TIMEOUT = 8 * 60 * 60 * 1000 // 8h fallback (matches backend default)
 
 export function SessionWarning() {
@@ -24,11 +25,13 @@ export function SessionWarning() {
   const sessionTimeoutRef = useRef(FALLBACK_TIMEOUT)
   const checkingRef = useRef(false)
   const recheckAtRef = useRef(0)
+  const unknownSinceRef = useRef(null)
 
   // Fetch actual session timeout from backend on mount
   useEffect(() => {
     if (!user) return
     recheckAtRef.current = 0 // a new sign-in starts a fresh countdown
+    unknownSinceRef.current = null
     const fetchTimeout = async () => {
       try {
         const response = await authService.getCurrentUser()
@@ -91,15 +94,19 @@ export function SessionWarning() {
       const stillValid = await checkSession()
       if (stillValid) {
         // Backend says session is still valid — reset timer
+        unknownSinceRef.current = null
         setLastActivity(Date.now())
         setShowWarning(false)
         return
       }
       if (stillValid === null) {
         // Server unreachable (e.g. a laptop waking before the network is
-        // back): logging out now would not even reach the server
-        recheckAtRef.current = Date.now() + UNKNOWN_RECHECK
-        return
+        // back): wait for it, but not forever, the expired tab still shows data
+        unknownSinceRef.current ??= Date.now()
+        if (Date.now() - unknownSinceRef.current < UNKNOWN_MAX) {
+          recheckAtRef.current = Date.now() + UNKNOWN_RECHECK
+          return
+        }
       }
     } catch {
       // Truly expired
@@ -111,16 +118,17 @@ export function SessionWarning() {
   }, [checkSession, logout])
 
   const extendSession = useCallback(async () => {
-    try {
-      // Make authenticated request to refresh backend session
-      await authService.getCurrentUser()
+    // /auth/verify refreshes the server session; only a server that says it
+    // is gone signs out, an unreachable one leaves the warning up
+    const stillValid = await checkSession()
+    if (stillValid) {
+      unknownSinceRef.current = null
       setLastActivity(Date.now())
       setShowWarning(false)
-    } catch {
-      // If verify fails, session is already expired
+    } else if (stillValid === false) {
       logout()
     }
-  }, [logout])
+  }, [checkSession, logout])
 
   const formatTime = (seconds) => {
     const mins = Math.floor(seconds / 60)

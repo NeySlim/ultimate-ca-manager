@@ -4,7 +4,7 @@
  * reaching the server. Only a check that says the session is gone may.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, act } from '@testing-library/react'
+import { render, act, screen, fireEvent } from '@testing-library/react'
 
 const auth = vi.hoisted(() => ({ checkSession: vi.fn(), logout: vi.fn() }))
 
@@ -16,8 +16,9 @@ vi.mock('../index.js', () => ({
 vi.mock('../../contexts', () => ({
   useAuth: () => ({ user: { username: 'admin' }, ...auth }),
 }))
+const timeout = vi.hoisted(() => ({ seconds: 1 }))
 vi.mock('../../services', () => ({
-  authService: { getCurrentUser: vi.fn().mockResolvedValue({ data: { session_timeout: 1 } }) },
+  authService: { getCurrentUser: vi.fn(async () => ({ data: { session_timeout: timeout.seconds } })) },
 }))
 
 import { SessionWarning } from '../SessionWarning'
@@ -29,6 +30,7 @@ describe('SessionWarning with the server unreachable (#384)', () => {
     vi.useFakeTimers()
     auth.checkSession.mockReset()
     auth.logout.mockReset()
+    timeout.seconds = 1
   })
   afterEach(() => vi.useRealTimers())
 
@@ -51,5 +53,26 @@ describe('SessionWarning with the server unreachable (#384)', () => {
     expect(auth.logout).not.toHaveBeenCalled()
     await tick(30000)
     expect(auth.logout).toHaveBeenCalledTimes(1)
+  })
+
+  it('still locks the tab once the server stayed unreachable for five minutes', async () => {
+    auth.checkSession.mockResolvedValue(null)
+    render(<SessionWarning />)
+    await tick(4 * 60 * 1000)
+    expect(auth.logout).not.toHaveBeenCalled()
+    await tick(2 * 60 * 1000)
+    expect(auth.logout).toHaveBeenCalledTimes(1)
+  })
+
+  it('"Stay logged in" leaves the warning up when the server cannot answer', async () => {
+    timeout.seconds = 400 // the warning shows in the last 5 minutes
+    auth.checkSession.mockResolvedValue(null)
+    render(<SessionWarning />)
+    await tick(120 * 1000)
+    fireEvent.click(screen.getByText('session.stayLoggedIn'))
+    await tick(0)
+    expect(auth.checkSession).toHaveBeenCalled()
+    expect(auth.logout).not.toHaveBeenCalled()
+    expect(screen.getByText('session.stayLoggedIn')).toBeInTheDocument()
   })
 })

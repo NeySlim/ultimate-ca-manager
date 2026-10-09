@@ -335,6 +335,15 @@ describe('AuthContext', () => {
       expect(screen.getByTestId('user').textContent).toBe('admin')
     })
 
+    it('treats a 200 that is not the API as unknown', async () => {
+      const auth = await signedIn()
+      authService.getCurrentUser.mockResolvedValue('<html>captive portal</html>')
+      let result
+      await act(async () => { result = await auth().checkSession() })
+      expect(result).toBeNull()
+      expect(screen.getByTestId('authenticated').textContent).toBe('true')
+    })
+
     it('signs out on a 401', async () => {
       const auth = await signedIn()
       authService.getCurrentUser.mockRejectedValue(Object.assign(new Error('Unauthorized'), { status: 401 }))
