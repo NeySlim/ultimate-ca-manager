@@ -6,6 +6,8 @@ import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 export default function AuditSection({ settings, updateSetting, handleSave, saving, hasPermission, syslogConfig, updateSyslogConfig, syslogSaving, syslogTesting, handleSaveSyslog, handleTestSyslog }) {
   const { t } = useTranslation()
   const canWriteSettings = hasPermission('write:settings')
+  // The backend accepts a retention from admins only: shortening it deletes history.
+  const canAdminSettings = hasPermission('admin:settings')
   return (
     <DetailContent>
       <DetailHeader
@@ -25,11 +27,12 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
           <Input
             label={t('settings.logRetention')}
             type="number"
-            value={settings.audit_retention_days || 90}
-            onChange={(e) => updateSetting('audit_retention_days', parseInt(e.target.value))}
-            min="7"
-            max="730"
-            disabled={!settings.audit_enabled}
+            value={settings.audit_retention_days ?? 0}
+            onChange={(e) => updateSetting('audit_retention_days', parseInt(e.target.value, 10) || 0)}
+            min="0"
+            max="1825"
+            helperText={t('settings.logRetentionHelp')}
+            disabled={!canAdminSettings}
           />
         </div>
       </DetailSection>

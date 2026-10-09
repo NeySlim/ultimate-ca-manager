@@ -2459,6 +2459,7 @@
     "loadingSettings": "Einstellungen werden geladen...",
     "lockoutDuration": "Sperrdauer (Minuten)",
     "logRetention": "Protokollaufbewahrung",
+    "logRetentionHelp": "0 behält alle Protokolle. Mit einem Wert (7 bis 1825) werden ältere Einträge täglich gelöscht.",
     "maintenance": "Wartung",
     "maxLoginAttempts": "Max. Anmeldeversuche",
     "min12Characters": "Mindestens 12 Zeichen",

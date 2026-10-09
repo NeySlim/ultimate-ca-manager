@@ -2459,6 +2459,7 @@
     "loadingSettings": "設定を読み込み中...",
     "lockoutDuration": "ロック時間（分）",
     "logRetention": "ログ保持",
+    "logRetentionHelp": "0 の場合はすべてのログを保持します。値（7〜1825）を設定すると、それより古いエントリが毎日削除されます。",
     "maintenance": "メンテナンス",
     "maxLoginAttempts": "最大ログイン試行回数",
     "min12Characters": "最低12文字",

@@ -2459,6 +2459,7 @@
     "loadingSettings": "Caricamento impostazioni...",
     "lockoutDuration": "Durata del blocco (minuti)",
     "logRetention": "Conservazione log",
+    "logRetentionHelp": "0 conserva tutti i log. Con un valore (da 7 a 1825), le voci più vecchie vengono eliminate ogni giorno.",
     "maintenance": "Manutenzione",
     "maxLoginAttempts": "Tentativi max login",
     "min12Characters": "Minimo 12 caratteri",

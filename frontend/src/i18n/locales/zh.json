@@ -2459,6 +2459,7 @@
     "loadingSettings": "加载设置中...",
     "lockoutDuration": "锁定时间（分钟）",
     "logRetention": "日志保留",
+    "logRetentionHelp": "0 表示保留所有日志。设置数值（7 至 1825）后，更早的条目将每天删除。",
     "maintenance": "维护",
     "maxLoginAttempts": "最大登录尝试",
     "min12Characters": "最少12个字符",

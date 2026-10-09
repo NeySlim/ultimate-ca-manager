@@ -8,6 +8,7 @@ from services.settings_registry import DATE_FORMATS, as_boolean_word, effective
 from utils.response import success_response, error_response
 from models import db, Certificate
 from services.audit_service import AuditService
+from services.retention_service import RetentionPolicy, RetentionSettingError
 from api.v2.key_recovery import _dual_control_enabled, _dual_control_env
 import json
 import logging
@@ -66,6 +67,8 @@ _ADMIN_ONLY_SETTINGS = frozenset({
     'clear_backup_password',
     'crl_auto_delete_expired_revoked',
     'crl_auto_purge_stale_serials',
+    # Shortening it has the daily task delete audit history.
+    'audit_retention_days',
 })
 
 
@@ -88,6 +91,7 @@ def get_general_settings():
         'auto_backup_enabled': get_config('auto_backup_enabled', 'false') == 'true',
         'backup_frequency': get_config('backup_frequency', 'daily'),
         'backup_retention_days': int(get_config('backup_retention_days', '30')),
+        'audit_retention_days': RetentionPolicy.get_retention_days(),
         'backup_password': '',  # Never return password
         # Whether one is stored, so the screen can say so without the value
         'backup_password_set': bool(get_config('backup_password', '')),
@@ -201,6 +205,8 @@ def update_general_settings():
         'crl_auto_delete_expired_revoked',
         # CRL auto-purge stale RevokedSerial entries
         'crl_auto_purge_stale_serials',
+        # Audit log retention in days, 0 keeps every log
+        'audit_retention_days',
     ]
 
     if 'ocsp_response_validity_hours' in data:
@@ -319,6 +325,14 @@ def update_general_settings():
             data['backup_retention_days'] = validate_retention_days(
                 data['backup_retention_days'])
         except BackupSettingError as e:
+            return error_response(str(e), 400)
+
+    if 'audit_retention_days' in data:
+        try:
+            data['audit_retention_days'] = str(
+                RetentionPolicy.validate_days(
+                    data['audit_retention_days'], field='audit_retention_days'))
+        except RetentionSettingError as e:
             return error_response(str(e), 400)
 
     # Validate HSTS max-age (non-negative int) when provided

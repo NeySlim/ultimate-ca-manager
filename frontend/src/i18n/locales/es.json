@@ -2459,6 +2459,7 @@
     "loadingSettings": "Cargando configuración...",
     "lockoutDuration": "Duración del bloqueo (minutos)",
     "logRetention": "Retención de registros",
+    "logRetentionHelp": "0 conserva todos los registros. Con un valor (7 a 1825), las entradas más antiguas se eliminan cada día.",
     "maintenance": "Mantenimiento",
     "maxLoginAttempts": "Intentos máximos",
     "min12Characters": "Mínimo 12 caracteres",

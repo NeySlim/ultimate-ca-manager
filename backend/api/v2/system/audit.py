@@ -9,7 +9,8 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db
 from services.audit_service import AuditService
-from services.retention_service import RetentionPolicy, cleanup_audit_logs as do_cleanup
+from services.retention_service import (
+    RetentionPolicy, RetentionSettingError, cleanup_audit_logs as do_cleanup)
 from services.syslog_service import syslog_forwarder
 from api.v2.settings import set_config
 import logging
@@ -39,6 +40,8 @@ def update_audit_retention():
             message="Retention settings updated",
             data=settings
         )
+    except RetentionSettingError as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f"Failed to update retention settings: {e}")
         return error_response("Failed to update settings", 500)
@@ -55,6 +58,8 @@ def cleanup_audit_logs():
             message=result.get('message', 'Cleanup complete'),
             data=result
         )
+    except RetentionSettingError as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f"Cleanup failed: {e}")
         return error_response("Cleanup failed", 500)

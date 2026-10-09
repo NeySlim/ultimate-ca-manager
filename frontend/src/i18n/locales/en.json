@@ -2460,6 +2460,7 @@
     "loadingSettings": "Loading settings...",
     "lockoutDuration": "Lockout Duration (minutes)",
     "logRetention": "Log Retention (days)",
+    "logRetentionHelp": "0 keeps every log. With a value (7 to 1825), older entries are deleted every day.",
     "maintenance": "Maintenance",
     "maxLoginAttempts": "Max Login Attempts",
     "min12Characters": "Minimum 12 characters",

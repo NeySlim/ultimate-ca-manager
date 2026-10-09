@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+
+- Audit log retention: the daily purge failed whenever it had something to delete, and the Settings › Audit field was disabled and its value ignored. The retention is now stored and nothing is purged until an administrator sets one; `archive_before_delete`, which was never implemented, is refused by the API.
+
 ## [2.237] - 2026-10-09
 
 ### Fixed

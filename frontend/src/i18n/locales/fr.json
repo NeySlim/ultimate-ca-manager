@@ -2489,6 +2489,7 @@
     "noBackups": "Aucune sauvegarde trouvée",
     "eventsToLog": "Événements à journaliser",
     "logRetention": "Rétention des journaux (jours)",
+    "logRetentionHelp": "0 conserve tous les journaux. Avec une valeur (7 à 1825), les entrées plus anciennes sont supprimées chaque jour.",
     "dbStats": "Statistiques BD",
     "dbSize": "Taille BD",
     "tableCount": "Tables",
