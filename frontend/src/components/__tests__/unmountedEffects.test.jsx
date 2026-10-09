@@ -32,6 +32,10 @@ vi.mock('../../services/apiClient', () => ({
   apiClient: { get: (...a) => apiGet(...a), post: vi.fn() },
 }))
 
+// Loaded at module level: its @phosphor-icons/react import takes seconds cold,
+// which inside a test body counts against the 5 s timeout.
+import EmailTemplateWindow from '../EmailTemplateWindow'
+
 describe('EmailTemplateWindow — a request that outlives the window', () => {
   beforeEach(() => { showError.mockClear(); apiGet.mockReset() })
   afterEach(() => { vi.clearAllMocks() })
@@ -40,7 +44,6 @@ describe('EmailTemplateWindow — a request that outlives the window', () => {
     let rejectLoad
     apiGet.mockReturnValue(new Promise((_, reject) => { rejectLoad = reject }))
 
-    const { default: EmailTemplateWindow } = await import('../EmailTemplateWindow')
     const { unmount } = render(<EmailTemplateWindow onClose={() => {}} />)
 
     // The user closes the window while the template is still loading.
@@ -59,7 +62,6 @@ describe('EmailTemplateWindow — a request that outlives the window', () => {
     let rejectLoad
     apiGet.mockReturnValue(new Promise((_, reject) => { rejectLoad = reject }))
 
-    const { default: EmailTemplateWindow } = await import('../EmailTemplateWindow')
     render(<EmailTemplateWindow onClose={() => {}} />)
 
     await act(async () => {
