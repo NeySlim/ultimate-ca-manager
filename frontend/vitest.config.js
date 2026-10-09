@@ -12,6 +12,14 @@ export default defineConfig({
     globals: true,
     setupFiles: ['./src/test/setup.js'],
     exclude: ['node_modules/', 'e2e/**', '**/*.e2e.js', '**/*.spec.js'],
+    // The icon barrel is ~4,500 modules: unbundled, each test file spent
+    // about 2.5 s importing it, inside the 5 s timeout of the first test that
+    // did. Pre-bundled it loads in about 0.1 s.
+    deps: {
+      optimizer: {
+        client: { enabled: true, include: ['@phosphor-icons/react'] },
+      },
+    },
     pool: 'forks',
     maxForks: 2,
     minForks: 1,
