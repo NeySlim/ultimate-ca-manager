@@ -28,14 +28,18 @@ def keyenc():
     os.environ.setdefault("SECRET_KEY", "test-secret-key-for-testing")
     os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-for-testing")
     from cryptography.fernet import Fernet
-    os.environ["KEY_ENCRYPTION_KEY"] = Fernet.generate_key().decode()
-
     from security import encryption as enc_mod
-    # Singleton — reload to pick up the env var.
-    inst = enc_mod.KeyEncryption()
+
+    # The key and the singleton are put back afterwards: left behind, every
+    # later test encrypted with this key and a test switching keys broke.
+    with pytest.MonkeyPatch.context() as patch:
+        patch.setenv("KEY_ENCRYPTION_KEY", Fernet.generate_key().decode())
+        # Singleton — reload to pick up the env var.
+        inst = enc_mod.KeyEncryption()
+        inst.reload()
+        assert inst.is_enabled, "KeyEncryption did not initialise with KEY_ENCRYPTION_KEY"
+        yield inst
     inst.reload()
-    assert inst.is_enabled, "KeyEncryption did not initialise with KEY_ENCRYPTION_KEY"
-    return inst
 
 
 PEM_PRIVATE_KEY = (

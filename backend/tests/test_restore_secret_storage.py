@@ -109,7 +109,9 @@ class TestASecretGoesBackTheWayTheColumnHoldsIt:
     @pytest.mark.parametrize('section_name, column, make, read',
                              CASES, ids=[f'{s}.{c}' for s, c, _, _ in CASES])
     def test_the_column_does_not_come_back_readable(
-            self, app, section_name, column, make, read):
+            self, app, encryption_enabled, section_name, column, make, read):
+        # encrypt_text is a no-op without a master key, and the case is about
+        # a column that was encrypted before the backup.
         cleartext = f'{MARK}-{column}-only-this-server-knows'
         with app.app_context():
             model, row, where = make(cleartext)

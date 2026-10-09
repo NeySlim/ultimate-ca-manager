@@ -115,6 +115,16 @@ from services.database_admin import persistence as _db_persistence  # noqa: E402
 _db_helpers.UCM_ENV_PATH = UCM_TEST_ENV_FILE
 _db_persistence.UCM_ENV_PATH = UCM_TEST_ENV_FILE
 
+# The host's master key, when the machine runs UCM, must not reach the tests:
+# rows encrypted with it outlive the test that wrote them and break any later
+# test that switches keys. The suite starts unencrypted, as on CI.
+from security import encryption as _encryption  # noqa: E402
+
+_encryption.MASTER_KEY_PATH = UCM_TEST_ENV_FILE.parent / 'master.key'
+for _var in ('KEY_ENCRYPTION_KEY', 'KEY_ENCRYPTION_KEY_FILE'):
+    os.environ.pop(_var, None)
+_encryption.key_encryption.reload()
+
 
 class _GuardResolverProxy:
     """Stand-in for utils.ssrf_protection's `socket` module (and ONLY its):

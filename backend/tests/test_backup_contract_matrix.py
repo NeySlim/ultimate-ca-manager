@@ -226,9 +226,11 @@ def _remove(order):
     db.session.commit()
 
 
-@pytest.fixture
+@pytest.fixture(scope='module')
 def seeded(app, create_ca, create_cert):
     """One row in every section, and the archive taken while they are there.
+
+    Built once for the module: every test below only reads it.
 
     The sections with a dedicated exporter read real cryptographic material,
     which no generic factory can invent, so the suite's own factories create
