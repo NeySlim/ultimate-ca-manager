@@ -106,8 +106,8 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r backend/requirements.txt
-          pip install pytest pytest-cov pytest-mock
-      
+          pip install pytest pytest-cov pytest-mock pytest-xdist
+
       - name: Run tests
         env:
           SECRET_KEY: test-secret-key-for-ci
@@ -117,9 +117,12 @@ jobs:
           INITIAL_ADMIN_PASSWORD: changeme123
           CSRF_DISABLED: 'true'
           UCM_DEV_MODE: 'true'
+        # Parallel by file, as scripts/pre-commit runs it: tests share state
+        # within a file, and each worker gets its own data directory and
+        # database (conftest.py).
         run: |
           cd backend
-          pytest -v --tb=short
+          pytest -v --tb=short -n auto --dist loadfile
 
   test-backend-postgres:
     name: Backend Tests (PostgreSQL)
