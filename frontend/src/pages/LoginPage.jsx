@@ -23,6 +23,10 @@ import { cn } from '../lib/utils'
 
 const STORAGE_KEY = 'ucm_last_username'
 const STORAGE_AUTH_METHOD_KEY = 'ucm_last_auth_method'
+const SSO_RETRY_BASE_MS = 2000
+const SSO_RETRY_MAX_MS = 30000
+
+const toProviderList = (ssoData) => (Array.isArray(ssoData?.data) ? ssoData.data : [])
 
 const getSSOIcon = (provider) => {
   const name = provider.name?.toLowerCase() || ''
@@ -66,6 +70,7 @@ export default function LoginPage() {
   
   // SSO state
   const [ssoProviders, setSsoProviders] = useState([])
+  const [ssoLoadFailed, setSsoLoadFailed] = useState(false)
   const [selectedLdapProvider, setSelectedLdapProvider] = useState(null)
 
   const currentLang = languages.find(l => l.code === (i18n.language?.split('-')[0] || 'en')) || languages[0]
@@ -103,16 +108,24 @@ export default function LoginPage() {
       .then(data => setEmailConfigured(data?.configured || false))
       .catch(() => {})
 
-    // Load SSO providers + detect global auth methods in parallel
-    Promise.all([
-      authService.getSsoProviders().catch(() => null),
+    // Load SSO providers + detect global auth methods in parallel.
+    // Settled independently: a failed /auth/methods must not discard the
+    // providers, and a failed /sso/available is retried by the effect below.
+    Promise.allSettled([
+      authService.getSsoProviders(),
       authMethodsService.detectMethods(null)
-    ]).then(([ssoData, methods]) => {
+    ]).then(([ssoResult, methodsResult]) => {
       // SSO providers
-      const providers = ssoData?.data && Array.isArray(ssoData.data) ? ssoData.data : []
+      let providers = []
+      if (ssoResult.status === 'fulfilled') {
+        providers = toProviderList(ssoResult.value)
+      } else {
+        setSsoLoadFailed(true)
+      }
       setSsoProviders(providers)
-      
+
       // Global methods (no username - detects cert presence)
+      const methods = methodsResult.status === 'fulfilled' ? methodsResult.value : null
       setGlobalMethods(methods)
 
       // Restore saved LDAP provider
@@ -140,6 +153,50 @@ export default function LoginPage() {
       setStep('username')
     })
   }, [sessionChecked]) // eslint-disable-line react-hooks/exhaustive-deps
+
+  // Retry a failed SSO provider load. The page is often reached by an
+  // in-app redirect right after the session expired, e.g. when a laptop wakes
+  // up before the network is back; without a retry the SSO buttons stay
+  // missing until a full reload. Back off, and retry at once when the
+  // browser goes online again or the tab becomes visible.
+  useEffect(() => {
+    if (!ssoLoadFailed) return
+    let cancelled = false
+    let inFlight = false
+    let attempt = 0
+    let timer = null
+
+    const retry = () => {
+      if (cancelled || inFlight) return
+      inFlight = true
+      clearTimeout(timer)
+      authService.getSsoProviders()
+        .then((data) => {
+          if (cancelled) return
+          setSsoProviders(toProviderList(data))
+          setSsoLoadFailed(false)
+        })
+        .catch(() => {
+          if (cancelled) return
+          attempt += 1
+          timer = setTimeout(retry, Math.min(SSO_RETRY_BASE_MS * 2 ** attempt, SSO_RETRY_MAX_MS))
+        })
+        .finally(() => { inFlight = false })
+    }
+    const onVisible = () => {
+      if (document.visibilityState === 'visible') retry()
+    }
+
+    timer = setTimeout(retry, SSO_RETRY_BASE_MS)
+    window.addEventListener('online', retry)
+    document.addEventListener('visibilitychange', onVisible)
+    return () => {
+      cancelled = true
+      clearTimeout(timer)
+      window.removeEventListener('online', retry)
+      document.removeEventListener('visibilitychange', onVisible)
+    }
+  }, [ssoLoadFailed])
 
   // SSO callback handling
   useEffect(() => {
