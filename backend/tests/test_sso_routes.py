@@ -266,11 +266,20 @@ class TestSAMLMetadata:
         r = _post(auth_client, '/api/v2/sso/saml/metadata/fetch', {})
         assert r.status_code == 400
 
-    def test_fetch_metadata_unreachable_url(self, auth_client):
+    def test_fetch_metadata_unreachable_url(self, auth_client, monkeypatch):
+        # The autouse resolver maps this host to TEST-NET-3, so a real request
+        # waited out the route's 10 s timeout; the refusal is what is tested.
+        import requests
+
+        def refused(url, **kwargs):
+            raise requests.exceptions.ConnectionError(f'cannot reach {url}')
+
+        monkeypatch.setattr('api.v2.sso.sessions.safe_request_get', refused)
         r = _post(auth_client, '/api/v2/sso/saml/metadata/fetch', {
             'metadata_url': 'https://unreachable.invalid/metadata',
         })
         assert r.status_code == 400
+        assert 'reachable' in get_json(r)['message']
 
     def test_fetch_metadata_uses_pinned_safe_request_get(self, auth_client, monkeypatch):
         """Metadata fetch must use DNS-pinned safe_request_get (rebinding defense)."""
