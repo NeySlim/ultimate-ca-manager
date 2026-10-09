@@ -28,6 +28,17 @@ const SSO_RETRY_MAX_MS = 30000
 
 const toProviderList = (ssoData) => (Array.isArray(ssoData?.data) ? ssoData.data : [])
 
+// The LDAP provider the saved username last signed in with, if still offered
+const savedLdapProvider = (providers) => {
+  try {
+    const saved = JSON.parse(localStorage.getItem(STORAGE_AUTH_METHOD_KEY) || '{}')
+    if (saved.method !== 'ldap' || !saved.providerId) return null
+    return providers.find(p => p.id === saved.providerId) || null
+  } catch {
+    return null
+  }
+}
+
 const getSSOIcon = (provider) => {
   const name = provider.name?.toLowerCase() || ''
   const type = provider.provider_type
@@ -56,6 +67,9 @@ export default function LoginPage() {
   // State machine: 'init' | 'username' | 'auth' | '2fa' | 'ldap'
   const [step, setStep] = useState('init')
   const [username, setUsername] = useState('')
+  // Read by the SSO retry, which outlives the render that started it
+  const stepRef = useRef(step)
+  stepRef.current = step
   const [password, setPassword] = useState('')
   const [totpCode, setTotpCode] = useState('')
   const [loading, setLoading] = useState(false)
@@ -129,18 +143,11 @@ export default function LoginPage() {
       setGlobalMethods(methods)
 
       // Restore saved LDAP provider
-      if (lastUsername && providers.length > 0) {
-        try {
-          const saved = JSON.parse(localStorage.getItem(STORAGE_AUTH_METHOD_KEY) || '{}')
-          if (saved.method === 'ldap' && saved.providerId) {
-            const provider = providers.find(p => p.id === saved.providerId)
-            if (provider) {
-              setSelectedLdapProvider(provider)
-              setStep('ldap')
-              return
-            }
-          }
-        } catch {}
+      const ldapProvider = lastUsername ? savedLdapProvider(providers) : null
+      if (ldapProvider) {
+        setSelectedLdapProvider(ldapProvider)
+        setStep('ldap')
+        return
       }
 
       // If mTLS cert present but not enrolled, show info
@@ -173,8 +180,18 @@ export default function LoginPage() {
       authService.getSsoProviders()
         .then((data) => {
           if (cancelled) return
-          setSsoProviders(toProviderList(data))
+          const providers = toProviderList(data)
+          setSsoProviders(providers)
           setSsoLoadFailed(false)
+          // Restore the saved LDAP provider as the first load would have,
+          // unless the user has started on something else meanwhile
+          let lastUsername = ''
+          try { lastUsername = localStorage.getItem(STORAGE_KEY) || '' } catch {}
+          const ldapProvider = lastUsername ? savedLdapProvider(providers) : null
+          if (ldapProvider && stepRef.current === 'username') {
+            setSelectedLdapProvider(ldapProvider)
+            setStep('ldap')
+          }
         })
         .catch(() => {
           if (cancelled) return

@@ -8,7 +8,7 @@
  * discarded providers that had loaded fine.
  */
 import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
-import { render, screen, act } from '@testing-library/react'
+import { render, screen, act, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 const services = vi.hoisted(() => ({
@@ -124,5 +124,34 @@ describe('LoginPage — SSO provider loading', () => {
     // No further requests once the providers are loaded.
     await act(async () => { await vi.advanceTimersByTimeAsync(60000) })
     expect(services.getSsoProviders).toHaveBeenCalledTimes(3)
+  })
+
+  describe('saved LDAP provider after a retried load', () => {
+    const LDAP = { data: [{ id: 2, name: 'corp-ldap', display_name: 'Corporate LDAP', provider_type: 'ldap' }] }
+
+    beforeEach(() => {
+      localStorage.setItem('ucm_last_username', 'alice')
+      localStorage.setItem('ucm_last_auth_method', JSON.stringify({ method: 'ldap', providerId: 2 }))
+    })
+    afterEach(() => localStorage.clear())
+
+    it('reselects it as the first load would have', async () => {
+      services.getSsoProviders.mockRejectedValueOnce(networkError()).mockResolvedValue(LDAP)
+      renderLogin()
+      expect(await screen.findByText('auth.continueAs')).toBeInTheDocument()
+      await act(async () => { window.dispatchEvent(new Event('online')) })
+      expect(await screen.findByText('auth.signingInWith')).toBeInTheDocument()
+    })
+
+    it('leaves the form alone once the user has moved on', async () => {
+      services.getSsoProviders.mockRejectedValueOnce(networkError()).mockResolvedValue(LDAP)
+      renderLogin()
+      fireEvent.click(await screen.findByText('auth.continueAs'))
+      await waitFor(() => expect(services.detectMethods).toHaveBeenCalledWith('alice'))
+      await act(async () => { window.dispatchEvent(new Event('online')) })
+      await waitFor(() => expect(services.getSsoProviders).toHaveBeenCalledTimes(2))
+      await act(async () => {})
+      expect(screen.queryByText('auth.signingInWith')).not.toBeInTheDocument()
+    })
   })
 })

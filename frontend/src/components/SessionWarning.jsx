@@ -12,6 +12,7 @@ import { useAuth } from '../contexts'
 import { authService } from '../services'
 
 const WARNING_BEFORE = 5 * 60 * 1000 // Show warning 5 minutes before expiry
+const UNKNOWN_RECHECK = 30 * 1000 // Server unreachable: ask again after this
 const FALLBACK_TIMEOUT = 8 * 60 * 60 * 1000 // 8h fallback (matches backend default)
 
 export function SessionWarning() {
@@ -21,10 +22,13 @@ export function SessionWarning() {
   const [secondsLeft, setSecondsLeft] = useState(0)
   const [lastActivity, setLastActivity] = useState(Date.now())
   const sessionTimeoutRef = useRef(FALLBACK_TIMEOUT)
+  const checkingRef = useRef(false)
+  const recheckAtRef = useRef(0)
 
   // Fetch actual session timeout from backend on mount
   useEffect(() => {
     if (!user) return
+    recheckAtRef.current = 0 // a new sign-in starts a fresh countdown
     const fetchTimeout = async () => {
       try {
         const response = await authService.getCurrentUser()
@@ -62,7 +66,7 @@ export function SessionWarning() {
 
       if (timeUntilExpiry <= 0) {
         // Verify with backend before logging out — session may still be valid
-        handleExpired()
+        if (!checkingRef.current && Date.now() >= recheckAtRef.current) handleExpired()
         return
       }
 
@@ -82,6 +86,7 @@ export function SessionWarning() {
 
   // Verify with backend before actually logging out
   const handleExpired = useCallback(async () => {
+    checkingRef.current = true
     try {
       const stillValid = await checkSession()
       if (stillValid) {
@@ -90,9 +95,18 @@ export function SessionWarning() {
         setShowWarning(false)
         return
       }
+      if (stillValid === null) {
+        // Server unreachable (e.g. a laptop waking before the network is
+        // back): logging out now would not even reach the server
+        recheckAtRef.current = Date.now() + UNKNOWN_RECHECK
+        return
+      }
     } catch {
-      // Network error or truly expired
+      // Truly expired
+    } finally {
+      checkingRef.current = false
     }
+    recheckAtRef.current = Infinity // one logout, not one per tick while it runs
     logout()
   }, [checkSession, logout])
 

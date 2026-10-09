@@ -72,6 +72,9 @@ export function AuthProvider({ children }) {
       return true
     } catch (error) {
       debug('❌ Session check failed:', error.message)
+      // An unreachable server (network down, restart) says nothing about the
+      // session: keep the current state and answer null, "unknown"
+      if (error?.status !== 401 && error?.status !== 403) return null
       setUser(null)
       setIsAuthenticated(false)
       setPermissions([])

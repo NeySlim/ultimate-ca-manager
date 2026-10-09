@@ -309,4 +309,39 @@ describe('AuthContext', () => {
       expect(authContext.forcePasswordChange).toBe(false)
     })
   })
+
+  describe('session check while the server is unreachable (#384)', () => {
+    const SESSION = { data: { authenticated: true, user: { username: 'admin' }, permissions: ['read'], role: 'admin' } }
+
+    const signedIn = async () => {
+      authService.getCurrentUser.mockResolvedValue(SESSION)
+      let authContext
+      render(
+        <AuthProvider>
+          <TestComponent onRender={(auth) => { authContext = auth }} />
+        </AuthProvider>
+      )
+      await waitFor(() => expect(screen.getByTestId('authenticated').textContent).toBe('true'))
+      return () => authContext
+    }
+
+    it('keeps the session on a network error and answers unknown', async () => {
+      const auth = await signedIn()
+      authService.getCurrentUser.mockRejectedValue(Object.assign(new Error('Network error'), { status: 0 }))
+      let result
+      await act(async () => { result = await auth().checkSession() })
+      expect(result).toBeNull()
+      expect(screen.getByTestId('authenticated').textContent).toBe('true')
+      expect(screen.getByTestId('user').textContent).toBe('admin')
+    })
+
+    it('signs out on a 401', async () => {
+      const auth = await signedIn()
+      authService.getCurrentUser.mockRejectedValue(Object.assign(new Error('Unauthorized'), { status: 401 }))
+      let result
+      await act(async () => { result = await auth().checkSession() })
+      expect(result).toBe(false)
+      expect(screen.getByTestId('authenticated').textContent).toBe('false')
+    })
+  })
 })

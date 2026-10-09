@@ -11,7 +11,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 - Remote syslog could not be switched to TCP in Settings › Audit, nor its framing changed, so TLS and octet framing were out of reach too: both selectors threw on every choice and now save it (#380, reported by @arthur-2sheds-jackson, by @heidrickla).
-- The login page lost its SSO buttons until a full reload when the provider list failed to load, typically after a session expired while the network was briefly down (a laptop waking from sleep). It now retries the list, and a failed sign-in method check no longer hides providers that loaded (#384).
+- The login page lost its SSO buttons until a full reload when the provider list failed to load, typically after a session expired while the network was briefly down (a laptop waking from sleep). It now retries the list, reselects the LDAP provider last used, and a failed sign-in method check no longer hides providers that loaded (#384, reported and fixed by @mripkens-reuter).
+- A tab whose inactivity timeout ran out while the server was unreachable signed the user out locally without reaching the server; it now waits for an answer and asks again every 30 seconds. Only a server that says the session is gone signs the tab out (#384).
 
 ## [2.236] - 2026-10-08
 
