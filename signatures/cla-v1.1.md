@@ -18,3 +18,4 @@ not counted as a signature.
 | stefanelul2000 | 2026-09-21 | I have read and agree to the UCM CLA v1.1 |
 | seanpdiaz | 2026-09-24 | I have read and agree to the UCM CLA v1.1 |
 | Hemsby | 2026-09-26 | I have read and agree to the UCM CLA v1.1 |
+| heidrickla | 2026-10-09 | I have read and agree to the UCM CLA v1.1 |
