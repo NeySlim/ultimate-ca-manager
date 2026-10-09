@@ -331,7 +331,7 @@ export default function DevShowcasePage() {
             <Select
               label="Key Algorithm"
               value={selectValue}
-              onChange={e => setSelectValue(e.target.value)}
+              onChange={setSelectValue}
               options={[
                 { value: '', label: 'Select...' },
                 { value: 'rsa2048', label: 'RSA 2048' },
