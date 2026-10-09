@@ -7,7 +7,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [Unreleased]
+## [2.237] - 2026-10-09
 
 ### Fixed
 - Remote syslog could not be switched to TCP in Settings › Audit, nor its framing changed, so TLS and octet framing were out of reach too: both selectors threw on every choice and now save it (#380, reported by @arthur-2sheds-jackson, by @heidrickla).
