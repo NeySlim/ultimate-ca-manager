@@ -18,6 +18,7 @@ This guide covers all installation methods for Ultimate Certificate Manager.
 ### Software Requirements
 - **Docker:** 20.10+ (for Docker installation)
 - **Python:** 3.11+ (for source installation)
+- **Node.js:** 20.19+ or 22.12+ with npm (to build the web interface from source)
 - **Database:** SQLite (included) or PostgreSQL 13+ (optional, set via `DATABASE_URL`)
 
 ### Optional: Kerberos/SPNEGO support
@@ -119,8 +120,18 @@ source venv/bin/activate
 # Install dependencies
 pip install -r backend/requirements.txt
 
+# Build the web interface (served from frontend/dist)
+(cd frontend && npm ci && npm run build)
+
 # Run
 python wsgi.py
+```
+
+Building the Docker image from a clone needs the same frontend build first: the `Dockerfile` copies `frontend/dist/` as is.
+
+```bash
+(cd frontend && npm ci && npm run build)
+docker build -t ucm:local .
 ```
 
 **Access:** https://localhost:8443 or https://your-server-fqdn:8443
