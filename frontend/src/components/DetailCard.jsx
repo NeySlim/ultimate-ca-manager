@@ -67,6 +67,7 @@ const FIELD_ICONS = {
   'environment': Globe, 'method': Key, 'provider': Database,
   'orderStatus': ShieldCheck, 'orderId': Hash,
   'dnsRecordName': FileText, 'dnsRecordValue': FileText,
+  'challengeUrl': Link, 'challengeFileContent': FileText,
   // HSM
   'slotId': Hash, 'token': Key, 'clusterId': Database,
   'region': MapPin, 'cryptoUser': User,

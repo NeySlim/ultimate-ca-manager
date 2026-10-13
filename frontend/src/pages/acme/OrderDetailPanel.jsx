@@ -1,7 +1,13 @@
 import { useTranslation } from 'react-i18next'
 import { Certificate, Globe, PlugsConnected, CheckCircle, Trash, Play, DownloadSimple, Eye, LockKey, ArrowsClockwise } from '@phosphor-icons/react'
 import { Badge, Button, CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader } from '../../components'
-import { cn, formatDate } from '../../lib/utils'
+import { cn, formatDate, downloadBlob } from '../../lib/utils'
+
+// RFC 8555 §8.3: the CA fetches the key authorization over plain HTTP, port 80
+export function http01Url(domain, data) {
+  const host = data.identifier_type === 'ip' && domain.includes(':') ? `[${domain}]` : domain
+  return `http://${host}/.well-known/acme-challenge/${data.token}`
+}
 
 export default function OrderDetailPanel({ order, onDownloadCert, onViewCertificate, onRenewCertificate, onVerifyChallenge, onFinalizeOrder, onDeleteOrder }) {
   const { t } = useTranslation()
@@ -61,6 +67,9 @@ export default function OrderDetailPanel({ order, onDownloadCert, onViewCertific
       {order.status === 'pending' && order.challenges && (
         <CompactSection title={t('acme.pendingChallenge')}>
           <div className="space-y-3">
+            {order.challenge_type === 'http-01' && (
+              <p className="text-xs text-text-secondary">{t('acme.http01Hint')}</p>
+            )}
             {Object.entries(order.challenges).map(([domain, data]) => (
               <div key={domain} className="p-2 bg-tertiary-op50 rounded-lg border border-border-op50">
                 <p className="text-sm font-medium text-text-primary mb-2">{domain}</p>
@@ -68,6 +77,16 @@ export default function OrderDetailPanel({ order, onDownloadCert, onViewCertific
                   <div className="space-y-2 text-xs">
                     <CompactField autoIcon="dnsRecordName" label={t('acme.dnsRecordName')} value={data.dns_txt_name || data.record_name} mono copyable />
                     <CompactField autoIcon="dnsRecordValue" label={t('acme.dnsRecordValue')} value={data.dns_txt_value || data.record_value} mono copyable />
+                  </div>
+                )}
+                {order.challenge_type === 'http-01' && data.token && data.key_authorization && (
+                  <div className="space-y-2 text-xs">
+                    <CompactField autoIcon="challengeUrl" label={t('acme.http01Url')} value={http01Url(domain, data)} mono copyable />
+                    <CompactField autoIcon="challengeFileContent" label={t('acme.http01FileContent')} value={data.key_authorization} mono copyable />
+                    <Button type="button" size="sm" variant="secondary" onClick={() => downloadBlob(new Blob([data.key_authorization], { type: 'application/octet-stream' }), data.token)}>
+                      <DownloadSimple size={12} />
+                      {t('acme.http01DownloadFile')}
+                    </Button>
                   </div>
                 )}
               </div>

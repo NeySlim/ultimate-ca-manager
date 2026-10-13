@@ -9,6 +9,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+
+- Let's Encrypt HTTP-01: the order showed nothing to publish, so the challenge could not be answered. A pending order now shows the challenge URL and file content, with the file to download (#392, reported by @ziller-hqs).
+- Installation guide: running from source or building the Docker image now includes the frontend build step (#393, reported by @ziller-hqs).
+
 ## [2.238] - 2026-10-12
 
 ### Added
