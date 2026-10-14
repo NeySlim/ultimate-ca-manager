@@ -26,6 +26,7 @@ export default {
           { label: 'DNS-Anbieter', text: 'DNS-01-Challenge-Anbieter konfigurieren (Cloudflare, Route53, Tencent DNSPod, usw.)' },
           { label: 'Custom Command', text: 'DNS-Anbietertyp, der vom Admin konfigurierte lokale Befehle zum Erstellen/Löschen von TXT-Einträgen ausführt, Eintragsdetails werden über die Umgebungsvariablen DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION übergeben. Absoluter Binärpfad erforderlich, keine Shell, konfigurierbares Timeout' },
           { label: 'Domänen', text: 'Domänen DNS-Anbietern für automatische Validierung zuordnen' },
+          { label: 'HTTP-01', text: 'UCM stellt die Challenge-Datei seiner offenen Orders unter /.well-known/acme-challenge/ auf dem HTTP-Protokollport bereit (standardmäßig 8080): leiten Sie diesen Pfad von Port 80 der Domäne an UCM weiter. Verifizieren prüft zuerst die Datei, und HTTP-01-Orders werden automatisch erneuert' },
         ]
       },
       {
@@ -240,6 +241,9 @@ Der Befehl erfordert einen **absoluten Binärpfad**, läuft ohne Shell (keine Pi
 
 ### Benutzerdefinierte DNS-Resolver
 Überschreiben Sie optional die Resolver, die zur Überprüfung der \`_acme-challenge\`-TXT-Einträge verwendet werden (nützlich für Split-Horizon-DNS oder um Public-Resolver-Caching zu vermeiden). Einträge sind kommagetrennt und akzeptieren einfache IPs oder \`host:port\`: z. B. ein nur auf Loopback lauschender BIND oder eine dnsmasq-Instanz auf einem alternativen Port.
+
+### HTTP-01-Challenges
+UCM stellt die Challenge-Datei seiner offenen Orders unter \`/.well-known/acme-challenge/<token>\` auf dem HTTP-Protokollport bereit (standardmäßig 8080). Die CA ruft sie auf Port 80 der Domäne ab, leiten Sie daher diesen Pfad von Ihrem Reverse-Proxy an UCM weiter oder binden Sie UCM an Port 80. **Challenge verifizieren** ruft zuerst die Datei ab und übermittelt nicht, wenn sie nicht ausgeliefert wird; **Verifizierung erzwingen** übermittelt trotzdem. HTTP-01-Orders werden automatisch erneuert.
 
 ### Domänen
 Ordnen Sie Ihre Domänen DNS-Anbietern zu. Beim Anfordern eines Zertifikats für eine Domäne verwendet UCM den zugeordneten Anbieter, um DNS-01-Challenge-Einträge zu erstellen.

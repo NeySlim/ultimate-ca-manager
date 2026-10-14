@@ -26,6 +26,7 @@ export default {
           { label: 'DNS 提供商', text: '配置 DNS-01 挑战提供商（Cloudflare、Route53、Tencent DNSPod 等）' },
           { label: '自定义命令', text: '运行管理员配置的本地命令来创建/删除 TXT 记录的 DNS 提供商类型,, 记录详情通过 DOMAIN、RECORD_NAME、RECORD_VALUE、TTL、ACTION 环境变量传递。要求二进制文件绝对路径，不经过 shell，超时可配置' },
           { label: '域名', text: '将域名映射到 DNS 提供商以进行自动验证' },
+          { label: 'HTTP-01', text: 'UCM 在 HTTP 协议端口（默认 8080）的 /.well-known/acme-challenge/ 下提供其待处理订单的 challenge 文件：请将域名 80 端口上的该路径转发到 UCM。验证会先检查该文件，HTTP-01 订单会自动续期' },
         ]
       },
       {
@@ -240,6 +241,9 @@ ECDSA 密钥推荐用于现代部署:, 更小、更快且同样安全。
 
 ### 自定义 DNS 解析器
 可选地覆盖用于验证 \`_acme-challenge\` TXT 记录的解析器（适用于分裂视图 DNS 或避免公共解析器缓存）。条目以逗号分隔，接受纯 IP 或 \`host:port\`:, 例如仅监听环回的 BIND 或使用备用端口的 dnsmasq 实例。
+
+### HTTP-01 挑战
+UCM 在 HTTP 协议端口（默认 8080）的 \`/.well-known/acme-challenge/<token>\` 下提供其待处理订单的 challenge 文件。CA 会在域名的 80 端口获取该文件，因此请从反向代理将该路径转发到 UCM，或将 UCM 绑定到 80 端口。**验证挑战**会先获取该文件，若未提供则不提交；**强制验证**则仍然提交。HTTP-01 订单会自动续期。
 
 ### 域名
 将域名映射到 DNS 提供商。当为域名请求证书时，UCM 使用映射的提供商创建 DNS-01 挑战记录。

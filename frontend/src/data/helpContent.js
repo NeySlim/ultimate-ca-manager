@@ -584,6 +584,7 @@ export const helpContent = {
           { label: 'DNS Providers', text: 'Configure DNS-01 challenge providers (Cloudflare, Route53, Tencent DNSPod, etc.)' },
           { label: 'Custom Command', text: 'DNS provider type running admin-configured local commands for TXT create/delete, record details passed via DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION environment variables. Absolute binary path required, no shell, configurable timeout' },
           { label: 'Domains', text: 'Map domains to DNS providers for automatic validation' },
+          { label: 'HTTP-01', text: 'UCM serves the challenge file of its pending orders at /.well-known/acme-challenge/ on the HTTP protocol port (8080 by default): forward that path from port 80 of the domain to UCM. Verify checks the file first, and HTTP-01 orders renew automatically' },
         ]
       },
       {

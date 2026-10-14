@@ -26,6 +26,7 @@ export default {
           { label: 'Provedores DNS', text: 'Configurar provedores de desafio DNS-01 (Cloudflare, Route53, Tencent DNSPod, etc.)' },
           { label: 'Comando Personalizado', text: 'Tipo de provedor DNS que executa comandos locais configurados pelo admin para criar/excluir TXT, detalhes do registro passados via variáveis de ambiente DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Caminho absoluto do binário obrigatório, sem shell, timeout configurável' },
           { label: 'Domínios', text: 'Mapear domínios para provedores DNS para validação automática' },
+          { label: 'HTTP-01', text: 'O UCM serve o arquivo de desafio dos seus pedidos pendentes em /.well-known/acme-challenge/ na porta do protocolo HTTP (8080 por padrão): encaminhe esse caminho da porta 80 do domínio para o UCM. Verificar confere primeiro o arquivo, e os pedidos HTTP-01 são renovados automaticamente' },
         ]
       },
       {
@@ -240,6 +241,9 @@ O comando requer um **caminho absoluto do binário**, executa sem shell (sem pip
 
 ### Resolvedores DNS personalizados
 Opcionalmente sobrescreva os resolvedores usados para verificar os registros TXT \`_acme-challenge\` (útil para DNS split-horizon ou para evitar o cache de resolvedores públicos). As entradas são separadas por vírgula e aceitam IPs simples ou \`host:port\`: ex. um BIND somente em loopback ou uma instância dnsmasq numa porta alternativa.
+
+### Desafios HTTP-01
+O UCM serve o arquivo de desafio dos seus pedidos pendentes em \`/.well-known/acme-challenge/<token>\`, na porta do protocolo HTTP (8080 por padrão). A CA o busca na porta 80 do domínio, então encaminhe esse caminho para o UCM a partir do seu proxy reverso, ou associe o UCM à porta 80. **Verify Challenge** busca o arquivo primeiro e não envia quando ele não é servido; **Force verification** envia mesmo assim. Os pedidos HTTP-01 são renovados automaticamente.
 
 ### Domínios
 Mapeie seus domínios para provedores DNS. Ao solicitar um certificado para um domínio, o UCM usa o provedor mapeado para criar registros de desafio DNS-01.

@@ -26,6 +26,7 @@ export default {
           { label: 'Proveedores DNS', text: 'Configura proveedores de desafío DNS-01 (Cloudflare, Route53, Tencent DNSPod, etc.)' },
           { label: 'Custom Command', text: 'Tipo de proveedor DNS que ejecuta comandos locales configurados por el administrador para crear/eliminar registros TXT, los detalles del registro se pasan mediante las variables de entorno DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Ruta absoluta al binario obligatoria, sin shell, tiempo límite configurable' },
           { label: 'Dominios', text: 'Mapea dominios a proveedores DNS para validación automática' },
+          { label: 'HTTP-01', text: 'UCM sirve el archivo de desafío de sus pedidos pendientes en /.well-known/acme-challenge/ en el puerto del protocolo HTTP (8080 por defecto): redirija esa ruta desde el puerto 80 del dominio hacia UCM. Verificar comprueba primero el archivo, y los pedidos HTTP-01 se renuevan automáticamente' },
         ]
       },
       {
@@ -240,6 +241,9 @@ El comando requiere una **ruta absoluta al binario**, se ejecuta sin shell (sin 
 
 ### Resolutores DNS personalizados
 Opcionalmente, sobrescriba los resolutores usados para verificar los registros TXT \`_acme-challenge\` (útil para DNS split-horizon o para evitar el caching de resolutores públicos). Las entradas van separadas por comas y aceptan IP simples o \`host:port\`: p. ej. un BIND solo en loopback o una instancia de dnsmasq en un puerto alternativo.
+
+### Desafíos HTTP-01
+UCM sirve el archivo de desafío de sus pedidos pendientes en \`/.well-known/acme-challenge/<token>\`, en el puerto del protocolo HTTP (8080 por defecto). La CA lo solicita en el puerto 80 del dominio, así que redirija esa ruta hacia UCM desde su proxy inverso, o enlace UCM al puerto 80. **Verificar desafío** comprueba primero el archivo y no envía si no se sirve; **Forzar verificación** envía de todos modos. Los pedidos HTTP-01 se renuevan automáticamente.
 
 ### Dominios
 Mapea tus dominios a proveedores DNS. Al solicitar un certificado para un dominio, UCM usa el proveedor mapeado para crear los registros de desafío DNS-01.

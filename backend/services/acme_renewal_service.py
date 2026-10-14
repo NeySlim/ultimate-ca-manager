@@ -12,6 +12,8 @@ from models.acme_models import AcmeClientOrder
 from services.acme import dns_providers
 from services.acme.acme_client_service import AcmeClientService
 from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challenges
+from services.acme.http01 import wait_for_http01
+from services.audit.staging import stage_audit_entry
 from services.cert_service import CertificateService
 from utils.acme_debug import acme_log
 from utils.datetime_utils import utc_now
@@ -23,6 +25,12 @@ logger = logging.getLogger(__name__)
 # Default: renew 30 days before expiry
 DEFAULT_RENEWAL_DAYS = 30
 MAX_RENEWAL_FAILURES = 5
+# UCM serves its own HTTP-01 tokens, so the file is there at once or not at all.
+HTTP01_RENEWAL_WAIT = 10
+
+
+class RenewalBlocked(Exception):
+    """Renewal stopped before reaching the CA; the message is meant for the operator."""
 
 # Successful ARI responses are cached until the upstream Retry-After time.
 # The scheduler is process-local, so this is sufficient to prevent repeated
@@ -151,6 +159,14 @@ def scheduled_acme_renewal():
                 order.renewal_failures += 1
                 order.last_error_at = utc_now()
                 order.error_message = str(e)
+                stage_audit_entry(
+                    action='acme_order.auto_renewal_failed',
+                    resource_type='acme_order',
+                    resource_id=str(order.id),
+                    resource_name=order.primary_domain,
+                    details=f'Auto-renewal failed: {e}',
+                    success=False,
+                )
                 commit_or_rollback(
                     logger,
                     f"Failed to persist renewal failure for order {order.id}",
@@ -181,16 +197,20 @@ def renew_certificate(order) -> tuple:
         if old_certificate_id else None
     )
     
-    # Get DNS provider
-    dns_provider_model = db.session.get(DnsProvider, order.dns_provider_id)
-    if not dns_provider_model:
-        raise Exception("DNS provider not found")
-    
-    credentials = json.loads(dns_provider_model.credentials) if dns_provider_model.credentials else {}
-    dns_provider = dns_providers.create_provider(
-        dns_provider_model.provider_type,
-        credentials,
-    )
+    challenge_type = order.challenge_type or 'dns-01'
+    # HTTP-01 and TLS-ALPN-01 proofs are served by UCM itself; only DNS-01 needs a provider.
+    dns_provider = None
+    if challenge_type == 'dns-01':
+        dns_provider_model = db.session.get(DnsProvider, order.dns_provider_id)
+        if not dns_provider_model:
+            raise RenewalBlocked(
+                'No DNS provider on this DNS-01 order: a manual DNS order cannot renew automatically'
+            )
+        credentials = json.loads(dns_provider_model.credentials) if dns_provider_model.credentials else {}
+        dns_provider = dns_providers.create_provider(
+            dns_provider_model.provider_type,
+            credentials,
+        )
     
     # Initialize ACME client for the same CA that issued the original order
     acme_client = AcmeClientService.for_order(order)
@@ -221,7 +241,7 @@ def renew_certificate(order) -> tuple:
     success, message, new_order = acme_client.create_order(
         domains=domains,
         email=email,
-        challenge_type=order.challenge_type or 'dns-01',
+        challenge_type=challenge_type,
         dns_provider_id=order.dns_provider_id,
         replaces=replaces,
     )
@@ -268,51 +288,60 @@ def renew_certificate(order) -> tuple:
                 )
 
     try:
-        # Setup DNS challenges using data already computed by create_order
-        for domain, challenge_info in challenges.items():
-            dns_value = challenge_info.get('dns_txt_value')
-            record_name = challenge_info.get(
-                'dns_txt_name', f"_acme-challenge.{strip_wildcard(domain)}"
+        if challenge_type == 'dns-01':
+            # Setup DNS challenges using data already computed by create_order
+            for domain, challenge_info in challenges.items():
+                dns_value = challenge_info.get('dns_txt_value')
+                record_name = challenge_info.get(
+                    'dns_txt_name', f"_acme-challenge.{strip_wildcard(domain)}"
+                )
+
+                if not dns_value:
+                    raise Exception(f"No DNS challenge value for {domain}")
+
+                success_dns, msg = dns_provider.create_txt_record(
+                    domain=strip_wildcard(domain),
+                    record_name=record_name,
+                    record_value=dns_value,
+                    ttl=300,
+                )
+
+                if not success_dns:
+                    raise Exception(f"Failed to create DNS record for {domain}: {msg}")
+
+                dns_txt_created = True
+
+            # Wait for DNS propagation using active self-check.
+            timeout = dns_propagation_timeout('acme.client.dns_propagation_timeout')
+            acme_log(
+                logger,
+                'Renewal DNS propagation wait: timeout=%ss, domains=%s',
+                timeout, ', '.join(sorted(challenges)),
             )
+            if timeout <= 0:
+                logger.info("DNS propagation pre-check skipped (timeout=0)")
+                check = {'ok': True, 'missing': [], 'waited': 0}
+            else:
+                check = wait_for_challenges(challenges, timeout)
+            if not check['ok']:
+                # Soft-fail: our local resolver may not see the record (split-horizon,
+                # filtered egress DNS) even though the CA can. Warn and let the CA be
+                # the authority — do NOT abort before submitting the challenge.
+                logger.warning(
+                    "DNS propagation not confirmed locally after %ss for: %s, "
+                    "submitting to the CA anyway",
+                    timeout, ', '.join(check['missing']),
+                )
+            else:
+                logger.info("DNS propagation confirmed after %ss", check['waited'])
 
-            if not dns_value:
-                raise Exception(f"No DNS challenge value for {domain}")
-
-            success_dns, msg = dns_provider.create_txt_record(
-                domain=strip_wildcard(domain),
-                record_name=record_name,
-                record_value=dns_value,
-                ttl=300,
-            )
-
-            if not success_dns:
-                raise Exception(f"Failed to create DNS record for {domain}: {msg}")
-
-            dns_txt_created = True
-
-        # Wait for DNS propagation using active self-check.
-        timeout = dns_propagation_timeout('acme.client.dns_propagation_timeout')
-        acme_log(
-            logger,
-            'Renewal DNS propagation wait: timeout=%ss, domains=%s',
-            timeout, ', '.join(sorted(challenges)),
-        )
-        if timeout <= 0:
-            logger.info("DNS propagation pre-check skipped (timeout=0)")
-            check = {'ok': True, 'missing': [], 'waited': 0}
-        else:
-            check = wait_for_challenges(challenges, timeout)
-        if not check['ok']:
-            # Soft-fail: our local resolver may not see the record (split-horizon,
-            # filtered egress DNS) even though the CA can. Warn and let the CA be
-            # the authority — do NOT abort before submitting the challenge.
-            logger.warning(
-                "DNS propagation not confirmed locally after %ss for: %s, "
-                "submitting to the CA anyway",
-                timeout, ', '.join(check['missing']),
-            )
-        else:
-            logger.info("DNS propagation confirmed after %ss", check['waited'])
+        elif challenge_type == 'http-01':
+            probe = wait_for_http01(challenges, HTTP01_RENEWAL_WAIT)
+            if not probe['ok']:
+                reason = '; '.join(probe['reasons'].values())
+                new_order.error_message = f'HTTP-01 file not reachable, order left pending: {reason}'
+                commit_or_rollback(logger, "Could not persist HTTP-01 self-check failure")
+                raise RenewalBlocked(new_order.error_message)
 
         # Submit challenges for validation
         for domain in challenges.keys():

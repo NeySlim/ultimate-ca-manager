@@ -14,7 +14,7 @@ import requests
 from models import db
 from models.acme_models import AcmeAccount
 from services.acme.acme_service import AcmeService
-from services.acme.mixins.challenge import _HTTP01_MAX_REDIRECTS
+from services.acme.http01 import MAX_REDIRECTS as _HTTP01_MAX_REDIRECTS
 import utils.ssrf_protection as ssrf_protection
 
 

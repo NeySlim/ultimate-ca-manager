@@ -26,6 +26,7 @@ export default {
           { label: 'Fournisseurs DNS', text: 'Configurer les fournisseurs de défi DNS-01 (Cloudflare, Route53, Tencent DNSPod, etc.)' },
           { label: 'Custom Command', text: 'Type de fournisseur DNS exécutant des commandes locales configurées par l\'admin pour créer/supprimer les TXT, détails de l\'enregistrement passés via les variables d\'environnement DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Chemin binaire absolu requis, sans shell, timeout configurable' },
           { label: 'Domaines', text: 'Associer des domaines aux fournisseurs DNS pour la validation automatique' },
+          { label: 'HTTP-01', text: 'UCM sert le fichier de challenge de ses orders en attente sur /.well-known/acme-challenge/ via le port du protocole HTTP (8080 par défaut) : redirigez ce chemin depuis le port 80 du domaine vers UCM. Verify vérifie d\'abord le fichier, et les orders HTTP-01 se renouvellent automatiquement' },
         ]
       },
       {
@@ -240,6 +241,9 @@ La commande exige un **chemin binaire absolu**, s'exécute sans shell (ni pipes 
 
 ### Résolveurs DNS personnalisés
 Surchargez optionnellement les résolveurs utilisés pour vérifier les enregistrements TXT \`_acme-challenge\` (utile pour le DNS split-horizon ou pour éviter la mise en cache des résolveurs publics). Les entrées sont séparées par des virgules et acceptent des IP simples ou \`host:port\` : par ex. un BIND en loopback seul ou une instance dnsmasq sur un port alternatif.
+
+### Challenges HTTP-01
+UCM sert le fichier de challenge de ses orders en attente sur \`/.well-known/acme-challenge/<token>\`, via le port du protocole HTTP (8080 par défaut). Le CA le récupère sur le port 80 du domaine : redirigez donc ce chemin vers UCM depuis votre reverse proxy, ou liez UCM au port 80. **Verify Challenge** récupère d'abord le fichier et ne soumet pas s'il n'est pas servi ; **Force verification** soumet quand même. Les orders HTTP-01 se renouvellent automatiquement.
 
 ### Domaines
 Associez vos domaines aux fournisseurs DNS. Lors de la demande d'un certificat pour un domaine, UCM utilise le fournisseur associé pour créer les enregistrements de défi DNS-01.

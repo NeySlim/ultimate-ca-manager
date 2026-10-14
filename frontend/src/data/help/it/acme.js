@@ -26,6 +26,7 @@ export default {
           { label: 'Provider DNS', text: 'Configura i provider di sfida DNS-01 (Cloudflare, Route53, Tencent DNSPod, ecc.)' },
           { label: 'Comando personalizzato', text: 'Tipo di provider DNS che esegue comandi locali configurati dall\'amministratore per creare/eliminare record TXT, i dettagli del record sono passati tramite le variabili d\'ambiente DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Percorso binario assoluto obbligatorio, nessuna shell, timeout configurabile' },
           { label: 'Domini', text: 'Mappa i domini ai provider DNS per la validazione automatica' },
+          { label: 'HTTP-01', text: 'UCM serve il file di sfida dei suoi ordini in sospeso su /.well-known/acme-challenge/ sulla porta del protocollo HTTP (8080 per impostazione predefinita): inoltra quel percorso dalla porta 80 del dominio a UCM. Verify controlla prima il file e gli ordini HTTP-01 si rinnovano automaticamente' },
         ]
       },
       {
@@ -240,6 +241,9 @@ Il comando richiede un **percorso binario assoluto**, viene eseguito senza shell
 
 ### Resolver DNS personalizzati
 Facoltativamente puoi sovrascrivere i resolver usati per verificare i record TXT \`_acme-challenge\` (utile per DNS split-horizon o per evitare il caching dei resolver pubblici). Le voci sono separate da virgole e accettano IP semplici o \`host:port\`: es. un BIND solo loopback o un'istanza dnsmasq su una porta alternativa.
+
+### Sfide HTTP-01
+UCM serve il file di sfida dei suoi ordini in sospeso su \`/.well-known/acme-challenge/<token>\`, sulla porta del protocollo HTTP (8080 per impostazione predefinita). La CA lo richiede sulla porta 80 del dominio: inoltra quel percorso a UCM dal tuo reverse proxy, oppure associa UCM alla porta 80. **Verify Challenge** controlla prima il file e non invia se non viene servito; **Force verification** invia comunque. Gli ordini HTTP-01 si rinnovano automaticamente.
 
 ### Domini
 Mappa i tuoi domini ai provider DNS. Quando si richiede un certificato per un dominio, UCM utilizza il provider mappato per creare i record di sfida DNS-01.

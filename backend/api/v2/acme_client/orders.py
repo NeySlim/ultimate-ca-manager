@@ -27,6 +27,7 @@ from services.acme.acme_client_service import (
     csr_identifiers_match_order,
 )
 from services.audit_service import AuditService
+from services.acme.http01 import wait_for_http01
 from services.acme.dns_selfcheck import (
     dns_propagation_timeout as _shared_dns_propagation_timeout,
     wait_for_challenges as _shared_wait_for_challenges,
@@ -415,6 +416,18 @@ def verify_challenges(order_id):
                 '(acme.client.dns_propagation_timeout=0); submitting to CA'
             )
 
+        # Same gate for HTTP-01: a CA fetch that fails invalidates the authorization.
+        if not force and order.challenge_type == 'http-01':
+            to_probe = {d: challenges[d] for d in domains_to_verify
+                        if d in challenges and challenges[d].get('status') != 'valid'}
+            probe = wait_for_http01(to_probe, 0)
+            if not probe['ok']:
+                return success_response(
+                    data={'http_not_ready': True, 'missing': probe['missing'],
+                          'reasons': probe['reasons'], 'order': order.to_dict()},
+                    message=('Challenge file not reachable for '
+                             f'{", ".join(probe["missing"])}. Publish it, then verify again.'))
+
         for domain in domains_to_verify:
             if domain not in challenges:
                 results[domain] = {'success': False, 'message': 'Domain not in order'}
@@ -589,9 +602,9 @@ def renew_order(order_id):
     if order.status not in ('valid', 'issued'):
         return error_response('Only valid/issued orders can be renewed', 400)
 
-    try:
-        from services.acme_renewal_service import renew_certificate
+    from services.acme_renewal_service import RenewalBlocked, renew_certificate
 
+    try:
         success, message = renew_certificate(order)
 
         if success:
@@ -610,6 +623,8 @@ def renew_order(order_id):
         else:
             return error_response(message, 400)
 
+    except RenewalBlocked as e:
+        return error_response(str(e), 409)
     except Exception as e:
         logger.error(f'ACME certificate renewal failed: {e}')
         return error_response('Renewal failed', 500)

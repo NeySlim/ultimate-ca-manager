@@ -975,6 +975,9 @@ The command requires an **absolute binary path**, runs without a shell (no pipes
 ### Custom DNS Resolvers
 Optionally override the resolvers used to verify \`_acme-challenge\` TXT records (useful for split-horizon DNS or to avoid public-resolver caching). Entries are comma-separated and accept plain IPs or \`host:port\`: e.g. a loopback-only BIND or a dnsmasq instance on an alternate port.
 
+### HTTP-01 Challenges
+UCM serves the challenge file of its pending orders at \`/.well-known/acme-challenge/<token>\`, on the HTTP protocol port (8080 by default). The CA fetches it on port 80 of the domain, so forward that path to UCM from your reverse proxy, or bind UCM to port 80. **Verify Challenge** fetches the file first and does not submit when it is not served; **Force verification** submits anyway. HTTP-01 orders renew automatically.
+
 ### Domains
 Map your domains to DNS providers. When requesting a certificate for a domain, UCM uses the mapped provider to create DNS-01 challenge records.
 

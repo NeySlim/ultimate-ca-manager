@@ -1705,6 +1705,9 @@ def register_blueprints(app):
     app.register_blueprint(ocsp_bp)                        # OCSP Responder (/ocsp)
     app.register_blueprint(scep_protocol_bp)               # SCEP Protocol (/scep)
     app.register_blueprint(health_bp)  # Health check endpoints (no auth)
+
+    from api.acme_http01_routes import acme_http01_bp
+    app.register_blueprint(acme_http01_bp)  # HTTP-01 tokens of ACME client orders
     
     # SSH CA Setup Script (public, curl-friendly)
     try:

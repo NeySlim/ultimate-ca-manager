@@ -532,6 +532,24 @@ export default function ACMEPage() {
 
       const updatedOrder = data.order
       if (updatedOrder?.status === 'ready') {
+      // Same gate for HTTP-01: UCM could not fetch the challenge file itself.
+      if (data.http_not_ready) {
+        const missing = (data.missing || []).join(', ') || '?'
+        const confirmed = await showConfirm(
+          t('acme.http01NotReadyConfirmDesc', { domains: missing }),
+          {
+            title: t('acme.http01NotReadyTitle'),
+            confirmText: t('acme.forceVerify'),
+            variant: 'primary',
+          }
+        )
+        if (confirmed) {
+          return handleVerifyChallenge(order, true)
+        }
+        showWarning(t('acme.http01NotReadyWarning', { domains: missing }))
+        return
+      }
+
         showSuccess(t('acme.challengeValidated'))
       } else if (updatedOrder?.status === 'pending') {
         showWarning(result.message || t('acme.challengeVerificationFailed'))

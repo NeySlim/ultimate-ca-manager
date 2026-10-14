@@ -9,10 +9,16 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- Let's Encrypt HTTP-01: UCM now serves the challenge file itself at `/.well-known/acme-challenge/` (HTTP protocol port and HTTPS), so forwarding that path from port 80 of the domain is enough, and HTTP-01 orders renew automatically (#392).
+
 ### Fixed
 
 - Let's Encrypt HTTP-01: the order showed nothing to publish, so the challenge could not be answered. A pending order now shows the challenge URL and file content, with the file to download (#392, reported by @ziller-hqs).
 - Installation guide: running from source or building the Docker image now includes the frontend build step (#393, reported by @ziller-hqs).
+- Let's Encrypt HTTP-01: Verify no longer submits a challenge whose file UCM cannot fetch, which made the CA invalidate the order; Force verification still submits (#392).
+- ACME client: renewing an HTTP-01 or TLS-ALPN-01 order failed with "DNS provider not found"; only DNS-01 orders need a provider now (#392).
 
 ## [2.238] - 2026-10-12
 

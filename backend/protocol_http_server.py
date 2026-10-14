@@ -1,10 +1,10 @@
 """
 Protocol HTTP Server
-Lightweight HTTP-only server for CDP/OCSP endpoints.
+Lightweight HTTP-only server for CDP/OCSP/AIA endpoints and HTTP-01 tokens.
 Avoids TLS certificate verification loops when clients fetch CRLs.
 
 Started automatically when http_protocol_port > 0 (default: 8080).
-Only serves /cdp/, /ocsp, and /health endpoints — all other paths return 404.
+Only serves /cdp/, /ca/, /ocsp, /.well-known/acme-challenge/ and /health — all other paths return 404.
 """
 import logging
 
@@ -25,13 +25,13 @@ class ProtocolOnlyMiddleware:
             start_response('200 OK', [('Content-Type', 'text/plain')])
             return [b'OK']
 
-        if path.startswith(('/cdp/', '/ca/', '/ocsp')):
+        if path.startswith(('/cdp/', '/ca/', '/ocsp', '/.well-known/acme-challenge/')):
             # Disable Talisman HTTPS redirect for protocol requests
             environ['wsgi.url_scheme'] = 'https'
             return self.app(environ, start_response)
 
         start_response('404 Not Found', [('Content-Type', 'text/plain')])
-        return [b'Only CDP/OCSP/AIA endpoints are available on this port']
+        return [b'Only CDP/OCSP/AIA and ACME HTTP-01 endpoints are available on this port']
 
 
 def get_http_protocol_port():

@@ -6,16 +6,10 @@ import logging
 
 from models import db
 from models.acme_models import AcmeChallenge, AcmeAuthorization
+from services.acme.http01 import fetch_following_redirects
 from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
-
-# RFC 8555 §8.3: http-01 validators SHOULD follow redirects — site-wide
-# http→https 301s routinely cover /.well-known/acme-challenge/ and public
-# CAs (Boulder) follow them. Hops are bounded and each target is re-vetted
-# (scheme, port, SSRF) before it is fetched.
-_HTTP01_REDIRECT_STATUSES = frozenset((301, 302, 303, 307, 308))
-_HTTP01_MAX_REDIRECTS = 5
 
 
 class ChallengeMixin:
@@ -114,9 +108,7 @@ class ChallengeMixin:
                 pin = (identifier_value, pinned_ips)
             else:
                 pin = None
-            response = self._http01_fetch_following_redirects(
-                url, pin, allow_private
-            )
+            response = fetch_following_redirects(url, pin, allow_private)
             response.raise_for_status()
             
             if response.text.strip() == key_authz:
@@ -146,83 +138,6 @@ class ChallengeMixin:
                 logger.error(f"DB commit failed: {commit_err}")
                 raise
             return False
-
-    def _http01_get(self, url: str, pin):
-        """One unredirected GET of an http-01 challenge URL.
-
-        TLS verification is deliberately OFF: an https hop usually presents
-        the very certificate the client is trying to renew (expired, or a
-        placeholder), and http-01 derives no security from TLS — the initial
-        contact is plain HTTP.
-        """
-        import warnings
-        import requests
-        import urllib3
-
-        with warnings.catch_warnings():
-            warnings.simplefilter(
-                'ignore', urllib3.exceptions.InsecureRequestWarning
-            )
-            if pin is not None:
-                from utils.ssrf_protection import pin_host
-                host, ips = pin
-                with pin_host(host, ips):
-                    return requests.get(
-                        url, timeout=10, allow_redirects=False, verify=False
-                    )
-            return requests.get(
-                url, timeout=10, allow_redirects=False, verify=False
-            )
-
-    def _http01_fetch_following_redirects(
-        self, url: str, pin, allow_private: bool
-    ):
-        """Fetch the key authorization, following redirects (RFC 8555 §8.3).
-
-        Comparing a 301 body to the key authorization fails every site that
-        redirects http→https across the board, so redirects must be walked.
-        Every hop is re-vetted with the same policy as the identifier itself:
-        http/https schemes on default ports only (80/443, as Boulder allows),
-        cloud metadata always refused, and under allow_private_ips=false each
-        target hostname is resolved, vetted and pinned before connecting.
-        Raises ValueError on a policy violation or when the chain exceeds
-        _HTTP01_MAX_REDIRECTS hops.
-        """
-        from urllib.parse import urljoin, urlparse
-
-        current = url
-        for _ in range(_HTTP01_MAX_REDIRECTS + 1):
-            response = self._http01_get(current, pin)
-            if response.status_code not in _HTTP01_REDIRECT_STATUSES:
-                return response
-            location = response.headers.get('Location')
-            if not location:
-                raise ValueError('redirect without a Location header')
-            current = urljoin(current, location)
-            parsed = urlparse(current)
-            scheme = (parsed.scheme or '').lower()
-            if scheme not in ('http', 'https'):
-                raise ValueError(f"redirect to unsupported scheme '{scheme}'")
-            if not parsed.hostname:
-                raise ValueError('redirect without a hostname')
-            if parsed.port not in (None, 80, 443):
-                raise ValueError('redirect to a non-standard port')
-            from utils.ssrf_protection import validate_url_not_cloud_metadata
-            validate_url_not_cloud_metadata(
-                current, allow_loopback=allow_private
-            )
-            if not allow_private:
-                from utils.ssrf_protection import validate_host_not_private
-                pin = (
-                    parsed.hostname,
-                    validate_host_not_private(parsed.hostname),
-                )
-            else:
-                pin = None
-        raise ValueError(
-            f'more than {_HTTP01_MAX_REDIRECTS} redirects during http-01 '
-            'validation'
-        )
 
     def validate_dns01_challenge(
         self,
