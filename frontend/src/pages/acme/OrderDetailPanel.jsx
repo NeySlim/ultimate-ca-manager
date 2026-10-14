@@ -3,9 +3,10 @@ import { Certificate, Globe, PlugsConnected, CheckCircle, Trash, Play, DownloadS
 import { Badge, Button, CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader } from '../../components'
 import { cn, formatDate, downloadBlob } from '../../lib/utils'
 
-// RFC 8555 §8.3: the CA fetches the key authorization over plain HTTP, port 80
+// RFC 8555 §8.3: the CA fetches the key authorization over plain HTTP, port 80.
+// A DNS name never holds ':', so it marks an IPv6 literal even on rows without identifier_type.
 export function http01Url(domain, data) {
-  const host = data.identifier_type === 'ip' && domain.includes(':') ? `[${domain}]` : domain
+  const host = domain.includes(':') ? `[${domain}]` : domain
   return `http://${host}/.well-known/acme-challenge/${data.token}`
 }
 

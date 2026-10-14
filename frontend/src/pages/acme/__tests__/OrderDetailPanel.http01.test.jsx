@@ -94,4 +94,10 @@ describe('OrderDetailPanel HTTP-01 challenge', () => {
     expect(http01Url('192.0.2.10', { ...http01, identifier_type: 'ip' }))
       .toBe('http://192.0.2.10/.well-known/acme-challenge/tok-123')
   })
+
+  it('brackets an IPv6 identifier on an order stored without identifier_type', () => {
+    const { identifier_type: _omit, ...legacy } = http01
+    expect(http01Url('2001:db8::1', legacy))
+      .toBe('http://[2001:db8::1]/.well-known/acme-challenge/tok-123')
+  })
 })
