@@ -632,10 +632,10 @@ export const helpContent = {
         title: 'Custom DNS Resolvers (DNS-01)',
         icon: Globe,
         items: [
-          { label: 'Per-account override', text: 'Override system resolvers when validating _acme-challenge TXT records' },
+          { label: 'Mode', text: 'ACME → Let\'s Encrypt → DNS-01 resolvers: Automatic (listed, authoritative, public, then system), System resolver only, or Listed resolvers only. The restricted modes never query public resolvers, for networks that block them' },
           { label: 'Split-horizon', text: 'Useful when your authoritative server is internal but the public view is cached elsewhere' },
           { label: 'Stale records', text: 'Avoids public-resolver caching during fast automated renewals' },
-          { label: 'host:port entries', text: 'Resolvers not listening on port 53 are accepted (e.g. a loopback-only BIND or dnsmasq on an alternate port): comma-separated, plain IPs still work' },
+          { label: 'host:port entries', text: 'Comma-separated IPs with an optional port (127.0.0.1:5353, [2001:db8::53]:5300), each resolver keeping its own port: e.g. a loopback-only BIND or dnsmasq on an alternate port' },
         ]
       },
       {

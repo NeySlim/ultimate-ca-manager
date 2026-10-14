@@ -17,6 +17,13 @@ from utils.acme_debug import clear_acme_debug_cache
 from services.audit_service import AuditService
 from services.acme.acme_client_service import ACCOUNT_KEY_TYPES, CERT_KEY_TYPES
 from security.encryption import encrypt_text
+from utils.dns_txt_lookup import (
+    RESOLVER_MODES,
+    configured_nameservers_raw,
+    dns01_resolver_mode,
+    format_resolver_entries,
+    parse_resolver_entries,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -118,6 +125,8 @@ def get_settings():
         'renewal_days': int(renewal_days.value) if renewal_days else 30,
         'dns_propagation_timeout': dns_timeout,
         'tls_alpn_port': tls_alpn_port,
+        'dns01_resolver_mode': dns01_resolver_mode(),
+        'dns01_nameservers': configured_nameservers_raw(),
         'debug_logging': _coerce_bool(debug_logging_cfg.value if debug_logging_cfg else None, False),
         'allow_loopback_upstream': _coerce_bool(allow_loopback_cfg.value if allow_loopback_cfg else None, False),
         'has_staging_account': bool(staging_account and staging_account.is_registered()),
@@ -208,6 +217,23 @@ def update_settings():
         _set_config('acme.client.dns_propagation_timeout', str(dns_to),
                     'Seconds to self-check DNS-01 TXT propagation before submitting to the CA')
         updates.append('dns_propagation_timeout')
+
+    if 'dns01_resolver_mode' in data or 'dns01_nameservers' in data:
+        mode = data.get('dns01_resolver_mode', dns01_resolver_mode())
+        if mode not in RESOLVER_MODES:
+            return error_response(f"DNS-01 resolver mode must be one of: {', '.join(RESOLVER_MODES)}", 400)
+        servers = data.get('dns01_nameservers', configured_nameservers_raw())
+        try:
+            entries = parse_resolver_entries(servers, strict=True)
+        except ValueError as exc:
+            return error_response(f'{exc} (expected an IP, ipv4:port or [ipv6]:port)', 400)
+        if mode == 'custom' and not entries:
+            return error_response('Custom DNS-01 resolver mode needs at least one resolver', 400)
+        _set_config('acme.dns01_resolver_mode', mode,
+                    'Resolvers used to check DNS-01 TXT records: auto, system or custom')
+        _set_config('acme.dns01_nameservers', format_resolver_entries(entries),
+                    'Comma-separated DNS resolvers for DNS-01 checks (ip, ipv4:port, [ipv6]:port)')
+        updates.extend(k for k in ('dns01_resolver_mode', 'dns01_nameservers') if k in data)
 
     if 'tls_alpn_port' in data:
         try:

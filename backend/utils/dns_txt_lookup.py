@@ -1,15 +1,16 @@
 """
 DNS TXT lookup helpers for ACME DNS-01 propagation checks.
 
-Checks run in order:
-1. ``acme.dns01_nameservers`` when configured in SystemConfig
-2. authoritative nameservers for the zone (fast — record published at source)
-3. public recursive resolvers (9.9.9.9, 8.8.8.8, 1.1.1.1) — global propagation
-4. system resolver as last resort
+``acme.dns01_resolver_mode`` picks the resolvers:
+- ``auto``: ``acme.dns01_nameservers`` if set, then the zone's authoritative
+  nameservers, then 9.9.9.9 / 8.8.8.8 / 1.1.1.1, then the system resolver;
+- ``system``: the system resolver only;
+- ``custom``: ``acme.dns01_nameservers`` only.
+Outside ``auto`` nothing else is queried, for networks that block outbound DNS.
 """
 import ipaddress
 import logging
-from typing import Dict, List, Tuple
+from typing import Dict, List, Optional, Tuple
 
 from utils.acme_debug import acme_log
 
@@ -17,37 +18,99 @@ logger = logging.getLogger(__name__)
 
 # Public resolvers polled explicitly (matches typical /etc/resolv.conf on UCM hosts).
 PUBLIC_DNS_RESOLVERS: Tuple[str, ...] = ('9.9.9.9', '8.8.8.8', '1.1.1.1')
+RESOLVER_MODES: Tuple[str, ...] = ('auto', 'system', 'custom')
 
 
-def _parse_resolver_ips(raw: str) -> List[str]:
-    """Parse comma-separated resolver IPs; skip invalid entries with a warning."""
-    ips: List[str] = []
-    for part in str(raw).split(','):
+def _parse_entry(entry: str) -> Tuple[str, int]:
+    """``ip``, ``ipv4:port`` or ``[ipv6]:port`` → (ip, port). Raises ValueError."""
+    host, port = entry, '53'
+    if entry.startswith('['):
+        host, sep, rest = entry[1:].partition(']')
+        if not sep or (rest and not rest.startswith(':')):
+            raise ValueError(entry)
+        port = rest[1:] or '53'
+    elif entry.count(':') == 1:
+        host, _, port = entry.partition(':')
+    ipaddress.ip_address(host)
+    if not port.isdigit() or not 1 <= int(port) <= 65535:
+        raise ValueError(entry)
+    return host, int(port)
+
+
+def parse_resolver_entries(raw: str, *, strict: bool = False) -> List[Tuple[str, int]]:
+    """Comma-separated resolvers → [(ip, port)]. Invalid entries are skipped
+    with a warning, or raise ValueError when *strict*."""
+    entries: List[Tuple[str, int]] = []
+    for part in str(raw or '').split(','):
         candidate = part.strip()
         if not candidate:
             continue
         try:
-            ipaddress.ip_address(candidate)
+            entries.append(_parse_entry(candidate))
         except ValueError:
-            logger.warning(
-                'Ignoring invalid acme.dns01_nameservers entry: %r', candidate
-            )
-            continue
-        ips.append(candidate)
-    return ips
+            if strict:
+                raise ValueError(f'Invalid DNS resolver: {candidate}')
+            logger.warning('Ignoring invalid acme.dns01_nameservers entry: %r', candidate)
+    return entries
 
 
-def get_configured_dns01_nameservers() -> List[str]:
-    """SystemConfig ``acme.dns01_nameservers``: comma-separated resolver IPs."""
+def format_resolver_entries(entries: List[Tuple[str, int]]) -> str:
+    """Inverse of :func:`parse_resolver_entries`; port 53 is left implicit."""
+    def one(host, port):
+        if port == 53:
+            return host
+        return f'[{host}]:{port}' if ':' in host else f'{host}:{port}'
+    return ', '.join(one(h, p) for h, p in entries)
+
+
+def _parse_resolver_ips(raw: str) -> List[str]:
+    """Resolvers on port 53 only, for callers that cannot take a port."""
+    return [host for host, port in parse_resolver_entries(raw) if port == 53]
+
+
+def _config_value(key: str) -> str:
     try:
         from models import SystemConfig
 
-        setting = SystemConfig.query.filter_by(key='acme.dns01_nameservers').first()
-        if not setting or not setting.value:
-            return []
-        return _parse_resolver_ips(setting.value)
+        setting = SystemConfig.query.filter_by(key=key).first()
+        return (setting.value or '') if setting else ''
     except Exception:
+        return ''
+
+
+def dns01_resolver_mode() -> str:
+    mode = _config_value('acme.dns01_resolver_mode').strip().lower()
+    return mode if mode in RESOLVER_MODES else 'auto'
+
+
+def configured_nameservers_raw() -> str:
+    return _config_value('acme.dns01_nameservers')
+
+
+def _configured_entries() -> List[Tuple[str, int]]:
+    if dns01_resolver_mode() == 'system':
         return []
+    return parse_resolver_entries(_config_value('acme.dns01_nameservers'))
+
+
+def get_configured_dns01_nameservers() -> List[str]:
+    """Configured resolver IPs on port 53 (empty in ``system`` mode)."""
+    return [host for host, port in _configured_entries() if port == 53]
+
+
+def configured_resolver():
+    """dns.resolver.Resolver over the configured resolvers, or None to use the system one."""
+    entries = _configured_entries()
+    if not entries:
+        return None
+    import dns.nameserver
+    import dns.resolver
+
+    resolver = dns.resolver.Resolver(configure=False)
+    resolver.nameservers = [dns.nameserver.Do53Nameserver(host, port) for host, port in entries]
+    resolver.timeout = 5
+    resolver.lifetime = 10
+    return resolver
 
 
 def _txt_rdata_matches(rdata, expected: str) -> bool:
@@ -148,7 +211,10 @@ def log_public_resolver_status(name: str, expected: str) -> Dict[str, bool]:
     the authoritative (or configured) resolver sees the TXT record, regardless of
     whether the public recursors have caught up. The line is emitted even on
     success to aid debugging; a ``pending`` entry does NOT block issuance.
+    Skipped outside ``auto`` mode, where public resolvers must not be queried.
     """
+    if dns01_resolver_mode() != 'auto':
+        return {}
     status = check_public_resolvers(name, expected)
     parts = [f'{ip}={"OK" if ok else "pending"}' for ip, ok in status.items()]
     logger.info(
@@ -159,23 +225,23 @@ def log_public_resolver_status(name: str, expected: str) -> Dict[str, bool]:
 
 
 def resolve_txt_answers(name: str) -> Tuple[object, str]:
-    """
-    Resolve TXT records with resolver fallbacks:
-    1. ``acme.dns01_nameservers`` when configured
-    2. authoritative nameservers for the containing zone
-    3. each public resolver (9.9.9.9, 8.8.8.8, 1.1.1.1)
-    4. system recursive resolver
+    """Resolve TXT records per ``acme.dns01_resolver_mode`` (see module docstring).
 
     Returns (answers, source) where *source* identifies the winning resolver.
     """
     import dns.resolver
 
-    custom = get_configured_dns01_nameservers()
-    if custom:
+    mode = dns01_resolver_mode()
+    custom = configured_resolver()
+    if custom is not None:
         try:
-            return _resolve_with_ns(name, custom), 'configured'
+            return custom.resolve(name, 'TXT'), 'configured'
         except Exception as exc:
             acme_log(logger, 'TXT via configured NS failed for %s: %s', name, exc)
+            if mode == 'custom':
+                raise
+    if mode != 'auto':
+        return dns.resolver.resolve(name, 'TXT', lifetime=10), 'recursive'
 
     auth_ips = _authoritative_nameserver_ips(name)
     if auth_ips:

@@ -26,6 +26,8 @@ export default function LetsEncryptTab({
   onBlurSaveInt,
   localDnsTimeout,
   onLocalDnsTimeoutChange,
+  localDnsNameservers,
+  onLocalDnsNameserversChange,
   onUpdateClientSetting,
   onRegisterProxy,
   onUnregisterProxy,
@@ -138,6 +140,31 @@ export default function LetsEncryptTab({
             disabled={!canWrite}
             helperText={t('acme.dnsPropagationTimeoutHelper')}
           />
+
+          <Select
+            label={t('acme.dnsResolverMode')}
+            value={clientSettings.dns01_resolver_mode || 'auto'}
+            onChange={(val) => onUpdateClientSetting('dns01_resolver_mode', val)}
+            disabled={!canWrite}
+            options={[
+              { value: 'auto', label: t('acme.dnsResolverModeAuto') },
+              { value: 'system', label: t('acme.dnsResolverModeSystem') },
+              { value: 'custom', label: t('acme.dnsResolverModeCustom') },
+            ]}
+            helperText={t('acme.dnsResolverModeHelper')}
+          />
+
+          {(clientSettings.dns01_resolver_mode || 'auto') !== 'system' && (
+            <Input
+              label={t('acme.dnsResolvers')}
+              value={localDnsNameservers}
+              onChange={(e) => onLocalDnsNameserversChange(e.target.value)}
+              onBlur={() => onBlurSave('dns01_nameservers', localDnsNameservers, onLocalDnsNameserversChange)}
+              placeholder="10.0.0.53, 127.0.0.1:5353"
+              disabled={!canWrite}
+              helperText={t('acme.dnsResolversHelper')}
+            />
+          )}
 
           <ToggleSwitch
             checked={clientSettings.debug_logging ?? false}

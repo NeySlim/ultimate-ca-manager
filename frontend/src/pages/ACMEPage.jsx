@@ -89,6 +89,7 @@ export default function ACMEPage() {
   const [localProxyUpstreamUrl, setLocalProxyUpstreamUrl] = useState('')
   const [localProxyEabKid, setLocalProxyEabKid] = useState('')
   const [localDnsTimeout, setLocalDnsTimeout] = useState('')
+  const [localDnsNameservers, setLocalDnsNameservers] = useState('')
   const [proxyEabHmacInput, setProxyEabHmacInput] = useState(null)
   const [testingConnection, setTestingConnection] = useState(false)
   const [connectionResult, setConnectionResult] = useState(null)
@@ -186,6 +187,7 @@ export default function ACMEPage() {
       setLocalProxyUpstreamUrl(cs.proxy_upstream_url || '')
       setLocalProxyEabKid(cs.proxy_eab_kid || '')
       setLocalDnsTimeout(String(cs.dns_propagation_timeout ?? 120))
+      setLocalDnsNameservers(cs.dns01_nameservers || '')
       
       setDnsProviders(dnsProvidersRes.data || [])
       setDnsProviderTypes(dnsTypesRes.data || [])
@@ -530,8 +532,6 @@ export default function ACMEPage() {
         return
       }
 
-      const updatedOrder = data.order
-      if (updatedOrder?.status === 'ready') {
       // Same gate for HTTP-01: UCM could not fetch the challenge file itself.
       if (data.http_not_ready) {
         const missing = (data.missing || []).join(', ') || '?'
@@ -550,6 +550,8 @@ export default function ACMEPage() {
         return
       }
 
+      const updatedOrder = data.order
+      if (updatedOrder?.status === 'ready') {
         showSuccess(t('acme.challengeValidated'))
       } else if (updatedOrder?.status === 'pending') {
         showWarning(result.message || t('acme.challengeVerificationFailed'))
@@ -1168,6 +1170,8 @@ export default function ACMEPage() {
             onBlurSaveInt={handleBlurSaveInt}
             localDnsTimeout={localDnsTimeout}
             onLocalDnsTimeoutChange={setLocalDnsTimeout}
+            localDnsNameservers={localDnsNameservers}
+            onLocalDnsNameserversChange={setLocalDnsNameservers}
             onUpdateClientSetting={handleUpdateClientSetting}
             onRegisterProxy={handleRegisterProxy}
             onUnregisterProxy={handleUnregisterProxy}

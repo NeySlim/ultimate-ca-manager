@@ -349,14 +349,14 @@ class TestDnsPersistChallengeFlow:
         _disable(app)
 
     def test_custom_resolver_host_port_parsed(self, app):
-        """acme.dns01_nameservers accepts host:port entries."""
+        """acme.dns01_nameservers accepts host:port entries, each keeping its own port."""
         _set_cfg(app, 'acme.dns01_nameservers', '127.0.0.1:5353, 10.9.8.7')
         with app.app_context():
             from services.acme.acme_service import AcmeService
             resolver = AcmeService(base_url='http://localhost')._acme_dns01_resolver()
         assert resolver is not None
-        assert resolver.nameservers == ['127.0.0.1', '10.9.8.7']
-        assert resolver.port == 5353
+        assert [(ns.address, ns.port) for ns in resolver.nameservers] == [
+            ('127.0.0.1', 5353), ('10.9.8.7', 53)]
         _set_cfg(app, 'acme.dns01_nameservers', '')
 
     def test_multiple_records_any_match_passes(self, app, client, acme_persist_account, monkeypatch):

@@ -973,7 +973,7 @@ For DNS services without a native driver, the **Custom Command** provider runs a
 The command requires an **absolute binary path**, runs without a shell (no pipes or expansion), and is killed after a configurable timeout (5–300 s, default 60). Use a small wrapper script to bridge any external DNS tooling.
 
 ### Custom DNS Resolvers
-Optionally override the resolvers used to verify \`_acme-challenge\` TXT records (useful for split-horizon DNS or to avoid public-resolver caching). Entries are comma-separated and accept plain IPs or \`host:port\`: e.g. a loopback-only BIND or a dnsmasq instance on an alternate port.
+**DNS-01 resolvers** chooses where UCM looks up \`_acme-challenge\` TXT records: **Automatic** (listed resolvers, then the zone's authoritative servers, then public resolvers, then the system resolver), **System resolver only**, or **Listed resolvers only**. The restricted modes never query public resolvers, for networks that block them. Entries are comma-separated IPs with an optional port, e.g. \`127.0.0.1:5353\` or \`[2001:db8::53]:5300\`.
 
 ### HTTP-01 Challenges
 UCM serves the challenge file of its pending orders at \`/.well-known/acme-challenge/<token>\`, on the HTTP protocol port (8080 by default). The CA fetches it on port 80 of the domain, so forward that path to UCM from your reverse proxy, or bind UCM to port 80. **Verify Challenge** fetches the file first and does not submit when it is not served; **Force verification** submits anyway. HTTP-01 orders renew automatically.

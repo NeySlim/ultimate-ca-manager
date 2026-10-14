@@ -496,6 +496,22 @@ renewal of an HTTP-01 order relies on this hosting: when the URL does not
 answer, the new order is left pending with the reason, and the failure is
 recorded in the audit log.
 
+### ACME DNS-01 resolvers
+
+**ACME → Let's Encrypt → DNS-01 resolvers** chooses where UCM looks up
+`_acme-challenge` TXT records, for the client, the proxy and the ACME server:
+
+| Mode | Resolvers queried |
+|------|-------------------|
+| Automatic (default) | listed resolvers, then the zone's authoritative servers, then 9.9.9.9 / 8.8.8.8 / 1.1.1.1, then the system resolver |
+| System resolver only | `/etc/resolv.conf` |
+| Listed resolvers only | the list below |
+
+Use a restricted mode when outbound DNS to public resolvers is blocked. Entries
+are comma-separated IPs with an optional port: `10.0.0.53, 127.0.0.1:5353,
+[2001:db8::53]:5300`. API: `dns01_resolver_mode` and `dns01_nameservers` on
+`PATCH /api/v2/acme/client/settings`.
+
 ### ACME client accounts: `preferred_chain` (RFC 8555 alternate chains)
 
 UCM can select an *alternate* chain advertised by the CA via `Link: rel="alternate"` (RFC 8555 §7.4.2). This choice is driven by the `preferred_chain` field on **ACME client accounts**.

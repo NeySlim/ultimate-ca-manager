@@ -70,10 +70,10 @@ export default {
       {
         title: 'Benutzerdefinierte DNS-Resolver (DNS-01)',
         items: [
-          { label: 'Pro Konto override', text: 'System-Resolver bei der Validierung von _acme-challenge TXT-Records überschreiben' },
+          { label: 'Modus', text: 'ACME → Let\'s Encrypt → DNS-01-Resolver: Automatisch (aufgelistete, autoritative, öffentliche, dann System-Resolver), Nur System-Resolver oder Nur aufgelistete Resolver. Die eingeschränkten Modi fragen nie öffentliche Resolver ab, für Netzwerke, die sie blockieren' },
           { label: 'Split-Horizon', text: 'Nützlich, wenn Ihr autoritativer Server intern ist, die öffentliche Sicht aber anderswo gecacht wird' },
           { label: 'Veraltete Records', text: 'Vermeidet Public-Resolver-Caching während schneller Auto-Renewals' },
-          { label: 'host:port-Einträge', text: 'Resolver, die nicht auf Port 53 lauschen, werden akzeptiert (z. B. ein nur auf Loopback lauschender BIND oder dnsmasq auf einem alternativen Port): kommagetrennt, einfache IPs funktionieren weiterhin' },
+          { label: 'host:port-Einträge', text: 'Kommagetrennte IPs mit optionalem Port (127.0.0.1:5353, [2001:db8::53]:5300), jeder Resolver behält seinen eigenen Port: z. B. ein nur auf Loopback lauschender BIND oder dnsmasq auf einem alternativen Port' },
         ]
       },
       {
@@ -240,7 +240,7 @@ Für DNS-Dienste ohne nativen Treiber führt der **Custom Command**-Anbieter vom
 Der Befehl erfordert einen **absoluten Binärpfad**, läuft ohne Shell (keine Pipes oder Expansion) und wird nach einem konfigurierbaren Timeout beendet (5–300 s, Standard 60). Verwenden Sie ein kleines Wrapper-Skript, um externes DNS-Tooling anzubinden.
 
 ### Benutzerdefinierte DNS-Resolver
-Überschreiben Sie optional die Resolver, die zur Überprüfung der \`_acme-challenge\`-TXT-Einträge verwendet werden (nützlich für Split-Horizon-DNS oder um Public-Resolver-Caching zu vermeiden). Einträge sind kommagetrennt und akzeptieren einfache IPs oder \`host:port\`: z. B. ein nur auf Loopback lauschender BIND oder eine dnsmasq-Instanz auf einem alternativen Port.
+**DNS-01-Resolver** legt fest, wo UCM die \`_acme-challenge\`-TXT-Einträge abfragt: **Automatisch** (aufgelistete Resolver, dann die autoritativen Server der Zone, dann öffentliche Resolver, dann der System-Resolver), **Nur System-Resolver** oder **Nur aufgelistete Resolver**. Die eingeschränkten Modi fragen nie öffentliche Resolver ab, für Netzwerke, die sie blockieren. Einträge sind kommagetrennte IPs mit optionalem Port, z. B. \`127.0.0.1:5353\` oder \`[2001:db8::53]:5300\`.
 
 ### HTTP-01-Challenges
 UCM stellt die Challenge-Datei seiner offenen Orders unter \`/.well-known/acme-challenge/<token>\` auf dem HTTP-Protokollport bereit (standardmäßig 8080). Die CA ruft sie auf Port 80 der Domäne ab, leiten Sie daher diesen Pfad von Ihrem Reverse-Proxy an UCM weiter oder binden Sie UCM an Port 80. **Challenge verifizieren** ruft zuerst die Datei ab und übermittelt nicht, wenn sie nicht ausgeliefert wird; **Verifizierung erzwingen** übermittelt trotzdem. HTTP-01-Orders werden automatisch erneuert.

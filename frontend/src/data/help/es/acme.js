@@ -70,10 +70,10 @@ export default {
       {
         title: 'Resolutores DNS personalizados (DNS-01)',
         items: [
-          { label: 'Override por cuenta', text: 'Sobrescribir resolutores del sistema al validar registros TXT _acme-challenge' },
+          { label: 'Modo', text: 'ACME → Let\'s Encrypt → resolutores DNS-01: Automático (los indicados, autoritativos, públicos, luego el del sistema), Solo resolutor del sistema o Solo resolutores indicados. Los modos restringidos nunca consultan resolutores públicos, para redes que los bloquean' },
           { label: 'Split-horizon', text: 'Útil cuando su servidor autoritativo es interno pero la vista pública se cachea en otro lugar' },
           { label: 'Registros obsoletos', text: 'Evita el caching de resolutores públicos durante renovaciones automáticas rápidas' },
-          { label: 'Entradas host:port', text: 'Se aceptan resolutores que no escuchan en el puerto 53 (p. ej. un BIND solo en loopback o un dnsmasq en un puerto alternativo): separados por comas, las IP simples siguen funcionando' },
+          { label: 'Entradas host:port', text: 'IP separadas por comas con un puerto opcional (127.0.0.1:5353, [2001:db8::53]:5300), cada resolutor conserva su propio puerto: p. ej. un BIND solo en loopback o un dnsmasq en un puerto alternativo' },
         ]
       },
       {
@@ -240,7 +240,7 @@ Para servicios DNS sin driver nativo, el proveedor **Custom Command** ejecuta co
 El comando requiere una **ruta absoluta al binario**, se ejecuta sin shell (sin pipes ni expansión) y se termina tras un tiempo límite configurable (5–300 s, 60 por defecto). Use un pequeño script wrapper para integrar cualquier herramienta DNS externa.
 
 ### Resolutores DNS personalizados
-Opcionalmente, sobrescriba los resolutores usados para verificar los registros TXT \`_acme-challenge\` (útil para DNS split-horizon o para evitar el caching de resolutores públicos). Las entradas van separadas por comas y aceptan IP simples o \`host:port\`: p. ej. un BIND solo en loopback o una instancia de dnsmasq en un puerto alternativo.
+**Resolutores DNS-01** define dónde busca UCM los registros TXT \`_acme-challenge\`: **Automático** (los resolutores indicados, luego los servidores autoritativos de la zona, luego los resolutores públicos y por último el del sistema), **Solo resolutor del sistema** o **Solo resolutores indicados**. Los modos restringidos nunca consultan resolutores públicos, para redes que los bloquean. Las entradas son IP separadas por comas con un puerto opcional, p. ej. \`127.0.0.1:5353\` o \`[2001:db8::53]:5300\`.
 
 ### Desafíos HTTP-01
 UCM sirve el archivo de desafío de sus pedidos pendientes en \`/.well-known/acme-challenge/<token>\`, en el puerto del protocolo HTTP (8080 por defecto). La CA lo solicita en el puerto 80 del dominio, así que redirija esa ruta hacia UCM desde su proxy inverso, o enlace UCM al puerto 80. **Verificar desafío** comprueba primero el archivo y no envía si no se sirve; **Forzar verificación** envía de todos modos. Los pedidos HTTP-01 se renuevan automáticamente.

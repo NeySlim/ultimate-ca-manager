@@ -6,7 +6,7 @@ import time
 
 from models import SystemConfig
 from utils.acme_debug import acme_log
-from utils.dns_txt_lookup import log_public_resolver_status, txt_record_present
+from utils.dns_txt_lookup import txt_record_present
 from utils.san_parse import strip_wildcard
 
 logger = logging.getLogger(__name__)
@@ -74,7 +74,6 @@ def wait_for_challenges(challenges: dict, timeout: int) -> dict:
                     'DNS TXT still pending for %s (%s) after %ss',
                     domain, txt_name, waited,
                 )
-                log_public_resolver_status(txt_name, txt_value)
         if not pending or waited >= timeout:
             break
         time.sleep(DNS_SELFCHECK_INTERVAL)

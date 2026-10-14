@@ -70,10 +70,10 @@ export default {
       {
         title: 'Résolveurs DNS personnalisés (DNS-01)',
         items: [
-          { label: 'Override par compte', text: 'Surcharge des résolveurs système lors de la validation des TXT _acme-challenge' },
+          { label: 'Mode', text: 'ACME → Let\'s Encrypt → résolveurs DNS-01 : Automatique (résolveurs listés, autoritaires, publics, puis système), Résolveur système uniquement, ou Résolveurs listés uniquement. Les modes restreints n\'interrogent jamais les résolveurs publics, pour les réseaux qui les bloquent' },
           { label: 'Split-horizon', text: 'Utile lorsque votre serveur autoritaire est interne mais la vue publique est cachée ailleurs' },
           { label: 'Enregistrements obsolètes', text: 'Évite la mise en cache des résolveurs publics pendant les renouvellements rapides' },
-          { label: 'Entrées host:port', text: 'Les résolveurs n\'écoutant pas sur le port 53 sont acceptés (par ex. un BIND en loopback seul ou dnsmasq sur un port alternatif) : séparés par des virgules, les IP simples fonctionnent toujours' },
+          { label: 'Entrées host:port', text: 'IP séparées par des virgules avec un port optionnel (127.0.0.1:5353, [2001:db8::53]:5300), chaque résolveur gardant son propre port : par ex. un BIND en loopback seul ou dnsmasq sur un port alternatif' },
         ]
       },
       {
@@ -240,7 +240,7 @@ Pour les services DNS sans pilote natif, le fournisseur **Custom Command** exéc
 La commande exige un **chemin binaire absolu**, s'exécute sans shell (ni pipes ni expansion) et est tuée après un timeout configurable (5–300 s, 60 par défaut). Utilisez un petit script wrapper pour relier n'importe quel outillage DNS externe.
 
 ### Résolveurs DNS personnalisés
-Surchargez optionnellement les résolveurs utilisés pour vérifier les enregistrements TXT \`_acme-challenge\` (utile pour le DNS split-horizon ou pour éviter la mise en cache des résolveurs publics). Les entrées sont séparées par des virgules et acceptent des IP simples ou \`host:port\` : par ex. un BIND en loopback seul ou une instance dnsmasq sur un port alternatif.
+**Résolveurs DNS-01** choisit où UCM recherche les enregistrements TXT \`_acme-challenge\` : **Automatique** (résolveurs listés, puis serveurs autoritaires de la zone, puis résolveurs publics, puis résolveur système), **Résolveur système uniquement** ou **Résolveurs listés uniquement**. Les modes restreints n'interrogent jamais les résolveurs publics, pour les réseaux qui les bloquent. Les entrées sont des IP séparées par des virgules avec un port optionnel, par ex. \`127.0.0.1:5353\` ou \`[2001:db8::53]:5300\`.
 
 ### Challenges HTTP-01
 UCM sert le fichier de challenge de ses orders en attente sur \`/.well-known/acme-challenge/<token>\`, via le port du protocole HTTP (8080 par défaut). Le CA le récupère sur le port 80 du domaine : redirigez donc ce chemin vers UCM depuis votre reverse proxy, ou liez UCM au port 80. **Verify Challenge** récupère d'abord le fichier et ne soumet pas s'il n'est pas servi ; **Force verification** soumet quand même. Les orders HTTP-01 se renouvellent automatiquement.
