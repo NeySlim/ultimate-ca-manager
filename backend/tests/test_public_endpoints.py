@@ -185,6 +185,26 @@ class TestPreflightDiagnostics:
             assert 'local:' in admin['detail']
             assert 'public:' in admin['detail']
 
+    def test_preflight_skips_public_dns_in_restricted_resolver_mode(self, app, monkeypatch):
+        with app.app_context():
+            from utils.public_endpoints import run_preflight_checks
+
+            monkeypatch.setattr('utils.public_endpoints._get_internal_dns_nameservers', lambda: [])
+            monkeypatch.setattr('utils.public_endpoints._resolve_host_ips', lambda host: (['10.0.0.8'], None))
+
+            def no_public(host):
+                raise AssertionError('public resolvers queried')
+
+            monkeypatch.setattr('utils.public_endpoints._resolve_host_ips_public', no_public)
+            _set_config(app, 'base_url', 'https://admin.ucm.example.com')
+            _set_config(app, 'acme.dns01_resolver_mode', 'system')
+            try:
+                admin = next(c for c in run_preflight_checks()['checks'] if c['label'] == 'admin')
+            finally:
+                _set_config(app, 'acme.dns01_resolver_mode', 'auto')
+            assert admin['dns_public'] == 'skip'
+            assert admin['dns_local'] != 'skip'
+
     def test_preflight_internal_dns_ok(self, app, monkeypatch):
         with app.app_context():
             from utils.public_endpoints import run_preflight_checks

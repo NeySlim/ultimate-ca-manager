@@ -135,7 +135,7 @@ def test_challenge_url_brackets_ipv6():
 ])
 def test_challenge_reachable(responses, ok):
     queue = list(responses)
-    with patch.object(http01, '_get', side_effect=lambda url, pin: queue.pop(0)):
+    with patch.object(http01, '_get', side_effect=lambda *a, **k: queue.pop(0)):
         result, _reason = http01.challenge_reachable(
             'www.example.com', {'token': 'tok', 'key_authorization': 'tok.thumb'})
     assert result is ok
@@ -193,12 +193,12 @@ def test_verify_force_skips_the_http01_check(app, auth_client, make_order, monke
 
 # ---- renewal -------------------------------------------------------------------
 
-def _renew(app, order_id, new_order_id, probe_response):
+def _renew(app, order_id, new_order_id, probe_response, client=None):
     """Run renew_certificate with a mocked CA; return the client mock."""
     with app.app_context():
         order = db.session.get(AcmeClientOrder, order_id)
         new_order = db.session.get(AcmeClientOrder, new_order_id)
-        client = MagicMock()
+        client = client or MagicMock()
         client.create_order.return_value = (True, 'ok', new_order)
         client.verify_challenge.return_value = (True, 'ok')
         client.finalize_order.side_effect = RuntimeError('STOP_AFTER_SUBMIT')
@@ -231,6 +231,26 @@ def test_http01_renewal_stops_before_the_ca_when_the_file_is_unreachable(app, ma
         new_order = db.session.get(AcmeClientOrder, new_id)
         assert new_order.status == 'pending'
         assert 'not reachable' in new_order.error_message
+
+
+def test_blocked_http01_renewal_reuses_the_pending_order(app, make_order, acme_email):
+    order_id, _ = make_order(status='issued')
+    pending_id, _ = make_order()
+    client = MagicMock()
+    for _attempt in range(2):
+        with pytest.raises(renew_mod.RenewalBlocked):
+            _renew(app, order_id, pending_id, _Resp(404), client=client)
+    client.create_order.assert_not_called()
+    with app.app_context():
+        assert AcmeClientOrder.query.filter_by(status='pending', challenge_type='http-01').count() == 1
+
+
+def test_http01_renewal_opens_an_order_when_none_is_pending(app, make_order, acme_email):
+    order_id, _ = make_order(status='issued')
+    make_order(domain='other.example.com')  # pending, but for other names
+    new_id, new_token = make_order(status='ready')
+    client = _renew(app, order_id, new_id, _Resp(200, f'{new_token}.thumbprint'))
+    client.create_order.assert_called_once()
 
 
 def test_tls_alpn_renewal_needs_no_dns_provider(app, make_order, acme_email):
@@ -286,3 +306,21 @@ def test_scheduled_renewal_failure_is_audited(app, make_order, acme_email):
 def test_challenge_path_has_its_own_rate_limit_bucket():
     from security.rate_limiter import RateLimitConfig
     assert RateLimitConfig.pattern_for(f'/.well-known/acme-challenge/{_token()}') == '/.well-known/acme-challenge/'
+
+
+def test_selfcheck_probes_identifiers_in_parallel_with_a_short_timeout():
+    import time as _time
+    timeouts = []
+
+    def slow_get(url, pin, timeout=10):
+        timeouts.append(timeout)
+        _time.sleep(0.3)
+        return _Resp(404)
+
+    challenges = {f'host{i}.example.com': {'token': f'tok{i}', 'key_authorization': 'k'} for i in range(4)}
+    started = _time.monotonic()
+    with patch.object(http01, '_get', side_effect=slow_get):
+        result = http01.wait_for_http01(challenges, 0)
+    assert _time.monotonic() - started < 0.9
+    assert sorted(result['missing']) == sorted(challenges)
+    assert timeouts == [http01.SELFCHECK_TIMEOUT] * 4

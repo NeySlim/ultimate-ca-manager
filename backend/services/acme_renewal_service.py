@@ -76,6 +76,29 @@ def _order_is_due(order, now, fallback_threshold):
     return bool(order.expires_at and order.expires_at <= fallback_threshold)
 
 
+def _pending_http01_order(order):
+    """Unexpired pending HTTP-01 order for the same names, CA account and environment.
+
+    A blocked HTTP-01 renewal leaves its order pending; the next attempt reuses it
+    instead of opening one more order per scheduler tick.
+    """
+    now = utc_now()
+    wanted = sorted(order.domains_list)
+    candidates = AcmeClientOrder.query.filter(
+        AcmeClientOrder.id != order.id,
+        AcmeClientOrder.challenge_type == 'http-01',
+        AcmeClientOrder.status == 'pending',
+        AcmeClientOrder.acme_client_account_id == order.acme_client_account_id,
+        AcmeClientOrder.environment == order.environment,
+    ).order_by(AcmeClientOrder.created_at.desc()).all()
+    for candidate in candidates:
+        if candidate.is_proxy_order or (candidate.expires_at and candidate.expires_at <= now):
+            continue
+        if sorted(candidate.domains_list) == wanted:
+            return candidate
+    return None
+
+
 def _revoke_replaced_certificate(acme_client, certificate):
     """Best-effort local and upstream revocation after successful renewal."""
     try:
@@ -240,16 +263,19 @@ def renew_certificate(order) -> tuple:
             exc,
         )
 
-    # Create new ACME order
-    success, message, new_order = acme_client.create_order(
-        domains=domains,
-        email=email,
-        challenge_type=challenge_type,
-        dns_provider_id=order.dns_provider_id,
-        replaces=replaces,
-    )
-    if not success:
-        raise Exception(f"Order creation failed: {message}")
+    new_order = _pending_http01_order(order) if challenge_type == 'http-01' else None
+    if new_order is not None:
+        logger.info("Renewal of order %s reuses pending order %s", order.id, new_order.id)
+    else:
+        success, message, new_order = acme_client.create_order(
+            domains=domains,
+            email=email,
+            challenge_type=challenge_type,
+            dns_provider_id=order.dns_provider_id,
+            replaces=replaces,
+        )
+        if not success:
+            raise Exception(f"Order creation failed: {message}")
     
     # Preserve key source across renewals (#161)
     new_order.key_source = order.key_source or 'generate'

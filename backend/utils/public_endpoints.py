@@ -777,6 +777,8 @@ def check_host_access(path: str, host: str) -> Optional[tuple[int, str]]:
 
 def run_preflight_checks() -> dict:
     """DNS/TLS diagnostics for configured public hosts (admin + ACME)."""
+    from utils.dns_txt_lookup import dns01_resolver_mode
+
     results = []
 
     def _check_dns(label: str, hostname: str):
@@ -821,8 +823,12 @@ def run_preflight_checks() -> dict:
         else:
             internal_status, internal_detail = 'skip', ''
 
-        pub_ips, pub_err = _resolve_host_ips_public(hostname)
-        pub_status, pub_detail = _classify_preflight_dns(hostname, pub_ips, pub_err)
+        # Restricted DNS-01 resolver modes mean public resolvers are unreachable: skip them.
+        if dns01_resolver_mode() == 'auto':
+            pub_ips, pub_err = _resolve_host_ips_public(hostname)
+            pub_status, pub_detail = _classify_preflight_dns(hostname, pub_ips, pub_err)
+        else:
+            pub_status, pub_detail = 'skip', ''
         entry['dns_public'] = pub_status
 
         for status in (pub_status, internal_status, local_status):

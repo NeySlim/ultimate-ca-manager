@@ -2,6 +2,7 @@
 import logging
 import time
 import warnings
+from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from urllib.parse import urljoin, urlparse
 
@@ -22,9 +23,12 @@ MAX_REDIRECTS = 5
 # Order states in which the CA may still fetch the token.
 _AWAITING_VALIDATION = ('pending', 'processing', 'validating')
 SELFCHECK_INTERVAL = 2
+# Self-checks run inside a request: short per-hop timeout, all identifiers probed at once.
+SELFCHECK_TIMEOUT = 5
+_SELFCHECK_WORKERS = 8
 
 
-def _get(url: str, pin):
+def _get(url: str, pin, timeout: int = 10):
     """One unredirected GET. TLS is not verified: an https hop usually presents
     the certificate being renewed, and HTTP-01 derives no security from TLS."""
     with warnings.catch_warnings():
@@ -32,11 +36,11 @@ def _get(url: str, pin):
         if pin is not None:
             host, ips = pin
             with pin_host(host, ips):
-                return requests.get(url, timeout=10, allow_redirects=False, verify=False)
-        return requests.get(url, timeout=10, allow_redirects=False, verify=False)
+                return requests.get(url, timeout=timeout, allow_redirects=False, verify=False)
+        return requests.get(url, timeout=timeout, allow_redirects=False, verify=False)
 
 
-def fetch_following_redirects(url: str, pin, allow_private: bool):
+def fetch_following_redirects(url: str, pin, allow_private: bool, timeout: int = 10):
     """GET *url*, following redirects on http/https and ports 80/443 only.
 
     Cloud metadata is always refused; without *allow_private* every hop is
@@ -44,7 +48,7 @@ def fetch_following_redirects(url: str, pin, allow_private: bool):
     """
     current = url
     for _ in range(MAX_REDIRECTS + 1):
-        response = _get(current, pin)
+        response = _get(current, pin, timeout)
         if response.status_code not in REDIRECT_STATUSES:
             return response
         location = response.headers.get('Location')
@@ -96,7 +100,7 @@ def challenge_reachable(identifier: str, challenge: dict) -> tuple:
     url = challenge_url(identifier, challenge['token'])
     try:
         validate_url_not_cloud_metadata(url, allow_loopback=True)
-        response = fetch_following_redirects(url, None, allow_private=True)
+        response = fetch_following_redirects(url, None, allow_private=True, timeout=SELFCHECK_TIMEOUT)
     except ValueError:
         return False, f'{url}: name not resolvable or address refused'
     except requests.Timeout:
@@ -121,8 +125,9 @@ def wait_for_http01(challenges: dict, timeout: int) -> dict:
     reasons = {}
     deadline = time.monotonic() + max(0, timeout)
     while True:
-        for identifier in list(pending):
-            ok, reason = challenge_reachable(identifier, pending[identifier])
+        with ThreadPoolExecutor(max_workers=min(_SELFCHECK_WORKERS, max(1, len(pending)))) as pool:
+            results = dict(zip(pending, pool.map(lambda i: challenge_reachable(i, pending[i]), list(pending))))
+        for identifier, (ok, reason) in results.items():
             if ok:
                 del pending[identifier]
                 reasons.pop(identifier, None)

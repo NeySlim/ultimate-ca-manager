@@ -493,8 +493,8 @@ Before submitting a challenge, UCM fetches the URL itself and refuses to submit
 when the file is not served; *Force verification* bypasses this check when
 UCM's view of the domain differs from the CA's (split-horizon DNS). Automatic
 renewal of an HTTP-01 order relies on this hosting: when the URL does not
-answer, the new order is left pending with the reason, and the failure is
-recorded in the audit log.
+answer, the new order is left pending with the reason (the next attempt reuses
+it), and the failure is recorded in the audit log.
 
 ### ACME DNS-01 resolvers
 
@@ -507,7 +507,8 @@ recorded in the audit log.
 | System resolver only | `/etc/resolv.conf` |
 | Listed resolvers only | the list below |
 
-Use a restricted mode when outbound DNS to public resolvers is blocked. Entries
+Use a restricted mode when outbound DNS to public resolvers is blocked; the
+public-endpoints preflight then skips its public DNS check as well. Entries
 are comma-separated IPs with an optional port: `10.0.0.53, 127.0.0.1:5353,
 [2001:db8::53]:5300`. API: `dns01_resolver_mode` and `dns01_nameservers` on
 `PATCH /api/v2/acme/client/settings`.
