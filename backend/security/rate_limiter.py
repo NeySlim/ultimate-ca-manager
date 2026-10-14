@@ -139,6 +139,7 @@ class RateLimitConfig:
             '/tsa/': {'rpm': standard_rpm, 'burst': standard_burst},
             '/tsa': {'rpm': standard_rpm, 'burst': standard_burst},
             '/ssh/setup/': {'rpm': standard_rpm, 'burst': standard_burst},
+            '/.well-known/acme-challenge/': {'rpm': standard_rpm, 'burst': standard_burst},
             # Windows enrolment: a GPO refresh fans a fleet out at once, and
             # these had `_default` before. Separate bucket, same rate.
             '/ADPolicyProvider_CEP_': {'rpm': standard_rpm, 'burst': standard_burst},

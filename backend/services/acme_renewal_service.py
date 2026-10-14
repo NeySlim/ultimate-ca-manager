@@ -201,10 +201,13 @@ def renew_certificate(order) -> tuple:
     # HTTP-01 and TLS-ALPN-01 proofs are served by UCM itself; only DNS-01 needs a provider.
     dns_provider = None
     if challenge_type == 'dns-01':
-        dns_provider_model = db.session.get(DnsProvider, order.dns_provider_id)
-        if not dns_provider_model:
+        dns_provider_model = (
+            db.session.get(DnsProvider, order.dns_provider_id) if order.dns_provider_id else None
+        )
+        # The manual provider publishes nothing: submitting would only invalidate the order.
+        if not dns_provider_model or dns_provider_model.provider_type == 'manual':
             raise RenewalBlocked(
-                'No DNS provider on this DNS-01 order: a manual DNS order cannot renew automatically'
+                'No automatic DNS provider on this DNS-01 order: a manual DNS order cannot renew automatically'
             )
         credentials = json.loads(dns_provider_model.credentials) if dns_provider_model.credentials else {}
         dns_provider = dns_providers.create_provider(

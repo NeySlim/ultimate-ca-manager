@@ -18,7 +18,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Let's Encrypt HTTP-01: the order showed nothing to publish, so the challenge could not be answered. A pending order now shows the challenge URL and file content, with the file to download (#392, reported by @ziller-hqs).
 - Let's Encrypt HTTP-01: Verify no longer submits a challenge whose file UCM cannot fetch, which made the CA invalidate the order; Force verification still submits (#392).
-- ACME client: renewing an HTTP-01 or TLS-ALPN-01 order failed with "DNS provider not found"; only DNS-01 orders need a provider now (#392).
+- ACME client: renewing an HTTP-01 or TLS-ALPN-01 order failed with "DNS provider not found"; only DNS-01 orders need a provider now, and one using the manual provider stops with an explicit message instead of invalidating a new order on every cycle (#392).
 - ACME DNS-01: each propagation poll queried the public resolvers twice, adding up to 30 seconds per poll on a network that blocks them (#394).
 - Installation guide: running from source or building the Docker image now includes the frontend build step (#393, reported by @ziller-hqs).
 

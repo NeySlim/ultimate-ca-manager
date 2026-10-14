@@ -10,7 +10,7 @@ from werkzeug.test import Client
 
 from api.v2.acme_client import orders as orders_mod
 from models import db, AuditLog, SystemConfig
-from models.acme_models import AcmeClientOrder
+from models.acme_models import AcmeClientOrder, DnsProvider
 from protocol_http_server import ProtocolOnlyMiddleware
 from services import acme_renewal_service as renew_mod
 from services.acme import http01
@@ -29,6 +29,12 @@ class _Resp:
         self.status_code = status_code
         self.text = text
         self.headers = headers or {}
+
+
+@pytest.fixture(autouse=True)
+def no_dns(monkeypatch):
+    """The SSRF guard resolves the host; keep these tests off the network."""
+    monkeypatch.setattr(http01, 'validate_url_not_cloud_metadata', lambda *a, **k: None)
 
 
 @pytest.fixture
@@ -129,8 +135,7 @@ def test_challenge_url_brackets_ipv6():
 ])
 def test_challenge_reachable(responses, ok):
     queue = list(responses)
-    with patch.object(http01, '_get', side_effect=lambda url, pin: queue.pop(0)), \
-         patch('utils.ssrf_protection.validate_url_not_cloud_metadata'):
+    with patch.object(http01, '_get', side_effect=lambda url, pin: queue.pop(0)):
         result, _reason = http01.challenge_reachable(
             'www.example.com', {'token': 'tok', 'key_authorization': 'tok.thumb'})
     assert result is ok
@@ -142,8 +147,7 @@ def test_challenge_reachable(responses, ok):
     (requests.Timeout('slow'), 'timed out'),
 ])
 def test_unreachable_reason_names_the_failure(exc, reason):
-    with patch.object(http01, 'fetch_following_redirects', side_effect=exc), \
-         patch('utils.ssrf_protection.validate_url_not_cloud_metadata'):
+    with patch.object(http01, 'fetch_following_redirects', side_effect=exc):
         ok, why = http01.challenge_reachable('www.example.com', {'token': 'tok', 'key_authorization': 'k'})
     assert not ok and reason in why and why.startswith('http://www.example.com/')
 
@@ -236,6 +240,22 @@ def test_tls_alpn_renewal_needs_no_dns_provider(app, make_order, acme_email):
     client.verify_challenge.assert_called_once()
 
 
+def test_manual_provider_dns01_renewal_is_blocked(app, make_order, acme_email):
+    with app.app_context():
+        provider = DnsProvider(name='manual-renewal-test', provider_type='manual', credentials='{}')
+        db.session.add(provider)
+        db.session.commit()
+        provider_id = provider.id
+    order_id, _ = make_order(challenge_type='dns-01', status='issued', dns_provider_id=provider_id)
+    with app.app_context():
+        order = db.session.get(AcmeClientOrder, order_id)
+        with pytest.raises(renew_mod.RenewalBlocked, match='manual DNS order'):
+            renew_mod.renew_certificate(order)
+        AcmeClientOrder.query.filter_by(id=order_id).delete()
+        DnsProvider.query.filter_by(id=provider_id).delete()
+        db.session.commit()
+
+
 def test_manual_dns01_renewal_says_why(app, make_order, acme_email):
     order_id, _ = make_order(challenge_type='dns-01', status='issued')
     with app.app_context():
@@ -261,3 +281,8 @@ def test_scheduled_renewal_failure_is_audited(app, make_order, acme_email):
         entry = AuditLog.query.filter_by(
             action='acme_order.auto_renewal_failed', resource_id=str(order_id)).first()
         assert entry is not None and entry.success is False
+
+
+def test_challenge_path_has_its_own_rate_limit_bucket():
+    from security.rate_limiter import RateLimitConfig
+    assert RateLimitConfig.pattern_for(f'/.well-known/acme-challenge/{_token()}') == '/.well-known/acme-challenge/'
