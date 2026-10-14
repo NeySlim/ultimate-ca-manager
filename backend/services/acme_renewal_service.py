@@ -76,7 +76,7 @@ def _order_is_due(order, now, fallback_threshold):
     return bool(order.expires_at and order.expires_at <= fallback_threshold)
 
 
-def _pending_http01_order(order):
+def _pending_http01_order(order, account_id):
     """Unexpired pending HTTP-01 order for the same names, CA account and environment.
 
     A blocked HTTP-01 renewal leaves its order pending; the next attempt reuses it
@@ -88,13 +88,17 @@ def _pending_http01_order(order):
         AcmeClientOrder.id != order.id,
         AcmeClientOrder.challenge_type == 'http-01',
         AcmeClientOrder.status == 'pending',
-        AcmeClientOrder.acme_client_account_id == order.acme_client_account_id,
+        AcmeClientOrder.acme_client_account_id == account_id,
         AcmeClientOrder.environment == order.environment,
     ).order_by(AcmeClientOrder.created_at.desc()).all()
     for candidate in candidates:
         if candidate.is_proxy_order or (candidate.expires_at and candidate.expires_at <= now):
             continue
-        if sorted(candidate.domains_list) == wanted:
+        challenges = candidate.challenges_dict
+        # An order whose authorizations were never fetched cannot be answered: open a new one.
+        if sorted(candidate.domains_list) == wanted and sorted(challenges) == wanted and all(
+            c.get('token') and c.get('key_authorization') for c in challenges.values()
+        ):
             return candidate
     return None
 
@@ -263,7 +267,9 @@ def renew_certificate(order) -> tuple:
             exc,
         )
 
-    new_order = _pending_http01_order(order) if challenge_type == 'http-01' else None
+    # The resolved account, not the old order's column: legacy rows have none.
+    account_id = getattr(acme_client.account, 'id', None)
+    new_order = _pending_http01_order(order, account_id) if challenge_type == 'http-01' else None
     if new_order is not None:
         logger.info("Renewal of order %s reuses pending order %s", order.id, new_order.id)
     else:
@@ -371,6 +377,7 @@ def renew_certificate(order) -> tuple:
                 new_order.error_message = f'HTTP-01 file not reachable, order left pending: {reason}'
                 commit_or_rollback(logger, "Could not persist HTTP-01 self-check failure")
                 raise RenewalBlocked(new_order.error_message)
+            new_order.error_message = None  # left by an earlier blocked attempt
 
         # Submit challenges for validation
         for domain in challenges.keys():

@@ -198,7 +198,9 @@ def _renew(app, order_id, new_order_id, probe_response, client=None):
     with app.app_context():
         order = db.session.get(AcmeClientOrder, order_id)
         new_order = db.session.get(AcmeClientOrder, new_order_id)
-        client = client or MagicMock()
+        if client is None:
+            client = MagicMock()
+            client.account = None
         client.create_order.return_value = (True, 'ok', new_order)
         client.verify_challenge.return_value = (True, 'ok')
         client.finalize_order.side_effect = RuntimeError('STOP_AFTER_SUBMIT')
@@ -237,6 +239,7 @@ def test_blocked_http01_renewal_reuses_the_pending_order(app, make_order, acme_e
     order_id, _ = make_order(status='issued')
     pending_id, _ = make_order()
     client = MagicMock()
+    client.account = None
     for _attempt in range(2):
         with pytest.raises(renew_mod.RenewalBlocked):
             _renew(app, order_id, pending_id, _Resp(404), client=client)
@@ -248,6 +251,10 @@ def test_blocked_http01_renewal_reuses_the_pending_order(app, make_order, acme_e
 def test_http01_renewal_opens_an_order_when_none_is_pending(app, make_order, acme_email):
     order_id, _ = make_order(status='issued')
     make_order(domain='other.example.com')  # pending, but for other names
+    without_challenges, _ = make_order()  # pending, authorizations never fetched
+    with app.app_context():
+        db.session.get(AcmeClientOrder, without_challenges).set_challenges_dict({})
+        db.session.commit()
     new_id, new_token = make_order(status='ready')
     client = _renew(app, order_id, new_id, _Resp(200, f'{new_token}.thumbprint'))
     client.create_order.assert_called_once()
@@ -324,3 +331,47 @@ def test_selfcheck_probes_identifiers_in_parallel_with_a_short_timeout():
     assert _time.monotonic() - started < 0.9
     assert sorted(result['missing']) == sorted(challenges)
     assert timeouts == [http01.SELFCHECK_TIMEOUT] * 4
+
+
+def test_legacy_order_reuses_the_order_pinned_to_the_resolved_account(app, make_order, acme_email):
+    from models import AcmeClientAccount
+    with app.app_context():
+        account = AcmeClientAccount(directory_url='https://ca.example/directory', label='Reuse test', email='reuse@example.com')
+        db.session.add(account)
+        db.session.commit()
+        account_id = account.id
+    order_id, _ = make_order(status='issued')  # legacy row: no account
+    pending_id, _ = make_order()
+    with app.app_context():
+        db.session.get(AcmeClientOrder, pending_id).acme_client_account_id = account_id
+        db.session.commit()
+    client = MagicMock()
+    client.account.id = account_id
+    try:
+        with pytest.raises(renew_mod.RenewalBlocked):
+            _renew(app, order_id, pending_id, _Resp(404), client=client)
+        client.create_order.assert_not_called()
+    finally:
+        with app.app_context():
+            db.session.get(AcmeClientOrder, pending_id).acme_client_account_id = None
+            db.session.delete(db.session.get(AcmeClientAccount, account_id))
+            db.session.commit()
+
+
+def test_reused_order_drops_the_earlier_block_message(app, make_order, acme_email):
+    order_id, _ = make_order(status='issued')
+    pending_id, token = make_order()
+    with app.app_context():
+        db.session.get(AcmeClientOrder, pending_id).error_message = 'HTTP-01 file not reachable, order left pending: x'
+        db.session.commit()
+        order = db.session.get(AcmeClientOrder, order_id)
+        client = MagicMock()
+        client.account = None
+        client.verify_challenge.return_value = (True, 'ok')
+        client.finalize_order.side_effect = RuntimeError('STOP_AFTER_SUBMIT')
+        with patch.object(renew_mod.AcmeClientService, 'for_order', return_value=client), \
+             patch.object(http01, '_get', return_value=_Resp(200, f'{token}.thumbprint')), \
+             patch('time.sleep', return_value=None):
+            with pytest.raises(RuntimeError):
+                renew_mod.renew_certificate(order)
+        assert db.session.get(AcmeClientOrder, pending_id).error_message is None

@@ -1,7 +1,6 @@
 """HTTP-01 (RFC 8555 §8.3): fetching a challenge URL, serving the client's own tokens."""
 import logging
 import time
-import warnings
 from concurrent.futures import ThreadPoolExecutor
 from typing import Optional
 from urllib.parse import urljoin, urlparse
@@ -14,6 +13,9 @@ from utils.acme_ip import format_ip_for_url
 from utils.ssrf_protection import pin_host, validate_host_not_private, validate_url_not_cloud_metadata
 
 logger = logging.getLogger(__name__)
+
+# Set once: catch_warnings() is not thread-safe and probes run in parallel.
+urllib3.disable_warnings(urllib3.exceptions.InsecureRequestWarning)
 
 # Validators SHOULD follow redirects: site-wide http→https 301s cover the
 # challenge path and public CAs (Boulder) follow them. Each hop is re-vetted.
@@ -31,13 +33,11 @@ _SELFCHECK_WORKERS = 8
 def _get(url: str, pin, timeout: int = 10):
     """One unredirected GET. TLS is not verified: an https hop usually presents
     the certificate being renewed, and HTTP-01 derives no security from TLS."""
-    with warnings.catch_warnings():
-        warnings.simplefilter('ignore', urllib3.exceptions.InsecureRequestWarning)
-        if pin is not None:
-            host, ips = pin
-            with pin_host(host, ips):
-                return requests.get(url, timeout=timeout, allow_redirects=False, verify=False)
-        return requests.get(url, timeout=timeout, allow_redirects=False, verify=False)
+    if pin is not None:
+        host, ips = pin
+        with pin_host(host, ips):
+            return requests.get(url, timeout=timeout, allow_redirects=False, verify=False)
+    return requests.get(url, timeout=timeout, allow_redirects=False, verify=False)
 
 
 def fetch_following_redirects(url: str, pin, allow_private: bool, timeout: int = 10):
