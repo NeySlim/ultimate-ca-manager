@@ -252,8 +252,11 @@ def test_http01_renewal_opens_an_order_when_none_is_pending(app, make_order, acm
     order_id, _ = make_order(status='issued')
     make_order(domain='other.example.com')  # pending, but for other names
     without_challenges, _ = make_order()  # pending, authorizations never fetched
+    without_token, _ = make_order()  # pending, name present but no token
     with app.app_context():
         db.session.get(AcmeClientOrder, without_challenges).set_challenges_dict({})
+        db.session.get(AcmeClientOrder, without_token).set_challenges_dict(
+            {'www.example.com': {'url': 'https://ca.example/chall/2', 'status': 'pending'}})
         db.session.commit()
     new_id, new_token = make_order(status='ready')
     client = _renew(app, order_id, new_id, _Resp(200, f'{new_token}.thumbprint'))
