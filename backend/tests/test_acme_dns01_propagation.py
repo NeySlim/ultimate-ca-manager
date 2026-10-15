@@ -80,6 +80,7 @@ def zone(app, monkeypatch):
     _set(app, 'acme.dns01_resolver_mode', 'auto')
     _set(app, 'acme.dns01_nameservers', '')
     served = {}
+    asked = []
 
     def _system(qname, rtype, lifetime=None):
         if rtype == 'NS':
@@ -93,6 +94,7 @@ def zone(app, monkeypatch):
     def _query(self, qname, rtype='TXT', *a, **k):
         # dnspython stops at the first server that answers.
         ip = str(self.nameservers[0])
+        asked.append((ip, qname, self.flags))
         if ip not in served:
             return [_RData(TOKEN)]  # a public resolver
         outcome = served[ip]
@@ -106,6 +108,7 @@ def zone(app, monkeypatch):
 
     monkeypatch.setattr(dns.resolver, 'resolve', _system)
     monkeypatch.setattr(dns.resolver.Resolver, 'resolve', _query)
+    served['asked'] = asked
     return served
 
 
@@ -182,6 +185,26 @@ def test_cname_loop_ends_in_the_public_fallback(app, zone):
     zone['192.0.2.2'] = zone['192.0.2.1']
     with app.app_context():
         assert lookup.resolve_txt_answers(NAME, TOKEN)[1] == 'public:9.9.9.9'
+    authoritative = [q for q in zone['asked'] if q[0] in NS_IPS.values()]
+    assert len(authoritative) == 4  # NAME then TARGET on each server, no more
+
+
+def test_cname_target_that_cannot_be_checked_does_not_confirm(app, zone):
+    unreachable = dns.resolver.NoNameservers()
+    zone['192.0.2.1'] = {NAME: TOKEN, TARGET: unreachable}
+    zone['192.0.2.2'] = {NAME: _no_answer(cname=TARGET), TARGET: unreachable}
+    with app.app_context():
+        assert lookup.resolve_txt_answers(NAME, TOKEN)[1] == 'public:9.9.9.9'
+
+
+def test_authoritative_queries_do_not_ask_for_recursion(app, zone):
+    zone['192.0.2.1'] = TOKEN
+    zone['192.0.2.2'] = TOKEN
+    with app.app_context():
+        assert lookup.txt_record_present(NAME, TOKEN) is True
+    flags = {ip: f for ip, _, f in zone['asked']}
+    assert flags['192.0.2.1'] == 0 and flags['192.0.2.2'] == 0
+    assert flags['9.9.9.9'] is None  # public resolvers keep RD
 
 
 def test_non_authoritative_positive_reply_does_not_confirm(app, zone):

@@ -145,13 +145,17 @@ def _answers_contain_expected(answers, expected: str) -> bool:
     return False
 
 
-def _resolve_with_ns(name: str, nameservers: List[str], rtype: str = 'TXT', lifetime: float = 10):
+def _resolve_with_ns(name: str, nameservers: List[str], rtype: str = 'TXT', lifetime: float = 10,
+                     recurse: bool = True):
     import dns.resolver
 
     resolver = dns.resolver.Resolver(configure=False)
     resolver.nameservers = nameservers
     resolver.timeout = min(5, lifetime)
     resolver.lifetime = lifetime
+    if not recurse:
+        # RD clear: an authoritative server that also recurses answers from its own data only.
+        resolver.flags = 0
     return resolver.resolve(name, rtype)
 
 
@@ -212,7 +216,7 @@ def _cname_target(response, qname: str) -> Optional[str]:
 
 def _negative_reply(exc, qname: str):
     """('lacks', None) when an authoritative server (AA) holds no TXT for *qname*,
-    ('hop', target) when it answers with a CNAME out of what it serves,
+    ('hop', target) when its answer is a CNAME chain without the TXT,
     ('skip', None) for a lame or unreadable reply."""
     import dns.flags
     import dns.resolver
@@ -232,9 +236,10 @@ def _negative_reply(exc, qname: str):
     return 'skip', None
 
 
-def _authoritative_txt_answers(name: str, expected: str, depth: int = 0):
+def _authoritative_txt_answers(name: str, expected: str, seen: frozenset = frozenset()):
     """Answers once every authoritative NS of *name* that responds serves
-    *expected*; ``[]`` while one still lacks it; None when none responds.
+    *expected*; ``[]`` while one still lacks it; None when none responds or a
+    CNAME it returns cannot be checked.
 
     The CA validates from several vantage points that each reach any NS, so a
     single up-to-date server proves nothing. A CNAME is followed only as the
@@ -243,11 +248,12 @@ def _authoritative_txt_answers(name: str, expected: str, depth: int = 0):
     import dns.flags
     import dns.resolver
 
-    servers = _authoritative_nameservers(name) if depth <= MAX_CNAME_HOPS else []
+    seen = seen | {name.rstrip('.').lower()}
+    servers = _authoritative_nameservers(name) if len(seen) <= MAX_CNAME_HOPS else []
     confirmed, lagging, hops = None, [], set()
     for host, ips in servers:
         try:
-            answers = _resolve_with_ns(name, ips, lifetime=AUTHORITATIVE_QUERY_LIFETIME)
+            answers = _resolve_with_ns(name, ips, lifetime=AUTHORITATIVE_QUERY_LIFETIME, recurse=False)
         except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer) as exc:
             verdict, target = _negative_reply(exc, name)
             if verdict == 'lacks':
@@ -270,11 +276,18 @@ def _authoritative_txt_answers(name: str, expected: str, depth: int = 0):
     if lagging:
         acme_log(logger, 'TXT for %s not yet served by authoritative %s', name, ', '.join(lagging))
         return []
+    unchecked = False
     for target in sorted(hops):
-        result = _authoritative_txt_answers(target, expected, depth + 1)
+        result = None if target in seen else _authoritative_txt_answers(target, expected, seen)
         if result == []:
             return []
-        confirmed = confirmed if result is None else result
+        if result is None:
+            unchecked = True
+        else:
+            confirmed = result
+    if unchecked:
+        acme_log(logger, 'TXT for %s: a CNAME returned by its nameservers could not be checked', name)
+        return None
     return confirmed
 
 
