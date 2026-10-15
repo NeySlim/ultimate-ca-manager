@@ -20,6 +20,7 @@ NAME = '_acme-challenge.example.com'
 TOKEN = 'the-token'
 NS_IPS = {'ns1.example.net.': '192.0.2.1', 'ns2.example.net.': '192.0.2.2'}
 TARGET = 'abcd.acme-dns.example.org'
+ALIAS = 'alias.example.com'
 
 
 class _RData:
@@ -31,23 +32,29 @@ class _RData:
         return self._value
 
 
-def _reply(rcode=dns.rcode.NOERROR, authoritative=True, cname=None):
-    reply = dns.message.make_response(dns.message.make_query(NAME, 'TXT'))
+def _reply(rcode=dns.rcode.NOERROR, authoritative=True, cname=None, qname=NAME):
+    reply = dns.message.make_response(dns.message.make_query(qname, 'TXT'))
     reply.set_rcode(rcode)
     if authoritative:
         reply.flags |= dns.flags.AA
     if cname:
-        reply.answer.append(dns.rrset.from_text(NAME, 300, 'IN', 'CNAME', cname + '.'))
+        reply.answer.append(dns.rrset.from_text(qname, 300, 'IN', 'CNAME', cname + '.'))
     return reply
 
 
-def _nxdomain():
-    qname = dns.name.from_text(NAME)
-    return dns.resolver.NXDOMAIN(qnames=[qname], responses={qname: _reply(dns.rcode.NXDOMAIN)})
+def _nxdomain(name=NAME):
+    qname = dns.name.from_text(name)
+    return dns.resolver.NXDOMAIN(qnames=[qname], responses={qname: _reply(dns.rcode.NXDOMAIN, qname=name)})
 
 
 def _no_answer(**kwargs):
     return dns.resolver.NoAnswer(response=_reply(**kwargs))
+
+
+class _Answers(list):
+    def __init__(self, value, authoritative=True):
+        super().__init__([_RData(value)])
+        self.response = _reply(authoritative=authoritative)
 
 
 def _set(app, key, value):
@@ -73,12 +80,6 @@ def zone(app, monkeypatch):
     _set(app, 'acme.dns01_resolver_mode', 'auto')
     _set(app, 'acme.dns01_nameservers', '')
     served = {}
-    canonical = {}
-
-    def _canonical(qname):
-        if canonical.get('down'):
-            raise dns.resolver.NoNameservers()
-        return dns.name.from_text(canonical.get(qname, qname))
 
     def _system(qname, rtype, lifetime=None):
         if rtype == 'NS':
@@ -99,12 +100,12 @@ def zone(app, monkeypatch):
             outcome = outcome[qname]
         if isinstance(outcome, Exception):
             raise outcome
+        if isinstance(outcome, _Answers):
+            return outcome
         return [_RData(outcome)]
 
     monkeypatch.setattr(dns.resolver, 'resolve', _system)
     monkeypatch.setattr(dns.resolver.Resolver, 'resolve', _query)
-    monkeypatch.setattr(dns.resolver, 'canonical_name', _canonical)
-    served['canonical'] = canonical
     return served
 
 
@@ -150,23 +151,44 @@ def test_lame_nameserver_is_ignored(app, zone):
         assert lookup.txt_record_present(NAME, TOKEN, log_public=False) is True
 
 
-def test_cname_delegated_challenge_is_checked_on_its_target(app, zone):
-    zone['canonical'][NAME] = TARGET
+def test_cname_returned_by_the_nameservers_is_followed(app, zone):
     hop = _no_answer(cname=TARGET)
     zone['192.0.2.1'] = {NAME: hop, TARGET: TOKEN}
-    zone['192.0.2.2'] = {NAME: hop, TARGET: _nxdomain()}
+    zone['192.0.2.2'] = {NAME: hop, TARGET: _nxdomain(TARGET)}
     with app.app_context():
         assert lookup.txt_record_present(NAME, TOKEN, log_public=False) is False
         zone['192.0.2.2'] = {NAME: hop, TARGET: TOKEN}
         assert lookup.txt_record_present(NAME, TOKEN, log_public=False) is True
 
 
-def test_cname_hop_without_canonical_lookup_falls_back_to_public(app, zone):
-    zone['canonical']['down'] = True
-    zone['192.0.2.1'] = _no_answer(cname=TARGET)
-    zone['192.0.2.2'] = _no_answer(cname=TARGET)
+def test_wildcard_cname_cached_by_the_recursive_is_not_followed(app, zone, monkeypatch):
+    # The explicit TXT beats *.example.com CNAME at the authoritative servers.
+    monkeypatch.setattr(dns.resolver, 'canonical_name', lambda qname: dns.name.from_text(TARGET))
+    zone['192.0.2.1'] = {NAME: TOKEN, TARGET: _nxdomain(TARGET)}
+    zone['192.0.2.2'] = {NAME: TOKEN, TARGET: _nxdomain(TARGET)}
     with app.app_context():
         assert lookup.txt_record_present(NAME, TOKEN, log_public=False) is True
+
+
+def test_in_zone_cname_without_txt_keeps_the_record_pending(app, zone):
+    zone['192.0.2.1'] = {NAME: TOKEN, ALIAS: _no_answer(qname=ALIAS)}
+    zone['192.0.2.2'] = {NAME: _no_answer(cname=ALIAS), ALIAS: _no_answer(qname=ALIAS)}
+    with app.app_context():
+        assert lookup.txt_record_present(NAME, TOKEN, log_public=False) is False
+
+
+def test_cname_loop_ends_in_the_public_fallback(app, zone):
+    zone['192.0.2.1'] = {NAME: _no_answer(cname=TARGET), TARGET: _no_answer(qname=TARGET, cname=NAME)}
+    zone['192.0.2.2'] = zone['192.0.2.1']
+    with app.app_context():
+        assert lookup.resolve_txt_answers(NAME, TOKEN)[1] == 'public:9.9.9.9'
+
+
+def test_non_authoritative_positive_reply_does_not_confirm(app, zone):
+    zone['192.0.2.1'] = _Answers(TOKEN, authoritative=False)
+    zone['192.0.2.2'] = dns.resolver.LifetimeTimeout(timeout=4.0, errors=[])
+    with app.app_context():
+        assert lookup.resolve_txt_answers(NAME, TOKEN)[1] == 'public:9.9.9.9'
 
 
 def test_no_authoritative_reachable_falls_back_to_public(app, zone):
@@ -215,6 +237,7 @@ def test_slow_lookups_count_against_the_timeout(app, monkeypatch, sleeps):
         res = dns_selfcheck.wait_for_challenges({'example.com': {'dns_txt_value': TOKEN}}, 30)
     assert res['ok'] is False
     assert len(checks) == 2  # 20 s then 40 s of lookups, not 7 polls of 5 s
+    assert res['waited'] >= 30
 
 
 def test_no_settle_delay_when_the_record_is_missing(app, monkeypatch, sleeps, delay_setting):
@@ -268,9 +291,14 @@ def test_settings_round_trip_the_delay(app, auth_client, delay_setting):
     assert auth_client.get('/api/v2/acme/client/settings').get_json()['data']['dns_propagation_delay'] == 45
 
 
-@pytest.mark.parametrize('bad', [-1, 301, 'soon', None])
+@pytest.mark.parametrize('bad', [-1, 301, 'soon', None, True, False])
 def test_settings_reject_an_invalid_delay(app, auth_client, delay_setting, bad):
     delay_setting('20')
     assert _patch(auth_client, {'dns_propagation_delay': bad}).status_code == 400
     with app.app_context():
         assert dns_selfcheck.dns_propagation_delay() == 20
+
+
+@pytest.mark.parametrize('bad', [True, False])
+def test_settings_reject_a_boolean_timeout(app, auth_client, bad):
+    assert _patch(auth_client, {'dns_propagation_timeout': bad}).status_code == 400

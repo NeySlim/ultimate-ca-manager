@@ -102,6 +102,7 @@ def wait_for_challenges(challenges: dict, timeout: int, delay: Optional[int] = N
                 'DNS propagation poll tick: waited=%ss, remaining=%s',
                 waited, ', '.join(sorted(pending)),
             )
+    waited = max(waited, int(time.monotonic() - started))
     if pending:
         logger.warning(
             'DNS propagation poll finished without all TXT records: waited=%ss, missing=%s',

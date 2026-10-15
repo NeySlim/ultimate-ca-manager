@@ -211,6 +211,8 @@ def update_settings():
 
     if 'dns_propagation_timeout' in data:
         try:
+            if isinstance(data['dns_propagation_timeout'], bool):
+                raise TypeError
             dns_to = int(data['dns_propagation_timeout'])
         except (TypeError, ValueError):
             return error_response('DNS propagation timeout must be an integer', 400)
@@ -222,6 +224,8 @@ def update_settings():
 
     if 'dns_propagation_delay' in data:
         try:
+            if isinstance(data['dns_propagation_delay'], bool):
+                raise TypeError
             dns_delay = int(data['dns_propagation_delay'])
         except (TypeError, ValueError):
             return error_response('DNS propagation delay must be an integer', 400)

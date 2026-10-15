@@ -3,8 +3,8 @@ DNS TXT lookup helpers for ACME DNS-01 propagation checks.
 
 ``acme.dns01_resolver_mode`` picks the resolvers:
 - ``auto``: ``acme.dns01_nameservers`` if set, then the authoritative
-  nameservers of the name's CNAME target: every one that answers must serve
-  the value, and one still lacking it ends the check. Only when none answers:
+  nameservers (following the CNAMEs they return): every one that answers must
+  serve the value, and one still lacking it ends the check. Only when none answers:
   9.9.9.9 / 8.8.8.8 / 1.1.1.1, then the system resolver;
 - ``system``: the system resolver only;
 - ``custom``: ``acme.dns01_nameservers`` only.
@@ -159,16 +159,6 @@ def _resolve_with_ns(name: str, nameservers: List[str], rtype: str = 'TXT', life
 AUTHORITATIVE_QUERY_LIFETIME = 4
 
 
-def _canonical_txt_name(name: str) -> str:
-    """*name* after CNAME/DNAME hops (acme-dns style delegation), or *name* itself."""
-    import dns.resolver
-
-    try:
-        return str(dns.resolver.canonical_name(name)).rstrip('.')
-    except Exception:
-        return name
-
-
 def _authoritative_nameservers(name: str) -> List[Tuple[str, List[str]]]:
     """(NS host, its A then AAAA addresses) for each authoritative NS of *name*'s zone."""
     import dns.resolver
@@ -198,9 +188,32 @@ def _authoritative_nameservers(name: str) -> List[Tuple[str, List[str]]]:
     return []
 
 
-def _authoritative_denial(exc) -> bool:
-    """True when the server, authoritative for the name (AA set), says it holds
-    no TXT there. A lame delegation or a CNAME hop out of the zone proves nothing."""
+MAX_CNAME_HOPS = 8
+
+
+def _cname_target(response, qname: str) -> Optional[str]:
+    """End of the CNAME chain for *qname* in *response*'s answer section, if any."""
+    import dns.rdatatype
+
+    def norm(name) -> str:
+        return str(name).rstrip('.').lower()
+
+    hops = {norm(rrset.name): norm(rrset[0].target) for rrset in response.answer
+            if rrset.rdtype == dns.rdatatype.CNAME and len(rrset)}
+    current = norm(qname)
+    for _ in range(MAX_CNAME_HOPS):
+        if current not in hops:
+            break
+        current = hops[current]
+    else:
+        return None
+    return None if current == norm(qname) else current
+
+
+def _negative_reply(exc, qname: str):
+    """('lacks', None) when an authoritative server (AA) holds no TXT for *qname*,
+    ('hop', target) when it answers with a CNAME out of what it serves,
+    ('skip', None) for a lame or unreadable reply."""
     import dns.flags
     import dns.resolver
 
@@ -210,39 +223,58 @@ def _authoritative_denial(exc) -> bool:
         else:
             responses = [exc.response()]
     except Exception:
-        return True
-    return any(r is not None and r.flags & dns.flags.AA and not r.answer for r in responses)
+        return 'skip', None
+    for response in responses:
+        if not response.flags & dns.flags.AA:
+            continue
+        target = _cname_target(response, qname)
+        return ('hop', target) if target else ('lacks', None)
+    return 'skip', None
 
 
-def _authoritative_txt_answers(name: str, expected: str, servers):
-    """Answers once every authoritative NS that responds serves *expected*;
-    ``[]`` while one still lacks it; None when none responds.
+def _authoritative_txt_answers(name: str, expected: str, depth: int = 0):
+    """Answers once every authoritative NS of *name* that responds serves
+    *expected*; ``[]`` while one still lacks it; None when none responds.
 
     The CA validates from several vantage points that each reach any NS, so a
-    single up-to-date server proves nothing.
+    single up-to-date server proves nothing. A CNAME is followed only as the
+    authoritative servers return it, never from a recursive cache (wildcards).
     """
+    import dns.flags
     import dns.resolver
 
-    confirmed, lagging = None, []
+    servers = _authoritative_nameservers(name) if depth <= MAX_CNAME_HOPS else []
+    confirmed, lagging, hops = None, [], set()
     for host, ips in servers:
         try:
             answers = _resolve_with_ns(name, ips, lifetime=AUTHORITATIVE_QUERY_LIFETIME)
         except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer) as exc:
-            if _authoritative_denial(exc):
+            verdict, target = _negative_reply(exc, name)
+            if verdict == 'lacks':
                 lagging.append(host)
+            elif verdict == 'hop':
+                hops.add(target)
             else:
-                acme_log(logger, 'TXT via %s for %s: non-authoritative or CNAME reply ignored', host, name)
+                acme_log(logger, 'TXT via %s for %s: non-authoritative reply ignored', host, name)
             continue
         except Exception as exc:
             acme_log(logger, 'TXT via authoritative %s failed for %s: %s', host, name, exc)
             continue
-        if _answers_contain_expected(answers, expected):
+        response = getattr(answers, 'response', None)
+        if response is not None and not response.flags & dns.flags.AA:
+            acme_log(logger, 'TXT via %s for %s: non-authoritative reply ignored', host, name)
+        elif _answers_contain_expected(answers, expected):
             confirmed = answers
         else:
             lagging.append(host)
     if lagging:
         acme_log(logger, 'TXT for %s not yet served by authoritative %s', name, ', '.join(lagging))
         return []
+    for target in sorted(hops):
+        result = _authoritative_txt_answers(target, expected, depth + 1)
+        if result == []:
+            return []
+        confirmed = confirmed if result is None else result
     return confirmed
 
 
@@ -310,12 +342,9 @@ def resolve_txt_answers(name: str, expected: str) -> Tuple[object, str]:
     if mode != 'auto':
         return dns.resolver.resolve(name, 'TXT', lifetime=10), 'recursive'
 
-    target = _canonical_txt_name(name)
-    servers = _authoritative_nameservers(target)
-    if servers:
-        answers = _authoritative_txt_answers(target, expected, servers)
-        if answers is not None:
-            return answers, 'authoritative'
+    answers = _authoritative_txt_answers(name, expected)
+    if answers is not None:
+        return answers, 'authoritative'
 
     for resolver_ip in PUBLIC_DNS_RESOLVERS:
         try:
