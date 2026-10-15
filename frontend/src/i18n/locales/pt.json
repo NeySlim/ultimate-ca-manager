@@ -390,7 +390,9 @@
       "rsa4096": "RSA 4096 bits",
       "ecdsaP256": "ECDSA P-256",
       "ecdsaP384": "ECDSA P-384",
-      "ecdsaP521": "ECDSA P-521"
+      "ecdsaP521": "ECDSA P-521",
+      "ed25519": "Ed25519",
+      "ed448": "Ed448"
     },
     "dnFields": {
       "cn": "Nome comum",
@@ -818,7 +820,8 @@
     "issuedFromTemplate": "Emitido a partir do modelo: {{name}}",
     "templateOverridesHint": "Diverge do modelo '{{name}}' em: {{fields}}",
     "deleteNeedsRevoke": "Este certificado ainda é válido, por isso não pode ser eliminado sozinho: desapareceria do UCM continuando a ser confiável para qualquer cliente que não verifique a revogação. Revogue-o primeiro, para que a CRL e o respondedor OCSP levem a retirada, e depois será eliminado.",
-    "revokeThenDelete": "Revogar e depois eliminar"
+    "revokeThenDelete": "Revogar e depois eliminar",
+    "noKeyTypeAllowedByPolicy": "Nenhum tipo de chave é permitido pelas políticas desta CA e deste modelo."
   },
   "cas": {
     "chainRevoked": "Revogada a montante",
@@ -966,7 +969,9 @@
       "digestAutoHint": "Usará {{digest}} para a chave selecionada",
       "certificateProfile": "Perfil do certificado (RFC 5280)",
       "certificateProfileHelp": "CA raiz: keyCertSign + cRLSign. CA emissora: digitalSignature e serverAuth opcional.",
-      "ekuServerAuth": "Utilização estendida da chave: autenticação de servidor Web TLS (serverAuth)"
+      "ekuServerAuth": "Utilização estendida da chave: autenticação de servidor Web TLS (serverAuth)",
+      "noKeyTypeAllowedByPolicy": "Nenhum tipo de chave é permitido pelas políticas aplicáveis a esta CA.",
+      "noDigestAllowedByPolicy": "Nenhum hash de assinatura é permitido pelas políticas aplicáveis a esta CA."
     },
     "detail": {
       "hsmBacked": "Apoiada por HSM",
@@ -4114,7 +4119,7 @@
     "disable": "Desativar",
     "disabled": "Política desativada",
     "dnsPattern": "Restrição de Padrão DNS",
-    "rulesEnforcedHelp": "Aplicado ao formulário de emissão e aos pedidos aprovados: um pedido cujo tipo de chave não é permitido ou que traz mais nomes DNS do que o máximo é recusado, e a validade é limitada. O padrão DNS delimita a que pedidos a política se aplica.",
+    "rulesEnforcedHelp": "Os tipos de chave e os hashes de assinatura são aplicados em toda emissão: formulário de emissão, assinatura de CSR, renovações, pedidos aprovados, ACME, SCEP, EST, WSTEP, criação de CA e signatário TSA. Quando um hash que ninguém escolheu explicitamente não é permitido, é usado o hash permitido mais fraco. No formulário de emissão, na assinatura de CSR, nas renovações e nos pedidos aprovados, um pedido com mais nomes DNS do que o máximo também é recusado e a validade é limitada. O padrão DNS delimita a que pedidos a política se aplica.",
     "editPolicy": "Editar Política",
     "enable": "Ativar",
     "enabled": "Política ativada",
@@ -4146,7 +4151,9 @@
       "issuance": "Emissão",
       "renewal": "Renovação",
       "revocation": "Revogação"
-    }
+    },
+    "allowedDigests": "Hashes de Assinatura Permitidos",
+    "allowedDigestsHelp": "Nenhum selecionado: qualquer hash é permitido."
   },
   "reports": {
     "complianceReport": "Relatório de Conformidade",

@@ -390,7 +390,9 @@
       "rsa4096": "RSA 4096-Bit",
       "ecdsaP256": "ECDSA P-256",
       "ecdsaP384": "ECDSA P-384",
-      "ecdsaP521": "ECDSA P-521"
+      "ecdsaP521": "ECDSA P-521",
+      "ed25519": "Ed25519",
+      "ed448": "Ed448"
     },
     "dnFields": {
       "cn": "Allgemeiner Name",
@@ -818,7 +820,8 @@
     "issuedFromTemplate": "Ausgestellt aus Vorlage: {{name}}",
     "templateOverridesHint": "Weicht von Vorlage '{{name}}' ab in: {{fields}}",
     "deleteNeedsRevoke": "Dieses Zertifikat ist noch gültig und kann daher nicht allein gelöscht werden: Es würde aus UCM verschwinden, während jeder Client, der den Sperrstatus nicht prüft, ihm weiter vertraut. Widerrufen Sie es zuerst, damit CRL und OCSP-Responder den Widerruf tragen, danach wird es gelöscht.",
-    "revokeThenDelete": "Widerrufen, dann löschen"
+    "revokeThenDelete": "Widerrufen, dann löschen",
+    "noKeyTypeAllowedByPolicy": "Die Richtlinien dieser CA und dieser Vorlage erlauben keinen Schlüsseltyp."
   },
   "cas": {
     "chainRevoked": "Übergeordnet gesperrt",
@@ -966,7 +969,9 @@
       "digestAutoHint": "Verwendet {{digest}} für den gewählten Schlüssel",
       "certificateProfile": "Zertifikatsprofil (RFC 5280)",
       "certificateProfileHelp": "Root-CAs: keyCertSign + cRLSign. Ausstellende CAs: digitalSignature und optional serverAuth.",
-      "ekuServerAuth": "Erweiterte Schlüsselverwendung: TLS-Webserver-Authentifizierung (serverAuth)"
+      "ekuServerAuth": "Erweiterte Schlüsselverwendung: TLS-Webserver-Authentifizierung (serverAuth)",
+      "noKeyTypeAllowedByPolicy": "Die für diese CA geltenden Richtlinien erlauben keinen Schlüsseltyp.",
+      "noDigestAllowedByPolicy": "Die für diese CA geltenden Richtlinien erlauben keinen Signatur-Hash."
     },
     "detail": {
       "hsmBacked": "HSM-gesichert",
@@ -4114,7 +4119,7 @@
     "disable": "Deaktivieren",
     "disabled": "Richtlinie deaktiviert",
     "dnsPattern": "DNS-Musterbeschränkung",
-    "rulesEnforcedHelp": "Gilt für das Ausstellungsformular und genehmigte Anfragen: eine Anfrage mit nicht erlaubtem Schlüsseltyp oder mehr DNS-Namen als dem Maximum wird abgelehnt, die Gültigkeit wird begrenzt. Das DNS-Muster legt fest, für welche Anfragen die Richtlinie gilt.",
+    "rulesEnforcedHelp": "Schlüsseltypen und Signatur-Hashes werden bei jeder Ausstellung durchgesetzt: Ausstellungsformular, CSR-Signierung, Erneuerungen, genehmigte Anfragen, ACME, SCEP, EST, WSTEP, CA-Erstellung und TSA-Signierer. Ist ein Hash, den niemand ausdrücklich gewählt hat, nicht erlaubt, wird stattdessen der schwächste erlaubte Hash verwendet. Beim Ausstellungsformular, bei der CSR-Signierung, bei Erneuerungen und bei genehmigten Anfragen wird zudem eine Anfrage mit mehr DNS-Namen als dem Maximum abgelehnt und die Gültigkeit begrenzt. Das DNS-Muster legt fest, für welche Anfragen die Richtlinie gilt.",
     "editPolicy": "Richtlinie bearbeiten",
     "enable": "Aktivieren",
     "enabled": "Richtlinie aktiviert",
@@ -4146,7 +4151,9 @@
       "issuance": "Ausstellung",
       "renewal": "Erneuerung",
       "revocation": "Widerruf"
-    }
+    },
+    "allowedDigests": "Erlaubte Signatur-Hashes",
+    "allowedDigestsHelp": "Keine Auswahl: Jeder Hash ist erlaubt."
   },
   "reports": {
     "complianceReport": "Compliance-Bericht",

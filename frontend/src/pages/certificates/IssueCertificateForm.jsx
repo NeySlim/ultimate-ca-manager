@@ -6,6 +6,7 @@ import { getSanValidationError, getAutoSansFromCn } from '../../lib/sanValidate'
 import { useNotification } from '../../contexts'
 import { signingCas } from '../../lib/caSelection'
 import { daysRemaining } from '../../lib/utils'
+import { ISSUE_KEY_CHOICES, issueKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 
 // Issue Certificate Form — full-featured with template, cert type, structured SANs, date picker
 export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
@@ -122,6 +123,25 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
       setShowSubject(true)
     }
   }, [initialData])
+
+  // Key types the policies of this CA/template allow (#397); the server enforces them regardless
+  const { allowedKeyTypes } = useEffectiveAlgorithms({
+    caId: formData.ca_id, templateId: selectedTemplate, enabled: !!formData.ca_id,
+  })
+  const allowedKeys = useMemo(
+    () => ISSUE_KEY_CHOICES.filter(([type, size]) => isAllowed(allowedKeyTypes, issueKeyLabel(type, size))),
+    [allowedKeyTypes],
+  )
+  const noKeyAllowed = allowedKeys.length === 0
+  const firstAllowedSize = (type) => allowedKeys.find(([k]) => k === type)?.[1]
+
+  // A key the policies forbid (template default, previous CA) switches to the first allowed one
+  useEffect(() => {
+    if (noKeyAllowed) return
+    if (allowedKeys.some(([k, sz]) => k === formData.key_type && sz === formData.key_size)) return
+    const [type, size] = allowedKeys.find(([k]) => k === formData.key_type) || allowedKeys[0]
+    setFormData(prev => ({ ...prev, key_type: type, key_size: size }))
+  }, [allowedKeys, noKeyAllowed, formData.key_type, formData.key_size])
 
   // Get selected CA's expiry for max date
   const selectedCa = useMemo(() => 
@@ -560,18 +580,18 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
           value={formData.key_type}
           onChange={(val) => {
             update('key_type', val)
-            update('key_size', val === 'rsa' ? '2048' : '256')
+            update('key_size', firstAllowedSize(val) || (val === 'rsa' ? '2048' : '256'))
           }}
           options={[
             { value: 'rsa', label: 'RSA' },
             { value: 'ecdsa', label: 'ECDSA' },
-          ]}
+          ].filter(o => noKeyAllowed || allowedKeys.some(([k]) => k === o.value))}
         />
         <Select
           label={t('common.keySize')}
           value={formData.key_size}
           onChange={(val) => update('key_size', val)}
-          options={formData.key_type === 'rsa'
+          options={(formData.key_type === 'rsa'
             ? [
               { value: '2048', label: t('certificates.keySizeRsa2048') },
               { value: '3072', label: t('certificates.keySizeRsa3072') },
@@ -582,9 +602,12 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
               { value: '384', label: t('certificates.keyCurveNistP384') },
               { value: '521', label: t('certificates.keyCurveNistP521') },
             ]
-          }
+          ).filter(o => noKeyAllowed || allowedKeys.some(([k, sz]) => k === formData.key_type && sz === o.value))}
         />
       </div>
+      {noKeyAllowed && (
+        <p className="text-xs text-status-danger" role="alert">{t('certificates.noKeyTypeAllowedByPolicy')}</p>
+      )}
 
       {/* Validity — days or calendar */}
       <div className="space-y-2">
@@ -651,7 +674,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
         <Button type="button" variant="secondary" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
-        <Button type="submit" disabled={issuing}>
+        <Button type="submit" disabled={issuing || noKeyAllowed}>
           <Certificate size={16} />
           {issuing ? t('common.creating') : t('certificates.issueCertificate')}
         </Button>

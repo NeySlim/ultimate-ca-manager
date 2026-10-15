@@ -390,7 +390,9 @@
       "rsa4096": "RSA 4096-bit",
       "ecdsaP256": "ECDSA P-256",
       "ecdsaP384": "ECDSA P-384",
-      "ecdsaP521": "ECDSA P-521"
+      "ecdsaP521": "ECDSA P-521",
+      "ed25519": "Ed25519",
+      "ed448": "Ed448"
     },
     "dnFields": {
       "cn": "Common Name",
@@ -818,7 +820,8 @@
     "issuedFromTemplate": "Issued from template: {{name}}",
     "templateOverridesHint": "Diverges from template '{{name}}' on: {{fields}}",
     "deleteNeedsRevoke": "This certificate is still valid, so it cannot be deleted on its own: deleting it would remove it from UCM while it stays trusted by every client that does not check revocation. Revoke it first, so the CRL and the OCSP responder carry the withdrawal, and it is then deleted.",
-    "revokeThenDelete": "Revoke, then delete"
+    "revokeThenDelete": "Revoke, then delete",
+    "noKeyTypeAllowedByPolicy": "No key type is allowed by the policies of this CA and template."
   },
   "cas": {
     "chainRevoked": "Revoked upstream",
@@ -966,7 +969,9 @@
       "digestAutoHint": "Will use {{digest}} for the selected key",
       "certificateProfile": "Certificate Profile (RFC 5280)",
       "certificateProfileHelp": "Root CAs default to keyCertSign + cRLSign. Issuing CAs add digitalSignature and may include TLS Web Server Authentication (serverAuth).",
-      "ekuServerAuth": "Extended Key Usage: TLS Web Server Authentication (serverAuth)"
+      "ekuServerAuth": "Extended Key Usage: TLS Web Server Authentication (serverAuth)",
+      "noKeyTypeAllowedByPolicy": "No key type is allowed by the policies that apply to this CA.",
+      "noDigestAllowedByPolicy": "No signature hash is allowed by the policies that apply to this CA."
     },
     "detail": {
       "hsmBacked": "HSM-backed",
@@ -3815,7 +3820,7 @@
     "allowedKeyTypes": "Allowed Key Types",
     "maxSANs": "Max SANs",
     "dnsPattern": "DNS Pattern Restriction",
-    "rulesEnforcedHelp": "Enforced on the issue form and on approved requests: a request whose key type is not allowed or which carries more DNS names than the maximum is refused, and the validity is capped. The DNS pattern scopes which requests the policy applies to.",
+    "rulesEnforcedHelp": "Key types and signature hashes are enforced on every issuance: the issue form, CSR signing, renewals, approved requests, ACME, SCEP, EST, WSTEP, CA creation and the TSA signer. When a hash nobody chose explicitly is not allowed, the weakest allowed hash is used instead. On the issue form, CSR signing, renewals and approved requests, a request with more DNS names than the maximum is also refused and the validity is capped. The DNS pattern scopes which requests the policy applies to.",
     "approvalWorkflow": "Approval Workflow",
     "approval": "Approval",
     "requireApproval": "Require approval before issuance",
@@ -3842,7 +3847,9 @@
       "issuance": "Issuance",
       "renewal": "Renewal",
       "revocation": "Revocation"
-    }
+    },
+    "allowedDigests": "Allowed Signature Hashes",
+    "allowedDigestsHelp": "None selected: any hash is allowed."
   },
   "approvals": {
     "title": "Approval Requests",

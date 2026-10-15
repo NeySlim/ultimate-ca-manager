@@ -1,7 +1,7 @@
 /**
  * Certificate Policies Service
  */
-import { apiClient } from './apiClient'
+import { apiClient, buildQueryString } from './apiClient'
 
 export const policiesService = {
   async list() {
@@ -26,5 +26,10 @@ export const policiesService = {
 
   async toggle(id) {
     return apiClient.post(`/policies/${id}/toggle`)
+  },
+
+  // Key types and signature hashes the active policies allow for a CA/template (null = unrestricted)
+  async getEffective({ ca_id, template_id } = {}) {
+    return apiClient.get(`/policies/effective${buildQueryString({ ca_id, template_id })}`)
   },
 }

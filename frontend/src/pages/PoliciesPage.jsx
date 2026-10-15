@@ -41,6 +41,19 @@ const KEY_TYPE_OPTIONS = [
   { value: 'EC-P521', labelKey: 'common.keyTypes.ecdsaP521' },
 ]
 
+// EdDSA keys only arrive through CSRs and enrollment protocols (no template generates them)
+const EDDSA_KEY_TYPE_OPTIONS = [
+  { value: 'ED25519', labelKey: 'common.keyTypes.ed25519' },
+  { value: 'ED448', labelKey: 'common.keyTypes.ed448' },
+]
+
+// Signature hashes; none selected means any hash
+const DIGEST_OPTIONS = [
+  { value: 'sha256', label: 'SHA-256' },
+  { value: 'sha384', label: 'SHA-384' },
+  { value: 'sha512', label: 'SHA-512' },
+]
+
 const DEFAULT_FORM = {
   name: '',
   description: '',
@@ -56,6 +69,7 @@ const DEFAULT_FORM = {
   rules: {
     max_validity_days: 397,
     allowed_key_types: KEY_TYPE_OPTIONS.map(o => o.value),
+    allowed_digests: [],
     required_extensions: [],
     san_restrictions: {
       max_dns_names: 50,
@@ -73,7 +87,10 @@ export default function PoliciesPage() {
 
   // Resolve i18n labels for module-level option arrays
   const policyTypeOptions = useMemo(() => POLICY_TYPES.map(o => ({ value: o.value, label: t(o.labelKey) })), [t])
-  const keyTypeOptions = useMemo(() => KEY_TYPE_OPTIONS.map(o => ({ value: o.value, label: t(o.labelKey) })), [t])
+  const keyTypeOptions = useMemo(
+    () => [...KEY_TYPE_OPTIONS, ...EDDSA_KEY_TYPE_OPTIONS].map(o => ({ value: o.value, label: t(o.labelKey) })),
+    [t],
+  )
 
   // cas/groups must be declared before loadFn (loadFn sets them as side effects)
   const [cas, setCas] = useState([])
@@ -277,7 +294,8 @@ export default function PoliciesPage() {
       priority: policy.priority || 100,
       rules: {
         max_validity_days: policy.rules?.max_validity_days || 397,
-        allowed_key_types: policy.rules?.allowed_key_types || ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384'],
+        allowed_key_types: policy.rules?.allowed_key_types || [],
+        allowed_digests: policy.rules?.allowed_digests || [],
         required_extensions: policy.rules?.required_extensions || [],
         san_restrictions: {
           max_dns_names: policy.rules?.san_restrictions?.max_dns_names || 50,
@@ -348,6 +366,14 @@ export default function PoliciesPage() {
     }))
   }
 
+  const toggleDigest = (digest) => {
+    setFormData(prev => {
+      const current = prev.rules.allowed_digests || []
+      const next = current.includes(digest) ? current.filter(d => d !== digest) : [...current, digest]
+      return { ...prev, rules: { ...prev.rules, allowed_digests: next } }
+    })
+  }
+
   const toggleKeyType = (keyType) => {
     setFormData(prev => {
       const current = prev.rules.allowed_key_types || []
@@ -403,6 +429,18 @@ export default function PoliciesPage() {
                 <div className="flex flex-wrap gap-1 mt-1">
                   {selectedPolicy.rules.allowed_key_types.map(k => (
                     <Badge key={k} variant="default" size="sm">{k}</Badge>
+                  ))}
+                </div>
+              </div>
+            )}
+            {selectedPolicy.rules.allowed_digests?.length > 0 && (
+              <div>
+                <span className="text-text-muted">{t('policies.allowedDigests')}</span>
+                <div className="flex flex-wrap gap-1 mt-1">
+                  {selectedPolicy.rules.allowed_digests.map(d => (
+                    <Badge key={d} variant="default" size="sm">
+                      {DIGEST_OPTIONS.find(o => o.value === d)?.label || d}
+                    </Badge>
                   ))}
                 </div>
               </div>
@@ -665,6 +703,32 @@ export default function PoliciesPage() {
                   </button>
                 ))}
               </div>
+            </div>
+
+            {/* Allowed signature hashes */}
+            <div className="mt-3">
+              <label className="text-sm font-medium text-text-primary mb-2 block">
+                {t('policies.allowedDigests')}
+              </label>
+              <div className="flex flex-wrap gap-2">
+                {DIGEST_OPTIONS.map(opt => (
+                  <button
+                    key={opt.value}
+                    type="button"
+                    aria-pressed={!!formData.rules.allowed_digests?.includes(opt.value)}
+                    onClick={() => toggleDigest(opt.value)}
+                    className={cn(
+                      'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                      formData.rules.allowed_digests?.includes(opt.value)
+                        ? 'bg-accent-primary-op10 border-accent-primary text-accent-primary'
+                        : 'bg-bg-secondary border-border text-text-muted hover:border-border-hover'
+                    )}
+                  >
+                    {opt.label}
+                  </button>
+                ))}
+              </div>
+              <p className="text-xs text-text-tertiary mt-1">{t('policies.allowedDigestsHelp')}</p>
             </div>
 
             {/* DNS Pattern */}

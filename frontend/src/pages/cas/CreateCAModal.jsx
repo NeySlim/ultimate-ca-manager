@@ -7,7 +7,7 @@
  *   cas        — array of existing CAs (for parent CA select dropdown)
  *   onSuccess  — called with the new CA after it is created
  */
-import { useState, useEffect, useRef } from 'react'
+import { useState, useEffect, useMemo, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { CaretRight, CaretDown, X, Plus } from '@phosphor-icons/react'
 import { Modal, Input, Select, Button } from '../../components'
@@ -16,6 +16,9 @@ import { useNotification } from '../../contexts'
 import { useWebSocket } from '../../hooks'
 import { extractData, cn, downloadBlob } from '../../lib/utils'
 import { signingCas } from '../../lib/caSelection'
+import { CA_KEY_CHOICES, POLICY_DIGESTS, caKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
+
+const HSM_KEY_ALGORITHMS = ['RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521']
 
 const VALIDITY_YEAR_PRESETS = [1, 2, 3, 5, 10, 15, 20]
 const CUSTOM_VALIDITY = 'custom'
@@ -198,6 +201,47 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     setCreateFormHsmKeyId('')
   }, [open])
 
+  // Policies of the parent CA, or the global ones for a root/external CA (#397)
+  const { allowedKeyTypes, allowedDigests } = useEffectiveAlgorithms({
+    caId: createFormType === 'intermediate' ? createFormParentCAId : null,
+    enabled: open,
+  })
+  const allowedLocalKeys = useMemo(
+    () => CA_KEY_CHOICES.filter(([algo, size]) => isAllowed(allowedKeyTypes, caKeyLabel(algo, size))),
+    [allowedKeyTypes],
+  )
+  const allowedDigestChoices = useMemo(
+    () => POLICY_DIGESTS.filter(d => isAllowed(allowedDigests, d)), [allowedDigests])
+  const noKeyAllowed = allowedLocalKeys.length === 0
+  const noDigestAllowed = allowedDigestChoices.length === 0
+  // 'auto' resolves like the server: the key's own digest when allowed, else the weakest allowed
+  const suggested = suggestedDigest(createFormKeyAlgo, createFormKeySize)
+  const autoDigest = allowedDigestChoices.includes(suggested) ? suggested : allowedDigestChoices[0]
+  const hsmAlgorithmOptions = useMemo(
+    () => HSM_KEY_ALGORITHMS.filter(a => isAllowed(allowedKeyTypes, a)), [allowedKeyTypes])
+  const policyBlocksCreate = noDigestAllowed || (createFormKeyStorage === 'local'
+    ? noKeyAllowed
+    : createFormHsmKeyMode === 'generate' && hsmAlgorithmOptions.length === 0)
+
+  // A key or digest the policies forbid switches to the first allowed one
+  useEffect(() => {
+    if (noKeyAllowed) return
+    if (allowedLocalKeys.some(([a, sz]) => a === createFormKeyAlgo && sz === createFormKeySize)) return
+    const [algo, size] = allowedLocalKeys.find(([a]) => a === createFormKeyAlgo) || allowedLocalKeys[0]
+    setCreateFormKeyAlgo(algo)
+    setCreateFormKeySize(size)
+  }, [allowedLocalKeys, noKeyAllowed, createFormKeyAlgo, createFormKeySize])
+  useEffect(() => {
+    if (createFormDigest !== 'auto' && !allowedDigestChoices.includes(createFormDigest)) {
+      setCreateFormDigest('auto')
+    }
+  }, [allowedDigestChoices, createFormDigest])
+  useEffect(() => {
+    if (hsmAlgorithmOptions.length && !hsmAlgorithmOptions.includes(createFormHsmKeyAlgorithm)) {
+      setCreateFormHsmKeyAlgorithm(hsmAlgorithmOptions[0])
+    }
+  }, [hsmAlgorithmOptions, createFormHsmKeyAlgorithm])
+
   const handleCreateCA = async (e) => {
     e.preventDefault()
     if (creatingRef.current) return
@@ -365,16 +409,17 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
               options={[
                 { value: 'RSA', label: 'RSA' },
                 { value: 'ECDSA', label: 'ECDSA' }
-              ]}
+              ].filter(o => noKeyAllowed || allowedLocalKeys.some(([a]) => a === o.value))}
               value={createFormKeyAlgo}
               onChange={(value) => {
                 setCreateFormKeyAlgo(value)
-                setCreateFormKeySize(value === 'ECDSA' ? 'prime256v1' : '2048')
+                setCreateFormKeySize(allowedLocalKeys.find(([a]) => a === value)?.[1]
+                  || (value === 'ECDSA' ? 'prime256v1' : '2048'))
               }}
             />
             <Select
               label={t('common.keySize')}
-              options={createFormKeyAlgo === 'ECDSA' ? [
+              options={(createFormKeyAlgo === 'ECDSA' ? [
                 { value: 'prime256v1', label: 'P-256 (256 bits)' },
                 { value: 'secp384r1', label: 'P-384 (384 bits)' },
                 { value: 'secp521r1', label: 'P-521 (521 bits)' }
@@ -382,30 +427,32 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
                 { value: '2048', label: '2048 bits' },
                 { value: '3072', label: '3072 bits' },
                 { value: '4096', label: '4096 bits' }
-              ]}
+              ]).filter(o => noKeyAllowed || allowedLocalKeys.some(([a, sz]) => a === createFormKeyAlgo && sz === o.value))}
               value={createFormKeySize}
               onChange={(value) => setCreateFormKeySize(value)}
             />
             <Select
               label={t('common.signatureAlgorithm')}
               options={[
-                { value: 'auto', label: t('cas.create.digestAuto') },
-                { value: 'sha256', label: 'SHA-256' },
-                { value: 'sha384', label: 'SHA-384' },
-                { value: 'sha512', label: 'SHA-512' },
+                ...(noDigestAllowed ? [] : [{ value: 'auto', label: t('cas.create.digestAuto') }]),
+                ...allowedDigestChoices.map(d => ({ value: d, label: d.toUpperCase().replace('SHA', 'SHA-') })),
               ]}
               value={createFormDigest}
               onChange={(value) => setCreateFormDigest(value)}
               helperText={
-                createFormDigest === 'auto'
-                  ? t('cas.create.digestAutoHint', {
-                      digest: suggestedDigest(createFormKeyAlgo, createFormKeySize).toUpperCase(),
-                    })
+                createFormDigest === 'auto' && autoDigest
+                  ? t('cas.create.digestAutoHint', { digest: autoDigest.toUpperCase() })
                   : undefined
               }
             />
           </div>
+          {noKeyAllowed && (
+            <p className="text-xs text-status-danger" role="alert">{t('cas.create.noKeyTypeAllowedByPolicy')}</p>
+          )}
         </div>
+        )}
+        {noDigestAllowed && (
+          <p className="text-xs text-status-danger" role="alert">{t('cas.create.noDigestAllowedByPolicy')}</p>
         )}
 
         {createFormKeyStorage === 'hsm' && (
@@ -479,18 +526,14 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
                   />
                   <Select
                     label={t('cas.create.hsmKeyAlgorithm')}
-                    options={[
-                      { value: 'RSA-2048', label: 'RSA-2048' },
-                      { value: 'RSA-3072', label: 'RSA-3072' },
-                      { value: 'RSA-4096', label: 'RSA-4096' },
-                      { value: 'EC-P256', label: 'EC-P256' },
-                      { value: 'EC-P384', label: 'EC-P384' },
-                      { value: 'EC-P521', label: 'EC-P521' }
-                    ]}
+                    options={hsmAlgorithmOptions.map(a => ({ value: a, label: a }))}
                     value={createFormHsmKeyAlgorithm}
                     onChange={(v) => setCreateFormHsmKeyAlgorithm(v)}
                   />
                 </div>
+              )}
+              {createFormHsmKeyMode === 'generate' && hsmAlgorithmOptions.length === 0 && (
+                <p className="text-xs text-status-danger" role="alert">{t('cas.create.noKeyTypeAllowedByPolicy')}</p>
               )}
 
               {createFormHsmKeyMode === 'existing' && (
@@ -686,7 +729,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
           <Button
             type="submit"
             disabled={
-              creating || (
+              creating || policyBlocksCreate || (
               createFormKeyStorage === 'hsm' && (
                 hsmProviders.length === 0 ||
                 (createFormHsmKeyMode === 'existing' && !!createFormHsmProviderId && hsmKeys.length === 0)

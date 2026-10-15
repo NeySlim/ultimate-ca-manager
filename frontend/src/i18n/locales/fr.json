@@ -857,7 +857,9 @@
       "digestAutoHint": "Utilisera {{digest}} pour la clé sélectionnée",
       "certificateProfile": "Profil certificat (RFC 5280)",
       "certificateProfileHelp": "Les CA racines utilisent keyCertSign + cRLSign par défaut. Les CA émettrices ajoutent digitalSignature et peuvent inclure l'authentification de serveur web TLS (serverAuth).",
-      "ekuServerAuth": "Utilisation étendue de la clé : authentification de serveur web TLS (serverAuth)"
+      "ekuServerAuth": "Utilisation étendue de la clé : authentification de serveur web TLS (serverAuth)",
+      "noKeyTypeAllowedByPolicy": "Aucun type de clé n'est autorisé par les politiques qui s'appliquent à cette CA.",
+      "noDigestAllowedByPolicy": "Aucun hachage de signature n'est autorisé par les politiques qui s'appliquent à cette CA."
     },
     "detail": {
       "hsmBacked": "Adossé HSM",
@@ -1051,7 +1053,8 @@
     "issuedFromTemplate": "Émis depuis le modèle : {{name}}",
     "templateOverridesHint": "Diverge du modèle « {{name}} » sur : {{fields}}",
     "deleteNeedsRevoke": "Ce certificat est encore valide, il ne peut donc pas être supprimé seul : le supprimer le retirerait d'UCM alors qu'il reste approuvé par tout client qui ne vérifie pas la révocation. Révoquez-le d'abord, pour que la CRL et le répondeur OCSP portent le retrait, puis il sera supprimé.",
-    "revokeThenDelete": "Révoquer, puis supprimer"
+    "revokeThenDelete": "Révoquer, puis supprimer",
+    "noKeyTypeAllowedByPolicy": "Aucun type de clé n'est autorisé par les politiques de cette CA et de ce modèle."
   },
   "common": {
     "saved": "Paramètres enregistrés",
@@ -1444,7 +1447,9 @@
       "rsa4096": "RSA 4096 bits",
       "ecdsaP256": "ECDSA P-256",
       "ecdsaP384": "ECDSA P-384",
-      "ecdsaP521": "ECDSA P-521"
+      "ecdsaP521": "ECDSA P-521",
+      "ed25519": "Ed25519",
+      "ed448": "Ed448"
     },
     "dnFields": {
       "cn": "Nom commun",
@@ -3827,7 +3832,7 @@
     "allowedKeyTypes": "Types de clés autorisés",
     "maxSANs": "SANs max",
     "dnsPattern": "Restriction de motif DNS",
-    "rulesEnforcedHelp": "Appliqué au formulaire d'émission et aux demandes approuvées : une demande dont le type de clé n'est pas autorisé ou qui porte plus de noms DNS que le maximum est refusée, et la validité est plafonnée. Le motif DNS délimite les demandes auxquelles la politique s'applique.",
+    "rulesEnforcedHelp": "Les types de clé et les algorithmes de hachage de signature sont appliqués à chaque émission : formulaire d'émission, signature de CSR, renouvellements, demandes approuvées, ACME, SCEP, EST, WSTEP, création de CA et signataire TSA. Lorsqu'un hachage que personne n'a choisi explicitement n'est pas autorisé, le hachage autorisé le plus faible est utilisé à la place. Sur le formulaire d'émission, la signature de CSR, les renouvellements et les demandes approuvées, une demande comportant plus de noms DNS que le maximum est aussi refusée et la validité est plafonnée. Le motif DNS délimite les demandes auxquelles la politique s'applique.",
     "approvalWorkflow": "Workflow d'approbation",
     "approval": "Approbation",
     "requireApproval": "Exiger une approbation avant l'émission",
@@ -3854,7 +3859,9 @@
       "issuance": "Émission",
       "renewal": "Renouvellement",
       "revocation": "Révocation"
-    }
+    },
+    "allowedDigests": "Algorithmes de hachage de signature autorisés",
+    "allowedDigestsHelp": "Aucun sélectionné : tous les hachages sont autorisés."
   },
   "approvals": {
     "title": "Demandes d'approbation",

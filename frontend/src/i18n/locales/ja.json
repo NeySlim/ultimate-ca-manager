@@ -390,7 +390,9 @@
       "rsa4096": "RSA 4096ビット",
       "ecdsaP256": "ECDSA P-256",
       "ecdsaP384": "ECDSA P-384",
-      "ecdsaP521": "ECDSA P-521"
+      "ecdsaP521": "ECDSA P-521",
+      "ed25519": "Ed25519",
+      "ed448": "Ed448"
     },
     "dnFields": {
       "cn": "コモンネーム",
@@ -818,7 +820,8 @@
     "issuedFromTemplate": "テンプレートから発行: {{name}}",
     "templateOverridesHint": "テンプレート '{{name}}' との相違: {{fields}}",
     "deleteNeedsRevoke": "この証明書はまだ有効なため、単独では削除できません。削除すると UCM からは消えますが、失効を確認しないクライアントからは引き続き信頼されます。まず失効させて CRL と OCSP レスポンダに反映させ、そのうえで削除します。",
-    "revokeThenDelete": "失効させてから削除"
+    "revokeThenDelete": "失効させてから削除",
+    "noKeyTypeAllowedByPolicy": "この CA とテンプレートのポリシーで許可されている鍵タイプはありません。"
   },
   "cas": {
     "chainRevoked": "上位で失効",
@@ -966,7 +969,9 @@
       "digestAutoHint": "選択した鍵に {{digest}} を使用します",
       "certificateProfile": "証明書プロファイル (RFC 5280)",
       "certificateProfileHelp": "ルート CA: keyCertSign + cRLSign。発行 CA: digitalSignature と任意で serverAuth。",
-      "ekuServerAuth": "拡張キー使用法: TLS Webサーバー認証 (serverAuth)"
+      "ekuServerAuth": "拡張キー使用法: TLS Webサーバー認証 (serverAuth)",
+      "noKeyTypeAllowedByPolicy": "この CA に適用されるポリシーで許可されている鍵タイプはありません。",
+      "noDigestAllowedByPolicy": "この CA に適用されるポリシーで許可されている署名ハッシュはありません。"
     },
     "detail": {
       "hsmBacked": "HSM バック",
@@ -4114,7 +4119,7 @@
     "disable": "無効化",
     "disabled": "ポリシーが無効化されました",
     "dnsPattern": "DNSパターン制限",
-    "rulesEnforcedHelp": "発行フォームと承認済み申請に適用されます。許可されていない鍵タイプの申請や、上限を超える DNS 名を含む申請は拒否され、有効期間は上限で制限されます。DNS パターンは、このポリシーが適用される申請の範囲を定めます。",
+    "rulesEnforcedHelp": "鍵タイプと署名ハッシュは、発行フォーム、CSR 署名、更新、承認済み申請、ACME、SCEP、EST、WSTEP、CA 作成、TSA 署名者など、すべての発行で適用されます。誰も明示的に選択していないハッシュが許可されていない場合は、許可されているハッシュのうち最も弱いものが代わりに使用されます。発行フォーム、CSR 署名、更新、承認済み申請では、上限を超える DNS 名を含む申請も拒否され、有効期間は上限で制限されます。DNS パターンは、このポリシーが適用される申請の範囲を定めます。",
     "editPolicy": "ポリシーを編集",
     "enable": "有効化",
     "enabled": "ポリシーが有効化されました",
@@ -4146,7 +4151,9 @@
       "issuance": "発行",
       "renewal": "更新",
       "revocation": "失効"
-    }
+    },
+    "allowedDigests": "許可する署名ハッシュ",
+    "allowedDigestsHelp": "未選択の場合: すべてのハッシュが許可されます。"
   },
   "reports": {
     "complianceReport": "コンプライアンスレポート",

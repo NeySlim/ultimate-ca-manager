@@ -390,7 +390,9 @@
       "rsa4096": "RSA 4096 bit",
       "ecdsaP256": "ECDSA P-256",
       "ecdsaP384": "ECDSA P-384",
-      "ecdsaP521": "ECDSA P-521"
+      "ecdsaP521": "ECDSA P-521",
+      "ed25519": "Ed25519",
+      "ed448": "Ed448"
     },
     "dnFields": {
       "cn": "Nome comune",
@@ -818,7 +820,8 @@
     "issuedFromTemplate": "Emesso dal modello: {{name}}",
     "templateOverridesHint": "Diverge dal modello '{{name}}' per: {{fields}}",
     "deleteNeedsRevoke": "Questo certificato è ancora valido e non può essere eliminato da solo: sparirebbe da UCM restando affidabile per ogni client che non controlla la revoca. Revocalo prima, così che la CRL e il responder OCSP riportino il ritiro, poi verrà eliminato.",
-    "revokeThenDelete": "Revoca, poi elimina"
+    "revokeThenDelete": "Revoca, poi elimina",
+    "noKeyTypeAllowedByPolicy": "Nessun tipo di chiave è consentito dai criteri di questa CA e del template."
   },
   "cas": {
     "chainRevoked": "Revocata a monte",
@@ -966,7 +969,9 @@
       "digestAutoHint": "Userà {{digest}} per la chiave selezionata",
       "certificateProfile": "Profilo certificato (RFC 5280)",
       "certificateProfileHelp": "CA root: keyCertSign + cRLSign. CA emittenti: digitalSignature e serverAuth opzionale.",
-      "ekuServerAuth": "Uso esteso della chiave: autenticazione server web TLS (serverAuth)"
+      "ekuServerAuth": "Uso esteso della chiave: autenticazione server web TLS (serverAuth)",
+      "noKeyTypeAllowedByPolicy": "Nessun tipo di chiave è consentito dai criteri che si applicano a questa CA.",
+      "noDigestAllowedByPolicy": "Nessun hash di firma è consentito dai criteri che si applicano a questa CA."
     },
     "detail": {
       "hsmBacked": "Supportata da HSM",
@@ -4114,7 +4119,7 @@
     "disable": "Disabilita",
     "disabled": "Policy disabilitata",
     "dnsPattern": "Restrizione pattern DNS",
-    "rulesEnforcedHelp": "Applicato al modulo di emissione e alle richieste approvate: una richiesta con tipo di chiave non consentito o con più nomi DNS del massimo viene rifiutata, e la validità viene limitata. Il pattern DNS delimita le richieste a cui si applica il criterio.",
+    "rulesEnforcedHelp": "Tipi di chiave e hash di firma vengono applicati a ogni emissione: modulo di emissione, firma CSR, rinnovi, richieste approvate, ACME, SCEP, EST, WSTEP, creazione CA e firmatario TSA. Quando un hash che nessuno ha scelto esplicitamente non è consentito, viene usato il più debole tra quelli consentiti. Su modulo di emissione, firma CSR, rinnovi e richieste approvate viene inoltre rifiutata una richiesta con più nomi DNS del massimo e la validità viene limitata. Il pattern DNS delimita le richieste a cui si applica il criterio.",
     "editPolicy": "Modifica policy",
     "enable": "Abilita",
     "enabled": "Policy abilitata",
@@ -4146,7 +4151,9 @@
       "issuance": "Emissione",
       "renewal": "Rinnovo",
       "revocation": "Revoca"
-    }
+    },
+    "allowedDigests": "Hash di firma consentiti",
+    "allowedDigestsHelp": "Nessuno selezionato: qualsiasi hash è consentito."
   },
   "reports": {
     "complianceReport": "Report di conformità",
