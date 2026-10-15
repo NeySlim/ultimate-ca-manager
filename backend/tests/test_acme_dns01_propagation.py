@@ -3,7 +3,12 @@ every authoritative nameserver must serve the TXT before UCM submits, and a
 settle delay follows for anycast nodes UCM cannot see."""
 import json
 
+import dns.flags
+import dns.message
+import dns.name
+import dns.rcode
 import dns.resolver
+import dns.rrset
 import pytest
 
 from api.v2.acme_client import orders as orders_mod
@@ -14,6 +19,7 @@ from utils import dns_txt_lookup as lookup
 NAME = '_acme-challenge.example.com'
 TOKEN = 'the-token'
 NS_IPS = {'ns1.example.net.': '192.0.2.1', 'ns2.example.net.': '192.0.2.2'}
+TARGET = 'abcd.acme-dns.example.org'
 
 
 class _RData:
@@ -23,6 +29,25 @@ class _RData:
 
     def __str__(self):
         return self._value
+
+
+def _reply(rcode=dns.rcode.NOERROR, authoritative=True, cname=None):
+    reply = dns.message.make_response(dns.message.make_query(NAME, 'TXT'))
+    reply.set_rcode(rcode)
+    if authoritative:
+        reply.flags |= dns.flags.AA
+    if cname:
+        reply.answer.append(dns.rrset.from_text(NAME, 300, 'IN', 'CNAME', cname + '.'))
+    return reply
+
+
+def _nxdomain():
+    qname = dns.name.from_text(NAME)
+    return dns.resolver.NXDOMAIN(qnames=[qname], responses={qname: _reply(dns.rcode.NXDOMAIN)})
+
+
+def _no_answer(**kwargs):
+    return dns.resolver.NoAnswer(response=_reply(**kwargs))
 
 
 def _set(app, key, value):
@@ -48,6 +73,12 @@ def zone(app, monkeypatch):
     _set(app, 'acme.dns01_resolver_mode', 'auto')
     _set(app, 'acme.dns01_nameservers', '')
     served = {}
+    canonical = {}
+
+    def _canonical(qname):
+        if canonical.get('down'):
+            raise dns.resolver.NoNameservers()
+        return dns.name.from_text(canonical.get(qname, qname))
 
     def _system(qname, rtype, lifetime=None):
         if rtype == 'NS':
@@ -64,18 +95,22 @@ def zone(app, monkeypatch):
         if ip not in served:
             return [_RData(TOKEN)]  # a public resolver
         outcome = served[ip]
+        if isinstance(outcome, dict):
+            outcome = outcome[qname]
         if isinstance(outcome, Exception):
             raise outcome
         return [_RData(outcome)]
 
     monkeypatch.setattr(dns.resolver, 'resolve', _system)
     monkeypatch.setattr(dns.resolver.Resolver, 'resolve', _query)
+    monkeypatch.setattr(dns.resolver, 'canonical_name', _canonical)
+    served['canonical'] = canonical
     return served
 
 
 def test_one_authoritative_lagging_keeps_the_record_pending(app, zone):
     zone['192.0.2.1'] = TOKEN
-    zone['192.0.2.2'] = dns.resolver.NXDOMAIN()
+    zone['192.0.2.2'] = _nxdomain()
     with app.app_context():
         assert lookup.txt_record_present(NAME, TOKEN, log_public=False) is False
 
@@ -97,6 +132,39 @@ def test_every_authoritative_serving_the_value_confirms(app, zone):
 def test_unreachable_authoritative_does_not_block(app, zone):
     zone['192.0.2.1'] = TOKEN
     zone['192.0.2.2'] = dns.resolver.LifetimeTimeout(timeout=10.0, errors=[])
+    with app.app_context():
+        assert lookup.txt_record_present(NAME, TOKEN, log_public=False) is True
+
+
+def test_empty_authoritative_reply_keeps_the_record_pending(app, zone):
+    zone['192.0.2.1'] = TOKEN
+    zone['192.0.2.2'] = _no_answer()
+    with app.app_context():
+        assert lookup.txt_record_present(NAME, TOKEN, log_public=False) is False
+
+
+def test_lame_nameserver_is_ignored(app, zone):
+    zone['192.0.2.1'] = TOKEN
+    zone['192.0.2.2'] = _no_answer(authoritative=False)
+    with app.app_context():
+        assert lookup.txt_record_present(NAME, TOKEN, log_public=False) is True
+
+
+def test_cname_delegated_challenge_is_checked_on_its_target(app, zone):
+    zone['canonical'][NAME] = TARGET
+    hop = _no_answer(cname=TARGET)
+    zone['192.0.2.1'] = {NAME: hop, TARGET: TOKEN}
+    zone['192.0.2.2'] = {NAME: hop, TARGET: _nxdomain()}
+    with app.app_context():
+        assert lookup.txt_record_present(NAME, TOKEN, log_public=False) is False
+        zone['192.0.2.2'] = {NAME: hop, TARGET: TOKEN}
+        assert lookup.txt_record_present(NAME, TOKEN, log_public=False) is True
+
+
+def test_cname_hop_without_canonical_lookup_falls_back_to_public(app, zone):
+    zone['canonical']['down'] = True
+    zone['192.0.2.1'] = _no_answer(cname=TARGET)
+    zone['192.0.2.2'] = _no_answer(cname=TARGET)
     with app.app_context():
         assert lookup.txt_record_present(NAME, TOKEN, log_public=False) is True
 
@@ -136,6 +204,17 @@ def test_default_settle_delay(app, monkeypatch, sleeps):
     with app.app_context():
         dns_selfcheck.wait_for_challenges({'example.com': {'dns_txt_value': TOKEN}}, 30)
     assert sleeps == [dns_selfcheck.DNS_PROPAGATION_DEFAULT_DELAY]
+
+
+def test_slow_lookups_count_against_the_timeout(app, monkeypatch, sleeps):
+    clock = iter(range(0, 1000, 20))
+    monkeypatch.setattr(dns_selfcheck.time, 'monotonic', lambda: next(clock))
+    checks = []
+    monkeypatch.setattr(dns_selfcheck, 'txt_record_present', lambda name, value: checks.append(name) and False)
+    with app.app_context():
+        res = dns_selfcheck.wait_for_challenges({'example.com': {'dns_txt_value': TOKEN}}, 30)
+    assert res['ok'] is False
+    assert len(checks) == 2  # 20 s then 40 s of lookups, not 7 polls of 5 s
 
 
 def test_no_settle_delay_when_the_record_is_missing(app, monkeypatch, sleeps, delay_setting):

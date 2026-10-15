@@ -71,6 +71,7 @@ def wait_for_challenges(challenges: dict, timeout: int, delay: Optional[int] = N
     pending = {d: c for d, c in challenges.items() if c.get('dns_txt_value')}
     checked = bool(pending)
     waited = 0
+    started = time.monotonic()
     if pending:
         logger.info(
             'DNS propagation poll started: timeout=%ss, interval=%ss, domains=%s',
@@ -90,7 +91,8 @@ def wait_for_challenges(challenges: dict, timeout: int, delay: Optional[int] = N
                     'DNS TXT still pending for %s (%s) after %ss',
                     domain, txt_name, waited,
                 )
-        if not pending or waited >= timeout:
+        # Wall clock too: slow lookups count against the timeout, not only sleeps.
+        if not pending or max(waited, time.monotonic() - started) >= timeout:
             break
         time.sleep(DNS_SELFCHECK_INTERVAL)
         waited += DNS_SELFCHECK_INTERVAL

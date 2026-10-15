@@ -164,7 +164,7 @@ def test_txt_present_uses_authoritative_before_public(fake_dns, monkeypatch):
         def __init__(self, values):
             self.strings = [v.encode() for v in values]
 
-    def _resolve_with_ns(name, nameservers, rtype='TXT'):
+    def _resolve_with_ns(name, nameservers, rtype='TXT', lifetime=10):
         calls.append((name, nameservers))
         return [_RData(fake_dns['records'][name])]
 

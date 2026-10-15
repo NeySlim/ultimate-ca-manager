@@ -65,10 +65,11 @@ def _txt_present(name: str, expected: str) -> bool:
 def _dns_selfcheck(challenges: dict, timeout: int, delay=None) -> dict:
     """Poll DNS until every dns-01 TXT record is visible, or until timeout.
 
-    Each poll queries configured/authoritative resolvers plus 9.9.9.9, 8.8.8.8
-    and 1.1.1.1 explicitly (logged per resolver). A domain is ready when any of
-    these paths returns the expected TXT. ``timeout == 0`` means "single pass,
-    no loop" (used by the manual verify endpoint for a quick readiness probe).
+    Each poll follows ``acme.dns01_resolver_mode`` (see utils.dns_txt_lookup):
+    in ``auto`` a domain is ready once every authoritative nameserver that
+    answers serves the expected TXT. Readiness is followed by the settle *delay*
+    (default: ``acme.client.dns_propagation_delay``). ``timeout == 0`` means
+    "single pass, no loop".
 
     The auto-poll background path short-circuits *before* calling this when the
     operator-configured ``dns_propagation_timeout`` is 0 ("submit immediately")
