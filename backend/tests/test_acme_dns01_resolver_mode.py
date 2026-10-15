@@ -52,7 +52,8 @@ def queries(monkeypatch):
         raise dns.resolver.NoNameservers()
 
     monkeypatch.setattr(lookup, '_resolve_with_ns', _with_ns)
-    monkeypatch.setattr(lookup, '_authoritative_nameserver_ips', lambda name: seen.append(('authoritative',)) or ['192.0.2.53'])
+    monkeypatch.setattr(lookup, '_authoritative_nameservers',
+                        lambda name: seen.append(('authoritative',)) or [('ns1.example.com', ['192.0.2.53'])])
     monkeypatch.setattr(dns.resolver, 'resolve', _system)
     monkeypatch.setattr(dns.resolver.Resolver, 'resolve', _configured)
     return seen
@@ -98,7 +99,7 @@ def test_auto_mode_keeps_the_full_chain(app, resolver_config, queries):
 def test_poll_queries_public_resolvers_once_per_tick(app, resolver_config, monkeypatch):
     resolver_config('auto')
     calls = []
-    monkeypatch.setattr(lookup, 'resolve_txt_answers', lambda name: ([], 'recursive'))
+    monkeypatch.setattr(lookup, 'resolve_txt_answers', lambda name, expected: ([], 'recursive'))
     monkeypatch.setattr(lookup, 'check_public_resolvers', lambda name, expected: calls.append(name) or {})
     with app.app_context():
         dns_selfcheck.wait_for_challenges({'example.com': {'dns_txt_value': 'tok'}}, 0)

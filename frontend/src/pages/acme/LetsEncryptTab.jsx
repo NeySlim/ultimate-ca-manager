@@ -26,6 +26,8 @@ export default function LetsEncryptTab({
   onBlurSaveInt,
   localDnsTimeout,
   onLocalDnsTimeoutChange,
+  localDnsDelay,
+  onLocalDnsDelayChange,
   localDnsNameservers,
   onLocalDnsNameserversChange,
   onUpdateClientSetting,
@@ -139,6 +141,18 @@ export default function LetsEncryptTab({
             onBlur={() => onBlurSaveInt('dns_propagation_timeout', localDnsTimeout, onLocalDnsTimeoutChange, { min: 0, max: 3600, fallback: 120 })}
             disabled={!canWrite}
             helperText={t('acme.dnsPropagationTimeoutHelper')}
+          />
+
+          <Input
+            label={t('acme.dnsPropagationDelay')}
+            type="number"
+            min="0"
+            max="300"
+            value={localDnsDelay}
+            onChange={(e) => onLocalDnsDelayChange(e.target.value)}
+            onBlur={() => onBlurSaveInt('dns_propagation_delay', localDnsDelay, onLocalDnsDelayChange, { min: 0, max: 300, fallback: 10 })}
+            disabled={!canWrite}
+            helperText={t('acme.dnsPropagationDelayHelper')}
           />
 
           <Select

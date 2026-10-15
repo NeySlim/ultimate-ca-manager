@@ -62,6 +62,8 @@ const renderTab = (props = {}) => render(
     onBlurSaveInt={noop}
     localDnsTimeout="120"
     onLocalDnsTimeoutChange={noop}
+    localDnsDelay="10"
+    onLocalDnsDelayChange={noop}
     localDnsNameservers="10.0.0.53"
     onLocalDnsNameserversChange={noop}
     onUpdateClientSetting={noop}
@@ -115,5 +117,19 @@ describe('LetsEncryptTab DNS-01 resolvers (#394)', () => {
     renderTab()
     expect(screen.getByLabelText('acme.dnsResolverMode')).toHaveValue('auto')
     expect(resolversInput()).toBeInTheDocument()
+  })
+})
+
+describe('LetsEncryptTab DNS propagation delay (#395)', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('saves the delay on blur within 0-300 s', () => {
+    const onBlurSaveInt = vi.fn()
+    const onLocalDnsDelayChange = vi.fn()
+    renderTab({ onBlurSaveInt, onLocalDnsDelayChange, localDnsDelay: '25' })
+    fireEvent.blur(screen.getByDisplayValue('25'))
+    expect(onBlurSaveInt).toHaveBeenCalledWith(
+      'dns_propagation_delay', '25', onLocalDnsDelayChange, { min: 0, max: 300, fallback: 10 },
+    )
   })
 })

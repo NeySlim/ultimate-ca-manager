@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+
+- ACME DNS-01: UCM submitted the challenge as soon as one authoritative nameserver served the TXT record, so Let's Encrypt often got NXDOMAIN from another one. Every authoritative nameserver must now serve it, followed by a configurable settle delay (10 s by default) (#395, reported by @ziller-hqs).
+
 ## [2.239] - 2026-10-14
 
 ### Added

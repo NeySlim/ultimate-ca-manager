@@ -4,7 +4,14 @@ import types
 import pytest
 
 from api.v2.acme_client import orders as orders_mod
+from services.acme import dns_selfcheck as dns_selfcheck_mod
 from utils import dns_txt_lookup as dns_lookup_mod
+
+
+@pytest.fixture(autouse=True)
+def _no_propagation_delay(monkeypatch):
+    monkeypatch.setattr(dns_selfcheck_mod, 'dns_propagation_delay', lambda: 0)
+    monkeypatch.setattr(orders_mod, 'dns_propagation_delay', lambda: 0)
 
 
 @pytest.fixture
@@ -148,8 +155,8 @@ def test_txt_present_uses_authoritative_before_public(fake_dns, monkeypatch):
     fake_dns['records']['_acme-challenge.example.com'] = ['token']
     monkeypatch.setattr(
         dns_lookup_mod,
-        '_authoritative_nameserver_ips',
-        lambda _name: ['203.0.113.53'],
+        '_authoritative_nameservers',
+        lambda _name: [('ns1.example.com', ['203.0.113.53'])],
     )
     calls = []
 
@@ -188,7 +195,7 @@ def test_check_public_resolvers_queries_each_ip(fake_dns, monkeypatch):
 
 def test_txt_present_falls_back_to_public_resolver(fake_dns, monkeypatch):
     monkeypatch.setattr(dns_lookup_mod, 'get_configured_dns01_nameservers', lambda: [])
-    monkeypatch.setattr(dns_lookup_mod, '_authoritative_nameserver_ips', lambda _name: [])
+    monkeypatch.setattr(dns_lookup_mod, '_authoritative_nameservers', lambda _name: [])
 
     class _RData:
         def __init__(self, values):

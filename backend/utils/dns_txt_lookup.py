@@ -3,7 +3,8 @@ DNS TXT lookup helpers for ACME DNS-01 propagation checks.
 
 ``acme.dns01_resolver_mode`` picks the resolvers:
 - ``auto``: ``acme.dns01_nameservers`` if set, then the zone's authoritative
-  nameservers, then 9.9.9.9 / 8.8.8.8 / 1.1.1.1, then the system resolver;
+  nameservers (every one that answers must serve the value), then
+  9.9.9.9 / 8.8.8.8 / 1.1.1.1, then the system resolver;
 - ``system``: the system resolver only;
 - ``custom``: ``acme.dns01_nameservers`` only.
 Outside ``auto`` nothing else is queried, for networks that block outbound DNS.
@@ -153,8 +154,8 @@ def _resolve_with_ns(name: str, nameservers: List[str], rtype: str = 'TXT'):
     return resolver.resolve(name, rtype)
 
 
-def _authoritative_nameserver_ips(name: str) -> List[str]:
-    """Return A/AAAA addresses for the authoritative NS of *name*'s zone."""
+def _authoritative_nameservers(name: str) -> List[Tuple[str, List[str]]]:
+    """(NS host, its A then AAAA addresses) for each authoritative NS of *name*'s zone."""
     import dns.resolver
 
     parts = name.rstrip('.').split('.')
@@ -165,18 +166,50 @@ def _authoritative_nameserver_ips(name: str) -> List[str]:
         except Exception:
             continue
 
-        ips: List[str] = []
+        servers: List[Tuple[str, List[str]]] = []
         for ns in ns_answers:
             host = str(ns).rstrip('.')
+            ips: List[str] = []
             for family in ('A', 'AAAA'):
                 try:
                     addrs = dns.resolver.resolve(host, family, lifetime=5)
                     ips.extend(str(r) for r in addrs)
                 except Exception:
                     pass
-        if ips:
-            return ips
+            if ips:
+                servers.append((host, ips))
+        if servers:
+            return servers
     return []
+
+
+def _authoritative_txt_answers(name: str, expected: str, servers):
+    """Answers once every authoritative NS that responds serves *expected*;
+    ``[]`` while one still lacks it; None when none responds.
+
+    The CA validates from several vantage points that each reach any NS, so a
+    single up-to-date server proves nothing.
+    """
+    import dns.resolver
+
+    confirmed, lagging = None, []
+    for host, ips in servers:
+        try:
+            answers = _resolve_with_ns(name, ips)
+        except (dns.resolver.NXDOMAIN, dns.resolver.NoAnswer):
+            lagging.append(host)
+            continue
+        except Exception as exc:
+            acme_log(logger, 'TXT via authoritative %s failed for %s: %s', host, name, exc)
+            continue
+        if _answers_contain_expected(answers, expected):
+            confirmed = answers
+        else:
+            lagging.append(host)
+    if lagging:
+        acme_log(logger, 'TXT for %s not yet served by authoritative %s', name, ', '.join(lagging))
+        return []
+    return confirmed
 
 
 def check_public_resolvers(name: str, expected: str) -> Dict[str, bool]:
@@ -208,7 +241,7 @@ def log_public_resolver_status(name: str, expected: str) -> Dict[str, bool]:
     """Log and return per-resolver public propagation status.
 
     This is a *diagnostic* log only: the DNS-01 self-check succeeds as soon as
-    the authoritative (or configured) resolver sees the TXT record, regardless of
+    the configured resolver or every authoritative one sees the TXT record, regardless of
     whether the public recursors have caught up. The line is emitted even on
     success to aid debugging; a ``pending`` entry does NOT block issuance.
     Skipped outside ``auto`` mode, where public resolvers must not be queried.
@@ -224,7 +257,7 @@ def log_public_resolver_status(name: str, expected: str) -> Dict[str, bool]:
     return status
 
 
-def resolve_txt_answers(name: str) -> Tuple[object, str]:
+def resolve_txt_answers(name: str, expected: str) -> Tuple[object, str]:
     """Resolve TXT records per ``acme.dns01_resolver_mode`` (see module docstring).
 
     Returns (answers, source) where *source* identifies the winning resolver.
@@ -243,12 +276,11 @@ def resolve_txt_answers(name: str) -> Tuple[object, str]:
     if mode != 'auto':
         return dns.resolver.resolve(name, 'TXT', lifetime=10), 'recursive'
 
-    auth_ips = _authoritative_nameserver_ips(name)
-    if auth_ips:
-        try:
-            return _resolve_with_ns(name, auth_ips[:6]), 'authoritative'
-        except Exception as exc:
-            acme_log(logger, 'TXT via authoritative NS failed for %s: %s', name, exc)
+    servers = _authoritative_nameservers(name)
+    if servers:
+        answers = _authoritative_txt_answers(name, expected, servers)
+        if answers is not None:
+            return answers, 'authoritative'
 
     for resolver_ip in PUBLIC_DNS_RESOLVERS:
         try:
@@ -263,7 +295,7 @@ def resolve_txt_answers(name: str) -> Tuple[object, str]:
 def txt_record_present(name: str, expected: str, *, log_public: bool = True) -> bool:
     """True when *name* serves a TXT RR whose value equals *expected*."""
     try:
-        answers, source = resolve_txt_answers(name)
+        answers, source = resolve_txt_answers(name, expected)
         if _answers_contain_expected(answers, expected):
             acme_log(logger, 'DNS TXT lookup for %s via %s', name, source)
             if source != 'recursive' and not source.startswith('public:'):

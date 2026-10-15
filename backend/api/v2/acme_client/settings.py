@@ -16,6 +16,7 @@ from models import db, SystemConfig
 from utils.acme_debug import clear_acme_debug_cache
 from services.audit_service import AuditService
 from services.acme.acme_client_service import ACCOUNT_KEY_TYPES, CERT_KEY_TYPES
+from services.acme.dns_selfcheck import DNS_PROPAGATION_MAX_DELAY, dns_propagation_delay
 from security.encryption import encrypt_text
 from utils.dns_txt_lookup import (
     RESOLVER_MODES,
@@ -124,6 +125,7 @@ def get_settings():
         'renewal_enabled': renewal_enabled.value == 'true' if renewal_enabled else True,
         'renewal_days': int(renewal_days.value) if renewal_days else 30,
         'dns_propagation_timeout': dns_timeout,
+        'dns_propagation_delay': dns_propagation_delay(),
         'tls_alpn_port': tls_alpn_port,
         'dns01_resolver_mode': dns01_resolver_mode(),
         'dns01_nameservers': configured_nameservers_raw(),
@@ -217,6 +219,18 @@ def update_settings():
         _set_config('acme.client.dns_propagation_timeout', str(dns_to),
                     'Seconds to self-check DNS-01 TXT propagation before submitting to the CA')
         updates.append('dns_propagation_timeout')
+
+    if 'dns_propagation_delay' in data:
+        try:
+            dns_delay = int(data['dns_propagation_delay'])
+        except (TypeError, ValueError):
+            return error_response('DNS propagation delay must be an integer', 400)
+        if dns_delay < 0 or dns_delay > DNS_PROPAGATION_MAX_DELAY:
+            return error_response(
+                f'DNS propagation delay must be between 0 and {DNS_PROPAGATION_MAX_DELAY} seconds', 400)
+        _set_config('acme.client.dns_propagation_delay', str(dns_delay),
+                    'Seconds to wait after the DNS-01 TXT is visible before submitting to the CA')
+        updates.append('dns_propagation_delay')
 
     if 'dns01_resolver_mode' in data or 'dns01_nameservers' in data:
         mode = data.get('dns01_resolver_mode', dns01_resolver_mode())
