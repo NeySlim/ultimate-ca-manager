@@ -5,6 +5,7 @@ Enrollment over Secure Transport for automated certificate enrollment.
 from flask import Blueprint, request, Response
 from models import db, CA
 from services.ca_service import CAService
+from services.policy_service import PolicyViolation
 from services.audit_service import AuditService
 from utils.trusted_proxy import client_ip
 from utils.db_transaction import safe_commit
@@ -701,6 +702,9 @@ def simple_enroll(label=None):
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
         return _certs_only_response(cert, ca=ca)
         
+    except PolicyViolation as e:
+        logger.warning(f"EST simpleenroll refused by policy: {e}")
+        return Response(f"Policy violation: {e}", status=400)
     except Exception as e:
         logger.error(f"EST simpleenroll failed: {e}")
         return Response("Enrollment failed", status=400)
@@ -815,6 +819,9 @@ def simple_reenroll(label=None):
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
         return _certs_only_response(cert, ca=ca)
         
+    except PolicyViolation as e:
+        logger.warning(f"EST simplereenroll refused by policy: {e}")
+        return Response(f"Policy violation: {e}", status=400)
     except Exception as e:
         logger.error(f"EST simplereenroll failed: {e}")
         return Response("Re-enrollment failed", status=400)
@@ -1054,6 +1061,9 @@ Content-Transfer-Encoding: base64\r
             content_type=f'{MULTIPART_MIXED}; boundary={boundary}'
         )
         
+    except PolicyViolation as e:
+        logger.warning(f"EST serverkeygen refused by policy: {e}")
+        return Response(f"Policy violation: {e}", status=400)
     except Exception as e:
         logger.error(f"EST serverkeygen failed: {e}")
         return Response("Server key generation failed", status=400)

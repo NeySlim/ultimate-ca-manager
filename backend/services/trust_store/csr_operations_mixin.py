@@ -594,6 +594,7 @@ class CSROperationsMixin:
         requester_sid: Optional[str] = None,
         template_ext: Optional[dict] = None,
         extra_san: Optional[List[x509.GeneralName]] = None,
+        policy_scope: Optional[dict] = None,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
         signing renews — its names are graced by NameConstraints validation.
@@ -634,7 +635,10 @@ class CSROperationsMixin:
         authenticated, not what subject was requested).
         ``extra_san``: names the operator adds to the request's own (admin
         Sign CSR only); with a request that names none, they join those its
-        CN implies, a CN that is not a hostname giving no DNS name."""
+        CN implies, a CN that is not a hostname giving no DNS name.
+        ``policy_scope``: ``{ca_id, template_id, digest_explicit}`` of the
+        issuance; the policies in that scope bind the key type and the digest
+        (an implicit one yields to them). Every production caller passes it."""
         from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 
         # Load CSR
@@ -705,6 +709,23 @@ class CSROperationsMixin:
         # never outlives it (RFC 5280 §6.1) -- checked here for every caller
         # of this trunk rather than by each of them
         check_issuer_window(ca_cert)
+
+        # Issuance policies: key type and signature hash (#397)
+        from services.policy_service import (PolicyEvaluationService, PolicyViolation,
+                                             key_label_for_public_key)
+        policies = []
+        if policy_scope is not None:
+            cn_attrs = subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+            policies = PolicyEvaluationService.applicable_policies(
+                policy_scope.get('ca_id'), policy_scope.get('template_id'),
+                cn_attrs[0].value if cn_attrs else None,
+                [n.value for n in (effective_sans or []) if isinstance(n, x509.DNSName)])
+        sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
+            policies, ca_private_key, digest,
+            explicit=bool((policy_scope or {}).get('digest_explicit', policy_scope is None)),
+            key_type=key_label_for_public_key(csr.public_key()))
+        if violations:
+            raise PolicyViolation('; '.join(violations))
 
         # Build certificate from CSR
         builder = x509.CertificateBuilder()
@@ -1106,10 +1127,9 @@ class CSROperationsMixin:
             )
 
         # Sign
-        hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
         certificate = builder.sign(
             private_key=ca_private_key,
-            algorithm=signing_hash_for(ca_private_key, hash_algo),
+            algorithm=sign_hash,
             backend=default_backend()
         )
 

@@ -53,7 +53,6 @@ _EC_CURVES = {
 from security.encryption import encrypt_private_key
 
 
-from utils.signing_hash import signing_hash_for
 from utils.x509_aki import authority_key_identifier_from_issuer
 
 
@@ -197,7 +196,15 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
             sign_hash = ca_sig_hash
     except Exception:
         pass
-    new_cert = builder.sign(ca_key, signing_hash_for(ca_key, sign_hash), default_backend())
+    # Issuance policies (#397): that default yields to the digests they allow
+    from services.policy_service import PolicyEvaluationService, key_label_for_public_key
+    sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
+        PolicyEvaluationService.applicable_policies(ca.id, None, cn),
+        ca_key, sign_hash.name, explicit=False,
+        key_type=key_label_for_public_key(new_key.public_key()))
+    if violations:
+        raise TsaSignerIssueError('Policy violation: ' + '; '.join(violations), 400)
+    new_cert = builder.sign(ca_key, sign_hash, default_backend())
 
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
     key_pem = private_key_to_pem(new_key).decode('utf-8')

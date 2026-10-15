@@ -179,6 +179,8 @@ class CSRMixin:
         allow_sensitive_ekus: bool = False,
         template_id: int = None,
         extra_san: list = None,
+        digest_explicit: bool = False,
+        policy_template_id: int = None,
     ) -> Certificate:
         """
         Sign a CSR with a CA
@@ -195,6 +197,10 @@ class CSRMixin:
                 (an ACME profile): its KU/EKU govern the leaf and the
                 certificate records the link, as on the issue form
             extra_san: x509 GeneralName entries added to the request's names
+            digest_explicit: *digest* was chosen (ACME profile); otherwise it
+                yields to the digests the issuance policies allow
+            policy_template_id: template that scopes the policies when it is
+                not bound to the issuance (Sign CSR form), else *template_id*
 
         Returns:
             Updated Certificate with signed cert (or new CA record for intermediate_ca)
@@ -294,6 +300,11 @@ class CSRMixin:
             allow_sensitive_ekus=allow_sensitive_ekus,
             template_ext=template_ext,
             extra_san=extra_san,
+            policy_scope={
+                'ca_id': ca.id,
+                'template_id': policy_template_id if policy_template_id is not None else template_id,
+                'digest_explicit': digest_explicit,
+            },
         )
 
         # Parse signed certificate

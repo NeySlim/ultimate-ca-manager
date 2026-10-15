@@ -18,7 +18,7 @@ from cryptography.exceptions import InvalidSignature
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa
-from cryptography.x509.oid import ExtensionOID
+from cryptography.x509.oid import ExtensionOID, NameOID
 
 from config.settings import Config
 from models import CA, Certificate, SCEPRequest, db
@@ -61,7 +61,6 @@ from services.scep.response_builder import (
 logger = logging.getLogger(__name__)
 
 
-from utils.signing_hash import signing_hash_for
 from utils.x509_aki import authority_key_identifier_from_issuer
 from services.cert.issued_lookup import find_issued_row, san_identity_matches
 
@@ -447,6 +446,14 @@ class SCEPService:
                 logger.warning("SCEP: rejecting weak enrollment key: %s", key_err)
                 return self._create_error_response(
                     self.FAIL_BAD_REQUEST, key_err,
+                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                ), 200
+            # Issuance policies (key type, signature hash), before anything is stored
+            _, policy_violations = self._policy_signing_hash(csr)
+            if policy_violations:
+                logger.warning("SCEP: request refused by policy: %s", '; '.join(policy_violations))
+                return self._create_error_response(
+                    self.FAIL_BAD_REQUEST, 'Policy violation: ' + '; '.join(policy_violations),
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
                 ), 200
 
@@ -1156,6 +1163,24 @@ class SCEPService:
             return default
         return max(lo, min(hi, value))
 
+    def _policy_signing_hash(self, csr):
+        """``(hash to sign with, violations)`` under the issuance policies of
+        this CA and profile template (#397)."""
+        from services.policy_service import PolicyEvaluationService, key_label_for_public_key
+        cn_attrs = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        try:
+            dns = csr_extensions(csr).get_extension_for_oid(
+                ExtensionOID.SUBJECT_ALTERNATIVE_NAME).value.get_values_for_type(x509.DNSName)
+        except x509.ExtensionNotFound:
+            dns = []
+        policies = PolicyEvaluationService.applicable_policies(
+            self.ca.id, self.template.id if self.template is not None else None,
+            cn_attrs[0].value if cn_attrs else None, list(dns))
+        sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
+            policies, self.ca_key, explicit=False,
+            key_type=key_label_for_public_key(csr.public_key()))
+        return sign_hash, violations
+
     def _auto_approve_request(
         self,
         scep_req: SCEPRequest,
@@ -1173,6 +1198,12 @@ class SCEPService:
             raise ValueError("CA is revoked and can no longer sign")
         from utils.ca_signing_window import check_issuer_window
         check_issuer_window(self.ca_cert)
+
+        # Re-checked here: a manual approval may come after the policies changed
+        from services.policy_service import PolicyViolation
+        sign_hash, policy_violations = self._policy_signing_hash(csr)
+        if policy_violations:
+            raise PolicyViolation('; '.join(policy_violations))
 
         cert_refid = str(uuid.uuid4())
         public_key = csr.public_key()
@@ -1493,7 +1524,7 @@ class SCEPService:
                 critical=False,
             )
 
-        cert = builder.sign(self.ca_key, signing_hash_for(self.ca_key), default_backend())
+        cert = builder.sign(self.ca_key, sign_hash, default_backend())
         # Same CT policy as every other leaf path (a ValueError here is a
         # refusal the SCEP layer reports as a failure)
         from utils.ct_client import apply_ct_policy

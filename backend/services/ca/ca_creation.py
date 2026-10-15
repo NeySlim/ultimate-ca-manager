@@ -33,6 +33,28 @@ def _key_default_digest(private_key) -> str:
     return 'sha256'
 
 
+def _ca_policies(parent_refid, dn, key_type, hsm_key_id, hsm_key_algorithm):
+    """``(policies, key label)`` binding a new CA (#397): those of the parent
+    for an intermediate, the global ones for a root. Read before any key exists."""
+    from services.policy_service import PolicyEvaluationService
+    from services.template_service import _normalize_key_type_label
+    parent = CA.query.filter_by(refid=parent_refid).first() if parent_refid else None
+    if hsm_key_id:
+        hsm_key = db.session.get(HsmKey, hsm_key_id)
+        label = hsm_key.algorithm if hsm_key else None
+    else:
+        label = hsm_key_algorithm or key_type
+    policies = PolicyEvaluationService.applicable_policies(
+        parent.id if parent else None, None, (dn or {}).get('CN'))
+    return policies, _normalize_key_type_label(label) or label
+
+
+def _refuse_on_violations(violations):
+    from services.policy_service import PolicyViolation
+    if violations:
+        raise PolicyViolation('Policy violation: ' + '; '.join(violations))
+
+
 class CACreationMixin:
     """CA creation and import operations"""
 
@@ -159,6 +181,7 @@ class CACreationMixin:
         key_usage: Optional[List[str]] = None,
         extended_key_usage: Optional[List[str]] = None,
         named_urls: bool = False,
+        digest_explicit: bool = True,
     ) -> CA:
         """
         Create an internal Certificate Authority.
@@ -176,11 +199,22 @@ class CACreationMixin:
             hsm_provider_id: Generate a new HSM key on this provider
             hsm_key_label: Label for the new HSM key
             hsm_key_algorithm: Algorithm for the new HSM key
+            digest_explicit: False when *digest* was not chosen ('auto'): it
+                then yields to the digests the issuance policies allow
 
         Returns:
             CA model instance
         """
         from services.hsm.ca_key_loader import get_ca_signing_key
+        from services.policy_service import PolicyEvaluationService, key_label_for_public_key
+
+        # Issuance policies, checked before a key is generated (an HSM key is
+        # created on the device), then again on the real key and signer below
+        policies, key_label = _ca_policies(caref, dn, key_type, hsm_key_id, hsm_key_algorithm)
+        if not digest_explicit:
+            digest = PolicyEvaluationService.choose_digest(policies, digest)
+        _refuse_on_violations(PolicyEvaluationService.enforce_rules(
+            policies, key_type=key_label, digest=digest)[0])
 
         # Resolve signing key - local generation, existing HSM key, or new HSM key
         private_key, key_pem, hsm_key = CACreationMixin._resolve_signing_key(
@@ -251,6 +285,10 @@ class CACreationMixin:
             if parent_ca.cps_enabled and parent_ca.cps_uri:
                 parent_cps_uri = parent_ca.cps_uri
                 parent_cps_oid = parent_ca.cps_oid
+
+        _refuse_on_violations(PolicyEvaluationService.checked_signing_hash(
+            policies, issuer_private_key or private_key, digest,
+            key_type=key_label_for_public_key(private_key.public_key()))[1])
 
         # Create CA certificate
         cert_pem, generated_key_pem = TrustStoreService.create_ca_certificate(
@@ -475,11 +513,19 @@ class CACreationMixin:
 
         The row uses the crt='' sentinel until complete_external_ca installs
         the externally signed certificate. The private key (or HSM binding)
-        is created immediately so the CSR's public key is final.
+        is created immediately so the CSR's public key is final. The issuance
+        policies bind its key type; the certificate's hash is the signer's.
         """
+        from services.policy_service import PolicyEvaluationService, key_label_for_public_key
+        policies, key_label = _ca_policies(None, dn, key_type, hsm_key_id, hsm_key_algorithm)
+        _refuse_on_violations(PolicyEvaluationService.enforce_rules(
+            policies, key_type=key_label)[0])
         private_key, key_pem, hsm_key = CACreationMixin._resolve_signing_key(
             key_type, hsm_provider_id, hsm_key_id, hsm_key_label, hsm_key_algorithm
         )
+
+        _refuse_on_violations(PolicyEvaluationService.enforce_rules(
+            policies, key_type=key_label_for_public_key(private_key.public_key()))[0])
 
         subject = TrustStoreService.build_subject(dn)
         csr_pem = TrustStoreService.generate_ca_csr(

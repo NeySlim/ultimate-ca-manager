@@ -616,6 +616,7 @@ class IssuanceMixin:
                 cert_type='server_cert',
                 validity_days=params['validity_days'],
                 digest=params['digest'],
+                digest_explicit=params.get('digest_explicit', True),
                 username='acme',
                 template_id=params.get('template_id'),
             )

@@ -33,7 +33,6 @@ RESPONDER_KEY_PREFIX = 'ocsp_responder_cert_'
 DEFAULT_RENEW_DAYS = 30
 
 
-from utils.signing_hash import signing_hash_for
 from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.cert_issuer import authority_key_identifier_hex
 
@@ -109,7 +108,14 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
         critical=False,
     )
 
-    new_cert = builder.sign(ca_key, signing_hash_for(ca_key), default_backend())
+    from services.policy_service import (PolicyEvaluationService, PolicyViolation,
+                                         key_label_for_public_key)
+    sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
+        PolicyEvaluationService.applicable_policies(ca.id, cert.template_id, cert.subject_cn),
+        ca_key, explicit=False, key_type=key_label_for_public_key(private_key.public_key()))
+    if violations:
+        raise PolicyViolation('; '.join(violations))
+    new_cert = builder.sign(ca_key, sign_hash, default_backend())
 
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode()
 

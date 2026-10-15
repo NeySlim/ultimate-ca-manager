@@ -16,15 +16,13 @@ from utils.eku_validation import add_ocsp_nocheck_if_responder
 from utils.cert_profiles import profile_for
 from utils.leaf_key_usage import key_usage_for_key
 from models import Certificate, CertificateTemplate, CA, db
-from services.trust_store.constants import HASH_ALGORITHMS
 from services.trust_store.constraints_mixin import validate_name_constraints
 from services.template_service import compute_template_overrides
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID, ExtensionOID
-from utils.signing_hash import signing_hash_for
 from services.audit_service import AuditService
 from services.notification_service import NotificationService
 from websocket.emitters import on_certificate_issued
@@ -260,6 +258,11 @@ def create_certificate():
             dns_name_count=len(set(requested_dns) | set(implicit_dns)),
             validity_days=validity_days,
         )
+        # The template's digest is a choice, checked; without one the default yields
+        template_digest = template.digest if template and template.digest else None
+        sign_hash, digest_violations = PolicyEvaluationService.checked_signing_hash(
+            policies, ca_key, template_digest, explicit=template_digest is not None)
+        violations += digest_violations
         if violations:
             return error_response('Policy violation: ' + '; '.join(violations), 400)
         notices = []
@@ -519,11 +522,8 @@ def create_certificate():
                 critical=False,
             )
 
-        # Sign certificate — honor the template digest when one is used
-        sign_hash = hashes.SHA256()
-        if template and template.digest:
-            sign_hash = HASH_ALGORITHMS.get(template.digest.lower().strip(), hashes.SHA256())
-        new_cert = builder.sign(ca_key, signing_hash_for(ca_key, sign_hash), default_backend())
+        # Sign with the digest resolved against the policies above
+        new_cert = builder.sign(ca_key, sign_hash, default_backend())
         # The CT policy (embed SCTs, ct_required) applies to this builder as
         # it does to the CSR trunk and the lifecycle service
         from utils.ct_client import apply_ct_policy

@@ -21,6 +21,7 @@ from utils.sanitize import sanitize_filename
 from models import db, Certificate, CA
 from services.cert_service import CertificateService
 from services.deletion_blockers import parse_bulk_ids
+from services.policy_service import PolicyViolation
 from utils.san_parse import (general_names_from_buckets, parse_extra_san_payload,
                              san_buckets_from_general_names)
 from services.audit_service import AuditService
@@ -105,7 +106,6 @@ def list_csrs():
 def _csr_identity(cert):
     """``(cn, dns_names, key_label)`` of a stored request, or raises ValueError."""
     from cryptography import x509 as _x509
-    from cryptography.hazmat.primitives.asymmetric import ec as _ec, rsa as _rsa
     from cryptography.x509.oid import ExtensionOID as _ExtOID, NameOID as _NameOID
     csr_obj = _x509.load_pem_x509_csr(base64.b64decode(cert.csr))
     cn_attrs = csr_obj.subject.get_attributes_for_oid(_NameOID.COMMON_NAME)
@@ -115,10 +115,8 @@ def _csr_identity(cert):
             _ExtOID.SUBJECT_ALTERNATIVE_NAME).value.get_values_for_type(_x509.DNSName))
     except _x509.ExtensionNotFound:
         csr_dns = []
-    pub = csr_obj.public_key()
-    key_label = (str(pub.key_size) if isinstance(pub, _rsa.RSAPublicKey)
-                 else pub.curve.name if isinstance(pub, _ec.EllipticCurvePublicKey) else None)
-    return csr_cn, csr_dns, key_label
+    from services.policy_service import key_label_for_public_key
+    return csr_cn, csr_dns, key_label_for_public_key(csr_obj.public_key())
 
 
 def _policy_rule_refusal(ca, cert, template_id, validity_days, extra_dns=()):
@@ -998,6 +996,7 @@ def sign_csr(csr_id):
             allow_sensitive_ekus=True,
             username=getattr(g.current_user, 'username', 'system'),
             extra_san=general_names_from_buckets(extra_san) if extra_san else None,
+            policy_template_id=data.get('template_id'),
         )
         
         # Determine if result is a CA or Certificate
@@ -1023,6 +1022,8 @@ def sign_csr(csr_id):
             meta=notices_mod.meta_with_notices(
                 notices_mod.collect(validity_notice, ca_clamp_notice)),
         )
+    except PolicyViolation as e:
+        return error_response(f'Policy violation: {e}', 400)
     except ValueError as e:
         if 'another request' in str(e):
             return error_response('CSR was signed by another request; reload it', 409)
@@ -1115,8 +1116,11 @@ def bulk_sign_csrs():
             signed_cert = CertificateService.sign_csr(
                 cert_id=csr_id, caref=ca.refid, validity_days=item_validity,
                 allow_sensitive_ekus=True,
-                username=getattr(g.current_user, 'username', 'system'))
+                username=getattr(g.current_user, 'username', 'system'),
+                policy_template_id=data.get('template_id'))
             results['success'].append(csr_id)
+        except PolicyViolation as e:
+            results['failed'].append({'id': csr_id, 'error': f'Policy violation: {e}'})
         except Exception as e:
             results['failed'].append({'id': csr_id, 'error': 'Signing failed'})
 

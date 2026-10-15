@@ -57,7 +57,6 @@ from utils.validity import MAX_VALIDITY_DAYS as MAX_RENEWAL_DAYS
 DEFAULT_RENEWAL_DAYS = 365
 
 
-from utils.signing_hash import signing_hash_for
 from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.ca_pointer_extensions import add_ca_pointer_extensions
 from utils.leaf_key_usage import constrain_builder_key_usage
@@ -449,15 +448,17 @@ def renew_certificate_in_place(
             ExtensionOID.SUBJECT_ALTERNATIVE_NAME).value.get_values_for_type(x509.DNSName))
     except x509.ExtensionNotFound:
         orig_dns = []
-    key_label = (str(public_key.key_size) if isinstance(public_key, rsa.RSAPublicKey)
-                 else public_key.curve.name if isinstance(public_key, ec.EllipticCurvePublicKey)
-                 else None)
+    from services.policy_service import key_label_for_public_key
     requested_validity = validity_days
+    policies = PolicyEvaluationService.applicable_policies(
+        ca.id, getattr(cert, 'template_id', None),
+        cn_attrs[0].value if cn_attrs else None, orig_dns)
     violations, validity_days, capped_by = PolicyEvaluationService.enforce_rules(
-        PolicyEvaluationService.applicable_policies(
-            ca.id, getattr(cert, 'template_id', None),
-            cn_attrs[0].value if cn_attrs else None, orig_dns),
-        key_type=key_label, dns_name_count=len(set(orig_dns)), validity_days=validity_days)
+        policies, key_type=key_label_for_public_key(public_key),
+        dns_name_count=len(set(orig_dns)), validity_days=validity_days)
+    sign_hash, digest_violations = PolicyEvaluationService.checked_signing_hash(
+        policies, ca_key, explicit=False)
+    violations += digest_violations
     if violations:
         raise RenewalError('Policy violation: ' + '; '.join(violations), 400)
     not_before = cert_not_before()
@@ -546,7 +547,7 @@ def renew_certificate_in_place(
         authority_key_identifier_from_issuer(ca_cert), critical=False
     )
 
-    new_cert = builder.sign(ca_key, signing_hash_for(ca_key), default_backend())
+    new_cert = builder.sign(ca_key, sign_hash, default_backend())
     try:
         from utils.ct_client import apply_ct_policy
         new_cert, _ = apply_ct_policy(new_cert, ca_cert, ca_key)

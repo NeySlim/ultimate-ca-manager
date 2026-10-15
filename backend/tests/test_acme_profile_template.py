@@ -145,7 +145,7 @@ class TestProfileConfig:
                 assert profiles['flag']['template_id'] is None
                 params = acme_profiles.issuance_params('mtls')
                 assert params == {'validity_days': 30, 'digest': 'sha256',
-                                  'template_id': mtls_template}
+                                  'digest_explicit': False, 'template_id': mtls_template}
                 assert acme_profiles.issuance_params('plain')['template_id'] is None
         finally:
             _clear_profiles(app)

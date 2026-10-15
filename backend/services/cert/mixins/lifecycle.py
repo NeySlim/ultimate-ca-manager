@@ -95,6 +95,8 @@ class LifecycleMixin:
             key_type = '2048'
         if validity_days is None:
             validity_days = DEFAULT_CERTIFICATE_VALIDITY_DAYS
+        # A digest asked for (or the template's) is checked; the default yields
+        digest_explicit = digest is not None
         if digest is None:
             digest = 'sha256'
 
@@ -139,6 +141,19 @@ class LifecycleMixin:
             ca_private_key = get_ca_signing_key(ca)
         except Exception as e:
             raise ValueError(f"Failed to load CA signing key: {e}")
+
+        # Issuance policies (#397): key type and signature hash
+        from services.policy_service import PolicyEvaluationService, PolicyViolation
+        from services.template_service import _normalize_key_type_label
+        sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
+            PolicyEvaluationService.applicable_policies(
+                ca.id, template_id, (dn or {}).get('CN'), san_dns),
+            ca_private_key, digest, explicit=digest_explicit,
+            key_type=_normalize_key_type_label(key_type) or key_type)
+        if violations:
+            raise PolicyViolation('Policy violation: ' + '; '.join(violations))
+        if sign_hash is not None:
+            digest = sign_hash.name
 
         # Build subject
         subject = TrustStoreService.build_subject(dn)

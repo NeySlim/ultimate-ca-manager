@@ -19,6 +19,7 @@ from cryptography.x509.oid import NameOID
 
 from models import Certificate
 from services.ca_service import CAService
+from services.policy_service import PolicyViolation
 from utils.csr_extensions import extensions_of
 from utils.datetime_utils import utc_now
 from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
@@ -757,7 +758,11 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
             # extension, whatever cert_type is — extra_ekus is the only
             # way a Smartcard Logon template still issues correctly.
             extra_ekus=_template_extra_ekus(matched_template),
+            policy_template_id=getattr(matched_template, 'id', None),
         )
+    except PolicyViolation as e:
+        logger.warning('WSTEP issue refused by policy: %s', e)
+        return None, f'Policy violation: {e}'
     except Exception as e:
         logger.error('WSTEP issue failed: %s', e)
         return None, 'Certificate issuance failed'
@@ -834,7 +839,11 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
             ms_certificate_template_oid=template_oid,
             # See issue()'s matching kwarg for why.
             extra_ekus=_template_extra_ekus(matched_template),
+            policy_template_id=getattr(matched_template, 'id', None),
         )
+    except PolicyViolation as e:
+        logger.warning('WSTEP renew refused by policy: %s', e)
+        return None, f'Policy violation: {e}'
     except Exception as e:
         logger.error('WSTEP renew failed: %s', e)
         return None, 'Certificate renewal failed'

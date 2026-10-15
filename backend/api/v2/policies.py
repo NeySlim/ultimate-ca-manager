@@ -34,7 +34,6 @@ bp = Blueprint('policies_pro', __name__)
 from utils.validity import MAX_VALIDITY_DAYS as _MAX_VALIDITY_DAYS
 
 
-from utils.signing_hash import signing_hash_for
 from utils.x509_aki import authority_key_identifier_from_issuer
 
 
@@ -213,6 +212,7 @@ def _issue_approved_csr(approval, data):
         allow_sensitive_ekus=True,
         username=approval.requester.username if approval.requester else 'system',
         extra_san=general_names_from_buckets(data['extra_san']) if data.get('extra_san') else None,
+        policy_template_id=data.get('template_id'),
     )
     if isinstance(signed, CA):
         # An intermediate CA request: the result lives in the CA table, the
@@ -277,7 +277,7 @@ def _issue_approved_certificate(approval):
     """
     from services.policy_service import PolicyEvaluationService
     from cryptography import x509
-    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives import serialization
     from cryptography.hazmat.primitives.asymmetric import rsa, ec
     from cryptography.hazmat.backends import default_backend
     from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID, ExtensionOID
@@ -376,6 +376,10 @@ def _issue_approved_certificate(approval):
         dns_name_count=len(set(_requested_dns) | set(_implicit_dns)),
         validity_days=validity_days,
     )
+    _template_digest = template.digest if template and template.digest else None
+    _sign_hash, _digest_violations = PolicyEvaluationService.checked_signing_hash(
+        _policies, ca_key, _template_digest, explicit=_template_digest is not None)
+    _violations += _digest_violations
     if _violations:
         raise PolicyViolation('; '.join(_violations))
     data['validity_days'] = validity_days
@@ -563,12 +567,8 @@ def _issue_approved_certificate(approval):
             x509.PolicyInformation(policy_identifier=x509.ObjectIdentifier(ca.cps_oid or '2.5.29.32.0'), policy_qualifiers=[ca.cps_uri])
         ]), critical=False)
     
-    # Sign — honor the template digest when one is used
-    from services.trust_store.constants import HASH_ALGORITHMS
-    sign_hash = hashes.SHA256()
-    if template and template.digest:
-        sign_hash = HASH_ALGORITHMS.get(template.digest.lower().strip(), hashes.SHA256())
-    new_cert = builder.sign(ca_key, signing_hash_for(ca_key, sign_hash), default_backend())
+    # Sign with the digest resolved against the policies above
+    new_cert = builder.sign(ca_key, _sign_hash, default_backend())
     # Same CT policy as the direct issue form (raises ValueError when
     # ct_required cannot be met: the approval stays pending with the reason)
     from utils.ct_client import apply_ct_policy
@@ -662,6 +662,44 @@ def _issue_approved_certificate(approval):
 
 # ============ Policy Management ============
 
+def _validated_rules(rules):
+    """``(rules, error)``: key-type and digest lists normalised, unknown values refused."""
+    from services.policy_service import normalize_digest
+    from services.template_service import _normalize_key_type_label
+    if not isinstance(rules, dict):
+        return None, 'rules must be an object'
+    rules = dict(rules)
+    key_types = rules.get('allowed_key_types')
+    if key_types is not None:
+        if not isinstance(key_types, list):
+            return None, 'allowed_key_types must be a list'
+        labels = [_normalize_key_type_label(k) if isinstance(k, (str, int)) else None
+                  for k in key_types]
+        if None in labels:
+            return None, f'Unknown key type in allowed_key_types: {key_types[labels.index(None)]}'
+        rules['allowed_key_types'] = list(dict.fromkeys(labels))
+    digests = rules.get('allowed_digests')
+    if digests is not None:
+        if not isinstance(digests, list):
+            return None, 'allowed_digests must be a list'
+        names = [normalize_digest(d) if isinstance(d, str) else None for d in digests]
+        if None in names:
+            return None, f'Unknown digest in allowed_digests: {digests[names.index(None)]}'
+        rules['allowed_digests'] = list(dict.fromkeys(names))
+    return rules, None
+
+
+@bp.route('/api/v2/policies/effective', methods=['GET'])
+@require_auth()
+def effective_policy_algorithms():
+    """Key types and digests the active policies leave for a CA and template,
+    so a form offers only what issuance will accept (null = unrestricted)."""
+    from services.policy_service import PolicyEvaluationService
+    ca_id = request.args.get('ca_id', type=int)
+    template_id = request.args.get('template_id', type=int)
+    key_types, digests = PolicyEvaluationService.effective_algorithms(ca_id, template_id)
+    return success_response(data={'allowed_key_types': key_types, 'allowed_digests': digests})
+
 @bp.route('/api/v2/policies', methods=['GET'])
 @require_auth(['read:policies'])
 def list_policies():
@@ -707,7 +745,10 @@ def create_policy():
     )
     
     if data.get('rules'):
-        policy.set_rules(data['rules'])
+        rules, rules_error = _validated_rules(data['rules'])
+        if rules_error:
+            return error_response(rules_error, 400)
+        policy.set_rules(rules)
     
     if data.get('notification_emails'):
         policy.notification_emails = json.dumps(data['notification_emails'])
@@ -738,6 +779,10 @@ def update_policy(policy_id):
     """Update certificate policy"""
     policy = db.get_or_404(CertificatePolicy, policy_id)
     data = request.get_json()
+    if 'rules' in data:
+        rules, rules_error = _validated_rules(data['rules'] or {})
+        if rules_error:
+            return error_response(rules_error, 400)
     
     # Update fields
     if 'name' in data:
@@ -767,7 +812,7 @@ def update_policy(policy_id):
     if 'priority' in data:
         policy.priority = data['priority']
     if 'rules' in data:
-        policy.set_rules(data['rules'])
+        policy.set_rules(rules)
     if 'notification_emails' in data:
         policy.notification_emails = json.dumps(data['notification_emails'])
     

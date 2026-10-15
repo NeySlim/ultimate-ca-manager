@@ -558,6 +558,8 @@ def create_ca():
             hsm_key_label=hsm_key_label,
             hsm_key_algorithm=hsm_key_algorithm,
             named_urls=bool(data.get('namedUrls')),
+            # 'auto' (or nothing) is no choice: it yields to the policies
+            digest_explicit=str(raw_digest or 'auto').strip().lower() != 'auto',
         )
 
         # Single lifecycle event — bus fans out to webhook + email + WebSocket.

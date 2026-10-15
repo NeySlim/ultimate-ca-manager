@@ -9,8 +9,17 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- Policies: allowed signature hashes join allowed key types, and both now bind every issuance (CSR signing, ACME, SCEP, EST, WSTEP, CA creation, renewals, mTLS, TSA and OCSP responder certificates). A hash nobody chose yields to the weakest allowed one, and the issue and CA forms only offer what the policies allow (#397, requested by @Stryker-88).
+
+### Changed
+
+- Upgrade note: an active policy with allowed key types or hashes now also refuses ACME, SCEP, EST and WSTEP requests outside them, and CAs created under them; review active policies before upgrading (#397).
+
 ### Fixed
 
+- Policies: an Ed25519 or Ed448 request was signed whatever the allowed key types said, and editing a policy without key types silently restricted it to four of them (#397).
 - ACME DNS-01: UCM submitted the challenge as soon as one authoritative nameserver served the TXT record, so Let's Encrypt often got NXDOMAIN from another one. Every authoritative nameserver must now serve it, CNAME delegations included, followed by a configurable settle delay (10 s by default) (#395, reported by @ziller-hqs).
 
 ## [2.239] - 2026-10-14

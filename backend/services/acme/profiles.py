@@ -65,11 +65,20 @@ def get_default_digest():
     invalid falls back to the historical sha256. Profiles that omit their
     own ``digest`` inherit this value too.
     """
+    return _configured_default_digest() or DEFAULT_DIGEST
+
+
+def _is_allowed_digest(value):
+    return isinstance(value, str) and value.lower() in _ALLOWED_DIGESTS
+
+
+def _configured_default_digest():
+    """The ``acme_default_digest`` an administrator set, else None."""
     from models import SystemConfig
 
     row = SystemConfig.query.filter_by(key=DEFAULT_DIGEST_KEY).first()
     value = (row.value or '').strip().lower() if row and row.value else ''
-    return value if value in _ALLOWED_DIGESTS else DEFAULT_DIGEST
+    return value if value in _ALLOWED_DIGESTS else None
 
 
 def _raw_config():
@@ -248,7 +257,7 @@ def _sanitize(name, spec):
         validity = _MAX_VALIDITY_DAYS
 
     digest = spec.get('digest', None)
-    if not isinstance(digest, str) or digest.lower() not in _ALLOWED_DIGESTS:
+    if not _is_allowed_digest(digest):
         digest = get_default_digest()
 
     return {
@@ -360,10 +369,16 @@ def issuance_params(name):
         return {
             'validity_days': DEFAULT_VALIDITY_DAYS,
             'digest': get_default_digest(),
+            'digest_explicit': _configured_default_digest() is not None,
             'template_id': None,
         }
+    # A digest an administrator chose is checked against the issuance
+    # policies; the built-in default yields to them
+    raw = _raw_config().get(name)
     return {
         'validity_days': profile['validity_days'],
         'digest': profile['digest'],
+        'digest_explicit': (_is_allowed_digest(raw.get('digest')) if isinstance(raw, dict) else False)
+                           or _configured_default_digest() is not None,
         'template_id': profile.get('template_id'),
     }

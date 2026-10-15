@@ -56,6 +56,7 @@ class CASigningMixin:
         cert_type: str = 'server_cert',
         extra_ekus: list = None,
         supersedes=None,
+        policy_template_id: int = None,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -87,6 +88,8 @@ class CASigningMixin:
                 docstring. Only WSTEP passes this, for a matched template's
                 own configured EKUs (e.g. Smartcard Logon) that a CSR-EKU
                 cap keyed off cert_type could otherwise never let through.
+            policy_template_id: template scoping the issuance policies (the
+                WSTEP matched template), none for EST.
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -130,6 +133,8 @@ class CASigningMixin:
             override_san=override_san,
             requester_sid=requester_sid,
             extra_ekus=extra_ekus,
+            policy_scope={'ca_id': ca.id, 'template_id': policy_template_id,
+                          'digest_explicit': False},
         )
 
         # Extract serial number
