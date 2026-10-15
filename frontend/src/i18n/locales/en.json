@@ -3849,6 +3849,7 @@
       "revocation": "Revocation"
     },
     "allowedDigests": "Allowed Signature Hashes",
+    "allowedKeyTypesHelp": "None selected: any key type is allowed.",
     "allowedDigestsHelp": "None selected: any hash is allowed."
   },
   "approvals": {

@@ -485,6 +485,9 @@ class IssuanceMixin:
         invalid) rather than the server's (order retryable)."""
         if exc is None:
             return True
+        from services.policy_service import PolicyViolation
+        if isinstance(exc, PolicyViolation):
+            return True
         from utils.ca_signing_window import IssuerWindowError
         try:
             from services.ca.ca_signing import CAOfflineError

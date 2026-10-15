@@ -4153,6 +4153,7 @@
       "revocation": "吊销"
     },
     "allowedDigests": "允许的签名摘要",
+    "allowedKeyTypesHelp": "未选择任何项：允许所有密钥类型。",
     "allowedDigestsHelp": "未选择任何项：允许所有摘要。"
   },
   "reports": {

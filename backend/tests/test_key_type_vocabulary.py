@@ -61,8 +61,8 @@ class TestTheScreensOfferWhatTheApiAccepts:
         match = re.search(r'allowed_key_types:\s*(.+)', source)
         assert match, 'no allowed_key_types default in the policy screen'
         line = match.group(1)
-        if 'KEY_TYPE_OPTIONS' in line:
-            return      # seeded from the list itself, which is the point
+        if 'KEY_TYPE_OPTIONS' in line or line.strip().rstrip(',') == '[]':
+            return      # seeded from the list itself, or empty: no restriction
         seeded = set(re.findall(r"'([^']+)'", line))
         assert seeded == CANONICAL, (
             f'a new policy is seeded permitting {sorted(seeded)}, so an '

@@ -10,6 +10,7 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, SCEPRequest, SystemConfig, CA
 from services.audit_service import AuditService
+from services.policy_service import PolicyViolation
 from datetime import datetime, timedelta, timezone
 import secrets
 import logging
@@ -184,6 +185,9 @@ def approve_scep_request(request_id):
         db.session.rollback()
         logger.warning(f"SCEP approve: request {request_id} cannot be issued: {e}")
         return error_response(str(e), 409)
+    except PolicyViolation as e:
+        db.session.rollback()
+        return error_response(f'Policy violation: {e}', 400)
     except ValueError as e:
         # The CA refused (offline, revoked, outside its signing window, name
         # constraints...): the approver needs the reason

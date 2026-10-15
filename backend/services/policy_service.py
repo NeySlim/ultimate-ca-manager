@@ -251,6 +251,8 @@ class PolicyEvaluationService:
             allowed = (policy.get_rules() or {}).get('allowed_key_types')
             if isinstance(allowed, list) and allowed:
                 labels = {_normalize_key_type_label(a) for a in allowed} - {None}
+                if not labels:
+                    continue  # unknown labels only: enforce_rules skips it too
                 key_types = labels if key_types is None else key_types & labels
         if key_types is not None:
             key_types = sorted(key_types)

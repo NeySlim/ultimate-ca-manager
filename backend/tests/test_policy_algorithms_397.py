@@ -392,3 +392,150 @@ class TestInternalSigners:
             assert isinstance(cert.signature_hash_algorithm, hashes.SHA512)
         finally:
             _drop(app, CertificatePolicy, pid)
+
+
+class TestReviewFollowups:
+
+    def test_parent_bound_hash_is_refused_before_a_key_exists(
+            self, app, auth_client, create_ca, monkeypatch):
+        # An HSM parent may sign with a hash bound to its key (Azure P-384 is SHA-384)
+        from cryptography.hazmat.primitives import hashes as h
+        from services.ca.ca_creation import CACreationMixin
+        import utils.signing_hash
+
+        def _no_key(*args, **kwargs):
+            raise AssertionError('a key was generated for a refused CA')
+        parent = create_ca(cn='Algo bound-hash parent')
+        monkeypatch.setattr(CACreationMixin, '_resolve_signing_key', staticmethod(_no_key))
+        monkeypatch.setattr(utils.signing_hash, 'signing_hash_for', lambda key, requested: h.SHA384())
+        pid = _policy(app, 'algo-bound', parent['id'], {'allowed_digests': ['sha256']})
+        try:
+            r = TestCaCreation()._create(auth_client, type='intermediate', parentCAId=parent['id'],
+                                         hashAlgorithm='sha256')
+            assert r.status_code == 400 and b'SHA384' in r.data, r.data
+        finally:
+            _drop(app, CertificatePolicy, pid)
+
+    def test_new_hsm_root_key_is_dropped_when_its_hash_is_refused(self, app, monkeypatch):
+        from types import SimpleNamespace
+        from cryptography.hazmat.primitives import hashes as h
+        from services.ca.ca_creation import CACreationMixin
+        from services.hsm import HsmService
+        import utils.signing_hash
+        key = ec.generate_private_key(ec.SECP384R1())
+        monkeypatch.setattr(CACreationMixin, '_resolve_signing_key', staticmethod(
+            lambda *a, **k: (key, None, SimpleNamespace(id=4242, label='algo-hsm'))))
+        monkeypatch.setattr(utils.signing_hash, 'signing_hash_for', lambda k, requested: h.SHA384())
+        dropped = []
+        monkeypatch.setattr(HsmService, 'delete_key', classmethod(lambda cls, key_id: dropped.append(key_id)))
+        pid = _policy(app, 'algo-hsm-root', None, {'allowed_digests': ['sha256']})
+        try:
+            with app.app_context():
+                with pytest.raises(PolicyViolation, match='SHA384'):
+                    CACreationMixin.create_internal_ca(
+                        descr='algo hsm root', dn={'CN': 'algo hsm root'}, digest='sha256',
+                        hsm_provider_id=1, hsm_key_label='algo-hsm', hsm_key_algorithm='EC-P384')
+                db.session.rollback()
+            assert dropped == [4242]
+        finally:
+            _drop(app, CertificatePolicy, pid)
+
+    def test_scep_manual_approval_reports_a_policy_violation(self, app, auth_client, create_ca):
+        from models import SCEPRequest
+        ca = create_ca(cn='Algo SCEP approve CA')
+        pid = _policy(app, 'algo-scep-approve', ca['id'], {'allowed_key_types': ['EC-P384']})
+        with app.app_context():
+            req = SCEPRequest(transaction_id=f'txn-algo-{uuid.uuid4().hex[:8]}',
+                              ca_refid=db.session.get(CA, ca['id']).refid,
+                              csr=base64.b64encode(_csr().public_bytes(serialization.Encoding.DER)).decode(),
+                              status='pending', subject='CN=algo.policy.test')
+            db.session.add(req)
+            db.session.commit()
+            req_id = req.id
+        try:
+            r = auth_client.post(f'/api/v2/scep/{req_id}/approve', data='{}', content_type=CONTENT_JSON)
+            assert r.status_code == 400, r.data
+            assert b'Policy violation' in r.data and b'RSA-2048' in r.data
+        finally:
+            _drop(app, CertificatePolicy, pid)
+            _drop(app, SCEPRequest, req_id)
+
+    def test_acme_policy_refusal_is_the_request_fault(self):
+        from services.acme.mixins.issuance import IssuanceMixin
+        exc = PolicyViolation('Key type RSA-2048 is not allowed by policy "HSM only"')
+        assert IssuanceMixin._is_request_failure(exc) is True
+
+    def test_legacy_unknown_key_labels_do_not_empty_the_form(self, app, create_ca):
+        ca = create_ca(cn='Algo legacy labels CA')
+        pid = _policy(app, 'algo-legacy', ca['id'], {'allowed_key_types': ['RSA', 'ECDSA']})
+        try:
+            with app.app_context():
+                assert PolicyEvaluationService.effective_algorithms(ca['id']) == (None, None)
+        finally:
+            _drop(app, CertificatePolicy, pid)
+
+    def test_bulk_sign_reports_a_policy_violation(self, app, auth_client, create_ca):
+        ca = create_ca(cn='Algo bulk CA')
+        pid = _policy(app, 'algo-bulk', ca['id'], {'allowed_key_types': ['RSA-2048'],
+                                                   'allowed_digests': ['sha384']})
+        csr_id = _store_csr(app, _csr(cn='bulk.algo.test'))
+        ed_id = _store_csr(app, _csr(ed25519.Ed25519PrivateKey.generate(), cn='bulk-ed.algo.test'))
+        try:
+            r = auth_client.post('/api/v2/csrs/bulk/sign', content_type=CONTENT_JSON,
+                                 data=json.dumps({'ids': [csr_id, ed_id], 'ca_id': ca['id']}))
+            assert r.status_code == 200, r.data
+            data = get_json(r)['data']
+            assert data['success'] == [csr_id]
+            assert [f['id'] for f in data['failed']] == [ed_id]
+            assert 'Policy violation' in data['failed'][0]['error'] and 'ED25519' in data['failed'][0]['error']
+            assert isinstance(_signed(app, csr_id).signature_hash_algorithm, hashes.SHA384)
+        finally:
+            _drop(app, CertificatePolicy, pid)
+            _drop(app, Certificate, ed_id)
+
+    def test_bulk_sign_reports_a_refusal_from_the_signer(self, app, auth_client, create_ca):
+        # Two policies with no hash in common: only the signer itself can refuse
+        ca = create_ca(cn='Algo bulk disjoint CA')
+        a = _policy(app, 'algo-bulk-a', ca['id'], {'allowed_digests': ['sha384']})
+        b = _policy(app, 'algo-bulk-b', ca['id'], {'allowed_digests': ['sha512']})
+        csr_id = _store_csr(app, _csr(cn='bulk-disjoint.algo.test'))
+        try:
+            r = auth_client.post('/api/v2/csrs/bulk/sign', content_type=CONTENT_JSON,
+                                 data=json.dumps({'ids': [csr_id], 'ca_id': ca['id']}))
+            assert r.status_code == 200, r.data
+            failed = get_json(r)['data']['failed']
+            assert [f['id'] for f in failed] == [csr_id]
+            assert failed[0]['error'].startswith('Policy violation'), failed
+        finally:
+            _drop(app, CertificatePolicy, a, b)
+            _drop(app, Certificate, csr_id)
+
+    def test_ocsp_responder_renewal_takes_the_allowed_digest(self, app, auth_client, create_ca):
+        from datetime import timedelta
+        from models import SystemConfig
+        from services.ocsp_responder_renewal import run_ocsp_responder_renewal
+        from utils.datetime_utils import utc_now
+        ca = create_ca(cn='Algo OCSP responder CA')
+        r = auth_client.post('/api/v2/certificates', content_type=CONTENT_JSON, data=json.dumps({
+            'cn': 'ocsp.algo.test', 'ca_id': ca['id'], 'key_type': 'rsa', 'key_size': 2048,
+            'validity_days': 90, 'cert_type': 'custom', 'extra_ekus': ['OCSPSigning']}))
+        assert r.status_code in (200, 201), r.data
+        cert_id = get_json(r)['data']['id']
+        pid = _policy(app, 'algo-ocsp', ca['id'], {'allowed_digests': ['sha512']})
+        key = f"ocsp_responder_cert_{ca['id']}"
+        try:
+            with app.app_context():
+                db.session.add(SystemConfig(key=key, value=str(cert_id)))
+                row = db.session.get(Certificate, cert_id)
+                row.valid_from, row.valid_to = utc_now() - timedelta(days=85), utc_now() + timedelta(days=5)
+                db.session.commit()
+                assert run_ocsp_responder_renewal()['renewed'] == 1
+                new_id = int(SystemConfig.query.filter_by(key=key).first().value)
+            assert isinstance(_signed(app, new_id).signature_hash_algorithm, hashes.SHA512)
+        finally:
+            _drop(app, CertificatePolicy, pid)
+            with app.app_context():
+                row = SystemConfig.query.filter_by(key=key).first()
+                if row:
+                    db.session.delete(row)
+                    db.session.commit()

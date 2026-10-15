@@ -4153,6 +4153,7 @@
       "revocation": "Widerruf"
     },
     "allowedDigests": "Erlaubte Signatur-Hashes",
+    "allowedKeyTypesHelp": "Keine Auswahl: Jeder Schlüsseltyp ist erlaubt.",
     "allowedDigestsHelp": "Keine Auswahl: Jeder Hash ist erlaubt."
   },
   "reports": {

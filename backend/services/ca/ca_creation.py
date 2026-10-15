@@ -49,6 +49,16 @@ def _ca_policies(parent_refid, dn, key_type, hsm_key_id, hsm_key_algorithm):
     return policies, _normalize_key_type_label(label) or label
 
 
+def _discard_generated_hsm_key(key_id):
+    from services.hsm import HsmService
+    db.session.rollback()
+    try:
+        HsmService.delete_key(key_id)
+    except Exception:
+        logger.warning("HSM key %s generated for a refused CA could not be deleted",
+                       key_id, exc_info=True)
+
+
 def _refuse_on_violations(violations):
     from services.policy_service import PolicyViolation
     if violations:
@@ -206,7 +216,8 @@ class CACreationMixin:
             CA model instance
         """
         from services.hsm.ca_key_loader import get_ca_signing_key
-        from services.policy_service import PolicyEvaluationService, key_label_for_public_key
+        from services.policy_service import (
+            PolicyEvaluationService, PolicyViolation, key_label_for_public_key)
 
         # Issuance policies, checked before a key is generated (an HSM key is
         # created on the device), then again on the real key and signer below
@@ -215,15 +226,6 @@ class CACreationMixin:
             digest = PolicyEvaluationService.choose_digest(policies, digest)
         _refuse_on_violations(PolicyEvaluationService.enforce_rules(
             policies, key_type=key_label, digest=digest)[0])
-
-        # Resolve signing key - local generation, existing HSM key, or new HSM key
-        private_key, key_pem, hsm_key = CACreationMixin._resolve_signing_key(
-            key_type, hsm_provider_id, hsm_key_id, hsm_key_label, hsm_key_algorithm
-        )
-        use_hsm = hsm_key is not None
-
-        # Build subject
-        subject = TrustStoreService.build_subject(dn)
 
         # Get parent CA if intermediate
         issuer = None
@@ -268,9 +270,6 @@ class CACreationMixin:
                 raise ValueError("Parent CA has no private key")
             issuer_private_key = get_ca_signing_key(parent_ca)
 
-            # Increment parent CA serial
-            parent_ca.serial = (parent_ca.serial or 0) + 1
-
             # Resolve parent CDP/OCSP/AIA URLs
             if parent_ca.cdp_enabled:
                 parent_cdp_urls = [url.replace('{ca_refid}', parent_ca.url_ref)
@@ -286,9 +285,29 @@ class CACreationMixin:
                 parent_cps_uri = parent_ca.cps_uri
                 parent_cps_oid = parent_ca.cps_oid
 
-        _refuse_on_violations(PolicyEvaluationService.checked_signing_hash(
-            policies, issuer_private_key or private_key, digest,
-            key_type=key_label_for_public_key(private_key.public_key()))[1])
+        # The parent's real signing hash (HSM-bound) is known before any key exists
+        if issuer_private_key is not None:
+            _refuse_on_violations(PolicyEvaluationService.checked_signing_hash(
+                policies, issuer_private_key, digest, key_type=key_label)[1])
+
+        # Resolve signing key - local generation, existing HSM key, or new HSM key
+        private_key, key_pem, hsm_key = CACreationMixin._resolve_signing_key(
+            key_type, hsm_provider_id, hsm_key_id, hsm_key_label, hsm_key_algorithm
+        )
+        use_hsm = hsm_key is not None
+        subject = TrustStoreService.build_subject(dn)
+        if caref:
+            parent_ca.serial = (parent_ca.serial or 0) + 1
+
+        try:
+            _refuse_on_violations(PolicyEvaluationService.checked_signing_hash(
+                policies, issuer_private_key or private_key, digest,
+                key_type=key_label_for_public_key(private_key.public_key()))[1])
+        except PolicyViolation:
+            # A root's new HSM key may sign with a provider-bound hash: drop the key
+            if hsm_provider_id and hsm_key is not None:
+                _discard_generated_hsm_key(hsm_key.id)
+            raise
 
         # Create CA certificate
         cert_pem, generated_key_pem = TrustStoreService.create_ca_certificate(

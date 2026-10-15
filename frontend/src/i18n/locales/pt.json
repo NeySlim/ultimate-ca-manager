@@ -4153,6 +4153,7 @@
       "revocation": "Revogação"
     },
     "allowedDigests": "Hashes de Assinatura Permitidos",
+    "allowedKeyTypesHelp": "Nenhum selecionado: qualquer tipo de chave é permitido.",
     "allowedDigestsHelp": "Nenhum selecionado: qualquer hash é permitido."
   },
   "reports": {

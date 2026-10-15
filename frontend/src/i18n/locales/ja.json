@@ -4153,6 +4153,7 @@
       "revocation": "失効"
     },
     "allowedDigests": "許可する署名ハッシュ",
+    "allowedKeyTypesHelp": "未選択の場合: すべての鍵タイプが許可されます。",
     "allowedDigestsHelp": "未選択の場合: すべてのハッシュが許可されます。"
   },
   "reports": {

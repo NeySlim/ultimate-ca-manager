@@ -3861,6 +3861,7 @@
       "revocation": "Révocation"
     },
     "allowedDigests": "Algorithmes de hachage de signature autorisés",
+    "allowedKeyTypesHelp": "Aucun sélectionné : tous les types de clés sont autorisés.",
     "allowedDigestsHelp": "Aucun sélectionné : tous les hachages sont autorisés."
   },
   "approvals": {

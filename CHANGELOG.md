@@ -19,7 +19,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- Policies: an Ed25519 or Ed448 request was signed whatever the allowed key types said, and editing a policy without key types silently restricted it to four of them (#397).
+- Policies: an Ed25519 or Ed448 request was signed whatever the allowed key types said, and the policy form ticked key types on its own, so a new or edited policy restricted them unasked (#397).
 - ACME DNS-01: UCM submitted the challenge as soon as one authoritative nameserver served the TXT record, so Let's Encrypt often got NXDOMAIN from another one. Every authoritative nameserver must now serve it, CNAME delegations included, followed by a configurable settle delay (10 s by default) (#395, reported by @ziller-hqs).
 
 ## [2.239] - 2026-10-14

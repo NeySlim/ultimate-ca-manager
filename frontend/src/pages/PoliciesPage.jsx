@@ -68,7 +68,7 @@ const DEFAULT_FORM = {
   priority: 100,
   rules: {
     max_validity_days: 397,
-    allowed_key_types: KEY_TYPE_OPTIONS.map(o => o.value),
+    allowed_key_types: [],
     allowed_digests: [],
     required_extensions: [],
     san_restrictions: {
@@ -703,6 +703,7 @@ export default function PoliciesPage() {
                   </button>
                 ))}
               </div>
+              <p className="text-xs text-text-tertiary mt-1">{t('policies.allowedKeyTypesHelp')}</p>
             </div>
 
             {/* Allowed signature hashes */}

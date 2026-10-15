@@ -4153,6 +4153,7 @@
       "revocation": "Revocación"
     },
     "allowedDigests": "Hashes de firma permitidos",
+    "allowedKeyTypesHelp": "Ninguno seleccionado: se permite cualquier tipo de clave.",
     "allowedDigestsHelp": "Ninguno seleccionado: se permite cualquier hash."
   },
   "reports": {
