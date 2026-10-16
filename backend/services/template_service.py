@@ -14,6 +14,24 @@ import logging
 
 logger = logging.getLogger(__name__)
 
+# Key types a template may ask for: X.509 issuance cannot generate an Edwards key.
+TEMPLATE_KEY_TYPES = tuple(
+    a.label for a in key_algorithms.algorithms() if a.family in ('RSA', 'EC'))
+
+
+def template_key_type_label(value) -> Optional[str]:
+    """Canonical label ('EC-P384') for any registered spelling of a template
+    key type ('ec:p384', 'EC P-384'), None when a template cannot use it."""
+    label = key_algorithms.normalize_label(value)
+    return label if label in TEMPLATE_KEY_TYPES else None
+
+
+def _required_template_key_type(value) -> str:
+    label = template_key_type_label(value)
+    if label is None:
+        raise ValueError(f"Unsupported key_type: {value}")
+    return label
+
 
 class TemplateService:
     """Service for Certificate Template operations"""
@@ -272,7 +290,7 @@ class TemplateService:
             name=data['name'],
             description=data.get('description', ''),
             template_type=data.get('template_type', 'custom'),
-            key_type=data.get('key_type', 'RSA-2048'),
+            key_type=_required_template_key_type(data.get('key_type') or 'RSA-2048'),
             validity_days=data.get('validity_days', 397),
             digest=data.get('digest', 'sha256'),
             dn_template=json.dumps(data.get('dn_template', {})),
@@ -318,7 +336,8 @@ class TemplateService:
         
         if template.is_system:
             raise ValueError("Cannot modify system templates")
-        
+        key_type = _required_template_key_type(data['key_type']) if data.get('key_type') else None
+
         # Update fields
         if 'name' in data:
             template.name = data['name']
@@ -326,8 +345,8 @@ class TemplateService:
             template.description = data['description']
         if 'template_type' in data:
             template.template_type = data['template_type']
-        if 'key_type' in data:
-            template.key_type = data['key_type']
+        if key_type:
+            template.key_type = key_type
         if 'validity_days' in data:
             template.validity_days = data['validity_days']
         if 'digest' in data:

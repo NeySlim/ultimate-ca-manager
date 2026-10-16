@@ -28,6 +28,7 @@ whether real clients tolerate the nil.
 """
 import base64
 import json
+import logging
 import struct
 import uuid
 
@@ -35,12 +36,15 @@ from asn1crypto import x509 as asn1_x509
 from lxml import etree
 
 from services.wstep.soap_envelope import build_envelope
+from utils import key_algorithms
 
 XCEP_NS = 'http://schemas.microsoft.com/windows/pki/2009/01/enrollmentpolicy'
 SOAP_NS = 'http://www.w3.org/2003/05/soap-envelope'
 XSI_NS = 'http://www.w3.org/2001/XMLSchema-instance'
 
 NSMAP = {'xcep': XCEP_NS, 'xsi': XSI_NS}
+
+logger = logging.getLogger(__name__)
 
 # wsaw:Action for the GetPolicies operation's output message, per the
 # published MS-XCEP WSDL. Required: a real client expects the response to
@@ -85,16 +89,8 @@ _KEY_USAGE_BITS = {
     'decipherOnly': 'decipher_only',
 }
 
-# key_type -> (algorithm OID, algorithm name, minimal key length in bits)
-_KEY_TYPE_INFO = {
-    'RSA-2048': ('1.2.840.113549.1.1.1', 'RSA', 2048),
-    'RSA-3072': ('1.2.840.113549.1.1.1', 'RSA', 3072),
-    'RSA-4096': ('1.2.840.113549.1.1.1', 'RSA', 4096),
-    'EC-P256': ('1.2.840.10045.3.1.7', 'ECDSA_P256', 256),
-    'EC-P384': ('1.3.132.0.34', 'ECDSA_P384', 384),
-    'EC-P521': ('1.3.132.0.35', 'ECDSA_P521', 521),
-}
-_DEFAULT_KEY_TYPE_INFO = ('1.2.840.113549.1.1.1', 'RSA', 2048)
+# Families XCEP can describe to a Windows client (keySpec, provider, length).
+_XCEP_KEY_FAMILIES = ('RSA', 'EC')
 
 # privateKeyAttributes/keySpec + cryptoProviders, by algorithm family.
 # Confirmed against a real ADCS server's own WCF trace: every real
@@ -221,7 +217,12 @@ def _resolve_templates_for_ca(ca, all_active_templates):
 
 
 def _key_type_info(key_type):
-    return _KEY_TYPE_INFO.get((key_type or '').upper(), _DEFAULT_KEY_TYPE_INFO)
+    """``(algorithm name, minimal key length)`` from the key registry, or None
+    when the template's key type cannot be announced. Unset means the column default."""
+    alg = key_algorithms.get(key_type or 'RSA-2048')
+    if alg is None or alg.family not in _XCEP_KEY_FAMILIES:
+        return None
+    return ('RSA' if alg.family == 'RSA' else f'ECDSA_{alg.param}'), alg.key_size
 
 
 def _policy_oid_for_template(ca, template):
@@ -355,6 +356,13 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
     ca_ref_id = 1
 
     for template in resolved_templates:
+        key_info = _key_type_info(template.key_type)
+        if key_info is None:
+            # Announcing a default would have the client generate the wrong key.
+            logger.warning("XCEP: template %r left out, unsupported key type %r",
+                           template.name, template.key_type)
+            continue
+        algo_name, min_key_length = key_info
         extensions = {}
         if template.extensions_template:
             try:
@@ -364,7 +372,6 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
             except (TypeError, ValueError):
                 pass
 
-        _algo_oid, algo_name, min_key_length = _key_type_info(template.key_type)
         policy_oid = _policy_oid_for_template(ca, template)
         policy_ref = oids.ref(policy_oid, group=_GROUP_POLICY, default_name=template.name)
 

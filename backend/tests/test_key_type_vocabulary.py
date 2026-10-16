@@ -1,6 +1,6 @@
 """The key types a policy may allow are the ones a template may ask for.
 
-`api/v2/templates._VALID_KEY_TYPES` accepts RSA-2048/3072/4096 and
+`services/template_service.TEMPLATE_KEY_TYPES` accepts RSA-2048/3072/4096 and
 EC-P256/384/521; `utils/key_type.RSA_SIZES` generates all three RSA sizes.
 `frontend/src/pages/PoliciesPage.jsx` offered five of the six, with
 **RSA-3072 missing**, and seeded a new policy's `allowed_key_types` with four
@@ -18,15 +18,15 @@ import re
 
 import pytest
 
-from api.v2.templates import _VALID_KEY_TYPES
+from services.template_service import TEMPLATE_KEY_TYPES
 
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 POLICIES = os.path.join(_REPO, 'frontend', 'src', 'pages', 'PoliciesPage.jsx')
 TEMPLATES = os.path.join(_REPO, 'frontend', 'src', 'pages', 'TemplatesPage.jsx')
 
-# The canonical spelling the template API documents; the same file also
-# accepts the legacy `rsa:2048` / `ec:p256` forms for older clients.
-CANONICAL = {name for name in _VALID_KEY_TYPES if '-' in name}
+# The labels a template stores; legacy spellings (`rsa:2048`, `ec:p256`) are
+# accepted on input and stored as these.
+CANONICAL = set(TEMPLATE_KEY_TYPES)
 
 
 def _js_array(path, name):

@@ -21,6 +21,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Templates: a key type saved in a legacy spelling (`ec:p384`) was advertised to Windows clients as RSA 2048 over XCEP, and issuing from it failed with "Unsupported key type". Key types are now stored under their canonical label, existing templates at upgrade.
 - Certificates: only imports and renewals recorded the key algorithm (imports as "EdDSA" for Ed25519), so sorting by key algorithm or compliance grade lumped most certificates together. Every certificate now records it, existing ones at upgrade.
 - HSM: a CA on a PKCS#11 RSA key failed with "Could not deserialize key data", because its public key was stored in PKCS#1 form under a SubjectPublicKeyInfo label. Keys already stored are repaired at their next use.
 - Policies: an Ed25519 or Ed448 request was signed whatever the allowed key types said, and the policy form ticked key types on its own, so a new or edited policy restricted them unasked (#397).

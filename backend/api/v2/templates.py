@@ -18,7 +18,7 @@ from services.audit_service import AuditService
 from services.deletion_blockers import (
     first_blocker, parse_bulk_ids, template_deletion_blockers,
 )
-from services.template_service import TemplateService
+from services.template_service import TemplateService, template_key_type_label
 from utils.dn_validation import validate_dn_field
 from datetime import datetime
 import traceback
@@ -44,15 +44,6 @@ bp = Blueprint('templates_v2', __name__)
 from utils.validity import (MAX_VALIDITY_DAYS as _MAX_VALIDITY_DAYS,
                             MIN_VALIDITY_DAYS as _MIN_VALIDITY_DAYS,
                             coerce_validity_days)
-_VALID_KEY_TYPES = {
-    'RSA-2048', 'RSA-3072', 'RSA-4096',
-    'EC-P256', 'EC-P384', 'EC-P521',
-    # no ED25519: parse_issue_key_type() cannot generate an Edwards key, so a
-    # template saved with it fails every issuance with a 400
-    # legacy lowercase forms used by some import payloads
-    'rsa:2048', 'rsa:3072', 'rsa:4096',
-    'ec:p256', 'ec:p384', 'ec:p521',
-}
 _VALID_DIGESTS = {'sha256', 'sha384', 'sha512'}
 _VALID_TEMPLATE_TYPES = {
     'web_server', 'email', 'vpn_server', 'vpn_client',
@@ -132,9 +123,14 @@ def _validate_template_payload(data, *, partial=False):
     elif not partial:
         # default applied at object creation, no-op
         pass
-    if 'key_type' in data and data['key_type']:
-        if data['key_type'] not in _VALID_KEY_TYPES:
-            return False, f'Unsupported key_type: {data["key_type"]}'
+    if 'key_type' in data:
+        if not data['key_type']:
+            data.pop('key_type')    # unset: the default on create, unchanged on update
+        else:
+            label = template_key_type_label(data['key_type'])
+            if label is None:
+                return False, f'Unsupported key_type: {data["key_type"]}'
+            data['key_type'] = label
     if 'digest' in data and data['digest']:
         if data['digest'].lower() not in _VALID_DIGESTS:
             return False, f'Unsupported digest: {data["digest"]} (allowed: {", ".join(sorted(_VALID_DIGESTS))})'
