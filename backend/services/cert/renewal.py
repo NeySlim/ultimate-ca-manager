@@ -34,7 +34,7 @@ from datetime import timedelta
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.x509.oid import ExtensionOID, NameOID
 
 from models import CA, Certificate, RevokedSerial, db
@@ -45,6 +45,7 @@ from utils.db_transaction import commit_or_rollback
 from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
 from utils.key_codec import private_key_to_pem
+from utils.key_algorithms import algorithms as registered_algorithms, family_for_public_key
 from utils.eku_validation import add_ocsp_nocheck_if_responder
 
 logger = logging.getLogger(__name__)
@@ -160,13 +161,13 @@ def _generate_matching_key(orig_pub_key):
         )
     if isinstance(orig_pub_key, ec.EllipticCurvePublicKey):
         return ec.generate_private_key(orig_pub_key.curve, default_backend())
-    if isinstance(orig_pub_key, ed25519.Ed25519PublicKey):
-        return ed25519.Ed25519PrivateKey.generate()
-    if isinstance(orig_pub_key, ed448.Ed448PublicKey):
-        return ed448.Ed448PrivateKey.generate()
-    return rsa.generate_private_key(
-        public_exponent=65537, key_size=2048, backend=default_backend()
-    )
+    family = family_for_public_key(orig_pub_key)
+    if family in ('ED25519', 'ED448'):
+        return registered_algorithms(family)[0].generate()
+    # Never another algorithm: the renewed certificate must keep the family it had
+    raise RenewalError(
+        f'Cannot renew: a {type(orig_pub_key).__name__} key cannot be regenerated; '
+        'issue a new certificate instead', 400)
 
 
 def _key_algo_label(public_key) -> str:

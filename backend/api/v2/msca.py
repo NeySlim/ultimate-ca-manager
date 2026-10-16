@@ -13,6 +13,10 @@ from services.msca_service import MicrosoftCAService
 from services.audit import AuditService
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
+from utils import key_algorithms
+from utils.key_type import MIN_RSA_BITS
+from services.trust_store.constants import KEY_TYPES
+from cryptography.hazmat.primitives.asymmetric import rsa
 
 logger = logging.getLogger(__name__)
 
@@ -1086,6 +1090,23 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
         raise
 
 
+def _rekey_key_type(public_key):
+    """TrustStore key type reproducing *public_key* (registry RSA sizes and
+    EC curves, plus the larger RSA sizes UCM generates); ValueError otherwise."""
+    label = key_algorithms.label_for_public_key(public_key)
+    alg = key_algorithms.get(label) if label else None
+    if (alg is None and isinstance(public_key, rsa.RSAPublicKey)
+            and public_key.key_size >= MIN_RSA_BITS and str(public_key.key_size) in KEY_TYPES):
+        return str(public_key.key_size)
+    if alg is None or alg.family not in ('RSA', 'EC') or not alg.trust_store_id:
+        supported = ', '.join(a.display for a in key_algorithms.algorithms()
+                              if a.family in ('RSA', 'EC'))
+        raise ValueError(
+            f'Cannot rekey for renewal: the original key is not one UCM can reproduce '
+            f'(supported: {supported})')
+    return alg.trust_store_id
+
+
 def _generate_rekey_csr(cert):
     """Generate a new key pair + CSR (same subject and SANs) for an imported
     MS CA certificate that has no CSR/private key in UCM (AD CS never exports
@@ -1096,7 +1117,6 @@ def _generate_rekey_csr(cert):
     import json
 
     from cryptography import x509 as cx509
-    from cryptography.hazmat.primitives.asymmetric import rsa as crsa
     from services.trust_store.csr_operations_mixin import CSROperationsMixin
     from utils.key_codec import store_pem_bytes
 
@@ -1107,14 +1127,7 @@ def _generate_rekey_csr(cert):
     except Exception:
         raise ValueError("Stored certificate is unreadable; cannot rekey for renewal")
 
-    # Match the original RSA key size when supported; default RSA 2048.
-    key_type = '2048'
-    try:
-        pub = orig.public_key()
-        if isinstance(pub, crsa.RSAPublicKey) and str(pub.key_size) in ('2048', '3072', '4096', '8192'):
-            key_type = str(pub.key_size)
-    except Exception:
-        pass
+    key_type = _rekey_key_type(orig.public_key())
 
     def _san(col):
         try:

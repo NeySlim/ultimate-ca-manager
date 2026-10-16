@@ -21,6 +21,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- CAs: creating a CA with keyAlgo `EC`, a lowercase name or an unsupported algorithm silently produced an RSA-2048 key. Valid spellings are honoured, anything else is refused, and the CA detail view reports the real key algorithm and size.
+- Renewal: a certificate whose key family cannot be regenerated (DSA) was renewed with an RSA-2048 key, and a Microsoft CA rekey of an EC certificate produced an RSA-2048 request. The first is now refused and the second keeps its curve.
 - ACME client: new orders ignored the configured key type and always used RSA-2048. They now take it, an unknown type fails at finalize instead of falling back to RSA-2048, and Ed25519 or P-521 CSRs are signed with the right hash.
 - Key labels: Ed25519 and Ed448 CAs showed "Unknown", and the compliance grade presented secp256k1 or brainpool keys as NIST P-256 or P-384.
 - HSM: syncing a PKCS#11 provider deleted every key row and unbound the CAs using them, because the key listing could not read any key and came back empty. The listing reads keys and their real curve again, and a sync never removes a key a CA uses nor anything when the listing reports errors.

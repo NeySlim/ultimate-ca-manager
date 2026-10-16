@@ -33,6 +33,8 @@ from models import Certificate, CA, db
 from models.hsm import HsmKey
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives.asymmetric import dsa
+from utils import key_algorithms
 from websocket.emitters import on_ca_created, on_ca_updated, on_ca_deleted
 
 logger = logging.getLogger(__name__)
@@ -66,6 +68,65 @@ _MAX_NAME_CONSTRAINT_LEN = 255
 _MAX_SIA_URLS = 8
 _MAX_PATH_LENGTH = 32
 _OID_RE = re.compile(r'^[0-2](\.\d+)+$')
+
+
+_CA_KEY_FAMILIES = {'rsa': 'RSA', 'ecdsa': 'EC', 'ec': 'EC'}
+
+
+def _blank(value):
+    return value is None or (isinstance(value, str) and not value.strip())
+
+
+def _resolve_local_key_type(data):
+    """(TrustStore key type, error) for a locally generated CA key.
+
+    keyType is accepted as an alias of keyAlgo; a value that names no usable
+    key is an error, only a request without any key field gets RSA-2048.
+    """
+    algo, alias, size = data.get('keyAlgo'), data.get('keyType'), data.get('keySize')
+    if _blank(algo) and _blank(alias):
+        if _blank(size):
+            return '2048', None
+        return None, 'keySize requires keyAlgo (RSA or ECDSA)'
+    names = [v for v in (algo, alias) if not _blank(v)]
+    if not all(isinstance(v, str) for v in names):
+        return None, 'keyAlgo must be a string (RSA or ECDSA)'
+    families = {_CA_KEY_FAMILIES.get(v.strip().lower()) for v in names}
+    if None in families:
+        return None, f'Unsupported keyAlgo {names[0]!r}: a CA key is RSA or ECDSA (EC)'
+    if len(families) > 1:
+        return None, 'keyAlgo and keyType name different algorithms'
+    family = families.pop()
+    choices = [a for a in key_algorithms.algorithms(family) if a.trust_store_id]
+    if _blank(size):
+        return choices[0].trust_store_id, None
+    alg = None
+    if isinstance(size, int) and not isinstance(size, bool):
+        alg = next((a for a in choices if a.key_size == size), None)
+    elif isinstance(size, str):
+        text = size.strip()
+        if text.isdigit():
+            alg = next((a for a in choices if a.key_size == int(text)), None)
+        else:
+            alg = key_algorithms.get(text)
+    if alg is None or alg not in choices:
+        if family == 'RSA':
+            return None, f'RSA key size must be one of {[a.key_size for a in choices]}'
+        return None, f'ECDSA curve must be one of {[a.trust_store_id for a in choices]}'
+    return alg.trust_store_id, None
+
+
+def _public_key_summary(public_key):
+    """(keyAlgo, keySize) of a CA public key, as the detail view reports them."""
+    family = key_algorithms.family_for_public_key(public_key)
+    if family in ('RSA', 'EC'):
+        return family, public_key.key_size
+    if family:
+        alg = key_algorithms.algorithms(family)[0]
+        return alg.display, alg.key_size
+    if isinstance(public_key, dsa.DSAPublicKey):
+        return 'DSA', public_key.key_size
+    return 'Unknown', getattr(public_key, 'key_size', None)
 
 
 def _validate_protocol_url(url, field):
@@ -304,28 +365,10 @@ def create_ca():
         if not is_valid:
             return error_response(error, 400)
 
-        # Determine key type — whitelist algorithms and parameters to prevent
-        # DoS (huge RSA key generation) and unsupported curves.
-        ALLOWED_RSA_SIZES = {2048, 3072, 4096}
-        ALLOWED_EC_CURVES = {'prime256v1', 'secp384r1', 'secp521r1'}
-        key_type = '2048'  # Default
-        if data.get('keyAlgo') == 'RSA':
-            try:
-                key_size = int(data.get('keySize') or 2048)
-            except (TypeError, ValueError):
-                return error_response('Invalid RSA key size', 400)
-            if key_size not in ALLOWED_RSA_SIZES:
-                return error_response(
-                    f'RSA key size must be one of {sorted(ALLOWED_RSA_SIZES)}', 400
-                )
-            key_type = str(key_size)
-        elif data.get('keyAlgo') == 'ECDSA':
-            curve = data.get('keySize') or 'prime256v1'
-            if curve not in ALLOWED_EC_CURVES:
-                return error_response(
-                    f'ECDSA curve must be one of {sorted(ALLOWED_EC_CURVES)}', 400
-                )
-            key_type = curve
+        # Registry sizes and curves only: no huge RSA keys, no unknown curves
+        key_type, key_err = _resolve_local_key_type(data)
+        if key_err:
+            return error_response(key_err, 400)
 
         # ----- HSM key selection (Issue #77.3) -----
         hsm_provider_id = data.get('hsm_provider_id') or data.get('hsmProviderId')
@@ -619,13 +662,15 @@ def get_ca(ca_id):
     try:
         details = CAService.get_ca_details(ca_id)
         fingerprints = details.get('fingerprints', {})
+        key_algo, key_size = _public_key_summary(x509.load_pem_x509_certificate(
+            base64.b64decode(ca.crt), default_backend()).public_key())
         # Merge details into response
         ca_data.update({
             'commonName': details.get('subject', {}).get('CN', ca.descr),
             'org': details.get('subject', {}).get('O', ''),
             'country': details.get('subject', {}).get('C', ''),
-            'keyAlgo': details.get('public_key', {}).get('algorithm', 'RSA'),
-            'keySize': details.get('public_key', {}).get('size', 2048),
+            'keyAlgo': key_algo,
+            'keySize': key_size,
             'fingerprint': fingerprints.get('sha256', ''),
             'thumbprint_sha256': fingerprints.get('sha256', ''),
             'thumbprint_sha1': fingerprints.get('sha1', ''),

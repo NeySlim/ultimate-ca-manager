@@ -417,11 +417,14 @@ def create_ca(auth_client):
             'country': 'US',
             'state': 'CA',
             'locality': 'Test City',
-            'keyType': 'RSA',
+            'keyAlgo': 'RSA',
             'keySize': 2048,
             'validityYears': 10,
             'hashAlgorithm': 'sha256',
         }
+        # keyAlgo is the API's field; keyType stays accepted from callers
+        if 'keyType' in kwargs:
+            data['keyAlgo'] = kwargs.pop('keyType')
         data.update(kwargs)
         r = auth_client.post('/api/v2/cas',
                              data=json.dumps(data),
