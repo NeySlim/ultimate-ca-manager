@@ -4,10 +4,8 @@ Constants for TrustStoreService
 from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import ec
 
-# Supported key types
+# Supported key types; 8192 is not in the key registry but MSCA rekeys keep it.
 KEY_TYPES = {
-    '512': ('rsa', 512),
-    '1024': ('rsa', 1024),
     '2048': ('rsa', 2048),
     '3072': ('rsa', 3072),
     '4096': ('rsa', 4096),

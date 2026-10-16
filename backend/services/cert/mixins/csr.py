@@ -17,21 +17,6 @@ from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, ca_c
 logger = logging.getLogger(__name__)
 
 
-def _csr_key_type_label(public_key):
-    """The CSR key in the form compute_template_overrides normalizes: an RSA
-    size ('2048'), an OpenSSL curve name ('secp256r1') or an Edwards curve
-    ('ed25519', 'ed448'), the key types enrollment accepts; None otherwise."""
-    from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
-    if isinstance(public_key, rsa.RSAPublicKey):
-        return str(public_key.key_size)
-    if isinstance(public_key, ec.EllipticCurvePublicKey):
-        return public_key.curve.name
-    if isinstance(public_key, ed25519.Ed25519PublicKey):
-        return 'ed25519'
-    if isinstance(public_key, ed448.Ed448PublicKey):
-        return 'ed448'
-    return None
-
 # CSRs generated before 2.225 were described as "CSR for <CN>"
 _LEGACY_CSR_DESCR_PREFIX = 'CSR for '
 
@@ -367,11 +352,12 @@ class CSRMixin:
         # is the requester's own, so it diverges whenever it is not the
         # template's declared type.
         if template is not None:
+            from services.policy_service import key_label_for_public_key
             from services.template_service import compute_template_overrides
             certificate.template_id = template.id
             certificate.template_overrides = compute_template_overrides(
                 template,
-                key_type=_csr_key_type_label(csr_obj.public_key()),
+                key_type=key_label_for_public_key(csr_obj.public_key()),
                 validity_days=validity_days,
                 digest=digest,
             )

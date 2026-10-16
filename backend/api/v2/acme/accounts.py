@@ -7,7 +7,6 @@ from models import db, AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge,
 from models.acme_models import AcmeClientOrder
 from services.audit_service import AuditService
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
-from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from auth.unified import require_auth
 from utils.response import success_response, error_response
@@ -15,8 +14,37 @@ from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
 from services.acme.acme_client_service import CERT_KEY_TYPES
 from services.acme.jwk_thumbprint import jwk_thumbprint
+from utils import key_algorithms
 
 from . import bp, logger, resolve_acme_account
+
+# RFC 7518 §6.2.1.1 curve names, keyed by the pyca curve name.
+_JWK_CURVES = {'secp256r1': 'P-256', 'secp384r1': 'P-384', 'secp521r1': 'P-521'}
+
+
+def _b64url_uint(value: int, length: int) -> str:
+    return base64.urlsafe_b64encode(value.to_bytes(length, byteorder='big')).rstrip(b'=').decode()
+
+
+def _public_jwk(private_key) -> dict:
+    """RFC 7517 public JWK of an RSA or NIST EC key; ValueError for anything else."""
+    public_key = private_key.public_key()
+    if isinstance(public_key, rsa.RSAPublicKey):
+        numbers = public_key.public_numbers()
+        return {
+            'kty': 'RSA',
+            'e': _b64url_uint(numbers.e, 3),
+            'n': _b64url_uint(numbers.n, (public_key.key_size + 7) // 8),
+        }
+    if isinstance(public_key, ec.EllipticCurvePublicKey):
+        crv = _JWK_CURVES.get(public_key.curve.name)
+        if crv is None:
+            raise ValueError(f'No JWK curve name for {public_key.curve.name}')
+        numbers = public_key.public_numbers()
+        size = (public_key.curve.key_size + 7) // 8
+        return {'kty': 'EC', 'crv': crv,
+                'x': _b64url_uint(numbers.x, size), 'y': _b64url_uint(numbers.y, size)}
+    raise ValueError(f'Unsupported ACME account key: {type(public_key).__name__}')
 
 
 @bp.route('/api/v2/acme/accounts', methods=['GET'])
@@ -83,37 +111,9 @@ def create_acme_account():
         import secrets
         account_id = f'acme-{secrets.token_hex(8)}'
 
-        def _b64url(data):
-            return base64.urlsafe_b64encode(data).rstrip(b'=').decode()
-
-        # Generate key pair based on key_type
-        if key_type.startswith('EC'):
-            curve_map = {'EC-P256': ec.SECP256R1(), 'EC-P384': ec.SECP384R1()}
-            curve = curve_map.get(key_type, ec.SECP256R1())
-            private_key = ec.generate_private_key(curve, default_backend())
-            public_key = private_key.public_key()
-            numbers = public_key.public_numbers()
-            crv = 'P-256' if isinstance(curve, ec.SECP256R1) else 'P-384'
-            byte_len = 32 if crv == 'P-256' else 48
-            jwk_dict = {
-                'kty': 'EC',
-                'crv': crv,
-                'x': _b64url(numbers.x.to_bytes(byte_len, byteorder='big')),
-                'y': _b64url(numbers.y.to_bytes(byte_len, byteorder='big')),
-            }
-        else:
-            key_size = int(key_type.replace('RSA-', '')) if 'RSA-' in key_type else 2048
-            private_key = rsa.generate_private_key(
-                public_exponent=65537, key_size=key_size, backend=default_backend()
-            )
-            public_key = private_key.public_key()
-            numbers = public_key.public_numbers()
-            byte_len = key_size // 8
-            jwk_dict = {
-                'kty': 'RSA',
-                'e': _b64url(numbers.e.to_bytes(3, byteorder='big')),
-                'n': _b64url(numbers.n.to_bytes(byte_len, byteorder='big')),
-            }
+        # The JWK describes the key actually generated, never the requested label.
+        private_key = key_algorithms.generate(key_type)
+        jwk_dict = _public_jwk(private_key)
 
         # The same RFC 7638 canonicalization the ACME service and the proxy
         # use, so the thumbprint stored here is the one they compare against.

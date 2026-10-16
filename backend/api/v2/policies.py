@@ -278,7 +278,7 @@ def _issue_approved_certificate(approval):
     from services.policy_service import PolicyEvaluationService
     from cryptography import x509
     from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric import rsa, ec
+    from utils import key_algorithms
     from cryptography.hazmat.backends import default_backend
     from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID, ExtensionOID
     from utils.datetime_utils import utc_now
@@ -390,15 +390,7 @@ def _issue_approved_certificate(approval):
         _notices.append(notices_mod.validity_shortened(
             requested_validity, validity_days,
             notices_mod.policy_validity_reason(_capper, validity_days)))
-    EC_CURVES = {
-        'prime256v1': ec.SECP256R1(),
-        'secp384r1': ec.SECP384R1(),
-        'secp521r1': ec.SECP521R1(),
-    }
-    if normalized_key in EC_CURVES:
-        new_key = ec.generate_private_key(EC_CURVES[normalized_key], default_backend())
-    else:
-        new_key = rsa.generate_private_key(65537, int(normalized_key), default_backend())
+    new_key = key_algorithms.generate(normalized_key)
     
     # Build subject
     subject_attrs = [x509.NameAttribute(NameOID.COMMON_NAME, data['cn'])]

@@ -21,6 +21,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- TSA: generating a signing certificate with an EC key but no curve reported an invalid curve; it now says a curve is required.
 - CAs: creating a CA with keyAlgo `EC`, a lowercase name or an unsupported algorithm silently produced an RSA-2048 key. Valid spellings are honoured, anything else is refused, and the CA detail view reports the real key algorithm and size.
 - Renewal: a certificate whose key family cannot be regenerated (DSA) was renewed with an RSA-2048 key, and a Microsoft CA rekey of an EC certificate produced an RSA-2048 request. The first is now refused and the second keeps its curve.
 - ACME client: new orders ignored the configured key type and always used RSA-2048. They now take it, an unknown type fails at finalize instead of falling back to RSA-2048, and Ed25519 or P-521 CSRs are signed with the right hash.

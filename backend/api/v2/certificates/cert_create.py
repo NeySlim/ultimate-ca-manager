@@ -20,7 +20,6 @@ from services.trust_store.constraints_mixin import validate_name_constraints
 from services.template_service import compute_template_overrides
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import NameOID, ExtendedKeyUsageOID, ExtensionOID
 from services.audit_service import AuditService
@@ -30,6 +29,7 @@ from utils.datetime_utils import utc_now, utc_isoformat, cert_not_before
 from security.encryption import encrypt_private_key
 from utils.db_transaction import safe_commit
 from . import bp
+from utils import key_algorithms
 from utils.key_codec import private_key_to_pem
 from utils.x509_aki import authority_key_identifier_from_issuer
 
@@ -190,19 +190,7 @@ def create_certificate():
         except ValueError as exc:
             return error_response(str(exc), 400)
 
-        EC_CURVES = {
-            'prime256v1': ec.SECP256R1(),
-            'secp384r1': ec.SECP384R1(),
-            'secp521r1': ec.SECP521R1(),
-        }
-        if normalized_key in EC_CURVES:
-            new_key = ec.generate_private_key(EC_CURVES[normalized_key], default_backend())
-        else:
-            new_key = rsa.generate_private_key(
-                public_exponent=65537,
-                key_size=int(normalized_key),
-                backend=default_backend()
-            )
+        new_key = key_algorithms.generate(normalized_key)
 
         # Build subject
         subject_attrs = [x509.NameAttribute(NameOID.COMMON_NAME, data['cn'])]

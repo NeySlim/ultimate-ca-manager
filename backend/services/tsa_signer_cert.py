@@ -25,13 +25,13 @@ from datetime import timedelta
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, ExtensionOID, NameOID
 
 from models import Certificate, db
 from services.trust_store.constraints_mixin import validate_name_constraints
 from utils.datetime_utils import cert_not_before, utc_now
 from utils.db_transaction import safe_commit
+from utils import key_algorithms
 from utils.key_type import parse_issue_key_type
 from utils.key_codec import private_key_to_pem
 
@@ -42,13 +42,6 @@ DEFAULT_VALIDITY_DAYS = 397
 DEFAULT_KEY_TYPE = 'rsa'
 DEFAULT_KEY_SIZE = '3072'
 from utils.validity import MAX_VALIDITY_DAYS  # noqa: F401  (re-exported here)
-
-# KEY_TYPES ids that parse_issue_key_type returns for EC curves.
-_EC_CURVES = {
-    'prime256v1': ec.SECP256R1,
-    'secp384r1': ec.SECP384R1,
-    'secp521r1': ec.SECP521R1,
-}
 
 from security.encryption import encrypt_private_key
 
@@ -66,18 +59,17 @@ class TsaSignerIssueError(Exception):
 
 
 def _generate_key(key_type, key_size, curve):
+    # With neither curve nor size, the RSA default size would be parsed as a curve.
+    if str(key_type or '').strip().lower() in ('ec', 'ecdsa') and not key_size and not curve:
+        raise TsaSignerIssueError(
+            'An EC key needs a curve: pass curve (P-256, P-384 or P-521)', 400)
     try:
         normalized = parse_issue_key_type(key_type or DEFAULT_KEY_TYPE,
                                           key_size or DEFAULT_KEY_SIZE,
                                           curve=curve)
     except ValueError as exc:
         raise TsaSignerIssueError(str(exc), 400)
-
-    if normalized in _EC_CURVES:
-        return ec.generate_private_key(_EC_CURVES[normalized](), default_backend())
-    return rsa.generate_private_key(
-        public_exponent=65537, key_size=int(normalized), backend=default_backend()
-    )
+    return key_algorithms.generate(normalized)
 
 
 def _key_algo_label(public_key) -> str:
