@@ -88,7 +88,7 @@ def confirm_2fa():
     # Generate backup codes
     backup_codes = [f'{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}-{secrets.token_hex(2).upper()}' for _ in range(8)]
 
-    # Enable 2FA — backup codes are stored as scrypt hashes; the
+    # Enable 2FA — backup codes are stored hashed; the
     # plaintext list is only ever returned here.
     user.totp_confirmed = True
     user.backup_codes = backup_hash_codes(backup_codes)

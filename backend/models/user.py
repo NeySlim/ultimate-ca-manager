@@ -1,7 +1,7 @@
 """
 User and UserSession Models
 """
-from werkzeug.security import generate_password_hash, check_password_hash
+from utils.password_hash import hash_password, needs_rehash, verify_password
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -106,17 +106,17 @@ class User(db.Model):
         return [db.session.get(Group, m.group_id) for m in memberships if db.session.get(Group, m.group_id)]
     
     def set_password(self, password: str):
-        """Hash and set password.
-
-        Algorithm is pinned explicitly so a future Werkzeug upgrade cannot
-        silently downgrade us (e.g. back to pbkdf2:sha256 with low iterations).
-        scrypt is the current Werkzeug default and our chosen baseline.
-        """
-        self.password_hash = generate_password_hash(password, method='scrypt')
+        """Hash and set password, with the method pinned in utils.password_hash."""
+        self.password_hash = hash_password(password)
     
     def check_password(self, password: str) -> bool:
-        """Verify password"""
-        return check_password_hash(self.password_hash, password)
+        """Verify password; a hash of an older method is replaced on success
+        and saved by the caller's next commit."""
+        if not verify_password(self.password_hash, password):
+            return False
+        if needs_rehash(self.password_hash):
+            self.password_hash = hash_password(password)
+        return True
 
     def get_preferences(self) -> dict:
         """Return the user's preferences as a dict (empty if unset/invalid)."""

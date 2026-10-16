@@ -96,8 +96,8 @@ def update_wstep_config():
     if 'username' in data:
         set_config('wstep_username', data['username'])
     if 'password' in data and data['password']:
-        from werkzeug.security import generate_password_hash
-        set_config('wstep_password', generate_password_hash(data['password']))
+        from utils.password_hash import hash_password
+        set_config('wstep_password', hash_password(data['password']))
     if 'validity_days' in data:
         # Bound to PKI-internal cap (10 years), same as EST.
         from utils.validity import (MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS,

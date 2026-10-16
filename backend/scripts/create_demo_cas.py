@@ -9,7 +9,7 @@ sys.path.insert(0, str(Path(__file__).parent.parent))
 from app import create_app
 from models import db, User, CA
 from services.ca_service import CAService
-from werkzeug.security import generate_password_hash
+from utils.password_hash import hash_password
 
 app = create_app()
 
@@ -22,11 +22,11 @@ with app.app_context():
     
     print("\n👥 Creating users...")
     users = [
-        User(username='admin', password_hash=generate_password_hash('admin'), 
+        User(username='admin', password_hash=hash_password('admin'), 
              email='admin@certific.ate', role='admin'),
-        User(username='alice', password_hash=generate_password_hash('alice123'), 
+        User(username='alice', password_hash=hash_password('alice123'), 
              email='alice@certific.ate', role='user'),
-        User(username='bob', password_hash=generate_password_hash('bob123'), 
+        User(username='bob', password_hash=hash_password('bob123'), 
              email='bob@certific.ate', role='user'),
     ]
     db.session.add_all(users)

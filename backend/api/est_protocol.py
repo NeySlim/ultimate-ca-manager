@@ -509,14 +509,14 @@ def _authenticate_est_client():
         est_password = SystemConfig.query.filter_by(key='est_password').first()
         
         if est_username and est_password and est_username.value and est_password.value:
-            from werkzeug.security import check_password_hash
+            from utils.password_hash import HASH_PREFIXES, verify_password
             # auth.username/password may be None for malformed headers
             if auth.username is None or auth.password is None:
                 return False, None
             username_match = hmac.compare_digest(auth.username, est_username.value)
             # Support both hashed and legacy plaintext passwords
-            if est_password.value.startswith(('scrypt:', 'pbkdf2:')):
-                password_match = check_password_hash(est_password.value, auth.password)
+            if est_password.value.startswith(HASH_PREFIXES):
+                password_match = verify_password(est_password.value, auth.password)
             else:
                 password_match = hmac.compare_digest(auth.password, est_password.value)
             if username_match and password_match:

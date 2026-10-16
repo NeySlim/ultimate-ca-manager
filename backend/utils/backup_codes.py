@@ -10,8 +10,8 @@ membership check, both delete it.
 
 This module:
 
-  * stores codes as a JSON list of werkzeug scrypt hashes;
-  * verifies by iterating hashes with werkzeug.check_password_hash;
+  * stores codes as a JSON list of PBKDF2 hashes (utils.password_hash);
+  * verifies by iterating them, older scrypt hashes included;
   * consumes atomically via an UPDATE...WHERE backup_codes = <old>
     optimistic-lock — the loser of the race observes rowcount == 0
     and is rejected.
@@ -28,7 +28,7 @@ import logging
 from typing import List, Optional, Tuple
 
 from sqlalchemy import update
-from werkzeug.security import check_password_hash, generate_password_hash
+from utils.password_hash import hash_password, verify_password
 
 from models import User, db
 
@@ -43,7 +43,7 @@ _HASH_PREFIXES = ('scrypt:', 'pbkdf2:', 'argon2:')
 
 def hash_codes(codes: List[str]) -> str:
     """Return the JSON-encoded blob to store in user.backup_codes."""
-    return json.dumps([generate_password_hash(c, method='scrypt') for c in codes])
+    return json.dumps([hash_password(c) for c in codes])
 
 
 def _load_entries(blob: Optional[str]) -> Tuple[List[str], bool]:
@@ -87,7 +87,7 @@ def verify_code_only(blob: Optional[str], code: str) -> bool:
     if not code:
         return False
     if hashed:
-        return any(check_password_hash(h, code) for h in entries)
+        return any(verify_password(h, code) for h in entries)
     return code in entries
 
 
@@ -114,7 +114,7 @@ def consume_code(user: User, code: str) -> bool:
     if hashed:
         for i, h in enumerate(entries):
             try:
-                if check_password_hash(h, code):
+                if verify_password(h, code):
                     matched_index = i
                     break
             except Exception:

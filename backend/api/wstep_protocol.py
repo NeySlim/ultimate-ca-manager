@@ -93,9 +93,9 @@ def _check_credentials(username, password):
     # every other bad-credential case gets. bytes operands have no such
     # restriction, so encode first.
     username_match = hmac.compare_digest(username.encode('utf-8'), wstep_username.value.encode('utf-8'))
-    from werkzeug.security import check_password_hash
-    if wstep_password.value.startswith(('scrypt:', 'pbkdf2:')):
-        password_match = check_password_hash(wstep_password.value, password)
+    from utils.password_hash import HASH_PREFIXES, verify_password
+    if wstep_password.value.startswith(HASH_PREFIXES):
+        password_match = verify_password(wstep_password.value, password)
     else:
         password_match = hmac.compare_digest(password.encode('utf-8'), wstep_password.value.encode('utf-8'))
     return username_match and password_match

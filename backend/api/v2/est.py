@@ -115,8 +115,8 @@ def update_est_config():
     if 'username' in data:
         set_config('est_username', data['username'])
     if 'password' in data and data['password']:
-        from werkzeug.security import generate_password_hash
-        set_config('est_password', generate_password_hash(data['password']))
+        from utils.password_hash import hash_password
+        set_config('est_password', hash_password(data['password']))
     if 'validity_days' in data:
         # Bound to PKI-internal cap (10 years).
         from utils.validity import (MAX_VALIDITY_DAYS, MIN_VALIDITY_DAYS,

@@ -3,7 +3,6 @@ import logging
 
 from flask import request, g
 from models import db, User
-from werkzeug.security import check_password_hash, generate_password_hash
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
@@ -55,11 +54,11 @@ def change_password():
 
     # Skip current-password verification only when the SERVER says so
     if not skip_current_check:
-        if not current_password or not check_password_hash(user.password_hash, current_password):
+        if not current_password or not user.check_password(current_password):
             return error_response('Current password is incorrect', 401)
 
     # Update password
-    user.password_hash = generate_password_hash(new_password)
+    user.set_password(new_password)
     user.force_password_change = False
     ok, _err = safe_commit(logger, "Failed to update password")
     if not ok:

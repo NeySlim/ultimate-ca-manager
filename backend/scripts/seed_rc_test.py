@@ -34,7 +34,7 @@ from app import create_app
 from models import db, User, CA, Certificate
 from services.ca_service import CAService
 from services.cert_service import CertificateService
-from werkzeug.security import generate_password_hash
+from utils.password_hash import hash_password
 
 
 def seed():
@@ -52,19 +52,19 @@ def seed():
         users = [
             User(
                 username='admin',
-                password_hash=generate_password_hash('changeme123'),
+                password_hash=hash_password('changeme123'),
                 email='admin@example.test',
                 role='admin',
             ),
             User(
                 username='operator',
-                password_hash=generate_password_hash('changeme123'),
+                password_hash=hash_password('changeme123'),
                 email='operator@example.test',
                 role='operator',
             ),
             User(
                 username='viewer',
-                password_hash=generate_password_hash('changeme123'),
+                password_hash=hash_password('changeme123'),
                 email='viewer@example.test',
                 role='viewer',
             ),

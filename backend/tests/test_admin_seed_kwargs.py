@@ -15,7 +15,7 @@ only mapped columns yet still hard-coded 'admin'/'admin@localhost' (a
 deployment with INITIAL_ADMIN_USERNAME set got the WRONG admin back from a
 UI button), skipped totp_exempt (under global 2FA enforcement the recreated
 admin had no enrolled device and no exemption — the exact lockout #141
-exists to prevent), and bypassed the scrypt pin in User.set_password() with
+exists to prevent), and bypassed the hash pin in User.set_password() with
 a bare generate_password_hash(). The canonical-shape test below asserts the
 three properties every seeding site must agree on.
 
@@ -156,7 +156,7 @@ def test_seeding_sites_match_the_canonical_bootstrap_shape(path):
         # 2. The password goes through User.set_password(), which pins the
         #    hash algorithm — never a password_hash= kwarg built elsewhere.
         assert 'password_hash' not in kwargs, (
-            f"{path.name}: pass the password through set_password() (scrypt "
+            f"{path.name}: pass the password through set_password() (hash "
             f"pin, models/user.py), not a precomputed password_hash="
         )
 

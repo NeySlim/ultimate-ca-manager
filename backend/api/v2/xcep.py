@@ -85,8 +85,8 @@ def update_xcep_config():
     if 'username' in data:
         set_config('xcep_username', data['username'])
     if 'password' in data and data['password']:
-        from werkzeug.security import generate_password_hash
-        set_config('xcep_password', generate_password_hash(data['password']))
+        from utils.password_hash import hash_password
+        set_config('xcep_password', hash_password(data['password']))
 
     ok, _err = safe_commit(logger, "Failed to update XCEP configuration")
     if not ok:
