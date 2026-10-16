@@ -66,18 +66,20 @@ def _migration():
     return module
 
 
-def test_migration_fills_empty_and_eddsa_values_only():
+def test_migration_recomputes_every_readable_certificate():
     conn = sqlite3.connect(':memory:')
     conn.execute('CREATE TABLE certificates (id INTEGER PRIMARY KEY, crt TEXT, key_algo VARCHAR(50))')
     rows = [
         (1, _crt(rsa.generate_private_key(public_exponent=65537, key_size=2048)), None),
         (2, _crt(ec.generate_private_key(ec.SECP384R1())), ''),
         (3, _crt(ed25519.Ed25519PrivateKey.generate()), 'EdDSA'),
-        (4, _crt(rsa.generate_private_key(public_exponent=65537, key_size=2048)), 'kept as is'),
+        (4, _crt(rsa.generate_private_key(public_exponent=65537, key_size=2048)), 'RSA'),
+        (7, _crt(ec.generate_private_key(ec.SECP256R1())), 'ECDSA'),
         (5, None, None),
-        (6, 'not a certificate', None),
+        (6, 'not a certificate', 'kept as is'),
     ]
     conn.executemany('INSERT INTO certificates VALUES (?, ?, ?)', rows)
     _migration().upgrade(conn)
     assert dict(conn.execute('SELECT id, key_algo FROM certificates').fetchall()) == {
-        1: 'RSA 2048', 2: 'EC secp384r1', 3: 'Ed25519', 4: 'kept as is', 5: None, 6: None}
+        1: 'RSA 2048', 2: 'EC secp384r1', 3: 'Ed25519', 4: 'RSA 2048', 5: None,
+        6: 'kept as is', 7: 'EC secp256r1'}
