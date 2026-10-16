@@ -21,6 +21,25 @@ from utils import hsm_check, pkcs11_config
 logger = logging.getLogger(__name__)
 
 
+
+def _spki_from_pkcs1_pem(pem):
+    """SubjectPublicKeyInfo PEM for a cached PKCS#11 RSA key that earlier
+    versions stored as PKCS#1 under a "PUBLIC KEY" label; None if it loads."""
+    import base64
+    from cryptography.hazmat.primitives import serialization
+    try:
+        serialization.load_pem_public_key(pem.encode())
+        return None
+    except ValueError:
+        pass
+    try:
+        body = ''.join(line for line in pem.strip().splitlines() if not line.startswith('-----'))
+        public_key = serialization.load_der_public_key(base64.b64decode(body))
+    except (ValueError, TypeError):
+        return None
+    return public_key.public_bytes(serialization.Encoding.PEM,
+                                   serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+
 class HsmService:
     """
     HSM Service - manages providers and keys
@@ -432,6 +451,10 @@ class HsmService:
         
         # Return cached public key if available
         if key.public_key_pem:
+            repaired = _spki_from_pkcs1_pem(key.public_key_pem)
+            if repaired:
+                key.public_key_pem = repaired
+                db.session.flush()
             return key.public_key_pem
         
         # Fetch from HSM

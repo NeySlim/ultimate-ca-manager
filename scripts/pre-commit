@@ -14,6 +14,8 @@
 set -e
 
 ROOT="$(git rev-parse --show-toplevel)"
+# A venv at the repo root (.venv, ignored) carries the cryptography the CI uses
+PYTEST_PY="$ROOT/.venv/bin/python"; [ -x "$PYTEST_PY" ] || PYTEST_PY=python3
 RED='\033[0;31m'
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
@@ -51,8 +53,6 @@ fi
 # share state within a file). Strict: any "failed"/"error" in the summary
 # fails the hook — "1 failed, N passed" used to be accepted.
 echo -n "  Backend tests... "
-# A venv at the repo root (.venv, ignored) carries the cryptography the CI uses
-PYTEST_PY="$ROOT/.venv/bin/python"; [ -x "$PYTEST_PY" ] || PYTEST_PY=python3
 BACK_RESULT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -n auto --dist loadfile 2>&1 | tail -1)
 if echo "$BACK_RESULT" | grep -q "passed" && ! echo "$BACK_RESULT" | grep -qE "failed|error"; then
     echo -e "${GREEN}✅${NC} $BACK_RESULT"
@@ -75,7 +75,7 @@ fi
 
 # ── 5. Backend static audit (undefined references + import smoke) ──
 echo -n "  Backend undefined refs... "
-if python3 "$ROOT/backend/scripts/audit_undefined_names.py" > /tmp/ucm-audit-refs.log 2>&1; then
+if "$PYTEST_PY" "$ROOT/backend/scripts/audit_undefined_names.py" > /tmp/ucm-audit-refs.log 2>&1; then
     echo -e "${GREEN}✅${NC}"
 else
     echo -e "${RED}❌ Undefined references in backend (logger / helpers / imports)${NC}"
@@ -84,7 +84,7 @@ else
 fi
 
 echo -n "  Backend module import smoke... "
-if cd "$ROOT/backend" && python3 scripts/audit_imports.py > /tmp/ucm-audit-imports.log 2>&1; then
+if cd "$ROOT/backend" && "$PYTEST_PY" scripts/audit_imports.py > /tmp/ucm-audit-imports.log 2>&1; then
     echo -e "${GREEN}✅${NC}"
 else
     echo -e "${RED}❌ Module import errors (NameError / ImportError at load time)${NC}"
