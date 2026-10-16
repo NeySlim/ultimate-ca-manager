@@ -17,6 +17,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Upgrade note: an active policy with allowed key types or hashes now also refuses ACME, SCEP, EST and WSTEP requests outside them, and CAs created under them; review active policies before upgrading (#397).
 - Passwords, 2FA backup codes and the EST, WSTEP and XCEP secrets are hashed with PBKDF2-HMAC-SHA256 (600,000 iterations) instead of scrypt, which a FIPS-mode host refuses and which stopped UCM from starting there. Outside FIPS mode, existing scrypt hashes keep working and are replaced at the next login; on a FIPS host they must be reset (#399).
+- Docker image on Debian 13 (trixie) instead of 12: system OpenSSL 3.5 and PostgreSQL client 17. Existing volumes upgrade in place. cryptography is pinned to 50.0.2.
 
 ### Fixed
 

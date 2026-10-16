@@ -3,7 +3,7 @@
 # Paths aligned with DEB/RPM packages: /opt/ucm/{backend,frontend,data}
 
 # Stage 1: Builder - Install dependencies and build environment
-FROM python:3.13-slim-bookworm AS builder
+FROM python:3.13-slim-trixie AS builder
 
 # Install build dependencies (fallback for packages without prebuilt wheels)
 # Note: pyjks is installed separately with --no-deps to skip `twofish`
@@ -30,7 +30,7 @@ RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --no-deps pyjks==20.0.0
 
 # Stage 2: Runtime - Minimal production image
-FROM python:3.13-slim-bookworm
+FROM python:3.13-slim-trixie
 
 LABEL maintainer="NeySlim <https://github.com/NeySlim>" \
       description="Ultimate CA Manager - Certificate Authority Management System" \

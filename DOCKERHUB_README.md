@@ -130,7 +130,7 @@ Release candidates are published under their own `X.Y-rcN` tag and never move `l
 
 ## Image Details
 
-- Base: `python:3.13-slim-bookworm`
+- Base: `python:3.13-slim-trixie`
 - User: non-root (`ucm`)
 - Server: Gunicorn production WSGI
 - Platforms: linux/amd64, linux/arm64
