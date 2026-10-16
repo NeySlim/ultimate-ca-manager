@@ -219,3 +219,41 @@ class TestRoomForNewFamilies:
     def test_facades_pick_it_up(self, with_mldsa65):
         assert key_label_for_public_key(build_key('mldsa65')) == 'ML-DSA-65'
         assert _normalize_key_type_label('ml-dsa-65') == 'ML-DSA-65'
+
+
+@pytest.mark.parametrize('make_key,expected', [
+    (lambda: rsa.generate_private_key(public_exponent=65537, key_size=2048), 'RSA 2048'),
+    (lambda: rsa.generate_private_key(public_exponent=65537, key_size=1024), 'RSA 1024'),
+    (lambda: ec.generate_private_key(ec.SECP384R1()), 'EC secp384r1'),
+    (lambda: ec.generate_private_key(ec.SECP256K1()), 'EC secp256k1'),
+    (lambda: ed25519.Ed25519PrivateKey.generate(), 'Ed25519'),
+    (lambda: ed448.Ed448PrivateKey.generate(), 'Ed448'),
+])
+def test_imported_and_renewed_certificates_store_one_spelling(make_key, expected):
+    # Import wrote "EdDSA" where renewal wrote "Ed25519"/"Ed448"
+    from services.cert.renewal import _key_algo_label
+    public_key = make_key().public_key()
+    assert ka.key_algo_for_public_key(public_key) == expected
+    assert _key_algo_label(public_key) == expected
+
+
+def test_an_imported_ed25519_certificate_stores_ed25519(app):
+    import datetime
+    from cryptography.hazmat.primitives import serialization
+    from models import Certificate, db
+    from services.cert_service import CertificateService
+    key = ed25519.Ed25519PrivateKey.generate()
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'ed-import.registry.test')])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now).not_valid_after(now + datetime.timedelta(days=30))
+            .sign(key, None))
+    pem = cert.public_bytes(serialization.Encoding.PEM).decode()
+    with app.app_context():
+        row = CertificateService.import_certificate(descr='ed-import', cert_pem=pem)
+        try:
+            assert row.key_algo == 'Ed25519'
+        finally:
+            db.session.delete(db.session.get(Certificate, row.id))
+            db.session.commit()

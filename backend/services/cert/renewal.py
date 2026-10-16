@@ -170,15 +170,8 @@ def _generate_matching_key(orig_pub_key):
 
 
 def _key_algo_label(public_key) -> str:
-    if isinstance(public_key, rsa.RSAPublicKey):
-        return f'RSA {public_key.key_size}'
-    if isinstance(public_key, ec.EllipticCurvePublicKey):
-        return f'EC {public_key.curve.name}'
-    if isinstance(public_key, ed25519.Ed25519PublicKey):
-        return 'Ed25519'
-    if isinstance(public_key, ed448.Ed448PublicKey):
-        return 'Ed448'
-    return 'Unknown'
+    from utils.key_algorithms import key_algo_for_public_key
+    return key_algo_for_public_key(public_key)
 
 
 def _extract_sans(certificate: x509.Certificate) -> dict:

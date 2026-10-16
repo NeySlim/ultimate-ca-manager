@@ -81,11 +81,8 @@ def _generate_key(key_type, key_size, curve):
 
 
 def _key_algo_label(public_key) -> str:
-    if isinstance(public_key, rsa.RSAPublicKey):
-        return f'RSA {public_key.key_size}'
-    if isinstance(public_key, ec.EllipticCurvePublicKey):
-        return f'EC {public_key.curve.name}'
-    return 'Unknown'
+    from utils.key_algorithms import key_algo_for_public_key
+    return key_algo_for_public_key(public_key)
 
 
 from utils.ca_pointer_extensions import add_ca_pointer_extensions as _copy_ca_pointer_extensions

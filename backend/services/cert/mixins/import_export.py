@@ -50,16 +50,8 @@ class ImportExportMixin:
         )
 
         # Extract key algorithm info
-        from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519, ed448
-        pub_key = cert.public_key()
-        if isinstance(pub_key, rsa.RSAPublicKey):
-            key_algo = f"RSA {pub_key.key_size}"
-        elif isinstance(pub_key, ec.EllipticCurvePublicKey):
-            key_algo = f"EC {pub_key.curve.name}"
-        elif isinstance(pub_key, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)):
-            key_algo = "EdDSA"
-        else:
-            key_algo = "Unknown"
+        from utils.key_algorithms import key_algo_for_public_key
+        key_algo = key_algo_for_public_key(cert.public_key())
 
         # Extract signature algorithm
         sig_algo = cert.signature_algorithm_oid._name if hasattr(cert.signature_algorithm_oid, '_name') else str(cert.signature_algorithm_oid.dotted_string)
