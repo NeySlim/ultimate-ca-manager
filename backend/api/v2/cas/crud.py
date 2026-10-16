@@ -92,9 +92,13 @@ def _resolve_local_key_type(data):
     if not all(isinstance(v, str) for v in names):
         return None, 'keyAlgo must be a string (RSA or ECDSA)'
     # A full label ('RSA-4096', 'EC-P384', '2048') names size and curve at once
-    if len(names) == 1 and _blank(size):
-        alg = key_algorithms.get(names[0])
-        if alg is not None and alg.family in ('RSA', 'EC') and alg.trust_store_id:
+    labels = {key_algorithms.get(v) for v in names}
+    if len(labels) == 1 and None not in labels:
+        alg = labels.pop()
+        if alg.family in ('RSA', 'EC') and alg.trust_store_id:
+            if not _blank(size) and key_algorithms.get(str(size).strip()) is not alg \
+                    and str(size).strip() != str(alg.key_size):
+                return None, 'keyAlgo and keySize name different keys'
             return alg.trust_store_id, None
     families = {_CA_KEY_FAMILIES.get(v.strip().lower()) for v in names}
     if None in families:

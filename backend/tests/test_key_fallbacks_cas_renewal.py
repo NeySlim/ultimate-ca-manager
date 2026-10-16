@@ -78,10 +78,12 @@ class TestCreateCaKey:
         ({'keyType': 'RSA-4096'}, 'RSA', 4096),
         ({'keyType': 'EC-P384'}, 'EC', 384),
         ({'keyAlgo': 'ec-p521'}, 'EC', 521),
+        ({'keyType': 'RSA-4096', 'keySize': 4096}, 'RSA', 4096),
+        ({'keyAlgo': 'EC-P384', 'keyType': 'EC-P384', 'keySize': 'secp384r1'}, 'EC', 384),
     ])
     def test_a_full_key_label_names_size_and_curve(self, app, auth_client, created, fields, family, size):
         # Scripts sent keyType 'RSA-2048'-style labels; they no longer fall back to RSA-2048
-        r = _post_ca(auth_client, created, f'Label {family} {size} CA', **fields)
+        r = _post_ca(auth_client, created, f'Label {family} {size} {len(fields)} CA', **fields)
         assert r.status_code == 201, r.get_json()
         key = _ca_public_key(app, r.get_json()['data']['id'])
         assert key.key_size == size
@@ -98,6 +100,8 @@ class TestCreateCaKey:
         {'keyType': 'Ed25519'},
         {'keySize': 4096},
         {'keyAlgo': 'RSA', 'keyType': 'EC'},
+        {'keyType': 'RSA-4096', 'keySize': 2048},
+        {'keyAlgo': 'EC-P384', 'keySize': 'secp256r1'},
     ])
     def test_unusable_requests_are_refused(self, auth_client, created, fields):
         r = _post_ca(auth_client, created, 'Refused key CA', **fields)
