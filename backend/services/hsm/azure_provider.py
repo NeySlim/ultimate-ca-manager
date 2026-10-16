@@ -13,7 +13,17 @@ from services.hsm.base_provider import (
     HsmConnectionError, HsmOperationError, HsmKeyNotFoundError, HsmConfigError
 )
 
+from utils.key_algorithms import label_for_curve_name
+
 logger = logging.getLogger(__name__)
+
+# JWK curve names (RFC 7518) to the pyca names the key algorithm registry knows
+_JWK_CURVES = {'P-256': 'secp256r1', 'P-384': 'secp384r1', 'P-521': 'secp521r1'}
+
+
+def _curve_name(crv) -> Optional[str]:
+    """pyca name of a JWK ``crv`` (str or KeyCurveName), None when unsupported."""
+    return _JWK_CURVES.get(str(getattr(crv, 'value', crv) or ''))
 
 # Try to import Azure libraries - they're optional
 AZURE_AVAILABLE = False
@@ -92,7 +102,8 @@ class AzureKeyVaultProvider(BaseHsmProvider):
         
         self._credential = None
         self._key_client: Optional[KeyClient] = None
-    
+        self.list_errors: List[str] = []
+
     def connect(self) -> bool:
         """Connect to Azure Key Vault"""
         try:
@@ -171,7 +182,8 @@ class AzureKeyVaultProvider(BaseHsmProvider):
             raise HsmOperationError("Not connected")
         
         keys = []
-        
+        self.list_errors = []
+
         try:
             for key_properties in self._key_client.list_properties_of_keys():
                 # Get full key to access key type info
@@ -180,8 +192,11 @@ class AzureKeyVaultProvider(BaseHsmProvider):
                     key_info = self._key_to_key_info(key)
                     if key_info:
                         keys.append(key_info)
+                    else:
+                        self.list_errors.append(f"{key_properties.name}: unreadable")
                 except Exception as e:
                     logger.warning(f"Failed to get key {key_properties.name}: {e}")
+                    self.list_errors.append(f"{key_properties.name}: {e}")
             
             return keys
             
@@ -197,16 +212,8 @@ class AzureKeyVaultProvider(BaseHsmProvider):
             if key_type in (KeyType.rsa, KeyType.rsa_hsm):
                 algorithm = f'RSA-{key.key.n.bit_length() if hasattr(key.key, "n") else 2048}'
             elif key_type in (KeyType.ec, KeyType.ec_hsm):
-                curve = key.key.crv if hasattr(key.key, 'crv') else 'P-256'
-                curve_map = {
-                    KeyCurveName.p_256: 'EC-P256',
-                    KeyCurveName.p_384: 'EC-P384',
-                    KeyCurveName.p_521: 'EC-P521',
-                    'P-256': 'EC-P256',
-                    'P-384': 'EC-P384',
-                    'P-521': 'EC-P521',
-                }
-                algorithm = curve_map.get(curve, 'EC-P256')
+                curve = _curve_name(getattr(key.key, 'crv', None))
+                algorithm = label_for_curve_name(curve) or 'UNKNOWN'
             else:
                 algorithm = str(key_type)
             
@@ -323,15 +330,15 @@ class AzureKeyVaultProvider(BaseHsmProvider):
                 # Reconstruct EC public key
                 from cryptography.hazmat.primitives.asymmetric import ec
                 
-                curve_map = {
-                    KeyCurveName.p_256: ec.SECP256R1(),
-                    KeyCurveName.p_384: ec.SECP384R1(),
-                    KeyCurveName.p_521: ec.SECP521R1(),
-                }
-                
+                curve = {
+                    'secp256r1': ec.SECP256R1, 'secp384r1': ec.SECP384R1, 'secp521r1': ec.SECP521R1,
+                }.get(_curve_name(getattr(jwk, 'crv', None)))
+                if curve is None:
+                    raise ValueError(f"unsupported curve {getattr(jwk, 'crv', None)}")
+                curve = curve()
+
                 x = int.from_bytes(jwk.x, 'big')
                 y = int.from_bytes(jwk.y, 'big')
-                curve = curve_map.get(jwk.crv, ec.SECP256R1())
                 
                 public_key = ec.EllipticCurvePublicNumbers(x, y, curve).public_key(default_backend())
             else:

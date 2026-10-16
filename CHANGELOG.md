@@ -21,6 +21,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- HSM: syncing a PKCS#11 provider deleted every key row and unbound the CAs using them, because the key listing could not read any key and came back empty. The listing reads keys and their real curve again, and a sync never removes a key a CA uses nor anything when the listing reports errors.
 - Templates: a key type saved in a legacy spelling (`ec:p384`) was advertised to Windows clients as RSA 2048 over XCEP, and issuing from it failed with "Unsupported key type". Key types are now stored under their canonical label, existing templates at upgrade.
 - Certificates: only imports and renewals recorded the key algorithm (imports as "EdDSA" for Ed25519), so sorting by key algorithm or compliance grade lumped most certificates together. Every certificate now records it, existing ones at upgrade.
 - HSM: a CA on a PKCS#11 RSA key failed with "Could not deserialize key data", because its public key was stored in PKCS#1 form under a SubjectPublicKeyInfo label. Keys already stored are repaired at their next use.

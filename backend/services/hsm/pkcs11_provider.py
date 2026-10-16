@@ -14,6 +14,7 @@ from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo,
     HsmConnectionError, HsmOperationError, HsmKeyNotFoundError, HsmConfigError
 )
+from utils.key_algorithms import label_for_curve_name
 from utils.pkcs11_config import normalize_pkcs11_config
 from utils.request_helpers import safe_call
 
@@ -104,6 +105,7 @@ class Pkcs11Provider(BaseHsmProvider):
         self._lib = None
         self._token = None
         self._session = None
+        self.list_errors: List[str] = []
     
     def connect(self) -> bool:
         """Connect to HSM and open session"""
@@ -176,12 +178,13 @@ class Pkcs11Provider(BaseHsmProvider):
             }
     
     def list_keys(self) -> List[HsmKeyInfo]:
-        """List all keys in the token"""
+        """List all keys in the token; keys that could not be read land in ``list_errors``."""
         if not self._session:
             raise HsmOperationError("Not connected")
-        
+
         keys = []
-        
+        self.list_errors = []
+
         try:
             # Find all private keys (we use private keys as reference)
             for obj in self._session.get_objects({
@@ -190,7 +193,7 @@ class Pkcs11Provider(BaseHsmProvider):
                 key_info = self._object_to_key_info(obj, 'asymmetric')
                 if key_info:
                     keys.append(key_info)
-            
+
             # Find all secret keys
             for obj in self._session.get_objects({
                 Attribute.CLASS: ObjectClass.SECRET_KEY
@@ -198,36 +201,70 @@ class Pkcs11Provider(BaseHsmProvider):
                 key_info = self._object_to_key_info(obj, 'symmetric')
                 if key_info:
                     keys.append(key_info)
-            
+
             return keys
-            
+
         except pkcs11.PKCS11Error as e:
             raise HsmOperationError(f"Failed to list keys: {str(e)}")
-    
+
+    @staticmethod
+    def _attr(obj, attribute, default=None):
+        """Attribute value, or *default* when the token does not expose it."""
+        try:
+            return obj[attribute]
+        except pkcs11.PKCS11Error:
+            return default
+
+    def _ec_algorithm(self, obj, key_id: Optional[bytes]) -> str:
+        """Label of the key's curve, read from EC_PARAMS on the key or its public half."""
+        params = self._attr(obj, Attribute.EC_PARAMS)
+        if not params and key_id:
+            for pub in self._session.get_objects({
+                Attribute.CLASS: ObjectClass.PUBLIC_KEY, Attribute.ID: key_id
+            }):
+                params = self._attr(pub, Attribute.EC_PARAMS)
+                break
+        if not params:
+            return 'UNKNOWN'
+        try:
+            from asn1crypto.keys import ECDomainParameters
+            domain = ECDomainParameters.load(bytes(params))
+            if domain.name != 'named':
+                return 'UNKNOWN'
+            return label_for_curve_name(domain.chosen.native) or 'UNKNOWN'
+        except Exception:
+            return 'UNKNOWN'
+
     def _object_to_key_info(self, obj, key_type: str) -> Optional[HsmKeyInfo]:
         """Convert PKCS#11 object to HsmKeyInfo"""
         try:
-            label = obj[Attribute.LABEL]
-            key_id = obj[Attribute.ID].hex() if obj[Attribute.ID] else label
-            
-            # Determine algorithm
-            pkcs11_key_type = obj[Attribute.KEY_TYPE]
-            
+            raw_id = self._attr(obj, Attribute.ID)
+            label = self._attr(obj, Attribute.LABEL) or ''
+            key_id = raw_id.hex() if raw_id else label
+            if not key_id:
+                raise ValueError('key has neither ID nor LABEL')
+
+            pkcs11_key_type = self._attr(obj, Attribute.KEY_TYPE)
+
             if pkcs11_key_type == KeyType.RSA:
-                modulus_bits = obj[Attribute.MODULUS_BITS] if hasattr(obj, '__getitem__') else 2048
-                algorithm = f'RSA-{modulus_bits}'
+                # Private keys carry MODULUS; MODULUS_BITS is a public-key attribute.
+                modulus = self._attr(obj, Attribute.MODULUS)
+                bits = int.from_bytes(modulus, 'big').bit_length() if modulus else \
+                    self._attr(obj, Attribute.MODULUS_BITS)
+                algorithm = f'RSA-{bits}' if bits else 'UNKNOWN'
             elif pkcs11_key_type == KeyType.EC:
-                algorithm = 'EC-P256'  # Simplified, could parse EC params
+                algorithm = self._ec_algorithm(obj, raw_id)
             elif pkcs11_key_type == KeyType.AES:
-                value_len = obj.get(Attribute.VALUE_LEN, 32) * 8
-                algorithm = f'AES-{value_len}'
+                value_len = self._attr(obj, Attribute.VALUE_LEN)
+                algorithm = f'AES-{value_len * 8}' if value_len else 'UNKNOWN'
             else:
                 algorithm = 'UNKNOWN'
-            
-            # Determine purpose
-            can_sign = obj.get(Attribute.SIGN, False)
-            can_encrypt = obj.get(Attribute.ENCRYPT, False) or obj.get(Attribute.WRAP, False)
-            
+
+            # Determine purpose (private keys expose DECRYPT/UNWRAP, secret keys ENCRYPT/WRAP)
+            can_sign = bool(self._attr(obj, Attribute.SIGN, False))
+            can_encrypt = any(self._attr(obj, a, False) for a in (
+                Attribute.ENCRYPT, Attribute.DECRYPT, Attribute.WRAP, Attribute.UNWRAP))
+
             if can_sign and can_encrypt:
                 purpose = 'all'
             elif can_sign:
@@ -236,22 +273,22 @@ class Pkcs11Provider(BaseHsmProvider):
                 purpose = 'encryption'
             else:
                 purpose = 'all'
-            
-            is_extractable = obj.get(Attribute.EXTRACTABLE, False)
-            
+
+            is_extractable = bool(self._attr(obj, Attribute.EXTRACTABLE, False))
+
             return HsmKeyInfo(
                 key_identifier=key_id,
-                label=label,
+                label=label or key_id,
                 algorithm=algorithm,
                 key_type=key_type,
                 purpose=purpose,
                 is_extractable=is_extractable
             )
-            
+
         except Exception as e:
             logger.warning(f"Failed to parse key object: {e}")
+            self.list_errors.append(str(e) or type(e).__name__)
             return None
-    
     def generate_key(
         self,
         label: str,

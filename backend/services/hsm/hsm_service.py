@@ -560,13 +560,16 @@ class HsmService:
     def sync_keys(cls, provider_id: int) -> Dict[str, int]:
         """
         Sync keys from HSM to database.
-        Adds new keys found in HSM, marks missing keys.
-        
+        Adds new keys found in HSM and removes missing ones, except keys another
+        row references (kept, counted in 'missing_kept') and except when the
+        listing reported errors ('listing_errors' > 0: nothing is removed).
+
         Args:
             provider_id: Provider ID
-            
+
         Returns:
-            Dict with 'added', 'removed', 'unchanged' counts
+            Dict with 'added', 'removed', 'unchanged', 'missing_kept' and
+            'listing_errors' counts
         """
         provider = db.session.get(HsmProvider, provider_id)
         if not provider:
@@ -576,7 +579,8 @@ class HsmService:
             hsm = cls._get_provider_instance(provider)
             with hsm:
                 hsm_keys = hsm.list_keys()
-            
+            listing_errors = len(getattr(hsm, 'list_errors', None) or [])
+
             # Get existing keys in DB
             db_keys = {k.key_identifier: k for k in provider.keys}
             hsm_key_ids = {k.key_identifier for k in hsm_keys}
@@ -604,22 +608,50 @@ class HsmService:
                 else:
                     unchanged += 1
             
-            # Remove keys no longer in HSM
+            # A partial listing proves nothing missing; a referenced key is never dropped
+            # (deleting it would null the CA's hsm_key_id).
+            referenced = cls._referenced_hsm_key_ids()
+            missing_kept = 0
             for key_id, key in db_keys.items():
-                if key_id not in hsm_key_ids:
-                    db.session.delete(key)
-                    removed += 1
-            
+                if key_id in hsm_key_ids:
+                    continue
+                if listing_errors or key.id in referenced:
+                    missing_kept += 1
+                    continue
+                db.session.delete(key)
+                removed += 1
+
             db.session.commit()
-            
+
+            if listing_errors or missing_kept:
+                logger.warning(
+                    f"HSM sync for {provider.name}: {listing_errors} unreadable key(s), "
+                    f"{missing_kept} missing key(s) kept")
             logger.info(f"Synced HSM keys for {provider.name}: +{added} -{removed} ={unchanged}")
-            return {'added': added, 'removed': removed, 'unchanged': unchanged}
-            
+            return {'added': added, 'removed': removed, 'unchanged': unchanged,
+                    'missing_kept': missing_kept, 'listing_errors': listing_errors}
+
         except HsmError:
+            db.session.rollback()
             raise
         except Exception as e:
+            db.session.rollback()
             logger.exception(f"Failed to sync HSM keys for {provider.name}")
             raise HsmOperationError(f"Failed to sync keys: {str(e)}")
+
+    @staticmethod
+    def _referenced_hsm_key_ids() -> set:
+        """Ids of hsm_keys rows that any foreign key in the schema points to."""
+        ids = set()
+        for table in db.metadata.tables.values():
+            if table.name == 'hsm_keys':
+                continue
+            for fk in table.foreign_keys:
+                if fk.target_fullname == 'hsm_keys.id':
+                    column = fk.parent
+                    ids.update(row[0] for row in db.session.execute(
+                        db.select(column).where(column.isnot(None))))
+        return ids
 
     @staticmethod
     def repair_pkcs11_provider_config(provider: HsmProvider) -> bool:
