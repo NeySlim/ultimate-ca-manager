@@ -498,7 +498,8 @@ class AcmeClientService:
                 return 'ES256'
             elif isinstance(curve, ec.SECP384R1):
                 return 'ES384'
-        return 'RS256'
+        # Account keys are generated or imported as RSA, P-256 or P-384 only
+        raise ValueError(f'Unsupported ACME account key: {type(key).__name__}')
     
     def _get_account_url(self) -> Optional[str]:
         """Get stored account URL"""

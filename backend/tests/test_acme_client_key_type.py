@@ -220,3 +220,14 @@ def test_proxy_order_does_not_claim_a_key_type(app):
         finally:
             db.session.delete(order)
             db.session.commit()
+
+
+def test_an_unsupported_account_key_is_refused_not_signed_rs256():
+    import pytest
+    from cryptography.hazmat.primitives.asymmetric import ec, ed25519
+    from services.acme.acme_client_service import AcmeClientService
+    detect = AcmeClientService._detect_key_algorithm
+    assert detect(None, ec.generate_private_key(ec.SECP384R1())) == 'ES384'
+    for key in (ec.generate_private_key(ec.SECP521R1()), ed25519.Ed25519PrivateKey.generate()):
+        with pytest.raises(ValueError, match='Unsupported ACME account key'):
+            detect(None, key)
