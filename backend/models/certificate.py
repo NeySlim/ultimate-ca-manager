@@ -171,7 +171,6 @@ class Certificate(db.Model):
         try:
             from cryptography import x509
             from cryptography.hazmat.backends import default_backend
-            from cryptography.hazmat.primitives.asymmetric import rsa, ec, dsa
             import base64
             
             # Try parsing CRT first
@@ -187,8 +186,6 @@ class Certificate(db.Model):
             else:
                 return "N/A"
             
-            if isinstance(public_key, dsa.DSAPublicKey):
-                return f"DSA {public_key.key_size}"
             from utils.key_algorithms import key_algo_for_public_key
             return key_algo_for_public_key(public_key)
         except Exception:

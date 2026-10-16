@@ -91,6 +91,11 @@ def _resolve_local_key_type(data):
     names = [v for v in (algo, alias) if not _blank(v)]
     if not all(isinstance(v, str) for v in names):
         return None, 'keyAlgo must be a string (RSA or ECDSA)'
+    # A full label ('RSA-4096', 'EC-P384', '2048') names size and curve at once
+    if len(names) == 1 and _blank(size):
+        alg = key_algorithms.get(names[0])
+        if alg is not None and alg.family in ('RSA', 'EC') and alg.trust_store_id:
+            return alg.trust_store_id, None
     families = {_CA_KEY_FAMILIES.get(v.strip().lower()) for v in names}
     if None in families:
         return None, f'Unsupported keyAlgo {names[0]!r}: a CA key is RSA or ECDSA (EC)'

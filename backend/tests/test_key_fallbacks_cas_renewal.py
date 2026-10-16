@@ -74,6 +74,19 @@ class TestCreateCaKey:
         key = _ca_public_key(app, r.get_json()['data']['id'])
         assert isinstance(key, ec.EllipticCurvePublicKey) and key.curve.name == 'secp384r1'
 
+    @pytest.mark.parametrize('fields, family, size', [
+        ({'keyType': 'RSA-4096'}, 'RSA', 4096),
+        ({'keyType': 'EC-P384'}, 'EC', 384),
+        ({'keyAlgo': 'ec-p521'}, 'EC', 521),
+    ])
+    def test_a_full_key_label_names_size_and_curve(self, app, auth_client, created, fields, family, size):
+        # Scripts sent keyType 'RSA-2048'-style labels; they no longer fall back to RSA-2048
+        r = _post_ca(auth_client, created, f'Label {family} {size} CA', **fields)
+        assert r.status_code == 201, r.get_json()
+        key = _ca_public_key(app, r.get_json()['data']['id'])
+        assert key.key_size == size
+        assert isinstance(key, rsa.RSAPublicKey if family == 'RSA' else ec.EllipticCurvePublicKey)
+
     @pytest.mark.parametrize('fields', [
         {'keyAlgo': 'Ed25519'},
         {'keyAlgo': 'DSA', 'keySize': 2048},

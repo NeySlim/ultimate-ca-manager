@@ -179,7 +179,8 @@ class GcpKmsProvider(BaseHsmProvider):
             raise HsmOperationError("Not connected")
         
         keys = []
-        
+        self.list_errors = []  # an unread key is not an absent key (sync_keys)
+
         try:
             for crypto_key in self._client.list_crypto_keys(parent=self._key_ring_path):
                 key_info = self._key_to_key_info(crypto_key)
@@ -228,7 +229,7 @@ class GcpKmsProvider(BaseHsmProvider):
                 key_type='asymmetric',
                 purpose=purpose,
                 is_extractable=False,  # GCP KMS keys are never extractable
-                extra_data={
+                metadata={
                     'protection_level': protection,
                     'version_template': str(crypto_key.version_template.algorithm) if crypto_key.version_template else None
                 }
@@ -236,6 +237,7 @@ class GcpKmsProvider(BaseHsmProvider):
             
         except Exception as e:
             logger.warning(f"Failed to parse key: {e}")
+            self.list_errors.append(f"{getattr(crypto_key, 'name', '?')}: {e}")
             return None
     
     def generate_key(

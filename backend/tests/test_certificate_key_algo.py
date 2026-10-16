@@ -83,3 +83,34 @@ def test_migration_recomputes_every_readable_certificate():
     assert dict(conn.execute('SELECT id, key_algo FROM certificates').fetchall()) == {
         1: 'RSA 2048', 2: 'EC secp384r1', 3: 'Ed25519', 4: 'RSA 2048', 5: None,
         6: 'kept as is', 7: 'EC secp256r1'}
+
+
+def test_dsa_and_curves_outside_the_registry():
+    from cryptography.hazmat.primitives.asymmetric import dsa
+    from utils.key_algorithms import key_algo_for_public_key
+    assert key_algo_for_public_key(dsa.generate_private_key(key_size=2048).public_key()) == 'DSA 2048'
+    assert key_algo_for_public_key(ec.generate_private_key(ec.SECP256K1()).public_key()) == 'EC secp256k1'
+
+
+def test_compliance_sort_scores_other_curves_like_the_service(app, auth_client):
+    # secp256k1 scores 15 in compliance_service and in the SQL sort; a DSA key 10.
+    # Names are chosen so the name tie-break would put the DSA first.
+    from cryptography.hazmat.primitives.asymmetric import dsa
+    from services.cert_service import CertificateService
+    ids = []
+    with app.app_context():
+        for cn, key in (('grade-other-a-dsa.test', dsa.generate_private_key(key_size=2048)),
+                        ('grade-other-b-k1.test', ec.generate_private_key(ec.SECP256K1()))):
+            pem = base64.b64decode(_crt(key, cn)).decode()
+            ids.append(CertificateService.import_certificate(descr=cn, cert_pem=pem).id)
+    try:
+        r = auth_client.get('/api/v2/certificates?search=grade-other-&sort_by=compliance_grade'
+                            '&sort_order=desc&per_page=50')
+        assert r.status_code == 200, r.data
+        order = [c['id'] for c in get_json(r)['data'] if c['id'] in ids]
+        assert order == [ids[1], ids[0]]
+    finally:
+        with app.app_context():
+            for cert_id in ids:
+                db.session.delete(db.session.get(Certificate, cert_id))
+            db.session.commit()

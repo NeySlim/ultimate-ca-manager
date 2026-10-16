@@ -1341,6 +1341,7 @@ export default function ACMEPage() {
           caAccounts={caAccounts}
           defaultEnvironment={clientSettings.environment || 'staging'}
           defaultEmail={clientSettings.email || ''}
+          defaultKeyType={clientSettings.key_type}
           preflightLoading={preflightLoading}
         />
       </Modal>

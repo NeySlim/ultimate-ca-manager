@@ -180,6 +180,7 @@ def list_certificates():
                 (Certificate.key_algo.ilike('EC secp256r1'), 25),
                 (Certificate.key_algo.ilike('Ed25519'), 30),
                 (Certificate.key_algo.ilike('Ed448'), 30),
+                (Certificate.key_algo.ilike('EC %'), 15),
                 else_=10
             ) +
             # Validity component (0-25)

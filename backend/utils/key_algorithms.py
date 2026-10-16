@@ -11,7 +11,7 @@ import re
 from dataclasses import dataclass
 from typing import Callable
 
-from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
+from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, rsa
 
 
 @dataclass(frozen=True)
@@ -177,7 +177,7 @@ def label_for_public_key(public_key) -> str | None:
 
 def key_algo_for_public_key(public_key) -> str:
     """Spelling stored in ``certificates.key_algo``; sizes and curves outside
-    the registry keep the "RSA <bits>" / "EC <curve>" form."""
+    the registry keep the "RSA <bits>" / "EC <curve>" form, DSA "DSA <bits>"."""
     for alg in _REGISTRY.algorithms:
         if isinstance(public_key, alg.public_class) and alg.matches_key(public_key):
             return alg.legacy_key_algo
@@ -185,6 +185,8 @@ def key_algo_for_public_key(public_key) -> str:
         return f'RSA {public_key.key_size}'
     if isinstance(public_key, ec.EllipticCurvePublicKey):
         return f'EC {public_key.curve.name}'
+    if isinstance(public_key, dsa.DSAPublicKey):
+        return f'DSA {public_key.key_size}'
     return 'Unknown'
 
 

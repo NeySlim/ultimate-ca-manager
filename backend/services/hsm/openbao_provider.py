@@ -230,6 +230,7 @@ class OpenBaoProvider(BaseHsmProvider):
         key_names = result.get('data', {}).get('keys', [])
 
         keys = []
+        self.list_errors = []  # an unread key is not an absent key (sync_keys)
         for name in key_names:
             try:
                 detail = self._api('GET', f'keys/{name}')
@@ -264,6 +265,7 @@ class OpenBaoProvider(BaseHsmProvider):
                 ))
             except Exception as e:
                 logger.warning(f'Failed to read key {name}: {e}')
+                self.list_errors.append(f'{name}: {e}')
 
         return keys
 

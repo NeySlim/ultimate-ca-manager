@@ -10,6 +10,7 @@ import sqlite3
 pg_compatible = True
 
 _SELECT = "SELECT id, crt, key_algo FROM certificates WHERE crt IS NOT NULL AND crt <> ''"
+_BATCH = 500
 
 
 def _labels(rows):
@@ -26,17 +27,30 @@ def _labels(rows):
             yield label, row_id
 
 
+def _changes(cursor):
+    """(label, id) pairs to write, reading the certificates in batches."""
+    changes = []
+    while True:
+        rows = cursor.fetchmany(_BATCH)
+        if not rows:
+            return changes
+        changes.extend(_labels(rows))
+
+
 def _upgrade_sqlite(conn):
-    rows = conn.execute(_SELECT).fetchall()
-    conn.executemany("UPDATE certificates SET key_algo = ? WHERE id = ?", list(_labels(rows)))
+    changes = _changes(conn.execute(_SELECT))
+    conn.executemany("UPDATE certificates SET key_algo = ? WHERE id = ?", changes)
     conn.commit()
 
 
 def _upgrade_pg(conn):
     from sqlalchemy import text
 
-    rows = conn.execute(text(_SELECT)).fetchall()
-    for label, row_id in _labels(rows):
+    # Streaming is set on the statement: on the connection it would also apply to the updates
+    cursor = conn.execute(text(_SELECT).execution_options(stream_results=True))
+    changes = _changes(cursor)
+    cursor.close()
+    for label, row_id in changes:
         conn.execute(text("UPDATE certificates SET key_algo = :label WHERE id = :id"),
                      {'label': label, 'id': row_id})
 

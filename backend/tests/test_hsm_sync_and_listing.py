@@ -109,6 +109,11 @@ class TestPkcs11ListingOnFakeObjects:
                         _ec_public(b'\x06', 'secp384r1')])
         assert keys['ec-secp384r1'].algorithm == 'EC-P384'
 
+    def test_a_key_with_no_curve_anywhere_is_unknown(self, fake_pkcs11):
+        _provider, listing = fake_pkcs11
+        keys = listing([_ec_private(b'\x08', 'secp384r1', with_params=False)])
+        assert keys['ec-secp384r1'].algorithm == 'UNKNOWN'
+
     def test_an_unreadable_key_is_reported(self, fake_pkcs11):
         provider, listing = fake_pkcs11
         broken = _FakeObject({Attribute.CLASS: ObjectClass.PRIVATE_KEY, Attribute.KEY_TYPE: KeyType.EC})
@@ -331,3 +336,40 @@ class TestSoftHsm:
                 db.session.query(HsmKey).filter_by(provider_id=provider_id).delete()
                 db.session.query(HsmProvider).filter_by(id=provider_id).delete()
                 db.session.commit()
+
+
+# ---------------------------------------------------------------------------
+# OpenBao and GCP report the keys they could not read
+# ---------------------------------------------------------------------------
+
+def test_openbao_reports_an_unread_key():
+    from services.hsm.openbao_provider import OpenBaoProvider
+    provider = OpenBaoProvider.__new__(OpenBaoProvider)
+
+    def api(method, path, **kwargs):
+        if method == 'LIST':
+            return {'data': {'keys': ['good', 'flaky']}}
+        if path == 'keys/flaky':
+            raise RuntimeError('503 from transit')
+        return {'data': {'type': 'ecdsa-p384', 'keys': {}}}
+    provider._api = api
+    keys = provider.list_keys()
+    assert [k.label for k in keys] == ['good']
+    assert len(provider.list_errors) == 1 and 'flaky' in provider.list_errors[0]
+
+
+def test_gcp_lists_its_keys_and_reports_an_unread_one():
+    kms = pytest.importorskip('google.cloud.kms_v1')
+    from services.hsm.gcp_provider import GcpKmsProvider
+    provider = GcpKmsProvider.__new__(GcpKmsProvider)
+    provider._key_ring_path = 'projects/p/locations/l/keyRings/r'
+    good = SimpleNamespace(
+        name=f'{provider._key_ring_path}/cryptoKeys/ca-key', primary=None, version_template=None,
+        purpose=kms.CryptoKey.CryptoKeyPurpose.ASYMMETRIC_SIGN)
+    broken = SimpleNamespace(name=f'{provider._key_ring_path}/cryptoKeys/broken')
+    provider._client = SimpleNamespace(list_crypto_keys=lambda parent: [good, broken])
+    keys = provider.list_keys()
+    # The key info used to be built with a field HsmKeyInfo does not have: every key was dropped
+    assert [k.label for k in keys] == ['ca-key']
+    assert keys[0].purpose == 'signing'
+    assert len(provider.list_errors) == 1 and 'broken' in provider.list_errors[0]
