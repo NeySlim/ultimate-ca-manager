@@ -51,12 +51,14 @@ fi
 # share state within a file). Strict: any "failed"/"error" in the summary
 # fails the hook — "1 failed, N passed" used to be accepted.
 echo -n "  Backend tests... "
-BACK_RESULT=$(cd "$ROOT/backend" && python3 -m pytest tests/ -q --tb=no -n auto --dist loadfile 2>&1 | tail -1)
+# A venv at the repo root (.venv, ignored) carries the cryptography the CI uses
+PYTEST_PY="$ROOT/.venv/bin/python"; [ -x "$PYTEST_PY" ] || PYTEST_PY=python3
+BACK_RESULT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -n auto --dist loadfile 2>&1 | tail -1)
 if echo "$BACK_RESULT" | grep -q "passed" && ! echo "$BACK_RESULT" | grep -qE "failed|error"; then
     echo -e "${GREEN}✅${NC} $BACK_RESULT"
 else
     echo -e "${RED}❌${NC} $BACK_RESULT"
-    echo -e "${YELLOW}    Run 'cd backend && python3 -m pytest tests/ -v' for details${NC}"
+    echo -e "${YELLOW}    Run 'cd backend && $PYTEST_PY -m pytest tests/ -v' for details${NC}"
     FAILED=1
 fi
 

@@ -21,6 +21,14 @@ import json
 import tempfile
 from pathlib import Path
 
+import cryptography
+
+# The CI and the packages run cryptography 50; an older one (the distro's)
+# hides whole features behind ImportErrors and skips, so refuse it outright.
+if int(cryptography.__version__.split('.')[0]) < 49:
+    pytest.exit(f'cryptography {cryptography.__version__} is too old for the test suite '
+                '(49 or newer, as in requirements.txt): run it with the project venv', returncode=4)
+
 # Set required env vars at MODULE LOAD time, before any test file is collected.
 # settings.py reads SECRET_KEY / JWT_SECRET_KEY at class-body load time, so they
 # must be present before the first `from app import create_app` (which can be
