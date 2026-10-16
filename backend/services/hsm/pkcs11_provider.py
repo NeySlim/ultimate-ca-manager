@@ -353,8 +353,11 @@ class Pkcs11Provider(BaseHsmProvider):
     def _export_rsa_public_key(self, pub_key) -> str:
         """Export RSA public key as PEM"""
         try:
-            der = encode_rsa_public_key(pub_key)
-            return self._der_to_pem(der, 'PUBLIC KEY')
+            # python-pkcs11 encodes PKCS#1; "PUBLIC KEY" PEM must hold a SubjectPublicKeyInfo
+            from cryptography.hazmat.primitives import serialization
+            spki = serialization.load_der_public_key(encode_rsa_public_key(pub_key)).public_bytes(
+                serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+            return self._der_to_pem(spki, 'PUBLIC KEY')
         except Exception as e:
             logger.warning(f"Failed to export RSA public key: {e}")
             return None
