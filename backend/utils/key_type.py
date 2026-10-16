@@ -3,32 +3,15 @@ from __future__ import annotations
 
 import re
 
-RSA_SIZES = frozenset({'2048', '3072', '4096'})
+from utils import key_algorithms
 
-# Canonical TrustStoreService KEY_TYPES names for EC curves.
+RSA_SIZES = frozenset(a.trust_store_id for a in key_algorithms.algorithms('RSA'))
+
+# Spellings of each registered curve, mapped to its TrustStoreService KEY_TYPES id.
 _EC_ALIASES: dict[str, str] = {
-    'p-256': 'prime256v1',
-    'p256': 'prime256v1',
-    'nistp-256': 'prime256v1',
-    'nistp256': 'prime256v1',
-    'secp256r1': 'prime256v1',
-    'prime256v1': 'prime256v1',
-    'ec-p256': 'prime256v1',
-    'ecdsa-p256': 'prime256v1',
-    'p-384': 'secp384r1',
-    'p384': 'secp384r1',
-    'nistp-384': 'secp384r1',
-    'nistp384': 'secp384r1',
-    'secp384r1': 'secp384r1',
-    'ec-p384': 'secp384r1',
-    'ecdsa-p384': 'secp384r1',
-    'p-521': 'secp521r1',
-    'p521': 'secp521r1',
-    'nistp-521': 'secp521r1',
-    'nistp521': 'secp521r1',
-    'secp521r1': 'secp521r1',
-    'ec-p521': 'secp521r1',
-    'ecdsa-p521': 'secp521r1',
+    name: alg.trust_store_id
+    for alg in key_algorithms.algorithms('EC')
+    for name in (alg.label, *alg.curve_names, *alg.aliases)
 }
 
 _EC_ERROR_HINT = (
@@ -171,7 +154,8 @@ MIN_RSA_BITS = 2048
 # of magnitude more than a 4096-bit one, on the CA and on every relying party
 # afterwards. 8192 is above anything a real deployment asks for.
 MAX_RSA_BITS = 8192
-_ALLOWED_EC_CURVES = frozenset({'secp256r1', 'prime256v1', 'secp384r1', 'secp521r1'})
+_ALLOWED_EC_CURVES = frozenset(
+    c for a in key_algorithms.algorithms('EC') for c in a.curve_names)
 
 
 def validate_enrollment_public_key(public_key) -> str | None:
@@ -181,9 +165,9 @@ def validate_enrollment_public_key(public_key) -> str | None:
     Ed448 are accepted (fixed, strong). Unknown key types are rejected — an
     enrollment endpoint should not sign a key it cannot assess.
     """
-    from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519, ed448
+    family = key_algorithms.family_for_public_key(public_key)
 
-    if isinstance(public_key, rsa.RSAPublicKey):
+    if family == 'RSA':
         bits = public_key.key_size
         if bits < MIN_RSA_BITS:
             return f'RSA key too small ({bits} bits); minimum is {MIN_RSA_BITS}'
@@ -191,13 +175,13 @@ def validate_enrollment_public_key(public_key) -> str | None:
             return f'RSA key too large ({bits} bits); maximum is {MAX_RSA_BITS}'
         return None
 
-    if isinstance(public_key, ec.EllipticCurvePublicKey):
+    if family == 'EC':
         curve = public_key.curve.name.lower()
         if curve not in _ALLOWED_EC_CURVES:
             return f'Unsupported EC curve {public_key.curve.name!r} (allowed: P-256/384/521)'
         return None
 
-    if isinstance(public_key, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)):
+    if family in ('ED25519', 'ED448'):
         return None
 
     return f'Unsupported public key type: {type(public_key).__name__}'

@@ -10,6 +10,7 @@ from models import db
 from models.policy import CertificatePolicy, ApprovalRequest
 from datetime import timedelta
 from utils.datetime_utils import utc_now
+from utils import key_algorithms
 
 logger = logging.getLogger(__name__)
 
@@ -48,16 +49,14 @@ def key_label_for_public_key(public_key):
     An algorithm outside the vocabulary gets a label no policy lists, so a
     non-empty ``allowed_key_types`` refuses it rather than skipping the check.
     """
-    from cryptography.hazmat.primitives.asymmetric import ec, ed448, ed25519, rsa
-    from services.template_service import _normalize_key_type_label
-    if isinstance(public_key, rsa.RSAPublicKey):
+    label = key_algorithms.label_for_public_key(public_key)
+    if label:
+        return label
+    family = key_algorithms.family_for_public_key(public_key)
+    if family == 'RSA':
         return f'RSA-{public_key.key_size}'
-    if isinstance(public_key, ec.EllipticCurvePublicKey):
-        return _normalize_key_type_label(public_key.curve.name) or f'EC-{public_key.curve.name}'
-    if isinstance(public_key, ed25519.Ed25519PublicKey):
-        return 'ED25519'
-    if isinstance(public_key, ed448.Ed448PublicKey):
-        return 'ED448'
+    if family == 'EC':
+        return f'EC-{public_key.curve.name}'
     return type(public_key).__name__
 
 

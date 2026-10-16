@@ -9,6 +9,7 @@ from datetime import datetime
 
 from models import db, CertificateTemplate, CA, CATemplatePin
 from utils.datetime_utils import utc_now
+from utils import key_algorithms
 import logging
 
 logger = logging.getLogger(__name__)
@@ -618,14 +619,6 @@ def template_extensions(template):
         return {}
     return raw if isinstance(raw, dict) else {}
 
-_EC_CURVE_LABELS = {
-    'prime256v1': 'P256',
-    'secp256r1': 'P256',
-    'secp384r1': 'P384',
-    'secp521r1': 'P521',
-}
-
-
 def _normalize_key_type_label(value):
     """Normalize a key-type value to the template format ('RSA-2048',
     'EC-P256', ...).
@@ -644,11 +637,12 @@ def _normalize_key_type_label(value):
         return None
     if v.isdigit():
         return f'RSA-{v}'
-    lowered = v.lower()
-    if lowered in _EC_CURVE_LABELS:
-        return f'EC-{_EC_CURVE_LABELS[lowered]}'
+    by_curve = key_algorithms.label_for_curve_name(v)
+    if by_curve:
+        return by_curve
     uppered = v.upper()
-    if uppered.startswith(('RSA-', 'EC-')) or uppered in ('ED25519', 'ED448'):
+    # Any RSA-/EC- spelling passes through so an unregistered size still compares.
+    if uppered.startswith(('RSA-', 'EC-')) or uppered in key_algorithms.labels():
         return uppered
     # legacy lowercase forms the template import accepts ('rsa:2048', 'ec:p256')
     if ':' in uppered:
