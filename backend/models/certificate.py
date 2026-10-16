@@ -2,6 +2,8 @@
 Certificate Model - Certificates and CSRs
 """
 import json
+from sqlalchemy import event
+
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -185,13 +187,10 @@ class Certificate(db.Model):
             else:
                 return "N/A"
             
-            if isinstance(public_key, rsa.RSAPublicKey):
-                return f"RSA {public_key.key_size}"
-            elif isinstance(public_key, ec.EllipticCurvePublicKey):
-                return f"EC {public_key.curve.name}"
-            elif isinstance(public_key, dsa.DSAPublicKey):
+            if isinstance(public_key, dsa.DSAPublicKey):
                 return f"DSA {public_key.key_size}"
-            return "Unknown"
+            from utils.key_algorithms import key_algo_for_public_key
+            return key_algo_for_public_key(public_key)
         except Exception:
             return "N/A"
     
@@ -517,3 +516,23 @@ class Certificate(db.Model):
             return base64.b64decode(encoded).decode('utf-8')
         except Exception:
             return None
+
+
+def key_algo_from_crt(crt):
+    """The ``key_algo`` spelling for a stored certificate (base64 of PEM), None if unreadable."""
+    import base64
+    from cryptography import x509
+    from utils.key_algorithms import key_algo_for_public_key
+    try:
+        return key_algo_for_public_key(
+            x509.load_pem_x509_certificate(base64.b64decode(crt)).public_key())
+    except Exception:
+        return None
+
+
+@event.listens_for(Certificate.crt, 'set')
+def _key_algo_follows_crt(target, value, oldvalue, initiator):
+    # Every issuance path sets crt; key_algo (sorting, compliance) follows it
+    if value:
+        target.key_algo = key_algo_from_crt(value) or target.key_algo
+

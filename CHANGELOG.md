@@ -21,7 +21,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- Certificates: an imported Ed25519 or Ed448 certificate was recorded as "EdDSA" while a renewed one was recorded as "Ed25519" or "Ed448", so sorting by key algorithm split them; both now record the same name.
+- Certificates: only imports and renewals recorded the key algorithm (imports as "EdDSA" for Ed25519), so sorting by key algorithm or compliance grade lumped most certificates together. Every certificate now records it, existing ones at upgrade.
 - HSM: a CA on a PKCS#11 RSA key failed with "Could not deserialize key data", because its public key was stored in PKCS#1 form under a SubjectPublicKeyInfo label. Keys already stored are repaired at their next use.
 - Policies: an Ed25519 or Ed448 request was signed whatever the allowed key types said, and the policy form ticked key types on its own, so a new or edited policy restricted them unasked (#397).
 - ACME DNS-01: UCM submitted the challenge as soon as one authoritative nameserver served the TXT record, so Let's Encrypt often got NXDOMAIN from another one. Every authoritative nameserver must now serve it, CNAME delegations included, followed by a configurable settle delay (10 s by default) (#395, reported by @ziller-hqs).

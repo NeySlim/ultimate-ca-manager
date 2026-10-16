@@ -167,15 +167,20 @@ def list_certificates():
 
         compliance_order = (
             # Key strength component (0-30)
+            # Same points as compliance_service._score_key_strength, on the
+            # key_algo spellings ("RSA 4096", "EC secp384r1", "Ed25519")
             case(
-                (Certificate.key_algo.ilike('%4096%'), 30),
-                (Certificate.key_algo.ilike('%EC%'), 30),
-                (Certificate.key_algo.ilike('%P-256%'), 30),
-                (Certificate.key_algo.ilike('%P-384%'), 30),
-                (Certificate.key_algo.ilike('%Ed25519%'), 30),
-                (Certificate.key_algo.ilike('%2048%'), 20),
-                (Certificate.key_algo.ilike('%1024%'), 5),
-                else_=15
+                (Certificate.key_algo.ilike('RSA 4096'), 30),
+                (Certificate.key_algo.ilike('RSA 8192'), 30),
+                (Certificate.key_algo.ilike('RSA 3072'), 25),
+                (Certificate.key_algo.ilike('RSA 2048'), 20),
+                (Certificate.key_algo.ilike('RSA 1024'), 5),
+                (Certificate.key_algo.ilike('EC secp521r1'), 30),
+                (Certificate.key_algo.ilike('EC secp384r1'), 30),
+                (Certificate.key_algo.ilike('EC secp256r1'), 25),
+                (Certificate.key_algo.ilike('Ed25519'), 30),
+                (Certificate.key_algo.ilike('Ed448'), 30),
+                else_=10
             ) +
             # Validity component (0-25)
             case(
