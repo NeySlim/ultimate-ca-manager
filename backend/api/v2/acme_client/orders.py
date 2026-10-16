@@ -24,6 +24,7 @@ from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import (
     AcmeClientService,
     AUTHZ_INVALID_USER_MSG,
+    CERT_KEY_TYPES,
     csr_identifiers_match_order,
 )
 from services.audit_service import AuditService
@@ -220,8 +221,9 @@ def request_certificate():
 
     # Key type for certificate (ignored when key_source=csr)
     key_type = data.get('key_type')
-    if key_type and key_type not in ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384']:
-        return error_response('Invalid key type', 400)
+    if key_type and key_type not in CERT_KEY_TYPES:
+        return error_response(
+            f'Invalid key type: must be one of {", ".join(CERT_KEY_TYPES)}', 400)
 
     key_source = (data.get('key_source') or 'generate').lower()
     if key_source not in ('generate', 'reuse', 'csr'):
@@ -271,8 +273,10 @@ def request_certificate():
 
         # Persist key options on order
         order.key_source = key_source
-        if key_type:
-            order.key_type = key_type
+        # Only a key UCM generates has a type to record; the setting is the default.
+        generates_key = key_source == 'generate' or (
+            key_source == 'reuse' and not data.get('source_certificate_id'))
+        order.key_type = (key_type or client._get_default_key_type()) if generates_key else None
         if key_source == 'csr':
             order.csr_pem = csr_pem.strip() + '\n'
         if key_source == 'reuse' and data.get('source_certificate_id'):

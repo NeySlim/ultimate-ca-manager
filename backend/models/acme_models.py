@@ -364,7 +364,8 @@ class AcmeClientOrder(db.Model):
     # Challenge configuration
     challenge_type = db.Column(db.String(20), nullable=False, default='dns-01')  # http-01, dns-01, tls-alpn-01
     environment = db.Column(db.String(20), nullable=False, default='staging')  # staging, production
-    key_type = db.Column(db.String(20), default='RSA-2048')  # RSA-2048, RSA-4096, EC-P256, EC-P384
+    # Set at order creation from the request or acme.client.key_type; NULL when the key is not generated.
+    key_type = db.Column(db.String(20))
     key_source = db.Column(db.String(20), default='generate', nullable=False)  # generate, reuse, csr
     csr_pem = db.Column(db.Text)  # PEM CSR when key_source=csr
     source_certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'))  # reuse key from this cert
@@ -468,7 +469,12 @@ class AcmeClientOrder(db.Model):
     def is_wildcard(self):
         """Check if order includes wildcard domains"""
         return any(d.startswith('*.') for d in self.domains_list)
-    
+
+    def _generates_key(self):
+        """False when the key comes from an external CSR or a stored certificate."""
+        source = (self.key_source or 'generate').lower()
+        return source == 'generate' or (source == 'reuse' and not self.source_certificate_id)
+
     def to_dict(self):
         """Convert to dictionary for API responses"""
         # Resolve linked local AcmeAccount info (proxy orders only).
@@ -495,7 +501,7 @@ class AcmeClientOrder(db.Model):
             'primary_domain': self.primary_domain,
             'challenge_type': self.challenge_type,
             'environment': self.environment,
-            'key_type': self.key_type or 'RSA-2048',
+            'key_type': self.key_type if self._generates_key() else None,
             'key_source': self.key_source or 'generate',
             'has_csr': bool(self.csr_pem),
             'source_certificate_id': self.source_certificate_id,

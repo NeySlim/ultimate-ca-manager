@@ -8,6 +8,8 @@ validity, SANs, and industry best practices.
 import logging
 from datetime import datetime, timezone
 
+from utils.key_algorithms import normalize_label
+
 logger = logging.getLogger(__name__)
 
 
@@ -76,18 +78,8 @@ def _score_key_strength(cert_dict):
     if not key_algo and key_type:
         key_algo = key_type
 
-    # Normalize
-    key_info = (key_algo + ' ' + key_type).upper()
     if 'EC' in key_algo or 'ECDSA' in key_algo or 'P-' in key_algo or 'PRIME' in key_type:
-        algo_family = 'EC'
-        if 'P-521' in key_info or 'SECP521' in key_info or 'PRIME521' in key_info or key_size >= 521:
-            score, reason = max_points, 'ECDSA P-521'
-        elif 'P-384' in key_info or 'SECP384' in key_info or 'PRIME384' in key_info or key_size >= 384:
-            score, reason = max_points, 'ECDSA P-384'
-        elif 'P-256' in key_info or 'SECP256' in key_info or 'PRIME256' in key_info or key_size >= 256:
-            score, reason = 25, 'ECDSA P-256'
-        else:
-            score, reason = 15, f'ECDSA ({key_size}-bit)'
+        score, reason = _score_ec_key(cert_dict, key_size)
     elif 'ED25519' in key_algo or 'ED448' in key_algo:
         score, reason = max_points, key_algo.strip()
     elif 'RSA' in key_algo:
@@ -106,6 +98,33 @@ def _score_key_strength(cert_dict):
         score, reason = 10, key_algo or 'Unknown'
 
     return {'score': score, 'max': max_points, 'reason': reason}
+
+
+_EC_POINTS = {'EC-P256': (25, 'ECDSA P-256'), 'EC-P384': (30, 'ECDSA P-384'),
+              'EC-P521': (30, 'ECDSA P-521')}
+_EC_LABEL_BY_SIZE = {256: 'EC-P256', 384: 'EC-P384', 521: 'EC-P521'}
+
+
+def _score_ec_key(cert_dict, key_size):
+    """Points for an EC key from its actual curve; a curve outside the registry
+    (secp256k1, brainpool) is named as such and scored as an unrated EC key."""
+    unregistered = None
+    for field in ('key_type', 'key_algo', 'key_algorithm'):
+        spelling = str(cert_dict.get(field) or '').strip()
+        parts = spelling.split()
+        curves = parts[1:] if parts and parts[0].upper() in ('EC', 'ECDSA') else []
+        for candidate in (spelling, *curves):
+            label = normalize_label(candidate)
+            if label in _EC_POINTS:
+                return _EC_POINTS[label]
+        if unregistered is None and len(curves) == 1:
+            unregistered = curves[0]
+    if unregistered:
+        return 15, f'ECDSA {unregistered}'
+    label = _EC_LABEL_BY_SIZE.get(key_size)
+    if label:
+        return _EC_POINTS[label]
+    return 15, f'ECDSA ({key_size}-bit)'
 
 
 def _score_signature(cert_dict):

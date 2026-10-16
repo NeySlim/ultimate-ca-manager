@@ -1,8 +1,11 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Warning, CloudArrowUp, MagnifyingGlass } from '@phosphor-icons/react'
 import { Input, Select, Button } from '../../components'
 import { useNotification } from '../../contexts'
+import { acmeService } from '../../services'
+
+const KEY_TYPES = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384']
 
 export default function RequestCertificateForm({
   onSubmit,
@@ -12,6 +15,7 @@ export default function RequestCertificateForm({
   caAccounts = [],
   defaultEnvironment,
   defaultEmail,
+  defaultKeyType,
   preflightLoading = false,
 }) {
   const { t } = useTranslation()
@@ -24,12 +28,27 @@ export default function RequestCertificateForm({
     environment: defaultEnvironment,
     acme_account_id: defaultCaAccountId,
     dns_provider_id: dnsProviders.find(p => p.is_default)?.id || null,
-    key_type: 'RSA-2048',
+    key_type: KEY_TYPES.includes(defaultKeyType) ? defaultKeyType : null,
     key_source: 'generate',
     csr_pem: '',
     verify_dns: false,
     preflight_mode: 'full',
   })
+
+  // Start from the configured client key type unless the caller or the user already chose one.
+  useEffect(() => {
+    if (KEY_TYPES.includes(defaultKeyType)) return undefined
+    let active = true
+    acmeService.getClientSettings()
+      .then((res) => {
+        const configured = res?.data?.key_type
+        if (active && KEY_TYPES.includes(configured)) {
+          setFormData(prev => (prev.key_type ? prev : { ...prev, key_type: configured }))
+        }
+      })
+      .catch(() => {})
+    return () => { active = false }
+  }, [defaultKeyType])
 
   const buildPayload = () => {
     const domainList = formData.domains
@@ -74,7 +93,8 @@ export default function RequestCertificateForm({
       key_source: formData.key_source,
     }
 
-    if (formData.key_source !== 'csr') {
+    // Without a choice the server applies the configured default.
+    if (formData.key_source !== 'csr' && formData.key_type) {
       payload.key_type = formData.key_type
     }
     if (formData.key_source === 'csr') {
@@ -234,7 +254,7 @@ export default function RequestCertificateForm({
       {formData.key_source !== 'csr' && (
         <Select
           label={t('acme.keyType')}
-          value={formData.key_type || 'RSA-2048'}
+          value={formData.key_type || ''}
           onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
           options={[
             { value: 'RSA-2048', label: 'RSA 2048' },

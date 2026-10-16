@@ -36,6 +36,8 @@ from utils.acme_ip import (
     TlsAlpn01Listener,
 )
 from utils import ssrf_protection
+from utils.ca_profile import default_digest_for_key_type
+from utils.signing_hash import HASH_BY_NAME, signing_hash_for
 from utils.san_parse import strip_wildcard
 
 if TYPE_CHECKING:
@@ -1466,9 +1468,9 @@ class AcmeClientService:
                 src_id = order.source_certificate_id or order.certificate_id
                 if not src_id:
                     # First issuance: generate a key; renewals reuse it via source_certificate_id.
-                    key_type = getattr(order, 'key_type', None) or self._get_default_key_type()
-                    key_generator = CERT_KEY_TYPES.get(key_type, CERT_KEY_TYPES['RSA-2048'])
-                    cert_key = key_generator()
+                    cert_key, key_error = self._generate_cert_key(order)
+                    if key_error:
+                        return False, key_error, None
                     csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
                 else:
                     src_cert = db.session.get(Certificate, src_id)
@@ -1478,9 +1480,9 @@ class AcmeClientService:
                         return False, str(exc), None
                     csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
             else:
-                key_type = getattr(order, 'key_type', None) or self._get_default_key_type()
-                key_generator = CERT_KEY_TYPES.get(key_type, CERT_KEY_TYPES['RSA-2048'])
-                cert_key = key_generator()
+                cert_key, key_error = self._generate_cert_key(order)
+                if key_error:
+                    return False, key_error, None
                 csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
 
             # Submit CSR to finalize URL
@@ -1631,16 +1633,22 @@ class AcmeClientService:
         kt = cfg.value if cfg else 'RSA-2048'
         return kt if kt in CERT_KEY_TYPES else 'RSA-2048'
 
+    def _generate_cert_key(self, order):
+        """A new key of the order's type: ``(key, None)``, or ``(None, error)`` when unsupported."""
+        key_type = getattr(order, 'key_type', None) or self._get_default_key_type()
+        generator = CERT_KEY_TYPES.get(key_type)
+        if generator is None:
+            return None, f'Unsupported certificate key type on order: {key_type}'
+        return generator(), None
+
     @staticmethod
     def _build_csr_b64(cert_key, domains: List[str], primary_domain: str) -> str:
         """Build a CSR for the given domains and return base64url DER."""
+        # Curve-matched digest for EC, SHA-256 for RSA, none for Ed25519/Ed448.
+        requested = None
         if isinstance(cert_key, ec.EllipticCurvePrivateKey):
-            if isinstance(cert_key.curve, ec.SECP384R1):
-                hash_alg = hashes.SHA384()
-            else:
-                hash_alg = hashes.SHA256()
-        else:
-            hash_alg = hashes.SHA256()
+            requested = HASH_BY_NAME[default_digest_for_key_type(cert_key.curve.name)]()
+        hash_alg = signing_hash_for(cert_key, requested)
 
         subject = x509.Name([
             x509.NameAttribute(NameOID.COMMON_NAME, primary_domain),
