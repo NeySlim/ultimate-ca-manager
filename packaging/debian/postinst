@@ -171,39 +171,6 @@ ENVEOF
         # Resumed after a failed first attempt: the service never had a working venv
         # ($2 is empty for a first configure, so an upgrade never shows the banner)
         [ -n "$2" ] || bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
-        if [ -n "$NEW_CONFIG" ]; then
-            ADMIN_PASS=$(sed -n 's/^INITIAL_ADMIN_PASSWORD=//p' "$UCM_CONFIG/ucm.env" | tail -n 1)
-            echo ""
-            # Detect access URLs
-            INSTALL_HOST=$(hostname -f 2>/dev/null || hostname)
-            INSTALL_PORT=$(grep "^HTTPS_PORT=" "$UCM_CONFIG/ucm.env" 2>/dev/null | cut -d= -f2)
-            INSTALL_PORT=${INSTALL_PORT:-8443}
-            INSTALL_IPS=$(hostname -I 2>/dev/null | xargs)
-            echo ""
-            echo "============================================"
-            echo " UCM INSTALLED"
-            echo "============================================"
-            echo ""
-            echo " Access:   https://${INSTALL_HOST}:${INSTALL_PORT}"
-            if [ -n "$INSTALL_IPS" ]; then
-                for ip in $INSTALL_IPS; do
-                    echo "            https://${ip}:${INSTALL_PORT}"
-                done
-            fi
-            echo ""
-            echo " Admin:    admin / $ADMIN_PASS"
-            echo " Config:   $UCM_CONFIG/ucm.env"
-            echo ""
-            # Optional packages suggestions
-            echo " Optional packages:"
-            if dpkg -l softhsm2 2>/dev/null | grep -q "^ii"; then
-                echo "  [ok] softhsm2 (HSM support)"
-            else
-                echo "  [ ]  softhsm2 - HSM support (apt install softhsm2)"
-            fi
-            echo ""
-            echo "============================================"
-        fi
         
         # Always ensure config has correct paths (for upgrades from older versions)
         if [ -f "$UCM_CONFIG/ucm.env" ]; then
@@ -227,6 +194,10 @@ ENVEOF
 
         # Host FIPS state, UCM_FIPS and readiness report (UCM_FIPS_BUILD=1 only)
         bash "$UCM_SETUP" fips-finish "$UCM_HOME" "$UCM_CONFIG/ucm.env" "$UCM_DATA" "$UCM_USER"
+        # Shown once the venv is built, so a failed build never follows the banner
+        if [ -n "$NEW_CONFIG" ]; then
+            bash "$UCM_SETUP" banner "$UCM_CONFIG/ucm.env" deb
+        fi
         
         # Install sudoers file to allow service management
         if [ -f "$UCM_HOME/sudoers/ucm" ]; then

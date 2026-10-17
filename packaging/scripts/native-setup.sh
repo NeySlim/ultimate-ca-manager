@@ -381,6 +381,45 @@ cmd_fips_build_ok() {
     fi
 }
 
+# Post-install banner; IPv6 addresses are bracketed in the URLs.
+cmd_banner() {
+    local envfile=$1 pkg=$2 host port ips ip pass
+    pass=$(sed -n 's/^INITIAL_ADMIN_PASSWORD=//p' "$envfile" | tail -n 1)
+    echo ""
+    host=$(hostname -f 2>/dev/null || hostname)
+    port=$(grep "^HTTPS_PORT=" "$envfile" 2>/dev/null | cut -d= -f2)
+    port=${port:-8443}
+    ips=$(hostname -I 2>/dev/null | xargs)
+    echo ""
+    echo "============================================"
+    echo " UCM INSTALLED"
+    echo "============================================"
+    echo ""
+    echo " Access:   https://${host}:${port}"
+    for ip in $ips; do
+        case $ip in *:*) ip="[$ip]" ;; esac
+        echo "            https://${ip}:${port}"
+    done
+    echo ""
+    echo " Admin:    admin / $pass"
+    echo " Config:   $envfile"
+    echo ""
+    echo " Optional packages:"
+    if [ "$pkg" = deb ]; then
+        if dpkg -l softhsm2 2>/dev/null | grep -q "^ii"; then
+            echo "  [ok] softhsm2 (HSM support)"
+        else
+            echo "  [ ]  softhsm2 - HSM support (apt install softhsm2)"
+        fi
+    elif rpm -q softhsm >/dev/null 2>&1; then
+        echo "  [ok] softhsm (HSM support)"
+    else
+        echo "  [ ]  softhsm - HSM support (dnf install softhsm)"
+    fi
+    echo ""
+    echo "============================================"
+}
+
 case "${1:-}" in
     env) cmd_env "$2" "$3" ;;
     venv-ok) venv_ok "$2/venv" ;;
@@ -390,9 +429,10 @@ case "${1:-}" in
     check-build-tools) cmd_check_build_tools "$2" "$3" ;;
     update-precheck) cmd_update_precheck "$2" "$3" "${4:-}" ;;
     fips-build-ok) cmd_fips_build_ok "$2" ;;
+    banner) cmd_banner "$2" "$3" ;;
     *) die "usage: $0 env <ucm.env> <data dir>
   | venv <ucm home> <python> <deb|rpm> <ucm.env> | venv-ok <ucm home>
   | fips-finish <ucm home> <ucm.env> <data dir> <user> | fips-requested <ucm.env>
   | check-build-tools <python> <deb|rpm> | update-precheck <ucm home> <ucm.env> <deb|rpm>
-  | fips-build-ok <ucm.env>" ;;
+  | fips-build-ok <ucm.env> | banner <ucm.env> <deb|rpm>" ;;
 esac

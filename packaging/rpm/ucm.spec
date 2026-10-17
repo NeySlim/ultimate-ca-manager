@@ -173,39 +173,6 @@ ENV_STATE=$(bash "$UCM_SETUP" env "$UCM_CONFIG/ucm.env" "$UCM_DATA") || exit 1
 [ "$ENV_STATE" != new ] || NEW_CONFIG=1
 # Resumed after a failed first attempt: the service never had a working venv
 bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
-if [ -n "$NEW_CONFIG" ]; then
-    ADMIN_PASS=$(sed -n 's/^INITIAL_ADMIN_PASSWORD=//p' "$UCM_CONFIG/ucm.env" | tail -n 1)
-    echo ""
-    # Detect access URLs
-    INSTALL_HOST=$(hostname -f 2>/dev/null || hostname)
-    INSTALL_PORT=$(grep "^HTTPS_PORT=" "$UCM_CONFIG/ucm.env" 2>/dev/null | cut -d= -f2)
-    INSTALL_PORT=${INSTALL_PORT:-8443}
-    INSTALL_IPS=$(hostname -I 2>/dev/null | xargs)
-    echo ""
-    echo "============================================"
-    echo " UCM INSTALLED"
-    echo "============================================"
-    echo ""
-    echo " Access:   https://${INSTALL_HOST}:${INSTALL_PORT}"
-    if [ -n "$INSTALL_IPS" ]; then
-        for ip in $INSTALL_IPS; do
-            echo "            https://${ip}:${INSTALL_PORT}"
-        done
-    fi
-    echo ""
-    echo " Admin:    admin / $ADMIN_PASS"
-    echo " Config:   $UCM_CONFIG/ucm.env"
-    echo ""
-    # Optional packages suggestions
-    echo " Optional packages:"
-    if rpm -q softhsm >/dev/null 2>&1; then
-        echo "  [ok] softhsm (HSM support)"
-    else
-        echo "  [ ]  softhsm - HSM support (dnf install softhsm)"
-    fi
-    echo ""
-    echo "============================================"
-fi
 
 # Create venv and install dependencies
 echo "Creating Python virtual environment..."
@@ -222,6 +189,10 @@ chmod 750 $UCM_DATA
 
 # Host FIPS state, UCM_FIPS and readiness report (UCM_FIPS_BUILD=1 only)
 bash "$UCM_SETUP" fips-finish "$UCM_HOME" "$UCM_CONFIG/ucm.env" "$UCM_DATA" %{name}
+# Shown once the venv is built, so a failed build never follows the banner
+if [ -n "$NEW_CONFIG" ]; then
+    bash "$UCM_SETUP" banner "$UCM_CONFIG/ucm.env" rpm
+fi
 
 # Generate HTTPS cert if not exists
 if [ ! -f "$UCM_DATA/https_cert.pem" ]; then

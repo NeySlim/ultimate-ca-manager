@@ -582,3 +582,37 @@ def test_a_generated_secret_never_appears_in_a_command_line(tmp_path):
     assert result.returncode == 0, result.stderr
     assert _values(envfile)['SECRET_KEY'] == [secret]
     assert log.exists() and secret not in log.read_text()
+
+
+# ----------------------------------------------------------------- banner
+
+def _banner(tmp_path, pkg, softhsm=False):
+    bin_dir = tmp_path / 'bin'
+    _stub(bin_dir / 'hostname', '[ "$1" = -I ] && echo "192.0.2.10 2001:db8::10 " || echo ucm.example.test')
+    _stub(bin_dir / 'dpkg', 'echo "ii  softhsm2  2.6.1"' if softhsm else 'exit 1')
+    _stub(bin_dir / 'rpm', 'exit 0' if softhsm else 'exit 1')
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('HTTPS_PORT=9443\nINITIAL_ADMIN_PASSWORD=s3cret\n')
+    path = f"{bin_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}"
+    return envfile, _run(['banner', str(envfile), pkg], _env(tmp_path, extra={'PATH': path}))
+
+
+def test_the_banner_brackets_ipv6_addresses(tmp_path):
+    envfile, result = _banner(tmp_path, 'deb')
+    assert result.returncode == 0, result.stderr
+    urls = [line.split()[-1] for line in result.stdout.splitlines() if 'https://' in line]
+    assert urls == ['https://ucm.example.test:9443', 'https://192.0.2.10:9443', 'https://[2001:db8::10]:9443']
+    assert ' Admin:    admin / s3cret' in result.stdout
+    assert f' Config:   {envfile}' in result.stdout
+
+
+@pytest.mark.parametrize('pkg, softhsm, line', [
+    ('deb', True, '  [ok] softhsm2 (HSM support)'),
+    ('deb', False, '  [ ]  softhsm2 - HSM support (apt install softhsm2)'),
+    ('rpm', True, '  [ok] softhsm (HSM support)'),
+    ('rpm', False, '  [ ]  softhsm - HSM support (dnf install softhsm)'),
+])
+def test_the_banner_names_the_hsm_package_of_the_distribution(tmp_path, pkg, softhsm, line):
+    _, result = _banner(tmp_path, pkg, softhsm)
+    assert result.returncode == 0, result.stderr
+    assert line in result.stdout.splitlines()
