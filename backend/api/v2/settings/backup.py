@@ -22,6 +22,7 @@ from services.database_admin.lock import (
 )
 from services.backup.settings_contract import (
     BackupSettingError,
+    validate_backup_kdf,
     validate_backup_password,
     validate_frequency,
     validate_retention_days,
@@ -370,7 +371,7 @@ def update_backup_schedule():
 
     Writes the same General-settings keys the UI uses, so both surfaces stay
     consistent: enabled→auto_backup_enabled, frequency→backup_frequency,
-    retention_days→backup_retention_days.
+    retention_days→backup_retention_days, kdf→backup_kdf.
     """
     from . import set_config
     from services.backup.schedule import get_schedule
@@ -387,6 +388,8 @@ def update_backup_schedule():
         if 'retention_days' in data:
             data['retention_days'] = validate_retention_days(
                 data['retention_days'], 'retention_days')
+        if 'kdf' in data:
+            data['kdf'] = validate_backup_kdf(data['kdf'], 'kdf')
     except BackupSettingError as e:
         return error_response(str(e), 400)
 
@@ -396,6 +399,8 @@ def update_backup_schedule():
         set_config('backup_frequency', data['frequency'])
     if 'retention_days' in data:
         set_config('backup_retention_days', str(data['retention_days']))
+    if 'kdf' in data:
+        set_config('backup_kdf', data['kdf'])
 
     try:
         db.session.commit()

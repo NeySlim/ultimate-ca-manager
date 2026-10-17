@@ -57,6 +57,18 @@ export default function BackupSection({
                 onChange={(val) => updateSetting('backup_frequency', val)}
                 helperText={t('settings.backupCadenceNote')}
               />
+              <Select
+                label={t('settings.backupKdf')}
+                options={[
+                  { value: 'auto', label: t('settings.backupKdfAuto') },
+                  { value: 'pbkdf2', label: 'PBKDF2-HMAC-SHA256' },
+                  { value: 'argon2id', label: 'Argon2id' },
+                ]}
+                value={settings.backup_kdf || 'auto'}
+                onChange={(val) => updateSetting('backup_kdf', val)}
+                helperText={t('settings.backupKdfHelper')}
+                disabled={!canAdminSettings}
+              />
               <Input
                 label={
                   <span className="flex items-center gap-1">

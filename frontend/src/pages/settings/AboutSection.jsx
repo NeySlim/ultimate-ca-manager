@@ -10,11 +10,12 @@ import { systemService } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { downloadBlob } from '../../lib/utils'
+import FipsPreflightPanel from './FipsPreflightPanel'
 
 export default function AboutSection() {
   const { t } = useTranslation()
   const { showError, showSuccess } = useNotification()
-  const { isAdmin } = usePermission()
+  const { isAdmin, hasPermission } = usePermission()
   const [info, setInfo] = useState(null)
   const [loading, setLoading] = useState(true)
   const [bundleLoading, setBundleLoading] = useState(false)
@@ -107,6 +108,8 @@ export default function AboutSection() {
           </div>
         </DetailSection>
       )}
+
+      {hasPermission('admin:system') && <FipsPreflightPanel />}
 
       {/* Links */}
       <DetailSection title={t('settings.about.links')} icon={Globe} iconClass="icon-bg-teal" className="mt-4">

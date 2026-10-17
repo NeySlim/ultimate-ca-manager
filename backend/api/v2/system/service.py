@@ -10,6 +10,8 @@ from services.audit_service import AuditService
 from services.ski_aki_backfill import get_last_run_stats as get_backfill_stats
 from services.scheduler_service import get_scheduler
 from services.updates import get_current_version
+from services import fips_preflight
+from models import db
 from config.settings import is_docker
 import os
 import psutil
@@ -163,6 +165,19 @@ def get_service_status():
     except Exception as e:
         logger.error(f"Failed to get service status: {e}")
         return error_response("Failed to get service status", 500)
+
+
+@bp.route('/api/v2/system/fips-preflight', methods=['GET'])
+@require_auth(['admin:system'])
+def get_fips_preflight():
+    """What FIPS mode would refuse on this instance; reads only."""
+    try:
+        return success_response(data=fips_preflight.run())
+    except Exception as e:
+        logger.error(f"FIPS preflight failed: {e}")
+        return error_response("FIPS preflight failed", 500)
+    finally:
+        db.session.rollback()
 
 
 @bp.route('/api/v2/system/service/restart', methods=['POST'])

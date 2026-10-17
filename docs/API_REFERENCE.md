@@ -1853,7 +1853,8 @@ Content-Type: application/json
   "enabled": true,
   "frequency": "daily",
   "time": "02:00",
-  "retention_days": 30
+  "retention_days": 30,
+  "kdf": "pbkdf2"                 # auto (default), pbkdf2 or argon2id; argon2id refused in FIPS mode
 }
 
 # Create backup ("kdf": "pbkdf2" writes an archive a FIPS-mode instance can restore)
@@ -2192,6 +2193,41 @@ Content-Type: application/json
   "service": "ucm"
 }
 ```
+
+### FIPS Readiness
+```http
+# What FIPS mode would refuse on this instance; reads only (admin:system).
+# Same report as `python -m scripts.fips_preflight --json` run from backend/
+# (exit code 1 with blockers, 2 when a check could not run).
+GET /api/v2/system/fips-preflight
+
+# Response
+{
+  "data": {
+    "fips_active": false,
+    "ready": false,                 # no blocker and every check ran
+    "summary": {"blocker": 1, "warning": 0, "info": 0},
+    "findings": [{
+      "id": "users.password_scrypt",
+      "severity": "blocker",        # blocker, warning or info
+      "title": "Local users with an scrypt password hash: ...",
+      "count": 3,
+      "examples": ["alice (#2)", "bob (#5)", "carol (#9)"],   # at most 5
+      "remedy": "Have each user sign in once before the switch: ..."
+    }],
+    "errors": [],                   # [{"id": "...", "error": "..."}] for a check that failed
+    "checked": ["users.password_scrypt", "users.backup_codes_scrypt", "..."]
+  }
+}
+```
+
+Check ids: `users.password_scrypt`, `protocols.secret_scrypt`, `ca.eddsa_key`, `ca.weak_key`,
+`ssh_ca.eddsa_key`, `deploy.ssh_eddsa_key`, `tsa.signer_unapproved_key`, `dns.tsig_hmac_md5`,
+`msca.winrm_ntlm`, `database.postgres_without_tls`, `https.unapproved_key` (blockers);
+`users.backup_codes_scrypt`, `ocsp.responder_unapproved_key`, `templates.unapproved_key_type`,
+`policies.unapproved_key_type`, `acme_client.unapproved_key_type`, `hsm.softhsm`, `hsm.gcp_grpc`,
+`hsm.unapproved_keys`, `backup.schedule_argon2id`, `backup.archives_argon2id` (warnings);
+`certificates.unapproved_key`, `ssh_certificates.eddsa_key` (information).
 
 ---
 

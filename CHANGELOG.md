@@ -15,6 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Docker: building with `UCM_FIPS_BUILD=1` adds the OpenSSL 3.1.2 FIPS provider (CMVP certificate #4985) and links cryptography, psycopg2 and xmlsec to the system OpenSSL; the image runs in standard mode without `UCM_FIPS`, and the Helm chart has `fips.enabled` (#399).
 - Service status shows the OpenSSL library and FIPS provider in use, and `/api/v2/health` reports `fips_active` (#399).
 - Backups: `"kdf": "pbkdf2"` at creation writes an archive that a FIPS-mode instance can restore (#399).
+- FIPS readiness check: `python -m scripts.fips_preflight`, `GET /api/v2/system/fips-preflight` and a button under Settings > About list, on a standard instance, what FIPS mode would refuse (scrypt passwords, Ed25519 authorities, hmac-md5 TSIG, Argon2id backups, PostgreSQL without TLS...) with a remedy for each; scheduled backups gain a KDF setting (#399).
 
 ### Changed
 

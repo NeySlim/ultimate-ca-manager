@@ -5,8 +5,9 @@ backup history from disk.
 
 The source of truth is the General-settings keys the UI actually writes:
 ``auto_backup_enabled``, ``backup_frequency`` (daily/weekly/monthly),
-``backup_retention_days`` and ``backup_password``. There is no time-of-day in
-the UI, so cadence is driven by a stored ``backup.last_run`` timestamp.
+``backup_retention_days``, ``backup_password`` and ``backup_kdf``. There is
+no time-of-day in the UI, so cadence is driven by a stored ``backup.last_run``
+timestamp.
 """
 import base64
 import glob
@@ -24,6 +25,7 @@ from . import storage
 from .backup_service import BackupService
 from .locking import BackupBusyError, backup_operation_lock
 from .errors import ScheduledBackupError
+from .settings_contract import scheduled_kdf
 
 logger = logging.getLogger(__name__)
 
@@ -94,6 +96,7 @@ def get_schedule() -> dict:
         'last_archive': os.path.basename(newest) if newest else None,
         'last_archive_age_seconds': age,
         'password_set': bool(_get('backup_password')),
+        'kdf': _get('backup_kdf') or 'auto',
     }
 
 
@@ -466,7 +469,8 @@ def run_scheduled_backup() -> dict:
 def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
     """Write, validate and record one scheduled archive."""
     try:
-        backup_bytes = BackupService().create_backup(password)
+        backup_bytes = BackupService().create_backup(
+            password, kdf=scheduled_kdf(sched.get('kdf')))
 
         # The same naming as every other archive: a name to the second could
         # collide with a manual backup taken in the same second, and the

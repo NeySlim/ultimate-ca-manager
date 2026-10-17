@@ -175,6 +175,7 @@ BACKUP_SETTINGS = {
     'backup_frequency': 'daily',
     'backup_retention_days': 30,
     'backup_password': 'Correct-Horse-Battery-9',
+    'backup_kdf': 'pbkdf2',
 }
 
 
@@ -240,7 +241,7 @@ def backup_dir(app, tmp_path, monkeypatch):
 
 @pytest.fixture
 def keep_backup_settings(app):
-    """Put the four backup settings back: the database is shared."""
+    """Put the backup settings back: the database is shared."""
     with app.app_context():
         before = {key: (SystemConfig.query.filter_by(key=key).first() or
                         SystemConfig(key=key, value=None)).value
@@ -378,7 +379,7 @@ def test_a_refusal_discloses_nothing_about_the_archives(
 class TestBackupSettingsAreAdminOnlyEverywhere:
     """The schedule route is admin-only; General settings writes the same rows.
 
-    An operator holds `write:settings`, so without an explicit list these four
+    An operator holds `write:settings`, so without an explicit list these
     keys would be his to change — and shortening retention to a day is enough
     to have the daily task delete every archive on the server.
     """

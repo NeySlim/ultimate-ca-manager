@@ -14,6 +14,9 @@ always something the scheduler can run, and reading it back needs no
 correction.
 """
 import logging
+from typing import Optional
+
+from fips_mode import FipsRestricted
 
 logger = logging.getLogger(__name__)
 
@@ -90,6 +93,33 @@ def validate_backup_password(value) -> str:
     except BackupPasswordError as exc:
         raise BackupSettingError(str(exc)) from exc
     return value
+
+
+BACKUP_KDFS = ('auto', 'pbkdf2', 'argon2id')
+
+
+def validate_backup_kdf(value, field: str = 'backup_kdf') -> str:
+    """The scheduled backups' KDF: 'auto' (Argon2id when available, PBKDF2 in
+    FIPS mode), 'pbkdf2' or 'argon2id'; FIPS mode refuses 'argon2id'."""
+    from .backup_service import check_backup_kdf
+
+    if value in (None, ''):
+        return 'auto'
+    if not isinstance(value, str) or value not in BACKUP_KDFS:
+        raise BackupSettingError(f"{field} must be one of {', '.join(BACKUP_KDFS)}")
+    if value != 'auto':
+        try:
+            check_backup_kdf(value)
+        except FipsRestricted:
+            raise
+        except ValueError as exc:
+            raise BackupSettingError(str(exc)) from exc
+    return value
+
+
+def scheduled_kdf(stored) -> Optional[str]:
+    """What create_backup is given for a stored KDF setting: None means automatic."""
+    return stored if stored in ('pbkdf2', 'argon2id') else None
 
 
 def _whole_number(value):

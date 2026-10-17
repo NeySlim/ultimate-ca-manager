@@ -104,6 +104,10 @@ export const systemService = {
     return apiClient.get('/system/service/status')
   },
 
+  async getFipsPreflight() {
+    return apiClient.get('/system/fips-preflight')
+  },
+
   async restartService() {
     return apiClient.post('/system/service/restart')
   },
