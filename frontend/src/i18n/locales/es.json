@@ -2006,6 +2006,7 @@
     "reloadCommand": "Comando de recarga",
     "reloadCommandHint": "Opcional para este despliegue: se ejecuta por SSH después de una transferencia correcta (código de salida 0 = éxito). Sin plantillas.",
     "privateKeyOptional": "Clave privada SSH (opcional: deje vacío para generar una clave ed25519)",
+    "privateKeyOptionalFips": "SSH private key (optional: leave empty to generate an ECDSA P-256 key; Ed25519 keys are refused in FIPS mode)",
     "privateKeyRotate": "Nueva clave privada SSH (deje vacío para conservar la actual)",
     "privateKeyPlaceholder": "Pegue una clave privada PEM/OpenSSH, o deje vacío para generar una",
     "certSection": "Despliegue",

@@ -64,3 +64,28 @@ export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
   }, [caId, templateId, enabled])
   return state
 }
+
+/**
+ * Whether the server runs in FIPS mode (#399), read from the effective policy.
+ * A failed lookup reads as false: the server refuses what FIPS mode forbids anyway.
+ */
+export function useFipsMode() {
+  const [fips, setFips] = useState(false)
+  useEffect(() => {
+    let cancelled = false
+    Promise.resolve()
+      .then(() => policiesService.getEffective())
+      .then((res) => { if (!cancelled) setFips((extractData(res) || {}).fips === true) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
+  return fips
+}
+
+// SSH key types outside the FIPS module, and the default FIPS mode takes instead
+export const SSH_EDDSA_KEY_TYPES = ['ed25519']
+export const SSH_FIPS_DEFAULT_KEY_TYPE = 'ecdsa-p256'
+
+export function sshKeyOptions(options, fips) {
+  return fips ? options.filter(o => !SSH_EDDSA_KEY_TYPES.includes(o.value)) : options
+}

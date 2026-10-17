@@ -2006,6 +2006,7 @@
     "reloadCommand": "Reload command",
     "reloadCommandHint": "Optional for this deployment: run over SSH after a successful push (exit 0 = success). No templating.",
     "privateKeyOptional": "SSH private key (optional: leave empty to generate an ed25519 key)",
+    "privateKeyOptionalFips": "SSH private key (optional: leave empty to generate an ECDSA P-256 key; Ed25519 keys are refused in FIPS mode)",
     "privateKeyRotate": "New SSH private key (leave empty to keep the current one)",
     "privateKeyPlaceholder": "Paste a PEM/OpenSSH private key, or leave empty to generate one",
     "certSection": "Deployment",

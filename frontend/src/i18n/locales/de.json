@@ -2006,6 +2006,7 @@
     "reloadCommand": "Reload-Befehl",
     "reloadCommandHint": "Optional für diese Bereitstellung: wird nach erfolgreicher Übertragung per SSH ausgeführt (Exitcode 0 = Erfolg). Kein Templating.",
     "privateKeyOptional": "Privater SSH-Schlüssel (optional: leer lassen, um einen ed25519-Schlüssel zu generieren)",
+    "privateKeyOptionalFips": "SSH private key (optional: leave empty to generate an ECDSA P-256 key; Ed25519 keys are refused in FIPS mode)",
     "privateKeyRotate": "Neuer privater SSH-Schlüssel (leer lassen, um den aktuellen zu behalten)",
     "privateKeyPlaceholder": "PEM-/OpenSSH-Privatschlüssel einfügen oder leer lassen, um einen zu generieren",
     "certSection": "Bereitstellung",

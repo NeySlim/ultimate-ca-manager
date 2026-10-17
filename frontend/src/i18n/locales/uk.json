@@ -2032,6 +2032,7 @@
     "reloadCommand": "Команда перезавантаження",
     "reloadCommandHint": "Необов’язково для цього розгортання: виконується через SSH після успішної передачі (код виходу 0 = успіх). Без шаблонів.",
     "privateKeyOptional": "Закритий ключ SSH (необов'язково: залиште порожнім, щоб згенерувати ключ ed25519)",
+    "privateKeyOptionalFips": "SSH private key (optional: leave empty to generate an ECDSA P-256 key; Ed25519 keys are refused in FIPS mode)",
     "privateKeyRotate": "Новий закритий ключ SSH (залиште порожнім, щоб зберегти поточний)",
     "privateKeyPlaceholder": "Вставте закритий ключ PEM/OpenSSH або залиште порожнім, щоб згенерувати новий",
     "certSection": "Розгортання",

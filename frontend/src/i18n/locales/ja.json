@@ -2006,6 +2006,7 @@
     "reloadCommand": "リロードコマンド",
     "reloadCommandHint": "このデプロイでは任意です。転送成功後に SSH で実行されます（終了コード 0 = 成功）。テンプレートは使用できません。",
     "privateKeyOptional": "SSH 秘密鍵（任意: 空欄の場合は ed25519 鍵を生成します）",
+    "privateKeyOptionalFips": "SSH private key (optional: leave empty to generate an ECDSA P-256 key; Ed25519 keys are refused in FIPS mode)",
     "privateKeyRotate": "新しい SSH 秘密鍵（現在の鍵を維持する場合は空欄のまま）",
     "privateKeyPlaceholder": "PEM/OpenSSH 秘密鍵を貼り付けるか、空欄のままにして生成します",
     "certSection": "デプロイ",

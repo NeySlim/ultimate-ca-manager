@@ -1647,6 +1647,7 @@
     "reloadCommand": "Commande de rechargement",
     "reloadCommandHint": "Optionnel pour ce déploiement : exécutée via SSH après un transfert réussi (code de sortie 0 = succès). Aucun modèle de commande.",
     "privateKeyOptional": "Clé privée SSH (optionnel : laisser vide pour générer une clé ed25519)",
+    "privateKeyOptionalFips": "SSH private key (optional: leave empty to generate an ECDSA P-256 key; Ed25519 keys are refused in FIPS mode)",
     "privateKeyRotate": "Nouvelle clé privée SSH (laisser vide pour conserver l'actuelle)",
     "privateKeyPlaceholder": "Collez une clé privée PEM/OpenSSH, ou laissez vide pour en générer une",
     "certSection": "Déploiement",

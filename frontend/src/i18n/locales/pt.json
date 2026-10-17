@@ -2006,6 +2006,7 @@
     "reloadCommand": "Comando de recarga",
     "reloadCommandHint": "Opcional para esta implantação: executado via SSH após uma transferência bem-sucedida (código de saída 0 = sucesso). Sem modelos.",
     "privateKeyOptional": "Chave privada SSH (opcional: deixe vazio para gerar uma chave ed25519)",
+    "privateKeyOptionalFips": "SSH private key (optional: leave empty to generate an ECDSA P-256 key; Ed25519 keys are refused in FIPS mode)",
     "privateKeyRotate": "Nova chave privada SSH (deixe vazio para manter a atual)",
     "privateKeyPlaceholder": "Cole uma chave privada PEM/OpenSSH ou deixe vazio para gerar uma",
     "certSection": "Implantação",

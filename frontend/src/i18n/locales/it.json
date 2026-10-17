@@ -2006,6 +2006,7 @@
     "reloadCommand": "Comando di ricarica",
     "reloadCommandHint": "Facoltativo per questa distribuzione: eseguito tramite SSH dopo un trasferimento riuscito (codice di uscita 0 = successo). Nessun modello.",
     "privateKeyOptional": "Chiave privata SSH (facoltativa: lascia vuoto per generare una chiave ed25519)",
+    "privateKeyOptionalFips": "SSH private key (optional: leave empty to generate an ECDSA P-256 key; Ed25519 keys are refused in FIPS mode)",
     "privateKeyRotate": "Nuova chiave privata SSH (lascia vuoto per mantenere quella attuale)",
     "privateKeyPlaceholder": "Incolla una chiave privata PEM/OpenSSH, oppure lascia vuoto per generarne una",
     "certSection": "Distribuzione",

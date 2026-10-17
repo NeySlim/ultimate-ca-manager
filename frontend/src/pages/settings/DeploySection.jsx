@@ -13,6 +13,7 @@ import { deployService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks/useClipboard'
 import { extractData, formatDate } from '../../lib/utils'
+import { useFipsMode } from '../../lib/policyAlgorithms'
 
 const EMPTY_FORM = {
   name: '', host: '', port: 22, username: '', private_key: '', enabled: true,
@@ -20,6 +21,7 @@ const EMPTY_FORM = {
 
 export default function DeploySection() {
   const { t } = useTranslation()
+  const fips = useFipsMode()
   const { showSuccess, showError, showConfirm } = useNotification()
 
   const [targets, setTargets] = useState([])
@@ -254,7 +256,7 @@ export default function DeploySection() {
           </div>
           <div className="space-y-1">
             <label className="block text-xs font-medium text-text-secondary">
-              {editing ? t('deploy.privateKeyRotate') : t('deploy.privateKeyOptional')}
+              {editing ? t('deploy.privateKeyRotate') : t(fips ? 'deploy.privateKeyOptionalFips' : 'deploy.privateKeyOptional')}
             </label>
             <textarea className="w-full h-20 px-3 py-2 bg-bg-tertiary border border-border rounded-md text-xs font-mono text-text-primary resize-y focus:outline-none focus:border-accent-primary"
                       placeholder={t('deploy.privateKeyPlaceholder')}
