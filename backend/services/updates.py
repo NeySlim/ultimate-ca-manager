@@ -3,6 +3,7 @@ Update Service - Check and install updates from GitHub releases
 """
 import hashlib
 import os
+import platform
 import re
 import logging
 from pathlib import Path
@@ -34,6 +35,31 @@ REPO = "NeySlim/ultimate-ca-manager"
 
 # Simple cache to avoid GitHub rate limits (5 min TTL)
 _releases_cache = {'data': None, 'ts': 0, 'ttl': 300}
+
+
+_EL_TAG = re.compile(r'\.el(\d+)\.')
+
+
+def _el_release():
+    """Major version of a RHEL-family host ('9'), None elsewhere (Fedora included)."""
+    try:
+        info = platform.freedesktop_os_release()
+    except OSError:
+        return None
+    family = {info.get('ID', '')} | set(info.get('ID_LIKE', '').split())
+    if 'rhel' not in family:
+        return None
+    return info.get('VERSION_ID', '').split('.')[0] or None
+
+
+def _pick_rpm(assets, el):
+    """The .elN. build matching this host, else the first RPM built for neither EL release."""
+    rpms = [a for a in assets if a['name'].endswith('.rpm')]
+    for asset in rpms:
+        tag = _EL_TAG.search(asset['name'])
+        if el and tag and tag.group(1) == el:
+            return asset
+    return next((a for a in rpms if not _EL_TAG.search(a['name'])), None)
 
 
 def get_github_repo():
@@ -241,7 +267,6 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
         
         # Collect all matching assets, then pick the best one
         deb_asset = None
-        rpm_asset = None
         checksum_assets = {}
         checksum_url = None
 
@@ -255,10 +280,9 @@ def check_for_updates(include_prereleases=False, include_dev=False, force=False,
                 checksum_assets[name[:-len('.sha256')]] = asset
             elif name.endswith('.deb') and not deb_asset:
                 deb_asset = asset
-            elif name.endswith('.rpm') and not rpm_asset:
-                rpm_asset = asset
 
         if not is_docker:
+            rpm_asset = _pick_rpm(latest_release.get('assets', []), _el_release()) if is_rpm else None
             chosen = deb_asset if is_deb and deb_asset else (rpm_asset if is_rpm and rpm_asset else None)
             if chosen:
                 download_url = chosen['browser_download_url']

@@ -647,3 +647,55 @@ class TestChecksumAssetNameTransform:
 
         monkeypatch.setattr(updates.requests, 'get', lambda *a, **k: _Resp())
         assert updates.fetch_expected_sha256('https://x/pkg.sha256', 'ucm_2.224.rc1_all.deb') is None
+
+
+def _rpm(name):
+    return {'name': name, 'browser_download_url': f'http://x/{name}'}
+
+
+class TestRpmAssetPerDistribution:
+    """A release carries a Fedora RPM and an EL9 one (python3.12): each host takes its own."""
+
+    ASSETS = [_rpm('ucm-99.0-1.el9.noarch.rpm'), _rpm('ucm-99.0-1.el9.noarch.rpm.sha256'),
+              _rpm('ucm-99.0-1.fc43.noarch.rpm'), _rpm('ucm-99.0-1.fc43.noarch.rpm.sha256')]
+
+    def _check(self, monkeypatch, el, assets):
+        import time as _time
+        monkeypatch.setitem(updates._releases_cache, 'data', [{
+            'tag_name': 'v99.0', 'draft': False, 'prerelease': False, 'body': '', 'assets': assets}])
+        monkeypatch.setitem(updates._releases_cache, 'ts', _time.time())
+        monkeypatch.setattr(updates.os.path, 'exists', lambda p: p == '/usr/bin/rpm')
+        monkeypatch.setattr(updates, '_el_release', lambda: el)
+        return updates.check_for_updates()
+
+    @pytest.mark.parametrize('order', [1, -1])
+    def test_el9_host_takes_the_el9_build(self, monkeypatch, order):
+        result = self._check(monkeypatch, '9', self.ASSETS[::order])
+        assert result['package_name'] == 'ucm-99.0-1.el9.noarch.rpm'
+        assert result['checksum_url'] == 'http://x/ucm-99.0-1.el9.noarch.rpm.sha256'
+
+    @pytest.mark.parametrize('el', [None, '10'])
+    def test_other_hosts_never_take_the_el9_build(self, monkeypatch, el):
+        result = self._check(monkeypatch, el, self.ASSETS)
+        assert result['package_name'] == 'ucm-99.0-1.fc43.noarch.rpm'
+
+    def test_el9_host_falls_back_on_a_release_without_el9_build(self, monkeypatch):
+        result = self._check(monkeypatch, '9', self.ASSETS[2:])
+        assert result['package_name'] == 'ucm-99.0-1.fc43.noarch.rpm'
+
+    @pytest.mark.parametrize('info, expected', [
+        ({'ID': 'almalinux', 'ID_LIKE': 'rhel centos fedora', 'VERSION_ID': '9.8'}, '9'),
+        ({'ID': 'rhel', 'ID_LIKE': 'fedora', 'VERSION_ID': '9.6'}, '9'),
+        ({'ID': 'rocky', 'ID_LIKE': 'rhel centos fedora', 'VERSION_ID': '10.0'}, '10'),
+        ({'ID': 'fedora', 'VERSION_ID': '43'}, None),
+        ({'ID': 'debian', 'VERSION_ID': '13'}, None),
+    ])
+    def test_el_release(self, monkeypatch, info, expected):
+        monkeypatch.setattr(updates.platform, 'freedesktop_os_release', lambda: info)
+        assert updates._el_release() == expected
+
+    def test_el_release_without_os_release(self, monkeypatch):
+        def missing():
+            raise OSError('no os-release')
+        monkeypatch.setattr(updates.platform, 'freedesktop_os_release', missing)
+        assert updates._el_release() is None

@@ -16,6 +16,8 @@ MANIFEST_FILE="$DATA_DIR/.update_manifest.json"
 PROCESSING_FILE="$DATA_DIR/.update_manifest.processing"
 RESULT_FILE="$DATA_DIR/.update_result.json"
 VERSION_FILE="/opt/ucm/VERSION"
+SETUP="/opt/ucm/scripts/native-setup.sh"
+UCM_ENV="/etc/ucm/ucm.env"
 LOG_FILE="/var/log/ucm/ucm.log"
 
 log() {
@@ -129,6 +131,13 @@ if [ -f "$UPDATE_FILE" ]; then
     log "Starting update with package: $PACKAGE_PATH"
     INSTALL_OK=1
 
+    # UCM_FIPS_BUILD=1 recompiles at every upgrade: missing build tools refuse the update untouched
+    if [ -f "$SETUP" ] && ! PRECHECK=$(bash "$SETUP" update-precheck /opt/ucm "$UCM_ENV" "${PACKAGE_PATH##*.}" 2>&1); then
+        log "ERROR: update refused: $PRECHECK"
+        write_result failed precheck "$PRECHECK"
+        finish_update
+    fi
+
     if [[ "$PACKAGE_PATH" == *.deb ]]; then
         log "Installing DEB package..."
         # dpkg first, then apt to resolve any missing dependencies; the
@@ -170,6 +179,9 @@ if [ -f "$UPDATE_FILE" ]; then
         if [ -n "$TARGET_VERSION" ] && ! versions_match "$DETECTED" "$TARGET_VERSION"; then
             log "ERROR: installed version does not match the update target"
             write_result failed verify "installed version '$DETECTED' does not match target '$TARGET_VERSION'"
+        elif [ -f "$SETUP" ] && ! FIPS_BUILD=$(bash "$SETUP" fips-build-ok "$UCM_ENV" 2>&1); then
+            log "ERROR: $FIPS_BUILD"
+            write_result failed fips-build "$FIPS_BUILD"
         else
             log "Package installed and version verified"
             write_result installed "" ""

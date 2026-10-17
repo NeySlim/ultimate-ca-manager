@@ -15,6 +15,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Docker: building with `UCM_FIPS_BUILD=1` adds the OpenSSL 3.1.2 FIPS provider (CMVP certificate #4985) and links cryptography, psycopg2 and xmlsec to the system OpenSSL; the image runs in standard mode without `UCM_FIPS`, and the Helm chart has `fips.enabled` (#399).
 - Service status shows the OpenSSL library and FIPS provider in use, and `/api/v2/health` reports `fips_active` (#399).
 - Backups: `"kdf": "pbkdf2"` at creation writes an archive that a FIPS-mode instance can restore (#399).
+- DEB and RPM: with `UCM_FIPS_BUILD=1` in `/etc/ucm/ucm.env` before the install, RHEL 9 and Ubuntu 24.04 hosts build cryptography, psycopg2, lxml and xmlsec against the system OpenSSL, and a host in FIPS mode gets `UCM_FIPS=1` and the readiness report (#399). The updater keeps that build, and refuses the update when a build tool is missing.
+- RPM for RHEL, AlmaLinux and Rocky Linux 9 (`.el9.`), running on python3.12; the Fedora RPM is unchanged and the updater picks the build matching the host.
 - FIPS readiness check: `python -m scripts.fips_preflight`, `GET /api/v2/system/fips-preflight` and a button under Settings > About list, on a standard instance, what FIPS mode would refuse (scrypt passwords, Ed25519 authorities, hmac-md5 TSIG, Argon2id backups, PostgreSQL without TLS...) with a remedy for each; scheduled backups gain a KDF setting (#399).
 
 ### Changed
@@ -22,6 +24,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Upgrade note: SAML responses and assertions signed or digested with SHA-1 are refused; an identity provider still using SHA-1 (an older ADFS relying party trust, for instance) must switch to SHA-256 (#399).
 - Upgrade note: WSTEP requests whose WS-Security signature does not use RSA or ECDSA with SHA-256, SHA-384 or SHA-512 are refused (#399).
 - python-jose, which nothing used, is no longer installed (#399).
+
+### Fixed
+
+- DEB and RPM: an `/etc/ucm/ucm.env` written before the install was kept as is, without secrets, and the service did not start. Missing secrets and defaults are now added, without changing any value already there.
 
 ## [2.240] - 2026-10-17
 
