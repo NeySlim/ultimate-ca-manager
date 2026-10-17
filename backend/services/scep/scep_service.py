@@ -21,6 +21,7 @@ from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.x509.oid import ExtensionOID, NameOID
 
 from config.settings import Config
+from fips_mode import FipsRestricted
 from models import CA, Certificate, SCEPRequest, db
 from services.crl_service import CRLService
 from utils.dn_parse import subject_common_name
@@ -366,6 +367,11 @@ class SCEPService:
                 message_data = decrypt_scep_envelope(
                     encrypted_bytes, self.ca_key, self.ca_cert
                 )
+            except FipsRestricted as e:
+                return self._create_error_response(
+                    self.FAIL_BAD_ALG, str(e),
+                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                ), 200
             except Exception as e:
                 logger.error(f"SCEP: Failed to decrypt envelopedData: {e}")
                 return self._create_error_response(

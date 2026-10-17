@@ -122,9 +122,11 @@ class TestSitesDrawFromTheDrbg:
         assert [len(v) for v in drbg] == [32, 16]
 
     def test_scep_key_transport_envelope(self, drbg, rsa_identity):
-        from services.scep.crypto_helpers import AES256_CBC, encrypt_for_client
+        from services.scep.crypto_helpers import AES256_CBC, RSAES_OAEP, encrypt_for_client
         _key, cert = rsa_identity
-        encrypt_for_client(b'payload', cert, content_encryption_algorithm=AES256_CBC)
+        # OAEP: FIPS mode refuses the v1.5 default
+        encrypt_for_client(b'payload', cert, content_encryption_algorithm=AES256_CBC,
+                           key_transport=(RSAES_OAEP, 'sha256'))
         assert [len(v) for v in drbg] == [32, 16]
 
     def test_scep_password_envelope(self, drbg):

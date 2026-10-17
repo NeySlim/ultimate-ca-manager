@@ -16,6 +16,7 @@ from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed25519, rsa
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
+import fips_mode
 from utils.randomness import csp_bytes
 
 
@@ -94,6 +95,8 @@ def select_response_key_transport(encrypted_bytes: bytes) -> tuple:
             hash_name, _mgf_hash, _label = oaep_parameters(algorithm['parameters'])
             if hash_name in _OAEP_HASHES:
                 return (RSAES_OAEP, hash_name)
+        if fips_mode.enabled():
+            continue  # a v1.5 recipient is not ours: FIPS mode refused it inbound
         return DEFAULT_KEY_TRANSPORT
     return DEFAULT_KEY_TRANSPORT
 _CONTENT_ENCRYPTION = {
@@ -254,6 +257,8 @@ def _key_transport_recipient_info(
     key_transport: tuple = DEFAULT_KEY_TRANSPORT,
 ) -> asn1crypto.cms.RecipientInfo:
     algorithm, hash_name = key_transport
+    if algorithm != RSAES_OAEP:
+        fips_mode.refuse('RSA PKCS#1 v1.5 key transport')
     if algorithm == RSAES_OAEP:
         hash_cls = _OAEP_HASHES[hash_name]
         encrypted_key = recipient_cert.public_key().encrypt(

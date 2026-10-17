@@ -17,6 +17,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed25519, rsa
 from cryptography.hazmat.primitives.asymmetric import padding
 
+import fips_mode
+from fips_mode import FipsRestricted
 from services.scep.crypto_helpers import oaep_padding
 
 logger = logging.getLogger(__name__)
@@ -36,6 +38,7 @@ _DIGEST_MAP = {
 # legacy SCEP clients still sign with them, but we never *advertise* them in
 # GetCACaps and never sign outbound responses with them.
 _INBOUND_DIGEST_ALLOWED = {"sha1", "sha224", "sha256", "sha384", "sha512"}
+_TDES_CBC = "1.2.840.113549.3.7"
 
 
 def _coerce_message_type(raw) -> Optional[int]:
@@ -173,13 +176,15 @@ def verify_cms_signature(signed_data, signer_cert) -> None:
     signer_info = signer_infos[0]
 
     digest_name = signer_info["digest_algorithm"]["algorithm"].native
+    sig_alg = signer_info["signature_algorithm"]["algorithm"].native
+    # The module verifies SHA-1 signatures; FIPS mode refuses them all the same
+    if fips_mode.enabled() and (digest_name == "sha1" or sig_alg == "sha1_rsa"):
+        raise FipsRestricted("SHA-1 CMS signatures not available in FIPS mode")
     if digest_name not in _INBOUND_DIGEST_ALLOWED:
         raise ValueError(f"Unsupported digest algorithm in CMS signature: {digest_name}")
     hash_cls = _DIGEST_MAP.get(digest_name)
     if hash_cls is None:
         raise ValueError(f"Unknown digest algorithm: {digest_name}")
-
-    sig_alg = signer_info["signature_algorithm"]["algorithm"].native
 
     signature = signer_info["signature"].native
     if not isinstance(signature, (bytes, bytearray)):
@@ -361,6 +366,12 @@ def decrypt_scep_envelope(
         key_padding = oaep_padding(key_algorithm["parameters"])
     else:
         raise ValueError("Unsupported SCEP key transport algorithm")
+    if fips_mode.enabled():
+        # Refused before the CA key is used: the module has no 3DES and lets v1.5 through
+        if key_algorithm_name == "rsaes_pkcs1v15":
+            fips_mode.refuse("RSA PKCS#1 v1.5 key transport")
+        if env["encrypted_content_info"]["content_encryption_algorithm"]["algorithm"].dotted == _TDES_CBC:
+            fips_mode.refuse("3DES content encryption")
 
     content_encryption_key = ca_key.decrypt(
         matching_ktri["encrypted_key"].native,
@@ -382,7 +393,7 @@ def decrypt_scep_envelope(
         logger.warning("SCEP client using DES encryption: rejected (insecure)")
         raise ValueError("DES encryption is not supported: use AES or 3DES")
 
-    if alg_oid == "1.2.840.113549.3.7":
+    if alg_oid == _TDES_CBC:
         if len(iv) != 8:
             raise ValueError("Invalid 3DES-CBC IV length")
         logger.warning("SCEP client using 3DES encryption: deprecated, prefer AES")
