@@ -6,7 +6,9 @@
 
 set -euo pipefail
 
-DATA_DIR="/opt/ucm/data"
+# UCM_WATCHER_ROOT relocates every path, for tests only
+ROOT="${UCM_WATCHER_ROOT:-}"
+DATA_DIR="$ROOT/opt/ucm/data"
 RESTART_FILE="$DATA_DIR/.restart_requested"
 UPDATE_FILE="$DATA_DIR/.update_pending"
 MANIFEST_FILE="$DATA_DIR/.update_manifest.json"
@@ -15,10 +17,10 @@ MANIFEST_FILE="$DATA_DIR/.update_manifest.json"
 # claimed copy only (never from the mutable global file)
 PROCESSING_FILE="$DATA_DIR/.update_manifest.processing"
 RESULT_FILE="$DATA_DIR/.update_result.json"
-VERSION_FILE="/opt/ucm/VERSION"
-SETUP="/opt/ucm/scripts/native-setup.sh"
-UCM_ENV="/etc/ucm/ucm.env"
-LOG_FILE="/var/log/ucm/ucm.log"
+VERSION_FILE="$ROOT/opt/ucm/VERSION"
+SETUP="$ROOT/opt/ucm/scripts/native-setup.sh"
+UCM_ENV="$ROOT/etc/ucm/ucm.env"
+LOG_FILE="$ROOT/var/log/ucm/ucm.log"
 
 log() {
     echo "$(date -Iseconds) [ucm-watcher] $*" | tee -a "$LOG_FILE"
@@ -103,6 +105,16 @@ PYEOF
     fi
 }
 
+# Records a failed UCM_FIPS_BUILD=1 build of this update as its result
+fips_build_ok() {
+    local msg
+    if [ -f "$SETUP" ] && ! msg=$(bash "$SETUP" fips-build-ok "$UCM_ENV" 2>&1); then
+        log "ERROR: $msg"
+        write_result failed fips-build "$msg"
+        return 1
+    fi
+}
+
 finish_update() {
     # Always restart UCM so the backend consumes the result and emits the
     # truthful installed/failed event
@@ -131,8 +143,8 @@ if [ -f "$UPDATE_FILE" ]; then
     log "Starting update with package: $PACKAGE_PATH"
     INSTALL_OK=1
 
-    # UCM_FIPS_BUILD=1 recompiles at every upgrade: missing build tools refuse the update untouched
-    if [ -f "$SETUP" ] && ! PRECHECK=$(bash "$SETUP" update-precheck /opt/ucm "$UCM_ENV" "${PACKAGE_PATH##*.}" 2>&1); then
+    # UCM_FIPS_BUILD=1 compiles during the install: missing build tools refuse the update untouched
+    if [ -f "$SETUP" ] && ! PRECHECK=$(bash "$SETUP" update-precheck "$ROOT/opt/ucm" "$UCM_ENV" "${PACKAGE_PATH##*.}" 2>&1); then
         log "ERROR: update refused: $PRECHECK"
         write_result failed precheck "$PRECHECK"
         finish_update
@@ -143,11 +155,18 @@ if [ -f "$UPDATE_FILE" ]; then
         # dpkg first, then apt to resolve any missing dependencies; the
         # authoritative success check is the version verification below
         dpkg -i "$PACKAGE_PATH" >> "$LOG_FILE" 2>&1 || true
-        log "Resolving dependencies..."
-        if ! apt-get -f install -y >> "$LOG_FILE" 2>&1; then
-            log "ERROR: apt-get -f install failed"
-            write_result failed apt-get "apt-get -f install failed (see ucm.log)"
+        # apt-get -f install would configure the package again, and rerun a failed FIPS build
+        if ! fips_build_ok; then
             INSTALL_OK=0
+        else
+            log "Resolving dependencies..."
+            if ! apt-get -f install -y >> "$LOG_FILE" 2>&1; then
+                INSTALL_OK=0
+                if fips_build_ok; then
+                    log "ERROR: apt-get -f install failed"
+                    write_result failed apt-get "apt-get -f install failed (see ucm.log)"
+                fi
+            fi
         fi
     elif [[ "$PACKAGE_PATH" == *.rpm ]]; then
         log "Installing RPM package..."
@@ -179,10 +198,7 @@ if [ -f "$UPDATE_FILE" ]; then
         if [ -n "$TARGET_VERSION" ] && ! versions_match "$DETECTED" "$TARGET_VERSION"; then
             log "ERROR: installed version does not match the update target"
             write_result failed verify "installed version '$DETECTED' does not match target '$TARGET_VERSION'"
-        elif [ -f "$SETUP" ] && ! FIPS_BUILD=$(bash "$SETUP" fips-build-ok "$UCM_ENV" 2>&1); then
-            log "ERROR: $FIPS_BUILD"
-            write_result failed fips-build "$FIPS_BUILD"
-        else
+        elif fips_build_ok; then
             log "Package installed and version verified"
             write_result installed "" ""
         fi
