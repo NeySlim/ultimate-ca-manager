@@ -77,6 +77,12 @@ proxy:
   # entry as a literal string that never matches, and trusts no proxy.
   trustedProxies: []
 
+## FIPS mode: runs the <tag>-fips image with UCM_FIPS=1 and an in-memory
+## /run/ucm for the module configuration. The pod refuses to start if the
+## OpenSSL FIPS provider is missing or fails its self-tests.
+fips:
+  enabled: false
+
 ## Extra environment variables (UCM_* etc.), passed verbatim.
 extraEnv: []
   # - name: UCM_LOG_LEVEL

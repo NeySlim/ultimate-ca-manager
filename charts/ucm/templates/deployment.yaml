@@ -91,6 +91,10 @@ spec:
             - name: UCM_TRUSTED_PROXIES
               value: {{ join "," . | quote }}
             {{- end }}
+            {{- if .Values.fips.enabled }}
+            - name: UCM_FIPS
+              value: "1"
+            {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}
             {{- end }}
@@ -125,6 +129,10 @@ spec:
               mountPath: /opt/ucm/data
             - name: etc
               mountPath: /etc/ucm
+            {{- if .Values.fips.enabled }}
+            - name: fips-run
+              mountPath: /run/ucm
+            {{- end }}
       volumes:
         - name: data
           {{- if .Values.persistence.enabled }}
@@ -140,6 +148,12 @@ spec:
           {{- else }}
           emptyDir: {}
           {{- end }}
+        {{- if .Values.fips.enabled }}
+        - name: fips-run
+          emptyDir:
+            medium: Memory
+            sizeLimit: 1Mi
+        {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:
         {{- toYaml . | nindent 8 }}

@@ -64,7 +64,16 @@ services:
       # Paste PEM-encoded certificate/key here or mount as volumes
       - UCM_HTTPS_CERT=${UCM_HTTPS_CERT:-}
       - UCM_HTTPS_KEY=${UCM_HTTPS_KEY:-}
-    
+
+      # ========================================
+      # FIPS MODE (OPTIONAL)
+      # ========================================
+
+      # Needs the -fips image (e.g. neyslim/ultimate-ca-manager:<version>-fips);
+      # the standard image refuses to start with it. With read_only: true, add
+      # a tmpfs for the module configuration: tmpfs: [/run/ucm:uid=1000]
+      # - UCM_FIPS=1
+
     healthcheck:
       test: ["CMD", "curl", "-f", "-k", "https://localhost:${UCM_HTTPS_PORT:-8443}/api/health"]
       interval: 30s

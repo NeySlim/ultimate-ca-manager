@@ -54,6 +54,9 @@ app.kubernetes.io/instance: {{ .Release.Name }}
 {{/* Image reference (tag falls back to appVersion). */}}
 {{- define "ucm.image" -}}
 {{- $tag := .Values.image.tag | default .Chart.AppVersion -}}
+{{- if and .Values.fips.enabled (not (hasSuffix "-fips" $tag)) -}}
+{{- $tag = printf "%s-fips" $tag -}}
+{{- end -}}
 {{- printf "%s:%s" .Values.image.repository $tag }}
 {{- end }}
 
