@@ -1079,6 +1079,12 @@ def create_app(config_name=None):
     
     @app.errorhandler(Exception)
     def handle_exception(e):
+        from fips_mode import FipsRestricted, PROBLEM_TYPE as FIPS_PROBLEM
+        if isinstance(e, FipsRestricted):
+            from utils.response import build_problem, PROBLEM_CONTENT_TYPE
+            response = flask_jsonify(build_problem(str(e), 400, problem_type=FIPS_PROBLEM))
+            response.mimetype = PROBLEM_CONTENT_TYPE
+            return response, 400
         if isinstance(e, (OverflowError, ValueError)):
             return _json_error(400, 'Invalid parameter value')
         app.logger.error("Unhandled exception on %s: %s", request.path, e, exc_info=True)
