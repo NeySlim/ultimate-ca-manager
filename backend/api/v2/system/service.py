@@ -13,6 +13,7 @@ from services.updates import get_current_version
 from config.settings import is_docker
 import os
 import psutil
+import fips_mode
 from datetime import datetime, timezone
 import logging
 
@@ -156,7 +157,8 @@ def get_service_status():
             'started_at': create_time.isoformat(),
             'memory_mb': memory_mb,
             'is_docker': is_docker_env,
-            'python_version': f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}"
+            'python_version': f"{os.sys.version_info.major}.{os.sys.version_info.minor}.{os.sys.version_info.micro}",
+            'crypto': fips_mode.status(),
         })
     except Exception as e:
         logger.error(f"Failed to get service status: {e}")

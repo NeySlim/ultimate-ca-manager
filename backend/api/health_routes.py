@@ -8,6 +8,8 @@ from models import db
 from config.settings import redis_url as config_redis_url
 import os
 
+import fips_mode
+
 health_bp = Blueprint('health', __name__)
 
 _started_at = time.time()
@@ -38,7 +40,8 @@ def health():
         'service': 'ucm',
         'version': _config.APP_VERSION,
         'started_at': _started_at,
-        'websocket': ws_ready
+        'websocket': ws_ready,
+        'fips_active': fips_mode.enabled(),
     }
     if current_app.config.get('SAFE_MODE'):
         result['safe_mode'] = True

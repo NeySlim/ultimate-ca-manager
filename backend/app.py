@@ -175,6 +175,9 @@ def create_app(config_name=None):
             "trusted reverse proxy)"
         )
     
+    import fips_mode
+    fips_mode.enforce_at_startup(app.logger)
+
     # Validate secrets at runtime (not during package installation)
     try:
         config.validate_secrets()

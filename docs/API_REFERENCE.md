@@ -2171,8 +2171,18 @@ GET /api/v2/system/hsm-status
 
 ### Service Management
 ```http
-# Get service status
+# Get service status (includes the crypto block below)
 GET /api/v2/system/service/status
+
+# "crypto" in the response: FIPS mode asked for (UCM_FIPS=1), in force,
+# the OpenSSL library cryptography uses, and the loaded FIPS provider
+"crypto": {
+  "fips_requested": true,
+  "fips_active": true,
+  "provider_active": true,
+  "library": "OpenSSL 3.5.7 9 Jun 2026",
+  "provider": {"name": "OpenSSL FIPS Provider", "version": "3.1.2", "buildinfo": "3.1.2"}
+}
 
 # Restart service
 POST /api/v2/system/service/restart
@@ -3350,7 +3360,8 @@ GET /api/v2/health
   "service": "ucm",
   "version": "2.1.0",
   "started_at": 1707123456.789,
-  "websocket": true
+  "websocket": true,
+  "fips_active": false
 }
 ```
 
@@ -3361,6 +3372,7 @@ GET /api/v2/health
 | `version` | Current application version |
 | `started_at` | Unix timestamp when the service started |
 | `websocket` | Indicates whether the WebSocket (Socket.IO) server is initialized and ready to accept connections |
+| `fips_active` | `true` when FIPS mode is in force (`UCM_FIPS=1` on an active FIPS provider); versions are only in the authenticated service status |
 
 ### Readiness Check
 ```http
