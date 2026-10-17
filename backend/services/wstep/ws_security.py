@@ -42,6 +42,21 @@ from .soap_envelope import DS_NS, WSSE_NS, WSU_NS
 # loop in verify_signed_request.
 _ENVELOPED_SIGNATURE_TRANSFORM = 'http://www.w3.org/2000/09/xmldsig#enveloped-signature'
 
+# SHA-2 public-key signatures only: SHA-1, SHA-224 and HMAC are refused.
+_ALLOWED_SIGNATURE_METHODS = frozenset({
+    'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
+    'http://www.w3.org/2001/04/xmldsig-more#rsa-sha384',
+    'http://www.w3.org/2001/04/xmldsig-more#rsa-sha512',
+    'http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha256',
+    'http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha384',
+    'http://www.w3.org/2001/04/xmldsig-more#ecdsa-sha512',
+})
+_ALLOWED_DIGEST_METHODS = frozenset({
+    'http://www.w3.org/2001/04/xmlenc#sha256',
+    'http://www.w3.org/2001/04/xmldsig-more#sha384',
+    'http://www.w3.org/2001/04/xmlenc#sha512',
+})
+
 
 class WSSecurityError(Exception):
     """Raised when the signature is missing, malformed, or does not verify."""
@@ -71,6 +86,23 @@ class SignedContent:
                 if ancestor is signed_el:
                     return True
         return False
+
+
+def _check_algorithms(signature_node):
+    """Refuse the signature unless SignatureMethod and every DigestMethod are allowed."""
+    methods = signature_node.findall(f'{{{DS_NS}}}SignedInfo/{{{DS_NS}}}SignatureMethod')
+    if len(methods) != 1:
+        raise WSSecurityError('ds:SignedInfo must contain exactly one SignatureMethod')
+    algorithm = methods[0].get('Algorithm') or ''
+    if algorithm not in _ALLOWED_SIGNATURE_METHODS:
+        raise WSSecurityError(f'Signature algorithm not allowed: {algorithm or "(none)"}')
+    for reference in signature_node.findall(f'{{{DS_NS}}}SignedInfo/{{{DS_NS}}}Reference'):
+        digests = reference.findall(f'{{{DS_NS}}}DigestMethod')
+        if len(digests) != 1:
+            raise WSSecurityError('ds:Reference must contain exactly one DigestMethod')
+        algorithm = digests[0].get('Algorithm') or ''
+        if algorithm not in _ALLOWED_DIGEST_METHODS:
+            raise WSSecurityError(f'Digest algorithm not allowed: {algorithm or "(none)"}')
 
 
 def verify_signed_request(security_header):
@@ -105,6 +137,8 @@ def verify_signed_request(security_header):
     signature_node = security_header.find(f'{{{DS_NS}}}Signature')
     if signature_node is None:
         raise WSSecurityError('wsse:Security is missing ds:Signature')
+
+    _check_algorithms(signature_node)
 
     try:
         key = xmlsec.Key.from_memory(cert_der, xmlsec.constants.KeyDataFormatCertDer)
