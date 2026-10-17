@@ -472,3 +472,10 @@ class TestSiblingIssuancePaths:
                 CertificateService.create_certificate(
                     descr='svc leaf', caref=refid, dn={'CN': 'svc.fips-ed.test'},
                     cert_type='server_cert', key_type='EC-P256', validity_days=30)
+
+    def test_installing_a_certificate_on_it_keeps_the_fips_refusal(self, app, ed_ca, fips_on):
+        from services.ca_service import CAService
+        with app.app_context():
+            ca = db.session.get(CA, ed_ca)
+            with pytest.raises(FipsRestricted, match='Ed25519 key of CA'):
+                CAService.complete_external_ca(ca, base64.b64decode(ca.crt))

@@ -12,6 +12,7 @@ from cryptography.x509.oid import ExtensionOID
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
+from fips_mode import FipsRestricted
 from models import CA, db
 from models.hsm import HsmKey
 from services.audit_service import AuditService
@@ -625,6 +626,8 @@ class CACreationMixin:
             # ancestor must still be able to install a certificate from a healthy
             # issuer, the one way out of a revoked chain (review of #343)
             private_key = get_ca_signing_key(ca, allow_revoked=True)
+        except FipsRestricted:
+            raise
         except Exception as e:
             logger.error(f"Cannot load signing key for CA {ca.id}: {e}", exc_info=True)
             raise ValueError("CA private key is not available")

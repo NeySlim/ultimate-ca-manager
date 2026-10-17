@@ -176,6 +176,8 @@ jobs:
   smoke-fips:
     name: Smoke (SQLite, FIPS)
     runs-on: ubuntu-latest
+    # The -fips image is best effort: its absence must not fail the standard smokes
+    continue-on-error: true
     if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
 
     steps:
