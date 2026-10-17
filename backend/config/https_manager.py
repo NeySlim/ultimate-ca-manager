@@ -8,11 +8,11 @@ from typing import Tuple, Optional
 from cryptography import x509
 from cryptography.x509.oid import NameOID, ExtensionOID
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
 from cryptography.hazmat.backends import default_backend
 import socket
 import ipaddress
 import logging
+from utils import key_algorithms
 from utils.datetime_utils import utc_now
 from utils.key_codec import private_key_to_pem
 
@@ -44,11 +44,7 @@ class HTTPSManager:
             Tuple of (cert_path, key_path)
         """
         # Generate private key
-        private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-            backend=default_backend()
-        )
+        private_key = key_algorithms.generate('RSA-2048')
         
         # Get hostname for CN
         if common_name is None:

@@ -23,6 +23,7 @@ from cryptography.hazmat.backends import default_backend
 from sqlalchemy import or_
 
 from models import db, CA, Certificate, OCSPResponse, SystemConfig, RevokedSerial
+from utils import key_algorithms
 from utils.datetime_utils import utc_now
 from utils.revocation_reasons import REASON_FLAGS
 from utils.serial_format import serial_to_hex, serial_variants
@@ -149,7 +150,7 @@ def _child_ca_for_serial(issuer: CA, cert_serial: int, variants) -> Optional[CA]
 
 def _build_unknown_certificate(serial: int, issuer: x509.Certificate) -> x509.Certificate:
     """Build a transient certificate so older cryptography can encode UNKNOWN."""
-    key = ec.generate_private_key(ec.SECP256R1())
+    key = key_algorithms.generate('EC-P256')
     now = utc_now()
     return (
         x509.CertificateBuilder()

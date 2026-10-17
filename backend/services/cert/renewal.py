@@ -45,7 +45,8 @@ from utils.db_transaction import commit_or_rollback
 from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
 from utils.key_codec import private_key_to_pem
-from utils.key_algorithms import algorithms as registered_algorithms, family_for_public_key
+from utils.key_algorithms import (algorithms as registered_algorithms, family_for_public_key,
+                                  generate_ec, generate_rsa)
 from utils.eku_validation import add_ocsp_nocheck_if_responder
 
 logger = logging.getLogger(__name__)
@@ -155,13 +156,9 @@ def _matching_key_generator(orig_pub_key):
     """A callable making a fresh private key of the same algorithm/size as the
     original; refuses an algorithm it cannot regenerate before any key exists."""
     if isinstance(orig_pub_key, rsa.RSAPublicKey):
-        return lambda: rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=orig_pub_key.key_size,
-            backend=default_backend(),
-        )
+        return lambda: generate_rsa(orig_pub_key.key_size)
     if isinstance(orig_pub_key, ec.EllipticCurvePublicKey):
-        return lambda: ec.generate_private_key(orig_pub_key.curve, default_backend())
+        return lambda: generate_ec(orig_pub_key.curve)
     family = family_for_public_key(orig_pub_key)
     if family in ('ED25519', 'ED448'):
         return registered_algorithms(family)[0].generate

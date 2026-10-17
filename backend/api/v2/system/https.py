@@ -21,7 +21,7 @@ from config.settings import is_docker
 from cryptography import x509
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import rsa
+from utils import key_algorithms
 from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
@@ -141,10 +141,7 @@ def regenerate_https_cert():
 
     try:
         # Generate private key
-        private_key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048
-        )
+        private_key = key_algorithms.generate('RSA-2048')
 
         # Build certificate
         subject = issuer = x509.Name([

@@ -21,6 +21,7 @@ from cryptography.hazmat.primitives.serialization import ssh as ssh_serializatio
 
 from models import db
 from models.ssh import SSHCertificateAuthority
+from utils import key_algorithms
 from utils.datetime_utils import utc_now
 from utils.duration import parse_duration_seconds
 
@@ -58,11 +59,11 @@ class SSHCAService:
 
         algo, param = KEY_TYPE_MAP[key_type]
         if algo == 'ed25519':
-            return ed25519.Ed25519PrivateKey.generate()
+            return key_algorithms.generate('ED25519')
         elif algo == 'rsa':
-            return rsa.generate_private_key(public_exponent=65537, key_size=param)
+            return key_algorithms.generate_rsa(param)
         elif algo == 'ec':
-            return ec.generate_private_key(param)
+            return key_algorithms.generate_ec(param)
 
         raise ValueError(f"Unknown algorithm: {algo}")
 

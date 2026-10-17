@@ -1,8 +1,7 @@
 """
 Key operations mixin for TrustStoreService
 """
-from cryptography.hazmat.primitives.asymmetric import rsa, ec
-from cryptography.hazmat.backends import default_backend
+from utils import key_algorithms
 
 from .constants import KEY_TYPES
 
@@ -19,12 +18,8 @@ class KeyOperationsMixin:
         algo, param = KEY_TYPES[key_type]
 
         if algo == 'rsa':
-            return rsa.generate_private_key(
-                public_exponent=65537,
-                key_size=param,
-                backend=default_backend()
-            )
+            return key_algorithms.generate_rsa(param)
         elif algo == 'ec':
-            return ec.generate_private_key(param, default_backend())
+            return key_algorithms.generate_ec(param)
 
         raise ValueError(f"Unknown algorithm: {algo}")

@@ -35,7 +35,7 @@ from utils.acme_ip import (
     normalize_ip_for_identifier,
     TlsAlpn01Listener,
 )
-from utils import ssrf_protection
+from utils import key_algorithms, ssrf_protection
 from utils.ca_profile import default_digest_for_key_type
 from utils.signing_hash import HASH_BY_NAME, signing_hash_for
 from utils.san_parse import strip_wildcard
@@ -51,16 +51,16 @@ AUTHZ_INVALID_USER_MSG = (
 
 # Supported key types for account keys and certificate keys
 ACCOUNT_KEY_TYPES = {
-    'RS256': {'alg': 'RS256', 'generate': lambda: rsa.generate_private_key(65537, 2048, default_backend())},
-    'ES256': {'alg': 'ES256', 'generate': lambda: ec.generate_private_key(ec.SECP256R1(), default_backend())},
-    'ES384': {'alg': 'ES384', 'generate': lambda: ec.generate_private_key(ec.SECP384R1(), default_backend())},
+    'RS256': {'alg': 'RS256', 'generate': lambda: key_algorithms.generate('RSA-2048')},
+    'ES256': {'alg': 'ES256', 'generate': lambda: key_algorithms.generate('EC-P256')},
+    'ES384': {'alg': 'ES384', 'generate': lambda: key_algorithms.generate('EC-P384')},
 }
 
 CERT_KEY_TYPES = {
-    'RSA-2048': lambda: rsa.generate_private_key(65537, 2048, default_backend()),
-    'RSA-4096': lambda: rsa.generate_private_key(65537, 4096, default_backend()),
-    'EC-P256': lambda: ec.generate_private_key(ec.SECP256R1(), default_backend()),
-    'EC-P384': lambda: ec.generate_private_key(ec.SECP384R1(), default_backend()),
+    'RSA-2048': lambda: key_algorithms.generate('RSA-2048'),
+    'RSA-4096': lambda: key_algorithms.generate('RSA-4096'),
+    'EC-P256': lambda: key_algorithms.generate('EC-P256'),
+    'EC-P384': lambda: key_algorithms.generate('EC-P384'),
 }
 
 

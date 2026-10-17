@@ -1493,7 +1493,6 @@ def init_database(app):
             from cryptography import x509
             from cryptography.x509.oid import NameOID
             from cryptography.hazmat.primitives import hashes, serialization
-            from cryptography.hazmat.primitives.asymmetric import rsa
             from datetime import timedelta
             import socket
             import ipaddress
@@ -1505,10 +1504,8 @@ def init_database(app):
                 hostname = 'ucm.local'
             
             # Generate private key
-            private_key = rsa.generate_private_key(
-                public_exponent=65537,
-                key_size=2048
-            )
+            from utils import key_algorithms
+            private_key = key_algorithms.generate('RSA-2048')
             
             # Create certificate
             subject = issuer = x509.Name([

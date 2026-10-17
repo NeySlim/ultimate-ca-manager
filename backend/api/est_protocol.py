@@ -7,6 +7,7 @@ from models import db, CA
 from services.ca_service import CAService
 from services.policy_service import PolicyViolation
 from services.audit_service import AuditService
+from utils import key_algorithms
 from utils.trusted_proxy import client_ip
 from utils.db_transaction import safe_commit
 from utils.est_cms import build_server_generated_key_cms
@@ -983,11 +984,7 @@ def server_keygen(label=None):
         )
         
         # Generate new key pair
-        key = rsa.generate_private_key(
-            public_exponent=65537,
-            key_size=2048,
-            backend=default_backend()
-        )
+        key = key_algorithms.generate('RSA-2048')
         
         # Create a new CSR with the server-generated key while retaining the
         # subject and requested extensions (including SubjectAltName).

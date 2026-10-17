@@ -17,8 +17,9 @@ from typing import Optional, Tuple
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec
 from cryptography.x509.oid import NameOID
+
+from utils import key_algorithms
 
 logger = logging.getLogger(__name__)
 
@@ -45,7 +46,7 @@ def build_tls_alpn01_certificate(identifier: str, key_authorization: str) -> Tup
     if not isinstance(key_authorization, str) or not key_authorization:
         raise ValueError('TLS-ALPN-01 key authorization is required')
 
-    key = ec.generate_private_key(ec.SECP256R1(), default_backend())
+    key = key_algorithms.generate('EC-P256')
     now = datetime.now(timezone.utc)
     digest = hashlib.sha256(key_authorization.encode('utf-8')).digest()
     # UnrecognizedExtension receives the ASN.1 extension value itself. RFC 8737

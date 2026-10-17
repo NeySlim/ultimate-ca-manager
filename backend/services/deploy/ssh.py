@@ -48,9 +48,9 @@ def _require_paramiko():
 def generate_keypair() -> Tuple[str, str]:
     """Generate an ed25519 keypair. Returns (private_openssh, public_openssh)."""
     from cryptography.hazmat.primitives import serialization
-    from cryptography.hazmat.primitives.asymmetric.ed25519 import Ed25519PrivateKey
+    from utils import key_algorithms
 
-    key = Ed25519PrivateKey.generate()
+    key = key_algorithms.generate('ED25519')
     private_pem = key.private_bytes(
         serialization.Encoding.PEM,
         serialization.PrivateFormat.OpenSSH,

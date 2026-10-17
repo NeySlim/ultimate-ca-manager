@@ -8,10 +8,87 @@ lookups go through the table, never by splitting a label on '-'.
 from __future__ import annotations
 
 import re
+import shutil
+import subprocess
 from dataclasses import dataclass
 from typing import Callable
 
+from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, rsa
+
+import fips_mode
+
+
+class KeyGenerationError(RuntimeError):
+    """``openssl genpkey`` could not produce the requested key."""
+
+
+# FIPS 186-5 curves, by pyca name, as openssl genpkey spells them
+_FIPS_CURVES = {'secp256r1': 'P-256', 'secp384r1': 'P-384', 'secp521r1': 'P-521'}
+_GENPKEY_TIMEOUT = 300  # seconds; RSA-8192 is the slowest key UCM asks for
+
+
+def _stderr_summary(stderr: bytes) -> str:
+    text = (stderr or b'').decode('utf-8', 'replace')
+    lines = [line.strip() for line in text.splitlines() if line.strip()]
+    return '; '.join(lines[:3])[:300] or 'no error output'
+
+
+def _genpkey(args: list[str]):
+    """Private key from ``openssl genpkey``: inherits OPENSSL_CONF, so the FIPS
+    provider generates it; the PEM is read from stdout, never from a file."""
+    binary = shutil.which('openssl')
+    if binary is None:
+        raise KeyGenerationError('FIPS mode generates keys with the openssl command, which is not installed')
+    try:
+        proc = subprocess.run([binary, 'genpkey', '-quiet', *args], stdin=subprocess.DEVNULL,
+                              capture_output=True, timeout=_GENPKEY_TIMEOUT, check=False)
+    except subprocess.TimeoutExpired:
+        raise KeyGenerationError(f'openssl genpkey timed out after {_GENPKEY_TIMEOUT} s') from None
+    except OSError as exc:
+        raise KeyGenerationError(f'openssl genpkey could not run: {exc.strerror or exc}') from None
+    if proc.returncode != 0:
+        raise KeyGenerationError(
+            f'openssl genpkey failed (exit {proc.returncode}): {_stderr_summary(proc.stderr)}')
+    try:
+        return serialization.load_pem_private_key(proc.stdout, password=None)
+    except (ValueError, TypeError, UnsupportedAlgorithm):
+        raise KeyGenerationError('openssl genpkey printed no usable private key') from None
+
+
+def generate_rsa(bits: int):
+    """RSA key, public exponent 65537, of any size (off-registry ones included)."""
+    if not fips_mode.enabled():
+        return rsa.generate_private_key(public_exponent=65537, key_size=bits)
+    bits = int(bits)
+    if bits < 2048:
+        fips_mode.refuse(f'RSA-{bits} keys')
+    key = _genpkey(['-algorithm', 'RSA', '-pkeyopt', f'rsa_keygen_bits:{bits}'])
+    if not (isinstance(key, rsa.RSAPrivateKey) and key.key_size == bits
+            and key.private_numbers().public_numbers.e == 65537):
+        raise KeyGenerationError(f'openssl genpkey returned a key that is not RSA-{bits}')
+    return key
+
+
+def generate_ec(curve: ec.EllipticCurve):
+    """EC key on *curve* (an instance); FIPS mode allows P-256, P-384 and P-521 only."""
+    if not fips_mode.enabled():
+        return ec.generate_private_key(curve)
+    openssl_name = _FIPS_CURVES.get(curve.name)
+    if openssl_name is None:
+        fips_mode.refuse(f'{curve.name} keys')
+    key = _genpkey(['-algorithm', 'EC', '-pkeyopt', f'ec_paramgen_curve:{openssl_name}'])
+    if not (isinstance(key, ec.EllipticCurvePrivateKey) and key.curve.name == curve.name):
+        raise KeyGenerationError(f'openssl genpkey returned a key that is not on {curve.name}')
+    return key
+
+
+def _edwards_generator(name: str, private_class: type) -> Callable[[], object]:
+    def generate():
+        fips_mode.refuse(f'{name} keys')
+        return private_class.generate()
+    return generate
 
 
 @dataclass(frozen=True)
@@ -50,7 +127,7 @@ def _rsa(bits: int) -> KeyAlgorithm:
     return KeyAlgorithm(
         label=f'RSA-{bits}', family='RSA', param=str(bits),
         private_class=rsa.RSAPrivateKey, public_class=rsa.RSAPublicKey,
-        generator=lambda: rsa.generate_private_key(public_exponent=65537, key_size=bits),
+        generator=lambda: generate_rsa(bits),
         needs_digest=True, default_digest='sha256',
         display=f'RSA {bits}', legacy_key_algo=f'RSA {bits}', trust_store_id=str(bits),
         fips_approved=bits >= 2048, key_size=bits,
@@ -61,7 +138,7 @@ def _ec(bits: int, curve: type, names: tuple[str, ...], trust_store_id: str) -> 
     return KeyAlgorithm(
         label=f'EC-P{bits}', family='EC', param=f'P{bits}',
         private_class=ec.EllipticCurvePrivateKey, public_class=ec.EllipticCurvePublicKey,
-        generator=lambda: ec.generate_private_key(curve()),
+        generator=lambda: generate_ec(curve()),
         needs_digest=True, default_digest='sha256',
         display=f'EC P-{bits}', legacy_key_algo=f'EC {curve.name}', trust_store_id=trust_store_id,
         fips_approved=True, key_size=bits, curve_names=names,
@@ -73,7 +150,7 @@ def _edwards(name: str, private_class: type, public_class: type, bits: int) -> K
     return KeyAlgorithm(
         label=name.upper(), family=name.upper(), param=None,
         private_class=private_class, public_class=public_class,
-        generator=private_class.generate,
+        generator=_edwards_generator(name, private_class),
         needs_digest=False, default_digest=None,
         display=name, legacy_key_algo=name, trust_store_id=None,
         fips_approved=False, key_size=bits,
