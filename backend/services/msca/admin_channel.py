@@ -186,6 +186,11 @@ class MicrosoftCAAdminChannelMixin:
                 server_cert_validation=server_cert_validation,
             )
 
+        import fips_mode
+        if fips_mode.enabled():
+            # NTLM hashes with MD4/MD5 outside the FIPS module
+            raise MSCAAdminChannelError(
+                'NTLM is not available in FIPS mode: use the Kerberos transport')
         username = msca.winrm_effective_username
         password = msca.winrm_effective_password
         if not username or not password:

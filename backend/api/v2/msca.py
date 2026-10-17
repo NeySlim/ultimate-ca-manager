@@ -13,6 +13,7 @@ from services.msca_service import MicrosoftCAService
 from services.audit import AuditService
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
+import fips_mode
 from utils import key_algorithms
 from utils.key_type import MIN_RSA_BITS
 from services.trust_store.constants import KEY_TYPES
@@ -85,6 +86,12 @@ def _apply_winrm_fields(msca, data):
         tr = (data['winrm_transport'] or '').strip().lower()
         if tr not in _WINRM_TRANSPORTS:
             return error_response(f"winrm_transport must be one of {_WINRM_TRANSPORTS}", 400)
+        if tr == 'ntlm':
+            # Returned, not raised: the callers turn exceptions into a 500
+            try:
+                fips_mode.refuse('NTLM for the WinRM channel')
+            except fips_mode.FipsRestricted as e:
+                return error_response(str(e), 400, problem_type=fips_mode.PROBLEM_TYPE)
         msca.winrm_transport = tr
     if 'winrm_username' in data:
         msca.winrm_username = (data['winrm_username'] or '').strip() or None
