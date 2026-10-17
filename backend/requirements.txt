@@ -63,7 +63,6 @@ ldap3>=2.9.1
 
 # SSO/SAML Support
 python3-saml>=1.16.0
-python-jose>=3.3.0
 
 # HSM Support (PKCS#11, Azure Key Vault, Google Cloud KMS)
 python-pkcs11>=0.7.0
