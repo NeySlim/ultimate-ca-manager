@@ -129,7 +129,8 @@ class TestCommandLine:
             report = json.loads(out)
             assert report['ready'] is False and report['errors'][0]['id'] == 'fips.provider'
         else:
-            assert '[ERROR] fips.provider' in out and 'OPENSSL_CONF=/run/ucm/openssl-fips.cnf' in out
+            assert '[ERROR] fips.provider: UCM_FIPS is set' in out
+            assert 'OPENSSL_CONF=/run/ucm/openssl-fips.cnf' in out and 'could not run' not in out
 
     def test_the_database_is_opened_read_only(self, instance_db):
         _engine, config = instance_db

@@ -2198,7 +2198,8 @@ Content-Type: application/json
 ```http
 # What FIPS mode would refuse on this instance; reads only (admin:system).
 # Same report as `python -m scripts.fips_preflight --json` run from backend/
-# (exit code 1 with blockers, 2 when a check could not run).
+# (exit code 1 with blockers, 2 when a check could not run or UCM_FIPS is set
+# without the FIPS provider).
 GET /api/v2/system/fips-preflight
 
 # Response

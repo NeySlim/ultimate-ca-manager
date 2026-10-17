@@ -1,7 +1,8 @@
 """List what FIPS mode would refuse on this instance, without changing anything.
 
 Run from backend/: ``python -m scripts.fips_preflight [--json]``. Exit code 0
-when nothing blocks, 1 with blockers, 2 when a check could not run.
+when nothing blocks, 1 with blockers, 2 when a check could not run or UCM_FIPS
+is set without the FIPS provider.
 """
 import argparse
 import json
@@ -52,7 +53,10 @@ def render_text(report: dict) -> str:
         lines.append(f"  Remedy: {finding['remedy']}")
     for error in report['errors']:
         lines.append('')
-        lines.append(f"[ERROR] {error['id']}: the check could not run ({error['error']})")
+        if error['id'] == 'fips.provider':
+            lines.append(f"[ERROR] {error['id']}: {error['error']}")
+        else:
+            lines.append(f"[ERROR] {error['id']}: the check could not run ({error['error']})")
     if not report['findings'] and not report['errors']:
         lines.append('Nothing found that FIPS mode would refuse.')
     return '\n'.join(lines)
@@ -75,7 +79,7 @@ def main(argv=None) -> int:
         finally:
             db.session.rollback()
     if fips_mode.requested() and not fips_mode.provider_active():
-        # A docker exec does not inherit the entrypoint's OPENSSL_CONF: the report would be wrong.
+        # A docker exec does not inherit the entrypoint's OPENSSL_CONF: the header would say FIPS is off.
         report['errors'].insert(0, {'id': 'fips.provider', 'error': (
             'UCM_FIPS is set but this process runs without the FIPS provider: '
             'set OPENSSL_CONF=/run/ucm/openssl-fips.cnf')})
