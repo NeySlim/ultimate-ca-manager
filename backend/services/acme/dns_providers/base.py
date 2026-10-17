@@ -316,6 +316,10 @@ class BaseDnsProvider(ABC):
         return schema
     
     @classmethod
+    def validate_credentials(cls, credentials: Dict[str, Any]) -> None:
+        """Raise FipsRestricted (a ValueError) for credentials a mode refuses."""
+
+    @classmethod
     def to_dict(cls) -> Dict[str, Any]:
         """
         Get provider info for API responses.

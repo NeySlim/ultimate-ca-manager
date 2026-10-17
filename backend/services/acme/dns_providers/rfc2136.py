@@ -6,6 +6,9 @@ Requires dnspython library (dns.update, dns.tsigkeyring)
 import logging
 from typing import Tuple, Dict, Any, Optional
 
+import fips_mode
+from fips_mode import FipsRestricted
+
 from .base import BaseDnsProvider
 
 logger = logging.getLogger(__name__)
@@ -16,9 +19,16 @@ class Rfc2136DnsProvider(BaseDnsProvider):
     PROVIDER_NAME = "RFC2136 (nsupdate)"
     PROVIDER_DESCRIPTION = "Dynamic DNS Update (BIND, Knot, PowerDNS)"
     REQUIRED_CREDENTIALS = ["server", "tsig_key_name", "tsig_key_secret"]
-    
+
+    @classmethod
+    def validate_credentials(cls, credentials):
+        # hashlib and hmac fall back to CPython's MD5, so only UCM can refuse it
+        if str(credentials.get('tsig_algorithm') or '').strip().lower() == 'hmac-md5':
+            fips_mode.refuse('TSIG hmac-md5')
+
     def _get_keyring(self):
         """Create TSIG keyring for authentication."""
+        self.validate_credentials(self.credentials)
         try:
             import dns.tsigkeyring
             algo = self.credentials.get('tsig_algorithm', 'hmac-sha256')
@@ -72,7 +82,10 @@ class Rfc2136DnsProvider(BaseDnsProvider):
         if not zone:
             return False, f"Could not determine zone for {domain}"
         
-        keyring, algo = self._get_keyring()
+        try:
+            keyring, algo = self._get_keyring()
+        except FipsRestricted as e:
+            return False, str(e)
         if keyring is None:
             return False, "Failed to create TSIG keyring"
         
@@ -102,7 +115,10 @@ class Rfc2136DnsProvider(BaseDnsProvider):
         if not zone:
             return False, f"Could not determine zone for {domain}"
         
-        keyring, algo = self._get_keyring()
+        try:
+            keyring, algo = self._get_keyring()
+        except FipsRestricted as e:
+            return False, str(e)
         if keyring is None:
             return False, "Failed to create TSIG keyring"
         
@@ -161,6 +177,5 @@ class Rfc2136DnsProvider(BaseDnsProvider):
                  {'value': 'hmac-sha512', 'label': 'HMAC-SHA512'},
                  {'value': 'hmac-sha384', 'label': 'HMAC-SHA384'},
                  {'value': 'hmac-sha1', 'label': 'HMAC-SHA1'},
-                 {'value': 'hmac-md5', 'label': 'HMAC-MD5'},
-             ]},
+             ] + ([] if fips_mode.enabled() else [{'value': 'hmac-md5', 'label': 'HMAC-MD5'}])},
         ]

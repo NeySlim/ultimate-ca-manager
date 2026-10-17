@@ -5,6 +5,7 @@ CRUD operations for DNS provider configurations
 import json
 from flask import Blueprint, request
 from auth.unified import require_auth
+from fips_mode import FipsRestricted
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, DnsProvider
@@ -70,6 +71,9 @@ def create_dns_provider():
             for key in provider_class.REQUIRED_CREDENTIALS:
                 if not credentials.get(key):
                     return error_response(f'Missing required credential: {key}', 400)
+            provider_class.validate_credentials(credentials)
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except Exception as e:
         logger.warning(f"Invalid DNS provider credentials: {e}")
         return error_response('Invalid credentials format', 400)
@@ -147,6 +151,9 @@ def update_provider(provider_id):
                     if value:  # Don't overwrite with empty values
                         existing[key] = value
                 credentials = existing
+            provider_class = get_provider_class(provider.provider_type)
+            if provider_class:
+                provider_class.validate_credentials(credentials)
             provider.credentials = json.dumps(credentials) if credentials else None
     
     if 'zones' in data:
