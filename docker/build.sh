@@ -35,6 +35,7 @@ echo -e "${GREEN}✅ Docker found: $(docker --version)${NC}"
 PUSH=false
 MULTIARCH=false
 NO_CACHE=false
+FIPS=false
 
 while [[ $# -gt 0 ]]; do
     case $1 in
@@ -50,6 +51,10 @@ while [[ $# -gt 0 ]]; do
             NO_CACHE=true
             shift
             ;;
+        --fips)
+            FIPS=true
+            shift
+            ;;
         --tag)
             IMAGE_TAG="$2"
             shift 2
@@ -61,6 +66,7 @@ while [[ $# -gt 0 ]]; do
             echo "  --push         Push image to registry after build"
             echo "  --multiarch    Build multi-architecture images (amd64, arm64)"
             echo "  --no-cache     Build without using cache"
+            echo "  --fips         Build the -fips variant (OpenSSL FIPS provider, tags suffixed -fips)"
             echo "  --tag TAG      Set image tag (default: latest)"
             echo "  --help         Show this help message"
             echo ""
@@ -79,6 +85,13 @@ while [[ $# -gt 0 ]]; do
     esac
 done
 
+# The -fips variant is tagged <tag>-fips and <version>-fips
+TAG_SUFFIX=""
+if [ "$FIPS" = true ]; then
+    TAG_SUFFIX="-fips"
+    IMAGE_TAG="${IMAGE_TAG%-fips}$TAG_SUFFIX"
+fi
+
 # Construct full image name
 if [ -n "$REGISTRY" ]; then
     FULL_IMAGE_NAME="$REGISTRY/$IMAGE_NAME"
@@ -93,6 +106,7 @@ echo "   • Version: $VERSION"
 echo "   • Multi-arch: $([ "$MULTIARCH" = true ] && echo 'Yes' || echo 'No')"
 echo "   • Push: $([ "$PUSH" = true ] && echo 'Yes' || echo 'No')"
 echo "   • No cache: $([ "$NO_CACHE" = true ] && echo 'Yes' || echo 'No')"
+echo "   • FIPS variant: $([ "$FIPS" = true ] && echo 'Yes' || echo 'No')"
 echo ""
 
 # Build arguments
@@ -102,6 +116,10 @@ BUILD_ARGS=(
     --label "org.opencontainers.image.created=$(date -u +'%Y-%m-%dT%H:%M:%SZ')"
     --label "org.opencontainers.image.source=https://github.com/NeySlim/ultimate-ca-manager"
 )
+
+if [ "$FIPS" = true ]; then
+    BUILD_ARGS+=(--build-arg "UCM_FIPS_BUILD=1")
+fi
 
 # Add no-cache if requested
 if [ "$NO_CACHE" = true ]; then
@@ -129,7 +147,7 @@ if [ "$MULTIARCH" = true ]; then
         "${BUILD_ARGS[@]}" \
         --platform "$PLATFORMS" \
         --tag "$FULL_IMAGE_NAME:$IMAGE_TAG" \
-        --tag "$FULL_IMAGE_NAME:$VERSION" \
+        --tag "$FULL_IMAGE_NAME:$VERSION$TAG_SUFFIX" \
         "$([ "$PUSH" = true ] && echo "--push" || echo "--load")" \
         .
 else
@@ -137,7 +155,7 @@ else
     docker build \
         "${BUILD_ARGS[@]}" \
         --tag "$FULL_IMAGE_NAME:$IMAGE_TAG" \
-        --tag "$FULL_IMAGE_NAME:$VERSION" \
+        --tag "$FULL_IMAGE_NAME:$VERSION$TAG_SUFFIX" \
         .
 fi
 
@@ -157,7 +175,7 @@ if [ $? -eq 0 ]; then
     if [ "$PUSH" = true ] && [ "$MULTIARCH" != true ]; then
         echo -e "${BLUE}📤 Pushing image to registry...${NC}"
         docker push "$FULL_IMAGE_NAME:$IMAGE_TAG"
-        docker push "$FULL_IMAGE_NAME:$VERSION"
+        docker push "$FULL_IMAGE_NAME:$VERSION$TAG_SUFFIX"
         echo -e "${GREEN}✅ Push successful!${NC}"
     fi
     
