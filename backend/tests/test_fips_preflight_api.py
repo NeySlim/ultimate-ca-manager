@@ -122,6 +122,7 @@ class TestCommandLine:
     def test_ucm_fips_without_the_provider_exits_2(self, instance_db, monkeypatch, capsys, as_json):
         _engine, config = instance_db
         monkeypatch.setenv('UCM_FIPS', '1')
+        monkeypatch.setenv('UCM_DOCKER', '1')
         monkeypatch.setattr(fips_mode, 'provider_active', lambda: False)
         code, out = self._run(monkeypatch, capsys, config, *(['--json'] if as_json else []))
         assert code == 2
@@ -131,6 +132,16 @@ class TestCommandLine:
         else:
             assert '[ERROR] fips.provider: UCM_FIPS is set' in out
             assert 'OPENSSL_CONF=/run/ucm/openssl-fips.cnf' in out and 'could not run' not in out
+
+    def test_a_native_install_is_not_sent_to_the_docker_remedy(self, instance_db, monkeypatch, capsys):
+        _engine, config = instance_db
+        monkeypatch.setenv('UCM_FIPS', '1')
+        monkeypatch.delenv('UCM_DOCKER', raising=False)
+        monkeypatch.setattr(fips_mode, 'provider_active', lambda: False)
+        code, out = self._run(monkeypatch, capsys, config)
+        assert code == 2
+        assert 'install the package with UCM_FIPS_BUILD=1 in /etc/ucm/ucm.env' in out
+        assert 'OPENSSL_CONF' not in out
 
     def test_the_database_is_opened_read_only(self, instance_db):
         _engine, config = instance_db
