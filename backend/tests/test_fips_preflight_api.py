@@ -118,6 +118,19 @@ class TestCommandLine:
         assert code == 2
         assert '[ERROR] users.password_scrypt' in out
 
+    @pytest.mark.parametrize('as_json', [False, True])
+    def test_ucm_fips_without_the_provider_exits_2(self, instance_db, monkeypatch, capsys, as_json):
+        _engine, config = instance_db
+        monkeypatch.setenv('UCM_FIPS', '1')
+        monkeypatch.setattr(fips_mode, 'provider_active', lambda: False)
+        code, out = self._run(monkeypatch, capsys, config, *(['--json'] if as_json else []))
+        assert code == 2
+        if as_json:
+            report = json.loads(out)
+            assert report['ready'] is False and report['errors'][0]['id'] == 'fips.provider'
+        else:
+            assert '[ERROR] fips.provider' in out and 'OPENSSL_CONF=/run/ucm/openssl-fips.cnf' in out
+
     def test_the_database_is_opened_read_only(self, instance_db):
         _engine, config = instance_db
         app = cli.read_only_app(config)

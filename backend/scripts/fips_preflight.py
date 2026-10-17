@@ -10,6 +10,7 @@ import sys
 from flask import Flask
 from sqlalchemy import event
 
+import fips_mode
 from config.settings import get_config
 from models import db
 from services import fips_preflight
@@ -73,6 +74,12 @@ def main(argv=None) -> int:
             report = fips_preflight.run()
         finally:
             db.session.rollback()
+    if fips_mode.requested() and not fips_mode.provider_active():
+        # A docker exec does not inherit the entrypoint's OPENSSL_CONF: the report would be wrong.
+        report['errors'].insert(0, {'id': 'fips.provider', 'error': (
+            'UCM_FIPS is set but this process runs without the FIPS provider: '
+            'set OPENSSL_CONF=/run/ucm/openssl-fips.cnf')})
+        report['ready'] = False
     print(json.dumps(report, indent=2) if args.json else render_text(report))
     return exit_code(report)
 
