@@ -247,7 +247,7 @@ fi
 
 %files
 %{ucm_home}/
-%dir %{_sysconfdir}/%{name}/
+%dir %attr(0750,%{name},%{name}) %{_sysconfdir}/%{name}/
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 %dir %{_localstatedir}/log/%{name}/
 %{_unitdir}/%{name}.service
