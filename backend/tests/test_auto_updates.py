@@ -8,8 +8,6 @@ import os
 import pathlib
 
 import pytest
-import yaml
-
 import services.updates as updates
 
 
@@ -662,6 +660,7 @@ def _release_assets(tag):
     """The assets of release `tag` as build-release.yml names them, in GitHub's order (by name)."""
     version = tag.replace('-', '.')  # GitHub turns the RPM's '~' into '.'
     names = [f'ucm_{version}_all.deb']
+    yaml = pytest.importorskip('yaml')
     for build in yaml.safe_load(WORKFLOW.read_text())['jobs']['build-rpm']['strategy']['matrix']['include']:
         distro, release = build['image'].split(':')
         dist = {'fedora': 'fc', 'almalinux': 'el'}[distro] + release

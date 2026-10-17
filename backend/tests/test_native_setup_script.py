@@ -564,3 +564,21 @@ def test_a_host_outside_fips_mode_is_told_how_to_enable_it(tmp_path, os_release,
     assert result.returncode == 0
     assert 'not in FIPS mode' in result.stdout and command in result.stdout
     assert 'UCM_FIPS=' not in envfile.read_text().replace('UCM_FIPS_BUILD=', '')
+
+
+def test_a_generated_secret_never_appears_in_a_command_line(tmp_path):
+    """Every external command is wrapped and logs its argv; the secret must not be there."""
+    secret = 'cd' * 32
+    bin_dir = tmp_path / 'bin'
+    log = tmp_path / 'argv.log'
+    for util in UTILS + ('mktemp', 'rm', 'cat', 'stat'):
+        real = shutil.which(util)
+        if real and util != 'openssl':
+            _stub(bin_dir / util, f'printf "%s\\n" "$0 $*" >> {log}\nexec {real} "$@"')
+    _stub(bin_dir / 'openssl', f'echo {secret}')
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('SECRET_KEY=\nJWT_SECRET_KEY=\n')
+    result = _run(['env', str(envfile), '/d'], _env(tmp_path, extra={'PATH': str(bin_dir)}))
+    assert result.returncode == 0, result.stderr
+    assert _values(envfile)['SECRET_KEY'] == [secret]
+    assert log.exists() and secret not in log.read_text()
