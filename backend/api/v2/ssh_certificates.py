@@ -9,9 +9,11 @@ from datetime import datetime, timezone, timedelta
 from flask import Blueprint, request, g, Response
 
 from auth.unified import require_auth
+from fips_mode import FipsRestricted
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import parse_request_pagination
 from services.ssh_cert_service import SSHCertificateService
+from services.ssh_ca_service import normalize_key_type
 from services.audit_service import AuditService
 from sqlalchemy import or_, and_
 from models.ssh import SSHCertificate, SSHCertificateAuthority
@@ -251,6 +253,8 @@ def import_ssh_certificate():
             message='SSH certificate imported successfully'
         )
 
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except ValueError as e:
         AuditService.log_action(
             action='ssh_cert_import_failed',
@@ -321,6 +325,8 @@ def sign_ssh_certificate():
             message='SSH certificate issued successfully'
         )
 
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:
@@ -342,7 +348,7 @@ def generate_ssh_certificate():
         if err:
             return err
 
-        key_type = (data.get('key_type') or 'ed25519').strip().lower()
+        key_type = normalize_key_type(data.get('key_type'))
         if key_type not in _VALID_KEY_TYPES:
             return error_response(
                 f'key_type must be one of: {", ".join(_VALID_KEY_TYPES)}', 400)
@@ -390,6 +396,8 @@ def generate_ssh_certificate():
             message='SSH certificate and key pair generated'
         )
 
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:
@@ -505,6 +513,8 @@ def verify_ssh_certificate():
 
         return success_response(data=result)
 
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:

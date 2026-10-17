@@ -11,6 +11,7 @@ from cryptography.hazmat.backends import default_backend
 from flask import Blueprint, make_response, request
 from sqlalchemy import and_
 
+from fips_mode import FipsRestricted
 from models import CA, SystemConfig, db
 from services.scep.crypto_helpers import create_degenerate_pkcs7, create_signed_pkcs7
 from services.scep.scep_service import SCEPService
@@ -203,6 +204,8 @@ def get_scep_service(profile_slug=None):
             profile_id=profile.id if profile is not None else None,
         )
         return service, None
+    except FipsRestricted as e:
+        return _reject(str(e))
     except Exception as e:
         logger.error(f"SCEP service init failed: {e}")
         return None, "SCEP service initialization failed"

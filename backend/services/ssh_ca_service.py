@@ -19,9 +19,11 @@ from cryptography.hazmat.primitives.serialization import (
 )
 from cryptography.hazmat.primitives.serialization import ssh as ssh_serialization
 
+import fips_mode
 from models import db
 from models.ssh import SSHCertificateAuthority
 from utils import key_algorithms
+from utils.key_codec import refuse_eddsa_key
 from utils.datetime_utils import utc_now
 from utils.duration import parse_duration_seconds
 
@@ -37,6 +39,18 @@ KEY_TYPE_MAP = {
     'ecdsa-p384': ('ec', ec.SECP384R1()),
     'ecdsa-p521': ('ec', ec.SECP521R1()),
 }
+KEY_TYPE_ALIASES = {'ecdsa': 'ecdsa-p256'}
+
+
+def default_key_type() -> str:
+    """Ed25519 is outside the FIPS module: ECDSA P-256 there, Ed25519 elsewhere."""
+    return 'ecdsa-p256' if fips_mode.enabled() else 'ed25519'
+
+
+def normalize_key_type(value) -> str:
+    """Requested SSH key type, lower-cased, aliases resolved, default when empty."""
+    key_type = str(value or '').strip().lower() or default_key_type()
+    return KEY_TYPE_ALIASES.get(key_type, key_type)
 
 # Default TTLs (seconds)
 DEFAULT_USER_TTL = 86400       # 24 hours
@@ -92,10 +106,11 @@ class SSHCAService:
         return encrypt_private_key(encoded)
 
     @staticmethod
-    def _load_private_key(stored_key):
+    def _load_private_key(stored_key, context='SSH CA'):
         """Load a private key from stored (base64 + optionally encrypted) form."""
         decrypted = decrypt_private_key(stored_key)
         pem = base64.b64decode(decrypted)
+        refuse_eddsa_key(pem, context)
         from cryptography.hazmat.primitives.serialization import load_ssh_private_key
         return load_ssh_private_key(pem, password=None)
 
@@ -117,7 +132,7 @@ class SSHCAService:
         return 'unknown'
 
     @staticmethod
-    def create_ca(descr, ca_type, key_type='ed25519', username=None,
+    def create_ca(descr, ca_type, key_type=None, username=None,
                   default_ttl=None, max_ttl=0, default_extensions=None,
                   allowed_principals=None, comment=None, owner_group_id=None):
         """Create a new SSH Certificate Authority.
@@ -125,7 +140,8 @@ class SSHCAService:
         Args:
             descr: Human-readable description
             ca_type: 'user' or 'host'
-            key_type: Key algorithm (ed25519, rsa, ecdsa-p256/p384/p521)
+            key_type: Key algorithm (ed25519, rsa, ecdsa-p256/p384/p521);
+                default_key_type() when None
             username: Who created it
             default_ttl: Default certificate validity — seconds or a
                 duration string ("24h", "7d", "365d")
@@ -141,6 +157,7 @@ class SSHCAService:
         if ca_type not in SSHCertificateAuthority.VALID_CA_TYPES:
             raise ValueError(f"Invalid CA type: {ca_type}. Must be 'user' or 'host'.")
 
+        key_type = normalize_key_type(key_type)
         if key_type not in KEY_TYPE_MAP:
             raise ValueError(f"Invalid key type: {key_type}. "
                              f"Valid: {', '.join(KEY_TYPE_MAP.keys())}")
@@ -222,6 +239,7 @@ class SSHCAService:
 
         # Load and validate the key
         from cryptography.hazmat.primitives.serialization import load_ssh_private_key
+        refuse_eddsa_key(private_key_pem, f"imported SSH CA '{descr}'")
         try:
             private_key = load_ssh_private_key(private_key_pem, password=None)
         except Exception as e:
@@ -369,6 +387,12 @@ class SSHCAService:
         return ca.public_key
 
     @staticmethod
+    def refuse_unusable_ca(ca):
+        """FipsRestricted for a CA whose stored key type FIPS mode cannot load."""
+        if ca.key_type == 'ed25519':
+            fips_mode.refuse(f"Ed25519 key of SSH CA '{ca.descr}'")
+
+    @staticmethod
     def get_private_key_object(ca_id):
         """Load and return the CA's private key object for signing.
 
@@ -378,4 +402,5 @@ class SSHCAService:
         if not ca:
             raise ValueError(f"SSH CA not found: {ca_id}")
 
-        return SSHCAService._load_private_key(ca.private_key)
+        SSHCAService.refuse_unusable_ca(ca)
+        return SSHCAService._load_private_key(ca.private_key, f"SSH CA '{ca.descr}'")

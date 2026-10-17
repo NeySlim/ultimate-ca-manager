@@ -22,9 +22,11 @@ from cryptography.hazmat.primitives.asymmetric import (
 from cryptography.hazmat.backends import default_backend
 from sqlalchemy import or_
 
+from fips_mode import FipsRestricted
 from models import db, CA, Certificate, OCSPResponse, SystemConfig, RevokedSerial
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
+from utils.key_codec import refuse_eddsa_key
 from utils.revocation_reasons import REASON_FLAGS
 from utils.serial_format import serial_to_hex, serial_variants
 
@@ -330,7 +332,10 @@ class OCSPService:
         internalError for every HSM-backed CA while the multi-CertID path,
         duck-typed, answered (self-review of #347)."""
         from services.hsm.ca_key_loader import get_ca_signing_key
-        return get_ca_signing_key(ca, allow_revoked=True)
+        try:
+            return get_ca_signing_key(ca, allow_revoked=True)
+        except FipsRestricted as e:
+            raise OCSPSigningUnavailable(str(e)) from e
 
     @staticmethod
     def _bound_next_update(next_update, signing_cert, use_delegated):
@@ -429,8 +434,9 @@ class OCSPService:
             prv_decrypted = decrypt_private_key(responder_record.prv)
         except ImportError:
             prv_decrypted = responder_record.prv
-        pem = base64.b64decode(prv_decrypted).decode('utf-8')
-        return serialization.load_pem_private_key(pem.encode(), password=None, backend=self.backend)
+        pem = base64.b64decode(prv_decrypted)
+        refuse_eddsa_key(pem, f'OCSP responder certificate {responder_record.id}')
+        return serialization.load_pem_private_key(pem, password=None, backend=self.backend)
 
     def _get_delegated_responder(self, ca: CA):
         """The configured delegated responder as (cert, key), or (None, None).

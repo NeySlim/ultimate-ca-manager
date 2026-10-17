@@ -5,9 +5,10 @@ SSH CA CRUD routes — list, get, import, create, update, delete.
 from flask import request, g
 
 from auth.unified import require_auth
+from fips_mode import FipsRestricted
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import parse_request_pagination
-from services.ssh_ca_service import SSHCAService
+from services.ssh_ca_service import SSHCAService, normalize_key_type
 from services.audit_service import AuditService
 from models.ssh import SSHCertificateAuthority
 
@@ -115,6 +116,8 @@ def import_ssh_ca():
             message='SSH CA imported successfully'
         )
 
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except ValueError as e:
         AuditService.log_action(
             action='ssh_ca_import_failed',
@@ -148,7 +151,7 @@ def create_ssh_ca():
             return error_response('Description is required', 400)
 
         ca_type = (data.get('ca_type') or 'user').strip().lower()
-        key_type = (data.get('key_type') or 'ed25519').strip().lower()
+        key_type = normalize_key_type(data.get('key_type'))
 
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
 
@@ -186,6 +189,8 @@ def create_ssh_ca():
             message='SSH CA created successfully'
         )
 
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except ValueError as e:
         return error_response(str(e), 400)
     except Exception as e:

@@ -4,6 +4,7 @@ CRL & OCSP Routes v2.0
 
 from flask import Blueprint, request, g
 from auth.unified import require_auth
+from fips_mode import FipsRestricted
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.protocol_url import get_protocol_base_url
@@ -149,6 +150,8 @@ def regenerate_crl(ca_id):
             data=data,
             message='CRL regenerated successfully'
         )
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except Exception as e:
         logger.error(f'Failed to regenerate CRL: {e}')
         return error_response("Failed to regenerate CRL", 500)

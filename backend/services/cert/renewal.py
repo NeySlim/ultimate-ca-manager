@@ -44,9 +44,12 @@ from utils.datetime_utils import utc_now
 from utils.db_transaction import commit_or_rollback
 from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
-from utils.key_codec import private_key_to_pem
+from utils.key_codec import eddsa_key_name, load_pem_bytes, private_key_to_pem
+from utils import key_algorithms
 from utils.key_algorithms import (algorithms as registered_algorithms, family_for_public_key,
                                   generate_ec, generate_rsa)
+import fips_mode
+from fips_mode import FipsRestricted
 from utils.eku_validation import add_ocsp_nocheck_if_responder
 
 logger = logging.getLogger(__name__)
@@ -97,10 +100,15 @@ class RenewalError(Exception):
     callers can ignore it and just use ``message``.
     """
 
-    def __init__(self, message: str, status: int = 400):
+    def __init__(self, message: str, status: int = 400, problem_type=None):
         super().__init__(message)
         self.message = message
         self.status = status
+        self.problem_type = problem_type
+
+    @classmethod
+    def from_fips(cls, exc: FipsRestricted) -> 'RenewalError':
+        return cls(str(exc), 400, problem_type=fips_mode.PROBLEM_TYPE)
 
 
 def resolve_issuing_ca(cert: Certificate):
@@ -317,6 +325,23 @@ def check_renewable(cert: Certificate) -> None:
             409,
         )
 
+    # Read from the stored type, before the certificate's key is ever loaded
+    if fips_mode.enabled():
+        alg = key_algorithms.get(cert.key_algo)
+        name = alg.display if alg else _stored_eddsa_name(cert)
+        if name in ('Ed25519', 'Ed448'):
+            try:
+                fips_mode.refuse(f'{name} key of certificate {cert.id}')
+            except FipsRestricted as e:
+                raise RenewalError.from_fips(e) from e
+
+
+def _stored_eddsa_name(cert: Certificate):
+    try:
+        return eddsa_key_name(load_pem_bytes(cert.prv, context=f'certificate {cert.id}'))
+    except ValueError:
+        return None
+
 
 def renew_certificate_in_place(
     cert: Certificate,
@@ -403,6 +428,8 @@ def renew_certificate_in_place(
     from services.hsm.ca_key_loader import get_ca_signing_key
     try:
         ca_key = get_ca_signing_key(ca)
+    except FipsRestricted as e:
+        raise RenewalError.from_fips(e) from e
     except Exception as e:
         logger.error(f"Failed to load signing key for CA {ca.id}: {e}", exc_info=True)
         raise RenewalError('Failed to load CA signing key', 500) from e

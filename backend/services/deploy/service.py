@@ -21,6 +21,7 @@ from utils.datetime_utils import utc_now
 from utils.export_options import json_boolean
 from utils.key_codec import load_pem_bytes
 from services.deploy import ssh as deploy_ssh
+from fips_mode import FipsRestricted
 from services.deploy.ssh import DeploySSHError
 
 logger = logging.getLogger(__name__)
@@ -256,6 +257,9 @@ class DeployService:
             return False
         except DeploySSHError as e:
             DeployService._record_failure(delivery, target, str(e), now, detail=detail)
+            return False
+        except FipsRestricted as e:
+            DeployService._record_failure(delivery, target, str(e), now, permanent=True, detail=detail)
             return False
         except Exception as e:
             logger.error(f"Deploy delivery {delivery.id} unexpected failure: {e}", exc_info=True)

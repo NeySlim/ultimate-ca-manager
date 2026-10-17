@@ -20,6 +20,7 @@ from models import (
     DeployDelivery,
 )
 from services.deploy import DeployService
+from fips_mode import FipsRestricted
 from services.deploy.ssh import DeploySSHError, HostKeyMismatch
 from services.audit_service import AuditService
 
@@ -171,6 +172,9 @@ def test_target(target_id):
     except HostKeyMismatch as e:
         db.session.rollback()
         return error_response(str(e), 409)
+    except FipsRestricted:
+        db.session.rollback()
+        raise  # the app handler answers 400 with the FIPS problem type
     except DeploySSHError as e:
         db.session.rollback()
         return error_response(str(e), 502)

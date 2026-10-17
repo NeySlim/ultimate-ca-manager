@@ -27,7 +27,7 @@ from services.hsm.hsm_private_key import (
     load_hsm_private_key,
     is_hsm_private_key,
 )
-from utils.key_codec import load_pem_bytes
+from utils.key_codec import load_pem_bytes, refuse_eddsa_key
 
 logger = logging.getLogger(__name__)
 
@@ -63,6 +63,7 @@ def get_ca_signing_key(ca, *, allow_revoked: bool = False):
         )
 
     pem = load_pem_bytes(ca.prv, context=f"CA {getattr(ca, 'refid', ca.id)}")
+    refuse_eddsa_key(pem, f"CA '{getattr(ca, 'descr', None) or getattr(ca, 'refid', ca.id)}'")
     return serialization.load_pem_private_key(
         pem, password=None, backend=default_backend()
     )

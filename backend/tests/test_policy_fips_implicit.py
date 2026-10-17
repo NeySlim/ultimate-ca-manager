@@ -302,10 +302,10 @@ class TestEveryIssuancePath:
         monkeypatch.setattr(renewal, '_matching_key_generator', lambda public_key: _no_key)
         try:
             with app.app_context():
-                with pytest.raises(renewal.RenewalError, match='ED25519.*FIPS mode'):
+                with pytest.raises(renewal.RenewalError, match='(?i)ED25519.*FIPS mode'):
                     renewal.renew_certificate_in_place(db.session.get(Certificate, cert_id))
                 db.session.rollback()
-                with pytest.raises(renewal.RenewalError, match='ED25519.*FIPS mode'):
+                with pytest.raises(renewal.RenewalError, match='(?i)ED25519.*FIPS mode'):
                     renewal.renew_certificate_in_place(db.session.get(Certificate, cert_id),
                                                        rekey=False)
                 db.session.rollback()

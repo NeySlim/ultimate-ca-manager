@@ -14,6 +14,7 @@ from typing import Dict, List, Optional, Any
 
 import requests
 
+import fips_mode
 from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo,
     HsmConnectionError, HsmOperationError, HsmKeyNotFoundError, HsmConfigError
@@ -45,6 +46,8 @@ TRANSIT_TO_ALGORITHM = {
     'ed25519': 'Ed25519',
     'chacha20-poly1305': 'ChaCha20',
 }
+# Transit key types outside the FIPS module, left out of the inventory there
+FIPS_UNAPPROVED_TRANSIT = frozenset({'ed25519', 'chacha20-poly1305'})
 
 # Hash algorithm for signing based on key type
 SIGN_HASH_ALGORITHM = {
@@ -236,6 +239,8 @@ class OpenBaoProvider(BaseHsmProvider):
                 detail = self._api('GET', f'keys/{name}')
                 data = detail.get('data', {})
                 transit_type = data.get('type', 'unknown')
+                if transit_type in FIPS_UNAPPROVED_TRANSIT and fips_mode.enabled():
+                    continue
                 algorithm = TRANSIT_TO_ALGORITHM.get(transit_type, transit_type)
                 is_symmetric = transit_type in ('aes128-gcm96', 'aes256-gcm96', 'chacha20-poly1305')
 

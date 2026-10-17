@@ -13,6 +13,9 @@ import logging
 import socket
 from typing import Optional, Tuple
 
+import fips_mode
+from utils.key_codec import refuse_eddsa_key
+
 logger = logging.getLogger(__name__)
 
 CONNECT_TIMEOUT_SECONDS = 10
@@ -46,11 +49,12 @@ def _require_paramiko():
 
 
 def generate_keypair() -> Tuple[str, str]:
-    """Generate an ed25519 keypair. Returns (private_openssh, public_openssh)."""
+    """Generate an Ed25519 keypair, ECDSA P-256 in FIPS mode where Ed25519 is
+    not approved. Returns (private_openssh, public_openssh)."""
     from cryptography.hazmat.primitives import serialization
     from utils import key_algorithms
 
-    key = key_algorithms.generate('ED25519')
+    key = key_algorithms.generate('EC-P256' if fips_mode.enabled() else 'ED25519')
     private_pem = key.private_bytes(
         serialization.Encoding.PEM,
         serialization.PrivateFormat.OpenSSH,
@@ -65,6 +69,7 @@ def generate_keypair() -> Tuple[str, str]:
 
 def load_private_key(text: str):
     """Parse an SSH private key (OpenSSH or PEM; ed25519/ECDSA/RSA)."""
+    refuse_eddsa_key(text, 'the deploy target')
     paramiko = _require_paramiko()
     last_error = None
     for key_cls in (paramiko.Ed25519Key, paramiko.ECDSAKey, paramiko.RSAKey):
@@ -112,8 +117,8 @@ def open_client(host: str, port: int, username: str, private_key_text: str,
     Returns (client, learned_host_key) — learned_host_key is set only on a
     first (TOFU) connection. Caller must close the client.
     """
-    paramiko = _require_paramiko()
     pkey = load_private_key(private_key_text)
+    paramiko = _require_paramiko()
     policy = _PinningPolicy(expected_host_key)
 
     client = paramiko.SSHClient()

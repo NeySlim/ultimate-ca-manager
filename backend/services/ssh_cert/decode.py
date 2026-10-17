@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives.serialization import ssh as ssh_serializatio
 
 from models import db
 from models.ssh import SSHCertificateAuthority, SSHCertificate
+from utils.key_codec import refuse_eddsa_key
 from .utils import SSHCertificateUtilsMixin
 
 logger = logging.getLogger(__name__)
@@ -18,6 +19,7 @@ class SSHCertificateDecodeMixin:
     def decode_certificate(cert_data):
         if isinstance(cert_data, str):
             cert_data = cert_data.strip().encode('utf-8')
+        refuse_eddsa_key(cert_data, 'the SSH certificate')
 
         try:
             cert = ssh_serialization.load_ssh_public_identity(cert_data)

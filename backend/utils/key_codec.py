@@ -32,9 +32,12 @@ pattern. No bug fix, no security change.
 from __future__ import annotations
 
 import base64
+import binascii
 import logging
+import re
 from typing import Optional, Union
 
+import fips_mode
 from security.encryption import decrypt_private_key, encrypt_private_key
 
 logger = logging.getLogger(__name__)
@@ -103,7 +106,8 @@ def store_pem_bytes(pem_bytes: Union[str, bytes]) -> str:
     return encrypt_private_key(b64)
 
 
-__all__ = ['load_pem_bytes', 'store_pem_bytes', 'private_key_to_pem']
+__all__ = ['load_pem_bytes', 'store_pem_bytes', 'private_key_to_pem',
+           'eddsa_key_name', 'refuse_eddsa_key']
 
 
 def private_key_to_pem(private_key) -> bytes:
@@ -128,3 +132,98 @@ def private_key_to_pem(private_key) -> bytes:
             format=serialization.PrivateFormat.PKCS8,
             encryption_algorithm=serialization.NoEncryption(),
         )
+
+
+# EdDSA keys fail to load in FIPS mode with an opaque error: they are
+# recognised from their encoding instead (PKCS#8/SPKI OID, OpenSSH type name)
+_EDDSA_OIDS = {b'\x2b\x65\x70': 'Ed25519', b'\x2b\x65\x71': 'Ed448'}
+_EDDSA_SSH_TYPES = {
+    b'ssh-ed25519': 'Ed25519', b'ssh-ed25519-cert-v01@openssh.com': 'Ed25519',
+    b'sk-ssh-ed25519@openssh.com': 'Ed25519', b'sk-ssh-ed25519-cert-v01@openssh.com': 'Ed25519',
+    b'ssh-ed448': 'Ed448', b'ssh-ed448-cert-v01@openssh.com': 'Ed448',
+}
+_PEM_BLOCK = re.compile(rb'-----BEGIN ([A-Z0-9 ]+)-----(.*?)-----END \1-----', re.S)
+
+
+def _der_tlv(buf: bytes, pos: int):
+    """(tag, value start, value end) of the DER element at *pos*."""
+    tag, length = buf[pos], buf[pos + 1]
+    pos += 2
+    if length & 0x80:
+        count = length & 0x7f
+        if not 0 < count <= 4:
+            raise ValueError('unsupported DER length')
+        length = int.from_bytes(buf[pos:pos + count], 'big')
+        pos += count
+    if pos + length > len(buf):
+        raise ValueError('truncated DER')
+    return tag, pos, pos + length
+
+
+def _der_eddsa(der: bytes) -> Optional[str]:
+    """PKCS#8 or SubjectPublicKeyInfo: the first inner SEQUENCE is the AlgorithmIdentifier."""
+    tag, pos, end = _der_tlv(der, 0)
+    if tag != 0x30:
+        return None
+    while pos < end:
+        tag, start, stop = _der_tlv(der, pos)
+        if tag == 0x30:
+            oid_tag, oid_start, oid_end = _der_tlv(der, start)
+            return _EDDSA_OIDS.get(der[oid_start:oid_end]) if oid_tag == 0x06 else None
+        pos = stop
+    return None
+
+
+def _ssh_blob_eddsa(blob: bytes) -> Optional[str]:
+    """SSH wire blob (key, certificate, openssh-key-v1 file) holding a length-prefixed EdDSA type."""
+    for name, label in _EDDSA_SSH_TYPES.items():
+        if len(name).to_bytes(4, 'big') + name in blob:
+            return label
+    return None
+
+
+def eddsa_key_name(data) -> Optional[str]:
+    """'Ed25519' or 'Ed448' when *data* (PEM, DER, OpenSSH private key, public
+    key line or certificate) holds an EdDSA key, else None; never raises."""
+    if isinstance(data, str):
+        data = data.encode('utf-8', 'replace')
+    if not isinstance(data, (bytes, bytearray)) or not data:
+        return None
+    data = bytes(data)
+    try:
+        blocks = _PEM_BLOCK.findall(data)
+        for label, body in blocks:
+            der = base64.b64decode(b''.join(body.split()))
+            if label == b'OPENSSH PRIVATE KEY':
+                found = _ssh_blob_eddsa(der)
+            elif label in (b'PRIVATE KEY', b'PUBLIC KEY'):
+                found = _der_eddsa(der)
+            else:
+                found = None
+            if found:
+                return found
+        if blocks:
+            return None
+        if data[:1] == b'\x30':
+            return _der_eddsa(data)
+        for token in data.split()[:2]:
+            if token in _EDDSA_SSH_TYPES:
+                return _EDDSA_SSH_TYPES[token]
+            try:
+                found = _ssh_blob_eddsa(base64.b64decode(token, validate=True))
+            except (ValueError, binascii.Error):
+                continue
+            if found:
+                return found
+    except (ValueError, IndexError, binascii.Error):
+        return None
+    return None
+
+
+def refuse_eddsa_key(data, context: str = 'key') -> None:
+    """In FIPS mode, FipsRestricted naming *context* before an EdDSA key reaches the crypto library."""
+    if not fips_mode.enabled():
+        return
+    name = eddsa_key_name(data)
+    if name:
+        fips_mode.refuse(f'{name} key of {context}')

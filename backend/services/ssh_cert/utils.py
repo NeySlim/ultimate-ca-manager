@@ -4,6 +4,8 @@ import logging
 
 from cryptography.hazmat.primitives.serialization import ssh as ssh_serialization
 
+from utils.key_codec import refuse_eddsa_key
+
 logger = logging.getLogger(__name__)
 
 
@@ -13,6 +15,7 @@ class SSHCertificateUtilsMixin:
     def _parse_public_key(pub_key_data):
         if isinstance(pub_key_data, str):
             pub_key_data = pub_key_data.strip().encode('utf-8')
+        refuse_eddsa_key(pub_key_data, 'the SSH public key')
 
         try:
             return ssh_serialization.load_ssh_public_identity(pub_key_data)

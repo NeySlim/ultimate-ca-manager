@@ -81,7 +81,7 @@ def renew_certificate(cert_id):
     try:
         check_renewable(cert)
     except RenewalError as e:
-        return error_response(e.message, e.status)
+        return error_response(e.message, e.status, problem_type=e.problem_type)
     try:
         policy, approval = _approval_for_renewal(g.current_user, cert, data, validity_days)
     except Exception as e:
@@ -110,7 +110,7 @@ def renew_certificate(cert_id):
     except RenewalError as e:
         db.session.rollback()
         logger.info(f"Renewal refused for certificate {cert_id}: {e.message}")
-        return error_response(e.message, e.status)
+        return error_response(e.message, e.status, problem_type=e.problem_type)
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to renew certificate {cert_id}: {e}", exc_info=True)

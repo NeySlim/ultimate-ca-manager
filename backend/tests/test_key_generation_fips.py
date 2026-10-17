@@ -244,10 +244,11 @@ class TestSitesInFipsMode:
         with pytest.raises(FipsRestricted):
             SSHCAService._generate_key('ed25519')
 
-    def test_deploy_keypair_is_refused(self, fips_on, genpkey):
+    def test_deploy_keypair_is_ecdsa_p256_from_genpkey(self, fips_on, genpkey):
         from services.deploy.ssh import generate_keypair
-        with pytest.raises(FipsRestricted):
-            generate_keypair()
+        _, public = generate_keypair()
+        assert public.startswith('ecdsa-sha2-nistp256 ')
+        assert len(genpkey) == 1 and 'ec_paramgen_curve:P-256' in genpkey[0]['cmd']
 
     @pytest.mark.parametrize('make', [
         lambda: rsa.generate_private_key(65537, 2560),

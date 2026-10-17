@@ -25,7 +25,7 @@ from utils.eku_validation import add_ocsp_nocheck_if_responder
 
 from models import CA, AuditLog, Certificate, SystemConfig, db
 from utils.datetime_utils import cert_not_before, utc_now
-from utils.key_codec import load_pem_bytes
+from utils.key_codec import load_pem_bytes, refuse_eddsa_key
 
 logger = logging.getLogger(__name__)
 
@@ -62,6 +62,7 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
         base64.b64decode(cert.crt), default_backend()
     )
     key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
+    refuse_eddsa_key(key_pem, f'OCSP responder certificate {cert.id}')
     private_key = serialization.load_pem_private_key(
         key_pem, password=None, backend=default_backend()
     )

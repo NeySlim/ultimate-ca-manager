@@ -8,6 +8,7 @@ from datetime import timedelta
 from ipaddress import ip_address
 from flask import request, g
 from auth.unified import require_auth
+from fips_mode import FipsRestricted
 from utils.response import success_response, error_response, created_response
 from utils import notices as notices_mod
 from utils.dn_validation import validate_dn_field
@@ -602,6 +603,9 @@ def create_certificate():
             meta=notices_mod.meta_with_notices(notices),
         )
 
+    except FipsRestricted:
+        db.session.rollback()
+        raise  # the app handler answers 400 with the FIPS problem type
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to create certificate: {e}")

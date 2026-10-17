@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives.serialization import ssh as ssh_serializatio
 
 from models import db
 from models.ssh import SSHCertificateAuthority, SSHCertificate
-from services.ssh_ca_service import SSHCAService
+from services.ssh_ca_service import SSHCAService, normalize_key_type
 from .utils import SSHCertificateUtilsMixin
 
 logger = logging.getLogger(__name__)
@@ -34,6 +34,7 @@ class SSHCertificateSigningMixin:
             raise ValueError(
                 f"SSH {ca.ca_type} CA cannot sign {cert_type} certificates"
             )
+        SSHCAService.refuse_unusable_ca(ca)  # before a serial is spent
 
         if not principals or not isinstance(principals, list):
             raise ValueError("At least one principal is required")
@@ -183,7 +184,7 @@ class SSHCertificateSigningMixin:
         return ssh_cert
 
     @staticmethod
-    def generate_and_sign(ca_id, cert_type, principals, key_type='ed25519',
+    def generate_and_sign(ca_id, cert_type, principals, key_type=None,
                           validity_seconds=None, key_id=None,
                           extensions=None, critical_options=None,
                           descr=None, source='web', username=None,
@@ -192,7 +193,7 @@ class SSHCertificateSigningMixin:
             Encoding, NoEncryption, PrivateFormat,
         )
 
-        private_key = SSHCAService._generate_key(key_type)
+        private_key = SSHCAService._generate_key(normalize_key_type(key_type))
         public_key = private_key.public_key()
         pub_openssh = ssh_serialization.serialize_ssh_public_key(public_key).decode('utf-8')
 

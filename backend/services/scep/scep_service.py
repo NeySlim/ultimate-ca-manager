@@ -27,7 +27,7 @@ from services.crl_service import CRLService
 from utils.dn_parse import subject_common_name
 from utils.eku_validation import add_ocsp_nocheck_if_responder
 from utils.leaf_key_usage import constrain_builder_key_usage
-from utils.key_codec import load_pem_bytes
+from utils.key_codec import load_pem_bytes, refuse_eddsa_key
 from utils.csr_extensions import csr_extensions
 from utils.datetime_utils import utc_now
 from utils.file_naming import cert_cert_path
@@ -169,10 +169,10 @@ class SCEPService:
         self.ca_cert = x509.load_pem_x509_certificate(
             base64.b64decode(self.ca.crt), default_backend()
         )
+        ca_key_pem = load_pem_bytes(self.ca.prv, context=f"SCEP CA {self.ca.id}")
+        refuse_eddsa_key(ca_key_pem, f"CA '{self.ca.descr}'")
         self.ca_key = serialization.load_pem_private_key(
-            load_pem_bytes(self.ca.prv, context=f"SCEP CA {self.ca.id}"),
-            password=None,
-            backend=default_backend(),
+            ca_key_pem, password=None, backend=default_backend(),
         )
 
     # ------------------------------------------------------------------
