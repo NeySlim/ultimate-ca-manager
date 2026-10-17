@@ -105,11 +105,50 @@ def test_present_values_are_never_overwritten(tmp_path):
     assert 'INITIAL_ADMIN_PASSWORD' not in values and 'LOG_LEVEL' not in values
 
 
-def test_an_empty_secret_is_completed(tmp_path):
+@pytest.mark.parametrize('empty', ['SECRET_KEY=', 'SECRET_KEY=""', "export SECRET_KEY=''", 'SECRET_KEY = '])
+def test_an_empty_secret_is_filled_in_place(tmp_path, empty):
     envfile = tmp_path / 'ucm.env'
-    envfile.write_text('SECRET_KEY=\nJWT_SECRET_KEY=x\n')
+    envfile.write_text(f'# head\n{empty}\nJWT_SECRET_KEY=x\nDATA_DIR=\nTAIL=1\n')
     assert _run(['env', str(envfile), '/d'], _env(tmp_path)).returncode == 0
-    assert len(_values(envfile)['SECRET_KEY'][-1]) == 64
+    lines = envfile.read_text().splitlines()
+    assert lines[0] == '# head' and lines[2:5] == ['JWT_SECRET_KEY=x', 'DATA_DIR=/d', 'TAIL=1'], lines
+    key, _, value = lines[1].partition('=')
+    assert key == 'SECRET_KEY' and len(value) == 64, lines
+    values = _values(envfile)
+    assert len(values['SECRET_KEY']) == 1 and values['DATA_DIR'] == ['/d']
+
+
+def test_a_value_set_earlier_is_kept_when_a_later_line_empties_it(tmp_path):
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('SECRET_KEY=keep-me\nSECRET_KEY=\nJWT_SECRET_KEY=x\n')
+    assert _run(['env', str(envfile), '/d'], _env(tmp_path)).returncode == 0
+    values = _values(envfile)['SECRET_KEY']
+    assert values[0] == 'keep-me' and len(values) == 2 and len(values[1]) == 64
+
+
+def test_a_default_with_sed_metacharacters_is_written_verbatim(tmp_path):
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('DATA_DIR=\n')
+    assert _run(['env', str(envfile), '/srv/a&b#c\\d'], _env(tmp_path)).returncode == 0
+    assert _values(envfile)['DATA_DIR'] == ['/srv/a&b#c\\d']
+
+
+def test_the_file_is_restricted_before_a_secret_is_written(tmp_path):
+    """openssl, which produces each secret, sees the file mode at that moment."""
+    bin_dir = tmp_path / 'bin'
+    bin_dir.mkdir()
+    for util in UTILS + ('stat',):
+        real = shutil.which(util)
+        if real and util != 'openssl':
+            (bin_dir / util).symlink_to(real)
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('UCM_FIPS_BUILD=1\n')
+    envfile.chmod(0o644)
+    modes = tmp_path / 'modes'
+    _stub(bin_dir / 'openssl', f'stat -c %a {envfile} >> {modes}; echo {"ab" * 32}')
+    result = _run(['env', str(envfile), '/d'], _env(tmp_path, extra={'PATH': str(bin_dir)}))
+    assert result.returncode == 0, result.stderr
+    assert modes.read_text().split() == ['600', '600']
 
 
 def test_a_complete_file_is_left_untouched(tmp_path):
@@ -304,6 +343,53 @@ def test_a_failed_fips_build_fails_and_keeps_the_previous_venv(tmp_path):
     assert '--quiet -r' not in record.read_text()  # never falls back to the wheels
 
 
+def _venv_dir(path, works=True, gunicorn=True, tag='good'):
+    (path / 'bin').mkdir(parents=True)
+    _stub(path / 'bin' / 'python', 'exit 0' if works else 'exit 127')
+    if gunicorn:
+        _stub(path / 'bin' / 'gunicorn')
+    (path / tag).write_text(tag)
+
+
+@pytest.mark.parametrize('broken', [{'gunicorn': False}, {'works': False}])
+@pytest.mark.parametrize('build', ['exit 0', 'case "$*" in *no-binary*) exit 1;; esac; exit 0'])
+def test_an_interrupted_build_does_not_cost_the_working_venv(tmp_path, broken, build):
+    """A build killed after venv was moved aside leaves venv.prev (working) and an incomplete venv."""
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    python, _ = _fake_python(tmp_path, build)
+    home, envfile = _home(tmp_path)
+    shutil.rmtree(home / 'venv')
+    _venv_dir(home / 'venv.prev')
+    _venv_dir(home / 'venv', tag='partial', **broken)
+    result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, {'PATH': str(bin_dir)}))
+    if build == 'exit 0':
+        assert result.returncode == 0, result.stderr
+    else:
+        assert result.returncode == 1
+        assert (home / 'venv' / 'good').exists() and not (home / 'venv' / 'partial').exists()
+    assert not (home / 'venv.prev').exists()
+
+
+def test_a_working_venv_is_preferred_to_a_leftover_prev(tmp_path):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    python, _ = _fake_python(tmp_path, 'case "$*" in *no-binary*) exit 1;; esac; exit 0')
+    home, envfile = _home(tmp_path)
+    shutil.rmtree(home / 'venv')
+    _venv_dir(home / 'venv.prev', tag='older')
+    _venv_dir(home / 'venv', tag='current')
+    result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, {'PATH': str(bin_dir)}))
+    assert result.returncode == 1
+    assert (home / 'venv' / 'current').exists() and not (home / 'venv.prev').exists()
+
+
+@pytest.mark.parametrize('layout, ok', [
+    (None, False), ({'gunicorn': False}, False), ({'works': False}, False), ({}, True)])
+def test_venv_ok(tmp_path, layout, ok):
+    if layout is not None:
+        _venv_dir(tmp_path / 'venv', **layout)
+    assert (_run(['venv-ok', str(tmp_path)], _env(tmp_path)).returncode == 0) is ok
+
+
 def test_missing_tools_fail_before_the_venv_is_touched(tmp_path):
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
     python, record = _fake_python(tmp_path, 'exit 0')
@@ -378,6 +464,22 @@ def test_the_updater_refuses_a_fips_build_without_tools(tmp_path):
     result = _precheck(tmp_path, envfile, _stub(tmp_path / 'python3.12'), rustc_in_path=None)
     assert result.returncode == 1
     assert 'cargo/rustc>=1.83' in result.stderr and 'sudo dnf install -y python3.12-devel' in result.stderr
+    # Shown in the UI: the next step is the update, not a package manager command
+    assert 'then run the update again.' in result.stderr
+    assert 'dpkg --configure' not in result.stderr and 'dnf reinstall' not in result.stderr
+
+
+@pytest.mark.parametrize('rustc, cleared', [('1.92.0', True), (None, False)])
+def test_a_passed_precheck_clears_the_failure_of_an_earlier_attempt(tmp_path, rustc, cleared):
+    """The watcher then blames on this update only a marker its own install left."""
+    envfile = tmp_path / 'ucm.env'
+    envfile.write_text('UCM_FIPS_BUILD=1\n')
+    marker = tmp_path / 'log' / 'fips-build.failed'
+    marker.parent.mkdir()
+    marker.write_text('build failed')
+    result = _precheck(tmp_path, envfile, _stub(tmp_path / 'python3.12'), rustc_in_path=rustc)
+    assert (result.returncode == 0) is cleared, result.stderr
+    assert marker.exists() is not cleared
 
 
 def test_the_updater_checks_the_interpreter_of_the_venv(tmp_path):

@@ -171,6 +171,8 @@ fi
 # A file written before the install (UCM_FIPS_BUILD=1 alone) gets its secrets and defaults
 ENV_STATE=$(bash "$UCM_SETUP" env "$UCM_CONFIG/ucm.env" "$UCM_DATA") || exit 1
 [ "$ENV_STATE" != new ] || NEW_CONFIG=1
+# Resumed after a failed first attempt: the service never had a working venv
+bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
 if [ -n "$NEW_CONFIG" ]; then
     ADMIN_PASS=$(sed -n 's/^INITIAL_ADMIN_PASSWORD=//p' "$UCM_CONFIG/ucm.env" | tail -n 1)
     echo ""

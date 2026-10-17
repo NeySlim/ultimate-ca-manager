@@ -1,15 +1,7 @@
 #!/bin/bash
-# Steps shared by the DEB postinst and the RPM %post: ucm.env completion, the
-# virtual environment (standard wheels, or built against the system OpenSSL
-# with UCM_FIPS_BUILD=1) and the host FIPS state.
-#
-#   native-setup.sh env <ucm.env> <data dir>
-#   native-setup.sh venv <ucm home> <python> <deb|rpm> <ucm.env>
-#   native-setup.sh fips-finish <ucm home> <ucm.env> <data dir> <user>
-#   native-setup.sh fips-requested <ucm.env>
-#   native-setup.sh check-build-tools <python> <deb|rpm>
-#   native-setup.sh update-precheck <ucm home> <ucm.env> <deb|rpm>
-#   native-setup.sh fips-build-ok <ucm.env>
+# Steps shared by the DEB postinst, the RPM %post and the updater: ucm.env completion,
+# the venv (standard wheels, or built against the system OpenSSL with UCM_FIPS_BUILD=1)
+# and the host FIPS state. Subcommands and their arguments: see the case at the end.
 set -eu
 
 OS_RELEASE=${UCM_SETUP_OS_RELEASE:-/etc/os-release}
@@ -45,6 +37,16 @@ env_append() {
         echo >> "$1"
     fi
     echo "$2=$3" >> "$1"
+}
+
+# Sets a key that has no value: an empty assignment (KEY=, KEY="") is filled in place.
+env_fill() {
+    local re="^[[:space:]]*(export[[:space:]]+)?$2[[:space:]]*=[[:space:]]*(\"\"|'')?[[:space:]]*\$"
+    if grep -Eq "$re" "$1"; then
+        sed -i -E "s#$re#$2=$(printf '%s' "$3" | sed 's/[\\&#]/\\&/g')#" "$1"
+    else
+        env_append "$1" "$2" "$3"
+    fi
 }
 
 fips_requested() {
@@ -86,11 +88,11 @@ install_hint() {
 }
 
 retry_hint() {
-    if [ "$1" = deb ]; then
-        say "then finish the installation with: sudo dpkg --configure -a"
-    else
-        say "then reinstall the package: sudo dnf reinstall ./<the ucm .el9.noarch.rpm file>"
-    fi
+    case "$1" in
+        deb) say "then finish the installation with: sudo dpkg --configure -a" ;;
+        rpm) say "then reinstall the package: sudo dnf reinstall ./ucm-el9-<version>-1.el9.noarch.rpm" ;;
+        update) say "then run the update again." ;;
+    esac
 }
 
 # Newest directory holding both cargo and rustc >= RUST_MIN, PATH first.
@@ -154,26 +156,24 @@ cmd_check_build_tools() {
 }
 
 cmd_env() {
-    local file=$1 data=$2 had_secret="" added_secret="" key
+    local file=$1 data=$2 had_secret="" key
     touch "$file"
     env_has "$file" SECRET_KEY && had_secret=1
+    # Restricted before the first secret is written
+    env_has "$file" SECRET_KEY && env_has "$file" JWT_SECRET_KEY || chmod 600 "$file"
     for key in SECRET_KEY JWT_SECRET_KEY; do
-        if ! env_has "$file" "$key"; then
-            env_append "$file" "$key" "$(openssl rand -hex 32)"
-            added_secret=1
-        fi
+        env_has "$file" "$key" || env_fill "$file" "$key" "$(openssl rand -hex 32)"
     done
     # A file the package never completed (written by hand before the install) gets the defaults too.
     if [ -z "$had_secret" ]; then
-        env_has "$file" DATABASE_PATH || env_append "$file" DATABASE_PATH "$data/ucm.db"
-        env_has "$file" DATA_DIR || env_append "$file" DATA_DIR "$data"
-        env_has "$file" HTTPS_PORT || env_append "$file" HTTPS_PORT 8443
-        env_has "$file" HTTP_PROTOCOL_PORT || env_append "$file" HTTP_PROTOCOL_PORT 8080
-        env_has "$file" LOG_LEVEL || env_append "$file" LOG_LEVEL INFO
-        env_has "$file" INITIAL_ADMIN_PASSWORD || env_append "$file" INITIAL_ADMIN_PASSWORD changeme123
+        env_has "$file" DATABASE_PATH || env_fill "$file" DATABASE_PATH "$data/ucm.db"
+        env_has "$file" DATA_DIR || env_fill "$file" DATA_DIR "$data"
+        env_has "$file" HTTPS_PORT || env_fill "$file" HTTPS_PORT 8443
+        env_has "$file" HTTP_PROTOCOL_PORT || env_fill "$file" HTTP_PROTOCOL_PORT 8080
+        env_has "$file" LOG_LEVEL || env_fill "$file" LOG_LEVEL INFO
+        env_has "$file" INITIAL_ADMIN_PASSWORD || env_fill "$file" INITIAL_ADMIN_PASSWORD changeme123
         echo new
     fi
-    [ -z "$added_secret" ] || chmod 600 "$file"
     if is_true "${UCM_FIPS_BUILD:-}" && ! is_true "$(env_value "$file" UCM_FIPS_BUILD)"; then
         if grep -Eq '^[[:space:]]*(export[[:space:]]+)?UCM_FIPS_BUILD[[:space:]]*=' "$file"; then
             sed -i -E 's/^[[:space:]]*(export[[:space:]]+)?UCM_FIPS_BUILD[[:space:]]*=.*/UCM_FIPS_BUILD=1/' "$file"
@@ -202,6 +202,11 @@ build_fips_venv() {
     "$venv/bin/pip" install --upgrade pip &&
     "$venv/bin/pip" install --no-binary cryptography,psycopg2,lxml,xmlsec -r "$reqs" &&
     "$venv/bin/pip" install --no-deps pyjks==20.0.0
+}
+
+# A venv the service can start: an interrupted build leaves one without gunicorn or python.
+venv_ok() {
+    [ -x "$1/bin/gunicorn" ] && "$1/bin/python" -c '' >/dev/null 2>&1
 }
 
 # Every OpenSSL the venv loads must be the system one.
@@ -265,9 +270,13 @@ cmd_venv() {
         rust=$(cmd_check_build_tools "$python" "$format")
         export PATH="$rust:$PATH" RUSTC="$rust/rustc" CARGO="$rust/cargo"
         say "UCM_FIPS_BUILD=1: building cryptography, psycopg2, lxml and xmlsec against the system OpenSSL"
-        say "(about 5 minutes, log: $BUILD_LOG)..."
+        say "(about 5 minutes the first time, then from pip's wheel cache; log: $BUILD_LOG)..."
         reqs=$(mktemp)
         fips_requirements "$home/requirements.txt" "$reqs"
+        # A build interrupted earlier left an incomplete venv next to the last working one
+        if [ -e "$venv.prev" ] && ! venv_ok "$venv"; then
+            rm -rf "$venv" && mv "$venv.prev" "$venv"
+        fi
         rm -rf "$venv.prev"
         [ ! -e "$venv" ] || mv "$venv" "$venv.prev"
         echo "build failed" > "$BUILD_FAILED"
@@ -349,10 +358,12 @@ cmd_fips_finish() {
 
 # Run by the updater before installing: a FIPS build that cannot happen is refused up front.
 cmd_update_precheck() {
-    local home=$1 envfile=$2 format=$3 python=python3
+    local home=$1 envfile=$2 python=python3
     fips_requested "$envfile" || return 0
     [ ! -x "$home/venv/bin/python" ] || python=$(readlink -f "$home/venv/bin/python")
-    cmd_check_build_tools "$python" "$format" > /dev/null
+    cmd_check_build_tools "$python" update > /dev/null
+    # A new attempt starts: a failure marker left by an earlier one is not this update's
+    rm -f "$BUILD_FAILED"
 }
 
 cmd_fips_build_ok() {
@@ -364,11 +375,16 @@ cmd_fips_build_ok() {
 
 case "${1:-}" in
     env) cmd_env "$2" "$3" ;;
+    venv-ok) venv_ok "$2/venv" ;;
     venv) cmd_venv "$2" "$3" "$4" "$5" ;;
     fips-finish) cmd_fips_finish "$2" "$3" "$4" "$5" ;;
     fips-requested) fips_requested "$2" ;;
     check-build-tools) cmd_check_build_tools "$2" "$3" ;;
     update-precheck) cmd_update_precheck "$2" "$3" "$4" ;;
     fips-build-ok) cmd_fips_build_ok "$2" ;;
-    *) die "usage: $0 env|venv|fips-finish|fips-requested|check-build-tools|update-precheck|fips-build-ok ..." ;;
+    *) die "usage: $0 env <ucm.env> <data dir>
+  | venv <ucm home> <python> <deb|rpm> <ucm.env> | venv-ok <ucm home>
+  | fips-finish <ucm home> <ucm.env> <data dir> <user> | fips-requested <ucm.env>
+  | check-build-tools <python> <deb|rpm> | update-precheck <ucm home> <ucm.env> <deb|rpm>
+  | fips-build-ok <ucm.env>" ;;
 esac
