@@ -586,9 +586,10 @@ def test_a_generated_secret_never_appears_in_a_command_line(tmp_path):
 
 # ----------------------------------------------------------------- banner
 
-def _banner(tmp_path, pkg, softhsm=False):
+def _banner(tmp_path, pkg, softhsm=False,
+            hostname='[ "$1" = -I ] && echo "192.0.2.10 2001:db8::10 " || echo ucm.example.test'):
     bin_dir = tmp_path / 'bin'
-    _stub(bin_dir / 'hostname', '[ "$1" = -I ] && echo "192.0.2.10 2001:db8::10 " || echo ucm.example.test')
+    _stub(bin_dir / 'hostname', hostname)
     _stub(bin_dir / 'dpkg', 'echo "ii  softhsm2  2.6.1"' if softhsm else 'exit 1')
     _stub(bin_dir / 'rpm', 'exit 0' if softhsm else 'exit 1')
     envfile = tmp_path / 'ucm.env'
@@ -616,3 +617,10 @@ def test_the_banner_names_the_hsm_package_of_the_distribution(tmp_path, pkg, sof
     _, result = _banner(tmp_path, pkg, softhsm)
     assert result.returncode == 0, result.stderr
     assert line in result.stdout.splitlines()
+
+
+def test_a_failed_host_lookup_does_not_cut_the_banner_short(tmp_path):
+    _, result = _banner(tmp_path, 'rpm', hostname='exit 127')
+    assert result.returncode == 0, result.stderr
+    assert ' Admin:    admin / s3cret' in result.stdout
+    assert result.stdout.rstrip().endswith('============================================')

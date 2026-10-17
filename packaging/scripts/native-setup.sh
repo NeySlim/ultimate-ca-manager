@@ -384,6 +384,8 @@ cmd_fips_build_ok() {
 # Post-install banner; IPv6 addresses are bracketed in the URLs.
 cmd_banner() {
     local envfile=$1 pkg=$2 host port ips ip pass
+    # Cosmetic: a failed lookup (no hostname binary) must not cut it short
+    set +e
     pass=$(sed -n 's/^INITIAL_ADMIN_PASSWORD=//p' "$envfile" | tail -n 1)
     echo ""
     host=$(hostname -f 2>/dev/null || hostname)
