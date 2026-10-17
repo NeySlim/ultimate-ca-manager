@@ -18,6 +18,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 
+from utils.randomness import csp_bytes
+
 logger = logging.getLogger(__name__)
 
 ENCRYPTED_MARKER = b'ENC:'
@@ -201,7 +203,7 @@ class KeyEncryption:
     
     @staticmethod
     def generate_key() -> str:
-        return Fernet.generate_key().decode('utf-8')
+        return base64.urlsafe_b64encode(csp_bytes(32)).decode('utf-8')
     
     @staticmethod
     def write_key_file(key: str) -> None:

@@ -1,7 +1,6 @@
 """
 SCEP Crypto Helpers - PKCS#7 construction, signing, and client encryption.
 """
-import secrets
 from datetime import datetime, timezone
 from typing import Optional
 
@@ -16,6 +15,8 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed25519, rsa
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+
+from utils.randomness import csp_bytes
 
 
 AES128_CBC = "aes128_cbc"
@@ -299,7 +300,7 @@ def _rfc3211_wrap_key(content_key: bytes, kek: bytes, iv: bytes) -> bytes:
     formatted = (
         prefix
         + content_key
-        + secrets.token_bytes(wrapped_length - unpadded_length)
+        + csp_bytes(wrapped_length - unpadded_length)
     )
 
     first_encryptor = Cipher(algorithms.AES(kek), modes.CBC(iv)).encryptor()
@@ -318,8 +319,8 @@ def _password_recipient_info(
     if not isinstance(password_bytes, bytes) or not password_bytes:
         raise ValueError("A non-empty challengePassword is required for PWRI")
 
-    salt = secrets.token_bytes(16)
-    kek_iv = secrets.token_bytes(16)
+    salt = csp_bytes(16)
+    kek_iv = csp_bytes(16)
     kek_length = 16
     kek = PBKDF2HMAC(
         algorithm=hashes.SHA256(),
@@ -389,8 +390,8 @@ def encrypt_for_client(
             f"{content_encryption_algorithm}"
         ) from e
 
-    content_key = secrets.token_bytes(content_key_length)
-    content_iv = secrets.token_bytes(16)
+    content_key = csp_bytes(content_key_length)
+    content_iv = csp_bytes(16)
     encrypted_content = _encrypt_content(data, content_key, content_iv)
     recipient_public_key = recipient_cert.public_key()
 

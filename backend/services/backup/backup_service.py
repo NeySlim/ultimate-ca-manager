@@ -8,7 +8,6 @@ import gzip
 import struct
 import uuid
 import hashlib
-import secrets
 import base64
 import logging
 from datetime import datetime
@@ -30,6 +29,7 @@ except ImportError:
 from models import db
 from config.settings import Config
 from utils.datetime_utils import utc_now, utc_isoformat
+from utils.randomness import csp_bytes
 
 logger = logging.getLogger(__name__)
 
@@ -213,7 +213,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         kdf_id = self.KDF_ARGON2ID if _ARGON2_AVAILABLE else self.KDF_PBKDF2
         profile = container.KDF_PROFILES[kdf_id]
         kdf_params = {'type': profile['type'], **profile['emitted']}
-        salt = secrets.token_bytes(profile['salt_size'])
+        salt = csp_bytes(profile['salt_size'])
 
         if kdf_id == self.KDF_ARGON2ID:
             master_key = self._derive_argon2id(
@@ -251,7 +251,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
 
         # Build the header first: it is the additional data the tag covers, so
         # every byte an attacker could edit is authenticated with the payload.
-        nonce = secrets.token_bytes(self.NONCE_SIZE)
+        nonce = csp_bytes(self.NONCE_SIZE)
         header = container.build_header(
             format_version=self.FORMAT_VERSION_V3,
             flags=flags,
@@ -475,13 +475,13 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
 
     def _derive_master_key(self, password: str) -> tuple:
         """Legacy v1 PBKDF2 derivation (kept for backward-compat restore)"""
-        salt = secrets.token_bytes(self.SALT_SIZE)
+        salt = csp_bytes(self.SALT_SIZE)
         key = self._derive_pbkdf2(password, salt, self.PBKDF2_ITERATIONS)
         return key, salt
 
     def _encrypt_backup(self, data: bytes, key: bytes) -> bytes:
         """Legacy v1 AES-256-GCM encrypt (kept for tests / fallback)"""
-        nonce = secrets.token_bytes(self.NONCE_SIZE)
+        nonce = csp_bytes(self.NONCE_SIZE)
         aesgcm = AESGCM(key)
         ciphertext = aesgcm.encrypt(nonce, data, None)
         return nonce + ciphertext
@@ -508,7 +508,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         with a vector produced before any such change.
         """
         # Derive unique key for this specific private key
-        salt = secrets.token_bytes(self.SALT_SIZE)
+        salt = csp_bytes(self.SALT_SIZE)
         kdf = PBKDF2HMAC(
             algorithm=hashes.SHA256(),
             length=self.KEY_SIZE,
@@ -519,7 +519,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         key = kdf.derive(master_key)
 
         # Encrypt
-        nonce = secrets.token_bytes(self.NONCE_SIZE)
+        nonce = csp_bytes(self.NONCE_SIZE)
         aesgcm = AESGCM(key)
         ciphertext = aesgcm.encrypt(nonce, key_pem.encode(), None)
 

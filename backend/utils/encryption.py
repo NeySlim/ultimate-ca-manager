@@ -79,8 +79,8 @@ def _get_encryption_key() -> bytes:
     
     if not machine_id:
         # Create a persistent machine key
-        import secrets
-        machine_id = secrets.token_hex(32)
+        from utils.randomness import csp_bytes
+        machine_id = csp_bytes(32).hex()
         try:
             os.makedirs('/opt/ucm/data', exist_ok=True)
             with open('/opt/ucm/data/.machine-key', 'w') as f:

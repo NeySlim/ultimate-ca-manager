@@ -1,11 +1,11 @@
 """CMS encoding helpers for RFC 7030 server-side key generation."""
-import os
-
 from asn1crypto import algos, cms, x509 as asn1_x509
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import padding as asym_padding, rsa
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.primitives.padding import PKCS7
+
+from utils.randomness import csp_bytes
 
 
 def _signed_private_key(private_key, issued_cert, pkcs8_der):
@@ -77,8 +77,8 @@ def build_server_generated_key_cms(private_key, issued_cert, recipient_cert):
     signed_data = _signed_private_key(private_key, issued_cert, pkcs8_der)
     signed_der = signed_data.dump()
 
-    content_key = os.urandom(32)
-    iv = os.urandom(16)
+    content_key = csp_bytes(32)
+    iv = csp_bytes(16)
     padder = PKCS7(128).padder()
     padded = padder.update(signed_der) + padder.finalize()
     encryptor = Cipher(algorithms.AES(content_key), modes.CBC(iv)).encryptor()

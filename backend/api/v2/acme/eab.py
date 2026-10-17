@@ -16,6 +16,7 @@ from services.audit_service import AuditService
 from auth.unified import require_auth
 from utils.response import success_response, error_response, no_content_response
 from utils.db_transaction import safe_commit
+from utils.randomness import csp_bytes
 
 from . import bp, logger
 
@@ -157,7 +158,7 @@ def create_eab_credential():
     # 16-byte kid (URL-safe), 32-byte HMAC secret (256-bit), URL-safe base64 encoded
     # without padding — RFC 8555 §7.3.4 only specifies HMAC, doesn't mandate length.
     kid = _secrets.token_urlsafe(16)
-    hmac_raw = _secrets.token_bytes(32)
+    hmac_raw = csp_bytes(32)
     hmac_b64 = base64.urlsafe_b64encode(hmac_raw).rstrip(b'=').decode('ascii')
 
     user_id = getattr(g, 'user_id', None) or (getattr(g, 'current_user', None).id if getattr(g, 'current_user', None) else None)
