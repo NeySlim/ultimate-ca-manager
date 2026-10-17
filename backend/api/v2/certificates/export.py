@@ -19,6 +19,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+import fips_mode
+from fips_mode import FipsRestricted
 
 from models import db, Certificate, CA
 from utils.cert_status import issued_certificates
@@ -508,6 +510,7 @@ def export_certificate(cert_id):
                 return error_response('Password required for JKS export', 400)
             if not certificate.prv:
                 return error_response('Certificate has no private key for JKS export', 400)
+            fips_mode.refuse('JKS export')
 
             import jks as pyjks
             import time
@@ -551,6 +554,8 @@ def export_certificate(cert_id):
         else:
             return error_response(f'Unsupported format: {export_format}', 400)
 
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except Exception as e:
         logger.error(f"Certificate export failed: {e}")
         return error_response('Export failed', 500)

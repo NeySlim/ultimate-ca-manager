@@ -19,6 +19,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+import fips_mode
+from fips_mode import FipsRestricted
 
 from auth.unified import require_auth, has_permission
 # `auth.permissions` exports a function of the same name whose arguments
@@ -225,6 +227,8 @@ def recover_key(rid):
             key=private_key, cert=cert_obj, cas=chain or None,
             encryption_algorithm=pkcs12_encryption(password, legacy),
         )
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except Exception as e:
         logger.error(f"Key recovery {rid} failed to build PKCS12: {e}")
         _audit('key_recovery.recover_failed', req, success=False)

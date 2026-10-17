@@ -22,6 +22,8 @@ per-export opt-in, never a stored default.
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 
+import fips_mode
+
 _TRUE_STRINGS = frozenset({'1', 'true', 'yes', 'on'})
 
 
@@ -39,6 +41,7 @@ def pkcs12_encryption(password, legacy: bool = False):
     secret = password.encode() if isinstance(password, str) else bytes(password)
     if not legacy:
         return serialization.BestAvailableEncryption(secret)
+    fips_mode.refuse('PKCS#12 legacy encryption (3DES/SHA-1)')
     return (
         serialization.PrivateFormat.PKCS12.encryption_builder()
         .key_cert_algorithm(pkcs12.PBES.PBESv1SHA1And3KeyTripleDESCBC)

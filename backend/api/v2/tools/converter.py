@@ -9,6 +9,8 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from auth.unified import require_auth
+import fips_mode
+from fips_mode import FipsRestricted
 from utils.response import success_response, error_response
 from utils.export_password import validate_export_password
 
@@ -232,6 +234,7 @@ def convert_certificate():
             pw_err = validate_export_password(pkcs12_password)
             if pw_err:
                 return error_response(pw_err, 400)
+            fips_mode.refuse('JKS export')
 
             import jks as pyjks
             import time as _time
@@ -273,6 +276,8 @@ def convert_certificate():
 
         return success_response(data=result)
 
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except Exception as e:
         logger.error(f'Conversion failed: {e}')
         return error_response('Conversion failed', 400)

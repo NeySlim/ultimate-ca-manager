@@ -12,6 +12,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+import fips_mode
+from fips_mode import FipsRestricted
 from flask import Blueprint, Response, g, request
 
 from auth.unified import require_auth, has_permission
@@ -393,6 +395,7 @@ def export_user_certificate(cert_id):
                 return error_response(pw_err, 400)
             if not cert.prv:
                 return error_response('Certificate has no private key for JKS export', 400)
+            fips_mode.refuse('JKS export')
 
             import jks as pyjks
             import time as _time
@@ -481,6 +484,8 @@ def export_user_certificate(cert_id):
             headers={'Content-Disposition': f'attachment; filename="{filename}"'}
         )
 
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except Exception as e:
         logger.error(f"Failed to export user certificate {cert_id}: {e}")
         return error_response('Failed to export certificate', 500)
