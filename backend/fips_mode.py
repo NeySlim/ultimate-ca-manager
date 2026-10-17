@@ -117,9 +117,9 @@ def status() -> dict:
             'provider': provider_info() if active else None}
 
 
-def enforce_at_startup(log) -> None:
-    """UCM_FIPS=1 without an active provider, or with a failed self-test,
-    stops the process before it serves anything."""
+def enforce_at_startup(log, database_url: str = '') -> None:
+    """UCM_FIPS=1 without an active provider, with a failed self-test or with a
+    PostgreSQL connection outside TLS stops the process before it serves anything."""
     if not requested():
         return
     from cryptography.hazmat.bindings._rust import openssl as rust_openssl
@@ -136,6 +136,12 @@ def enforce_at_startup(log) -> None:
         self_tests()
     except RuntimeError as e:
         log.error('FIPS self-test failed: %s; refusing to start', e)
+        raise SystemExit(1)
+    from utils.db_url import postgres_tls_problem
+    problem = postgres_tls_problem(database_url)
+    if problem:
+        log.error('UCM_FIPS=1 but DATABASE_URL reaches PostgreSQL over TCP with %s: '
+                  'use sslmode=require or stricter; refusing to start', problem)
         raise SystemExit(1)
     info = provider_info() or {}
     log.info('FIPS mode active: %s %s (library %s)', info.get('name', 'unknown provider'),

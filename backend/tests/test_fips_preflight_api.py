@@ -210,3 +210,23 @@ class TestScheduledBackupKdf:
             finally:
                 for key in ('auto_backup_enabled', 'backup_password', 'backup_kdf', 'backup.last_run'):
                     _delete(key)
+
+    def test_a_stored_argon2id_falls_back_to_pbkdf2_in_fips_mode(self, app, tmp_path, monkeypatch, caplog):
+        from services.backup import schedule
+        from utils.encryption import encrypt_if_needed
+        monkeypatch.setattr(Config, 'BACKUP_DIR', tmp_path, raising=False)
+        monkeypatch.setattr(schedule, '_LAST_ATTEMPT', {'at': None})
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        with app.app_context():
+            try:
+                _set('auto_backup_enabled', 'true')
+                _set('backup_password', encrypt_if_needed('a scheduled backup password'))
+                _set('backup_kdf', 'argon2id')
+                _delete('backup.last_run')
+                result = schedule.run_scheduled_backup()
+                assert result['status'] == 'ok'
+                assert (tmp_path / result['filename']).read_bytes()[6] == container.KDF_PBKDF2
+                assert 'using PBKDF2' in caplog.text
+            finally:
+                for key in ('auto_backup_enabled', 'backup_password', 'backup_kdf', 'backup.last_run'):
+                    _delete(key)

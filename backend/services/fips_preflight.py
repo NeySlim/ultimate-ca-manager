@@ -18,7 +18,6 @@ from typing import Callable, Iterable, List, Optional, Tuple
 from cryptography import x509
 from cryptography.utils import CryptographyDeprecationWarning
 from flask import current_app
-from sqlalchemy.engine import make_url
 
 import fips_mode
 from models import (CA, Certificate, CertificatePolicy, CertificateTemplate, DeployTarget,
@@ -32,6 +31,7 @@ from services.backup.settings_contract import scheduled_kdf
 from services.tsa_service import tsa_is_enabled
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
+from utils.db_url import postgres_tls_problem
 from utils.key_codec import eddsa_key_name
 
 logger = logging.getLogger(__name__)
@@ -41,7 +41,6 @@ SEVERITIES = (BLOCKER, WARNING, INFO)
 MAX_EXAMPLES = 5
 
 _EDDSA_OIDS = {'1.3.101.112': 'Ed25519', '1.3.101.113': 'Ed448'}
-_TLS_SSLMODES = ('require', 'verify-ca', 'verify-full')
 
 
 @dataclass(frozen=True)
@@ -184,7 +183,7 @@ def _ca_eddsa():
 
 
 @detector('ca.weak_key', BLOCKER,
-          'Certificate authorities with RSA under 2048 bits or a curve other than P-256/384/521',
+          'Certificate authorities with a DSA key, RSA under 2048 bits or a curve other than P-256/384/521',
           'Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it.')
 def _ca_weak():
     return [_named(ca.descr, ca.id, name) for ca, (name, approved) in _ca_keys()
@@ -380,13 +379,18 @@ def _gcp():
     return [_named(p.name, p.id) for p in rows]
 
 
+_HSM_UNAPPROVED = ('ED25519', 'ED448', 'EDDSA', 'EDWARDS', 'CHACHA')
+
+
 @detector('hsm.unapproved_keys', WARNING,
-          'HSM keys of an algorithm FIPS mode hides (Ed25519, ChaCha20...)',
-          'Replace them with RSA, ECDSA or AES keys; FIPS mode leaves them out of the inventory.')
+          'HSM keys of an algorithm outside FIPS mode (Ed25519, Ed448, ChaCha20-Poly1305)',
+          'Replace them with RSA, ECDSA or AES keys; in FIPS mode, OpenBao and Vault Transit '
+          'keys of these types are no longer listed.')
 def _hsm_keys():
+    # Only algorithms known to be refused: UNKNOWN or provider-specific types stay out.
     rows = HsmKey.query.with_entities(HsmKey.id, HsmKey.label, HsmKey.algorithm).order_by(HsmKey.id)
     return [_named(r.label, r.id, r.algorithm) for r in rows.all()
-            if not (str(r.algorithm or '').upper().startswith('AES') or stored_label_approved(r.algorithm))]
+            if any(word in str(r.algorithm or '').upper() for word in _HSM_UNAPPROVED)]
 
 
 @detector('dns.tsig_hmac_md5', BLOCKER,
@@ -446,29 +450,9 @@ def _backup_archives():
     return found
 
 
-def postgres_tls_problem(url, environ=None) -> Optional[str]:
-    """Why a PostgreSQL URL would reach its server over TCP without TLS, None when it would not."""
-    environ = os.environ if environ is None else environ
-    try:
-        parsed = make_url(str(url))
-    except Exception:
-        return None
-    if not parsed.drivername.startswith('postgres'):
-        return None
-
-    def query(name):
-        value = parsed.query.get(name)
-        return value[0] if isinstance(value, tuple) else value
-    host = parsed.host or query('host') or query('hostaddr') or environ.get('PGHOST') \
-        or environ.get('PGHOSTADDR')
-    if not host or str(host).startswith('/'):
-        return None  # Unix socket: no TLS needed
-    sslmode = query('sslmode') or environ.get('PGSSLMODE') or 'prefer'
-    return None if sslmode in _TLS_SSLMODES else f'sslmode={sslmode}'
-
-
 @detector('database.postgres_without_tls', BLOCKER,
-          'The PostgreSQL connection runs over TCP without sslmode=require or stricter',
+          'The PostgreSQL connection runs over TCP without sslmode=require or stricter: '
+          'UCM refuses to start in FIPS mode',
           'Enable TLS on the server and add sslmode=require (or verify-full) to DATABASE_URL.')
 def _database():
     problem = postgres_tls_problem(current_app.config.get('SQLALCHEMY_DATABASE_URI') or '')

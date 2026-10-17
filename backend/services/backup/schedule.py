@@ -17,6 +17,7 @@ import os
 import time
 from datetime import datetime, timezone
 
+import fips_mode
 from models import db, SystemConfig
 from config.settings import Config
 from utils.datetime_utils import utc_now, utc_isoformat
@@ -469,8 +470,12 @@ def run_scheduled_backup() -> dict:
 def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
     """Write, validate and record one scheduled archive."""
     try:
-        backup_bytes = BackupService().create_backup(
-            password, kdf=scheduled_kdf(sched.get('kdf')))
+        kdf = scheduled_kdf(sched.get('kdf'))
+        if kdf == 'argon2id' and fips_mode.enabled():
+            # A setting carried over from a standard instance must not stop every run.
+            logger.warning("Scheduled backup KDF is Argon2id, refused in FIPS mode: using PBKDF2")
+            kdf = None
+        backup_bytes = BackupService().create_backup(password, kdf=kdf)
 
         # The same naming as every other archive: a name to the second could
         # collide with a manual backup taken in the same second, and the

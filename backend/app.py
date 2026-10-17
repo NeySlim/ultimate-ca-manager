@@ -176,7 +176,7 @@ def create_app(config_name=None):
         )
     
     import fips_mode
-    fips_mode.enforce_at_startup(app.logger)
+    fips_mode.enforce_at_startup(app.logger, app.config.get('SQLALCHEMY_DATABASE_URI') or '')
 
     # Validate secrets at runtime (not during package installation)
     try:

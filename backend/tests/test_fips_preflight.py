@@ -25,6 +25,7 @@ from models import (CA, AcmeClientOrder, Certificate, CertificatePolicy, Certifi
 from services import fips_preflight
 from tests.test_backup_cross_installation import _bound_to
 from utils.datetime_utils import utc_now
+from utils.db_url import postgres_tls_problem
 from utils.password_hash import hash_password
 
 _PG_URL = os.environ.get('UCM_TEST_PG_URL')
@@ -320,7 +321,8 @@ def test_hsm_unapproved_keys(session):
     session.add(provider)
     session.flush()
     for label, algorithm in (('ed-key', 'Ed25519'), ('chacha-key', 'ChaCha20'),
-                             ('rsa-key', 'RSA-3072'), ('aes-key', 'AES-256')):
+                             ('rsa-key', 'RSA-3072'), ('aes-key', 'AES-256'),
+                             ('unreadable', 'UNKNOWN'), ('azure-oct', 'oct-HSM')):
         session.add(HsmKey(provider_id=provider.id, key_identifier=label, label=label,
                            algorithm=algorithm, key_type='asymmetric', purpose='signing'))
     session.flush()
@@ -383,7 +385,7 @@ def test_database_postgres_without_tls(session, app, monkeypatch):
     ('sqlite:////opt/ucm/data/ucm.db', {}, None),
 ])
 def test_postgres_tls_problem(url, env, problem):
-    assert fips_preflight.postgres_tls_problem(url, env) == problem
+    assert postgres_tls_problem(url, env) == problem
 
 
 def test_https_unapproved_key(session, app, tmp_path, monkeypatch):

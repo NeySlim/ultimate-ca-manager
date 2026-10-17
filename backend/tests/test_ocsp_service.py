@@ -1222,6 +1222,20 @@ class TestResponderKeyOwnership:
             row = self._stored(ca_obj, cert, key, 'keyown-right')
             assert OCSPService().check_delegated_responder(ca_obj, row) is None
 
+    @pytest.mark.parametrize('bits, refused', [(1024, True), (2048, False)])
+    def test_fips_mode_refuses_a_weak_responder_key(self, app, create_ca, monkeypatch, bits, refused):
+        import fips_mode
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        with app.app_context():
+            ca = create_ca(cn=f'Key Ownership FIPS {bits} CA')
+            ca_obj = _ca_model(ca); ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            key = rsa.generate_private_key(public_exponent=65537, key_size=bits)
+            cert = _delegated_certificate(ca_cert, get_ca_signing_key(ca_obj), key)
+            row = self._stored(ca_obj, cert, key, f'keyown-fips-{bits}')
+            reason = OCSPService().check_delegated_responder(ca_obj, row)
+            assert (reason == 'key is not approved in FIPS mode') if refused else reason is None
+
     def test_an_unloadable_key_is_a_reason(self, app, create_ca):
         with app.app_context():
             ca = create_ca(cn='Key Ownership Broken CA')

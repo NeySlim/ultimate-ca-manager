@@ -58,6 +58,47 @@ class TestEnforceAtStartup:
             fips_mode.enforce_at_startup(LOG)
         assert 'FIPS mode active: OpenSSL FIPS Provider 3.1.2' in caplog.text
 
+    @pytest.mark.parametrize('url', [
+        'postgresql://ucm@db.example/ucm',
+        'postgresql://ucm@db.example/ucm?sslmode=prefer',
+    ])
+    def test_postgres_without_tls_stops_the_process(self, monkeypatch, providers, caplog, url):
+        monkeypatch.setenv('UCM_FIPS', '1')
+        monkeypatch.delenv('PGSSLMODE', raising=False)
+        providers(True, True)
+        monkeypatch.setattr(fips_mode, 'self_tests', lambda: None)
+        with caplog.at_level(logging.ERROR), pytest.raises(SystemExit):
+            fips_mode.enforce_at_startup(LOG, url)
+        assert 'DATABASE_URL reaches PostgreSQL over TCP with sslmode=' in caplog.text
+
+    @pytest.mark.parametrize('url', [
+        'postgresql://ucm@db.example/ucm?sslmode=require',
+        'postgresql://ucm@db.example/ucm?sslmode=verify-full',
+        'postgresql://ucm@/ucm?host=/run/postgresql',
+        'sqlite:////var/lib/ucm/ucm.db',
+        '',
+    ])
+    def test_tls_socket_or_sqlite_starts(self, monkeypatch, providers, url):
+        monkeypatch.setenv('UCM_FIPS', '1')
+        monkeypatch.delenv('PGSSLMODE', raising=False)
+        monkeypatch.delenv('PGHOST', raising=False)
+        providers(True, True)
+        monkeypatch.setattr(fips_mode, 'self_tests', lambda: None)
+        monkeypatch.setattr(fips_mode, 'provider_info', lambda: None)
+        fips_mode.enforce_at_startup(LOG, url)
+
+    def test_create_app_passes_the_database_url(self, monkeypatch):
+        seen = {}
+
+        def capture(log, database_url=''):
+            seen['url'] = database_url
+            raise _Stopped
+        monkeypatch.setattr(fips_mode, 'enforce_at_startup', capture)
+        from app import create_app
+        with pytest.raises(_Stopped):
+            create_app('testing')
+        assert seen['url'].startswith('sqlite:')
+
     def test_without_ucm_fips_nothing_is_checked(self, monkeypatch, providers):
         monkeypatch.delenv('UCM_FIPS', raising=False)
         providers(False, False)
@@ -73,7 +114,7 @@ class _Stopped(Exception):
 
 
 def test_create_app_runs_the_check_before_anything_else(monkeypatch):
-    def stop(log):
+    def stop(log, database_url=''):
         raise _Stopped
     monkeypatch.setattr(fips_mode, 'enforce_at_startup', stop)
     from app import create_app

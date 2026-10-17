@@ -22,6 +22,7 @@ from cryptography.hazmat.primitives.asymmetric import (
 from cryptography.hazmat.backends import default_backend
 from sqlalchemy import or_
 
+import fips_mode
 from fips_mode import FipsRestricted
 from models import db, CA, Certificate, OCSPResponse, SystemConfig, RevokedSerial
 from utils import key_algorithms
@@ -426,6 +427,8 @@ class OCSPService:
         from utils.cert_issuer import private_key_matches
         if not private_key_matches(key, resp_cert):
             return 'private key does not match the certificate'
+        if fips_mode.enabled() and not key_algorithms.fips_approved(key_algorithms.label_for_private_key(key)):
+            return 'key is not approved in FIPS mode'
         return None
 
     def _load_responder_key(self, responder_record):
