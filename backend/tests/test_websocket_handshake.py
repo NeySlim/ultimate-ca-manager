@@ -10,12 +10,16 @@ from websocket import events, socketio
 
 
 @pytest.fixture
-def api_key(auth_client):
+def api_key(app, auth_client, monkeypatch):
+    # Keys other files left on the shared admin must not hit the per-user cap
+    monkeypatch.setitem(app.config, 'API_KEY_MAX_PER_USER', 1000)
     r = auth_client.post('/api/v2/account/apikeys', json={
         'name': 'ws-handshake',
         'permissions': ['read:certificates', 'read:cas'],
     })
-    return assert_success(r, 201)['key']
+    data = assert_success(r, 201)
+    yield data['key']
+    auth_client.delete(f"/api/v2/account/apikeys/{data['id']}")
 
 
 class TestHandshake:
