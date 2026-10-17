@@ -52,34 +52,115 @@ validate_fqdn() {
 }
 
 # =============================================================================
+# FIPS MODE (UCM_FIPS=1): module configuration written at every start
+# =============================================================================
+
+# Same values as backend/fips_mode.py requested()
+UCM_FIPS_FLAG=$(printf '%s' "${UCM_FIPS:-}" | tr -d '[:space:]' | tr '[:upper:]' '[:lower:]')
+case "$UCM_FIPS_FLAG" in
+    1|true|yes|on) FIPS_REQUESTED=1 ;;
+    *) FIPS_REQUESTED=0 ;;
+esac
+
+if [ "$FIPS_REQUESTED" = 1 ]; then
+    echo -e "${BLUE}🔒 UCM_FIPS=1: configuring the OpenSSL FIPS provider...${NC}"
+    FIPS_MODULE="$(openssl version -m | sed -E 's/^MODULESDIR: "(.*)"$/\1/')/fips.so"
+    if [ ! -f "$FIPS_MODULE" ]; then
+        echo -e "${RED}❌ UCM_FIPS=1 but this image has no OpenSSL FIPS provider ($FIPS_MODULE)${NC}"
+        echo "   Use the -fips variant of the image, or remove UCM_FIPS to run in standard mode."
+        exit 1
+    fi
+    FIPS_RUN_DIR="/run/ucm"
+    if ! mkdir -p "$FIPS_RUN_DIR" 2>/dev/null || [ ! -w "$FIPS_RUN_DIR" ]; then
+        echo -e "${RED}❌ $FIPS_RUN_DIR is not writable by UID $(id -u)${NC}"
+        echo "   FIPS mode writes the module configuration there at each start."
+        echo "   With a read-only root filesystem, mount a tmpfs: --tmpfs /run/ucm:uid=1000"
+        exit 1
+    fi
+    if ! openssl fipsinstall -module "$FIPS_MODULE" -provider_name fips \
+        -out "$FIPS_RUN_DIR/fipsmodule.cnf" > "$FIPS_RUN_DIR/fipsinstall.log" 2>&1; then
+        echo -e "${RED}❌ openssl fipsinstall failed: the FIPS module did not pass its self-tests${NC}"
+        cat "$FIPS_RUN_DIR/fipsinstall.log"
+        exit 1
+    fi
+    cat > "$FIPS_RUN_DIR/openssl-fips.cnf" <<EOF
+# Written by the UCM entrypoint: fips + base providers, approved algorithms only
+config_diagnostics = 1
+openssl_conf = openssl_init
+
+.include $FIPS_RUN_DIR/fipsmodule.cnf
+
+[openssl_init]
+providers = provider_sect
+alg_section = algorithm_sect
+
+[provider_sect]
+fips = fips_sect
+base = base_sect
+
+[base_sect]
+activate = 1
+
+[algorithm_sect]
+default_properties = fips=yes
+EOF
+    export OPENSSL_CONF="$FIPS_RUN_DIR/openssl-fips.cnf"
+
+    # Pre-checks: provider active, MD5 refused, SHA-256 and Python on the module
+    FIPS_PROVIDERS=$(openssl list -providers 2>&1) || FIPS_PROVIDERS=""
+    FIPS_NAME=$(printf '%s\n' "$FIPS_PROVIDERS" | awk '/^  [^ ]/{p=($1=="fips")} p&&/^ +name:/{sub(/^ +name: */,""); print; exit}')
+    FIPS_VERSION=$(printf '%s\n' "$FIPS_PROVIDERS" | awk '/^  [^ ]/{p=($1=="fips")} p&&/^ +version:/{print $2; exit}')
+    if ! printf '%s\n' "$FIPS_PROVIDERS" | awk '/^  [^ ]/{p=($1=="fips")} p&&/^ +status: active/{ok=1} END{exit !ok}'; then
+        echo -e "${RED}❌ The FIPS provider is not active with $OPENSSL_CONF${NC}"
+        printf '%s\n' "$FIPS_PROVIDERS"
+        exit 1
+    fi
+    if echo x | openssl md5 >/dev/null 2>&1; then
+        echo -e "${RED}❌ MD5 still works: approved-only algorithms are not enforced${NC}"
+        exit 1
+    fi
+    if ! echo x | openssl sha256 >/dev/null 2>&1 \
+        || ! python3 -c 'import _hashlib, sys; sys.exit(0 if _hashlib.get_fips_mode() == 1 else 1)'; then
+        echo -e "${RED}❌ SHA-256 or Python's hashlib does not run on the FIPS provider${NC}"
+        exit 1
+    fi
+
+    # SoftHSM is not a validated module: no default token in FIPS mode
+    if [ "${HSM_AUTO_INIT:-true}" = "true" ]; then
+        echo -e "${YELLOW}   HSM_AUTO_INIT forced to false in FIPS mode${NC}"
+    fi
+    export HSM_AUTO_INIT=false
+    echo -e "${GREEN}✅ FIPS mode: ${FIPS_NAME:-fips} ${FIPS_VERSION} active (fips + base, default_properties = fips=yes)${NC}"
+fi
+
+# =============================================================================
 # ENVIRONMENT VARIABLE DEFAULTS
 # =============================================================================
 
 # Core Settings
-# shellcheck disable=SC2223
-: ${UCM_FQDN:="ucm.local"}
-: ${UCM_HTTPS_PORT:=8443}
-: ${UCM_HTTP_PORT:=8080}
-: ${UCM_DEBUG:=false}
-: ${UCM_LOG_LEVEL:="INFO"}
+: "${UCM_FQDN:="ucm.local"}"
+: "${UCM_HTTPS_PORT:=8443}"
+: "${UCM_HTTP_PORT:=8080}"
+: "${UCM_DEBUG:=false}"
+: "${UCM_LOG_LEVEL:="INFO"}"
 
 # Security
-: ${UCM_SECRET_KEY:=$(generate_secret)}
-: ${UCM_JWT_SECRET:=$(generate_secret)}
+: "${UCM_SECRET_KEY:=$(generate_secret)}"
+: "${UCM_JWT_SECRET:=$(generate_secret)}"
 
 # Database
-: ${UCM_DATABASE_PATH:="/opt/ucm/data/ucm.db"}
+: "${UCM_DATABASE_PATH:="/opt/ucm/data/ucm.db"}"
 # Copy of the SQLite database taken by this script before each start
-: ${UCM_BACKUP_ENABLED:=true}
-: ${UCM_BACKUP_RETENTION_DAYS:=30}
+: "${UCM_BACKUP_ENABLED:=true}"
+: "${UCM_BACKUP_RETENTION_DAYS:=30}"
 
 # Initial Admin User
-: ${UCM_INITIAL_ADMIN_USERNAME:="admin"}
-: ${UCM_INITIAL_ADMIN_EMAIL:="admin@${UCM_FQDN}"}
-: ${UCM_INITIAL_ADMIN_PASSWORD:="changeme123"}
+: "${UCM_INITIAL_ADMIN_USERNAME:="admin"}"
+: "${UCM_INITIAL_ADMIN_EMAIL:="admin@${UCM_FQDN}"}"
+: "${UCM_INITIAL_ADMIN_PASSWORD:="changeme123"}"
 
 # Application
-: ${UCM_APP_VERSION:="${UCM_VERSION}"}
+: "${UCM_APP_VERSION:="${UCM_VERSION}"}"
 
 # =============================================================================
 # VALIDATION
@@ -200,8 +281,9 @@ echo -e "${GREEN}✅ Directories ready${NC}"
 
 echo -e "${BLUE}⚙️  Generating configuration...${NC}"
 
-# Create .env file from environment variables
-cat > /opt/ucm/.env <<EOF
+# Create .env file from environment variables; skipped on a read-only root,
+# the same values are exported to the application below
+if { cat > /opt/ucm/.env; } 2>/dev/null <<EOF
 # UCM Configuration - Auto-generated by Docker entrypoint
 # Generated: $(date -u +"%Y-%m-%d %H:%M:%S UTC")
 
@@ -227,9 +309,12 @@ INITIAL_ADMIN_PASSWORD=${UCM_INITIAL_ADMIN_PASSWORD}
 # Application Version
 APP_VERSION=${UCM_APP_VERSION}
 EOF
-
-chmod 600 /opt/ucm/.env
-echo -e "${GREEN}✅ Configuration file created${NC}"
+then
+    chmod 600 /opt/ucm/.env
+    echo -e "${GREEN}✅ Configuration file created${NC}"
+else
+    echo -e "${YELLOW}   /opt/ucm is read-only: configuration passed through the environment only${NC}"
+fi
 
 # =============================================================================
 # HTTPS CERTIFICATE SETUP
@@ -370,7 +455,7 @@ echo ""
 # =============================================================================
 
 # Create health check endpoint marker
-touch /opt/ucm/.docker-ready
+touch /opt/ucm/.docker-ready 2>/dev/null || true
 
 # Export environment variables for Python app (without UCM_ prefix)
 export FQDN="${UCM_FQDN}"
