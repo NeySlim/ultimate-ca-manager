@@ -491,7 +491,7 @@ class TestValidatedArchivePublication:
         monkeypatch.setattr(Config, 'BACKUP_DIR', tmp_path, raising=False)
         monkeypatch.setattr(
             BackupService, 'create_backup',
-            lambda self, password: b'archive')
+            lambda self, password, **kwargs: b'archive')
         monkeypatch.setattr(routes.AuditService, 'log_action',
                             lambda **kwargs: None)
         monkeypatch.setattr(

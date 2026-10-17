@@ -83,7 +83,7 @@ class DecryptMixin:
             if fips_mode.enabled():
                 raise FipsRestricted(
                     "Backups protected with Argon2id cannot be restored in FIPS mode: "
-                    "convert the archive to PBKDF2 on a standard (non-FIPS) instance first")
+                    "restore it on a standard instance and back up again with the PBKDF2 KDF")
             if not _ARGON2_AVAILABLE:
                 raise ValueError("Backup uses Argon2id but argon2-cffi is not installed")
             master_key = self._derive_argon2id(

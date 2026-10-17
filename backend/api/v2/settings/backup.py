@@ -26,6 +26,7 @@ from services.backup.settings_contract import (
     validate_frequency,
     validate_retention_days,
 )
+from services.backup.backup_service import check_backup_kdf
 from services.backup_service import (
     BackupService,
     BackupExportError,
@@ -79,8 +80,16 @@ def create_backup():
     except BackupSettingError as e:
         return error_response(str(e), 400)
 
+    kdf = data.get('kdf')
     try:
-        backup_bytes = BackupService().create_backup(password)
+        check_backup_kdf(kdf)
+    except FipsRestricted:
+        raise
+    except ValueError as e:
+        return error_response(str(e), 400)
+
+    try:
+        backup_bytes = BackupService().create_backup(password, kdf=kdf)
         _filepath, filename = storage.create_archive(backup_bytes)
     except BackupPasswordError as e:
         return error_response(str(e), 400)

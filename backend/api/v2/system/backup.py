@@ -23,6 +23,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.pagination import parse_request_pagination
 from services.audit_service import AuditService
+from services.backup.backup_service import check_backup_kdf
 from services.backup_service import (
     BackupService,
     BackupExportError,
@@ -81,7 +82,15 @@ def create_backup():
         except BackupSettingError as exc:
             return error_response(str(exc), 400)
 
-        backup_bytes = BackupService().create_backup(password)
+        kdf = data.get("kdf")
+        try:
+            check_backup_kdf(kdf)
+        except FipsRestricted:
+            raise
+        except ValueError as exc:
+            return error_response(str(exc), 400)
+
+        backup_bytes = BackupService().create_backup(password, kdf=kdf)
 
         # Naming, publication and the proof of what was written are the
         # storage module's, for every route that creates an archive.
@@ -113,6 +122,8 @@ def create_backup():
     except BackupValidationError as exc:
         logger.error("Backup written but not validated: %s", exc)
         return error_response(f"Backup could not be validated: {exc}", 500)
+    except FipsRestricted:
+        raise
     except ValueError as exc:
         logger.warning("Backup validation error: %s", exc)
         return error_response("Invalid backup parameters", 400)

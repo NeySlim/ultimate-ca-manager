@@ -67,6 +67,16 @@ class BackupPasswordError(ValueError):
     caller, unlike the other ValueErrors raised while building a backup.
     """
 
+def check_backup_kdf(kdf: Optional[str]) -> None:
+    """A KDF a caller may ask for: None, 'pbkdf2', or 'argon2id' outside FIPS mode."""
+    if kdf not in (None, 'pbkdf2', 'argon2id'):
+        raise ValueError("kdf must be 'pbkdf2' or 'argon2id'")
+    if kdf == 'argon2id':
+        fips_mode.refuse('Argon2id backups')
+        if not _ARGON2_AVAILABLE:
+            raise ValueError("Argon2id backups need argon2-cffi")
+
+
 class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
                    RestoreCoreMixin, RestoreRbacMixin, RestoreAuthMixin,
                    RestoreNotificationsMixin, RestorePoliciesMixin, RestoreExtendedMixin):
@@ -127,7 +137,8 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         self,
         password: str,
         backup_type: str = "full",
-        include: Optional[Dict[str, bool]] = None
+        include: Optional[Dict[str, bool]] = None,
+        kdf: Optional[str] = None
     ) -> bytes:
         """
         Create encrypted backup archive
@@ -136,6 +147,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
             password: Encryption password (min 12 chars)
             backup_type: "full", "database", or "certificates"
             include: Dict of what to include (cas, certificates, users, etc.)
+            kdf: "pbkdf2" or "argon2id"; None picks Argon2id when it can
 
         Returns:
             Encrypted backup as bytes
@@ -212,7 +224,9 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         # table: a parameter changed on one side and not the other would
         # produce archives this server refuses to read back.
         # FIPS mode: PBKDF2 only, Argon2id is not an approved KDF.
-        use_argon2 = _ARGON2_AVAILABLE and not fips_mode.enabled()
+        # kdf='pbkdf2' writes an archive a FIPS instance can restore.
+        check_backup_kdf(kdf)
+        use_argon2 = kdf != 'pbkdf2' and _ARGON2_AVAILABLE and not fips_mode.enabled()
         kdf_id = self.KDF_ARGON2ID if use_argon2 else self.KDF_PBKDF2
         profile = container.KDF_PROFILES[kdf_id]
         kdf_params = {'type': profile['type'], **profile['emitted']}

@@ -1856,8 +1856,12 @@ Content-Type: application/json
   "retention_days": 30
 }
 
-# Create backup
+# Create backup ("kdf": "pbkdf2" writes an archive a FIPS-mode instance can restore)
 POST /api/v2/settings/backup/create
+{
+  "password": "...",
+  "kdf": "pbkdf2"
+}
 
 # List backups
 GET /api/v2/settings/backup/history
@@ -1929,7 +1933,7 @@ Content-Type: application/json
 # List backups
 GET /api/v2/system/backup/list
 
-# Create backup
+# Create backup (body: "password", optional "kdf": "pbkdf2" or "argon2id")
 POST /api/v2/system/backup/create
 
 # Download backup

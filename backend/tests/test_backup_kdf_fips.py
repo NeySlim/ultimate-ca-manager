@@ -12,7 +12,7 @@ from services.backup import container, manifest
 
 PASSWORD = 'Correct-Horse-Battery-9'
 ARGON2_REFUSAL = ('Backups protected with Argon2id cannot be restored in FIPS mode: '
-                  'convert the archive to PBKDF2 on a standard (non-FIPS) instance first')
+                  'restore it on a standard instance and back up again with the PBKDF2 KDF')
 
 
 def _service():
@@ -112,3 +112,39 @@ def test_the_refusal_reaches_the_restore_api_unchanged(
     assert r.status_code == 400, r.data
     assert body['type'] == fips_mode.PROBLEM_TYPE
     assert body['message'] == ARGON2_REFUSAL
+
+
+class TestRequestedKdf:
+    """A standard instance writes PBKDF2 on request: the way to move an
+    Argon2id archive to a FIPS instance."""
+
+    def test_pbkdf2_on_request_opens_in_fips_mode(self, app, monkeypatch, no_argon2_derivation):
+        with app.app_context():
+            blob = _service().create_backup(PASSWORD, include=_groups_only(), kdf='pbkdf2')
+        assert _kdf_of(blob) == (container.KDF_PBKDF2, 'pbkdf2-sha256')
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        _key, payload = _service()._decrypt_framed(blob, PASSWORD)
+        assert 'groups' in payload
+
+    def test_argon2id_on_request_is_refused_in_fips_mode(self, app, fips, no_argon2_derivation):
+        with app.app_context(), pytest.raises(FipsRestricted, match='Argon2id backups'):
+            _service().create_backup(PASSWORD, include=_groups_only(), kdf='argon2id')
+
+
+CREATE_ROUTES = ['/api/v2/system/backup', '/api/v2/settings/backup/create']
+
+
+@pytest.mark.parametrize('route', CREATE_ROUTES)
+def test_an_unknown_kdf_is_refused_by_name(auth_client, route):
+    r = auth_client.post(route, json={'password': PASSWORD, 'kdf': 'scrypt'})
+    assert r.status_code == 400, r.data
+    assert json.loads(r.data)['message'] == "kdf must be 'pbkdf2' or 'argon2id'"
+
+
+@pytest.mark.parametrize('route', CREATE_ROUTES)
+def test_argon2id_creation_is_refused_by_the_api_in_fips_mode(auth_client, fips, route):
+    r = auth_client.post(route, json={'password': PASSWORD, 'kdf': 'argon2id'})
+    body = json.loads(r.data)
+    assert r.status_code == 400, r.data
+    assert body['type'] == fips_mode.PROBLEM_TYPE
+    assert body['message'] == 'Argon2id backups not available in FIPS mode'
