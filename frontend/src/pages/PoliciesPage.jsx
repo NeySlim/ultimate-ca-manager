@@ -2,7 +2,7 @@
  * PoliciesPage — Certificate Policies & Approval Workflows
  * CRUD for certificate policies with rules, approval settings, and notifications.
  */
-import { useState, useCallback, useMemo, useEffect } from 'react'
+import { useState, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Gavel, Plus, PencilSimple, Trash, Power, ShieldCheck,
@@ -18,6 +18,7 @@ import { useNotification } from '../contexts'
 import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { pickerCas } from '../lib/caSelection'
+import { useFipsMode } from '../lib/policyAlgorithms'
 
 // Policy type options — labels resolved via t() inside component
 const POLICY_TYPES = [
@@ -89,15 +90,7 @@ export default function PoliciesPage() {
   // Resolve i18n labels for module-level option arrays
   const policyTypeOptions = useMemo(() => POLICY_TYPES.map(o => ({ value: o.value, label: t(o.labelKey) })), [t])
   // FIPS mode puts a read-only system policy ahead of these, without EdDSA keys
-  const [fipsActive, setFipsActive] = useState(false)
-  useEffect(() => {
-    let alive = true
-    Promise.resolve()
-      .then(() => policiesService.getEffective())
-      .then(res => { if (alive) setFipsActive(res?.data?.fips === true) })
-      .catch(() => {})
-    return () => { alive = false }
-  }, [])
+  const fipsActive = useFipsMode()
   const keyTypeOptions = useMemo(
     () => [...KEY_TYPE_OPTIONS, ...EDDSA_KEY_TYPE_OPTIONS].map(o => ({ value: o.value, label: t(o.labelKey) })),
     [t],
