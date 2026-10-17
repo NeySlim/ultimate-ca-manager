@@ -11,6 +11,7 @@ from services.database_admin.lock import (
     database_migration_lock,
     pending_switch_refusal,
 )
+from fips_mode import FipsRestricted
 from services.backup.decrypt_mixin import BackupDecryptionError
 from services.backup.settings_contract import (
     BackupSettingError,
@@ -514,6 +515,8 @@ def restore_backup():
             data=results,
         )
 
+    except FipsRestricted:
+        raise  # the app maps it to its problem type, message unchanged
     except BackupDecryptionError:
         logger.warning("Restore refused: the backup could not be decrypted")
         return error_response("Wrong backup password, or the file is not a valid backup", 400)

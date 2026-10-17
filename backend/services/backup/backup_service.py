@@ -26,6 +26,7 @@ try:
 except ImportError:
     _ARGON2_AVAILABLE = False
 
+import fips_mode
 from models import db
 from config.settings import Config
 from utils.datetime_utils import utc_now, utc_isoformat
@@ -210,7 +211,9 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         # written here is the one the reader whitelists, taken from the same
         # table: a parameter changed on one side and not the other would
         # produce archives this server refuses to read back.
-        kdf_id = self.KDF_ARGON2ID if _ARGON2_AVAILABLE else self.KDF_PBKDF2
+        # FIPS mode: PBKDF2 only, Argon2id is not an approved KDF.
+        use_argon2 = _ARGON2_AVAILABLE and not fips_mode.enabled()
+        kdf_id = self.KDF_ARGON2ID if use_argon2 else self.KDF_PBKDF2
         profile = container.KDF_PROFILES[kdf_id]
         kdf_params = {'type': profile['type'], **profile['emitted']}
         salt = csp_bytes(profile['salt_size'])

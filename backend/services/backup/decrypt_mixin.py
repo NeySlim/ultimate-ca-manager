@@ -22,7 +22,9 @@ try:
 except ImportError:
     _ARGON2_AVAILABLE = False
 
+import fips_mode
 from config.settings import Config
+from fips_mode import FipsRestricted
 from utils.datetime_utils import utc_now
 
 from . import container
@@ -78,6 +80,10 @@ class DecryptMixin:
         salt, nonce, kdf_params = container.validate_kdf(kdf_id, metadata)
 
         if kdf_id == self.KDF_ARGON2ID:
+            if fips_mode.enabled():
+                raise FipsRestricted(
+                    "Backups protected with Argon2id cannot be restored in FIPS mode: "
+                    "convert the archive to PBKDF2 on a standard (non-FIPS) instance first")
             if not _ARGON2_AVAILABLE:
                 raise ValueError("Backup uses Argon2id but argon2-cffi is not installed")
             master_key = self._derive_argon2id(

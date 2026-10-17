@@ -9,6 +9,7 @@ from utils.response import success_response, error_response, no_content_response
 from models import db, SystemConfig
 from services.audit_service import AuditService
 from services.backup import storage
+from fips_mode import FipsRestricted
 from services.backup.decrypt_mixin import BackupDecryptionError
 from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.restore.plan import RestoreValidationError
@@ -249,6 +250,8 @@ def restore_backup():
             data=results,
             message=restore_message(results),
         )
+    except FipsRestricted:
+        raise  # the app maps it to its problem type, message unchanged
     except BackupDecryptionError:
         logger.warning("Settings restore refused: the backup could not be decrypted")
         return error_response(
