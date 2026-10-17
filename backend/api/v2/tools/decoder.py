@@ -6,6 +6,8 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
 from auth.unified import require_auth
+from fips_mode import FipsRestricted
+from utils.pkcs12_import import refuse_pkcs12_import
 from utils.response import success_response, error_response
 
 from . import tools_bp, csr_to_dict, cert_to_dict, logger
@@ -90,6 +92,7 @@ def decode_cert():
                     pass
             # Try PKCS12
             if not certs:
+                refuse_pkcs12_import(raw_bytes)
                 try:
                     from cryptography.hazmat.primitives.serialization import pkcs12 as p12mod
                     _, cert, chain = p12mod.load_key_and_certificates(raw_bytes, None)
@@ -123,6 +126,8 @@ def decode_cert():
             result['chain'] = [cert_to_dict(c) for c in certs[1:]]
         return success_response(data=result)
 
+    except FipsRestricted:
+        raise  # the app handler answers 400 with the FIPS problem type
     except Exception as e:
         logger.error(f'Failed to decode certificate: {e}')
         return error_response('Failed to decode certificate', 400)

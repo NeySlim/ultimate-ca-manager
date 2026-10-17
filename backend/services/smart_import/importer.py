@@ -20,6 +20,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
 from flask import has_request_context, request
+from fips_mode import FipsRestricted
 from utils.trusted_proxy import client_ip
 from models import db, Certificate, CA, AuditLog
 from .parser import ParsedObject, ObjectType, SmartParser
@@ -237,6 +238,9 @@ class SmartImporter:
             except Exception as e:
                 logger.error(f"Webhook emit (import) failed: {e}")
 
+        except FipsRestricted:
+            db.session.rollback()
+            raise
         except Exception as e:
             db.session.rollback()
             result.success = False

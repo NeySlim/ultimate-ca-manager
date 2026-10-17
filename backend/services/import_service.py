@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives import serialization
 import re
 import base64
 from utils.key_codec import private_key_to_pem
+from utils.pkcs12_import import refuse_pkcs12_import
 
 
 def parse_certificate_file(file_data, filename, password=None, import_key=True):
@@ -78,6 +79,7 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
         
     elif format_type == 'pkcs12':
         from cryptography.hazmat.primitives.serialization import pkcs12
+        refuse_pkcs12_import()
         try:
             private_key, cert, chain = pkcs12.load_key_and_certificates(
                 file_data, password.encode() if password else None, default_backend()

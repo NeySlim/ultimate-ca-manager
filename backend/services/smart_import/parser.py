@@ -20,6 +20,9 @@ from cryptography.hazmat.primitives.serialization import pkcs12, pkcs7
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID
 
+from fips_mode import FipsRestricted
+from utils.pkcs12_import import refuse_pkcs12_import
+
 
 class ObjectType(Enum):
     CERTIFICATE = "certificate"
@@ -155,6 +158,8 @@ class SmartParser:
             try:
                 decoded = base64.b64decode(content_str)
                 return self._parse_binary(decoded, password)
+            except FipsRestricted:
+                raise
             except Exception:
                 pass
         
@@ -186,6 +191,8 @@ class SmartParser:
                 binary_data = base64.b64decode(b64_data)
                 objs = self._parse_pkcs12(binary_data, password)
                 objects.extend(objs)
+            except FipsRestricted:
+                raise
             except Exception:
                 pass
         
@@ -236,6 +243,7 @@ class SmartParser:
         objects: List[ParsedObject] = []
         
         # Try PKCS12 first (most common binary format)
+        refuse_pkcs12_import(data)
         try:
             pwd = password.encode() if password else None
             private_key, cert, additional_certs = pkcs12.load_key_and_certificates(data, pwd)
@@ -489,6 +497,7 @@ class SmartParser:
     def _parse_pkcs12(self, data: bytes, password: Optional[str] = None) -> List[ParsedObject]:
         """Parse PKCS12 binary data"""
         objects = []
+        refuse_pkcs12_import()
         try:
             pwd = password.encode() if password else None
             private_key, cert, additional_certs = pkcs12.load_key_and_certificates(data, pwd)

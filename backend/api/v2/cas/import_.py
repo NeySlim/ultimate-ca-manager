@@ -11,6 +11,7 @@ import traceback
 import uuid
 
 from auth.unified import require_auth
+from fips_mode import FipsRestricted
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
@@ -262,6 +263,9 @@ def import_ca():
             message += f'; pending request "{fulfilled}" fulfilled, its key is now the CA\'s'
         return created_response(data=ca_dict, message=message)
 
+    except FipsRestricted:
+        db.session.rollback()
+        raise  # the app handler answers 400 with the FIPS problem type
     except ValueError as e:
         db.session.rollback()
         logger.warning(f"CA import validation error: {e}")

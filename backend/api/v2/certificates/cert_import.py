@@ -7,6 +7,7 @@ import json
 import traceback
 from flask import request, g
 from auth.unified import require_auth
+from fips_mode import FipsRestricted
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
@@ -422,6 +423,9 @@ def import_certificate():
             message=f'Certificate "{certificate.descr}" imported successfully'
         )
 
+    except FipsRestricted:
+        db.session.rollback()
+        raise  # the app handler answers 400 with the FIPS problem type
     except ValueError as e:
         db.session.rollback()
         logger.error(f"Certificate import validation error: {e}")
