@@ -3046,7 +3046,7 @@
         },
         "database_postgres_without_tls": {
           "title": "PostgreSQL 连接通过 TCP 运行，且未设置 sslmode=require 或更严格的模式：FIPS 模式下 UCM 拒绝启动",
-          "remedy": "请在服务器上启用 TLS，并在 DATABASE_URL 中添加 sslmode=require（或 verify-full）。"
+          "remedy": "请在服务器上启用 TLS，并在 DATABASE_URL 中添加 sslmode=require（或 verify-full）；若服务器与 UCM 位于同一主机，请改为通过其 Unix 套接字连接：postgresql://ucm:<password>@/ucm?host=/var/run/postgresql"
         },
         "https_unapproved_key": {
           "title": "HTTPS 证书使用 Ed25519/Ed448 或弱密钥：Web 服务器在 FIPS 模式下无法使用它",

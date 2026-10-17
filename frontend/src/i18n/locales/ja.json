@@ -3046,7 +3046,7 @@
         },
         "database_postgres_without_tls": {
           "title": "PostgreSQL 接続が sslmode=require 以上の設定なしで TCP 上で動作しています。FIPS モードでは UCM は起動しません",
-          "remedy": "サーバーで TLS を有効にし、DATABASE_URL に sslmode=require（または verify-full）を追加してください。"
+          "remedy": "サーバーで TLS を有効にし、DATABASE_URL に sslmode=require（または verify-full）を追加してください。同じホスト上のサーバーの場合は、代わりに Unix ソケット経由で接続してください：postgresql://ucm:<password>@/ucm?host=/var/run/postgresql"
         },
         "https_unapproved_key": {
           "title": "HTTPS 証明書が Ed25519/Ed448 または脆弱な鍵です：FIPS モードではウェブサーバーが使用できません",

@@ -3046,7 +3046,7 @@
         },
         "database_postgres_without_tls": {
           "title": "Die PostgreSQL-Verbindung läuft über TCP ohne sslmode=require oder strenger: UCM startet im FIPS-Modus nicht",
-          "remedy": "TLS auf dem Server aktivieren und sslmode=require (oder verify-full) zu DATABASE_URL hinzufügen."
+          "remedy": "TLS auf dem Server aktivieren und sslmode=require (oder verify-full) zu DATABASE_URL hinzufügen; bei einem Server auf demselben Host stattdessen über dessen Unix-Socket verbinden: postgresql://ucm:<password>@/ucm?host=/var/run/postgresql"
         },
         "https_unapproved_key": {
           "title": "Das HTTPS-Zertifikat hat einen Ed25519/Ed448- oder schwachen Schlüssel: Der Webserver kann es im FIPS-Modus nicht verwenden",
