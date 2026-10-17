@@ -16,7 +16,8 @@ ROOT = pathlib.Path(__file__).resolve().parents[2]
 SCRIPT = ROOT / 'packaging' / 'scripts' / 'native-setup.sh'
 BASH = shutil.which('bash')
 UTILS = ('sed', 'awk', 'sort', 'grep', 'dirname', 'tail', 'head', 'tr', 'cat', 'wc',
-         'mktemp', 'rm', 'mv', 'mkdir', 'touch', 'chmod', 'openssl', 'env', 'cp', 'readlink')
+         'mktemp', 'rm', 'mv', 'mkdir', 'touch', 'chmod', 'chown', 'openssl', 'env', 'cp',
+         'readlink')
 
 UBUNTU = 'ID=ubuntu\nVERSION_ID="24.04"\nPRETTY_NAME="Ubuntu 24.04.3 LTS"\n'
 ALMA = 'ID="almalinux"\nID_LIKE="rhel centos fedora"\nVERSION_ID="9.8"\nPRETTY_NAME="AlmaLinux 9.8"\n'
@@ -590,8 +591,8 @@ def _banner(tmp_path, pkg, softhsm=False,
             hostname='[ "$1" = -I ] && echo "192.0.2.10 2001:db8::10 " || echo ucm.example.test'):
     bin_dir = tmp_path / 'bin'
     _stub(bin_dir / 'hostname', hostname)
-    _stub(bin_dir / 'dpkg', 'echo "ii  softhsm2  2.6.1"' if softhsm else 'exit 1')
-    _stub(bin_dir / 'rpm', 'exit 0' if softhsm else 'exit 1')
+    _stub(bin_dir / 'dpkg', '[ "$*" = "-l softhsm2" ] && echo "ii  softhsm2  2.6.1"' if softhsm else 'exit 1')
+    _stub(bin_dir / 'rpm', '[ "$*" = "-q softhsm" ]' if softhsm else 'exit 1')
     envfile = tmp_path / 'ucm.env'
     envfile.write_text('HTTPS_PORT=9443\nINITIAL_ADMIN_PASSWORD=s3cret\n')
     path = f"{bin_dir}:{os.environ.get('PATH', '/usr/bin:/bin')}"
@@ -624,3 +625,21 @@ def test_a_failed_host_lookup_does_not_cut_the_banner_short(tmp_path):
     assert result.returncode == 0, result.stderr
     assert ' Admin:    admin / s3cret' in result.stdout
     assert result.stdout.rstrip().endswith('============================================')
+
+
+def test_a_failed_write_leaves_no_copy_of_the_secret(tmp_path):
+    bin_dir = tmp_path / 'bin'
+    for util in UTILS:
+        real = shutil.which(util)
+        if real and util not in ('openssl', 'mv'):
+            (bin_dir / util).parent.mkdir(parents=True, exist_ok=True)
+            (bin_dir / util).symlink_to(real)
+    _stub(bin_dir / 'openssl', f'echo {"ef" * 32}')
+    _stub(bin_dir / 'mv', 'exit 1')
+    conf = tmp_path / 'etc'
+    conf.mkdir()
+    envfile = conf / 'ucm.env'
+    envfile.write_text('SECRET_KEY=\n')
+    result = _run(['env', str(envfile), '/d'], _env(tmp_path, extra={'PATH': str(bin_dir)}))
+    assert result.returncode != 0
+    assert [p.name for p in conf.iterdir()] == ['ucm.env'] and envfile.read_text() == 'SECRET_KEY=\n'

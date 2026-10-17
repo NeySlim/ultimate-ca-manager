@@ -46,12 +46,15 @@ env_fill() {
         # Builtins only: the value is a secret and must not appear in a process's argv
         local tmp line
         tmp=$(mktemp "$1.XXXXXX")
+        trap "rm -f -- $(printf %q "$tmp")" EXIT
         while IFS= read -r line || [ -n "$line" ]; do
             [[ $line =~ $re ]] && line="$2=$3"
             printf '%s\n' "$line"
         done < "$1" > "$tmp"
-        cat "$tmp" > "$1"
-        rm -f "$tmp"
+        chown --reference="$1" "$tmp"
+        chmod --reference="$1" "$tmp"
+        mv -f "$tmp" "$1"
+        trap - EXIT
     else
         env_append "$1" "$2" "$3"
     fi
@@ -429,12 +432,12 @@ case "${1:-}" in
     fips-finish) cmd_fips_finish "$2" "$3" "$4" "$5" ;;
     fips-requested) fips_requested "$2" ;;
     check-build-tools) cmd_check_build_tools "$2" "$3" ;;
-    update-precheck) cmd_update_precheck "$2" "$3" "${4:-}" ;;
+    update-precheck) cmd_update_precheck "$2" "$3" ;;
     fips-build-ok) cmd_fips_build_ok "$2" ;;
     banner) cmd_banner "$2" "$3" ;;
     *) die "usage: $0 env <ucm.env> <data dir>
   | venv <ucm home> <python> <deb|rpm> <ucm.env> | venv-ok <ucm home>
   | fips-finish <ucm home> <ucm.env> <data dir> <user> | fips-requested <ucm.env>
-  | check-build-tools <python> <deb|rpm> | update-precheck <ucm home> <ucm.env> <deb|rpm>
+  | check-build-tools <python> <deb|rpm> | update-precheck <ucm home> <ucm.env>
   | fips-build-ok <ucm.env> | banner <ucm.env> <deb|rpm>" ;;
 esac

@@ -144,7 +144,7 @@ if [ -f "$UPDATE_FILE" ]; then
     INSTALL_OK=1
 
     # UCM_FIPS_BUILD=1 compiles during the install: missing build tools refuse the update untouched
-    if [ -f "$SETUP" ] && ! PRECHECK=$(bash "$SETUP" update-precheck "$ROOT/opt/ucm" "$UCM_ENV" "${PACKAGE_PATH##*.}" 2>&1); then
+    if [ -f "$SETUP" ] && ! PRECHECK=$(bash "$SETUP" update-precheck "$ROOT/opt/ucm" "$UCM_ENV" 2>&1); then
         log "ERROR: update refused: $PRECHECK"
         write_result failed precheck "$PRECHECK"
         finish_update
