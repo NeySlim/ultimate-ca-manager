@@ -172,3 +172,60 @@ jobs:
       - name: Cleanup
         if: always()
         run: docker rm -f ucm-smoke || true
+
+  smoke-fips:
+    name: Smoke (SQLite, FIPS)
+    runs-on: ubuntu-latest
+    if: ${{ github.event_name == 'workflow_dispatch' || github.event.workflow_run.conclusion == 'success' }}
+
+    steps:
+      - uses: actions/checkout@v6
+
+      - name: Resolve version
+        id: ver
+        run: |
+          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
+            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
+            echo "image=${{ inputs.image }}" >> "$GITHUB_OUTPUT"
+          else
+            REF="${{ github.event.workflow_run.head_branch }}"
+            VER="${REF#v}"
+            echo "version=$VER" >> "$GITHUB_OUTPUT"
+            echo "image=neyslim/ultimate-ca-manager" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Determine RC flag
+        id: rc
+        env:
+          VERSION: ${{ steps.ver.outputs.version }}
+        run: |
+          if [[ "$VERSION" == *-rc* ]]; then
+            echo "flag=--allow-rc" >> "$GITHUB_OUTPUT"
+          else
+            echo "flag=" >> "$GITHUB_OUTPUT"
+          fi
+
+      - name: Pull Docker image
+        run: docker pull "${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}-fips"
+
+      - name: Boot UCM container (UCM_FIPS=1)
+        env:
+          FIPS_CHECK_KEEP: '1'
+        run: |
+          scripts/ci/check-fips-image.sh \
+            "${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}-fips" ucm-smoke 8443
+
+      - name: Run release smoke
+        run: |
+          python3 scripts/smoke_release.py \
+            --version "${{ steps.ver.outputs.version }}" \
+            ${{ steps.rc.outputs.flag }} \
+            --target "Docker SQLite FIPS=https://localhost:8443"
+
+      - name: Container logs on failure
+        if: failure()
+        run: docker logs ucm-smoke || true
+
+      - name: Cleanup
+        if: always()
+        run: docker rm -f ucm-smoke || true
