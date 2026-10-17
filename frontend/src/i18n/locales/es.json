@@ -4141,6 +4141,8 @@
     "searchPlaceholder": "Buscar políticas...",
     "selectGroup": "Seleccionar grupo...",
     "subtitle": "Gestionar reglas de emisión, requisitos de claves y flujos de aprobación",
+    "fipsRulesTitle": "FIPS rules active (read only)",
+    "fipsRulesDesc": "FIPS mode applies a system policy ahead of these: RSA 2048 to 4096 and EC P-256 to P-521 keys, SHA-256 to SHA-512 signatures. Policies here can only narrow it.",
     "targetCA": "CA destino",
     "title": "Políticas de certificados",
     "toggleFailed": "Error al cambiar el estado de la política",

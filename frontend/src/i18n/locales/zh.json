@@ -4141,6 +4141,8 @@
     "searchPlaceholder": "搜索策略...",
     "selectGroup": "选择用户组...",
     "subtitle": "管理签发规则、密钥要求和审批工作流",
+    "fipsRulesTitle": "FIPS rules active (read only)",
+    "fipsRulesDesc": "FIPS mode applies a system policy ahead of these: RSA 2048 to 4096 and EC P-256 to P-521 keys, SHA-256 to SHA-512 signatures. Policies here can only narrow it.",
     "targetCA": "目标 CA",
     "title": "证书策略",
     "toggleFailed": "切换策略失败",

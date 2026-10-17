@@ -3799,6 +3799,8 @@
   "policies": {
     "title": "Certificate Policies",
     "subtitle": "Manage issuance rules, key requirements, and approval workflows",
+    "fipsRulesTitle": "FIPS rules active (read only)",
+    "fipsRulesDesc": "FIPS mode applies a system policy ahead of these: RSA 2048 to 4096 and EC P-256 to P-521 keys, SHA-256 to SHA-512 signatures. Policies here can only narrow it.",
     "total": "Total",
     "active": "Active",
     "inactive": "Inactive",

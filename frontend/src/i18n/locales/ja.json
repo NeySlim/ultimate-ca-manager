@@ -4141,6 +4141,8 @@
     "searchPlaceholder": "ポリシーを検索...",
     "selectGroup": "グループを選択...",
     "subtitle": "発行ルール、鍵要件、承認ワークフローを管理します",
+    "fipsRulesTitle": "FIPS rules active (read only)",
+    "fipsRulesDesc": "FIPS mode applies a system policy ahead of these: RSA 2048 to 4096 and EC P-256 to P-521 keys, SHA-256 to SHA-512 signatures. Policies here can only narrow it.",
     "targetCA": "対象CA",
     "title": "証明書ポリシー",
     "toggleFailed": "ポリシーの切り替えに失敗しました",

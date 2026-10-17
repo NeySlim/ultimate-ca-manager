@@ -2,7 +2,7 @@
  * PoliciesPage — Certificate Policies & Approval Workflows
  * CRUD for certificate policies with rules, approval settings, and notifications.
  */
-import { useState, useCallback, useMemo } from 'react'
+import { useState, useCallback, useMemo, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
   Gavel, Plus, PencilSimple, Trash, Power, ShieldCheck,
@@ -46,6 +46,7 @@ const EDDSA_KEY_TYPE_OPTIONS = [
   { value: 'ED25519', labelKey: 'common.keyTypes.ed25519' },
   { value: 'ED448', labelKey: 'common.keyTypes.ed448' },
 ]
+const EDDSA_VALUES = new Set(EDDSA_KEY_TYPE_OPTIONS.map(o => o.value))
 
 // Signature hashes; none selected means any hash
 const DIGEST_OPTIONS = [
@@ -87,6 +88,16 @@ export default function PoliciesPage() {
 
   // Resolve i18n labels for module-level option arrays
   const policyTypeOptions = useMemo(() => POLICY_TYPES.map(o => ({ value: o.value, label: t(o.labelKey) })), [t])
+  // FIPS mode puts a read-only system policy ahead of these, without EdDSA keys
+  const [fipsActive, setFipsActive] = useState(false)
+  useEffect(() => {
+    let alive = true
+    Promise.resolve()
+      .then(() => policiesService.getEffective())
+      .then(res => { if (alive) setFipsActive(res?.data?.fips === true) })
+      .catch(() => {})
+    return () => { alive = false }
+  }, [])
   const keyTypeOptions = useMemo(
     () => [...KEY_TYPE_OPTIONS, ...EDDSA_KEY_TYPE_OPTIONS].map(o => ({ value: o.value, label: t(o.labelKey) })),
     [t],
@@ -561,6 +572,15 @@ export default function PoliciesPage() {
         onSlideOverClose={() => setSelectedPolicy(null)}
         loading={loading}
       >
+        {fipsActive && (
+          <div role="note" className="mx-4 mt-3 flex items-start gap-2 rounded-lg px-3 py-2 text-sm bg-status-info-op10 text-status-info">
+            <ShieldCheck size={16} className="mt-0.5 shrink-0" />
+            <div>
+              <div className="font-medium">{t('policies.fipsRulesTitle')}</div>
+              <div className="text-text-secondary">{t('policies.fipsRulesDesc')}</div>
+            </div>
+          </div>
+        )}
         <ResponsiveDataTable
           data={filteredPolicies}
           columns={columns}
@@ -687,7 +707,9 @@ export default function PoliciesPage() {
                 {t('policies.allowedKeyTypes')}
               </label>
               <div className="flex flex-wrap gap-2">
-                {keyTypeOptions.map(opt => (
+                {/* In FIPS mode an EdDSA key shows only while ticked, so it can be removed */}
+                {keyTypeOptions.filter(opt => !fipsActive || !EDDSA_VALUES.has(opt.value)
+                  || formData.rules.allowed_key_types?.includes(opt.value)).map(opt => (
                   <button
                     key={opt.value}
                     type="button"

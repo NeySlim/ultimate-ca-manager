@@ -4193,6 +4193,8 @@
     "searchPlaceholder": "Пошук політик...",
     "selectGroup": "Оберіть групу...",
     "subtitle": "Керування правилами видачі, вимогами до ключів та процесами затвердження",
+    "fipsRulesTitle": "FIPS rules active (read only)",
+    "fipsRulesDesc": "FIPS mode applies a system policy ahead of these: RSA 2048 to 4096 and EC P-256 to P-521 keys, SHA-256 to SHA-512 signatures. Policies here can only narrow it.",
     "targetCA": "Цільовий CA",
     "title": "Політики сертифікатів",
     "toggleFailed": "Не вдалося змінити стан політики",
