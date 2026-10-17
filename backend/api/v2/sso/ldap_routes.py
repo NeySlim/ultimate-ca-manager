@@ -268,6 +268,10 @@ def _get_saml_auth(flask_request, provider, relay_state=None):
             'wantAssertionsEncrypted': False,
             'requestedAuthnContext': False,
             'allowSingleLabelDomains': True,
+            # SHA-256 for anything the SP signs; IdP signatures or digests in SHA-1 are refused.
+            'signatureAlgorithm': 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
+            'digestAlgorithm': 'http://www.w3.org/2001/04/xmlenc#sha256',
+            'rejectDeprecatedAlgorithm': True,
         },
     }
 
