@@ -106,6 +106,8 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r backend/requirements.txt
+          # As the packages do: pyjks without its twofish dependency
+          pip install --no-deps pyjks==20.0.0
           pip install pytest pytest-cov pytest-mock
       
       - name: Run tests
@@ -157,6 +159,7 @@ jobs:
         run: |
           pip install --upgrade pip
           pip install -r backend/requirements.txt
+          pip install --no-deps pyjks==20.0.0
           pip install pytest pytest-cov pytest-mock psycopg2-binary
 
       - name: Wait for PostgreSQL
