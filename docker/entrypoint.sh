@@ -74,7 +74,7 @@ if [ "$FIPS_REQUESTED" = 1 ]; then
     if ! mkdir -p "$FIPS_RUN_DIR" 2>/dev/null || [ ! -w "$FIPS_RUN_DIR" ]; then
         echo -e "${RED}❌ $FIPS_RUN_DIR is not writable by UID $(id -u)${NC}"
         echo "   FIPS mode writes the module configuration there at each start."
-        echo "   With a read-only root filesystem, mount a tmpfs: --tmpfs /run/ucm:uid=1000"
+        echo "   With a read-only root filesystem, mount tmpfs: --tmpfs /run/ucm:uid=1000 --tmpfs /tmp"
         exit 1
     fi
     if ! openssl fipsinstall -module "$FIPS_MODULE" -provider_name fips \

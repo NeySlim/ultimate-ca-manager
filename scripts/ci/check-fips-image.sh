@@ -12,7 +12,7 @@ conf=/run/ucm/openssl-fips.cnf
 passed=0
 cleanup() {
     if [ "$passed" != 1 ] || [ "${FIPS_CHECK_KEEP:-0}" != 1 ]; then
-        docker rm -f "$name" >/dev/null 2>&1 || true
+        docker rm -f -v "$name" >/dev/null 2>&1 || true
     fi
 }
 trap cleanup EXIT

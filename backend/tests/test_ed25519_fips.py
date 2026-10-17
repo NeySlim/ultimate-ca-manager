@@ -479,3 +479,25 @@ class TestSiblingIssuancePaths:
             ca = db.session.get(CA, ed_ca)
             with pytest.raises(FipsRestricted, match='Ed25519 key of CA'):
                 CAService.complete_external_ca(ca, base64.b64decode(ca.crt))
+
+
+def _ed_pem_bundle(cn, ca=True):
+    key = ed25519.Ed25519PrivateKey.generate()
+    now = datetime.now(timezone.utc)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)])
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=365))
+            .add_extension(x509.BasicConstraints(ca=ca, path_length=None), critical=True)
+            .sign(key, None))
+    return (cert.public_bytes(serialization.Encoding.PEM) + _pkcs8(key)).decode()
+
+
+class TestImports:
+    @pytest.mark.parametrize('url, ca', [('/api/v2/cas/import', True),
+                                         ('/api/v2/certificates/import', False)])
+    def test_an_ed25519_file_answers_the_fips_problem(self, auth_client, fips_on, url, ca):
+        pem = _ed_pem_bundle(f'Imported Ed25519 {uuid.uuid4().hex[:6]}', ca=ca)
+        r = auth_client.post(url, data={'pem_content': pem, 'name': 'ed import'})
+        _assert_fips_problem(r)
+        assert 'the imported file' in r.get_json()['detail']

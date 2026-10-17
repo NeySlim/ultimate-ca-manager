@@ -6,7 +6,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 import re
 import base64
-from utils.key_codec import private_key_to_pem
+from utils.key_codec import private_key_to_pem, refuse_eddsa_key
 from utils.pkcs12_import import refuse_pkcs12_import
 
 
@@ -16,6 +16,8 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
     Returns: (cert, private_key, format_detected)
     Raises: ValueError on parse error
     """
+    # Before any parsing: the FIPS provider cannot load an EdDSA key, so the refusal must say so.
+    refuse_eddsa_key(file_data, 'the imported file')
     cert = None
     private_key = None
     format_type = 'auto'
