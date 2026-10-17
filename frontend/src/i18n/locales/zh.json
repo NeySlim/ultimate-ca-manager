@@ -2943,120 +2943,120 @@
     "httpsUnbind": "停止跟随续期",
     "httpsUnbindDone": "已解除 HTTPS 证书绑定",
     "fipsPreflight": {
-      "title": "FIPS readiness",
-      "hint": "Lists what FIPS mode would refuse on this instance, with a remedy for each. Nothing is changed.",
-      "run": "Check FIPS readiness",
-      "running": "Checking...",
-      "failed": "The FIPS readiness check failed",
-      "ready": "Nothing blocks FIPS mode",
-      "notReady": "Not ready for FIPS mode",
-      "nothingFound": "Nothing found that FIPS mode would refuse.",
+      "title": "FIPS 就绪检查",
+      "hint": "列出 FIPS 模式在此实例上会拒绝的项目，并为每项给出补救办法。不会更改任何内容。",
+      "run": "检查 FIPS 就绪情况",
+      "running": "正在检查...",
+      "failed": "FIPS 就绪检查失败",
+      "ready": "没有任何项目阻止启用 FIPS 模式",
+      "notReady": "尚未做好启用 FIPS 模式的准备",
+      "nothingFound": "未发现 FIPS 模式会拒绝的项目。",
       "severity": {
-        "blocker": "Blockers",
-        "warning": "Warnings",
-        "info": "Information"
+        "blocker": "阻塞项",
+        "warning": "警告",
+        "info": "信息"
       },
-      "remedy": "Remedy:",
-      "more": "and {{count}} more",
-      "checkFailed": "The check {{id}} could not run",
+      "remedy": "补救办法：",
+      "more": "另有 {{count}} 项",
+      "checkFailed": "检查 {{id}} 无法运行",
       "checks": {
         "users_password_scrypt": {
-          "title": "Local users with an scrypt password hash: they cannot sign in once FIPS mode is on",
-          "remedy": "Have each user sign in once before the switch: the hash is replaced by PBKDF2 automatically; otherwise an administrator resets the password."
+          "title": "使用 scrypt 密码哈希的本地用户：启用 FIPS 模式后将无法登录",
+          "remedy": "请在切换前让每位用户登录一次：哈希会自动替换为 PBKDF2；否则由管理员重置密码。"
         },
         "users_backup_codes_scrypt": {
-          "title": "Users whose 2FA backup codes are scrypt hashes: those codes stop working in FIPS mode",
-          "remedy": "Ask these users to regenerate their backup codes before the switch."
+          "title": "双因素验证备份码为 scrypt 哈希的用户：这些备份码在 FIPS 模式下将失效",
+          "remedy": "请这些用户在切换前重新生成备份码。"
         },
         "protocols_secret_scrypt": {
-          "title": "EST, WSTEP or XCEP passwords stored as scrypt hashes: clients are refused in FIPS mode",
-          "remedy": "Enter the password again in the protocol settings: it is then stored as a PBKDF2 hash."
+          "title": "以 scrypt 哈希存储的 EST、WSTEP 或 XCEP 密码：FIPS 模式下客户端将被拒绝",
+          "remedy": "请在协议设置中重新输入密码：之后将以 PBKDF2 哈希存储。"
         },
         "ca_eddsa_key": {
-          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode",
-          "remedy": "Create an RSA or ECDSA (P-256/P-384/P-521) authority and move issuance to it before the switch; an authority key cannot be converted."
+          "title": "使用 Ed25519 或 Ed448 密钥的证书颁发机构：在 FIPS 模式下无法签名",
+          "remedy": "请在切换前创建 RSA 或 ECDSA（P-256/P-384/P-521）颁发机构并将签发迁移过去；颁发机构密钥无法转换。"
         },
         "ca_weak_key": {
-          "title": "Certificate authorities with RSA under 2048 bits or a curve other than P-256/384/521",
-          "remedy": "Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it."
+          "title": "使用 DSA 密钥、2048 位以下 RSA 或 P-256/384/521 以外曲线的证书颁发机构",
+          "remedy": "请创建使用 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521 的颁发机构，并将签发迁移过去。"
         },
         "ssh_ca_eddsa_key": {
-          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode",
-          "remedy": "Create an ECDSA or RSA SSH authority and distribute its public key to the hosts before the switch."
+          "title": "使用 Ed25519 密钥的 SSH 证书颁发机构：在 FIPS 模式下无法签名",
+          "remedy": "请在切换前创建 ECDSA 或 RSA 的 SSH 颁发机构，并将其公钥分发到各主机。"
         },
         "ssh_certificates_eddsa_key": {
-          "title": "Active SSH certificates for Ed25519 keys: they stay valid but cannot be signed again",
-          "remedy": "Have their holders switch to an ECDSA or RSA key at the next renewal."
+          "title": "针对 Ed25519 密钥的有效 SSH 证书：它们仍然有效，但无法再次签名",
+          "remedy": "请持有者在下次续期时改用 ECDSA 或 RSA 密钥。"
         },
         "deploy_ssh_eddsa_key": {
-          "title": "Deployment targets that sign in with an Ed25519 SSH key: deployments fail in FIPS mode",
-          "remedy": "Give each target a new ECDSA or RSA key and install its public key on the host."
+          "title": "使用 Ed25519 SSH 密钥登录的部署目标：FIPS 模式下部署将失败",
+          "remedy": "请为每个目标配置新的 ECDSA 或 RSA 密钥，并将其公钥安装到主机上。"
         },
         "ocsp_responder_unapproved_key": {
-          "title": "Delegated OCSP responders with an Ed25519/Ed448 or weak key: the CA signs instead",
-          "remedy": "Issue a new RSA or ECDSA responder certificate and select it in the CA settings."
+          "title": "使用 Ed25519/Ed448 或弱密钥的委派 OCSP 响应器：将改由 CA 签名",
+          "remedy": "请签发新的 RSA 或 ECDSA 响应器证书，并在 CA 设置中选择它。"
         },
         "tsa_signer_unapproved_key": {
-          "title": "The timestamping certificate has an Ed25519/Ed448 or weak key: timestamps fail in FIPS mode",
-          "remedy": "Issue a new RSA or ECDSA timestamping certificate and select it in the TSA settings."
+          "title": "时间戳证书使用 Ed25519/Ed448 或弱密钥：FIPS 模式下时间戳将失败",
+          "remedy": "请签发新的 RSA 或 ECDSA 时间戳证书，并在 TSA 设置中选择它。"
         },
         "certificates_unapproved_key": {
-          "title": "Active certificates with an Ed25519/Ed448 key, RSA under 2048 bits or another curve",
-          "remedy": "They stay valid; renew them with a new RSA 2048+ or ECDSA P-256/P-384/P-521 key, since renewing with the same key is refused in FIPS mode."
+          "title": "使用 Ed25519/Ed448 密钥、2048 位以下 RSA 或其他曲线的有效证书",
+          "remedy": "它们仍然有效；请使用新的 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521 密钥续期，因为 FIPS 模式下拒绝使用相同密钥续期。"
         },
         "templates_unapproved_key_type": {
-          "title": "Active templates whose key type is not FIPS approved: issuance from them is refused",
-          "remedy": "Change the key type of these templates to RSA 2048+ or ECDSA P-256/P-384/P-521."
+          "title": "密钥类型不被 FIPS 批准的有效模板：将拒绝通过它们签发",
+          "remedy": "请将这些模板的密钥类型改为 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521。"
         },
         "policies_unapproved_key_type": {
-          "title": "Active policies that allow key types FIPS mode removes (Ed25519, Ed448, short RSA...)",
-          "remedy": "Remove those key types from the policies; a policy left with none allows no issuance."
+          "title": "允许 FIPS 模式所移除密钥类型（Ed25519、Ed448、短 RSA 等）的有效策略",
+          "remedy": "请从策略中移除这些密钥类型；若策略中不剩任何类型，则不允许任何签发。"
         },
         "acme_client_unapproved_key_type": {
-          "title": "ACME client settings or renewing orders that use a key type FIPS mode refuses",
-          "remedy": "Set the ACME client key type to RSA or ECDSA and re-create these orders with a new key."
+          "title": "使用 FIPS 模式所拒绝密钥类型的 ACME 客户端设置或续期订单",
+          "remedy": "请将 ACME 客户端密钥类型设为 RSA 或 ECDSA，并使用新密钥重新创建这些订单。"
         },
         "hsm_softhsm": {
-          "title": "SoftHSM providers: SoftHSM is not a validated module, keys on it are not FIPS protected",
-          "remedy": "Move the keys to a validated HSM, or accept SoftHSM as a test setup only."
+          "title": "SoftHSM 提供商：SoftHSM 不是经过验证的模块，其上的密钥不受 FIPS 保护",
+          "remedy": "请将密钥迁移到经过验证的 HSM，或仅将 SoftHSM 作为测试环境使用。"
         },
         "hsm_gcp_grpc": {
-          "title": "Google Cloud KMS providers: their client uses gRPC with its own TLS, outside the FIPS module",
-          "remedy": "Prefer a PKCS#11, Azure Key Vault or OpenBao provider for keys that must stay in FIPS scope."
+          "title": "Google Cloud KMS 提供商：其客户端使用带有自身 TLS 的 gRPC，位于 FIPS 模块之外",
+          "remedy": "对于必须保持在 FIPS 范围内的密钥，请优先选择 PKCS#11、Azure Key Vault 或 OpenBao 提供商。"
         },
         "hsm_unapproved_keys": {
-          "title": "HSM keys of an algorithm FIPS mode hides (Ed25519, ChaCha20...)",
-          "remedy": "Replace them with RSA, ECDSA or AES keys; FIPS mode leaves them out of the inventory."
+          "title": "使用 FIPS 模式之外算法（Ed25519、Ed448、ChaCha20-Poly1305）的 HSM 密钥",
+          "remedy": "请将其替换为 RSA、ECDSA 或 AES 密钥；在 FIPS 模式下，这些类型的 OpenBao 和 Vault Transit 密钥将不再列出。"
         },
         "dns_tsig_hmac_md5": {
-          "title": "RFC 2136 DNS providers signing with TSIG hmac-md5: DNS-01 updates are refused in FIPS mode",
-          "remedy": "Create an hmac-sha256 TSIG key on the DNS server and enter it in the provider."
+          "title": "使用 TSIG hmac-md5 签名的 RFC 2136 DNS 提供商：FIPS 模式下 DNS-01 更新将被拒绝",
+          "remedy": "请在 DNS 服务器上创建 hmac-sha256 TSIG 密钥，并在提供商中填写。"
         },
         "msca_winrm_ntlm": {
-          "title": "Microsoft CA connections whose WinRM channel uses NTLM: the channel is refused in FIPS mode",
-          "remedy": "Switch the WinRM transport of these connections to Kerberos."
+          "title": "WinRM 通道使用 NTLM 的 Microsoft CA 连接：FIPS 模式下该通道将被拒绝",
+          "remedy": "请将这些连接的 WinRM 传输方式改为 Kerberos。"
         },
         "backup_schedule_argon2id": {
-          "title": "Scheduled backups are written with Argon2id: such archives cannot be restored in FIPS mode",
-          "remedy": "Set the scheduled backup KDF to PBKDF2, and take a manual backup with kdf \"pbkdf2\" before the switch."
+          "title": "计划备份使用 Argon2id 写入：此类归档在 FIPS 模式下无法恢复",
+          "remedy": "请将计划备份的 KDF 设为 PBKDF2，并在切换前使用 kdf \"pbkdf2\" 手动备份一次。"
         },
         "backup_archives_argon2id": {
-          "title": "Backup archives on disk encrypted with Argon2id: they cannot be restored in FIPS mode",
-          "remedy": "Keep them for a standard instance, and take a manual backup with kdf \"pbkdf2\" before the switch."
+          "title": "磁盘上使用 Argon2id 加密的备份归档：它们在 FIPS 模式下无法恢复",
+          "remedy": "请将其保留给标准实例使用，并在切换前使用 kdf \"pbkdf2\" 手动备份一次。"
         },
         "database_postgres_without_tls": {
-          "title": "The PostgreSQL connection runs over TCP without sslmode=require or stricter",
-          "remedy": "Enable TLS on the server and add sslmode=require (or verify-full) to DATABASE_URL."
+          "title": "PostgreSQL 连接通过 TCP 运行，且未设置 sslmode=require 或更严格的模式：FIPS 模式下 UCM 拒绝启动",
+          "remedy": "请在服务器上启用 TLS，并在 DATABASE_URL 中添加 sslmode=require（或 verify-full）。"
         },
         "https_unapproved_key": {
-          "title": "The HTTPS certificate has an Ed25519/Ed448 or weak key: the web server cannot use it in FIPS mode",
-          "remedy": "Install an RSA 2048+ or ECDSA P-256/P-384/P-521 certificate in the HTTPS settings."
+          "title": "HTTPS 证书使用 Ed25519/Ed448 或弱密钥：Web 服务器在 FIPS 模式下无法使用它",
+          "remedy": "请在 HTTPS 设置中安装 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521 证书。"
         }
       }
     },
-    "backupKdf": "Key derivation",
-    "backupKdfAuto": "Automatic (Argon2id when available, PBKDF2 in FIPS mode)",
-    "backupKdfHelper": "Archives written with Argon2id cannot be restored on an instance in FIPS mode."
+    "backupKdf": "密钥派生",
+    "backupKdfAuto": "自动（可用时使用 Argon2id，FIPS 模式下使用 PBKDF2）",
+    "backupKdfHelper": "使用 Argon2id 写入的归档无法在 FIPS 模式的实例上恢复。"
   },
   "account": {
     "profile": "个人资料",

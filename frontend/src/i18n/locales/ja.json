@@ -2943,120 +2943,120 @@
     "httpsUnbind": "更新の追従を停止",
     "httpsUnbindDone": "HTTPS 証明書の紐付けを解除しました",
     "fipsPreflight": {
-      "title": "FIPS readiness",
-      "hint": "Lists what FIPS mode would refuse on this instance, with a remedy for each. Nothing is changed.",
-      "run": "Check FIPS readiness",
-      "running": "Checking...",
-      "failed": "The FIPS readiness check failed",
-      "ready": "Nothing blocks FIPS mode",
-      "notReady": "Not ready for FIPS mode",
-      "nothingFound": "Nothing found that FIPS mode would refuse.",
+      "title": "FIPS 対応状況",
+      "hint": "このインスタンスで FIPS モードが拒否する項目と、それぞれの対処方法を一覧表示します。変更は行われません。",
+      "run": "FIPS 対応状況を確認",
+      "running": "確認中...",
+      "failed": "FIPS 対応状況の確認に失敗しました",
+      "ready": "FIPS モードを妨げる項目はありません",
+      "notReady": "FIPS モードの準備ができていません",
+      "nothingFound": "FIPS モードが拒否する項目は見つかりませんでした。",
       "severity": {
-        "blocker": "Blockers",
-        "warning": "Warnings",
-        "info": "Information"
+        "blocker": "ブロッカー",
+        "warning": "警告",
+        "info": "情報"
       },
-      "remedy": "Remedy:",
-      "more": "and {{count}} more",
-      "checkFailed": "The check {{id}} could not run",
+      "remedy": "対処方法：",
+      "more": "ほか {{count}} 件",
+      "checkFailed": "チェック {{id}} を実行できませんでした",
       "checks": {
         "users_password_scrypt": {
-          "title": "Local users with an scrypt password hash: they cannot sign in once FIPS mode is on",
-          "remedy": "Have each user sign in once before the switch: the hash is replaced by PBKDF2 automatically; otherwise an administrator resets the password."
+          "title": "scrypt パスワードハッシュを持つローカルユーザー：FIPS モードを有効にするとログインできなくなります",
+          "remedy": "切り替え前に各ユーザーが一度ログインしてください。ハッシュは自動的に PBKDF2 に置き換えられます。それ以外の場合は管理者がパスワードをリセットしてください。"
         },
         "users_backup_codes_scrypt": {
-          "title": "Users whose 2FA backup codes are scrypt hashes: those codes stop working in FIPS mode",
-          "remedy": "Ask these users to regenerate their backup codes before the switch."
+          "title": "2FA バックアップコードが scrypt ハッシュのユーザー：FIPS モードではこれらのコードが使えなくなります",
+          "remedy": "切り替え前に、これらのユーザーにバックアップコードを再生成するよう依頼してください。"
         },
         "protocols_secret_scrypt": {
-          "title": "EST, WSTEP or XCEP passwords stored as scrypt hashes: clients are refused in FIPS mode",
-          "remedy": "Enter the password again in the protocol settings: it is then stored as a PBKDF2 hash."
+          "title": "scrypt ハッシュで保存された EST、WSTEP、XCEP のパスワード：FIPS モードではクライアントが拒否されます",
+          "remedy": "プロトコル設定でパスワードを再入力してください。PBKDF2 ハッシュとして保存されます。"
         },
         "ca_eddsa_key": {
-          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode",
-          "remedy": "Create an RSA or ECDSA (P-256/P-384/P-521) authority and move issuance to it before the switch; an authority key cannot be converted."
+          "title": "Ed25519 または Ed448 の鍵を持つ認証局：FIPS モードでは署名できません",
+          "remedy": "切り替え前に RSA または ECDSA（P-256/P-384/P-521）の認証局を作成し、発行をそちらへ移行してください。認証局の鍵は変換できません。"
         },
         "ca_weak_key": {
-          "title": "Certificate authorities with RSA under 2048 bits or a curve other than P-256/384/521",
-          "remedy": "Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it."
+          "title": "DSA 鍵、2048 ビット未満の RSA、または P-256/384/521 以外の曲線を使う認証局",
+          "remedy": "RSA 2048 以上または ECDSA P-256/P-384/P-521 の認証局を作成し、発行をそちらへ移行してください。"
         },
         "ssh_ca_eddsa_key": {
-          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode",
-          "remedy": "Create an ECDSA or RSA SSH authority and distribute its public key to the hosts before the switch."
+          "title": "Ed25519 鍵を持つ SSH 認証局：FIPS モードでは署名できません",
+          "remedy": "切り替え前に ECDSA または RSA の SSH 認証局を作成し、その公開鍵をホストに配布してください。"
         },
         "ssh_certificates_eddsa_key": {
-          "title": "Active SSH certificates for Ed25519 keys: they stay valid but cannot be signed again",
-          "remedy": "Have their holders switch to an ECDSA or RSA key at the next renewal."
+          "title": "Ed25519 鍵の有効な SSH 証明書：有効なままですが、再署名はできません",
+          "remedy": "次回の更新時に、保有者に ECDSA または RSA 鍵へ切り替えてもらってください。"
         },
         "deploy_ssh_eddsa_key": {
-          "title": "Deployment targets that sign in with an Ed25519 SSH key: deployments fail in FIPS mode",
-          "remedy": "Give each target a new ECDSA or RSA key and install its public key on the host."
+          "title": "Ed25519 SSH 鍵でログインするデプロイ先：FIPS モードではデプロイが失敗します",
+          "remedy": "各デプロイ先に新しい ECDSA または RSA 鍵を設定し、その公開鍵をホストに登録してください。"
         },
         "ocsp_responder_unapproved_key": {
-          "title": "Delegated OCSP responders with an Ed25519/Ed448 or weak key: the CA signs instead",
-          "remedy": "Issue a new RSA or ECDSA responder certificate and select it in the CA settings."
+          "title": "Ed25519/Ed448 または脆弱な鍵を持つ委任 OCSP レスポンダー：代わりに CA が署名します",
+          "remedy": "新しい RSA または ECDSA のレスポンダー証明書を発行し、CA 設定で選択してください。"
         },
         "tsa_signer_unapproved_key": {
-          "title": "The timestamping certificate has an Ed25519/Ed448 or weak key: timestamps fail in FIPS mode",
-          "remedy": "Issue a new RSA or ECDSA timestamping certificate and select it in the TSA settings."
+          "title": "タイムスタンプ証明書が Ed25519/Ed448 または脆弱な鍵です：FIPS モードではタイムスタンプが失敗します",
+          "remedy": "新しい RSA または ECDSA のタイムスタンプ証明書を発行し、TSA 設定で選択してください。"
         },
         "certificates_unapproved_key": {
-          "title": "Active certificates with an Ed25519/Ed448 key, RSA under 2048 bits or another curve",
-          "remedy": "They stay valid; renew them with a new RSA 2048+ or ECDSA P-256/P-384/P-521 key, since renewing with the same key is refused in FIPS mode."
+          "title": "Ed25519/Ed448 鍵、2048 ビット未満の RSA、または他の曲線を使う有効な証明書",
+          "remedy": "有効なままですが、FIPS モードでは同じ鍵での更新が拒否されるため、新しい RSA 2048 以上または ECDSA P-256/P-384/P-521 の鍵で更新してください。"
         },
         "templates_unapproved_key_type": {
-          "title": "Active templates whose key type is not FIPS approved: issuance from them is refused",
-          "remedy": "Change the key type of these templates to RSA 2048+ or ECDSA P-256/P-384/P-521."
+          "title": "鍵タイプが FIPS で承認されていない有効なテンプレート：これらからの発行は拒否されます",
+          "remedy": "これらのテンプレートの鍵タイプを RSA 2048 以上または ECDSA P-256/P-384/P-521 に変更してください。"
         },
         "policies_unapproved_key_type": {
-          "title": "Active policies that allow key types FIPS mode removes (Ed25519, Ed448, short RSA...)",
-          "remedy": "Remove those key types from the policies; a policy left with none allows no issuance."
+          "title": "FIPS モードが除外する鍵タイプ（Ed25519、Ed448、短い RSA など）を許可している有効なポリシー",
+          "remedy": "ポリシーからこれらの鍵タイプを削除してください。許可する鍵タイプが残らないポリシーでは発行できません。"
         },
         "acme_client_unapproved_key_type": {
-          "title": "ACME client settings or renewing orders that use a key type FIPS mode refuses",
-          "remedy": "Set the ACME client key type to RSA or ECDSA and re-create these orders with a new key."
+          "title": "FIPS モードが拒否する鍵タイプを使う ACME クライアント設定または更新中のオーダー",
+          "remedy": "ACME クライアントの鍵タイプを RSA または ECDSA に設定し、これらのオーダーを新しい鍵で作り直してください。"
         },
         "hsm_softhsm": {
-          "title": "SoftHSM providers: SoftHSM is not a validated module, keys on it are not FIPS protected",
-          "remedy": "Move the keys to a validated HSM, or accept SoftHSM as a test setup only."
+          "title": "SoftHSM プロバイダー：SoftHSM は検証済みモジュールではなく、その上の鍵は FIPS で保護されません",
+          "remedy": "鍵を検証済みの HSM に移すか、SoftHSM をテスト用の構成としてのみ使用してください。"
         },
         "hsm_gcp_grpc": {
-          "title": "Google Cloud KMS providers: their client uses gRPC with its own TLS, outside the FIPS module",
-          "remedy": "Prefer a PKCS#11, Azure Key Vault or OpenBao provider for keys that must stay in FIPS scope."
+          "title": "Google Cloud KMS プロバイダー：クライアントは独自の TLS で gRPC を使用し、FIPS モジュールの外で動作します",
+          "remedy": "FIPS の範囲内に置く必要がある鍵には、PKCS#11、Azure Key Vault、OpenBao のプロバイダーを使用してください。"
         },
         "hsm_unapproved_keys": {
-          "title": "HSM keys of an algorithm FIPS mode hides (Ed25519, ChaCha20...)",
-          "remedy": "Replace them with RSA, ECDSA or AES keys; FIPS mode leaves them out of the inventory."
+          "title": "FIPS モードの対象外のアルゴリズム（Ed25519、Ed448、ChaCha20-Poly1305）の HSM 鍵",
+          "remedy": "RSA、ECDSA、AES の鍵に置き換えてください。FIPS モードでは、これらの種類の OpenBao および Vault Transit の鍵は一覧に表示されなくなります。"
         },
         "dns_tsig_hmac_md5": {
-          "title": "RFC 2136 DNS providers signing with TSIG hmac-md5: DNS-01 updates are refused in FIPS mode",
-          "remedy": "Create an hmac-sha256 TSIG key on the DNS server and enter it in the provider."
+          "title": "TSIG hmac-md5 で署名する RFC 2136 DNS プロバイダー：FIPS モードでは DNS-01 の更新が拒否されます",
+          "remedy": "DNS サーバーで hmac-sha256 の TSIG 鍵を作成し、プロバイダーに入力してください。"
         },
         "msca_winrm_ntlm": {
-          "title": "Microsoft CA connections whose WinRM channel uses NTLM: the channel is refused in FIPS mode",
-          "remedy": "Switch the WinRM transport of these connections to Kerberos."
+          "title": "WinRM チャネルが NTLM を使う Microsoft CA 接続：FIPS モードではチャネルが拒否されます",
+          "remedy": "これらの接続の WinRM トランスポートを Kerberos に切り替えてください。"
         },
         "backup_schedule_argon2id": {
-          "title": "Scheduled backups are written with Argon2id: such archives cannot be restored in FIPS mode",
-          "remedy": "Set the scheduled backup KDF to PBKDF2, and take a manual backup with kdf \"pbkdf2\" before the switch."
+          "title": "スケジュールバックアップが Argon2id で書き込まれています：FIPS モードではこのアーカイブを復元できません",
+          "remedy": "スケジュールバックアップの KDF を PBKDF2 に設定し、切り替え前に kdf \"pbkdf2\" で手動バックアップを取得してください。"
         },
         "backup_archives_argon2id": {
-          "title": "Backup archives on disk encrypted with Argon2id: they cannot be restored in FIPS mode",
-          "remedy": "Keep them for a standard instance, and take a manual backup with kdf \"pbkdf2\" before the switch."
+          "title": "ディスク上の Argon2id で暗号化されたバックアップアーカイブ：FIPS モードでは復元できません",
+          "remedy": "標準のインスタンス用に保管し、切り替え前に kdf \"pbkdf2\" で手動バックアップを取得してください。"
         },
         "database_postgres_without_tls": {
-          "title": "The PostgreSQL connection runs over TCP without sslmode=require or stricter",
-          "remedy": "Enable TLS on the server and add sslmode=require (or verify-full) to DATABASE_URL."
+          "title": "PostgreSQL 接続が sslmode=require 以上の設定なしで TCP 上で動作しています。FIPS モードでは UCM は起動しません",
+          "remedy": "サーバーで TLS を有効にし、DATABASE_URL に sslmode=require（または verify-full）を追加してください。"
         },
         "https_unapproved_key": {
-          "title": "The HTTPS certificate has an Ed25519/Ed448 or weak key: the web server cannot use it in FIPS mode",
-          "remedy": "Install an RSA 2048+ or ECDSA P-256/P-384/P-521 certificate in the HTTPS settings."
+          "title": "HTTPS 証明書が Ed25519/Ed448 または脆弱な鍵です：FIPS モードではウェブサーバーが使用できません",
+          "remedy": "HTTPS 設定で RSA 2048 以上または ECDSA P-256/P-384/P-521 の証明書をインストールしてください。"
         }
       }
     },
-    "backupKdf": "Key derivation",
-    "backupKdfAuto": "Automatic (Argon2id when available, PBKDF2 in FIPS mode)",
-    "backupKdfHelper": "Archives written with Argon2id cannot be restored on an instance in FIPS mode."
+    "backupKdf": "鍵導出",
+    "backupKdfAuto": "自動（利用可能なら Argon2id、FIPS モードでは PBKDF2）",
+    "backupKdfHelper": "Argon2id で書き込まれたアーカイブは、FIPS モードのインスタンスでは復元できません。"
   },
   "account": {
     "profile": "プロフィール",

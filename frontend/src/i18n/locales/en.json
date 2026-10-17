@@ -2978,7 +2978,7 @@
           "remedy": "Create an RSA or ECDSA (P-256/P-384/P-521) authority and move issuance to it before the switch; an authority key cannot be converted."
         },
         "ca_weak_key": {
-          "title": "Certificate authorities with RSA under 2048 bits or a curve other than P-256/384/521",
+          "title": "Certificate authorities with a DSA key, RSA under 2048 bits or a curve other than P-256/384/521",
           "remedy": "Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it."
         },
         "ssh_ca_eddsa_key": {
@@ -3026,8 +3026,8 @@
           "remedy": "Prefer a PKCS#11, Azure Key Vault or OpenBao provider for keys that must stay in FIPS scope."
         },
         "hsm_unapproved_keys": {
-          "title": "HSM keys of an algorithm FIPS mode hides (Ed25519, ChaCha20...)",
-          "remedy": "Replace them with RSA, ECDSA or AES keys; FIPS mode leaves them out of the inventory."
+          "title": "HSM keys of an algorithm outside FIPS mode (Ed25519, Ed448, ChaCha20-Poly1305)",
+          "remedy": "Replace them with RSA, ECDSA or AES keys; in FIPS mode, OpenBao and Vault Transit keys of these types are no longer listed."
         },
         "dns_tsig_hmac_md5": {
           "title": "RFC 2136 DNS providers signing with TSIG hmac-md5: DNS-01 updates are refused in FIPS mode",
@@ -3046,7 +3046,7 @@
           "remedy": "Keep them for a standard instance, and take a manual backup with kdf \"pbkdf2\" before the switch."
         },
         "database_postgres_without_tls": {
-          "title": "The PostgreSQL connection runs over TCP without sslmode=require or stricter",
+          "title": "The PostgreSQL connection runs over TCP without sslmode=require or stricter: UCM refuses to start in FIPS mode",
           "remedy": "Enable TLS on the server and add sslmode=require (or verify-full) to DATABASE_URL."
         },
         "https_unapproved_key": {

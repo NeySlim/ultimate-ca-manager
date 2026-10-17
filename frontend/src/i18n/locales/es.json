@@ -2943,120 +2943,120 @@
     "httpsUnbind": "Dejar de seguir las renovaciones",
     "httpsUnbindDone": "Vinculación del certificado HTTPS eliminada",
     "fipsPreflight": {
-      "title": "FIPS readiness",
-      "hint": "Lists what FIPS mode would refuse on this instance, with a remedy for each. Nothing is changed.",
-      "run": "Check FIPS readiness",
-      "running": "Checking...",
-      "failed": "The FIPS readiness check failed",
-      "ready": "Nothing blocks FIPS mode",
-      "notReady": "Not ready for FIPS mode",
-      "nothingFound": "Nothing found that FIPS mode would refuse.",
+      "title": "Preparación para FIPS",
+      "hint": "Enumera lo que el modo FIPS rechazaría en esta instancia, con un remedio para cada caso. No se modifica nada.",
+      "run": "Comprobar la preparación para FIPS",
+      "running": "Comprobando...",
+      "failed": "Falló la comprobación de preparación para FIPS",
+      "ready": "Nada impide el modo FIPS",
+      "notReady": "No está lista para el modo FIPS",
+      "nothingFound": "No se encontró nada que el modo FIPS rechazaría.",
       "severity": {
-        "blocker": "Blockers",
-        "warning": "Warnings",
-        "info": "Information"
+        "blocker": "Bloqueos",
+        "warning": "Advertencias",
+        "info": "Información"
       },
-      "remedy": "Remedy:",
-      "more": "and {{count}} more",
-      "checkFailed": "The check {{id}} could not run",
+      "remedy": "Remedio:",
+      "more": "y {{count}} más",
+      "checkFailed": "No se pudo ejecutar la comprobación {{id}}",
       "checks": {
         "users_password_scrypt": {
-          "title": "Local users with an scrypt password hash: they cannot sign in once FIPS mode is on",
-          "remedy": "Have each user sign in once before the switch: the hash is replaced by PBKDF2 automatically; otherwise an administrator resets the password."
+          "title": "Usuarios locales con hash de contraseña scrypt: no podrán iniciar sesión cuando el modo FIPS esté activo",
+          "remedy": "Haga que cada usuario inicie sesión una vez antes del cambio: el hash se reemplaza automáticamente por PBKDF2; de lo contrario, un administrador restablece la contraseña."
         },
         "users_backup_codes_scrypt": {
-          "title": "Users whose 2FA backup codes are scrypt hashes: those codes stop working in FIPS mode",
-          "remedy": "Ask these users to regenerate their backup codes before the switch."
+          "title": "Usuarios cuyos códigos de respaldo 2FA son hashes scrypt: esos códigos dejan de funcionar en modo FIPS",
+          "remedy": "Pida a estos usuarios que regeneren sus códigos de respaldo antes del cambio."
         },
         "protocols_secret_scrypt": {
-          "title": "EST, WSTEP or XCEP passwords stored as scrypt hashes: clients are refused in FIPS mode",
-          "remedy": "Enter the password again in the protocol settings: it is then stored as a PBKDF2 hash."
+          "title": "Contraseñas de EST, WSTEP o XCEP almacenadas como hashes scrypt: los clientes son rechazados en modo FIPS",
+          "remedy": "Vuelva a introducir la contraseña en la configuración del protocolo: se almacenará entonces como hash PBKDF2."
         },
         "ca_eddsa_key": {
-          "title": "Certificate authorities with an Ed25519 or Ed448 key: they cannot sign in FIPS mode",
-          "remedy": "Create an RSA or ECDSA (P-256/P-384/P-521) authority and move issuance to it before the switch; an authority key cannot be converted."
+          "title": "Autoridades de certificación con clave Ed25519 o Ed448: no pueden firmar en modo FIPS",
+          "remedy": "Cree una autoridad RSA o ECDSA (P-256/P-384/P-521) y traslade la emisión a ella antes del cambio; la clave de una autoridad no se puede convertir."
         },
         "ca_weak_key": {
-          "title": "Certificate authorities with RSA under 2048 bits or a curve other than P-256/384/521",
-          "remedy": "Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it."
+          "title": "Autoridades de certificación con una clave DSA, RSA de menos de 2048 bits o una curva distinta de P-256/384/521",
+          "remedy": "Cree una autoridad con RSA 2048+ o ECDSA P-256/P-384/P-521 y traslade la emisión a ella."
         },
         "ssh_ca_eddsa_key": {
-          "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode",
-          "remedy": "Create an ECDSA or RSA SSH authority and distribute its public key to the hosts before the switch."
+          "title": "Autoridades de certificación SSH con clave Ed25519: no pueden firmar en modo FIPS",
+          "remedy": "Cree una autoridad SSH ECDSA o RSA y distribuya su clave pública a los hosts antes del cambio."
         },
         "ssh_certificates_eddsa_key": {
-          "title": "Active SSH certificates for Ed25519 keys: they stay valid but cannot be signed again",
-          "remedy": "Have their holders switch to an ECDSA or RSA key at the next renewal."
+          "title": "Certificados SSH activos para claves Ed25519: siguen siendo válidos pero no se pueden volver a firmar",
+          "remedy": "Pida a sus titulares que cambien a una clave ECDSA o RSA en la próxima renovación."
         },
         "deploy_ssh_eddsa_key": {
-          "title": "Deployment targets that sign in with an Ed25519 SSH key: deployments fail in FIPS mode",
-          "remedy": "Give each target a new ECDSA or RSA key and install its public key on the host."
+          "title": "Destinos de despliegue que inician sesión con una clave SSH Ed25519: los despliegues fallan en modo FIPS",
+          "remedy": "Asigne a cada destino una nueva clave ECDSA o RSA e instale su clave pública en el host."
         },
         "ocsp_responder_unapproved_key": {
-          "title": "Delegated OCSP responders with an Ed25519/Ed448 or weak key: the CA signs instead",
-          "remedy": "Issue a new RSA or ECDSA responder certificate and select it in the CA settings."
+          "title": "Respondedores OCSP delegados con clave Ed25519/Ed448 o débil: firma la CA en su lugar",
+          "remedy": "Emita un nuevo certificado de respondedor RSA o ECDSA y selecciónelo en la configuración de la CA."
         },
         "tsa_signer_unapproved_key": {
-          "title": "The timestamping certificate has an Ed25519/Ed448 or weak key: timestamps fail in FIPS mode",
-          "remedy": "Issue a new RSA or ECDSA timestamping certificate and select it in the TSA settings."
+          "title": "El certificado de sellado de tiempo tiene una clave Ed25519/Ed448 o débil: los sellos de tiempo fallan en modo FIPS",
+          "remedy": "Emita un nuevo certificado de sellado de tiempo RSA o ECDSA y selecciónelo en la configuración de TSA."
         },
         "certificates_unapproved_key": {
-          "title": "Active certificates with an Ed25519/Ed448 key, RSA under 2048 bits or another curve",
-          "remedy": "They stay valid; renew them with a new RSA 2048+ or ECDSA P-256/P-384/P-521 key, since renewing with the same key is refused in FIPS mode."
+          "title": "Certificados activos con clave Ed25519/Ed448, RSA de menos de 2048 bits u otra curva",
+          "remedy": "Siguen siendo válidos; renuévelos con una nueva clave RSA 2048+ o ECDSA P-256/P-384/P-521, ya que renovar con la misma clave se rechaza en modo FIPS."
         },
         "templates_unapproved_key_type": {
-          "title": "Active templates whose key type is not FIPS approved: issuance from them is refused",
-          "remedy": "Change the key type of these templates to RSA 2048+ or ECDSA P-256/P-384/P-521."
+          "title": "Plantillas activas cuyo tipo de clave no está aprobado por FIPS: se rechaza la emisión desde ellas",
+          "remedy": "Cambie el tipo de clave de estas plantillas a RSA 2048+ o ECDSA P-256/P-384/P-521."
         },
         "policies_unapproved_key_type": {
-          "title": "Active policies that allow key types FIPS mode removes (Ed25519, Ed448, short RSA...)",
-          "remedy": "Remove those key types from the policies; a policy left with none allows no issuance."
+          "title": "Políticas activas que permiten tipos de clave que el modo FIPS elimina (Ed25519, Ed448, RSA corto...)",
+          "remedy": "Quite esos tipos de clave de las políticas; una política que se quede sin ninguno no permite ninguna emisión."
         },
         "acme_client_unapproved_key_type": {
-          "title": "ACME client settings or renewing orders that use a key type FIPS mode refuses",
-          "remedy": "Set the ACME client key type to RSA or ECDSA and re-create these orders with a new key."
+          "title": "Ajustes del cliente ACME u órdenes con renovación que usan un tipo de clave que el modo FIPS rechaza",
+          "remedy": "Establezca el tipo de clave del cliente ACME en RSA o ECDSA y vuelva a crear estas órdenes con una clave nueva."
         },
         "hsm_softhsm": {
-          "title": "SoftHSM providers: SoftHSM is not a validated module, keys on it are not FIPS protected",
-          "remedy": "Move the keys to a validated HSM, or accept SoftHSM as a test setup only."
+          "title": "Proveedores SoftHSM: SoftHSM no es un módulo validado, las claves en él no están protegidas por FIPS",
+          "remedy": "Traslade las claves a un HSM validado, o acepte SoftHSM solo como entorno de pruebas."
         },
         "hsm_gcp_grpc": {
-          "title": "Google Cloud KMS providers: their client uses gRPC with its own TLS, outside the FIPS module",
-          "remedy": "Prefer a PKCS#11, Azure Key Vault or OpenBao provider for keys that must stay in FIPS scope."
+          "title": "Proveedores Google Cloud KMS: su cliente usa gRPC con su propio TLS, fuera del módulo FIPS",
+          "remedy": "Prefiera un proveedor PKCS#11, Azure Key Vault u OpenBao para las claves que deben permanecer dentro del alcance de FIPS."
         },
         "hsm_unapproved_keys": {
-          "title": "HSM keys of an algorithm FIPS mode hides (Ed25519, ChaCha20...)",
-          "remedy": "Replace them with RSA, ECDSA or AES keys; FIPS mode leaves them out of the inventory."
+          "title": "Claves HSM de un algoritmo fuera del modo FIPS (Ed25519, Ed448, ChaCha20-Poly1305)",
+          "remedy": "Reemplácelas por claves RSA, ECDSA o AES; en modo FIPS, las claves de estos tipos de OpenBao y Vault Transit ya no se listan."
         },
         "dns_tsig_hmac_md5": {
-          "title": "RFC 2136 DNS providers signing with TSIG hmac-md5: DNS-01 updates are refused in FIPS mode",
-          "remedy": "Create an hmac-sha256 TSIG key on the DNS server and enter it in the provider."
+          "title": "Proveedores DNS RFC 2136 que firman con TSIG hmac-md5: las actualizaciones DNS-01 se rechazan en modo FIPS",
+          "remedy": "Cree una clave TSIG hmac-sha256 en el servidor DNS e introdúzcala en el proveedor."
         },
         "msca_winrm_ntlm": {
-          "title": "Microsoft CA connections whose WinRM channel uses NTLM: the channel is refused in FIPS mode",
-          "remedy": "Switch the WinRM transport of these connections to Kerberos."
+          "title": "Conexiones a CA de Microsoft cuyo canal WinRM usa NTLM: el canal se rechaza en modo FIPS",
+          "remedy": "Cambie el transporte WinRM de estas conexiones a Kerberos."
         },
         "backup_schedule_argon2id": {
-          "title": "Scheduled backups are written with Argon2id: such archives cannot be restored in FIPS mode",
-          "remedy": "Set the scheduled backup KDF to PBKDF2, and take a manual backup with kdf \"pbkdf2\" before the switch."
+          "title": "Las copias de seguridad programadas se escriben con Argon2id: esos archivos no se pueden restaurar en modo FIPS",
+          "remedy": "Establezca la KDF de la copia programada en PBKDF2 y haga una copia manual con kdf \"pbkdf2\" antes del cambio."
         },
         "backup_archives_argon2id": {
-          "title": "Backup archives on disk encrypted with Argon2id: they cannot be restored in FIPS mode",
-          "remedy": "Keep them for a standard instance, and take a manual backup with kdf \"pbkdf2\" before the switch."
+          "title": "Archivos de copia de seguridad en disco cifrados con Argon2id: no se pueden restaurar en modo FIPS",
+          "remedy": "Consérvelos para una instancia estándar y haga una copia manual con kdf \"pbkdf2\" antes del cambio."
         },
         "database_postgres_without_tls": {
-          "title": "The PostgreSQL connection runs over TCP without sslmode=require or stricter",
-          "remedy": "Enable TLS on the server and add sslmode=require (or verify-full) to DATABASE_URL."
+          "title": "La conexión PostgreSQL se realiza por TCP sin sslmode=require ni más estricto: UCM se niega a iniciar en modo FIPS",
+          "remedy": "Active TLS en el servidor y añada sslmode=require (o verify-full) a DATABASE_URL."
         },
         "https_unapproved_key": {
-          "title": "The HTTPS certificate has an Ed25519/Ed448 or weak key: the web server cannot use it in FIPS mode",
-          "remedy": "Install an RSA 2048+ or ECDSA P-256/P-384/P-521 certificate in the HTTPS settings."
+          "title": "El certificado HTTPS tiene una clave Ed25519/Ed448 o débil: el servidor web no puede usarlo en modo FIPS",
+          "remedy": "Instale un certificado RSA 2048+ o ECDSA P-256/P-384/P-521 en la configuración de HTTPS."
         }
       }
     },
-    "backupKdf": "Key derivation",
-    "backupKdfAuto": "Automatic (Argon2id when available, PBKDF2 in FIPS mode)",
-    "backupKdfHelper": "Archives written with Argon2id cannot be restored on an instance in FIPS mode."
+    "backupKdf": "Derivación de clave",
+    "backupKdfAuto": "Automática (Argon2id si está disponible, PBKDF2 en modo FIPS)",
+    "backupKdfHelper": "Los archivos escritos con Argon2id no se pueden restaurar en una instancia en modo FIPS."
   },
   "account": {
     "profile": "Perfil",
