@@ -53,7 +53,7 @@ def _el_release():
 
 
 def _pick_rpm(assets, el):
-    """The .elN. build matching this host, else the first RPM built for neither EL release."""
+    """The .elN. build matching this host (ucm-el9-*.el9.noarch.rpm), else the RPM tagged for no EL release."""
     rpms = [a for a in assets if a['name'].endswith('.rpm')]
     for asset in rpms:
         tag = _EL_TAG.search(asset['name'])

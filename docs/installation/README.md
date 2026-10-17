@@ -87,14 +87,14 @@ sudo systemctl status ucm
 
 **Native installation for Fedora, Red Hat Enterprise Linux, Rocky Linux, AlmaLinux, and derivatives.**
 
-Each release has two RPMs: `ucm-VERSION-1.fc43.noarch.rpm` for Fedora, and `ucm-VERSION-1.el9.noarch.rpm` for RHEL, Rocky Linux and AlmaLinux 9, which runs on the `python3.12` package of the distribution (its `python3` is 3.9).
+Each release has two RPMs: `ucm-VERSION-1.fc43.noarch.rpm` for Fedora, and `ucm-el9-VERSION-1.el9.noarch.rpm` for RHEL, Rocky Linux and AlmaLinux 9, which runs on the `python3.12` package of the distribution (its `python3` is 3.9).
 
 ```bash
 # Download latest package (replace VERSION with actual version, e.g. 2.241)
-wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-VERSION-1.el9.noarch.rpm
+wget https://github.com/NeySlim/ultimate-ca-manager/releases/latest/download/ucm-el9-VERSION-1.el9.noarch.rpm
 
 # Install
-sudo dnf install ./ucm-VERSION-1.el9.noarch.rpm
+sudo dnf install ./ucm-el9-VERSION-1.el9.noarch.rpm
 
 # Enable and start
 sudo systemctl enable ucm
@@ -131,7 +131,7 @@ The packages install pre-built Python wheels, and the `cryptography` and `psycop
 
    ```bash
    sudo install -d -m 750 /etc/ucm && echo 'UCM_FIPS_BUILD=1' | sudo tee /etc/ucm/ucm.env
-   sudo dnf install ./ucm-VERSION-1.el9.noarch.rpm      # or: sudo apt install ./ucm_VERSION_all.deb
+   sudo dnf install ./ucm-el9-VERSION-1.el9.noarch.rpm  # or: sudo apt install ./ucm_VERSION_all.deb
    ```
 
    The package completes `/etc/ucm/ucm.env` with its secrets and defaults. `sudo UCM_FIPS_BUILD=1 dnf install ...` works too and records the option in `ucm.env` (a variable exported before `sudo` does not reach the package). The build takes about five minutes (log: `/var/log/ucm/fips-build.log`) and is redone at every upgrade; when a tool is missing or the build fails, the installation stops with the command to run, and an upgrade keeps the previous environment. The built-in updater checks the build tools before installing: when one is missing it refuses the update and leaves the installation untouched, and a failed build is reported as a failed update.
