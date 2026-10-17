@@ -137,8 +137,11 @@ class LifecycleMixin:
 
         # Load CA signing key (local or HSM-backed)
         from services.hsm.ca_key_loader import get_ca_signing_key
+        from fips_mode import FipsRestricted
         try:
             ca_private_key = get_ca_signing_key(ca)
+        except FipsRestricted:
+            raise
         except Exception as e:
             raise ValueError(f"Failed to load CA signing key: {e}")
 

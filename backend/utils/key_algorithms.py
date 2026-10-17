@@ -26,7 +26,7 @@ class KeyGenerationError(RuntimeError):
 
 # FIPS 186-5 curves, by pyca name, as openssl genpkey spells them
 _FIPS_CURVES = {'secp256r1': 'P-256', 'secp384r1': 'P-384', 'secp521r1': 'P-521'}
-_GENPKEY_TIMEOUT = 300  # seconds; RSA-8192 is the slowest key UCM asks for
+_GENPKEY_TIMEOUT = 110  # seconds; RSA-8192 is the slowest key UCM asks for
 
 
 def _stderr_summary(stderr: bytes) -> str:

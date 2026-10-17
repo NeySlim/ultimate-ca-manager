@@ -124,8 +124,11 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
     except ValueError as exc:
         raise TsaSignerIssueError(str(exc), 400)
     from services.hsm.ca_key_loader import get_ca_signing_key
+    from fips_mode import FipsRestricted
     try:
         ca_key = get_ca_signing_key(ca)
+    except FipsRestricted:
+        raise
     except ValueError as exc:
         raise TsaSignerIssueError(f'Failed to load CA signing key: {exc}', 500)
 

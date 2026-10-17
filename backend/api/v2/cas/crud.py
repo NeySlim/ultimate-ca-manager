@@ -19,6 +19,7 @@ from utils.protocol_url import get_protocol_base_url
 from utils.decorators import require_json_body
 from utils.validity import coerce_validity_days
 from utils.db_transaction import safe_commit
+from fips_mode import FipsRestricted
 from services.ca_service import CAService
 from services.audit_service import AuditService
 from services.deletion_blockers import ca_deletion_blockers, first_blocker
@@ -624,6 +625,8 @@ def create_ca():
             data=ca_dict,
             message='CA created successfully'
         )
+    except FipsRestricted:
+        raise
     except ValueError as e:
         # Validation errors (HSM key conflicts, missing fields, etc.) -- surface to user
         logger.info(f"CA creation validation error: {e}")

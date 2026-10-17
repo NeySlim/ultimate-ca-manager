@@ -430,3 +430,45 @@ class TestOpenBaoInventory:
     def test_every_type_is_listed_outside_fips_mode(self, monkeypatch, fips_off):
         listed = {k.key_identifier for k in self._provider(monkeypatch).list_keys()}
         assert listed == {'ca-ec', 'ssh-ed', 'wrap', 'aes'}
+
+
+@pytest.fixture
+def pending_csr(auth_client):
+    """A CSR made before FIPS mode is switched on (list it ahead of fips_on)."""
+    r = _post(auth_client, '/api/v2/csrs', {'cn': f'csr-{uuid.uuid4().hex[:6]}.fips-ed.test',
+                                            'organization': 'FIPS', 'country': 'US',
+                                            'key_type': 'EC-P256'})
+    assert r.status_code in (200, 201), r.get_json()
+    return r.get_json()['data']['id']
+
+
+class TestSiblingIssuancePaths:
+    """Paths next to POST /certificates keep the FIPS problem type."""
+
+    def test_signing_a_csr_from_it_answers_the_fips_problem(self, auth_client, pending_csr, ed_ca, fips_on):
+        _assert_fips_problem(_post(auth_client, f'/api/v2/csrs/{pending_csr}/sign',
+                                   {'ca_id': ed_ca, 'validity_days': 30}))
+
+    def test_bulk_signing_names_the_fips_reason(self, auth_client, pending_csr, ed_ca, fips_on):
+        r = _post(auth_client, '/api/v2/csrs/bulk/sign', {'ids': [pending_csr], 'ca_id': ed_ca})
+        failed = r.get_json()['data']['failed']
+        assert failed and 'not available in FIPS mode' in failed[0]['error'], r.get_json()
+
+    def test_the_tsa_signer_from_it_answers_the_fips_problem(self, auth_client, ed_ca, fips_on):
+        _assert_fips_problem(_post(auth_client, '/api/v2/tsa/signer-certificate',
+                                   {'ca_id': ed_ca, 'key_type': 'ec', 'curve': 'P-256'}))
+
+    def test_an_intermediate_under_it_answers_the_fips_problem(self, auth_client, ed_ca, fips_on):
+        _assert_fips_problem(_post(auth_client, '/api/v2/cas', {
+            'type': 'intermediate', 'parentCAId': ed_ca, 'commonName': 'Sub of Ed25519',
+            'organization': 'FIPS', 'country': 'US', 'validityYears': 1,
+            'keyAlgo': 'EC', 'keySize': 'secp256r1'}))
+
+    def test_service_issuance_keeps_the_fips_refusal(self, app, ed_ca, fips_on):
+        from services.cert_service import CertificateService
+        with app.app_context():
+            refid = db.session.get(CA, ed_ca).refid
+            with pytest.raises(FipsRestricted, match='Ed25519 key of CA'):
+                CertificateService.create_certificate(
+                    descr='svc leaf', caref=refid, dn={'CN': 'svc.fips-ed.test'},
+                    cert_type='server_cert', key_type='EC-P256', validity_days=30)

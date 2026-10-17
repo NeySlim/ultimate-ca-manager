@@ -22,6 +22,7 @@ from models import db, Certificate, CA
 from services.cert_service import CertificateService
 from services.deletion_blockers import parse_bulk_ids
 from services.policy_service import PolicyViolation
+from fips_mode import FipsRestricted
 from utils.san_parse import (general_names_from_buckets, parse_extra_san_payload,
                              san_buckets_from_general_names)
 from services.audit_service import AuditService
@@ -1022,6 +1023,8 @@ def sign_csr(csr_id):
             meta=notices_mod.meta_with_notices(
                 notices_mod.collect(validity_notice, ca_clamp_notice)),
         )
+    except FipsRestricted:
+        raise
     except PolicyViolation as e:
         return error_response(f'Policy violation: {e}', 400)
     except ValueError as e:
@@ -1121,6 +1124,8 @@ def bulk_sign_csrs():
             results['success'].append(csr_id)
         except PolicyViolation as e:
             results['failed'].append({'id': csr_id, 'error': f'Policy violation: {e}'})
+        except FipsRestricted as e:
+            results['failed'].append({'id': csr_id, 'error': str(e)})
         except Exception as e:
             results['failed'].append({'id': csr_id, 'error': 'Signing failed'})
 
