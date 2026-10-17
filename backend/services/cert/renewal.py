@@ -151,19 +151,20 @@ def resolve_issuing_ca(cert: Certificate):
     return verified[0][0]
 
 
-def _generate_matching_key(orig_pub_key):
-    """A fresh private key of the same algorithm/size as the original."""
+def _matching_key_generator(orig_pub_key):
+    """A callable making a fresh private key of the same algorithm/size as the
+    original; refuses an algorithm it cannot regenerate before any key exists."""
     if isinstance(orig_pub_key, rsa.RSAPublicKey):
-        return rsa.generate_private_key(
+        return lambda: rsa.generate_private_key(
             public_exponent=65537,
             key_size=orig_pub_key.key_size,
             backend=default_backend(),
         )
     if isinstance(orig_pub_key, ec.EllipticCurvePublicKey):
-        return ec.generate_private_key(orig_pub_key.curve, default_backend())
+        return lambda: ec.generate_private_key(orig_pub_key.curve, default_backend())
     family = family_for_public_key(orig_pub_key)
     if family in ('ED25519', 'ED448'):
-        return registered_algorithms(family)[0].generate()
+        return registered_algorithms(family)[0].generate
     # Never another algorithm: the renewed certificate must keep the family it had
     raise RenewalError(
         f'Cannot renew: a {type(orig_pub_key).__name__} key cannot be regenerated; '
@@ -419,12 +420,12 @@ def renew_certificate_in_place(
     except ValueError as e:
         raise RenewalError(str(e), 400) from e
 
+    # A new key keeps the original's algorithm: it is checked before the key exists
     orig_pub_key = orig_cert.public_key()
-    new_key = _generate_matching_key(orig_pub_key) if rekey else None
-    public_key = new_key.public_key() if rekey else orig_pub_key
+    make_key = _matching_key_generator(orig_pub_key) if rekey else None
     # Same floor as issuance (a re-signed RSA-1024 is still RSA-1024)
     from utils.key_type import validate_enrollment_public_key
-    key_error = validate_enrollment_public_key(public_key)
+    key_error = validate_enrollment_public_key(orig_pub_key)
     if key_error:
         raise RenewalError(f'Cannot renew: {key_error}', 400)
 
@@ -448,13 +449,15 @@ def renew_certificate_in_place(
         ca.id, getattr(cert, 'template_id', None),
         cn_attrs[0].value if cn_attrs else None, orig_dns)
     violations, validity_days, capped_by = PolicyEvaluationService.enforce_rules(
-        policies, key_type=key_label_for_public_key(public_key),
+        policies, key_type=key_label_for_public_key(orig_pub_key),
         dns_name_count=len(set(orig_dns)), validity_days=validity_days)
     sign_hash, digest_violations = PolicyEvaluationService.checked_signing_hash(
         policies, ca_key, explicit=False)
     violations += digest_violations
     if violations:
         raise RenewalError('Policy violation: ' + '; '.join(violations), 400)
+    new_key = make_key() if rekey else None
+    public_key = new_key.public_key() if rekey else orig_pub_key
     not_before = cert_not_before()
     uncapped_not_after = now + timedelta(days=validity_days)
     not_after = min(uncapped_not_after, ca_not_after)

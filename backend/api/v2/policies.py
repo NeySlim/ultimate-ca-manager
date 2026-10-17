@@ -6,7 +6,7 @@ from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
-from utils import notices as notices_mod
+from utils import key_algorithms, notices as notices_mod
 from models import db, CA, Certificate
 from models.policy import CertificatePolicy, ApprovalRequest
 from models.certificate_template import CertificateTemplate
@@ -15,6 +15,7 @@ import json
 import logging
 import base64
 import uuid
+import fips_mode
 from utils.datetime_utils import cert_not_before, utc_now
 from utils.leaf_key_usage import key_usage_for_key
 from services.audit_service import AuditService
@@ -669,6 +670,9 @@ def _validated_rules(rules):
                   for k in key_types]
         if None in labels:
             return None, f'Unknown key type in allowed_key_types: {key_types[labels.index(None)]}'
+        refused = [label for label in labels if not key_algorithms.fips_approved(label)]
+        if refused:
+            fips_mode.refuse(f'{refused[0]} keys')
         rules['allowed_key_types'] = list(dict.fromkeys(labels))
     digests = rules.get('allowed_digests')
     if digests is not None:
@@ -690,7 +694,10 @@ def effective_policy_algorithms():
     ca_id = request.args.get('ca_id', type=int)
     template_id = request.args.get('template_id', type=int)
     key_types, digests = PolicyEvaluationService.effective_algorithms(ca_id, template_id)
-    return success_response(data={'allowed_key_types': key_types, 'allowed_digests': digests})
+    data = {'allowed_key_types': key_types, 'allowed_digests': digests}
+    if fips_mode.enabled():
+        data['fips'] = True  # the FIPS system policy is part of the result
+    return success_response(data=data)
 
 @bp.route('/api/v2/policies', methods=['GET'])
 @require_auth(['read:policies'])

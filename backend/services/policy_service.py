@@ -11,6 +11,7 @@ from models.policy import CertificatePolicy, ApprovalRequest
 from datetime import timedelta
 from utils.datetime_utils import utc_now
 from utils import key_algorithms
+import fips_mode
 
 logger = logging.getLogger(__name__)
 
@@ -41,6 +42,41 @@ def _rule_digests(rules):
         return []
     names = {normalize_digest(d) for d in allowed} - {None}
     return [d for d in POLICY_DIGESTS if d in names]
+
+
+class SystemPolicy:
+    """A policy that lives in code, not in the database: global, read only."""
+    id = None
+    ca_id = None
+    template_id = None
+    priority = 0
+    requires_approval = False
+
+    def __init__(self, name, rules):
+        self.name = name
+        self._rules = rules
+
+    def get_rules(self):
+        return {k: list(v) if isinstance(v, list) else v for k, v in self._rules.items()}
+
+
+def fips_policy():
+    """The policy FIPS mode puts ahead of all others, None outside FIPS mode."""
+    if not fips_mode.enabled():
+        return None
+    return SystemPolicy('FIPS mode', {
+        'allowed_key_types': list(key_algorithms.fips_approved_labels()),
+        'allowed_digests': list(POLICY_DIGESTS),
+    })
+
+
+def with_system_policies(policies):
+    """*policies* headed by the system policies they do not already hold."""
+    policies = list(policies or [])
+    system = fips_policy()
+    if system is None or any(isinstance(p, SystemPolicy) for p in policies):
+        return policies
+    return [system] + policies
 
 
 def key_label_for_public_key(public_key):
@@ -105,7 +141,7 @@ class PolicyEvaluationService:
         Same CA / template / dns_pattern scoping as ``check_approval_required``
         but regardless of ``requires_approval``: a policy's Rules bind every
         request in its scope, not only the ones routed through approval.
-        Ordered by priority (lower number first).
+        Ordered by priority (lower number first), the system policies first.
         """
         query = CertificatePolicy.query.filter_by(
             is_active=True, policy_type='issuance'
@@ -119,7 +155,7 @@ class PolicyEvaluationService:
             if not PolicyEvaluationService._matches_rules(policy, cn, san_list):
                 continue
             matching.append(policy)
-        return matching
+        return with_system_policies(matching)
 
     @staticmethod
     def enforce_rules(policies: list, *, key_type=None, dns_name_count=None,
@@ -132,7 +168,8 @@ class PolicyEvaluationService:
         exceeded), the validity capped by the lowest ``max_validity_days``
         among the policies, and the name of the policy that set that cap, or
         ``None`` when nothing was shortened. Parameters left ``None`` are not
-        checked. Key types compare in the template label form (RSA-2048,
+        checked. The system policies (FIPS mode) apply whatever the list.
+        Key types compare in the template label form (RSA-2048,
         EC-P256), whatever spelling the request used; *digest* is the hash the
         signature is computed with (None for Ed25519/Ed448 signers).
 
@@ -144,7 +181,7 @@ class PolicyEvaluationService:
         violations = []
         effective_validity = validity_days
         capped_by = None
-        for policy in policies:
+        for policy in with_system_policies(policies):
             rules = policy.get_rules() or {}
 
             allowed = rules.get('allowed_key_types')
