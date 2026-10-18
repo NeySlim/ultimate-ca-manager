@@ -13,7 +13,8 @@
  *      the change and update their local state + the DOM.
  *   3. When a user changes a setting, the relevant component calls
  *      persistPreference(key, value) which (a) pushes into this store
- *      and (b) PUTs to /account/preferences when authenticated.
+ *      and (b) PUTs to /account/preferences when authenticated and loaded
+ *      (changes made before the load are sent with it, in one PUT).
  */
 import { accountService } from '../services/account.service'
 
@@ -75,7 +76,7 @@ async function _save() {
   try {
     await accountService.updatePreferences(_prefs)
   } catch {
-    // Network / backend failure — silent: local state still applies.
+    // Network / backend failure: silent, local state still applies.
     // Next login will fall back to server-side value (the prior one).
   }
 }

@@ -11,12 +11,21 @@ import { accountService } from '../services/account.service'
 import { apiClient } from '../services/apiClient'
 import { setAppTimezone } from '../stores/timezoneStore'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
-import { applyServerPreferences, setAuthenticated as setPrefsAuthenticated } from '../stores/userPreferencesStore'
+import { applyServerPreferences, getPreferences, setAuthenticated as setPrefsAuthenticated } from '../stores/userPreferencesStore'
 import i18n from '../i18n'
 
 const AuthContext = createContext()
 
 const debug = import.meta.env.DEV ? console.log : () => {}
+
+// The language to show is the merged one: a choice made while loading wins.
+function applyPreferences(prefs) {
+  applyServerPreferences(prefs)
+  const language = getPreferences().language
+  if (language && language !== i18n.language) {
+    try { i18n.changeLanguage(language) } catch { /* noop */ }
+  }
+}
 
 export function AuthProvider({ children }) {
   const [user, setUser] = useState(null)
@@ -65,11 +74,7 @@ export function AuthProvider({ children }) {
       if (userData.show_time !== undefined) setShowTime(userData.show_time !== false)
       // Apply server-side UI preferences (issue #73)
       setPrefsAuthenticated(true)
-      const verifyPrefs = userData.preferences || {}
-      applyServerPreferences(verifyPrefs)
-      if (verifyPrefs.language && verifyPrefs.language !== i18n.language) {
-        try { i18n.changeLanguage(verifyPrefs.language) } catch { /* noop */ }
-      }
+      applyPreferences(userData.preferences || {})
       debug('✅ Session valid:', userData.user?.username)
       return true
     } catch (error) {
@@ -82,6 +87,7 @@ export function AuthProvider({ children }) {
       setPermissions([])
       setRole(null)
       setMustEnroll2fa(false)
+      setPrefsAuthenticated(false)
       return false
     } finally {
       setLoading(false)
@@ -131,15 +137,15 @@ export function AuthProvider({ children }) {
       // Apply server-side UI preferences (issue #73). Most login endpoints
       // don't include them, so we fetch them once auth is established.
       setPrefsAuthenticated(true)
-      try {
+      const loadPreferences = async () => {
         const prefsResp = await accountService.getPreferences()
-        const prefs = prefsResp?.data || prefsResp || {}
-        applyServerPreferences(prefs)
-        if (prefs.language && prefs.language !== i18n.language) {
-          try { i18n.changeLanguage(prefs.language) } catch { /* noop */ }
-        }
+        applyPreferences(prefsResp?.data || prefsResp || {})
+      }
+      try {
+        await loadPreferences()
       } catch {
-        // Preferences fetch is best-effort; localStorage fallback applies.
+        // One retry; if it fails too, changes stay local until a later load.
+        try { await loadPreferences() } catch { /* noop */ }
       }
       debug('✅ User authenticated:', userData)
       return response
