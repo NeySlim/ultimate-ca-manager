@@ -13,6 +13,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Administrators see a small dismissible card suggesting support on Ko-fi, once per UCM version after an install or update, and Settings > About links to it.
 
+### Fixed
+
+- Changing the language or theme, or closing the what's-new window, just after signing in could erase the user's other saved preferences; the change is now saved together with them once they have loaded.
+
 ## [2.241] - 2026-10-18
 
 ### Added

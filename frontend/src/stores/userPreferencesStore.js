@@ -21,6 +21,8 @@ let _prefs = {}
 let _authenticated = false
 // True once the server copy has been applied: a PUT before that would erase it.
 let _loaded = false
+// Keys changed while signed in but before the server copy arrived.
+let _pendingKeys = new Set()
 const _listeners = new Set()
 
 function _notify() {
@@ -47,6 +49,7 @@ export function setAuthenticated(value) {
   if (!_authenticated) {
     _prefs = {}
     _loaded = false
+    _pendingKeys = new Set()
     _notify()
   }
 }
@@ -57,23 +60,38 @@ export function setAuthenticated(value) {
  */
 export function applyServerPreferences(prefs) {
   if (!prefs || typeof prefs !== 'object') return
+  const local = _prefs
+  const pending = _pendingKeys
+  _pendingKeys = new Set()
   _prefs = { ...prefs }
+  // Changes made while loading win over the server copy, then go out in one full PUT.
+  for (const key of pending) _prefs[key] = local[key]
   _loaded = true
   _notify()
+  if (pending.size && _authenticated) _save()
 }
 
-/**
- * Update one preference and persist server-side when authenticated.
- * Always updates the local store so subscribers react immediately.
- */
-export async function persistPreference(key, value) {
-  _prefs = { ..._prefs, [key]: value }
-  _notify()
-  if (!_authenticated) return
+async function _save() {
   try {
     await accountService.updatePreferences(_prefs)
   } catch {
     // Network / backend failure — silent: local state still applies.
     // Next login will fall back to server-side value (the prior one).
   }
+}
+
+/**
+ * Update one preference and persist server-side when authenticated.
+ * Always updates the local store so subscribers react immediately.
+ * The PUT replaces the whole object, so it waits for the server copy.
+ */
+export async function persistPreference(key, value) {
+  _prefs = { ..._prefs, [key]: value }
+  _notify()
+  if (!_authenticated) return
+  if (!_loaded) {
+    _pendingKeys.add(key)
+    return
+  }
+  await _save()
 }
