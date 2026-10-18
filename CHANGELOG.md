@@ -15,7 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- A preference change (language, theme, a dismissed window) made before the user's saved preferences had loaded, during an SSO sign-in or after a failed load, replaced them all on the server; it is now saved together with them once they load.
+- A preference change (language, theme, a dismissed window) made before the user's saved preferences had loaded (just after signing in, or after a failed load) replaced them all on the server; it is now saved together with them once they load.
 
 ## [2.241] - 2026-10-18
 
