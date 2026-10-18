@@ -22,6 +22,25 @@ CONNECT_TIMEOUT_SECONDS = 10
 COMMAND_TIMEOUT_SECONDS = 60
 
 
+# What paramiko runs through the FIPS module: ECDH on NIST curves, ECDSA and RSA,
+# AES, HMAC-SHA-1/SHA-2. Ed25519 (libsodium) and DH groups (Python pow) are outside.
+FIPS_SSH_ALGORITHMS = {
+    'kex': ('ecdh-sha2-nistp256', 'ecdh-sha2-nistp384', 'ecdh-sha2-nistp521'),
+    'keys': ('ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521',
+             'rsa-sha2-512', 'rsa-sha2-256'),
+    'pubkeys': ('ecdsa-sha2-nistp256', 'ecdsa-sha2-nistp384', 'ecdsa-sha2-nistp521',
+                'rsa-sha2-512', 'rsa-sha2-256'),
+    'ciphers': ('aes128-ctr', 'aes192-ctr', 'aes256-ctr', 'aes128-cbc', 'aes192-cbc',
+                'aes256-cbc', 'aes128-gcm@openssh.com', 'aes256-gcm@openssh.com'),
+    'macs': ('hmac-sha2-256', 'hmac-sha2-512', 'hmac-sha2-256-etm@openssh.com',
+             'hmac-sha2-512-etm@openssh.com', 'hmac-sha1'),
+}
+FIPS_SSH_REFUSED = ('the target offers no SSH algorithm FIPS mode accepts: it needs an ECDSA '
+                    'or RSA host key, ECDH key exchange on P-256, P-384 or P-521, AES and '
+                    'HMAC-SHA-2 (an Ed25519 host key or Diffie-Hellman group exchange alone '
+                    'is refused)')
+
+
 class DeploySSHError(Exception):
     """Transport-level deploy failure with an operator-readable message."""
 
@@ -89,6 +108,15 @@ def public_key_from_private(text: str) -> Optional[str]:
         return None
 
 
+def disabled_algorithms(paramiko):
+    """Every algorithm paramiko offers outside FIPS_SSH_ALGORITHMS in FIPS mode, None otherwise."""
+    if not fips_mode.enabled():
+        return None
+    transport = paramiko.Transport
+    return {kind: [name for name in getattr(transport, f'_preferred_{kind}') if name not in allowed]
+            for kind, allowed in FIPS_SSH_ALGORITHMS.items()}
+
+
 class _PinningPolicy:
     """MissingHostKeyPolicy implementing TOFU pinning against a stored pin."""
 
@@ -119,6 +147,11 @@ def open_client(host: str, port: int, username: str, private_key_text: str,
     """
     pkey = load_private_key(private_key_text)
     paramiko = _require_paramiko()
+    disabled = disabled_algorithms(paramiko)
+    if disabled and str(expected_host_key or '').startswith('ssh-ed25519 '):
+        raise HostKeyMismatch(
+            "The pinned host key is Ed25519, which FIPS mode cannot verify: reset the pinned "
+            "host key on the deploy target so that the next connection pins its ECDSA or RSA key.")
     policy = _PinningPolicy(expected_host_key)
 
     client = paramiko.SSHClient()
@@ -134,10 +167,16 @@ def open_client(host: str, port: int, username: str, private_key_text: str,
             auth_timeout=CONNECT_TIMEOUT_SECONDS,
             allow_agent=False,
             look_for_keys=False,
+            disabled_algorithms=disabled,
         )
     except HostKeyMismatch:
         client.close()
         raise
+    except paramiko.ssh_exception.IncompatiblePeer as e:
+        client.close()
+        if disabled:
+            raise DeploySSHError(f"SSH connection failed: {FIPS_SSH_REFUSED} ({e})")
+        raise DeploySSHError(f"SSH connection failed: {e}")
     except paramiko.AuthenticationException as e:
         client.close()
         raise DeploySSHError(f"SSH authentication failed: {e}")
