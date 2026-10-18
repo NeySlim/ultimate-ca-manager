@@ -37,8 +37,8 @@ FIPS_SSH_ALGORITHMS = {
 }
 FIPS_SSH_REFUSED = ('the target offers no SSH algorithm FIPS mode accepts: it needs an ECDSA '
                     'or RSA host key, ECDH key exchange on P-256, P-384 or P-521, AES and '
-                    'HMAC-SHA-2 (an Ed25519 host key or Diffie-Hellman group exchange alone '
-                    'is refused)')
+                    'HMAC-SHA-1/SHA-2 (an Ed25519 host key or a Diffie-Hellman key exchange '
+                    'alone is refused)')
 
 
 class DeploySSHError(Exception):

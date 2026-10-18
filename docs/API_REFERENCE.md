@@ -2177,7 +2177,8 @@ GET /api/v2/system/service/status
 
 # "crypto" in the response: FIPS mode asked for (UCM_FIPS=1), in force,
 # the OpenSSL library cryptography uses, the loaded FIPS provider and the
-# approved-mode settings it reports (null when it reports none). UCM refuses
+# approved-mode settings it reports (each null when the provider does not
+# report it; the block is null without an active provider). UCM refuses
 # to start when one is not 1 on the OpenSSL FIPS Provider; a distribution
 # module follows its own security policy.
 "crypto": {

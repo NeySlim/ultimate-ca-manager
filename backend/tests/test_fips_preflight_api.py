@@ -143,6 +143,18 @@ class TestCommandLine:
         assert 'install the package with UCM_FIPS_BUILD=1 in /etc/ucm/ucm.env' in out
         assert 'OPENSSL_CONF' not in out
 
+    @pytest.mark.parametrize('fips, preset, expected', [
+        ('1', None, 'disable'), ('1', 'prefer', 'prefer'), (None, None, None)])
+    def test_libpq_gets_no_gssapi_encryption_in_fips_mode(self, instance_db, monkeypatch,
+                                                          fips, preset, expected):
+        _engine, config = instance_db
+        for name, value in (('UCM_FIPS', fips), ('PGGSSENCMODE', preset)):
+            monkeypatch.setenv(name, value or 'x')
+            if value is None:
+                monkeypatch.delenv(name)
+        cli.read_only_app(config)
+        assert os.environ.get('PGGSSENCMODE') == expected
+
     def test_the_database_is_opened_read_only(self, instance_db):
         _engine, config = instance_db
         app = cli.read_only_app(config)

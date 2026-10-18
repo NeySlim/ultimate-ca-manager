@@ -20,6 +20,9 @@ from services import fips_preflight
 
 def read_only_app(config=None) -> Flask:
     """The database the service uses, opened read-only; no migration, no scheduler."""
+    if fips_mode.requested():
+        # As enforce_at_startup does; an explicit value stays, for the report to name it
+        os.environ.setdefault('PGGSSENCMODE', 'disable')
     app = Flask('ucm-fips-preflight')
     app.config.from_object(config or get_config())
     uri = app.config['SQLALCHEMY_DATABASE_URI']

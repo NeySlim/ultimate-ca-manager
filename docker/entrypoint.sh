@@ -122,6 +122,8 @@ system_default = system_default_sect
 Groups = P-256:P-384:P-521:ffdhe2048:ffdhe3072:ffdhe4096
 EOF
     export OPENSSL_CONF="$FIPS_RUN_DIR/openssl-fips.cnf"
+    # libpq: no GSSAPI encryption (Kerberos library, outside the module) for any process
+    export PGGSSENCMODE="${PGGSSENCMODE:-disable}"
 
     # Pre-checks: provider active, MD5 refused, SHA-256 and Python on the module
     FIPS_PROVIDERS=$(openssl list -providers 2>&1) || FIPS_PROVIDERS=""

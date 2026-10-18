@@ -359,6 +359,12 @@ class TestTlsGroups:
         monkeypatch.setattr(ssl, 'create_default_context', factory)
         assert fips_mode.tls_negotiates('X25519') is True
 
+    @pytest.mark.parametrize('group', ['X25519', 'X448'])
+    def test_each_refused_group_is_checked(self, monkeypatch, group):
+        monkeypatch.setattr(fips_mode, 'tls_negotiates', lambda g: g in (group, 'prime256v1'))
+        with pytest.raises(RuntimeError, match=f'TLS still negotiates {group}'):
+            REAL_TLS_SELF_TEST()
+
     def test_tls_that_fails_on_p256_fails_the_check(self, monkeypatch):
         monkeypatch.setattr(fips_mode, 'tls_negotiates', lambda group: False)
         with pytest.raises(RuntimeError, match='TLS fails on P-256'):
