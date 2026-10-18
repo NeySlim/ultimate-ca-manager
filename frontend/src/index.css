@@ -2913,4 +2913,5 @@ input:focus, select:focus, textarea:focus {
 .kofi-badge { background-color: var(--kofi-coral-strong); color: #FFFFFF; }
 .kofi-button { background-color: var(--kofi-coral-strong); color: #FFFFFF; transition: background-color 150ms; }
 .kofi-button:hover { background-color: var(--kofi-coral-hover); }
-.kofi-icon { color: var(--kofi-coral); }
+/* Pulled toward the text colour: darker on light themes, lighter on dark ones (≥ 3:1) */
+.kofi-icon { color: color-mix(in srgb, var(--kofi-coral) 75%, var(--text-primary)); }
