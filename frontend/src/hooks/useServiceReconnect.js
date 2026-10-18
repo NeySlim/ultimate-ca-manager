@@ -2,7 +2,7 @@
  * useServiceReconnect - Hook for waiting on service restart/update
  * 
  * Flow:
- * 1. countdown (30s) - visual countdown before any polling
+ * 1. countdown (60s) - visual countdown before any polling
  * 2. connecting - polls /api/health until service is back with new started_at
  * 3. redirecting - service is back, clears cache & redirects to /login
  * 4. timeout - maxWaitMs elapsed after the countdown
@@ -25,10 +25,12 @@ export function useServiceReconnect() {
   const countdownRef = useRef(null)
   const cancelledRef = useRef(false)
 
-  // Cleanup countdown interval on unmount
+  // Leaving the page ends the countdown and the polling chain, which would otherwise redirect later
   useEffect(() => {
     return () => {
+      cancelledRef.current = true
       if (countdownRef.current) clearInterval(countdownRef.current)
+      if (abortRef.current) abortRef.current.abort()
     }
   }, [])
 

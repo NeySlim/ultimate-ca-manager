@@ -76,6 +76,18 @@ describe('waiting for UCM after an update', () => {
     expect(screen.getByText('reconnect.redirecting')).toBeInTheDocument()
   })
 
+  it('stops polling once the page is left', async () => {
+    const { result, unmount } = renderHook(() => useServiceReconnect())
+    act(() => { result.current.waitForRestart() })
+    await tick(MINUTE + 10 * 1000)
+    const calls = globalThis.fetch.mock.calls.length
+    expect(calls).toBeGreaterThan(1)
+    unmount()
+    health.down = false
+    await tick(10 * MINUTE)
+    expect(globalThis.fetch.mock.calls.length).toBe(calls)
+  })
+
   it('a plain restart still times out after three minutes', async () => {
     const { result } = renderHook(() => useServiceReconnect())
     act(() => { result.current.waitForRestart() })
