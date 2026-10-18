@@ -6,6 +6,7 @@ is set without the FIPS provider.
 """
 import argparse
 import json
+import os
 import sys
 
 from flask import Flask
@@ -80,9 +81,10 @@ def main(argv=None) -> int:
             db.session.rollback()
     if fips_mode.requested() and not fips_mode.provider_active():
         # A docker exec does not inherit the entrypoint's OPENSSL_CONF: the header would say FIPS is off.
+        remedy = ('set OPENSSL_CONF=/run/ucm/openssl-fips.cnf' if os.getenv('UCM_DOCKER') == '1' else
+                  'put the host in FIPS mode and install the package with UCM_FIPS_BUILD=1 in /etc/ucm/ucm.env')
         report['errors'].insert(0, {'id': 'fips.provider', 'error': (
-            'UCM_FIPS is set but this process runs without the FIPS provider: '
-            'set OPENSSL_CONF=/run/ucm/openssl-fips.cnf')})
+            f'UCM_FIPS is set but this process runs without the FIPS provider: {remedy}')})
         report['ready'] = False
     print(json.dumps(report, indent=2) if args.json else render_text(report))
     return exit_code(report)

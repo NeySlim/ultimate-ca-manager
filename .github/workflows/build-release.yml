@@ -158,10 +158,24 @@ jobs:
   # Build RPM Package
   # ============================================================
   build-rpm:
-    name: Build RPM Package
+    name: Build RPM Package (${{ matrix.label }})
     runs-on: ubuntu-latest
     needs: build-deb
-    
+    strategy:
+      fail-fast: false
+      matrix:
+        include:
+          - label: Fedora 43
+            image: fedora:43
+            artifact: rpm-package
+            asset_prefix: ucm-
+          # EL9 build: python3.12 instead of the system python3 (3.9). Its name sorts
+          # after the Fedora RPM: updaters before 2.241 take the first .rpm asset by name.
+          - label: EL9
+            image: almalinux:9
+            artifact: rpm-el9-package
+            asset_prefix: ucm-el9-
+
     steps:
       - uses: actions/checkout@v6
       
@@ -186,7 +200,7 @@ jobs:
           npm ci
           npm run build
 
-      - name: Build RPM in Fedora container
+      - name: Build RPM in ${{ matrix.label }} container
         run: |
           VERSION="${{ needs.build-deb.outputs.version }}"
           # For RPM Version field (supports ~), and for tarball name (use _)
@@ -210,7 +224,8 @@ jobs:
             -v /tmp/rpm-output:/output \
             -e RPM_VERSION="$RPM_VERSION" \
             -e TAR_VERSION="$TAR_VERSION" \
-            fedora:43 bash -c '
+            -e ASSET_PREFIX="${{ matrix.asset_prefix }}" \
+            ${{ matrix.image }} bash -c '
               set -e
               dnf install -y rpm-build rpmdevtools python3 python3-pip systemd-rpm-macros
               
@@ -230,13 +245,17 @@ jobs:
               
               # Copy outputs
               cp ~/rpmbuild/RPMS/noarch/*.rpm /output/
-              cd /output && for f in *.rpm; do echo "$(sha256sum "$f" | cut -c1-64)  ${f//\~/.}" > "$f.sha256"; done
+              cd /output && for f in *.rpm; do
+                name=${ASSET_PREFIX}${f#ucm-}
+                [ "$name" = "$f" ] || mv "$f" "$name"
+                echo "$(sha256sum "$name" | cut -c1-64)  ${name//\~/.}" > "$name.sha256"
+              done
             '
 
       - name: Upload artifact
         uses: actions/upload-artifact@v7
         with:
-          name: rpm-package
+          name: ${{ matrix.artifact }}
           path: |
             /tmp/rpm-output/*.rpm
             /tmp/rpm-output/*.rpm.sha256
@@ -547,6 +566,21 @@ jobs:
         with:
           name: rpm-package
           path: ./artifacts
+
+      - name: Download EL9 RPM artifact
+        uses: actions/download-artifact@v7
+        with:
+          name: rpm-el9-package
+          path: ./artifacts
+
+      - name: Check the RPM taken by older updaters
+        # Updaters before 2.241 install the first .rpm asset by name: it must be the Fedora one
+        run: |
+          FIRST=$(cd artifacts && ls -1 *.rpm | LC_ALL=C sort | head -n 1)
+          case "$FIRST" in
+            ucm-[0-9]*.fc43.noarch.rpm) echo "First RPM asset: $FIRST" ;;
+            *) echo "::error::the first RPM asset by name is $FIRST, not the Fedora build"; exit 1 ;;
+          esac
       
       - name: Generate release notes
         id: notes
@@ -631,10 +665,16 @@ jobs:
           sudo apt-get install -f
           ```
           
-          ### Fedora/RHEL
+          ### Fedora
           ```bash
           wget https://github.com/REPO/releases/download/vVERSION/ucm-RPM_VERSION-1.fc43.noarch.rpm
           sudo dnf install ./ucm-RPM_VERSION-1.fc43.noarch.rpm
+          ```
+
+          ### RHEL, AlmaLinux, Rocky Linux 9
+          ```bash
+          wget https://github.com/REPO/releases/download/vVERSION/ucm-el9-RPM_VERSION-1.el9.noarch.rpm
+          sudo dnf install ./ucm-el9-RPM_VERSION-1.el9.noarch.rpm
           ```
           
           ### Silent/Automated Install

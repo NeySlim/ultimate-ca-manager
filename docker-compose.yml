@@ -71,7 +71,8 @@ services:
 
       # Needs the -fips image (e.g. neyslim/ultimate-ca-manager:<version>-fips);
       # the standard image refuses to start with it. With read_only: true, add
-      # a tmpfs for the module configuration: tmpfs: [/run/ucm:uid=1000]
+      # tmpfs for the module configuration and temporary files:
+      # tmpfs: [/run/ucm:uid=1000, /tmp]
       # - UCM_FIPS=1
 
     healthcheck:

@@ -3084,7 +3084,7 @@
         },
         "database_postgres_without_tls": {
           "title": "З'єднання PostgreSQL працює через TCP без sslmode=require або суворішого: UCM відмовляється запускатися в режимі FIPS",
-          "remedy": "Увімкніть TLS на сервері та додайте sslmode=require (або verify-full) до DATABASE_URL."
+          "remedy": "Увімкніть TLS на сервері та додайте sslmode=require (або verify-full) до DATABASE_URL; для сервера на тому самому хості натомість підключайтеся через його сокет Unix: postgresql://ucm:<password>@/ucm?host=/var/run/postgresql"
         },
         "https_unapproved_key": {
           "title": "Сертифікат HTTPS має ключ Ed25519/Ed448 або слабкий ключ: вебсервер не може використовувати його в режимі FIPS",

@@ -141,7 +141,7 @@ def enforce_at_startup(log, database_url: str = '') -> None:
     problem = postgres_tls_problem(database_url)
     if problem:
         log.error('UCM_FIPS=1 but DATABASE_URL reaches PostgreSQL over TCP with %s: '
-                  'use sslmode=require or stricter; refusing to start', problem)
+                  'use sslmode=require or stricter, or a Unix socket; refusing to start', problem)
         raise SystemExit(1)
     info = provider_info() or {}
     log.info('FIPS mode active: %s %s (library %s)', info.get('name', 'unknown provider'),

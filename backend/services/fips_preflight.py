@@ -453,7 +453,9 @@ def _backup_archives():
 @detector('database.postgres_without_tls', BLOCKER,
           'The PostgreSQL connection runs over TCP without sslmode=require or stricter: '
           'UCM refuses to start in FIPS mode',
-          'Enable TLS on the server and add sslmode=require (or verify-full) to DATABASE_URL.')
+          'Enable TLS on the server and add sslmode=require (or verify-full) to DATABASE_URL; '
+          'for a server on the same host, connect through its Unix socket instead: '
+          'postgresql://ucm:<password>@/ucm?host=/var/run/postgresql')
 def _database():
     problem = postgres_tls_problem(current_app.config.get('SQLALCHEMY_DATABASE_URI') or '')
     return [f'DATABASE_URL: {problem}'] if problem else []

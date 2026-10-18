@@ -99,8 +99,12 @@ SUDOERS
         systemctl enable ucm-watcher.path 2>/dev/null || true
         systemctl start ucm-watcher.path 2>/dev/null || true
         
+        UCM_SETUP="$UCM_HOME/scripts/native-setup.sh"
+        NEW_CONFIG=""
+
         # Create config if not exists (fresh install)
         if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
+            NEW_CONFIG=1
             SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
             JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
             ADMIN_PASS="changeme123"
@@ -160,38 +164,13 @@ INITIAL_ADMIN_PASSWORD=$ADMIN_PASS
 # REDIS_URL=redis://localhost:6379/0
 ENVEOF
             chmod 600 "$UCM_CONFIG/ucm.env"
-            
-            echo ""
-            # Detect access URLs
-            INSTALL_HOST=$(hostname -f 2>/dev/null || hostname)
-            INSTALL_PORT=$(grep "^HTTPS_PORT=" "$UCM_CONFIG/ucm.env" 2>/dev/null | cut -d= -f2)
-            INSTALL_PORT=${INSTALL_PORT:-8443}
-            INSTALL_IPS=$(hostname -I 2>/dev/null | xargs)
-            echo ""
-            echo "============================================"
-            echo " UCM INSTALLED"
-            echo "============================================"
-            echo ""
-            echo " Access:   https://${INSTALL_HOST}:${INSTALL_PORT}"
-            if [ -n "$INSTALL_IPS" ]; then
-                for ip in $INSTALL_IPS; do
-                    echo "            https://${ip}:${INSTALL_PORT}"
-                done
-            fi
-            echo ""
-            echo " Admin:    admin / $ADMIN_PASS"
-            echo " Config:   $UCM_CONFIG/ucm.env"
-            echo ""
-            # Optional packages suggestions
-            echo " Optional packages:"
-            if dpkg -l softhsm2 2>/dev/null | grep -q "^ii"; then
-                echo "  [ok] softhsm2 (HSM support)"
-            else
-                echo "  [ ]  softhsm2 - HSM support (apt install softhsm2)"
-            fi
-            echo ""
-            echo "============================================"
         fi
+        # A file written before the install (UCM_FIPS_BUILD=1 alone) gets its secrets and defaults
+        ENV_STATE=$(bash "$UCM_SETUP" env "$UCM_CONFIG/ucm.env" "$UCM_DATA")
+        [ "$ENV_STATE" != new ] || NEW_CONFIG=1
+        # Resumed after a failed first attempt: the service never had a working venv
+        # ($2 is empty for a first configure, so an upgrade never shows the banner)
+        [ -n "$2" ] || bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
         
         # Always ensure config has correct paths (for upgrades from older versions)
         if [ -f "$UCM_CONFIG/ucm.env" ]; then
@@ -204,41 +183,7 @@ ENVEOF
         # Always recreate venv to ensure correct dependencies
         # This handles both fresh install and upgrades
         echo "Creating/updating Python virtual environment..."
-
-        # requests-kerberos and pyspnego[kerberos] are optional (excluded from
-        # requirements.txt, see there for why) and admin-installed manually.
-        # The rm -rf below would silently drop them on every upgrade even
-        # though the admin already opted in, breaking MS CA Kerberos auth /
-        # Autoenrollment's SPNEGO binding a few days after every update.
-        # Remember what was there and reinstall it after, rather than making
-        # either package part of the default install for everyone.
-        HAD_REQUESTS_KERBEROS=""
-        HAD_PYSPNEGO_KERBEROS=""
-        if [ -x "$UCM_HOME/venv/bin/pip" ]; then
-            "$UCM_HOME/venv/bin/pip" show requests-kerberos >/dev/null 2>&1 && HAD_REQUESTS_KERBEROS=1 || true
-            "$UCM_HOME/venv/bin/pip" show gssapi >/dev/null 2>&1 && HAD_PYSPNEGO_KERBEROS=1 || true
-        fi
-
-        rm -rf "$UCM_HOME/venv" 2>/dev/null || true
-        python3 -m venv "$UCM_HOME/venv"
-        "$UCM_HOME/venv/bin/pip" install --quiet --upgrade pip
-        "$UCM_HOME/venv/bin/pip" install --quiet -r "$UCM_HOME/requirements.txt"
-        # Install pyjks separately with --no-deps to avoid pulling `twofish`
-        # (sdist-only, would require gcc + python3-dev to build its C extension;
-        # only used by pyjks for the BKS UBER format which UCM does not export).
-        # See backend/requirements.txt for full rationale.
-        "$UCM_HOME/venv/bin/pip" install --quiet --no-deps pyjks==20.0.0
-
-        if [ -n "$HAD_REQUESTS_KERBEROS" ]; then
-            echo "Reinstalling requests-kerberos (was present before upgrade)..."
-            "$UCM_HOME/venv/bin/pip" install --quiet requests-kerberos || \
-                echo "WARNING: requests-kerberos reinstall failed, Kerberos auth to the upstream CA is unavailable until 'pip install requests-kerberos' is run manually in $UCM_HOME/venv"
-        fi
-        if [ -n "$HAD_PYSPNEGO_KERBEROS" ]; then
-            echo "Reinstalling pyspnego[kerberos] (was present before upgrade)..."
-            "$UCM_HOME/venv/bin/pip" install --quiet 'pyspnego[kerberos]' || \
-                echo "WARNING: pyspnego[kerberos] reinstall failed (needs libkrb5-dev/gcc), Autoenrollment's Kerberos/SPNEGO binding is unavailable until 'pip install pyspnego[kerberos]' is run manually in $UCM_HOME/venv"
-        fi
+        bash "$UCM_SETUP" venv "$UCM_HOME" python3 deb "$UCM_CONFIG/ucm.env"
 
         # Set permissions
         chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_HOME"
@@ -246,6 +191,13 @@ ENVEOF
         chown -R "$UCM_USER":"$UCM_GROUP" "$UCM_CONFIG"
         chown -R "$UCM_USER":"$UCM_GROUP" /var/log/ucm
         chmod 750 "$UCM_DATA"
+
+        # Host FIPS state, UCM_FIPS and readiness report (UCM_FIPS_BUILD=1 only)
+        bash "$UCM_SETUP" fips-finish "$UCM_HOME" "$UCM_CONFIG/ucm.env" "$UCM_DATA" "$UCM_USER"
+        # Shown once the venv is built, so a failed build never follows the banner
+        if [ -n "$NEW_CONFIG" ]; then
+            bash "$UCM_SETUP" banner "$UCM_CONFIG/ucm.env" deb
+        fi
         
         # Install sudoers file to allow service management
         if [ -f "$UCM_HOME/sudoers/ucm" ]; then

@@ -10,7 +10,14 @@ Source0:        %{name}-%{version}.tar.gz
 BuildArch:      noarch
 # Disable auto-detection of requires (we manage deps via venv)
 AutoReqProv:    no
+# EL9's python3 is 3.9: the el9 build runs on the parallel-installable python3.12
+%if 0%{?rhel}
+Requires:       python3.12
+%global ucm_python python3.12
+%else
 Requires:       python3 >= 3.12
+%global ucm_python python3
+%endif
 Requires:       systemd
 Requires:       openssl >= 1.1.1
 Requires:       logrotate
@@ -35,7 +42,7 @@ install -d %{buildroot}%{ucm_home}
 install -d %{buildroot}%{ucm_home}/backend
 install -d %{buildroot}%{ucm_home}/frontend
 install -d %{buildroot}%{ucm_home}/scripts
-# Listed one by one on purpose: %install runs under /bin/sh, and a shell
+# Listed one by one on purpose: %%install runs under /bin/sh, and a shell
 # without brace expansion would create a single directory named after the
 # whole list instead of the seven wanted here
 for d in ca certs private crl scep backups sessions; do
@@ -58,6 +65,7 @@ install -m 644 backend/requirements.txt %{buildroot}%{ucm_home}/requirements.txt
 install -m 755 packaging/debian/start-ucm.sh %{buildroot}%{ucm_home}/start-ucm.sh
 install -m 755 packaging/scripts/configure-firewall.sh %{buildroot}%{ucm_home}/scripts/
 install -m 755 packaging/scripts/ucm-watcher.sh %{buildroot}%{ucm_home}/scripts/
+install -m 755 packaging/scripts/native-setup.sh %{buildroot}%{ucm_home}/scripts/
 install -m 644 packaging/firewall/ucm.xml %{buildroot}/usr/lib/firewalld/services/
 # Log rotation for the gunicorn streams (#350)
 install -d %{buildroot}%{_sysconfdir}/logrotate.d
@@ -93,8 +101,9 @@ systemctl start ucm-watcher.path
 UCM_HOME=%{ucm_home}
 UCM_DATA=%{ucm_data}
 UCM_CONFIG=/etc/%{name}
+UCM_SETUP=$UCM_HOME/scripts/native-setup.sh
 
-# Listed one by one for the same reason as in %install: this scriptlet
+# Listed one by one for the same reason as in %%install: this scriptlet
 # runs under /bin/sh, which does not always expand braces
 for d in ca certs private crl scep backups sessions; do
     mkdir -p $UCM_DATA/$d
@@ -141,7 +150,9 @@ SECRET_KEY=$(openssl rand -hex 32)
 JWT_SECRET=$(openssl rand -hex 32)
 
 # Create config if not exists
+NEW_CONFIG=""
 if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
+    NEW_CONFIG=1
     cat > "$UCM_CONFIG/ucm.env" << ENVEOF
 # UCM Configuration - Generated on install
 DATABASE_PATH=$UCM_DATA/ucm.db
@@ -156,75 +167,18 @@ JWT_SECRET_KEY=$JWT_SECRET
 INITIAL_ADMIN_PASSWORD=$ADMIN_PASS
 ENVEOF
     chmod 600 "$UCM_CONFIG/ucm.env"
-    
-    echo ""
-    # Detect access URLs
-    INSTALL_HOST=$(hostname -f 2>/dev/null || hostname)
-    INSTALL_PORT=$(grep "^HTTPS_PORT=" "$UCM_CONFIG/ucm.env" 2>/dev/null | cut -d= -f2)
-    INSTALL_PORT=${INSTALL_PORT:-8443}
-    INSTALL_IPS=$(hostname -I 2>/dev/null | xargs)
-    echo ""
-    echo "============================================"
-    echo " UCM INSTALLED"
-    echo "============================================"
-    echo ""
-    echo " Access:   https://${INSTALL_HOST}:${INSTALL_PORT}"
-    if [ -n "$INSTALL_IPS" ]; then
-        for ip in $INSTALL_IPS; do
-            echo "            https://${ip}:${INSTALL_PORT}"
-        done
-    fi
-    echo ""
-    echo " Admin:    admin / $ADMIN_PASS"
-    echo " Config:   $UCM_CONFIG/ucm.env"
-    echo ""
-    # Optional packages suggestions
-    echo " Optional packages:"
-    if rpm -q softhsm >/dev/null 2>&1; then
-        echo "  [ok] softhsm (HSM support)"
-    else
-        echo "  [ ]  softhsm - HSM support (dnf install softhsm)"
-    fi
-    echo ""
-    echo "============================================"
 fi
+# A file written before the install (UCM_FIPS_BUILD=1 alone) gets its secrets and defaults
+ENV_STATE=$(bash "$UCM_SETUP" env "$UCM_CONFIG/ucm.env" "$UCM_DATA") || exit 1
+[ "$ENV_STATE" != new ] || NEW_CONFIG=1
+# Resumed after a failed first attempt: the service never had a working venv
+bash "$UCM_SETUP" venv-ok "$UCM_HOME" || NEW_CONFIG=1
 
 # Create venv and install dependencies
 echo "Creating Python virtual environment..."
-
-# requests-kerberos and pyspnego[kerberos] are optional (excluded from
-# requirements.txt, see there for why) and admin-installed manually. The
-# rm -rf below would silently drop them on every upgrade even though the
-# admin already opted in, breaking MS CA Kerberos auth / Autoenrollment's
-# SPNEGO binding a few days after every update. Remember what was there and
-# reinstall it after, rather than making either package part of the default
-# install for everyone.
-HAD_REQUESTS_KERBEROS=""
-HAD_PYSPNEGO_KERBEROS=""
-if [ -x "$UCM_HOME/venv/bin/pip" ]; then
-    "$UCM_HOME/venv/bin/pip" show requests-kerberos >/dev/null 2>&1 && HAD_REQUESTS_KERBEROS=1 || true
-    "$UCM_HOME/venv/bin/pip" show gssapi >/dev/null 2>&1 && HAD_PYSPNEGO_KERBEROS=1 || true
-fi
-
-rm -rf "$UCM_HOME/venv" 2>/dev/null || true
-python3 -m venv "$UCM_HOME/venv"
-"$UCM_HOME/venv/bin/pip" install --quiet --upgrade pip
-"$UCM_HOME/venv/bin/pip" install --quiet -r "$UCM_HOME/requirements.txt"
-# Install pyjks separately with --no-deps to avoid pulling `twofish`
-# (sdist-only, would require gcc + python3-devel to build its C extension;
-# only used by pyjks for the BKS UBER format which UCM does not export).
-# See backend/requirements.txt for full rationale.
-"$UCM_HOME/venv/bin/pip" install --quiet --no-deps pyjks==20.0.0
-
-if [ -n "$HAD_REQUESTS_KERBEROS" ]; then
-    echo "Reinstalling requests-kerberos (was present before upgrade)..."
-    "$UCM_HOME/venv/bin/pip" install --quiet requests-kerberos || \
-        echo "WARNING: requests-kerberos reinstall failed, Kerberos auth to the upstream CA is unavailable until 'pip install requests-kerberos' is run manually in $UCM_HOME/venv"
-fi
-if [ -n "$HAD_PYSPNEGO_KERBEROS" ]; then
-    echo "Reinstalling pyspnego[kerberos] (was present before upgrade)..."
-    "$UCM_HOME/venv/bin/pip" install --quiet 'pyspnego[kerberos]' || \
-        echo "WARNING: pyspnego[kerberos] reinstall failed (needs libkrb5-dev/gcc), Autoenrollment's Kerberos/SPNEGO binding is unavailable until 'pip install pyspnego[kerberos]' is run manually in $UCM_HOME/venv"
+# A failed UCM_FIPS_BUILD=1 build fails the scriptlet; the standard install keeps going as before
+if ! bash "$UCM_SETUP" venv "$UCM_HOME" %{ucm_python} rpm "$UCM_CONFIG/ucm.env"; then
+    bash "$UCM_SETUP" fips-requested "$UCM_CONFIG/ucm.env" && exit 1
 fi
 
 # Set permissions
@@ -232,6 +186,13 @@ chown -R %{name}:%{name} $UCM_HOME
 chown -R %{name}:%{name} $UCM_CONFIG
 chown -R %{name}:%{name} /var/log/%{name}
 chmod 750 $UCM_DATA
+
+# Host FIPS state, UCM_FIPS and readiness report (UCM_FIPS_BUILD=1 only)
+bash "$UCM_SETUP" fips-finish "$UCM_HOME" "$UCM_CONFIG/ucm.env" "$UCM_DATA" %{name}
+# Shown once the venv is built, so a failed build never follows the banner
+if [ -n "$NEW_CONFIG" ]; then
+    bash "$UCM_SETUP" banner "$UCM_CONFIG/ucm.env" rpm
+fi
 
 # Generate HTTPS cert if not exists
 if [ ! -f "$UCM_DATA/https_cert.pem" ]; then
@@ -259,7 +220,7 @@ V1_DATA="$UCM_HOME/backend/data"
 if [ -f "$V1_DATA/ucm.db" ] && [ ! -f "$UCM_DATA/ucm.db" ]; then
     echo "Detected UCM v1.8.x - running automatic migration..."
     if [ -f "$UCM_HOME/backend/migrate_v1_to_v2.py" ]; then
-        python3 "$UCM_HOME/backend/migrate_v1_to_v2.py" "$UCM_HOME" 2>&1 | tee /var/log/%{name}/migration.log
+        %{ucm_python} "$UCM_HOME/backend/migrate_v1_to_v2.py" "$UCM_HOME" 2>&1 | tee /var/log/%{name}/migration.log
     fi
 fi
 
@@ -286,7 +247,7 @@ fi
 
 %files
 %{ucm_home}/
-%dir %{_sysconfdir}/%{name}/
+%dir %attr(0750,%{name},%{name}) %{_sysconfdir}/%{name}/
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}
 %dir %{_localstatedir}/log/%{name}/
 %{_unitdir}/%{name}.service

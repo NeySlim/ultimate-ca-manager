@@ -5,9 +5,9 @@ check/notify/install task, and the update-settings API.
 import hashlib
 import json
 import os
+import pathlib
 
 import pytest
-
 import services.updates as updates
 
 
@@ -647,3 +647,79 @@ class TestChecksumAssetNameTransform:
 
         monkeypatch.setattr(updates.requests, 'get', lambda *a, **k: _Resp())
         assert updates.fetch_expected_sha256('https://x/pkg.sha256', 'ucm_2.224.rc1_all.deb') is None
+
+
+def _rpm(name):
+    return {'name': name, 'browser_download_url': f'http://x/{name}'}
+
+
+WORKFLOW = pathlib.Path(__file__).resolve().parents[2] / '.github' / 'workflows' / 'build-release.yml'
+
+
+def _release_assets(tag):
+    """The assets of release `tag` as build-release.yml names them, in GitHub's order (by name)."""
+    version = tag.replace('-', '.')  # GitHub turns the RPM's '~' into '.'
+    names = [f'ucm_{version}_all.deb']
+    yaml = pytest.importorskip('yaml')
+    for build in yaml.safe_load(WORKFLOW.read_text())['jobs']['build-rpm']['strategy']['matrix']['include']:
+        distro, release = build['image'].split(':')
+        dist = {'fedora': 'fc', 'almalinux': 'el'}[distro] + release
+        names.append(f"{build['asset_prefix']}{version}-1.{dist}.noarch.rpm")
+    names += [f'{n}.sha256' for n in names]
+    return [_rpm(n) for n in sorted(names)]
+
+
+TAGS = ['2.241', '2.241-rc1', '2.300-dev2', '10.0']
+
+
+@pytest.mark.parametrize('tag', TAGS)
+def test_updaters_before_2_241_still_take_the_fedora_rpm(tag):
+    """They install the first .rpm asset of the list, with no notion of an EL9 build."""
+    first = next(a for a in _release_assets(tag) if a['name'].endswith('.rpm'))
+    assert first['name'].endswith('.fc43.noarch.rpm'), first['name']
+
+
+class TestRpmAssetPerDistribution:
+    """A release carries a Fedora RPM and an EL9 one (python3.12): each host takes its own."""
+
+    def _check(self, monkeypatch, el, assets):
+        import time as _time
+        monkeypatch.setitem(updates._releases_cache, 'data', [{
+            'tag_name': 'v99.0', 'draft': False, 'prerelease': False, 'body': '', 'assets': assets}])
+        monkeypatch.setitem(updates._releases_cache, 'ts', _time.time())
+        monkeypatch.setattr(updates.os.path, 'exists', lambda p: p == '/usr/bin/rpm')
+        monkeypatch.setattr(updates, '_el_release', lambda: el)
+        return updates.check_for_updates()
+
+    @pytest.mark.parametrize('order', [1, -1])
+    def test_el9_host_takes_the_el9_build(self, monkeypatch, order):
+        result = self._check(monkeypatch, '9', _release_assets('99.0')[::order])
+        assert result['package_name'] == 'ucm-el9-99.0-1.el9.noarch.rpm'
+        assert result['checksum_url'] == 'http://x/ucm-el9-99.0-1.el9.noarch.rpm.sha256'
+
+    @pytest.mark.parametrize('el', [None, '10'])
+    def test_other_hosts_never_take_the_el9_build(self, monkeypatch, el):
+        result = self._check(monkeypatch, el, _release_assets('99.0'))
+        assert result['package_name'] == 'ucm-99.0-1.fc43.noarch.rpm'
+
+    def test_el9_host_falls_back_on_a_release_without_el9_build(self, monkeypatch):
+        assets = [a for a in _release_assets('99.0') if '.el9.' not in a['name']]
+        result = self._check(monkeypatch, '9', assets)
+        assert result['package_name'] == 'ucm-99.0-1.fc43.noarch.rpm'
+
+    @pytest.mark.parametrize('info, expected', [
+        ({'ID': 'almalinux', 'ID_LIKE': 'rhel centos fedora', 'VERSION_ID': '9.8'}, '9'),
+        ({'ID': 'rhel', 'ID_LIKE': 'fedora', 'VERSION_ID': '9.6'}, '9'),
+        ({'ID': 'rocky', 'ID_LIKE': 'rhel centos fedora', 'VERSION_ID': '10.0'}, '10'),
+        ({'ID': 'fedora', 'VERSION_ID': '43'}, None),
+        ({'ID': 'debian', 'VERSION_ID': '13'}, None),
+    ])
+    def test_el_release(self, monkeypatch, info, expected):
+        monkeypatch.setattr(updates.platform, 'freedesktop_os_release', lambda: info)
+        assert updates._el_release() == expected
+
+    def test_el_release_without_os_release(self, monkeypatch):
+        def missing():
+            raise OSError('no os-release')
+        monkeypatch.setattr(updates.platform, 'freedesktop_os_release', missing)
+        assert updates._el_release() is None
