@@ -7,10 +7,11 @@ import { useCallback, useEffect, useState } from 'react'
 import { useLocation } from 'react-router-dom'
 import { useTranslation } from 'react-i18next'
 import { Coffee, X } from '@phosphor-icons/react'
-import { accountService } from '../services'
 import { useAuth } from '../contexts/AuthContext'
 import { usePermission } from '../hooks/usePermission'
-import { persistPreference } from '../stores/userPreferencesStore'
+import {
+  arePreferencesLoaded, getPreferences, persistPreference, subscribePreferences,
+} from '../stores/userPreferencesStore'
 import { KOFI_URL } from '../lib/support'
 
 const OPEN_DIALOG_SELECTOR = '[role="dialog"]:not([data-state="closed"]), [role="alertdialog"]'
@@ -25,23 +26,19 @@ export function KofiSupportCard({ version = __APP_VERSION__ }) {
   const { user, forcePasswordChange, mustEnroll2fa } = useAuth()
   const { isAdmin } = usePermission()
   const admin = isAdmin()
-  const [pending, setPending] = useState(false)
+  const [prefs, setPrefs] = useState(() => ({
+    loaded: arePreferencesLoaded(), seen: getPreferences().kofi_seen_version,
+  }))
   const [dialogOpen, setDialogOpen] = useState(isDialogOpen)
 
   useEffect(() => {
-    setPending(false)
-    if (!user?.id || !admin || !version) return
-    let cancelled = false
-    // Read the server copy: the store may not hold the prefs yet right after login.
-    accountService.getPreferences()
-      .then((response) => {
-        if (cancelled) return
-        const prefs = response?.data || response || {}
-        if (prefs.kofi_seen_version !== version) setPending(true)
-      })
-      .catch(() => {})
-    return () => { cancelled = true }
-  }, [user?.id, admin, version])
+    const read = (next) => setPrefs({ loaded: arePreferencesLoaded(), seen: next.kofi_seen_version })
+    read(getPreferences())
+    return subscribePreferences(read)
+  }, [])
+
+  // Only once the server prefs are in the store: the dismissal PUT sends them all.
+  const pending = !!user?.id && admin && !!version && prefs.loaded && prefs.seen !== version
 
   // Radix portals mount on <body>; navigation is the fallback re-check.
   useEffect(() => {
@@ -54,7 +51,6 @@ export function KofiSupportCard({ version = __APP_VERSION__ }) {
   }, [pending, location.pathname])
 
   const acknowledge = useCallback(() => {
-    setPending(false)
     persistPreference('kofi_seen_version', version)
   }, [version])
 
@@ -63,7 +59,7 @@ export function KofiSupportCard({ version = __APP_VERSION__ }) {
   return (
     <aside
       aria-label={t('kofi.label')}
-      className="fixed z-30 bottom-3 left-3 right-3 sm:left-auto sm:right-8 sm:bottom-12 sm:w-80 rounded-xl border border-border bg-bg-secondary shadow-xl p-3 motion-safe:animate-in motion-safe:fade-in-0 motion-safe:duration-300"
+      className="fixed z-30 bottom-3 left-3 right-3 sm:left-auto sm:right-8 sm:bottom-12 sm:w-80 rounded-xl border border-border bg-bg-secondary shadow-xl p-3"
     >
       <div className="flex items-start gap-3">
         <div className="flex-shrink-0 mt-0.5 text-accent-primary">

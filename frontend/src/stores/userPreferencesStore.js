@@ -19,6 +19,8 @@ import { accountService } from '../services/account.service'
 
 let _prefs = {}
 let _authenticated = false
+// True once the server copy has been applied: a PUT before that would erase it.
+let _loaded = false
 const _listeners = new Set()
 
 function _notify() {
@@ -31,6 +33,10 @@ export function getPreferences() {
   return { ..._prefs }
 }
 
+export function arePreferencesLoaded() {
+  return _loaded
+}
+
 export function subscribePreferences(cb) {
   _listeners.add(cb)
   return () => _listeners.delete(cb)
@@ -40,6 +46,7 @@ export function setAuthenticated(value) {
   _authenticated = !!value
   if (!_authenticated) {
     _prefs = {}
+    _loaded = false
     _notify()
   }
 }
@@ -51,6 +58,7 @@ export function setAuthenticated(value) {
 export function applyServerPreferences(prefs) {
   if (!prefs || typeof prefs !== 'object') return
   _prefs = { ...prefs }
+  _loaded = true
   _notify()
 }
 
