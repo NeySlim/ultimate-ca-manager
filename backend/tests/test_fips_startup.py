@@ -54,6 +54,8 @@ class TestEnforceAtStartup:
         monkeypatch.setattr(fips_mode, 'self_tests', lambda: None)
         monkeypatch.setattr(fips_mode, 'provider_info', lambda: {
             'name': 'OpenSSL FIPS Provider', 'version': '3.1.2', 'buildinfo': '3.1.2'})
+        monkeypatch.setattr(fips_mode, 'module_settings',
+                            lambda: dict.fromkeys(fips_mode.APPROVED_MODE_SETTINGS, 1))
         with caplog.at_level(logging.INFO):
             fips_mode.enforce_at_startup(LOG)
         assert 'FIPS mode active: OpenSSL FIPS Provider 3.1.2' in caplog.text
@@ -113,6 +115,59 @@ class _Stopped(Exception):
     pass
 
 
+UPSTREAM = {'name': 'OpenSSL FIPS Provider', 'version': '3.1.2', 'buildinfo': '3.1.2'}
+ALL_ON = dict.fromkeys(fips_mode.APPROVED_MODE_SETTINGS, 1)
+
+
+class TestApprovedModeSettings:
+    """The upstream provider must run with every setting of its security
+    policy's approved mode at 1; a distribution module is not judged."""
+
+    @pytest.fixture
+    def active(self, monkeypatch, providers):
+        monkeypatch.setenv('UCM_FIPS', '1')
+        providers(True, True)
+        monkeypatch.setattr(fips_mode, 'self_tests', lambda: None)
+
+        def set_module(info, settings):
+            monkeypatch.setattr(fips_mode, 'provider_info', lambda: info)
+            monkeypatch.setattr(fips_mode, 'module_settings', lambda: settings)
+        return set_module
+
+    @pytest.mark.parametrize('setting', fips_mode.APPROVED_MODE_SETTINGS)
+    @pytest.mark.parametrize('value', [0, None])
+    def test_a_setting_off_or_unreported_stops_the_process(self, active, caplog, setting, value):
+        active(UPSTREAM, {**ALL_ON, setting: value})
+        with caplog.at_level(logging.ERROR), pytest.raises(SystemExit):
+            fips_mode.enforce_at_startup(LOG)
+        assert f'runs with {setting} not at 1' in caplog.text
+
+    def test_unreadable_settings_stop_the_process(self, active, caplog):
+        active(UPSTREAM, None)
+        with caplog.at_level(logging.ERROR), pytest.raises(SystemExit):
+            fips_mode.enforce_at_startup(LOG)
+        assert 'security-checks, tls1-prf-ems-check, drbg-no-trunc-md not at 1' in caplog.text
+
+    def test_all_settings_on_starts(self, active, caplog):
+        active(UPSTREAM, ALL_ON)
+        with caplog.at_level(logging.INFO):
+            fips_mode.enforce_at_startup(LOG)
+        assert 'FIPS mode active: OpenSSL FIPS Provider 3.1.2' in caplog.text
+
+    def test_a_distribution_module_follows_its_own_policy(self, active, caplog):
+        # Measured on a RHEL-family host: drbg-no-trunc-md = 0, Ubuntu reports none
+        active({'name': 'Red Hat Enterprise Linux OpenSSL FIPS Provider', 'version': '3.5.8'},
+               {**ALL_ON, 'drbg-no-trunc-md': 0})
+        with caplog.at_level(logging.INFO):
+            fips_mode.enforce_at_startup(LOG)
+        assert 'FIPS mode active: Red Hat Enterprise Linux OpenSSL FIPS Provider' in caplog.text
+
+
+@pytest.mark.skipif(fips_mode.provider_active(), reason='runs on a FIPS provider')
+def test_no_settings_are_reported_without_a_fips_provider():
+    assert fips_mode.module_settings() is None
+
+
 def test_create_app_runs_the_check_before_anything_else(monkeypatch):
     def stop(log, database_url=''):
         raise _Stopped
@@ -137,18 +192,22 @@ class TestApi:
     def test_status_carries_the_crypto_block(self, auth_client, monkeypatch, providers):
         monkeypatch.setenv('UCM_FIPS', '1')
         providers(True, True)
+        monkeypatch.setattr(fips_mode, 'module_settings',
+                            lambda: dict.fromkeys(fips_mode.APPROVED_MODE_SETTINGS, 1))
         monkeypatch.setattr(fips_mode, 'provider_info', lambda: {
             'name': 'OpenSSL FIPS Provider', 'version': '3.1.2', 'buildinfo': '3.1.2'})
         crypto = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
         assert crypto['fips_requested'] and crypto['fips_active'] and crypto['provider_active']
         assert crypto['provider']['version'] == '3.1.2'
+        assert crypto['module_settings'] == dict.fromkeys(fips_mode.APPROVED_MODE_SETTINGS, 1)
         assert crypto['library'] == fips_mode.library_version()
 
     def test_status_outside_fips(self, auth_client, monkeypatch):
         monkeypatch.delenv('UCM_FIPS', raising=False)
         crypto = auth_client.get('/api/v2/system/service/status').get_json()['data']['crypto']
         assert crypto == {'fips_requested': False, 'fips_active': False, 'provider_active': False,
-                          'library': fips_mode.library_version(), 'provider': None}
+                          'library': fips_mode.library_version(), 'provider': None,
+                          'module_settings': None}
 
     @pytest.mark.parametrize('active', [True, False])
     def test_health_says_whether_fips_is_on_without_versions(self, client, monkeypatch, active):

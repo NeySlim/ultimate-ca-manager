@@ -18,6 +18,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - A preference change (language, theme, a dismissed window) made before the user's saved preferences had loaded (just after signing in, or after a failed load) replaced them all on the server; it is now saved together with them once they load.
 - DEB and RPM: an upgrade rebuilt the Python environment while UCM was still running on it, which logged errors such as a missing CA bundle for the update check (up to five minutes with `UCM_FIPS_BUILD=1`). The service is now stopped during the rebuild and started again on the previous environment when the build fails or is interrupted, and the update screen waits up to ten minutes for it.
 - DEB: the install banner listed softhsm2 as missing when apt installed it in the same run.
+- FIPS mode (Docker): the module was installed without `-pedantic`, which left the Extended Master Secret check and the DRBG digest restriction of its approved mode off. Both are now on and UCM refuses to start when a required setting is off (the service status lists them); TLS 1.2 peers without Extended Master Secret are refused.
 
 ## [2.241] - 2026-10-18
 

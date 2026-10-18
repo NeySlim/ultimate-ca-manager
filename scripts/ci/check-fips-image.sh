@@ -53,5 +53,11 @@ if docker exec -e OPENSSL_CONF="$conf" "$name" sh -c 'echo x | openssl md5' >/de
     fail "MD5 still works under $conf"
 fi
 
+# Settings the module's security policy requires at 1 in the approved mode
+for setting in security-checks conditional-errors tls1-prf-ems-check drbg-no-trunc-md; do
+    docker exec "$name" grep -Eq "^[[:space:]]*$setting[[:space:]]*=[[:space:]]*1[[:space:]]*$" \
+        /run/ucm/fipsmodule.cnf || fail "$setting is not 1 in fipsmodule.cnf"
+done
+
 passed=1
 echo "FIPS check passed for $image"

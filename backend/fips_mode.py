@@ -45,13 +45,17 @@ class _Param(ctypes.Structure):
                 ('return_size', ctypes.c_size_t)]
 
 
-_UTF8_PTR = 6
+_INTEGER, _UTF8_PTR = 1, 6
+_UNMODIFIED = ctypes.c_size_t(-1).value
 _PROVIDER_CB = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
 
+# Upstream provider: its security policy (#4985, section 2.4) requires these at 1
+UPSTREAM_PROVIDER = 'OpenSSL FIPS Provider'
+APPROVED_MODE_SETTINGS = ('security-checks', 'tls1-prf-ems-check', 'drbg-no-trunc-md')
 
-def provider_info():
-    """Name, version and build of the loaded 'fips' provider, read from the
-    process's libcrypto; None when no such provider is loaded."""
+
+def _fips_provider():
+    """(libcrypto, the loaded 'fips' provider), or None."""
     try:
         lib = ctypes.CDLL('libcrypto.so.3')
         lib.OSSL_PROVIDER_get0_name.restype = ctypes.c_char_p
@@ -68,16 +72,36 @@ def provider_info():
         return 1
 
     lib.OSSL_PROVIDER_do_all(None, _PROVIDER_CB(visit), None)
-    if not found:
+    return (lib, found[0]) if found else None
+
+
+def _get_params(names, data_type, ctype):
+    """{name: value or None when not reported} from the 'fips' provider; None without one."""
+    loaded = _fips_provider()
+    if loaded is None:
         return None
-    keys = ('name', 'version', 'buildinfo')
-    values = [ctypes.c_char_p() for _ in keys]
-    params = (_Param * (len(keys) + 1))(*[
-        _Param(k.encode(), _UTF8_PTR, ctypes.cast(ctypes.byref(v), ctypes.c_void_p),
-               ctypes.sizeof(v), 0) for k, v in zip(keys, values)])
-    if not lib.OSSL_PROVIDER_get_params(found[0], params):
+    lib, prov = loaded
+    values = [ctype() for _ in names]
+    params = (_Param * (len(names) + 1))(*[
+        _Param(k.encode(), data_type, ctypes.cast(ctypes.byref(v), ctypes.c_void_p),
+               ctypes.sizeof(v), _UNMODIFIED) for k, v in zip(names, values)])
+    if not lib.OSSL_PROVIDER_get_params(prov, params):
         return None
-    return {k: (v.value or b'').decode() for k, v in zip(keys, values)}
+    return {k: (v.value if p.return_size != _UNMODIFIED else None)
+            for k, v, p in zip(names, values, params)}
+
+
+def provider_info():
+    """Name, version and build of the loaded 'fips' provider, read from the
+    process's libcrypto; None when no such provider is loaded."""
+    info = _get_params(('name', 'version', 'buildinfo'), _UTF8_PTR, ctypes.c_char_p)
+    return None if info is None else {k: (v or b'').decode() for k, v in info.items()}
+
+
+def module_settings():
+    """Approved-mode settings as the 'fips' provider applies them (1, 0, or None
+    when it does not report one); None without a FIPS provider."""
+    return _get_params(APPROVED_MODE_SETTINGS, _INTEGER, ctypes.c_int)
 
 
 def self_tests() -> None:
@@ -110,16 +134,27 @@ def self_tests() -> None:
 
 
 def status() -> dict:
-    """What the API shows: asked for, in force, library and provider."""
+    """What the API shows: asked for, in force, library, provider and its settings."""
     active = provider_active()
     return {'fips_requested': requested(), 'fips_active': requested() and active,
             'provider_active': active, 'library': library_version(),
-            'provider': provider_info() if active else None}
+            'provider': provider_info() if active else None,
+            'module_settings': module_settings() if active else None}
+
+
+def settings_off(info, settings) -> list:
+    """Approved-mode settings not at 1 on the upstream provider; distribution
+    modules follow their own security policies and are not judged here."""
+    if (info or {}).get('name') != UPSTREAM_PROVIDER:
+        return []
+    settings = settings or {}
+    return [name for name in APPROVED_MODE_SETTINGS if settings.get(name) != 1]
 
 
 def enforce_at_startup(log, database_url: str = '') -> None:
-    """UCM_FIPS=1 without an active provider, with a failed self-test or with a
-    PostgreSQL connection outside TLS stops the process before it serves anything."""
+    """UCM_FIPS=1 without an active provider, with a failed self-test, with the
+    upstream provider outside its approved-mode settings or with a PostgreSQL
+    connection outside TLS stops the process before it serves anything."""
     if not requested():
         return
     from cryptography.hazmat.bindings._rust import openssl as rust_openssl
@@ -144,5 +179,11 @@ def enforce_at_startup(log, database_url: str = '') -> None:
                   'use sslmode=require or stricter, or a Unix socket; refusing to start', problem)
         raise SystemExit(1)
     info = provider_info() or {}
+    off = settings_off(info, module_settings())
+    if off:
+        log.error('The FIPS provider runs with %s not at 1, outside the approved mode of its '
+                  'security policy (openssl fipsinstall -pedantic sets them); refusing to start',
+                  ', '.join(off))
+        raise SystemExit(1)
     log.info('FIPS mode active: %s %s (library %s)', info.get('name', 'unknown provider'),
              info.get('version', ''), library_version())

@@ -2176,13 +2176,17 @@ GET /api/v2/system/hsm-status
 GET /api/v2/system/service/status
 
 # "crypto" in the response: FIPS mode asked for (UCM_FIPS=1), in force,
-# the OpenSSL library cryptography uses, and the loaded FIPS provider
+# the OpenSSL library cryptography uses, the loaded FIPS provider and the
+# approved-mode settings it reports (null when it reports none). UCM refuses
+# to start when one is not 1 on the OpenSSL FIPS Provider; a distribution
+# module follows its own security policy.
 "crypto": {
   "fips_requested": true,
   "fips_active": true,
   "provider_active": true,
   "library": "OpenSSL 3.5.7 9 Jun 2026",
-  "provider": {"name": "OpenSSL FIPS Provider", "version": "3.1.2", "buildinfo": "3.1.2"}
+  "provider": {"name": "OpenSSL FIPS Provider", "version": "3.1.2", "buildinfo": "3.1.2"},
+  "module_settings": {"security-checks": 1, "tls1-prf-ems-check": 1, "drbg-no-trunc-md": 1}
 }
 
 # Restart service
