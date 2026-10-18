@@ -7,11 +7,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ---
 
-## [Unreleased]
+## [2.241] - 2026-10-18
 
 ### Added
 
-- FIPS mode (preview): with `UCM_FIPS=1`, UCM refuses to start unless its crypto libraries run on an active OpenSSL FIPS provider and pass their self-tests and PostgreSQL is reached over TLS, generates keys through the provider, and refuses what it does not approve (Ed25519 and Ed448, MD5, 3DES, scrypt and Argon2id, legacy PKCS#12 and JKS exports, PKCS#12 import, SCEP key transport in PKCS#1 v1.5, NTLM to a Microsoft CA). UCM is not FIPS validated itself (#399, requested by @Stryker-88).
+- FIPS mode (preview): with `UCM_FIPS=1`, UCM refuses to start unless its crypto libraries run on an active OpenSSL FIPS provider and pass their self-tests and PostgreSQL is reached over TLS, generates keys through the provider, and refuses what it does not approve (Ed25519 and Ed448, MD5, 3DES, scrypt and Argon2id, legacy PKCS#12 and JKS exports, PKCS#12 import, SCEP key transport in PKCS#1 v1.5, NTLM to a Microsoft CA). UCM is not FIPS validated itself. This is a first release of FIPS mode: feedback is welcome on #399 (requested by @Stryker-88).
 - Docker: building with `UCM_FIPS_BUILD=1` adds the OpenSSL 3.1.2 FIPS provider (CMVP certificate #4985) and links cryptography, psycopg2 and xmlsec to the system OpenSSL; the image runs in standard mode without `UCM_FIPS`, and the Helm chart has `fips.enabled` (#399).
 - Service status shows the OpenSSL library and FIPS provider in use, and `/api/v2/health` reports `fips_active` (#399).
 - Backups: `"kdf": "pbkdf2"` at creation writes an archive that a FIPS-mode instance can restore (#399).
