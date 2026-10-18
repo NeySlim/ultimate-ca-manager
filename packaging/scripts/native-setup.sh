@@ -431,7 +431,8 @@ cmd_banner() {
     echo ""
     echo " Optional packages:"
     if [ "$pkg" = deb ]; then
-        if dpkg -l softhsm2 2>/dev/null | grep -q "^ii"; then
+        # Installed in the same apt run, softhsm2 is only unpacked while ucm is configured
+        if dpkg-query -W -f='${Status}' softhsm2 2>/dev/null | grep -Eq '^install ok (installed|unpacked|half-configured)$'; then
             echo "  [ok] softhsm2 (HSM support)"
         else
             echo "  [ ]  softhsm2 - HSM support (apt install softhsm2)"

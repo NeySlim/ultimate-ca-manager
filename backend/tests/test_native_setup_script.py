@@ -682,7 +682,9 @@ def _banner(tmp_path, pkg, softhsm=False,
             hostname='[ "$1" = -I ] && echo "192.0.2.10 2001:db8::10 " || echo ucm.example.test'):
     bin_dir = tmp_path / 'bin'
     _stub(bin_dir / 'hostname', hostname)
-    _stub(bin_dir / 'dpkg', '[ "$*" = "-l softhsm2" ] && echo "ii  softhsm2  2.6.1"' if softhsm else 'exit 1')
+    status = 'install ok installed' if softhsm is True else softhsm
+    _stub(bin_dir / 'dpkg-query', f'[ "$*" = \'-W -f=${{Status}} softhsm2\' ] && printf %s \'{status}\'' if softhsm else 'exit 1')
+    _stub(bin_dir / 'dpkg', 'exit 1')
     _stub(bin_dir / 'rpm', '[ "$*" = "-q softhsm" ]' if softhsm else 'exit 1')
     envfile = tmp_path / 'ucm.env'
     envfile.write_text('HTTPS_PORT=9443\nINITIAL_ADMIN_PASSWORD=s3cret\n')
@@ -701,6 +703,11 @@ def test_the_banner_brackets_ipv6_addresses(tmp_path):
 
 @pytest.mark.parametrize('pkg, softhsm, line', [
     ('deb', True, '  [ok] softhsm2 (HSM support)'),
+    # Unpacked by the same apt run, configured after ucm
+    ('deb', 'install ok unpacked', '  [ok] softhsm2 (HSM support)'),
+    ('deb', 'install ok half-configured', '  [ok] softhsm2 (HSM support)'),
+    ('deb', 'deinstall ok config-files', '  [ ]  softhsm2 - HSM support (apt install softhsm2)'),
+    ('deb', 'unknown ok not-installed', '  [ ]  softhsm2 - HSM support (apt install softhsm2)'),
     ('deb', False, '  [ ]  softhsm2 - HSM support (apt install softhsm2)'),
     ('rpm', True, '  [ok] softhsm (HSM support)'),
     ('rpm', False, '  [ ]  softhsm - HSM support (dnf install softhsm)'),
