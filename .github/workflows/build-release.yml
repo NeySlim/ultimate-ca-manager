@@ -677,6 +677,35 @@ jobs:
           sudo dnf install ./ucm-el9-RPM_VERSION-1.el9.noarch.rpm
           ```
           
+          ### FIPS mode (preview)
+          FIPS mode is a preview: feedback is welcome on [#399](https://github.com/REPO/issues/399). Full guide: [FIPS Mode](https://github.com/REPO/wiki/FIPS-Mode).
+          
+          Docker, any Linux host (amd64, arm64):
+          ```bash
+          docker run -d -p 8443:8443 -e UCM_FIPS=1 \
+            -v ucm-data:/opt/ucm/data -v ucm-config:/etc/ucm \
+            --name ucm neyslim/ultimate-ca-manager:VERSION-fips
+          ```
+          
+          Ubuntu 24.04 with Ubuntu Pro (`sudo pro enable fips-updates`, then reboot):
+          ```bash
+          sudo apt-get install -y gcc pkg-config python3-dev python3-venv libpq-dev libxml2-dev libxslt1-dev \
+              zlib1g-dev libssl-dev libxmlsec1-dev libxmlsec1t64-openssl rustc-1.91 cargo-1.91
+          sudo install -d -m 750 /etc/ucm && echo 'UCM_FIPS_BUILD=1' | sudo tee /etc/ucm/ucm.env
+          sudo apt install ./ucm_DEB_VERSION_all.deb
+          ```
+          
+          RHEL, AlmaLinux, Rocky Linux 9 (`sudo fips-mode-setup --enable`, then reboot; on RHEL, enable CodeReady Builder instead of CRB):
+          ```bash
+          sudo dnf config-manager --set-enabled crb
+          sudo dnf install -y python3.12-devel gcc pkgconf-pkg-config libpq-devel libxml2-devel libxslt-devel \
+              openssl-devel xmlsec1-devel xmlsec1-openssl libtool-ltdl-devel rust cargo
+          sudo install -d -m 750 /etc/ucm && echo 'UCM_FIPS_BUILD=1' | sudo tee /etc/ucm/ucm.env
+          sudo dnf install ./ucm-el9-RPM_VERSION-1.el9.noarch.rpm
+          ```
+          
+          The package builds its crypto libraries against the system OpenSSL (about five minutes), sets `UCM_FIPS=1` on a host in FIPS mode and prints a readiness report. Fedora, Debian and other distributions are not supported in FIPS mode: use the Docker image.
+          
           ### Silent/Automated Install
           ```bash
           # Skip firewall prompts for CI/automation
