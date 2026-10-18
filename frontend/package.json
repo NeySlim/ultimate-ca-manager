@@ -73,6 +73,7 @@
   "overrides": {
     "ws": "8.21.0",
     "js-yaml": "^4.3.2",
-    "@babel/core": "^7.29.6"
+    "@babel/core": "^7.29.6",
+    "postcss-selector-parser": "7.1.6"
   }
 }
