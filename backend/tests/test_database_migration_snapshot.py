@@ -372,6 +372,10 @@ class TestTheDumpKeepsTheServiceTransport:
         env = dump_env('postgresql://ucm:pw@db.example/ucm')
         assert (env['PGSSLMODE'], env['PGSSLROOTCERT']) == ('verify-full', '/etc/ucm/pg-root.pem')
 
+    def test_a_service_file_cannot_redirect_the_dump(self, dump_env, monkeypatch):
+        monkeypatch.setenv('PGSERVICE', 'other')
+        assert 'PGSERVICE' not in dump_env('postgresql://ucm:pw@db.example/ucm')
+
     def test_the_url_tls_files_win(self, dump_env, monkeypatch):
         monkeypatch.setenv('PGSSLROOTCERT', '/etc/ucm/pg-root.pem')
         env = dump_env('postgresql://ucm:pw@db.example/ucm?sslrootcert=/srv/other.pem')

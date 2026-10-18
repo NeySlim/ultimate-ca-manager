@@ -110,10 +110,6 @@ def _discard(path: Path) -> None:
         pass
 
 
-# Kept from the service environment when the URL is silent: the FIPS startup
-# check accepts PGSSLMODE as the TLS guarantee and sets PGGSSENCMODE itself.
-
-
 def _set_env_or_remove(env: dict, key: str, value) -> None:
     """Set an environment variable when *value* is non-empty; otherwise remove it."""
     if isinstance(value, (tuple, list)):
@@ -415,10 +411,13 @@ def _backup_current_db(reasons: Optional[list] = None,
     }
 
     # As in libpq, the URL wins; otherwise the service's own setting, which the
-    # live connection uses too, is kept.
+    # live connection uses too, is kept. PGSERVICE is not: its file would
+    # override the host and database taken from the URL above.
     for query_key, env_key in libpq_query_options.items():
         if url.query.get(query_key):
             env[env_key] = str(url.query[query_key])
+        elif env_key == "PGSERVICE":
+            env.pop(env_key, None)
     if fips_mode.requested():
         env['PGGSSENCMODE'] = 'disable'  # GSSAPI encryption runs outside the FIPS module
 
