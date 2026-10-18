@@ -12,7 +12,7 @@ SYSTEMD_RUN=${UCM_SETUP_SYSTEMD_RUN:-/run/systemd/system}
 # Present while the last UCM_FIPS_BUILD=1 build failed: rpm reports success despite a failed %post
 BUILD_FAILED=${BUILD_LOG%.log}.failed
 RUST_MIN=1.83
-GUARDED_VENV="" SERVICE_STOPPED="" VENV_MOVED=""
+GUARDED_VENV="" GUARDED_TMP="" SERVICE_STOPPED="" VENV_BUILDING=""
 
 say() { echo "$*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -269,7 +269,7 @@ PY
 # Until the new venv is complete, any exit (failure or signal) puts the previous one back and
 # starts ucm again if it was stopped here; on success the package script starts it at the end.
 guard_venv() {
-    GUARDED_VENV=$1
+    GUARDED_VENV=$1 GUARDED_TMP=${2:-}
     trap recover_venv EXIT
     # Trapped, a signal is handled once pip has exited: recover_venv never races a dying pip
     trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
@@ -282,24 +282,36 @@ guard_venv() {
 }
 
 recover_venv() {
+    # Runs to the end despite a repeated Ctrl-C or a terminal gone (every write failing)
+    trap '' HUP INT TERM
+    set +e
     local venv=$GUARDED_VENV
-    if [ -e "$venv.prev" ] && { [ -n "$VENV_MOVED" ] || ! venv_ok "$venv"; }; then
-        say "Restoring the previous Python environment..." >&2
-        rm -rf "$venv" && mv "$venv.prev" "$venv"
-    fi
+    [ -z "$GUARDED_TMP" ] || rm -f "$GUARDED_TMP"
+    case $VENV_BUILDING in
+        moved) [ ! -e "$venv.prev" ] || { rm -rf "$venv" && mv -T "$venv.prev" "$venv" \
+                   && say "Restored the previous Python environment." >&2; } ;;
+        # A first install has no previous venv: an incomplete one must not pass venv-ok
+        fresh) rm -rf "$venv" ;;
+        *) if [ -e "$venv.prev" ] && ! venv_ok "$venv"; then rm -rf "$venv" && mv -T "$venv.prev" "$venv"; fi ;;
+    esac
     if [ -n "$SERVICE_STOPPED" ] && venv_ok "$venv"; then
         say "Starting UCM again..." >&2
-        systemctl start ucm || true
+        systemctl start ucm
     fi
 }
 
 # Moves the venv aside as venv.prev, after resolving what an interrupted build left behind.
 set_aside_venv() {
     if [ -e "$1.prev" ] && ! venv_ok "$1"; then
-        rm -rf "$1" && mv "$1.prev" "$1"
+        rm -rf "$1" && mv -T "$1.prev" "$1"
     fi
     rm -rf "$1.prev"
-    [ ! -e "$1" ] || { mv "$1" "$1.prev" && VENV_MOVED=1; }
+    if [ -e "$1" ]; then
+        mv -T "$1" "$1.prev"
+        VENV_BUILDING=moved
+    else
+        VENV_BUILDING=fresh
+    fi
 }
 
 cmd_venv() {
@@ -322,16 +334,14 @@ cmd_venv() {
         say "(about 5 minutes the first time, then from pip's wheel cache; log: $BUILD_LOG)..."
         reqs=$(mktemp)
         fips_requirements "$home/requirements.txt" "$reqs"
-        guard_venv "$venv"
+        guard_venv "$venv" "$reqs"
         set_aside_venv "$venv"
         echo "build failed" > "$BUILD_FAILED"
         if ! build_fips_venv "$python" "$venv" "$reqs" > "$BUILD_LOG" 2>&1 \
                 || ! verify_fips_venv "$home" >> "$BUILD_LOG" 2>&1; then
-            rm -f "$reqs"
             tail -n 25 "$BUILD_LOG" >&2 || true
-            # Even a venv with gunicorn fails here when verify_fips_venv refused it
-            rm -rf "$venv"
-            echo "ERROR: the UCM_FIPS_BUILD=1 build failed (full log: $BUILD_LOG); the previous environment was kept." >&2
+            # recover_venv then drops the new venv, even one verify_fips_venv refused with gunicorn in it
+            echo "ERROR: the UCM_FIPS_BUILD=1 build failed (full log: $BUILD_LOG)." >&2
             echo "Fix the cause, or remove UCM_FIPS_BUILD from $envfile for the standard build, and" >&2
             retry_hint "$format" >&2
             exit 1
@@ -347,9 +357,9 @@ cmd_venv() {
         # --no-deps keeps out twofish, an sdist-only dependency UCM never uses (see requirements.txt)
         "$venv/bin/pip" install --quiet --no-deps pyjks==20.0.0
     fi
-    # Complete: the previous venv is no longer needed
+    # Complete: the previous venv is no longer needed (flag first, so no exit drops the new one)
+    VENV_BUILDING=""
     rm -rf "$venv.prev"
-    VENV_MOVED=""
 
     if [ -n "$had_requests_kerberos" ]; then
         say "Reinstalling requests-kerberos (was present before upgrade)..."

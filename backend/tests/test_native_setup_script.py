@@ -578,6 +578,130 @@ def test_a_failed_first_fips_build_leaves_no_venv_that_looks_usable(tmp_path):
     assert _run(['venv-ok', str(home)], _env(tmp_path)).returncode != 0
 
 
+def _slow_pip(step, started):
+    """Fake pip body that sleeps at the given step and, like pip, takes a moment to die."""
+    sleep = shutil.which('sleep')
+    return f'''{GUNICORN}
+case "$*" in {step})
+  trap '{sleep} 0.3; : > "$(dirname "$0")/late"; exit 1' TERM INT HUP
+  touch {started}; {sleep} 30;;
+esac; exit 0'''
+
+
+def _spawn(tmp_path, home, python, envfile, extra, stderr=subprocess.PIPE):
+    return subprocess.Popen([BASH, str(SCRIPT), 'venv', str(home), str(python), 'rpm', str(envfile)],
+                            env=_env(tmp_path, ALMA, extra), stdin=subprocess.DEVNULL, stdout=subprocess.PIPE,
+                            stderr=stderr, text=True, start_new_session=True, preexec_fn=_default_signals)
+
+
+def _wait_for(path, proc):
+    deadline = time.monotonic() + 15
+    while not path.exists() and proc.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert path.exists(), proc.communicate(timeout=5)
+
+
+def _systemctl_lines(record):
+    return [line for line in record.read_text().splitlines() if line.startswith('SYSTEMCTL')]
+
+
+RESTARTED = ['SYSTEMCTL is-active --quiet ucm [bin good ]', 'SYSTEMCTL stop ucm [bin good ]',
+             'SYSTEMCTL start ucm [bin good ]']
+
+
+@pytest.mark.parametrize('trigger', ['pip fails', 'SIGHUP'])
+def test_a_dead_terminal_does_not_cut_the_recovery_short(tmp_path, trigger):
+    """After an SSH disconnection every write to the terminal fails; the recovery must still finish."""
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    started = tmp_path / 'pip-started'
+    body = 'case "$*" in *" -r "*) exit 1;; esac; exit 0' if trigger == 'pip fails' else _slow_pip('*" -r "*', started)
+    python, record = _fake_python(tmp_path, body)
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    shutil.rmtree(home / 'venv')
+    _venv_dir(home / 'venv')
+    extra = _systemd(tmp_path, bin_dir, record)
+    with open('/dev/full', 'w') as dead:
+        proc = _spawn(tmp_path, home, python, envfile, extra, stderr=dead)
+        if trigger == 'SIGHUP':
+            _wait_for(started, proc)
+            os.killpg(proc.pid, signal.SIGHUP)
+        proc.communicate(timeout=20)
+    assert proc.returncode != 0
+    assert (home / 'venv' / 'good').exists() and not (home / 'venv.prev').exists()
+    assert _systemctl_lines(record) == RESTARTED
+
+
+def test_a_second_signal_does_not_cut_the_recovery_short(tmp_path):
+    """Ctrl-C pressed again while the incomplete venv is being removed."""
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    started, removing = tmp_path / 'pip-started', tmp_path / 'rm-started'
+    (bin_dir / 'rm').unlink()
+    _stub(bin_dir / 'rm', f'case "$*" in *"/opt/venv") touch {removing}; {shutil.which("sleep")} 1;; esac\n'
+                          f'exec {shutil.which("rm")} "$@"')
+    python, record = _fake_python(tmp_path, _slow_pip('*" -r "*', started))
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    shutil.rmtree(home / 'venv')
+    _venv_dir(home / 'venv')
+    extra = _systemd(tmp_path, bin_dir, record)
+    proc = _spawn(tmp_path, home, python, envfile, extra)
+    _wait_for(started, proc)
+    os.killpg(proc.pid, signal.SIGINT)
+    _wait_for(removing, proc)
+    os.killpg(proc.pid, signal.SIGINT)
+    proc.communicate(timeout=20)
+    assert proc.returncode != 0
+    assert (home / 'venv' / 'good').exists() and not (home / 'venv.prev').exists()
+    assert _systemctl_lines(record) == RESTARTED
+
+
+@pytest.mark.parametrize('trigger', ['pip fails', 'SIGTERM'])
+def test_an_incomplete_first_venv_does_not_pass_venv_ok(tmp_path, trigger):
+    """Cut at the last pip step, a first install's venv already has gunicorn: it must go."""
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    started = tmp_path / 'pip-started'
+    body = (f'{GUNICORN}\ncase "$*" in *pyjks*) exit 1;; esac; exit 0' if trigger == 'pip fails'
+            else _slow_pip('*pyjks*', started))
+    python, _ = _fake_python(tmp_path, body)
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    shutil.rmtree(home / 'venv')
+    proc = _spawn(tmp_path, home, python, envfile, {'PATH': str(bin_dir)})
+    if trigger == 'SIGTERM':
+        _wait_for(started, proc)
+        os.killpg(proc.pid, signal.SIGTERM)
+    proc.communicate(timeout=20)
+    assert proc.returncode != 0
+    assert _run(['venv-ok', str(home)], _env(tmp_path)).returncode != 0
+
+
+def test_a_failed_fips_build_reports_the_restore_after_doing_it(tmp_path):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    python, _ = _fake_python(tmp_path, 'case "$*" in *no-binary*) exit 1;; esac; exit 0')
+    home, envfile = _home(tmp_path)
+    result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, {'PATH': str(bin_dir)}))
+    assert result.returncode == 1
+    err = result.stderr
+    assert err.index('the UCM_FIPS_BUILD=1 build failed') < err.index('Restored the previous Python environment.')
+    assert (home / 'venv' / 'previous').exists()
+
+
+def test_an_interrupted_fips_build_leaves_no_temporary_file(tmp_path):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    started = tmp_path / 'pip-started'
+    python, _ = _fake_python(tmp_path, _slow_pip('*no-binary*', started))
+    home, envfile = _home(tmp_path)
+    tmpdir = tmp_path / 'tmp'
+    tmpdir.mkdir()
+    proc = _spawn(tmp_path, home, python, envfile, {'PATH': str(bin_dir), 'TMPDIR': str(tmpdir)})
+    _wait_for(started, proc)
+    assert list(tmpdir.iterdir())  # the requirements copy exists during the build
+    os.killpg(proc.pid, signal.SIGTERM)
+    proc.communicate(timeout=20)
+    assert list(tmpdir.iterdir()) == []
+
+
 def test_missing_build_tools_never_stop_the_service(tmp_path):
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
     python, record = _fake_python(tmp_path, 'exit 0')
