@@ -3921,7 +3921,8 @@
     "timeout": "Verbindungszeitüberschreitung",
     "timeoutSub": "Der Dienst benötigt möglicherweise mehr Zeit. Versuchen Sie, die Seite manuell zu aktualisieren.",
     "attempt": "Versuch {{count}}",
-    "refresh": "Seite aktualisieren"
+    "refresh": "Seite aktualisieren",
+    "updateNote": "UCM ist während der Installation des Updates nicht erreichbar: einige Minuten, bei einem FIPS-Build bis zu {{minutes}} Minuten."
   },
   "approvals": {
     "actionFailed": "Aktion fehlgeschlagen",

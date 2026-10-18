@@ -3921,7 +3921,8 @@
     "timeout": "连接超时",
     "timeoutSub": "服务可能需要更多时间。请尝试手动刷新。",
     "attempt": "尝试 {{count}}",
-    "refresh": "刷新页面"
+    "refresh": "刷新页面",
+    "updateNote": "安装更新期间 UCM 不可用：通常需要几分钟，FIPS 构建最多需要 {{minutes}} 分钟。"
   },
   "approvals": {
     "actionFailed": "操作失败",

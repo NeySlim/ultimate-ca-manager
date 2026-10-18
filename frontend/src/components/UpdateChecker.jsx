@@ -8,7 +8,7 @@ import { ArrowsClockwise, Download, CheckCircle, Warning, Info, Rocket } from '@
 import { Card, Button, Badge, LoadingSpinner, ServiceReconnectOverlay } from '../components'
 import { apiClient } from '../services'
 import { useNotification } from '../contexts'
-import { useServiceReconnect } from '../hooks'
+import { useServiceReconnect, UPDATE_MAX_WAIT_MS } from '../hooks'
 import { formatRelativeTime } from '../lib/utils'
 import { MARKDOWN_ELEMENT_CLASSES } from '../lib/markdown'
 
@@ -71,7 +71,8 @@ export function UpdateChecker() {
       
       // Show reconnect overlay — countdown then poll until service is back
       waitForRestart({
-        expectedVersion: updateInfo.latest_version
+        expectedVersion: updateInfo.latest_version,
+        maxWaitMs: UPDATE_MAX_WAIT_MS
       })
     } catch (err) {
       showError(err.message || t('settings.installFailed', 'Failed to install update'))
@@ -104,7 +105,8 @@ export function UpdateChecker() {
   return (
     <>
       {reconnecting && (
-        <ServiceReconnectOverlay status={status} attempt={attempt} countdown={countdown} onCancel={cancel} />
+        <ServiceReconnectOverlay status={status} attempt={attempt} countdown={countdown} onCancel={cancel}
+          note={t('reconnect.updateNote', { minutes: UPDATE_MAX_WAIT_MS / 60000 })} />
       )}
       <Card className="p-4">
       <div className="flex items-start justify-between gap-4">

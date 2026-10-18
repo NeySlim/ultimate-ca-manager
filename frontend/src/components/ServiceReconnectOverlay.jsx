@@ -8,7 +8,7 @@ import { ArrowsClockwise, Check, Warning, Timer, SignOut } from '@phosphor-icons
 
 const COUNTDOWN_TOTAL = 60
 
-export function ServiceReconnectOverlay({ status, attempt, countdown, onCancel }) {
+export function ServiceReconnectOverlay({ status, attempt, countdown, onCancel, note }) {
   const { t } = useTranslation()
 
   const statusConfig = {
@@ -42,6 +42,9 @@ export function ServiceReconnectOverlay({ status, attempt, countdown, onCancel }
         <div className="flex justify-center">{config.icon}</div>
         <h2 className="text-xl font-semibold text-text-primary">{config.title}</h2>
         <p className="text-sm text-text-secondary">{config.subtitle}</p>
+        {note && (status === 'countdown' || status === 'connecting') && (
+          <p className="text-xs text-text-tertiary">{note}</p>
+        )}
         
         {/* Countdown ring */}
         {status === 'countdown' && (

@@ -3921,7 +3921,8 @@
     "timeout": "Tempo de conexão esgotado",
     "timeoutSub": "O serviço pode precisar de mais tempo. Tente atualizar manualmente.",
     "attempt": "Tentativa {{count}}",
-    "refresh": "Atualizar página"
+    "refresh": "Atualizar página",
+    "updateNote": "O UCM fica indisponível enquanto a atualização é instalada: alguns minutos, até {{minutes}} minutos em uma compilação FIPS."
   },
   "approvals": {
     "actionFailed": "Ação falhou",

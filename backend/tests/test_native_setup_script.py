@@ -44,6 +44,8 @@ def _env(tmp_path, os_release=UBUNTU, extra=None):
         'UCM_SETUP_FIPS_FLAG': str(tmp_path / 'fips_enabled'),
         'UCM_SETUP_RUST_ROOT': str(tmp_path / 'usrlib'),
         'UCM_SETUP_BUILD_LOG': str(tmp_path / 'log' / 'fips-build.log'),
+        # Absent unless a test says otherwise: the host's own ucm service is never queried
+        'UCM_SETUP_SYSTEMD_RUN': str(tmp_path / 'no-systemd'),
     }
     env.update(extra or {})
     return env
@@ -414,6 +416,95 @@ def test_the_standard_install_is_unchanged(tmp_path):
         f'ARGS install --quiet -r {home}/requirements.txt',
         'ARGS install --quiet --no-deps pyjks==20.0.0',
     ]
+
+
+# ------------------------------------------------------- running service
+
+def _systemd(tmp_path, bin_dir, record, state='active'):
+    """A booted systemd whose systemctl logs each call, with the venv's content at that moment."""
+    (tmp_path / 'run-systemd').mkdir()
+    (tmp_path / 'ucm-state').write_text(state)
+    venv = tmp_path / 'opt' / 'venv'
+    _stub(bin_dir / 'systemctl', f"""echo "SYSTEMCTL $* [$({shutil.which('ls')} {venv} 2>/dev/null | tr '\\n' ' ')]" >> {record}
+state=$(cat {tmp_path}/ucm-state)
+case "$1" in
+  is-active) [ "$state" = active ] ;;
+  stop) echo inactive > {tmp_path}/ucm-state ;;
+  start|restart) echo active > {tmp_path}/ucm-state ;;
+esac""")
+    return {'PATH': str(bin_dir), 'UCM_SETUP_SYSTEMD_RUN': str(tmp_path / 'run-systemd')}
+
+
+def _calls(record):
+    return [line.split(' [')[0] if line.startswith('SYSTEMCTL') else line.split()[0] + ' ' + line.split()[1]
+            for line in record.read_text().splitlines() if line.startswith(('SYSTEMCTL', 'ARGS'))]
+
+
+def test_a_running_service_is_stopped_before_its_venv_is_replaced(tmp_path):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    python, record = _fake_python(tmp_path, 'exit 0')
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    extra = _systemd(tmp_path, bin_dir, record)
+    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, DEBIAN, extra))
+    assert result.returncode == 0, result.stderr
+    assert _calls(record)[:3] == ['SYSTEMCTL is-active --quiet ucm', 'SYSTEMCTL stop ucm', 'ARGS install']
+    assert 'SYSTEMCTL stop ucm [previous ]' in record.read_text()
+    # Started again by the package script, after the permissions and the FIPS step
+    assert not [c for c in _calls(record) if c.startswith('SYSTEMCTL start')]
+
+
+@pytest.mark.parametrize('state, booted', [('inactive', True), ('active', False)])
+def test_a_stopped_service_or_a_chroot_is_left_alone(tmp_path, state, booted):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    python, record = _fake_python(tmp_path, 'exit 0')
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    extra = _systemd(tmp_path, bin_dir, record, state)
+    if not booted:
+        extra.pop('UCM_SETUP_SYSTEMD_RUN')
+    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, DEBIAN, extra))
+    assert result.returncode == 0, result.stderr
+    expected = ['SYSTEMCTL is-active --quiet ucm'] if booted else []
+    assert [c for c in _calls(record) if c.startswith('SYSTEMCTL')] == expected
+
+
+def test_a_failed_fips_build_starts_the_service_again_on_the_previous_venv(tmp_path):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    python, record = _fake_python(tmp_path, 'case "$*" in *no-binary*) exit 1;; esac; exit 0')
+    home, envfile = _home(tmp_path)
+    shutil.rmtree(home / 'venv')
+    _venv_dir(home / 'venv')
+    extra = _systemd(tmp_path, bin_dir, record)
+    result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, extra))
+    assert result.returncode == 1
+    # Started once the previous venv is back in place, not on the half-built one
+    assert [line for line in record.read_text().splitlines() if line.startswith('SYSTEMCTL')] == [
+        'SYSTEMCTL is-active --quiet ucm [bin good ]', 'SYSTEMCTL stop ucm [bin good ]', 'SYSTEMCTL start ucm [bin good ]']
+    assert _calls(record).index('SYSTEMCTL stop ucm') < _calls(record).index('ARGS install')
+    assert (tmp_path / 'ucm-state').read_text().strip() == 'active'
+
+
+def test_a_failed_standard_build_does_not_start_a_broken_venv(tmp_path):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    python, record = _fake_python(tmp_path, 'case "$*" in *-r*) exit 1;; esac; exit 0')
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    extra = _systemd(tmp_path, bin_dir, record)
+    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, DEBIAN, extra))
+    assert result.returncode != 0
+    assert [c for c in _calls(record) if c.startswith('SYSTEMCTL')] == [
+        'SYSTEMCTL is-active --quiet ucm', 'SYSTEMCTL stop ucm']
+
+
+def test_missing_build_tools_never_stop_the_service(tmp_path):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    python, record = _fake_python(tmp_path, 'exit 0')
+    home, envfile = _home(tmp_path)
+    extra = _systemd(tmp_path, bin_dir, record)
+    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, UBUNTU, extra))
+    assert result.returncode == 1 and 'cargo/rustc>=1.83' in result.stderr
+    assert not record.exists() and (tmp_path / 'ucm-state').read_text() == 'active'
 
 
 def _build_ok(tmp_path, envfile, os_release=ALMA):

@@ -3921,7 +3921,8 @@
     "timeout": "接続タイムアウト",
     "timeoutSub": "サービスにはもう少し時間が必要かもしれません。手動で更新してください。",
     "attempt": "試行 {{count}}",
-    "refresh": "ページを更新"
+    "refresh": "ページを更新",
+    "updateNote": "アップデートのインストール中は UCM を利用できません。通常は数分、FIPS ビルドでは最大 {{minutes}} 分かかります。"
   },
   "approvals": {
     "actionFailed": "アクションに失敗しました",

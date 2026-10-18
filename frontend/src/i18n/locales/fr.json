@@ -3924,7 +3924,8 @@
     "timeout": "Délai de connexion dépassé",
     "timeoutSub": "Le service peut nécessiter plus de temps. Essayez de rafraîchir manuellement.",
     "attempt": "Tentative {{count}}",
-    "refresh": "Rafraîchir la page"
+    "refresh": "Rafraîchir la page",
+    "updateNote": "UCM reste hors ligne pendant l'installation de la mise à jour : quelques minutes, jusqu'à {{minutes}} minutes pour une compilation FIPS."
   },
   "policies": {
     "title": "Politiques de certificats",

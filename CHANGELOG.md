@@ -16,6 +16,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - A preference change (language, theme, a dismissed window) made before the user's saved preferences had loaded (just after signing in, or after a failed load) replaced them all on the server; it is now saved together with them once they load.
+- DEB and RPM: an upgrade rebuilt the Python environment while UCM was still running on it, which logged errors such as a missing CA bundle for the update check (up to five minutes with `UCM_FIPS_BUILD=1`). The service is now stopped during the rebuild, started again on the previous environment when a FIPS build fails, and the update screen waits up to ten minutes for it.
 
 ## [2.241] - 2026-10-18
 

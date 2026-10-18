@@ -5,13 +5,15 @@
  * 1. countdown (30s) - visual countdown before any polling
  * 2. connecting - polls /api/health until service is back with new started_at
  * 3. redirecting - service is back, clears cache & redirects to /login
- * 4. timeout - max attempts exceeded
+ * 4. timeout - maxWaitMs elapsed after the countdown
  */
 import { useState, useCallback, useRef, useEffect } from 'react'
 
 const HEALTH_URL = '/api/v2/health'
 const POLL_INTERVAL = 2000
-const MAX_ATTEMPTS = 90 // 3 minutes max after countdown
+const MAX_WAIT_MS = 3 * 60 * 1000
+// The package stops UCM while it rebuilds its Python environment: about 5 minutes with UCM_FIPS_BUILD=1
+export const UPDATE_MAX_WAIT_MS = 10 * 60 * 1000
 const COUNTDOWN_SECONDS = 60
 
 export function useServiceReconnect() {
@@ -31,7 +33,7 @@ export function useServiceReconnect() {
   }, [])
 
   const waitForRestart = useCallback((opts = {}) => {
-    const { expectedVersion } = opts
+    const { expectedVersion, maxWaitMs = MAX_WAIT_MS } = opts
     
     cancelledRef.current = false
     setReconnecting(true)
@@ -64,13 +66,14 @@ export function useServiceReconnect() {
     const startPolling = (initStartedAt, expVersion) => {
       setStatus('connecting')
       let attempts = 0
+      const deadline = Date.now() + maxWaitMs
 
       const poll = async () => {
         if (cancelledRef.current) return
         attempts++
         setAttempt(attempts)
 
-        if (attempts > MAX_ATTEMPTS) {
+        if (Date.now() > deadline) {
           setStatus('timeout')
           return
         }

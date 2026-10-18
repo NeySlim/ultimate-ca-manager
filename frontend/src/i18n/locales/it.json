@@ -3921,7 +3921,8 @@
     "timeout": "Timeout della connessione",
     "timeoutSub": "Il servizio potrebbe richiedere più tempo. Prova ad aggiornare manualmente.",
     "attempt": "Tentativo {{count}}",
-    "refresh": "Aggiorna pagina"
+    "refresh": "Aggiorna pagina",
+    "updateNote": "UCM non è disponibile durante l'installazione dell'aggiornamento: alcuni minuti, fino a {{minutes}} minuti per una build FIPS."
   },
   "approvals": {
     "actionFailed": "Azione fallita",

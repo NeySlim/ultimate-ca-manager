@@ -4147,7 +4147,8 @@
     "timeout": "Connection timeout",
     "timeoutSub": "Service may need more time. Try refreshing manually.",
     "attempt": "Attempt {{count}}",
-    "refresh": "Refresh Page"
+    "refresh": "Refresh Page",
+    "updateNote": "UCM stays offline while the update installs: a few minutes, up to {{minutes}} minutes for a FIPS build."
   },
   "messages": {
     "errors": {

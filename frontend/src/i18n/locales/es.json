@@ -3921,7 +3921,8 @@
     "timeout": "Tiempo de conexión agotado",
     "timeoutSub": "El servicio puede necesitar más tiempo. Intente actualizar manualmente.",
     "attempt": "Intento {{count}}",
-    "refresh": "Actualizar página"
+    "refresh": "Actualizar página",
+    "updateNote": "UCM no está disponible mientras se instala la actualización: unos minutos, hasta {{minutes}} minutos con una compilación FIPS."
   },
   "approvals": {
     "actionFailed": "Acción fallida",

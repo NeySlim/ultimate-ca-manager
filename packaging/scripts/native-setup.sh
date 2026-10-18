@@ -8,6 +8,7 @@ OS_RELEASE=${UCM_SETUP_OS_RELEASE:-/etc/os-release}
 FIPS_FLAG=${UCM_SETUP_FIPS_FLAG:-/proc/sys/crypto/fips_enabled}
 RUST_ROOT=${UCM_SETUP_RUST_ROOT:-/usr/lib}
 BUILD_LOG=${UCM_SETUP_BUILD_LOG:-/var/log/ucm/fips-build.log}
+SYSTEMD_RUN=${UCM_SETUP_SYSTEMD_RUN:-/run/systemd/system}
 # Present while the last UCM_FIPS_BUILD=1 build failed: rpm reports success despite a failed %post
 BUILD_FAILED=${BUILD_LOG%.log}.failed
 RUST_MIN=1.83
@@ -264,6 +265,23 @@ print(f'cryptography, hashlib and psycopg2 use the system {ssl.OPENSSL_VERSION}'
 PY
 }
 
+# Stops a running ucm before its venv is replaced; skipped in a chroot or container without systemd.
+# The package script starts it again at the end, restart_after_failure after a failed build.
+stop_service() {
+    [ -d "$SYSTEMD_RUN" ] && systemctl is-active --quiet ucm || return 0
+    say "Stopping UCM while its Python environment is rebuilt..."
+    trap "restart_after_failure $(printf %q "$1")" EXIT
+    systemctl stop ucm || say "WARNING: could not stop UCM; rebuilding its environment anyway"
+}
+
+restart_after_failure() {
+    local rc=$?
+    [ "$rc" != 0 ] && venv_ok "$1" || return "$rc"
+    say "Starting UCM again on the previous environment..." >&2
+    systemctl start ucm || true
+    return "$rc"
+}
+
 cmd_venv() {
     local home=$1 python=$2 format=$3 envfile=$4 venv=$1/venv rust reqs
     local had_requests_kerberos="" had_pyspnego_kerberos=""
@@ -284,6 +302,7 @@ cmd_venv() {
         say "(about 5 minutes the first time, then from pip's wheel cache; log: $BUILD_LOG)..."
         reqs=$(mktemp)
         fips_requirements "$home/requirements.txt" "$reqs"
+        stop_service "$venv"
         # A build interrupted earlier left an incomplete venv next to the last working one
         if [ -e "$venv.prev" ] && ! venv_ok "$venv"; then
             rm -rf "$venv" && mv "$venv.prev" "$venv"
@@ -305,6 +324,7 @@ cmd_venv() {
         rm -rf "$venv.prev" "$reqs" "$BUILD_FAILED"
         tail -n 1 "$BUILD_LOG"
     else
+        stop_service "$venv"
         rm -rf "$venv" 2>/dev/null || true
         "$python" -m venv "$venv"
         "$venv/bin/pip" install --quiet --upgrade pip
