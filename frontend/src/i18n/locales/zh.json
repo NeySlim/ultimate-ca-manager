@@ -2737,6 +2737,8 @@
       "reportBugs": "报告错误和功能请求",
       "documentation": "文档",
       "wikiGuides": "Wiki和用户指南",
+      "support": "支持 UCM",
+      "supportDesc": "在 Ko-fi 上支持开发",
       "license": "许可证",
       "licenseDesc": "自由开源软件。",
       "diagnostic": "诊断",
@@ -5330,6 +5332,12 @@
     "title": "UCM {{version}} 新功能",
     "installedOn": "安装于 {{date}}",
     "noNotes": "无法加载版本说明。请在设置 › 更新中查看更新日志。"
+  },
+  "kofi": {
+    "label": "支持 UCM",
+    "message": "UCM 免费提供，由开发者利用业余时间维护。如果它对您有帮助，可以在 Ko-fi 上支持它。",
+    "support": "在 Ko-fi 上支持",
+    "dismiss": "关闭"
   },
   "logs": {
     "title": "系统日志",

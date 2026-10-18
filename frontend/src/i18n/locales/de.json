@@ -2737,6 +2737,8 @@
       "reportBugs": "Fehler und Funktionswünsche melden",
       "documentation": "Dokumentation",
       "wikiGuides": "Wiki und Benutzerhandbücher",
+      "support": "UCM unterstützen",
+      "supportDesc": "Die Entwicklung auf Ko-fi unterstützen",
       "license": "Lizenz",
       "licenseDesc": "Freie und quelloffene Software.",
       "diagnostic": "Diagnose",
@@ -5330,6 +5332,12 @@
     "title": "Neu in UCM {{version}}",
     "installedOn": "Installiert am {{date}}",
     "noNotes": "Die Versionshinweise konnten nicht geladen werden. Siehe das Änderungsprotokoll unter Einstellungen › Aktualisierungen."
+  },
+  "kofi": {
+    "label": "UCM unterstützen",
+    "message": "UCM ist kostenlos und wird in der Freizeit gepflegt. Wenn es Ihnen hilft, können Sie es auf Ko-fi unterstützen.",
+    "support": "Auf Ko-fi unterstützen",
+    "dismiss": "Schließen"
   },
   "logs": {
     "title": "Systemprotokolle",

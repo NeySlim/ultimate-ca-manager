@@ -2738,6 +2738,8 @@
       "reportBugs": "Report bugs and feature requests",
       "documentation": "Documentation",
       "wikiGuides": "Wiki and user guides",
+      "support": "Support UCM",
+      "supportDesc": "Support development on Ko-fi",
       "license": "License",
       "licenseDesc": "Free and open-source software.",
       "diagnostic": "Diagnostic",
@@ -5333,6 +5335,12 @@
     "title": "What's new in UCM {{version}}",
     "installedOn": "Installed on {{date}}",
     "noNotes": "Release notes could not be loaded. See the changelog in Settings › Updates."
+  },
+  "kofi": {
+    "label": "Support UCM",
+    "message": "UCM is free and maintained in spare time. If it helps you, you can support it on Ko-fi.",
+    "support": "Support on Ko-fi",
+    "dismiss": "Dismiss"
   },
   "logs": {
     "title": "System Logs",

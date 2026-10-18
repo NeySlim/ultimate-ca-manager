@@ -18,6 +18,7 @@ import { CommandPalette, useKeyboardShortcuts } from './CommandPalette'
 import { WebSocketIndicator } from './WebSocketIndicator'
 import { FloatingHelpPanel } from './ui/FloatingHelpPanel'
 import { UpdatePopup } from './UpdatePopup'
+import { KofiSupportCard } from './KofiSupportCard'
 import { StatusFooter } from './ui/StatusFooter'
 import { TooltipComponent } from './Tooltip'
 import { cn } from '../lib/utils'
@@ -547,6 +548,9 @@ export function AppShell() {
 
       {/* Optional what's-new window after an update (#308) */}
       <UpdatePopup />
+
+      {/* Ko-fi support card, once per version for admins */}
+      <KofiSupportCard />
     </div>
     </div>
   )

@@ -2737,6 +2737,8 @@
       "reportBugs": "Reportar errores y solicitudes de funciones",
       "documentation": "Documentación",
       "wikiGuides": "Wiki y guías de usuario",
+      "support": "Apoyar UCM",
+      "supportDesc": "Apoyar el desarrollo en Ko-fi",
       "license": "Licencia",
       "licenseDesc": "Software libre y de código abierto.",
       "diagnostic": "Diagnóstico",
@@ -5330,6 +5332,12 @@
     "title": "Novedades de UCM {{version}}",
     "installedOn": "Instalada el {{date}}",
     "noNotes": "No se pudieron cargar las notas de la versión. Consulte el registro de cambios en Configuración › Actualizaciones."
+  },
+  "kofi": {
+    "label": "Apoyar UCM",
+    "message": "UCM es gratuito y se mantiene en el tiempo libre. Si le resulta útil, puede apoyarlo en Ko-fi.",
+    "support": "Apoyar en Ko-fi",
+    "dismiss": "Cerrar"
   },
   "logs": {
     "title": "Registros del sistema",

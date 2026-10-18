@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- Administrators see a small dismissible card suggesting support on Ko-fi, once per UCM version after an install or update, and Settings > About links to it.
+
 ## [2.241] - 2026-10-18
 
 ### Added

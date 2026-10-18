@@ -2737,6 +2737,8 @@
       "reportBugs": "バグ報告と機能リクエスト",
       "documentation": "ドキュメント",
       "wikiGuides": "Wikiとユーザーガイド",
+      "support": "UCM を支援",
+      "supportDesc": "Ko-fi で開発を支援する",
       "license": "ライセンス",
       "licenseDesc": "フリーでオープンソースなソフトウェアです。",
       "diagnostic": "診断",
@@ -5330,6 +5332,12 @@
     "title": "UCM {{version}} の新機能",
     "installedOn": "{{date}} にインストール",
     "noNotes": "リリースノートを読み込めませんでした。設定 › 更新 の変更履歴を参照してください。"
+  },
+  "kofi": {
+    "label": "UCM を支援",
+    "message": "UCM は無料で、空き時間にメンテナンスされています。お役に立っていれば、Ko-fi で支援していただけます。",
+    "support": "Ko-fi で支援する",
+    "dismiss": "閉じる"
   },
   "logs": {
     "title": "システムログ",

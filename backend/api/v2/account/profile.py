@@ -38,6 +38,8 @@ _PREF_VALIDATORS = {
     # change anywhere.
     # Last version acknowledged in the post-update popup (#308)
     'update_popup_seen_version': lambda v: isinstance(v, str) and 1 <= len(v) <= 32,
+    # Last version for which the admin dismissed the Ko-fi support card
+    'kofi_seen_version': lambda v: isinstance(v, str) and 1 <= len(v) <= 32,
 }
 
 

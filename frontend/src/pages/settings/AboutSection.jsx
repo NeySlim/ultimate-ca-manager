@@ -1,7 +1,7 @@
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Info, HardDrives, Globe, GithubLogo, WarningCircle, Shield, Archive,
+  Info, HardDrives, Globe, GithubLogo, WarningCircle, Shield, Archive, Coffee,
 } from '@phosphor-icons/react'
 import {
   Badge, Logo, DetailContent, DetailHeader, DetailSection, DetailGrid, DetailField, Button,
@@ -11,6 +11,7 @@ import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { downloadBlob } from '../../lib/utils'
 import FipsPreflightPanel from './FipsPreflightPanel'
+import { KOFI_URL } from '../../lib/support'
 
 export default function AboutSection() {
   const { t } = useTranslation()
@@ -148,6 +149,18 @@ export default function AboutSection() {
             <div>
               <div className="text-sm font-medium text-text-primary">{t('settings.about.documentation')}</div>
               <div className="text-xs text-text-secondary">{t('settings.about.wikiGuides')}</div>
+            </div>
+          </a>
+          <a
+            href={KOFI_URL}
+            target="_blank"
+            rel="noopener noreferrer"
+            className="flex items-center gap-3 p-3 bg-tertiary-50 border border-border rounded-lg hover:bg-bg-tertiary transition-colors"
+          >
+            <Coffee size={20} className="text-text-secondary" />
+            <div>
+              <div className="text-sm font-medium text-text-primary">{t('settings.about.support')}</div>
+              <div className="text-xs text-text-secondary">{t('settings.about.supportDesc')}</div>
             </div>
           </a>
         </div>
