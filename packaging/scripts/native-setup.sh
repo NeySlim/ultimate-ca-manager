@@ -272,7 +272,7 @@ guard_venv() {
     GUARDED_VENV=$1 GUARDED_TMP=${2:-}
     trap recover_venv EXIT
     # Trapped, a signal is handled once pip has exited: recover_venv never races a dying pip
-    trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
+    trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM; trap 'exit 141' PIPE
     # Skipped in a chroot or container without systemd
     if [ -d "$SYSTEMD_RUN" ] && systemctl is-active --quiet ucm; then
         say "Stopping UCM while its Python environment is rebuilt..."
@@ -282,8 +282,8 @@ guard_venv() {
 }
 
 recover_venv() {
-    # Runs to the end despite a repeated Ctrl-C or a terminal gone (every write failing)
-    trap '' HUP INT TERM
+    # Runs to the end despite a repeated Ctrl-C or a session gone (every write failing or raising SIGPIPE)
+    trap '' HUP INT TERM PIPE
     set +e
     local venv=$GUARDED_VENV
     [ -z "$GUARDED_TMP" ] || rm -f "$GUARDED_TMP"
@@ -333,8 +333,8 @@ cmd_venv() {
         say "UCM_FIPS_BUILD=1: building cryptography, psycopg2, lxml and xmlsec against the system OpenSSL"
         say "(about 5 minutes the first time, then from pip's wheel cache; log: $BUILD_LOG)..."
         reqs=$(mktemp)
-        fips_requirements "$home/requirements.txt" "$reqs"
         guard_venv "$venv" "$reqs"
+        fips_requirements "$home/requirements.txt" "$reqs"
         set_aside_venv "$venv"
         echo "build failed" > "$BUILD_FAILED"
         if ! build_fips_venv "$python" "$venv" "$reqs" > "$BUILD_LOG" 2>&1 \
@@ -346,8 +346,10 @@ cmd_venv() {
             retry_hint "$format" >&2
             exit 1
         fi
+        # Verified: from here on no exit may drop the new venv
+        VENV_BUILDING=""
         rm -f "$reqs" "$BUILD_FAILED"
-        tail -n 1 "$BUILD_LOG"
+        tail -n 1 "$BUILD_LOG" || true
     else
         guard_venv "$venv"
         set_aside_venv "$venv"
@@ -371,7 +373,7 @@ cmd_venv() {
         "$venv/bin/pip" install --quiet 'pyspnego[kerberos]' || \
             say "WARNING: pyspnego[kerberos] reinstall failed (needs libkrb5-dev/gcc), Autoenrollment's Kerberos/SPNEGO binding is unavailable until 'pip install pyspnego[kerberos]' is run manually in $venv"
     fi
-    trap - EXIT HUP INT TERM
+    trap - EXIT HUP INT TERM PIPE
 }
 
 run_preflight() {

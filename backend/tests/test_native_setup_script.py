@@ -632,6 +632,84 @@ def test_a_dead_terminal_does_not_cut_the_recovery_short(tmp_path, trigger):
     assert _systemctl_lines(record) == RESTARTED
 
 
+@pytest.mark.parametrize('case', ['standard pip fails', 'fips build succeeds', 'kerberos reinstall'])
+def test_a_closed_session_does_not_cost_the_service(tmp_path, case):
+    """ssh without a tty, or a pipe reader that dies: every later write raises SIGPIPE.
+
+    With requests-kerberos in the previous venv, bash itself writes after the build."""
+    fips = case == 'fips build succeeds'
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    started, go = tmp_path / 'pip-started', tmp_path / 'go'
+    step = '*no-binary*' if fips else '*" -r "*'
+    wait = f'while [ ! -e {go} ]; do {shutil.which("sleep")} 0.05; done'
+    python, record = _fake_python(tmp_path, f'{GUNICORN}\ncase "$*" in {step}) touch {started}; {wait}; '
+                                            f'exit {1 if case == "standard pip fails" else 0};; esac; exit 0')
+    home, envfile = _home(tmp_path)
+    if not fips:
+        envfile.write_text('SECRET_KEY=a\n')
+    shutil.rmtree(home / 'venv')
+    _venv_dir(home / 'venv')
+    if case == 'kerberos reinstall':
+        _stub(home / 'venv' / 'bin' / 'pip')  # `pip show requests-kerberos` succeeds
+    extra = _systemd(tmp_path, bin_dir, record)
+    proc = _spawn(tmp_path, home, python, envfile, extra)
+    _wait_for(started, proc)
+    proc.stdout.close()
+    proc.stderr.close()
+    go.touch()
+    proc.wait(timeout=20)
+    if fips:
+        # The verified build is kept; the package script starts ucm at the end
+        assert proc.returncode == 0
+        assert (home / 'venv' / 'bin' / 'gunicorn').exists() and not (home / 'venv' / 'good').exists()
+        assert not (tmp_path / 'log' / 'fips-build.failed').exists()
+        assert _systemctl_lines(record) == RESTARTED[:2]
+    elif case == 'kerberos reinstall':
+        # Complete before the first failed write: ucm starts again on the new venv
+        assert proc.returncode == 141
+        assert (home / 'venv' / 'bin' / 'gunicorn').exists() and not (home / 'venv' / 'good').exists()
+        assert _systemctl_lines(record)[-1].startswith('SYSTEMCTL start ucm')
+    else:
+        assert proc.returncode != 0
+        assert (home / 'venv' / 'good').exists()
+        assert _systemctl_lines(record) == RESTARTED
+    assert not (home / 'venv.prev').exists()
+
+
+def test_a_signal_while_the_previous_venv_is_dropped_keeps_the_new_one(tmp_path):
+    """The build is complete once the drop of venv.prev starts: an interruption must not undo it."""
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    removing = tmp_path / 'rm-started'
+    (bin_dir / 'rm').unlink()
+    _stub(bin_dir / 'rm', f'case "$2" in */venv.prev) if [ -d "$2" ]; then {shutil.which("rm")} -f "$2/bin/gunicorn"; '
+                          f'touch {removing}; {shutil.which("sleep")} 1; fi;; esac\nexec {shutil.which("rm")} "$@"')
+    python, record = _fake_python(tmp_path, GUNICORN)
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    shutil.rmtree(home / 'venv')
+    _venv_dir(home / 'venv')
+    extra = _systemd(tmp_path, bin_dir, record)
+    proc = _spawn(tmp_path, home, python, envfile, extra)
+    _wait_for(removing, proc)
+    os.killpg(proc.pid, signal.SIGINT)
+    proc.communicate(timeout=20)
+    assert (home / 'venv' / 'bin' / 'gunicorn').exists() and not (home / 'venv' / 'good').exists()
+    assert _systemctl_lines(record)[-1].startswith('SYSTEMCTL start ucm')
+
+
+def test_a_malformed_requirements_file_leaves_no_temporary_file(tmp_path):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    python, _ = _fake_python(tmp_path, 'exit 0')
+    home, envfile = _home(tmp_path)
+    (home / 'requirements.txt').write_text('cryptography==50.0.2\n')
+    tmpdir = tmp_path / 'tmp'
+    tmpdir.mkdir()
+    result = _run(['venv', str(home), str(python), 'rpm', str(envfile)],
+                  _env(tmp_path, ALMA, {'PATH': str(bin_dir), 'TMPDIR': str(tmpdir)}))
+    assert result.returncode == 1 and 'psycopg2-binary not found once' in result.stderr
+    assert list(tmpdir.iterdir()) == [] and (home / 'venv' / 'previous').exists()
+
+
 def test_a_second_signal_does_not_cut_the_recovery_short(tmp_path):
     """Ctrl-C pressed again while the incomplete venv is being removed."""
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
