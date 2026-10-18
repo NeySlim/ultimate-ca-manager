@@ -52,6 +52,8 @@ _PROVIDER_CB = ctypes.CFUNCTYPE(ctypes.c_int, ctypes.c_void_p, ctypes.c_void_p)
 # Upstream provider: its security policy (#4985, section 2.4) requires these at 1
 UPSTREAM_PROVIDER = 'OpenSSL FIPS Provider'
 APPROVED_MODE_SETTINGS = ('security-checks', 'tls1-prf-ems-check', 'drbg-no-trunc-md')
+# Key agreement the policy lists as not allowed; the 3.1.2 provider still offers it
+REFUSED_TLS_GROUPS = ('X25519', 'X448')
 
 
 def _fips_provider():
@@ -104,6 +106,76 @@ def module_settings():
     return _get_params(APPROVED_MODE_SETTINGS, _INTEGER, ctypes.c_int)
 
 
+def tls_negotiates(group: str) -> bool:
+    """Whether this process's default TLS contexts complete a handshake on
+    ``group`` alone, as a server (gunicorn) or as a client (outgoing calls)."""
+    import ssl
+    import tempfile
+    with tempfile.TemporaryDirectory() as tmp:
+        pem = _self_signed_pem(tmp)
+        for limit_server in (True, False):
+            server = ssl.create_default_context(ssl.Purpose.CLIENT_AUTH)
+            server.load_cert_chain(pem)
+            client = ssl.create_default_context()
+            client.check_hostname, client.verify_mode = False, ssl.CERT_NONE
+            try:
+                (server if limit_server else client).set_ecdh_curve(group)
+            except (ssl.SSLError, ValueError):
+                return False  # the stack cannot even offer it
+            if _handshake(client, server):
+                return True
+    return False
+
+
+def _self_signed_pem(directory: str) -> str:
+    import datetime
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from cryptography.x509.oid import NameOID
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'ucm-tls-self-test')])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - datetime.timedelta(minutes=5))
+            .not_valid_after(now + datetime.timedelta(hours=1))
+            .sign(key, hashes.SHA256()))
+    path = os.path.join(directory, 'self-test.pem')
+    with open(path, 'wb') as handle:
+        handle.write(key.private_bytes(serialization.Encoding.PEM,
+                                       serialization.PrivateFormat.PKCS8,
+                                       serialization.NoEncryption()))
+        handle.write(cert.public_bytes(serialization.Encoding.PEM))
+    return path
+
+
+def _handshake(client_ctx, server_ctx) -> bool:
+    """A full handshake between the two contexts in memory; False when either side refuses."""
+    import ssl
+    c_in, c_out, s_in, s_out = (ssl.MemoryBIO() for _ in range(4))
+    client = client_ctx.wrap_bio(c_in, c_out)
+    server = server_ctx.wrap_bio(s_in, s_out, server_side=True)
+    done = set()
+    for _ in range(8):
+        for end, out_bio, peer_in in ((client, c_out, s_in), (server, s_out, c_in)):
+            if end not in done:
+                try:
+                    end.do_handshake()
+                    done.add(end)
+                except ssl.SSLWantReadError:
+                    pass
+                except ssl.SSLError:
+                    return False
+            pending = out_bio.read()
+            if pending:
+                peer_in.write(pending)
+        if len(done) == 2:
+            return True
+    return False
+
+
 def self_tests() -> None:
     """Raise RuntimeError unless approved operations work and refused ones
     fail, in both libraries: proof that the provider, not a fallback, answers."""
@@ -131,6 +203,19 @@ def self_tests() -> None:
         except Exception:
             continue
         raise RuntimeError(f'{name} still works: the FIPS provider is not the one answering')
+
+
+def tls_self_test() -> None:
+    """Raise RuntimeError when TLS still negotiates a refused group, or fails on P-256."""
+    try:
+        for group in REFUSED_TLS_GROUPS:
+            if tls_negotiates(group):
+                raise RuntimeError(f'TLS still negotiates {group}, which the module does not '
+                                   'allow (restrict Groups in the OpenSSL configuration)')
+        if not tls_negotiates('prime256v1'):
+            raise RuntimeError('TLS fails on P-256')
+    except OSError as e:
+        raise RuntimeError(f'the TLS check could not run: {e}') from e
 
 
 def status() -> dict:
@@ -169,6 +254,7 @@ def enforce_at_startup(log, database_url: str = '') -> None:
         raise SystemExit(1)
     try:
         self_tests()
+        tls_self_test()
     except RuntimeError as e:
         log.error('FIPS self-test failed: %s; refusing to start', e)
         raise SystemExit(1)

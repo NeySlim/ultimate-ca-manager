@@ -93,7 +93,7 @@ if [ "$FIPS_REQUESTED" = 1 ]; then
         fi
     done
     cat > "$FIPS_RUN_DIR/openssl-fips.cnf" <<EOF
-# Written by the UCM entrypoint: fips + base providers, approved algorithms only
+# Written by the UCM entrypoint: fips + base providers, approved algorithms and TLS groups only
 config_diagnostics = 1
 openssl_conf = openssl_init
 
@@ -102,6 +102,7 @@ openssl_conf = openssl_init
 [openssl_init]
 providers = provider_sect
 alg_section = algorithm_sect
+ssl_conf = ssl_sect
 
 [provider_sect]
 fips = fips_sect
@@ -112,6 +113,13 @@ activate = 1
 
 [algorithm_sect]
 default_properties = fips=yes
+
+# Every TLS context of the process: X25519 and X448 are not allowed by the module's policy
+[ssl_sect]
+system_default = system_default_sect
+
+[system_default_sect]
+Groups = P-256:P-384:P-521:ffdhe2048:ffdhe3072:ffdhe4096
 EOF
     export OPENSSL_CONF="$FIPS_RUN_DIR/openssl-fips.cnf"
 

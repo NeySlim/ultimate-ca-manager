@@ -138,6 +138,8 @@ The packages install pre-built Python wheels, and the `cryptography` and `psycop
 
 3. When the host is in FIPS mode (`/proc/sys/crypto/fips_enabled` is 1), the package adds `UCM_FIPS=1` to `ucm.env` (an explicit `UCM_FIPS=0` is kept), checks that the FIPS provider is active, and prints the readiness report of `python -m scripts.fips_preflight`. Otherwise UCM runs in standard mode on the system OpenSSL: enable FIPS mode with `sudo fips-mode-setup --enable` (RHEL) or `sudo pro enable fips-updates` (Ubuntu Pro), reboot, and reinstall the package.
 
+TLS follows the host's configuration: with the FIPS crypto policy of RHEL 9 and the FIPS module of Ubuntu 24.04, X25519 and X448 are not offered, and UCM refuses to start in FIPS mode when its TLS contexts still accept them.
+
 A standard package installed on a host in FIPS mode prints a reminder to set `UCM_FIPS_BUILD=1`. To return to the standard build, remove the line from `ucm.env` and reinstall.
 
 ---

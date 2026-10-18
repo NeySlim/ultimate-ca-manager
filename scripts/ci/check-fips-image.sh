@@ -59,5 +59,11 @@ for setting in security-checks conditional-errors tls1-prf-ems-check drbg-no-tru
         /run/ucm/fipsmodule.cnf || fail "$setting is not 1 in fipsmodule.cnf"
 done
 
+# TLS: X25519 and X448 never negotiated, P-256 is
+tls() { timeout 10 openssl s_client -connect "127.0.0.1:$port" "$@" </dev/null 2>&1 || true; }
+tls -groups X25519:X448 | grep -q 'Cipher is (NONE)' || fail "TLS accepts X25519 or X448"
+tls -groups P-256 | grep -Eq 'Temp Key: ECDH, prime256v1' || fail "TLS refuses P-256"
+tls | grep -E 'Temp Key' | grep -q X25519 && fail "TLS negotiates X25519 by default"
+
 passed=1
 echo "FIPS check passed for $image"

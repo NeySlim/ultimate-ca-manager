@@ -10,6 +10,13 @@ from cryptography.hazmat.bindings._rust import openssl as rust_openssl
 import fips_mode
 
 LOG = logging.getLogger('test-fips-startup')
+REAL_TLS_SELF_TEST = fips_mode.tls_self_test
+
+
+@pytest.fixture(autouse=True)
+def tls_checked_elsewhere(monkeypatch):
+    """The test process negotiates X25519: TestTlsGroups runs the TLS check for real."""
+    monkeypatch.setattr(fips_mode, 'tls_self_test', lambda: None)
 
 
 @pytest.fixture
@@ -215,3 +222,75 @@ class TestApi:
         body = client.get('/api/v2/health').get_json()
         assert body['fips_active'] is active
         assert 'library' not in body and 'provider' not in body
+
+
+GROUPS_CNF = """openssl_conf = openssl_init
+
+[openssl_init]
+ssl_conf = ssl_sect
+
+[ssl_sect]
+system_default = system_default_sect
+
+[system_default_sect]
+Groups = P-256:P-384:P-521:ffdhe2048:ffdhe3072:ffdhe4096
+"""
+
+
+def _tls_self_test_in(tmp_path, groups):
+    """Run tls_self_test() in a fresh interpreter, with or without the Groups section."""
+    import os
+    import subprocess
+    import sys
+    env = {k: v for k, v in os.environ.items() if k != 'OPENSSL_CONF'}
+    if groups:
+        (tmp_path / 'groups.cnf').write_text(GROUPS_CNF)
+        env['OPENSSL_CONF'] = str(tmp_path / 'groups.cnf')
+    code = 'import fips_mode; fips_mode.tls_self_test(); print("passed")'
+    return subprocess.run([sys.executable, '-c', code], cwd=os.path.dirname(fips_mode.__file__),
+                          env=env, capture_output=True, text=True, timeout=60)
+
+
+class TestTlsGroups:
+    def test_x25519_offered_by_default_fails_the_check(self, tmp_path):
+        result = _tls_self_test_in(tmp_path, groups=False)
+        assert result.returncode != 0
+        assert 'TLS still negotiates X25519' in result.stderr
+
+    def test_the_groups_section_passes_it(self, tmp_path):
+        result = _tls_self_test_in(tmp_path, groups=True)
+        assert result.returncode == 0, result.stderr
+        assert result.stdout.strip() == 'passed'
+
+    def test_this_process_negotiates_every_group(self):
+        for group in ('X25519', 'X448', 'prime256v1', 'secp384r1'):
+            assert fips_mode.tls_negotiates(group) is True, group
+
+    @pytest.mark.parametrize('narrowed', ['clients', 'servers'])
+    def test_either_side_accepting_x25519_is_seen(self, monkeypatch, narrowed):
+        import ssl
+        real = ssl.create_default_context
+        purpose = ssl.Purpose.SERVER_AUTH if narrowed == 'clients' else ssl.Purpose.CLIENT_AUTH
+
+        def factory(which=ssl.Purpose.SERVER_AUTH, **kwargs):
+            ctx = real(which, **kwargs)
+            if which == purpose:
+                ctx.set_ecdh_curve('prime256v1')
+            return ctx
+        monkeypatch.setattr(ssl, 'create_default_context', factory)
+        assert fips_mode.tls_negotiates('X25519') is True
+
+    def test_tls_that_fails_on_p256_fails_the_check(self, monkeypatch):
+        monkeypatch.setattr(fips_mode, 'tls_negotiates', lambda group: False)
+        with pytest.raises(RuntimeError, match='TLS fails on P-256'):
+            REAL_TLS_SELF_TEST()
+
+    def test_a_failure_stops_the_process(self, monkeypatch, providers, caplog):
+        monkeypatch.setenv('UCM_FIPS', '1')
+        providers(True, True)
+        monkeypatch.setattr(fips_mode, 'self_tests', lambda: None)
+        monkeypatch.setattr(fips_mode, 'tls_self_test', REAL_TLS_SELF_TEST)
+        monkeypatch.setattr(fips_mode, 'tls_negotiates', lambda group: True)
+        with caplog.at_level(logging.ERROR), pytest.raises(SystemExit):
+            fips_mode.enforce_at_startup(LOG)
+        assert 'FIPS self-test failed: TLS still negotiates X25519' in caplog.text
