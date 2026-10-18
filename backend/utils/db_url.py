@@ -25,9 +25,9 @@ def is_postgres_url(url: str) -> bool:
     return sqlalchemy_url(url or '').startswith(('postgresql://', 'postgresql+'))
 
 
-def postgres_tls_problem(url, environ=None) -> Optional[str]:
-    """Why a PostgreSQL URL would reach its server over TCP without TLS, None when it would not."""
-    environ = os.environ if environ is None else environ
+def _postgres_tcp_setting(url, name, env_name, environ):
+    """The value of a libpq setting for a URL that reaches PostgreSQL over TCP,
+    '' when unset, None for a Unix socket or another database."""
     try:
         parsed = make_url(str(url))
     except Exception:
@@ -35,12 +35,28 @@ def postgres_tls_problem(url, environ=None) -> Optional[str]:
     if not parsed.drivername.startswith('postgres'):
         return None
 
-    def query(name):
-        value = parsed.query.get(name)
+    def query(key):
+        value = parsed.query.get(key)
         return value[0] if isinstance(value, tuple) else value
     host = parsed.host or query('host') or query('hostaddr') or environ.get('PGHOST') \
         or environ.get('PGHOSTADDR')
     if not host or str(host).startswith('/'):
-        return None  # Unix socket: no TLS needed
-    sslmode = query('sslmode') or environ.get('PGSSLMODE') or 'prefer'
+        return None  # Unix socket: neither TLS nor GSSAPI encryption applies
+    return query(name) or environ.get(env_name) or ''
+
+
+def postgres_tls_problem(url, environ=None) -> Optional[str]:
+    """Why a PostgreSQL URL would reach its server over TCP without TLS, None when it would not."""
+    environ = os.environ if environ is None else environ
+    sslmode = _postgres_tcp_setting(url, 'sslmode', 'PGSSLMODE', environ)
+    if sslmode is None:
+        return None
+    sslmode = sslmode or 'prefer'
     return None if sslmode in _TLS_SSLMODES else f'sslmode={sslmode}'
+
+
+def postgres_gssenc_problem(url, environ=None) -> Optional[str]:
+    """A GSSAPI encryption mode other than disable asked for explicitly over TCP, None otherwise."""
+    environ = os.environ if environ is None else environ
+    mode = _postgres_tcp_setting(url, 'gssencmode', 'PGGSSENCMODE', environ)
+    return f'gssencmode={mode}' if mode and mode != 'disable' else None

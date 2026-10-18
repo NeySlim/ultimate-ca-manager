@@ -14,6 +14,13 @@ REAL_TLS_SELF_TEST = fips_mode.tls_self_test
 
 
 @pytest.fixture(autouse=True)
+def pg_environment_restored(monkeypatch):
+    """enforce_at_startup sets PGGSSENCMODE: undo it after each test."""
+    monkeypatch.setenv('PGGSSENCMODE', 'unset')
+    monkeypatch.delenv('PGGSSENCMODE')
+
+
+@pytest.fixture(autouse=True)
 def tls_checked_elsewhere(monkeypatch):
     """The test process negotiates X25519: TestTlsGroups runs the TLS check for real."""
     monkeypatch.setattr(fips_mode, 'tls_self_test', lambda: None)
@@ -120,6 +127,78 @@ class TestEnforceAtStartup:
 
 class _Stopped(Exception):
     pass
+
+
+def _libpq_default(keyword):
+    """What libpq itself would use for ``keyword`` with no value in the connection string."""
+    import ctypes
+    import ctypes.util
+
+    class Option(ctypes.Structure):
+        _fields_ = [('keyword', ctypes.c_char_p), ('envvar', ctypes.c_char_p),
+                    ('compiled', ctypes.c_char_p), ('val', ctypes.c_char_p),
+                    ('label', ctypes.c_char_p), ('dispchar', ctypes.c_char_p),
+                    ('dispsize', ctypes.c_int)]
+    try:
+        lib = ctypes.CDLL(ctypes.util.find_library('pq') or 'libpq.so.5')
+    except OSError:
+        pytest.skip('libpq is not installed')
+    lib.PQconndefaults.restype = ctypes.POINTER(Option)
+    lib.PQconninfoFree.argtypes = [ctypes.POINTER(Option)]
+    options = lib.PQconndefaults()
+    try:
+        i = 0
+        while options[i].keyword:
+            if options[i].keyword.decode() == keyword:
+                value = options[i].val or options[i].compiled
+                return value.decode() if value else None
+            i += 1
+    finally:
+        lib.PQconninfoFree(options)
+    pytest.skip(f'this libpq has no {keyword}')
+
+
+class TestPostgresGssapiEncryption:
+    """libpq prefers GSSAPI encryption (Kerberos library, outside the module) to
+    TLS when a ticket is present: FIPS mode turns it off or refuses to start."""
+
+    @pytest.fixture
+    def active(self, monkeypatch, providers):
+        monkeypatch.setenv('UCM_FIPS', '1')
+        monkeypatch.delenv('PGSSLMODE', raising=False)
+        monkeypatch.delenv('PGHOST', raising=False)
+        providers(True, True)
+        monkeypatch.setattr(fips_mode, 'self_tests', lambda: None)
+        monkeypatch.setattr(fips_mode, 'provider_info', lambda: None)
+
+    @pytest.mark.parametrize('url, env', [
+        ('postgresql://ucm@db.example/ucm?sslmode=require&gssencmode=prefer', None),
+        ('postgresql://ucm@db.example/ucm?sslmode=require&gssencmode=require', None),
+        ('postgresql://ucm@db.example/ucm?sslmode=require', 'prefer'),
+    ])
+    def test_gssapi_encryption_asked_for_stops_the_process(self, monkeypatch, active, caplog,
+                                                           url, env):
+        if env:
+            monkeypatch.setenv('PGGSSENCMODE', env)
+        with caplog.at_level(logging.ERROR), pytest.raises(SystemExit):
+            fips_mode.enforce_at_startup(LOG, url)
+        assert 'PostgreSQL is set to gssencmode=' in caplog.text
+
+    @pytest.mark.parametrize('url', [
+        'postgresql://ucm@db.example/ucm?sslmode=require',
+        'postgresql://ucm@db.example/ucm?sslmode=require&gssencmode=disable',
+        'postgresql://ucm@/ucm?host=/run/postgresql&gssencmode=prefer',
+        'sqlite:////var/lib/ucm/ucm.db',
+    ])
+    def test_otherwise_libpq_is_told_to_disable_it(self, active, url):
+        assert _libpq_default('gssencmode') == 'prefer'
+        fips_mode.enforce_at_startup(LOG, url)
+        assert _libpq_default('gssencmode') == 'disable'
+
+    def test_standard_mode_leaves_libpq_alone(self, monkeypatch, providers):
+        monkeypatch.delenv('UCM_FIPS', raising=False)
+        fips_mode.enforce_at_startup(LOG, 'postgresql://ucm@db.example/ucm?sslmode=require')
+        assert _libpq_default('gssencmode') == 'prefer'
 
 
 UPSTREAM = {'name': 'OpenSSL FIPS Provider', 'version': '3.1.2', 'buildinfo': '3.1.2'}

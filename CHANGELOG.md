@@ -21,6 +21,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - FIPS mode (Docker): the module was installed without `-pedantic`, which left the Extended Master Secret check and the DRBG digest restriction of its approved mode off. Both are now on and UCM refuses to start when a required setting is off (the service status lists them); TLS 1.2 peers without Extended Master Secret are refused.
 - FIPS mode (Docker): the HTTPS server and UCM's TLS clients negotiated X25519, which the module's security policy does not allow. TLS now uses only the NIST curves and FFDHE groups, and UCM refuses to start in FIPS mode when TLS still accepts X25519 or X448.
 - FIPS mode: SSH deployments checked Ed25519 host keys with libsodium and could fall back to a Diffie-Hellman key exchange computed outside the module. They now negotiate only ECDSA or RSA host keys, ECDH on NIST curves, AES and HMAC-SHA-1/SHA-2, and a target pinned to an Ed25519 host key asks for a pin reset.
+- FIPS mode: with a Kerberos ticket present, libpq could encrypt the PostgreSQL connection with GSSAPI, which runs in the Kerberos library outside the module, instead of TLS. UCM now turns GSSAPI encryption off for itself and its backup tools, and refuses to start when `gssencmode` or `PGGSSENCMODE` asks for it.
 
 ## [2.241] - 2026-10-18
 

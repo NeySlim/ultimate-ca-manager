@@ -25,7 +25,7 @@ from models import (CA, AcmeClientOrder, Certificate, CertificatePolicy, Certifi
 from services import fips_preflight
 from tests.test_backup_cross_installation import _bound_to
 from utils.datetime_utils import utc_now
-from utils.db_url import postgres_tls_problem
+from utils.db_url import postgres_gssenc_problem, postgres_tls_problem
 from utils.password_hash import hash_password
 
 _PG_URL = os.environ.get('UCM_TEST_PG_URL')
@@ -386,6 +386,18 @@ def test_database_postgres_without_tls(session, app, monkeypatch):
 ])
 def test_postgres_tls_problem(url, env, problem):
     assert postgres_tls_problem(url, env) == problem
+
+
+@pytest.mark.parametrize('url, env, problem', [
+    ('postgresql://u@db/ucm?sslmode=require', {}, None),
+    ('postgresql://u@db/ucm?gssencmode=disable', {'PGGSSENCMODE': 'prefer'}, None),
+    ('postgresql://u@db/ucm?gssencmode=prefer', {}, 'gssencmode=prefer'),
+    ('postgresql://u@db/ucm', {'PGGSSENCMODE': 'require'}, 'gssencmode=require'),
+    ('postgresql://u@/ucm?host=/run/postgresql&gssencmode=require', {}, None),
+    ('sqlite:////var/lib/ucm/ucm.db', {'PGGSSENCMODE': 'require'}, None),
+])
+def test_postgres_gssenc_problem(url, env, problem):
+    assert postgres_gssenc_problem(url, env) == problem
 
 
 def test_https_unapproved_key(session, app, tmp_path, monkeypatch):

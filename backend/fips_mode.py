@@ -239,7 +239,8 @@ def settings_off(info, settings) -> list:
 def enforce_at_startup(log, database_url: str = '') -> None:
     """UCM_FIPS=1 without an active provider, with a failed self-test, with the
     upstream provider outside its approved-mode settings or with a PostgreSQL
-    connection outside TLS stops the process before it serves anything."""
+    connection outside TLS or on GSSAPI encryption stops the process before it
+    serves anything."""
     if not requested():
         return
     from cryptography.hazmat.bindings._rust import openssl as rust_openssl
@@ -258,12 +259,21 @@ def enforce_at_startup(log, database_url: str = '') -> None:
     except RuntimeError as e:
         log.error('FIPS self-test failed: %s; refusing to start', e)
         raise SystemExit(1)
-    from utils.db_url import postgres_tls_problem
+    from utils.db_url import postgres_gssenc_problem, postgres_tls_problem
     problem = postgres_tls_problem(database_url)
     if problem:
         log.error('UCM_FIPS=1 but DATABASE_URL reaches PostgreSQL over TCP with %s: '
                   'use sslmode=require or stricter, or a Unix socket; refusing to start', problem)
         raise SystemExit(1)
+    problem = postgres_gssenc_problem(database_url)
+    if problem:
+        log.error('UCM_FIPS=1 but PostgreSQL is set to %s: GSSAPI encryption runs in the '
+                  'Kerberos library, outside the module; use gssencmode=disable; '
+                  'refusing to start', problem)
+        raise SystemExit(1)
+    # libpq's default (prefer) would pick GSSAPI encryption over TLS when a Kerberos
+    # ticket is present; the variable also reaches pg_dump and pg_restore.
+    os.environ['PGGSSENCMODE'] = 'disable'
     info = provider_info() or {}
     off = settings_off(info, module_settings())
     if off:
