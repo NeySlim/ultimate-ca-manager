@@ -157,7 +157,7 @@ export default function AboutSection() {
             rel="noopener noreferrer"
             className="flex items-center gap-3 p-3 bg-tertiary-50 border border-border rounded-lg hover:bg-bg-tertiary transition-colors"
           >
-            <Coffee size={20} className="text-text-secondary" />
+            <Coffee size={20} className="kofi-icon" />
             <div>
               <div className="text-sm font-medium text-text-primary">{t('settings.about.support')}</div>
               <div className="text-xs text-text-secondary">{t('settings.about.supportDesc')}</div>

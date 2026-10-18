@@ -59,24 +59,13 @@ export function KofiSupportCard({ version = __APP_VERSION__ }) {
   return (
     <aside
       aria-label={t('kofi.label')}
-      className="fixed z-30 bottom-3 left-3 right-3 sm:left-auto sm:right-8 sm:bottom-12 sm:w-80 rounded-xl border border-border bg-bg-secondary shadow-xl p-3"
+      className="kofi-card fixed z-30 bottom-3 left-3 right-3 sm:left-auto sm:right-8 sm:bottom-12 sm:w-80 rounded-xl border border-border bg-bg-secondary shadow-xl p-3"
     >
       <div className="flex items-start gap-3">
-        <div className="flex-shrink-0 mt-0.5 text-accent-primary">
-          <Coffee size={20} />
+        <div className="kofi-badge flex-shrink-0 w-7 h-7 rounded-full flex items-center justify-center">
+          <Coffee size={16} weight="bold" />
         </div>
-        <div className="flex-1 min-w-0">
-          <p className="text-sm text-text-secondary">{t('kofi.message')}</p>
-          <a
-            href={KOFI_URL}
-            target="_blank"
-            rel="noopener noreferrer"
-            onClick={acknowledge}
-            className="mt-2 inline-flex items-center gap-1.5 rounded-md px-2.5 py-1.5 text-xs font-medium btn-soft text-text-primary focus-ring"
-          >
-            {t('kofi.support')}
-          </a>
-        </div>
+        <p className="flex-1 min-w-0 text-sm text-text-secondary">{t('kofi.message')}</p>
         <button
           type="button"
           onClick={acknowledge}
@@ -85,6 +74,17 @@ export function KofiSupportCard({ version = __APP_VERSION__ }) {
         >
           <X size={16} />
         </button>
+      </div>
+      <div className="mt-2 flex justify-center">
+        <a
+          href={KOFI_URL}
+          target="_blank"
+          rel="noopener noreferrer"
+          onClick={acknowledge}
+          className="kofi-button inline-flex items-center gap-1.5 rounded-md px-3 py-1.5 text-xs font-medium focus-ring"
+        >
+          {t('kofi.support')}
+        </a>
       </div>
     </aside>
   )

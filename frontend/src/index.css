@@ -65,6 +65,11 @@
    THEME: Dark (default)
    ============================================ */
 :root {
+  /* Ko-fi accent, shared by light and dark: tints mix with --bg-secondary.
+     White text on --kofi-coral-strong is 4.6:1 (5.98:1 on hover). */
+  --kofi-coral: #FF5E5B;
+  --kofi-coral-strong: #D63B36;
+  --kofi-coral-hover: #B8312C;
   --bg-primary: #12161C;
   --bg-secondary: #1C222A;
   --bg-tertiary: #252D38;
@@ -2899,3 +2904,13 @@ input:focus, select:focus, textarea:focus {
   background: var(--bg-primary);
   color: var(--text-tertiary);
 }
+
+/* Ko-fi support card and About link */
+.kofi-card {
+  background-image: linear-gradient(to right, color-mix(in srgb, var(--kofi-coral) 10%, var(--bg-secondary)), var(--bg-secondary));
+  border-left: 3px solid var(--kofi-coral);
+}
+.kofi-badge { background-color: var(--kofi-coral-strong); color: #FFFFFF; }
+.kofi-button { background-color: var(--kofi-coral-strong); color: #FFFFFF; transition: background-color 150ms; }
+.kofi-button:hover { background-color: var(--kofi-coral-hover); }
+.kofi-icon { color: var(--kofi-coral); }
