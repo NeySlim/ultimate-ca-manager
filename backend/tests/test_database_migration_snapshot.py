@@ -366,6 +366,13 @@ class TestTheDumpKeepsTheServiceTransport:
         env = dump_env('postgresql://ucm:pw@db.example/ucm')
         assert 'PGGSSENCMODE' not in env and 'PGSSLMODE' not in env
 
-    def test_other_stale_options_are_still_removed(self, dump_env, monkeypatch):
-        monkeypatch.setenv('PGSSLROOTCERT', '/stale/root.pem')
-        assert 'PGSSLROOTCERT' not in dump_env('postgresql://ucm:pw@db.example/ucm')
+    def test_the_service_tls_files_are_kept(self, dump_env, monkeypatch):
+        monkeypatch.setenv('PGSSLMODE', 'verify-full')
+        monkeypatch.setenv('PGSSLROOTCERT', '/etc/ucm/pg-root.pem')
+        env = dump_env('postgresql://ucm:pw@db.example/ucm')
+        assert (env['PGSSLMODE'], env['PGSSLROOTCERT']) == ('verify-full', '/etc/ucm/pg-root.pem')
+
+    def test_the_url_tls_files_win(self, dump_env, monkeypatch):
+        monkeypatch.setenv('PGSSLROOTCERT', '/etc/ucm/pg-root.pem')
+        env = dump_env('postgresql://ucm:pw@db.example/ucm?sslrootcert=/srv/other.pem')
+        assert env['PGSSLROOTCERT'] == '/srv/other.pem'
