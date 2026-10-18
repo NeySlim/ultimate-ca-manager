@@ -311,3 +311,61 @@ class TestTheMigrationRefusesWithoutOne:
         assert stats['refusal'] == 'snapshot'
         assert stats['tables_migrated'] == 0
         assert not target.exists() or target.stat().st_size == 0
+
+
+class TestTheDumpKeepsTheServiceTransport:
+    """pg_dump must reach PostgreSQL the way the service does: the service's
+    PGSSLMODE and PGGSSENCMODE survive, and FIPS mode keeps GSSAPI encryption off."""
+
+    @pytest.fixture
+    def dump_env(self, app, snapshots_dir, monkeypatch):
+        from sqlalchemy.engine import make_url
+        for name in ('PGSSLMODE', 'PGGSSENCMODE', 'PGSSLROOTCERT', 'UCM_FIPS'):
+            monkeypatch.setenv(name, 'x')
+            monkeypatch.delenv(name)
+        seen = {}
+
+        class Failed:
+            returncode = 1
+            stderr = b'pg_dump: error: stopped by the test'
+
+        def run(cmd, env=None, **kwargs):
+            seen.update(env)
+            return Failed()
+        monkeypatch.setattr(helpers.subprocess, 'run', run)
+
+        def dump(url):
+            monkeypatch.setattr(helpers, '_live_database_url', lambda: make_url(url))
+            seen.clear()
+            with app.app_context():
+                with pytest.raises(SnapshotError):
+                    create_source_snapshot()
+            return seen
+        return dump
+
+    def test_the_service_sslmode_is_kept(self, dump_env, monkeypatch):
+        monkeypatch.setenv('PGSSLMODE', 'require')
+        assert dump_env('postgresql://ucm:pw@db.example/ucm')['PGSSLMODE'] == 'require'
+
+    def test_the_url_sslmode_wins(self, dump_env, monkeypatch):
+        monkeypatch.setenv('PGSSLMODE', 'require')
+        env = dump_env('postgresql://ucm:pw@db.example/ucm?sslmode=verify-full')
+        assert env['PGSSLMODE'] == 'verify-full'
+
+    def test_the_service_gssencmode_is_kept(self, dump_env, monkeypatch):
+        monkeypatch.setenv('PGGSSENCMODE', 'disable')
+        assert dump_env('postgresql://ucm:pw@db.example/ucm')['PGGSSENCMODE'] == 'disable'
+
+    @pytest.mark.parametrize('query', ['', '?gssencmode=prefer'])
+    def test_fips_mode_turns_gssapi_encryption_off(self, dump_env, monkeypatch, query):
+        monkeypatch.setenv('UCM_FIPS', '1')
+        env = dump_env(f'postgresql://ucm:pw@db.example/ucm{query}')
+        assert env['PGGSSENCMODE'] == 'disable'
+
+    def test_standard_mode_adds_nothing(self, dump_env):
+        env = dump_env('postgresql://ucm:pw@db.example/ucm')
+        assert 'PGGSSENCMODE' not in env and 'PGSSLMODE' not in env
+
+    def test_other_stale_options_are_still_removed(self, dump_env, monkeypatch):
+        monkeypatch.setenv('PGSSLROOTCERT', '/stale/root.pem')
+        assert 'PGSSLROOTCERT' not in dump_env('postgresql://ucm:pw@db.example/ucm')

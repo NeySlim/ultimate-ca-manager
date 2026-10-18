@@ -23,6 +23,7 @@ from sqlalchemy import (
 )
 from sqlalchemy.engine import make_url
 
+import fips_mode
 from config.settings import Config, DATA_DIR
 
 logger = logging.getLogger(__name__)
@@ -107,6 +108,11 @@ def _discard(path: Path) -> None:
         path.unlink()
     except OSError:
         pass
+
+
+# Kept from the service environment when the URL is silent: the FIPS startup
+# check accepts PGSSLMODE as the TLS guarantee and sets PGGSSENCMODE itself.
+_SERVICE_LIBPQ_GUARANTEES = ('PGSSLMODE', 'PGGSSENCMODE')
 
 
 def _set_env_or_remove(env: dict, key: str, value) -> None:
@@ -410,7 +416,11 @@ def _backup_current_db(reasons: Optional[list] = None,
     }
 
     for query_key, env_key in libpq_query_options.items():
+        if env_key in _SERVICE_LIBPQ_GUARANTEES and not url.query.get(query_key):
+            continue  # the service's own setting, which the live connection uses too
         _set_env_or_remove(env, env_key, url.query.get(query_key))
+    if fips_mode.requested():
+        env['PGGSSENCMODE'] = 'disable'  # GSSAPI encryption runs outside the FIPS module
 
     cmd = [
         "pg_dump",
