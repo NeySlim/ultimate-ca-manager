@@ -12,6 +12,7 @@ SYSTEMD_RUN=${UCM_SETUP_SYSTEMD_RUN:-/run/systemd/system}
 # Present while the last UCM_FIPS_BUILD=1 build failed: rpm reports success despite a failed %post
 BUILD_FAILED=${BUILD_LOG%.log}.failed
 RUST_MIN=1.83
+GUARDED_VENV="" SERVICE_STOPPED="" VENV_MOVED=""
 
 say() { echo "$*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -265,21 +266,40 @@ print(f'cryptography, hashlib and psycopg2 use the system {ssl.OPENSSL_VERSION}'
 PY
 }
 
-# Stops a running ucm before its venv is replaced; skipped in a chroot or container without systemd.
-# The package script starts it again at the end, restart_after_failure after a failed build.
-stop_service() {
-    [ -d "$SYSTEMD_RUN" ] && systemctl is-active --quiet ucm || return 0
-    say "Stopping UCM while its Python environment is rebuilt..."
-    trap "restart_after_failure $(printf %q "$1")" EXIT
-    systemctl stop ucm || say "WARNING: could not stop UCM; rebuilding its environment anyway"
+# Until the new venv is complete, any exit (failure or signal) puts the previous one back and
+# starts ucm again if it was stopped here; on success the package script starts it at the end.
+guard_venv() {
+    GUARDED_VENV=$1
+    trap recover_venv EXIT
+    # Trapped, a signal is handled once pip has exited: recover_venv never races a dying pip
+    trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM
+    # Skipped in a chroot or container without systemd
+    if [ -d "$SYSTEMD_RUN" ] && systemctl is-active --quiet ucm; then
+        say "Stopping UCM while its Python environment is rebuilt..."
+        SERVICE_STOPPED=1
+        systemctl stop ucm || say "WARNING: could not stop UCM; rebuilding its environment anyway"
+    fi
 }
 
-restart_after_failure() {
-    local rc=$?
-    [ "$rc" != 0 ] && venv_ok "$1" || return "$rc"
-    say "Starting UCM again on the previous environment..." >&2
-    systemctl start ucm || true
-    return "$rc"
+recover_venv() {
+    local venv=$GUARDED_VENV
+    if [ -e "$venv.prev" ] && { [ -n "$VENV_MOVED" ] || ! venv_ok "$venv"; }; then
+        say "Restoring the previous Python environment..." >&2
+        rm -rf "$venv" && mv "$venv.prev" "$venv"
+    fi
+    if [ -n "$SERVICE_STOPPED" ] && venv_ok "$venv"; then
+        say "Starting UCM again..." >&2
+        systemctl start ucm || true
+    fi
+}
+
+# Moves the venv aside as venv.prev, after resolving what an interrupted build left behind.
+set_aside_venv() {
+    if [ -e "$1.prev" ] && ! venv_ok "$1"; then
+        rm -rf "$1" && mv "$1.prev" "$1"
+    fi
+    rm -rf "$1.prev"
+    [ ! -e "$1" ] || { mv "$1" "$1.prev" && VENV_MOVED=1; }
 }
 
 cmd_venv() {
@@ -302,36 +322,34 @@ cmd_venv() {
         say "(about 5 minutes the first time, then from pip's wheel cache; log: $BUILD_LOG)..."
         reqs=$(mktemp)
         fips_requirements "$home/requirements.txt" "$reqs"
-        stop_service "$venv"
-        # A build interrupted earlier left an incomplete venv next to the last working one
-        if [ -e "$venv.prev" ] && ! venv_ok "$venv"; then
-            rm -rf "$venv" && mv "$venv.prev" "$venv"
-        fi
-        rm -rf "$venv.prev"
-        [ ! -e "$venv" ] || mv "$venv" "$venv.prev"
+        guard_venv "$venv"
+        set_aside_venv "$venv"
         echo "build failed" > "$BUILD_FAILED"
         if ! build_fips_venv "$python" "$venv" "$reqs" > "$BUILD_LOG" 2>&1 \
                 || ! verify_fips_venv "$home" >> "$BUILD_LOG" 2>&1; then
             rm -f "$reqs"
             tail -n 25 "$BUILD_LOG" >&2 || true
+            # Even a venv with gunicorn fails here when verify_fips_venv refused it
             rm -rf "$venv"
-            [ ! -e "$venv.prev" ] || mv "$venv.prev" "$venv"
             echo "ERROR: the UCM_FIPS_BUILD=1 build failed (full log: $BUILD_LOG); the previous environment was kept." >&2
             echo "Fix the cause, or remove UCM_FIPS_BUILD from $envfile for the standard build, and" >&2
             retry_hint "$format" >&2
             exit 1
         fi
-        rm -rf "$venv.prev" "$reqs" "$BUILD_FAILED"
+        rm -f "$reqs" "$BUILD_FAILED"
         tail -n 1 "$BUILD_LOG"
     else
-        stop_service "$venv"
-        rm -rf "$venv" 2>/dev/null || true
+        guard_venv "$venv"
+        set_aside_venv "$venv"
         "$python" -m venv "$venv"
         "$venv/bin/pip" install --quiet --upgrade pip
         "$venv/bin/pip" install --quiet -r "$home/requirements.txt"
         # --no-deps keeps out twofish, an sdist-only dependency UCM never uses (see requirements.txt)
         "$venv/bin/pip" install --quiet --no-deps pyjks==20.0.0
     fi
+    # Complete: the previous venv is no longer needed
+    rm -rf "$venv.prev"
+    VENV_MOVED=""
 
     if [ -n "$had_requests_kerberos" ]; then
         say "Reinstalling requests-kerberos (was present before upgrade)..."
@@ -343,6 +361,7 @@ cmd_venv() {
         "$venv/bin/pip" install --quiet 'pyspnego[kerberos]' || \
             say "WARNING: pyspnego[kerberos] reinstall failed (needs libkrb5-dev/gcc), Autoenrollment's Kerberos/SPNEGO binding is unavailable until 'pip install pyspnego[kerberos]' is run manually in $venv"
     fi
+    trap - EXIT HUP INT TERM
 }
 
 run_preflight() {
@@ -432,7 +451,7 @@ cmd_banner() {
     echo " Optional packages:"
     if [ "$pkg" = deb ]; then
         # Installed in the same apt run, softhsm2 is only unpacked while ucm is configured
-        if dpkg-query -W -f='${Status}' softhsm2 2>/dev/null | grep -Eq '^install ok (installed|unpacked|half-configured)$'; then
+        if dpkg-query -W -f='${Status}' softhsm2 2>/dev/null | grep -Eq '^(install|hold) ok (installed|unpacked|half-configured|triggers-(awaited|pending))$'; then
             echo "  [ok] softhsm2 (HSM support)"
         else
             echo "  [ ]  softhsm2 - HSM support (apt install softhsm2)"

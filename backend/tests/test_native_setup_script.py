@@ -6,9 +6,11 @@ UCM_FIPS_BUILD=1 build-tool check, the venv build and the host FIPS step.
 import os
 import pathlib
 import shutil
+import signal
 import stat
 import subprocess
 import sys
+import time
 
 import pytest
 
@@ -416,9 +418,14 @@ def test_the_standard_install_is_unchanged(tmp_path):
         f'ARGS install --quiet -r {home}/requirements.txt',
         'ARGS install --quiet --no-deps pyjks==20.0.0',
     ]
+    # The previous venv was set aside during the build, then dropped
+    assert not (home / 'venv.prev').exists() and not (home / 'venv' / 'previous').exists()
 
 
 # ------------------------------------------------------- running service
+
+# Fake pip body: installing the requirements gives the venv its gunicorn
+GUNICORN = 'case "$*" in *" -r "*) d=$(dirname "$0"); printf "#!/bin/sh\\n" > "$d/gunicorn"; chmod +x "$d/gunicorn";; esac'
 
 def _systemd(tmp_path, bin_dir, record, state='active'):
     """A booted systemd whose systemctl logs each call, with the venv's content at that moment."""
@@ -442,7 +449,7 @@ def _calls(record):
 
 def test_a_running_service_is_stopped_before_its_venv_is_replaced(tmp_path):
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
-    python, record = _fake_python(tmp_path, 'exit 0')
+    python, record = _fake_python(tmp_path, GUNICORN)
     home, envfile = _home(tmp_path)
     envfile.write_text('SECRET_KEY=a\n')
     extra = _systemd(tmp_path, bin_dir, record)
@@ -451,6 +458,7 @@ def test_a_running_service_is_stopped_before_its_venv_is_replaced(tmp_path):
     assert _calls(record)[:3] == ['SYSTEMCTL is-active --quiet ucm', 'SYSTEMCTL stop ucm', 'ARGS install']
     assert 'SYSTEMCTL stop ucm [previous ]' in record.read_text()
     # Started again by the package script, after the permissions and the FIPS step
+    assert (home / 'venv' / 'bin' / 'gunicorn').exists()
     assert not [c for c in _calls(record) if c.startswith('SYSTEMCTL start')]
 
 
@@ -485,7 +493,24 @@ def test_a_failed_fips_build_starts_the_service_again_on_the_previous_venv(tmp_p
     assert (tmp_path / 'ucm-state').read_text().strip() == 'active'
 
 
-def test_a_failed_standard_build_does_not_start_a_broken_venv(tmp_path):
+def test_a_failed_standard_build_starts_the_service_again_on_the_previous_venv(tmp_path):
+    """PyPI unreachable: ucm goes on running the venv it had, as before the stop existed."""
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    python, record = _fake_python(tmp_path, 'case "$*" in *-r*) exit 1;; esac; exit 0')
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    shutil.rmtree(home / 'venv')
+    _venv_dir(home / 'venv')
+    extra = _systemd(tmp_path, bin_dir, record)
+    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, DEBIAN, extra))
+    assert result.returncode != 0
+    assert [line for line in record.read_text().splitlines() if line.startswith('SYSTEMCTL')] == [
+        'SYSTEMCTL is-active --quiet ucm [bin good ]', 'SYSTEMCTL stop ucm [bin good ]', 'SYSTEMCTL start ucm [bin good ]']
+    assert 'ARGS install' in _calls(record)
+    assert not (home / 'venv.prev').exists()
+
+
+def test_a_failed_build_without_a_working_previous_venv_starts_nothing(tmp_path):
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
     python, record = _fake_python(tmp_path, 'case "$*" in *-r*) exit 1;; esac; exit 0')
     home, envfile = _home(tmp_path)
@@ -495,6 +520,62 @@ def test_a_failed_standard_build_does_not_start_a_broken_venv(tmp_path):
     assert result.returncode != 0
     assert [c for c in _calls(record) if c.startswith('SYSTEMCTL')] == [
         'SYSTEMCTL is-active --quiet ucm', 'SYSTEMCTL stop ucm']
+
+
+def _default_signals():
+    for sig in (signal.SIGINT, signal.SIGTERM, signal.SIGHUP):
+        signal.signal(sig, signal.SIG_DFL)
+
+
+@pytest.mark.parametrize('sig', [signal.SIGTERM, signal.SIGINT, signal.SIGHUP])
+@pytest.mark.parametrize('step', ['*no-binary*', '*" -r "*', '*pyjks*'])
+def test_an_interrupted_build_restores_the_previous_venv_and_the_service(tmp_path, sig, step):
+    """The signal reaches the whole process group while pip runs, as when dpkg or the updater is stopped.
+
+    At the pyjks step the new venv already has gunicorn, yet it is incomplete."""
+    fips = step == '*no-binary*'
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    started = tmp_path / 'pip-started'
+    # Like pip finishing a write, the fake takes a moment to die and writes into its venv meanwhile
+    sleep = shutil.which('sleep')
+    python, record = _fake_python(tmp_path, f'''{GUNICORN}
+case "$*" in {step})
+  trap '{sleep} 0.3; : > "$(dirname "$0")/late"; exit 1' TERM INT HUP
+  touch {started}; {sleep} 30;;
+esac; exit 0''')
+    home, envfile = _home(tmp_path)
+    if not fips:
+        envfile.write_text('SECRET_KEY=a\n')
+    shutil.rmtree(home / 'venv')
+    _venv_dir(home / 'venv')
+    extra = _systemd(tmp_path, bin_dir, record)
+    proc = subprocess.Popen([BASH, str(SCRIPT), 'venv', str(home), str(python), 'rpm', str(envfile)],
+                            env=_env(tmp_path, ALMA, extra), stdin=subprocess.DEVNULL,
+                            stdout=subprocess.PIPE, stderr=subprocess.PIPE,
+                            text=True, start_new_session=True, preexec_fn=_default_signals)
+    deadline = time.monotonic() + 15
+    while not started.exists() and proc.poll() is None and time.monotonic() < deadline:
+        time.sleep(0.05)
+    assert started.exists(), proc.communicate(timeout=5)
+    os.killpg(proc.pid, sig)
+    _out, err = proc.communicate(timeout=20)
+    assert proc.returncode != 0, err
+    assert (home / 'venv' / 'good').exists() and not (home / 'venv.prev').exists()
+    assert not (home / 'venv' / 'bin' / 'late').exists()
+    assert [line for line in record.read_text().splitlines() if line.startswith('SYSTEMCTL')] == [
+        'SYSTEMCTL is-active --quiet ucm [bin good ]', 'SYSTEMCTL stop ucm [bin good ]', 'SYSTEMCTL start ucm [bin good ]']
+    assert (tmp_path / 'ucm-state').read_text().strip() == 'active'
+
+
+def test_a_failed_first_fips_build_leaves_no_venv_that_looks_usable(tmp_path):
+    """Refused by the build or by verify_fips_venv, a venv with gunicorn must not stay behind."""
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    python, _ = _fake_python(tmp_path, f'{GUNICORN}\ncase "$*" in *no-binary*) exit 1;; esac; exit 0')
+    home, envfile = _home(tmp_path)
+    shutil.rmtree(home / 'venv')
+    result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, {'PATH': str(bin_dir)}))
+    assert result.returncode == 1
+    assert _run(['venv-ok', str(home)], _env(tmp_path)).returncode != 0
 
 
 def test_missing_build_tools_never_stop_the_service(tmp_path):
@@ -706,6 +787,9 @@ def test_the_banner_brackets_ipv6_addresses(tmp_path):
     # Unpacked by the same apt run, configured after ucm
     ('deb', 'install ok unpacked', '  [ok] softhsm2 (HSM support)'),
     ('deb', 'install ok half-configured', '  [ok] softhsm2 (HSM support)'),
+    ('deb', 'install ok triggers-awaited', '  [ok] softhsm2 (HSM support)'),
+    ('deb', 'install ok triggers-pending', '  [ok] softhsm2 (HSM support)'),
+    ('deb', 'hold ok installed', '  [ok] softhsm2 (HSM support)'),
     ('deb', 'deinstall ok config-files', '  [ ]  softhsm2 - HSM support (apt install softhsm2)'),
     ('deb', 'unknown ok not-installed', '  [ ]  softhsm2 - HSM support (apt install softhsm2)'),
     ('deb', False, '  [ ]  softhsm2 - HSM support (apt install softhsm2)'),
