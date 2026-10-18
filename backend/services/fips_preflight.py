@@ -23,6 +23,7 @@ import fips_mode
 from models import (CA, Certificate, CertificatePolicy, CertificateTemplate, DeployTarget,
                     DnsProvider, AcmeClientOrder, HsmKey, HsmProvider, MicrosoftCA,
                     SSHCertificate, SSHCertificateAuthority, SystemConfig, User, db)
+from security import encryption
 from security.encryption import decrypt_text
 from services.backup import container
 from services.backup.backup_service import _ARGON2_AVAILABLE
@@ -31,7 +32,7 @@ from services.backup.settings_contract import scheduled_kdf
 from services.tsa_service import tsa_is_enabled
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
-from utils.db_url import postgres_tls_problem
+from utils.db_url import postgres_gssenc_problem, postgres_tls_problem
 from utils.key_codec import eddsa_key_name
 
 logger = logging.getLogger(__name__)
@@ -235,6 +236,17 @@ def _deploy_eddsa():
     return found
 
 
+@detector('deploy.ssh_eddsa_host_key', BLOCKER,
+          'Deployment targets pinned to an Ed25519 host key: deployments fail in FIPS mode '
+          'until the pin is reset',
+          'Make sure each host also has an ECDSA or RSA host key, then reset the pinned host key '
+          'of the target: the next connection pins that key.')
+def _deploy_eddsa_host_key():
+    rows = DeployTarget.query.with_entities(DeployTarget.id, DeployTarget.name, DeployTarget.host_key)
+    return [_named(r.name, r.id) for r in rows.order_by(DeployTarget.id).all()
+            if str(r.host_key or '').startswith('ssh-ed25519 ')]
+
+
 def _configured_certificate(key: str, by: str):
     rows = SystemConfig.query.filter(SystemConfig.key.like(f'{key}%')).all()
     for row in rows:
@@ -411,7 +423,9 @@ def _tsig_md5():
 
 @detector('msca.winrm_ntlm', BLOCKER,
           'Microsoft CA connections whose WinRM channel uses NTLM: the channel is refused in FIPS mode',
-          'Switch the WinRM transport of these connections to Kerberos.')
+          'Turn off the WinRM channel of these connections. Kerberos replaces NTLM only on a '
+          'native install with pywinrm[kerberos] and a Kerberos library built on the system '
+          'OpenSSL (RHEL); the Docker image has neither.')
 def _msca_ntlm():
     rows = MicrosoftCA.query.filter(MicrosoftCA.winrm_enabled.is_(True)).order_by(MicrosoftCA.id).all()
     return [_named(m.name, m.id) for m in rows
@@ -459,6 +473,28 @@ def _backup_archives():
 def _database():
     problem = postgres_tls_problem(current_app.config.get('SQLALCHEMY_DATABASE_URI') or '')
     return [f'DATABASE_URL: {problem}'] if problem else []
+
+
+@detector('database.postgres_gssenc', BLOCKER,
+          'PostgreSQL is set to use GSSAPI encryption, which runs in the Kerberos library '
+          'outside the FIPS module: UCM refuses to start in FIPS mode',
+          'Remove gssencmode from DATABASE_URL and PGGSSENCMODE from the environment, or set '
+          'them to disable: TLS then protects the connection.')
+def _database_gssenc():
+    problem = postgres_gssenc_problem(current_app.config.get('SQLALCHEMY_DATABASE_URI') or '')
+    return [f'DATABASE_URL: {problem}'] if problem else []
+
+
+@detector('keys.no_master_key', WARNING,
+          'No master key is configured: CA and certificate private keys are stored unencrypted '
+          'in the database',
+          'Enable private key encryption in Settings > Security, or provide '
+          '/etc/ucm/master.key or KEY_ENCRYPTION_KEY; with UCM_REQUIRE_KEY_ENCRYPTION=true, '
+          'UCM then refuses to start without one.')
+def _no_master_key():
+    if encryption.key_encryption.is_enabled:
+        return []
+    return [f'{encryption.MASTER_KEY_PATH}, KEY_ENCRYPTION_KEY']
 
 
 @detector('https.unapproved_key', BLOCKER,

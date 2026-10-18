@@ -33,6 +33,15 @@ _CERTUTIL_UNREVOKE = -1
 _SERIAL_RE = re.compile(r'^[0-9a-fA-F]+$')
 
 
+def kerberos_transport_available() -> bool:
+    """Whether pywinrm can use Kerberos here (pykerberos installed)."""
+    try:
+        from winrm.transport import HAVE_KERBEROS
+    except ImportError:
+        return False
+    return bool(HAVE_KERBEROS)
+
+
 class MSCAAdminChannelError(Exception):
     """Raised for admin-channel configuration or remote-execution failures."""
 
@@ -189,8 +198,12 @@ class MicrosoftCAAdminChannelMixin:
         import fips_mode
         if fips_mode.enabled():
             # NTLM hashes with MD4/MD5 outside the FIPS module
+            if kerberos_transport_available():
+                raise MSCAAdminChannelError(
+                    'NTLM is not available in FIPS mode: use the Kerberos transport')
             raise MSCAAdminChannelError(
-                'NTLM is not available in FIPS mode: use the Kerberos transport')
+                'NTLM is not available in FIPS mode and the Kerberos transport is not '
+                'installed (pywinrm[kerberos]): turn off the WinRM channel of this connection')
         username = msca.winrm_effective_username
         password = msca.winrm_effective_password
         if not username or not password:

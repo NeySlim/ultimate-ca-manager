@@ -2994,6 +2994,10 @@
           "title": "Ed25519 SSH 鍵でログインするデプロイ先：FIPS モードではデプロイが失敗します",
           "remedy": "各デプロイ先に新しい ECDSA または RSA 鍵を設定し、その公開鍵をホストに登録してください。"
         },
+        "deploy_ssh_eddsa_host_key": {
+          "title": "Ed25519 ホスト鍵に固定されたデプロイ先：固定をリセットするまで、FIPS モードではデプロイが失敗します",
+          "remedy": "各ホストに ECDSA または RSA のホスト鍵もあることを確認してから、デプロイ先の固定済みホスト鍵をリセットしてください。次回の接続でその鍵が固定されます。"
+        },
         "ocsp_responder_unapproved_key": {
           "title": "Ed25519/Ed448 または脆弱な鍵を持つ委任 OCSP レスポンダー：代わりに CA が署名します",
           "remedy": "新しい RSA または ECDSA のレスポンダー証明書を発行し、CA 設定で選択してください。"
@@ -3036,7 +3040,7 @@
         },
         "msca_winrm_ntlm": {
           "title": "WinRM チャネルが NTLM を使う Microsoft CA 接続：FIPS モードではチャネルが拒否されます",
-          "remedy": "これらの接続の WinRM トランスポートを Kerberos に切り替えてください。"
+          "remedy": "これらの接続の WinRM チャネルをオフにしてください。NTLM を Kerberos に置き換えられるのは、pywinrm[kerberos] とシステムの OpenSSL でビルドされた Kerberos ライブラリ (RHEL) を使うネイティブインストールのみです。Docker イメージはどちらも備えていません。"
         },
         "backup_schedule_argon2id": {
           "title": "スケジュールバックアップが Argon2id で書き込まれています：FIPS モードではこのアーカイブを復元できません",
@@ -3049,6 +3053,14 @@
         "database_postgres_without_tls": {
           "title": "PostgreSQL 接続が sslmode=require 以上の設定なしで TCP 上で動作しています。FIPS モードでは UCM は起動しません",
           "remedy": "サーバーで TLS を有効にし、DATABASE_URL に sslmode=require（または verify-full）を追加してください。同じホスト上のサーバーの場合は、代わりに Unix ソケット経由で接続してください：postgresql://ucm:<password>@/ucm?host=/var/run/postgresql"
+        },
+        "database_postgres_gssenc": {
+          "title": "PostgreSQL が GSSAPI 暗号化を使う設定になっています。これは FIPS モジュール外の Kerberos ライブラリで動作するため、FIPS モードでは UCM は起動しません",
+          "remedy": "DATABASE_URL から gssencmode を、環境変数から PGGSSENCMODE を削除するか、disable に設定してください。接続は TLS で保護されます。"
+        },
+        "keys_no_master_key": {
+          "title": "マスターキーが設定されていません。CA と証明書の秘密鍵は暗号化されずにデータベースに保存されます",
+          "remedy": "設定 > セキュリティで秘密鍵の暗号化を有効にするか、/etc/ucm/master.key または KEY_ENCRYPTION_KEY を指定してください。UCM_REQUIRE_KEY_ENCRYPTION=true の場合、マスターキーがないと UCM は起動しません。"
         },
         "https_unapproved_key": {
           "title": "HTTPS 証明書が Ed25519/Ed448 または脆弱な鍵です：FIPS モードではウェブサーバーが使用できません",

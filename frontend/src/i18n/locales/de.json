@@ -2994,6 +2994,10 @@
           "title": "Bereitstellungsziele, die sich mit einem Ed25519-SSH-Schlüssel anmelden: Bereitstellungen schlagen im FIPS-Modus fehl",
           "remedy": "Jedem Ziel einen neuen ECDSA- oder RSA-Schlüssel geben und seinen öffentlichen Schlüssel auf dem Host installieren."
         },
+        "deploy_ssh_eddsa_host_key": {
+          "title": "Bereitstellungsziele mit festgelegtem Ed25519-Host-Schlüssel: Bereitstellungen schlagen im FIPS-Modus fehl, bis die Festlegung zurückgesetzt wird",
+          "remedy": "Sicherstellen, dass jeder Host auch einen ECDSA- oder RSA-Host-Schlüssel hat, und dann den festgelegten Host-Schlüssel des Ziels zurücksetzen: Bei der nächsten Verbindung wird dieser Schlüssel festgelegt."
+        },
         "ocsp_responder_unapproved_key": {
           "title": "Delegierte OCSP-Responder mit Ed25519/Ed448- oder schwachem Schlüssel: Stattdessen signiert die CA",
           "remedy": "Ein neues RSA- oder ECDSA-Responder-Zertifikat ausstellen und in den CA-Einstellungen auswählen."
@@ -3036,7 +3040,7 @@
         },
         "msca_winrm_ntlm": {
           "title": "Microsoft-CA-Verbindungen, deren WinRM-Kanal NTLM verwendet: Der Kanal wird im FIPS-Modus abgelehnt",
-          "remedy": "Den WinRM-Transport dieser Verbindungen auf Kerberos umstellen."
+          "remedy": "Den WinRM-Kanal dieser Verbindungen deaktivieren. Kerberos ersetzt NTLM nur bei einer nativen Installation mit pywinrm[kerberos] und einer Kerberos-Bibliothek, die gegen das System-OpenSSL gebaut ist (RHEL); das Docker-Image bietet beides nicht."
         },
         "backup_schedule_argon2id": {
           "title": "Geplante Sicherungen werden mit Argon2id geschrieben: Solche Archive lassen sich im FIPS-Modus nicht wiederherstellen",
@@ -3049,6 +3053,14 @@
         "database_postgres_without_tls": {
           "title": "Die PostgreSQL-Verbindung läuft über TCP ohne sslmode=require oder strenger: UCM startet im FIPS-Modus nicht",
           "remedy": "TLS auf dem Server aktivieren und sslmode=require (oder verify-full) zu DATABASE_URL hinzufügen; bei einem Server auf demselben Host stattdessen über dessen Unix-Socket verbinden: postgresql://ucm:<password>@/ucm?host=/var/run/postgresql"
+        },
+        "database_postgres_gssenc": {
+          "title": "PostgreSQL ist auf GSSAPI-Verschlüsselung eingestellt, die in der Kerberos-Bibliothek außerhalb des FIPS-Moduls läuft: UCM startet im FIPS-Modus nicht",
+          "remedy": "gssencmode aus DATABASE_URL und PGGSSENCMODE aus der Umgebung entfernen oder auf disable setzen: TLS schützt die Verbindung dann."
+        },
+        "keys_no_master_key": {
+          "title": "Es ist kein Master-Schlüssel konfiguriert: Private Schlüssel von CAs und Zertifikaten werden unverschlüsselt in der Datenbank gespeichert",
+          "remedy": "Die Verschlüsselung privater Schlüssel unter Einstellungen > Sicherheit aktivieren oder /etc/ucm/master.key bzw. KEY_ENCRYPTION_KEY bereitstellen; mit UCM_REQUIRE_KEY_ENCRYPTION=true startet UCM ohne einen solchen Schlüssel nicht."
         },
         "https_unapproved_key": {
           "title": "Das HTTPS-Zertifikat hat einen Ed25519/Ed448- oder schwachen Schlüssel: Der Webserver kann es im FIPS-Modus nicht verwenden",

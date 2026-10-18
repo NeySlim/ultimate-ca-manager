@@ -2995,6 +2995,10 @@
           "title": "Deployment targets that sign in with an Ed25519 SSH key: deployments fail in FIPS mode",
           "remedy": "Give each target a new ECDSA or RSA key and install its public key on the host."
         },
+        "deploy_ssh_eddsa_host_key": {
+          "title": "Deployment targets pinned to an Ed25519 host key: deployments fail in FIPS mode until the pin is reset",
+          "remedy": "Make sure each host also has an ECDSA or RSA host key, then reset the pinned host key of the target: the next connection pins that key."
+        },
         "ocsp_responder_unapproved_key": {
           "title": "Delegated OCSP responders with an Ed25519/Ed448 or weak key: the CA signs instead",
           "remedy": "Issue a new RSA or ECDSA responder certificate and select it in the CA settings."
@@ -3037,7 +3041,7 @@
         },
         "msca_winrm_ntlm": {
           "title": "Microsoft CA connections whose WinRM channel uses NTLM: the channel is refused in FIPS mode",
-          "remedy": "Switch the WinRM transport of these connections to Kerberos."
+          "remedy": "Turn off the WinRM channel of these connections. Kerberos replaces NTLM only on a native install with pywinrm[kerberos] and a Kerberos library built on the system OpenSSL (RHEL); the Docker image has neither."
         },
         "backup_schedule_argon2id": {
           "title": "Scheduled backups are written with Argon2id: such archives cannot be restored in FIPS mode",
@@ -3050,6 +3054,14 @@
         "database_postgres_without_tls": {
           "title": "The PostgreSQL connection runs over TCP without sslmode=require or stricter: UCM refuses to start in FIPS mode",
           "remedy": "Enable TLS on the server and add sslmode=require (or verify-full) to DATABASE_URL; for a server on the same host, connect through its Unix socket instead: postgresql://ucm:<password>@/ucm?host=/var/run/postgresql"
+        },
+        "database_postgres_gssenc": {
+          "title": "PostgreSQL is set to use GSSAPI encryption, which runs in the Kerberos library outside the FIPS module: UCM refuses to start in FIPS mode",
+          "remedy": "Remove gssencmode from DATABASE_URL and PGGSSENCMODE from the environment, or set them to disable: TLS then protects the connection."
+        },
+        "keys_no_master_key": {
+          "title": "No master key is configured: CA and certificate private keys are stored unencrypted in the database",
+          "remedy": "Enable private key encryption in Settings > Security, or provide /etc/ucm/master.key or KEY_ENCRYPTION_KEY; with UCM_REQUIRE_KEY_ENCRYPTION=true, UCM then refuses to start without one."
         },
         "https_unapproved_key": {
           "title": "The HTTPS certificate has an Ed25519/Ed448 or weak key: the web server cannot use it in FIPS mode",

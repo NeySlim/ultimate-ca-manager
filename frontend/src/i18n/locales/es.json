@@ -2994,6 +2994,10 @@
           "title": "Destinos de despliegue que inician sesión con una clave SSH Ed25519: los despliegues fallan en modo FIPS",
           "remedy": "Asigne a cada destino una nueva clave ECDSA o RSA e instale su clave pública en el host."
         },
+        "deploy_ssh_eddsa_host_key": {
+          "title": "Destinos de despliegue con la clave de host fijada en Ed25519: los despliegues fallan en modo FIPS hasta que se restablezca la fijación",
+          "remedy": "Asegúrese de que cada host tenga también una clave de host ECDSA o RSA y restablezca la clave de host fijada del destino: la siguiente conexión fijará esa clave."
+        },
         "ocsp_responder_unapproved_key": {
           "title": "Respondedores OCSP delegados con clave Ed25519/Ed448 o débil: firma la CA en su lugar",
           "remedy": "Emita un nuevo certificado de respondedor RSA o ECDSA y selecciónelo en la configuración de la CA."
@@ -3036,7 +3040,7 @@
         },
         "msca_winrm_ntlm": {
           "title": "Conexiones a CA de Microsoft cuyo canal WinRM usa NTLM: el canal se rechaza en modo FIPS",
-          "remedy": "Cambie el transporte WinRM de estas conexiones a Kerberos."
+          "remedy": "Desactive el canal WinRM de estas conexiones. Kerberos sustituye a NTLM solo en una instalación nativa con pywinrm[kerberos] y una biblioteca Kerberos compilada con el OpenSSL del sistema (RHEL); la imagen de Docker no tiene ninguno de los dos."
         },
         "backup_schedule_argon2id": {
           "title": "Las copias de seguridad programadas se escriben con Argon2id: esos archivos no se pueden restaurar en modo FIPS",
@@ -3049,6 +3053,14 @@
         "database_postgres_without_tls": {
           "title": "La conexión PostgreSQL se realiza por TCP sin sslmode=require ni más estricto: UCM se niega a iniciar en modo FIPS",
           "remedy": "Active TLS en el servidor y añada sslmode=require (o verify-full) a DATABASE_URL; si el servidor está en el mismo host, conéctese en su lugar mediante su socket Unix: postgresql://ucm:<password>@/ucm?host=/var/run/postgresql"
+        },
+        "database_postgres_gssenc": {
+          "title": "PostgreSQL está configurado para usar el cifrado GSSAPI, que se ejecuta en la biblioteca Kerberos fuera del módulo FIPS: UCM se niega a iniciar en modo FIPS",
+          "remedy": "Elimine gssencmode de DATABASE_URL y PGGSSENCMODE del entorno, o establézcalos en disable: TLS protegerá entonces la conexión."
+        },
+        "keys_no_master_key": {
+          "title": "No hay ninguna clave maestra configurada: las claves privadas de las CA y de los certificados se almacenan sin cifrar en la base de datos",
+          "remedy": "Active el cifrado de claves privadas en Configuración > Seguridad, o proporcione /etc/ucm/master.key o KEY_ENCRYPTION_KEY; con UCM_REQUIRE_KEY_ENCRYPTION=true, UCM se niega a iniciar sin una."
         },
         "https_unapproved_key": {
           "title": "El certificado HTTPS tiene una clave Ed25519/Ed448 o débil: el servidor web no puede usarlo en modo FIPS",

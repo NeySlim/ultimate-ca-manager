@@ -247,6 +247,16 @@ def test_deploy_ssh_eddsa_key(session):
     _assert_found('deploy.ssh_eddsa_key', 1, 'edwards-host')
 
 
+def test_deploy_ssh_eddsa_host_key(session):
+    for name, pin in (('edwards-pin', 'ssh-ed25519 AAAAC3NzaC1lZDI1NTE5AAAAIEd'),
+                      ('ecdsa-pin', 'ecdsa-sha2-nistp256 AAAAE2VjZHNh'), ('no-pin', None)):
+        session.add(DeployTarget(name=name, host=name, username='u', private_key='x',
+                                 host_key=pin))
+    session.flush()
+    finding = _assert_found('deploy.ssh_eddsa_host_key', 1, 'edwards-pin')
+    assert finding['severity'] == 'blocker'
+
+
 def test_ocsp_responder_unapproved_key(session):
     responder = _leaf('ocsp-responder', _ed25519())
     _config('ocsp_responder_cert_1', str(responder.id))
@@ -345,7 +355,9 @@ def test_msca_winrm_ntlm(session):
         session.add(MicrosoftCA(name=name, server='adcs', auth_method='basic',
                                 winrm_enabled=enabled, winrm_transport=transport))
     session.flush()
-    _assert_found('msca.winrm_ntlm', 1, 'ntlm-ca')
+    finding = _assert_found('msca.winrm_ntlm', 1, 'ntlm-ca')
+    # Kerberos is no way out in the Docker image (no pykerberos, Kerberos crypto outside OpenSSL)
+    assert finding['remedy'].startswith('Turn off the WinRM channel')
 
 
 @pytest.mark.parametrize('kdf, flagged', [('argon2id', True), ('pbkdf2', False)])
@@ -400,6 +412,34 @@ def test_postgres_gssenc_problem(url, env, problem):
     assert postgres_gssenc_problem(url, env) == problem
 
 
+@pytest.mark.parametrize('url, env, flagged', [
+    ('postgresql+psycopg2://ucm:pw@db.example/ucm?sslmode=require&gssencmode=prefer', None, True),
+    ('postgresql+psycopg2://ucm:pw@db.example/ucm?sslmode=require', 'require', True),
+    ('postgresql+psycopg2://ucm:pw@db.example/ucm?sslmode=require', None, False),
+])
+def test_database_postgres_gssenc(session, app, monkeypatch, url, env, flagged):
+    monkeypatch.setitem(app.config, 'SQLALCHEMY_DATABASE_URI', url)
+    if env:
+        monkeypatch.setenv('PGGSSENCMODE', env)
+    else:
+        monkeypatch.delenv('PGGSSENCMODE', raising=False)
+    finding = _finding(fips_preflight.run(), 'database.postgres_gssenc')
+    assert (finding is not None) is flagged
+    if flagged:
+        assert finding['severity'] == 'blocker' and 'gssencmode=' in finding['examples'][0]
+
+
+@pytest.mark.parametrize('enabled', [False, True])
+def test_keys_no_master_key(session, monkeypatch, enabled):
+    from security import encryption
+    monkeypatch.setattr(encryption.key_encryption, '_enabled', enabled)
+    finding = _finding(fips_preflight.run(), 'keys.no_master_key')
+    assert (finding is not None) is not enabled
+    if finding:
+        assert finding['severity'] == 'warning'
+        assert finding['examples'] == [f'{encryption.MASTER_KEY_PATH}, KEY_ENCRYPTION_KEY']
+
+
 def test_https_unapproved_key(session, app, tmp_path, monkeypatch):
     path = tmp_path / 'https_cert.pem'
     path.write_bytes(_certificate(ed25519.Ed25519PrivateKey.generate()).public_bytes(
@@ -411,7 +451,9 @@ def test_https_unapproved_key(session, app, tmp_path, monkeypatch):
 # --- the whole run ------------------------------------------------------------
 
 def test_a_clean_instance_has_nothing_to_report(session, app, tmp_path, monkeypatch):
+    from security import encryption
     from services.template_service import TemplateService
+    monkeypatch.setattr(encryption.key_encryption, '_enabled', True)
     TemplateService.seed_system_templates()
     session.add(User(username='admin-clean', email='a@example.com',
                      password_hash=hash_password('a long password')))
@@ -436,7 +478,9 @@ def test_a_clean_instance_has_nothing_to_report(session, app, tmp_path, monkeypa
     assert set(report['checked']) == {d.id for d in fips_preflight.DETECTORS}
 
 
-def test_findings_are_ordered_and_counted(session):
+def test_findings_are_ordered_and_counted(session, monkeypatch):
+    from security import encryption
+    monkeypatch.setattr(encryption.key_encryption, '_enabled', True)
     _leaf('info-leaf', _ed25519())
     session.add(HsmProvider(name='Cloud', type='google-kms', config='{}'))
     session.add(User(username='blocked', email='b@example.com', password_hash=SCRYPT_HASH))
@@ -472,3 +516,14 @@ def test_detector_ids_are_unique_and_severities_known():
     assert len(ids) == len(set(ids))
     assert {d.severity for d in fips_preflight.DETECTORS} <= set(fips_preflight.SEVERITIES)
     assert all(d.remedy and d.title for d in fips_preflight.DETECTORS)
+
+
+def test_every_check_has_its_english_strings_in_the_interface():
+    """The panel shows the en.json strings: they must say what the report says."""
+    path = os.path.join(os.path.dirname(__file__), '..', '..', 'frontend', 'src', 'i18n',
+                        'locales', 'en.json')
+    with open(path, encoding='utf-8') as handle:
+        checks = json.load(handle)['settings']['fipsPreflight']['checks']
+    for item in fips_preflight.DETECTORS:
+        key = item.id.replace('.', '_')
+        assert checks.get(key) == {'title': item.title, 'remedy': item.remedy}, item.id

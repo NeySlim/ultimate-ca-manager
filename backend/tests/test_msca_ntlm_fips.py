@@ -47,16 +47,31 @@ def test_saving_an_ntlm_channel_is_refused_and_nothing_changes(app, auth_client,
         assert db.session.get(MicrosoftCA, msca_id).winrm_transport == 'kerberos'
 
 
-def test_a_stored_ntlm_connection_is_not_opened(app, fips):
+@pytest.mark.parametrize('kerberos, advice', [
+    (True, 'use the Kerberos transport'),
+    (False, 'the Kerberos transport is not installed (pywinrm[kerberos]): turn off the WinRM'),
+])
+def test_a_stored_ntlm_connection_is_not_opened(app, fips, monkeypatch, kerberos, advice):
+    from services.msca import admin_channel
     from services.msca.admin_channel import MicrosoftCAAdminChannelMixin, MSCAAdminChannelError
-    msca_id, _, _ = _make_msca_cert(app, 'ntlm-stored.fips.local')
+    monkeypatch.setattr(admin_channel, 'kerberos_transport_available', lambda: kerberos)
+    msca_id, _, _ = _make_msca_cert(app, ('krb' if kerberos else 'nokrb') + '-ntlm.fips.local')
     with app.app_context():
         from models import db
         from models.msca import MicrosoftCA
         msca = db.session.get(MicrosoftCA, msca_id)
         msca.winrm_host = 'dc.fips.local'
-        with pytest.raises(MSCAAdminChannelError, match='NTLM is not available in FIPS mode'):
+        with pytest.raises(MSCAAdminChannelError, match='NTLM is not available in FIPS mode') as exc:
             MicrosoftCAAdminChannelMixin._build_session(msca)
+    assert advice in str(exc.value)
+
+
+def test_kerberos_availability_is_what_pywinrm_says(monkeypatch):
+    import winrm.transport
+    from services.msca.admin_channel import kerberos_transport_available
+    for have in (True, False):
+        monkeypatch.setattr(winrm.transport, 'HAVE_KERBEROS', have)
+        assert kerberos_transport_available() is have
 
 
 def test_ntlm_still_works_outside_fips(app):

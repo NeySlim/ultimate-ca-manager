@@ -2994,6 +2994,10 @@
           "title": "使用 Ed25519 SSH 密钥登录的部署目标：FIPS 模式下部署将失败",
           "remedy": "请为每个目标配置新的 ECDSA 或 RSA 密钥，并将其公钥安装到主机上。"
         },
+        "deploy_ssh_eddsa_host_key": {
+          "title": "部署目标已固定 Ed25519 主机密钥：重置固定之前，FIPS 模式下部署将失败",
+          "remedy": "请确保每台主机同时具有 ECDSA 或 RSA 主机密钥，然后重置该目标已固定的主机密钥：下次连接时将固定该密钥。"
+        },
         "ocsp_responder_unapproved_key": {
           "title": "使用 Ed25519/Ed448 或弱密钥的委派 OCSP 响应器：将改由 CA 签名",
           "remedy": "请签发新的 RSA 或 ECDSA 响应器证书，并在 CA 设置中选择它。"
@@ -3036,7 +3040,7 @@
         },
         "msca_winrm_ntlm": {
           "title": "WinRM 通道使用 NTLM 的 Microsoft CA 连接：FIPS 模式下该通道将被拒绝",
-          "remedy": "请将这些连接的 WinRM 传输方式改为 Kerberos。"
+          "remedy": "请关闭这些连接的 WinRM 通道。仅在原生安装且已安装 pywinrm[kerberos]，并使用基于系统 OpenSSL 构建的 Kerberos 库（RHEL）时，Kerberos 才能取代 NTLM；Docker 镜像两者都不具备。"
         },
         "backup_schedule_argon2id": {
           "title": "计划备份使用 Argon2id 写入：此类归档在 FIPS 模式下无法恢复",
@@ -3049,6 +3053,14 @@
         "database_postgres_without_tls": {
           "title": "PostgreSQL 连接通过 TCP 运行，且未设置 sslmode=require 或更严格的模式：FIPS 模式下 UCM 拒绝启动",
           "remedy": "请在服务器上启用 TLS，并在 DATABASE_URL 中添加 sslmode=require（或 verify-full）；若服务器与 UCM 位于同一主机，请改为通过其 Unix 套接字连接：postgresql://ucm:<password>@/ucm?host=/var/run/postgresql"
+        },
+        "database_postgres_gssenc": {
+          "title": "PostgreSQL 被设置为使用 GSSAPI 加密，该加密在 FIPS 模块之外的 Kerberos 库中运行：FIPS 模式下 UCM 拒绝启动",
+          "remedy": "请从 DATABASE_URL 中移除 gssencmode，并从环境变量中移除 PGGSSENCMODE，或将它们设置为 disable：此后由 TLS 保护连接。"
+        },
+        "keys_no_master_key": {
+          "title": "未配置主密钥：CA 和证书的私钥以未加密形式存储在数据库中",
+          "remedy": "请在 设置 > 安全 中启用私钥加密，或提供 /etc/ucm/master.key 或 KEY_ENCRYPTION_KEY；若设置 UCM_REQUIRE_KEY_ENCRYPTION=true，则没有主密钥时 UCM 将拒绝启动。"
         },
         "https_unapproved_key": {
           "title": "HTTPS 证书使用 Ed25519/Ed448 或弱密钥：Web 服务器在 FIPS 模式下无法使用它",
