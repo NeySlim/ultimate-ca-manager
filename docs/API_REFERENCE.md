@@ -122,6 +122,30 @@ Content-Type: application/json
 }
 ```
 
+### Second factor after a password
+When the password login answers `"requires_2fa": true`, its `methods` list says which second factors the account has: `totp` (code or recovery code) and/or `webauthn` (a registered security key). A security key also satisfies enforced 2FA in place of enrolling TOTP.
+```http
+# TOTP code or recovery code
+POST /api/v2/auth/login/2fa
+{ "code": "123456" }
+
+# Security key: options bound to this login session, then one verification attempt per challenge
+POST /api/v2/auth/login/2fa/webauthn/options
+POST /api/v2/auth/login/2fa/webauthn/verify
+{ "response": { ... } }  // from navigator.credentials.get()
+```
+Failures with either factor count toward the same 2FA lockout.
+
+A user can also make a key the second factor of password logins without enforcement:
+```http
+PUT /api/v2/account/2fa/webauthn
+{ "enabled": true }                          // needs an enabled key
+{ "enabled": false, "password": "..." }      // the account password (local accounts)
+```
+`GET /api/v2/account/profile` reports `webauthn_2fa`, `two_factor_enforced` and `two_factor_methods` (the factors a password login asks for).
+
+Under enforced 2FA, a forced-enrolment session may register a key (`/api/v2/webauthn/register/*`) instead of confirming TOTP. `POST /api/v2/account/2fa/disable` and removing or disabling one's own last key answer 403 when required 2FA (enforced, or a key turned on as second factor) would be left with neither TOTP nor an enabled key; an administrator can still remove another user's lost key, and `POST /api/v2/users/{id}/reset-2fa` also turns the key second factor off, as does removing or disabling the account's last enabled key.
+
 ### Login with mTLS
 ```http
 POST /api/v2/auth/login/mtls
@@ -289,6 +313,8 @@ POST /api/v2/account/apikeys/{key_id}/regenerate
 # Delete API key
 DELETE /api/v2/account/apikeys/{key_id}
 ```
+
+A key is sent as `X-API-Key: ucm_ak_...` or, equivalently, `Authorization: Bearer ucm_ak_...`. Both get the key's scopes and need no CSRF token; a key that fails is refused (401) even when a session cookie is present.
 
 ### WebAuthn Credentials
 
@@ -3211,7 +3237,7 @@ UCM provides 6 built-in report types, an executive PDF report, and a full report
 | Type Key | Description |
 |----------|-------------|
 | `expiring_certificates` | Certificates expiring within N days |
-| `revoked_certificates` | All revoked certificates with revocation reason |
+| `revoked_certificates` | Certificates revoked within the period, with revocation date and reason |
 | `ca_hierarchy` | CA tree with issued certificate counts |
 | `audit_summary` | Audit log activity grouped by action type |
 | `compliance_status` | Policy compliance across all certificates |
@@ -3279,7 +3305,9 @@ Content-Type: application/json
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `report_type` | string | Yes | One of the 6 report type keys |
-| `params.days` | integer | No | Look-ahead days (for `expiring_certificates`, default: 30) |
+| `params.days` | integer | No | Look-ahead days for `expiring_certificates`, look-back period for `revoked_certificates` and `audit_summary` (default: 30) |
+| `params.reason` | string | No | `revoked_certificates` only: keep one RFC 5280 reason (e.g. `keyCompromise`) |
+| `params.format` | string | No | `json` (default) or `csv` |
 
 **Response:**
 ```json
@@ -3328,7 +3356,7 @@ GET /api/v2/reports/schedule
       "recipients": ["admin@example.com"],
       "format": "csv"
     },
-    "revoked_certificates": {
+    "pdf_compliance": {
       "enabled": false,
       "frequency": "monthly",
       "time": "09:00",
@@ -3347,31 +3375,31 @@ PUT /api/v2/reports/schedule
 Content-Type: application/json
 
 {
-  "report_type": "expiring_certificates",
-  "config": {
+  "expiring_certificates": {
     "enabled": true,
     "frequency": "weekly",
     "time": "08:00",
     "day_of_week": 1,
     "day_of_month": 1,
     "recipients": ["admin@example.com", "security@example.com"],
-    "format": "csv"
+    "format": "json"
   }
 }
 ```
+
+The body maps schedule keys to their configuration. Keys are the report type keys, plus `pdf_<template>` for the PDF templates (`pdf_executive`, `pdf_certificate_inventory`, `pdf_compliance`, `pdf_ca_overview`, `pdf_security_audit`). The report is emailed as an attachment in the schedule's format: CSV or JSON for data reports, PDF for templates.
 
 **Schedule Config Fields:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `report_type` | string | Yes | One of the 6 report type keys |
-| `config.enabled` | boolean | Yes | Enable or disable the schedule |
-| `config.frequency` | string | Yes | `daily`, `weekly`, or `monthly` |
-| `config.time` | string | Yes | Execution time in `HH:MM` (24-hour format) |
-| `config.day_of_week` | integer | No | For weekly: `0` (Mon) – `6` (Sun) |
-| `config.day_of_month` | integer | No | For monthly: `1` – `28` |
-| `config.recipients` | array | Yes | Email addresses (max 50) |
-| `config.format` | string | Yes | `csv`, `json`, or `pdf` |
+| `enabled` | boolean | Yes | Enable or disable the schedule |
+| `frequency` | string | Yes | `daily`, `weekly`, or `monthly` |
+| `time` | string | Yes | Execution time in `HH:MM` (24-hour format) |
+| `day_of_week` | integer | No | For weekly: `0` (Mon) – `6` (Sun) |
+| `day_of_month` | integer | No | For monthly: `1` – `28` |
+| `recipients` | array | Yes | Email addresses (max 50) |
+| `format` | string | No | `csv` (default) or `json`; always `pdf` for `pdf_<template>` keys |
 
 ### Send Test Report
 ```http
@@ -3384,14 +3412,15 @@ Content-Type: application/json
 }
 ```
 
-Generates the report immediately and sends it to the specified recipient. Use this to verify email delivery and report content before enabling a schedule.
+Generates the report immediately and sends it to the specified recipient, attached in the schedule's saved format. Use this to verify email delivery and report content before enabling a schedule. Answers 502 when the email could not be sent.
 
 **Parameters:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `report_type` | string | Yes | One of the 6 report type keys |
+| `report_type` | string | Yes | A schedule key (report type or `pdf_<template>`) |
 | `recipient` | string | Yes | Email address to send the test report to |
+| `format` | string | No | `csv` or `json`, overrides the saved format |
 
 ---
 

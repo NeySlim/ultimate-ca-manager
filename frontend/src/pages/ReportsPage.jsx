@@ -8,7 +8,7 @@ import {
   ChartBar, Download, PaperPlaneTilt, CalendarBlank, FileText,
   FileCsv, FileJs, Play, CheckCircle, Clock, Gear, FilePdf,
   Certificate, ShieldCheck, ClockCounterClockwise, Gavel, TreeStructure,
-  Checks, SlidersHorizontal, FileArrowDown
+  Checks, SlidersHorizontal, FileArrowDown, XCircle
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, Card, Button, Badge, Input, Modal,
@@ -25,6 +25,7 @@ const REPORT_ICONS = {
   ca_hierarchy: TreeStructure,
   audit_summary: ClockCounterClockwise,
   compliance_status: Gavel,
+  revoked_certificates: XCircle,
 }
 
 const REPORT_VARIANTS = {
@@ -33,6 +34,7 @@ const REPORT_VARIANTS = {
   ca_hierarchy: 'success',
   audit_summary: 'default',
   compliance_status: 'danger',
+  revoked_certificates: 'danger',
 }
 
 export default function ReportsPage() {
@@ -78,6 +80,7 @@ export default function ReportsPage() {
     { key: 'ca_hierarchy', icon: TreeStructure, label: t('reports.types.ca_hierarchy.name', { defaultValue: 'CA Hierarchy' }), variant: 'success', group: 'data' },
     { key: 'audit_summary', icon: ClockCounterClockwise, label: t('reports.types.audit_summary.name', { defaultValue: 'Audit Summary' }), variant: 'default', group: 'data' },
     { key: 'compliance_status', icon: Gavel, label: t('reports.types.compliance_status.name', { defaultValue: 'Compliance Status' }), variant: 'danger', group: 'data' },
+    { key: 'revoked_certificates', icon: XCircle, label: t('reports.types.revoked_certificates.name', { defaultValue: 'Revoked Certificates' }), variant: 'danger', group: 'data' },
     // PDF templates
     { key: 'pdf_executive', icon: FilePdf, label: t('reports.pdf.template.executive.name', { defaultValue: 'Executive Summary' }), variant: 'purple', formatLocked: 'pdf', group: 'pdf' },
     { key: 'pdf_certificate_inventory', icon: FilePdf, label: t('reports.pdf.template.certificate_inventory.name', { defaultValue: 'Certificate Inventory' }), variant: 'purple', formatLocked: 'pdf', group: 'pdf' },

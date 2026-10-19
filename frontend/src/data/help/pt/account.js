@@ -89,6 +89,10 @@ Registre chaves de segurança de hardware ou autenticadores biométricos:
 3. Siga o prompt do navegador para autenticar
 4. A chave aparece na sua lista de credenciais registradas
 
+Com 2FA ativada ou obrigatória, uma chave registrada também pode concluir a segunda etapa de um login com senha: escolha **Usar uma chave de segurança**.
+
+Sem um aplicativo autenticador, ative **Chave de segurança como segundo fator** na seção de autenticação de dois fatores: cada login com senha passa a pedir uma das suas chaves, e a última chave não pode ser removida enquanto a opção estiver ativa.
+
 ### Certificados mTLS
 Gerencie certificados de cliente para autenticação TLS mútua:
 - Enviar um certificado de cliente
@@ -110,6 +114,8 @@ Inclua a chave no cabeçalho \`X-API-Key\`:
 \`\`\`
 X-API-Key: <sua-chave-de-api>
 \`\`\`
+
+Ou envie-a como token bearer: \`Authorization: Bearer <sua-chave-de-api>\`.
 
 ### Permissões
 As chaves de API herdam as permissões do perfil do seu usuário. Elas não podem ter mais acesso do que sua conta.

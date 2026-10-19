@@ -2168,6 +2168,10 @@ Register hardware security keys or biometric authenticators:
 3. Follow the browser prompt to authenticate
 4. The key appears in your registered credentials list
 
+With 2FA enabled or enforced, a registered key can also answer the second step of a password login: choose **Use a security key**.
+
+Without an authenticator app, turn on **Security key as second factor** in the Two-Factor Authentication section: every password login then asks for one of your keys, and the last key cannot be removed while it is on.
+
 ### mTLS Certificates
 Manage client certificates for mutual TLS authentication:
 - Upload a client certificate
@@ -2189,6 +2193,8 @@ Include the key in the \`X-API-Key\` header:
 \`\`\`
 X-API-Key: <your-api-key>
 \`\`\`
+
+Or send it as a bearer token: \`Authorization: Bearer <your-api-key>\`.
 
 ### Permissions
 API keys inherit your user role's permissions. They cannot have more access than your account.
@@ -2669,7 +2675,7 @@ Block specific IPs or CIDR ranges. All other IPs are allowed.
 ## Two-Factor Authentication
 
 ### Enforcement
-Require all users to enable 2FA. Users who haven't set up 2FA will be prompted on their next login.
+Require all users to enable 2FA. Users who haven't set up 2FA will be prompted on their next login. A TOTP app or a registered security key satisfies it, at enrolment and at login. While it is enforced, TOTP can be turned off only if a security key remains, and the last key removed only if TOTP remains. A user whose key became their second factor keeps it when enforcement is lifted.
 
 ### Supported Methods
 - **TOTP**: Time-based one-time passwords (authenticator apps)
@@ -2927,6 +2933,9 @@ Security events and user activity summary. Includes login attempts, certificate 
 ### Compliance Status
 Policy compliance and violation summary. Shows which certificates comply with your policies and which ones violate them. Required for regulatory compliance.
 
+### Revoked Certificates
+Certificates revoked during the chosen period (default: 30 days), with revocation date and reason. Review it to follow revocations and their causes.
+
 ## Executive PDF Report
 
 Click **Download PDF** in the top-right to generate a professional executive report suitable for management reviews, board presentations, and compliance audits.
@@ -2976,6 +2985,8 @@ Sends a policy compliance summary every week. Useful for ongoing compliance moni
 2. Enable the reports you want to schedule
 3. Add recipient email addresses (press Enter or click Add)
 4. Click Save
+
+Each scheduled report is attached to the email in its format: CSV or JSON for data reports, PDF for the PDF templates.
 
 ### Test Send
 Before enabling schedules, use the ✈️ button on any report row to send a test report to a specific email address. This verifies that SMTP is configured correctly and the report format meets your needs.

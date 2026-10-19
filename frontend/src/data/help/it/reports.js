@@ -12,6 +12,7 @@ export default {
           { label: 'Gerarchia CA', text: 'Struttura delle Autorità di certificazione e statistiche' },
           { label: 'Riepilogo audit', text: 'Riepilogo eventi di sicurezza e attività utente' },
           { label: 'Stato conformità', text: 'Riepilogo conformità e violazioni delle politiche' },
+          { label: 'Certificati revocati', text: 'Certificati revocati nel periodo, con data e motivo' },
         ]
       },
       {
@@ -59,6 +60,9 @@ Riepilogo eventi di sicurezza e attività utente. Include tentativi di accesso, 
 
 ### Stato conformità
 Riepilogo conformità e violazioni delle politiche. Mostra quali certificati sono conformi alle tue politiche e quali le violano. Necessario per la conformità normativa.
+
+### Certificati revocati
+Certificati revocati nel periodo scelto (predefinito: 30 giorni), con data e motivo della revoca. Consultalo per seguire le revoche e le loro cause.
 
 ## Report esecutivo PDF
 
@@ -109,6 +113,8 @@ Invia un riepilogo della conformità alle politiche ogni settimana. Utile per il
 2. Abilita i report che vuoi pianificare
 3. Aggiungi gli indirizzi email dei destinatari (premi Invio o clicca Aggiungi)
 4. Clicca Salva
+
+Ogni report programmato viene allegato all'e-mail nel suo formato: CSV o JSON per i report di dati, PDF per i modelli PDF.
 
 ### Invio di test
 Prima di abilitare le pianificazioni, usa il pulsante ✈️ su qualsiasi riga del report per inviare un report di test a un indirizzo email specifico. Questo verifica che SMTP sia configurato correttamente e che il formato del report soddisfi le tue esigenze.

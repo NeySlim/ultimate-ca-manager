@@ -141,6 +141,7 @@ def test_opnsense_ca_import_requires_write_cas(app, auth_client, monkeypatch):
         }),
         content_type='application/json',
     )
+    assert r_key.status_code == 201, r_key.data
     api_key = json.loads(r_key.data)['data']['key']
 
     client = app.test_client()

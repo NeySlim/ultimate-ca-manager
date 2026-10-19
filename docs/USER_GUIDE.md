@@ -214,6 +214,12 @@ Configure SSO in **Settings** → **SSO** tab (admin only). Each provider type s
 3. Insert and touch your hardware key
 4. Name the key for identification
 
+With 2FA enabled (or enforced by an administrator), a registered key can answer the second step of a password login: choose **Use a security key** instead of typing a code.
+
+When an administrator enforces 2FA, registering a key fulfils it as well as a TOTP app does; the account must keep at least one of the two.
+
+Without enforcement, turn on **Security key as second factor** under **Account** → **Security** to have every password login ask for one of your keys. Keys used only for passwordless login change nothing until you do.
+
 ---
 
 ## Protocol Configuration

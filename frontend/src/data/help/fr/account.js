@@ -89,6 +89,10 @@ Enregistrez des clés de sécurité matérielles ou des authentificateurs biomé
 3. Suivez l'invite du navigateur pour vous authentifier
 4. La clé apparaît dans la liste de vos identifiants enregistrés
 
+Avec la 2FA activée ou imposée, une clé enregistrée peut aussi valider la seconde étape d'une connexion par mot de passe : choisissez **Utiliser une clé de sécurité**.
+
+Sans application d'authentification, activez **Clé de sécurité comme second facteur** dans la section Authentification à deux facteurs : chaque connexion par mot de passe demande alors l'une de vos clés, et la dernière clé ne peut pas être supprimée tant que l'option est active.
+
 ### Certificats mTLS
 Gérez les certificats client pour l'authentification TLS mutuel :
 - Téléverser un certificat client
@@ -110,6 +114,8 @@ Incluez la clé dans l'en-tête \`X-API-Key\` :
 \`\`\`
 X-API-Key: <votre-cle-api>
 \`\`\`
+
+Ou envoyez-la comme jeton bearer : \`Authorization: Bearer <votre-cle-api>\`.
 
 ### Permissions
 Les clés API héritent des permissions du rôle de votre utilisateur. Elles ne peuvent pas avoir plus d'accès que votre compte.

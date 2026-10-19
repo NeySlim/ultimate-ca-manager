@@ -553,6 +553,10 @@
     "totpCode": "Código de verificación",
     "totpCodeRequired": "Ingrese un código de verificación de 6 dígitos",
     "invalidTotpCode": "Código de verificación inválido",
+    "twoFactorKeyDescription": "Confirme con su llave de seguridad",
+    "twoFactorUseSecurityKey": "Usar una llave de seguridad",
+    "twoFactorKeyCancelled": "Llave de seguridad cancelada.",
+    "twoFactorKeyFailed": "Error al verificar la llave de seguridad",
     "verifying": "Verificando...",
     "verify": "Verificar",
     "checkingMethods": "Detectando métodos de autenticación...",
@@ -3204,6 +3208,18 @@
     "expiresInDaysPlaceholder": "ej. 365 (vacío = sin caducidad)",
     "enroll2faRequired": "Se requiere autenticación de dos factores",
     "enroll2faReason": "Su administrador exige 2FA en su cuenta. Configúrela ahora para continuar.",
+    "enroll2faOrKey": "O registre una llave de seguridad en su lugar",
+    "keyAsSecondFactor": "Llave de seguridad como segundo factor",
+    "keyAsSecondFactorHint": "Un inicio de sesión con contraseña también pide una de sus llaves de seguridad",
+    "keyAsSecondFactorNoKey": "Registre una llave de seguridad abajo para usarla como segundo factor",
+    "turnOnKey2fa": "Activar",
+    "turnOffKey2fa": "Desactivar",
+    "enterPasswordToDisableKey2fa": "Introduzca su contraseña para dejar de pedir una llave de seguridad al iniciar sesión",
+    "key2faEnabled": "Su llave de seguridad es ahora su segundo factor",
+    "key2faDisabled": "Un inicio de sesión con contraseña ya no pide una llave de seguridad",
+    "activeSecondFactors": "Segundos factores activos",
+    "noSecondFactor": "ninguno",
+    "twoFactorEnforced": "exigido por su administrador",
     "twoFaSetupFailed": "No se pudo iniciar la configuración de 2FA",
     "twoFaEnabled": "Autenticación de dos factores activada",
     "backupCodesHint": "Guarde estos códigos de respaldo en un lugar seguro. Cada uno puede usarse una vez si pierde el acceso a su autenticador.",
@@ -4383,6 +4399,10 @@
       "compliance_status": {
         "name": "Estado de cumplimiento",
         "description": "Puntuaciones de cumplimiento y resumen de violaciones"
+      },
+      "revoked_certificates": {
+        "name": "Certificados revocados",
+        "description": "Certificados revocados durante el período, con fecha y motivo"
       }
     },
     "available": "disponibles",

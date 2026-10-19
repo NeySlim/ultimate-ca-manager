@@ -616,7 +616,7 @@ Users can create API keys for automation:
 1. Go to **Account** > **API Keys**
 2. Click **Generate Key**
 3. Copy key (shown only once)
-4. Use in `X-API-Key` header
+4. Use in the `X-API-Key` header, or as `Authorization: Bearer <key>`
 
 ---
 

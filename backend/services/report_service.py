@@ -8,6 +8,7 @@ import json
 import csv
 import io
 import base64
+import html
 from models import db, Certificate, CA, User, AuditLog, SystemConfig
 from services.email_service import EmailService
 import logging
@@ -42,7 +43,19 @@ class ReportService:
             'name': 'Compliance Status',
             'description': 'Policy compliance and violation summary',
         },
+        'revoked_certificates': {
+            'name': 'Revoked Certificates',
+            'description': 'Certificates revoked within the period, with date and reason',
+        },
     }
+
+    # Email attachment per data format; PDF schedules are 'pdf_<template>'.
+    ATTACHMENT_TYPES = {'csv': 'text/csv', 'json': 'application/json'}
+
+    @classmethod
+    def attachment_format(cls, value) -> str:
+        """The data format to attach: ``value`` when it is one, else CSV."""
+        return value if isinstance(value, str) and value in cls.ATTACHMENT_TYPES else 'csv'
     
     @classmethod
     def generate_report(cls, report_type: str, params: dict = None) -> dict:
@@ -65,6 +78,7 @@ class ReportService:
             'ca_hierarchy': cls._generate_ca_hierarchy,
             'audit_summary': cls._generate_audit_summary,
             'compliance_status': cls._generate_compliance_status,
+            'revoked_certificates': cls._generate_revoked_certificates,
         }
         
         if report_type not in generators:
@@ -175,6 +189,49 @@ class ReportService:
             },
         }
     
+    @classmethod
+    def _generate_revoked_certificates(cls, params: dict) -> dict:
+        """Certificates revoked in the last ``days`` days, optionally for one ``reason``."""
+        try:
+            days = min(max(int(params.get('days', 30)), 1), 3650)
+        except (TypeError, ValueError):
+            days = 30
+        since = utc_now() - timedelta(days=days)
+        query = Certificate.query.filter(
+            Certificate.revoked == True,  # noqa: E712
+            Certificate.revoked_at != None,  # noqa: E711
+            Certificate.revoked_at >= since,
+        )
+        reason = params.get('reason')
+        if reason:
+            query = query.filter(Certificate.revoke_reason == str(reason)[:100])
+
+        items, by_reason = [], {}
+        for cert in query.order_by(Certificate.revoked_at.desc()).all():
+            cert_reason = cert.revoke_reason or 'unspecified'
+            by_reason[cert_reason] = by_reason.get(cert_reason, 0) + 1
+            items.append({
+                'id': cert.id,
+                'common_name': cert.common_name,
+                'serial_number': cert.serial_number,
+                'issuer': cert.issuer,
+                'revoked_at': cert.revoked_at,
+                'revoke_reason': cert_reason,
+                'valid_to': cert.valid_to,
+                'source': cert.source,
+            })
+
+        return {
+            'items': items,
+            'columns': ['id', 'common_name', 'serial_number', 'issuer',
+                        'revoked_at', 'revoke_reason', 'valid_to', 'source'],
+            'summary': {
+                'total_revoked': len(items),
+                'period_days': days,
+                'by_reason': by_reason,
+            },
+        }
+
     @classmethod
     def _generate_ca_hierarchy(cls, params: dict) -> dict:
         """Generate CA hierarchy report"""
@@ -366,23 +423,18 @@ class ReportService:
         return output.getvalue()
     
     @classmethod
-    def send_scheduled_report(cls, report_type: str, recipients: list, params: dict = None):
-        """
-        Generate and email a scheduled report.
-        
-        Args:
-            report_type: Type of report to generate
-            recipients: List of email addresses
-            params: Report parameters
+    def send_scheduled_report(cls, report_type: str, recipients: list, params: dict = None) -> bool:
+        """Generate a data report and email it as a CSV or JSON attachment.
+
+        Returns True when every recipient was sent the report.
         """
         try:
-            params = params or {}
-            params['format'] = 'csv'  # CSV for email attachments
-            
+            params = dict(params or {})
+            fmt = params['format'] = cls.attachment_format(params.get('format'))
+
             report = cls.generate_report(report_type, params)
-            
-            subject = f"UCM Report: {report['report_name']} - {utc_now().strftime('%Y-%m-%d')}"
-            
+            today = utc_now().strftime('%Y-%m-%d')
+            subject = f"UCM Report: {report['report_name']} - {today}"
             body = f"""
 UCM Scheduled Report: {report['report_name']}
 
@@ -392,60 +444,83 @@ Parameters: {json.dumps(report['parameters'])}
 Summary:
 {json.dumps(report['summary'], indent=2)}
 
-The full report is attached as a CSV file.
+The full report is attached as a {fmt.upper()} file.
 
 --
 Ultimate Certificate Manager
             """
-            
-            for recipient in recipients:
-                try:
-                    EmailService.send_email(
-                        recipients=[recipient],
-                        subject=subject,
-                        body_html=f"<pre>{body}</pre>",
-                        body_text=body,
-                        notification_type="report",
-                    )
-                    logger.info(f"Sent {report_type} report to {recipient}")
-                except Exception as e:
-                    logger.error(f"Failed to send report to {recipient}: {e}")
-            
+            attachment = (
+                f"ucm-report-{report_type}-{today}.{fmt}",
+                report['content'].encode('utf-8'),
+                cls.ATTACHMENT_TYPES[fmt],
+            )
+            return cls._mail_each(recipients, subject, body, attachment, report_type)
         except Exception as e:
             logger.error(f"Failed to generate scheduled report {report_type}: {e}")
+            return False
 
     @classmethod
-    def send_scheduled_pdf_report(cls, recipients: list):
-        """Generate and email the executive PDF report."""
+    def send_scheduled_pdf_report(cls, recipients: list, template: str = 'executive') -> bool:
+        """Generate a PDF report from one of the PDF templates and email it attached."""
         try:
             from services.pdf_report_service import PDFReportService
-            pdf_bytes = PDFReportService.generate_executive_report()
-            
-            subject = f"UCM Executive Report - {utc_now().strftime('%Y-%m-%d')}"
-            body = """
-UCM Executive Report
+            tpl = PDFReportService.TEMPLATES.get(template) or PDFReportService.TEMPLATES['executive']
+            pdf_bytes = PDFReportService.generate_executive_report(sections=tpl['sections'])
 
-Please find the attached PDF executive report with a comprehensive overview
-of your PKI infrastructure, compliance status, and recommendations.
+            today = utc_now().strftime('%Y-%m-%d')
+            subject = f"UCM {tpl['name']} Report - {today}"
+            body = f"""
+UCM {tpl['name']} Report
+
+Please find the attached PDF report ({tpl['description']}).
 
 --
 Ultimate Certificate Manager
             """
-            
-            for recipient in recipients:
-                try:
-                    EmailService.send_email(
-                        recipients=[recipient],
-                        subject=subject,
-                        body_html=f"<pre>{body}</pre>",
-                        body_text=body,
-                        notification_type="report",
-                    )
-                    logger.info(f"Sent executive PDF report to {recipient}")
-                except Exception as e:
-                    logger.error(f"Failed to send PDF report to {recipient}: {e}")
+            attachment = (f"ucm-report-{template}-{today}.pdf", pdf_bytes, 'application/pdf')
+            return cls._mail_each(recipients, subject, body, attachment, f'pdf_{template}')
         except Exception as e:
             logger.error(f"Failed to generate scheduled PDF report: {e}")
+            return False
+
+    @staticmethod
+    def _mail_each(recipients, subject, body, attachment, label) -> bool:
+        all_sent = True
+        for recipient in recipients:
+            try:
+                ok, message = EmailService.send_email(
+                    recipients=[recipient],
+                    subject=subject,
+                    body_html=f"<pre>{html.escape(body)}</pre>",
+                    body_text=body,
+                    notification_type="report",
+                    attachments=[attachment],
+                )
+            except Exception as e:
+                ok, message = False, str(e)
+            if ok:
+                logger.info(f"Sent {label} report to {recipient}")
+            else:
+                all_sent = False
+                logger.error(f"Failed to send {label} report to {recipient}: {message}")
+        return all_sent
+
+
+def schedulable_reports() -> list:
+    """Schedule keys: every data report, then 'pdf_<template>' (and the legacy 'executive_pdf')."""
+    from services.pdf_report_service import PDFReportService
+    return (list(ReportService.REPORT_TYPES)
+            + [f'pdf_{t}' for t in PDFReportService.TEMPLATES]
+            + ['executive_pdf'])
+
+
+def send_report(report_key: str, recipients: list, fmt: str = 'csv') -> bool:
+    """Send one schedule key's report: a PDF template or a data report in ``fmt``."""
+    if report_key == 'executive_pdf':
+        return ReportService.send_scheduled_pdf_report(recipients, 'executive')
+    if report_key.startswith('pdf_'):
+        return ReportService.send_scheduled_pdf_report(recipients, report_key[len('pdf_'):])
+    return ReportService.send_scheduled_report(report_key, recipients, {'days': 30, 'format': fmt})
 
 
 def run_scheduled_reports():
@@ -456,10 +531,7 @@ def run_scheduled_reports():
     current_dow = now.weekday()  # 0=Monday
     current_dom = now.day
     
-    for report_key in [
-        'certificate_inventory', 'expiring_certificates', 'ca_hierarchy',
-        'audit_summary', 'compliance_status', 'executive_pdf',
-    ]:
+    for report_key in schedulable_reports():
         config = SystemConfig.query.filter_by(key=f'report_schedule_{report_key}').first()
         if not config or not config.value:
             continue
@@ -490,12 +562,7 @@ def run_scheduled_reports():
         # Time matches — send the report
         logger.info(f"Running scheduled report: {report_key} ({freq} at {sched_time})")
         try:
-            if report_key == 'executive_pdf':
-                ReportService.send_scheduled_pdf_report(recipients)
-            else:
-                ReportService.send_scheduled_report(
-                    report_key, recipients, {'days': 30, 'format': 'csv'}
-                )
+            send_report(report_key, recipients, sched.get('format', 'csv'))
         except Exception as e:
             logger.error(f"Scheduled report {report_key} failed: {e}")
 

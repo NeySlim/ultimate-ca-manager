@@ -553,6 +553,10 @@
     "totpCode": "Codice di verifica",
     "totpCodeRequired": "Inserisci un codice di verifica a 6 cifre",
     "invalidTotpCode": "Codice di verifica non valido",
+    "twoFactorKeyDescription": "Conferma con la tua chiave di sicurezza",
+    "twoFactorUseSecurityKey": "Usa una chiave di sicurezza",
+    "twoFactorKeyCancelled": "Chiave di sicurezza annullata.",
+    "twoFactorKeyFailed": "Verifica della chiave di sicurezza non riuscita",
     "verifying": "Verifica...",
     "verify": "Verifica",
     "checkingMethods": "Rilevamento dei metodi di autenticazione...",
@@ -3204,6 +3208,18 @@
     "expiresInDaysPlaceholder": "es. 365 (vuoto = nessuna scadenza)",
     "enroll2faRequired": "Autenticazione a due fattori richiesta",
     "enroll2faReason": "L'amministratore richiede la 2FA sul tuo account. Configurala ora per continuare.",
+    "enroll2faOrKey": "Oppure registra invece una chiave di sicurezza",
+    "keyAsSecondFactor": "Chiave di sicurezza come secondo fattore",
+    "keyAsSecondFactorHint": "Un accesso con password richiede anche una delle tue chiavi di sicurezza",
+    "keyAsSecondFactorNoKey": "Registra una chiave di sicurezza qui sotto per usarla come secondo fattore",
+    "turnOnKey2fa": "Attiva",
+    "turnOffKey2fa": "Disattiva",
+    "enterPasswordToDisableKey2fa": "Inserisci la password per non richiedere più una chiave di sicurezza all'accesso",
+    "key2faEnabled": "La tua chiave di sicurezza è ora il tuo secondo fattore",
+    "key2faDisabled": "Un accesso con password non richiede più una chiave di sicurezza",
+    "activeSecondFactors": "Secondi fattori attivi",
+    "noSecondFactor": "nessuno",
+    "twoFactorEnforced": "richiesto dal tuo amministratore",
     "twoFaSetupFailed": "Impossibile avviare la configurazione 2FA",
     "twoFaEnabled": "Autenticazione a due fattori attivata",
     "backupCodesHint": "Conserva questi codici di backup in un luogo sicuro. Ognuno può essere usato una volta se perdi l'accesso all'app di autenticazione.",
@@ -4383,6 +4399,10 @@
       "compliance_status": {
         "name": "Stato conformità",
         "description": "Punteggi di conformità e riepilogo violazioni"
+      },
+      "revoked_certificates": {
+        "name": "Certificati revocati",
+        "description": "Certificati revocati nel periodo, con data e motivo"
       }
     },
     "available": "disponibili",

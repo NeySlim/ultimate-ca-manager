@@ -12,6 +12,7 @@ export default {
           { label: 'Hierarquia de CA', text: 'Estrutura da Autoridade Certificadora e estatísticas' },
           { label: 'Resumo de Auditoria', text: 'Eventos de segurança e resumo de atividades dos usuários' },
           { label: 'Status de Conformidade', text: 'Conformidade com políticas e resumo de violações' },
+          { label: 'Certificados revogados', text: 'Certificados revogados no período, com data e motivo' },
         ]
       },
       {
@@ -59,6 +60,9 @@ Eventos de segurança e resumo de atividades dos usuários. Inclui tentativas de
 
 ### Status de Conformidade
 Conformidade com políticas e resumo de violações. Mostra quais certificados estão em conformidade com suas políticas e quais as violam. Necessário para conformidade regulatória.
+
+### Certificados revogados
+Certificados revogados no período escolhido (padrão: 30 dias), com data e motivo da revogação. Consulte-o para acompanhar as revogações e suas causas.
 
 ## Relatório PDF Executivo
 
@@ -109,6 +113,8 @@ Envia um resumo de conformidade com políticas toda semana. Útil para monitoram
 2. Ative os relatórios que deseja agendar
 3. Adicione endereços de e-mail dos destinatários (pressione Enter ou clique em Adicionar)
 4. Clique em Salvar
+
+Cada relatório agendado é anexado ao e-mail no seu formato: CSV ou JSON para relatórios de dados, PDF para os modelos PDF.
 
 ### Envio de Teste
 Antes de ativar agendamentos, use o botão ✈️ em qualquer linha de relatório para enviar um relatório de teste para um endereço de e-mail específico. Isso verifica se o SMTP está configurado corretamente e se o formato do relatório atende suas necessidades.

@@ -8,7 +8,8 @@ Architecture:
 3. POST /api/v2/auth/login/mtls - mTLS login (auto or manual)
 4. POST /api/v2/auth/login/webauthn/start - Start WebAuthn auth
 5. POST /api/v2/auth/login/webauthn/verify - Verify WebAuthn response
-6. POST /api/v2/auth/logout - Logout (clears session)
+6. POST /api/v2/auth/login/2fa[/webauthn/options|/webauthn/verify] - Second factor after a password
+7. POST /api/v2/auth/logout - Logout (clears session)
 """
 
 from flask import Blueprint, request, jsonify, session, current_app, g
@@ -18,6 +19,7 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils import trusted_proxy
 from models import User, db
+from models.webauthn import WebAuthnCredential
 from services.mtls_auth_service import MTLSAuthService
 from services.webauthn_service import WebAuthnService
 
@@ -267,8 +269,11 @@ def login_password():
     if not ok:
         return _err
 
-    # Check if 2FA is enabled - require TOTP verification before creating session - require TOTP verification before creating session
-    if user.totp_confirmed:
+    # Second factor: TOTP (with recovery codes) and/or a security key, the key
+    # when 2FA is enforced or the user turned it on as second factor.
+    from auth.twofa_enforcement import second_factor_methods
+    second_factors = second_factor_methods(user)
+    if second_factors:
         session.clear()
         session['pending_2fa_user_id'] = user.id
         session['pending_2fa_username'] = user.username
@@ -288,6 +293,7 @@ def login_password():
         return success_response(
             data={
                 'requires_2fa': True,
+                'methods': second_factors,
                 'user': {'id': user.id, 'username': user.username}
             },
             message='2FA verification required'
@@ -382,21 +388,14 @@ def login_2fa():
     Requires a pending 2FA session (from password login)
     """
     import pyotp
-    from auth.permissions import get_effective_permissions
     from services.audit_service import AuditService
 
-    # Check for pending 2FA session
-    pending_user_id = session.get('pending_2fa_user_id')
-    pending_username = session.get('pending_2fa_username')
+    # Pending 2FA session, with brute-force protection (SEC-03)
+    user, lockout_key, err = _pending_2fa_user()
+    if err:
+        return err
+    pending_username = user.username
     auth_method = session.get('pending_2fa_method', 'password')
-
-    if not pending_user_id:
-        return error_response('No pending 2FA verification', 401)
-
-    # SEC-03: Brute-force protection on 2FA
-    lockout_key = str(pending_user_id)
-    if _check_2fa_lockout(lockout_key, _2fa_failed_attempts):
-        return error_response('Too many failed attempts. Try again later.', 429)
 
     data = request.json
     if not data or not data.get('code'):
@@ -412,14 +411,10 @@ def login_2fa():
     if not code or len(code) < 6:
         return error_response('Invalid verification code format', 400)
 
-    user = db.session.get(User, pending_user_id)
-    if not user or not user.active:
-        session.clear()
-        return error_response('Invalid credentials', 401)
-
-    # Verify TOTP code
-    totp = pyotp.TOTP(user.totp_secret)
-    if not totp.verify(str(code), valid_window=1):
+    # Verify TOTP code (a key-only account has none to check)
+    totp_ok = bool(user.totp_confirmed and user.totp_secret) and \
+        pyotp.TOTP(user.totp_secret).verify(str(code), valid_window=1)
+    if not totp_ok:
         # Check recovery codes - atomic verify-and-consume to prevent
         # double-spend (two parallel logins replaying the same code).
         from utils.backup_codes import consume_code, count_remaining
@@ -447,8 +442,30 @@ def login_2fa():
             _record_2fa_failure(lockout_key, _2fa_failed_attempts)
             return error_response('Invalid verification code', 401)
 
-    # 2FA verified - create full session
     _clear_2fa_failures(lockout_key, _2fa_failed_attempts)
+    return _complete_2fa_login(user, auth_method, f'Login successful with 2FA for {user.username}')
+
+
+def _pending_2fa_user():
+    """(user, lockout_key, error_response) for the login waiting on its second factor."""
+    pending_user_id = session.get('pending_2fa_user_id')
+    if not pending_user_id:
+        return None, None, error_response('No pending 2FA verification', 401)
+    lockout_key = str(pending_user_id)
+    if _check_2fa_lockout(lockout_key, _2fa_failed_attempts):
+        return None, None, error_response('Too many failed attempts. Try again later.', 429)
+    user = db.session.get(User, pending_user_id)
+    if not user or not user.active:
+        session.clear()
+        return None, None, error_response('Invalid credentials', 401)
+    return user, lockout_key, None
+
+
+def _complete_2fa_login(user, auth_method, details):
+    """Turn the pending 2FA session into a full one."""
+    from auth.permissions import get_effective_permissions
+    from services.audit_service import AuditService
+
     now = utc_now()
     session.clear()
     session['user_id'] = user.id
@@ -465,7 +482,7 @@ def login_2fa():
         resource_type='user',
         resource_id=user.id,
         resource_name=user.username,
-        details=f'Login successful with 2FA for {user.username}',
+        details=details,
         success=True,
         username=user.username
     )
@@ -483,6 +500,65 @@ def login_2fa():
         ),
         message='Login successful'
     )
+
+
+_2FA_WEBAUTHN_CHALLENGE = 'pending_2fa_webauthn_challenge'
+
+
+@bp.route('/api/v2/auth/login/2fa/webauthn/options', methods=['POST'])
+@limiter.limit("10/minute")
+def login_2fa_webauthn_options():
+    """Security-key challenge for the pending 2FA login, bound to this session."""
+    user, _key, err = _pending_2fa_user()
+    if err:
+        return err
+    options, challenge = WebAuthnService.authentication_options_for(user, request.host, '2fa')
+    if not options:
+        return error_response('No security key registered', 400)
+    session[_2FA_WEBAUTHN_CHALLENGE] = challenge
+    return success_response(data={'options': options})
+
+
+@bp.route('/api/v2/auth/login/2fa/webauthn/verify', methods=['POST'])
+@limiter.limit("10/minute")
+def login_2fa_webauthn_verify():
+    """Complete the pending 2FA login with a security key assertion."""
+    from services.audit_service import AuditService
+
+    user, lockout_key, err = _pending_2fa_user()
+    if err:
+        return err
+    data = request.get_json(silent=True) or {}
+    credential_response = data.get('response')
+    if not isinstance(credential_response, dict) or len(str(credential_response)) > 50000:
+        return error_response('Invalid WebAuthn response format', 400)
+
+    # One attempt per challenge: whatever the outcome, the next try needs new options.
+    expected = session.pop(_2FA_WEBAUTHN_CHALLENGE, None)
+    ok = False
+    if expected:
+        ok, _msg, _user = WebAuthnService.verify_authentication(
+            user.id, credential_response, request.host,
+            challenge_type='2fa', expected_challenge=expected,
+        )
+    if not ok:
+        AuditService.log_action(
+            action='login_2fa_failure',
+            resource_type='user',
+            resource_id=user.id,
+            details=f'Invalid security key for {user.username}',
+            success=False,
+            username=user.username
+        )
+        _record_2fa_failure(lockout_key, _2fa_failed_attempts)
+        return error_response('Security key verification failed', 401)
+
+    _clear_2fa_failures(lockout_key, _2fa_failed_attempts)
+    return _complete_2fa_login(
+        user, session.get('pending_2fa_method', 'password'),
+        f'Login successful with 2FA (security key) for {user.username}',
+    )
+
 
 @bp.route('/api/v2/auth/login/mtls', methods=['POST'])
 @limiter.limit("10/minute")
@@ -620,7 +696,6 @@ def webauthn_start():
     hostname = request.host
     secret = (current_app.secret_key or '').encode('utf-8')
 
-    from models.webauthn import WebAuthnCredential
     user = User.query.filter_by(username=username).first()
     creds = []
     if user and user.active:

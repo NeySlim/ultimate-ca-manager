@@ -89,6 +89,10 @@ Registra claves de seguridad de hardware o autenticadores biométricos:
 3. Sigue la solicitud del navegador para autenticarte
 4. La clave aparece en tu lista de credenciales registradas
 
+Con 2FA activada o impuesta, una llave registrada también puede completar el segundo paso de un inicio de sesión con contraseña: elija **Usar una llave de seguridad**.
+
+Sin aplicación de autenticación, active **Llave de seguridad como segundo factor** en la sección de autenticación de dos factores: cada inicio de sesión con contraseña pedirá entonces una de sus llaves, y la última llave no puede eliminarse mientras esté activado.
+
 ### Certificados mTLS
 Gestiona certificados de cliente para autenticación TLS mutua:
 - Sube un certificado de cliente
@@ -110,6 +114,8 @@ Incluye la clave en el encabezado \`X-API-Key\`:
 \`\`\`
 X-API-Key: <tu-clave-api>
 \`\`\`
+
+O envíala como token bearer: \`Authorization: Bearer <tu-clave-api>\`.
 
 ### Permisos
 Las claves API heredan los permisos del rol de tu usuario. No pueden tener más acceso que tu cuenta.

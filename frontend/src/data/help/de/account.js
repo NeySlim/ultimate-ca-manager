@@ -89,6 +89,10 @@ Registrieren Sie Hardware-Sicherheitsschlüssel oder biometrische Authentifikato
 3. Folgen Sie der Browseraufforderung zur Authentifizierung
 4. Der Schlüssel erscheint in Ihrer Liste der registrierten Anmeldeinformationen
 
+Ist 2FA aktiviert oder erzwungen, kann ein registrierter Schlüssel auch den zweiten Schritt einer Passwortanmeldung bestätigen: wählen Sie **Sicherheitsschlüssel verwenden**.
+
+Ohne Authentifizierungs-App aktivieren Sie im Abschnitt Zwei-Faktor-Authentifizierung **Sicherheitsschlüssel als zweiter Faktor**: Jede Anmeldung mit Passwort verlangt dann einen Ihrer Schlüssel, und der letzte Schlüssel kann nicht entfernt werden, solange die Option aktiv ist.
+
 ### mTLS-Zertifikate
 Verwalten Sie Client-Zertifikate für die gegenseitige TLS-Authentifizierung:
 - Laden Sie ein Client-Zertifikat hoch
@@ -110,6 +114,8 @@ Fügen Sie den Schlüssel im \`X-API-Key\`-Header ein:
 \`\`\`
 X-API-Key: <ihr-api-schlüssel>
 \`\`\`
+
+Oder senden Sie ihn als Bearer-Token: \`Authorization: Bearer <ihr-api-schlüssel>\`.
 
 ### Berechtigungen
 API-Schlüssel erben die Berechtigungen Ihrer Benutzerrolle. Sie können nicht mehr Zugriff haben als Ihr Konto.

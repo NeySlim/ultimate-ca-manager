@@ -89,6 +89,10 @@ Registra chiavi di sicurezza hardware o autenticatori biometrici:
 3. Segui la richiesta del browser per l'autenticazione
 4. La chiave appare nell'elenco delle credenziali registrate
 
+Con il 2FA attivo o imposto, una chiave registrata può anche completare il secondo passaggio di un accesso con password: scegli **Usa una chiave di sicurezza**.
+
+Senza un'app di autenticazione, attiva **Chiave di sicurezza come secondo fattore** nella sezione Autenticazione a due fattori: ogni accesso con password richiede allora una delle tue chiavi, e l'ultima chiave non può essere rimossa finché l'opzione è attiva.
+
 ### Certificati mTLS
 Gestisci i certificati client per l'autenticazione TLS reciproca:
 - Carica un certificato client
@@ -110,6 +114,8 @@ Includi la chiave nell'header \`X-API-Key\`:
 \`\`\`
 X-API-Key: <la-tua-chiave-api>
 \`\`\`
+
+Oppure inviala come token bearer: \`Authorization: Bearer <la-tua-chiave-api>\`.
 
 ### Permessi
 Le chiavi API ereditano i permessi del ruolo del tuo utente. Non possono avere più accesso del tuo account.

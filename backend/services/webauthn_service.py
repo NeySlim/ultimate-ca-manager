@@ -56,6 +56,15 @@ def get_rp_id(hostname: str) -> str:
     return hostname
 
 
+def _drop_key_second_factor_if_last(credential):
+    """Without an enabled key left, the key stops being the owner's second factor,
+    as an administrator's 2FA reset does."""
+    from auth.twofa_enforcement import has_security_key
+    owner = credential.user
+    if owner is not None and not has_security_key(owner, excluding=credential.id):
+        owner.webauthn_2fa = False
+
+
 class WebAuthnService:
     """Service for WebAuthn/FIDO2 operations"""
     
@@ -208,40 +217,44 @@ class WebAuthnService:
         """
         Generate options for authenticating with WebAuthn
         """
-        rp_id = get_rp_id(hostname)
-        
         user = User.query.filter_by(username=username).first()
         if not user:
             return None, None
-        
-        # Generate challenge
+        options, _challenge = WebAuthnService.authentication_options_for(user, hostname, 'authentication')
+        return (options, user.id) if options else (None, None)
+
+    @staticmethod
+    def authentication_options_for(user: User, hostname: str, challenge_type: str) -> Tuple[Optional[dict], Optional[str]]:
+        """Options over the user's enabled keys, plus the stored challenge (base64url).
+
+        ``challenge_type`` keeps a passwordless challenge ('authentication') and a
+        second-factor one ('2fa') from being redeemed through each other's door.
+        """
+        rp_id = get_rp_id(hostname)
+
+        credentials = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).all()
+        if not credentials:
+            return None, None
+
         challenge_bytes = secrets.token_bytes(32)
         challenge_b64 = base64url_encode(challenge_bytes)
-        
+
         # Clean up old challenges
         WebAuthnChallenge.query.filter(
             WebAuthnChallenge.user_id == user.id,
-            WebAuthnChallenge.challenge_type == 'authentication',
+            WebAuthnChallenge.challenge_type == challenge_type,
             (WebAuthnChallenge.used == True) | (WebAuthnChallenge.expires_at < utc_now())
         ).delete()
-        
-        # Store challenge
-        challenge_record = WebAuthnChallenge(
+
+        db.session.add(WebAuthnChallenge(
             user_id=user.id,
             challenge=challenge_b64,
-            challenge_type='authentication',
+            challenge_type=challenge_type,
             expires_at=utc_now() + timedelta(minutes=WebAuthnService.CHALLENGE_TIMEOUT_MINUTES)
-        )
-        db.session.add(challenge_record)
+        ))
         if not commit_or_rollback(logger, "Failed to persist WebAuthn authentication challenge"):
             return None, None
-        
-        # Get user's credentials with transports
-        credentials = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).all()
-        
-        if not credentials:
-            return None, None
-        
+
         allow_credentials = []
         for cred in credentials:
             transports = []
@@ -254,16 +267,14 @@ class WebAuthnService:
             allow_credentials.append(
                 PublicKeyCredentialDescriptor(id=cred.credential_id, transports=transports or None)
             )
-        
-        # Generate authentication options
+
         options = generate_authentication_options(
             rp_id=rp_id,
             challenge=challenge_bytes,
             allow_credentials=allow_credentials,
             user_verification=UserVerificationRequirement.PREFERRED,
         )
-        
-        return json.loads(options_to_json(options)), user.id
+        return json.loads(options_to_json(options)), challenge_b64
 
     @staticmethod
     def generate_decoy_authentication_options(username: str, hostname: str, secret: bytes) -> dict:
@@ -292,9 +303,12 @@ class WebAuthnService:
         return json.loads(options_to_json(options))
 
     @staticmethod
-    def verify_authentication(user_id: int, credential_data: dict, hostname: str) -> Tuple[bool, str, Optional[User]]:
+    def verify_authentication(user_id: int, credential_data: dict, hostname: str,
+                              challenge_type: str = 'authentication',
+                              expected_challenge: Optional[str] = None) -> Tuple[bool, str, Optional[User]]:
         """
-        Verify authentication response
+        Verify authentication response. With ``expected_challenge``, the signed
+        challenge must also be that one (the one handed to this login session).
         """
         rp_id = get_rp_id(hostname)
         
@@ -317,12 +331,15 @@ class WebAuthnService:
             client_data_json = base64url_decode(credential_data['response']['clientDataJSON']).decode('utf-8')
             challenge_json = json.loads(client_data_json)
             challenge = challenge_json['challenge']
-            
+            if expected_challenge is not None and not hmac.compare_digest(
+                    str(challenge).encode(), expected_challenge.encode()):
+                return False, "Invalid or expired challenge", None
+
             # Find challenge record
             challenge_record = WebAuthnChallenge.query.filter_by(
                 challenge=challenge,
                 user_id=user_id,
-                challenge_type='authentication',
+                challenge_type=challenge_type,
                 used=False
             ).first()
             
@@ -398,6 +415,7 @@ class WebAuthnService:
             if not user or user.role != 'admin':
                 return False, "Not authorized"
         
+        _drop_key_second_factor_if_last(credential)
         db.session.delete(credential)
         if not commit_or_rollback(logger, f"Failed to delete WebAuthn credential id={credential_id}"):
             return False, "Failed to delete credential"
@@ -418,6 +436,8 @@ class WebAuthnService:
             if not user or user.role != 'admin':
                 return False, "Not authorized"
         
+        if not enabled:
+            _drop_key_second_factor_if_last(credential)
         credential.enabled = enabled
         if not commit_or_rollback(logger, f"Failed to toggle WebAuthn credential id={credential_id}"):
             return False, "Failed to update credential"

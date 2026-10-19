@@ -25,6 +25,8 @@ from typing import Optional, Tuple
 from functools import wraps
 from flask import request, g, session, current_app
 
+from auth.unified import presented_api_key
+
 logger = logging.getLogger(__name__)
 
 # CSRF token validity (seconds)
@@ -187,9 +189,9 @@ def init_csrf_middleware(app):
         if CSRFProtection.is_exempt(request.path):
             return None
         
-        # Skip for API key auth (external integrations)
-        api_key_header = request.headers.get('X-API-Key', '')
-        if api_key_header:
+        # Skip for API key auth (X-API-Key or Bearer): a browser never sends
+        # either on its own, and a presented key never falls back to the session.
+        if presented_api_key(request):
             return None
         
         # Get user_id from session or g (set by auth middleware)

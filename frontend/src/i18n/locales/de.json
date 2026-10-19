@@ -553,6 +553,10 @@
     "totpCode": "Bestätigungscode",
     "totpCodeRequired": "Bitte geben Sie einen 6-stelligen Code ein",
     "invalidTotpCode": "Ungültiger Bestätigungscode",
+    "twoFactorKeyDescription": "Bestätigen Sie mit Ihrem Sicherheitsschlüssel",
+    "twoFactorUseSecurityKey": "Sicherheitsschlüssel verwenden",
+    "twoFactorKeyCancelled": "Sicherheitsschlüssel abgebrochen.",
+    "twoFactorKeyFailed": "Überprüfung des Sicherheitsschlüssels fehlgeschlagen",
     "verifying": "Überprüfung...",
     "verify": "Bestätigen",
     "checkingMethods": "Authentifizierungsmethoden werden erkannt...",
@@ -3204,6 +3208,18 @@
     "expiresInDaysPlaceholder": "z. B. 365 (leer = kein Ablaufdatum)",
     "enroll2faRequired": "Zwei-Faktor-Authentifizierung erforderlich",
     "enroll2faReason": "Ihr Administrator verlangt 2FA für Ihr Konto. Richten Sie sie jetzt ein, um fortzufahren.",
+    "enroll2faOrKey": "Oder registrieren Sie stattdessen einen Sicherheitsschlüssel",
+    "keyAsSecondFactor": "Sicherheitsschlüssel als zweiter Faktor",
+    "keyAsSecondFactorHint": "Eine Anmeldung mit Passwort verlangt zusätzlich einen Ihrer Sicherheitsschlüssel",
+    "keyAsSecondFactorNoKey": "Registrieren Sie unten einen Sicherheitsschlüssel, um ihn als zweiten Faktor zu verwenden",
+    "turnOnKey2fa": "Aktivieren",
+    "turnOffKey2fa": "Deaktivieren",
+    "enterPasswordToDisableKey2fa": "Geben Sie Ihr Passwort ein, damit bei der Anmeldung kein Sicherheitsschlüssel mehr verlangt wird",
+    "key2faEnabled": "Ihr Sicherheitsschlüssel ist jetzt Ihr zweiter Faktor",
+    "key2faDisabled": "Eine Anmeldung mit Passwort verlangt keinen Sicherheitsschlüssel mehr",
+    "activeSecondFactors": "Aktive zweite Faktoren",
+    "noSecondFactor": "keiner",
+    "twoFactorEnforced": "von Ihrem Administrator verlangt",
     "twoFaSetupFailed": "2FA-Einrichtung konnte nicht gestartet werden",
     "twoFaEnabled": "Zwei-Faktor-Authentifizierung aktiviert",
     "backupCodesHint": "Bewahren Sie diese Backup-Codes sicher auf. Jeder kann einmal verwendet werden, falls Sie den Zugriff auf Ihre Authentifizierungs-App verlieren.",
@@ -4383,6 +4399,10 @@
       "compliance_status": {
         "name": "Compliance-Status",
         "description": "Compliance-Bewertungen und Zusammenfassung der Verstöße"
+      },
+      "revoked_certificates": {
+        "name": "Widerrufene Zertifikate",
+        "description": "Im Zeitraum widerrufene Zertifikate mit Datum und Grund"
       }
     },
     "available": "verfügbar",

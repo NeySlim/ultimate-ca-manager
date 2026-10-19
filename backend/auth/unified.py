@@ -28,6 +28,17 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+def presented_api_key(request_obj):
+    """API key from ``X-API-Key``, or from ``Authorization: Bearer`` as an alias."""
+    key = (request_obj.headers.get('X-API-Key') or '').strip()
+    if key:
+        return key
+    scheme, _, token = (request_obj.headers.get('Authorization') or '').partition(' ')
+    if scheme.lower() == 'bearer' and token.strip():
+        return token.strip()
+    return None
+
+
 class AuthManager:
     """
     Unified Authentication Manager
@@ -41,17 +52,16 @@ class AuthManager:
     def authenticate_request(self, request_obj):
         """
         Auto-detect and authenticate request
-        Priority: API Key → Session Cookie
+        Priority: API Key (X-API-Key or Bearer) → Session Cookie
         
         Returns:
             dict: User info with permissions, or None if not authenticated
         """
-        # 1. Check API Key (highest priority)
-        api_key = request_obj.headers.get('X-API-Key')
+        # 1. API key (highest priority). A key that fails is refused outright:
+        # its header skipped CSRF, so it must not fall back to the session.
+        api_key = presented_api_key(request_obj)
         if api_key:
-            result = self.verify_api_key(api_key)
-            if result:
-                return result
+            return self.verify_api_key(api_key)
         
         # 2. Check Session Cookie (Flask session)
         if 'user_id' in session:

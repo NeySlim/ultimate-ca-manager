@@ -12,6 +12,7 @@ export default {
           { label: 'Jerarquía de CA', text: 'Estructura y estadísticas de las autoridades de certificación' },
           { label: 'Resumen de auditoría', text: 'Resumen de eventos de seguridad y actividad de usuarios' },
           { label: 'Estado de cumplimiento', text: 'Resumen de cumplimiento de políticas e infracciones' },
+          { label: 'Certificados revocados', text: 'Certificados revocados durante el período, con fecha y motivo' },
         ]
       },
       {
@@ -59,6 +60,9 @@ Resumen de eventos de seguridad y actividad de usuarios. Incluye intentos de ini
 
 ### Estado de cumplimiento
 Resumen de cumplimiento de políticas e infracciones. Muestra qué certificados cumplen con sus políticas y cuáles las infringen. Necesario para el cumplimiento normativo.
+
+### Certificados revocados
+Certificados revocados durante el período elegido (por defecto: 30 días), con fecha y motivo de revocación. Revíselo para seguir las revocaciones y sus causas.
 
 ## Informe ejecutivo PDF
 
@@ -109,6 +113,8 @@ Envía un resumen de cumplimiento de políticas cada semana. Útil para el monit
 2. Active los informes que desea programar
 3. Agregue direcciones de correo electrónico de los destinatarios (presione Enter o haga clic en Agregar)
 4. Haga clic en Guardar
+
+Cada informe programado se adjunta al correo en su formato: CSV o JSON para los informes de datos, PDF para las plantillas PDF.
 
 ### Envío de prueba
 Antes de activar los programas, use el botón ✈️ en cualquier fila de informe para enviar un informe de prueba a una dirección de correo específica. Esto verifica que SMTP esté configurado correctamente y que el formato del informe cumple con sus necesidades.

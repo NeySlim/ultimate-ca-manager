@@ -79,6 +79,8 @@ export default function AccountPage() {
   
   // WebAuthn state
   const [webauthnName, setWebauthnName] = useState('')
+  const hasEnabledKey = webauthnCredentials.some(c => c.enabled)
+  const activeFactors = accountData.two_factor_methods || []
   const [webauthnRegistering, setWebauthnRegistering] = useState(false)
 
   // API Key form state
@@ -211,6 +213,28 @@ export default function AccountPage() {
     }
   }
 
+  // Security key as the second factor of password logins (needs a registered key)
+  const handleToggleKey2FA = async () => {
+    try {
+      if (accountData.webauthn_2fa) {
+        const password = await showPrompt(t('account.enterPasswordToDisableKey2fa'), {
+          title: t('account.keyAsSecondFactor'),
+          type: 'password',
+          confirmText: t('account.turnOffKey2fa')
+        })
+        if (!password) return
+        await accountService.setWebAuthnSecondFactor(false, password)
+        showSuccess(t('account.key2faDisabled'))
+      } else {
+        await accountService.setWebAuthnSecondFactor(true)
+        showSuccess(t('account.key2faEnabled'))
+      }
+      await loadAccount()
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.generic'))
+    }
+  }
+
   const handleConfirm2FA = async () => {
     try {
       await accountService.confirm2FA(confirmCode)
@@ -233,60 +257,7 @@ export default function AccountPage() {
     
     setWebauthnRegistering(true)
     try {
-      const response = await accountService.startWebAuthnRegistration()
-      const options = response.data
-      
-      const base64urlToUint8Array = (base64url) => {
-        let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')
-        while (base64.length % 4) base64 += '='
-        return Uint8Array.from(atob(base64), c => c.charCodeAt(0))
-      }
-      
-      const stringToUint8Array = (str) => new TextEncoder().encode(str)
-      
-      const publicKeyOptions = {
-        challenge: base64urlToUint8Array(options.challenge),
-        rp: options.rp,
-        user: {
-          id: stringToUint8Array(String(options.user.id)),
-          name: options.user.name,
-          displayName: options.user.displayName
-        },
-        pubKeyCredParams: options.pubKeyCredParams,
-        timeout: options.timeout || 60000,
-        authenticatorSelection: options.authenticatorSelection,
-        attestation: options.attestation || 'none'
-      }
-      
-      if (options.excludeCredentials?.length > 0) {
-        publicKeyOptions.excludeCredentials = options.excludeCredentials.map(c => ({
-          type: c.type,
-          id: base64urlToUint8Array(c.id),
-          transports: c.transports
-        }))
-      }
-      
-      const credential = await navigator.credentials.create({ publicKey: publicKeyOptions })
-      
-      const uint8ArrayToBase64url = (arr) => {
-        const str = String.fromCharCode.apply(null, new Uint8Array(arr))
-        return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
-      }
-      
-      const attestationResponse = {
-        id: credential.id,
-        rawId: uint8ArrayToBase64url(credential.rawId),
-        type: credential.type,
-        response: {
-          clientDataJSON: uint8ArrayToBase64url(credential.response.clientDataJSON),
-          attestationObject: uint8ArrayToBase64url(credential.response.attestationObject)
-        }
-      }
-      
-      await accountService.completeWebAuthnRegistration({
-        credential: attestationResponse,
-        name: webauthnName
-      })
+      await accountService.registerWebAuthnKey(webauthnName)
       
       showSuccess(t('account.keyRegistered'))
       setShowWebAuthnModal(false)
@@ -666,6 +637,33 @@ export default function AccountPage() {
             {accountData.two_factor_enabled ? t('common.disable2FA') : t('common.enable2FA')}
           </Button>
         </div>
+        <div className="flex items-center justify-between pt-3 mt-3 border-t border-border">
+          <div>
+            <p className="text-sm text-text-primary">{t('account.keyAsSecondFactor')}</p>
+            <p className="text-xs text-text-tertiary mt-0.5">
+              {hasEnabledKey ? t('account.keyAsSecondFactorHint') : t('account.keyAsSecondFactorNoKey')}
+            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant={accountData.webauthn_2fa ? 'success' : 'secondary'}>
+                {accountData.webauthn_2fa ? t('common.enabled') : t('common.disabled')}
+              </Badge>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant={accountData.webauthn_2fa ? 'danger' : 'primary'}
+            disabled={!accountData.webauthn_2fa && !hasEnabledKey}
+            onClick={handleToggleKey2FA}
+          >
+            {accountData.webauthn_2fa ? t('account.turnOffKey2fa') : t('account.turnOnKey2fa')}
+          </Button>
+        </div>
+        <p className="text-xs text-text-secondary pt-3 mt-3 border-t border-border">
+          {t('account.activeSecondFactors')}: {activeFactors.length
+            ? activeFactors.map(m => (m === 'totp' ? t('account.authenticatorApp') : t('account.securityKey'))).join(', ')
+            : t('account.noSecondFactor')}
+          {accountData.two_factor_enforced && ` (${t('account.twoFactorEnforced')})`}
+        </p>
       </DetailSection>
 
       {/* WebAuthn */}

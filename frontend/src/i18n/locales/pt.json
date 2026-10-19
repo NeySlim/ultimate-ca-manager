@@ -553,6 +553,10 @@
     "totpCode": "Código de verificação",
     "totpCodeRequired": "Digite um código de verificação de 6 dígitos",
     "invalidTotpCode": "Código de verificação inválido",
+    "twoFactorKeyDescription": "Confirme com a sua chave de segurança",
+    "twoFactorUseSecurityKey": "Usar uma chave de segurança",
+    "twoFactorKeyCancelled": "Chave de segurança cancelada.",
+    "twoFactorKeyFailed": "Falha na verificação da chave de segurança",
     "verifying": "Verificando...",
     "verify": "Verificar",
     "checkingMethods": "Detetando métodos de autenticação...",
@@ -3204,6 +3208,18 @@
     "expiresInDaysPlaceholder": "ex. 365 (vazio = sem expiração)",
     "enroll2faRequired": "Autenticação de dois fatores obrigatória",
     "enroll2faReason": "O seu administrador exige 2FA na sua conta. Configure-a agora para continuar.",
+    "enroll2faOrKey": "Ou registe antes uma chave de segurança",
+    "keyAsSecondFactor": "Chave de segurança como segundo fator",
+    "keyAsSecondFactorHint": "Um login com senha também pede uma das suas chaves de segurança",
+    "keyAsSecondFactorNoKey": "Registre uma chave de segurança abaixo para usá-la como segundo fator",
+    "turnOnKey2fa": "Ativar",
+    "turnOffKey2fa": "Desativar",
+    "enterPasswordToDisableKey2fa": "Digite sua senha para deixar de pedir uma chave de segurança no login",
+    "key2faEnabled": "Sua chave de segurança agora é seu segundo fator",
+    "key2faDisabled": "Um login com senha não pede mais uma chave de segurança",
+    "activeSecondFactors": "Segundos fatores ativos",
+    "noSecondFactor": "nenhum",
+    "twoFactorEnforced": "exigido pelo seu administrador",
     "twoFaSetupFailed": "Falha ao iniciar a configuração de 2FA",
     "twoFaEnabled": "Autenticação de dois fatores ativada",
     "backupCodesHint": "Guarde estes códigos de backup num local seguro. Cada um pode ser usado uma vez se perder o acesso ao seu autenticador.",
@@ -4383,6 +4399,10 @@
       "compliance_status": {
         "name": "Status de conformidade",
         "description": "Pontuações de conformidade e resumo de violações"
+      },
+      "revoked_certificates": {
+        "name": "Certificados revogados",
+        "description": "Certificados revogados no período, com data e motivo"
       }
     },
     "available": "disponíveis",

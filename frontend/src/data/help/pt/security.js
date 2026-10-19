@@ -118,7 +118,7 @@ Bloquear IPs ou faixas CIDR específicas. Todos os outros IPs são permitidos.
 ## Autenticação de Dois Fatores
 
 ### Aplicação
-Exigir que todos os usuários ativem 2FA. Usuários que não configuraram 2FA serão solicitados no próximo login.
+Exigir que todos os usuários ativem 2FA. Usuários que não configuraram 2FA serão solicitados no próximo login. Um aplicativo TOTP ou uma chave de segurança registrada atende ao requisito, na configuração e no login. Enquanto for obrigatória, o TOTP só pode ser desativado se restar uma chave de segurança, e a última chave só pode ser removida se restar o TOTP. Um usuário cuja chave se tornou seu segundo fator a mantém quando a obrigatoriedade é retirada.
 
 ### Métodos Suportados
 - **TOTP**: Senhas únicas baseadas em tempo (aplicativos autenticadores)

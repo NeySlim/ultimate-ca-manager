@@ -387,6 +387,12 @@ def create_app(config_name=None):
                 "in": "header",
                 "description": "API Key authentication. Example: 'ucm_ak_...'"
             },
+            "Bearer": {
+                "type": "apiKey",
+                "name": "Authorization",
+                "in": "header",
+                "description": "Same API key as a bearer token. Example: 'Bearer ucm_ak_...'"
+            },
             "Session": {
                 "type": "apiKey",
                 "name": "Cookie",
@@ -394,7 +400,7 @@ def create_app(config_name=None):
                 "description": "Session cookie (set after login)"
             }
         },
-        "security": [{"ApiKey": []}, {"Session": []}],
+        "security": [{"ApiKey": []}, {"Bearer": []}, {"Session": []}],
         "tags": [
             {"name": "auth", "description": "Authentication endpoints"},
             {"name": "cas", "description": "Certificate Authorities"},

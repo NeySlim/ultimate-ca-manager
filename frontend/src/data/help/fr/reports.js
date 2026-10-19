@@ -12,6 +12,7 @@ export default {
           { label: 'Hiérarchie des CA', text: 'Structure et statistiques des autorités de certification' },
           { label: 'Résumé d\'audit', text: 'Événements de sécurité et résumé de l\'activité des utilisateurs' },
           { label: 'Statut de conformité', text: 'Résumé de la conformité et des violations de politique' },
+          { label: 'Certificats révoqués', text: 'Certificats révoqués sur la période, avec date et raison' },
         ]
       },
       {
@@ -59,6 +60,9 @@ Résumé des événements de sécurité et de l'activité des utilisateurs. Incl
 
 ### Statut de conformité
 Résumé de la conformité et des violations de politique. Montre quels certificats sont conformes à vos politiques et lesquels les violent. Requis pour la conformité réglementaire.
+
+### Certificats révoqués
+Certificats révoqués sur la période choisie (30 jours par défaut), avec la date et la raison de révocation. Consultez-le pour suivre les révocations et leurs causes.
 
 ## Rapport PDF exécutif
 
@@ -109,6 +113,8 @@ Envoie un résumé de conformité aux politiques chaque semaine. Utile pour un s
 2. Activez les rapports que vous souhaitez programmer
 3. Ajoutez les adresses e-mail des destinataires (appuyez sur Entrée ou cliquez sur Ajouter)
 4. Cliquez sur Enregistrer
+
+Chaque rapport programmé est joint à l'e-mail dans son format : CSV ou JSON pour les rapports de données, PDF pour les modèles PDF.
 
 ### Envoi test
 Avant d'activer les programmations, utilisez le bouton ✈️ sur n'importe quelle ligne de rapport pour envoyer un rapport test à une adresse e-mail spécifique. Cela vérifie que SMTP est correctement configuré et que le format du rapport répond à vos besoins.

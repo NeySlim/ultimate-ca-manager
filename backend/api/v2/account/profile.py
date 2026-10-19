@@ -7,6 +7,7 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.datetime_utils import utc_isoformat
 from auth.unified import require_auth
+from auth.twofa_enforcement import enforcement_active_for, second_factor_methods
 
 from . import bp
 
@@ -80,6 +81,9 @@ def get_profile():
             'last_login': utc_isoformat(user.last_login) if hasattr(user, 'last_login') and user.last_login else None,
             'login_count': getattr(user, 'login_count', 0),
             'two_factor_enabled': getattr(user, 'totp_confirmed', False),
+            'webauthn_2fa': bool(user.webauthn_2fa),
+            'two_factor_enforced': enforcement_active_for(user),
+            'two_factor_methods': second_factor_methods(user),
             'password_changed_at': utc_isoformat(user.password_changed_at) if hasattr(user, 'password_changed_at') and user.password_changed_at else None,
         }
     )
