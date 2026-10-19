@@ -91,3 +91,24 @@ def test_approval_refuses_it(app, create_ca, disabled_template):
     with app.app_context():
         with pytest.raises(ValueError, match='disabled'):
             _issue_approved_certificate(db.session.get(ApprovalRequest, approval_id))
+
+
+def test_scep_profile_keeps_a_binding_made_while_active(app, auth_client, create_ca, disabled_template):
+    """The form sends template_id back on every save: an existing binding is not a new one."""
+    ca = create_ca(cn='Disabled tpl SCEP keep CA')
+    with app.app_context():
+        db.session.get(CertificateTemplate, disabled_template).is_active = True
+        db.session.commit()
+    r = auth_client.post('/api/v2/scep/profiles', json={
+        'name': f'keep-{uuid.uuid4().hex[:6]}', 'ca_id': ca['id'], 'template_id': disabled_template})
+    assert r.status_code in (200, 201), r.get_json()
+    profile_id = r.get_json()['data']['id']
+    with app.app_context():
+        db.session.get(CertificateTemplate, disabled_template).is_active = False
+        db.session.commit()
+    try:
+        r = auth_client.put(f'/api/v2/scep/profiles/{profile_id}', json={
+            'name': f'kept-{uuid.uuid4().hex[:6]}', 'template_id': disabled_template})
+        assert r.status_code == 200, r.get_json()
+    finally:
+        auth_client.delete(f'/api/v2/scep/profiles/{profile_id}')

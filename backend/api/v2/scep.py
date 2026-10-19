@@ -457,7 +457,9 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
             return False, 'Template not found'
         if tpl.template_type == 'ca':
             return False, 'CA templates cannot be used for SCEP profiles'
-        if not tpl.is_active and 'template_id' in data:
+        # A disabled template cannot be newly bound; an existing binding stays
+        saved_tpl = getattr(db.session.get(ScepProfile, profile_id), 'template_id', None) if profile_id else None
+        if not tpl.is_active and 'template_id' in data and tpl.id != saved_tpl:
             return False, f"Template '{tpl.name}' is disabled"
         # Same rule as ACME profiles: a template must not hand a SCEP
         # enrollee (a challenge password, at most an Intune check) an EKU
