@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Removed
+
+- ACME: EAB keys still kept in the pre-2.139 `acme_eab_keys` setting registered accounts without appearing anywhere; the upgrade moves them to ACME > EAB as active credentials, where they can be seen and revoked, and the old setting is no longer read. Nothing to do.
+
 ### Fixed
 
 - Helm: `initialAdminPassword` had no effect and every install started with the default `changeme123`; the chart now passes it under the name the image reads, and the image also honours `INITIAL_ADMIN_PASSWORD`.

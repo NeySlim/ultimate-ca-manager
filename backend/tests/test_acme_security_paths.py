@@ -103,6 +103,12 @@ def _csr_b64(key, common_name='finalize.example.com'):
     return b64.urlsafe_b64encode(der).rstrip(b'=').decode()
 
 
+def _add_eab_credential(kid, key_b64):
+    AcmeEabCredential.query.filter_by(kid=kid).delete()
+    db.session.add(AcmeEabCredential(kid=kid, hmac_key_b64=key_b64, status='active'))
+    db.session.commit()
+
+
 @pytest.fixture
 def acme_account(app):
     """Create a persisted ACME account with a known key pair."""
@@ -1122,12 +1128,7 @@ class TestExternalAccountBinding:
         key = b'eab-regression-secret'
         key_b64 = b64.urlsafe_b64encode(key).rstrip(b'=').decode()
         with app.app_context():
-            config = SystemConfig.query.filter_by(key='acme_eab_keys').first()
-            if config is None:
-                config = SystemConfig(key='acme_eab_keys', value='{}')
-                db.session.add(config)
-            config.value = json.dumps({kid: key_b64})
-            db.session.commit()
+            _add_eab_credential(kid, key_b64)
 
             service = AcmeService(base_url='http://localhost')
             wrong = self._eab(
@@ -1152,10 +1153,11 @@ class TestExternalAccountBinding:
                 'http://localhost/acme/new-account',
             )
             assert valid is True, error
-            assert kid in json.loads(config.value)
+            assert AcmeEabCredential.query.filter_by(kid=kid).first().status == 'active'
 
             service.mark_eab_used(kid, acme_account['account_id'])
-            assert kid not in json.loads(config.value)
+            db.session.expire_all()
+            assert AcmeEabCredential.query.filter_by(kid=kid).first().status == 'used'
 
     def test_lost_single_use_race_does_not_leave_unbound_account(
         self, app, client, monkeypatch
@@ -1165,12 +1167,7 @@ class TestExternalAccountBinding:
         key_b64 = b64.urlsafe_b64encode(hmac_key).rstrip(b'=').decode()
         account_key, account_jwk = _gen_key_and_jwk()
         with app.app_context():
-            config = SystemConfig.query.filter_by(key='acme_eab_keys').first()
-            if config is None:
-                config = SystemConfig(key='acme_eab_keys', value='{}')
-                db.session.add(config)
-            config.value = json.dumps({kid: key_b64})
-            db.session.commit()
+            _add_eab_credential(kid, key_b64)
 
         path = '/acme/new-account'
         eab = self._eab(
