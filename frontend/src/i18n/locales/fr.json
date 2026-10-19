@@ -3960,7 +3960,7 @@
     "allowedKeyTypes": "Types de clés autorisés",
     "maxSANs": "SANs max",
     "dnsPattern": "Restriction de motif DNS",
-    "rulesEnforcedHelp": "Les types de clé et les algorithmes de hachage de signature sont appliqués à chaque émission : formulaire d'émission, signature de CSR, renouvellements, demandes approuvées, ACME, SCEP, EST, WSTEP, création de CA et signataire TSA. Lorsqu'un hachage que personne n'a choisi explicitement n'est pas autorisé, le hachage autorisé le plus faible est utilisé à la place. Sur le formulaire d'émission, la signature de CSR, les renouvellements et les demandes approuvées, une demande comportant plus de noms DNS que le maximum est aussi refusée et la validité est plafonnée. Le motif DNS délimite les demandes auxquelles la politique s'applique.",
+    "rulesEnforcedHelp": "Les types de clé et les algorithmes de hachage de signature sont appliqués à chaque émission : formulaire d'émission, signature de CSR, renouvellements, demandes approuvées, ACME, SCEP, EST, WSTEP, création de CA et signataire TSA. Lorsqu'un hachage que personne n'a choisi explicitement n'est pas autorisé, le hachage autorisé le plus faible est utilisé à la place. Sur le formulaire d'émission, la signature de CSR, les renouvellements, les demandes approuvées, ACME, SCEP, EST et WSTEP, une demande comportant plus de noms DNS que le maximum est aussi refusée et la validité est plafonnée. Le motif DNS délimite les demandes auxquelles la politique s'applique.",
     "approvalWorkflow": "Workflow d'approbation",
     "approval": "Approbation",
     "requireApproval": "Exiger une approbation avant l'émission",

@@ -724,6 +724,15 @@ class CSROperationsMixin:
             policies, ca_private_key, digest,
             explicit=bool((policy_scope or {}).get('digest_explicit', policy_scope is None)),
             key_type=key_label_for_public_key(csr.public_key()))
+        if policy_scope is not None:
+            # Name count and validity ceiling, for the protocols as for the form
+            dns_count = sum(isinstance(n, x509.DNSName) for n in (effective_sans or []))
+            limit_violations, capped, capped_by = PolicyEvaluationService.enforce_rules(
+                policies, dns_name_count=dns_count, validity_days=validity_days)
+            violations = list(violations) + limit_violations
+            if capped_by:
+                logger.info(f"Validity capped to {capped} days by policy '{capped_by}'")
+                validity_days = capped
         if violations:
             raise PolicyViolation('; '.join(violations))
 

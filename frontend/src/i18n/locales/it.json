@@ -4245,7 +4245,7 @@
     "disable": "Disabilita",
     "disabled": "Policy disabilitata",
     "dnsPattern": "Restrizione pattern DNS",
-    "rulesEnforcedHelp": "Tipi di chiave e hash di firma vengono applicati a ogni emissione: modulo di emissione, firma CSR, rinnovi, richieste approvate, ACME, SCEP, EST, WSTEP, creazione CA e firmatario TSA. Quando un hash che nessuno ha scelto esplicitamente non è consentito, viene usato il più debole tra quelli consentiti. Su modulo di emissione, firma CSR, rinnovi e richieste approvate viene inoltre rifiutata una richiesta con più nomi DNS del massimo e la validità viene limitata. Il pattern DNS delimita le richieste a cui si applica il criterio.",
+    "rulesEnforcedHelp": "Tipi di chiave e hash di firma vengono applicati a ogni emissione: modulo di emissione, firma CSR, rinnovi, richieste approvate, ACME, SCEP, EST, WSTEP, creazione CA e firmatario TSA. Quando un hash che nessuno ha scelto esplicitamente non è consentito, viene usato il più debole tra quelli consentiti. Su modulo di emissione, firma CSR, rinnovi, richieste approvate, ACME, SCEP, EST e WSTEP viene inoltre rifiutata una richiesta con più nomi DNS del massimo e la validità viene limitata. Il pattern DNS delimita le richieste a cui si applica il criterio.",
     "editPolicy": "Modifica policy",
     "enable": "Abilita",
     "enabled": "Policy abilitata",

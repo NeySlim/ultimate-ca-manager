@@ -4245,7 +4245,7 @@
     "disable": "禁用",
     "disabled": "策略已禁用",
     "dnsPattern": "DNS 模式限制",
-    "rulesEnforcedHelp": "密钥类型和签名摘要会在每次签发时强制执行：签发表单、CSR 签名、续期、已批准的请求、ACME、SCEP、EST、WSTEP、CA 创建以及 TSA 签名者。当未被明确选择的摘要不被允许时，将改用允许范围内最弱的摘要。在签发表单、CSR 签名、续期和已批准的请求中，DNS 名称数超过上限的请求也会被拒绝，并限制有效期。DNS 模式用于界定该策略适用于哪些请求。",
+    "rulesEnforcedHelp": "密钥类型和签名摘要会在每次签发时强制执行：签发表单、CSR 签名、续期、已批准的请求、ACME、SCEP、EST、WSTEP、CA 创建以及 TSA 签名者。当未被明确选择的摘要不被允许时，将改用允许范围内最弱的摘要。在签发表单、CSR 签名、续期、已批准的请求以及 ACME、SCEP、EST、WSTEP 中，DNS 名称数超过上限的请求也会被拒绝，并限制有效期。DNS 模式用于界定该策略适用于哪些请求。",
     "editPolicy": "编辑策略",
     "enable": "启用",
     "enabled": "策略已启用",

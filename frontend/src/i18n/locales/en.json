@@ -3947,7 +3947,7 @@
     "allowedKeyTypes": "Allowed Key Types",
     "maxSANs": "Max SANs",
     "dnsPattern": "DNS Pattern Restriction",
-    "rulesEnforcedHelp": "Key types and signature hashes are enforced on every issuance: the issue form, CSR signing, renewals, approved requests, ACME, SCEP, EST, WSTEP, CA creation and the TSA signer. When a hash nobody chose explicitly is not allowed, the weakest allowed hash is used instead. On the issue form, CSR signing, renewals and approved requests, a request with more DNS names than the maximum is also refused and the validity is capped. The DNS pattern scopes which requests the policy applies to.",
+    "rulesEnforcedHelp": "Key types and signature hashes are enforced on every issuance: the issue form, CSR signing, renewals, approved requests, ACME, SCEP, EST, WSTEP, CA creation and the TSA signer. When a hash nobody chose explicitly is not allowed, the weakest allowed hash is used instead. On the issue form, CSR signing, renewals, approved requests, ACME, SCEP, EST and WSTEP, a request with more DNS names than the maximum is also refused and the validity is capped. The DNS pattern scopes which requests the policy applies to.",
     "approvalWorkflow": "Approval Workflow",
     "approval": "Approval",
     "requireApproval": "Require approval before issuance",

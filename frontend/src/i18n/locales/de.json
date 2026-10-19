@@ -4245,7 +4245,7 @@
     "disable": "Deaktivieren",
     "disabled": "Richtlinie deaktiviert",
     "dnsPattern": "DNS-Musterbeschränkung",
-    "rulesEnforcedHelp": "Schlüsseltypen und Signatur-Hashes werden bei jeder Ausstellung durchgesetzt: Ausstellungsformular, CSR-Signierung, Erneuerungen, genehmigte Anfragen, ACME, SCEP, EST, WSTEP, CA-Erstellung und TSA-Signierer. Ist ein Hash, den niemand ausdrücklich gewählt hat, nicht erlaubt, wird stattdessen der schwächste erlaubte Hash verwendet. Beim Ausstellungsformular, bei der CSR-Signierung, bei Erneuerungen und bei genehmigten Anfragen wird zudem eine Anfrage mit mehr DNS-Namen als dem Maximum abgelehnt und die Gültigkeit begrenzt. Das DNS-Muster legt fest, für welche Anfragen die Richtlinie gilt.",
+    "rulesEnforcedHelp": "Schlüsseltypen und Signatur-Hashes werden bei jeder Ausstellung durchgesetzt: Ausstellungsformular, CSR-Signierung, Erneuerungen, genehmigte Anfragen, ACME, SCEP, EST, WSTEP, CA-Erstellung und TSA-Signierer. Ist ein Hash, den niemand ausdrücklich gewählt hat, nicht erlaubt, wird stattdessen der schwächste erlaubte Hash verwendet. Beim Ausstellungsformular, bei der CSR-Signierung, bei Erneuerungen, bei genehmigten Anfragen sowie bei ACME, SCEP, EST und WSTEP wird zudem eine Anfrage mit mehr DNS-Namen als dem Maximum abgelehnt und die Gültigkeit begrenzt. Das DNS-Muster legt fest, für welche Anfragen die Richtlinie gilt.",
     "editPolicy": "Richtlinie bearbeiten",
     "enable": "Aktivieren",
     "enabled": "Richtlinie aktiviert",
