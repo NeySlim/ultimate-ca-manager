@@ -6,7 +6,7 @@ import {
   SiCloudflare, SiDigitalocean, SiOvh, SiHetzner, SiGandi, SiScaleway,
   SiVultr, SiGodaddy, SiNamecheap, SiVercel, SiPorkbun, SiBunnydotnet,
   SiIonos, SiNetcup, SiInfomaniak, SiAlwaysdata, SiAkamai,
-  SiNetlify, SiHostinger
+  SiNetlify, SiHostinger, SiPlesk
 } from '@icons-pack/react-simple-icons'
 
 // Custom SVG icons for providers not in Simple Icons
@@ -107,6 +107,7 @@ const PROVIDER_ICONS = {
   rcodezero:    { text: 'R0',  color: '#2D3748' },
   // Self-hosted / Protocol-based
   rfc2136:      { text: 'NS',  color: '#0F766E' },
+  plesk:        { Icon: SiPlesk,      color: '#52BBE6' },
 }
 
 /**
