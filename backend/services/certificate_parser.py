@@ -8,9 +8,22 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 import re
 import logging
+from urllib.parse import unquote
 from datetime import datetime, timezone
 
 logger = logging.getLogger(__name__)
+
+
+def decode_forwarded_pem(value):
+    """A client certificate as a proxy forwards it: raw PEM, PEM with escaped
+    newlines, or URL-encoded PEM (nginx ``$ssl_client_escaped_cert``)."""
+    if isinstance(value, bytes):
+        value = value.decode('ascii', errors='replace')
+    if not value:
+        return value
+    if '%' in value:  # never part of a PEM; '+' is base64, so not unquote_plus
+        value = unquote(value)
+    return value.replace('\\n', '\n')
 
 
 class CertificateParser:
@@ -29,11 +42,7 @@ class CertificateParser:
         """
         try:
             # Remove header/footer if present and clean up
-            pem_data = pem_data.strip()
-            
-            # Handle URL-encoded or escaped newlines
-            pem_data = pem_data.replace('\\n', '\n')
-            pem_data = pem_data.replace('%0A', '\n')
+            pem_data = decode_forwarded_pem(pem_data).strip()
             
             # Ensure proper PEM format
             if not pem_data.startswith('-----BEGIN CERTIFICATE-----'):

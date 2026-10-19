@@ -442,7 +442,8 @@ def _trusted_client_cert():
             )
         return None
 
-    return presented
+    from services.certificate_parser import decode_forwarded_pem
+    return decode_forwarded_pem(presented)
 
 
 def _presented_certificate_refusal(ca):
