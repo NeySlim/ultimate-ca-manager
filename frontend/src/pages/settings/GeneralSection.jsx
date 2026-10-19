@@ -1,10 +1,12 @@
-import { useState } from 'react'
+import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Gear, Clock, FloppyDisk, ChartBar, ArrowsClockwise, Lock } from '@phosphor-icons/react'
 import { Button, Input, Select, Badge, DetailHeader, DetailSection, DetailGrid, DetailContent } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { useNotification } from '../../contexts'
-import { settingsService } from '../../services'
+import { certificatesService, settingsService } from '../../services'
+import { certificateLabel } from '../../lib/utils'
+import { fetchAllPages } from '../../lib/fetchAllPages'
 import ServiceStatusWidget from './ServiceStatusWidget'
 import PublicEndpointsPanel from './PublicEndpointsPanel'
 
@@ -13,9 +15,26 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
   const { showSuccess, showError } = useNotification()
   const [metricsToken, setMetricsToken] = useState('')
   const [metricsBusy, setMetricsBusy] = useState(false)
+  const [tlsCertOptions, setTlsCertOptions] = useState([])
   const [endpointsRefresh, setEndpointsRefresh] = useState(0)
 
   const canAdminSettings = hasPermission ? hasPermission('admin:settings') : false
+
+  // Certificates with a private key, for the ACME public vhost TLS selector
+  useEffect(() => {
+    let cancelled = false
+    fetchAllPages((query) => certificatesService.getAll({ ...query, has_private_key: true }))
+      .then((all) => {
+        if (cancelled) return
+        const certs = all.filter((c) => !c.revoked)
+        setTlsCertOptions(certs.map((c) => ({
+          value: String(c.id),
+          label: `${certificateLabel(c) || c.refid} (#${c.id})`,
+        })))
+      })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   const generateToken = () => {
     const a = new Uint8Array(24)
@@ -133,6 +152,22 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
               updateSetting('acme_public_port', Math.min(65535, Math.max(1, val)))
             }}
             helperText={t('settings.acmePublicPortHelper')}
+            disabled={!canAdminSettings}
+          />
+          <Select
+            label={
+              <span className="flex items-center gap-1">
+                {t('settings.acmePublicTlsCertId')}
+                {!canAdminSettings && <Lock size={12} className="text-text-tertiary" />}
+              </span>
+            }
+            value={settings.acme_public_tls_cert_id ? String(settings.acme_public_tls_cert_id) : ''}
+            onChange={(val) => updateSetting('acme_public_tls_cert_id', val || '')}
+            options={[
+              { value: '', label: t('common.none') },
+              ...tlsCertOptions,
+            ]}
+            helperText={t('settings.acmePublicTlsCertIdHelper')}
             disabled={!canAdminSettings}
           />
           {canWrite('settings') && (

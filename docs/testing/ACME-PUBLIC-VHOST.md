@@ -25,6 +25,7 @@ See also: [ACME-PROXY-MULTI-CA.md](./ACME-PROXY-MULTI-CA.md), [ACME-DNS-PROPAGAT
 |-----|------------|----------------|
 | `acme_public_vhost` | Concrete hostname only (no `*.` prefix) | ACME directory URLs (local server **and** proxy) |
 | `acme_public_port` | 1–65535 | Port in URLs (omitted if 443) |
+| `acme_public_tls_cert_id` | UCM certificate ID with a private key | Ops metadata (no automatic TLS push) |
 
 ## Reference topology
 
@@ -44,6 +45,7 @@ The UCM listener (gunicorn) is single; in production a **reverse proxy** (F5, ng
 |--------------------|---------|--------|
 | `acme_public_vhost` | `acme.ucm.example.com` | Hostname in the ACME directory URLs (`newOrder`, `newNonce`, …) |
 | `acme_public_port` | `8443` | Port in those URLs (omitted if `443`) |
+| `acme_public_tls_cert_id` | UCM certificate ID | **Metadata**: TLS cert to deploy on the ACME vhost on the proxy side (not applied to the gunicorn runtime) |
 
 Without `acme_public_vhost`, UCM falls back to the `scheme://Host` of the incoming request.
 
@@ -140,9 +142,12 @@ PATCH /api/v2/settings/general
 {
   "base_url": "https://admin.ucm.example.com",
   "acme_public_vhost": "acme.ucm.example.com",
-  "acme_public_port": 8443
+  "acme_public_port": 8443,
+  "acme_public_tls_cert_id": 42
 }
 ```
+
+`acme_public_tls_cert_id` references the wildcard (or dedicated) certificate managed in UCM to install on the `acme.ucm.example.com` vhost of the reverse proxy.
 
 ### DNS
 
@@ -230,6 +235,7 @@ npm run check:i18n
 1. **Settings → General**: set
    - `acme_public_vhost` = `acme.ucm.example.com`
    - `acme_public_port` = `8443`
+   - `acme_public_tls_cert_id` = ID of a `*.ucm.example.com` cert (optional)
 2. Save → reload (`Ctrl+Shift+R`) → values persisted
 3. Check the **helpers** (concrete hostname, DNS/TLS warning) in at least **fr** and **en**
 4. **ACME → Configuration**: directory `https://acme.ucm.example.com:8443/acme/directory`

@@ -924,6 +924,7 @@ export const helpContent = {
           { label: "ACME", text: "acme.ucm.example.com, /acme/* and /acme/proxy/* (no client mTLS)" },
           { label: "Wildcard TLS", text: "Use a concrete hostname here (e.g. acme.ucm.example.com). A *.ucm.example.com certificate SAN covers TLS for admin and ACME vhosts, do not enter *.ucm.example.com as the vhost" },
           { label: "Before saving", text: "Have DNS and TLS working for the ACME vhost first, clients that re-read the directory switch URLs immediately and renewals fail if the vhost is unreachable" },
+          { label: "TLS certificate ID", text: "Metadata for the certificate deployed on the ACME vhost (e.g. wildcard)" },
         ]
       },
       {

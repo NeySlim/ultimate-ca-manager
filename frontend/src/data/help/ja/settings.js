@@ -21,6 +21,7 @@ export default {
           { label: "ACME", text: "acme.ucm.example.com, /acme/* と /acme/proxy/*（クライアント mTLS なし）" },
           { label: "ワイルドカード TLS", text: "具体ホスト名（例: acme.ucm.example.com）。証明書 SAN の *.ucm.example.com は admin/ACME の TLS をカバー, vhost に *. は不可" },
           { label: "保存前に", text: "先に ACME vhost の DNS と TLS を動作させてください, directory を再読込したクライアントは即座に URL を切り替えるため、vhost に到達できないと更新が失敗します" },
+          { label: "TLS 証明書 ID", text: "ACME vhost に配置する証明書のメタデータ（例: ワイルドカード）" },
         ]
       },
       {
