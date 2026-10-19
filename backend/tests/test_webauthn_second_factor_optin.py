@@ -5,6 +5,7 @@ the last factor is refused, and lifting enforcement later keeps a key that
 became the account's second factor. Passwordless-only users are unaffected.
 """
 import pyotp
+import pytest
 from models import User, db
 from tests.conftest import get_json
 from tests.test_2fa_security_key_enforcement import _key_ids, _key_session, _register
@@ -116,3 +117,29 @@ def test_admin_reset_clears_the_switch(app, auth_client, make_user):
         uid = User.query.filter_by(username=username).first().id
     assert auth_client.post(f'/api/v2/users/{uid}/reset-2fa').status_code == 200
     assert _flag(app, username) is False
+
+
+def _switched_on(app, make_user, keys=1):
+    username, key, _ = make_user(totp=False)
+    c = _password_session(app, username)
+    for _ in range(keys - 1):
+        assert _register(c, SoftKey()).status_code == 200
+    assert _put(c, {'enabled': True}).status_code == 200
+    return username
+
+
+@pytest.mark.parametrize('how', ['delete', 'disable'])
+def test_admin_removing_the_last_key_turns_the_switch_off(app, auth_client, make_user, how):
+    username = _switched_on(app, make_user)
+    key_id, = _key_ids(app, username)
+    r = (auth_client.delete(f'/api/v2/webauthn/credentials/{key_id}') if how == 'delete' else
+         _post(auth_client, f'/api/v2/webauthn/credentials/{key_id}/toggle', {'enabled': False}))
+    assert r.status_code == 200
+    assert _flag(app, username) is False
+
+
+def test_admin_removing_one_of_two_keys_keeps_the_switch(app, auth_client, make_user):
+    username = _switched_on(app, make_user, keys=2)
+    first, _second = _key_ids(app, username)
+    assert auth_client.delete(f'/api/v2/webauthn/credentials/{first}').status_code == 200
+    assert _flag(app, username) is True

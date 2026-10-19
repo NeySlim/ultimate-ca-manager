@@ -56,6 +56,15 @@ def get_rp_id(hostname: str) -> str:
     return hostname
 
 
+def _drop_key_second_factor_if_last(credential):
+    """Without an enabled key left, the key stops being the owner's second factor,
+    as an administrator's 2FA reset does."""
+    from auth.twofa_enforcement import has_security_key
+    owner = credential.user
+    if owner is not None and not has_security_key(owner, excluding=credential.id):
+        owner.webauthn_2fa = False
+
+
 class WebAuthnService:
     """Service for WebAuthn/FIDO2 operations"""
     
@@ -406,6 +415,7 @@ class WebAuthnService:
             if not user or user.role != 'admin':
                 return False, "Not authorized"
         
+        _drop_key_second_factor_if_last(credential)
         db.session.delete(credential)
         if not commit_or_rollback(logger, f"Failed to delete WebAuthn credential id={credential_id}"):
             return False, "Failed to delete credential"
@@ -426,6 +436,8 @@ class WebAuthnService:
             if not user or user.role != 'admin':
                 return False, "Not authorized"
         
+        if not enabled:
+            _drop_key_second_factor_if_last(credential)
         credential.enabled = enabled
         if not commit_or_rollback(logger, f"Failed to toggle WebAuthn credential id={credential_id}"):
             return False, "Failed to update credential"
