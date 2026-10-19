@@ -271,3 +271,34 @@ class TestOwnSession:
             assert NotificationLog.query.filter_by(resource_id='test:claim').count() == 1
             NotificationLog.query.filter_by(resource_id='test:claim').delete()
             db.session.commit()
+
+
+def test_a_custom_role_granting_write_approvals_makes_an_approver(app, create_ca, create_user, policies):
+    from models import User
+    from models.rbac import CustomRole
+    ca = create_ca(cn='notify custom role CA')
+    tag = uuid.uuid4().hex[:8]
+    granted = create_user(username=f'crole-{tag}', email=f'crole-{tag}@example.test', role='viewer')
+    plain = create_user(username=f'plain-{tag}', email=f'plain-{tag}@example.test', role='viewer')
+    with app.app_context():
+        role = CustomRole(name=f'Approver {tag}', permissions=['write:approvals'])
+        group = Group(name=f'notify-crole-{tag}', permissions=[])
+        db.session.add_all([role, group])
+        db.session.flush()
+        db.session.get(User, granted['id']).custom_role_id = role.id
+        db.session.add_all([GroupMember(group_id=group.id, user_id=granted['id']),
+                            GroupMember(group_id=group.id, user_id=plain['id'])])
+        db.session.commit()
+        role_id, group_id = role.id, group.id
+    pid, _name = policies(ca['id'], approval=True, group_id=group_id)
+    try:
+        with app.app_context():
+            to = policy_notifications.recipients(db.session.get(CertificatePolicy, pid))
+        assert to == [f'crole-{tag}@example.test']
+    finally:
+        with app.app_context():
+            GroupMember.query.filter_by(group_id=group_id).delete()
+            db.session.get(User, granted['id']).custom_role_id = None
+            db.session.delete(db.session.get(Group, group_id))
+            db.session.delete(db.session.get(CustomRole, role_id))
+            db.session.commit()
