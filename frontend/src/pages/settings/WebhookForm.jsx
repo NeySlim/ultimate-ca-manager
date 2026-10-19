@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Eye, EyeSlash, CheckCircle, WarningCircle, X } from '@phosphor-icons/react'
 import { Button, Input, Select } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
-import { secretRequiredForTarget } from '../../lib/secretTarget'
+import { changedTargets, secretRequiredForTarget } from '../../lib/secretTarget'
 
 const WEBHOOK_EVENTS = [
   'certificate.issued',
@@ -91,6 +91,7 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
     auth_token: '',           // never pre-filled (server never returns plaintext)
     auth_token_set: webhook?.auth_token_set || false,
     auth_token_cleared: false, // tracks explicit "clear" action
+    drop_custom_headers: false,
   })
 
   const [validationErrors, setValidationErrors] = useState({})
@@ -141,9 +142,14 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
     secretSaved: formData.auth_token_set && !formData.auth_token_cleared,
   })
 
+  // Headers set through the API can't be retyped here: a moved URL drops them
+  const urlMoved = Boolean(webhook) && changedTargets(webhook, formData, ['url']).length > 0
+  const headersMustGo = Boolean(webhook?.custom_headers_set) && urlMoved && !formData.drop_custom_headers
+
   // Client-side validation mirroring backend rules
   const validate = () => {
     const errors = {}
+    if (headersMustGo) errors.custom_headers = t('webhooks.customHeadersFollowUrl')
     const { auth_type, auth_token, auth_username, auth_header_name, auth_token_set, auth_token_cleared } = formData
 
     if (auth_type !== 'none') {
@@ -188,9 +194,11 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
     // Build payload — handle auth field semantics:
     // Empty strings ("") trigger 400 from backend ("cannot be empty, use null to clear").
     // Convert empty strings → null so the backend clears the field.
-    const { auth_token_set: _ignored, auth_token_cleared, auth_token, auth_username, auth_header_name, ...rest } = formData
+    const { auth_token_set: _ignored, auth_token_cleared, auth_token, auth_username, auth_header_name,
+      drop_custom_headers, ...rest } = formData
 
     const payload = { ...rest }
+    if (drop_custom_headers && urlMoved) payload.custom_headers = {}
 
     // auth_token: cleared → null, new value → include, otherwise omit (preserve)
     if (auth_token_cleared) {
@@ -293,6 +301,23 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
         required
         placeholder="https://example.com/webhook"
       />
+      {webhook?.custom_headers_set && (
+        <div className="space-y-1.5">
+          <p className="text-xs text-text-tertiary">{t('webhooks.customHeadersSet')}</p>
+          {urlMoved && (
+            <label className="flex items-center gap-2 text-sm">
+              <input
+                type="checkbox"
+                checked={formData.drop_custom_headers}
+                onChange={e => handleChange('drop_custom_headers', e.target.checked)}
+                className="rounded"
+              />
+              {t('webhooks.dropCustomHeaders')}
+            </label>
+          )}
+          {headersMustGo && <p className="text-xs status-danger-text">{t('webhooks.customHeadersFollowUrl')}</p>}
+        </div>
+      )}
       <Input
         label={t('webhooks.caFilter')}
         value={formData.ca_filter}

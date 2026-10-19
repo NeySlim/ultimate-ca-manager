@@ -62,6 +62,34 @@ describe('Webhook', () => {
   })
 })
 
+describe('Webhook with custom headers set through the API', () => {
+  const HOOK = { id: 6, name: 'Hdr', url: 'https://hooks.example.com/h', events: [], auth_type: 'none',
+    custom_headers_set: true }
+
+  it('moves the URL only once the headers are dropped', () => {
+    const onSave = vi.fn()
+    const { container } = render(<WebhookForm webhook={HOOK} onSave={onSave} onCancel={() => {}} />)
+    expect(screen.getByText('webhooks.customHeadersSet')).toBeInTheDocument()
+    fireEvent.change(screen.getByDisplayValue('https://hooks.example.com/h'),
+      { target: { value: 'https://hooks.example.com/moved' } })
+    submit(container)
+    expect(onSave).not.toHaveBeenCalled()
+    expect(screen.getByText('webhooks.customHeadersFollowUrl')).toBeInTheDocument()
+    fireEvent.click(screen.getByLabelText('webhooks.dropCustomHeaders'))
+    submit(container)
+    expect(onSave).toHaveBeenCalledWith(expect.objectContaining({
+      url: 'https://hooks.example.com/moved', custom_headers: {} }))
+    expect(onSave.mock.calls[0][0]).not.toHaveProperty('drop_custom_headers')
+  })
+
+  it('keeps the headers when the URL stays', () => {
+    const onSave = vi.fn()
+    const { container } = render(<WebhookForm webhook={HOOK} onSave={onSave} onCancel={() => {}} />)
+    submit(container)
+    expect(onSave.mock.calls[0][0]).not.toHaveProperty('custom_headers')
+  })
+})
+
 describe('DNS provider', () => {
   const TYPES = [{ type: 'powerdns', name: 'PowerDNS', credentials_schema: [
     { name: 'server_url', label: 'Server URL', type: 'text', required: true },

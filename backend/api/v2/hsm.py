@@ -10,7 +10,7 @@ Supports:
 
 from flask import Blueprint, request, g
 from auth.unified import require_auth
-from utils.secret_target import MASKS, retarget_error
+from utils.secret_target import MASKS, changed_targets, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
 from services.hsm import HsmService
 from services.hsm.base_provider import HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
@@ -168,9 +168,18 @@ def _hsm_retarget_error(provider, config):
     new_pin = isinstance(config.get('user_pin'), str) and config['user_pin'] not in MASKS + ('',)
     keeping = keeping or bool(existing.get('previous_user_pin') and 'previous_user_pin' not in config
                               and not new_pin)
+    return retarget_error(*_hsm_targets(provider, existing, config), keeping)
+
+
+def _hsm_targets(provider, existing, config):
     current = {k: existing.get(k) for k in _HSM_TARGET_FIELDS.get(provider.type, ())}
     # The config is replaced whole: a target left out is a target cleared
-    return retarget_error(current, {k: config.get(k) for k in current}, keeping)
+    return current, {k: config.get(k) for k in current}
+
+
+def _hsm_target_moved(provider, config):
+    existing = provider.get_config() if provider.config else {}
+    return bool(changed_targets(*_hsm_targets(provider, existing, config)))
 
 
 @bp.route('/api/v2/hsm/providers/<int:provider_id>', methods=['PUT'])
@@ -206,6 +215,9 @@ def update_provider(provider_id):
     err = _hsm_retarget_error(provider, config)
     if err:
         return err
+    if isinstance(config, dict) and 'previous_user_pin' not in config and _hsm_target_moved(provider, config):
+        # The previous PIN belongs to the old module and token: never carried to a new one
+        config = {**config, 'previous_user_pin': None}
     
     try:
         updated = HsmService.update_provider(

@@ -3879,7 +3879,10 @@
         "delivered": "已投递",
         "failed": "失败"
       }
-    }
+    },
+    "customHeadersSet": "此 Webhook 已通过 API 设置自定义请求头，其值不会显示。",
+    "dropCustomHeaders": "删除自定义请求头",
+    "customHeadersFollowUrl": "自定义请求头与已保存的 URL 绑定：如需更改 URL，请删除它们，或通过 API 重新输入。"
   },
   "safeMode": {
     "title": "安全模式",

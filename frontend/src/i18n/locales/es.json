@@ -3879,7 +3879,10 @@
         "delivered": "Entregada",
         "failed": "Fallida"
       }
-    }
+    },
+    "customHeadersSet": "Este webhook tiene encabezados personalizados definidos mediante la API; sus valores no se muestran.",
+    "dropCustomHeaders": "Eliminar los encabezados personalizados",
+    "customHeadersFollowUrl": "Los encabezados personalizados quedan ligados a la URL guardada: elimínelos para cambiarla o vuelva a introducirlos mediante la API."
   },
   "safeMode": {
     "title": "Modo seguro",

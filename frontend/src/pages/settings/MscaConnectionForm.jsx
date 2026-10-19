@@ -5,7 +5,7 @@ import { Button, Input, Select, Textarea } from '../../components'
 import CertificateInput from '../../components/CertificateInput'
 import { mscaService } from '../../services'
 import { useNotification } from '../../contexts'
-import { secretInputProps, secretRequiredForTarget } from '../../lib/secretTarget'
+import { secretInputProps, secretRequiredForTarget, typedSecret } from '../../lib/secretTarget'
 
 const WINRM_TARGET = ['winrm_host', 'winrm_port', 'winrm_use_ssl', 'winrm_verify_ssl',
   'winrm_transport', 'winrm_username']
@@ -81,7 +81,7 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
     secretSaved: Boolean(connection?.auth_method === 'basic' && connection?.password
       && formData.auth_method === 'basic'),
     fields: ['server', 'use_ssl', 'verify_ssl', 'ca_bundle', 'username',
-      ...(connection?.winrm_password ? [] : WINRM_TARGET)],
+      ...(connection?.winrm_password || typedSecret(formData.winrm_password) ? [] : WINRM_TARGET)],
   }
 
   const handleSubmit = (e) => {

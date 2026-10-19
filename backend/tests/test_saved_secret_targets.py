@@ -117,6 +117,21 @@ class TestMicrosoftCAAdminChannelTest:
         assert seen[-1] == ('other.example', 'typed')
 
 
+    def test_the_basic_password_stays_off_another_winrm_host(self, app, auth_client, msca_id, seen):
+        from models.msca import MicrosoftCA
+        with app.app_context():
+            row = db.session.get(MicrosoftCA, msca_id)
+            row.winrm_password, row.winrm_host = None, 'winrm.elsewhere.example'
+            db.session.commit()
+        self._test(auth_client, msca_id, {})
+        assert all(password != 'saved-basic' for _, password in seen)
+        with app.app_context():
+            db.session.get(MicrosoftCA, msca_id).winrm_host = None
+            db.session.commit()
+        assert self._test(auth_client, msca_id, {}).status_code == 200
+        assert seen[-1] == ('adcs.corp.local', 'saved-basic')
+
+
 class TestIntuneTests:
     @pytest.fixture
     def seen(self, monkeypatch):

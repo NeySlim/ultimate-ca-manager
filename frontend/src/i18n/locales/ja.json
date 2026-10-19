@@ -3879,7 +3879,10 @@
         "delivered": "配信済み",
         "failed": "失敗"
       }
-    }
+    },
+    "customHeadersSet": "この Webhook には API でカスタムヘッダーが設定されています。値は表示されません。",
+    "dropCustomHeaders": "カスタムヘッダーを削除する",
+    "customHeadersFollowUrl": "カスタムヘッダーは保存済みの URL に紐づいています。URL を変更するには削除するか、API で再入力してください。"
   },
   "safeMode": {
     "title": "セーフモード",

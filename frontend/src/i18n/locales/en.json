@@ -3882,7 +3882,10 @@
         "delivered": "Delivered",
         "failed": "Failed"
       }
-    }
+    },
+    "customHeadersSet": "Custom headers are set on this webhook through the API; their values are not shown.",
+    "dropCustomHeaders": "Remove the custom headers",
+    "customHeadersFollowUrl": "Custom headers stay with the saved URL: remove them to change it, or re-enter them through the API."
   },
   "safeMode": {
     "title": "Safe Mode",

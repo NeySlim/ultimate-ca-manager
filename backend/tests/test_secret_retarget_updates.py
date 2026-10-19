@@ -162,6 +162,11 @@ class TestWebhook:
         assert _send(auth_client, 'put', url, {
             'url': 'https://hooks.example.com/h2',
             'custom_headers': {'X-Api-Key': 'typed-header'}}).status_code == 200
+        assert json.loads(auth_client.get(url).data)['data']['custom_headers_set'] is True
+        # Dropping them is the other way to move the URL
+        assert _send(auth_client, 'put', url, {'url': 'https://hooks.example.com/h3',
+                                               'custom_headers': {}}).status_code == 200
+        assert json.loads(auth_client.get(url).data)['data']['custom_headers_set'] is False
 
 
 class TestDnsProvider:
@@ -339,6 +344,31 @@ class TestMicrosoftCA:
                                                  'password': 'typed'}))
         assert self._row(app, msca_id) == before
 
+    def test_the_basic_password_never_falls_back_to_another_host(self, app, auth_client):
+        # Typed WinRM password, moved with another typed one, then cleared
+        from models.msca import MicrosoftCA
+        msca_id = self._make(app, None)
+        url = f'/api/v2/microsoft-cas/{msca_id}'
+        for body in ({'winrm_password': 'x'},
+                     {'winrm_host': 'winrm.attacker.example', 'winrm_password': 'y'},
+                     {'winrm_password': ''}):
+            assert _send(auth_client, 'put', url, body).status_code == 200
+        with app.app_context():
+            row = db.session.get(MicrosoftCA, msca_id)
+            assert row.winrm_effective_host == 'winrm.attacker.example'
+            assert row.winrm_effective_password is None
+            row.winrm_host = 'ADCS.corp.example'  # the CA's own host, any case
+            assert row.winrm_effective_password == 'saved-basic'
+
+    def test_clearing_the_winrm_password_on_the_ca_host_needs_the_basic_one(self, app, auth_client):
+        msca_id = self._make(app, None)
+        url = f'/api/v2/microsoft-cas/{msca_id}'
+        assert _send(auth_client, 'put', url, {'winrm_password': 'x', 'winrm_port': 5985}).status_code == 200
+        before = self._row(app, msca_id)
+        _refused(_send(auth_client, 'put', url, {'winrm_password': ''}))
+        assert self._row(app, msca_id) == before
+        assert _send(auth_client, 'put', url, {'winrm_password': '', 'password': 'typed'}).status_code == 200
+
     def test_unchanged_targets_and_typed_secrets_are_accepted(self, app, auth_client):
         msca_id = self._make(app, 'saved-winrm')
         url = f'/api/v2/microsoft-cas/{msca_id}'
@@ -439,6 +469,18 @@ class TestHsmProvider:
         assert _send(auth_client, 'put', url, {'config': {
             'module_path': '/usr/lib/other.so', 'token_label': 'ucm', 'user_pin': 'typed'}}
         ).status_code == 200
+
+    def test_a_moved_module_does_not_carry_the_previous_pin(self, app, auth_client):
+        config = {'module_path': '/usr/lib/softhsm/libsofthsm2.so', 'token_label': 'ucm',
+                  'user_pin': 'saved', 'previous_user_pin': 'old'}
+        provider_id = self._make(app, 'pkcs11', config)
+        url = f'/api/v2/hsm/providers/{provider_id}'
+        assert _send(auth_client, 'put', url, {'config': dict(config, user_pin='***', previous_user_pin='***')}
+                     ).status_code == 200
+        assert self._config(app, provider_id)['previous_user_pin'] == 'old'
+        assert _send(auth_client, 'put', url, {'config': {
+            'module_path': '/usr/lib/other.so', 'token_label': 'ucm', 'user_pin': 'typed'}}).status_code == 200
+        assert not self._config(app, provider_id).get('previous_user_pin')
 
     def test_same_target_or_typed_credential_is_accepted(self, app, auth_client):
         config = {'url': 'https://bao.example.com', 'mount_path': 'transit', 'token': 'saved'}

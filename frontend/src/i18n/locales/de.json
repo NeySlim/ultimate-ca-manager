@@ -3879,7 +3879,10 @@
         "delivered": "Zugestellt",
         "failed": "Fehlgeschlagen"
       }
-    }
+    },
+    "customHeadersSet": "Für diesen Webhook sind benutzerdefinierte Header über die API gesetzt; ihre Werte werden nicht angezeigt.",
+    "dropCustomHeaders": "Benutzerdefinierte Header entfernen",
+    "customHeadersFollowUrl": "Benutzerdefinierte Header bleiben an die gespeicherte URL gebunden: Entfernen Sie sie, um die URL zu ändern, oder geben Sie sie über die API erneut ein."
   },
   "safeMode": {
     "title": "Abgesicherter Modus",

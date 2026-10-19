@@ -3879,7 +3879,10 @@
         "delivered": "Consegnata",
         "failed": "Fallita"
       }
-    }
+    },
+    "customHeadersSet": "Questo webhook ha intestazioni personalizzate impostate tramite l'API; i loro valori non vengono mostrati.",
+    "dropCustomHeaders": "Rimuovi le intestazioni personalizzate",
+    "customHeadersFollowUrl": "Le intestazioni personalizzate restano legate all'URL salvato: rimuovile per modificarlo, oppure reinseriscile tramite l'API."
   },
   "safeMode": {
     "title": "Modalità sicura",

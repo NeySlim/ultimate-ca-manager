@@ -6,10 +6,10 @@ CRUD for MS CA connections + CSR signing + request status tracking
 import logging
 from flask import Blueprint, request, g
 from auth.unified import require_auth, has_permission as _has_perm
-from utils.secret_target import keeps_saved_secret, retarget_error
+from utils.secret_target import MASKS, keeps_saved_secret, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db
-from models.msca import MicrosoftCA, MSCARequest
+from models.msca import MicrosoftCA, MSCARequest, basic_password_reaches
 from services.msca_service import MicrosoftCAService
 from services.audit import AuditService
 from utils.datetime_utils import utc_now
@@ -168,7 +168,8 @@ def _transient_winrm_config(msca, overrides):
     cfg.winrm_effective_username = cfg.winrm_username or (
         cfg.username if cfg.auth_method == 'basic' else None)
     cfg.winrm_effective_password = cfg.winrm_password or (
-        cfg.password if cfg.auth_method == 'basic' else None)
+        cfg.password if cfg.auth_method == 'basic'
+        and basic_password_reaches(cfg.winrm_host, cfg.server) else None)
     return cfg, None
 
 
@@ -346,12 +347,19 @@ def _msca_retarget_error(msca, data):
         return winrm_err
     if msca.auth_method != 'basic' or data.get('auth_method', 'basic') != 'basic':
         return None
+    if not keeps_saved_secret(data, 'password', msca.password, blank_clears=True):
+        return None
+    # Clearing the WinRM password hands its channel to the connection password
+    cleared = 'winrm_password' in data and not str(data['winrm_password'] or '').strip()
+    if cleared and msca.winrm_password and basic_password_reaches(
+            data.get('winrm_host', msca.winrm_host), data.get('server', msca.server)):
+        return retarget_error({'winrm_password': 'saved'}, {'winrm_password': 'cleared'}, True)
     current = {k: getattr(msca, k) for k in ('server', 'use_ssl', 'verify_ssl', 'ca_bundle', 'username')}
-    if not msca.winrm_password:
+    winrm_typed = str(data.get('winrm_password') or '').strip() not in ('', *MASKS)
+    if not msca.winrm_password and not winrm_typed:
         # The basic password doubles as the WinRM one
         current.update(_winrm_target_fields(msca))
-    return retarget_error(current, data, keeps_saved_secret(
-        data, 'password', msca.password, blank_clears=True))
+    return retarget_error(current, data, True)
 
 
 @bp.route('/<int:msca_id>', methods=['PUT'])

@@ -3882,7 +3882,10 @@
         "delivered": "Livree",
         "failed": "Echouee"
       }
-    }
+    },
+    "customHeadersSet": "Des en-têtes personnalisés sont définis sur ce webhook via l'API ; leurs valeurs ne sont pas affichées.",
+    "dropCustomHeaders": "Supprimer les en-têtes personnalisés",
+    "customHeadersFollowUrl": "Les en-têtes personnalisés restent liés à l'URL enregistrée : supprimez-les pour la modifier, ou ressaisissez-les via l'API."
   },
   "safeMode": {
     "title": "Mode sans échec",
