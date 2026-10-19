@@ -70,7 +70,7 @@ class AzureKeyVaultProvider(BaseHsmProvider):
         tenant_id: Azure AD tenant ID (optional if using managed identity)
         client_id: Azure AD application ID (optional if using managed identity)
         client_secret: Azure AD client secret (optional if using managed identity)
-        use_managed_identity: Use Azure Managed Identity (default: True)
+        use_managed_identity: Use the ambient identity (default: when no credential is given)
     """
     
     def __init__(self, config: Dict[str, Any]):
@@ -87,12 +87,13 @@ class AzureKeyVaultProvider(BaseHsmProvider):
         if not self.vault_url:
             raise HsmConfigError("vault_url is required")
         
-        self.use_managed_identity = config.get('use_managed_identity', True)
         self.tenant_id = config.get('tenant_id')
         self.client_id = config.get('client_id')
         self.client_secret = config.get('client_secret')
-        
-        # If not using managed identity, require credentials
+        # The form never sends the flag: typed credentials mean a client secret login
+        typed = (self.tenant_id, self.client_id, self.client_secret)
+        self.use_managed_identity = config.get('use_managed_identity', not any(typed))
+
         if not self.use_managed_identity:
             if not self.tenant_id or not self.client_id or not self.client_secret:
                 raise HsmConfigError(

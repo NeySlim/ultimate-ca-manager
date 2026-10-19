@@ -14,6 +14,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Helm: `initialAdminPassword` had no effect and every install started with the default `changeme123`; the chart now passes it under the name the image reads, and the image also honours `INITIAL_ADMIN_PASSWORD`.
 - A change to the password policy (minimum length, character classes) only applied after a restart; it now applies at once in every worker.
 - ACME: "Allow wildcard" on a domain had no effect; the ACME server and the ACME proxy now refuse `*.` identifiers for a domain where it is off (`rejectedIdentifier`).
+- HSM: Azure Key Vault ignored the tenant, client ID and secret typed in the form and signed in with the host's ambient identity; it now uses them, and falls back to the managed identity only when all three are empty.
 
 ## [2.242] - 2026-10-18
 
