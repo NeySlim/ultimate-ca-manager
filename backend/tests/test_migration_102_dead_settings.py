@@ -100,9 +100,12 @@ def test_sqlite_adds_the_discovery_notify_email_column():
     m = _migration()
     conn = sqlite3.connect(':memory:')
     conn.execute("CREATE TABLE discovery_scan_profiles (id INTEGER PRIMARY KEY, name TEXT)")
+    conn.execute("CREATE TABLE discovered_certificates (id INTEGER PRIMARY KEY, target TEXT)")
     m.upgrade(conn)
     m.upgrade(conn)
     assert 'notify_email' in {r[1] for r in conn.execute("PRAGMA table_info(discovery_scan_profiles)")}
+    assert 'expiry_notified_fingerprint' in {
+        r[1] for r in conn.execute("PRAGMA table_info(discovered_certificates)")}
 
 
 @pytest.mark.postgres
@@ -117,12 +120,17 @@ def test_postgres_adds_the_discovery_notify_email_column():
         conn.execute(text(f"CREATE SCHEMA {schema}"))
         conn.execute(text(f"SET search_path TO {schema}"))
         conn.execute(text("CREATE TABLE discovery_scan_profiles (id INTEGER PRIMARY KEY, name TEXT)"))
+        conn.execute(text("CREATE TABLE discovered_certificates (id INTEGER PRIMARY KEY, target TEXT)"))
         m.upgrade(conn)
         m.upgrade(conn)
         columns = {r[0] for r in conn.execute(text(
             "SELECT column_name FROM information_schema.columns "
             "WHERE table_schema = :s AND table_name = 'discovery_scan_profiles'"), {'s': schema})}
         assert 'notify_email' in columns
+        columns = {r[0] for r in conn.execute(text(
+            "SELECT column_name FROM information_schema.columns "
+            "WHERE table_schema = :s AND table_name = 'discovered_certificates'"), {'s': schema})}
+        assert 'expiry_notified_fingerprint' in columns
     finally:
         conn.rollback()
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))

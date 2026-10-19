@@ -11,14 +11,20 @@ logger = logging.getLogger(__name__)
 class NotificationsMixin:
 
     def _send_notifications(self, profile_id: int, summary: Dict,
-                            new_certs: int, changed_certs: int, expiring_certs: int = 0):
-        """Send email digest if profile has notifications enabled."""
+                            new_certs: int, changed_certs: int, expiring_ids=()):
+        """Send email digest if profile has notifications enabled.
+
+        *expiring_ids*: discovered certificates in the expiry window not yet
+        reported under their fingerprint; they are marked reported once sent.
+        """
         if not profile_id:
             return
         from models import ScanProfile
         profile = db.session.get(ScanProfile, profile_id)
         if not profile:
             return
+        expiring_ids = list(expiring_ids or []) if profile.notify_on_expiry else []
+        expiring_certs = len(expiring_ids)
 
         should_notify = (
             (profile.notify_on_new and new_certs > 0) or
@@ -45,7 +51,7 @@ class NotificationsMixin:
             if changed_certs > 0:
                 parts.append(f"{changed_certs} certificate(s) changed")
             if expiring_certs > 0:
-                parts.append(f"{expiring_certs} certificate(s) expiring soon")
+                parts.append(f"{expiring_certs} certificate(s) newly expiring or expired")
 
             from html import escape as html_escape
             safe_name = html_escape(profile.name)
@@ -56,11 +62,12 @@ class NotificationsMixin:
                 f"<p>Certificates found: {summary['certs_found']}</p>"
                 f"<p>New unmanaged: <strong>{new_certs}</strong></p>"
                 f"<p>Changed: <strong>{changed_certs}</strong></p>"
-                f"<p>Expiring within 30 days: <strong style='color:#e67e22'>{expiring_certs}</strong></p>"
+                f"<p>Newly expiring within 30 days or expired: "
+                f"<strong style='color:#e67e22'>{expiring_certs}</strong></p>"
                 f"<p>Errors: {summary['errors']}</p>"
             )
 
-            EmailService.send_email(
+            sent, _detail = EmailService.send_email(
                 recipients=recipients,
                 subject=subject,
                 body_html=body,
@@ -70,6 +77,39 @@ class NotificationsMixin:
                 notification_type='discovery_scan',
                 resource_type='discovery',
             )
+            if not sent:
+                logger.warning(f"Discovery notification not sent: {_detail}")
+                return
             logger.info(f"Discovery notification sent to {len(recipients)} recipients")
+            if expiring_ids:
+                self._mark_expiry_reported(expiring_ids)
         except Exception as e:
             logger.warning(f"Failed to send discovery notification: {e}")
+
+    @staticmethod
+    def _expiring_in_window(profile_id):
+        """``(count, ids)`` of the profile's certificates expiring within 30 days or
+        expired; *ids* only those not yet reported under their current fingerprint."""
+        from datetime import datetime, timedelta, timezone
+        from models import DiscoveredCertificate
+        if not profile_id:
+            return 0, []
+        threshold = datetime.now(timezone.utc) + timedelta(days=30)
+        rows = DiscoveredCertificate.query.filter(
+            DiscoveredCertificate.scan_profile_id == profile_id,
+            DiscoveredCertificate.not_after.isnot(None),
+            DiscoveredCertificate.not_after <= threshold,
+            DiscoveredCertificate.scan_error.is_(None),
+        ).all()
+        return len(rows), [r.id for r in rows if r.expiry_notified_fingerprint != r.fingerprint_sha256]
+
+    @staticmethod
+    def _mark_expiry_reported(ids):
+        from models import DiscoveredCertificate
+        for row in DiscoveredCertificate.query.filter(DiscoveredCertificate.id.in_(ids)).all():
+            row.expiry_notified_fingerprint = row.fingerprint_sha256
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.warning(f"Could not record the expiry alerts sent: {e}")

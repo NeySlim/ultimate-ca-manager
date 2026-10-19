@@ -3,7 +3,8 @@
 Each key below lost its reader or its screen in the same release; leaving the
 row would only keep a stale value (some of them secrets) in backups. Policy
 rules lose the JSON keys no evaluation ever read, and
-discovery profiles gain the notification address their form always sent.
+discovery profiles gain the notification address their form always sent, and
+discovered certificates the fingerprint whose expiry was last reported.
 """
 import json
 import sqlite3
@@ -102,6 +103,10 @@ def _upgrade_sqlite(conn):
         columns = {r[1] for r in conn.execute("PRAGMA table_info(discovery_scan_profiles)")}
         if 'notify_email' not in columns:
             conn.execute("ALTER TABLE discovery_scan_profiles ADD COLUMN notify_email VARCHAR(255)")
+    if 'discovered_certificates' in tables:
+        columns = {r[1] for r in conn.execute("PRAGMA table_info(discovered_certificates)")}
+        if 'expiry_notified_fingerprint' not in columns:
+            conn.execute("ALTER TABLE discovered_certificates ADD COLUMN expiry_notified_fingerprint VARCHAR(64)")
     for table, column, clean in JSON_COLUMNS:
         if table not in tables:
             continue
@@ -129,6 +134,9 @@ def _upgrade_pg(conn):
     if 'discovery_scan_profiles' in tables:
         conn.execute(text("ALTER TABLE discovery_scan_profiles "
                           "ADD COLUMN IF NOT EXISTS notify_email VARCHAR(255)"))
+    if 'discovered_certificates' in tables:
+        conn.execute(text("ALTER TABLE discovered_certificates "
+                          "ADD COLUMN IF NOT EXISTS expiry_notified_fingerprint VARCHAR(64)"))
     for table, column, clean in JSON_COLUMNS:
         if table not in tables:
             continue

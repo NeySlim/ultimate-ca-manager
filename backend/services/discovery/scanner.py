@@ -378,16 +378,7 @@ class ScannerMixin:
             logger.error(f"Commit failed in services/discovery/scanner.py:316: {_commit_err}", exc_info=True)
             raise
 
-        # Count expiring/expired certs for this profile
-        expiring_certs = 0
-        if profile_id:
-            threshold = datetime.now(timezone.utc) + timedelta(days=30)
-            expiring_certs = DiscoveredCertificate.query.filter(
-                DiscoveredCertificate.scan_profile_id == profile_id,
-                DiscoveredCertificate.not_after.isnot(None),
-                DiscoveredCertificate.not_after <= threshold,
-                DiscoveredCertificate.scan_error.is_(None),
-            ).count()
+        expiring_certs, newly_expiring = self._expiring_in_window(profile_id)
 
         # Update profile last_scan_at + next_scan_at
         if profile_id:
@@ -415,7 +406,7 @@ class ScannerMixin:
         logger.info(f"Discovery scan {run_id} complete: {summary}")
 
         # Send email notifications if configured
-        self._send_notifications(profile_id, summary, new_certs, changed_certs, expiring_certs)
+        self._send_notifications(profile_id, summary, new_certs, changed_certs, newly_expiring)
 
     def _save_error(self, r: Dict, profile_id: int, now: datetime):
         """Save a scan error (not connection_refused)."""

@@ -150,6 +150,8 @@ class DiscoveredCertificate(db.Model):
     last_seen = db.Column(db.DateTime, default=lambda: datetime.now(timezone.utc))
     last_changed_at = db.Column(db.DateTime)
     previous_fingerprint = db.Column(db.String(64))
+    # Fingerprint whose expiry the profile's notification already reported
+    expiry_notified_fingerprint = db.Column(db.String(64))
     dns_hostname = db.Column(db.String(1024))
     san_dns_names = db.Column(db.Text, nullable=False, default='[]')
     san_ip_addresses = db.Column(db.Text, nullable=False, default='[]')
