@@ -1824,12 +1824,7 @@ def main():
     print(f"  HTTPS Server: https://{config.HOST}:{config.HTTPS_PORT}")
     print(f"  Certificate: {config.HTTPS_CERT_PATH}")
     print(f"  Database: {config.DATABASE_PATH}")
-    print(f"  SCEP Enabled: {config.SCEP_ENABLED}")
     print(f"{'='*60}\n")
-    
-    if config.SCEP_ENABLED:
-        print(f"  SCEP Endpoint: https://{config.HOST}:{config.HTTPS_PORT}/scep/pkiclient.exe")
-        print(f"{'='*60}\n")
     
     # Start HTTP protocol server for CDP/OCSP (dev mode, non-blocking thread)
     try:

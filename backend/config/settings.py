@@ -3,7 +3,6 @@ Ultimate Certificate Manager - Configuration Management
 Handles all application settings with web UI configuration support
 """
 import os
-import secrets
 import subprocess
 from pathlib import Path
 from typing import Optional
@@ -209,16 +208,6 @@ class Config:
     INITIAL_ADMIN_USERNAME = os.getenv("INITIAL_ADMIN_USERNAME", "admin")
     INITIAL_ADMIN_PASSWORD = os.getenv("INITIAL_ADMIN_PASSWORD", "changeme123")
     INITIAL_ADMIN_EMAIL = os.getenv("INITIAL_ADMIN_EMAIL", "admin@localhost")
-    
-    # SCEP Configuration
-    SCEP_ENABLED = os.getenv("SCEP_ENABLED", "true").lower() == "true"
-    SCEP_CA_ID = os.getenv("SCEP_CA_ID")
-    # Generate random SCEP password if not configured (security: avoid weak defaults)
-    SCEP_CHALLENGE_PASSWORD = os.getenv("SCEP_CHALLENGE_PASSWORD") or secrets.token_urlsafe(16)
-    SCEP_AUTO_APPROVE = os.getenv("SCEP_AUTO_APPROVE", "false").lower() == "true"
-    SCEP_CERT_LIFETIME = int(os.getenv("SCEP_CERT_LIFETIME", "365"))
-    SCEP_KEY_SIZE = int(os.getenv("SCEP_KEY_SIZE", "2048"))
-    SCEP_RENEWAL_DAYS = int(os.getenv("SCEP_RENEWAL_DAYS", "30"))
     
     # Rate Limiting
     RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
