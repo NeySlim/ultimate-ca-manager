@@ -12,6 +12,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Removed
 
 - ACME: EAB keys still kept in the pre-2.139 `acme_eab_keys` setting registered accounts without appearing anywhere; the upgrade moves them to ACME > EAB as active credentials, where they can be seen and revoked, and the old setting is no longer read. Nothing to do.
+- The undocumented `admin_bypass_password_policy` setting, which let administrators skip the password policy when set in the database, is gone and the upgrade deletes it; administrators now follow the policy like everyone else. Nothing to do.
 
 ### Fixed
 

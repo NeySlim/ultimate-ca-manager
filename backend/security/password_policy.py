@@ -80,20 +80,6 @@ def load_policy_from_config() -> PasswordPolicy:
         return _DEFAULT_POLICY
 
 
-def is_admin_bypass_enabled() -> bool:
-    """Check if admin bypass for password policy is enabled."""
-    try:
-        from models import SystemConfig
-
-        cfg = SystemConfig.query.filter_by(key='admin_bypass_password_policy').first()
-        if cfg is None:
-            return False
-        return cfg.value.lower() in ('true', '1', 'yes')
-    except RuntimeError:
-        # Outside Flask app context
-        return False
-
-
 def validate_password(
     password: str,
     policy: Optional[PasswordPolicy] = None,
