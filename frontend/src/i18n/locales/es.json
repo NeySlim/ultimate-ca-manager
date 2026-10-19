@@ -3319,7 +3319,10 @@
       "projectId": "ID del proyecto",
       "location": "Ubicación",
       "keyRing": "Clave Ring",
-      "project": "Proyecto"
+      "project": "Proyecto",
+      "credentialsJson": "Clave JSON de la cuenta de servicio",
+      "credentialsJsonHelp": "Déjelo vacío para usar las credenciales de Google predeterminadas del servidor",
+      "credentialsJsonStored": "Hay una clave guardada. Pegue una nueva para reemplazarla"
     },
     "helpSecurity": "Las claves HSM residen en hardware resistente a manipulaciones. Destruir una clave es irreversible.",
     "helpBestPractice": "Use el HSM para todas las claves de firma de CA. Pruebe las conexiones con regularidad.",

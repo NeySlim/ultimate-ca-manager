@@ -706,7 +706,7 @@ def get_provider_types():
                 'project_id': {'type': 'string', 'required': True, 'description': 'GCP project ID'},
                 'location': {'type': 'string', 'required': True, 'description': 'Key ring location (e.g., us-east1)'},
                 'key_ring': {'type': 'string', 'required': True, 'description': 'Key ring name'},
-                'service_account_json': {'type': 'textarea', 'required': True, 'description': 'Service account JSON key'}
+                'service_account_json': {'type': 'textarea', 'required': False, 'description': 'Service account JSON key (empty: default credentials)'}
             }
         },
         {

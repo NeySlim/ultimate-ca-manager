@@ -3319,7 +3319,10 @@
       "projectId": "Projekt-ID",
       "location": "Standort",
       "keyRing": "Schlüsselring",
-      "project": "Projekt"
+      "project": "Projekt",
+      "credentialsJson": "JSON-Schlüssel des Dienstkontos",
+      "credentialsJsonHelp": "Leer lassen, um die Standard-Google-Anmeldedaten des Servers zu verwenden",
+      "credentialsJsonStored": "Ein Schlüssel ist gespeichert. Fügen Sie einen neuen ein, um ihn zu ersetzen"
     },
     "helpSecurity": "HSM-Schlüssel befinden sich in manipulationssicherer Hardware. Das Zerstören eines Schlüssels ist irreversibel.",
     "helpBestPractice": "HSM für alle CA-Signierschlüssel verwenden. Verbindungen regelmäßig testen.",

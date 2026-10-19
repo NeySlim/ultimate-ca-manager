@@ -2036,7 +2036,10 @@
       "projectId": "ID du projet",
       "location": "Emplacement",
       "keyRing": "Anneau de clés",
-      "project": "Projet"
+      "project": "Projet",
+      "credentialsJson": "Clé JSON du compte de service",
+      "credentialsJsonHelp": "Laisser vide pour utiliser les identifiants Google par défaut du serveur",
+      "credentialsJsonStored": "Une clé est enregistrée. Collez-en une nouvelle pour la remplacer"
     },
     "helpSecurity": "Les clés HSM sont dans un matériel inviolable. La destruction d'une clé est irréversible.",
     "helpBestPractice": "Utilisez HSM pour toutes les clés de signature CA. Testez les connexions régulièrement.",
