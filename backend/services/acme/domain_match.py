@@ -105,3 +105,18 @@ def find(model, domain: Optional[str]):
     rank = {name: position for position, name in enumerate(wanted)}
     return min(rows, key=lambda row: rank.get((row.domain or '').lower(),
                                               len(wanted)))
+
+
+def wildcard_refused(identifiers) -> List[str]:
+    """Wildcard identifiers whose ``acme_domains`` entry has "Allow wildcard" off."""
+    from models.acme_models import AcmeDomain
+
+    refused = []
+    for identifier in identifiers or []:
+        value = identifier.get('value') if isinstance(identifier, dict) else None
+        if not isinstance(value, str) or not value.startswith(_WILDCARD):
+            continue
+        entry = find(AcmeDomain, value)
+        if entry is not None and entry.is_wildcard_allowed is False:
+            refused.append(value)
+    return refused

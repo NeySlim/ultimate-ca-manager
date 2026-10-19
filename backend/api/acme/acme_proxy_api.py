@@ -30,6 +30,7 @@ from services.acme.acme_proxy_account import (
     resolve_proxy_by_slug,
 )
 from services.acme import AcmeService, ari
+from services.acme import domain_match
 from services.acme.identifiers import validate_acme_identifier
 from services.acme.jwk_thumbprint import jwk_thumbprint_or_none
 from utils.acme_csr import decode_csr_b64
@@ -440,6 +441,14 @@ def new_order(slug=None):
         ok, err_type, err_detail = validate_acme_identifier(identifier)
         if not ok:
             return proxy_error(err_type, err_detail, 400)
+
+    wildcard_denied = domain_match.wildcard_refused(identifiers)
+    if wildcard_denied:
+        return proxy_error(
+            'rejectedIdentifier',
+            'Wildcard certificates are not allowed for: ' + ', '.join(wildcard_denied),
+            400,
+        )
 
     requested_challenge = payload.get('challenge_type') or payload.get('challengeType')
     if requested_challenge and requested_challenge != 'dns-01':
