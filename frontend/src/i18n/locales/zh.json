@@ -3326,7 +3326,8 @@
       "project": "项目",
       "credentialsJson": "服务账号 JSON 密钥",
       "credentialsJsonHelp": "留空则使用服务器的默认 Google 凭据",
-      "credentialsJsonStored": "已保存密钥。粘贴新密钥即可替换"
+      "credentialsJsonStored": "已保存密钥。粘贴新密钥即可替换",
+      "useDefaultCredentials": "删除已存储的密钥并使用服务器的默认凭据"
     },
     "helpSecurity": "HSM 密钥存储在防篡改硬件中。销毁密钥是不可逆的。",
     "helpBestPractice": "将 HSM 用于所有 CA 签名密钥。定期测试连接。",

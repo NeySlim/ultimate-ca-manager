@@ -3328,7 +3328,8 @@
       "project": "Project",
       "credentialsJson": "Service account JSON key",
       "credentialsJsonHelp": "Leave empty to use the server's default Google credentials",
-      "credentialsJsonStored": "A key is stored. Paste a new one to replace it"
+      "credentialsJsonStored": "A key is stored. Paste a new one to replace it",
+      "useDefaultCredentials": "Remove the stored key and use the server's default credentials"
     },
     "helpSecurity": "HSM keys are in tamper-resistant hardware. Destroying a key is irreversible.",
     "helpBestPractice": "Use HSM for all CA signing keys. Test connections regularly.",

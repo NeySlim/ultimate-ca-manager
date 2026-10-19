@@ -669,7 +669,8 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
       config.project_id = formData.gcp_project_id
       config.location = formData.gcp_location
       config.key_ring = formData.gcp_keyring
-      // '***' keeps the stored key; empty uses the server's default credentials
+      // '***' keeps the stored key; left out, the saved config has none and the
+      // provider uses the server's default credentials
       if (formData.gcp_credentials_json) config.service_account_json = formData.gcp_credentials_json
     } else if (formData.provider_type === 'openbao') {
       config.url = formData.openbao_url
@@ -768,8 +769,16 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
             value={formData.gcp_credentials_json === '***' ? '' : formData.gcp_credentials_json}
             onChange={e => handleChange('gcp_credentials_json', e.target.value || (provider?.gcp_credentials_json === '***' ? '***' : ''))}
             placeholder='{"type": "service_account", ...}'
+            disabled={provider?.gcp_credentials_json === '***' && !formData.gcp_credentials_json}
             helperText={provider?.gcp_credentials_json === '***' ? t('hsm.gcpConfig.credentialsJsonStored') : t('hsm.gcpConfig.credentialsJsonHelp')}
           />
+          {provider?.gcp_credentials_json === '***' && (
+            <ToggleSwitch
+              checked={!formData.gcp_credentials_json}
+              onChange={(val) => handleChange('gcp_credentials_json', val ? '' : '***')}
+              label={t('hsm.gcpConfig.useDefaultCredentials')}
+            />
+          )}
         </div>
       )}
 

@@ -43,4 +43,15 @@ describe('HSM provider form, stored secrets', () => {
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2))
     expect(onSave.mock.calls[1][0].config.service_account_json).toBe('{"type": "service_account"}')
   })
+
+  it('google-kms: a stored key can be removed for the default credentials', async () => {
+    const onSave = vi.fn()
+    render(<ProviderModal provider={{ id: 3, name: 'G', provider_type: 'google-kms', gcp_project_id: 'p',
+                                      gcp_credentials_json: '***' }}
+                          hsmStatus={null} onSave={onSave} onClose={() => {}} />)
+    fireEvent.click(screen.getByText('hsm.gcpConfig.useDefaultCredentials'))
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalled())
+    expect(onSave.mock.calls[0][0].config).not.toHaveProperty('service_account_json')
+  })
 })

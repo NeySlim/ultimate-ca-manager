@@ -3326,7 +3326,8 @@
       "project": "Progetto",
       "credentialsJson": "Chiave JSON dell'account di servizio",
       "credentialsJsonHelp": "Lascia vuoto per usare le credenziali Google predefinite del server",
-      "credentialsJsonStored": "È memorizzata una chiave. Incollane una nuova per sostituirla"
+      "credentialsJsonStored": "È memorizzata una chiave. Incollane una nuova per sostituirla",
+      "useDefaultCredentials": "Rimuovi la chiave salvata e usa le credenziali predefinite del server"
     },
     "helpSecurity": "Le chiavi HSM sono in hardware resistente alle manomissioni. La distruzione di una chiave è irreversibile.",
     "helpBestPractice": "Usa HSM per tutte le chiavi di firma CA. Testa le connessioni regolarmente.",

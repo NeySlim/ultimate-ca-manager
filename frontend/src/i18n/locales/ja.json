@@ -3326,7 +3326,8 @@
       "project": "プロジェクト",
       "credentialsJson": "サービスアカウントの JSON キー",
       "credentialsJsonHelp": "空欄の場合、サーバーの既定の Google 認証情報を使用します",
-      "credentialsJsonStored": "キーが保存されています。置き換えるには新しいキーを貼り付けてください"
+      "credentialsJsonStored": "キーが保存されています。置き換えるには新しいキーを貼り付けてください",
+      "useDefaultCredentials": "保存されたキーを削除し、サーバーのデフォルト認証情報を使用する"
     },
     "helpSecurity": "HSM鍵は耐タンパー性ハードウェア内にあります。鍵の破棄は不可逆的です。",
     "helpBestPractice": "すべてのCA署名鍵にHSMを使用してください。定期的に接続をテストしてください。",
