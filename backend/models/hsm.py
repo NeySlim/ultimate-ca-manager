@@ -127,9 +127,9 @@ class HsmProvider(db.Model if db else object):
                             'slot_index': 'pkcs11_slot_id',
                         },
                         'aws-cloudhsm': {
+                            'module_path': 'pkcs11_library_path',
+                            'token_label': 'pkcs11_token_label',
                             'cluster_id': 'aws_cluster_id',
-                            'region': 'aws_region',
-                            'access_key': 'aws_access_key',
                             'hsm_user': 'aws_crypto_user',
                             'hsm_password': 'aws_crypto_password',
                         },

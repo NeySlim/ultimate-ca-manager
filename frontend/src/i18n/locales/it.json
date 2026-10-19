@@ -3306,9 +3306,6 @@
     },
     "awsConfig": {
       "clusterId": "ID Cluster",
-      "region": "Regione",
-      "accessKey": "Chiave di Accesso",
-      "secretKey": "Chiave Segreta",
       "cryptoUser": "Utente Crypto",
       "cryptoPassword": "Password Crypto"
     },

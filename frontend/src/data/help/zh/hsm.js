@@ -73,8 +73,8 @@ export default {
 ### AWS CloudHSM
 Amazon Web Services 基于云的 HSM：
 - **集群 ID**: CloudHSM 集群标识符
-- **区域**: AWS 区域
-- **凭据**: AWS 访问密钥和密钥
+- **令牌标签**: CloudHSM PKCS#11 令牌的标签
+- **加密用户 / 加密密码**: UCM 登录所用的加密用户 (CU)，无需 AWS 访问密钥
 
 ### Azure Key Vault
 Microsoft Azure 托管密钥存储：

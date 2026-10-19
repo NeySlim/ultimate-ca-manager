@@ -73,8 +73,8 @@ export default {
 ### AWS CloudHSM
 Amazon Web Servicesクラウドベースのhsm：
 - **クラスターID**: CloudHSMクラスター識別子
-- **リージョン**: AWSリージョン
-- **資格情報**: AWSアクセスキーとシークレット
+- **トークンラベル**: CloudHSM の PKCS#11 トークンのラベル
+- **暗号ユーザー / 暗号パスワード**: UCM がログインに使う暗号ユーザー (CU)。AWS アクセスキーは不要です
 
 ### Azure Key Vault
 Microsoft Azureマネージドキーストレージ：

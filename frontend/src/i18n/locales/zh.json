@@ -3306,9 +3306,6 @@
     },
     "awsConfig": {
       "clusterId": "集群 ID",
-      "region": "区域",
-      "accessKey": "访问密钥",
-      "secretKey": "私有密钥",
       "cryptoUser": "加密用户",
       "cryptoPassword": "加密密码"
     },

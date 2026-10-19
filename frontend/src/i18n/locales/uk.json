@@ -3346,9 +3346,6 @@
     },
     "awsConfig": {
       "clusterId": "ID кластера",
-      "region": "Регіон",
-      "accessKey": "Access Ключ",
-      "secretKey": "Secret Ключ",
       "cryptoUser": "Crypto Користувач",
       "cryptoPassword": "Crypto Пароль"
     },

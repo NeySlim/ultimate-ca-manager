@@ -3306,9 +3306,6 @@
     },
     "awsConfig": {
       "clusterId": "クラスターID",
-      "region": "リージョン",
-      "accessKey": "アクセスキー",
-      "secretKey": "シークレットキー",
       "cryptoUser": "暗号ユーザー",
       "cryptoPassword": "暗号パスワード"
     },

@@ -2017,9 +2017,6 @@
     },
     "awsConfig": {
       "clusterId": "ID de cluster",
-      "region": "Région",
-      "accessKey": "Clé d'accès",
-      "secretKey": "Clé secrète",
       "cryptoUser": "Utilisateur crypto",
       "cryptoPassword": "Mot de passe crypto"
     },

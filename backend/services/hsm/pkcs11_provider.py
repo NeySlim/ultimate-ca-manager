@@ -83,6 +83,9 @@ class Pkcs11Provider(BaseHsmProvider):
             )
         
         config = normalize_pkcs11_config(config)
+        if not config.get('user_pin') and config.get('hsm_user') and config.get('hsm_password'):
+            # AWS CloudHSM logs a crypto user in with the PIN "<user>:<password>".
+            config['user_pin'] = f"{config['hsm_user']}:{config['hsm_password']}"
         super().__init__(config)
 
         # Validate config
