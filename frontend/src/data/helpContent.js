@@ -799,7 +799,7 @@ export const helpContent = {
         icon: Key,
         items: [
           { label: 'Create Role', text: 'Define a new role with a name and description' },
-          { label: 'Permission Matrix', text: 'Check/uncheck permissions by category (CAs, Certs, Users, etc.)' },
+          { label: 'Permission Matrix', text: 'Check/uncheck permissions by category (CAs, Certs, Private Keys, etc.)' },
           { label: 'Coverage', text: 'Visual percentage of total permissions granted to the role' },
           { label: 'User Count', text: 'See how many users are assigned to each role' },
         ]

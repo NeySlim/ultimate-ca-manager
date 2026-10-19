@@ -17,7 +17,7 @@ export default {
         title: 'Rôles personnalisés',
         items: [
           { label: 'Créer un rôle', text: 'Définir un nouveau rôle avec un nom et une description' },
-          { label: 'Matrice de permissions', text: 'Cocher/décocher les permissions par catégorie (CA, Certificats, Utilisateurs, etc.)' },
+          { label: 'Matrice de permissions', text: 'Cocher/décocher les permissions par catégorie (CA, Certificats, Clés privées, etc.)' },
           { label: 'Couverture', text: 'Pourcentage visuel du total des permissions accordées au rôle' },
           { label: 'Nombre d\'utilisateurs', text: 'Voir combien d\'utilisateurs sont assignés à chaque rôle' },
         ]
@@ -57,10 +57,9 @@ Quatre rôles intégrés qui ne peuvent pas être modifiés ou supprimés :
 Les permissions sont organisées par catégorie :
 - **CA** : Créer, lire, mettre à jour, supprimer, importer, exporter (certificat seul : voir Clés privées)
 - **Certificats** : Émettre, lire, révoquer, renouveler, supprimer, exporter (certificat seul : voir Clés privées)
-- **Clés privées** : Export direct de clé privée (\`read:private_keys\`), réservé aux administrateurs : aucun rôle intégré hormis Admin ne la détient. Les rôles sans cette permission passent par la récupération de clés
+- **Clés privées** : Export direct de la clé privée d'un certificat ou d'une CA (\`read:private_keys\`). Aucun rôle intégré hormis Admin ne la détient ; un rôle personnalisé peut l'accorder. Les rôles sans cette permission passent par la récupération de clés
 - **CSR** : Créer, lire, signer, supprimer
 - **Modèles** : Créer, lire, mettre à jour, supprimer
-- **Utilisateurs** : Créer, lire, mettre à jour, supprimer
 - **Groupes** : Créer, lire, mettre à jour, supprimer
 - **Paramètres** : Lire, mettre à jour
 - **Audit** : Lire, exporter, nettoyer
@@ -72,25 +71,27 @@ Les permissions sont organisées par catégorie :
 - **Politiques** : Consulter les politiques de certificat
 - **Approbations** : Consulter et décider des demandes d'approbation
 - **Récupération de clés** : Demander des récupérations et consulter les demandes (l'approbation est réservée aux administrateurs)
-- **Sauvegarde** : Créer, restaurer
+
+Un rôle personnalisé accorde au plus ce que peut détenir le rôle intégré Opérateur, plus les clés privées : jamais l'accès complet, la gestion des utilisateurs, l'administration système, le SSO ni les déploiements. Les jokers sont refusés.
 
 ### Bascules de catégorie
 Cliquez sur un en-tête de catégorie pour activer/désactiver toutes les permissions de cette catégorie d'un coup.
 
 ### Indicateur de couverture
-Un badge de pourcentage montre quelle part de l'ensemble total des permissions le rôle couvre. 100% = équivalent Admin.
+Un badge de pourcentage montre quelle part de l'ensemble total des permissions le rôle couvre.
 
 ## Attribuer des rôles
 
 Les rôles sont attribués :
-- **Directement** : Sur la page Utilisateurs, modifiez un utilisateur et sélectionnez un rôle
+- **Directement** : Sur la page Utilisateurs, modifiez un utilisateur et sélectionnez un rôle intégré et, si besoin, un rôle personnalisé qui s'y ajoute. Les changements s'appliquent dès la requête suivante de l'utilisateur
 - **Via les groupes** : Un groupe accorde un ensemble de permissions ; chaque membre les reçoit en plus de son propre rôle
 
 ## Permissions effectives
 
 Les permissions effectives d'un utilisateur sont calculées comme l'union de :
-1. Les permissions du rôle directement attribué
-2. Les permissions accordées par les groupes auxquels il appartient
+1. Les permissions de son rôle intégré
+2. Les permissions de son rôle personnalisé, y compris celles des rôles dont il hérite
+3. Les permissions accordées par les groupes auxquels il appartient
 
 La règle la plus permissive l'emporte (modèle additif, pas de règles de refus).
 

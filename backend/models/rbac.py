@@ -23,13 +23,9 @@ class CustomRole(db.Model):
     parent = db.relationship('CustomRole', remote_side=[id], backref='children')
     
     def get_all_permissions(self):
-        """Get all permissions including inherited ones"""
-        perms = set(self.permissions or [])
-        
-        if self.parent:
-            perms.update(self.parent.get_all_permissions())
-        
-        return list(perms)
+        """What the role grants, inherited permissions included (cycle-safe)."""
+        from auth.permissions import custom_role_permissions
+        return custom_role_permissions(self)
     
     def to_dict(self):
         from models import User

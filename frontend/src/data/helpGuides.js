@@ -1643,10 +1643,9 @@ Four built-in roles that cannot be modified or deleted:
 Permissions are organized by category:
 - **CAs**: Create, read, update, delete, import, export (certificate only: see Private Keys)
 - **Certificates**: Issue, read, revoke, renew, delete, export (certificate only: see Private Keys)
-- **Private Keys**: Direct private-key export (\`read:private_keys\`), admin-only: no built-in role except Admin holds it. Roles without it go through Key Recovery
+- **Private Keys**: Direct private-key export of a certificate or a CA (\`read:private_keys\`). No built-in role except Admin holds it; a custom role can grant it. Roles without it go through Key Recovery
 - **CSRs**: Create, read, sign, delete
 - **Templates**: Create, read, update, delete
-- **Users**: Create, read, update, delete
 - **Groups**: Create, read, update, delete
 - **Settings**: Read, update
 - **Audit**: Read, export, cleanup
@@ -1658,25 +1657,27 @@ Permissions are organized by category:
 - **Policies**: View certificate policies
 - **Approvals**: View and decide approval requests
 - **Key Recovery**: Request recoveries and view requests (approval is admin-only)
-- **Backup**: Create, restore
+
+A custom role grants at most what the built-in Operator role can hold, plus Private Keys: never full access, user management, system administration, SSO or deployments. Wildcards are refused.
 
 ### Category Toggles
 Click a category header to enable/disable all permissions in that category at once.
 
 ### Coverage Indicator
-A percentage badge shows how much of the total permission set the role covers. 100% = Admin equivalent.
+A percentage badge shows how much of the total permission set the role covers.
 
 ## Assigning Roles
 
 Roles are assigned:
-- **Directly**: On the Users page, edit a user and select a role
+- **Directly**: On the Users page, edit a user and select a built-in role and, optionally, a custom role that adds to it. Changes apply from the user's next request
 - **Via Groups**: A group grants a permission set; every member receives it in addition to their own role
 
 ## Effective Permissions
 
 A user's effective permissions are computed as the union of:
-1. Their directly assigned role's permissions
-2. The permissions granted by groups they belong to
+1. Their built-in role's permissions
+2. Their custom role's permissions, including the roles it inherits from
+3. The permissions granted by groups they belong to
 
 The most permissive rule wins (additive model, no deny rules).
 

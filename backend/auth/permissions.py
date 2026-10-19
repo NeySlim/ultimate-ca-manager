@@ -114,6 +114,62 @@ GROUP_GRANTABLE_PERMISSIONS = sorted(
 )
 
 
+# A custom role grants what a group may, plus direct key export: never `*`,
+# `admin:*` or the users/system/sso/deploy resources, so no path to administrator.
+CUSTOM_ROLE_GRANTABLE_PERMISSIONS = sorted(
+    set(GROUP_GRANTABLE_PERMISSIONS) | {'read:private_keys'})
+
+# Resource names the role editor used to store, read as the enforced ones.
+_LEGACY_RESOURCE_ALIASES = {'certs': 'certificates'}
+
+
+def normalize_permission(perm):
+    """``read:certs`` -> ``read:certificates``; anything else unchanged."""
+    if not isinstance(perm, str) or ':' not in perm:
+        return perm
+    action, resource = perm.split(':', 1)
+    return f"{action}:{_LEGACY_RESOURCE_ALIASES.get(resource, resource)}"
+
+
+def custom_role_chain(role):
+    """``role`` then its ancestors, stopping at a cycle or a missing parent."""
+    chain, seen = [], set()
+    while role is not None and role.id not in seen:
+        seen.add(role.id)
+        chain.append(role)
+        role = role.parent
+    return chain
+
+
+def custom_role_permissions(role) -> list:
+    """Grantable permissions of ``role`` and the roles it inherits from."""
+    grantable = set(CUSTOM_ROLE_GRANTABLE_PERMISSIONS)
+    granted = []
+    for link in custom_role_chain(role):
+        for perm in (link.permissions or []):
+            perm = normalize_permission(perm)
+            if perm in grantable and perm not in granted:
+                granted.append(perm)
+    return granted
+
+
+def get_custom_role_permissions(user) -> list:
+    """Permissions granted to ``user`` by the custom role assigned to them.
+
+    Filtered on read like group grants; never raises.
+    """
+    role_id = getattr(user, 'custom_role_id', None)
+    if user is None or not role_id:
+        return []
+    try:
+        from models import db
+        from models.rbac import CustomRole
+        return custom_role_permissions(db.session.get(CustomRole, role_id))
+    except Exception as e:  # noqa: BLE001: authorisation must not 500 on this
+        logger.warning(f"Could not resolve custom role permissions for user {getattr(user, 'id', '?')}: {e}")
+        return []
+
+
 def get_role_permissions(role: str) -> list:
     """Get permissions for a role"""
     return ROLE_PERMISSIONS.get(role, [])
@@ -151,15 +207,17 @@ def get_group_permissions(user) -> list:
 
 
 def get_effective_permissions(user) -> list:
-    """Role permissions unioned with those granted by the user's groups.
+    """Built-in role, unioned with the user's custom role and groups.
 
     This is what authorisation and the login response must both use, so the UI
     gates on exactly what the API enforces.
     """
-    role_perms = list(get_role_permissions(getattr(user, 'role', None)))
-    if '*' in role_perms:
-        return role_perms  # administrator: nothing to add
-    return role_perms + [p for p in get_group_permissions(user) if p not in role_perms]
+    perms = list(get_role_permissions(getattr(user, 'role', None)))
+    if '*' in perms:
+        return perms  # administrator: nothing to add
+    for extra in (get_custom_role_permissions(user), get_group_permissions(user)):
+        perms += [p for p in extra if p not in perms]
+    return perms
 
 
 def has_permission(user_role: str, required_permission: str) -> bool:
