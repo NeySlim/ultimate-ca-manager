@@ -5,6 +5,7 @@ import base64
 from typing import List, Tuple
 
 from cryptography import x509
+from utils.csr_extensions import csr_extensions
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
@@ -80,7 +81,7 @@ def extract_domains_from_csr(csr: x509.CertificateSigningRequest) -> List[str]:
     except Exception:
         pass
     try:
-        san_ext = csr.extensions.get_extension_for_oid(
+        san_ext = csr_extensions(csr).get_extension_for_oid(
             x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME
         )
         for name in san_ext.value:

@@ -375,10 +375,11 @@ def extract_ip_from_csr_san(csr) -> list:
         List of IP address strings found in CSR SANs
     """
     from cryptography import x509
-    
+    from utils.csr_extensions import csr_extensions
+
     ip_addresses = []
     try:
-        san_ext = csr.extensions.get_extension_for_class(x509.SubjectAlternativeName)
+        san_ext = csr_extensions(csr).get_extension_for_class(x509.SubjectAlternativeName)
         san = san_ext.value
         
         # Get all IP addresses from SAN

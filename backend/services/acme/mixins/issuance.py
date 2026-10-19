@@ -6,6 +6,7 @@ from typing import Optional, Tuple, List
 from models import db
 from models.acme_models import AcmeOrder
 from utils.datetime_utils import utc_now
+from utils.csr_extensions import csr_extensions
 
 logger = logging.getLogger(__name__)
 
@@ -305,7 +306,7 @@ class IssuanceMixin:
         from cryptography import x509
 
         try:
-            san_ext = csr.extensions.get_extension_for_oid(
+            san_ext = csr_extensions(csr).get_extension_for_oid(
                 x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME
             )
         except x509.ExtensionNotFound:
@@ -439,7 +440,7 @@ class IssuanceMixin:
         
         # Get SANs
         try:
-            san_ext = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            san_ext = csr_extensions(csr).get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
             for name in san_ext.value:
                 if isinstance(name, x509.DNSName):
                     if name.value not in domains:
@@ -586,7 +587,7 @@ class IssuanceMixin:
             # If no CN, try first DNS name from SAN
             if not cn:
                 try:
-                    san_ext = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+                    san_ext = csr_extensions(csr).get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
                     for name in san_ext.value:
                         if isinstance(name, x509.DNSName):
                             cn = name.value
