@@ -356,9 +356,13 @@ def sso_callback(provider_type):
     elif provider.provider_type == 'saml':
         sp_base = saml_sp.sp_base_url(request)
 
+        # Dropped once the request is used up or gone, never by a refused POST.
+        drop_cookie = []
+
         @after_this_request
         def _drop_request_cookie(response):
-            saml_sp.clear_request_cookie(response, sp_base)
+            if drop_cookie:
+                saml_sp.clear_request_cookie(response, sp_base)
             return response
 
         try:
@@ -366,9 +370,10 @@ def sso_callback(provider_type):
             attrs = {}
             name_id = ''
 
-            # The AuthnRequest this browser started, consumed whatever the outcome.
+            # The AuthnRequest this browser started; consumed only by a valid response.
             request_id = request.cookies.get(saml_sp.REQUEST_COOKIE) or None
-            if request_id and not saml_sp.take_request(request_id, provider.id):
+            if request_id and not saml_sp.request_pending(request_id, provider.id):
+                drop_cookie.append(True)
                 return _reject_saml_login(provider, 'unknown, expired or already used AuthnRequest')
 
             # SECURITY: NEVER fall back to an unsigned XML parser here.
@@ -405,6 +410,11 @@ def sso_callback(provider_type):
                     return _reject_saml_login(provider, 'unsolicited response (IdP-initiated login is disabled)')
             elif request_id is None:
                 return _reject_saml_login(provider, 'InResponseTo matches no AuthnRequest from this browser')
+            elif not saml_sp.take_request(request_id, provider.id):
+                drop_cookie.append(True)
+                return _reject_saml_login(provider, 'unknown, expired or already used AuthnRequest')
+            else:
+                drop_cookie.append(True)
 
             not_on_or_after = saml_auth.get_last_assertion_not_on_or_after()
             if not not_on_or_after:

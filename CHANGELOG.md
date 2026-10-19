@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
-- SAML responses were accepted on their signature alone (no audience, Destination, validity window or InResponseTo check, replays possible); they are now validated strictly, tied to the login started in the same browser and accepted once. Check that the IdP clock is within five minutes and that its SP entity ID, ACS URL and issuer match `/api/v2/sso/saml/metadata` (they come from the admin Base URL, else `FQDN`, else the request's address, so set the Base URL); IdP-initiated logins need the new "Allow IdP-initiated login" option.
+- SAML responses were accepted on their signature alone (no audience, Destination, validity window or InResponseTo check, replays possible); they are now validated strictly, tied to the login started in the same browser (which a refused POST no longer cancels) and accepted once. Check that the IdP clock is within five minutes and that its SP entity ID, ACS URL and issuer match `/api/v2/sso/saml/metadata` (they come from the admin Base URL, else `FQDN`, else the request's address, so set the Base URL); IdP-initiated logins need the new "Allow IdP-initiated login" option.
 - SAML "Sign authentication requests" was saved but never applied, and the SP metadata always announced unsigned requests. Requests are now signed with the key of the chosen SP certificate (RSA only) when the option is on; it has been turned off on existing providers, matching what UCM actually sent.
 
 ### Added

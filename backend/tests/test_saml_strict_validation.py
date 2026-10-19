@@ -158,14 +158,31 @@ def test_sp_initiated_login_is_accepted(app, provider, idp_signer):
     assert _post(client, _response(idp_signer, in_response_to=request_id)) == OK
 
 
-def test_request_cookie_is_cross_site_and_cleared(app, provider):
+def _cookie_headers(r):
+    return [h for h in r.headers.getlist('Set-Cookie') if h.startswith(saml_sp.REQUEST_COOKIE)]
+
+
+def test_request_cookie_is_cross_site_and_cleared_by_the_login(app, provider, idp_signer):
     client = app.test_client()
     r = client.get('/api/v2/sso/login/saml', base_url=SP_BASE)
-    header = next(h for h in r.headers.getlist('Set-Cookie') if h.startswith(saml_sp.REQUEST_COOKIE))
+    header = _cookie_headers(r)[0]
     assert 'SameSite=None' in header and 'Secure' in header and 'HttpOnly' in header
-    r = client.post(ACS, base_url=SP_BASE, data={'SAMLResponse': 'x'})
-    cleared = [h for h in r.headers.getlist('Set-Cookie') if h.startswith(saml_sp.REQUEST_COOKIE)]
+    request_id = client.get_cookie(saml_sp.REQUEST_COOKIE, domain='ucm.example.test', path=ACS).value
+    r = client.post(ACS, base_url=SP_BASE, data={'SAMLResponse': _response(idp_signer, in_response_to=request_id)})
+    assert r.headers['Location'] == OK
+    cleared = _cookie_headers(r)
     assert cleared and 'Max-Age=0' in cleared[0]
+
+
+def test_a_forged_post_does_not_spoil_the_pending_login(app, provider, idp_signer):
+    # A cross-site POST lands in the victim's browser before the IdP answers.
+    client = app.test_client()
+    request_id = _start_login(client)
+    r = client.post(ACS, base_url=SP_BASE, data={'SAMLResponse': 'x'})
+    assert r.headers['Location'] == REFUSED and not _cookie_headers(r)
+    forged = _response(idp_signer, in_response_to=request_id, audience='https://other-sp.example.test/saml')
+    assert _post(client, forged) == REFUSED
+    assert _post(client, _response(idp_signer, in_response_to=request_id)) == OK
 
 
 def test_assertion_for_another_audience_is_refused(app, provider, idp_signer, caplog):
@@ -360,9 +377,11 @@ def test_message_ids_on_postgresql(monkeypatch):
         assert saml_sp.consume_assertion('_a1', 1, later)
         assert not saml_sp.consume_assertion('_a1', 1, later)
         saml_sp.remember_request('_r1', 1)
+        assert saml_sp.request_pending('_r1', 1) and not saml_sp.request_pending('_r1', 2)
         assert not saml_sp.take_request('_r1', 2)
         assert saml_sp.take_request('_r1', 1)
         assert not saml_sp.take_request('_r1', 1)
+        assert not saml_sp.request_pending('_r1', 1)
         earlier = (datetime.datetime.now(datetime.timezone.utc)
                    - datetime.timedelta(hours=1)).timestamp()
         assert saml_sp.consume_assertion('_old', 1, earlier)
@@ -550,3 +569,13 @@ def test_fallback_metadata_says_the_same(app, name_id_reset, signing_off, https_
     assert f'<md:NameIDFormat>{PERSISTENT}</md:NameIDFormat>' in xml
     assert 'AuthnRequestsSigned="true"' in xml and 'WantAssertionsSigned="false"' in xml
     assert f'entityID="{SP_BASE}/api/v2/sso"' in xml
+
+
+def test_a_request_answers_one_login_only(app, provider, idp_signer, caplog):
+    # A second, distinct assertion for the same AuthnRequest.
+    client = app.test_client()
+    request_id = _start_login(client)
+    assert _post(client, _response(idp_signer, in_response_to=request_id)) == OK
+    client.set_cookie(saml_sp.REQUEST_COOKIE, request_id, domain='ucm.example.test', path=ACS)
+    _refused(caplog, client, _response(idp_signer, in_response_to=request_id),
+             'unknown, expired or already used AuthnRequest')

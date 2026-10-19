@@ -204,6 +204,18 @@ def remember_request(request_id, provider_id):
     db.session.commit()
 
 
+def request_pending(request_id, provider_id):
+    """True while an AuthnRequest id awaits its response."""
+    if not request_id or len(request_id) > MAX_MESSAGE_ID_LENGTH:
+        return False
+    return db.session.query(SAMLMessageId.id).filter(
+        SAMLMessageId.kind == SAMLMessageId.KIND_REQUEST,
+        SAMLMessageId.message_id == request_id,
+        SAMLMessageId.provider_id == provider_id,
+        SAMLMessageId.expires_at >= utc_now(),
+    ).first() is not None
+
+
 def take_request(request_id, provider_id):
     """Consume a pending AuthnRequest id; False when unknown, expired or already used."""
     if not request_id or len(request_id) > MAX_MESSAGE_ID_LENGTH:
