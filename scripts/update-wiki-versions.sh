@@ -4,7 +4,7 @@
 #
 # This updates:
 #   - **Version:** headers
-#   - Docker pull commands
+#   - Docker pull commands, image tags (:X.Y, :X.Y-fips) and UCM_VERSION=X.Y
 #   - DEB/RPM download URLs and install commands
 #   - API docs version strings
 #   - Version badge on Home.md
@@ -54,6 +54,17 @@ for f in *.md; do
     [[ "$f" == Release-Notes* ]] && continue
     [[ "$f" == Building.md ]] && continue
     sed -i "s/\*\*Version:\*\* [0-9.]*/\*\*Version:\*\* ${NEW_VERSION}/g" "$f"
+done
+
+# 5b. UCM_VERSION= and image tags (:X.Y, :X.Y-fips) in examples, same pages.
+# A suffix other than -fips (-rc1, -beta) is left alone.
+for f in *.md; do
+    [[ "$f" == Release-Notes* ]] && continue
+    [[ "$f" == Building.md ]] && continue
+    sed -E -i \
+        -e "s/(UCM_VERSION=)[0-9]+(\.[0-9]+)*(-fips)?([^0-9A-Za-z.-]|$)/\1${NEW_VERSION}\3\4/g" \
+        -e "s/(ultimate-ca-manager:)[0-9]+(\.[0-9]+)*(-fips)?([^0-9A-Za-z.-]|$)/\1${NEW_VERSION}\3\4/g" \
+        "$f"
 done
 
 # 6. API version strings
