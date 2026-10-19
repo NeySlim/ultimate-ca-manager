@@ -43,7 +43,8 @@ class GroupMember(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=False)
     user_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
-    role = db.Column(db.String(20), default='member')  # member, admin
+    # Never read: managing a group takes the global admin role. Kept for older backups.
+    role = db.Column(db.String(20), default='member')
     joined_at = db.Column(db.DateTime, default=utc_now)
     
     # Unique constraint: user can only be in a group once
@@ -59,6 +60,5 @@ class GroupMember(db.Model):
             'username': user.username if user else None,
             'email': user.email if user else None,
             'full_name': user.full_name if user else None,
-            'role': self.role,
             'joined_at': utc_isoformat(self.joined_at)
         }

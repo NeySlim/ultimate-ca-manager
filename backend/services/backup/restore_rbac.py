@@ -55,7 +55,6 @@ class RestoreRbacMixin:
                     db.session.add(GroupMember(
                         group_id=group.id,
                         user_id=m_data['user_id'],
-                        role=m_data.get('role', 'member'),
                     ))
             results['groups'] += 1
 
