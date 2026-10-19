@@ -1221,6 +1221,10 @@ class AcmeClientService:
         err = authz_data.get('error') or {}
         if isinstance(err, dict) and err.get('detail'):
             return str(err['detail'])
+        for challenge in authz_data.get('challenges') or []:
+            challenge_error = challenge.get('error') or {}
+            if isinstance(challenge_error, dict) and challenge_error.get('detail'):
+                return str(challenge_error['detail'])
         return ''
 
     def check_authorization_status(

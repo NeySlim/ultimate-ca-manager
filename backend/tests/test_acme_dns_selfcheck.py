@@ -156,6 +156,51 @@ def test_auto_poll_spawns_thread_when_not_testing(app, monkeypatch):
     assert started == [True], 'a background thread must be spawned outside TESTING'
 
 
+def test_auto_poll_fetches_authorization_error_when_order_is_invalid(app, monkeypatch):
+    class _Order:
+        id = 1
+        status = 'pending'
+        error_message = None
+        challenges_dict = {
+            'activation.example.com': {
+                'dns_txt_name': '_acme-challenge.activation.example.com',
+                'dns_txt_value': 'token',
+            }
+        }
+
+    class _Client:
+        def verify_challenge(self, order, domain):
+            return True, 'submitted'
+
+        def get_poll_settings(self):
+            return {'order_poll_timeout_sec': 30, 'order_poll_interval_sec': 3}
+
+        def check_order_status(self, order):
+            return 'invalid', {'status': 'invalid'}
+
+        def find_invalid_authorization(self, order):
+            return (
+                'activation.example.com',
+                f'{orders_mod.AUTHZ_INVALID_USER_MSG} '
+                '(DNS problem: NXDOMAIN looking up TXT)',
+            )
+
+    monkeypatch.setattr(orders_mod, '_dns_propagation_timeout', lambda: 1)
+    monkeypatch.setattr(
+        orders_mod,
+        '_dns_selfcheck',
+        lambda challenges, timeout: {'ok': True, 'missing': [], 'waited': 1},
+    )
+    monkeypatch.setattr(orders_mod.time, 'sleep', lambda seconds: None)
+
+    with app.app_context():
+        result = orders_mod._auto_poll_and_finalize(_Client(), _Order())
+
+    assert result['polling_status'] == 'invalid'
+    assert 'DNS problem: NXDOMAIN looking up TXT' in result['error']
+    assert result['error'] != 'Order became invalid: Unknown'
+
+
 def test_txt_present_uses_authoritative_before_public(fake_dns, monkeypatch):
     """Authoritative resolver is tried before public resolvers."""
     fake_dns['records']['_acme-challenge.example.com'] = ['token']

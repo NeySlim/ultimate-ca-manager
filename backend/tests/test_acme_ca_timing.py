@@ -101,3 +101,23 @@ def test_verify_challenge_rejects_invalid_authz(app, custom_ca_account):
         ok, msg = svc.verify_challenge(order, 'test.example.com')
     assert ok is False
     assert AUTHZ_INVALID_USER_MSG in msg
+
+
+def test_authz_error_detail_uses_challenge_problem():
+    authz = {
+        'status': 'invalid',
+        'challenges': [
+            {
+                'type': 'dns-01',
+                'status': 'invalid',
+                'error': {
+                    'type': 'urn:ietf:params:acme:error:dns',
+                    'detail': 'DNS problem: NXDOMAIN looking up TXT',
+                },
+            }
+        ],
+    }
+
+    assert AcmeClientService._authz_error_detail(authz) == (
+        'DNS problem: NXDOMAIN looking up TXT'
+    )
