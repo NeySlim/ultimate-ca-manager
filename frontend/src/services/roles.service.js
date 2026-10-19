@@ -28,6 +28,11 @@ export const rolesService = {
     return response.data
   },
 
+  /** Permissions a custom role may grant (server-enforced list) */
+  async listPermissions() {
+    return apiClient.get('/rbac/permissions')
+  },
+
   async listRoles() {
     return apiClient.get('/rbac/roles')
   },

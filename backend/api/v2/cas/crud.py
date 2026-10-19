@@ -1055,6 +1055,10 @@ def take_ca_offline(ca_id):
         return error_response(
             "Invalid mode: must be 'password_protected' or 'file_exported'", 400
         )
+    # file_exported hands the key to the caller: same gate as a CA key export
+    if mode == 'file_exported' and not has_permission('read:private_keys', g.permissions):
+        return error_response(
+            'Exporting the CA key to a file requires the read:private_keys permission', 403)
 
     # Password complexity (canonical UCM policy)
     ok, errs = validate_password(password)

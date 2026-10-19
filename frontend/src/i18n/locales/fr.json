@@ -1188,6 +1188,7 @@
     "set": "Défini",
     "configured": "Configuré",
     "enterNewToChange": "Entrez une nouvelle valeur pour modifier",
+    "secretRequiredForTarget": "Le secret enregistré ne part que vers le serveur et le compte enregistrés. Saisissez-le à nouveau pour les modifier.",
     "auto": "Auto",
     "manual": "Manuel",
     "update": "Mettre à jour",
@@ -2327,7 +2328,9 @@
       "read:ssh": "Voir les CA et certificats SSH",
       "write:ssh": "Créer et signer des certificats SSH",
       "delete:ssh": "Supprimer les CA et certificats SSH"
-    }
+    },
+    "ignoredPermissions": "Permissions ignorées",
+    "ignoredPermissionsHint": "Enregistrées sur ce rôle mais non appliquées : réservées aux administrateurs ou inconnues. Elles sont conservées telles quelles."
   },
   "scep": {
     "title": "Protocole SCEP",
@@ -3879,7 +3882,10 @@
         "delivered": "Livree",
         "failed": "Echouee"
       }
-    }
+    },
+    "customHeadersSet": "Des en-têtes personnalisés sont définis sur ce webhook via l'API ; leurs valeurs ne sont pas affichées.",
+    "dropCustomHeaders": "Supprimer les en-têtes personnalisés",
+    "customHeadersFollowUrl": "Les en-têtes personnalisés restent liés à l'URL enregistrée : supprimez-les pour la modifier, ou ressaisissez-les via l'API."
   },
   "safeMode": {
     "title": "Mode sans échec",

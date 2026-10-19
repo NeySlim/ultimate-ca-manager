@@ -17,7 +17,7 @@ export default {
         title: 'Funções Personalizadas',
         items: [
           { label: 'Criar Função', text: 'Definir uma nova função com nome e descrição' },
-          { label: 'Matriz de Permissões', text: 'Marcar/desmarcar permissões por categoria (CAs, Certs, Usuários, etc.)' },
+          { label: 'Matriz de Permissões', text: 'Marcar/desmarcar permissões por categoria (CAs, Certs, Chaves Privadas, etc.)' },
           { label: 'Cobertura', text: 'Percentual visual do total de permissões concedidas à função' },
           { label: 'Contagem de Usuários', text: 'Ver quantos usuários estão atribuídos a cada função' },
         ]
@@ -55,42 +55,44 @@ Quatro funções integradas que não podem ser modificadas ou excluídas:
 
 ### Matriz de Permissões
 As permissões são organizadas por categoria:
-- **CAs**: Criar, ler, atualizar, excluir, importar, exportar
+- **CAs**: Criar, ler, atualizar, excluir, importar, exportar (somente o certificado: ver Chaves Privadas)
 - **Certificados**: Emitir, ler, revogar, renovar, excluir, exportar (somente o certificado: ver Chaves Privadas)
-- **Chaves Privadas**: Exportação direta da chave privada (\`read:private_keys\`), somente admin: nenhuma função integrada além de Admin a possui. As funções sem ela passam pela Recuperação de chaves
+- **Chaves Privadas**: Exportação direta da chave privada de um certificado ou de uma CA (\`read:private_keys\`). Nenhuma função integrada além de Admin a possui; uma função personalizada pode concedê-la. As funções sem ela passam pela Recuperação de chaves
 - **CSRs**: Criar, ler, assinar, excluir
 - **Modelos**: Criar, ler, atualizar, excluir
-- **Usuários**: Criar, ler, atualizar, excluir
+- **Usuários**: Ler (o gerenciamento de contas é reservado aos administradores)
 - **Grupos**: Criar, ler, atualizar, excluir
 - **Configurações**: Ler, atualizar
-- **Auditoria**: Ler, exportar, limpeza
+- **Auditoria**: Ler, exportar (a limpeza é reservada aos administradores)
 - **ACME**: Configurar, gerenciar contas
 - **SCEP**: Configurar, aprovar solicitações
 - **Armazenamento de Confiança**: Gerenciar certificados confiáveis
-- **HSM**: Gerenciar provedores e chaves
+- **HSM**: Ver, excluir (adicionar ou alterar provedores é reservado aos administradores)
 - **SSH**: Gerenciar CAs e certificados SSH
 - **Políticas**: Ver políticas de certificado
 - **Aprovações**: Ver e decidir solicitações de aprovação
 - **Recuperação de Chaves**: Solicitar recuperações e ver solicitações (a aprovação é somente admin)
-- **Backup**: Criar, restaurar
+
+Uma função personalizada pode conceder qualquer permissão verificada pelo UCM, exceto as reservadas aos administradores: acesso total e curingas, toda ação de administração (aprovação de recuperações de chaves, administração do sistema e de usuários), gerenciamento de contas, SSO, implantações, alterações do conector AD e dos provedores HSM, eventos do sistema e exclusão do log de auditoria. Uma permissão armazenada que a função não pode conceder é exibida como ignorada e mantida como está.
 
 ### Alternância de Categorias
 Clique no cabeçalho de uma categoria para ativar/desativar todas as permissões daquela categoria de uma vez.
 
 ### Indicador de Cobertura
-Um badge percentual mostra quanto do conjunto total de permissões a função cobre. 100% = equivalente a Admin.
+Um badge percentual mostra quanto do conjunto total de permissões a função cobre.
 
 ## Atribuindo Funções
 
 Funções são atribuídas:
-- **Diretamente**: Na página de Usuários, edite um usuário e selecione uma função
+- **Diretamente**: Na página de Usuários, edite um usuário e selecione uma função integrada e, opcionalmente, uma função personalizada que se soma a ela. As alterações valem a partir da próxima requisição do usuário
 - **Via Grupos**: Um grupo concede um conjunto de permissões; cada membro o recebe além de sua própria função
 
 ## Permissões Efetivas
 
 As permissões efetivas de um usuário são calculadas como a união de:
-1. As permissões da função atribuída diretamente
-2. As permissões concedidas pelos grupos aos quais pertence
+1. As permissões da sua função integrada
+2. As permissões da sua função personalizada, incluindo as das funções das quais ela herda
+3. As permissões concedidas pelos grupos aos quais pertence
 
 A regra mais permissiva prevalece (modelo aditivo, sem regras de negação).
 

@@ -321,6 +321,10 @@ def require_auth(permissions=None):
         @require_auth(['write:certificates'])  # Need write access
     """
     def decorator(f):
+        # Recorded so custom role validation knows every scope a route checks
+        from auth.permissions import ENFORCED_PERMISSIONS
+        ENFORCED_PERMISSIONS.update(permissions or [])
+
         @wraps(f)
         def wrapper(*args, **kwargs):
             # Initialize auth manager

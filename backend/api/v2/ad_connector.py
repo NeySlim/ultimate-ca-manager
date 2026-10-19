@@ -19,6 +19,7 @@ from services.audit_service import AuditService
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
+from utils.secret_target import keeps_saved_secret, retarget_error
 
 logger = logging.getLogger(__name__)
 
@@ -81,12 +82,37 @@ def get_config():
     return success_response(data=config.to_dict())
 
 
+def _ad_retarget_error(saved, data):
+    """The saved bind password stays with the saved DCs, port and TLS trust."""
+    if saved is None or not keeps_saved_secret(data, 'bind_password', saved.bind_password,
+                                               blank_clears=True):
+        return None
+    current = {'port': saved.port or 389, 'use_ssl': bool(saved.use_ssl),
+               'verify_ssl': bool(saved.verify_ssl), 'ca_bundle': saved.ca_bundle,
+               'bind_dn': saved.bind_dn}
+    requested = dict(data)
+    if 'servers' in data or 'server' in data:
+        joined, err = _parse_servers(data)
+        if err:
+            return err
+        # Dropping a DC sends the secret nowhere new; adding one does
+        current['servers'] = 'saved'
+        added = set(lookup.split_servers(joined)) - set(lookup.split_servers(saved.server))
+        requested['servers'] = 'added' if added else 'saved'
+    if 'port' in requested and requested['port'] in (None, ''):
+        requested['port'] = 389  # what the update stores for a blank port
+    return retarget_error(current, requested, True)
+
+
 @bp.route('/api/v2/ad-connector', methods=['PUT'])
 @require_auth(['write:ad_connector'])
 def update_config():
     """Update the Active Directory Connector configuration (upsert)."""
     data = request.json or {}
 
+    err = _ad_retarget_error(ADConnectorConfig.get_singleton(), data)
+    if err:
+        return err
     config = _get_or_create()
 
     if 'servers' in data or 'server' in data:
@@ -188,10 +214,20 @@ def test_connection_inline():
     if not (data.get('bind_dn') or '').strip():
         return error_response('bind_dn is required', 400)
 
+    port = int(data['port']) if data.get('port') else 389
+    use_ssl = bool(data.get('use_ssl'))
+    verify_ssl = data.get('verify_ssl', True)
+    ca_bundle = data.get('ca_bundle') or None
+
     bind_password = data.get('bind_password')
     if not bind_password:
+        # The saved secret only goes to the saved target, trusted the saved way
         saved = ADConnectorConfig.get_singleton()
-        if saved and saved.bind_password:
+        if (saved and saved.bind_password
+                and set(lookup.split_servers(joined)) <= set(lookup.split_servers(saved.server))
+                and (saved.port or 389, bool(saved.use_ssl), bool(saved.verify_ssl),
+                     saved.ca_bundle or None)
+                == (port, use_ssl, bool(verify_ssl), ca_bundle)):
             bind_password = saved.bind_password
     if not bind_password:
         # Same rule as the save: an anonymous bind is not a connection this
@@ -201,10 +237,10 @@ def test_connection_inline():
 
     cfg = SimpleNamespace(
         server=joined,
-        port=int(data['port']) if data.get('port') else 389,
-        use_ssl=bool(data.get('use_ssl')),
-        verify_ssl=data.get('verify_ssl', True),
-        ca_bundle=data.get('ca_bundle') or None,
+        port=port,
+        use_ssl=use_ssl,
+        verify_ssl=verify_ssl,
+        ca_bundle=ca_bundle,
         bind_dn=data.get('bind_dn'),
         bind_password=bind_password,
     )

@@ -20,7 +20,7 @@ vi.mock('../../../contexts', () => ({
 vi.mock('../../../services', () => ({ scepService: mocks }))
 vi.mock('../../../components', () => ({
   Button: ({ children, loading: _loading, ...props }) => <button {...props}>{children}</button>,
-  Input: ({ label, ...props }) => <label>{label}<input {...props} /></label>,
+  Input: ({ label, hasExistingValue: _e, error: _err, ...props }) => <label>{label}<input {...props} /></label>,
   Card: ({ children }) => <section>{children}</section>,
   Badge: ({ children }) => <span>{children}</span>,
   Modal: ({ open, title, children }) => open ? <div role="dialog" aria-label={title}>{children}</div> : null,
@@ -82,10 +82,27 @@ describe('ScepIntuneAppsTab', () => {
     await waitFor(() => expect(mocks.testIntuneApp).toHaveBeenCalledWith({
       app_id: 7, tenant_id: 'corp.onmicrosoft.com', client_id: 'client-7', client_secret: '',
     }))
-    fill('scep.intuneClientId', 'client-7b')
+    fill('common.name', 'Corp Intune 2')
     fireEvent.submit(document.querySelector('form'))
     await waitFor(() => expect(mocks.updateIntuneApp).toHaveBeenCalledWith(7, {
-      name: 'Corp Intune', tenant_id: 'corp.onmicrosoft.com', client_id: 'client-7b',
+      name: 'Corp Intune 2', tenant_id: 'corp.onmicrosoft.com', client_id: 'client-7',
+    }))
+  })
+
+  it('moving the saved secret to another client asks for it again', async () => {
+    render(<ScepIntuneAppsTab canWrite />)
+    await screen.findByText('Corp Intune')
+    fireEvent.click(screen.getAllByTitle('common.edit')[0])
+    await screen.findByRole('dialog')
+    fill('scep.intuneClientId', 'client-7b')
+    expect(screen.getByLabelText('scep.intuneClientSecret').required).toBe(true)
+    fireEvent.submit(document.querySelector('form'))
+    expect(mocks.showError).toHaveBeenCalledWith('common.secretRequiredForTarget')
+    expect(mocks.updateIntuneApp).not.toHaveBeenCalled()
+    fill('scep.intuneClientSecret', 'typed')
+    fireEvent.submit(document.querySelector('form'))
+    await waitFor(() => expect(mocks.updateIntuneApp).toHaveBeenCalledWith(7, {
+      name: 'Corp Intune', tenant_id: 'corp.onmicrosoft.com', client_id: 'client-7b', client_secret: 'typed',
     }))
   })
 

@@ -6,9 +6,11 @@ CRUD for MS CA connections + CSR signing + request status tracking
 import logging
 from flask import Blueprint, request, g
 from auth.unified import require_auth, has_permission as _has_perm
+from services.settings_registry import as_boolean_word
+from utils.secret_target import MASKS, keeps_saved_secret, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db
-from models.msca import MicrosoftCA, MSCARequest
+from models.msca import MicrosoftCA, MSCARequest, basic_password_reaches
 from services.msca_service import MicrosoftCAService
 from services.audit import AuditService
 from utils.datetime_utils import utc_now
@@ -64,6 +66,19 @@ def _clean_crl_url(raw):
 _WINRM_TRANSPORTS = ('kerberos', 'ntlm')
 
 
+def _winrm_transport_error(data):
+    tr = (data.get('winrm_transport') or '').strip().lower()
+    if tr not in _WINRM_TRANSPORTS:
+        return error_response(f"winrm_transport must be one of {_WINRM_TRANSPORTS}", 400)
+    if tr == 'ntlm':
+        # Returned, not raised: the callers turn exceptions into a 500
+        try:
+            fips_mode.refuse('NTLM for the WinRM channel')
+        except fips_mode.FipsRestricted as e:
+            return error_response(str(e), 400, problem_type=fips_mode.PROBLEM_TYPE)
+    return None
+
+
 def _apply_winrm_fields(msca, data):
     """Apply WinRM admin-channel fields from request data. Returns error_response or None."""
     if 'winrm_enabled' in data:
@@ -78,25 +93,25 @@ def _apply_winrm_fields(msca, data):
         if not (1 <= port <= 65535):
             return error_response("winrm_port out of range", 400)
         msca.winrm_port = port
-    if 'winrm_use_ssl' in data:
-        msca.winrm_use_ssl = bool(data['winrm_use_ssl'])
-    if 'winrm_verify_ssl' in data:
-        msca.winrm_verify_ssl = bool(data['winrm_verify_ssl'])
+    for key in ('winrm_use_ssl', 'winrm_verify_ssl'):
+        if key in data:
+            word = as_boolean_word(data[key])
+            if word is None:
+                return error_response(f"{key} must be a boolean", 400)
+            setattr(msca, key, word == 'true')
     if 'winrm_transport' in data:
-        tr = (data['winrm_transport'] or '').strip().lower()
-        if tr not in _WINRM_TRANSPORTS:
-            return error_response(f"winrm_transport must be one of {_WINRM_TRANSPORTS}", 400)
-        if tr == 'ntlm':
-            # Returned, not raised: the callers turn exceptions into a 500
-            try:
-                fips_mode.refuse('NTLM for the WinRM channel')
-            except fips_mode.FipsRestricted as e:
-                return error_response(str(e), 400, problem_type=fips_mode.PROBLEM_TYPE)
-        msca.winrm_transport = tr
+        err = _winrm_transport_error(data)
+        if err:
+            return err
+        msca.winrm_transport = (data['winrm_transport'] or '').strip().lower()
     if 'winrm_username' in data:
         msca.winrm_username = (data['winrm_username'] or '').strip() or None
-    if 'winrm_password' in data and data['winrm_password'] != '***':
-        msca.winrm_password = data['winrm_password'] or None
+    if 'winrm_password' in data:
+        password = data['winrm_password']
+        if password is not None and not isinstance(password, str):
+            return error_response("winrm_password must be a string", 400)
+        if (password or '').strip() not in MASKS:
+            msca.winrm_password = password or None
     if 'ca_config' in data:
         cfg = (data['ca_config'] or '').strip()
         if cfg and any(c in cfg for c in '"\r\n`$;|&'):
@@ -108,6 +123,11 @@ def _apply_winrm_fields(msca, data):
 _WINRM_OVERRIDE_FIELDS = ('winrm_enabled', 'winrm_host', 'winrm_port', 'winrm_use_ssl',
                           'winrm_verify_ssl', 'winrm_transport', 'winrm_username',
                           'winrm_password', 'ca_config')
+
+
+def _winrm_target(cfg):
+    return ((cfg.winrm_host or cfg.server or '').strip().lower(), cfg.winrm_port,
+            bool(cfg.winrm_use_ssl), bool(cfg.winrm_verify_ssl), cfg.winrm_transport or 'kerberos')
 
 
 def _transient_winrm_config(msca, overrides):
@@ -139,18 +159,24 @@ def _transient_winrm_config(msca, overrides):
 
     data = {k: v for k, v in (overrides or {}).items() if k in _WINRM_OVERRIDE_FIELDS}
     # Empty or masked password means "use the saved one".
-    if not data.get('winrm_password') or data.get('winrm_password') == '***':
+    if not data.get('winrm_password') or str(data['winrm_password']).strip() in MASKS:
         data.pop('winrm_password', None)
+    saved_target = _winrm_target(cfg)
     err = _apply_winrm_fields(cfg, data)
     if err:
         return None, err
+    # A saved password only goes to the saved target, trusted the saved way
+    if 'winrm_password' not in data and _winrm_target(cfg) != saved_target:
+        return None, error_response(
+            "Enter the WinRM password to test a host, port or transport other than the saved one", 400)
 
     # Mirror MicrosoftCA.winrm_effective_* on the transient object.
     cfg.winrm_effective_host = cfg.winrm_host or cfg.server
     cfg.winrm_effective_username = cfg.winrm_username or (
         cfg.username if cfg.auth_method == 'basic' else None)
     cfg.winrm_effective_password = cfg.winrm_password or (
-        cfg.password if cfg.auth_method == 'basic' else None)
+        cfg.password if cfg.auth_method == 'basic'
+        and basic_password_reaches(cfg.winrm_host, cfg.server) else None)
     return cfg, None
 
 
@@ -305,6 +331,44 @@ def get_connection(msca_id):
     return success_response(data=msca.to_dict())
 
 
+_WINRM_TARGET_FIELDS = ('winrm_host', 'winrm_port', 'winrm_use_ssl', 'winrm_verify_ssl',
+                        'winrm_transport', 'winrm_username')
+
+
+def _winrm_target_fields(msca):
+    current = {k: getattr(msca, k) for k in _WINRM_TARGET_FIELDS}
+    # Same defaults as to_dict, so a form sent back unchanged compares equal
+    current.update(winrm_port=msca.winrm_port or 5986,
+                   winrm_transport=msca.winrm_transport or 'kerberos')
+    if not msca.winrm_host:
+        current['server'] = msca.server  # WinRM falls back to the server
+    return current
+
+
+def _msca_retarget_error(msca, data):
+    """Saved passwords stay with their saved host. A TLS client key is never sent."""
+    current = _winrm_target_fields(msca)
+    winrm_err = retarget_error(current, data, keeps_saved_secret(
+        data, 'winrm_password', msca.winrm_password, blank_clears=True))
+    if winrm_err:
+        return winrm_err
+    if msca.auth_method != 'basic' or data.get('auth_method', 'basic') != 'basic':
+        return None
+    if not keeps_saved_secret(data, 'password', msca.password, blank_clears=True):
+        return None
+    # Clearing the WinRM password hands its channel to the connection password
+    cleared = 'winrm_password' in data and not str(data['winrm_password'] or '').strip()
+    if cleared and msca.winrm_password and basic_password_reaches(
+            data.get('winrm_host', msca.winrm_host), data.get('server', msca.server)):
+        return retarget_error({'winrm_password': 'saved'}, {'winrm_password': 'cleared'}, True)
+    current = {k: getattr(msca, k) for k in ('server', 'use_ssl', 'verify_ssl', 'ca_bundle', 'username')}
+    winrm_typed = str(data.get('winrm_password') or '').strip() not in ('', *MASKS)
+    if not msca.winrm_password and not winrm_typed:
+        # The basic password doubles as the WinRM one
+        current.update(_winrm_target_fields(msca))
+    return retarget_error(current, data, True)
+
+
 @bp.route('/<int:msca_id>', methods=['PUT'])
 @require_auth(['write:settings'])
 def update_connection(msca_id):
@@ -316,6 +380,11 @@ def update_connection(msca_id):
     data = request.get_json()
     if not data:
         return error_response("Request body required", 400)
+    # A transport refused outright is the answer, before any question of secrets
+    err = (_winrm_transport_error(data) if 'winrm_transport' in data else None) \
+        or _msca_retarget_error(msca, data)
+    if err:
+        return err
 
     try:
         # Cap PEM/keytab inputs.
@@ -391,12 +460,12 @@ def update_connection(msca_id):
         if auth == 'basic':
             if 'username' in data:
                 msca.username = data['username'].strip()
-            if 'password' in data and data['password'] != '***':
+            if 'password' in data and str(data['password'] or '').strip() not in MASKS:
                 msca.password = data['password']
         elif auth == 'certificate':
             if 'client_cert_pem' in data:
                 msca.client_cert_pem = data['client_cert_pem'].strip() or None
-            if 'client_key_pem' in data and data['client_key_pem'] != '***':
+            if 'client_key_pem' in data and str(data['client_key_pem'] or '').strip() not in MASKS:
                 msca.client_key_pem = data['client_key_pem'].strip() or None
         elif auth == 'kerberos':
             if 'kerberos_principal' in data:

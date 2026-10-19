@@ -18,6 +18,7 @@ export default function SsoLdapFields({
   handleTestMapping,
   roleOptions,
   setFormData,
+  secretProps,
 }) {
   const { t } = useTranslation()
 
@@ -120,6 +121,7 @@ export default function SsoLdapFields({
             value={formData.ldap_bind_password}
             onChange={e => handleChange('ldap_bind_password', e.target.value)}
             hasExistingValue={!!provider?.ldap_bind_password}
+            {...secretProps}
           />
           <Input
             label={t('sso.baseDn')}

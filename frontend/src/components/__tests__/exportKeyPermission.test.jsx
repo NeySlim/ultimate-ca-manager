@@ -6,7 +6,7 @@
  * and none hides one it would accept. The gates they mirror:
  *
  *   certificate       backend/api/v2/certificates/export.py  read:private_keys
- *   ca                backend/api/v2/cas/export.py           write:cas, 409 on HSM
+ *   ca                backend/api/v2/cas/export.py           write:cas + read:private_keys, 409 on HSM
  *   user_certificate  backend/api/v2/user_certificates.py    no key scope at all
  *
  * The built-in Operator role holds write:certificates but not read:private_keys
@@ -108,12 +108,16 @@ describe('canExportPrivateKey mirrors the server gate', () => {
     expect(canExportPrivateKey('certificate', scoped)).toBe(true)
   })
 
-  it('requires write:cas for a CA, and never an HSM-held key', () => {
+  it('requires write:cas and read:private_keys for a CA, and never an HSM-held key', () => {
     const operator = permissionApi(OPERATOR_PERMISSIONS)
-    expect(canExportPrivateKey('ca', operator)).toBe(true)
-    expect(canExportPrivateKey('ca', { ...operator, usesHsm: true })).toBe(false)
-    const reader = permissionApi(['read:cas'])
-    expect(canExportPrivateKey('ca', reader)).toBe(false)
+    expect(canExportPrivateKey('ca', operator)).toBe(false)
+    const admin = permissionApi(['*'])
+    expect(canExportPrivateKey('ca', admin)).toBe(true)
+    expect(canExportPrivateKey('ca', { ...admin, usesHsm: true })).toBe(false)
+    const scoped = permissionApi(['read:cas', 'write:cas', 'read:private_keys'])
+    expect(canExportPrivateKey('ca', scoped)).toBe(true)
+    const keysOnly = permissionApi(['read:cas', 'read:private_keys'])
+    expect(canExportPrivateKey('ca', keysOnly)).toBe(false)
   })
 
   it('asks for no key scope on a user certificate, as the route does not', () => {

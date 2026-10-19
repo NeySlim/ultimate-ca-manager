@@ -14,9 +14,9 @@
  *                     (an admin-only resource: no built-in role but Admin holds
  *                     it, so an Operator goes through Key Recovery instead)
  *
- *   ca                POST /api/v2/cas/<id>/export
- *                     backend/api/v2/cas/export.py — write:cas, and 409 for a
- *                     key that lives in an HSM and therefore cannot leave it
+ *   ca                POST /api/v2/cas/<id>/export, and /offline in
+ *                     file_exported mode: write:cas plus read:private_keys,
+ *                     and 409 for a key that lives in an HSM
  *
  *   user_certificate  POST /api/v2/user-certificates/<id>/export
  *                     backend/api/v2/user_certificates.py — no key scope at
@@ -45,6 +45,7 @@ export function canExportPrivateKey(entityType, ctx = {}) {
 
     case 'ca':
       return !usesHsm && typeof canWrite === 'function' && canWrite('cas')
+        && typeof hasPermission === 'function' && hasPermission('read:private_keys')
 
     case 'user_certificate':
       return true

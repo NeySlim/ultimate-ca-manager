@@ -130,6 +130,7 @@
     "set": "設定済み",
     "configured": "設定済み",
     "enterNewToChange": "変更するには新しい値を入力してください",
+    "secretRequiredForTarget": "保存済みのシークレットは保存済みのサーバーとアカウントにのみ送信されます。変更するにはシークレットを再入力してください。",
     "auto": "自動",
     "manual": "手動",
     "update": "更新",
@@ -3264,7 +3265,9 @@
       "read:ssh": "SSH CAと証明書を表示",
       "write:ssh": "SSH証明書を作成・署名",
       "delete:ssh": "SSH CAと証明書を削除"
-    }
+    },
+    "ignoredPermissions": "無視される権限",
+    "ignoredPermissionsHint": "このロールに保存されていますが適用されません（管理者専用または不明な権限）。そのまま保持されます。"
   },
   "hsm": {
     "statusUnavailable": "HSM機能は利用できません",
@@ -3876,7 +3879,10 @@
         "delivered": "配信済み",
         "failed": "失敗"
       }
-    }
+    },
+    "customHeadersSet": "この Webhook には API でカスタムヘッダーが設定されています。値は表示されません。",
+    "dropCustomHeaders": "カスタムヘッダーを削除する",
+    "customHeadersFollowUrl": "カスタムヘッダーは保存済みの URL に紐づいています。URL を変更するには削除するか、API で再入力してください。"
   },
   "safeMode": {
     "title": "セーフモード",

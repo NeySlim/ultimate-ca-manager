@@ -26,7 +26,7 @@ import { canExportPrivateKey } from '../../lib/exportPermissions'
 // CA DETAILS PANEL
 // =============================================================================
 
-export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, onChanged, t }) {
+export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExport, onDelete, onChanged, t }) {
   const [showExportModal, setShowExportModal] = useState(false)
   const [showOfflineModal, setShowOfflineModal] = useState(false)
   const [showRestoreModal, setShowRestoreModal] = useState(false)
@@ -319,7 +319,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, onExport, onDelete, on
       entityType="ca"
       entityName={ca.name || ca.common_name || ''}
       hasPrivateKey={!!ca.has_private_key && !ca.uses_hsm}
-      canExportKey={canExportPrivateKey('ca', { canWrite, usesHsm: !!ca.uses_hsm })}
+      canExportKey={canExportPrivateKey('ca', { canWrite, hasPermission, usesHsm: !!ca.uses_hsm })}
       isHsmBacked={!!ca.uses_hsm}
       onExport={onExport}
     />

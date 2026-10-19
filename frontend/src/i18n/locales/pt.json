@@ -130,6 +130,7 @@
     "set": "Definido",
     "configured": "Configurado",
     "enterNewToChange": "Digite um novo valor para alterar",
+    "secretRequiredForTarget": "O segredo salvo só é enviado ao servidor e à conta salvos. Digite-o novamente para alterá-los.",
     "auto": "Auto",
     "manual": "Manual",
     "update": "Actualizar",
@@ -3264,7 +3265,9 @@
       "read:ssh": "Ver CAs e certificados SSH",
       "write:ssh": "Criar e assinar certificados SSH",
       "delete:ssh": "Excluir CAs e certificados SSH"
-    }
+    },
+    "ignoredPermissions": "Permissões ignoradas",
+    "ignoredPermissionsHint": "Armazenadas nesta função, mas não aplicadas: reservadas aos administradores ou desconhecidas. São mantidas como estão."
   },
   "hsm": {
     "statusUnavailable": "Funcionalidades HSM não estão disponíveis",
@@ -3876,7 +3879,10 @@
         "delivered": "Entregue",
         "failed": "Falhou"
       }
-    }
+    },
+    "customHeadersSet": "Este webhook tem cabeçalhos personalizados definidos pela API; seus valores não são exibidos.",
+    "dropCustomHeaders": "Remover os cabeçalhos personalizados",
+    "customHeadersFollowUrl": "Os cabeçalhos personalizados ficam vinculados à URL salva: remova-os para alterá-la ou digite-os novamente pela API."
   },
   "safeMode": {
     "title": "Modo seguro",

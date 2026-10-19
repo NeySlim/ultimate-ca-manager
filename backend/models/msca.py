@@ -9,6 +9,12 @@ from datetime import datetime
 from utils.datetime_utils import utc_now, utc_isoformat
 
 
+def basic_password_reaches(winrm_host, server):
+    """The connection password doubles as the WinRM one only on the CA's own host."""
+    host = (winrm_host or '').strip().lower()
+    return not host or host == (server or '').strip().lower()
+
+
 class MicrosoftCA(db.Model):
     """Microsoft AD CS connection configuration"""
     __tablename__ = 'microsoft_cas'
@@ -165,7 +171,7 @@ class MicrosoftCA(db.Model):
     def winrm_effective_password(self):
         if self._winrm_password:
             return self.winrm_password
-        if self.auth_method == 'basic':
+        if self.auth_method == 'basic' and basic_password_reaches(self.winrm_host, self.server):
             return self.password
         return None
 

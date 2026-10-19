@@ -114,6 +114,122 @@ GROUP_GRANTABLE_PERMISSIONS = sorted(
 )
 
 
+# Every scope @require_auth checks, recorded as routes are declared.
+ENFORCED_PERMISSIONS = set()
+
+# Scopes checked inline with has_permission() rather than by the decorator.
+INLINE_CHECKED_PERMISSIONS = frozenset({
+    'admin:key_recovery', 'admin:settings', 'admin:system', 'read:audit',
+    'read:cas', 'read:certificates', 'read:private_keys', 'read:system',
+    'read:users', 'write:cas',
+})
+
+# Kept for administrators, beyond `*`, wildcards and every `admin:*` action.
+RESERVED_PERMISSIONS = {
+    'write:users': 'creates accounts and resets passwords: takes over any account',
+    'delete:users': 'removes accounts, administrators included',
+    'read:sso': 'shows identity provider settings and every SSO session',
+    'write:sso': 'decides which external identity signs in as which account',
+    'delete:sso': 'removes the sign-in path of SSO accounts',
+    'read:deploy': 'shows remote targets and how UCM reaches them',
+    'write:deploy': 'runs commands and pushes private keys on remote hosts',
+    'delete:deploy': 'removes deployments other services rely on',
+    'read:system': 'receives system-wide events over the WebSocket',
+    'delete:audit': 'erases the audit trail',
+    'write:ad_connector': 'handles the bind secret of the AD service account',
+    'write:hsm': 'loads native PKCS#11 modules into the UCM process',
+}
+
+
+def is_reserved_permission(perm) -> bool:
+    """True for what only an administrator may hold."""
+    return (not isinstance(perm, str) or '*' in perm
+            or perm.split(':', 1)[0] == 'admin' or perm in RESERVED_PERMISSIONS)
+
+
+# What a custom role may grant: every scope a route checks that is not reserved.
+# tests/test_custom_role_grantable.py fails when a new scope is left unclassified.
+CUSTOM_ROLE_GRANTABLE_PERMISSIONS = sorted({
+    'read:acme', 'write:acme', 'delete:acme',
+    'read:ad_connector',
+    'read:approvals', 'write:approvals',
+    'read:audit', 'export:audit',
+    'read:cas', 'write:cas', 'delete:cas',
+    'read:certificates', 'write:certificates', 'delete:certificates',
+    'read:crl', 'write:crl',
+    'read:csrs', 'write:csrs', 'delete:csrs',
+    'read:est', 'write:est',
+    'read:groups', 'write:groups', 'delete:groups',
+    'read:hsm', 'delete:hsm',
+    'read:kerberos', 'write:kerberos',
+    'read:key_recovery', 'write:key_recovery',
+    'read:policies', 'write:policies', 'delete:policies',
+    'read:private_keys',
+    'read:scep', 'write:scep',
+    'read:settings', 'write:settings', 'delete:settings',
+    'read:ssh', 'write:ssh', 'delete:ssh',
+    'read:templates', 'write:templates', 'delete:templates',
+    'read:truststore', 'write:truststore', 'delete:truststore',
+    'read:user_certificates', 'write:user_certificates', 'delete:user_certificates',
+    'read:users',
+    'read:wstep', 'write:wstep',
+    'read:xcep', 'write:xcep',
+})
+
+# Resource names the role editor used to store, read as the enforced ones.
+_LEGACY_RESOURCE_ALIASES = {'certs': 'certificates'}
+
+
+def normalize_permission(perm):
+    """``read:certs`` -> ``read:certificates``; anything else unchanged."""
+    if not isinstance(perm, str) or ':' not in perm:
+        return perm
+    action, resource = perm.split(':', 1)
+    return f"{action}:{_LEGACY_RESOURCE_ALIASES.get(resource, resource)}"
+
+
+MAX_ROLE_DEPTH = 64
+
+
+def custom_role_chain(role):
+    """``role`` then its ancestors; stops at a cycle, a missing parent or 64 levels."""
+    chain, seen = [], set()
+    while role is not None and role.id not in seen and len(chain) < MAX_ROLE_DEPTH:
+        seen.add(role.id)
+        chain.append(role)
+        role = role.parent
+    return chain
+
+
+def custom_role_permissions(role) -> list:
+    """Grantable permissions of ``role`` and the roles it inherits from."""
+    grantable = set(CUSTOM_ROLE_GRANTABLE_PERMISSIONS)
+    granted = []
+    for link in custom_role_chain(role):
+        for perm in (link.permissions or []):
+            perm = normalize_permission(perm)
+            if perm in grantable and perm not in granted:
+                granted.append(perm)
+    return granted
+
+
+def get_custom_role_permissions(user) -> list:
+    """Permissions granted to ``user`` by the custom role assigned to them.
+
+    Filtered on read like group grants; never raises.
+    """
+    role_id = getattr(user, 'custom_role_id', None)
+    if user is None or not role_id:
+        return []
+    try:
+        from models import db
+        from models.rbac import CustomRole
+        return custom_role_permissions(db.session.get(CustomRole, role_id))
+    except Exception as e:  # noqa: BLE001: authorisation must not 500 on this
+        logger.warning(f"Could not resolve custom role permissions for user {getattr(user, 'id', '?')}: {e}")
+        return []
+
+
 def get_role_permissions(role: str) -> list:
     """Get permissions for a role"""
     return ROLE_PERMISSIONS.get(role, [])
@@ -151,15 +267,17 @@ def get_group_permissions(user) -> list:
 
 
 def get_effective_permissions(user) -> list:
-    """Role permissions unioned with those granted by the user's groups.
+    """Built-in role, unioned with the user's custom role and groups.
 
     This is what authorisation and the login response must both use, so the UI
     gates on exactly what the API enforces.
     """
-    role_perms = list(get_role_permissions(getattr(user, 'role', None)))
-    if '*' in role_perms:
-        return role_perms  # administrator: nothing to add
-    return role_perms + [p for p in get_group_permissions(user) if p not in role_perms]
+    perms = list(get_role_permissions(getattr(user, 'role', None)))
+    if '*' in perms:
+        return perms  # administrator: nothing to add
+    for extra in (get_custom_role_permissions(user), get_group_permissions(user)):
+        perms += [p for p in extra if p not in perms]
+    return perms
 
 
 def has_permission(user_role: str, required_permission: str) -> bool:

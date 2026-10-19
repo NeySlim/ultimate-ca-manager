@@ -6,7 +6,10 @@ Custom roles and fine-grained permissions
 from flask import Blueprint, request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from auth.permissions import BUILTIN_ROLES
+from auth.permissions import (
+    BUILTIN_ROLES, CUSTOM_ROLE_GRANTABLE_PERMISSIONS, custom_role_chain,
+    get_effective_permissions as effective_permissions_of, normalize_permission,
+)
 from models import db
 from models.rbac import CustomRole, RolePermission
 from services.audit_service import AuditService
@@ -16,43 +19,8 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint('rbac_pro', __name__)
 
-# Default permissions available in the system
-AVAILABLE_PERMISSIONS = [
-    # CAs
-    'read:cas', 'write:cas', 'delete:cas', 'admin:cas',
-    # Certificates
-    'read:certs', 'write:certs', 'delete:certs', 'revoke:certs',
-    # CSRs
-    'read:csrs', 'write:csrs', 'delete:csrs', 'sign:csrs',
-    # Users
-    'read:users', 'write:users', 'delete:users', 'admin:users',
-    # Groups 
-    'read:groups', 'write:groups', 'delete:groups', 'admin:groups',
-    # Settings
-    'read:settings', 'write:settings', 'admin:system',
-    # Audit
-    'read:audit', 'export:audit',
-    # ACME 
-    'read:acme', 'write:acme', 'delete:acme',
-    # SCEP
-    'read:scep', 'write:scep', 'delete:scep',
-    # MS-XCEP (certificate enrollment policy)
-    'read:xcep', 'write:xcep', 'delete:xcep',
-    # MS-WSTEP (certificate enrollment issuance/renewal)
-    'read:wstep', 'write:wstep', 'delete:wstep',
-    # Trust Store 
-    'read:truststore', 'write:truststore', 'delete:truststore',
-    # HSM 
-    'read:hsm', 'write:hsm', 'delete:hsm',
-    # SSO 
-    'read:sso', 'write:sso', 'delete:sso',
-    # Templates
-    'read:templates', 'write:templates', 'delete:templates',
-    # Policies 
-    'read:policies', 'write:policies', 'delete:policies',
-    # Approvals 
-    'read:approvals', 'write:approvals',
-]
+# What a custom role may grant: the scopes the API enforces, never a path to admin
+AVAILABLE_PERMISSIONS = CUSTOM_ROLE_GRANTABLE_PERMISSIONS
 
 @bp.route('/api/v2/rbac/permissions', methods=['GET'])
 @require_auth(['admin:users'])
@@ -76,12 +44,12 @@ MAX_ROLE_DESC_LEN = 500
 MAX_ROLE_PERMS = 200
 
 
-def _validate_role_payload(data, *, partial=False):
+def _validate_role_payload(data, *, partial=False, role_id=None, stored=()):
     """Returns (cleaned_dict, error_response_or_None).
 
     Validates name (length, charset, reserved), description length,
-    and permissions (list of strings, capped, whitelisted against
-    AVAILABLE_PERMISSIONS keys + wildcard 'action:*' / '*').
+    and permissions (list of strings, capped, each one in
+    AVAILABLE_PERMISSIONS after legacy names are normalised; no wildcard).
     """
     cleaned = {}
 
@@ -113,24 +81,34 @@ def _validate_role_payload(data, *, partial=False):
             return None, error_response("permissions must be a list", 400)
         if len(perms) > MAX_ROLE_PERMS:
             return None, error_response(f"Too many permissions (max {MAX_ROLE_PERMS})", 400)
-        valid_keys = set(AVAILABLE_PERMISSIONS) if isinstance(AVAILABLE_PERMISSIONS, (list, set, tuple)) else set(AVAILABLE_PERMISSIONS.keys())
+        valid_keys = set(AVAILABLE_PERMISSIONS)
+        # A permission the role already holds stays, ignored, rather than block the save
+        kept = set(stored or ())
+        normalized = []
         for p in perms:
             if not isinstance(p, str) or not p.strip():
                 return None, error_response("permissions must be non-empty strings", 400)
             if len(p) > 100:
                 return None, error_response("permission too long", 400)
-            # Allow exact whitelist match, full wildcard '*', or 'action:*'
-            if p == '*' or p in valid_keys:
-                continue
-            if ':' in p and p.endswith(':*'):
-                continue
-            return None, error_response(f"Unknown permission: {p}", 400)
-        cleaned['permissions'] = perms
+            # Wildcards and admin-only scopes are refused: assigned roles now apply
+            if normalize_permission(p) in valid_keys:
+                p = normalize_permission(p)
+            elif p not in kept:
+                return None, error_response(f"Permission not grantable by a custom role: {p}", 400)
+            if p not in normalized:
+                normalized.append(p)
+        cleaned['permissions'] = normalized
 
     if 'inherits_from' in data:
         inh = data.get('inherits_from')
-        if inh is not None and not isinstance(inh, int):
+        if inh is not None and (isinstance(inh, bool) or not isinstance(inh, int)):
             return None, error_response("inherits_from must be an integer role id", 400)
+        if inh is not None:
+            parent = db.session.get(CustomRole, inh)
+            if parent is None:
+                return None, error_response("Parent role not found", 404)
+            if role_id is not None and role_id in {r.id for r in custom_role_chain(parent)}:
+                return None, error_response("A role cannot inherit from itself or a descendant", 400)
         cleaned['inherits_from'] = inh
 
     return cleaned, None
@@ -190,7 +168,8 @@ def update_custom_role(role_id):
     if getattr(role, 'is_system', False):
         return error_response("System roles cannot be modified", 403)
 
-    cleaned, err = _validate_role_payload(data, partial=True)
+    cleaned, err = _validate_role_payload(data, partial=True, role_id=role_id,
+                                          stored=role.permissions or [])
     if err:
         return err
 
@@ -243,6 +222,8 @@ def delete_custom_role(role_id):
     user_count = User.query.filter_by(custom_role_id=role_id).count()
     if user_count > 0:
         return error_response(f"Role is assigned to {user_count} user(s). Remove assignments first.", 409)
+    if CustomRole.query.filter_by(inherits_from=role_id).count():
+        return error_response("Other roles inherit from this role. Change them first.", 409)
     
     role_name = role.name
     db.session.delete(role)
@@ -267,31 +248,7 @@ def delete_custom_role(role_id):
 @bp.route('/api/v2/rbac/effective-permissions/<int:user_id>', methods=['GET'])
 @require_auth(['admin:users'])
 def get_effective_permissions(user_id):
-    """Get effective permissions for a user (role + groups + custom)"""
+    """Effective permissions of a user: exactly what authorisation applies."""
     from models import User
     user = db.get_or_404(User, user_id)
-    
-    permissions = set()
-    
-    # Base role permissions
-    if user.role == 'admin':
-        permissions.update(AVAILABLE_PERMISSIONS)
-    elif user.role == 'operator':
-        permissions.update(['read:cas', 'read:certs', 'write:certs', 'read:csrs', 'sign:csrs'])
-    else:
-        permissions.update(['read:cas', 'read:certs'])
-    
-    # Custom role permissions
-    if getattr(user, 'custom_role_id', None):
-        custom_role = db.session.get(CustomRole, user.custom_role_id)
-        if custom_role:
-            permissions.update(custom_role.get_all_permissions())
-    
-    # Group permissions
-    try:
-        for group in user.groups:
-            permissions.update(group.permissions or [])
-    except Exception:
-        pass
-    
-    return success_response(data=list(permissions))
+    return success_response(data=effective_permissions_of(user))

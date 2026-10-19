@@ -5,6 +5,7 @@ import { Button, Input, Card, Badge, Modal, EmptyState, HelpCard } from '../../c
 import { scepService } from '../../services'
 import { useNotification } from '../../contexts'
 import { extractData, formatDate } from '../../lib/utils'
+import { secretInputProps, secretRequiredForTarget } from '../../lib/secretTarget'
 
 const EMPTY_FORM = { name: '', tenant_id: '', client_id: '', client_secret: '' }
 
@@ -47,8 +48,17 @@ export default function ScepIntuneAppsTab({ canWrite }) {
 
   const update = (field, value) => setFormData(prev => ({ ...prev, [field]: value }))
 
+  const secretTarget = {
+    saved: editing, current: formData, fields: ['tenant_id', 'client_id'],
+    secret: formData.client_secret, secretSaved: Boolean(editing?.client_secret_set),
+  }
+
   const handleSubmit = async (event) => {
     event.preventDefault()
+    if (secretRequiredForTarget(secretTarget)) {
+      showError(t('common.secretRequiredForTarget'))
+      return
+    }
     setSaving(true)
     try {
       const payload = { name: formData.name, tenant_id: formData.tenant_id, client_id: formData.client_id }
@@ -195,6 +205,7 @@ export default function ScepIntuneAppsTab({ canWrite }) {
             onChange={(e) => update('client_secret', e.target.value)}
             placeholder={editing?.client_secret_set ? '••••••••' : ''}
             required={!editing?.client_secret_set}
+            {...secretInputProps(t, secretTarget)}
           />
           <div className="flex items-center justify-between gap-2 pt-2">
             <Button

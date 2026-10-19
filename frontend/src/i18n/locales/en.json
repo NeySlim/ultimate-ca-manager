@@ -131,6 +131,7 @@
     "set": "Set",
     "configured": "Configured",
     "enterNewToChange": "Enter a new value to change",
+    "secretRequiredForTarget": "The saved secret only goes to the saved server and account. Re-enter it to change them.",
     "auto": "Auto",
     "manual": "Manual",
     "update": "Update",
@@ -3266,7 +3267,9 @@
       "read:ssh": "View SSH CAs and certificates",
       "write:ssh": "Create and sign SSH certificates",
       "delete:ssh": "Delete SSH CAs and certificates"
-    }
+    },
+    "ignoredPermissions": "Ignored permissions",
+    "ignoredPermissionsHint": "Stored on this role but not applied: reserved for administrators or unknown. They are kept as they are."
   },
   "hsm": {
     "statusUnavailable": "HSM features are not available",
@@ -3879,7 +3882,10 @@
         "delivered": "Delivered",
         "failed": "Failed"
       }
-    }
+    },
+    "customHeadersSet": "Custom headers are set on this webhook through the API; their values are not shown.",
+    "dropCustomHeaders": "Remove the custom headers",
+    "customHeadersFollowUrl": "Custom headers stay with the saved URL: remove them to change it, or re-enter them through the API."
   },
   "safeMode": {
     "title": "Safe Mode",

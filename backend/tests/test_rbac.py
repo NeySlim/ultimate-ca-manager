@@ -97,9 +97,12 @@ class TestListPermissions:
     def test_contains_known_permissions(self, auth_client):
         r = auth_client.get('/api/v2/rbac/permissions')
         data = _json(r).get('data', _json(r))
-        for expected in ['read:cas', 'write:cas', 'read:certs', 'write:certs',
-                         'read:users', 'admin:users', 'read:audit']:
+        for expected in ['read:cas', 'write:cas', 'read:certificates', 'write:certificates',
+                         'read:private_keys', 'read:audit']:
             assert expected in data, f"Missing expected permission '{expected}'"
+        # A custom role is never a path to administrator
+        for refused in ['*', 'admin:users', 'admin:system', 'write:users', 'read:sso']:
+            assert refused not in data, f"'{refused}' offered to custom roles"
 
 
 # ============================================================
@@ -140,11 +143,11 @@ class TestCreateRole:
         r = _post_json(auth_client, '/api/v2/rbac/roles', {
             'name': 'Cert Reader',
             'description': 'Can only read certificates',
-            'permissions': ['read:certs', 'read:cas'],
+            'permissions': ['read:certificates', 'read:cas'],
         })
         assert r.status_code == 200
         role = _json(r).get('data', _json(r))
-        assert 'read:certs' in role['permissions']
+        assert 'read:certificates' in role['permissions']
         assert 'read:cas' in role['permissions']
         assert role['description'] == 'Can only read certificates'
 
@@ -185,7 +188,7 @@ class TestGetRole:
         # Create a role first
         cr = _post_json(auth_client, '/api/v2/rbac/roles', {
             'name': 'Role For Get Test',
-            'permissions': ['read:certs'],
+            'permissions': ['read:certificates'],
         })
         role_id = _json(cr).get('data', _json(cr))['id']
 
@@ -235,16 +238,16 @@ class TestUpdateRole:
     def test_update_permissions(self, auth_client):
         cr = _post_json(auth_client, '/api/v2/rbac/roles', {
             'name': 'Perm Update Test',
-            'permissions': ['read:certs'],
+            'permissions': ['read:certificates'],
         })
         role_id = _json(cr).get('data', _json(cr))['id']
 
         r = _put_json(auth_client, f'/api/v2/rbac/roles/{role_id}', {
-            'permissions': ['read:certs', 'write:certs', 'read:cas'],
+            'permissions': ['read:certificates', 'write:certificates', 'read:cas'],
         })
         assert r.status_code == 200
         role = _json(r).get('data', _json(r))
-        assert set(role['permissions']) == {'read:certs', 'write:certs', 'read:cas'}
+        assert set(role['permissions']) == {'read:certificates', 'write:certificates', 'read:cas'}
 
     def test_update_description(self, auth_client):
         cr = _post_json(auth_client, '/api/v2/rbac/roles', {
@@ -314,7 +317,7 @@ class TestDeleteRole:
                 sys_role = CustomRole(
                     name='System Test Role',
                     description='Built-in',
-                    permissions=['read:certs'],
+                    permissions=['read:certificates'],
                     is_system=True,
                 )
                 db.session.add(sys_role)
@@ -342,9 +345,8 @@ class TestEffectivePermissions:
         perms = _json(r).get('data', _json(r))
         assert isinstance(perms, list)
         assert len(perms) > 0
-        # Admin should have key permissions
-        for expected in ['read:cas', 'read:certs', 'admin:users']:
-            assert expected in perms, f"Admin missing '{expected}'"
+        # What authorisation applies to an administrator: the wildcard
+        assert '*' in perms
 
     def test_nonexistent_user_404(self, auth_client):
         r = auth_client.get('/api/v2/rbac/effective-permissions/99999')
@@ -368,7 +370,7 @@ class TestEffectivePermissions:
         assert r.status_code == 200
         perms = _json(r).get('data', _json(r))
         # Operator should have basic read perms
-        assert 'read:certs' in perms
+        assert 'read:certificates' in perms
         assert 'read:cas' in perms
 
     def test_viewer_has_read_only(self, auth_client, create_user):
@@ -382,7 +384,7 @@ class TestEffectivePermissions:
         assert r.status_code == 200
         perms = _json(r).get('data', _json(r))
         assert 'read:cas' in perms
-        assert 'read:certs' in perms
+        assert 'read:certificates' in perms
 
 
 # ============================================================
@@ -396,22 +398,22 @@ class TestRoleInheritance:
         # Create parent
         pr = _post_json(auth_client, '/api/v2/rbac/roles', {
             'name': 'Inheritance Parent',
-            'permissions': ['read:certs', 'read:cas'],
+            'permissions': ['read:certificates', 'read:cas'],
         })
         parent_id = _json(pr).get('data', _json(pr))['id']
 
         # Create child inheriting from parent
         cr = _post_json(auth_client, '/api/v2/rbac/roles', {
             'name': 'Inheritance Child',
-            'permissions': ['write:certs'],
+            'permissions': ['write:certificates'],
             'inherits_from': parent_id,
         })
         assert cr.status_code == 200
         child = _json(cr).get('data', _json(cr))
         all_perms = child.get('all_permissions', child.get('permissions', []))
         # Should have own + parent
-        assert 'write:certs' in all_perms
-        assert 'read:certs' in all_perms
+        assert 'write:certificates' in all_perms
+        assert 'read:certificates' in all_perms
         assert 'read:cas' in all_perms
 
     def test_update_inherits_from(self, auth_client):
@@ -423,7 +425,7 @@ class TestRoleInheritance:
 
         cr = _post_json(auth_client, '/api/v2/rbac/roles', {
             'name': 'Inherit Update Child',
-            'permissions': ['read:certs'],
+            'permissions': ['read:certificates'],
         })
         child_id = _json(cr).get('data', _json(cr))['id']
 
@@ -448,7 +450,7 @@ class TestRoleCRUDLifecycle:
         r = _post_json(auth_client, '/api/v2/rbac/roles', {
             'name': 'Lifecycle Role',
             'description': 'For lifecycle test',
-            'permissions': ['read:certs'],
+            'permissions': ['read:certificates'],
         })
         assert r.status_code == 200
         role = _json(r).get('data', _json(r))
@@ -463,12 +465,12 @@ class TestRoleCRUDLifecycle:
         # 3. Update
         r = _put_json(auth_client, f'/api/v2/rbac/roles/{role_id}', {
             'name': 'Lifecycle Role Updated',
-            'permissions': ['read:certs', 'write:certs'],
+            'permissions': ['read:certificates', 'write:certificates'],
         })
         assert r.status_code == 200
         role = _json(r).get('data', _json(r))
         assert role['name'] == 'Lifecycle Role Updated'
-        assert 'write:certs' in role['permissions']
+        assert 'write:certificates' in role['permissions']
 
         # 4. Appears in list
         r = auth_client.get('/api/v2/rbac/roles')

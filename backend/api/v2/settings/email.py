@@ -6,6 +6,7 @@ from flask import request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.ssrf_protection import validate_url_not_cloud_metadata
+from utils.secret_target import changed_targets, keeps_saved_secret, retarget_error
 from models import db
 from services.audit_service import AuditService
 import logging
@@ -77,6 +78,54 @@ def get_email_settings():
     })
 
 
+def _smtp_retarget_check(smtp, data):
+    """(error, stale): saved SMTP secrets stay with their target.
+
+    The secret the resulting method uses must be typed again; ``stale`` lists
+    the unused ones, and the refresh token, that a moved target drops instead.
+    """
+    security = 'ssl' if smtp.smtp_use_ssl else ('starttls' if smtp.smtp_use_tls else 'none')
+    server = {'smtp_host': smtp.smtp_host, 'smtp_port': smtp.smtp_port or 587,
+              'smtp_username': smtp.smtp_user, 'smtp_security': security}
+    if 'smtp_security' not in data:
+        server.update(smtp_tls=bool(smtp.smtp_use_tls), smtp_ssl=bool(smtp.smtp_use_ssl))
+    oauth = dict(smtp_oauth_tenant_id=smtp.smtp_oauth_tenant_id,
+                 smtp_oauth_client_id=smtp.smtp_oauth_client_id,
+                 smtp_oauth_authorize_url=smtp.smtp_oauth_authorize_url,
+                 smtp_oauth_token_url=smtp.smtp_oauth_token_url,
+                 smtp_oauth_provider=smtp.smtp_oauth_provider)
+    request_view = dict(data)
+    if not request_view.get('smtp_username'):
+        request_view.pop('smtp_username', None)  # turning authentication off clears it
+    if request_view.get('smtp_oauth_provider'):
+        request_view['smtp_oauth_provider'] = str(request_view['smtp_oauth_provider']).lower()
+
+    # The resulting method, as the update below derives it
+    method = data.get('smtp_auth_method')
+    if 'smtp_auth' in data:
+        auth_on = bool(data['smtp_auth'])
+    else:
+        auth_on = method in ('password', 'oauth2') or (method is None and bool(smtp.smtp_auth))
+    auth_on = auth_on and method != 'none'
+    if method not in ('password', 'oauth2'):
+        method = smtp.smtp_auth_method or 'password'
+    stale = []
+    for key, current, used in (('smtp_password', server, auth_on and method == 'password'),
+                               ('smtp_oauth_client_secret', oauth, auth_on and method == 'oauth2')):
+        if not keeps_saved_secret(data, key, getattr(smtp, key)):
+            continue
+        if used:
+            err = retarget_error(current, request_view, True)
+            if err:
+                return err, []
+        elif changed_targets(current, request_view):
+            stale.append(key)  # unused here, so dropped rather than moved
+    # Access tokens go to the SMTP server: any move needs a new consent
+    if changed_targets(dict(server, **oauth), request_view):
+        stale.append('smtp_oauth_refresh_token')
+    return None, stale
+
+
 @bp.route('/api/v2/settings/email', methods=['PATCH'])
 @require_auth(['write:settings'])
 def update_email_settings():
@@ -90,6 +139,11 @@ def update_email_settings():
         return error_response('smtp_security must be one of: none, starttls, ssl', 400)
 
     smtp = SMTPConfig.query.first()
+    stale = []
+    if smtp:
+        err, stale = _smtp_retarget_check(smtp, data)
+        if err:
+            return err
     if not smtp:
         smtp = SMTPConfig()
         db.session.add(smtp)
@@ -157,6 +211,8 @@ def update_email_settings():
         smtp.smtp_oauth_scope = data['smtp_oauth_scope'] or None
     if 'smtp_oauth_redirect_uri' in data:
         smtp.smtp_oauth_redirect_uri = data['smtp_oauth_redirect_uri'] or None
+    for key in stale:
+        setattr(smtp, key, None)
 
     try:
         db.session.commit()
@@ -164,6 +220,9 @@ def update_email_settings():
         db.session.rollback()
         logger.error(f"Failed to update email settings: {e}")
         return error_response('Failed to update email settings', 500)
+    if 'smtp_oauth_refresh_token' in stale:
+        from services import smtp_oauth as oauth_helper
+        oauth_helper.invalidate_cache(smtp.id)
 
     AuditService.log_action(
         action='settings_update',

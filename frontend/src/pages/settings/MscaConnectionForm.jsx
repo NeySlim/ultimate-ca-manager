@@ -5,6 +5,10 @@ import { Button, Input, Select, Textarea } from '../../components'
 import CertificateInput from '../../components/CertificateInput'
 import { mscaService } from '../../services'
 import { useNotification } from '../../contexts'
+import { secretInputProps, secretRequiredForTarget, typedSecret } from '../../lib/secretTarget'
+
+const WINRM_TARGET = ['winrm_host', 'winrm_port', 'winrm_use_ssl', 'winrm_verify_ssl',
+  'winrm_transport', 'winrm_username']
 
 export default function MscaConnectionForm({ connection, onSave, onCancel }) {
   const { t } = useTranslation()
@@ -39,6 +43,8 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
     ca_config: connection?.ca_config || '',
     inventory_sync_enabled: connection?.inventory_sync_enabled ?? false,
   })
+  // The form as loaded: what each saved password was saved for
+  const [savedForm] = useState(formData)
   const [testingAdmin, setTestingAdmin] = useState(false)
   const [availableTemplates, setAvailableTemplates] = useState([])
   const [fetchingTemplates, setFetchingTemplates] = useState(false)
@@ -64,8 +70,26 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
     setFormData(prev => ({ ...prev, [field]: value }))
   }
 
+  // Same rule as the server: each saved password stays with the host it is sent to
+  const winrmSecret = {
+    saved: savedForm, current: formData, secret: formData.winrm_password,
+    secretSaved: Boolean(connection?.winrm_password),
+    fields: connection?.winrm_host ? WINRM_TARGET : [...WINRM_TARGET, 'server'],
+  }
+  const basicSecret = {
+    saved: savedForm, current: formData, secret: formData.password,
+    secretSaved: Boolean(connection?.auth_method === 'basic' && connection?.password
+      && formData.auth_method === 'basic'),
+    fields: ['server', 'use_ssl', 'verify_ssl', 'ca_bundle', 'username',
+      ...(connection?.winrm_password || typedSecret(formData.winrm_password) ? [] : WINRM_TARGET)],
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (secretRequiredForTarget(winrmSecret) || secretRequiredForTarget(basicSecret)) {
+      showError(t('common.secretRequiredForTarget'))
+      return
+    }
     const data = { ...formData }
     // Don't send masked password if unchanged
     if (connection && !data.password) delete data.password
@@ -175,6 +199,7 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
             value={formData.password}
             onChange={(e) => updateField('password', e.target.value)}
             placeholder={connection ? '••••••••' : ''}
+            {...secretInputProps(t, basicSecret)}
           />
         </>
       )}
@@ -336,6 +361,7 @@ export default function MscaConnectionForm({ connection, onSave, onCancel }) {
                 value={formData.winrm_password}
                 onChange={(e) => updateField('winrm_password', e.target.value)}
                 placeholder={connection?.winrm_username ? '••••••••' : ''}
+                {...secretInputProps(t, winrmSecret)}
               />
             </div>
             <Input

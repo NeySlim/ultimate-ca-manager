@@ -130,6 +130,7 @@
     "set": "Impostato",
     "configured": "Configurato",
     "enterNewToChange": "Inserisci un nuovo valore per modificare",
+    "secretRequiredForTarget": "Il segreto salvato viene inviato solo al server e all'account salvati. Reinseriscilo per modificarli.",
     "auto": "Auto",
     "manual": "Manuale",
     "update": "Aggiornamento",
@@ -3264,7 +3265,9 @@
       "read:ssh": "Visualizza CA e certificati SSH",
       "write:ssh": "Crea e firma certificati SSH",
       "delete:ssh": "Elimina CA e certificati SSH"
-    }
+    },
+    "ignoredPermissions": "Permessi ignorati",
+    "ignoredPermissionsHint": "Salvati in questo ruolo ma non applicati: riservati agli amministratori o sconosciuti. Vengono conservati così come sono."
   },
   "hsm": {
     "statusUnavailable": "Le funzioni HSM non sono disponibili",
@@ -3876,7 +3879,10 @@
         "delivered": "Consegnata",
         "failed": "Fallita"
       }
-    }
+    },
+    "customHeadersSet": "Questo webhook ha intestazioni personalizzate impostate tramite l'API; i loro valori non vengono mostrati.",
+    "dropCustomHeaders": "Rimuovi le intestazioni personalizzate",
+    "customHeadersFollowUrl": "Le intestazioni personalizzate restano legate all'URL salvato: rimuovile per modificarlo, oppure reinseriscile tramite l'API."
   },
   "safeMode": {
     "title": "Modalità sicura",

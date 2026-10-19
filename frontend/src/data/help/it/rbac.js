@@ -17,7 +17,7 @@ export default {
         title: 'Ruoli personalizzati',
         items: [
           { label: 'Crea ruolo', text: 'Definisci un nuovo ruolo con nome e descrizione' },
-          { label: 'Matrice dei permessi', text: 'Seleziona/deseleziona i permessi per categoria (CA, Certificati, Utenti, ecc.)' },
+          { label: 'Matrice dei permessi', text: 'Seleziona/deseleziona i permessi per categoria (CA, Certificati, Chiavi private, ecc.)' },
           { label: 'Copertura', text: 'Percentuale visuale dei permessi totali concessi al ruolo' },
           { label: 'Conteggio utenti', text: 'Vedi quanti utenti sono assegnati a ogni ruolo' },
         ]
@@ -55,42 +55,44 @@ Quattro ruoli integrati che non possono essere modificati o eliminati:
 
 ### Matrice dei permessi
 I permessi sono organizzati per categoria:
-- **CA**: Creazione, lettura, aggiornamento, eliminazione, importazione, esportazione
+- **CA**: Creazione, lettura, aggiornamento, eliminazione, importazione, esportazione (solo certificato: vedi Chiavi private)
 - **Certificati**: Emissione, lettura, revoca, rinnovo, esportazione, eliminazione (solo certificato: vedi Chiavi private)
-- **Chiavi private**: Esportazione diretta della chiave privata (\`read:private_keys\`), riservata agli admin: nessun ruolo predefinito la possiede tranne Admin. I ruoli che ne sono privi passano dal Recupero delle chiavi
+- **Chiavi private**: Esportazione diretta della chiave privata di un certificato o di una CA (\`read:private_keys\`). Nessun ruolo predefinito la possiede tranne Admin; un ruolo personalizzato può concederla. I ruoli che ne sono privi passano dal Recupero delle chiavi
 - **CSR**: Creazione, lettura, firma, eliminazione
 - **Template**: Creazione, lettura, aggiornamento, eliminazione
-- **Utenti**: Creazione, lettura, aggiornamento, eliminazione
+- **Utenti**: Lettura (la gestione degli account è riservata agli amministratori)
 - **Gruppi**: Creazione, lettura, aggiornamento, eliminazione
 - **Impostazioni**: Lettura, aggiornamento
-- **Audit**: Lettura, esportazione, pulizia
+- **Audit**: Lettura, esportazione (la pulizia è riservata agli amministratori)
 - **ACME**: Configurazione, gestione account
 - **SCEP**: Configurazione, approvazione richieste
 - **Trust Store**: Gestione certificati di fiducia
-- **HSM**: Gestione provider e chiavi
+- **HSM**: Visualizzazione, eliminazione (aggiungere o modificare provider è riservato agli amministratori)
 - **SSH**: Gestione delle CA e dei certificati SSH
 - **Politiche**: Visualizzazione delle politiche dei certificati
 - **Approvazioni**: Visualizzazione e decisione delle richieste di approvazione
 - **Recupero delle chiavi**: Richiesta di recuperi e consultazione delle richieste (l'approvazione è riservata agli admin)
-- **Backup**: Creazione, ripristino
+
+Un ruolo personalizzato può concedere qualsiasi permesso verificato da UCM, tranne quelli riservati agli amministratori: accesso completo e caratteri jolly, ogni azione di amministrazione (approvazione dei recuperi di chiavi, amministrazione di sistema e utenti), gestione degli account, SSO, distribuzioni, modifiche al connettore AD e ai provider HSM, eventi di sistema ed eliminazione del registro di audit. Un permesso salvato che il ruolo non può concedere viene mostrato come ignorato e conservato così com'è.
 
 ### Attivazione per categoria
 Clicca sull'intestazione di una categoria per abilitare/disabilitare tutti i permessi in quella categoria contemporaneamente.
 
 ### Indicatore di copertura
-Un badge percentuale mostra quanta parte dell'insieme totale dei permessi copre il ruolo. 100% = equivalente ad Admin.
+Un badge percentuale mostra quanta parte dell'insieme totale dei permessi copre il ruolo.
 
 ## Assegnazione dei ruoli
 
 I ruoli vengono assegnati:
-- **Direttamente**: Nella pagina Utenti, modifica un utente e seleziona un ruolo
+- **Direttamente**: Nella pagina Utenti, modifica un utente e seleziona un ruolo predefinito e, facoltativamente, un ruolo personalizzato che vi si aggiunge. Le modifiche si applicano dalla richiesta successiva dell'utente
 - **Tramite gruppi**: Un gruppo concede un insieme di permessi; ogni membro lo riceve in aggiunta al proprio ruolo
 
 ## Permessi effettivi
 
 I permessi effettivi di un utente sono calcolati come l'unione di:
-1. I permessi del ruolo assegnato direttamente
-2. I permessi concessi dai gruppi a cui appartiene
+1. I permessi del suo ruolo predefinito
+2. I permessi del suo ruolo personalizzato, compresi quelli dei ruoli da cui eredita
+3. I permessi concessi dai gruppi a cui appartiene
 
 Prevale la regola più permissiva (modello additivo, senza regole di negazione).
 

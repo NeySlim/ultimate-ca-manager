@@ -208,8 +208,9 @@ class MicrosoftCAAdminChannelMixin:
         password = msca.winrm_effective_password
         if not username or not password:
             raise MSCAAdminChannelError(
-                'WinRM channel needs a username and password (set an override; '
-                'mTLS-enrolled connections have no reusable credential)'
+                'WinRM channel needs a username and password (set an override: the '
+                'connection password is reused only on the CA host, and mTLS-enrolled '
+                'connections have no reusable credential)'
             )
         return winrm.Session(
             endpoint,

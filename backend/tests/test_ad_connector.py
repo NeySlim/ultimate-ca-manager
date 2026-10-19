@@ -238,9 +238,8 @@ class TestBindCredentialIsRequired:
         }).status_code == 200
 
     def test_a_later_save_keeps_the_stored_one(self, app, auth_client):
-        """The form never re-sends a saved password, so a blank field means
-        "unchanged" -- editing the port must not demand the credential
-        again, and must not clear it."""
+        """The form never re-sends a saved password, so an absent field means
+        "unchanged": editing a non-target field keeps it, moving the port needs it."""
         with app.app_context():
             ADConnectorConfig.query.delete()
             db.session.commit()
@@ -250,7 +249,9 @@ class TestBindCredentialIsRequired:
             'bind_password': 'svc-password',
         }).status_code == 200
 
-        assert self._put(auth_client, {'port': 636}).status_code == 200
+        assert self._put(auth_client, {'base_dn': 'DC=corp2,DC=local'}).status_code == 200
+        assert self._put(auth_client, {'port': 636}).status_code == 400
+        assert self._put(auth_client, {'port': 636, 'bind_password': 'svc-password'}).status_code == 200
         with app.app_context():
             config = ADConnectorConfig.get_singleton()
             assert (config.port, config.bind_password) == (636, 'svc-password')

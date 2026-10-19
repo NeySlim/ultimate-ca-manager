@@ -5,6 +5,11 @@ import { Input, Select, Button } from '../../components'
 import { useNotification } from '../../contexts'
 import ProviderTypeGrid from './ProviderTypeGrid'
 
+// Same split as the server: anything that looks secret is one, the rest is the target
+const SECRET_HINTS = ['secret', 'token', 'password', 'key']
+const isSecretField = (field) =>
+  field.type === 'password' || SECRET_HINTS.some(h => field.name.toLowerCase().includes(h))
+
 export default function DnsProviderForm({ provider, providerTypes, onSubmit, onCancel }) {
   const { t } = useTranslation()
   const { showWarning } = useNotification()
@@ -17,6 +22,12 @@ export default function DnsProviderForm({ provider, providerTypes, onSubmit, onC
   
   const existingCredentialKeys = provider?.credential_keys || []
   const selectedType = providerTypes.find(pt => pt.type === formData.provider_type)
+  // Saved values are never shown: typing a target field asks for the saved secrets again
+  const typed = (name) => String(formData.credentials[name] || '').trim() !== ''
+  const schema = selectedType?.credentials_schema || []
+  const targetTyped = Boolean(provider) && schema.some(f => !isSecretField(f) && typed(f.name))
+  const secretMissing = (field) => targetTyped && isSecretField(field)
+    && existingCredentialKeys.includes(field.name) && !typed(field.name)
   
   const handleSubmit = (e) => {
     e.preventDefault()
@@ -26,6 +37,11 @@ export default function DnsProviderForm({ provider, providerTypes, onSubmit, onC
       return
     }
     
+    if (schema.some(secretMissing)) {
+      showWarning(t('common.secretRequiredForTarget'))
+      return
+    }
+
     if (selectedType?.credentials_schema && !provider) {
       const missing = selectedType.credentials_schema
         .filter(field => field.required && !formData.credentials[field.name])
@@ -90,8 +106,9 @@ export default function DnsProviderForm({ provider, providerTypes, onSubmit, onC
                     onChange={(e) => updateCredential(field.name, e.target.value)}
                     required={field.required}
                     placeholder={field.placeholder}
-                    hasExistingValue={hasExistingValue}
+                    hasExistingValue={hasExistingValue && !secretMissing(field)}
                     helperText={field.help}
+                    {...(secretMissing(field) ? { required: true, error: t('common.secretRequiredForTarget') } : {})}
                   />
                 )}
               </div>

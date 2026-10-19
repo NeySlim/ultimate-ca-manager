@@ -137,6 +137,8 @@ class WebhookEndpoint(db.Model):
             'auth_token_set': bool(self._auth_token),
             'auth_username': self.auth_username,
             'auth_header_name': self.auth_header_name,
+            # Header values may carry credentials: only whether some are set
+            'custom_headers_set': bool(self.get_headers()),
         }
 
 

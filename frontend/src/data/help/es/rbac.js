@@ -17,7 +17,7 @@ export default {
         title: 'Roles personalizados',
         items: [
           { label: 'Crear rol', text: 'Definir un nuevo rol con nombre y descripción' },
-          { label: 'Matriz de permisos', text: 'Marcar/desmarcar permisos por categoría (CA, Certificados, Usuarios, etc.)' },
+          { label: 'Matriz de permisos', text: 'Marcar/desmarcar permisos por categoría (CA, Certificados, Claves privadas, etc.)' },
           { label: 'Cobertura', text: 'Porcentaje visual del total de permisos otorgados al rol' },
           { label: 'Cantidad de usuarios', text: 'Ver cuántos usuarios están asignados a cada rol' },
         ]
@@ -55,42 +55,44 @@ Cuatro roles integrados que no se pueden modificar ni eliminar:
 
 ### Matriz de permisos
 Los permisos están organizados por categoría:
-- **CA**: Crear, leer, actualizar, eliminar, importar, exportar
+- **CA**: Crear, leer, actualizar, eliminar, importar, exportar (solo el certificado: véase Claves privadas)
 - **Certificados**: Emitir, leer, revocar, renovar, eliminar, exportar (solo el certificado: véase Claves privadas)
-- **Claves privadas**: Exportación directa de la clave privada (\`read:private_keys\`), solo administradores: ningún rol integrado salvo Admin la posee. Los roles sin ella pasan por la Recuperación de claves
+- **Claves privadas**: Exportación directa de la clave privada de un certificado o de una CA (\`read:private_keys\`). Ningún rol integrado salvo Admin la posee; un rol personalizado puede concederla. Los roles sin ella pasan por la Recuperación de claves
 - **CSR**: Crear, leer, firmar, eliminar
 - **Plantillas**: Crear, leer, actualizar, eliminar
-- **Usuarios**: Crear, leer, actualizar, eliminar
+- **Usuarios**: Leer (la gestión de cuentas está reservada a los administradores)
 - **Grupos**: Crear, leer, actualizar, eliminar
 - **Configuración**: Leer, actualizar
-- **Auditoría**: Leer, exportar, limpiar
+- **Auditoría**: Leer, exportar (la limpieza está reservada a los administradores)
 - **ACME**: Configurar, gestionar cuentas
 - **SCEP**: Configurar, aprobar solicitudes
 - **Almacén de confianza**: Gestionar certificados de confianza
-- **HSM**: Gestionar proveedores y claves
+- **HSM**: Ver, eliminar (añadir o modificar proveedores está reservado a los administradores)
 - **SSH**: Gestionar CA SSH y certificados SSH
 - **Políticas**: Ver políticas de certificados
 - **Aprobaciones**: Ver y decidir solicitudes de aprobación
 - **Recuperación de claves**: Solicitar recuperaciones y ver solicitudes (la aprobación es solo para administradores)
-- **Respaldo**: Crear, restaurar
+
+Un rol personalizado puede conceder cualquier permiso que UCM comprueba, salvo los reservados a los administradores: acceso completo y comodines, toda acción de administración (aprobación de recuperaciones de claves, administración del sistema y de usuarios), gestión de cuentas, SSO, despliegues, cambios del conector AD y de los proveedores HSM, eventos del sistema y borrado del registro de auditoría. Un permiso guardado que el rol no puede conceder se muestra como ignorado y se conserva tal cual.
 
 ### Alternar categorías
 Haga clic en el encabezado de una categoría para activar/desactivar todos los permisos de esa categoría de una vez.
 
 ### Indicador de cobertura
-Una insignia de porcentaje muestra cuánto del conjunto total de permisos cubre el rol. 100% = equivalente a Admin.
+Una insignia de porcentaje muestra cuánto del conjunto total de permisos cubre el rol.
 
 ## Asignación de roles
 
 Los roles se asignan:
-- **Directamente**: En la página de Usuarios, edite un usuario y seleccione un rol
+- **Directamente**: En la página de Usuarios, edite un usuario y seleccione un rol integrado y, opcionalmente, un rol personalizado que se le suma. Los cambios se aplican desde la siguiente solicitud del usuario
 - **Mediante grupos**: Un grupo otorga un conjunto de permisos; cada miembro lo recibe además de su propio rol
 
 ## Permisos efectivos
 
 Los permisos efectivos de un usuario se calculan como la unión de:
-1. Los permisos del rol asignado directamente
-2. Los permisos otorgados por los grupos a los que pertenece
+1. Los permisos de su rol integrado
+2. Los permisos de su rol personalizado, incluidos los de los roles de los que hereda
+3. Los permisos otorgados por los grupos a los que pertenece
 
 La regla más permisiva prevalece (modelo aditivo, sin reglas de denegación).
 
