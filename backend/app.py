@@ -1341,12 +1341,8 @@ def init_database(app):
 
             # Add initial system config
             configs = [
-                SystemConfig(key="app.initialized", value="true", 
-                            description="Application initialized"),
                 SystemConfig(key="app.version", value=app.config["APP_VERSION"],
                             description="Application version"),
-                SystemConfig(key="https.enabled", value="true",
-                            description="HTTPS enforcement enabled"),
             ]
             
             for config in configs:
@@ -1387,7 +1383,8 @@ def init_database(app):
                         "basic_constraints": {"ca": False},
                         "san_types": ["dns", "ip"]
                     }),
-                    "is_system": True
+                    "is_system": True,
+                    "enforce_san_types": False
                 },
                 {
                     "name": "Client Certificate",
@@ -1401,9 +1398,10 @@ def init_database(app):
                         "key_usage": ["digitalSignature", "keyEncipherment"],
                         "extended_key_usage": ["clientAuth"],
                         "basic_constraints": {"ca": False},
-                        "san_types": ["email"]
+                        "san_types": ["dns", "email", "upn"]
                     }),
-                    "is_system": True
+                    "is_system": True,
+                    "enforce_san_types": False
                 },
                 {
                     "name": "VPN Server",
@@ -1419,7 +1417,8 @@ def init_database(app):
                         "basic_constraints": {"ca": False},
                         "san_types": ["dns", "ip"]
                     }),
-                    "is_system": True
+                    "is_system": True,
+                    "enforce_san_types": False
                 },
                 {
                     "name": "Email (S/MIME)",
@@ -1435,7 +1434,8 @@ def init_database(app):
                         "basic_constraints": {"ca": False},
                         "san_types": ["email"]
                     }),
-                    "is_system": True
+                    "is_system": True,
+                    "enforce_san_types": False
                 },
                 # CA template removed — CAs are created from the CAs page, not via templates
                 {
@@ -1452,7 +1452,8 @@ def init_database(app):
                         "basic_constraints": {"ca": False},
                         "san_types": []
                     }),
-                    "is_system": True
+                    "is_system": True,
+                    "enforce_san_types": False
                 },
                 {
                     "name": "Smartcard Logon",
@@ -1466,9 +1467,10 @@ def init_database(app):
                         "key_usage": ["digitalSignature", "keyEncipherment"],
                         "extended_key_usage": ["clientAuth", "msSmartcardLogin"],
                         "basic_constraints": {"ca": False},
-                        "san_types": ["upn"]
+                        "san_types": ["upn", "email"]
                     }),
-                    "is_system": True
+                    "is_system": True,
+                    "enforce_san_types": False
                 }
             ]
             
@@ -1856,12 +1858,7 @@ def main():
     print(f"  HTTPS Server: https://{config.HOST}:{config.HTTPS_PORT}")
     print(f"  Certificate: {config.HTTPS_CERT_PATH}")
     print(f"  Database: {config.DATABASE_PATH}")
-    print(f"  SCEP Enabled: {config.SCEP_ENABLED}")
     print(f"{'='*60}\n")
-    
-    if config.SCEP_ENABLED:
-        print(f"  SCEP Endpoint: https://{config.HOST}:{config.HTTPS_PORT}/scep/pkiclient.exe")
-        print(f"{'='*60}\n")
     
     # Start HTTP protocol server for CDP/OCSP (dev mode, non-blocking thread)
     try:

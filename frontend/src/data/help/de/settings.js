@@ -435,7 +435,7 @@ Der Tab verfolgt, was konfiguriert ist und was noch benötigt wird, sowohl für 
 ### Richtlinienermittlung (XCEP)
 
 - **Zertifizierungsstelle**: Die CA, deren Vorlagen angekündigt werden und die über diese Konfiguration Zertifikate ausstellt
-- **Gültigkeit (Tage)**: Standardgültigkeit für über WSTEP ausgestellte Zertifikate
+- **Gültigkeit (Tage)**: Gültigkeit der über WSTEP ausgestellten Zertifikate, wenn die Anfrage zu keiner Vorlage passt; sonst gilt die Gültigkeit der passenden Vorlage
 
 ### Kerberos / SPNEGO
 

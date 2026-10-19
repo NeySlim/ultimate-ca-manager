@@ -26,8 +26,8 @@ export default {
       {
         title: 'Agendamento',
         items: [
-          { label: 'Relatório de Expiração', text: 'E-mail diário com certificados expirando em breve' },
-          { label: 'Relatório de Conformidade', text: 'E-mail semanal com status de conformidade com políticas' },
+          { label: 'Relatório de Expiração', text: 'E-mail com certificados expirando em breve, na frequência escolhida' },
+          { label: 'Relatório de Conformidade', text: 'E-mail com status de conformidade com políticas, na frequência escolhida' },
         ]
       },
     ],

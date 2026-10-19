@@ -88,8 +88,6 @@ class ExportCoreMixin:
             'system': {
                 'fqdn': os.environ.get('FQDN', ''),
                 'https_port': int(os.environ.get('HTTPS_PORT', 8443)),
-                'session_timeout': int(os.environ.get('SESSION_TIMEOUT', 3600)),
-                'jwt_expiration': int(os.environ.get('JWT_EXPIRATION', 86400))
             },
             'settings': config,
             # Which settings the target has to store encrypted again, with the

@@ -4,7 +4,7 @@ Tests for general settings admin permission check.
 Verifies that security-sensitive settings (enforce_2fa, session_timeout,
 max_login_attempts, lockout_duration, password policy, metrics_token,
 key_recovery_dual_control, backup schedule) require admin:settings
-permission, while non-security settings (site_name, timezone, date_format) remain
+permission, while non-security settings (system_name, timezone, date_format) remain
 accessible with write:settings only.
 """
 import pytest
@@ -68,7 +68,7 @@ ADMIN_ONLY_KEYS = [
 
 # Settings that only need write:settings
 NON_ADMIN_KEYS = [
-    'site_name',
+    'system_name',
     'timezone',
     'date_format',
     'show_time',
@@ -114,7 +114,7 @@ class TestGeneralSettingsAdminPermission:
                                      f'op_nonadmin_{key[:8]}')
 
         test_values = {
-            'site_name': 'Operator UCM',
+            'system_name': 'Operator UCM',
             'timezone': 'America/New_York',
             'date_format': 'long',
             'show_time': False,
@@ -149,7 +149,7 @@ class TestGeneralSettingsAdminPermission:
         orig_attempts = before.get('max_login_attempts')
 
         r = patch_json(op_client, '/api/v2/settings/general', {
-            'site_name': 'Mixed Test',
+            'system_name': 'Mixed Test',
             'enforce_2fa': False,
             'max_login_attempts': 999,
         })
@@ -159,8 +159,8 @@ class TestGeneralSettingsAdminPermission:
         # Verify non-admin key was saved and admin keys were NOT changed
         r_after = auth_client.get('/api/v2/settings/general')
         after = get_json(r_after).get('data', get_json(r_after))
-        assert after.get('site_name') == 'Mixed Test', \
-            f'Non-admin key site_name should be saved: {after}'
+        assert after.get('system_name') == 'Mixed Test', \
+            f'Non-admin key system_name should be saved: {after}'
         assert after.get('enforce_2fa') == orig_2fa, \
             f'Admin key enforce_2fa should not be modified: {after}'
         assert after.get('max_login_attempts') == orig_attempts, \
@@ -171,7 +171,7 @@ class TestGeneralSettingsAdminPermission:
         op_client = _create_operator(app, auth_client, create_user, 'op_safe')
 
         r = patch_json(op_client, '/api/v2/settings/general', {
-            'site_name': 'Safe Operator',
+            'system_name': 'Safe Operator',
             'timezone': 'UTC',
             'date_format': 'short',
         })
@@ -180,6 +180,6 @@ class TestGeneralSettingsAdminPermission:
 
     def test_viewer_cannot_modify_any_setting(self, viewer_client):
         """Viewer (read-only) cannot PATCH any setting — requires write:settings."""
-        r = patch_json(viewer_client, '/api/v2/settings/general', {'site_name': 'Viewer UCM'})
+        r = patch_json(viewer_client, '/api/v2/settings/general', {'system_name': 'Viewer UCM'})
         assert r.status_code in (403, 401), \
             f'Viewer should not be able to modify settings: {r.data}'

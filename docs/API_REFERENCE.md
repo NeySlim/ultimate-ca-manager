@@ -438,7 +438,6 @@ GET /api/v2/cas?page=1&per_page=20
       "valid_until": "2035-01-01T00:00:00",
       "key_size": 4096,
       "signature_algorithm": "sha256WithRSAEncryption",
-      "is_active": true,
       "certificates_count": 42
     }
   ],
@@ -523,8 +522,7 @@ PATCH /api/v2/cas/{ca_id}
 Content-Type: application/json
 
 {
-  "name": "Updated Name",
-  "is_active": true
+  "name": "Updated Name"
 }
 ```
 
@@ -1306,9 +1304,7 @@ Response:
 {
   "data": {
     "enabled": true,
-    "url": "/scep/pkiclient.exe",
     "ca_id": 2,
-    "ca_ident": "ucm-ca",
     "auto_approve": false,
     "challenge_validity": 24
   }
@@ -1323,7 +1319,6 @@ Content-Type: application/json
 {
   "enabled": true,
   "ca_id": 2,
-  "ca_ident": "ucm-ca",
   "auto_approve": false,
   "challenge_validity": 24
 }
@@ -1838,7 +1833,7 @@ PATCH /api/v2/settings/general
 Content-Type: application/json
 
 {
-  "site_name": "My PKI",
+  "system_name": "pki-01",
   "default_validity_days": 365,
   "require_approval": false
 }
@@ -2614,7 +2609,6 @@ Content-Type: application/json
   "credentials": {
     "api_token": "..."
   },
-  "zones": ["example.com"],
   "is_default": true,
   "enabled": true
 }
@@ -2633,7 +2627,6 @@ Content-Type: application/json
 {
   "name": "Updated Name",
   "credentials": { "api_token": "new-token" },
-  "zones": ["example.com", "example.org"],
   "enabled": true,
   "is_default": false
 }

@@ -335,6 +335,23 @@ def check_renewable(cert: Certificate) -> None:
             except FipsRestricted as e:
                 raise RenewalError.from_fips(e) from e
 
+    # The template's SAN types bind the renewed names as they bound the issuance
+    template_id = getattr(cert, 'template_id', None)
+    if template_id:
+        from models.certificate_template import CertificateTemplate
+        from services.template_service import allowed_san_types, san_type_of, san_type_refusal
+        template = db.session.get(CertificateTemplate, template_id)
+        allowed = allowed_san_types(template) if template is not None else None
+        if allowed is not None:
+            try:
+                names = x509.load_pem_x509_certificate(base64.b64decode(cert.crt)).extensions \
+                    .get_extension_for_class(x509.SubjectAlternativeName).value
+            except x509.ExtensionNotFound:
+                names = []
+            refusal = san_type_refusal(allowed, [san_type_of(n) for n in names], template.name)
+            if refusal:
+                raise RenewalError(f'Policy violation: {refusal}', 400)
+
 
 def _stored_eddsa_name(cert: Certificate):
     try:

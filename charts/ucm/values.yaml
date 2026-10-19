@@ -28,7 +28,6 @@ initialAdminPassword: ""
 ## and PERSISTS them across upgrades (via lookup) so sessions survive restarts.
 secrets:
   secretKey: ""   # UCM_SECRET_KEY (Flask)
-  jwtSecret: ""   # UCM_JWT_SECRET
 
 ## Database backend.
 ##  - sqlite (default): file in the data PVC, single instance.

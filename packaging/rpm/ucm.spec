@@ -147,7 +147,6 @@ fi
 # Generate secrets
 ADMIN_PASS="changeme123"
 SECRET_KEY=$(openssl rand -hex 32)
-JWT_SECRET=$(openssl rand -hex 32)
 
 # Create config if not exists
 NEW_CONFIG=""
@@ -163,7 +162,6 @@ LOG_LEVEL=INFO
 
 # Security (auto-generated - keep secret)
 SECRET_KEY=$SECRET_KEY
-JWT_SECRET_KEY=$JWT_SECRET
 INITIAL_ADMIN_PASSWORD=$ADMIN_PASS
 ENVEOF
     chmod 600 "$UCM_CONFIG/ucm.env"

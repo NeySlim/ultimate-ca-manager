@@ -10,7 +10,6 @@ Default policy:
 - At least 1 special character
 """
 
-import functools
 import re
 import logging
 from typing import Tuple, List, Optional
@@ -46,16 +45,10 @@ class PasswordPolicy:
 _DEFAULT_POLICY = PasswordPolicy()
 
 
-def _invalidate_policy_cache():
-    """Call this after updating password policy in SystemConfig."""
-    load_policy_from_config.cache_clear()
-
-
-@functools.lru_cache(maxsize=16)
-def load_policy_from_config(cache_bust: int = 0) -> PasswordPolicy:
+def load_policy_from_config() -> PasswordPolicy:
     """Load password policy from SystemConfig, fallback to defaults.
 
-    Cached via lru_cache; call _invalidate_policy_cache() after policy changes.
+    Read on every call: a per-process cache kept other workers on the old policy.
     """
     try:
         from models import SystemConfig
@@ -85,20 +78,6 @@ def load_policy_from_config(cache_bust: int = 0) -> PasswordPolicy:
     except RuntimeError:
         # Outside Flask app context (e.g. unit tests without app_context)
         return _DEFAULT_POLICY
-
-
-def is_admin_bypass_enabled() -> bool:
-    """Check if admin bypass for password policy is enabled."""
-    try:
-        from models import SystemConfig
-
-        cfg = SystemConfig.query.filter_by(key='admin_bypass_password_policy').first()
-        if cfg is None:
-            return False
-        return cfg.value.lower() in ('true', '1', 'yes')
-    except RuntimeError:
-        # Outside Flask app context
-        return False
 
 
 def validate_password(

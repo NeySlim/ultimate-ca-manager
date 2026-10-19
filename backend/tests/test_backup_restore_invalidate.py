@@ -131,7 +131,7 @@ class TestCachesArePurged:
             result = invalidate_after_restore()
 
         for name in ('acme_proxy', 'external_crl_entries', 'ocsp_responses',
-                     'password_policy', 'oidc_discovery'):
+                     'oidc_discovery'):
             assert name in result['caches_cleared'], result
         assert result['caches_failed'] == []
 

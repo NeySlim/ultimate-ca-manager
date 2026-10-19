@@ -165,7 +165,6 @@ fi
 
 # Security
 : "${UCM_SECRET_KEY:=$(generate_secret)}"
-: "${UCM_JWT_SECRET:=$(generate_secret)}"
 
 # Database
 : "${UCM_DATABASE_PATH:="/opt/ucm/data/ucm.db"}"
@@ -173,10 +172,10 @@ fi
 : "${UCM_BACKUP_ENABLED:=true}"
 : "${UCM_BACKUP_RETENTION_DAYS:=30}"
 
-# Initial Admin User
-: "${UCM_INITIAL_ADMIN_USERNAME:="admin"}"
-: "${UCM_INITIAL_ADMIN_EMAIL:="admin@${UCM_FQDN}"}"
-: "${UCM_INITIAL_ADMIN_PASSWORD:="changeme123"}"
+# Initial Admin User (the unprefixed names, as set by older Helm charts, still count)
+: "${UCM_INITIAL_ADMIN_USERNAME:="${INITIAL_ADMIN_USERNAME:-admin}"}"
+: "${UCM_INITIAL_ADMIN_EMAIL:="${INITIAL_ADMIN_EMAIL:-admin@${UCM_FQDN}}"}"
+: "${UCM_INITIAL_ADMIN_PASSWORD:="${INITIAL_ADMIN_PASSWORD:-changeme123}"}"
 
 # Application
 : "${UCM_APP_VERSION:="${UCM_VERSION}"}"
@@ -315,7 +314,6 @@ LOG_LEVEL=${UCM_LOG_LEVEL}
 
 # Security
 SECRET_KEY=${UCM_SECRET_KEY}
-JWT_SECRET_KEY=${UCM_JWT_SECRET}
 
 # Database
 DATABASE_PATH=${UCM_DATABASE_PATH}
@@ -483,7 +481,6 @@ export HTTP_PORT="${UCM_HTTP_PORT}"
 export DEBUG="${UCM_DEBUG}"
 export LOG_LEVEL="${UCM_LOG_LEVEL}"
 export SECRET_KEY="${UCM_SECRET_KEY}"
-export JWT_SECRET_KEY="${UCM_JWT_SECRET}"
 export DATABASE_PATH="${UCM_DATABASE_PATH}"
 export INITIAL_ADMIN_USERNAME="${UCM_INITIAL_ADMIN_USERNAME}"
 export INITIAL_ADMIN_EMAIL="${UCM_INITIAL_ADMIN_EMAIL}"

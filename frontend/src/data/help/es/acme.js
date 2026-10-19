@@ -80,7 +80,7 @@ export default {
         title: 'ACME en IP internas / privadas',
         content: 'La validación HTTP-01 y TLS-ALPN-01 funciona de forma nativa para destinos RFC1918, loopback, .lan / .local / .corp, el modelo de despliegue principal de UCM.',
         items: [
-          { label: 'Conmutador', text: 'Settings → SystemConfig → acme.allow_private_ips (predeterminado: true)' },
+          { label: 'Conmutador', text: 'ACME → Servidor ACME → Permitir direcciones privadas e internas (predeterminado: activado)' },
           { label: 'Conmutador', text: 'Pestaña Let\'s Encrypt → Permitir CA ACME en loopback, para una CA coubicada en 127.0.0.1 (predeterminado: desactivado)' },
           { label: 'Siempre bloqueado', text: 'Las IP de metadatos cloud (169.254.169.254, fd00:ec2::254, etc.) se bloquean incondicionalmente' },
         ]
@@ -267,11 +267,10 @@ El proxy ACME permite a los clientes internos solicitar certificados de una CA p
 ### Configuración
 1. Vaya a **ACME** → pestaña **Let's Encrypt**
 2. Desplácese hasta la sección **Proxy ACME**
-3. Active el interruptor **Proxy ACME**
-4. Seleccione una **Cuenta CA upstream** en **Cuentas CA externas** (Let's Encrypt, Actalis, ZeroSSL, URL personalizada, EAB)
-5. Haga clic en **Probar conexión** para verificar la conectividad con la CA upstream
-6. Registre la cuenta upstream si es necesario (email + **Registrar cuenta**)
-7. UCM registra automáticamente una cuenta en la primera solicitud proxy si aún no lo está
+3. Seleccione una **Cuenta CA upstream** en **Cuentas CA externas** (Let's Encrypt, Actalis, ZeroSSL, URL personalizada, EAB)
+4. Haga clic en **Probar conexión** para verificar la conectividad con la CA upstream
+5. Registre la cuenta upstream si es necesario (email + **Registrar cuenta**)
+6. UCM registra automáticamente una cuenta en la primera solicitud proxy si aún no lo está
 
 ### Rutas proxy dedicadas (multi-CA)
 Cada cuenta CA externa puede exponer su propio endpoint proxy ACME:

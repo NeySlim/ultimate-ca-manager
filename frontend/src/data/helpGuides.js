@@ -733,7 +733,7 @@ UCM caches OCSP responses for performance. The cache is:
 
 By default, OCSP responses are signed with the CA key itself. A **delegated responder** uses a dedicated certificate with the **OCSPSigning** EKU instead: assign one per CA from the CA's detail panel (only certificates carrying the OCSPSigning EKU and a private key are eligible).
 
-**Automatic renewal**: a daily task re-issues the responder certificate before it expires, same key pair and extensions, renewed at par, and rebinds the CA's responder configuration to the new certificate. Short-lived OCSP signing certificates (e.g. a 90-day template) rotate without manual action. Enabled by default; it can be disabled and the renewal window tuned via configuration.
+**Automatic renewal**: a daily task re-issues the responder certificate before it expires, same key pair and extensions, renewed at par, and rebinds the CA's responder configuration to the new certificate. Short-lived OCSP signing certificates (e.g. a 90-day template) rotate without manual action. Enabled by default; it can be disabled and the renewal window tuned in Settings › Security.
 
 ### AIA URLs
 The Authority Information Access (AIA) extension is embedded in certificates to tell clients where to find:
@@ -786,7 +786,6 @@ View all SCEP enrollment requests:
 Configure the SCEP server:
 - **Enable/Disable**: Toggle the SCEP service
 - **Signing CA**: Select which CA signs SCEP-enrolled certificates
-- **CA Identifier**: The identifier devices use to locate the correct CA
 - **Auto-Approve**: Automatically approve requests with valid challenge passwords
 
 ### Profiles
@@ -830,7 +829,7 @@ https://your-server:8443/scep                          (global endpoint)
 https://your-server:8443/scep/<profile>/pkiclient.exe  (per-profile endpoint)
 \`\`\`
 
-Devices need the URL plus the CA identifier to enroll. Use a profile URL to target that profile's CA, template and challenge password.
+Devices need the URL to enroll. Use a profile URL to target that profile's CA, template and challenge password.
 
 ## Approving/Rejecting Requests
 
@@ -999,11 +998,10 @@ ACME Proxy lets internal clients request certificates from a public CA (Let's En
 ### Configuration
 1. Go to **ACME** → **Let's Encrypt** tab
 2. Scroll down to the **ACME Proxy** section
-3. Enable the **ACME Proxy** toggle
-4. Select an **Upstream CA account** from **External CA Accounts** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
-5. Click **Test Connection** to verify connectivity with the upstream CA
-6. Register the upstream account if needed (email + **Register Account**)
-7. UCM automatically registers an account on first proxy request if not already done
+3. Select an **Upstream CA account** from **External CA Accounts** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
+4. Click **Test Connection** to verify connectivity with the upstream CA
+5. Register the upstream account if needed (email + **Register Account**)
+6. UCM automatically registers an account on first proxy request if not already done
 
 ### Dedicated proxy paths (multi-CA)
 Each external CA account can expose its own ACME proxy endpoint:
@@ -2097,7 +2095,7 @@ The tab tracks what's configured versus what's still needed, for both manual and
 ### Policy Discovery (XCEP)
 
 - **Certificate Authority**: The CA whose templates are advertised and that issues certificates through this configuration
-- **Validity (days)**: Default validity applied to certificates issued via WSTEP
+- **Validity (days)**: Validity of certificates issued via WSTEP when the request matches no template; a matched template's own validity applies otherwise
 
 ### Kerberos / SPNEGO
 

@@ -167,7 +167,6 @@ def _app():
     # Re-use session-scoped app if available, else bootstrap a minimal one
     import os, tempfile
     os.environ.setdefault('SECRET_KEY', 'test-secret-key-for-testing')
-    os.environ.setdefault('JWT_SECRET_KEY', 'test-jwt-secret-key-for-testing')
     os.environ.setdefault('UCM_ENV', 'test')
     os.environ.setdefault('HTTP_REDIRECT', 'false')
     os.environ.setdefault('INITIAL_ADMIN_PASSWORD', 'changeme123')

@@ -26,8 +26,8 @@ export default {
       {
         title: 'Programmation',
         items: [
-          { label: 'Rapport d\'expiration', text: 'E-mail quotidien avec les certificats expirant bientôt' },
-          { label: 'Rapport de conformité', text: 'E-mail hebdomadaire avec le statut de conformité aux politiques' },
+          { label: 'Rapport d\'expiration', text: 'E-mail avec les certificats expirant bientôt, à la fréquence choisie' },
+          { label: 'Rapport de conformité', text: 'E-mail avec le statut de conformité aux politiques, à la fréquence choisie' },
         ]
       },
     ],

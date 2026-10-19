@@ -26,8 +26,8 @@ export default {
       {
         title: 'Pianificazione',
         items: [
-          { label: 'Report scadenze', text: 'Email giornaliera con i certificati in scadenza' },
-          { label: 'Report conformità', text: 'Email settimanale con lo stato di conformità delle politiche' },
+          { label: 'Report scadenze', text: 'Email con i certificati in scadenza, con la frequenza scelta' },
+          { label: 'Report conformità', text: 'Email con lo stato di conformità delle politiche, con la frequenza scelta' },
         ]
       },
     ],

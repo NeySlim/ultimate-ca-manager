@@ -43,7 +43,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `replicaCount` | `1` | Keep at 1 (see above) |
 | `fqdn` | `ucm.local` | FQDN for the self-signed UI cert / default AIA-CRL-OCSP base URL |
 | `initialAdminPassword` | `""` (→ image default `changeme123`) | First-boot admin password |
-| `secrets.secretKey` / `secrets.jwtSecret` | `""` (auto-generated + persisted) | Flask / JWT secrets |
+| `secrets.secretKey` | `""` (auto-generated + persisted) | Flask session secret |
 | `database.type` | `sqlite` | `sqlite` or `postgresql` |
 | `database.databaseUrl` | `""` | `postgresql://…` when `type=postgresql` |
 | `database.existingSecret` / `database.existingSecretKey` | `""` / `DATABASE_URL` | Use an existing Secret for the DB URL |

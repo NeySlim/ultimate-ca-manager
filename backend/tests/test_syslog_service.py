@@ -92,10 +92,19 @@ class TestBuildMessage:
         with app.app_context():
             from models import db
             from models.system_config import SystemConfig
+            # Other tests save a system name through the settings API
             cfg = SystemConfig.query.filter_by(key='system_name').first()
-            assert cfg is None or not cfg.value, 'test expects no system_name set'
-            msg = forwarder._build_message(make_audit_log()).decode()
-            assert msg.split(' ')[2] == _sanitize_hostname(socket.gethostname())
+            saved = cfg.value if cfg else None
+            if cfg:
+                cfg.value = ''
+                db.session.commit()
+            try:
+                msg = forwarder._build_message(make_audit_log()).decode()
+                assert msg.split(' ')[2] == _sanitize_hostname(socket.gethostname())
+            finally:
+                if cfg:
+                    cfg.value = saved
+                    db.session.commit()
 
     def test_hostname_never_nilvalue_blank(self, app, forwarder):
         with app.app_context():

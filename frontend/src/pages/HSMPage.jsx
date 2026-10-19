@@ -11,7 +11,7 @@ import {
   Cloud, HardDrive, ArrowsClockwise, Lock, Warning, Copy
 } from '@phosphor-icons/react'
 import { 
-  Badge, Button, FormModal, Input, Select, ExperimentalBadge,
+  Badge, Button, FormModal, Input, Select, Textarea, ExperimentalBadge,
   CompactSection, CompactGrid, CompactField, CompactStats, CompactHeader
 } from '../components'
 import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsive'
@@ -630,7 +630,6 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
   const [formData, setFormData] = useState({
     name: provider?.name || '',
     provider_type: provider?.provider_type || 'pkcs11',
-    enabled: provider?.enabled ?? false,
     connection_timeout: provider?.connection_timeout || 30,
     pkcs11_library_path: provider?.pkcs11_library_path || '',
     pkcs11_slot_id: provider?.pkcs11_slot_id ?? '',
@@ -646,7 +645,7 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
     gcp_project_id: provider?.gcp_project_id || '',
     gcp_location: provider?.gcp_location || 'global',
     gcp_keyring: provider?.gcp_keyring || '',
-    gcp_credentials_json: '',
+    gcp_credentials_json: provider?.gcp_credentials_json || '',
     openbao_url: provider?.openbao_url || '',
     openbao_token: provider?.openbao_token || '',
     openbao_mount_path: provider?.openbao_mount_path || 'transit',
@@ -687,6 +686,9 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
       config.project_id = formData.gcp_project_id
       config.location = formData.gcp_location
       config.key_ring = formData.gcp_keyring
+      // '***' keeps the stored key; left out, the saved config has none and the
+      // provider uses the server's default credentials
+      if (formData.gcp_credentials_json) config.service_account_json = formData.gcp_credentials_json
     } else if (formData.provider_type === 'openbao') {
       config.url = formData.openbao_url
       config.token = formData.openbao_token
@@ -774,6 +776,22 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
             <Input label={t('hsm.gcpConfig.location')} value={formData.gcp_location} onChange={e => handleChange('gcp_location', e.target.value)} />
           </div>
           <Input label={t('hsm.gcpConfig.keyRing')} value={formData.gcp_keyring} onChange={e => handleChange('gcp_keyring', e.target.value)} />
+          <Textarea
+            label={t('hsm.gcpConfig.credentialsJson')}
+            rows={4}
+            value={formData.gcp_credentials_json === '***' ? '' : formData.gcp_credentials_json}
+            onChange={e => handleChange('gcp_credentials_json', e.target.value || (provider?.gcp_credentials_json === '***' ? '***' : ''))}
+            placeholder='{"type": "service_account", ...}'
+            disabled={provider?.gcp_credentials_json === '***' && !formData.gcp_credentials_json}
+            helperText={provider?.gcp_credentials_json === '***' ? t('hsm.gcpConfig.credentialsJsonStored') : t('hsm.gcpConfig.credentialsJsonHelp')}
+          />
+          {provider?.gcp_credentials_json === '***' && (
+            <ToggleSwitch
+              checked={!formData.gcp_credentials_json}
+              onChange={(val) => handleChange('gcp_credentials_json', val ? '' : '***')}
+              label={t('hsm.gcpConfig.useDefaultCredentials')}
+            />
+          )}
         </div>
       )}
 
@@ -792,12 +810,6 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
           />
         </div>
       )}
-
-      <ToggleSwitch
-        checked={formData.enabled}
-        onChange={(val) => handleChange('enabled', val)}
-        label={t('common.enableProvider')}
-      />
     </FormModal>
   )
 }

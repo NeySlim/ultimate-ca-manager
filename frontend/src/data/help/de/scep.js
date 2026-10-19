@@ -8,7 +8,7 @@ export default {
         title: 'Tabs',
         items: [
           { label: 'Anfragen', text: 'Ausstehende, genehmigte und abgelehnte SCEP-Registrierungsanfragen' },
-          { label: 'Konfiguration', text: 'SCEP-Servereinstellungen: CA-Auswahl, CA-Kennung, Auto-Genehmigung' },
+          { label: 'Konfiguration', text: 'SCEP-Servereinstellungen: CA-Auswahl, Auto-Genehmigung' },
           { label: 'Profile', text: 'Benannte Enrollment-Endpunkte, jeder mit eigener URL, CA, Vorlage und Challenge' },
           { label: 'Intune-App-Registrierungen', text: 'Entra-App-Registrierungen (Mandanten-ID, Client-ID, Client-Secret), die sich die Profile teilen, die Intune-Challenges validieren; ein leeres Secret beim Bearbeiten behält das bisherige, Verbindung testen fordert ein Token an und ermittelt den Dienst, ohne eine Challenge zu verbrauchen, und eine noch von einem Profil verwendete App kann nicht gelöscht werden' },
           { label: 'Challenge-Passwörter', text: 'Pro-CA-Challenge-Passwörter für die Geräteregistrierung verwalten' },
@@ -65,7 +65,6 @@ Alle SCEP-Registrierungsanfragen anzeigen:
 Den SCEP-Server konfigurieren:
 - **Aktivieren/Deaktivieren**: Den SCEP-Dienst umschalten
 - **Signierende CA**: Auswählen, welche CA SCEP-registrierte Zertifikate signiert
-- **CA-Kennung**: Die Kennung, die Geräte verwenden, um die richtige CA zu finden
 - **Auto-Genehmigung**: Anfragen mit gültigem Challenge-Passwort automatisch genehmigen
 
 ### Profile
@@ -109,7 +108,7 @@ https://ihr-server:8443/scep                          (globaler Endpunkt)
 https://ihr-server:8443/scep/<profil>/pkiclient.exe   (Endpunkt pro Profil)
 \`\`\`
 
-Geräte benötigen die URL plus die CA-Kennung für die Registrierung. Verwenden Sie eine Profil-URL, um die CA, Vorlage und das Challenge-Passwort dieses Profils anzusprechen.
+Geräte benötigen die URL für die Registrierung. Verwenden Sie eine Profil-URL, um die CA, Vorlage und das Challenge-Passwort dieses Profils anzusprechen.
 
 ## Anfragen genehmigen/ablehnen
 

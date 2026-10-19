@@ -163,6 +163,7 @@ class NotificationConfig(db.Model):
     # clients renew themselves (#386)
     exclude_acme = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     recipients = db.Column(db.Text)  # JSON array of email addresses
+    # Never read or written: subjects are built per event. Kept for older databases.
     subject_template = db.Column(db.String(255))
     description = db.Column(db.String(512))
     # Deduplication: don't send same notification within this many hours
@@ -209,7 +210,6 @@ class NotificationConfig(db.Model):
             "include_revoked": bool(self.include_revoked),
             "exclude_acme": bool(self.exclude_acme),
             "recipients": json.loads(self.recipients) if self.recipients else [],
-            "subject_template": self.subject_template,
             "description": self.description,
             "cooldown_hours": self.cooldown_hours,
             "created_at": utc_isoformat(self.created_at),

@@ -18,6 +18,34 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Reports: a Revoked Certificates report (period, optional reason filter) can be generated, downloaded and scheduled.
 - API keys are also accepted as `Authorization: Bearer <key>`, with the same scopes and CSRF exemption as `X-API-Key`; a key that fails is now refused instead of falling back to the browser session.
 - SAML providers have a NameID format setting (unspecified, persistent, email address or transient), sent in each AuthnRequest and published in the SP metadata; the format used to be read from a setting that could not be saved, so UCM always asked for "unspecified".
+- Settings > Security: the OCSP responder certificate auto-renewal switch and its window (days before expiry), which the daily task already read but nothing could set.
+
+### Changed
+
+- Packaging: the DEB ucm.env offered `SESSION_TIMEOUT` and `RATE_LIMIT_PER_MINUTE`/`RATE_LIMIT_PER_HOUR`, which nothing applied; it now offers the `RATE_LIMIT_*_RPM` and `*_BURST` limits UCM reads. Session lifetime is set in Settings > Security.
+
+### Removed
+
+- ACME: EAB keys still kept in the pre-2.139 `acme_eab_keys` setting registered accounts without appearing anywhere; the upgrade moves them to ACME > EAB as active credentials, where they can be seen and revoked, and the old setting is no longer read; an entry that is not a key pair stays in that setting rather than being deleted. Nothing to do.
+- The undocumented `admin_bypass_password_policy` setting, which let administrators skip the password policy when set in the database, is gone and the upgrade deletes it; administrators now follow the policy like everyone else. Nothing to do.
+- Settings > Audit: the "Enable audit logging" switch and the "Events to log" checkboxes were stored nowhere and changed nothing; they are gone. The audit log always records every event; use the remote syslog categories to forward a subset.
+- Groups: the per-member `role` (`member`/`admin`) of the API was stored but never applied, since managing a group always takes the global admin role; it is no longer accepted or returned. Nothing to do: API clients that still send it are not refused.
+- ACME: the global "Enable ACME proxy" switch of the Let's Encrypt tab is gone, since turning it off never stopped the proxy, and the upgrade deletes the setting. To stop a proxy endpoint, turn off "Expose via ACME proxy" on its CA account, or clear the CA account selected for the default proxy path.
+- ACME proxy: the copies of the upstream account URL and EAB credentials kept in settings beside the proxy's CA account are gone and the upgrade deletes them; `proxy_eab_kid` and `proxy_eab_hmac_key` of the client settings API now write the selected CA account and are refused when none is selected. Nothing to do from the UI, which edits EAB on the CA account.
+- ACME DNS providers: the `zones` list of the API was stored but never used, since ACME > Domains decides which provider answers for a domain; it is no longer accepted or returned. Map each domain in ACME > Domains instead.
+- Policies: the `required_extensions` and `san_restrictions.require_approval_for_external` rules were saved but never enforced; they are dropped on save and the upgrade removes them from existing policies. Nothing to do: approval is set per policy with "Requires approval".
+- Reports: the legacy expiry and compliance report switches made the Reports page show a daily expiry report that never ran. The upgrade turns one switched on with recipients into a real schedule and removes the rest; check Reports > Schedule after upgrading.
+- HSM: the "Enable provider" switch of the provider form was never sent; it is gone. Nothing to do: a provider shows as enabled once its connection test succeeds.
+- SSH CAs: the RSA key size selector was ignored and every RSA SSH CA was 4096-bit; the selector is gone and the algorithm reads "RSA 4096". Nothing to do.
+- API: `owner_group_id` on SSH CAs and SSH certificates was stored, and returned for CAs and certificates, but no access control read it; it is no longer accepted or returned. Use roles to restrict access.
+- API: `PATCH /api/v2/cas/<id>` accepted `is_active` and logged it as a change, but CAs have no such flag and nothing was stored; the field is now ignored. Take a CA offline to stop it signing.
+- SCEP: the "CA Identifier" and SCEP URL settings were never read by any SCEP exchange; they are gone and the upgrade deletes them. Nothing to do: use a profile URL to target a specific CA.
+- Settings: `site_name` was only shown in place of an empty "System Name", which is in fact the syslog HOSTNAME; the field is now labelled "Syslog hostname" and the upgrade carries `site_name` into it when it was empty, then deletes it.
+- Settings: the internal `app.initialized` and `https.enabled` keys were seeded at startup and never read; they are no longer created and the upgrade deletes them. Nothing to do.
+- Notifications: the `subject_template` field of a notification setting was never read or written; it is no longer exposed. Nothing to do.
+- Packaging: the DEB and RPM packages, the native setup, the Docker image and the Helm chart no longer generate a JWT secret (`JWT_SECRET_KEY`, `UCM_JWT_SECRET`, `secrets.jwtSecret`), which nothing used. An existing value is ignored and can be deleted.
+- Configuration: the `SCEP_*` environment variables were loaded at startup and never used, and the DEB `ucm.env` still offered them; in particular `SCEP_ENABLED=false` never turned SCEP off. They are removed from ucm.env and existing lines are ignored: SCEP is enabled or disabled in Protocols > SCEP only.
+- Docker: `.env.docker.example` offered data directories, PostgreSQL credentials and resource limits that no compose file uses, and the dev compose set `SQL_DEBUG`, which nothing read; they are gone. Nothing to do: data lives in the `ucm-data` volume.
 
 ### Fixed
 
@@ -35,8 +63,25 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Settings > Security showed an "API Rate Limit" field that was never saved nor applied; it is removed. Rate limits are set with the `RATE_LIMIT_*` environment variables.
 - HSM: an AWS CloudHSM provider created from the form could not connect, since neither its token label nor its crypto user reached the PKCS#11 login. The form now asks for the token label and logs in as `<crypto user>:<password>`; the unused Region and AWS access key fields are gone.
 - SCEP: the challenge password validity field stopped at 168 hours while the API accepted up to 720; the form now takes its bounds (1 to 720 hours) from the API.
-- DEB: the generated `ucm.env` still offered `SCEP_*` variables that UCM never acts on (SCEP is configured under Protocols > SCEP); they are removed. The in-app help no longer lists Buypass, which stopped issuing certificates on 15 October 2025.
+- The in-app help no longer lists Buypass, which stopped issuing certificates on 15 October 2025.
 - docs/HSM_DOCKER.md said a key sync against an empty SoftHSM token removes every key record; since 2.240 it keeps the keys a CA uses, and the page now says so.
+- Helm: `initialAdminPassword` had no effect and every install started with the default `changeme123`; the chart now passes it under the name the image reads, and the image also honours `INITIAL_ADMIN_PASSWORD`.
+- A change to the password policy (minimum length, character classes) only applied after a restart; it now applies at once in every worker.
+- ACME: "Allow wildcard" on a domain had no effect; the ACME server and the ACME proxy now refuse `*.` identifiers for a domain where it is off (`rejectedIdentifier`). Upgrade note: the switch is on by default; check it is on for every ACME domain that should keep issuing wildcards, on the ACME server as on the proxy.
+- HSM: Azure Key Vault ignored the tenant, client ID and secret typed in the form and signed in with the host's ambient identity; it now uses them, and falls back to the managed identity only when all three are empty.
+- ACME server: whether HTTP-01 and TLS-ALPN-01 may reach private addresses could only be changed in the database, and the in-app help pointed at a page that does not exist; the switch is now under ACME > Local ACME > Challenge targets.
+- Users: the user detail showed "Enable 2FA" and "TOTP" as off for every user, and never offered "Reset 2FA", because it read fields the API does not set; it now shows the real two-factor state, and the unused `mfa_enabled` field is no longer returned.
+- Certificate Transparency: "Auto-submit new certificates to CT logs" only applied to mTLS enrolment certificates; with embedding off, every issuance path (form, CSR, renewal, approval, ACME, SCEP, EST) now submits the certificate in the background once it is issued, so a slow log never delays the issuance.
+- ACME client: turning off "Auto-renewal" in the Let's Encrypt tab did not stop scheduled renewals; it now does, and the per-order switch still applies when it is on.
+- ACME client: the renewal threshold (`renewal_days`, accepted by the API) was ignored and renewals always started 30 days before expiry; it is now applied when the CA gives no ARI window, and set in the Let's Encrypt tab (1 to 60 days).
+- Policies: the maximum validity and maximum number of DNS names only applied to the issue form, CSR signing, renewals and approvals; ACME, SCEP, EST and WSTEP now cap the validity and refuse a request with too many DNS names as well. Upgrade note: a policy saved from the Policies page carries a 50-name maximum by default, so an ACME order with more names now fails at finalize (`badCSR`); raise it on active policies that cover larger requests.
+- Templates: a disabled template was still used by the issue form, CSR signing, approvals and new SCEP and ACME profile bindings; these now refuse it, as Windows enrollment already did.
+- WSTEP: certificates were issued for the global WSTEP validity even when the request matched a template whose own validity XCEP advertises; the matched template's validity now applies, the global value only when no template matches.
+- Discovery: scan notifications were never sent and the profile's Notification Email was not saved; the digest now goes to that address, or to the SMTP sender address when it is empty, and reports an expiring or expired certificate once rather than at every scan. Upgrade note: existing profiles start sending (new, changed and expiring certificates are on by default); set the address or clear the switches on each profile to stop them.
+- HSM: a Google Cloud KMS provider could only use the server's ambient credentials, the form having no field for a service account key; it now takes one, kept encrypted and masked like the other secrets, and can be removed again to return to the default credentials.
+- Docs: the admin guide gave native installs the Docker-only `UCM_*` variable names (`UCM_SECRET_KEY`, `UCM_DATA_DIR`...), which ucm.env does not read; it now lists both names.
+- Templates: the "Subject Alternative Names" types of a template were never enforced. A new "Enforce the allowed SAN types" switch makes the issue form, Sign CSR, ACME profiles, SCEP, WSTEP, renewals and approvals refuse a request carrying another name type, naming it. Upgrade note: existing and built-in templates keep accepting every type until the switch is turned on (the built-in client, VPN client and smartcard lists now include the names those certificates carry); new templates have it on.
+- OCSP: on PostgreSQL, the response for a certificate revoked with a reason was never cached, its reason name going into an integer column, and a SQLite database holding such rows could not be migrated to PostgreSQL. The cache stores the CRLReason code, and existing rows are converted at upgrade.
 
 ### Security
 

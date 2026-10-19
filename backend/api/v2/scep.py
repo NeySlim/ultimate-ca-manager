@@ -47,9 +47,7 @@ def get_scep_config():
     """Get SCEP configuration from database"""
     return success_response(data={
         'enabled': get_config('scep_enabled', 'true') == 'true',
-        'url': get_config('scep_url', '/scep/pkiclient.exe'),
         'ca_id': int(get_config('scep_ca_id', '0') or 0) or None,
-        'ca_ident': get_config('scep_ca_ident', 'ucm-ca'),
         'auto_approve': get_config('scep_auto_approve', 'false') == 'true',
         'challenge_validity': int(get_config('scep_challenge_validity', '24')),
         'challenge_validity_range': list(CHALLENGE_VALIDITY_HOURS),
@@ -67,8 +65,6 @@ def update_scep_config():
 
     if 'enabled' in data:
         set_config('scep_enabled', 'true' if data['enabled'] else 'false')
-    if 'url' in data:
-        set_config('scep_url', data['url'])
     if 'ca_id' in data:
         # Validate CA exists if a non-empty ID was provided
         if data['ca_id']:
@@ -81,8 +77,6 @@ def update_scep_config():
             set_config('scep_ca_id', str(ca_id_int))
         else:
             set_config('scep_ca_id', '')
-    if 'ca_ident' in data:
-        set_config('scep_ca_ident', data['ca_ident'])
     if 'auto_approve' in data:
         set_config('scep_auto_approve', 'true' if data['auto_approve'] else 'false')
     if 'challenge_validity' in data:
@@ -469,6 +463,10 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
             return False, 'Template not found'
         if tpl.template_type == 'ca':
             return False, 'CA templates cannot be used for SCEP profiles'
+        # A disabled template cannot be newly bound; an existing binding stays
+        saved_tpl = getattr(db.session.get(ScepProfile, profile_id), 'template_id', None) if profile_id else None
+        if not tpl.is_active and 'template_id' in data and tpl.id != saved_tpl:
+            return False, f"Template '{tpl.name}' is disabled"
         # Same rule as ACME profiles: a template must not hand a SCEP
         # enrollee (a challenge password, at most an Intune check) an EKU
         # that grants authority over the PKI or an identity of its choosing

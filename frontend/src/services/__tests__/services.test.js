@@ -1038,10 +1038,9 @@ describe('groupsService', () => {
   })
 
   it('addMember → POST /groups/:id/members with user_id', async () => {
-    await groupsService.addMember(1, 5, 'member')
-    expect(mockApiClient.post).toHaveBeenCalledWith('/groups/1/members', {
-      user_id: 5, role: 'member'
-    })
+    await groupsService.addMember(1, 5)
+    // No per-group role: the backend never read one
+    expect(mockApiClient.post).toHaveBeenCalledWith('/groups/1/members', { user_id: 5 })
   })
 
   it('removeMember → DELETE /groups/:id/members/:userId', async () => {

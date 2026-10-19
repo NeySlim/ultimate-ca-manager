@@ -105,6 +105,20 @@ def key_label_for_public_key(public_key):
     return type(public_key).__name__
 
 
+# Rule keys nothing ever enforced: dropped on save and by migration 102.
+DEAD_RULE_KEYS = ('required_extensions', 'forbidden_extensions')
+DEAD_SAN_RULE_KEYS = ('require_approval_for_external',)
+
+
+def strip_dead_rules(rules):
+    """A copy of *rules* without the keys no evaluation reads."""
+    rules = {k: v for k, v in rules.items() if k not in DEAD_RULE_KEYS}
+    san = rules.get('san_restrictions')
+    if isinstance(san, dict):
+        rules['san_restrictions'] = {k: v for k, v in san.items() if k not in DEAD_SAN_RULE_KEYS}
+    return rules
+
+
 class PolicyEvaluationService:
     """Evaluates certificate requests against policies"""
 

@@ -54,12 +54,12 @@ class RateLimitConfig:
     Environment variables (set in /etc/ucm/ucm.env):
     
     RATE_LIMIT_ENABLED=true           # Enable/disable rate limiting globally
-    RATE_LIMIT_AUTH_RPM=10            # Auth endpoints: requests per minute
-    RATE_LIMIT_AUTH_BURST=3           # Auth endpoints: burst allowance
-    RATE_LIMIT_HEAVY_RPM=30           # Heavy ops (issue cert, create CA): rpm
-    RATE_LIMIT_HEAVY_BURST=5          # Heavy ops: burst
-    RATE_LIMIT_STANDARD_RPM=120       # Standard API endpoints: rpm
-    RATE_LIMIT_STANDARD_BURST=20      # Standard API: burst
+    RATE_LIMIT_AUTH_RPM=30            # Auth endpoints: requests per minute
+    RATE_LIMIT_AUTH_BURST=10          # Auth endpoints: burst allowance
+    RATE_LIMIT_HEAVY_RPM=60           # Heavy ops (issue cert, create CA): rpm
+    RATE_LIMIT_HEAVY_BURST=15         # Heavy ops: burst
+    RATE_LIMIT_STANDARD_RPM=600       # Standard API endpoints: rpm
+    RATE_LIMIT_STANDARD_BURST=100     # Standard API: burst
     RATE_LIMIT_PROTOCOL_RPM=500       # Protocol (ACME/SCEP/OCSP): rpm
     RATE_LIMIT_PROTOCOL_BURST=100     # Protocol: burst
     RATE_LIMIT_WHITELIST=127.0.0.1,::1  # Comma-separated IPs to whitelist

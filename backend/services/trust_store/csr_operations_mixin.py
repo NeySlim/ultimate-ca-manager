@@ -595,6 +595,7 @@ class CSROperationsMixin:
         template_ext: Optional[dict] = None,
         extra_san: Optional[List[x509.GeneralName]] = None,
         policy_scope: Optional[dict] = None,
+        san_template=None,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
         signing renews — its names are graced by NameConstraints validation.
@@ -638,7 +639,9 @@ class CSROperationsMixin:
         CN implies, a CN that is not a hostname giving no DNS name.
         ``policy_scope``: ``{ca_id, template_id, digest_explicit}`` of the
         issuance; the policies in that scope bind the key type and the digest
-        (an implicit one yields to them). Every production caller passes it."""
+        (an implicit one yields to them). Every production caller passes it.
+        ``san_template``: template whose SAN types bind the request's names;
+        names implied by the subject alone are dropped instead of refused."""
         from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 
         # Load CSR
@@ -700,6 +703,13 @@ class CSROperationsMixin:
         if extra_san:
             effective_sans = list(effective_sans) + [
                 n for n in extra_san if n not in effective_sans]
+        if san_template is not None:
+            from services.template_service import allowed_san_types, check_san_types, san_type_of
+            check_san_types(san_template, list(csr_sans or []) + list(override_san or [])
+                            + list(extra_san or []))
+            allowed = allowed_san_types(san_template)
+            if allowed is not None and override_san is None and not has_csr_san:
+                effective_sans = [n for n in effective_sans if san_type_of(n) in allowed]
 
         ConstraintsMixin._validate_name_constraints(
             ca_cert, subject, effective_sans if effective_sans else None, renewal_of=renewal_of
@@ -720,13 +730,23 @@ class CSROperationsMixin:
                 policy_scope.get('ca_id'), policy_scope.get('template_id'),
                 cn_attrs[0].value if cn_attrs else None,
                 [n.value for n in (effective_sans or []) if isinstance(n, x509.DNSName)])
+        policy_context = {'operation': 'issuance', 'ca_id': (policy_scope or {}).get('ca_id'),
+                          'subject': next((a.value for a in subject.get_attributes_for_oid(
+                              NameOID.COMMON_NAME)), None)}
         sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
             policies, ca_private_key, digest,
             explicit=bool((policy_scope or {}).get('digest_explicit', policy_scope is None)),
-            key_type=key_label_for_public_key(csr.public_key()),
-            context={'operation': 'issuance', 'ca_id': (policy_scope or {}).get('ca_id'),
-                     'subject': next((a.value for a in subject.get_attributes_for_oid(
-                         NameOID.COMMON_NAME)), None)})
+            key_type=key_label_for_public_key(csr.public_key()), context=policy_context)
+        if policy_scope is not None:
+            # Name count and validity ceiling, for the protocols as for the form
+            dns_count = sum(isinstance(n, x509.DNSName) for n in (effective_sans or []))
+            limit_violations, capped, capped_by = PolicyEvaluationService.enforce_rules(
+                policies, dns_name_count=dns_count, validity_days=validity_days,
+                context=policy_context)
+            violations = list(violations) + limit_violations
+            if capped_by:
+                logger.info(f"Validity capped to {capped} days by policy '{capped_by}'")
+                validity_days = capped
         if violations:
             raise PolicyViolation('; '.join(violations))
 

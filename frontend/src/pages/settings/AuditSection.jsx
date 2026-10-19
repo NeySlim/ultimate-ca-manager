@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { ListBullets, Eye, Globe, FloppyDisk, Lightning } from '@phosphor-icons/react'
+import { ListBullets, Globe, FloppyDisk, Lightning } from '@phosphor-icons/react'
 import { Button, Input, Select, DetailHeader, DetailSection, DetailContent } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 
@@ -17,13 +17,6 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
       />
       <DetailSection title={t('settings.auditLogging')} icon={ListBullets} iconClass="icon-bg-orange">
         <div className="space-y-4">
-          <ToggleSwitch
-            checked={settings.audit_enabled || true}
-            onChange={(val) => updateSetting('audit_enabled', val)}
-            label={t('settings.enableAuditLogging')}
-            description={t('settings.enableAuditLoggingDesc')}
-          />
-
           <Input
             label={t('settings.logRetention')}
             type="number"
@@ -34,27 +27,6 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
             helperText={t('settings.logRetentionHelp')}
             disabled={!canAdminSettings}
           />
-        </div>
-      </DetailSection>
-      <DetailSection title={t('settings.eventsToLog')} icon={Eye} iconClass="icon-bg-orange">
-        <div className="space-y-2">
-          {[
-            { key: 'userLoginLogout', label: t('settings.eventUserLoginLogout') },
-            { key: 'certIssueRevoke', label: t('settings.eventCertIssueRevoke') },
-            { key: 'caCreateDelete', label: t('settings.eventCaCreateDelete') },
-            { key: 'settingsChanges', label: t('settings.eventSettingsChanges') },
-            { key: 'userManagement', label: t('common.eventUserManagement') },
-          ].map(event => (
-            <label key={event.key} className="flex items-center gap-2 cursor-pointer">
-              <input
-                type="checkbox"
-                checked={true}
-                disabled={!settings.audit_enabled}
-                className="rounded border-border bg-bg-tertiary"
-              />
-              <span className="text-sm text-text-primary">{event.label}</span>
-            </label>
-          ))}
           {canWriteSettings && (
             <div className="pt-4">
               <Button type="button" onClick={() => handleSave('audit')} disabled={saving}>

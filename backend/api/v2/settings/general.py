@@ -68,6 +68,8 @@ _ADMIN_ONLY_SETTINGS = frozenset({
     'backup_kdf',
     'clear_backup_password',
     'crl_auto_delete_expired_revoked',
+    'ocsp_responder_auto_renew',
+    'ocsp_responder_renew_days',
     'crl_auto_purge_stale_serials',
     # Shortening it has the daily task delete audit history.
     'audit_retention_days',
@@ -87,8 +89,7 @@ def _int_config(key, default):
 def get_general_settings():
     """Get general settings from database"""
     return success_response(data={
-        'site_name': get_config('site_name', 'UCM'),
-        'system_name': get_config('system_name', get_config('site_name', 'UCM')),
+        'system_name': get_config('system_name', ''),
         'timezone': get_config('timezone', 'UTC'),
         'auto_backup_enabled': get_config('auto_backup_enabled', 'false') == 'true',
         'backup_frequency': get_config('backup_frequency', 'daily'),
@@ -136,6 +137,9 @@ def get_general_settings():
         'key_recovery_dual_control_locked': _dual_control_env() is not None,
         # OCSP responder: signed response validity window (hours, 1..168)
         'ocsp_response_validity_hours': int(get_config('ocsp_response_validity_hours', '24') or 24),
+        # Delegated OCSP responder certificates: daily renewal before expiry
+        'ocsp_responder_auto_renew': get_config('ocsp_responder_auto_renew', 'true') == 'true',
+        'ocsp_responder_renew_days': int(get_config('ocsp_responder_renew_days', '30') or 30),
         # CRL auto-delete: purge expired revoked Certificate rows during CRL
         # generation so the database doesn't grow unbounded. Defaults to off
         # — expired revoked certs are kept as historical records unless an
@@ -183,7 +187,7 @@ def update_general_settings():
 
     # List of allowed settings
     allowed_keys = [
-        'site_name', 'system_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',
+        'system_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',
         'backup_retention_days', 'backup_password', 'backup_kdf', 'session_timeout',
         'session_max_lifetime', 'max_login_attempts', 'lockout_duration',
         'protocol_base_url', 'http_protocol_port', 'base_url', 'date_format', 'show_time',
@@ -204,6 +208,8 @@ def update_general_settings():
         'metrics_token',
         # OCSP responder response validity window
         'ocsp_response_validity_hours',
+        'ocsp_responder_auto_renew',
+        'ocsp_responder_renew_days',
         # CRL auto-delete expired revoked certificates
         'crl_auto_delete_expired_revoked',
         # CRL auto-purge stale RevokedSerial entries
@@ -220,6 +226,17 @@ def update_general_settings():
         if hours < 1 or hours > 168:
             return error_response('ocsp_response_validity_hours must be between 1 and 168', 400)
         data['ocsp_response_validity_hours'] = str(hours)
+
+    if 'ocsp_responder_renew_days' in data:
+        try:
+            days = int(data['ocsp_responder_renew_days'])
+        except (TypeError, ValueError):
+            return error_response('ocsp_responder_renew_days must be an integer', 400)
+        if days < 1 or days > 365:
+            return error_response('ocsp_responder_renew_days must be between 1 and 365', 400)
+        data['ocsp_responder_renew_days'] = str(days)
+    if 'ocsp_responder_auto_renew' in data:
+        data['ocsp_responder_auto_renew'] = bool(data['ocsp_responder_auto_renew'])
 
     if 'base_url' in data:
         normalized, err = validate_admin_base_url(data.get('base_url') or '')

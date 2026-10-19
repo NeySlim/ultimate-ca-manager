@@ -37,12 +37,10 @@ def _ensure_secrets() -> None:
     if not os.environ.get('SECRET_KEY') or os.environ['SECRET_KEY'] == 'INSTALL_TIME_PLACEHOLDER':
         import secrets
         os.environ['SECRET_KEY'] = secrets.token_urlsafe(48)
-        os.environ.setdefault('JWT_SECRET_KEY', secrets.token_urlsafe(48))
         print('NOTE: no usable SECRET_KEY — using ephemeral key for this run')
         print(f'      create {ENV_LAB} (gitignored) for a stable lab secret')
     else:
         print(f'Loaded secrets from {ENV_LAB}')
-    os.environ.setdefault('JWT_SECRET_KEY', os.environ['SECRET_KEY'])
     os.environ.setdefault('UCM_ENV', 'lab')
     os.environ.setdefault('HTTP_REDIRECT', 'false')
     os.environ.setdefault('CSRF_DISABLED', 'true')

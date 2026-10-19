@@ -64,6 +64,7 @@ class SSHCertificateAuthority(db.Model if db else object):
     created_by = db.Column(db.String(80))
 
     # Ownership
+    # No access control reads it; kept for older databases and backups
     owner_group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
     owner_group = db.relationship('Group', backref='owned_ssh_cas')
 
@@ -150,7 +151,6 @@ class SSHCertificateAuthority(db.Model if db else object):
             'comment': self.comment,
             'created_at': utc_isoformat(self.created_at),
             'created_by': self.created_by,
-            'owner_group_id': self.owner_group_id,
             'owner_group_name': self.owner_group.name if self.owner_group else None,
             'cert_count': cert_count,
             'revoked_count': revoked_count,
@@ -216,6 +216,7 @@ class SSHCertificate(db.Model if db else object):
     created_by = db.Column(db.String(80))
 
     # Ownership
+    # No access control reads it; kept for older databases and backups
     owner_group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
     owner_group = db.relationship('Group', backref='owned_ssh_certificates')
 
@@ -303,7 +304,6 @@ class SSHCertificate(db.Model if db else object):
             'status': self.status,
             'created_at': utc_isoformat(self.created_at),
             'created_by': self.created_by,
-            'owner_group_id': self.owner_group_id,
             'owner_group_name': self.owner_group.name if self.owner_group else None,
         }
 

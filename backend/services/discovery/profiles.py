@@ -37,6 +37,7 @@ class ProfilesMixin:
             notify_on_new=data.get('notify_on_new', True),
             notify_on_change=data.get('notify_on_change', True),
             notify_on_expiry=data.get('notify_on_expiry', True),
+            notify_email=(data.get('notify_email') or '').strip() or None,
             timeout=min(max(int(data.get('timeout', 5)), 1), 30),
             max_workers=min(max(int(data.get('max_workers', 20)), 1), 50),
             resolve_dns=bool(data.get('resolve_dns', False)),
@@ -77,6 +78,8 @@ class ProfilesMixin:
             profile.notify_on_change = data['notify_on_change']
         if 'notify_on_expiry' in data:
             profile.notify_on_expiry = data['notify_on_expiry']
+        if 'notify_email' in data:
+            profile.notify_email = (data['notify_email'] or '').strip() or None
         if 'timeout' in data:
             profile.timeout = min(max(int(data['timeout']), 1), 30)
         if 'max_workers' in data:

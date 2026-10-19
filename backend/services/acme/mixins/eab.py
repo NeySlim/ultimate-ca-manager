@@ -58,26 +58,14 @@ class EabMixin:
             if not kid:
                 return False, "EAB missing kid (external account ID)"
             
-            # Look up the HMAC key for this external account.
-            # Preferred path: dedicated AcmeEabCredential table (v2.139+).
-            # Fallback: legacy SystemConfig 'acme_eab_keys' JSON blob.
-            from models import SystemConfig, AcmeEabCredential
+            from models import AcmeEabCredential
 
             credential = AcmeEabCredential.query.filter_by(kid=kid).first()
-            hmac_key_b64 = None
-
-            if credential is not None:
-                if not credential.is_usable:
-                    return False, f"EAB credential not usable (status={credential.status})"
-                hmac_key_b64 = credential.hmac_key_b64
-            else:
-                eab_config = SystemConfig.query.filter_by(key='acme_eab_keys').first()
-                eab_keys_json = eab_config.value if eab_config else '{}'
-                try:
-                    eab_keys = json.loads(eab_keys_json)
-                except Exception:
-                    eab_keys = {}
-                hmac_key_b64 = eab_keys.get(kid)
+            if credential is None:
+                return False, "Unknown external account"
+            if not credential.is_usable:
+                return False, f"EAB credential not usable (status={credential.status})"
+            hmac_key_b64 = credential.hmac_key_b64
 
             if not hmac_key_b64:
                 return False, "Unknown external account"
@@ -134,46 +122,31 @@ class EabMixin:
     def mark_eab_used(self, kid: str, account_id: str) -> bool:
         """Consume and bind an EAB credential after account creation commits."""
         try:
-            from models import AcmeEabCredential, SystemConfig
+            from models import AcmeEabCredential
             from utils.datetime_utils import utc_now
 
-            credential = AcmeEabCredential.query.filter_by(kid=kid).first()
-            if credential is not None:
-                now = utc_now()
-                consumed = AcmeEabCredential.query.filter(
-                    AcmeEabCredential.kid == kid,
-                    AcmeEabCredential.status == 'active',
-                    AcmeEabCredential.used_by_account_id.is_(None),
-                    or_(
-                        AcmeEabCredential.expires_at.is_(None),
-                        AcmeEabCredential.expires_at > now,
-                    ),
-                ).update({
-                    'status': 'used',
-                    'used_at': now,
-                    'used_by_account_id': account_id,
-                }, synchronize_session=False)
-                if consumed == 0:
-                    db.session.rollback()
-                    current = AcmeEabCredential.query.filter_by(kid=kid).first()
-                    return bool(
-                        current
-                        and current.status == 'used'
-                        and current.used_by_account_id == account_id
-                    )
-            else:
-                config = SystemConfig.query.filter_by(key='acme_eab_keys').first()
-                if config is None:
-                    return False
-                try:
-                    keys = json.loads(config.value or '{}')
-                except Exception:
-                    return False
-                if kid not in keys:
-                    return False
-                keys.pop(kid)
-                config.value = json.dumps(keys)
-
+            now = utc_now()
+            consumed = AcmeEabCredential.query.filter(
+                AcmeEabCredential.kid == kid,
+                AcmeEabCredential.status == 'active',
+                AcmeEabCredential.used_by_account_id.is_(None),
+                or_(
+                    AcmeEabCredential.expires_at.is_(None),
+                    AcmeEabCredential.expires_at > now,
+                ),
+            ).update({
+                'status': 'used',
+                'used_at': now,
+                'used_by_account_id': account_id,
+            }, synchronize_session=False)
+            if consumed == 0:
+                db.session.rollback()
+                current = AcmeEabCredential.query.filter_by(kid=kid).first()
+                return bool(
+                    current
+                    and current.status == 'used'
+                    and current.used_by_account_id == account_id
+                )
             db.session.commit()
             return True
         except Exception as e:

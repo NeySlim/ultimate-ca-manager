@@ -18,6 +18,7 @@ export default {
           { label: 'Valeurs par défaut du sujet', text: 'Préremplir Organisation, OU, Pays, État, Ville et Email. Sur les certificats Email (S/MIME) et Serveur + Client (Combiné), l\'Email devient aussi un SAN' },
           { label: 'Utilisation de la clé', text: 'Signature numérique, chiffrement de clé, etc.' },
           { label: 'Utilisation étendue de la clé', text: 'Authentification serveur, authentification client, signature de code, protection e-mail' },
+          { label: 'Types de SAN', text: 'Les types de noms (DNS, IP, Email, URI, UPN) qu\'une demande faite avec le modèle peut porter. Avec « Appliquer les types de SAN autorisés » activé, le formulaire d\'émission, la signature de CSR, les protocoles d\'enrôlement, les renouvellements et les approbations refusent tout autre type, et un nom seulement déduit du CN est omis. Les nouveaux modèles l\'ont activé ; les anciens et les modèles intégrés l\'ont désactivé. Aucune case cochée : tous les types sont permis' },
           { label: 'Validité', text: 'Période de validité par défaut en jours' },
           { label: 'Dupliquer', text: 'Cloner un modèle existant et le modifier' },
           { label: 'Afficher système', text: 'Masquer les modèles intégrés pour ne travailler qu\'avec les vôtres. Mémorisé par navigateur' },

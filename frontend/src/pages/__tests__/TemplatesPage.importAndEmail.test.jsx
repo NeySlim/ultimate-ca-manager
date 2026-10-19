@@ -202,4 +202,37 @@ describe('TemplatesPage Email field: not type="email" (built-in copies carry {em
     await waitFor(() => expect(svc.create).toHaveBeenCalledTimes(1))
     expect(svc.create.mock.calls[0][0]).not.toHaveProperty('max_validity_days')
   })
+
+  it('a new template enforces its SAN types', async () => {
+    svc.getAll.mockResolvedValue({ data: [] })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'templates.new' }))
+    fireEvent.change(await screen.findByPlaceholderText('templates.namePlaceholder'), {
+      target: { value: 'Enforcing Template' },
+    })
+    fireEvent.click(screen.getByRole('button', { name: 'common.create' }))
+
+    await waitFor(() => expect(svc.create).toHaveBeenCalledTimes(1))
+    expect(svc.create.mock.calls[0][0].enforce_san_types).toBe(true)
+  })
+
+  it('an existing template keeps enforcement off until the switch is ticked', async () => {
+    const legacy = { ...PLACEHOLDER_TEMPLATE, id: 11, name: 'Legacy Template', enforce_san_types: false,
+                     extensions_template: { san_types: ['dns'] } }
+    svc.getAll.mockResolvedValue({ data: [legacy] })
+    renderPage()
+
+    fireEvent.click(await screen.findByText(legacy.name))
+    fireEvent.click(await screen.findByRole('button', { name: 'common.edit' }))
+    fireEvent.click(screen.getByRole('button', { name: 'common.update' }))
+    await waitFor(() => expect(svc.update).toHaveBeenCalledTimes(1))
+    expect(svc.update.mock.calls[0][1].enforce_san_types).toBe(false)
+
+    fireEvent.click(await screen.findByRole('button', { name: 'common.edit' }))
+    fireEvent.click(await screen.findByLabelText('templates.enforceSanTypes'))
+    fireEvent.click(screen.getByRole('button', { name: 'common.update' }))
+    await waitFor(() => expect(svc.update).toHaveBeenCalledTimes(2))
+    expect(svc.update.mock.calls[1][1].enforce_san_types).toBe(true)
+  })
 })

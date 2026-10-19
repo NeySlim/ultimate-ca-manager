@@ -46,10 +46,6 @@ const renderTab = (props = {}) => render(
     onLocalContactEmailChange={noop}
     localProxyUpstreamUrl=""
     onLocalProxyUpstreamUrlChange={noop}
-    localProxyEabKid=""
-    onLocalProxyEabKidChange={noop}
-    proxyEabHmacInput=""
-    onProxyEabHmacInputChange={noop}
     proxyEmail=""
     onProxyEmailChange={noop}
     testingConnection={false}
@@ -57,6 +53,8 @@ const renderTab = (props = {}) => render(
     onBlurSave={noop}
     onBlurSaveInt={noop}
     localDnsTimeout="120"
+    localRenewalDays="30"
+    onLocalRenewalDaysChange={noop}
     onLocalDnsTimeoutChange={noop}
     onUpdateClientSetting={noop}
     onRegisterProxy={noop}
@@ -100,5 +98,23 @@ describe('LetsEncryptTab settings view', () => {
     renderTab({ onRefresh })
     fireEvent.click(screen.getByText('common.refresh'))
     expect(onRefresh).toHaveBeenCalledOnce()
+  })
+})
+
+describe('LetsEncryptTab renewal threshold', () => {
+  it('saves the days before expiry the scheduled renewal reads', () => {
+    const onBlurSaveInt = vi.fn()
+    renderTab({ onBlurSaveInt, localRenewalDays: '45' })
+    const field = screen.getByDisplayValue('45')
+    fireEvent.blur(field)
+    expect(onBlurSaveInt).toHaveBeenCalledWith('renewal_days', '45', expect.any(Function), { min: 1, max: 60, fallback: 30 })
+  })
+})
+
+describe('LetsEncryptTab proxy section', () => {
+  it('has no global proxy switch and always shows the proxy settings', () => {
+    renderTab({ clientSettings: {} })
+    expect(screen.queryByText('acme.enableAcmeProxy')).not.toBeInTheDocument()
+    expect(screen.getByText('acme.testConnection')).toBeInTheDocument()
   })
 })

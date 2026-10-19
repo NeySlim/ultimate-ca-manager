@@ -101,7 +101,7 @@ UCM memorizza nella cache le risposte OCSP per le prestazioni. La cache è:
 
 Per impostazione predefinita, le risposte OCSP sono firmate con la chiave della CA stessa. Un **risponditore delegato** usa invece un certificato dedicato con l'EKU **OCSPSigning**: assegnane uno per CA dal pannello di dettaglio della CA (sono idonei solo i certificati con EKU OCSPSigning e chiave privata).
 
-**Rinnovo automatico**: un task giornaliero riemette il certificato del risponditore prima della scadenza, stessa coppia di chiavi ed estensioni, rinnovato alla pari, e ricollega la configurazione del risponditore della CA al nuovo certificato. I certificati di firma OCSP a vita breve (es. un template di 90 giorni) ruotano senza intervento manuale. Abilitato per impostazione predefinita; può essere disabilitato e la finestra di rinnovo regolata tramite configurazione.
+**Rinnovo automatico**: un task giornaliero riemette il certificato del risponditore prima della scadenza, stessa coppia di chiavi ed estensioni, rinnovato alla pari, e ricollega la configurazione del risponditore della CA al nuovo certificato. I certificati di firma OCSP a vita breve (es. un template di 90 giorni) ruotano senza intervento manuale. Abilitato per impostazione predefinita; può essere disabilitato e la finestra di rinnovo regolata in Impostazioni › Sicurezza.
 
 ### URL AIA
 L'estensione Authority Information Access (AIA) viene incorporata nei certificati per indicare ai client dove trovare:

@@ -23,6 +23,7 @@ import { useNotification, useMobile } from '../contexts'
 import { usePermission, useWebSocket, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { reportSilentFailure } from '../lib/silentFailure'
+import UserSecuritySection from './users/UserSecuritySection'
 export default function UsersGroupsPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
@@ -210,7 +211,7 @@ export default function UsersGroupsPage() {
       showSuccess(t('users.reset2faSuccess'))
       loadData()
       if (selectedUser?.id === user.id) {
-        setSelectedUser({ ...selectedUser, totp_confirmed: false, two_factor_enabled: false, mfa_enabled: false })
+        setSelectedUser({ ...selectedUser, totp_enabled: false, two_factor_enabled: false })
       }
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.user'))
@@ -816,7 +817,7 @@ export default function UsersGroupsPage() {
             <Button type="button" size="sm" variant="secondary" onClick={() => handleResetPassword(selectedUser)}>
               <Key size={14} /> {t('users.resetPassword')}
             </Button>
-            {selectedUser.totp_confirmed && (
+            {selectedUser.totp_enabled && (
               <Button type="button" size="sm" variant="secondary" onClick={() => handleReset2FA(selectedUser)}>
                 <ShieldCheck size={14} /> {t('users.reset2fa')}
               </Button>
@@ -860,13 +861,7 @@ export default function UsersGroupsPage() {
         </CompactGrid>
       </CompactSection>
 
-      <CompactSection title={t('common.security')} icon={ShieldCheck} iconClass="icon-bg-purple">
-        <CompactGrid columns={1}>
-          <CompactField autoIcon="enable2FA" label={t('common.enable2FA')} value={selectedUser.mfa_enabled ? t('common.yes') : t('common.no')} />
-          <CompactField autoIcon="totp" label={t('common.totp', 'TOTP')} value={selectedUser.totp_confirmed ? t('common.yes') : t('common.no')} />
-          <CompactField autoIcon="totp" label={t('users.exempt2faLabel')} value={selectedUser.totp_exempt ? t('common.yes') : t('common.no')} />
-        </CompactGrid>
-      </CompactSection>
+      <UserSecuritySection user={selectedUser} />
 
       {/* mTLS Certificates (admin only) */}
       {canWrite('users') && (

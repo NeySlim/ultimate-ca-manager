@@ -174,6 +174,25 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
             helperText={t('settings.ocspResponseValidityDesc')}
           />
           <ToggleSwitch
+            checked={settings.ocsp_responder_auto_renew ?? true}
+            onChange={(val) => updateSetting('ocsp_responder_auto_renew', val)}
+            label={t('settings.ocspResponderAutoRenew')}
+            description={t('settings.ocspResponderAutoRenewDesc')}
+            disabled={!canAdminSettings}
+          />
+          {(settings.ocsp_responder_auto_renew ?? true) && (
+            <Input
+              label={t('settings.ocspResponderRenewDays')}
+              type="number"
+              value={settings.ocsp_responder_renew_days ?? 30}
+              onChange={(e) => updateSetting('ocsp_responder_renew_days', parseInt(e.target.value))}
+              min="1"
+              max="365"
+              helperText={t('settings.ocspResponderRenewDaysDesc')}
+              disabled={!canAdminSettings}
+            />
+          )}
+          <ToggleSwitch
             checked={settings.crl_auto_delete_expired_revoked || false}
             onChange={(val) => updateSetting('crl_auto_delete_expired_revoked', val)}
             label={t('settings.crlAutoDeleteExpiredRevoked')}

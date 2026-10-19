@@ -18,19 +18,21 @@ UCM stores data in:
 
 ### Environment Variables
 
-| Variable | Default | Description |
-|----------|---------|-------------|
-| `UCM_SECRET_KEY` | (generated) | Session signing key |
-| `HOST` | `0.0.0.0` | Listen address for HTTPS and the HTTP protocol port; `::` = IPv6 + IPv4 (dual-stack) |
-| `UCM_PORT` | `8443` | HTTPS port |
-| `UCM_DATA_DIR` | `/opt/ucm/data` | Data storage |
-| `UCM_LOG_LEVEL` | `INFO` | Logging verbosity |
-| `UCM_LOG_FILE` | `/var/log/ucm/ucm.log` | Application log file (native installs). Falls back to `UCM_DATA_DIR/ucm.log` when it cannot be opened |
-| `UCM_LOG_MAX_BYTES` | `10485760` | Size at which `ucm.log` is rotated by the application (10 MB) |
-| `UCM_LOG_BACKUPS` | `5` | Generations of `ucm.log` kept |
-| `UCM_HTTPS_CERT` | (auto) | Server certificate |
-| `UCM_HTTPS_KEY` | (auto) | Server private key |
-| `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use PostgreSQL. When unset, UCM uses SQLite at `UCM_DATA_DIR/ucm.db`. |
+Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `UCM_*` names and writes that file itself.
+
+| ucm.env (DEB/RPM) | Docker | Default | Description |
+|-------------------|--------|---------|-------------|
+| `SECRET_KEY` | `UCM_SECRET_KEY` | (generated) | Session signing key |
+| `HOST` | `HOST` | `0.0.0.0` | Listen address for HTTPS and the HTTP protocol port; `::` = IPv6 + IPv4 (dual-stack) |
+| `HTTPS_PORT` | `UCM_HTTPS_PORT` | `8443` | HTTPS port |
+| `DATA_DIR` | (fixed) | `/opt/ucm/data` | Data storage |
+| `LOG_LEVEL` | `UCM_LOG_LEVEL` | `INFO` | Logging verbosity |
+| `UCM_LOG_FILE` | `UCM_LOG_FILE` | `/var/log/ucm/ucm.log` | Application log file (native installs). Falls back to `DATA_DIR/ucm.log` when it cannot be opened |
+| `UCM_LOG_MAX_BYTES` | `UCM_LOG_MAX_BYTES` | `10485760` | Size at which `ucm.log` is rotated by the application (10 MB) |
+| `UCM_LOG_BACKUPS` | `UCM_LOG_BACKUPS` | `5` | Generations of `ucm.log` kept |
+| `HTTPS_CERT_PATH` | `UCM_HTTPS_CERT` | (auto) | Server certificate: a file path natively, the PEM itself in Docker |
+| `HTTPS_KEY_PATH` | `UCM_HTTPS_KEY` | (auto) | Server private key: a file path natively, the PEM itself in Docker |
+| `DATABASE_URL` | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use PostgreSQL. When unset, UCM uses SQLite at `DATA_DIR/ucm.db`. |
 
 ### Systemd Service
 
@@ -268,7 +270,7 @@ UCM supports two database backends:
 
 The active backend is selected by the `DATABASE_URL` environment variable (or `/etc/ucm/ucm.env` on DEB/RPM):
 
-- **Unset** → SQLite at `UCM_DATA_DIR/ucm.db`
+- **Unset** → SQLite at `DATA_DIR/ucm.db`
 - **`postgresql://user:pass@host:5432/dbname`** → PostgreSQL
 
 ### Switching Backend (UI)

@@ -23,7 +23,6 @@ sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 def app():
     """Create app with test configuration"""
     os.environ['SECRET_KEY'] = 'test-secret-key-for-testing'
-    os.environ['JWT_SECRET_KEY'] = 'test-jwt-secret-key-for-testing'
     os.environ['UCM_ENV'] = 'test'
     os.environ['HTTP_REDIRECT'] = 'false'
     os.environ['INITIAL_ADMIN_PASSWORD'] = 'changeme123'

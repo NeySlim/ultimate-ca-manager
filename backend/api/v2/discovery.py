@@ -71,6 +71,16 @@ def _safe_int(val, default, lo=None, hi=None):
 _service = None
 
 
+def _notify_email_error(data):
+    from utils.san_parse import is_valid_san_email
+    value = data.get('notify_email')
+    if value in (None, ''):
+        return None
+    if not isinstance(value, str) or len(value.strip()) > 255 or not is_valid_san_email(value):
+        return 'notify_email must be a single email address'
+    return None
+
+
 def _get_service():
     global _service
     if _service is None:
@@ -115,6 +125,9 @@ def create_profile():
     ok, err = _validate_targets(data.get('targets'), _MAX_TARGETS_PROFILE)
     if not ok:
         return error_response(err, 400)
+    err = _notify_email_error(data)
+    if err:
+        return error_response(err, 400)
     if 'ports' in data:
         ok, err = _validate_ports(data['ports'])
         if not ok:
@@ -154,6 +167,9 @@ def update_profile(profile_id):
         ok, err = _validate_targets(data['targets'], _MAX_TARGETS_PROFILE)
         if not ok:
             return error_response(err, 400)
+    err = _notify_email_error(data)
+    if err:
+        return error_response(err, 400)
     if 'ports' in data:
         ok, err = _validate_ports(data['ports'])
         if not ok:

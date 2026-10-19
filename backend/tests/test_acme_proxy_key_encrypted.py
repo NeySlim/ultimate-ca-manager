@@ -151,7 +151,6 @@ def test_legacy_system_config_eab_hmac_encrypted_at_rest(
 
     r = auth_client.patch('/api/v2/acme/client/settings', json={
         'eab_hmac_key': 'client-system-config-secret',
-        'proxy_eab_hmac_key': 'proxy-system-config-secret',
     })
     assert r.status_code == 200
 
@@ -159,11 +158,7 @@ def test_legacy_system_config_eab_hmac_encrypted_at_rest(
         client_raw = SystemConfig.query.filter_by(
             key='acme.client.eab_hmac_key'
         ).one().value
-        proxy_raw = SystemConfig.query.filter_by(
-            key='acme.proxy.eab_hmac_key'
-        ).one().value
         assert key_encryption.is_string_encrypted(client_raw)
-        assert key_encryption.is_string_encrypted(proxy_raw)
 
 
 def test_proxy_account_key_legacy_plaintext_still_loads(app, encryption_enabled):

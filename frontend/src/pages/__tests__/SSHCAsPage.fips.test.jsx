@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
 import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
@@ -78,5 +79,32 @@ describe('SSHCAsPage key algorithm in FIPS mode (#399)', () => {
     fireEvent.click(form.querySelector('button[type="submit"]'))
     await waitFor(() => expect(create).toHaveBeenCalled())
     expect(create.mock.calls[0][0].key_type).toBe('ed25519')
+  })
+})
+
+describe('SSHCAsPage RSA key size', () => {
+  beforeEach(() => {
+    window.localStorage.clear()
+    vi.clearAllMocks()
+    getAll.mockResolvedValue({ data: [] })
+    create.mockResolvedValue({ data: { id: 6, descr: 'New SSH CA', ca_type: 'user', cert_count: 0 } })
+    getEffective.mockResolvedValue({ data: {} })
+  })
+
+  it('offers no size the server ignored: RSA CAs are 4096-bit', async () => {
+    Element.prototype.hasPointerCapture = Element.prototype.hasPointerCapture || (() => false)
+    Element.prototype.setPointerCapture = Element.prototype.setPointerCapture || (() => {})
+    Element.prototype.releasePointerCapture = Element.prototype.releasePointerCapture || (() => {})
+    Element.prototype.scrollIntoView = Element.prototype.scrollIntoView || (() => {})
+    const user = userEvent.setup()
+    const form = await createCa()
+    const trigger = [...form.querySelectorAll('[role="combobox"]')].find(el => el.textContent.includes('Ed25519'))
+    await user.click(trigger)
+    await user.click(await screen.findByRole('option', { name: /^RSA/ }))
+    expect(screen.queryByText('sshCas.keySize')).toBeNull()
+    fireEvent.click(form.querySelector('button[type="submit"]'))
+    await waitFor(() => expect(create).toHaveBeenCalled())
+    expect(create.mock.calls[0][0].key_type).toBe('rsa')
+    expect(create.mock.calls[0][0]).not.toHaveProperty('key_size')
   })
 })

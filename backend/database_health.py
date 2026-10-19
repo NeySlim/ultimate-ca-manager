@@ -51,9 +51,7 @@ def ensure_system_config_defaults(app):
     from config.settings import Config
     
     defaults = [
-        ('app.initialized', 'true', 'Application initialized'),
         ('app.version', Config.APP_VERSION, 'Application version'),
-        ('https.enabled', 'true', 'HTTPS enforcement enabled'),
     ]
     
     for key, value, description in defaults:

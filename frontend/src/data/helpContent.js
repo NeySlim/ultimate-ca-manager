@@ -340,6 +340,7 @@ export const helpContent = {
           { label: 'Subject Defaults', text: 'Pre-fill Organization, OU, Country, State, City and Email. On Email and combined certificates the Email also becomes a SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, etc.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
+          { label: 'SAN types', text: 'The name types (DNS, IP, Email, URI, UPN) a request made with the template may carry. With "Enforce the allowed SAN types" on, the issue form, Sign CSR, the enrollment protocols, renewals and approvals refuse any other type, and a name only implied by the CN is left out. New templates have it on; older ones and the built-in ones have it off. None checked: every type is allowed' },
           { label: 'Validity', text: 'Default validity period in days' },
           { label: 'Duplicate', text: 'Clone an existing template and modify it' },
           { label: 'Show system', text: 'Hide the built-in templates to work with your own only. Remembered per browser' },
@@ -416,7 +417,7 @@ export const helpContent = {
         icon: ListChecks,
         items: [
           { label: 'Requests', text: 'Pending, approved, and rejected SCEP enrollment requests' },
-          { label: 'Configuration', text: 'SCEP server settings: CA selection, CA identifier, auto-approve' },
+          { label: 'Configuration', text: 'SCEP server settings: CA selection, auto-approve' },
           { label: 'Profiles', text: 'Named enrollment endpoints, each with its own URL, CA, template and challenge' },
           { label: 'Intune app registrations', text: 'Entra app registrations (tenant ID, client ID, client secret) shared by the profiles that validate Intune challenges; an empty secret on edit keeps the current one, Test connection requests a token and discovers the service without consuming any challenge, and an app still used by a profile cannot be deleted' },
           { label: 'Challenge Passwords', text: 'Manage per-CA challenge passwords for device enrollment' },
@@ -643,7 +644,7 @@ export const helpContent = {
         icon: ShieldCheck,
         content: 'HTTP-01 and TLS-ALPN-01 validation works out of the box for RFC1918, loopback, .lan / .local / .corp targets, UCM\'s primary deployment model.',
         items: [
-          { label: 'Toggle', text: 'Settings → SystemConfig → acme.allow_private_ips (default: true)' },
+          { label: 'Toggle', text: 'ACME → Local ACME → Allow private and internal addresses (default: on)' },
           { label: 'Toggle', text: 'Let\'s Encrypt tab → Allow loopback ACME CA, opt in for a colocated CA on 127.0.0.1 (default: off)' },
           { label: 'Always blocked', text: 'Cloud metadata IPs (169.254.169.254, fd00:ec2::254, etc.) are blocked unconditionally' },
         ]
@@ -1575,8 +1576,8 @@ export const helpContent = {
         title: 'Scheduling',
         icon: CalendarBlank,
         items: [
-          { label: 'Expiry Report', text: 'Daily email with certificates expiring soon' },
-          { label: 'Compliance Report', text: 'Weekly email with policy compliance status' },
+          { label: 'Expiry Report', text: 'Email with certificates expiring soon, at the frequency you set' },
+          { label: 'Compliance Report', text: 'Email with policy compliance status, at the frequency you set' },
         ]
       },
     ],

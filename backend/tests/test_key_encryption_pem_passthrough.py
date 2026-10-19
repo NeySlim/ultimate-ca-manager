@@ -26,7 +26,6 @@ import pytest
 def keyenc():
     # Force encryption enabled with a deterministic key so encrypt+decrypt round-trip works.
     os.environ.setdefault("SECRET_KEY", "test-secret-key-for-testing")
-    os.environ.setdefault("JWT_SECRET_KEY", "test-jwt-secret-key-for-testing")
     from cryptography.fernet import Fernet
     from security import encryption as enc_mod
 

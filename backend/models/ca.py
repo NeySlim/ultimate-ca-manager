@@ -74,6 +74,7 @@ class CA(db.Model):
     created_by = db.Column(db.String(80))
     
     # Ownership (Pro feature - group-based access control)
+    # No access control reads it; kept for older databases and backups
     owner_group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
     owner_group = db.relationship('Group', backref='owned_cas')
     
@@ -612,7 +613,6 @@ class CA(db.Model):
             "sia_enabled": self.sia_enabled,
             "sia_urls": self.get_sia_urls(),
             # Ownership (Pro feature)
-            "owner_group_id": self.owner_group_id,
             "owner_group_name": self.owner_group.name if self.owner_group else None,
             # HSM backing (Issue #77.3)
             "uses_hsm": self.uses_hsm,

@@ -49,11 +49,8 @@ export const groupsService = {
   /**
    * Add a member to a group
    */
-  addMember: async (groupId, userId, role = 'member') => {
-    return api.post(`/groups/${groupId}/members`, {
-      user_id: userId,
-      role
-    })
+  addMember: async (groupId, userId) => {
+    return api.post(`/groups/${groupId}/members`, { user_id: userId })
   },
 
   /**

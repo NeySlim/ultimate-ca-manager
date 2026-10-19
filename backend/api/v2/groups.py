@@ -266,11 +266,7 @@ def add_group_member(group_id):
     if existing:
         return error_response("User is already a member", 409)
     
-    role = data.get('role', 'member')
-    if role not in ['member', 'admin']:
-        return error_response("Invalid role. Must be 'member' or 'admin'", 400)
-    
-    member = GroupMember(group_id=group_id, user_id=user_id, role=role)
+    member = GroupMember(group_id=group_id, user_id=user_id)
     
     try:
         db.session.add(member)

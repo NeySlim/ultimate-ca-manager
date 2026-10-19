@@ -28,7 +28,7 @@ from models import db, CA, Certificate, OCSPResponse, SystemConfig, RevokedSeria
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
 from utils.key_codec import refuse_eddsa_key
-from utils.revocation_reasons import REASON_FLAGS
+from utils.revocation_reasons import REASON_CODES, REASON_FLAGS
 from utils.serial_format import serial_to_hex, serial_variants
 
 logger = logging.getLogger(__name__)
@@ -937,7 +937,7 @@ class OCSPService:
                     this_update=this_update,
                     next_update=next_update,
                     revocation_time=revocation_time,
-                    revocation_reason=revocation_reason.value if revocation_reason else None
+                    revocation_reason=REASON_CODES.get(revocation_reason)
                 )
             
             logger.info(f"Generated OCSP response for serial {cert_serial_hex}: {cert_status}")

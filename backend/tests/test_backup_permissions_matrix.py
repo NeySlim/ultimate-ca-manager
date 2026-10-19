@@ -441,10 +441,10 @@ class TestBackupSettingsAreAdminOnlyEverywhere:
             db.session.commit()
 
         current = auth_client.get('/api/v2/settings/general')
-        site_name = current.get_json()['data']['site_name']
+        site_name = current.get_json()['data']['system_name']
 
         response = _patch_json(clients['operator'], '/api/v2/settings/general',
-                               {'site_name': site_name,
+                               {'system_name': site_name,
                                 'backup_retention_days': 1})
         assert response.status_code == 200, response.data
 

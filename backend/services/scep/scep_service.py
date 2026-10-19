@@ -1169,10 +1169,9 @@ class SCEPService:
             return default
         return max(lo, min(hi, value))
 
-    def _policy_signing_hash(self, csr):
-        """``(hash to sign with, violations)`` under the issuance policies of
-        this CA and profile template (#397)."""
-        from services.policy_service import PolicyEvaluationService, key_label_for_public_key
+    def _policies_for(self, csr):
+        """``(policies, dns names)`` of this CA and profile template for *csr*."""
+        from services.policy_service import PolicyEvaluationService
         cn_attrs = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
         try:
             dns = csr_extensions(csr).get_extension_for_oid(
@@ -1182,12 +1181,42 @@ class SCEPService:
         policies = PolicyEvaluationService.applicable_policies(
             self.ca.id, self.template.id if self.template is not None else None,
             cn_attrs[0].value if cn_attrs else None, list(dns))
+        return policies, list(dns)
+
+    def _policy_signing_hash(self, csr):
+        """``(hash to sign with, violations)`` under the issuance policies of
+        this CA and profile template: key type, hash (#397) and name count."""
+        from services.policy_service import PolicyEvaluationService, key_label_for_public_key
+        policies, dns = self._policies_for(csr)
+        cn_attrs = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
+        context = {'operation': 'issuance', 'ca_id': self.ca.id,
+                   'subject': cn_attrs[0].value if cn_attrs else None}
         sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
             policies, self.ca_key, explicit=False,
-            key_type=key_label_for_public_key(csr.public_key()),
-            context={'operation': 'issuance', 'ca_id': self.ca.id,
-                     'subject': cn_attrs[0].value if cn_attrs else None})
-        return sign_hash, violations
+            key_type=key_label_for_public_key(csr.public_key()), context=context)
+        limit_violations, _, _ = PolicyEvaluationService.enforce_rules(
+            policies, dns_name_count=len(dns), context=context)
+        return sign_hash, list(violations) + limit_violations + self._san_type_violations(csr)
+
+    def _san_type_violations(self, csr):
+        """The profile template's refusal of the CSR's SAN types, as a list."""
+        from services.template_service import allowed_san_types, san_type_of, san_type_refusal
+        if self.template is None:
+            return []
+        try:
+            names = csr.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME).value
+        except x509.ExtensionNotFound:
+            return []
+        refusal = san_type_refusal(allowed_san_types(self.template),
+                                   [san_type_of(n) for n in names], self.template.name)
+        return [refusal] if refusal else []
+
+    def _policy_validity(self, csr, validity_days):
+        """*validity_days* under the policies' ``max_validity_days``."""
+        from services.policy_service import PolicyEvaluationService
+        policies, _ = self._policies_for(csr)
+        _, capped, _ = PolicyEvaluationService.enforce_rules(policies, validity_days=validity_days)
+        return capped
 
     def _auto_approve_request(
         self,
@@ -1252,6 +1281,8 @@ class SCEPService:
                     tpl_ext = raw_ext
             except (ValueError, TypeError):
                 tpl_ext = {}
+
+        validity_days = self._policy_validity(csr, validity_days)
 
         # Clamp validity to the CA's own expiry — issuing a leaf that outlives
         # its issuer is invalid per RFC 5280 §6.1 and breaks every chain

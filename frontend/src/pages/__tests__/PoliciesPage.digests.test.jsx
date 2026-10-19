@@ -94,3 +94,14 @@ describe('PoliciesPage signature hash rule (#397)', () => {
     expect(rules.allowed_key_types).toContain('ED25519')
   })
 })
+
+describe('PoliciesPage rules nothing enforced', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('sends neither required extensions nor approval for external names', async () => {
+    await openCreate()
+    const rules = await submitted()
+    expect(rules).not.toHaveProperty('required_extensions')
+    expect(rules.san_restrictions).not.toHaveProperty('require_approval_for_external')
+  })
+})

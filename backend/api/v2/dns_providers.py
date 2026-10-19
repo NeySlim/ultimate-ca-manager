@@ -54,7 +54,6 @@ def create_dns_provider():
     credentials = data.get('credentials', {})
     if credentials and not isinstance(credentials, dict):
         return error_response('Credentials must be an object', 400)
-    zones = data.get('zones', [])
     is_default = data.get('is_default', False)
     
     if not name:
@@ -87,7 +86,6 @@ def create_dns_provider():
         name=name,
         provider_type=provider_type,
         credentials=json.dumps(credentials) if credentials else None,
-        zones=json.dumps(zones) if zones else None,
         is_default=is_default,
         enabled=data.get('enabled', True)
     )
@@ -182,9 +180,6 @@ def update_provider(provider_id):
         provider.name = data['name']
     if merged is not None:
         provider.credentials = json.dumps(merged) if merged else None
-    
-    if 'zones' in data:
-        provider.zones = json.dumps(data['zones']) if data['zones'] else None
     
     if 'enabled' in data:
         provider.enabled = data['enabled']

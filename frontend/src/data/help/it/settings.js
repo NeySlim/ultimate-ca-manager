@@ -434,7 +434,7 @@ La scheda tiene traccia di ciò che è configurato rispetto a ciò che manca anc
 ### Rilevamento dei criteri (XCEP)
 
 - **Autorità di certificazione**: La CA i cui modelli vengono pubblicizzati e che emette certificati tramite questa configurazione
-- **Validità (giorni)**: Validità predefinita applicata ai certificati emessi tramite WSTEP
+- **Validità (giorni)**: Validità dei certificati emessi tramite WSTEP quando la richiesta non corrisponde a nessun modello; altrimenti si applica la validità del modello corrispondente
 
 ### Kerberos / SPNEGO
 

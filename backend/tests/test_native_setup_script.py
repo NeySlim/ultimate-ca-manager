@@ -76,10 +76,10 @@ def test_a_file_written_before_the_install_gets_secrets_and_defaults(tmp_path):
     assert result.returncode == 0, result.stderr
     assert result.stdout.strip() == 'new'
     values = _values(envfile)
-    for key in ('SECRET_KEY', 'JWT_SECRET_KEY'):
-        assert len(values[key]) == 1 and len(values[key][0]) == 64, values
-        int(values[key][0], 16)
-    assert values['SECRET_KEY'] != values['JWT_SECRET_KEY']
+    assert len(values['SECRET_KEY']) == 1 and len(values['SECRET_KEY'][0]) == 64, values
+    int(values['SECRET_KEY'][0], 16)
+    # Nothing reads a JWT secret: none is generated
+    assert 'JWT_SECRET_KEY' not in values
     assert values['DATABASE_PATH'] == ['/opt/ucm/data/ucm.db']
     assert values['DATA_DIR'] == ['/opt/ucm/data']
     assert values['HTTPS_PORT'] == ['8443'] and values['HTTP_PROTOCOL_PORT'] == ['8080']
@@ -105,7 +105,7 @@ def test_present_values_are_never_overwritten(tmp_path):
     values = _values(envfile)
     assert values['SECRET_KEY'] == ['keep-me']
     assert values['HTTPS_PORT'] == ['9443']
-    assert len(values['JWT_SECRET_KEY'][0]) == 64
+    assert 'JWT_SECRET_KEY' not in values
     # A configured install is not handed the first-start defaults again
     assert 'INITIAL_ADMIN_PASSWORD' not in values and 'LOG_LEVEL' not in values
 
@@ -153,7 +153,7 @@ def test_the_file_is_restricted_before_a_secret_is_written(tmp_path):
     _stub(bin_dir / 'openssl', f'stat -c %a {envfile} >> {modes}; echo {"ab" * 32}')
     result = _run(['env', str(envfile), '/d'], _env(tmp_path, extra={'PATH': str(bin_dir)}))
     assert result.returncode == 0, result.stderr
-    assert modes.read_text().split() == ['600', '600']
+    assert modes.read_text().split() == ['600']
 
 
 def test_a_complete_file_is_left_untouched(tmp_path):

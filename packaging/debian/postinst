@@ -106,7 +106,6 @@ SUDOERS
         if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
             NEW_CONFIG=1
             SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
-            JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
             ADMIN_PASS="changeme123"
             
             cat > "$UCM_CONFIG/ucm.env" << ENVEOF
@@ -118,7 +117,6 @@ SUDOERS
 
 # ============ REQUIRED (auto-generated) ============
 SECRET_KEY=$SECRET_KEY
-JWT_SECRET_KEY=$JWT_SECRET
 DATABASE_PATH=$UCM_DATA/ucm.db
 
 # ============ NETWORK ============
@@ -131,12 +129,17 @@ HTTP_PROTOCOL_PORT=8080
 LOG_LEVEL=INFO
 
 # ============ SECURITY ============
-# SESSION_TIMEOUT=3600
-# JWT_ACCESS_TOKEN_EXPIRES=900
-# JWT_REFRESH_TOKEN_EXPIRES=604800
+# Session lifetime and lockout are set in Settings > Security.
 # RATE_LIMIT_ENABLED=true
-# RATE_LIMIT_PER_MINUTE=60
-# RATE_LIMIT_PER_HOUR=1000
+# RATE_LIMIT_TRUST_LAN=true
+# RATE_LIMIT_AUTH_RPM=30
+# RATE_LIMIT_AUTH_BURST=10
+# RATE_LIMIT_HEAVY_RPM=60
+# RATE_LIMIT_HEAVY_BURST=15
+# RATE_LIMIT_STANDARD_RPM=600
+# RATE_LIMIT_STANDARD_BURST=100
+# RATE_LIMIT_PROTOCOL_RPM=500
+# RATE_LIMIT_PROTOCOL_BURST=100
 
 # ============ HTTPS CERTIFICATES ============
 # HTTPS_CERT_PATH=/opt/ucm/data/https_cert.pem

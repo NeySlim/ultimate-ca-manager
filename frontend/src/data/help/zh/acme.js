@@ -80,7 +80,7 @@ export default {
         title: '在内部 / 私有 IP 上的 ACME',
         content: 'HTTP-01 和 TLS-ALPN-01 验证对 RFC1918、loopback、.lan / .local / .corp 目标开箱即用, UCM 的主要部署模式。',
         items: [
-          { label: '开关', text: 'Settings → SystemConfig → acme.allow_private_ips(默认:true)' },
+          { label: '开关', text: 'ACME → ACME服务器 → 允许私有和内部地址(默认:开启)' },
           { label: '开关', text: 'Let\'s Encrypt 标签页 → 允许回环 ACME CA, 用于 127.0.0.1 上的同机 CA（默认：关闭）' },
           { label: '始终阻止', text: '云元数据 IP(169.254.169.254、fd00:ec2::254 等)无条件阻止' },
         ]
@@ -267,11 +267,10 @@ ACME代理允许内部客户端通过UCM从公共CA（Let's Encrypt、ZeroSSL等
 ### 配置
 1. 转到 **ACME** → **Let's Encrypt** 选项卡
 2. 滚动到 **ACME代理** 部分
-3. 启用 **ACME代理** 开关
-4. 在 **外部 CA 账户** 中选择 **上游 CA 账户**（Let's Encrypt、Actalis、ZeroSSL、自定义 URL、EAB）
-5. 点击 **测试连接** 验证与上游 CA 的连接
-6. 如需要，注册上游账户（邮箱 + **注册账户**）
-7. 若尚未注册，UCM 在首次代理请求时自动注册
+3. 在 **外部 CA 账户** 中选择 **上游 CA 账户**（Let's Encrypt、Actalis、ZeroSSL、自定义 URL、EAB）
+4. 点击 **测试连接** 验证与上游 CA 的连接
+5. 如需要，注册上游账户（邮箱 + **注册账户**）
+6. 若尚未注册，UCM 在首次代理请求时自动注册
 
 ### 专用代理路径（多 CA）
 每个外部 CA 账户可暴露自己的 ACME 代理端点：

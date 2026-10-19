@@ -56,7 +56,6 @@ def _generate_csr_pem():
 @pytest.fixture(scope='module')
 def app():
     os.environ['SECRET_KEY'] = 'test-secret-key-for-testing'
-    os.environ['JWT_SECRET_KEY'] = 'test-jwt-secret-key-for-testing'
     os.environ['UCM_ENV'] = 'test'
     os.environ['HTTP_REDIRECT'] = 'false'
     os.environ['INITIAL_ADMIN_PASSWORD'] = 'changeme123'

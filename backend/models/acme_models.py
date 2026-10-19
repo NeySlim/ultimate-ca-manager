@@ -285,7 +285,8 @@ class DnsProvider(db.Model):
     # as ``credentials`` so no schema migration is needed; migration 052 encrypts
     # any pre-existing plaintext rows.
     _credentials = db.Column('credentials', db.Text)
-    zones = db.Column(db.Text)  # JSON array of managed zones/domains
+    # Never read: domains map to providers in acme_domains. Kept for older databases.
+    zones = db.Column(db.Text)
     is_default = db.Column(db.Boolean, default=False)
     enabled = db.Column(db.Boolean, default=True)
     created_at = db.Column(db.DateTime, default=utc_now, nullable=False)
@@ -313,27 +314,12 @@ class DnsProvider(db.Model):
         else:
             self._credentials = None
 
-    @property
-    def zones_list(self):
-        """Parse zones JSON to list"""
-        if not self.zones:
-            return []
-        try:
-            return json.loads(self.zones)
-        except Exception:
-            return []
-    
-    def set_zones_list(self, zones):
-        """Set zones from array"""
-        self.zones = json.dumps(zones)
-    
     def to_dict(self, include_credentials=False):
         """Convert to dictionary for API responses"""
         result = {
             'id': self.id,
             'name': self.name,
             'provider_type': self.provider_type,
-            'zones': self.zones_list,
             'is_default': self.is_default,
             'enabled': self.enabled,
             'created_at': utc_isoformat(self.created_at),
@@ -613,7 +599,7 @@ class AcmeEabCredential(db.Model):
     __tablename__ = 'acme_eab_credentials'
 
     id = db.Column(db.Integer, primary_key=True)
-    kid = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    kid = db.Column(db.String(255), unique=True, nullable=False, index=True)
     # Encrypted at rest via Fernet (utils.encryption). Column name preserved
     # for backwards compatibility — older rows stored plaintext base64 are
     # transparently returned by decrypt_if_needed().

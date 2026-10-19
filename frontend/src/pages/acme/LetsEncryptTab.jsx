@@ -14,10 +14,6 @@ export default function LetsEncryptTab({
   onLocalContactEmailChange,
   localProxyUpstreamUrl,
   onLocalProxyUpstreamUrlChange,
-  localProxyEabKid,
-  onLocalProxyEabKidChange,
-  proxyEabHmacInput,
-  onProxyEabHmacInputChange,
   proxyEmail,
   onProxyEmailChange,
   testingConnection,
@@ -25,6 +21,8 @@ export default function LetsEncryptTab({
   onBlurSave,
   onBlurSaveInt,
   localDnsTimeout,
+  localRenewalDays,
+  onLocalRenewalDaysChange,
   onLocalDnsTimeoutChange,
   localDnsDelay,
   onLocalDnsDelayChange,
@@ -116,6 +114,18 @@ export default function LetsEncryptTab({
             disabled={!canWrite}
             label={t('acme.autoRenewal')}
             description={t('acme.autoRenewalDesc')}
+          />
+
+          <Input
+            label={t('acme.renewalDays')}
+            type="number"
+            min="1"
+            max="60"
+            value={localRenewalDays}
+            onChange={(e) => onLocalRenewalDaysChange(e.target.value)}
+            onBlur={() => onBlurSaveInt('renewal_days', localRenewalDays, onLocalRenewalDaysChange, { min: 1, max: 60, fallback: 30 })}
+            disabled={!canWrite || clientSettings.renewal_enabled === false}
+            helperText={t('acme.renewalDaysHelper')}
           />
 
           <ToggleSwitch
@@ -239,16 +249,7 @@ export default function LetsEncryptTab({
       {/* ACME Proxy */}
       <CompactSection title={t('acme.acmeProxy')} icon={ShieldCheck}>
         <div className="space-y-3">
-          <ToggleSwitch
-            checked={clientSettings.proxy_enabled || false}
-            onChange={(val) => onUpdateClientSetting('proxy_enabled', val)}
-            disabled={!canWrite}
-            label={t('acme.enableAcmeProxy')}
-            description={t('acme.enableAcmeProxyDesc')}
-          />
-
-          {clientSettings.proxy_enabled && (
-            <>
+          <>
               <Select
                 label={t('acme.proxyUpstreamCAAccount')}
                 value={proxyAccountId != null ? String(proxyAccountId) : ''}
@@ -460,8 +461,7 @@ export default function LetsEncryptTab({
                   </Button>
                 </div>
               ) : null}
-            </>
-          )}
+          </>
         </div>
       </CompactSection>
     </div>

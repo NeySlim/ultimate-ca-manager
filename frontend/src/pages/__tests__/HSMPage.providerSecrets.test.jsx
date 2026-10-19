@@ -14,6 +14,7 @@ const CASES = [
   ['aws-cloudhsm', { aws_cluster_id: 'c-1', aws_crypto_user: 'cu', aws_crypto_password: '***' }, 'hsm_password'],
   ['azure-keyvault', { azure_vault_url: 'https://v.vault.azure.net', azure_client_secret: '***' }, 'client_secret'],
   ['openbao', { openbao_url: 'https://bao.example', openbao_token: '***' }, 'token'],
+  ['google-kms', { gcp_project_id: 'p', gcp_keyring: 'r', gcp_credentials_json: '***' }, 'service_account_json'],
 ]
 
 describe('HSM provider form, stored secrets', () => {
@@ -26,4 +27,31 @@ describe('HSM provider form, stored secrets', () => {
     expect(onSave.mock.calls[0][0].config[key]).toBe('***')
   })
 
+  it('offers no "Enable provider" switch: the state follows the connection test', () => {
+    render(<ProviderModal provider={null} hsmStatus={null} onSave={() => {}} onClose={() => {}} />)
+    expect(screen.queryByText('common.enableProvider')).toBeNull()
+  })
+  it('google-kms: a pasted service account key is sent, none means default credentials', async () => {
+    const onSave = vi.fn()
+    render(<ProviderModal provider={{ id: 2, name: 'G', provider_type: 'google-kms', gcp_project_id: 'p' }}
+                          hsmStatus={null} onSave={onSave} onClose={() => {}} />)
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
+    expect(onSave.mock.calls[0][0].config).not.toHaveProperty('service_account_json')
+    fireEvent.change(screen.getByPlaceholderText('{"type": "service_account", ...}'), { target: { value: '{"type": "service_account"}' } })
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2))
+    expect(onSave.mock.calls[1][0].config.service_account_json).toBe('{"type": "service_account"}')
+  })
+
+  it('google-kms: a stored key can be removed for the default credentials', async () => {
+    const onSave = vi.fn()
+    render(<ProviderModal provider={{ id: 3, name: 'G', provider_type: 'google-kms', gcp_project_id: 'p',
+                                      gcp_credentials_json: '***' }}
+                          hsmStatus={null} onSave={onSave} onClose={() => {}} />)
+    fireEvent.click(screen.getByText('hsm.gcpConfig.useDefaultCredentials'))
+    fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
+    await waitFor(() => expect(onSave).toHaveBeenCalled())
+    expect(onSave.mock.calls[0][0].config).not.toHaveProperty('service_account_json')
+  })
 })

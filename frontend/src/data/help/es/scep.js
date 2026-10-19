@@ -8,7 +8,7 @@ export default {
         title: 'Pestañas',
         items: [
           { label: 'Solicitudes', text: 'Solicitudes de inscripción SCEP pendientes, aprobadas y rechazadas' },
-          { label: 'Configuración', text: 'Ajustes del servidor SCEP: selección de CA, identificador de CA, aprobación automática' },
+          { label: 'Configuración', text: 'Ajustes del servidor SCEP: selección de CA, aprobación automática' },
           { label: 'Perfiles', text: 'Endpoints de inscripción con nombre, cada uno con su propia URL, CA, plantilla y desafío' },
           { label: 'Registros de aplicación de Intune', text: 'Registros de aplicación en Entra (ID de inquilino, ID de cliente, secreto de cliente) compartidos por los perfiles que validan desafíos de Intune; un secreto vacío al editar conserva el actual, Probar conexión solicita un token y descubre el servicio sin consumir ningún desafío, y una app aún usada por un perfil no puede eliminarse' },
           { label: 'Contraseñas de desafío', text: 'Gestionar contraseñas de desafío por CA para la inscripción de dispositivos' },
@@ -65,7 +65,6 @@ Ver todas las solicitudes de inscripción SCEP:
 Configurar el servidor SCEP:
 - **Activar/Desactivar**: Alternar el servicio SCEP
 - **CA firmante**: Seleccionar qué CA firma los certificados inscritos por SCEP
-- **Identificador de CA**: El identificador que los dispositivos usan para localizar la CA correcta
 - **Aprobación automática**: Aprobar automáticamente solicitudes con contraseñas de desafío válidas
 
 ### Perfiles
@@ -109,7 +108,7 @@ https://su-servidor:8443/scep                          (endpoint global)
 https://su-servidor:8443/scep/<profile>/pkiclient.exe  (endpoint por perfil)
 \`\`\`
 
-Los dispositivos necesitan la URL más el identificador de CA para inscribirse. Use una URL de perfil para apuntar a la CA, la plantilla y la contraseña de desafío de ese perfil.
+Los dispositivos necesitan la URL para inscribirse. Use una URL de perfil para apuntar a la CA, la plantilla y la contraseña de desafío de ese perfil.
 
 ## Aprobar/Rechazar solicitudes
 

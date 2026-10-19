@@ -87,3 +87,18 @@ def invalid_reason_message(value) -> str:
         f"Invalid revocation reason {value!r}; accepted values: "
         + ', '.join(REVOCATION_REASONS)
     )
+
+
+# RFC 5280 §5.3.1 CRLReason codes (7 is unused)
+REASON_CODES = {
+    x509.ReasonFlags.unspecified: 0,
+    x509.ReasonFlags.key_compromise: 1,
+    x509.ReasonFlags.ca_compromise: 2,
+    x509.ReasonFlags.affiliation_changed: 3,
+    x509.ReasonFlags.superseded: 4,
+    x509.ReasonFlags.cessation_of_operation: 5,
+    x509.ReasonFlags.certificate_hold: 6,
+    x509.ReasonFlags.remove_from_crl: 8,
+    x509.ReasonFlags.privilege_withdrawn: 9,
+    x509.ReasonFlags.aa_compromise: 10,
+}

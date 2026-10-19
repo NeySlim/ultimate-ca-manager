@@ -9,7 +9,7 @@ import base64
 from typing import Dict, Any, Tuple, Optional
 
 from models import db, CA, Certificate
-from services.acme import AcmeService, ari
+from services.acme import AcmeService, ari, domain_match
 from models.acme_models import (
     AcmeAccount,
     AcmeAuthorization,
@@ -1039,6 +1039,20 @@ def new_order():
                 primary_type,
                 detail,
                 subproblems=identifier_errors,
+            )
+
+        wildcard_denied = domain_match.wildcard_refused(identifiers)
+        if wildcard_denied:
+            subproblems = [
+                _identifier_subproblem({'type': 'dns', 'value': value}, 'rejectedIdentifier',
+                                       'Wildcard certificates are not allowed for this domain')
+                for value in wildcard_denied
+            ]
+            return acme_error(
+                'rejectedIdentifier' if len(subproblems) == 1 else 'compound',
+                subproblems[0]['detail'] if len(subproblems) == 1
+                else 'Wildcard certificates are not allowed for these domains',
+                subproblems=subproblems,
             )
 
         # Per-EAB domain restrictions: if this account was registered via an

@@ -734,9 +734,9 @@ def get_provider_types():
             'available': 'azure-keyvault' in available,
             'config_schema': {
                 'vault_url': {'type': 'string', 'required': True, 'description': 'Key Vault URL'},
-                'tenant_id': {'type': 'string', 'required': True, 'description': 'Azure AD tenant ID'},
-                'client_id': {'type': 'string', 'required': True, 'description': 'Application client ID'},
-                'client_secret': {'type': 'password', 'required': True, 'description': 'Application client secret'},
+                'tenant_id': {'type': 'string', 'required': False, 'description': 'Azure AD tenant ID (empty: managed identity)'},
+                'client_id': {'type': 'string', 'required': False, 'description': 'Application client ID (empty: managed identity)'},
+                'client_secret': {'type': 'password', 'required': False, 'description': 'Application client secret (empty: managed identity)'},
                 'use_managed_identity': {'type': 'boolean', 'required': False, 'description': 'Use managed identity instead of client credentials'}
             }
         },
@@ -749,7 +749,7 @@ def get_provider_types():
                 'project_id': {'type': 'string', 'required': True, 'description': 'GCP project ID'},
                 'location': {'type': 'string', 'required': True, 'description': 'Key ring location (e.g., us-east1)'},
                 'key_ring': {'type': 'string', 'required': True, 'description': 'Key ring name'},
-                'service_account_json': {'type': 'textarea', 'required': True, 'description': 'Service account JSON key'}
+                'service_account_json': {'type': 'textarea', 'required': False, 'description': 'Service account JSON key (empty: default credentials)'}
             }
         },
         {

@@ -45,12 +45,10 @@ class CertificatePolicy(db.Model):
     # Example: {
     #   "max_validity_days": 397,
     #   "allowed_key_types": ["RSA-2048", "RSA-4096", "EC-P256"],
-    #   "required_extensions": ["keyUsage", "extendedKeyUsage"],
-    #   "forbidden_extensions": [],
+    #   "allowed_digests": ["sha256", "sha384"],
     #   "san_restrictions": {
     #     "max_dns_names": 50,
-    #     "dns_pattern": "*.company.com",
-    #     "require_approval_for_external": true
+    #     "dns_pattern": "*.company.com"
     #   }
     # }
     rules = db.Column(db.Text, nullable=False, default='{}')

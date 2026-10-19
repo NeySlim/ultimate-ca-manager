@@ -54,7 +54,8 @@ class User(db.Model):
     role = db.Column(db.String(20), nullable=False, default="viewer")  # see auth.permissions.BUILTIN_ROLES
     custom_role_id = db.Column(db.Integer, db.ForeignKey('pro_custom_roles.id', ondelete='SET NULL'), nullable=True)
     active = db.Column(db.Boolean, default=True)
-    mfa_enabled = db.Column(db.Boolean, default=False)  # MFA enabled for this user
+    # Never set by anything: the 2FA state is totp_confirmed. Kept for older databases.
+    mfa_enabled = db.Column(db.Boolean, default=False)
     
     # 2FA/TOTP fields
     totp_secret = db.Column(db.String(32))  # Base32-encoded TOTP secret
@@ -146,7 +147,6 @@ class User(db.Model):
             "role": self.role,
             "custom_role_id": self.custom_role_id,
             "active": self.active,
-            "mfa_enabled": self.mfa_enabled,
             "totp_enabled": self.totp_confirmed,
             "two_factor_enabled": self.totp_confirmed,
             "totp_exempt": bool(self.totp_exempt),

@@ -31,7 +31,6 @@ from tests.conftest import get_json, assert_success, assert_error
 def app():
     """Create app with test configuration."""
     os.environ['SECRET_KEY'] = 'test-secret-key-for-testing'
-    os.environ['JWT_SECRET_KEY'] = 'test-jwt-secret-key-for-testing'
     os.environ['UCM_ENV'] = 'test'
     os.environ['HTTP_REDIRECT'] = 'false'
     os.environ['INITIAL_ADMIN_PASSWORD'] = 'changeme123'
@@ -182,7 +181,7 @@ class TestListTemplates:
         if isinstance(ext, str):
             ext = json.loads(ext)
         assert ext['extended_key_usage'] == ['clientAuth', 'msSmartcardLogin']
-        assert ext['san_types'] == ['upn']
+        assert ext['san_types'] == ['upn', 'email']
 
     def test_create_smartcard_logon_template(self, auth_client):
         """smartcard_logon is an accepted template_type over the API."""

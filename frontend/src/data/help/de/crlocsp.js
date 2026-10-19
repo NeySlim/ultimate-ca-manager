@@ -101,7 +101,7 @@ UCM speichert OCSP-Antworten für die Leistung im Cache. Der Cache wird:
 
 Standardmäßig werden OCSP-Antworten mit dem CA-Schlüssel selbst signiert. Ein **delegierter Responder** verwendet stattdessen ein dediziertes Zertifikat mit der **OCSPSigning**-EKU: weisen Sie eines pro CA über das Detailpanel der CA zu (nur Zertifikate mit OCSPSigning-EKU und privatem Schlüssel sind wählbar).
 
-**Automatische Erneuerung**: Eine tägliche Aufgabe stellt das Responder-Zertifikat vor Ablauf neu aus, gleiches Schlüsselpaar und gleiche Erweiterungen, gleichwertig erneuert, und bindet die Responder-Konfiguration der CA an das neue Zertifikat. Kurzlebige OCSP-Signaturzertifikate (z. B. ein 90-Tage-Template) rotieren ohne manuellen Eingriff. Standardmäßig aktiviert; kann deaktiviert und das Erneuerungsfenster über die Konfiguration angepasst werden.
+**Automatische Erneuerung**: Eine tägliche Aufgabe stellt das Responder-Zertifikat vor Ablauf neu aus, gleiches Schlüsselpaar und gleiche Erweiterungen, gleichwertig erneuert, und bindet die Responder-Konfiguration der CA an das neue Zertifikat. Kurzlebige OCSP-Signaturzertifikate (z. B. ein 90-Tage-Template) rotieren ohne manuellen Eingriff. Standardmäßig aktiviert; kann deaktiviert und das Erneuerungsfenster unter Einstellungen › Sicherheit angepasst werden.
 
 ### AIA-URLs
 Die Authority Information Access (AIA)-Erweiterung wird in Zertifikate eingebettet, um Clients mitzuteilen, wo sie finden:

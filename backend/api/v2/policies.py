@@ -421,6 +421,13 @@ def _issue_approved_certificate(approval):
         template = db.session.get(CertificateTemplate, data['template_id'])
         if not template:
             raise ValueError(f"Template {data['template_id']} not found")
+        if not template.is_active:
+            raise ValueError(f"Template '{template.name}' is disabled")
+        from services.template_service import bucket_san_refusal
+        san_refusal = bucket_san_refusal(template, data)
+        if san_refusal:
+            from services.policy_service import PolicyViolation
+            raise PolicyViolation(san_refusal)
 
     # Re-clamp validity at issuance time:
     #   0) template default when the request didn't pick one (digest behaves
@@ -485,10 +492,11 @@ def _issue_approved_certificate(approval):
     from services.policy_service import PolicyViolation
     from utils.san_parse import auto_san_buckets_from_cn as _implicit_sans
     _requested_dns = list(data.get('san_dns') or [])
-    _implicit_dns = _implicit_sans(
+    from services.template_service import allowed_implicit_buckets
+    _implicit_dns = allowed_implicit_buckets(template, _implicit_sans(
         data.get('cn') or '', data.get('cert_type', 'server'),
         subject_email=data.get('email'),
-    ).get('san_dns') or []
+    )).get('san_dns') or []
     _policies = PolicyEvaluationService.applicable_policies(
         data['ca_id'], data.get('template_id'), data.get('cn'), _requested_dns)
     _rule_context = {'operation': 'issuance', 'subject': data.get('cn'), 'ca_id': data['ca_id'],
@@ -633,7 +641,8 @@ def _issue_approved_certificate(approval):
     cn = data['cn']
     from utils.san_parse import auto_san_buckets_from_cn
 
-    implicit = auto_san_buckets_from_cn(cn, cert_type, subject_email=data.get('email'))
+    implicit = allowed_implicit_buckets(
+        template, auto_san_buckets_from_cn(cn, cert_type, subject_email=data.get('email')))
     for dns in implicit.get('san_dns') or []:
         if dns not in data.get('san_dns', []):
             san_list.insert(0, x509.DNSName(dns))
@@ -779,11 +788,11 @@ def _issue_approved_certificate(approval):
 
 def _validated_rules(rules):
     """``(rules, error)``: key-type and digest lists normalised, unknown values refused."""
-    from services.policy_service import normalize_digest
+    from services.policy_service import normalize_digest, strip_dead_rules
     from services.template_service import _normalize_key_type_label
     if not isinstance(rules, dict):
         return None, 'rules must be an object'
-    rules = dict(rules)
+    rules = strip_dead_rules(rules)
     key_types = rules.get('allowed_key_types')
     if key_types is not None:
         if not isinstance(key_types, list):
