@@ -42,6 +42,28 @@ def sent(app, monkeypatch):
         db.session.commit()
 
 
+@pytest.fixture(autouse=True)
+def five_attempts(app):
+    """Pin the lockout threshold: other files in the same database may change it."""
+    from models import SystemConfig
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key='max_login_attempts').first()
+        saved = row.value if row else None
+        if row is None:
+            row = SystemConfig(key='max_login_attempts')
+            db.session.add(row)
+        row.value = '5'
+        db.session.commit()
+    yield
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key='max_login_attempts').first()
+        if saved is None:
+            db.session.delete(row)
+        else:
+            row.value = saved
+        db.session.commit()
+
+
 @pytest.fixture
 def user(app):
     username = f'lock{uuid.uuid4().hex[:8]}'
