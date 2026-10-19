@@ -579,3 +579,11 @@ def test_a_request_answers_one_login_only(app, provider, idp_signer, caplog):
     client.set_cookie(saml_sp.REQUEST_COOKIE, request_id, domain='ucm.example.test', path=ACS)
     _refused(caplog, client, _response(idp_signer, in_response_to=request_id),
              'unknown, expired or already used AuthnRequest')
+
+
+def test_an_oversized_assertion_id_is_not_reported_as_a_replay(app, provider, idp_signer, caplog):
+    client = app.test_client()
+    request_id = _start_login(client)
+    resp = _response(idp_signer, in_response_to=request_id, assertion_id='_' + 'a' * 300)
+    _refused(caplog, client, resp, 'assertion ID missing or longer than 256 characters')
+    assert 'replay' not in caplog.text

@@ -419,7 +419,11 @@ def sso_callback(provider_type):
             not_on_or_after = saml_auth.get_last_assertion_not_on_or_after()
             if not not_on_or_after:
                 return _reject_saml_login(provider, 'SubjectConfirmationData has no NotOnOrAfter')
-            if not saml_sp.consume_assertion(saml_auth.get_last_assertion_id(), provider.id, not_on_or_after):
+            assertion_id = saml_auth.get_last_assertion_id()
+            if not assertion_id or len(assertion_id) > saml_sp.MAX_MESSAGE_ID_LENGTH:
+                return _reject_saml_login(
+                    provider, f'assertion ID missing or longer than {saml_sp.MAX_MESSAGE_ID_LENGTH} characters')
+            if not saml_sp.consume_assertion(assertion_id, provider.id, not_on_or_after):
                 return _reject_saml_login(provider, 'assertion already consumed (replay)')
 
             # Only reached after signature + assertion verification succeeded
