@@ -25,6 +25,8 @@ export default function LetsEncryptTab({
   onBlurSave,
   onBlurSaveInt,
   localDnsTimeout,
+  localRenewalDays,
+  onLocalRenewalDaysChange,
   onLocalDnsTimeoutChange,
   localDnsDelay,
   onLocalDnsDelayChange,
@@ -116,6 +118,18 @@ export default function LetsEncryptTab({
             disabled={!canWrite}
             label={t('acme.autoRenewal')}
             description={t('acme.autoRenewalDesc')}
+          />
+
+          <Input
+            label={t('acme.renewalDays')}
+            type="number"
+            min="1"
+            max="60"
+            value={localRenewalDays}
+            onChange={(e) => onLocalRenewalDaysChange(e.target.value)}
+            onBlur={() => onBlurSaveInt('renewal_days', localRenewalDays, onLocalRenewalDaysChange, { min: 1, max: 60, fallback: 30 })}
+            disabled={!canWrite || clientSettings.renewal_enabled === false}
+            helperText={t('acme.renewalDaysHelper')}
           />
 
           <ToggleSwitch

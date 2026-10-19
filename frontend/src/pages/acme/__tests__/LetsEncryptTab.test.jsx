@@ -57,6 +57,8 @@ const renderTab = (props = {}) => render(
     onBlurSave={noop}
     onBlurSaveInt={noop}
     localDnsTimeout="120"
+    localRenewalDays="30"
+    onLocalRenewalDaysChange={noop}
     onLocalDnsTimeoutChange={noop}
     onUpdateClientSetting={noop}
     onRegisterProxy={noop}
@@ -100,5 +102,15 @@ describe('LetsEncryptTab settings view', () => {
     renderTab({ onRefresh })
     fireEvent.click(screen.getByText('common.refresh'))
     expect(onRefresh).toHaveBeenCalledOnce()
+  })
+})
+
+describe('LetsEncryptTab renewal threshold', () => {
+  it('saves the days before expiry the scheduled renewal reads', () => {
+    const onBlurSaveInt = vi.fn()
+    renderTab({ onBlurSaveInt, localRenewalDays: '45' })
+    const field = screen.getByDisplayValue('45')
+    fireEvent.blur(field)
+    expect(onBlurSaveInt).toHaveBeenCalledWith('renewal_days', '45', expect.any(Function), { min: 1, max: 60, fallback: 30 })
   })
 })

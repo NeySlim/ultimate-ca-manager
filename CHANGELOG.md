@@ -26,6 +26,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Users: the user detail showed "Enable 2FA" and "TOTP" as off for every user, and never offered "Reset 2FA", because it read fields the API does not set; it now shows the real two-factor state, and the unused `mfa_enabled` field is no longer returned.
 - Certificate Transparency: "Auto-submit new certificates to CT logs" only applied to mTLS enrolment certificates; with embedding off, every issuance path (form, CSR, renewal, approval, ACME, SCEP, EST) now submits the certificate after signing.
 - ACME client: turning off "Auto-renewal" in the Let's Encrypt tab did not stop scheduled renewals; it now does, and the per-order switch still applies when it is on.
+- ACME client: the renewal threshold (`renewal_days`, accepted by the API) was ignored and renewals always started 30 days before expiry; it is now applied when the CA gives no ARI window, and set in the Let's Encrypt tab (1 to 60 days).
 
 ## [2.242] - 2026-10-18
 

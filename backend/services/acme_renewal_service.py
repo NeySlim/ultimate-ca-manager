@@ -145,6 +145,16 @@ def _revoke_replaced_certificate(acme_client, certificate):
         )
 
 
+def _configured_renewal_days():
+    """``acme.client.renewal_days`` (1 to 60), the default when unset or invalid."""
+    row = SystemConfig.query.filter_by(key='acme.client.renewal_days').first()
+    try:
+        days = int(row.value) if row else DEFAULT_RENEWAL_DAYS
+    except (TypeError, ValueError):
+        return DEFAULT_RENEWAL_DAYS
+    return min(60, max(1, days))
+
+
 def scheduled_acme_renewal():
     """
     Scheduled task to check and renew ACME certificates.
@@ -159,8 +169,7 @@ def scheduled_acme_renewal():
         return
 
     try:
-        # Get renewal threshold from settings or use default
-        renewal_days = DEFAULT_RENEWAL_DAYS
+        renewal_days = _configured_renewal_days()
         
         now = utc_now()
         threshold_date = now + timedelta(days=renewal_days)

@@ -84,3 +84,13 @@ def test_global_switch_off_renews_nothing(app, settings, make_order):
 def test_global_switch_on_renews(app, settings, make_order):
     settings(renewal_enabled='true')
     assert _renewed(app, make_order(10))
+
+
+def test_renewal_days_sets_the_threshold(app, settings, make_order):
+    settings(renewal_enabled='true', renewal_days='60')
+    assert _renewed(app, make_order(40))
+
+
+def test_default_threshold_is_30_days(app, settings, make_order):
+    settings(renewal_enabled='true', renewal_days='30')
+    assert not _renewed(app, make_order(40))
