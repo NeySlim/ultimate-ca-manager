@@ -8,7 +8,7 @@ export default {
         title: 'Abas',
         items: [
           { label: 'Solicitações', text: 'Solicitações de inscrição SCEP pendentes, aprovadas e rejeitadas' },
-          { label: 'Configuração', text: 'Configurações do servidor SCEP: seleção de CA, identificador de CA, auto-aprovação' },
+          { label: 'Configuração', text: 'Configurações do servidor SCEP: seleção de CA, auto-aprovação' },
           { label: 'Perfis', text: 'Endpoints de inscrição nomeados, cada um com URL, CA, modelo e desafio próprios' },
           { label: 'Registros de aplicativo do Intune', text: 'Registros de aplicativo no Entra (ID do locatário, ID do cliente, segredo do cliente) compartilhados pelos perfis que validam desafios do Intune; um segredo vazio na edição mantém o atual, Testar conexão solicita um token e descobre o serviço sem consumir nenhum desafio, e um app ainda usado por um perfil não pode ser excluído' },
           { label: 'Senhas de Desafio', text: 'Gerenciar senhas de desafio por CA para inscrição de dispositivos' },
@@ -65,7 +65,6 @@ Visualize todas as solicitações de inscrição SCEP:
 Configure o servidor SCEP:
 - **Ativar/Desativar**: Alternar o serviço SCEP
 - **CA Assinante**: Selecionar qual CA assina certificados inscritos via SCEP
-- **Identificador de CA**: O identificador que dispositivos usam para localizar a CA correta
 - **Auto-Aprovação**: Aprovar automaticamente solicitações com senhas de desafio válidas
 
 ### Perfis
@@ -109,7 +108,7 @@ https://seu-servidor:8443/scep                          (endpoint global)
 https://seu-servidor:8443/scep/<perfil>/pkiclient.exe   (endpoint por perfil)
 \`\`\`
 
-Os dispositivos precisam da URL mais o identificador de CA para se inscrever. Use uma URL de perfil para direcionar a CA, o modelo e a senha de desafio daquele perfil.
+Os dispositivos precisam da URL para se inscrever. Use uma URL de perfil para direcionar a CA, o modelo e a senha de desafio daquele perfil.
 
 ## Aprovando/Rejeitando Solicitações
 

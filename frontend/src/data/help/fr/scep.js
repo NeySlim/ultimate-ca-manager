@@ -8,7 +8,7 @@ export default {
         title: 'Onglets',
         items: [
           { label: 'Requêtes', text: 'Requêtes d\'inscription SCEP en attente, approuvées et rejetées' },
-          { label: 'Configuration', text: 'Paramètres du serveur SCEP : sélection de CA, identifiant CA, approbation automatique' },
+          { label: 'Configuration', text: 'Paramètres du serveur SCEP : sélection de CA, approbation automatique' },
           { label: 'Profils', text: 'Endpoints d\'enrôlement nommés, chacun avec sa propre URL, CA, template et challenge' },
           { label: 'Inscriptions d\'application Intune', text: 'Inscriptions d\'application Entra (ID de locataire, ID client, secret client) partagées par les profils qui valident les challenges Intune ; un secret vide à l\'édition conserve l\'actuel, Tester la connexion demande un jeton et découvre le service sans consommer de challenge, et une app encore utilisée par un profil ne peut pas être supprimée' },
           { label: 'Mots de passe de défi', text: 'Gérer les mots de passe de défi par CA pour l\'inscription des appareils' },
@@ -65,7 +65,6 @@ Voir toutes les requêtes d'inscription SCEP :
 Configurer le serveur SCEP :
 - **Activer/Désactiver** : Basculer le service SCEP
 - **CA de signature** : Sélectionner quelle CA signe les certificats inscrits via SCEP
-- **Identifiant CA** : L'identifiant que les appareils utilisent pour localiser la bonne CA
 - **Approbation automatique** : Approuver automatiquement les requêtes avec des mots de passe de défi valides
 
 ### Profils
@@ -109,7 +108,7 @@ https://votre-serveur:8443/scep                         (endpoint global)
 https://votre-serveur:8443/scep/<profil>/pkiclient.exe  (endpoint par profil)
 \`\`\`
 
-Les appareils ont besoin de l'URL plus l'identifiant CA pour s'inscrire. Utilisez une URL de profil pour cibler la CA, le template et le mot de passe de défi de ce profil.
+Les appareils ont besoin de l'URL pour s'inscrire. Utilisez une URL de profil pour cibler la CA, le template et le mot de passe de défi de ce profil.
 
 ## Approuver/Rejeter des requêtes
 

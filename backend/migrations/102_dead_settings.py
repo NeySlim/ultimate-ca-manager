@@ -21,6 +21,8 @@ DEAD_KEYS = (
     'report_expiry_recipients',
     'report_compliance_enabled',
     'report_compliance_recipients',
+    'scep_url',
+    'scep_ca_ident',
 )
 
 # Legacy report switches nothing ran: (prefix, schedule key, frequency).

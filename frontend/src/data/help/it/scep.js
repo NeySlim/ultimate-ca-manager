@@ -8,7 +8,7 @@ export default {
         title: 'Schede',
         items: [
           { label: 'Richieste', text: 'Richieste di iscrizione SCEP in attesa, approvate e rifiutate' },
-          { label: 'Configurazione', text: 'Impostazioni del server SCEP: selezione CA, identificativo CA, approvazione automatica' },
+          { label: 'Configurazione', text: 'Impostazioni del server SCEP: selezione CA, approvazione automatica' },
           { label: 'Challenge Password', text: 'Gestisci le challenge password per CA per l\'iscrizione dei dispositivi' },
           { label: 'Informazioni', text: 'URL degli endpoint SCEP e istruzioni di integrazione' },
           { label: 'Profili', text: 'Endpoint di enrollment denominati, ciascuno con URL, CA, modello e challenge propri' },
@@ -65,7 +65,6 @@ Visualizza tutte le richieste di iscrizione SCEP:
 Configura il server SCEP:
 - **Abilita/Disabilita**: Attiva/disattiva il servizio SCEP
 - **CA firmataria**: Seleziona quale CA firma i certificati iscritti tramite SCEP
-- **Identificativo CA**: L'identificativo che i dispositivi usano per localizzare la CA corretta
 - **Approvazione automatica**: Approva automaticamente le richieste con challenge password valide
 
 ### Profili
@@ -109,7 +108,7 @@ https://your-server:8443/scep                          (global endpoint)
 https://your-server:8443/scep/<profile>/pkiclient.exe  (per-profile endpoint)
 \`\`\`
 
-I dispositivi necessitano dell'URL più l'identificativo CA per iscriversi. Usa un URL di profilo per indirizzare la CA, il modello e la challenge password di quel profilo.
+I dispositivi necessitano dell'URL per iscriversi. Usa un URL di profilo per indirizzare la CA, il modello e la challenge password di quel profilo.
 
 ## Approvazione/Rifiuto delle richieste
 

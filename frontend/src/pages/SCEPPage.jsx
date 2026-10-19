@@ -520,14 +520,6 @@ export default function SCEPPage() {
                 onChange={(val) => setConfig({ ...config, ca_id: parseInt(val) })}
                 disabled={!config.enabled}
               />
-
-              <Input
-                label={t('scep.caIdentifier')}
-                value={config.ca_ident || 'ucm-ca'}
-                onChange={(e) => setConfig({ ...config, ca_ident: e.target.value })}
-                helperText={t('scep.caIdentifierHelp')}
-                disabled={!config.enabled}
-              />
             </Card>
 
             <Card className="p-4 space-y-4">
@@ -701,18 +693,6 @@ export default function SCEPPage() {
                       {window.location.origin}/scep/pkiclient.exe
                     </code>
                     <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(`${window.location.origin}/scep/pkiclient.exe`)}>
-                      <Copy size={14} />
-                    </Button>
-                  </div>
-                </div>
-                
-                <div className="p-3 bg-bg-tertiary rounded-lg">
-                  <p className="text-xs text-text-secondary mb-1">{t('scep.caIdentifier')}</p>
-                  <div className="flex items-center gap-2">
-                    <code className="text-sm font-mono text-text-primary flex-1">
-                      {config.ca_ident || 'ucm-ca'}
-                    </code>
-                    <Button type="button" size="sm" variant="ghost" onClick={() => copyToClipboard(config.ca_ident || 'ucm-ca')}>
                       <Copy size={14} />
                     </Button>
                   </div>

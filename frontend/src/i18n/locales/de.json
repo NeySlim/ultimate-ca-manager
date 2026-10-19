@@ -1784,8 +1784,6 @@
     "serverSettings": "Server-Einstellungen",
     "scepEndpointUrl": "SCEP-Endpunkt-URL",
     "useThisUrl": "Diese URL in Client-Konfiguration verwenden",
-    "caIdentifier": "CA-Kennung",
-    "caIdentifierHelp": "Kennung bei GetCACaps",
     "autoApprove": "Automatisch genehmigen",
     "autoApproveDesc": "Gültige SCEP-Anfragen automatisch genehmigen",
     "autoApproveWarning": "Automatische Genehmigung aktiviert.",

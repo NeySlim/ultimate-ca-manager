@@ -1784,8 +1784,6 @@
     "serverSettings": "サーバー設定",
     "scepEndpointUrl": "SCEPエンドポイントURL",
     "useThisUrl": "クライアント設定でこのURLを使用してください",
-    "caIdentifier": "CA識別子",
-    "caIdentifierHelp": "GetCACaps中にクライアントに送信される識別子",
     "autoApprove": "リクエストを自動承認",
     "autoApproveDesc": "有効なSCEPリクエストを自動的に承認する",
     "autoApproveWarning": "自動承認が有効です。チャレンジパスワードが安全に配布されていることを確認してください。",

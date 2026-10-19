@@ -8,7 +8,7 @@ export default {
         title: '选项卡',
         items: [
           { label: '请求', text: '待处理、已批准和已拒绝的 SCEP 注册请求' },
-          { label: '配置', text: 'SCEP 服务器设置：CA 选择、CA 标识符、自动批准' },
+          { label: '配置', text: 'SCEP 服务器设置：CA 选择、自动批准' },
           { label: '配置文件', text: '命名注册端点，每个都有自己的 URL、CA、模板和质询' },
           { label: 'Intune 应用注册', text: '由验证 Intune 质询的配置文件共享的 Entra 应用注册（租户 ID、客户端 ID、客户端密钥）；编辑时密钥留空则保留当前密钥，测试连接仅获取令牌并发现服务，不消耗任何质询，仍被配置文件使用的应用无法删除' },
           { label: '质询密码', text: '管理每个 CA 的设备注册质询密码' },
@@ -65,7 +65,6 @@ export default {
 配置 SCEP 服务器设置：
 - **启用/禁用**: 开启或关闭 SCEP 服务
 - **签名 CA**: 选择哪个 CA 签署证书
-- **CA 标识符**: SCEP CA 标识符字符串
 - **自动批准**: 启用/禁用带有有效质询密码的请求的自动批准
 
 ### 配置文件
@@ -108,7 +107,7 @@ https://your-server:8443/scep                          (全局端点)
 https://your-server:8443/scep/<profile>/pkiclient.exe  (按配置文件端点)
 \`\`\`
 
-设备需要此 URL 加上 CA 标识符才能注册。使用配置文件 URL 可指向该配置文件的 CA、模板和质询密码。
+设备需要此 URL 才能注册。使用配置文件 URL 可指向该配置文件的 CA、模板和质询密码。
 
 ## 批准/拒绝请求
 

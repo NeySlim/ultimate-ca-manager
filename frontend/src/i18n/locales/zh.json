@@ -1784,8 +1784,6 @@
     "serverSettings": "服务器设置",
     "scepEndpointUrl": "SCEP 端点 URL",
     "useThisUrl": "在客户端配置中使用此 URL",
-    "caIdentifier": "CA 标识符",
-    "caIdentifierHelp": "在 GetCACaps 期间发送给客户端的标识符",
     "autoApprove": "自动批准请求",
     "autoApproveDesc": "自动批准有效的 SCEP 请求",
     "autoApproveWarning": "自动批准已启用。请确保挑战密码已安全分发。",

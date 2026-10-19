@@ -1278,9 +1278,7 @@ Response:
 {
   "data": {
     "enabled": true,
-    "url": "/scep/pkiclient.exe",
     "ca_id": 2,
-    "ca_ident": "ucm-ca",
     "auto_approve": false,
     "challenge_validity": 24
   }
@@ -1295,7 +1293,6 @@ Content-Type: application/json
 {
   "enabled": true,
   "ca_id": 2,
-  "ca_ident": "ucm-ca",
   "auto_approve": false,
   "challenge_validity": 24
 }

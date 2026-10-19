@@ -786,7 +786,6 @@ View all SCEP enrollment requests:
 Configure the SCEP server:
 - **Enable/Disable**: Toggle the SCEP service
 - **Signing CA**: Select which CA signs SCEP-enrolled certificates
-- **CA Identifier**: The identifier devices use to locate the correct CA
 - **Auto-Approve**: Automatically approve requests with valid challenge passwords
 
 ### Profiles
@@ -830,7 +829,7 @@ https://your-server:8443/scep                          (global endpoint)
 https://your-server:8443/scep/<profile>/pkiclient.exe  (per-profile endpoint)
 \`\`\`
 
-Devices need the URL plus the CA identifier to enroll. Use a profile URL to target that profile's CA, template and challenge password.
+Devices need the URL to enroll. Use a profile URL to target that profile's CA, template and challenge password.
 
 ## Approving/Rejecting Requests
 

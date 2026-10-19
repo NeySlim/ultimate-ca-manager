@@ -1810,8 +1810,6 @@
     "serverSettings": "Server Налаштування",
     "scepEndpointUrl": "URL кінцевої точки SCEP",
     "useThisUrl": "Використовуйте цю URL-адресу в конфігурації клієнта",
-    "caIdentifier": "Ідентифікатор CA",
-    "caIdentifierHelp": "Ідентифікатор, що надсилається клієнтам під час GetCACaps",
     "autoApprove": "Автоматично схвалювати запити",
     "autoApproveDesc": "Automatically approve дійсний SCEP requests",
     "autoApproveWarning": "Auto-approve увімкнено. Ensure challenge passwords are securely distributed.",

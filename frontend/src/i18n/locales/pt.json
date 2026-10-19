@@ -1784,8 +1784,6 @@
     "serverSettings": "Definições do servidor",
     "scepEndpointUrl": "URL do Endpoint SCEP",
     "useThisUrl": "Use este URL em client configuration",
-    "caIdentifier": "AC Identifier",
-    "caIdentifierHelp": "Identifier sent para clients during GetCACaps",
     "autoApprove": "Aprovar pedidos automaticamente",
     "autoApproveDesc": "Aprovar automaticamente pedidos SCEP válidos",
     "autoApproveWarning": "Auto-approve activado. Ensure challenge passwords são securely distributed.",

@@ -42,9 +42,7 @@ def get_scep_config():
     """Get SCEP configuration from database"""
     return success_response(data={
         'enabled': get_config('scep_enabled', 'true') == 'true',
-        'url': get_config('scep_url', '/scep/pkiclient.exe'),
         'ca_id': int(get_config('scep_ca_id', '0') or 0) or None,
-        'ca_ident': get_config('scep_ca_ident', 'ucm-ca'),
         'auto_approve': get_config('scep_auto_approve', 'false') == 'true',
         'challenge_validity': int(get_config('scep_challenge_validity', '24')),
         'enforce_signing_time': get_config('scep_enforce_signing_time', 'false') == 'true',
@@ -61,8 +59,6 @@ def update_scep_config():
 
     if 'enabled' in data:
         set_config('scep_enabled', 'true' if data['enabled'] else 'false')
-    if 'url' in data:
-        set_config('scep_url', data['url'])
     if 'ca_id' in data:
         # Validate CA exists if a non-empty ID was provided
         if data['ca_id']:
@@ -75,8 +71,6 @@ def update_scep_config():
             set_config('scep_ca_id', str(ca_id_int))
         else:
             set_config('scep_ca_id', '')
-    if 'ca_ident' in data:
-        set_config('scep_ca_ident', data['ca_ident'])
     if 'auto_approve' in data:
         set_config('scep_auto_approve', 'true' if data['auto_approve'] else 'false')
     if 'challenge_validity' in data:

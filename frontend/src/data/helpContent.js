@@ -416,7 +416,7 @@ export const helpContent = {
         icon: ListChecks,
         items: [
           { label: 'Requests', text: 'Pending, approved, and rejected SCEP enrollment requests' },
-          { label: 'Configuration', text: 'SCEP server settings: CA selection, CA identifier, auto-approve' },
+          { label: 'Configuration', text: 'SCEP server settings: CA selection, auto-approve' },
           { label: 'Profiles', text: 'Named enrollment endpoints, each with its own URL, CA, template and challenge' },
           { label: 'Intune app registrations', text: 'Entra app registrations (tenant ID, client ID, client secret) shared by the profiles that validate Intune challenges; an empty secret on edit keeps the current one, Test connection requests a token and discovers the service without consuming any challenge, and an app still used by a profile cannot be deleted' },
           { label: 'Challenge Passwords', text: 'Manage per-CA challenge passwords for device enrollment' },

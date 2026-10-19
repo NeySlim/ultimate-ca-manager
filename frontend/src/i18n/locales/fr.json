@@ -2356,8 +2356,6 @@
     "serverSettings": "Paramètres du serveur",
     "scepEndpointUrl": "URL du point de terminaison SCEP",
     "useThisUrl": "Utilisez cette URL dans la configuration client",
-    "caIdentifier": "Identifiant AC",
-    "caIdentifierHelp": "Identifiant envoyé aux clients lors de GetCACaps",
     "autoApprove": "Approbation automatique des demandes",
     "autoApproveDesc": "Approuver automatiquement les demandes SCEP valides",
     "autoApproveWarning": "Approbation automatique activée.",
