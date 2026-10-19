@@ -228,11 +228,15 @@ def get_schedule_settings():
 @require_auth(['write:settings'])
 def update_schedule_settings():
     """Update report schedule settings"""
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return error_response("Schedules must be an object", 400)
     
     for report_key in schedulable_reports():
         if report_key in data:
             sched = data[report_key]
+            if not isinstance(sched, dict):
+                return error_response(f"Invalid schedule for {report_key}", 400)
             # Validate frequency
             freq = sched.get('frequency', 'weekly')
             if freq not in ('daily', 'weekly', 'monthly'):
@@ -263,9 +267,7 @@ def update_schedule_settings():
                     return error_response(f"Invalid email in recipients for {report_key}", 400)
             
             # Validate format
-            fmt = sched.get('format', 'csv')
-            if not _is_pdf(report_key) and fmt not in ReportService.ATTACHMENT_TYPES:
-                fmt = 'csv'
+            fmt = ReportService.attachment_format(sched.get('format'))
             
             config_val = {
                 'enabled': bool(sched.get('enabled', False)),
@@ -288,13 +290,16 @@ def update_schedule_settings():
 @require_auth(['write:settings'])
 def send_test_report():
     """Send a test report to verify email configuration"""
-    data = request.get_json() or {}
+    data = request.get_json(silent=True) or {}
+    if not isinstance(data, dict):
+        return error_response("Invalid request body", 400)
     
     report_type = data.get('report_type', 'expiring_certificates')
     if report_type not in schedulable_reports():
         return error_response("Invalid report type", 400)
     
-    recipient = (data.get('recipient') or '').strip()
+    recipient = data.get('recipient')
+    recipient = recipient.strip() if isinstance(recipient, str) else ''
     if not recipient or not EMAIL_RE.match(recipient):
         return error_response("A valid recipient email is required", 400)
 
@@ -305,8 +310,7 @@ def send_test_report():
             fmt = json.loads(_get_config(f'report_schedule_{report_type}', '') or '{}').get('format')
         except (json.JSONDecodeError, ValueError, AttributeError):
             fmt = None
-    if not _is_pdf(report_type) and fmt not in ReportService.ATTACHMENT_TYPES:
-        fmt = 'csv'
+    fmt = ReportService.attachment_format(fmt)
 
     try:
         if not send_report(report_type, [recipient], fmt):

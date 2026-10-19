@@ -51,6 +51,11 @@ class ReportService:
 
     # Email attachment per data format; PDF schedules are 'pdf_<template>'.
     ATTACHMENT_TYPES = {'csv': 'text/csv', 'json': 'application/json'}
+
+    @classmethod
+    def attachment_format(cls, value) -> str:
+        """The data format to attach: ``value`` when it is one, else CSV."""
+        return value if isinstance(value, str) and value in cls.ATTACHMENT_TYPES else 'csv'
     
     @classmethod
     def generate_report(cls, report_type: str, params: dict = None) -> dict:
@@ -425,9 +430,7 @@ class ReportService:
         """
         try:
             params = dict(params or {})
-            if params.get('format') not in cls.ATTACHMENT_TYPES:
-                params['format'] = 'csv'
-            fmt = params['format']
+            fmt = params['format'] = cls.attachment_format(params.get('format'))
 
             report = cls.generate_report(report_type, params)
             today = utc_now().strftime('%Y-%m-%d')

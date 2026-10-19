@@ -19,6 +19,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Scheduled reports were emailed without the report attached and always announced as CSV; the file is now attached in the schedule's format (CSV, JSON or PDF), and a test send that fails says so.
 - Scheduled PDF reports saved from the Reports page were silently dropped by the API; each PDF template can now be scheduled.
+- Reports: a schedule or test send with a malformed body or a non-text format answered 500; the body is refused with 400 and an unknown format falls back to CSV.
 
 ## [2.242] - 2026-10-18
 

@@ -192,3 +192,42 @@ def test_email_carries_the_attachment(app, monkeypatch):
     assert parts[0].get_content_type() == 'application/json'
     assert parts[0].get_payload(decode=True) == b'{"items": []}'
     assert any(p.get_content_type() == 'text/html' for p in msg.walk())
+
+
+@pytest.mark.parametrize('bad', [['json'], {'f': 'json'}, 7, 'xml'])
+def test_odd_formats_fall_back_to_csv(auth_client, outbox, schedules, bad):
+    schedules('ca_hierarchy', {'enabled': False, 'format': bad, 'recipients': []})
+    r = _post(auth_client, '/api/v2/reports/send-test',
+              {'report_type': 'ca_hierarchy', 'recipient': 'ops@example.test'})
+    assert r.status_code == 200, r.data
+    assert outbox[-1]['attachments'][0][0].endswith('.csv')
+
+    r = _post(auth_client, '/api/v2/reports/send-test',
+              {'report_type': 'ca_hierarchy', 'recipient': 'ops@example.test', 'format': bad})
+    assert r.status_code == 200, r.data
+    assert outbox[-1]['attachments'][0][0].endswith('.csv')
+
+    r = auth_client.put('/api/v2/reports/schedule', data=json.dumps({'ca_hierarchy': {
+        'enabled': False, 'frequency': 'weekly', 'time': '08:00', 'recipients': [], 'format': bad}}),
+        content_type='application/json')
+    assert r.status_code == 200, r.data
+    assert r.get_json()['data']['ca_hierarchy']['format'] == 'csv'
+
+
+@pytest.mark.parametrize('body', [
+    {'ca_hierarchy': ['not', 'an', 'object']},
+    ['ca_hierarchy'],
+])
+def test_malformed_schedule_is_refused(auth_client, body):
+    r = auth_client.put('/api/v2/reports/schedule', data=json.dumps(body), content_type='application/json')
+    assert r.status_code == 400
+
+
+@pytest.mark.parametrize('body', [
+    {'report_type': 'ca_hierarchy', 'recipient': ['ops@example.test']},
+    {'report_type': ['ca_hierarchy'], 'recipient': 'ops@example.test'},
+    ['ca_hierarchy'],
+])
+def test_malformed_test_send_is_refused(auth_client, outbox, body):
+    r = _post(auth_client, '/api/v2/reports/send-test', body)
+    assert r.status_code == 400
