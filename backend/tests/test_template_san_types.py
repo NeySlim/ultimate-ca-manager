@@ -319,3 +319,51 @@ class TestEnforcementSwitch:
         assert set(types['Client Authentication']) == {'dns', 'email', 'upn'}
         assert set(types['VPN Client']) == {'dns', 'email', 'upn'}
         assert set(types['Smartcard Logon']) == {'upn', 'email'}
+
+
+class TestWindowsShapedRequests:
+    """Windows/Intune CSRs carry CA:FALSE with a path length, which the raw
+    cryptography accessor refuses: the SAN type check reads them as the rest does."""
+
+    @staticmethod
+    def _csr(cn):
+        from cryptography.hazmat.primitives.asymmetric import rsa
+        from tests.test_csr_windows_basic_constraints import _windows_shaped_csr
+        return _windows_shaped_csr(rsa.generate_private_key(public_exponent=65537, key_size=2048), cn)
+
+    @pytest.mark.parametrize('enforce, allowed, refused', [
+        (False, ['email'], False), (True, ['dns'], False), (True, ['email'], True)])
+    def test_scep(self, app, make_template, enforce, allowed, refused):
+        from services.scep.scep_service import SCEPService
+        tpl_id = make_template(allowed, enforce=enforce)
+        with app.app_context():
+            svc = SimpleNamespace(template=db.session.get(CertificateTemplate, tpl_id))
+            violations = SCEPService._san_type_violations(svc, self._csr('win.san.test'))
+        assert bool(violations) is refused
+
+    def test_sign_csr_check(self, app, make_template):
+        from api.v2.csrs import _san_type_refusal
+        csr = self._csr('win-csr.san.test')
+        row = SimpleNamespace(csr=csr.public_bytes(serialization.Encoding.PEM).decode())
+        with app.app_context():
+            assert 'DNS' in _san_type_refusal(row, make_template(['email']))
+            assert _san_type_refusal(row, make_template(['dns'])) is None
+
+
+def test_an_override_san_alone_is_checked(app, create_ca, make_template):
+    """WSTEP's AD-derived names replace a naked request's: they are what the template binds."""
+    from services.ca_service import CAService
+    from utils.upn_san import build_upn_other_name
+    ca = create_ca(cn='SAN types override CA')
+    naked = x509.CertificateSigningRequestBuilder().subject_name(x509.Name([])).sign(
+        ec.generate_private_key(ec.SECP256R1()), hashes.SHA256())
+    override = dict(override_subject=x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'Jane Doe')]),
+                    override_san=[build_upn_other_name('jane@example.com')])
+    with app.app_context():
+        signing_ca = db.session.get(CA, ca['id'])
+        pem, _ = CAService.sign_csr_from_crypto(ca=signing_ca, csr=naked,
+                                                policy_template_id=make_template(['upn']), **override)
+        assert pem
+        with pytest.raises(PolicyViolation, match='UPN'):
+            CAService.sign_csr_from_crypto(ca=signing_ca, csr=naked,
+                                           policy_template_id=make_template(['dns']), **override)

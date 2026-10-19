@@ -129,9 +129,10 @@ def _san_type_refusal(cert, template_id, extra_san=None):
     if allowed is None:
         return None
     from cryptography import x509 as _x509
+    from utils.csr_extensions import csr_extensions
     raw = cert.csr if cert.csr.startswith('-----BEGIN') else base64.b64decode(cert.csr).decode()
     try:
-        names = list(_x509.load_pem_x509_csr(raw.encode()).extensions.get_extension_for_class(
+        names = list(csr_extensions(_x509.load_pem_x509_csr(raw.encode())).get_extension_for_class(
             _x509.SubjectAlternativeName).value)
     except _x509.ExtensionNotFound:
         names = []

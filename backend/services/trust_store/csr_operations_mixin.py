@@ -705,8 +705,9 @@ class CSROperationsMixin:
                 n for n in extra_san if n not in effective_sans]
         if san_template is not None:
             from services.template_service import allowed_san_types, check_san_types, san_type_of
-            check_san_types(san_template, list(csr_sans or []) + list(override_san or [])
-                            + list(extra_san or []))
+            # The names that land: the CSR's own SAN when it has one, else the override
+            requested = list(csr_sans or []) if has_csr_san or override_san is None else override_san
+            check_san_types(san_template, list(requested) + list(extra_san or []))
             allowed = allowed_san_types(san_template)
             if allowed is not None and override_san is None and not has_csr_san:
                 effective_sans = [n for n in effective_sans if san_type_of(n) in allowed]
