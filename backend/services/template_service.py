@@ -623,6 +623,14 @@ class TemplateService:
 _TEMPLATE_OVERRIDABLE_FIELDS = ('key_type', 'validity_days', 'digest')
 
 
+def disabled_template_error(template_id):
+    """Refusal for a disabled template, None otherwise (a missing one is the caller's case)."""
+    template = db.session.get(CertificateTemplate, template_id) if template_id else None
+    if template is not None and not template.is_active:
+        return f"Template '{template.name}' is disabled"
+    return None
+
+
 def template_extensions(template):
     """A template's ``extensions_template`` as a dict ({} when unset or unusable).
 
