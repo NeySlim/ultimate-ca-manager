@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- Settings > Security: the OCSP responder certificate auto-renewal switch and its window (days before expiry), which the daily task already read but nothing could set.
+
 ### Removed
 
 - ACME: EAB keys still kept in the pre-2.139 `acme_eab_keys` setting registered accounts without appearing anywhere; the upgrade moves them to ACME > EAB as active credentials, where they can be seen and revoked, and the old setting is no longer read. Nothing to do.

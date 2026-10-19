@@ -101,7 +101,7 @@ UCM almacena en caché las respuestas OCSP para mejorar el rendimiento. La cach�
 
 Por defecto, las respuestas OCSP se firman con la propia clave de la CA. Un **respondedor delegado** utiliza en su lugar un certificado dedicado con el EKU **OCSPSigning**: asigne uno por CA desde el panel de detalles de la CA (solo son elegibles los certificados que llevan el EKU OCSPSigning y una clave privada).
 
-**Renovación automática**: una tarea diaria reemite el certificado del respondedor antes de que expire, mismo par de claves y extensiones, renovado a la par, y vuelve a vincular la configuración del respondedor de la CA al nuevo certificado. Los certificados de firma OCSP de corta duración (por ejemplo, una plantilla de 90 días) rotan sin acción manual. Activado por defecto; puede desactivarse y la ventana de renovación ajustarse mediante configuración.
+**Renovación automática**: una tarea diaria reemite el certificado del respondedor antes de que expire, mismo par de claves y extensiones, renovado a la par, y vuelve a vincular la configuración del respondedor de la CA al nuevo certificado. Los certificados de firma OCSP de corta duración (por ejemplo, una plantilla de 90 días) rotan sin acción manual. Activado por defecto; puede desactivarse y la ventana de renovación ajustarse en Ajustes › Seguridad.
 
 ### URLs AIA
 La extensión de acceso a información de autoridad (AIA) se incluye en los certificados para indicar a los clientes dónde encontrar:

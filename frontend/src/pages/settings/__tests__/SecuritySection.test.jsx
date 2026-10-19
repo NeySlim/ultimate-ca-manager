@@ -126,3 +126,16 @@ describe('SecuritySection disabling encryption', () => {
     expect(screen.queryByText('settings.disableEncryption')).not.toBeInTheDocument()
   })
 })
+
+describe('SecuritySection OCSP responder renewal', () => {
+  it('offers the auto-renewal switch and its window', () => {
+    renderSection({ enabled: false })
+    expect(screen.getByText('settings.ocspResponderAutoRenew')).toBeInTheDocument()
+    expect(screen.getByText('settings.ocspResponderRenewDays')).toBeInTheDocument()
+  })
+
+  it('hides the window when auto-renewal is off', () => {
+    renderSection({ enabled: false }, { settings: { ocsp_responder_auto_renew: false } })
+    expect(screen.queryByText('settings.ocspResponderRenewDays')).toBeNull()
+  })
+})

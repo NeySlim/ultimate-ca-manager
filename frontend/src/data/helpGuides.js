@@ -733,7 +733,7 @@ UCM caches OCSP responses for performance. The cache is:
 
 By default, OCSP responses are signed with the CA key itself. A **delegated responder** uses a dedicated certificate with the **OCSPSigning** EKU instead: assign one per CA from the CA's detail panel (only certificates carrying the OCSPSigning EKU and a private key are eligible).
 
-**Automatic renewal**: a daily task re-issues the responder certificate before it expires, same key pair and extensions, renewed at par, and rebinds the CA's responder configuration to the new certificate. Short-lived OCSP signing certificates (e.g. a 90-day template) rotate without manual action. Enabled by default; it can be disabled and the renewal window tuned via configuration.
+**Automatic renewal**: a daily task re-issues the responder certificate before it expires, same key pair and extensions, renewed at par, and rebinds the CA's responder configuration to the new certificate. Short-lived OCSP signing certificates (e.g. a 90-day template) rotate without manual action. Enabled by default; it can be disabled and the renewal window tuned in Settings › Security.
 
 ### AIA URLs
 The Authority Information Access (AIA) extension is embedded in certificates to tell clients where to find:
