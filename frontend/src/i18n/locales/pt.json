@@ -2310,7 +2310,10 @@
     "verifyIntegrity": "Verify Integrity",
     "integrityVerified": "Integridade do registo de auditoria verificada ({{count}} entradas verificadas)",
     "integrityFailed": "A verificação de integridade do registo de auditoria falhou ({{errors}} erros encontrados)",
-    "integrityError": "Falha ao verificar a integridade do registo de auditoria"
+    "integrityError": "Falha ao verificar a integridade do registo de auditoria",
+    "integrityBroken": "Cadeia do registo de auditoria quebrada na entrada #{{id}} ({{errors}} erros encontrados)",
+    "integrityUnprotected": "Nenhuma violação encontrada em {{count}} entradas, mas o registo de auditoria não está protegido: {{unprotected}} entradas não estão seladas pela chave mestra",
+    "integrityIntactPartial": "Registo de auditoria íntegro a partir da entrada #{{id}} ({{count}} entradas seladas pela chave mestra); {{older}} entradas anteriores já não podem ser atestadas"
   },
   "settings": {
     "appearanceSubtitle": "Personalize a aparência e o idioma do UCM",

@@ -2310,7 +2310,10 @@
     "verifyIntegrity": "Verify Integrity",
     "integrityVerified": "Integrità del log di audit verificata ({{count}} voci controllate)",
     "integrityFailed": "Verifica dell'integrità del log di audit fallita ({{errors}} errori trovati)",
-    "integrityError": "Impossibile verificare l'integrità del log di audit"
+    "integrityError": "Impossibile verificare l'integrità del log di audit",
+    "integrityBroken": "Catena del log di audit interrotta alla voce #{{id}} ({{errors}} errori trovati)",
+    "integrityUnprotected": "Nessuna violazione trovata in {{count}} voci, ma il log di audit non è protetto: {{unprotected}} voci non sono sigillate dalla chiave principale",
+    "integrityIntactPartial": "Log di audit integro dalla voce #{{id}} ({{count}} voci sigillate dalla chiave principale); {{older}} voci precedenti non possono più essere attestate"
   },
   "settings": {
     "appearanceSubtitle": "Personalizza l'aspetto e la lingua di UCM",

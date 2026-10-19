@@ -2310,7 +2310,10 @@
     "verifyIntegrity": "校验完整性",
     "integrityVerified": "审计日志完整性校验通过 (已检查 {{count}} 条记录)",
     "integrityFailed": "审计日志完整性校验失败 (发现 {{errors}} 处错误)",
-    "integrityError": "审计日志完整性校验失败"
+    "integrityError": "审计日志完整性校验失败",
+    "integrityBroken": "审计日志链在记录 #{{id}} 处中断 (发现 {{errors}} 处错误)",
+    "integrityUnprotected": "在 {{count}} 条记录中未发现违规，但审计日志未受保护: {{unprotected}} 条记录未由主密钥封印",
+    "integrityIntactPartial": "审计日志自记录 #{{id}} 起完整 ({{count}} 条记录由主密钥封印); 之前的 {{older}} 条记录已无法证明"
   },
   "settings": {
     "appearanceSubtitle": "自定义UCM的外观和语言",

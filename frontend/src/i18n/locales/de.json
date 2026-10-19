@@ -2310,7 +2310,10 @@
     "verifyIntegrity": "Verify Integrity",
     "integrityVerified": "Integrität des Audit-Protokolls bestätigt ({{count}} Einträge geprüft)",
     "integrityFailed": "Integritätsprüfung des Audit-Protokolls fehlgeschlagen ({{errors}} Fehler gefunden)",
-    "integrityError": "Integrität des Audit-Protokolls konnte nicht überprüft werden"
+    "integrityError": "Integrität des Audit-Protokolls konnte nicht überprüft werden",
+    "integrityBroken": "Kette des Audit-Protokolls bei Eintrag #{{id}} unterbrochen ({{errors}} Fehler gefunden)",
+    "integrityUnprotected": "Kein Verstoß in {{count}} Einträgen gefunden, aber das Audit-Protokoll ist nicht geschützt: {{unprotected}} Einträge sind nicht durch den Hauptschlüssel versiegelt",
+    "integrityIntactPartial": "Audit-Protokoll ab Eintrag #{{id}} intakt ({{count}} durch den Hauptschlüssel versiegelte Einträge); {{older}} ältere Einträge können nicht mehr bestätigt werden"
   },
   "settings": {
     "appearanceSubtitle": "Passen Sie Darstellung und Sprache von UCM an",

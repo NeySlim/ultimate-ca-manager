@@ -619,7 +619,10 @@
     "verifyIntegrity": "Vérifier l'intégrité",
     "integrityVerified": "Intégrité des journaux vérifiée ({{count}} entrées vérifiées)",
     "integrityFailed": "Échec de la vérification d'intégrité ({{errors}} erreurs trouvées)",
-    "integrityError": "Erreur lors de la vérification d'intégrité"
+    "integrityError": "Erreur lors de la vérification d'intégrité",
+    "integrityBroken": "Chaîne du journal d'audit rompue à l'entrée #{{id}} ({{errors}} erreurs trouvées)",
+    "integrityUnprotected": "Aucune violation trouvée dans {{count}} entrées, mais le journal d'audit n'est pas protégé : {{unprotected}} entrées ne sont pas scellées par la clé maître",
+    "integrityIntactPartial": "Journal d'audit intact à partir de l'entrée #{{id}} ({{count}} entrées scellées par la clé maître) ; {{older}} entrées antérieures ne peuvent plus être attestées"
   },
   "auth": {
     "continue": "Continuer",
