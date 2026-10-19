@@ -8,10 +8,13 @@ verification says so.
 import hmac as _hmac
 import json
 import logging
+import os
 
-from sqlalchemy import func, text
+from sqlalchemy import event, func, text
+from sqlalchemy.orm import Session
 
 from models import db, AuditLog
+from security import encryption as _encryption
 from security.encryption import key_encryption
 
 logger = logging.getLogger(__name__)
@@ -22,6 +25,8 @@ KEYED_CHAIN = 2
 _KEY_LABEL = b'ucm audit chain v2'
 _APPEND_LOCK = 0x75636D61756469  # PostgreSQL advisory lock id for appends
 _ERROR_LIST_CAP = 1000
+KEYRING_NAME = 'audit-chain.keys'
+_PENDING_KEYRING = 'ucm_audit_keyring'
 
 
 def chain_key():
@@ -30,6 +35,86 @@ def chain_key():
     if key is None:
         return None
     return key, _hmac.digest(key, b'ucm audit chain key id', 'sha256').hex()[:16]
+
+
+def keyring_path():
+    """The ids of the keys this instance sealed with, kept beside the master key, outside the database."""
+    return _encryption.MASTER_KEY_PATH.parent / KEYRING_NAME
+
+
+def read_keyring():
+    """{'current': key id, 'history': [key ids]}, or None when there is none."""
+    path = keyring_path()
+    if not path.exists():
+        return None
+    try:
+        data = json.loads(path.read_text())
+        if isinstance(data, dict) and isinstance(data.get('history'), list):
+            return data
+    except (OSError, ValueError) as e:
+        logger.error(f"Unreadable {path}: {e}")
+        return None
+    logger.error(f"Malformed {path}; key rotations are not attested until it is rewritten")
+    return None
+
+
+def _write_keyring(data):
+    path = keyring_path()
+    try:
+        path.parent.mkdir(parents=True, exist_ok=True)
+        tmp = path.with_suffix('.tmp')
+        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
+        with os.fdopen(fd, 'w') as handle:
+            json.dump(data, handle)
+        try:
+            import pwd
+            ucm = pwd.getpwnam('ucm')
+            os.chown(tmp, ucm.pw_uid, ucm.pw_gid)
+        except (KeyError, OSError):
+            pass
+        os.replace(tmp, path)
+    except OSError as e:
+        logger.error(f"Could not write {path}: {e}; the next key change will not be attested")
+
+
+@event.listens_for(Session, 'after_commit')
+def _keyring_after_commit(session):
+    # Written once the entry that relies on it is committed, never before
+    data = session.info.pop(_PENDING_KEYRING, None)
+    if data is not None:
+        _write_keyring(data)
+
+
+@event.listens_for(Session, 'after_rollback')
+def _keyring_after_rollback(session):
+    session.info.pop(_PENDING_KEYRING, None)
+
+
+def _rotation(session, entry, key_id):
+    """What the first entry under `key_id` says about the other keys in the ledger.
+
+    A rotation is attested only when the key history outside the database
+    shows the key changed, and only for keys in that history. Without a
+    history (new host, restored elsewhere) the other keys are listed as not
+    attested, which the verification reports.
+    """
+    in_ledger = dict(session.query(AuditLog.hash_key_id, func.max(AuditLog.id))
+                     .filter(AuditLog.hash_version == KEYED_CHAIN,
+                             AuditLog.hash_key_id != key_id, AuditLog.id < entry.id)
+                     .group_by(AuditLog.hash_key_id).all())
+    ring = read_keyring()
+    if ring is None:
+        rotation = {'attested': False, 'keys': in_ledger} if in_ledger else None
+    elif ring.get('current') != key_id:
+        known = set(ring['history'])
+        keys = {k: last for k, last in in_ledger.items() if k in known}
+        rotation = {'attested': True, 'keys': keys} if keys else None
+    else:
+        rotation = None     # same key as before: nothing was rotated
+    if ring is None or ring.get('current') != key_id:
+        history = [k for k in (ring or {}).get('history', []) if k != key_id]
+        session.info[_PENDING_KEYRING] = {'current': key_id, 'history': history + [key_id]}
+    return json.dumps(rotation, sort_keys=True) if rotation else None
 
 
 def append_entry(entry, session=None, purge_from=None):
@@ -64,17 +149,11 @@ def append_entry(entry, session=None, purge_from=None):
     entry.hash_key_id = key[1]
     if not (previous is not None and previous.hash_version == KEYED_CHAIN
             and previous.hash_key_id == key[1]):
-        # First entry under this key: it records where the ledger starts and,
-        # for each other key in it, its last entry; nothing past those counts
-        # as sealed under a retired key.
+        # First entry under this key: it records where the ledger starts and
+        # what it attests of the other keys in it.
         if entry.chain_start is None:
             entry.chain_start = session.query(func.min(AuditLog.id)).scalar()
-        retired = dict(session.query(AuditLog.hash_key_id, func.max(AuditLog.id))
-                       .filter(AuditLog.hash_version == KEYED_CHAIN,
-                               AuditLog.hash_key_id != key[1],
-                               AuditLog.id < entry.id)
-                       .group_by(AuditLog.hash_key_id).all())
-        entry.retired_keys = json.dumps(retired, sort_keys=True) if retired else None
+        entry.retired_keys = _rotation(session, entry, key[1])
     entry.entry_hash = entry.compute_hash(prev_hash, key[0])
     return entry
 
@@ -90,12 +169,14 @@ class _Walk:
         self.first = None
         self.prev_hash = None
         self.first_keyed = None
-        self.rotation = {}          # key id -> last id, attested by the first keyed entry
+        self.rotation, self.rotation_attested = {}, False   # from the first keyed entry
+        self.errors_at_first_keyed = 0
         self.run_start, self.run_index = None, 0
         self.protected_from, self.not_attested = None, 0
         self.retired = {}           # key id -> [first id, last id] before the first keyed entry
         self.retired_count = 0
         self.keyed_start = None     # chain_start of entries verified under the key
+        self.keyed_min_start = None
         self.any_start = None
 
     def error(self, entry_id, code, message, **extra):
@@ -156,6 +237,8 @@ class _Walk:
             self.any_start = max(self.any_start or log.chain_start, log.chain_start)
             if keyed_ok:
                 self.keyed_start = max(self.keyed_start or log.chain_start, log.chain_start)
+                self.keyed_min_start = min(self.keyed_min_start or log.chain_start,
+                                           log.chain_start)
 
         if after_key:
             if not keyed_ok and self.error_count == errors_before:
@@ -167,7 +250,10 @@ class _Walk:
             if self.run_start is None:
                 self.run_start, self.run_index = log.id, index
             self.protected_from, self.not_attested = self.run_start, self.run_index
-            self.rotation = json.loads(log.retired_keys) if log.retired_keys else {}
+            rotation = json.loads(log.retired_keys) if log.retired_keys else {}
+            self.rotation = rotation.get('keys') or {}
+            self.rotation_attested = bool(rotation.get('attested'))
+            self.errors_at_first_keyed = self.error_count
         elif recomputable:
             if self.run_start is None:
                 self.run_start, self.run_index = log.id, index
@@ -175,14 +261,18 @@ class _Walk:
             self.run_start = None
 
     def finish(self, whole_table, upper_id):
-        if self.key_id is not None and self.first_keyed is not None:
+        # A first keyed entry that fails explains what follows from it
+        if (self.key_id is not None and self.first_keyed is not None
+                and not self.errors_at_first_keyed):
             self._check_retired(upper_id)
         if whole_table and self.first is not None:
             self._check_chain_start()
 
         if self.error_count:
             status = 'broken'
-        elif self.key_id is None or (self.checked and self.first_keyed is None):
+        elif (self.key_id is None or (self.checked and self.first_keyed is None)
+              or (self.retired and not self.rotation_attested)):
+            # The last case: other keys this server has no record of rotating from
             status = 'unprotected'
         else:
             status = 'intact'
@@ -206,6 +296,7 @@ class _Walk:
                 'not_attested': not_attested,
                 'retired_key': self.retired_count,
                 'key_rotation_id': self.first_keyed if self.rotation else None,
+                'rotation_attested': self.rotation_attested if self.rotation else None,
             },
         }
 
@@ -234,6 +325,10 @@ class _Walk:
                     self.error(first_id, 'truncated', message)
             elif first_id > self.keyed_start:
                 self.error(first_id, 'truncated', message)
+            elif first_id < self.keyed_min_start and first_id != self.first_keyed:
+                # Below the first id the key ever recorded: added since
+                self.error(first_id, 'before_start',
+                           f'entry #{first_id} precedes where the ledger started')
         elif self.any_start is not None:
             if first_id > self.any_start:
                 self.error(first_id, 'truncated', message)

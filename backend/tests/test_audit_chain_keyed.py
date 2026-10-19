@@ -10,6 +10,7 @@ Each test runs on an empty ledger and puts the session's rows back after, so
 the whole-table checks see only what the test wrote.
 """
 import importlib.util
+import json
 import os
 import sqlite3
 import threading
@@ -292,6 +293,18 @@ class TestPurge:
             assert report['status'] == 'broken', report
             assert report['first_error_id'] == recent[0]
 
+    def test_a_row_added_before_the_first_is_seen(self, app, encryption_enabled, empty_ledger):
+        with app.app_context():
+            ids = [_log(f'chain_before_{i}') for i in range(2)]
+            db.session.execute(text(
+                "INSERT INTO audit_logs (id, action, username, success) "
+                "VALUES (:id, 'forged', 'someone', 1)"), {'id': ids[0] - 100})
+            db.session.commit()
+            report = AuditService.verify_integrity()
+            assert report['status'] == 'broken', report
+            assert (report['first_error_id'], report['first_error_code']) == (
+                ids[0] - 100, 'before_start')
+
     def test_a_prefix_removed_without_a_purge_is_seen(
             self, app, encryption_enabled, empty_ledger):
         with app.app_context():
@@ -346,12 +359,116 @@ class TestKeyRotation:
                 # Entries written without a key just before the new one are bound by it
                 assert protection['protected_from_id'] == (gap_ids or after)[0]
                 assert protection['not_attested'] == len(before)
+                assert protection['rotation_attested'] is True
+                marker = db.session.get(AuditLog, after[0])
+                old_key = db.session.get(AuditLog, before[0]).hash_key_id
+                assert json.loads(marker.retired_keys) == {
+                    'attested': True, 'keys': {old_key: before[-1]}}
 
                 # The new key's first entry recorded where the ledger started
                 AuditLog.query.filter_by(id=before[0]).delete()
                 db.session.commit()
                 report = AuditService.verify_integrity()
                 assert report['status'] == 'broken', report
+            encryption_enabled.key_encryption.reload()
+
+    @pytest.mark.parametrize('label', ['unknown', 'retired'])
+    def test_relabelling_the_whole_ledger_is_not_taken_for_a_rotation(
+            self, app, encryption_enabled, empty_ledger, monkeypatch, label):
+        """Every entry moved to another key, then the server writes: it knows,
+        outside the database, that its key did not change, so it attests nothing."""
+        with app.app_context():
+            if label == 'retired':
+                old = [_log(f'chain_k1_{i}') for i in range(2)]
+                key_id = db.session.get(AuditLog, old[0]).hash_key_id
+            else:
+                key_id = 'deadbeefdeadbeef'
+            with monkeypatch.context() as patch:
+                if label == 'retired':
+                    self._rotate(encryption_enabled, patch)
+                ids = [_log(f'chain_total_{i}') for i in range(3)]
+                _relabel([i for (i,) in db.session.query(AuditLog.id)], key_id=key_id)
+                _log('chain_total_after')
+                report = AuditService.verify_integrity()
+                assert report['status'] == 'broken', report
+                assert report['first_error_code'] in ('unattested_key', 'not_sealed_by_key')
+                assert report['first_error_id'] <= ids[0]
+            encryption_enabled.key_encryption.reload()
+
+    def test_without_the_key_history_a_rotation_is_not_attested(
+            self, app, encryption_enabled, empty_ledger, monkeypatch):
+        """A restore on another host: the other keys are reported, not passed."""
+        from services.audit.chain import keyring_path
+        with app.app_context():
+            before = [_log(f'chain_k1_{i}') for i in range(2)]
+            keyring_path().unlink()
+            with monkeypatch.context() as patch:
+                self._rotate(encryption_enabled, patch)
+                after = _log('chain_k2')
+                report = AuditService.verify_integrity()
+                assert report['valid'], report
+                assert report['status'] == 'unprotected'
+                assert report['protection']['key_rotation_id'] == after
+                assert report['protection']['rotation_attested'] is False
+                assert report['protection']['not_attested'] == len(before)
+            encryption_enabled.key_encryption.reload()
+
+    def test_a_rolled_back_rotation_does_not_move_the_key_history(
+            self, app, encryption_enabled, empty_ledger, monkeypatch):
+        with app.app_context():
+            [_log(f'chain_k1_{i}') for i in range(2)]
+            with monkeypatch.context() as patch:
+                self._rotate(encryption_enabled, patch)
+                stage_audit_entry(action='chain_rolled_back', resource_type='system',
+                                  username='chain-test')
+                db.session.rollback()
+                _log('chain_k2')
+                report = AuditService.verify_integrity()
+                assert report['status'] == 'intact', report
+                assert report['protection']['rotation_attested'] is True
+            encryption_enabled.key_encryption.reload()
+
+    def test_the_key_history_is_kept_beside_the_master_key(
+            self, app, encryption_enabled, empty_ledger):
+        from services.audit.chain import keyring_path, read_keyring
+        with app.app_context():
+            _log('chain_ring')
+            path = keyring_path()
+            assert path.parent == encryption_enabled.MASTER_KEY_PATH.parent
+            assert path.stat().st_mode & 0o777 == 0o600
+            assert read_keyring() == {'current': chain_key()[1], 'history': [chain_key()[1]]}
+
+    def test_the_rotation_record_is_sealed(self, app, encryption_enabled, empty_ledger,
+                                           monkeypatch):
+        with app.app_context():
+            before = [_log(f'chain_k1_{i}') for i in range(2)]
+            with monkeypatch.context() as patch:
+                self._rotate(encryption_enabled, patch)
+                marker = _log('chain_k2')
+                _log('chain_k2_next')
+                old_key = db.session.get(AuditLog, before[0]).hash_key_id
+                db.session.execute(text('UPDATE audit_logs SET retired_keys = :r WHERE id = :id'),
+                                   {'r': json.dumps({'attested': True, 'keys': {old_key: 999}}),
+                                    'id': marker})
+                db.session.commit()
+                report = AuditService.verify_integrity()
+                assert report['status'] == 'broken'
+                assert (report['first_error_id'], report['first_error_code']) == (marker, 'tampered')
+            encryption_enabled.key_encryption.reload()
+
+    def test_a_deleted_rotation_record_is_named_rather_than_the_entries_behind_it(
+            self, app, encryption_enabled, empty_ledger, monkeypatch):
+        with app.app_context():
+            [_log(f'chain_k1_{i}') for i in range(2)]
+            with monkeypatch.context() as patch:
+                self._rotate(encryption_enabled, patch)
+                marker = _log('chain_k2')
+                following = _log('chain_k2_next')
+                AuditLog.query.filter_by(id=marker).delete()
+                db.session.commit()
+                report = AuditService.verify_integrity()
+                assert report['status'] == 'broken'
+                assert (report['first_error_id'], report['first_error_code']) == (following, 'link')
             encryption_enabled.key_encryption.reload()
 
     def test_an_entry_relabelled_with_the_retired_key_past_its_last_entry_is_seen(
