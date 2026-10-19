@@ -24,6 +24,7 @@ DEAD_KEYS = (
     'scep_url',
     'scep_ca_ident',
     'site_name',
+    'acme_public_tls_cert_id',
 )
 
 # Legacy report switches nothing ran: (prefix, schedule key, frequency).

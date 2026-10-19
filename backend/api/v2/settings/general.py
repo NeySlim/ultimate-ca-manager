@@ -6,7 +6,7 @@ from flask import request, g
 from auth.unified import require_auth, has_permission
 from services.settings_registry import DATE_FORMATS, as_boolean_word, effective
 from utils.response import success_response, error_response
-from models import db, Certificate
+from models import db
 from services.audit_service import AuditService
 from services.retention_service import RetentionPolicy, RetentionSettingError
 from api.v2.key_recovery import _dual_control_enabled, _dual_control_env
@@ -57,7 +57,6 @@ _ADMIN_ONLY_SETTINGS = frozenset({
     'protocol_base_url',
     'acme_public_vhost',
     'acme_public_port',
-    'acme_public_tls_cert_id',
     # The whole backup schedule is admin-only, not just its password: an
     # operator who can shorten retention can have the daily task delete the
     # archives, which the dedicated admin:system route never allowed.
@@ -109,7 +108,6 @@ def get_general_settings():
         # ACME public endpoint (local server + proxy directory URLs behind reverse proxy)
         'acme_public_vhost': get_config('acme_public_vhost', ''),
         'acme_public_port': effective('acme_public_port'),
-        'acme_public_tls_cert_id': int(get_config('acme_public_tls_cert_id', '0') or 0) or None,
         'date_format': effective('date_format'),
         'show_time': effective('show_time'),
         # Password policy
@@ -186,7 +184,7 @@ def update_general_settings():
         'backup_retention_days', 'backup_password', 'backup_kdf', 'session_timeout',
         'session_max_lifetime', 'max_login_attempts', 'lockout_duration',
         'protocol_base_url', 'http_protocol_port', 'base_url', 'date_format', 'show_time',
-        'acme_public_vhost', 'acme_public_port', 'acme_public_tls_cert_id',
+        'acme_public_vhost', 'acme_public_port',
         # Password policy
         'min_password_length', 'max_password_length',
         'password_require_uppercase', 'password_require_lowercase',
@@ -291,25 +289,6 @@ def update_general_settings():
         if acme_port < 1 or acme_port > 65535:
             return error_response('acme_public_port must be between 1 and 65535', 400)
         data['acme_public_port'] = str(acme_port)
-
-    if 'acme_public_tls_cert_id' in data:
-        cert_id_raw = data.get('acme_public_tls_cert_id')
-        if cert_id_raw in (None, '', 0, '0'):
-            # Clearing removes the row entirely (no dead empty-string config)
-            from models import SystemConfig
-            SystemConfig.query.filter_by(key='acme_public_tls_cert_id').delete()
-            data.pop('acme_public_tls_cert_id')
-        else:
-            try:
-                cert_id = int(cert_id_raw)
-            except (ValueError, TypeError):
-                return error_response('acme_public_tls_cert_id must be an integer', 400)
-            cert = db.session.get(Certificate, cert_id)
-            if not cert:
-                return error_response('ACME public TLS certificate not found', 404)
-            if not cert.prv:
-                return error_response('ACME public TLS certificate must include a private key', 400)
-            data['acme_public_tls_cert_id'] = str(cert_id)
 
     # The backup schedule is validated by the same contract as PATCH
     # /api/v2/settings/backup/schedule. This route used to take any string as

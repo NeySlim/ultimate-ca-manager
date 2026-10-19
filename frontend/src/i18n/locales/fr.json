@@ -3026,8 +3026,6 @@
     "acmePublicVhostHelper": "Nom d'hôte concret dans les URL ACME (ex. acme.ucm.example.com : pas *.ucm.example.com). DNS et TLS opérationnels avant enregistrement ; les clients basculent immédiatement.",
     "acmePublicPort": "port public ACME",
     "acmePublicPortHelper": "Port HTTPS public dans les URL du directory ACME (serveur local et proxy).",
-    "acmePublicTlsCertId": "ID certificat TLS public ACME",
-    "acmePublicTlsCertIdHelper": "ID du certificat pour le vhost ACME (ex. SAN wildcard *.ucm.example.com ; métadonnée : déployer sur le reverse proxy).",
     "publicEndpoints": {
       "title": "Endpoints publics",
       "subtitle": "URLs effectives après enregistrement : redirect admin, CORS, protocoles PKI HTTP et directory ACME.",

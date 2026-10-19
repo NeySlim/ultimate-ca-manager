@@ -21,7 +21,6 @@ export default {
           { label: "ACME", text: "acme.ucm.example.com, /acme/* und /acme/proxy/* (ohne Client-mTLS)" },
           { label: "Wildcard TLS", text: "Konkreter Hostname (z. B. acme.ucm.example.com). Ein *.ucm.example.com-Zertifikat-SAN deckt TLS für Admin- und ACME-Vhosts ab, nicht *.ucm.example.com als Vhost eintragen" },
           { label: "Vor dem Speichern", text: "Sorgen Sie zuerst für funktionierendes DNS und TLS auf dem ACME-Vhost, Clients, die das Directory neu lesen, wechseln die URLs sofort, und Erneuerungen schlagen fehl, wenn der Vhost nicht erreichbar ist" },
-          { label: "TLS-Zertifikat-ID", text: "Metadaten für das auf dem ACME-Vhost bereitgestellte Zertifikat (z. B. Wildcard)" },
         ]
       },
       {

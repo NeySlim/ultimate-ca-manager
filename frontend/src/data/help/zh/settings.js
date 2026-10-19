@@ -21,7 +21,6 @@ export default {
           { label: "ACME", text: "acme.ucm.example.com, /acme/* 和 /acme/proxy/*（无客户端 mTLS）" },
           { label: "通配符 TLS", text: "具体主机名（如 acme.ucm.example.com）。证书 SAN *.ucm.example.com 覆盖 admin/ACME 的 TLS, 不可将 *.ucm.example.com 填为 vhost" },
           { label: "保存之前", text: "先确保 ACME vhost 的 DNS 和 TLS 正常工作,, 重新读取 directory 的客户端会立即切换 URL，若 vhost 不可达，续期将失败" },
-          { label: "TLS 证书 ID", text: "部署在 ACME vhost 上的证书元数据（如通配符）" },
         ]
       },
       {

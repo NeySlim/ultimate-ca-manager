@@ -2887,8 +2887,6 @@
     "acmePublicVhostHelper": "ACME 目录 URL 中的具体主机名（如 acme.ucm.example.com，不可填 *.ucm.example.com）。保存前确保 DNS 与 TLS 就绪；客户端会立即切换 URL。",
     "acmePublicPort": "ACME 公共端口",
     "acmePublicPortHelper": "ACME 目录 URL 中的公共 HTTPS 端口（本地服务器与代理）。",
-    "acmePublicTlsCertId": "ACME 公共 TLS 证书 ID",
-    "acmePublicTlsCertIdHelper": "ACME vhost 的证书 ID（如通配符 SAN *.ucm.example.com；仅元数据，需在反向代理上部署）。",
     "publicEndpoints": {
       "title": "公共接入端点",
       "subtitle": "保存后生效的地址：管理端重定向、跨域资源共享、PKI 协议 HTTP 接口以及 ACME 目录地址。",
