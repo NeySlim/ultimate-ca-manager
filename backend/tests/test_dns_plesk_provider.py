@@ -70,6 +70,41 @@ class TestRegistration:
             PleskDnsProvider({**CREDS, "propagation_delay_seconds": delay})
 
 
+class TestSaveTimeValidation:
+    """What the constructor refuses is refused when the provider is saved."""
+
+    @pytest.mark.parametrize("creds, message", [
+        ({"server_url": "plesk.example.com"}, "valid HTTP or HTTPS URL"),
+        ({"server_url": "https://plesk.example.com/?a=1"}, "query string"),
+        ({"propagation_delay_seconds": "soon"}, "whole number"),
+        ({"propagation_delay_seconds": "-5"}, "must not be negative"),
+    ])
+    def test_validate_credentials_refuses(self, creds, message):
+        with pytest.raises(ValueError, match=message):
+            PleskDnsProvider.validate_credentials({**CREDS, **creds})
+
+    def test_plain_http_is_accepted_like_powerdns(self):
+        PleskDnsProvider.validate_credentials({**CREDS, "server_url": "http://plesk.lan:8880"})
+
+    def test_create_answers_400_with_the_reason(self, auth_client):
+        r = auth_client.post("/api/v2/dns-providers", json={
+            "name": "plesk-bad-url", "provider_type": "plesk",
+            "credentials": {**CREDS, "server_url": "plesk.example.com"}})
+        assert r.status_code == 400, r.data
+        assert "valid HTTP or HTTPS URL" in r.get_data(as_text=True)
+
+    def test_update_answers_400_with_the_reason(self, auth_client):
+        r = auth_client.post("/api/v2/dns-providers", json={
+            "name": "plesk-bad-delay", "provider_type": "plesk", "credentials": dict(CREDS)})
+        assert r.status_code == 201, r.data
+        provider_id = r.get_json()["data"]["id"]
+        r = auth_client.patch(f"/api/v2/dns-providers/{provider_id}", json={
+            "credentials": {"propagation_delay_seconds": "soon", "api_key": "typed"}})
+        assert r.status_code == 400, r.data
+        assert "whole number" in r.get_data(as_text=True)
+        auth_client.delete(f"/api/v2/dns-providers/{provider_id}")
+
+
 class TestTransport:
     def test_posts_xml_to_plesk_endpoint(self, provider, caplog):
         with caplog.at_level(logging.DEBUG, logger="services.acme.dns_providers.plesk"):

@@ -1,14 +1,12 @@
 """Plesk DNS provider using the Plesk XML API."""
 import logging
 import time
-import warnings
 import xml.etree.ElementTree as XmlBuilder
 from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import defusedxml.ElementTree as SafeXml
 import requests
-from urllib3.exceptions import InsecureRequestWarning
 
 from .base import BaseDnsProvider
 
@@ -27,14 +25,8 @@ class PleskDnsProvider(BaseDnsProvider):
     def __init__(self, credentials: Dict[str, Any]):
         super().__init__(credentials)
         self.endpoint = self._build_endpoint(self.credentials["server_url"])
-        verify_ssl = self.credentials.get("verify_ssl", True)
-        self.verify_ssl = verify_ssl if isinstance(verify_ssl, bool) else str(verify_ssl).lower() not in {"0", "false", "no"}
-        try:
-            self.propagation_delay_seconds = int(self.credentials.get("propagation_delay_seconds") or 0)
-        except (TypeError, ValueError) as exc:
-            raise ValueError("Plesk propagation delay must be a whole number of seconds") from exc
-        if self.propagation_delay_seconds < 0:
-            raise ValueError("Plesk propagation delay must not be negative")
+        self.verify_ssl = self.parse_flag(self.credentials.get("verify_ssl"), default=True)
+        self.propagation_delay_seconds = self._propagation_delay(self.credentials)
         self._sites_cache: Optional[List[Dict[str, Any]]] = None
         logger.info("Plesk DNS provider initialized for %s (verify_tls=%s)", self.endpoint, self.verify_ssl)
         if not self.verify_ssl:
@@ -42,6 +34,23 @@ class PleskDnsProvider(BaseDnsProvider):
                 "Plesk TLS certificate verification is disabled for %s; enable it after installing a trusted certificate",
                 self.endpoint,
             )
+
+    @classmethod
+    def validate_credentials(cls, credentials: Dict[str, Any]) -> None:
+        """Refuse at save time what the constructor would refuse at first use."""
+        if credentials.get("server_url"):
+            cls._build_endpoint(str(credentials["server_url"]))
+        cls._propagation_delay(credentials)
+
+    @staticmethod
+    def _propagation_delay(credentials: Dict[str, Any]) -> int:
+        try:
+            delay = int(credentials.get("propagation_delay_seconds") or 0)
+        except (TypeError, ValueError) as exc:
+            raise ValueError("Plesk propagation delay must be a whole number of seconds") from exc
+        if delay < 0:
+            raise ValueError("Plesk propagation delay must not be negative")
+        return delay
 
     @classmethod
     def _build_endpoint(cls, server_url: str) -> str:
@@ -76,16 +85,13 @@ class PleskDnsProvider(BaseDnsProvider):
         started = time.monotonic()
         logger.debug("Plesk XML API %s request to %s", context, self.endpoint)
         try:
-            with warnings.catch_warnings():
-                if not self.verify_ssl:
-                    warnings.simplefilter("ignore", InsecureRequestWarning)
-                response = requests.post(
-                    self.endpoint,
-                    headers=self._headers(),
-                    data=payload,
-                    timeout=30,
-                    verify=self.verify_ssl,
-                )
+            response = requests.post(
+                self.endpoint,
+                headers=self._headers(),
+                data=payload,
+                timeout=30,
+                verify=self.verify_ssl,
+            )
             elapsed_ms = (time.monotonic() - started) * 1000
             if response.status_code >= 400:
                 diagnostic = self._error(response)

@@ -315,6 +315,15 @@ class BaseDnsProvider(ABC):
             })
         return schema
     
+    @staticmethod
+    def parse_flag(value: Any, default: bool = False) -> bool:
+        """A checkbox credential as saved by the form (bool) or an API client (text)."""
+        if value is None or value == "":
+            return default
+        if isinstance(value, bool):
+            return value
+        return str(value).strip().lower() not in {"0", "false", "no", "off"}
+
     @classmethod
     def validate_credentials(cls, credentials: Dict[str, Any]) -> None:
         """Raise FipsRestricted (a ValueError) for credentials a mode refuses."""

@@ -74,6 +74,8 @@ def create_dns_provider():
             provider_class.validate_credentials(credentials)
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type
+    except ValueError as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.warning(f"Invalid DNS provider credentials: {e}")
         return error_response('Invalid credentials format', 400)
@@ -176,7 +178,12 @@ def update_provider(provider_id):
                     merged[key] = value
         provider_class = get_provider_class(provider.provider_type)
         if provider_class:
-            provider_class.validate_credentials(merged)
+            try:
+                provider_class.validate_credentials(merged)
+            except FipsRestricted:
+                raise
+            except ValueError as e:
+                return error_response(str(e), 400)
     err = _credentials_retarget_error(provider, credentials)
     if err:
         return err
