@@ -25,6 +25,7 @@ from fips_mode import FipsRestricted
 from utils.key_codec import load_pem_bytes
 
 from utils.export_password import validate_export_password
+from services.key_export_audit import audit_key_export
 
 logger = logging.getLogger(__name__)
 
@@ -48,6 +49,10 @@ def _parent_cas(ca):
 def _validate_export_password(password):
     """Return error string or None. Empty means "do not encrypt"."""
     return validate_export_password(password, allow_empty=True)
+
+
+def _audit_key_export(ca, export_format, password):
+    audit_key_export('ca', ca.id, ca.descr or ca.refid, export_format, password)
 
 
 @bp.route('/api/v2/cas/export', methods=['GET', 'POST'])
@@ -190,6 +195,7 @@ def export_ca(ca_id):
                     format=serialization.PrivateFormat.PKCS8,
                     encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
                 )
+            _audit_key_export(ca, export_format, password)
             return Response(
                 key_pem,
                 mimetype='application/x-pem-file',
@@ -221,6 +227,8 @@ def export_ca(ca_id):
                 else:
                     filename = f"{sanitize_filename(ca.descr or ca.refid)}_chain.pem"
 
+            if include_key and ca.prv:
+                _audit_key_export(ca, export_format, password)
             return Response(
                 result,
                 mimetype=content_type,
@@ -264,6 +272,7 @@ def export_ca(ca_id):
                 encryption_algorithm=pkcs12_encryption(password, legacy)
             )
 
+            _audit_key_export(ca, export_format, password)
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
@@ -324,6 +333,7 @@ def export_ca(ca_id):
                 encryption_algorithm=pkcs12_encryption(password, legacy)
             )
 
+            _audit_key_export(ca, export_format, password)
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
@@ -371,6 +381,7 @@ def export_ca(ca_id):
             keystore = pyjks.KeyStore.new("jks", [pke])
             jks_bytes = keystore.saves(password)
 
+            _audit_key_export(ca, export_format, password)
             return Response(
                 jks_bytes,
                 mimetype='application/x-java-keystore',
