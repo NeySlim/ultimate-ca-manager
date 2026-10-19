@@ -24,6 +24,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - HSM: Azure Key Vault ignored the tenant, client ID and secret typed in the form and signed in with the host's ambient identity; it now uses them, and falls back to the managed identity only when all three are empty.
 - ACME server: whether HTTP-01 and TLS-ALPN-01 may reach private addresses could only be changed in the database, and the in-app help pointed at a page that does not exist; the switch is now under ACME > Local ACME > Challenge targets.
 - Users: the user detail showed "Enable 2FA" and "TOTP" as off for every user, and never offered "Reset 2FA", because it read fields the API does not set; it now shows the real two-factor state, and the unused `mfa_enabled` field is no longer returned.
+- Certificate Transparency: "Auto-submit new certificates to CT logs" only applied to mTLS enrolment certificates; with embedding off, every issuance path (form, CSR, renewal, approval, ACME, SCEP, EST) now submits the certificate after signing.
 
 ## [2.242] - 2026-10-18
 

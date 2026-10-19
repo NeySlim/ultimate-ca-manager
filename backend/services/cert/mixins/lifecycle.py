@@ -16,7 +16,7 @@ from utils.key_type import issue_key_type_from_template
 from services.file_regen_service import mirror_private_key
 from services.ocsp_service import OCSPService
 from services.trust_store import TrustStoreService
-from utils.ct_client import collect_scts, embed_scts_in_certificate
+from utils.ct_client import embed_scts_in_certificate
 from utils.file_naming import cert_cert_path, cert_key_path, cert_csr_path, cleanup_old_files
 from utils.datetime_utils import utc_now
 
@@ -218,7 +218,6 @@ class LifecycleMixin:
         # pre-certificate for CT submission, then by the final SCT-bearing
         # certificate before anything is persisted or returned.
         from utils.ct_client import apply_ct_policy
-        ct_embed = SystemConfig.query.filter_by(key='ct_embed_sct').first()
         signed_cert, embedded_scts = apply_ct_policy(cert, ca_cert, ca_private_key)
         if signed_cert is not cert:
             cert = signed_cert
@@ -276,28 +275,9 @@ class LifecycleMixin:
         from services.audit_service import AuditService
         AuditService.log_certificate('cert_created', certificate, f'Created certificate: {descr}')
 
-        # Persist embedded SCT metadata. If embedding is disabled, preserve the
-        # legacy post-issuance add-chain auto-submission behavior.
+        # Persist the SCTs that apply_ct_policy embedded or submitted.
         try:
             scts_to_store = embedded_scts
-            if not scts_to_store:
-                ct_enabled = SystemConfig.query.filter_by(key='ct_enabled').first()
-                ct_auto = SystemConfig.query.filter_by(key='ct_auto_submit').first()
-                if (
-                    not (ct_embed and str(ct_embed.value).lower() == 'true')
-                    and ct_enabled and ct_enabled.value == 'true'
-                    and ct_auto and ct_auto.value == 'true'
-                ):
-                    ct_log_urls_config = SystemConfig.query.filter_by(key='ct_log_urls').first()
-                    ct_log_urls = json.loads(ct_log_urls_config.value) \
-                        if ct_log_urls_config and ct_log_urls_config.value else None
-                    chain = [cert_pem.decode('utf-8') if isinstance(cert_pem, bytes) else cert_pem]
-                    chain.append(
-                        ca_cert_pem.decode('utf-8')
-                        if isinstance(ca_cert_pem, bytes) else ca_cert_pem
-                    )
-                    scts_to_store = collect_scts(chain, ct_log_urls)
-
             if scts_to_store:
                 config = SystemConfig(
                     key=f'cert_scts_{certificate.id}',

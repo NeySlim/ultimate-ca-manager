@@ -262,15 +262,57 @@ def embed_scts_in_certificate(
     return final_certificate, valid_scts
 
 
+def _configured_log_urls():
+    """``ct_log_urls`` as a list, None for the defaults, [] when malformed."""
+    from models import SystemConfig
+
+    row = SystemConfig.query.filter_by(key='ct_log_urls').first()
+    if not (row and row.value):
+        return None
+    try:
+        parsed = json.loads(row.value)
+        if not isinstance(parsed, list):
+            raise ValueError('ct_log_urls must be a JSON list')
+        return parsed
+    except (json.JSONDecodeError, TypeError, ValueError) as e:
+        logger.warning(f"Invalid CT log configuration: {e}")
+        return []
+
+
+def _auto_submit(certificate, issuer_certificate):
+    """Post-issuance ``add-chain`` when ``ct_enabled`` and ``ct_auto_submit`` are on.
+
+    Best effort: a log that refuses or times out never fails the issuance.
+    """
+    from models import SystemConfig
+
+    def on(key):
+        row = SystemConfig.query.filter_by(key=key).first()
+        return bool(row and str(row.value).lower() == 'true')
+
+    if not (on('ct_enabled') and on('ct_auto_submit')):
+        return []
+    chain = [c.public_bytes(serialization.Encoding.PEM).decode('ascii')
+             for c in (certificate, issuer_certificate)]
+    try:
+        scts = collect_scts(chain, _configured_log_urls())
+    except Exception as e:
+        logger.warning(f"CT auto-submission failed: {e}")
+        return []
+    if not scts:
+        logger.warning("No CT log accepted the issued certificate")
+    return scts
+
+
 def apply_ct_policy(certificate, issuer_certificate, issuer_private_key):
     """Apply the configured Certificate Transparency policy to a freshly signed
     leaf certificate. Reads ``ct_embed_sct`` / ``ct_required`` / ``ct_log_urls``
     from SystemConfig and, when embedding is enabled, re-issues the certificate
     with an embedded SCT list via the pre-certificate flow.
 
-    Returns ``(certificate, embedded_scts)`` — the (possibly re-issued)
-    certificate and the list of embedded SCTs (empty when embedding is off or
-    produced none). Raises ValueError when ``ct_required`` is set but no CT log
+    Returns ``(certificate, scts)`` — the (possibly re-issued) certificate and
+    its SCTs: embedded ones, or those of the post-issuance submission
+    (``ct_auto_submit``) when embedding is off. Raises ValueError when ``ct_required`` is set but no CT log
     accepted the pre-certificate — so the policy is enforced identically on
     every issuance path (web, ACME, EST).
     """
@@ -285,24 +327,14 @@ def apply_ct_policy(certificate, issuer_certificate, issuer_private_key):
 
     ct_embed = SystemConfig.query.filter_by(key='ct_embed_sct').first()
     if not (ct_embed and str(ct_embed.value).lower() == 'true'):
-        return certificate, []
+        return certificate, _auto_submit(certificate, issuer_certificate)
 
     ct_required_config = SystemConfig.query.filter_by(key='ct_required').first()
     ct_required = bool(
         ct_required_config and str(ct_required_config.value).lower() == 'true'
     )
 
-    ct_log_urls = None
-    ct_log_urls_config = SystemConfig.query.filter_by(key='ct_log_urls').first()
-    if ct_log_urls_config and ct_log_urls_config.value:
-        try:
-            parsed = json.loads(ct_log_urls_config.value)
-            if not isinstance(parsed, list):
-                raise ValueError('ct_log_urls must be a JSON list')
-            ct_log_urls = parsed
-        except (json.JSONDecodeError, TypeError, ValueError) as e:
-            logger.warning(f"Invalid CT log configuration: {e}")
-            ct_log_urls = []
+    ct_log_urls = _configured_log_urls()
 
     embedded_scts = []
     try:
