@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'ACME',
     subtitle: 'Automatisierte Zertifikatsverwaltung',
-    overview: 'UCM unterstützt zwei ACME-Modi: ACME-Client für öffentliche Zertifikate von jeder RFC 8555-konformen CA (Let\'s Encrypt, ZeroSSL, Buypass, HARICA, usw.) und lokaler ACME-Server für interne PKI-Automatisierung mit Multi-CA-Domänenzuordnung.',
+    overview: 'UCM unterstützt zwei ACME-Modi: ACME-Client für öffentliche Zertifikate von jeder RFC 8555-konformen CA (Let\'s Encrypt, ZeroSSL, HARICA, usw.) und lokaler ACME-Server für interne PKI-Automatisierung mit Multi-CA-Domänenzuordnung.',
     sections: [
       {
         title: "Renewal Information (ARI, RFC 9773)",
@@ -16,7 +16,7 @@ export default {
       {
         title: 'ACME-Client',
         items: [
-          { label: 'Client', text: 'Zertifikate von jeder ACME-CA anfordern, Let\'s Encrypt, ZeroSSL, Buypass, HARICA oder benutzerdefiniert' },
+          { label: 'Client', text: 'Zertifikate von jeder ACME-CA anfordern, Let\'s Encrypt, ZeroSSL, HARICA oder benutzerdefiniert' },
           { label: 'Order-Tab (v2.219)', text: 'Die Client-Orders haben einen eigenen Seitenleisten-Tab "Let\'s Encrypt orders" mit Zähler sichtbar/gesamt und Statusfilter, analog zur Ansicht Local orders' },
           { label: 'Externe CA-Konten', text: 'Ein oder mehrere Konten pro CA, mehrere Konten können dieselbe Verzeichnis-URL teilen (z. B. zwei Let\'s-Encrypt-Konten zur administrativen Trennung); eine leere Verzeichnis-URL steht für Let\'s Encrypt Production' },
           { label: 'Benutzerdefinierter Server', text: 'Eine benutzerdefinierte ACME-Directory-URL festlegen, um eine beliebige RFC 8555-konforme CA zu verwenden' },
@@ -120,7 +120,7 @@ export default {
     ],
     tips: [
       'ACME-Directory-URL: https://ihr-server:port/acme/directory',
-      'Verwenden Sie eine benutzerdefinierte Directory-URL, um sich mit ZeroSSL, Buypass, HARICA oder einer anderen RFC 8555-CA zu verbinden',
+      'Verwenden Sie eine benutzerdefinierte Directory-URL, um sich mit ZeroSSL, HARICA oder einer anderen RFC 8555-CA zu verbinden',
       'EAB-Anmeldeinformationen (Key ID + HMAC Key) werden von Ihrer CA bei der Registrierung bereitgestellt',
       'Wenn UCM der ACME-Server ist, eigene EAB-Credentials unter ACME → EAB Credentials ausstellen',
       'Für Kubernetes/cert-manager: Referenzmanifeste unter examples/kubernetes/cert-manager/',
@@ -143,7 +143,7 @@ export default {
 
 UCM unterstützt ACME (Automated Certificate Management Environment) in zwei Modi:
 
-- **ACME-Client**: Zertifikate von jeder RFC 8555-konformen CA erhalten (Let's Encrypt, ZeroSSL, Buypass, HARICA oder benutzerdefiniert)
+- **ACME-Client**: Zertifikate von jeder RFC 8555-konformen CA erhalten (Let's Encrypt, ZeroSSL, HARICA oder benutzerdefiniert)
 - **Lokaler ACME-Server**: Integrierter ACME-Server für interne PKI-Automatisierung mit Multi-CA-Unterstützung
 
 ## ACME-Client
@@ -163,7 +163,6 @@ Verwenden Sie jede RFC 8555-konforme CA, nicht nur Let's Encrypt:
 |---|---|
 | **Let's Encrypt** | *(Standard, leer lassen)* |
 | **ZeroSSL** | \`https://acme.zerossl.com/v2/DV90\` |
-| **Buypass** | \`https://api.buypass.com/acme/directory\` |
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 

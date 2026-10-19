@@ -148,11 +148,7 @@ INITIAL_ADMIN_PASSWORD=$ADMIN_PASS
 # INITIAL_ADMIN_USERNAME=admin
 # INITIAL_ADMIN_EMAIL=admin@ucm.local
 
-# ============ SCEP (optional) ============
-# SCEP_ENABLED=false
-# SCEP_CHALLENGE_PASSWORD=
-# SCEP_CA_ID=
-# SCEP_AUTO_APPROVE=false
+# SCEP is configured in the web interface (Protocols > SCEP), not here.
 
 # ============ DATABASE POOL (advanced) ============
 # DB_POOL_SIZE=10
