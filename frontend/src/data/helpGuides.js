@@ -2709,7 +2709,7 @@ The issue form, CSR signing and bulk signing, and the renewals an operator perfo
 Renewals by an operator, one or in bulk, and by the scheduler. Under a renewal policy that requires approval, the scheduler queues the renewal instead of performing it, and the approval re-signs the key the server holds.
 
 ### Revocation
-Revocations of certificates (one, in bulk, from the user certificates) and of intermediate CAs. Scoped by the issuing CA, the template and the DNS pattern; the other rules do not apply. An ACME client cannot wait for a decision: its revocation is refused, and left to the operators. Removing someone else's mTLS enrolment is refused until its certificate is revoked; removing your own is never held.
+Revocations of certificates (one, in bulk, from the user certificates) and of intermediate CAs. Scoped by the issuing CA, the template and the DNS pattern; a CA's revocation is also held by the policies scoped on that CA, since every certificate it issued falls with it. The other rules do not apply. An ACME client cannot wait for a decision: its revocation is refused, and left to the operators. Removing an mTLS enrolment is refused until its certificate is revoked, whoever holds it; administrators bypass.
 
 A policy created before operations existed keeps what it did: an issuance policy stays one, and a renewal or revocation type, never enforced, governs nothing until you choose its operations.
 
@@ -2796,6 +2796,9 @@ Any single rejection immediately stops the request. The certificate will not be 
 ### Expired
 The request was not decided within seven days. Expired requests must be re-submitted.
 
+### Cancelled
+Its requester performed the action directly, or approved another request for the same target: nobody approves their own request, so it is closed without a vote.
+
 ## Where requests come from
 Beyond the issue form, a policy that requires approval also queues:
 - **Sign CSR** and **bulk signing** from Operations: the approval performs the signing
@@ -2810,7 +2813,7 @@ Administrators bypass the queue on every path.
 - A request whose target was **deleted or revoked** is closed as rejected; a certificate hold keeps the renewal request waiting for the unhold
 - Approving a request **already satisfied** closes it on the existing certificate; approving one of several requests for the same target closes the others as approved by you
 - Approving a request whose stored request, certificate or CA **no longer exists** closes it as rejected
-- A queued revocation whose certificate was **revoked directly** is closed as approved; one whose certificate was **renewed** since is closed as rejected when approved; during a certificate hold it waits for the unhold
+- A queued revocation whose certificate was **revoked directly** is closed as approved (cancelled when its requester revoked it); one whose certificate was **renewed** since is closed as rejected when approved; during a certificate hold it waits for the unhold
 
 Webhooks are told of these closures as for a rejection.
 

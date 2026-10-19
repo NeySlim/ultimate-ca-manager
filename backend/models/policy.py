@@ -158,7 +158,7 @@ class ApprovalRequest(db.Model):
     requester_comment = db.Column(db.Text)
     
     # Status
-    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected, expired
+    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected, expired, cancelled
     
     # Approvals received (JSON array)
     # Example: [{"user_id": 1, "username": "admin", "action": "approve", "comment": "OK", "timestamp": "..."}]

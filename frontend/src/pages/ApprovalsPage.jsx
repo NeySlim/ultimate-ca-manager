@@ -38,6 +38,7 @@ const STATUS_VARIANTS = {
   approved: 'success',
   rejected: 'danger',
   expired: 'default',
+  cancelled: 'default',
 }
 
 const STATUS_ICONS = {
@@ -45,6 +46,7 @@ const STATUS_ICONS = {
   approved: CheckCircle,
   rejected: XCircle,
   expired: Warning,
+  cancelled: XCircle,
 }
 
 export default function ApprovalsPage() {

@@ -258,21 +258,43 @@ class AutoRenewalService:
             db.session.rollback()
 
     @staticmethod
-    def _held_for_approval(cert, *, already_queued: bool) -> bool:
-        """True when a policy requires approval to renew ``cert``: its
-        renewal is queued unless a request already waits for it."""
+    def _declined(cert) -> bool:
+        """True when an approver rejected the scheduler's renewal of this
+        very certificate (same serial): a decision, kept until it changes."""
+        import json as _json
+        from models.policy import ApprovalRequest
+        rows = ApprovalRequest.query.filter_by(status='rejected', request_type='renewal').filter(
+            ApprovalRequest.request_data.like(f'%"certificate_id": {int(cert.id)},%')).all()
+        for row in rows:
+            try:
+                data = _json.loads(row.request_data or '{}')
+            except ValueError:
+                continue
+            if (data.get('trigger') == 'auto' and data.get('certificate_id') == cert.id
+                    and data.get('serial_number') == cert.serial_number):
+                return True
+        return False
+
+    @staticmethod
+    def _held_for_approval(cert, *, already_queued: bool):
+        """Why a renewal policy holds ``cert``: 'queued' (a request is
+        queued now or already waits), 'declined' (its renewal was rejected),
+        or None when no policy requires approval."""
         from services.approval_gate import certificate_scope, queue_renewal
         from services.policy_service import PolicyEvaluationService
-        if already_queued:
+        declined = not already_queued and AutoRenewalService._declined(cert)
+        if already_queued or declined:
             ca_id, template_id, cn, dns = certificate_scope(cert)
-            return PolicyEvaluationService.check_approval_required(
-                ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns,
-                operation='renewal') is not None
+            if PolicyEvaluationService.check_approval_required(
+                    ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns,
+                    operation='renewal') is None:
+                return None
+            return 'declined' if declined else 'queued'
         _policy, approval = queue_renewal(None, cert, scheduled_by=AUTO_RENEWAL_ACTOR)
         if approval is None:
-            return False
+            return None
         logger.info(f"Auto-renewal of cert {cert.id} queued for approval (request #{approval.id})")
-        return True
+        return 'queued'
 
     @staticmethod
     def run_auto_renewal():
@@ -341,6 +363,10 @@ class AutoRenewalService:
                 stats['failed'] += 1
                 stats['errors'].append({'cert_id': cert_id, 'common_name': common_name,
                                         'error': 'Policy evaluation failed'})
+                continue
+            if held == 'declined':
+                logger.info(f"Auto-renewal skipped cert {cert_id}: its renewal was rejected")
+                stats['skipped'] += 1
                 continue
             if held:
                 stats['queued'] += 1

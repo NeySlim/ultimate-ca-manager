@@ -9,7 +9,7 @@ export default {
         items: [
           { label: 'Émission', text: 'Le formulaire d\'émission, la signature de CSR et la signature en masse, ainsi que les renouvellements effectués par un opérateur' },
           { label: 'Renouvellement', text: 'Renouvellements par un opérateur, un seul ou en masse, et par le planificateur, qui met son renouvellement en file au lieu de l\'effectuer' },
-          { label: 'Révocation', text: 'Révocations de certificats et de CA intermédiaires par un opérateur ; un client ACME ne peut pas attendre une décision, sa révocation est donc refusée' },
+          { label: 'Révocation', text: 'Révocations de certificats et de CA intermédiaires par un opérateur (une CA aussi sous les politiques qui la ciblent) ; un client ACME ne peut pas attendre une décision, sa révocation est donc refusée' },
           { label: 'Plusieurs à la fois', text: 'Une politique peut couvrir plusieurs opérations ; une politique sans aucune (ancien type renouvellement ou révocation, jamais appliqué) ne couvre rien tant que vous n\'en choisissez pas' },
         ]
       },
@@ -54,7 +54,7 @@ Le formulaire d'émission, la signature de CSR et la signature en masse, ainsi q
 Renouvellements par un opérateur, un seul ou en masse, et par le planificateur. Sous une politique de renouvellement qui exige une approbation, le planificateur met le renouvellement en file au lieu de l'effectuer, et l'approbation re-signe la clé détenue par le serveur.
 
 ### Révocation
-Révocations de certificats (un seul, en masse, depuis les certificats utilisateur) et de CA intermédiaires. Limitée par la CA émettrice, le modèle et le motif DNS ; les autres règles ne s'appliquent pas. Un client ACME ne peut pas attendre une décision : sa révocation est refusée et laissée aux opérateurs. Supprimer l'inscription mTLS d'un autre utilisateur est refusé tant que son certificat n'est pas révoqué ; supprimer la sienne n'est jamais retenu.
+Révocations de certificats (un seul, en masse, depuis les certificats utilisateur) et de CA intermédiaires. Limitée par la CA émettrice, le modèle et le motif DNS ; la révocation d'une CA est aussi retenue par les politiques limitées à cette CA, puisque tous les certificats qu'elle a émis tombent avec elle. Les autres règles ne s'appliquent pas. Un client ACME ne peut pas attendre une décision : sa révocation est refusée et laissée aux opérateurs. Supprimer une inscription mTLS est refusé tant que son certificat n'est pas révoqué, quel qu'en soit le titulaire ; les administrateurs contournent.
 
 Une politique créée avant l'existence des opérations conserve son comportement : une politique d'émission le reste, et un type renouvellement ou révocation, jamais appliqué, ne couvre rien tant que vous n'en choisissez pas les opérations.
 

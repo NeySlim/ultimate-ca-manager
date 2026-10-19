@@ -9,7 +9,7 @@ export default {
         items: [
           { label: 'Emissão', text: 'O formulário de emissão, a assinatura de CSR e em lote, e as renovações feitas por um operador' },
           { label: 'Renovação', text: 'Renovações por um operador, uma ou em lote, e pelo agendador, que coloca a sua renovação na fila em vez de a executar' },
-          { label: 'Revogação', text: 'Revogações de certificados e de CAs intermédias por um operador; um cliente ACME não pode aguardar uma decisão, por isso a sua revogação é recusada' },
+          { label: 'Revogação', text: 'Revogações de certificados e de CAs intermédias por um operador (uma CA também sob as políticas delimitadas a ela); um cliente ACME não pode aguardar uma decisão, por isso a sua revogação é recusada' },
           { label: 'Várias ao mesmo tempo', text: 'Uma política pode governar várias operações; uma sem nenhuma (um antigo tipo de renovação ou revogação, nunca aplicado) não governa nada até você escolher' },
         ]
       },
@@ -54,7 +54,7 @@ O formulário de emissão, a assinatura de CSR e em lote, e as renovações feit
 Renovações por um operador, uma ou em lote, e pelo agendador. Sob uma política de renovação que exige aprovação, o agendador coloca a renovação na fila em vez de a executar, e a aprovação reassina a chave detida pelo servidor.
 
 ### Revogação
-Revogações de certificados (um, em lote, a partir dos certificados de usuário) e de CAs intermédias. Delimitada pela CA emissora, pelo modelo e pelo padrão DNS; as outras regras não se aplicam. Um cliente ACME não pode aguardar uma decisão: a sua revogação é recusada e deixada aos operadores. Remover o registro mTLS de outra pessoa é recusado até que o seu certificado seja revogado; remover o seu próprio nunca é retido.
+Revogações de certificados (um, em lote, a partir dos certificados de usuário) e de CAs intermédias. Delimitada pela CA emissora, pelo modelo e pelo padrão DNS; a revogação de uma CA é retida também pelas políticas delimitadas a essa CA, pois todos os certificados que ela emitiu caem com ela. As outras regras não se aplicam. Um cliente ACME não pode aguardar uma decisão: a sua revogação é recusada e deixada aos operadores. Remover um registro mTLS é recusado até que o seu certificado seja revogado, quem quer que o detenha; os administradores ignoram a fila.
 
 Uma política criada antes de existirem as operações mantém o que fazia: uma política de emissão continua a sê-lo, e um tipo de renovação ou revogação, nunca aplicado, não governa nada até você escolher as suas operações.
 

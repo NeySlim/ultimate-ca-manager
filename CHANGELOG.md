@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
-- A policy can now govern revocations and renewals as well as issuance: revoking a certificate (alone, in bulk, a user certificate) or an intermediate CA, and the scheduled renewals, are queued for approval and performed with the requested parameters once approved; ACME revocations it covers are refused. Existing policies keep governing what they did.
+- A policy can now govern revocations and renewals as well as issuance: revoking a certificate (alone, in bulk, a user certificate) or an intermediate CA, and renewals by an operator or the scheduler, are queued for approval and performed with the requested parameters once approved; ACME revocations it covers are refused, and so is removing an mTLS enrolment (409) until its certificate is revoked. Existing policies keep governing what they did.
 
 ## [2.242] - 2026-10-18
 

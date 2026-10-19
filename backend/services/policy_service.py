@@ -111,9 +111,10 @@ class PolicyEvaluationService:
     @staticmethod
     def _in_scope(operation, ca_id, template_id, cn, san_list, *, approval: bool) -> list:
         """Active policies governing *operation* (a name or a tuple of them)
-        whose CA, template and name pattern cover the request, by priority
-        (lower number first)."""
+        whose CA (*ca_id*, or any of a tuple), template and name pattern
+        cover the request, by priority (lower number first)."""
         operations = (operation,) if isinstance(operation, str) else tuple(operation)
+        ca_ids = tuple(ca_id) if isinstance(ca_id, (tuple, list)) else (ca_id,)
         query = CertificatePolicy.query.filter_by(is_active=True)
         if approval:
             query = query.filter_by(requires_approval=True)
@@ -121,7 +122,7 @@ class PolicyEvaluationService:
         for policy in query.order_by(CertificatePolicy.priority.asc()).all():
             if not any(policy.applies_to(op) for op in operations):
                 continue
-            if policy.ca_id is not None and policy.ca_id != ca_id:
+            if policy.ca_id is not None and policy.ca_id not in ca_ids:
                 continue
             if policy.template_id is not None and policy.template_id != template_id:
                 continue

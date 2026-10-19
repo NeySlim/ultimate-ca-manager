@@ -9,7 +9,7 @@ export default {
         items: [
           { label: 'Ausstellung', text: 'Das Ausstellungsformular, CSR-Signierung und Massensignierung sowie die von einem Operator ausgeführten Erneuerungen' },
           { label: 'Erneuerung', text: 'Erneuerungen durch einen Operator, einzeln oder in Masse, und durch den Planer, der seine Erneuerung einreiht, statt sie auszuführen' },
-          { label: 'Widerruf', text: 'Widerrufe von Zertifikaten und Zwischen-CAs durch einen Operator; ein ACME-Client kann nicht auf eine Entscheidung warten, daher wird sein Widerruf abgelehnt' },
+          { label: 'Widerruf', text: 'Widerrufe von Zertifikaten und Zwischen-CAs durch einen Operator (bei einer CA auch unter den auf sie eingegrenzten Richtlinien); ein ACME-Client kann nicht auf eine Entscheidung warten, daher wird sein Widerruf abgelehnt' },
           { label: 'Mehrere gleichzeitig', text: 'Eine Richtlinie kann mehrere Operationen steuern; eine ohne Operation (ein alter, nie durchgesetzter Erneuerungs- oder Widerrufstyp) steuert nichts, bis Sie eine wählen' },
         ]
       },
@@ -54,7 +54,7 @@ Das Ausstellungsformular, CSR-Signierung und Massensignierung sowie die von eine
 Erneuerungen durch einen Operator, einzeln oder in Masse, und durch den Planer. Bei einer Erneuerungsrichtlinie mit Genehmigungspflicht reiht der Planer die Erneuerung ein, statt sie auszuführen, und die Genehmigung signiert den vom Server gehaltenen Schlüssel neu.
 
 ### Widerruf
-Widerrufe von Zertifikaten (einzeln, in Masse, aus den Benutzerzertifikaten) und von Zwischen-CAs. Eingegrenzt durch die ausstellende CA, die Vorlage und das DNS-Muster; die übrigen Regeln gelten nicht. Ein ACME-Client kann nicht auf eine Entscheidung warten: Sein Widerruf wird abgelehnt und den Operatoren überlassen. Das Entfernen der mTLS-Registrierung einer anderen Person wird abgelehnt, bis ihr Zertifikat widerrufen ist; das Entfernen der eigenen wird nie angehalten.
+Widerrufe von Zertifikaten (einzeln, in Masse, aus den Benutzerzertifikaten) und von Zwischen-CAs. Eingegrenzt durch die ausstellende CA, die Vorlage und das DNS-Muster; der Widerruf einer CA wird auch von den auf diese CA eingegrenzten Richtlinien angehalten, da alle von ihr ausgestellten Zertifikate mit fallen. Die übrigen Regeln gelten nicht. Ein ACME-Client kann nicht auf eine Entscheidung warten: Sein Widerruf wird abgelehnt und den Operatoren überlassen. Das Entfernen einer mTLS-Registrierung wird abgelehnt, bis ihr Zertifikat widerrufen ist, unabhängig davon, wem sie gehört; Administratoren umgehen dies.
 
 Eine Richtlinie, die vor den Operationen erstellt wurde, behält ihr Verhalten: Eine Ausstellungsrichtlinie bleibt eine solche, und ein nie durchgesetzter Erneuerungs- oder Widerrufstyp steuert nichts, bis Sie seine Operationen wählen.
 

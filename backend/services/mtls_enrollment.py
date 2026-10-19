@@ -142,12 +142,10 @@ def certificate_row_for(auth_cert) -> Optional[Certificate]:
 REMOVAL_REASON = 'cessationOfOperation'
 
 
-def _revocation_held(auth_cert, actor) -> bool:
-    """Whether the revocation policies apply: removing one's own enrolment
-    stays a single gesture, administrators bypass, anyone else is gated."""
-    if actor is None or getattr(actor, 'role', None) == 'admin':
-        return False
-    return auth_cert.user_id != getattr(actor, 'id', None)
+def _revocation_held(actor) -> bool:
+    """Whether the revocation policies apply: to anyone but an administrator,
+    the certificate's holder included."""
+    return actor is not None and getattr(actor, 'role', None) != 'admin'
 
 
 def remove_enrolment(auth_cert, username: str = 'system', actor=None):
@@ -175,7 +173,7 @@ def remove_enrolment(auth_cert, username: str = 'system', actor=None):
         and not certificate.revoked
         and (not certificate.valid_to or certificate.valid_to >= utc_now())
     )
-    if needs_revoking and _revocation_held(auth_cert, actor):
+    if needs_revoking and _revocation_held(actor):
         try:
             from services.approval_gate import revocation_policy_for
             policy = revocation_policy_for(certificate)

@@ -9,7 +9,7 @@ export default {
         items: [
           { label: 'Emissione', text: 'Il modulo di emissione, la firma CSR e la firma massiva, e i rinnovi eseguiti da un operatore' },
           { label: 'Rinnovo', text: 'Rinnovi da parte di un operatore, singoli o massivi, e dello scheduler, che mette in coda il proprio rinnovo invece di eseguirlo' },
-          { label: 'Revoca', text: 'Revoche di certificati e CA intermedie da parte di un operatore; un client ACME non può attendere una decisione, quindi la sua revoca viene rifiutata' },
+          { label: 'Revoca', text: 'Revoche di certificati e CA intermedie da parte di un operatore (una CA anche dalle politiche limitate a essa); un client ACME non può attendere una decisione, quindi la sua revoca viene rifiutata' },
           { label: 'Più operazioni', text: 'Una politica può governare più operazioni; una senza operazioni (un vecchio tipo rinnovo o revoca, mai applicato) non governa nulla finché non ne scegli' },
         ]
       },
@@ -54,7 +54,7 @@ Il modulo di emissione, la firma CSR e la firma massiva, e i rinnovi eseguiti da
 Rinnovi da parte di un operatore, singoli o massivi, e dello scheduler. Con una politica di rinnovo che richiede l'approvazione, lo scheduler mette in coda il rinnovo invece di eseguirlo, e l'approvazione rifirma la chiave detenuta dal server.
 
 ### Revoca
-Revoche di certificati (singole, massive, dai certificati utente) e di CA intermedie. Limitata dalla CA emittente, dal template e dal pattern DNS; le altre regole non si applicano. Un client ACME non può attendere una decisione: la sua revoca viene rifiutata e lasciata agli operatori. Rimuovere l'enrollment mTLS di un altro utente viene rifiutato finché il suo certificato non è revocato; rimuovere il proprio non viene mai trattenuto.
+Revoche di certificati (singole, massive, dai certificati utente) e di CA intermedie. Limitata dalla CA emittente, dal template e dal pattern DNS; la revoca di una CA è trattenuta anche dalle politiche limitate a quella CA, perché cadono con essa tutti i certificati che ha emesso. Le altre regole non si applicano. Un client ACME non può attendere una decisione: la sua revoca viene rifiutata e lasciata agli operatori. Rimuovere un enrollment mTLS viene rifiutato finché il suo certificato non è revocato, chiunque lo detenga; gli amministratori aggirano il blocco.
 
 Una politica creata prima dell'introduzione delle operazioni conserva ciò che faceva: una politica di emissione resta tale, mentre un tipo rinnovo o revoca, mai applicato, non governa nulla finché non ne scegli le operazioni.
 

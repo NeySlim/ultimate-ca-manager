@@ -11,6 +11,7 @@ export default {
           { label: 'Genehmigt', text: 'Alle erforderlichen Genehmigungen erhalten, Zertifikat kann ausgestellt werden' },
           { label: 'Abgelehnt', text: 'Jede Ablehnung stoppt die Anfrage sofort' },
           { label: 'Abgelaufen', text: 'Nicht innerhalb von sieben Tagen entschieden; als abgelaufen geschlossen und nie als ausstehend gezählt' },
+          { label: 'Abgebrochen', text: 'Der Antragsteller hat die Aktion direkt ausgeführt oder eine Doublette genehmigt: Niemand genehmigt seine eigene Anfrage' },
         ]
       },
       {
@@ -63,6 +64,9 @@ Jede einzelne Ablehnung stoppt die Anfrage sofort. Das Zertifikat wird nicht aus
 ### Abgelaufen
 Die Anfrage wurde nicht innerhalb von sieben Tagen entschieden. Abgelaufene Anfragen müssen erneut eingereicht werden.
 
+### Abgebrochen
+Der Antragsteller hat die Aktion direkt ausgeführt oder eine andere Anfrage für dasselbe Ziel genehmigt: Niemand genehmigt seine eigene Anfrage, daher wird sie ohne Abstimmung geschlossen.
+
 ## Woher Anfragen kommen
 Neben dem Ausstellungsformular reiht eine Richtlinie mit Genehmigungspflicht auch ein:
 - **CSR signieren** und **Massensignierung** aus Operationen: die Genehmigung führt die Signierung aus
@@ -77,7 +81,7 @@ Administratoren umgehen die Warteschlange auf jedem Pfad.
 - Eine Anfrage, deren Ziel **gelöscht oder widerrufen** wurde, wird als abgelehnt geschlossen; bei „Zertifikat gesperrt" wartet die Erneuerungsanfrage, bis die Sperre aufgehoben wird
 - Das Genehmigen einer **bereits erfüllten** Anfrage schließt sie auf dem vorhandenen Zertifikat; das Genehmigen einer von mehreren Anfragen für dasselbe Ziel schließt die anderen als von Ihnen genehmigt
 - Das Genehmigen einer Anfrage, deren gespeicherte Anfrage, Zertifikat oder CA **nicht mehr existiert**, schließt sie als abgelehnt
-- Ein eingereihter Widerruf, dessen Zertifikat **direkt widerrufen** wurde, wird als genehmigt geschlossen; einer, dessen Zertifikat seither **erneuert** wurde, wird bei der Genehmigung als abgelehnt geschlossen; während einer Zertifikatssperre wartet er, bis die Sperre aufgehoben wird
+- Ein eingereihter Widerruf, dessen Zertifikat **direkt widerrufen** wurde, wird als genehmigt geschlossen (als abgebrochen, wenn der Antragsteller es widerrufen hat); einer, dessen Zertifikat seither **erneuert** wurde, wird bei der Genehmigung als abgelehnt geschlossen; während einer Zertifikatssperre wartet er, bis die Sperre aufgehoben wird
 
 Webhooks werden über diese Schließungen wie über eine Ablehnung informiert.
 

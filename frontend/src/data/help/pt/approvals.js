@@ -11,6 +11,7 @@ export default {
           { label: 'Aprovada', text: 'Todas as aprovações necessárias foram recebidas, o certificado pode ser emitido' },
           { label: 'Rejeitada', text: 'Qualquer rejeição interrompe imediatamente a solicitação' },
           { label: 'Expirada', text: 'Não decidida em sete dias; encerrada como expirada e nunca contada como pendente' },
+          { label: 'Cancelada', text: 'O solicitante executou a ação diretamente ou aprovou uma duplicata dela: ninguém aprova a própria solicitação' },
         ]
       },
       {
@@ -63,6 +64,9 @@ Qualquer rejeição única interrompe imediatamente a solicitação. O certifica
 ### Expirada
 A solicitação não foi decidida em sete dias. Solicitações expiradas devem ser reenviadas.
 
+### Cancelada
+O solicitante executou a ação diretamente, ou aprovou outra solicitação para o mesmo alvo: ninguém aprova a própria solicitação, por isso é encerrada sem votação.
+
 ## De onde vêm as solicitações
 Além do formulário de emissão, uma política que exige aprovação também coloca na fila:
 - **Assinar CSR** e **assinatura em lote** a partir de Operações: a aprovação executa a assinatura
@@ -77,7 +81,7 @@ Os administradores ignoram a fila em todos os caminhos.
 - Uma solicitação cujo alvo foi **excluído ou revogado** é encerrada como rejeitada; uma suspensão de certificado mantém a solicitação de renovação aguardando a remoção da suspensão
 - Aprovar uma solicitação **já atendida** encerra-a sobre o certificado existente; aprovar uma de várias solicitações para o mesmo alvo encerra as outras como aprovadas por você
 - Aprovar uma solicitação cuja solicitação armazenada, certificado ou CA **não existe mais** encerra-a como rejeitada
-- Uma revogação na fila cujo certificado foi **revogado diretamente** é encerrada como aprovada; uma cujo certificado foi **renovado** desde então é encerrada como rejeitada quando aprovada; durante uma suspensão de certificado, aguarda a remoção da suspensão
+- Uma revogação na fila cujo certificado foi **revogado diretamente** é encerrada como aprovada (cancelada quando o seu solicitante a revogou); uma cujo certificado foi **renovado** desde então é encerrada como rejeitada quando aprovada; durante uma suspensão de certificado, aguarda a remoção da suspensão
 
 Os webhooks são notificados desses encerramentos como para uma rejeição.
 

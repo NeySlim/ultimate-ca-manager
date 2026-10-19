@@ -331,7 +331,7 @@ def _revoke_approved_certificate(approval, data):
         cert_id=cert.id, reason=reason, username=_requester_name(approval, data),
         invalidity_at=invalidity_at)
     cert_id, serial, msca = cert.id, cert.serial_number, cert.source == 'msca'
-    msca_local_only = False
+    msca_local_only, enrolment = False, None
     if msca:
         from services.msca.propagation import propagate_revocation, PROPAGATED
         msca_local_only = propagate_revocation(cert, reason)[0] != PROPAGATED
@@ -341,18 +341,32 @@ def _revoke_approved_certificate(approval, data):
         auth_cert = db.session.get(AuthCertificate, data['auth_certificate_id'])
         if auth_cert is not None:
             auth_cert.enabled = False
+            enrolment = (auth_cert.id, auth_cert.name or data.get('cn'))
     _link_duplicates(duplicate_ids, cert_id)
     _link_approval(approval, cert_id)
     logger.info(f"Certificate {cert_id} revoked via approval #{approval.id}")
-    return {'id': cert_id, 'cn': data.get('cn'), 'serial_number': serial,
-            'revoked': True, 'reason': reason, 'msca_local_only': msca_local_only}
+    result = {'id': cert_id, 'cn': data.get('cn'), 'serial_number': serial,
+              'revoked': True, 'reason': reason, 'msca_local_only': msca_local_only}
+    if enrolment:
+        # The direct route's entry, recorded by approve_request after its commit
+        result['_audit'] = [dict(
+            action='user_certificate_revoked', resource_type='user_certificate',
+            resource_id=enrolment[0], resource_name=enrolment[1],
+            details=f'Revoked user certificate: {enrolment[1]} (reason: {reason}, '
+                    f'approval #{approval.id})',
+            success=True)]
+    return result
 
 
 def _revoke_approved_ca(approval, data):
     """Revoke the intermediate CA an approved 'ca_revocation' request names."""
     from services.ca_service import CAService
     from api.v2.cas.crud import announce_ca_revoked
-    ca = _row(CA, data.get('target_ca_id'))
+    # The CA row is read afresh and locked (PostgreSQL): two approvals of
+    # the same revocation meet here, and the second finds it revoked
+    ca_ref = data.get('target_ca_id')
+    ca = (db.session.get(CA, int(ca_ref), populate_existing=True, with_for_update=True)
+          if ca_ref is not None and str(ca_ref).isdecimal() else None)
     if ca is None:
         raise ValueError('The CA to revoke no longer exists')
     if ca.is_revoked:
@@ -1176,6 +1190,8 @@ def approve_request(request_id):
     ok, _err = safe_commit(logger, "Failed to approve request")
     if not ok:
         return _err
+    for entry in (issued_cert or {}).pop('_audit', []):
+        AuditService.log_action(**entry)
 
     AuditService.log_action(
         action='approval_issue_failed' if issue_error else 'approval_approved',

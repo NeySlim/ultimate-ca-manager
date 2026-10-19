@@ -583,8 +583,8 @@ def delete_user_certificate(cert_id):
 
     cert_name = auth_cert.name or f'User Certificate #{cert_id}'
 
-    # Removing one's own enrolment is never held; removing someone else's
-    # is refused while a policy requires approval to revoke its certificate
+    # Refused while a policy requires approval to revoke its certificate,
+    # whoever holds it (administrators bypass)
     removed, failure = remove_enrolment(auth_cert, username=user.username, actor=user)
     if not removed:
         return failure

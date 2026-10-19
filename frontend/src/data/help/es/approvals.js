@@ -11,6 +11,7 @@ export default {
           { label: 'Aprobada', text: 'Todas las aprobaciones requeridas recibidas, el certificado puede ser emitido' },
           { label: 'Rechazada', text: 'Cualquier rechazo detiene inmediatamente la solicitud' },
           { label: 'Expirada', text: 'No decidida en siete días; cerrada como expirada y nunca contada como pendiente' },
+          { label: 'Cancelada', text: 'Su solicitante realizó la acción directamente o aprobó un duplicado de ella: nadie aprueba su propia solicitud' },
         ]
       },
       {
@@ -63,6 +64,9 @@ Cualquier rechazo individual detiene inmediatamente la solicitud. El certificado
 ### Expirada
 La solicitud no fue decidida en siete días. Las solicitudes expiradas deben ser reenviadas.
 
+### Cancelada
+Su solicitante realizó la acción directamente, o aprobó otra solicitud para el mismo objetivo: nadie aprueba su propia solicitud, por lo que se cierra sin votación.
+
 ## De dónde vienen las solicitudes
 Más allá del formulario de emisión, una política que requiere aprobación también encola:
 - **Firmar CSR** y **firma masiva** desde Operaciones: la aprobación realiza la firma
@@ -77,7 +81,7 @@ Los administradores omiten la cola en todas las rutas.
 - Una solicitud cuyo objetivo fue **eliminado o revocado** se cierra como rechazada; una suspensión de certificado mantiene la solicitud de renovación en espera hasta que se levante la suspensión
 - Aprobar una solicitud **ya satisfecha** la cierra sobre el certificado existente; aprobar una de varias solicitudes para el mismo objetivo cierra las demás como aprobadas por ti
 - Aprobar una solicitud cuya solicitud almacenada, certificado o CA **ya no existe** la cierra como rechazada
-- Una revocación en cola cuyo certificado fue **revocado directamente** se cierra como aprobada; si el certificado fue **renovado** desde entonces, se cierra como rechazada al aprobarla; durante una suspensión de certificado espera a que se levante
+- Una revocación en cola cuyo certificado fue **revocado directamente** se cierra como aprobada (cancelada cuando su solicitante lo revocó); si el certificado fue **renovado** desde entonces, se cierra como rechazada al aprobarla; durante una suspensión de certificado espera a que se levante
 
 Los webhooks reciben aviso de estos cierres igual que de un rechazo.
 

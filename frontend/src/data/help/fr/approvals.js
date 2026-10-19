@@ -11,6 +11,7 @@ export default {
           { label: 'Approuvée', text: 'Toutes les approbations requises ont été reçues, le certificat peut être émis' },
           { label: 'Rejetée', text: 'Tout rejet arrête immédiatement la demande' },
           { label: 'Expirée', text: 'Non décidée sous sept jours ; clôturée comme expirée et jamais comptée comme en attente' },
+          { label: 'Annulée', text: 'Son demandeur a effectué l\'action directement ou approuvé un doublon : personne n\'approuve sa propre demande' },
         ]
       },
       {
@@ -63,6 +64,9 @@ Tout rejet unique arrête immédiatement la demande. Le certificat ne sera pas �
 ### Expirée
 La demande n'a pas été décidée sous sept jours. Les demandes expirées doivent être soumises à nouveau.
 
+### Annulée
+Son demandeur a effectué l'action directement, ou approuvé une autre demande pour la même cible : personne n'approuve sa propre demande, elle est donc clôturée sans vote.
+
 ## Origine des demandes
 
 Au-delà du formulaire d'émission, une politique qui exige une approbation met aussi en file :
@@ -79,7 +83,7 @@ Les administrateurs contournent la file sur tous les chemins.
 - Une demande dont la cible a été **supprimée ou révoquée** est clôturée comme rejetée ; une suspension de certificat laisse la demande de renouvellement en attente jusqu'à la levée de la suspension
 - Approuver une demande **déjà satisfaite** la clôture sur le certificat existant ; approuver l'une de plusieurs demandes pour la même cible clôture les autres comme approuvées par vous
 - Approuver une demande dont la requête stockée, le certificat ou la CA **n'existe plus** la clôture comme rejetée
-- Une révocation en file dont le certificat a été **révoqué directement** est clôturée comme approuvée ; si le certificat a été **renouvelé** depuis, elle est clôturée comme rejetée à l'approbation ; pendant une suspension du certificat, elle attend la levée de la suspension
+- Une révocation en file dont le certificat a été **révoqué directement** est clôturée comme approuvée (annulée si son demandeur l'a révoqué) ; si le certificat a été **renouvelé** depuis, elle est clôturée comme rejetée à l'approbation ; pendant une suspension du certificat, elle attend la levée de la suspension
 
 Les webhooks sont notifiés de ces clôtures comme pour un rejet.
 

@@ -259,6 +259,31 @@ class TestRevocation:
         ap = _request(app, approval_id)
         assert ap.status == 'approved' and ap.certificate_id == cid
 
+    def test_a_requester_never_approves_their_own_request(self, app, auth_client, create_user, scoped):
+        from services.cert_service import CertificateService
+        ca, _pid = scoped('rv-own')
+        cid = scoped.cert(ca, 'rv-own.example.test')
+        operator, user = _login(app, create_user)
+        approval_id = _json(operator, 'post', f'/api/v2/certificates/{cid}/revoke',
+                            {'reason': 'superseded'}).get_json()['data']['approval_id']
+        with app.app_context():
+            CertificateService.revoke_certificate(cert_id=cid, reason='superseded', username=user['username'])
+        ap = _request(app, approval_id)
+        assert ap.status == 'cancelled' and ap.get_approvals() == []
+
+    def test_a_duplicate_of_the_approver_is_cancelled(self, app, auth_client, create_user, scoped):
+        ca, _pid = scoped('rv-dup')
+        cid = scoped.cert(ca, 'rv-dup.example.test')
+        first, _ = _login(app, create_user)
+        second, _ = _login(app, create_user)
+        one = _json(first, 'post', f'/api/v2/certificates/{cid}/revoke', {'reason': 'superseded'}).get_json()['data']['approval_id']
+        two = _json(second, 'post', f'/api/v2/certificates/{cid}/revoke', {'reason': 'superseded'}).get_json()['data']['approval_id']
+        assert _json(second, 'post', f'/api/v2/approvals/{one}/approve', {}).status_code == 200
+        assert _cert(app, cid)['revoked']
+        assert _request(app, one).status == 'approved'
+        ap = _request(app, two)
+        assert ap.status == 'cancelled' and ap.get_approvals() == []
+
     def test_policy_evaluation_failure_revokes_nothing(self, app, create_user, scoped, monkeypatch):
         from services.policy_service import PolicyEvaluationService
         ca, _pid = scoped('rv-boom')
@@ -331,7 +356,7 @@ class TestUserCertificates:
         finally:
             _drop_policy(app, pid)
 
-    def test_removing_someone_else_enrolment_waits_for_the_revocation(self, app, auth_client, create_user, mtls_ca):
+    def test_removing_an_enrolment_waits_for_the_revocation(self, app, auth_client, create_user, mtls_ca):
         pid = _policy(app, mtls_ca['id'], 'rv-remove', ['revocation'])
         try:
             owner_client, owner = _login(app, create_user)
@@ -339,13 +364,33 @@ class TestUserCertificates:
             theirs = _enrol(auth_client, owner['id'], 'approval removal other')
             r = operator.delete(f"/api/v2/user-certificates/{theirs['id']}")
             assert r.status_code == 409, r.get_json()
+            # The holder is held as well: removing would revoke without approval
+            r = owner_client.delete(f"/api/v2/mtls/certificates/{theirs['id']}")
+            assert r.status_code == 409, r.get_json()
             with app.app_context():
                 assert db.session.get(AuthCertificate, theirs['id']) is not None
-            # Removing one's own enrolment is never held
-            r = owner_client.delete(f"/api/v2/mtls/certificates/{theirs['id']}")
-            assert r.status_code == 200, r.get_json()
+            # Administrators bypass
+            r = auth_client.delete(f"/api/v2/user-certificates/{theirs['id']}")
+            assert r.status_code == 204, r.data
             with app.app_context():
                 assert db.session.get(AuthCertificate, theirs['id']) is None
+        finally:
+            _drop_policy(app, pid)
+
+    def test_an_approved_revocation_is_audited_as_the_direct_one(self, app, auth_client, create_user, mtls_ca):
+        from models import AuditLog
+        pid = _policy(app, mtls_ca['id'], 'rv-audit', ['revocation'])
+        try:
+            _c, owner = _login(app, create_user)
+            operator, _ = _login(app, create_user)
+            enrolment = _enrol(auth_client, owner['id'], 'approval audited cert')
+            approval_id = _json(operator, 'post', f"/api/v2/user-certificates/{enrolment['id']}/revoke",
+                                {'reason': 'superseded'}).get_json()['data']['approval_id']
+            assert _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/approve', {}).status_code == 200
+            with app.app_context():
+                entry = AuditLog.query.filter_by(action='user_certificate_revoked',
+                                                 resource_id=str(enrolment['id'])).first()
+                assert entry is not None and f'approval #{approval_id}' in entry.details
         finally:
             _drop_policy(app, pid)
 
@@ -382,6 +427,20 @@ class TestCaRevocation:
                 ca = db.session.get(CA, sub['id'])
                 assert ca.revoked and ca.revoke_reason == 'cACompromise'
                 assert db.session.get(ApprovalRequest, body['approval_id']).status == 'approved'
+        finally:
+            _drop_policy(app, pid)
+
+
+    def test_a_policy_on_the_ca_itself_holds_its_revocation(self, app, auth_client, create_user, create_ca):
+        root = create_ca(cn='rv-ca-self root')
+        sub = self._intermediate(auth_client, root, 'rv-ca-self sub')
+        pid = _policy(app, sub['id'], 'rv-ca-self', ['revocation'])
+        try:
+            operator, _ = _login(app, create_user)
+            r = _json(operator, 'post', f"/api/v2/cas/{sub['id']}/revoke", {'reason': 'superseded'})
+            assert r.status_code == 200 and r.get_json()['data'].get('approval_required'), r.get_json()
+            with app.app_context():
+                assert not db.session.get(CA, sub['id']).revoked
         finally:
             _drop_policy(app, pid)
 
@@ -461,6 +520,23 @@ class TestRenewal:
         assert _cert(app, cid)['serial'] != before['serial']
         # Performed as the scheduler would have: the held key re-signed
         assert self._public_key(app, cid) == key_before
+
+    def test_a_rejected_scheduled_renewal_is_not_asked_again(self, app, auth_client, scoped, monkeypatch):
+        ca, pid = scoped('rn-reject', operations=('renewal',))
+        cid = scoped.cert(ca, 'rn-reject.example.test')
+        self._run_scheduler(app, cid, monkeypatch)
+        with app.app_context():
+            approval_id = ApprovalRequest.query.filter_by(policy_id=pid, status='pending').one().id
+        assert _json(auth_client, 'post', f'/api/v2/approvals/{approval_id}/reject',
+                     {'comment': 'not this one'}).status_code == 200
+        stats = self._run_scheduler(app, cid, monkeypatch)
+        assert stats['skipped'] == 1 and stats['queued'] == 0, stats
+        with app.app_context():
+            assert ApprovalRequest.query.filter_by(policy_id=pid, status='pending').count() == 0
+        # A new serial is a new question
+        assert _json(auth_client, 'post', f'/api/v2/certificates/{cid}/renew', {}).status_code == 200
+        stats = self._run_scheduler(app, cid, monkeypatch)
+        assert stats['queued'] == 1, stats
 
     def test_the_scheduler_never_overrides_a_renewal_policy(self, app, scoped, monkeypatch):
         ca, pid = scoped('rn-late', operations=('renewal',))

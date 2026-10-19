@@ -1428,7 +1428,7 @@ export const helpContent = {
         items: [
           { label: 'Issuance', text: 'The issue form, CSR signing and bulk signing, and the renewals an operator performs' },
           { label: 'Renewal', text: 'Renewals by an operator, one or in bulk, and by the scheduler, which queues its renewal instead of performing it' },
-          { label: 'Revocation', text: 'Revocations of certificates and intermediate CAs by an operator; an ACME client cannot wait for a decision, so its revocation is refused' },
+          { label: 'Revocation', text: 'Revocations of certificates and intermediate CAs by an operator (a CA also under the policies scoped on it); an ACME client cannot wait for a decision, so its revocation is refused' },
           { label: 'Several at once', text: 'A policy can govern several operations; one with none (an old renewal or revocation type, never enforced) governs nothing until you choose' },
         ]
       },
@@ -1473,6 +1473,7 @@ export const helpContent = {
           { label: 'Approved', text: 'All required approvals received, certificate can be issued' },
           { label: 'Rejected', text: 'Any rejection immediately stops the request' },
           { label: 'Expired', text: 'Not decided within seven days; closed as expired and never counted as pending' },
+          { label: 'Cancelled', text: 'Its requester performed the action directly or approved a duplicate of it: nobody approves their own request' },
         ]
       },
       {

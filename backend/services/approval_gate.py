@@ -126,11 +126,13 @@ def ca_certificate_serial(ca) -> Optional[str]:
 def queue_ca_revocation(user, ca, parent, *, reason: str, invalidity_at=None,
                         comment: Optional[str] = None
                         ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
-    """Queue the revocation of an intermediate CA, scoped by the ``parent``
-    whose CRL will carry it; ``(None, None)`` when no policy requires approval."""
+    """Queue the revocation of an intermediate CA, held by the policies of the
+    ``parent`` whose CRL will carry it and by those scoped on the CA itself
+    (every certificate it issued falls with it); ``(None, None)`` when none
+    requires approval."""
     from utils.datetime_utils import utc_isoformat
     return queue_if_approval_required(
-        user, ca_id=parent.id, template_id=None, cn=ca.common_name, san_list=[],
+        user, ca_id=(parent.id, ca.id), template_id=None, cn=ca.common_name, san_list=[],
         request_type='ca_revocation', operation='revocation', comment=comment,
         request_data={'target_ca_id': ca.id, 'serial_number': ca_certificate_serial(ca),
                       'ca_id': parent.id, 'cn': ca.common_name, 'reason': reason,
@@ -278,6 +280,12 @@ def notify_rejected(snapshots: list, *, reason: str, actor: str) -> None:
         emit_csr_rejected(snapshot, reason=reason, actor=actor)
 
 
+def _acted_by_requester(approval, user_id, username) -> bool:
+    if user_id is not None:
+        return approval.requester_id == user_id
+    return bool(username) and approval.requester is not None and approval.requester.username == username
+
+
 def _resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: str,
                           username: str, user_id=None, certificate_id=None,
                           reason: str, commit: bool = True) -> list:
@@ -289,7 +297,8 @@ def _resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: s
     as approved, ``username`` recorded as its approver, and linked to the
     certificate when one is given. ``'rejected'``: the target is gone or
     revoked; the request is closed as rejected with the reason. A request
-    past its expiry is closed as expired instead, without a vote. Returns
+    past its expiry is closed as expired instead, and one the actor made
+    as cancelled, both without a vote. Returns
     the requests approved or rejected; the caller commits when ``commit``
     is False (the resolution then rides the caller's own transaction)."""
     from utils.datetime_utils import utc_now
@@ -303,6 +312,12 @@ def _resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: s
             approval.status = 'expired'
             approval.resolved_at = utc_now()
             logger.info("Approval request #%s expired before %s", approval.id, reason.lower())
+            continue
+        if outcome == 'approved' and _acted_by_requester(approval, user_id, username):
+            # Nobody approves their own request: it is withdrawn, without a vote
+            approval.status = 'cancelled'
+            approval.resolved_at = utc_now()
+            logger.info("Approval request #%s cancelled by its requester: %s", approval.id, reason)
             continue
         approval.add_approval(user_id=user_id, username=username,
                               action='approve' if outcome == 'approved' else 'reject',

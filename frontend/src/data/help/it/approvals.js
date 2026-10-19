@@ -11,6 +11,7 @@ export default {
           { label: 'Approvata', text: 'Tutte le approvazioni richieste sono state ricevute, il certificato può essere emesso' },
           { label: 'Rifiutata', text: 'Qualsiasi rifiuto blocca immediatamente la richiesta' },
           { label: 'Scaduta', text: 'Nessuna decisione entro sette giorni; chiusa come scaduta e mai conteggiata tra quelle in attesa' },
+          { label: 'Annullata', text: 'Il richiedente ha eseguito direttamente l\'azione o ne ha approvato un duplicato: nessuno approva la propria richiesta' },
         ]
       },
       {
@@ -63,6 +64,9 @@ Un singolo rifiuto blocca immediatamente la richiesta. Il certificato non verrà
 ### Scaduta
 La richiesta non è stata decisa entro sette giorni. Le richieste scadute devono essere ripresentate.
 
+### Annullata
+Il richiedente ha eseguito direttamente l'azione, oppure ha approvato un'altra richiesta per lo stesso oggetto: nessuno approva la propria richiesta, quindi viene chiusa senza voto.
+
 ## Da dove arrivano le richieste
 Oltre al modulo di emissione, una politica che richiede l'approvazione mette in coda anche:
 - **Firma CSR** e **firma massiva** da Operazioni: l'approvazione esegue la firma
@@ -77,7 +81,7 @@ Gli amministratori saltano la coda su ogni percorso.
 - Una richiesta il cui oggetto è stato **eliminato o revocato** viene chiusa come rifiutata; una sospensione del certificato lascia la richiesta di rinnovo in attesa della rimozione della sospensione
 - Approvare una richiesta **già soddisfatta** la chiude sul certificato esistente; approvare una di più richieste per lo stesso oggetto chiude le altre come approvate da te
 - Approvare una richiesta la cui richiesta memorizzata, certificato o CA **non esiste più** la chiude come rifiutata
-- Una revoca in coda il cui certificato è stato **revocato direttamente** viene chiusa come approvata; se il certificato è stato **rinnovato** nel frattempo, viene chiusa come rifiutata all'approvazione; durante una sospensione del certificato attende la rimozione della sospensione
+- Una revoca in coda il cui certificato è stato **revocato direttamente** viene chiusa come approvata (annullata se a revocarlo è stato il richiedente); se il certificato è stato **rinnovato** nel frattempo, viene chiusa come rifiutata all'approvazione; durante una sospensione del certificato attende la rimozione della sospensione
 
 I webhook vengono informati di queste chiusure come per un rifiuto.
 
