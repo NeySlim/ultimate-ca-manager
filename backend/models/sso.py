@@ -32,6 +32,8 @@ class SSOProvider(db.Model):
     saml_certificate = db.Column(db.Text)  # Public cert, not secret
     saml_sign_requests = db.Column(db.Boolean, default=True)
     saml_sp_cert_source = db.Column(db.String(50), default='https')  # 'https' or cert ID
+    # Unsolicited (IdP-initiated) responses carry no InResponseTo to check.
+    saml_allow_idp_initiated = db.Column(db.Boolean, default=False, nullable=False)
     saml_verify_ssl = db.Column(db.Boolean, default=True)
     saml_ca_bundle = db.Column(db.Text)  # PEM content
     
@@ -179,6 +181,7 @@ class SSOProvider(db.Model):
                 'saml_slo_url': self.saml_slo_url,
                 'saml_sign_requests': self.saml_sign_requests,
                 'saml_sp_cert_source': self.saml_sp_cert_source or 'https',
+                'saml_allow_idp_initiated': bool(self.saml_allow_idp_initiated),
                 'saml_certificate': self.saml_certificate,
                 'saml_verify_ssl': self.saml_verify_ssl if self.saml_verify_ssl is not None else True,
                 'saml_ca_bundle': self.saml_ca_bundle or '',
@@ -262,3 +265,22 @@ class SSOSession(db.Model):
             'created_at': utc_isoformat(self.created_at),
             'expires_at': utc_isoformat(self.expires_at),
         }
+
+
+class SAMLMessageId(db.Model):
+    """AuthnRequest ids awaiting a response, and assertion ids already consumed.
+
+    Shared by every worker; a row lives until `expires_at`, the unique key is
+    what refuses a second use.
+    """
+    __tablename__ = 'pro_sso_saml_message_ids'
+    __table_args__ = (db.UniqueConstraint('kind', 'message_id', name='uq_saml_message_kind_id'),)
+
+    KIND_REQUEST = 'request'
+    KIND_ASSERTION = 'assertion'
+
+    id = db.Column(db.Integer, primary_key=True)
+    kind = db.Column(db.String(16), nullable=False)
+    message_id = db.Column(db.String(256), nullable=False)
+    provider_id = db.Column(db.Integer, nullable=False)
+    expires_at = db.Column(db.DateTime, nullable=False, index=True)

@@ -3424,6 +3424,8 @@
     "roleMapping": "Mapeo de roles",
     "roleMappingHelp": "Mapee grupos o roles externos a roles de UCM. Los usuarios en grupos coincidentes recibirán el rol de UCM correspondiente. Si varios grupos coinciden, gana el rol con mayores privilegios (admin > operator > auditor > viewer).",
     "signRequests": "Firmar solicitudes de autenticación",
+    "allowIdpInitiated": "Permitir el inicio de sesión iniciado por el IdP",
+    "allowIdpInitiatedHelp": "Acepta respuestas que UCM no ha solicitado, como un inicio de sesión lanzado desde el portal del proveedor de identidad. Desactivado por defecto: esa respuesta no puede vincularse a un inicio de sesión iniciado en este navegador.",
     "spEntityId": "ID de entidad SP",
     "spMetadata": "Metadatos del proveedor de servicios (SP)",
     "spMetadataHelp": "Copie estas URLs en la configuración de su proveedor de identidad (IdP) para establecer la confianza SAML.",

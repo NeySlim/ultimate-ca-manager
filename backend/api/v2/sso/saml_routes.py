@@ -1,4 +1,5 @@
 from . import bp, logger, safe_fromstring
+from . import saml_sp
 from flask import request, Response
 from auth.unified import require_auth
 from utils.response import success_response, error_response
@@ -83,10 +84,10 @@ def get_sp_metadata():
     import os
     from onelogin.saml2.settings import OneLogin_Saml2_Settings
 
-    sp_base = request.url_root.rstrip('/')
-    entity_id = f'{sp_base}/api/v2/sso'
-    acs_url = f'{sp_base}/api/v2/sso/callback/saml'
-    slo_url = f'{sp_base}/api/v2/sso/callback/saml'
+    endpoints = saml_sp.sp_endpoints(saml_sp.sp_base_url(request))
+    entity_id = endpoints['entity_id']
+    acs_url = endpoints['acs_url']
+    slo_url = endpoints['slo_url']
 
     # Load SAML provider config if available (for NameIDFormat override + cert source)
     provider = SSOProvider.query.filter_by(provider_type='saml').first()

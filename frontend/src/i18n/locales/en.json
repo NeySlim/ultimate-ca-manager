@@ -3413,6 +3413,8 @@
     "isDefault": "Default login provider",
     "lastUsed": "Last used",
     "signRequests": "Sign authentication requests",
+    "allowIdpInitiated": "Allow IdP-initiated login",
+    "allowIdpInitiatedHelp": "Accept responses UCM did not request, such as a login started from the identity provider's portal. Off by default: such a response cannot be tied to a login started in this browser.",
     "spCertificate": "SP Certificate (Metadata)",
     "spCertificateHelp": "Certificate included in the SP metadata XML (KeyDescriptor). Must be trusted by the IDP. Default uses the HTTPS certificate.",
     "httpsDefault": "HTTPS Certificate (default)",

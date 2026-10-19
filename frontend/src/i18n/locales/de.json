@@ -3424,6 +3424,8 @@
     "roleMapping": "Rollenzuordnung",
     "roleMappingHelp": "Ordnen Sie externe Gruppen oder Rollen den UCM-Rollen zu. Benutzer in zugeordneten Gruppen erhalten die entsprechende UCM-Rolle. Wenn mehrere Gruppen zutreffen, gewinnt die Rolle mit den höchsten Rechten (admin > operator > auditor > viewer).",
     "signRequests": "Authentifizierungsanfragen signieren",
+    "allowIdpInitiated": "IdP-initiierte Anmeldung zulassen",
+    "allowIdpInitiatedHelp": "Akzeptiert Antworten, die UCM nicht angefordert hat, etwa eine Anmeldung aus dem Portal des Identitätsanbieters. Standardmäßig aus: Eine solche Antwort lässt sich keiner in diesem Browser gestarteten Anmeldung zuordnen.",
     "spEntityId": "SP Entity ID",
     "spMetadata": "Service Provider (SP) Metadaten",
     "spMetadataHelp": "Kopieren Sie diese URLs in Ihre Identity Provider (IdP) Konfiguration, um die SAML-Vertrauensstellung einzurichten.",

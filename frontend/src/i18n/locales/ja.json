@@ -3424,6 +3424,8 @@
     "roleMapping": "ロールマッピング",
     "roleMappingHelp": "外部グループまたはロールをUCMロールにマッピングします。一致するグループのユーザーには対応するUCMロールが割り当てられます。複数のグループが一致する場合、最も権限の高いロールが適用されます（admin > operator > auditor > viewer）。",
     "signRequests": "認証リクエストに署名",
+    "allowIdpInitiated": "IdP 起点のログインを許可",
+    "allowIdpInitiatedHelp": "UCM が要求していない応答 (ID プロバイダーのポータルから開始されたログインなど) を受け入れます。既定ではオフ: このような応答は、このブラウザーで開始されたログインと関連付けられません。",
     "spEntityId": "SPエンティティID",
     "spMetadata": "サービスプロバイダー（SP）メタデータ",
     "spMetadataHelp": "SAML信頼を設定するために、これらのURLをIDプロバイダー（IdP）設定にコピーしてください。",

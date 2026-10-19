@@ -119,6 +119,7 @@ def create_provider():
         provider.saml_sign_requests = data.get('saml_sign_requests', True)
         provider.saml_sp_cert_source = data.get('saml_sp_cert_source', 'https')
         provider.saml_verify_ssl = data.get('saml_verify_ssl', True)
+        provider.saml_allow_idp_initiated = bool(data.get('saml_allow_idp_initiated', False))
         ca = data.get('saml_ca_bundle')
         provider.saml_ca_bundle = ca if isinstance(ca, str) and ca.strip() else None
 
@@ -247,6 +248,8 @@ def update_provider(provider_id=None, provider_type_name=None):
                       'saml_verify_ssl']:
             if field in data:
                 setattr(provider, field, data[field])
+        if 'saml_allow_idp_initiated' in data:
+            provider.saml_allow_idp_initiated = bool(data['saml_allow_idp_initiated'])
         # ca_bundle: only update if string PEM content (ignore bool from to_dict round-trip)
         if 'saml_ca_bundle' in data and isinstance(data['saml_ca_bundle'], str):
             provider.saml_ca_bundle = data['saml_ca_bundle'] or None
