@@ -184,7 +184,10 @@ def cleanup_logs():
     # Ceiling: 3650 days (10 years; anything higher is effectively "never").
     retention_days = max(30, min(retention_days, 3650))
     
-    deleted = AuditService.cleanup_old_logs(retention_days=retention_days)
+    try:
+        deleted = AuditService.cleanup_old_logs(retention_days=retention_days)
+    except Exception:
+        return error_response("Failed to clean up audit logs", 500)
     
     # Log the cleanup action
     AuditService.log_action(
@@ -204,23 +207,27 @@ def cleanup_logs():
 @require_auth(['read:audit'])
 def verify_integrity():
     """
-    Verify audit log integrity using hash chain.
-    
+    Verify the audit log hash chain.
+
     Query params:
         start_id: First log ID to check (optional)
         end_id: Last log ID to check (optional)
-    
+
     Returns:
-        valid: Boolean - True if all hashes are valid
-        checked: Number of entries verified
-        errors: List of any integrity violations found
+        status: 'intact', 'broken' (first_error_id names the entry) or
+            'unprotected' (no master key, or entries the key does not seal)
+        valid: True when no entry fails its check
+        protection: what the master key attests
+        errors: integrity violations found
     """
     start_id = request.args.get('start_id', type=int)
     end_id = request.args.get('end_id', type=int)
-    
+
     result = AuditService.verify_integrity(start_id=start_id, end_id=end_id)
-    
-    return success_response(
-        data=result,
-        message='Integrity check passed' if result['valid'] else f"Found {len(result['errors'])} integrity violations"
-    )
+
+    messages = {
+        'intact': 'Integrity check passed',
+        'unprotected': 'No violation found, but the chain is not protected by the master key',
+        'broken': f"Chain broken at entry #{result['first_error_id']}",
+    }
+    return success_response(data=result, message=messages[result['status']])

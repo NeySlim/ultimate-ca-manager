@@ -20,6 +20,7 @@ from flask import has_request_context, request
 from models import db, AuditLog
 from utils.datetime_utils import utc_now
 from utils.trusted_proxy import client_ip
+from .chain import seal
 
 logger = logging.getLogger(__name__)
 
@@ -45,16 +46,7 @@ def stage_audit_entry(**fields):
 
         db.session.add(entry)
         db.session.flush()
-
-        previous = (AuditLog.query
-                    .filter(AuditLog.id < entry.id)
-                    .order_by(AuditLog.id.desc())
-                    .first())
-        prev_hash = (previous.entry_hash
-                     if previous and previous.entry_hash else '0' * 64)
-        entry.prev_hash = prev_hash
-        entry.entry_hash = entry.compute_hash(prev_hash)
-        return entry
+        return seal(entry)
     except Exception:
         logger.warning("An audit entry could not be staged", exc_info=True)
         return None

@@ -15,6 +15,7 @@ from pathlib import Path
 from typing import Optional, Tuple
 from cryptography.fernet import Fernet, InvalidToken
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.kdf.hkdf import HKDF
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 from cryptography.hazmat.backends import default_backend
 
@@ -46,6 +47,7 @@ class KeyEncryption:
     
     _instance = None
     _fernet = None
+    _key_bytes = None
     _enabled = False
     _key_source = None  # 'file', 'env', or None
     
@@ -109,6 +111,7 @@ class KeyEncryption:
         try:
             key_bytes = key.encode('utf-8')
             self._fernet = Fernet(key_bytes)
+            self._key_bytes = base64.urlsafe_b64decode(key_bytes)
             self._enabled = True
             logger.info("✅ Private key encryption enabled")
         except Exception as e:
@@ -129,6 +132,7 @@ class KeyEncryption:
     def reload(self):
         """Reload encryption key (after enable/disable)"""
         self._fernet = None
+        self._key_bytes = None
         self._enabled = False
         self._key_source = None
         self._initialize()
@@ -140,6 +144,16 @@ class KeyEncryption:
     @property
     def key_source(self) -> Optional[str]:
         return self._key_source
+
+    def derive_key(self, label: bytes, length: int = 32) -> Optional[bytes]:
+        """A key of its own for ``label``, derived from the master key (HKDF-SHA256).
+
+        None without a master key. The master key itself never leaves this object.
+        """
+        if not self._enabled or not self._key_bytes:
+            return None
+        return HKDF(algorithm=hashes.SHA256(), length=length, salt=None,
+                    info=label).derive(self._key_bytes)
     
     def encrypt(self, data: str) -> str:
         if not self._enabled or not data:

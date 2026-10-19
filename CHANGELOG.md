@@ -9,6 +9,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Security
+
+- Audit log: the hash chain was plain SHA-256, so anyone able to write the database could edit an entry and recompute the chain behind it. With a master key, entries are now sealed with HMAC-SHA256 under a key derived from it (existing entries still verify), the integrity check reports intact, broken at entry N or not protected, and a purge leaves a sealed record so the chain still verifies after it.
+
+### Fixed
+
+- `POST /api/v2/audit/cleanup` deleted every entry older than the retention, even one behind a newer entry, which broke the chain; it now purges the oldest entries as the scheduled retention does.
+
 ## [2.242] - 2026-10-18
 
 ### Added

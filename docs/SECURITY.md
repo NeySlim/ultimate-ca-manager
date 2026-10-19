@@ -172,6 +172,20 @@ POST /api/v2/system/audit/cleanup
 
 Default: 90 days, auto-cleanup daily at midnight.
 
+#### Integrity
+Each entry is chained to the previous one. With a master key (`/etc/ucm/master.key` or
+`KEY_ENCRYPTION_KEY`), entries are sealed with HMAC-SHA256 under a key derived from it
+(HKDF-SHA256), so editing, inserting or deleting entries cannot go unnoticed without that
+key. Without a master key, entries are sealed with SHA-256 and the check reports the log as
+not protected. A retention purge removes the oldest entries only and leaves a sealed record
+of where the log now starts.
+
+`GET /api/v2/audit/verify` (Audit Logs > Verify Integrity) reports `intact`, `broken` at
+entry N, or `unprotected`. Changing the master key re-anchors the chain: entries sealed under
+the previous key can no longer be attested and are reported as such until retention removes
+them. Deleting the most recent entries is not detectable from the database alone; syslog
+forwarding keeps a copy outside it.
+
 ---
 
 ### 6. Certificate Expiry Alerts

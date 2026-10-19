@@ -1757,12 +1757,28 @@ GET /api/v2/audit/verify?start_id=1&end_id=1000
 ```json
 {
   "data": {
+    "status": "intact",
     "valid": true,
+    "first_error_id": null,
     "checked": 1000,
-    "errors": []
+    "errors": [],
+    "protection": {
+      "key_available": true,
+      "protected": 1000,
+      "protected_from_id": 1,
+      "not_attested": 0,
+      "retired_key": 0
+    }
   }
 }
 ```
+
+`status` is `intact`, `broken` (`first_error_id` names the first entry that fails) or
+`unprotected`: no master key, or entries the key does not seal. With a master key, entries
+are sealed with HMAC-SHA256 under a key derived from it; without one, with SHA-256, which
+anyone able to write the database can recompute. After a master key change, entries sealed
+under the previous key are counted in `retired_key` and `not_attested`, and the chain is
+attested from the first entry under the new key.
 
 ---
 

@@ -33,6 +33,7 @@ def history(app):
         AuditLog.query.filter(AuditLog.id < 0).delete(synchronize_session=False)
         SystemConfig.query.filter_by(key=RetentionPolicy.CONFIG_KEY).delete()
         AuditLog.query.filter_by(action='audit_cleanup', username='system').delete()
+        AuditLog.query.filter_by(action='audit_purge').delete()
         db.session.commit()
     with app.app_context():
         reset()
@@ -54,7 +55,8 @@ def test_the_purge_removes_the_old_prefix_in_batches(app, history, monkeypatch):
         for i in range(-5, 0):
             _row(i, 400)
         RetentionPolicy.update_settings(retention_days=365)
-        before = db.session.query(db.func.count(AuditLog.id)).filter(AuditLog.id > 0).scalar()
+        kept = (AuditLog.id > 0) & (AuditLog.action != 'audit_purge')
+        before = db.session.query(db.func.count(AuditLog.id)).filter(kept).scalar()
         commits = []
         real_commit = db.session.commit
         monkeypatch.setattr(db.session, 'commit', lambda: commits.append(1) or real_commit())
@@ -64,7 +66,7 @@ def test_the_purge_removes_the_old_prefix_in_batches(app, history, monkeypatch):
         assert result['deleted'] == 5, result
         assert len(commits) == 3  # 2 + 2 + 1
         assert _alive(range(-5, 0)) == set()
-        after = db.session.query(db.func.count(AuditLog.id)).filter(AuditLog.id > 0).scalar()
+        after = db.session.query(db.func.count(AuditLog.id)).filter(kept).scalar()
         assert after == before
         assert AuditService.verify_integrity()['valid']
 
