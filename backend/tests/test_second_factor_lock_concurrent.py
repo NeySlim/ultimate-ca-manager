@@ -1,13 +1,14 @@
 """Two requests changing one account's second factors run one at a time.
 
 Disabling TOTP and removing the last security key each check that enforced
-2FA keeps a factor. Without the user row lock, both checks read the state
-before either commits and the account ends with neither. Only PostgreSQL can
-show it: the suite's SQLite runs on a single connection.
+2FA keeps a factor. Without the lock, both checks read the state before either
+commits and the account ends with neither. Each backend gets a database of its
+own with real concurrent connections (the suite's SQLite shares one).
 """
 import os
 import threading
 import time
+from contextlib import contextmanager
 
 import pytest
 
@@ -18,15 +19,28 @@ from tests.test_restore_reference_resolution_pg import _a_schema_of_our_own
 
 _PG_URL = os.environ.get('UCM_TEST_PG_URL')
 
-pytestmark = [pytest.mark.postgres,
-              pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')]
 
 HOLD_SECONDS = 1.0
 
 
-@pytest.fixture
-def on_postgresql(app):
-    with _a_schema_of_our_own('second_factor_lock') as url, _bound_to(app, url, is_postgresql=True):
+@contextmanager
+def _database(backend, tmp_path):
+    if backend == 'sqlite':
+        yield f"sqlite:///{tmp_path / 'lock.db'}"
+    else:
+        with _a_schema_of_our_own('second_factor_lock') as url:
+            yield url
+
+
+@pytest.fixture(params=[
+    'sqlite',
+    pytest.param('postgresql', marks=[
+        pytest.mark.postgres,
+        pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')]),
+])
+def account(app, request, tmp_path):
+    with _database(request.param, tmp_path) as url, \
+            _bound_to(app, url, is_postgresql=request.param == 'postgresql'):
         with app.app_context():
             db.session.add(SystemConfig(key='enforce_2fa', value='true'))
             user = User(username='lock-race', email='lock-race@example.test', role='operator',
@@ -43,9 +57,9 @@ def on_postgresql(app):
         yield ids
 
 
-def test_key_removal_waits_for_a_totp_disable_and_sees_it(app, on_postgresql):
+def test_key_removal_waits_for_a_totp_disable_and_sees_it(app, account):
     from auth import twofa_enforcement
-    user_id, key_id = on_postgresql
+    user_id, key_id = account
     locked, result = threading.Event(), {}
 
     def disable_totp():

@@ -2,7 +2,7 @@
 
 A change committed by another request right before the lock is taken must be
 seen by the check: the guard reads the account after locking it, never before.
-The PostgreSQL lock itself is exercised in test_second_factor_lock_pg.py.
+The lock itself, on both backends, is exercised in test_second_factor_lock_concurrent.py.
 """
 import pyotp
 import pytest

@@ -90,11 +90,15 @@ def would_leave_no_second_factor(user, *, dropping_totp=False, dropping_key=None
 
 
 def lock_user(user_id):
-    """The user row, locked until commit on PostgreSQL (SQLite serialises writers),
-    so changes to one account's second factors run one at a time."""
+    """The user row, read afresh after a no-op UPDATE of it: that write holds the row
+    lock on PostgreSQL and the database write lock on SQLite until commit, so changes
+    to one account's second factors run one at a time."""
+    from sqlalchemy import update
     from models import User, db
-    return (db.session.query(User).filter_by(id=user_id)
-            .populate_existing().with_for_update().one_or_none())
+    db.session.execute(update(User).where(User.id == user_id)
+                       .values(webauthn_2fa=User.webauthn_2fa)
+                       .execution_options(synchronize_session=False))
+    return db.session.query(User).filter_by(id=user_id).populate_existing().one_or_none()
 
 
 def lock_for_factor_change(user_id, *, dropping_totp=False, dropping_key=None):
