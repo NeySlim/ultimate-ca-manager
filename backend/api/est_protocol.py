@@ -12,6 +12,7 @@ from utils.trusted_proxy import client_ip
 from utils.db_transaction import safe_commit
 from utils.est_cms import build_server_generated_key_cms
 from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
+from utils.csr_extensions import csr_extensions, extensions_of
 import base64
 import hmac
 import json
@@ -195,7 +196,7 @@ def _certs_only_response(cert, ca=None):
 def _subject_alt_name(cert_or_csr):
     from cryptography import x509
     try:
-        return cert_or_csr.extensions.get_extension_for_class(
+        return extensions_of(cert_or_csr).get_extension_for_class(
             x509.SubjectAlternativeName
         )
     except x509.ExtensionNotFound:
@@ -225,7 +226,7 @@ def _reenroll_san_matches(client_cert_obj, csr):
 
 def _copy_csr_extensions(builder, csr):
     """Copy requested extensions while replacing the ignored CSR public key."""
-    for extension in csr.extensions:
+    for extension in csr_extensions(csr):
         builder = builder.add_extension(extension.value, extension.critical)
     return builder
 

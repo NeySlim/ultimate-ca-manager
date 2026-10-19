@@ -21,6 +21,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID
 
 from fips_mode import FipsRestricted
+from utils.csr_extensions import csr_extensions
 from utils.pkcs12_import import refuse_pkcs12_import
 
 
@@ -382,7 +383,7 @@ class SmartParser:
                     
                     # Extract SANs if present
                     try:
-                        san_ext = csr.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+                        san_ext = csr_extensions(csr).get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
                         for name in san_ext.value:
                             if isinstance(name, x509.DNSName):
                                 obj.san_dns.append(name.value)
