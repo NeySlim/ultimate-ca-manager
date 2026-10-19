@@ -113,7 +113,8 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
                                          key_label_for_public_key)
     sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
         PolicyEvaluationService.applicable_policies(ca.id, cert.template_id, cert.subject_cn),
-        ca_key, explicit=False, key_type=key_label_for_public_key(private_key.public_key()))
+        ca_key, explicit=False, key_type=key_label_for_public_key(private_key.public_key()),
+        context={'operation': 'renewal', 'subject': cert.subject_cn, 'ca_id': ca.id})
     if violations:
         raise PolicyViolation('; '.join(violations))
     new_cert = builder.sign(ca_key, sign_hash, default_backend())

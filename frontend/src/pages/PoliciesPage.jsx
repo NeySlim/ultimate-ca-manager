@@ -97,6 +97,14 @@ const DEFAULT_FORM = {
   notification_emails: [],
 }
 
+// Same shape the server accepts: one mailbox, no separators or brackets
+const EMAIL_RE = /^[^@\s,;<>"]+@[^@\s,;<>"]+$/
+
+function parseEmails(text) {
+  const emails = (text || '').split(/[\s,;]+/).filter(Boolean)
+  return { emails, invalid: emails.filter(e => !EMAIL_RE.test(e)) }
+}
+
 export default function PoliciesPage() {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
@@ -139,6 +147,8 @@ export default function PoliciesPage() {
 
   // Modal state (page-specific)
   const [formData, setFormData] = useState({ ...DEFAULT_FORM })
+  const [emailsText, setEmailsText] = useState('')
+  const parsedEmails = parseEmails(emailsText)
   const [actionInProgress, setActionInProgress] = useState(false)
 
   // Filters
@@ -289,6 +299,7 @@ export default function PoliciesPage() {
   const openCreateModal = () => {
     setEditing(null)
     setFormData({ ...DEFAULT_FORM, rules: { ...DEFAULT_FORM.rules, san_restrictions: { ...DEFAULT_FORM.rules.san_restrictions } } })
+    setEmailsText('')
     setShowModal(true)
   }
 
@@ -319,20 +330,23 @@ export default function PoliciesPage() {
       },
       notification_emails: policy.notification_emails || [],
     })
+    setEmailsText((policy.notification_emails || []).join('\n'))
     setShowModal(true)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
     if (!formData.name.trim() || !(formData.operations || []).length) return
+    if (parsedEmails.invalid.length) return
+    const payload = { ...formData, notification_emails: parsedEmails.emails }
 
     try {
       setSaving(true)
       if (editing) {
-        await policiesService.update(editing.id, formData)
+        await policiesService.update(editing.id, payload)
         showSuccess(t('policies.updated'))
       } else {
-        await policiesService.create(formData)
+        await policiesService.create(payload)
         showSuccess(t('policies.created'))
       }
       setShowModal(false)
@@ -853,6 +867,25 @@ export default function PoliciesPage() {
               <Bell size={16} className="text-text-secondary" />
               <span className="text-sm text-text-primary">{t('policies.notifyOnViolation')}</span>
             </label>
+            <p className="text-xs text-text-secondary mt-1">{t('policies.notifyHelp')}</p>
+            {formData.notify_on_violation && (
+              <div className="mt-3">
+                <Textarea
+                  label={t('policies.notificationEmails')}
+                  value={emailsText}
+                  onChange={(e) => setEmailsText(e.target.value)}
+                  placeholder="pki-team@example.com"
+                  rows={2}
+                />
+                {parsedEmails.invalid.length > 0 ? (
+                  <p className="text-xs text-status-danger mt-1">
+                    {t('policies.invalidEmails', { emails: parsedEmails.invalid.join(', ') })}
+                  </p>
+                ) : (
+                  <p className="text-xs text-text-secondary mt-1">{t('policies.notificationEmailsHelp')}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Footer */}
@@ -860,7 +893,7 @@ export default function PoliciesPage() {
             <Button type="button" variant="secondary" onClick={() => { setShowModal(false); setEditing(null) }}>
               {t('common.cancel')}
             </Button>
-            <Button type="submit" disabled={saving || !formData.name.trim() || !(formData.operations || []).length}>
+            <Button type="submit" disabled={saving || !formData.name.trim() || !(formData.operations || []).length || parsedEmails.invalid.length > 0}>
               {saving ? <LoadingSpinner size="sm" /> : (editing ? t('common.update') : t('common.create'))}
             </Button>
           </div>

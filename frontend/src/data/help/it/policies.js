@@ -26,7 +26,7 @@ export default {
         items: [
           { label: 'Gruppi di approvazione', text: 'Assegna un gruppo di utenti responsabile dell\'approvazione delle richieste' },
           { label: 'Approvatori minimi', text: 'Numero di approvazioni richieste prima dell\'emissione' },
-          { label: 'Notifiche', text: 'Avvisa gli amministratori quando le politiche vengono violate' },
+          { label: 'Notifiche', text: "E-mail quando la politica rifiuta un'operazione o la mette in attesa di approvazione; agli indirizzi indicati, altrimenti ai suoi approvatori. Un rifiuto ripetuto viene segnalato una volta all'ora" },
         ]
       },
     ],
@@ -86,7 +86,7 @@ Quando **Richiedi approvazione** è abilitato, l'emissione del certificato viene
 ### Configurazione
 - **Gruppo di approvazione**: Seleziona un gruppo di utenti responsabile delle approvazioni
 - **Approvatori minimi**: Numero di approvazioni richieste (es. 2 su 3 membri del gruppo)
-- **Notifiche**: Avvisa gli amministratori quando le politiche vengono violate
+- **Notifiche**: e-mail quando la politica rifiuta un'operazione (una regola violata) o la mette in attesa di approvazione. Vengono inviate agli indirizzi di notifica della politica, altrimenti ai suoi approvatori (i membri del suo gruppo di approvazione, o ogni utente che può approvare). Ogni richiesta in attesa viene segnalata una sola volta, con un link; lo stesso rifiuto ripetuto, ad esempio da un client ACME che riprova, una volta all'ora. SMTP deve essere configurato
 
 > 💡 Usa i flussi di approvazione per certificati di alto valore come la firma del codice e i certificati con carattere jolly.
 

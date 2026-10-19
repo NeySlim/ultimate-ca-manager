@@ -93,3 +93,25 @@ describe('PoliciesPage operations', () => {
     expect(await screen.findByText('policies.noOperation')).toBeTruthy()
   })
 })
+
+describe('PoliciesPage notification addresses', () => {
+  beforeEach(() => vi.clearAllMocks())
+
+  it('sends the addresses listed', async () => {
+    await openCreate()
+    fireEvent.change(screen.getByLabelText('policies.notificationEmails'),
+      { target: { value: 'pki@example.test\nsec@example.test, ' } })
+    fireEvent.submit(form())
+    await waitFor(() => expect(mocks.create).toHaveBeenCalled())
+    expect(mocks.create.mock.calls[0][0].notification_emails).toEqual(['pki@example.test', 'sec@example.test'])
+  })
+
+  it('refuses an invalid address', async () => {
+    await openCreate()
+    fireEvent.change(screen.getByLabelText('policies.notificationEmails'), { target: { value: 'not-an-address' } })
+    expect(screen.getByText('policies.invalidEmails')).toBeTruthy()
+    fireEvent.submit(form())
+    await new Promise(r => setTimeout(r, 0))
+    expect(mocks.create).not.toHaveBeenCalled()
+  })
+})

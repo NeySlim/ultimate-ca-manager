@@ -225,8 +225,9 @@ class CACreationMixin:
         policies, key_label = _ca_policies(caref, dn, key_type, hsm_key_id, hsm_key_algorithm)
         if not digest_explicit:
             digest = PolicyEvaluationService.choose_digest(policies, digest)
+        rule_context = {'operation': 'ca_creation', 'subject': (dn or {}).get('CN')}
         _refuse_on_violations(PolicyEvaluationService.enforce_rules(
-            policies, key_type=key_label, digest=digest)[0])
+            policies, key_type=key_label, digest=digest, context=rule_context)[0])
 
         # Get parent CA if intermediate
         issuer = None
@@ -289,7 +290,8 @@ class CACreationMixin:
         # The parent's real signing hash (HSM-bound) is known before any key exists
         if issuer_private_key is not None:
             _refuse_on_violations(PolicyEvaluationService.checked_signing_hash(
-                policies, issuer_private_key, digest, key_type=key_label)[1])
+                policies, issuer_private_key, digest, key_type=key_label,
+                context=rule_context)[1])
 
         # Resolve signing key - local generation, existing HSM key, or new HSM key
         private_key, key_pem, hsm_key = CACreationMixin._resolve_signing_key(
@@ -303,7 +305,8 @@ class CACreationMixin:
         try:
             _refuse_on_violations(PolicyEvaluationService.checked_signing_hash(
                 policies, issuer_private_key or private_key, digest,
-                key_type=key_label_for_public_key(private_key.public_key()))[1])
+                key_type=key_label_for_public_key(private_key.public_key()),
+                context=rule_context)[1])
         except PolicyViolation:
             # A root's new HSM key may sign with a provider-bound hash: drop the key
             if hsm_provider_id and hsm_key is not None:
@@ -538,14 +541,16 @@ class CACreationMixin:
         """
         from services.policy_service import PolicyEvaluationService, key_label_for_public_key
         policies, key_label = _ca_policies(None, dn, key_type, hsm_key_id, hsm_key_algorithm)
+        rule_context = {'operation': 'ca_creation', 'subject': (dn or {}).get('CN')}
         _refuse_on_violations(PolicyEvaluationService.enforce_rules(
-            policies, key_type=key_label)[0])
+            policies, key_type=key_label, context=rule_context)[0])
         private_key, key_pem, hsm_key = CACreationMixin._resolve_signing_key(
             key_type, hsm_provider_id, hsm_key_id, hsm_key_label, hsm_key_algorithm
         )
 
         _refuse_on_violations(PolicyEvaluationService.enforce_rules(
-            policies, key_type=key_label_for_public_key(private_key.public_key()))[0])
+            policies, key_type=key_label_for_public_key(private_key.public_key()),
+            context=rule_context)[0])
 
         subject = TrustStoreService.build_subject(dn)
         csr_pem = TrustStoreService.generate_ca_csr(

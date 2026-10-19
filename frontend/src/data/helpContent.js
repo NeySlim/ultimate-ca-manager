@@ -1447,7 +1447,7 @@ export const helpContent = {
         items: [
           { label: 'Approval Groups', text: 'Assign a user group responsible for approving requests' },
           { label: 'Min Approvers', text: 'Number of approvals required before issuance' },
-          { label: 'Notifications', text: 'Alert administrators when policies are violated' },
+          { label: 'Notifications', text: 'E-mail when the policy refuses an operation or holds one for approval; to the listed addresses, else to its approvers. A repeated refusal is reported once per hour' },
         ]
       },
     ],

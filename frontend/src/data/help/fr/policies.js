@@ -26,7 +26,7 @@ export default {
         items: [
           { label: 'Groupes d\'approbation', text: 'Assigner un groupe d\'utilisateurs responsable de l\'approbation des demandes' },
           { label: 'Approbateurs min', text: 'Nombre d\'approbations requises avant l\'émission' },
-          { label: 'Notifications', text: 'Alerter les administrateurs lors de violations de politique' },
+          { label: 'Notifications', text: "E-mail lorsque la politique refuse une opération ou en retient une pour approbation ; envoyé aux adresses listées, sinon à ses approbateurs. Un refus répété n'est signalé qu'une fois par heure" },
         ]
       },
     ],
@@ -86,7 +86,7 @@ Lorsque **Approbation requise** est activé, l'émission de certificat est suspe
 ### Configuration
 - **Groupe d'approbation** : Sélectionner un groupe d'utilisateurs responsable des approbations
 - **Approbateurs min** : Nombre d'approbations requises (par ex. 2 sur 3 membres du groupe)
-- **Notifications** : Alerter les administrateurs lors de violations de politique
+- **Notifications** : e-mail lorsque la politique refuse une opération (règle enfreinte) ou en retient une pour approbation. Il est envoyé aux adresses de notification de la politique, sinon à ses approbateurs (les membres de son groupe d'approbation, ou tous les utilisateurs pouvant approuver). Chaque demande retenue est signalée une fois, avec un lien vers elle ; un même refus répété, par exemple par un client ACME qui réessaie, une fois par heure. SMTP doit être configuré
 
 > 💡 Utilisez les flux d'approbation pour les certificats de haute valeur comme la signature de code et les certificats génériques.
 

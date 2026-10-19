@@ -4,6 +4,7 @@
  */
 import { useState, useEffect, useCallback, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
+import { useSearchParams } from 'react-router-dom'
 import {
   Stamp, CheckCircle, XCircle, Clock, Warning, User,
   ChatText, Gavel, Certificate, Funnel
@@ -88,6 +89,18 @@ export default function ApprovalsPage() {
   }, [statusFilter, showError, t])
 
   useEffect(() => { loadData() }, [loadData])
+
+  // Deep link from a notification e-mail: /approvals?id=N opens that request
+  const [searchParams] = useSearchParams()
+  const linkedId = searchParams.get('id')
+  useEffect(() => {
+    if (!linkedId || !/^\d+$/.test(linkedId)) return
+    let cancelled = false
+    approvalsService.getById(linkedId)
+      .then(res => { if (!cancelled && res?.data) setSelectedRequest(res.data) })
+      .catch(() => { if (!cancelled) showError(t('approvals.loadFailed')) })
+    return () => { cancelled = true }
+  }, [linkedId, showError, t])
 
   // Stats bar
   const statItems = useMemo(() => [

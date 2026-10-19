@@ -26,7 +26,7 @@ export default {
         items: [
           { label: 'Genehmigungsgruppen', text: 'Eine Benutzergruppe zuweisen, die für die Genehmigung von Anfragen verantwortlich ist' },
           { label: 'Min. Genehmiger', text: 'Anzahl der erforderlichen Genehmigungen vor der Ausstellung' },
-          { label: 'Benachrichtigungen', text: 'Administratoren bei Richtlinienverstößen benachrichtigen' },
+          { label: 'Benachrichtigungen', text: 'E-Mail, wenn die Richtlinie einen Vorgang ablehnt oder zur Genehmigung zurückhält; an die aufgeführten Adressen, sonst an ihre Genehmiger. Eine wiederholte Ablehnung wird nur einmal pro Stunde gemeldet' },
         ]
       },
     ],
@@ -86,7 +86,7 @@ Wenn **Genehmigung erforderlich** aktiviert ist, wird die Zertifikatsausstellung
 ### Konfiguration
 - **Genehmigungsgruppe**: Eine Benutzergruppe auswählen, die für Genehmigungen verantwortlich ist
 - **Min. Genehmiger**: Anzahl der erforderlichen Genehmigungen (z.B. 2 von 3 Gruppenmitgliedern)
-- **Benachrichtigungen**: Administratoren bei Richtlinienverstößen benachrichtigen
+- **Benachrichtigungen**: E-Mail, wenn die Richtlinie einen Vorgang ablehnt (eine Regel verletzt) oder zur Genehmigung zurückhält. Sie gehen an die Benachrichtigungsadressen der Richtlinie, sonst an ihre Genehmiger (die Mitglieder ihrer Genehmigungsgruppe oder alle Benutzer, die genehmigen dürfen). Jede zurückgehaltene Anfrage wird einmal mit einem Link darauf gemeldet; dieselbe wiederholte Ablehnung, etwa durch einen ACME-Client mit Wiederholungsversuchen, einmal pro Stunde. SMTP muss konfiguriert sein
 
 > 💡 Verwenden Sie Genehmigungsworkflows für hochwertige Zertifikate wie Code-Signierung und Wildcard-Zertifikate.
 

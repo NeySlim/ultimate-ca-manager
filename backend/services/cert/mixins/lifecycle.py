@@ -152,6 +152,7 @@ class LifecycleMixin:
             PolicyEvaluationService.applicable_policies(
                 ca.id, template_id, (dn or {}).get('CN'), san_dns),
             ca_private_key, digest, explicit=digest_explicit,
+            context={'operation': 'issuance', 'subject': (dn or {}).get('CN'), 'ca_id': ca.id},
             key_type=_normalize_key_type_label(key_type) or key_type)
         if violations:
             raise PolicyViolation('Policy violation: ' + '; '.join(violations))

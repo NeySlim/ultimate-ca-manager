@@ -723,7 +723,10 @@ class CSROperationsMixin:
         sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
             policies, ca_private_key, digest,
             explicit=bool((policy_scope or {}).get('digest_explicit', policy_scope is None)),
-            key_type=key_label_for_public_key(csr.public_key()))
+            key_type=key_label_for_public_key(csr.public_key()),
+            context={'operation': 'issuance', 'ca_id': (policy_scope or {}).get('ca_id'),
+                     'subject': next((a.value for a in subject.get_attributes_for_oid(
+                         NameOID.COMMON_NAME)), None)})
         if violations:
             raise PolicyViolation('; '.join(violations))
 

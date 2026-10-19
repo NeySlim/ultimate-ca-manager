@@ -19,6 +19,7 @@ import fips_mode
 from utils.datetime_utils import cert_not_before, utc_now
 from utils.leaf_key_usage import key_usage_for_key
 from services.audit_service import AuditService
+from services.policy_notifications import validated_emails
 from security.encryption import encrypt_private_key
 from services.template_service import compute_template_overrides
 from utils.key_codec import private_key_to_pem
@@ -490,14 +491,17 @@ def _issue_approved_certificate(approval):
     ).get('san_dns') or []
     _policies = PolicyEvaluationService.applicable_policies(
         data['ca_id'], data.get('template_id'), data.get('cn'), _requested_dns)
+    _rule_context = {'operation': 'issuance', 'subject': data.get('cn'), 'ca_id': data['ca_id'],
+                     'requester': _requester_name(approval, data)}
     _violations, validity_days, _capped_by = PolicyEvaluationService.enforce_rules(
         _policies, key_type=normalized_key,
         dns_name_count=len(set(_requested_dns) | set(_implicit_dns)),
-        validity_days=validity_days,
+        validity_days=validity_days, context=_rule_context,
     )
     _template_digest = template.digest if template and template.digest else None
     _sign_hash, _digest_violations = PolicyEvaluationService.checked_signing_hash(
-        _policies, ca_key, _template_digest, explicit=_template_digest is not None)
+        _policies, ca_key, _template_digest, explicit=_template_digest is not None,
+        context=_rule_context)
     _violations += _digest_violations
     if _violations:
         raise PolicyViolation('; '.join(_violations))
@@ -865,6 +869,9 @@ def create_policy():
     operations, operations_error = _validated_operations(data)
     if operations_error:
         return error_response(operations_error, 400)
+    emails, emails_error = validated_emails(data.get('notification_emails'))
+    if emails_error:
+        return error_response(emails_error, 400)
 
     policy = CertificatePolicy(
         name=data['name'],
@@ -874,7 +881,7 @@ def create_policy():
         requires_approval=data.get('requires_approval', False),
         approval_group_id=data.get('approval_group_id'),
         min_approvers=data.get('min_approvers', 1),
-        notify_on_violation=data.get('notify_on_violation', True),
+        notify_on_violation=bool(data.get('notify_on_violation', True)),
         is_active=data.get('is_active', True),
         priority=data.get('priority', 100),
         created_by=g.current_user.username if hasattr(g, 'current_user') and g.current_user else None
@@ -887,8 +894,8 @@ def create_policy():
         policy.set_rules(rules)
     policy.set_operations(operations or legacy_operations('issuance'))
     
-    if data.get('notification_emails'):
-        policy.notification_emails = json.dumps(data['notification_emails'])
+    if emails:
+        policy.notification_emails = json.dumps(emails)
     
     db.session.add(policy)
     try:
@@ -923,6 +930,9 @@ def update_policy(policy_id):
     operations, operations_error = _validated_operations(data)
     if operations_error:
         return error_response(operations_error, 400)
+    emails, emails_error = validated_emails(data.get('notification_emails'))
+    if emails_error:
+        return error_response(emails_error, 400)
 
     # Update fields
     if 'name' in data:
@@ -946,7 +956,7 @@ def update_policy(policy_id):
     if 'min_approvers' in data:
         policy.min_approvers = data['min_approvers']
     if 'notify_on_violation' in data:
-        policy.notify_on_violation = data['notify_on_violation']
+        policy.notify_on_violation = bool(data['notify_on_violation'])
     if 'is_active' in data:
         policy.is_active = data['is_active']
     if 'priority' in data:
@@ -954,7 +964,7 @@ def update_policy(policy_id):
     if 'rules' in data:
         policy.set_rules(rules)
     if 'notification_emails' in data:
-        policy.notification_emails = json.dumps(data['notification_emails'])
+        policy.notification_emails = json.dumps(emails) if emails else None
     
     ok, _err = safe_commit(logger, "Failed to update policy")
     if not ok:

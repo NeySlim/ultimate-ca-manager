@@ -2741,7 +2741,7 @@ When **Require Approval** is enabled, certificate issuance is paused until the r
 ### Configuration
 - **Approval Group**: Select a user group responsible for approvals
 - **Min Approvers**: Number of approvals required (e.g. 2 of 3 group members)
-- **Notifications**: Alert administrators when policies are violated
+- **Notifications**: e-mail when the policy refuses an operation (a rule broken) or holds one for approval. They go to the policy's notification addresses, else to its approvers (the members of its approval group, or every user who may approve). Each held request is reported once, with a link to it; the same refusal repeated, by an ACME client retrying for instance, once per hour. SMTP must be configured
 
 > 💡 Use approval workflows for high-value certificates like code signing and wildcard certificates.
 

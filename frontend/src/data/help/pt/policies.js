@@ -26,7 +26,7 @@ export default {
         items: [
           { label: 'Grupos de Aprovação', text: 'Atribuir um grupo de usuários responsável por aprovar solicitações' },
           { label: 'Mín. Aprovadores', text: 'Número de aprovações necessárias antes da emissão' },
-          { label: 'Notificações', text: 'Alertar administradores quando políticas são violadas' },
+          { label: 'Notificações', text: 'E-mail quando a política recusa uma operação ou a retém para aprovação; enviado aos endereços listados, senão aos seus aprovadores. Uma recusa repetida é notificada uma vez por hora' },
         ]
       },
     ],
@@ -86,7 +86,7 @@ Quando **Exigir Aprovação** está ativado, a emissão do certificado é pausad
 ### Configuração
 - **Grupo de Aprovação**: Selecionar um grupo de usuários responsável por aprovações
 - **Mín. Aprovadores**: Número de aprovações necessárias (ex.: 2 de 3 membros do grupo)
-- **Notificações**: Alertar administradores quando políticas são violadas
+- **Notificações**: e-mail quando a política recusa uma operação (uma regra violada) ou a retém para aprovação. Vai para os endereços de notificação da política, senão para seus aprovadores (os membros do grupo de aprovação, ou todo usuário que pode aprovar). Cada solicitação retida é notificada uma vez, com um link para ela; a mesma recusa repetida, por exemplo por um cliente ACME que tenta de novo, uma vez por hora. O SMTP deve estar configurado
 
 > 💡 Use fluxos de aprovação para certificados de alto valor como assinatura de código e certificados curinga.
 

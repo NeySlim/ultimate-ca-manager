@@ -136,7 +136,8 @@ def _policy_rule_refusal(ca, cert, template_id, validity_days, extra_dns=()):
         policies = PolicyEvaluationService.applicable_policies(ca.id, template_id, csr_cn, csr_dns)
         violations, validity_days, capped_by = PolicyEvaluationService.enforce_rules(
             policies, key_type=key_label, dns_name_count=len(set(csr_dns)),
-            validity_days=validity_days)
+            validity_days=validity_days,
+            context={'operation': 'csr', 'subject': csr_cn, 'ca_id': ca.id})
     except (ValueError, TypeError) as e:
         return f'Invalid CSR: {e}', validity_days, None
     if violations:

@@ -472,11 +472,13 @@ def renew_certificate_in_place(
     policies = PolicyEvaluationService.applicable_policies(
         ca.id, getattr(cert, 'template_id', None),
         cn_attrs[0].value if cn_attrs else None, orig_dns, operation=RENEWAL_OPERATIONS)
+    rule_context = {'operation': 'renewal', 'ca_id': ca.id,
+                    'subject': cn_attrs[0].value if cn_attrs else getattr(cert, 'descr', None)}
     violations, validity_days, capped_by = PolicyEvaluationService.enforce_rules(
         policies, key_type=key_label_for_public_key(orig_pub_key),
-        dns_name_count=len(set(orig_dns)), validity_days=validity_days)
+        dns_name_count=len(set(orig_dns)), validity_days=validity_days, context=rule_context)
     sign_hash, digest_violations = PolicyEvaluationService.checked_signing_hash(
-        policies, ca_key, explicit=False)
+        policies, ca_key, explicit=False, context=rule_context)
     violations += digest_violations
     if violations:
         raise RenewalError('Policy violation: ' + '; '.join(violations), 400)
