@@ -12,6 +12,9 @@ from functools import lru_cache
 
 logger = logging.getLogger(__name__)
 
+MACHINE_KEY_PATH = '/opt/ucm/data/.machine-key'
+MACHINE_ID_PATHS = ('/etc/machine-id', '/var/lib/dbus/machine-id', MACHINE_KEY_PATH)
+
 
 def _require_db_encryption_key() -> bool:
     """True when the deployment opted in to refusing the machine-id fallback.
@@ -62,32 +65,28 @@ def _get_encryption_key() -> bytes:
 
     # Generate deterministic key from machine-specific data
     # This ensures the same key is used across restarts
-    machine_id_paths = [
-        '/etc/machine-id',
-        '/var/lib/dbus/machine-id',
-        '/opt/ucm/data/.machine-key'
-    ]
-    
     machine_id = None
-    for path in machine_id_paths:
+    for path in MACHINE_ID_PATHS:
         try:
             with open(path, 'r') as f:
                 machine_id = f.read().strip()
-                break
         except Exception:
             continue
-    
+        if machine_id:
+            break  # an empty machine-id (common in containers) falls through to the next
+
     if not machine_id:
         # Create a persistent machine key
         from utils.randomness import csp_bytes
         machine_id = csp_bytes(32).hex()
         try:
-            os.makedirs('/opt/ucm/data', exist_ok=True)
-            with open('/opt/ucm/data/.machine-key', 'w') as f:
+            os.makedirs(os.path.dirname(MACHINE_KEY_PATH), exist_ok=True)
+            with open(MACHINE_KEY_PATH, 'w') as f:
                 f.write(machine_id)
-        except Exception:
-            pass
-    
+        except Exception as e:
+            logger.error(f'Could not persist {MACHINE_KEY_PATH}: integration secrets '
+                         f'will not be readable after a restart ({e})')
+
     # Derive Fernet-compatible key (32 bytes, base64 encoded).
     #
     # Every parameter below is frozen: the algorithm, the in-source salt, the
