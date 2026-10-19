@@ -172,3 +172,51 @@ def test_postgres_adds_the_discovery_notify_email_column():
         conn.commit()
         conn.close()
         engine.dispose()
+
+
+LEGACY = {'report_expiry_enabled': 'true', 'report_expiry_recipients': '["ops@example.test"]',
+          'report_compliance_enabled': 'true', 'report_compliance_recipients': '[]'}
+
+
+def _check_legacy_reports(config):
+    assert not any(k in config for k in LEGACY)
+    sched = json.loads(config['report_schedule_expiring_certificates'])
+    assert sched['enabled'] is True and sched['frequency'] == 'daily'
+    assert sched['recipients'] == ['ops@example.test']
+    # Switched on without recipients: it never sent anything, nothing to keep
+    assert 'report_schedule_compliance_status' not in config
+
+
+def test_sqlite_converts_the_legacy_report_switches():
+    m = _migration()
+    conn = sqlite3.connect(':memory:')
+    conn.execute("CREATE TABLE system_config (id INTEGER PRIMARY KEY NOT NULL, key VARCHAR(100) NOT NULL, value TEXT)")
+    conn.executemany("INSERT INTO system_config (key, value) VALUES (?, ?)", list(LEGACY.items()))
+    m.upgrade(conn)
+    m.upgrade(conn)
+    _check_legacy_reports(dict(conn.execute("SELECT key, value FROM system_config").fetchall()))
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_postgres_converts_the_legacy_report_switches():
+    m = _migration()
+    schema = f"migtest_102r_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
+    engine = create_engine(PG_URL)
+    conn = engine.connect()
+    try:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.execute(text(f"CREATE SCHEMA {schema}"))
+        conn.execute(text(f"SET search_path TO {schema}"))
+        conn.execute(text("CREATE TABLE system_config (id SERIAL PRIMARY KEY, key VARCHAR(100) NOT NULL, value TEXT)"))
+        for k, v in LEGACY.items():
+            conn.execute(text("INSERT INTO system_config (key, value) VALUES (:k, :v)"), {'k': k, 'v': v})
+        m.upgrade(conn)
+        m.upgrade(conn)
+        _check_legacy_reports(dict(conn.execute(text("SELECT key, value FROM system_config")).fetchall()))
+    finally:
+        conn.rollback()
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.commit()
+        conn.close()
+        engine.dispose()

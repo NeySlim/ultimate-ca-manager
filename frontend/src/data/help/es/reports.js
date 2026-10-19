@@ -25,8 +25,8 @@ export default {
       {
         title: 'Programación',
         items: [
-          { label: 'Informe de expiración', text: 'Correo electrónico diario con certificados que expiran pronto' },
-          { label: 'Informe de cumplimiento', text: 'Correo electrónico semanal con el estado de cumplimiento de políticas' },
+          { label: 'Informe de expiración', text: 'Correo electrónico con certificados que expiran pronto, con la frecuencia elegida' },
+          { label: 'Informe de cumplimiento', text: 'Correo electrónico con el estado de cumplimiento de políticas, con la frecuencia elegida' },
         ]
       },
     ],

@@ -20,6 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME DNS providers: the `zones` list of the API was stored but never used, since ACME > Domains decides which provider answers for a domain; it is no longer accepted or returned. Map each domain in ACME > Domains instead.
 - Policies: the `required_extensions` and `san_restrictions.require_approval_for_external` rules were saved but never enforced; they are dropped on save and the upgrade removes them from existing policies. Nothing to do: approval is set per policy with "Requires approval".
 - Templates: the "Subject Alternative Names" types and the stored basic constraints were never applied at issuance; the form no longer offers them and the upgrade removes them from existing templates. Nothing to do: the names come from the request.
+- Reports: the legacy expiry and compliance report switches made the Reports page show a daily expiry report that never ran. The upgrade turns one switched on with recipients into a real schedule and removes the rest; check Reports > Schedule after upgrading.
 
 ### Fixed
 

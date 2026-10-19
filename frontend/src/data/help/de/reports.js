@@ -25,8 +25,8 @@ export default {
       {
         title: 'Planung',
         items: [
-          { label: 'Ablaufbericht', text: 'Tägliche E-Mail mit bald ablaufenden Zertifikaten' },
-          { label: 'Compliance-Bericht', text: 'Wöchentliche E-Mail mit Richtlinien-Compliance-Status' },
+          { label: 'Ablaufbericht', text: 'E-Mail mit bald ablaufenden Zertifikaten, in der gewählten Häufigkeit' },
+          { label: 'Compliance-Bericht', text: 'E-Mail mit Richtlinien-Compliance-Status, in der gewählten Häufigkeit' },
         ]
       },
     ],

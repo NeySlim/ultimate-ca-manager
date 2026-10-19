@@ -17,7 +17,36 @@ DEAD_KEYS = (
     'acme.proxy.eab_hmac_key',
     'acme.proxy.account_url',
     'acme.proxy.account_key',
+    'report_expiry_enabled',
+    'report_expiry_recipients',
+    'report_compliance_enabled',
+    'report_compliance_recipients',
 )
+
+# Legacy report switches nothing ran: (prefix, schedule key, frequency).
+LEGACY_REPORTS = (
+    ('report_expiry', 'report_schedule_expiring_certificates', 'daily'),
+    ('report_compliance', 'report_schedule_compliance_status', 'weekly'),
+)
+
+
+def _legacy_schedules(config):
+    """``{schedule key: JSON}`` for each legacy report switched on with
+    recipients and not already scheduled, from ``{key: value}`` *config*."""
+    out = {}
+    for prefix, schedule_key, frequency in LEGACY_REPORTS:
+        if config.get(f'{prefix}_enabled') != 'true' or schedule_key in config:
+            continue
+        try:
+            recipients = json.loads(config.get(f'{prefix}_recipients') or '[]')
+        except (TypeError, ValueError):
+            continue
+        if not isinstance(recipients, list) or not recipients:
+            continue
+        out[schedule_key] = json.dumps({
+            'enabled': True, 'frequency': frequency, 'time': '08:00', 'day_of_week': 1,
+            'day_of_month': 1, 'recipients': recipients, 'format': 'csv'})
+    return out
 
 
 DEAD_RULE_KEYS = ('required_extensions', 'forbidden_extensions')
@@ -69,6 +98,9 @@ JSON_COLUMNS = (
 def _upgrade_sqlite(conn):
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if 'system_config' in tables:
+        config = dict(conn.execute("SELECT key, value FROM system_config").fetchall())
+        for key, value in _legacy_schedules(config).items():
+            conn.execute("INSERT INTO system_config (key, value) VALUES (?, ?)", (key, value))
         conn.executemany("DELETE FROM system_config WHERE key = ?", [(k,) for k in DEAD_KEYS])
     if 'discovery_scan_profiles' in tables:
         columns = {r[1] for r in conn.execute("PRAGMA table_info(discovery_scan_profiles)")}
@@ -89,6 +121,10 @@ def _upgrade_pg(conn):
 
     tables = set(inspect(conn).get_table_names())
     if 'system_config' in tables:
+        config = dict(conn.execute(text("SELECT key, value FROM system_config")).fetchall())
+        for key, value in _legacy_schedules(config).items():
+            conn.execute(text("INSERT INTO system_config (key, value) VALUES (:k, :v)"),
+                         {'k': key, 'v': value})
         conn.execute(text("DELETE FROM system_config WHERE key IN :keys").bindparams(
             bindparam('keys', expanding=True)), {'keys': list(DEAD_KEYS)})
     if 'discovery_scan_profiles' in tables:

@@ -1568,8 +1568,8 @@ export const helpContent = {
         title: 'Scheduling',
         icon: CalendarBlank,
         items: [
-          { label: 'Expiry Report', text: 'Daily email with certificates expiring soon' },
-          { label: 'Compliance Report', text: 'Weekly email with policy compliance status' },
+          { label: 'Expiry Report', text: 'Email with certificates expiring soon, at the frequency you set' },
+          { label: 'Compliance Report', text: 'Email with policy compliance status, at the frequency you set' },
         ]
       },
     ],

@@ -208,24 +208,7 @@ def get_schedule_settings():
                 schedules[report_key] = dict(DEFAULT_SCHEDULE)
         else:
             sched = dict(DEFAULT_SCHEDULE)
-            # Backward compat: migrate old expiry/compliance config
-            if report_key == 'expiring_certificates':
-                if _get_config('report_expiry_enabled', 'false') == 'true':
-                    sched['enabled'] = True
-                    sched['frequency'] = 'daily'
-                    try:
-                        sched['recipients'] = json.loads(_get_config('report_expiry_recipients', '[]'))
-                    except (json.JSONDecodeError, ValueError):
-                        pass
-            elif report_key == 'compliance_status':
-                if _get_config('report_compliance_enabled', 'false') == 'true':
-                    sched['enabled'] = True
-                    sched['frequency'] = 'weekly'
-                    try:
-                        sched['recipients'] = json.loads(_get_config('report_compliance_recipients', '[]'))
-                    except (json.JSONDecodeError, ValueError):
-                        pass
-            elif report_key == 'executive_pdf':
+            if report_key == 'executive_pdf':
                 sched['format'] = 'pdf'
                 sched['frequency'] = 'monthly'
             schedules[report_key] = sched
