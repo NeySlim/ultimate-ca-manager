@@ -10,6 +10,7 @@ import json
 from .helpers import _encrypt_ldap_password, _parse_json_field, _parse_group_list
 from .connection_tests import _test_ldap_connection, _test_oauth2_connection, _test_saml_connection
 from utils.ssrf_protection import validate_url_not_cloud_metadata
+from utils.secret_target import MASKS, keeps_saved_secret, retarget_error
 from services.oidc_id_token import clear_oidc_cache
 
 
@@ -188,6 +189,36 @@ def create_provider():
     return success_response(data=provider.to_dict(), message="SSO provider created")
 
 
+_SSO_SECRET_TARGETS = {
+    'oauth2': ('oauth2_client_secret', ('oauth2_client_id', 'oauth2_auth_url', 'oauth2_token_url',
+                                        'oauth2_userinfo_url', 'oauth2_issuer', 'oauth2_jwks_uri',
+                                        'oauth2_verify_ssl', 'oauth2_ca_bundle')),
+    'ldap': ('ldap_bind_password', ('ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_bind_dn',
+                                    'ldap_verify_ssl', 'ldap_ca_bundle')),
+}
+
+
+def _sso_retarget_error(provider, data):
+    """The saved client secret or bind password stays with its saved server."""
+    secret_key, targets = _SSO_SECRET_TARGETS.get(provider.provider_type, (None, ()))
+    if not secret_key or not isinstance(data, dict):
+        return None
+    current = {k: getattr(provider, k) for k in targets}
+    # Read back as the form shows them, so an unchanged form compares equal
+    for k in current:
+        if k.endswith('_verify_ssl'):
+            current[k] = current[k] is not False
+        elif k.endswith('_use_ssl'):
+            current[k] = bool(current[k])
+    if 'ldap_port' in current:
+        current['ldap_port'] = current['ldap_port'] or 389
+    # to_dict sends ca_bundle back as a boolean, which the update ignores
+    requested = {k: v for k, v in data.items()
+                 if not (k.endswith('_ca_bundle') and not isinstance(v, str))}
+    return retarget_error(current, requested,
+                          keeps_saved_secret(data, secret_key, getattr(provider, secret_key)))
+
+
 @bp.route('/api/v2/sso/providers/<int:provider_id>', methods=['PUT'])
 @bp.route('/api/v2/sso/providers/<string:provider_type_name>', methods=['PUT'])
 @require_auth(['write:sso'])
@@ -207,7 +238,7 @@ def update_provider(provider_id=None, provider_type_name=None):
     data = request.get_json()
 
     # SSRF guard on URLs the backend will dereference
-    err = _validate_sso_outbound_urls(data)
+    err = _validate_sso_outbound_urls(data) or _sso_retarget_error(provider, data)
     if err:
         return err
 
@@ -262,7 +293,7 @@ def update_provider(provider_id=None, provider_type_name=None):
         if 'oauth2_ca_bundle' in data and isinstance(data['oauth2_ca_bundle'], str):
             provider.oauth2_ca_bundle = data['oauth2_ca_bundle'] or None
         # Only update secret if non-empty (empty = keep existing)
-        if data.get('oauth2_client_secret'):
+        if data.get('oauth2_client_secret') and data['oauth2_client_secret'] not in MASKS:
             provider.oauth2_client_secret = data['oauth2_client_secret']
         if 'oauth2_scopes' in data:
             provider.oauth2_scopes = json.dumps(data['oauth2_scopes'])
@@ -286,7 +317,7 @@ def update_provider(provider_id=None, provider_type_name=None):
         if 'ldap_ca_bundle' in data and isinstance(data['ldap_ca_bundle'], str):
             provider.ldap_ca_bundle = data['ldap_ca_bundle'] or None
         # Only update password if non-empty (empty = keep existing)
-        if data.get('ldap_bind_password'):
+        if data.get('ldap_bind_password') and data['ldap_bind_password'] not in MASKS:
             provider.ldap_bind_password = _encrypt_ldap_password(data['ldap_bind_password'])
 
     # JSON fields

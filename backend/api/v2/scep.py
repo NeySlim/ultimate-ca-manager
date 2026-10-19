@@ -8,6 +8,7 @@ from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
+from utils.secret_target import SECRET_TARGET_MESSAGE, keeps_saved_secret, retarget_error
 from models import db, SCEPRequest, SystemConfig, CA
 from services.audit_service import AuditService
 from services.policy_service import PolicyViolation
@@ -486,6 +487,11 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
                     + ('' if intune_on else ' (Smartcard Logon requires Intune validation)')
                 )
 
+    saved = db.session.get(ScepProfile, profile_id) if profile_id else None
+    bound = saved.intune_app if saved is not None else None
+    if bound is not None and 'intune_app_id' not in data and _moves_bound_secret(data, bound):
+        return False, SECRET_TARGET_MESSAGE
+
     # Intune SCEP challenge validation (issue #228 part 2): validate against
     # the RESULTING state, not just what this payload touches — a partial
     # PATCH that only flips intune_enabled=True must still be checked against
@@ -518,6 +524,15 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
 class IntuneAppConflict(Exception):
     """The pre-092 trio names credentials that clash with a registration on
     file: answered 409, never a silent overwrite nor a duplicate."""
+
+
+def _moves_bound_secret(data, bound):
+    """True when the pre-092 trio moves the bound app's saved secret to another tenant or client."""
+    tenant = (data.get('intune_tenant_id') or '').strip() or bound.tenant_id
+    client = (data.get('intune_client_id') or '').strip() or bound.client_id
+    return bool(retarget_error({'tenant_id': bound.tenant_id, 'client_id': bound.client_id},
+                               {'tenant_id': tenant, 'client_id': client},
+                               keeps_saved_secret(data, 'intune_client_secret', bound.client_secret)))
 
 
 def _intune_app_for(data, existing, dry_run=False):
@@ -840,6 +855,10 @@ def update_intune_app(app_id):
     if twin and (fields['tenant_id'], fields['client_id']) != (app.tenant_id, app.client_id):
         return error_response(
             f'An app registration for this tenant and client ID already exists: {twin.name}', 409)
+    err = retarget_error({'tenant_id': app.tenant_id, 'client_id': app.client_id}, fields,
+                         keeps_saved_secret(data, 'client_secret', app.client_secret))
+    if err:
+        return err
     changed = [key for key, value in fields.items() if getattr(app, key) != value]
     for key, value in fields.items():
         setattr(app, key, value)

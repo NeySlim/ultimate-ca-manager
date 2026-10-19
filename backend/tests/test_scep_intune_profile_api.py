@@ -118,7 +118,7 @@ class TestIntuneProfileValidation:
 
         r = auth_client.patch(
             f"/api/v2/scep/profiles/{prof['id']}",
-            data=json.dumps({'intune_client_id': 'client-1-updated'}),
+            data=json.dumps({'description': 'edited', 'intune_client_secret': ''}),
             content_type=CONTENT_JSON,
         )
         assert r.status_code == 200, r.data

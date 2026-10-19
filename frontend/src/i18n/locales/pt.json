@@ -130,6 +130,7 @@
     "set": "Definido",
     "configured": "Configurado",
     "enterNewToChange": "Digite um novo valor para alterar",
+    "secretRequiredForTarget": "O segredo salvo só é enviado ao servidor e à conta salvos. Digite-o novamente para alterá-los.",
     "auto": "Auto",
     "manual": "Manual",
     "update": "Actualizar",

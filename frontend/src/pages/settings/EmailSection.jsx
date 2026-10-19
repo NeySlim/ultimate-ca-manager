@@ -7,9 +7,11 @@ import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import TagsInput from '../../components/ui/TagsInput'
 import EmailTemplateWindow from '../../components/EmailTemplateWindow'
 import { WarningCircle } from '@phosphor-icons/react'
+import { secretInputProps, smtpSecretTargets } from '../../lib/secretTarget'
 
-export default function EmailSection({ settings, updateSetting, handleSave, saving, canWrite, isMobile, emailTestResult, emailTesting, handleTestEmail, defaultTestRecipient, oauthDirty, setOauthDirty, oauthPresets, applyOAuthProviderPreset, handleSmtpOAuthAuthorize, handleSmtpOAuthRevoke, expiryAlerts, setExpiryAlerts, saveExpiryAlerts, triggerExpiryCheck, showTemplateEditor, setShowTemplateEditor }) {
+export default function EmailSection({ settings, savedEmail, updateSetting, handleSave, saving, canWrite, isMobile, emailTestResult, emailTesting, handleTestEmail, defaultTestRecipient, oauthDirty, setOauthDirty, oauthPresets, applyOAuthProviderPreset, handleSmtpOAuthAuthorize, handleSmtpOAuthRevoke, expiryAlerts, setExpiryAlerts, saveExpiryAlerts, triggerExpiryCheck, showTemplateEditor, setShowTemplateEditor }) {
   const { t } = useTranslation()
+  const secretTargets = smtpSecretTargets(savedEmail, settings)
   const { showSuccess } = useNotification()
   const { copy } = useClipboard()
   const oauthProviderSetup = {
@@ -99,6 +101,7 @@ export default function EmailSection({ settings, updateSetting, handleSave, savi
                     value={settings.smtp_password === '********' ? '' : (settings.smtp_password || '')}
                     onChange={(e) => updateSetting('smtp_password', e.target.value)}
                     hasExistingValue={settings.smtp_password === '********'}
+                    {...secretInputProps(t, secretTargets.password)}
                   />
                 </div>
               </DetailGrid>
@@ -186,6 +189,7 @@ export default function EmailSection({ settings, updateSetting, handleSave, savi
                       value={settings.smtp_oauth_client_secret === '********' ? '' : (settings.smtp_oauth_client_secret || '')}
                       onChange={(e) => { updateSetting('smtp_oauth_client_secret', e.target.value); setOauthDirty(true) }}
                       hasExistingValue={settings.has_oauth_client_secret}
+                      {...secretInputProps(t, secretTargets.oauth)}
                     />
                   </div>
                   {(settings.smtp_oauth_provider || 'google') === 'custom' && (

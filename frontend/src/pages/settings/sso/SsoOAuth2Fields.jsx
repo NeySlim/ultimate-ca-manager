@@ -16,6 +16,7 @@ export default function SsoOAuth2Fields({
   roleOptions,
   oauthCallbackUrl,
   handleTestConnection,
+  secretProps,
 }) {
   const { t } = useTranslation()
 
@@ -58,7 +59,7 @@ export default function SsoOAuth2Fields({
       >
         <div className="space-y-3">
           <Input label={t('common.clientId')} value={formData.oauth2_client_id} onChange={e => handleChange('oauth2_client_id', e.target.value)} />
-          <Input label={t('common.clientSecret')} type="password" noAutofill value={formData.oauth2_client_secret} onChange={e => handleChange('oauth2_client_secret', e.target.value)} hasExistingValue={!!provider?.oauth2_client_secret} />
+          <Input label={t('common.clientSecret')} type="password" noAutofill value={formData.oauth2_client_secret} onChange={e => handleChange('oauth2_client_secret', e.target.value)} hasExistingValue={!!provider?.oauth2_client_secret} {...secretProps} />
           <Input label={t('sso.authUrl')} value={formData.oauth2_auth_url} onChange={e => handleChange('oauth2_auth_url', e.target.value)} placeholder={t('sso.authUrlPlaceholder')} />
           <Input label={t('sso.tokenUrl')} value={formData.oauth2_token_url} onChange={e => handleChange('oauth2_token_url', e.target.value)} placeholder={t('sso.tokenUrlPlaceholder')} />
           <Input label={t('sso.userinfoUrl')} value={formData.oauth2_userinfo_url} onChange={e => handleChange('oauth2_userinfo_url', e.target.value)} placeholder={t('sso.userinfoUrlPlaceholder')} />

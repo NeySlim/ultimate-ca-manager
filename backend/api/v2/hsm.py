@@ -10,6 +10,7 @@ Supports:
 
 from flask import Blueprint, request, g
 from auth.unified import require_auth
+from utils.secret_target import MASKS, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
 from services.hsm import HsmService
 from services.hsm.base_provider import HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
@@ -146,6 +147,32 @@ def get_provider(provider_id):
     return success_response(data=provider.to_dict(include_config=True))
 
 
+_HSM_TARGET_FIELDS = {
+    'pkcs11': ('module_path', 'token_label', 'slot_index'),
+    'openbao': ('url', 'mount_path', 'namespace', 'tls_skip_verify'),
+    'azure-keyvault': ('vault_url', 'tenant_id', 'client_id', 'use_managed_identity'),
+    'google-kms': ('project_id', 'location', 'key_ring'),
+    'aws-cloudhsm': ('cluster_id', 'region', 'hsm_user'),
+}
+
+
+def _hsm_retarget_error(provider, config):
+    """A masked credential is kept only while the provider still points where it did."""
+    from models.hsm import _is_sensitive_key
+    if not isinstance(config, dict):
+        return None
+    existing = provider.get_config() if provider.config else {}
+    keeping = any(_is_sensitive_key(k) and isinstance(v, str) and v in MASKS and existing.get(k)
+                  for k, v in config.items())
+    # The service carries the previous PIN over unless a new PIN comes with the request
+    new_pin = isinstance(config.get('user_pin'), str) and config['user_pin'] not in MASKS + ('',)
+    keeping = keeping or bool(existing.get('previous_user_pin') and 'previous_user_pin' not in config
+                              and not new_pin)
+    current = {k: existing.get(k) for k in _HSM_TARGET_FIELDS.get(provider.type, ())}
+    # The config is replaced whole: a target left out is a target cleared
+    return retarget_error(current, {k: config.get(k) for k in current}, keeping)
+
+
 @bp.route('/api/v2/hsm/providers/<int:provider_id>', methods=['PUT'])
 @require_auth(['write:hsm'])
 def update_provider(provider_id):
@@ -176,6 +203,9 @@ def update_provider(provider_id):
     
     if config is not None and not isinstance(config, dict):
         return error_response('Config must be an object', 400)
+    err = _hsm_retarget_error(provider, config)
+    if err:
+        return err
     
     try:
         updated = HsmService.update_provider(

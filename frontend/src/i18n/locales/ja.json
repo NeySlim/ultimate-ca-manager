@@ -130,6 +130,7 @@
     "set": "設定済み",
     "configured": "設定済み",
     "enterNewToChange": "変更するには新しい値を入力してください",
+    "secretRequiredForTarget": "保存済みのシークレットは保存済みのサーバーとアカウントにのみ送信されます。変更するにはシークレットを再入力してください。",
     "auto": "自動",
     "manual": "手動",
     "update": "更新",

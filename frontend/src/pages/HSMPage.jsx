@@ -19,6 +19,7 @@ import { useNotification, useMobile } from '../contexts'
 import { usePermission, useClipboard, usePersistedState } from '../hooks'
 import { hsmService } from '../services'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
+import { secretInputProps } from '../lib/secretTarget'
 
 const PROVIDER_TYPES = [
   { value: 'pkcs11', label: 'PKCS#11 (Local HSM)', icon: HardDrive },
@@ -615,6 +616,15 @@ export default function HSMPage() {
   )
 }
 
+// Per type: the saved credential and the form fields it stays with (as on the server)
+const SECRET_TARGETS = {
+  pkcs11: ['pkcs11_pin', ['pkcs11_library_path', 'pkcs11_token_label', 'pkcs11_slot_id']],
+  'aws-cloudhsm': ['aws_crypto_password', ['aws_cluster_id', 'aws_crypto_user']],
+  'azure-keyvault': ['azure_client_secret', ['azure_vault_url', 'azure_tenant_id', 'azure_client_id']],
+  openbao: ['openbao_token', ['openbao_url', 'openbao_mount_path', 'openbao_namespace',
+    'openbao_tls_skip_verify']],
+}
+
 export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
   const { t } = useTranslation()
   const [formData, setFormData] = useState({
@@ -648,6 +658,15 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
   })
 
   const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }))
+
+  // The form as loaded: what the saved credential was saved for
+  const [savedForm] = useState(formData)
+  const [secretField, targetFields] = SECRET_TARGETS[formData.provider_type] || []
+  const secretTarget = secretField ? {
+    saved: savedForm, current: formData, fields: targetFields, secret: formData[secretField],
+    secretSaved: provider?.[secretField] === '***',
+  } : null
+  const secretProps = (field) => (field === secretField ? secretInputProps(t, secretTarget) : {})
 
   const buildPayload = () => {
     const config = {}
@@ -722,7 +741,7 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
             <Input label={t('hsm.pkcs11Config.slotId')} type="number" value={formData.pkcs11_slot_id} onChange={e => handleChange('pkcs11_slot_id', e.target.value ? parseInt(e.target.value) : '')} />
             <Input label={t('hsm.pkcs11Config.tokenLabel')} value={formData.pkcs11_token_label} onChange={e => handleChange('pkcs11_token_label', e.target.value)} />
           </div>
-          <Input label={t('hsm.pkcs11Config.pin')} type="password" noAutofill value={formData.pkcs11_pin === '***' ? '' : (formData.pkcs11_pin || '')} onChange={e => handleChange('pkcs11_pin', e.target.value)} hasExistingValue={provider?.pkcs11_pin === '***'} />
+          <Input label={t('hsm.pkcs11Config.pin')} type="password" noAutofill value={formData.pkcs11_pin === '***' ? '' : (formData.pkcs11_pin || '')} onChange={e => handleChange('pkcs11_pin', e.target.value)} hasExistingValue={provider?.pkcs11_pin === '***'} {...secretProps('pkcs11_pin')} />
         </div>
       )}
 
@@ -738,7 +757,7 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input label={t('hsm.awsConfig.cryptoUser')} value={formData.aws_crypto_user} onChange={e => handleChange('aws_crypto_user', e.target.value)} />
-            <Input label={t('hsm.awsConfig.cryptoPassword')} type="password" noAutofill value={formData.aws_crypto_password === '***' ? '' : (formData.aws_crypto_password || '')} onChange={e => handleChange('aws_crypto_password', e.target.value)} hasExistingValue={provider?.aws_crypto_password === '***'} />
+            <Input label={t('hsm.awsConfig.cryptoPassword')} type="password" noAutofill value={formData.aws_crypto_password === '***' ? '' : (formData.aws_crypto_password || '')} onChange={e => handleChange('aws_crypto_password', e.target.value)} hasExistingValue={provider?.aws_crypto_password === '***'} {...secretProps('aws_crypto_password')} />
           </div>
         </div>
       )}
@@ -750,7 +769,7 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
             <Input label={t('hsm.azureConfig.tenantId')} value={formData.azure_tenant_id} onChange={e => handleChange('azure_tenant_id', e.target.value)} />
             <Input label={t('common.clientId')} value={formData.azure_client_id} onChange={e => handleChange('azure_client_id', e.target.value)} />
           </div>
-          <Input label={t('common.clientSecret')} type="password" noAutofill value={formData.azure_client_secret === '***' ? '' : (formData.azure_client_secret || '')} onChange={e => handleChange('azure_client_secret', e.target.value)} hasExistingValue={provider?.azure_client_secret === '***'} />
+          <Input label={t('common.clientSecret')} type="password" noAutofill value={formData.azure_client_secret === '***' ? '' : (formData.azure_client_secret || '')} onChange={e => handleChange('azure_client_secret', e.target.value)} hasExistingValue={provider?.azure_client_secret === '***'} {...secretProps('azure_client_secret')} />
         </div>
       )}
 
@@ -767,7 +786,7 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
       {formData.provider_type === 'openbao' && (
         <div className="space-y-4">
           <Input label={t('hsm.openbaoConfig.url')} value={formData.openbao_url} onChange={e => handleChange('openbao_url', e.target.value)} placeholder="https://openbao.example.com:8200" required />
-          <Input label={t('hsm.openbaoConfig.token')} type="password" noAutofill value={formData.openbao_token === '***' ? '' : (formData.openbao_token || '')} onChange={e => handleChange('openbao_token', e.target.value)} hasExistingValue={provider?.openbao_token === '***'} />
+          <Input label={t('hsm.openbaoConfig.token')} type="password" noAutofill value={formData.openbao_token === '***' ? '' : (formData.openbao_token || '')} onChange={e => handleChange('openbao_token', e.target.value)} hasExistingValue={provider?.openbao_token === '***'} {...secretProps('openbao_token')} />
           <div className="grid grid-cols-2 gap-4">
             <Input label={t('hsm.openbaoConfig.mountPath')} value={formData.openbao_mount_path} onChange={e => handleChange('openbao_mount_path', e.target.value)} placeholder="transit" />
             <Input label={t('hsm.openbaoConfig.namespace')} value={formData.openbao_namespace} onChange={e => handleChange('openbao_namespace', e.target.value)} placeholder={t('common.optional')} />

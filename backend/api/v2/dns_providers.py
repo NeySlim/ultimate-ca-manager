@@ -8,6 +8,7 @@ from auth.unified import require_auth
 from fips_mode import FipsRestricted
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
+from utils.secret_target import retarget_error
 from models import db, DnsProvider
 from services.audit_service import AuditService
 from services.acme.dns_providers import (
@@ -123,6 +124,30 @@ def get_provider(provider_id):
     return success_response(data=provider.to_dict(include_credentials=True))
 
 
+_SECRET_HINTS = ('secret', 'token', 'password', 'key')
+
+
+def _credentials_retarget_error(provider, credentials):
+    """Saved credential secrets stay with the server and account they were saved for."""
+    if not isinstance(credentials, dict) or not credentials or not provider.credentials:
+        return None
+    try:
+        existing = json.loads(provider.credentials) or {}
+    except (TypeError, ValueError):
+        return None
+    provider_class = get_provider_class(provider.provider_type)
+    schema = provider_class.get_credential_schema() if provider_class else []
+    names = {f['name'] for f in schema} | set(existing) | set(credentials)
+    # Values are never shown back, so anything that looks secret is treated as one
+    secret = {n for n in names
+              if any(f['name'] == n and f.get('type') == 'password' for f in schema)
+              or any(h in n.lower() for h in _SECRET_HINTS)}
+    current = {n: existing.get(n) for n in names - secret}
+    requested = {k: v for k, v in credentials.items() if v}
+    keeping = any(existing.get(k) and not credentials.get(k) for k in secret)
+    return retarget_error(current, requested, keeping)
+
+
 @bp.route('/api/v2/dns-providers/<int:provider_id>', methods=['PATCH'])
 @require_auth(['write:acme'])
 def update_provider(provider_id):
@@ -134,27 +159,29 @@ def update_provider(provider_id):
     data = request.json
     if not data:
         return error_response('Request body required', 400)
-    
-    # Update fields
+    # Merged and checked before anything changes: a refused algorithm or a
+    # moved target leaves the provider as it was
+    credentials = data.get('credentials')
+    merged = None
+    if credentials and isinstance(credentials, dict):
+        merged = credentials
+        if provider.credentials:
+            merged = json.loads(provider.credentials)
+            # Only update with non-empty values
+            for key, value in credentials.items():
+                if value:  # Don't overwrite with empty values
+                    merged[key] = value
+        provider_class = get_provider_class(provider.provider_type)
+        if provider_class:
+            provider_class.validate_credentials(merged)
+    err = _credentials_retarget_error(provider, credentials)
+    if err:
+        return err
+
     if 'name' in data:
         provider.name = data['name']
-    
-    if 'credentials' in data:
-        credentials = data['credentials']
-        # Skip if credentials is empty or not a dict
-        if credentials and isinstance(credentials, dict):
-            # Merge with existing credentials (for partial updates)
-            if provider.credentials:
-                existing = json.loads(provider.credentials)
-                # Only update with non-empty values
-                for key, value in credentials.items():
-                    if value:  # Don't overwrite with empty values
-                        existing[key] = value
-                credentials = existing
-            provider_class = get_provider_class(provider.provider_type)
-            if provider_class:
-                provider_class.validate_credentials(credentials)
-            provider.credentials = json.dumps(credentials) if credentials else None
+    if merged is not None:
+        provider.credentials = json.dumps(merged) if merged else None
     
     if 'zones' in data:
         provider.zones = json.dumps(data['zones']) if data['zones'] else None

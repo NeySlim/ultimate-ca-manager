@@ -130,6 +130,7 @@
     "set": "已设置",
     "configured": "已配置",
     "enterNewToChange": "输入新值以更改",
+    "secretRequiredForTarget": "已保存的密钥只会发送到已保存的服务器和账户。如需更改，请重新输入密钥。",
     "auto": "自动",
     "manual": "手动",
     "update": "更新",

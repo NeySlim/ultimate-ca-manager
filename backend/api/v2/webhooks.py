@@ -13,6 +13,7 @@ from models import db
 from services.audit_service import AuditService
 from services.webhook_service import WebhookEndpoint, WebhookService
 from utils.db_transaction import safe_commit
+from utils.secret_target import keeps_saved_secret, retarget_error
 from utils.datetime_utils import utc_now
 from utils.decorators import require_json_body
 from utils.encryption import encrypt_if_needed
@@ -316,6 +317,17 @@ def update_webhook(endpoint_id):
     """Update webhook endpoint"""
     endpoint = db.get_or_404(WebhookEndpoint, endpoint_id)
     data = g.json_data
+
+    # The auth token and custom headers are sent; the HMAC secret only signs.
+    # Switching authentication off clears the token.
+    has_headers = endpoint.custom_headers not in (None, '', '{}')
+    token_dropped = 'auth_type' in data and data['auth_type'] in (None, 'none')
+    err = retarget_error({'url': endpoint.url}, data,
+                         (not token_dropped and keeps_saved_secret(
+                             data, 'auth_token', endpoint._auth_token, blank_clears=True))
+                         or keeps_saved_secret(data, 'custom_headers', has_headers, blank_clears=True))
+    if err:
+        return err
 
     if 'name' in data:
         endpoint.name = data['name']

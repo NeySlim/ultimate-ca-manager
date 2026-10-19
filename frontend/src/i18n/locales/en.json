@@ -131,6 +131,7 @@
     "set": "Set",
     "configured": "Configured",
     "enterNewToChange": "Enter a new value to change",
+    "secretRequiredForTarget": "The saved secret only goes to the saved server and account. Re-enter it to change them.",
     "auto": "Auto",
     "manual": "Manual",
     "update": "Update",

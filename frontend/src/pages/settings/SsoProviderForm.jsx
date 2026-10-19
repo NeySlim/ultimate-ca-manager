@@ -5,6 +5,15 @@ import { Button, Badge, Input } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { ssoService } from '../../services'
 import { useNotification } from '../../contexts'
+import { secretInputProps, secretRequiredForTarget } from '../../lib/secretTarget'
+
+// The saved client secret or bind password stays with these fields (as on the server)
+const SECRET_TARGETS = {
+  oauth2: ['oauth2_client_secret', ['oauth2_client_id', 'oauth2_auth_url', 'oauth2_token_url',
+    'oauth2_userinfo_url', 'oauth2_issuer', 'oauth2_jwks_uri', 'oauth2_verify_ssl', 'oauth2_ca_bundle']],
+  ldap: ['ldap_bind_password', ['ldap_server', 'ldap_port', 'ldap_use_ssl', 'ldap_bind_dn',
+    'ldap_verify_ssl', 'ldap_ca_bundle']],
+}
 import SsoLdapFields from './sso/SsoLdapFields'
 import SsoOAuth2Fields from './sso/SsoOAuth2Fields'
 import SsoSamlFields from './sso/SsoSamlFields'
@@ -78,6 +87,8 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     saml_verify_ssl: provider?.saml_verify_ssl ?? true,
     saml_ca_bundle: '',
   })
+  // The form as loaded: what the saved secret was saved for
+  const [savedForm] = useState(formData)
   const [fetchingMetadata, setFetchingMetadata] = useState(false)
   const [availableCerts, setAvailableCerts] = useState([])
   const [testingConnection, setTestingConnection] = useState(false)
@@ -157,8 +168,19 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     }
   }
 
+  const [secretKey, targetFields] = SECRET_TARGETS[formData.provider_type] || []
+  // The CA bundle loads empty and is sent only when typed, so typing it is the change
+  const secretTarget = secretKey && provider ? {
+    saved: savedForm, current: formData, fields: targetFields,
+    secret: formData[secretKey], secretSaved: Boolean(provider[secretKey]),
+  } : null
+
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (secretTarget && secretRequiredForTarget(secretTarget)) {
+      showError(t('common.secretRequiredForTarget'))
+      return
+    }
     const data = { ...formData }
     delete data._directoryType
     if (!data.oauth2_ca_bundle) delete data.oauth2_ca_bundle
@@ -236,7 +258,8 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
   const isOauth2 = formData.provider_type === 'oauth2'
   const isSaml = formData.provider_type === 'saml'
 
-  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, handleTestConnection }
+  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, handleTestConnection,
+    secretProps: secretTarget ? secretInputProps(t, secretTarget) : {} }
 
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">

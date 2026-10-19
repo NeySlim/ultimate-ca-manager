@@ -3,6 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { Eye, EyeSlash, CheckCircle, WarningCircle, X } from '@phosphor-icons/react'
 import { Button, Input, Select } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import { secretRequiredForTarget } from '../../lib/secretTarget'
 
 const WEBHOOK_EVENTS = [
   'certificate.issued',
@@ -134,6 +135,12 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
     }))
   }
 
+  // A moved URL needs the token typed again: show the field, with the reason
+  const tokenMustRetype = formData.auth_type !== 'none' && secretRequiredForTarget({
+    saved: webhook, current: formData, fields: ['url'], secret: formData.auth_token,
+    secretSaved: formData.auth_token_set && !formData.auth_token_cleared,
+  })
+
   // Client-side validation mirroring backend rules
   const validate = () => {
     const errors = {}
@@ -147,6 +154,8 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
 
       if (needsToken) {
         errors.auth_token = t('webhooks.auth.errors.tokenRequired')
+      } else if (tokenMustRetype) {
+        errors.auth_token = t('common.secretRequiredForTarget')
       } else if (tokenProvided && byteLength(auth_token) > TOKEN_MAX_BYTES) {
         errors.auth_token = t('webhooks.auth.errors.tokenTooLong')
       }
@@ -265,7 +274,8 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
   const showTokenSetBadge =
     formData.auth_token_set &&
     !formData.auth_token_cleared &&
-    formData.auth_token.length === 0
+    formData.auth_token.length === 0 &&
+    !tokenMustRetype
 
   return (
     <form onSubmit={handleSubmit} className="p-4 space-y-4">
@@ -331,7 +341,7 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
                 value={formData.auth_token}
                 onChange={e => handleChange('auth_token', e.target.value)}
                 placeholder={t('webhooks.auth.token.placeholder')}
-                error={validationErrors.auth_token}
+                error={validationErrors.auth_token || (tokenMustRetype ? t('common.secretRequiredForTarget') : undefined)}
                 helperText={showTokenByteCount ? `${tokenBytes} / ${TOKEN_MAX_BYTES} bytes` : undefined}
               />
             )}
@@ -375,7 +385,7 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
                 value={formData.auth_token}
                 onChange={e => handleChange('auth_token', e.target.value)}
                 placeholder={t('webhooks.auth.token.placeholder')}
-                error={validationErrors.auth_token}
+                error={validationErrors.auth_token || (tokenMustRetype ? t('common.secretRequiredForTarget') : undefined)}
                 helperText={showTokenByteCount ? `${tokenBytes} / ${TOKEN_MAX_BYTES} bytes` : undefined}
               />
             )}
@@ -425,7 +435,7 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
                 value={formData.auth_token}
                 onChange={e => handleChange('auth_token', e.target.value)}
                 placeholder={t('webhooks.auth.token.placeholder')}
-                error={validationErrors.auth_token}
+                error={validationErrors.auth_token || (tokenMustRetype ? t('common.secretRequiredForTarget') : undefined)}
                 helperText={showTokenByteCount ? `${tokenBytes} / ${TOKEN_MAX_BYTES} bytes` : undefined}
               />
             )}
@@ -469,7 +479,7 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
                 value={formData.auth_token}
                 onChange={e => handleChange('auth_token', e.target.value)}
                 placeholder={t('webhooks.auth.token.placeholder')}
-                error={validationErrors.auth_token}
+                error={validationErrors.auth_token || (tokenMustRetype ? t('common.secretRequiredForTarget') : undefined)}
                 helperText={showTokenByteCount ? `${tokenBytes} / ${TOKEN_MAX_BYTES} bytes` : undefined}
               />
             )}

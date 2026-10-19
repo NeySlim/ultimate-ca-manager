@@ -6,6 +6,7 @@ CRUD for MS CA connections + CSR signing + request status tracking
 import logging
 from flask import Blueprint, request, g
 from auth.unified import require_auth, has_permission as _has_perm
+from utils.secret_target import keeps_saved_secret, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db
 from models.msca import MicrosoftCA, MSCARequest
@@ -64,6 +65,19 @@ def _clean_crl_url(raw):
 _WINRM_TRANSPORTS = ('kerberos', 'ntlm')
 
 
+def _winrm_transport_error(data):
+    tr = (data.get('winrm_transport') or '').strip().lower()
+    if tr not in _WINRM_TRANSPORTS:
+        return error_response(f"winrm_transport must be one of {_WINRM_TRANSPORTS}", 400)
+    if tr == 'ntlm':
+        # Returned, not raised: the callers turn exceptions into a 500
+        try:
+            fips_mode.refuse('NTLM for the WinRM channel')
+        except fips_mode.FipsRestricted as e:
+            return error_response(str(e), 400, problem_type=fips_mode.PROBLEM_TYPE)
+    return None
+
+
 def _apply_winrm_fields(msca, data):
     """Apply WinRM admin-channel fields from request data. Returns error_response or None."""
     if 'winrm_enabled' in data:
@@ -83,16 +97,10 @@ def _apply_winrm_fields(msca, data):
     if 'winrm_verify_ssl' in data:
         msca.winrm_verify_ssl = bool(data['winrm_verify_ssl'])
     if 'winrm_transport' in data:
-        tr = (data['winrm_transport'] or '').strip().lower()
-        if tr not in _WINRM_TRANSPORTS:
-            return error_response(f"winrm_transport must be one of {_WINRM_TRANSPORTS}", 400)
-        if tr == 'ntlm':
-            # Returned, not raised: the callers turn exceptions into a 500
-            try:
-                fips_mode.refuse('NTLM for the WinRM channel')
-            except fips_mode.FipsRestricted as e:
-                return error_response(str(e), 400, problem_type=fips_mode.PROBLEM_TYPE)
-        msca.winrm_transport = tr
+        err = _winrm_transport_error(data)
+        if err:
+            return err
+        msca.winrm_transport = (data['winrm_transport'] or '').strip().lower()
     if 'winrm_username' in data:
         msca.winrm_username = (data['winrm_username'] or '').strip() or None
     if 'winrm_password' in data and data['winrm_password'] != '***':
@@ -315,6 +323,37 @@ def get_connection(msca_id):
     return success_response(data=msca.to_dict())
 
 
+_WINRM_TARGET_FIELDS = ('winrm_host', 'winrm_port', 'winrm_use_ssl', 'winrm_verify_ssl',
+                        'winrm_transport', 'winrm_username')
+
+
+def _winrm_target_fields(msca):
+    current = {k: getattr(msca, k) for k in _WINRM_TARGET_FIELDS}
+    # Same defaults as to_dict, so a form sent back unchanged compares equal
+    current.update(winrm_port=msca.winrm_port or 5986,
+                   winrm_transport=msca.winrm_transport or 'kerberos')
+    if not msca.winrm_host:
+        current['server'] = msca.server  # WinRM falls back to the server
+    return current
+
+
+def _msca_retarget_error(msca, data):
+    """Saved passwords stay with their saved host. A TLS client key is never sent."""
+    current = _winrm_target_fields(msca)
+    winrm_err = retarget_error(current, data, keeps_saved_secret(
+        data, 'winrm_password', msca.winrm_password, blank_clears=True))
+    if winrm_err:
+        return winrm_err
+    if msca.auth_method != 'basic' or data.get('auth_method', 'basic') != 'basic':
+        return None
+    current = {k: getattr(msca, k) for k in ('server', 'use_ssl', 'verify_ssl', 'ca_bundle', 'username')}
+    if not msca.winrm_password:
+        # The basic password doubles as the WinRM one
+        current.update(_winrm_target_fields(msca))
+    return retarget_error(current, data, keeps_saved_secret(
+        data, 'password', msca.password, blank_clears=True))
+
+
 @bp.route('/<int:msca_id>', methods=['PUT'])
 @require_auth(['write:settings'])
 def update_connection(msca_id):
@@ -326,6 +365,11 @@ def update_connection(msca_id):
     data = request.get_json()
     if not data:
         return error_response("Request body required", 400)
+    # A transport refused outright is the answer, before any question of secrets
+    err = (_winrm_transport_error(data) if 'winrm_transport' in data else None) \
+        or _msca_retarget_error(msca, data)
+    if err:
+        return err
 
     try:
         # Cap PEM/keytab inputs.

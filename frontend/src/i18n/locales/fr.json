@@ -1188,6 +1188,7 @@
     "set": "Défini",
     "configured": "Configuré",
     "enterNewToChange": "Entrez une nouvelle valeur pour modifier",
+    "secretRequiredForTarget": "Le secret enregistré ne part que vers le serveur et le compte enregistrés. Saisissez-le à nouveau pour les modifier.",
     "auto": "Auto",
     "manual": "Manuel",
     "update": "Mettre à jour",

@@ -130,6 +130,7 @@
     "set": "Configurado",
     "configured": "Configurado",
     "enterNewToChange": "Ingrese un nuevo valor para cambiar",
+    "secretRequiredForTarget": "El secreto guardado solo se envía al servidor y la cuenta guardados. Vuelva a introducirlo para cambiarlos.",
     "auto": "Auto",
     "manual": "Manual",
     "update": "Actualizar",

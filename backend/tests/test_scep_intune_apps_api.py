@@ -42,10 +42,13 @@ class TestAppRegistrations:
         assert _apps(auth_client)['apps-crud']['tenant_id'] == 'apps.onmicrosoft.com'
 
         r = _patch(auth_client, f"/api/v2/scep/intune-apps/{app['id']}",
-                   client_id='client-2', client_secret='')
+                   name='apps-crud', client_secret='')
+        assert r.status_code == 200, r.data
+        assert get_json(r)['data']['client_secret_set'] is True   # blank leaves it
+        r = _patch(auth_client, f"/api/v2/scep/intune-apps/{app['id']}",
+                   client_id='client-2', client_secret='new-secret')
         assert r.status_code == 200, r.data
         assert get_json(r)['data']['client_id'] == 'client-2'
-        assert get_json(r)['data']['client_secret_set'] is True   # blank leaves it
 
         r = auth_client.delete(f"/api/v2/scep/intune-apps/{app['id']}")
         assert r.status_code == 200

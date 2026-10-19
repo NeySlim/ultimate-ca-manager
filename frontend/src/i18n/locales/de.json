@@ -130,6 +130,7 @@
     "set": "Gesetzt",
     "configured": "Konfiguriert",
     "enterNewToChange": "Neuen Wert eingeben zum Ändern",
+    "secretRequiredForTarget": "Das gespeicherte Geheimnis geht nur an den gespeicherten Server und das gespeicherte Konto. Geben Sie es erneut ein, um sie zu ändern.",
     "auto": "Automatisch",
     "manual": "Manuell",
     "update": "Aktualisieren",

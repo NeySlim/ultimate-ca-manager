@@ -5,6 +5,7 @@ import { Button, Input, Textarea } from '../../components'
 import { formatDate } from '../../lib/utils'
 import { adConnectorService } from '../../services'
 import { useNotification } from '../../contexts'
+import { secretInputProps, secretRequiredForTarget } from '../../lib/secretTarget'
 
 // Rows need a key that survives reordering after a removal; the hostname
 // itself can't serve as one while it's still being typed (it's empty, and
@@ -59,8 +60,23 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
 
   const payload = () => ({ ...formData, servers })
 
+  // Dropping a DC sends the password nowhere new; adding one does
+  const savedServers = config?.servers || []
+  const secretTarget = {
+    saved: { ...config, port: config?.port || 389, use_ssl: config?.use_ssl ?? false,
+      verify_ssl: config?.verify_ssl ?? true, servers: 'saved' },
+    current: { ...formData, servers: servers.some(s => !savedServers.includes(s)) ? 'added' : 'saved' },
+    fields: ['servers', 'port', 'use_ssl', 'verify_ssl', 'ca_bundle', 'bind_dn'],
+    secret: formData.bind_password,
+    secretSaved: Boolean(config?.bind_password),
+  }
+
   const handleSubmit = (e) => {
     e.preventDefault()
+    if (secretRequiredForTarget(secretTarget)) {
+      showError(t('common.secretRequiredForTarget'))
+      return
+    }
     const data = payload()
     // Don't send the masked placeholder back if the password is unchanged
     if (config?.id && !data.bind_password) delete data.bind_password
@@ -219,6 +235,7 @@ export default function AdConnectorForm({ config, onSave, onCancel }) {
         onChange={(e) => updateField('bind_password', e.target.value)}
         required={formData.enabled && !config?.bind_password}
         hasExistingValue={Boolean(config?.bind_password)}
+        {...secretInputProps(t, secretTarget)}
       />
 
       <label className="flex items-center gap-2 text-sm">

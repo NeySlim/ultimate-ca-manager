@@ -68,6 +68,7 @@ import { setAppTimezone } from '../stores/timezoneStore'
 import { setDateFormat, setShowTime } from '../stores/dateFormatStore'
 import { reportSilentFailure } from '../lib/silentFailure'
 import { autoRenewalWaitingMessage } from '../lib/autoRenewalWaiting'
+import { secretRequiredForTarget, smtpSecretTargets } from '../lib/secretTarget'
 
 // Settings categories with colors for visual distinction
 const BASE_SETTINGS_CATEGORIES = [
@@ -146,6 +147,8 @@ export default function SettingsPage() {
   const [emailTestResult, setEmailTestResult] = useState(null) // { success, message }
   const [emailTesting, setEmailTesting] = useState(false)
   const [oauthDirty, setOauthDirty] = useState(false)
+  // Email settings as last loaded: the targets the saved SMTP secrets belong to
+  const [savedEmail, setSavedEmail] = useState(null)
   const [oauthPresets, setOauthPresets] = useState({})
   const [showTemplateEditor, setShowTemplateEditor] = useState(false)
   const [backups, setBackups] = useState([])
@@ -319,9 +322,7 @@ export default function SettingsPage() {
       
       // Merge email settings with mapped field names. The test recipient is
       // not a setting: keep what was typed across the reload a save triggers.
-      setSettings(prev => ({
-        _testRecipient: prev._testRecipient,
-        ...generalSettings,
+      const email = {
         smtp_host: emailSettings.smtp_host,
         smtp_port: emailSettings.smtp_port,
         smtp_username: emailSettings.smtp_username,
@@ -346,7 +347,9 @@ export default function SettingsPage() {
         smtp_oauth_token_url: emailSettings.smtp_oauth_token_url || '',
         smtp_oauth_scope: emailSettings.smtp_oauth_scope || '',
         smtp_oauth_redirect_uri: emailSettings.smtp_oauth_redirect_uri || '',
-      }))
+      }
+      setSettings(prev => ({ _testRecipient: prev._testRecipient, ...generalSettings, ...email }))
+      setSavedEmail(email)
       // Load OAuth provider presets in parallel (best-effort, non-blocking)
       settingsService.getSmtpOAuthProviders()
         .then(res => setOauthPresets(res?.data?.providers || res?.providers || {}))
@@ -1114,6 +1117,11 @@ export default function SettingsPage() {
     setSaving(true)
     try {
       if (section === 'email') {
+        const targets = smtpSecretTargets(savedEmail, settings)
+        if (secretRequiredForTarget(targets.password) || secretRequiredForTarget(targets.oauth)) {
+          showError(t('common.secretRequiredForTarget'))
+          return
+        }
         // Email settings go to a different endpoint with mapped field names
         await settingsService.updateEmailSettings({
           smtp_host: settings.smtp_host,
@@ -1500,6 +1508,7 @@ export default function SettingsPage() {
         return (
           <EmailSection
             settings={settings}
+            savedEmail={savedEmail}
             updateSetting={updateSetting}
             handleSave={handleSave}
             saving={saving}
