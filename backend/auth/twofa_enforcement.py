@@ -1,8 +1,8 @@
 """2FA enforcement policy (#141).
 
-Centralises the decision "must this user enrol TOTP before getting a full
-session?" so the login flows, the require_auth gate, and the disable guard all
-agree. Local accounts are gated by the global ``enforce_2fa`` setting; SSO
+Centralises the decision "must this login enrol a second factor (TOTP or a
+security key) before getting a full session?" so the login flows, the
+require_auth gate, and the factor-removal guards all agree. Local accounts are gated by the global ``enforce_2fa`` setting; SSO
 accounts by their provider's own ``enforce_2fa`` toggle (independent switches).
 """
 import logging
@@ -74,10 +74,11 @@ def would_leave_no_second_factor(user, *, dropping_totp=False, dropping_key=None
 
 
 def must_enroll_2fa(user, *, auth_method='password', provider=None):
-    """Whether ``user`` must enrol a second factor before receiving a full session.
+    """Whether this login gets a restricted session until a second factor is enrolled.
 
-    Returns False for users already enrolled (TOTP or a security key), explicitly
-    exempt, or logging in via a strong second factor (mTLS/WebAuthn).
+    Enrolled means confirmed TOTP or an enabled security key. Only password logins
+    are later challenged for that factor; SSO and LDAP logins get this enrolment
+    gate alone. False for exempt users and for mTLS/WebAuthn logins.
     """
     if getattr(user, 'totp_confirmed', False) or has_security_key(user):
         return False
