@@ -73,8 +73,8 @@ Configurazione:
 ### AWS CloudHSM
 HSM basato su cloud di Amazon Web Services:
 - **Cluster ID**: Identificatore del cluster CloudHSM
-- **Regione**: Regione AWS
-- **Credenziali**: Chiave di accesso e segreto AWS
+- **Etichetta Token**: etichetta del token PKCS#11 di CloudHSM
+- **Utente Crypto / Password Crypto**: l'utente crittografico (CU) con cui UCM accede; non serve alcuna chiave di accesso AWS
 
 ### Azure Key Vault
 Archiviazione chiavi gestita di Microsoft Azure:

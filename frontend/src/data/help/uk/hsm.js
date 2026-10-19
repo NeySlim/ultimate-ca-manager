@@ -73,8 +73,8 @@ export default {
 ### AWS CloudHSM
 Хмарний HSM Amazon Web Services:
 - **ID кластера**: Ідентифікатор кластера CloudHSM
-- **Регіон**: Регіон AWS
-- **Облікові дані**: Ключ доступу та секрет AWS
+- **Мітка токена**: мітка токена PKCS#11 CloudHSM
+- **Crypto Користувач / Crypto Пароль**: криптокористувач (CU), від імені якого входить UCM; ключ доступу AWS не потрібен
 
 ### Azure Key Vault
 Кероване сховище ключів Microsoft Azure:

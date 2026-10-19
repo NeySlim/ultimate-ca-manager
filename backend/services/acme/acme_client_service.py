@@ -1,7 +1,7 @@
 """
 ACME Client Service (RFC 8555)
 Client for requesting certificates from external ACME servers.
-Supports Let's Encrypt, HARICA, ZeroSSL, Buypass, Google Trust Services,
+Supports Let's Encrypt, HARICA, ZeroSSL, Google Trust Services,
 and any RFC 8555-compliant CA with optional EAB (§7.3.4).
 """
 import json

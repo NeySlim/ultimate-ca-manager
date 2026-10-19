@@ -37,12 +37,14 @@ services:
       - "8080:8080"   # HTTP — CRL/CDP and OCSP public endpoints
     volumes:
       - ucm-data:/opt/ucm/data
+      - ucm-config:/etc/ucm   # master.key: without it, encrypted private keys are lost
     environment:
       - UCM_FQDN=ucm.example.com
     restart: unless-stopped
 
 volumes:
   ucm-data:
+  ucm-config:
 ```
 
 ## Environment Variables
@@ -62,6 +64,8 @@ All data is stored in `/opt/ucm/data/`:
 - Backups
 
 Mount this directory as a Docker volume to persist data across container restarts.
+
+`/etc/ucm/` holds `master.key`, which decrypts every private key stored in the database. Mount it as a volume too: without one, recreating the container loses the key.
 
 ## Backup
 

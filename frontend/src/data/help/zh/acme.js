@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'ACME',
     subtitle: '自动化证书管理',
-    overview: 'UCM 支持两种 ACME 模式：ACME 客户端用于从任何符合 RFC 8555 的 CA（Let\'s Encrypt、ZeroSSL、Buypass、HARICA 等）获取公共证书；本地 ACME 服务器用于内部 PKI 自动化，支持多 CA 域名映射。',
+    overview: 'UCM 支持两种 ACME 模式：ACME 客户端用于从任何符合 RFC 8555 的 CA（Let\'s Encrypt、ZeroSSL、HARICA 等）获取公共证书；本地 ACME 服务器用于内部 PKI 自动化，支持多 CA 域名映射。',
     sections: [
       {
         title: "Renewal Information (ARI, RFC 9773)",
@@ -16,7 +16,7 @@ export default {
       {
         title: 'ACME 客户端',
         items: [
-          { label: '客户端', text: '从任何 ACME CA 请求证书,, Let\'s Encrypt、ZeroSSL、Buypass、HARICA 或自定义' },
+          { label: '客户端', text: '从任何 ACME CA 请求证书,, Let\'s Encrypt、ZeroSSL、HARICA 或自定义' },
           { label: '订单标签页 (v2.219)', text: '客户端订单现在有专属的侧边栏标签页「Let\'s Encrypt orders」，带有可见/总数计数和状态过滤器，与 Local orders 视图保持一致' },
           { label: '外部 CA 账户', text: '每个 CA 可以有多个账户,, 多个账户可以共享同一个目录 URL（例如两个 Let\'s Encrypt 账户用于管理分离）；目录 URL 留空默认为 Let\'s Encrypt 生产环境' },
           { label: '自定义服务器', text: '设置自定义 ACME 目录 URL 以使用任何符合 RFC 8555 的 CA' },
@@ -120,7 +120,7 @@ export default {
     ],
     tips: [
       'ACME 目录 URL：https://your-server:port/acme/directory',
-      '使用自定义目录 URL 连接到 ZeroSSL、Buypass、HARICA 或任何 RFC 8555 CA',
+      '使用自定义目录 URL 连接到 ZeroSSL、HARICA 或任何 RFC 8555 CA',
       'EAB 凭据（密钥 ID + HMAC 密钥）由您的 CA 在注册时提供',
       '当 UCM 是 ACME 服务器时，在 ACME → EAB Credentials 中签发您自己的 EAB 凭据',
       '对于 Kubernetes/cert-manager：参见 examples/kubernetes/cert-manager/ 中的参考清单',
@@ -143,7 +143,7 @@ export default {
 
 UCM 支持两种 ACME（自动化证书管理环境）模式：
 
-- **ACME 客户端**: 从任何符合 RFC 8555 的 CA 获取证书（Let's Encrypt、ZeroSSL、Buypass、HARICA 或自定义）
+- **ACME 客户端**: 从任何符合 RFC 8555 的 CA 获取证书（Let's Encrypt、ZeroSSL、HARICA 或自定义）
 - **本地 ACME 服务器**: 内置 ACME 服务器，用于内部 PKI 自动化，支持多 CA
 
 ## ACME 客户端
@@ -163,7 +163,6 @@ UCM 支持两种 ACME（自动化证书管理环境）模式：
 |---|---|
 | **Let's Encrypt** | *（默认，留空）* |
 | **ZeroSSL** | \`https://acme.zerossl.com/v2/DV90\` |
-| **Buypass** | \`https://api.buypass.com/acme/directory\` |
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 

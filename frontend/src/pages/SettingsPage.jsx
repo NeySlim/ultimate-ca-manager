@@ -39,6 +39,7 @@ import EmailTemplateWindow from '../components/EmailTemplateWindow'
 import DatabaseBackendSection from './settings/DatabaseBackendSection'
 import ServiceStatusWidget from './settings/ServiceStatusWidget'
 import AboutSection from './settings/AboutSection'
+import { addCtLogUrl, removeCtLogUrl } from './settings/ctLogUrls'
 import AppearanceSettings from './settings/AppearanceSettings'
 import CopyableUrl from './settings/CopyableUrl'
 import MappingEditor from './settings/MappingEditor'
@@ -1058,13 +1059,12 @@ export default function SettingsPage() {
   const handleCtAddLogUrl = () => {
     const url = ctNewLogUrl.trim()
     if (!url) return
-    if (ctSettings.log_urls.includes(url)) return
-    setCtSettings(prev => ({ ...prev, log_urls: [...prev.log_urls, url] }))
+    setCtSettings(prev => ({ ...prev, log_urls: addCtLogUrl(prev.log_urls, url) }))
     setCtNewLogUrl('')
   }
 
   const handleCtRemoveLogUrl = (index) => {
-    setCtSettings(prev => ({ ...prev, log_urls: prev.log_urls.filter((_, i) => i !== index) }))
+    setCtSettings(prev => ({ ...prev, log_urls: removeCtLogUrl(prev.log_urls, index) }))
   }
 
   // Auto-renewal

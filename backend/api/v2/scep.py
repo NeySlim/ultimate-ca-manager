@@ -37,6 +37,10 @@ def set_config(key, value):
         db.session.add(config)
 
 
+# Challenge validity bounds in hours (1 hour .. 30 days); the UI reads them from GET.
+CHALLENGE_VALIDITY_HOURS = (1, 720)
+
+
 @bp.route('/api/v2/scep/config', methods=['GET'])
 @require_auth(['read:scep'])
 def get_scep_config():
@@ -48,6 +52,7 @@ def get_scep_config():
         'ca_ident': get_config('scep_ca_ident', 'ucm-ca'),
         'auto_approve': get_config('scep_auto_approve', 'false') == 'true',
         'challenge_validity': int(get_config('scep_challenge_validity', '24')),
+        'challenge_validity_range': list(CHALLENGE_VALIDITY_HOURS),
         'enforce_signing_time': get_config('scep_enforce_signing_time', 'false') == 'true',
         'time_skew_minutes': int(get_config('scep_time_skew_minutes', '10') or 10),
         'getcacert_chain': get_config('scep_getcacert_chain', 'false') == 'true',
@@ -81,14 +86,14 @@ def update_scep_config():
     if 'auto_approve' in data:
         set_config('scep_auto_approve', 'true' if data['auto_approve'] else 'false')
     if 'challenge_validity' in data:
-        # Bound to a sane window: 1 hour .. 30 days. Anything beyond defeats
-        # the point of a one-time enrollment secret.
+        # Anything beyond 30 days defeats the point of a one-time enrollment secret.
+        low, high = CHALLENGE_VALIDITY_HOURS
         try:
             cv = int(data['challenge_validity'])
         except (TypeError, ValueError):
             return error_response('challenge_validity must be an integer (hours)', 400)
-        if cv < 1 or cv > 720:
-            return error_response('challenge_validity must be between 1 and 720 hours', 400)
+        if cv < low or cv > high:
+            return error_response(f'challenge_validity must be between {low} and {high} hours', 400)
         set_config('scep_challenge_validity', str(cv))
     if 'enforce_signing_time' in data:
         set_config('scep_enforce_signing_time',

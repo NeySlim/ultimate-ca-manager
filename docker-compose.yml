@@ -13,6 +13,8 @@ services:
     volumes:
       # Persistent data volume (REQUIRED)
       - ucm-data:/opt/ucm/data
+      # master.key, which decrypts every private key in the database (REQUIRED)
+      - ucm-config:/etc/ucm
 
       # SoftHSM tokens live in the data volume since 2.233. This older volume is
       # read once, at the first start of 2.233, to carry its tokens over.
@@ -119,6 +121,8 @@ networks:
 
 volumes:
   ucm-data:
+    driver: local
+  ucm-config:
     driver: local
   ucm-hsm-tokens:
     driver: local

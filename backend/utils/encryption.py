@@ -7,10 +7,14 @@ import os
 import base64
 import hashlib
 import logging
+import tempfile
 from cryptography.fernet import Fernet
 from functools import lru_cache
 
 logger = logging.getLogger(__name__)
+
+MACHINE_KEY_PATH = '/opt/ucm/data/.machine-key'
+MACHINE_ID_PATHS = ('/etc/machine-id', '/var/lib/dbus/machine-id', MACHINE_KEY_PATH)
 
 
 def _require_db_encryption_key() -> bool:
@@ -21,6 +25,52 @@ def _require_db_encryption_key() -> bool:
     """
     val = os.environ.get('UCM_REQUIRE_DB_ENCRYPTION_KEY', '').strip().lower()
     return val in ('1', 'true', 'yes', 'on')
+
+
+def _read_machine_key():
+    try:
+        with open(MACHINE_KEY_PATH, 'r') as f:
+            return f.read().strip() or None
+    except OSError:
+        return None
+
+
+def _create_machine_key() -> str:
+    """Persist a new .machine-key exactly once (0600); a worker that loses the
+    first-start race gets the winner's key, never a second one."""
+    from utils.randomness import csp_bytes
+    candidate = csp_bytes(32).hex()
+    directory = os.path.dirname(MACHINE_KEY_PATH)
+    try:
+        os.makedirs(directory, exist_ok=True)
+        fd, tmp = tempfile.mkstemp(dir=directory, prefix='.machine-key.')  # 0600
+        try:
+            with os.fdopen(fd, 'w') as f:
+                f.write(candidate)
+                f.flush()
+                os.fsync(f.fileno())
+            try:
+                os.link(tmp, MACHINE_KEY_PATH)  # atomic, fails if the key already exists
+            except FileExistsError:
+                raise
+            except OSError:
+                # No hard links on this filesystem: exclusive create, then write.
+                key_fd = os.open(MACHINE_KEY_PATH, os.O_WRONLY | os.O_CREAT | os.O_EXCL, 0o600)
+                with os.fdopen(key_fd, 'w') as f:
+                    f.write(candidate)
+        finally:
+            os.unlink(tmp)
+        return candidate
+    except FileExistsError:
+        existing = _read_machine_key()
+        if existing:
+            return existing
+        logger.error(f'{MACHINE_KEY_PATH} exists but is empty: integration secrets '
+                     'will not be readable after a restart')
+    except OSError as e:
+        logger.error(f'Could not persist {MACHINE_KEY_PATH}: integration secrets '
+                     f'will not be readable after a restart ({e})')
+    return candidate
 
 
 def _get_encryption_key() -> bytes:
@@ -62,32 +112,19 @@ def _get_encryption_key() -> bytes:
 
     # Generate deterministic key from machine-specific data
     # This ensures the same key is used across restarts
-    machine_id_paths = [
-        '/etc/machine-id',
-        '/var/lib/dbus/machine-id',
-        '/opt/ucm/data/.machine-key'
-    ]
-    
     machine_id = None
-    for path in machine_id_paths:
+    for path in MACHINE_ID_PATHS:
         try:
             with open(path, 'r') as f:
                 machine_id = f.read().strip()
-                break
         except Exception:
             continue
-    
+        if machine_id:
+            break  # an empty machine-id (common in containers) falls through to the next
+
     if not machine_id:
-        # Create a persistent machine key
-        from utils.randomness import csp_bytes
-        machine_id = csp_bytes(32).hex()
-        try:
-            os.makedirs('/opt/ucm/data', exist_ok=True)
-            with open('/opt/ucm/data/.machine-key', 'w') as f:
-                f.write(machine_id)
-        except Exception:
-            pass
-    
+        machine_id = _create_machine_key()
+
     # Derive Fernet-compatible key (32 bytes, base64 encoded).
     #
     # Every parameter below is frozen: the algorithm, the in-source salt, the

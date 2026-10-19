@@ -2,7 +2,7 @@ export default {
   helpContent: {
     title: 'ACME',
     subtitle: '自動証明書管理',
-    overview: 'UCMは2つのACMEモードをサポートしています：RFC 8555準拠のCA（Let\'s Encrypt、ZeroSSL、Buypass、HARICAなど）からパブリック証明書を取得するACMEクライアントと、マルチCA対応のドメインマッピングによる内部PKI自動化のためのローカルACMEサーバーです。',
+    overview: 'UCMは2つのACMEモードをサポートしています：RFC 8555準拠のCA（Let\'s Encrypt、ZeroSSL、HARICAなど）からパブリック証明書を取得するACMEクライアントと、マルチCA対応のドメインマッピングによる内部PKI自動化のためのローカルACMEサーバーです。',
     sections: [
       {
         title: "Renewal Information (ARI, RFC 9773)",
@@ -16,7 +16,7 @@ export default {
       {
         title: 'ACMEクライアント',
         items: [
-          { label: 'クライアント', text: '任意のACME CAから証明書を要求, Let\'s Encrypt、ZeroSSL、Buypass、HARICA、またはカスタム' },
+          { label: 'クライアント', text: '任意のACME CAから証明書を要求, Let\'s Encrypt、ZeroSSL、HARICA、またはカスタム' },
           { label: '注文タブ (v2.219)', text: 'クライアントの注文はサイドバーの専用タブ「Let\'s Encrypt orders」に表示され、表示件数/総数のカウントとステータスフィルタを備え、Local orders ビューと同じ構成です' },
           { label: '外部 CA アカウント', text: 'CA ごとに複数のアカウントを登録可能, 同じディレクトリ URL を共有できます（例: 管理分離のための 2 つの Let\'s Encrypt アカウント）。ディレクトリ URL が空欄の場合は Let\'s Encrypt Production になります' },
           { label: 'カスタムサーバー', text: 'カスタムACMEディレクトリURLを設定して、任意のRFC 8555準拠CAを使用します' },
@@ -120,7 +120,7 @@ export default {
     ],
     tips: [
       'ACMEディレクトリURL: https://your-server:port/acme/directory',
-      'カスタムディレクトリURLを使用して、ZeroSSL、Buypass、HARICA、またはその他のRFC 8555 CAに接続できます',
+      'カスタムディレクトリURLを使用して、ZeroSSL、HARICA、またはその他のRFC 8555 CAに接続できます',
       'EAB資格情報（キーID + HMACキー）は、登録時にCAから提供されます',
       'UCM が ACME サーバーの場合、ACME → EAB Credentials で独自の EAB クレデンシャルを発行してください',
       'Kubernetes/cert-manager 用: examples/kubernetes/cert-manager/ にある参照マニフェストを参照',
@@ -143,7 +143,7 @@ export default {
 
 UCMはACME（自動証明書管理環境）を2つのモードでサポートしています：
 
-- **ACMEクライアント**: 任意のRFC 8555準拠CA（Let's Encrypt、ZeroSSL、Buypass、HARICA、またはカスタム）から証明書を取得
+- **ACMEクライアント**: 任意のRFC 8555準拠CA（Let's Encrypt、ZeroSSL、HARICA、またはカスタム）から証明書を取得
 - **ローカルACMEサーバー**: マルチCA対応の内部PKI自動化のための組み込みACMEサーバー
 
 ## ACMEクライアント
@@ -163,7 +163,6 @@ Let's Encryptだけでなく、任意のRFC 8555準拠CAを使用できます：
 |---|---|
 | **Let's Encrypt** | *（デフォルト、空のまま）* |
 | **ZeroSSL** | \`https://acme.zerossl.com/v2/DV90\` |
-| **Buypass** | \`https://api.buypass.com/acme/directory\` |
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 

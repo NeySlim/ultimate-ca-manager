@@ -876,7 +876,7 @@ Intune-enabled profiles must have **Auto-Approve** on. Intune's enrollment flow 
 
 UCM supports ACME (Automated Certificate Management Environment) in two modes:
 
-- **ACME Client**: Obtain certificates from any RFC 8555-compliant CA (Let's Encrypt, ZeroSSL, Buypass, HARICA, or custom)
+- **ACME Client**: Obtain certificates from any RFC 8555-compliant CA (Let's Encrypt, ZeroSSL, HARICA, or custom)
 - **Local ACME Server**: Built-in ACME server for internal PKI automation with multi-CA support
 
 ## ACME Client
@@ -896,7 +896,6 @@ Use any RFC 8555-compliant CA, not just Let's Encrypt:
 |---|---|
 | **Let's Encrypt** | *(default, leave empty)* |
 | **ZeroSSL** | \`https://acme.zerossl.com/v2/DV90\` |
-| **Buypass** | \`https://api.buypass.com/acme/directory\` |
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
@@ -2436,8 +2435,8 @@ Configuration:
 ### AWS CloudHSM
 Amazon Web Services cloud-based HSM:
 - **Cluster ID**: CloudHSM cluster identifier
-- **Region**: AWS region
-- **Credentials**: AWS access key and secret
+- **Token Label**: label of the CloudHSM PKCS#11 token
+- **Crypto User / Crypto Password**: the crypto user (CU) UCM logs in as; no AWS access key is needed
 
 ### Azure Key Vault
 Microsoft Azure managed key storage:

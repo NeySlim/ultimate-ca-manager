@@ -38,7 +38,7 @@ export default function CTSection({ ctSettings, setCtSettings, ctLoading, ctSavi
                 <Input
                   value={ctNewLogUrl}
                   onChange={(e) => setCtNewLogUrl(e.target.value)}
-                  placeholder="https://ct.googleapis.com/logs/argon2025h1/"
+                  placeholder="https://ct.googleapis.com/logs/us1/argon2027h1/"
                   className="flex-1"
                   onKeyDown={(e) => { if (e.key === 'Enter') { e.preventDefault(); handleCtAddLogUrl() } }}
                 />
@@ -61,13 +61,15 @@ export default function CTSection({ ctSettings, setCtSettings, ctLoading, ctSavi
               onChange={(val) => setCtSettings(prev => ({ ...prev, enabled: val }))}
             />
 
-            <ToggleSwitch
-              label={t('settings.ctEmbedSct')}
-              checked={ctSettings.embed_sct ?? false}
-              onChange={(val) => setCtSettings(prev => ({ ...prev, embed_sct: val }))}
-            />
+            {ctSettings.enabled && (
+              <ToggleSwitch
+                label={t('settings.ctEmbedSct')}
+                checked={ctSettings.embed_sct ?? false}
+                onChange={(val) => setCtSettings(prev => ({ ...prev, embed_sct: val }))}
+              />
+            )}
 
-            {ctSettings.embed_sct && (
+            {ctSettings.enabled && ctSettings.embed_sct && (
               <>
                 <ToggleSwitch
                   label={t('settings.ctRequired')}

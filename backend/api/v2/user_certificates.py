@@ -380,7 +380,7 @@ def export_user_certificate(cert_id):
                 resource_type='user_certificate',
                 resource_id=cert_id,
                 resource_name=filename_base,
-                details=f'Exported PKCS12 for user cert: {filename_base}',
+                details=f'Exported PKCS12 with private key for user cert: {filename_base}',
                 success=True
             )
 
@@ -438,7 +438,7 @@ def export_user_certificate(cert_id):
                 resource_type='user_certificate',
                 resource_id=cert_id,
                 resource_name=filename_base,
-                details=f'Exported JKS for user cert: {filename_base}',
+                details=f'Exported JKS with private key for user cert: {filename_base}',
                 success=True
             )
 
@@ -475,7 +475,8 @@ def export_user_certificate(cert_id):
             resource_type='user_certificate',
             resource_id=cert_id,
             resource_name=filename_base,
-            details=f'Exported PEM for user cert: {filename_base}',
+            details=(f'Exported PEM with private key (unencrypted) for user cert: {filename_base}'
+                     if include_key and cert.prv else f'Exported PEM for user cert: {filename_base}'),
             success=True
         )
 

@@ -86,34 +86,15 @@ class TestSitesDrawFromTheDrbg:
         key = KeyEncryption.generate_key()
         assert base64.urlsafe_b64decode(key) == drbg[0] and len(drbg[0]) == 32
 
-    def test_machine_key_fallback(self, drbg, monkeypatch):
+    def test_machine_key_fallback(self, drbg, monkeypatch, tmp_path):
         import utils.encryption as module
-        written = {}
-
-        class _Sink:
-            def __init__(self, path):
-                self.path = path
-
-            def __enter__(self):
-                return self
-
-            def __exit__(self, *exc):
-                return False
-
-            def write(self, data):
-                written[self.path] = data
-
-        def fake_open(path, mode='r', *a, **k):
-            if 'w' in mode:
-                return _Sink(path)
-            raise FileNotFoundError(path)
-
-        monkeypatch.setattr(module, 'open', fake_open, raising=False)
-        monkeypatch.setattr(module.os, 'makedirs', lambda *a, **k: None)
+        key_path = tmp_path / '.machine-key'
+        monkeypatch.setattr(module, 'MACHINE_KEY_PATH', str(key_path))
+        monkeypatch.setattr(module, 'MACHINE_ID_PATHS', (str(tmp_path / 'absent'), str(key_path)))
         monkeypatch.delenv('UCM_DB_ENCRYPTION_KEY', raising=False)
         monkeypatch.setattr(module, '_require_db_encryption_key', lambda: False)
         module._get_encryption_key()
-        assert list(written.values()) == [drbg[0].hex()]
+        assert key_path.read_text() == drbg[0].hex()
 
     def test_est_server_generated_key(self, drbg, rsa_identity):
         from utils.est_cms import build_server_generated_key_cms

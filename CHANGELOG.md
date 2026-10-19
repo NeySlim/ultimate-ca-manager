@@ -24,6 +24,18 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Scheduled reports were emailed without the report attached and always announced as CSV; the file is now attached in the schedule's format (CSV, JSON or PDF), and a test send that fails says so.
 - Scheduled PDF reports saved from the Reports page were silently dropped by the API; each PDF template can now be scheduled.
 - Reports: a schedule or test send with a malformed body or a non-text format answered 500; the body is refused with 400 and an unknown format falls back to CSV.
+- Locking an account after too many failed password or LDAP logins never sent the security alert e-mail; it is now sent when the account is locked, at most once per lockout and within the security alert's cooldown for that account.
+- Exporting a certificate or CA private key (PEM, PKCS#12, PFX, JKS or bare key) left no audit entry; each export is now recorded with the user, the format and whether it was password-protected.
+- Docker: the bundled compose files left `/etc/ucm` (master.key) on an anonymous volume, so `docker compose down` then `up` lost the key to every encrypted private key; they now mount the named volume `ucm-config` (see UPGRADE.md before switching).
+- Without `UCM_DB_ENCRYPTION_KEY`, an empty `/etc/machine-id` (common in containers) made UCM derive a new key at every start, so stored integration secrets (SMTP, LDAP, DNS, SSO, webhooks) became unreadable after a restart; the persisted `.machine-key` is now used, created once (mode 0600) even when several workers start together.
+- Certificate Transparency: the built-in log list named Google's retired Argon 2026h1 shard; it now lists Google Argon and Cloudflare Nimbus shards accepted today. Embed SCTs and Require SCTs applied even with CT disabled; they now apply only while CT is enabled, and the settings page hides them otherwise.
+- Certificate Transparency settings could not be saved while no log list was set (the page sent back the `null` it had read and got a 400); `null` now keeps the built-in logs.
+- mTLS and EST behind a reverse proxy: a client certificate forwarded URL-encoded in `X-SSL-Client-Cert` (nginx `$ssl_client_escaped_cert`) could not be read; raw, URL-encoded and space-folded (Apache) PEM are accepted, and EST also takes bare base64 DER, still only from trusted proxies.
+- Settings > Security showed an "API Rate Limit" field that was never saved nor applied; it is removed. Rate limits are set with the `RATE_LIMIT_*` environment variables.
+- HSM: an AWS CloudHSM provider created from the form could not connect, since neither its token label nor its crypto user reached the PKCS#11 login. The form now asks for the token label and logs in as `<crypto user>:<password>`; the unused Region and AWS access key fields are gone.
+- SCEP: the challenge password validity field stopped at 168 hours while the API accepted up to 720; the form now takes its bounds (1 to 720 hours) from the API.
+- DEB: the generated `ucm.env` still offered `SCEP_*` variables that UCM never acts on (SCEP is configured under Protocols > SCEP); they are removed. The in-app help no longer lists Buypass, which stopped issuing certificates on 15 October 2025.
+- docs/HSM_DOCKER.md said a key sync against an empty SoftHSM token removes every key record; since 2.240 it keeps the keys a CA uses, and the page now says so.
 
 ### Security
 

@@ -559,7 +559,7 @@ export const helpContent = {
   acme: {
     title: 'ACME',
     subtitle: 'Automated Certificate Management',
-    overview: 'UCM supports two ACME modes: ACME client for public certificates from any RFC 8555-compliant CA (Let\'s Encrypt, ZeroSSL, Buypass, HARICA, etc.), and Local ACME server for internal PKI automation with multi-CA domain mapping.',
+    overview: 'UCM supports two ACME modes: ACME client for public certificates from any RFC 8555-compliant CA (Let\'s Encrypt, ZeroSSL, HARICA, etc.), and Local ACME server for internal PKI automation with multi-CA domain mapping.',
     sections: [
       {
         title: "Renewal Information (ARI, RFC 9773)",
@@ -574,7 +574,7 @@ export const helpContent = {
         title: 'ACME Client',
         icon: Globe,
         items: [
-          { label: 'Client', text: 'Request certificates from any ACME CA, Let\'s Encrypt, ZeroSSL, Buypass, HARICA, or custom' },
+          { label: 'Client', text: 'Request certificates from any ACME CA, Let\'s Encrypt, ZeroSSL, HARICA, or custom' },
           { label: 'Orders tab (v2.219)', text: 'The client orders have their own "Let\'s Encrypt orders" sidebar tab with a visible/total count and a status filter, mirroring the Local orders view' },
           { label: 'External CA Accounts', text: 'One or more accounts per CA, several accounts can share the same CA directory URL (e.g. two Let\'s Encrypt accounts for administrative separation); an empty Directory URL defaults to Let\'s Encrypt Production' },
           { label: 'Custom Server', text: 'Set a custom ACME directory URL to use any RFC 8555-compliant CA' },
@@ -686,7 +686,7 @@ export const helpContent = {
     ],
     tips: [
       'ACME directory URL: https://your-server:port/acme/directory',
-      'Use a custom directory URL to connect to ZeroSSL, Buypass, HARICA, or any RFC 8555 CA',
+      'Use a custom directory URL to connect to ZeroSSL, HARICA, or any RFC 8555 CA',
       'EAB credentials (Key ID + HMAC Key) are provided by your CA upon registration',
       'When UCM is the ACME server, issue your own EAB credentials in ACME → EAB Credentials',
       'For Kubernetes/cert-manager: see the reference manifests under examples/kubernetes/cert-manager/',

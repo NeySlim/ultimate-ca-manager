@@ -34,6 +34,7 @@ from utils.cert_issuer import (
     authority_key_identifier_hex, certificate_signed_by, is_self_signed,
 )
 from utils.export_options import json_boolean, query_boolean
+from services.key_export_audit import audit_key_export
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -365,6 +366,8 @@ def export_certificate(cert_id):
                     format=serialization.PrivateFormat.PKCS8,
                     encryption_algorithm=serialization.BestAvailableEncryption(password.encode())
                 )
+            audit_key_export('certificate', certificate.id, certificate.descr or certificate.refid,
+                             export_format, password)
             return Response(
                 key_pem,
                 mimetype='application/x-pem-file',
@@ -399,6 +402,9 @@ def export_certificate(cert_id):
                 else:
                     filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_chain.pem"
 
+            if include_key and certificate.prv:
+                audit_key_export('certificate', certificate.id, certificate.descr or certificate.refid,
+                                 export_format, password)
             return Response(
                 result,
                 mimetype=content_type,
@@ -439,6 +445,8 @@ def export_certificate(cert_id):
                 encryption_algorithm=pkcs12_encryption(password, legacy),
             )
 
+            audit_key_export('certificate', certificate.id, certificate.descr or certificate.refid,
+                             export_format, password)
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
@@ -499,6 +507,8 @@ def export_certificate(cert_id):
                 encryption_algorithm=pkcs12_encryption(password, legacy),
             )
 
+            audit_key_export('certificate', certificate.id, certificate.descr or certificate.refid,
+                             export_format, password)
             return Response(
                 p12_bytes,
                 mimetype='application/x-pkcs12',
@@ -545,6 +555,8 @@ def export_certificate(cert_id):
             keystore = pyjks.KeyStore.new("jks", [pke])
             jks_bytes = keystore.saves(password)
 
+            audit_key_export('certificate', certificate.id, certificate.descr or certificate.refid,
+                             export_format, password)
             return Response(
                 jks_bytes,
                 mimetype='application/x-java-keystore',

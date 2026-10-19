@@ -148,7 +148,7 @@ def _parse_json_field(value):
 
 
 # LDAP brute-force protection (reuses User model's lockout fields)
-# Settings read from DB config via _get_lockout_settings in auth.py
+# Settings read from DB config via _get_lockout_settings above
 
 
 def _get_ldap_lockout_settings():
@@ -176,6 +176,20 @@ def _check_ldap_lockout(username):
     return False
 
 
+def notify_account_locked(username):
+    """Send the account_locked security alert; never fails the login."""
+    try:
+        from services.notification_service import NotificationService
+        from utils.trusted_proxy import client_ip
+        NotificationService.on_security_alert(
+            alert_type='account_locked',
+            username=username,
+            ip_address=client_ip() or 'unknown',
+        )
+    except Exception as e:
+        logger.warning(f"Failed to send account_locked alert for {username}: {e}")
+
+
 def _record_ldap_failed_attempt(username):
     """Record a failed LDAP login attempt."""
     user = User.query.filter_by(username=username).first()
@@ -183,7 +197,8 @@ def _record_ldap_failed_attempt(username):
         return
     max_attempts, lockout_seconds = _get_ldap_lockout_settings()
     user.failed_logins = (user.failed_logins or 0) + 1
-    if user.failed_logins >= max_attempts:
+    locked = user.failed_logins >= max_attempts
+    if locked:
         user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
         logger.warning(f"LDAP account locked for {username} after {max_attempts} failed attempts")
     try:
@@ -191,6 +206,9 @@ def _record_ldap_failed_attempt(username):
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to record LDAP failed attempt for {username}: {e}")
+        return
+    if locked:
+        notify_account_locked(username)
 
 
 def _clear_ldap_failed_attempts(username):

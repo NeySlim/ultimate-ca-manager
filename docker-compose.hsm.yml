@@ -20,6 +20,8 @@ services:
       # HSM_PIN: "change-me"
     volumes:
       - ucm-data:/opt/ucm/data
+      # master.key, which decrypts every private key in the database (REQUIRED)
+      - ucm-config:/etc/ucm
       # SoftHSM tokens live in the data volume since 2.233. This older volume is
       # read once, at the first start of 2.233, to carry its tokens over.
       - ucm-hsm-tokens:/var/lib/softhsm/tokens
@@ -32,4 +34,5 @@ services:
 
 volumes:
   ucm-data:
+  ucm-config:
   ucm-hsm-tokens:

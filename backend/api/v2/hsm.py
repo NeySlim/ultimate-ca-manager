@@ -721,6 +721,7 @@ def get_provider_types():
             'available': 'pkcs11' in available,  # Uses PKCS#11
             'config_schema': {
                 'module_path': {'type': 'string', 'required': True, 'description': 'Path to CloudHSM PKCS#11 library'},
+                'token_label': {'type': 'string', 'required': True, 'description': 'Token label'},
                 'hsm_user': {'type': 'string', 'required': True, 'description': 'HSM crypto user name'},
                 'hsm_password': {'type': 'password', 'required': True, 'description': 'HSM user password'},
                 'cluster_id': {'type': 'string', 'required': False, 'description': 'CloudHSM cluster ID'}

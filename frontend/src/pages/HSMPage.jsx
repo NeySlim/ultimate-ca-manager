@@ -397,7 +397,7 @@ export default function HSMPage() {
           {provider.provider_type === 'aws-cloudhsm' && (
             <CompactGrid>
               <CompactField autoIcon="clusterId" label={t('hsm.awsConfig.clusterId')} value={provider.aws_cluster_id} mono copyable />
-              <CompactField autoIcon="region" label={t('hsm.awsConfig.region')} value={provider.aws_region} copyable />
+              <CompactField autoIcon="tokenLabel" label={t('hsm.pkcs11Config.tokenLabel')} value={provider.pkcs11_token_label} mono copyable />
               <CompactField autoIcon="cryptoUser" label={t('hsm.awsConfig.cryptoUser')} value={provider.aws_crypto_user} copyable />
             </CompactGrid>
           )}
@@ -637,9 +637,6 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
     pkcs11_pin: provider?.pkcs11_pin || '',
     pkcs11_token_label: provider?.pkcs11_token_label || '',
     aws_cluster_id: provider?.aws_cluster_id || '',
-    aws_region: provider?.aws_region || 'us-east-1',
-    aws_access_key: provider?.aws_access_key || '',
-    aws_secret_key: '',
     aws_crypto_user: provider?.aws_crypto_user || '',
     aws_crypto_password: provider?.aws_crypto_password || '',
     azure_vault_url: provider?.azure_vault_url || '',
@@ -680,6 +677,7 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
       config.hsm_user = formData.aws_crypto_user
       config.hsm_password = formData.aws_crypto_password
       config.cluster_id = formData.aws_cluster_id
+      config.token_label = formData.pkcs11_token_label
     } else if (formData.provider_type === 'azure-keyvault') {
       config.vault_url = formData.azure_vault_url
       config.tenant_id = formData.azure_tenant_id
@@ -749,11 +747,7 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
         <div className="space-y-4">
           <div className="grid grid-cols-2 gap-4">
             <Input label={t('hsm.awsConfig.clusterId')} value={formData.aws_cluster_id} onChange={e => handleChange('aws_cluster_id', e.target.value)} />
-            <Input label={t('hsm.awsConfig.region')} value={formData.aws_region} onChange={e => handleChange('aws_region', e.target.value)} />
-          </div>
-          <div className="grid grid-cols-2 gap-4">
-            <Input label={t('hsm.awsConfig.accessKey')} value={formData.aws_access_key} onChange={e => handleChange('aws_access_key', e.target.value)} />
-            <Input label={t('hsm.awsConfig.secretKey')} type="password" noAutofill value={formData.aws_secret_key === '***' ? '' : (formData.aws_secret_key || '')} onChange={e => handleChange('aws_secret_key', e.target.value)} hasExistingValue={provider?.aws_secret_key === '***'} />
+            <Input label={t('hsm.pkcs11Config.tokenLabel')} value={formData.pkcs11_token_label} onChange={e => handleChange('pkcs11_token_label', e.target.value)} />
           </div>
           <div className="grid grid-cols-2 gap-4">
             <Input label={t('hsm.awsConfig.cryptoUser')} value={formData.aws_crypto_user} onChange={e => handleChange('aws_crypto_user', e.target.value)} />
