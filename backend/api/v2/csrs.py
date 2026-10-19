@@ -944,6 +944,11 @@ def sign_csr(csr_id):
     if ca.revoked_in_chain:
         return error_response('CA is revoked and can no longer sign', 400)
 
+    from services.template_service import disabled_template_error
+    disabled = disabled_template_error(data.get('template_id'))
+    if disabled:
+        return error_response(disabled, 400)
+
     refusal, validity_days, validity_notice = _policy_rule_refusal(
         ca, cert, data.get('template_id'), validity_days,
         extra_dns=(extra_san or {}).get('san_dns') or ())
@@ -1065,6 +1070,10 @@ def bulk_sign_csrs():
     ca = _ca_by_id_or_refid(ca_id)
     if not ca or not ca.crt or not ca.has_private_key:
         return error_response('CA not found or not valid for signing', 404)
+    from services.template_service import disabled_template_error
+    disabled = disabled_template_error(data.get('template_id'))
+    if disabled:
+        return error_response(disabled, 400)
 
     # Clamp validity to CA expiration
     bulk_clamp_notice = None

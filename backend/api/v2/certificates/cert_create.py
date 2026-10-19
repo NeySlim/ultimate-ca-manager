@@ -89,6 +89,8 @@ def create_certificate():
         template = db.session.get(CertificateTemplate, data['template_id'])
         if not template:
             return error_response('Template not found', 404)
+        if not template.is_active:
+            return error_response(f"Template '{template.name}' is disabled", 400)
 
     if not ca.has_private_key:
         return error_response('CA private key not available', 400)

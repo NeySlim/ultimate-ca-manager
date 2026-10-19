@@ -32,6 +32,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: turning off "Auto-renewal" in the Let's Encrypt tab did not stop scheduled renewals; it now does, and the per-order switch still applies when it is on.
 - ACME client: the renewal threshold (`renewal_days`, accepted by the API) was ignored and renewals always started 30 days before expiry; it is now applied when the CA gives no ARI window, and set in the Let's Encrypt tab (1 to 60 days).
 - Policies: the maximum validity and maximum number of DNS names only applied to the issue form, CSR signing, renewals and approvals; ACME, SCEP, EST and WSTEP now cap the validity and refuse a request with too many DNS names as well.
+- Templates: a disabled template was still used by the issue form, CSR signing, approvals and new SCEP and ACME profile bindings; these now refuse it, as Windows enrollment already did.
 
 ## [2.242] - 2026-10-18
 

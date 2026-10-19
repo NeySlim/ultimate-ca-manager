@@ -317,6 +317,13 @@ def validate_config(obj):
             err = template_binding_error(name, spec['template_id'])
             if err:
                 return False, err
+            # A disabled template cannot be newly bound; an existing binding stays
+            saved = _coerce_template_id((_raw_config().get(name) or {}).get('template_id'))
+            if spec['template_id'] != saved:
+                from services.template_service import disabled_template_error
+                err = disabled_template_error(spec['template_id'])
+                if err:
+                    return False, f"profile '{name}': {err}"
 
     return True, None
 

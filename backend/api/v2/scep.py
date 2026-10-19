@@ -463,6 +463,8 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
             return False, 'Template not found'
         if tpl.template_type == 'ca':
             return False, 'CA templates cannot be used for SCEP profiles'
+        if not tpl.is_active and 'template_id' in data:
+            return False, f"Template '{tpl.name}' is disabled"
         # Same rule as ACME profiles: a template must not hand a SCEP
         # enrollee (a challenge password, at most an Intune check) an EKU
         # that grants authority over the PKI or an identity of its choosing

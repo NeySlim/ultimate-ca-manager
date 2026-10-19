@@ -302,6 +302,8 @@ def _issue_approved_certificate(approval):
         template = db.session.get(CertificateTemplate, data['template_id'])
         if not template:
             raise ValueError(f"Template {data['template_id']} not found")
+        if not template.is_active:
+            raise ValueError(f"Template '{template.name}' is disabled")
 
     # Re-clamp validity at issuance time:
     #   0) template default when the request didn't pick one (digest behaves
