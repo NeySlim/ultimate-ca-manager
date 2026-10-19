@@ -132,13 +132,13 @@ def disable_2fa():
     if not code and not backup_code:
         return error_response('Code or backup code required', 400)
 
-    user = db.session.get(User, g.current_user.id)
+    # Under enforced 2FA (#141), TOTP may go only if a security key remains;
+    # checked under the user row lock so a concurrent key removal cannot race it.
+    from auth.twofa_enforcement import lock_for_factor_change
+    user, refused = lock_for_factor_change(g.current_user.id, dropping_totp=True)
     if not user:
         return error_response('User not found', 404)
-
-    # Under enforced 2FA (#141), TOTP may go only if a security key remains.
-    from auth.twofa_enforcement import would_leave_no_second_factor
-    if would_leave_no_second_factor(user, dropping_totp=True):
+    if refused:
         return error_response(
             '2FA is enforced for your account: register a security key before disabling TOTP', 403)
 

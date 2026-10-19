@@ -6,7 +6,7 @@ Uses WebAuthnService for proper cryptographic verification
 
 from flask import Blueprint, request, g, session
 from auth.unified import require_auth
-from auth.twofa_enforcement import ENROLL_SESSION_KEY, would_leave_no_second_factor
+from auth.twofa_enforcement import ENROLL_SESSION_KEY, lock_for_factor_change
 from models import db
 from models.webauthn import WebAuthnCredential
 from services.webauthn_service import WebAuthnService
@@ -23,12 +23,14 @@ _LAST_FACTOR_MESSAGE = ('2FA is enforced for your account: keep TOTP or another 
 def _strips_last_factor(user, credential_id):
     """Own enabled key whose removal would leave enforced 2FA without a factor.
 
-    An administrator acting on someone else's key is not blocked (recovery of a lost key).
+    Read under the user row lock, held until the removal commits. An administrator
+    acting on someone else's key is not blocked (recovery of a lost key).
     """
     credential = db.session.get(WebAuthnCredential, credential_id)
     if not credential or credential.user_id != user.id or not credential.enabled:
         return False
-    return would_leave_no_second_factor(credential.user, dropping_key=credential.id)
+    _owner, refused = lock_for_factor_change(credential.user_id, dropping_key=credential.id)
+    return refused
 
 
 @bp.route('/credentials', methods=['GET'])

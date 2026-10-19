@@ -73,6 +73,23 @@ def would_leave_no_second_factor(user, *, dropping_totp=False, dropping_key=None
     return not totp_left and not has_security_key(user, excluding=dropping_key)
 
 
+def lock_user(user_id):
+    """The user row, locked until commit on PostgreSQL (SQLite serialises writers),
+    so changes to one account's second factors run one at a time."""
+    from models import User, db
+    return (db.session.query(User).filter_by(id=user_id)
+            .populate_existing().with_for_update().one_or_none())
+
+
+def lock_for_factor_change(user_id, *, dropping_totp=False, dropping_key=None):
+    """(locked user, refused): the guard is read under the lock, never before it."""
+    user = lock_user(user_id)
+    if user is None:
+        return None, False
+    return user, would_leave_no_second_factor(
+        user, dropping_totp=dropping_totp, dropping_key=dropping_key)
+
+
 def must_enroll_2fa(user, *, auth_method='password', provider=None):
     """Whether this login gets a restricted session until a second factor is enrolled.
 
