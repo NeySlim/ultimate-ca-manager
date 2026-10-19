@@ -599,7 +599,7 @@ class AcmeEabCredential(db.Model):
     __tablename__ = 'acme_eab_credentials'
 
     id = db.Column(db.Integer, primary_key=True)
-    kid = db.Column(db.String(64), unique=True, nullable=False, index=True)
+    kid = db.Column(db.String(255), unique=True, nullable=False, index=True)
     # Encrypted at rest via Fernet (utils.encryption). Column name preserved
     # for backwards compatibility — older rows stored plaintext base64 are
     # transparently returned by decrypt_if_needed().

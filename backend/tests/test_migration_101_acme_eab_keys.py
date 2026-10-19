@@ -21,7 +21,9 @@ from services.acme.acme_service import AcmeService
 from utils.encryption import decrypt_if_needed
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
-BLOB = json.dumps({'legacy-kid': 'bGVnYWN5LXNlY3JldA', 'kept-kid': 'bmV3', '': 'x', 'bad': 3})
+LONG_KID = 'k' * 100
+BLOB = json.dumps({'legacy-kid': 'bGVnYWN5LXNlY3JldA', 'kept-kid': 'bmV3', LONG_KID: 'bG9uZw',
+                   '': 'x', 'bad': 3})
 
 SQLITE_SCHEMA = (
     "CREATE TABLE system_config (key TEXT PRIMARY KEY, value TEXT)",
@@ -43,17 +45,27 @@ def _migration():
 
 def _check(rows, blob_left):
     by_kid = {r[0]: r for r in rows}
-    assert set(by_kid) == {'legacy-kid', 'kept-kid'}
+    assert set(by_kid) == {'legacy-kid', 'kept-kid', LONG_KID}
     # Encrypted at rest, and the secret survives the trip.
     assert by_kid['legacy-kid'][1] != 'bGVnYWN5LXNlY3JldA'
     assert decrypt_if_needed(by_kid['legacy-kid'][1]) == 'bGVnYWN5LXNlY3JldA'
     assert by_kid['legacy-kid'][2] == 'active'
     # An existing credential is not overwritten.
     assert by_kid['kept-kid'][1] == 'existing'
-    assert blob_left is None
+    # What cannot be a credential stays in the blob rather than being lost.
+    assert json.loads(blob_left[0]) == {'': 'x', 'bad': 3}
 
 
-def test_sqlite_imports_then_drops_the_blob():
+def test_an_unreadable_blob_is_left_whole():
+    conn = sqlite3.connect(':memory:')
+    for statement in SQLITE_SCHEMA:
+        conn.execute(statement)
+    conn.execute("INSERT INTO system_config VALUES ('acme_eab_keys', 'not json')")
+    _migration().upgrade(conn)
+    assert conn.execute("SELECT value FROM system_config WHERE key = 'acme_eab_keys'").fetchone() == ('not json',)
+
+
+def test_sqlite_imports_the_keys():
     conn = sqlite3.connect(':memory:')
     for statement in SQLITE_SCHEMA:
         conn.execute(statement)
@@ -63,13 +75,13 @@ def test_sqlite_imports_then_drops_the_blob():
     _migration().upgrade(conn)
     _migration().upgrade(conn)
     rows = conn.execute("SELECT kid, hmac_key_b64, status FROM acme_eab_credentials").fetchall()
-    blob = conn.execute("SELECT 1 FROM system_config WHERE key = 'acme_eab_keys'").fetchone()
+    blob = conn.execute("SELECT value FROM system_config WHERE key = 'acme_eab_keys'").fetchone()
     _check(rows, blob)
 
 
 @pytest.mark.postgres
 @pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_postgres_imports_then_drops_the_blob():
+def test_postgres_imports_the_keys():
     schema = f"migtest_101_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
     engine = create_engine(PG_URL)
     conn = engine.connect()
@@ -85,7 +97,7 @@ def test_postgres_imports_then_drops_the_blob():
         _migration().upgrade(conn)
         _migration().upgrade(conn)
         rows = conn.execute(text("SELECT kid, hmac_key_b64, status FROM acme_eab_credentials")).fetchall()
-        blob = conn.execute(text("SELECT 1 FROM system_config WHERE key = 'acme_eab_keys'")).fetchone()
+        blob = conn.execute(text("SELECT value FROM system_config WHERE key = 'acme_eab_keys'")).fetchone()
         _check(rows, blob)
     finally:
         conn.rollback()
