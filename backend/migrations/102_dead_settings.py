@@ -4,7 +4,8 @@ Each key below lost its reader or its screen in the same release; leaving the
 row would only keep a stale value (some of them secrets) in backups. Policy
 rules lose the JSON keys no evaluation ever read, and
 discovery profiles gain the notification address their form always sent, and
-discovered certificates the fingerprint whose expiry was last reported.
+discovered certificates the fingerprint whose expiry was last reported. The
+OCSP cache's revocation reasons stored as names become CRLReason codes.
 """
 import json
 import sqlite3
@@ -89,6 +90,14 @@ JSON_COLUMNS = (
 )
 
 
+# The OCSP cache stored the reason's name in its integer column; SQLite took it
+OCSP_REASON_CODES = {
+    'unspecified': 0, 'keyCompromise': 1, 'cACompromise': 2, 'affiliationChanged': 3,
+    'superseded': 4, 'cessationOfOperation': 5, 'certificateHold': 6, 'removeFromCRL': 8,
+    'privilegeWithdrawn': 9, 'aACompromise': 10,
+}
+
+
 def _upgrade_sqlite(conn):
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if 'system_config' in tables:
@@ -114,6 +123,11 @@ def _upgrade_sqlite(conn):
             cleaned = clean(value)
             if cleaned is not None:
                 conn.execute(f"UPDATE {table} SET {column} = ? WHERE id = ?", (cleaned, rid))
+    if 'ocsp_responses' in tables:
+        conn.executemany("UPDATE ocsp_responses SET revocation_reason = ? WHERE revocation_reason = ?",
+                         [(code, name) for name, code in OCSP_REASON_CODES.items()])
+        conn.execute("UPDATE ocsp_responses SET revocation_reason = NULL "
+                     "WHERE typeof(revocation_reason) = 'text'")
     conn.commit()
 
 

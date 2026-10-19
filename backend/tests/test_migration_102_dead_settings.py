@@ -232,3 +232,15 @@ def test_postgres_carries_site_name_into_system_name():
         conn.commit()
         conn.close()
         engine.dispose()
+
+
+def test_sqlite_turns_ocsp_reason_names_into_codes():
+    m = _migration()
+    conn = sqlite3.connect(':memory:')
+    conn.execute("CREATE TABLE ocsp_responses (id INTEGER PRIMARY KEY, revocation_reason INTEGER)")
+    conn.executemany("INSERT INTO ocsp_responses VALUES (?, ?)",
+                     [(1, 'keyCompromise'), (2, 'aACompromise'), (3, 4), (4, None), (5, 'nonsense')])
+    m.upgrade(conn)
+    m.upgrade(conn)
+    rows = dict(conn.execute("SELECT id, revocation_reason FROM ocsp_responses").fetchall())
+    assert rows == {1: 1, 2: 10, 3: 4, 4: None, 5: None}

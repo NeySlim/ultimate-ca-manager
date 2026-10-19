@@ -58,6 +58,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - HSM: a Google Cloud KMS provider could only use the server's ambient credentials, the form having no field for a service account key; it now takes one, kept encrypted and masked like the other secrets, and can be removed again to return to the default credentials.
 - Docs: the admin guide gave native installs the Docker-only `UCM_*` variable names (`UCM_SECRET_KEY`, `UCM_DATA_DIR`...), which ucm.env does not read; it now lists both names.
 - Templates: the "Subject Alternative Names" types of a template were never enforced; a request made with the template (issue form, Sign CSR, ACME profile, SCEP, WSTEP, renewal, approval) that carries another name type is now refused, naming the type. Upgrade note: templates with types unchecked, the built-in ones included (Client Authentication and VPN Client allow only Email, Smartcard Logon only UPN), start refusing those types; check every type the template should accept, or none to allow all.
+- OCSP: on PostgreSQL, the response for a certificate revoked with a reason was never cached, its reason name going into an integer column, and a SQLite database holding such rows could not be migrated to PostgreSQL. The cache stores the CRLReason code, and existing rows are converted at upgrade.
 
 ## [2.242] - 2026-10-18
 
