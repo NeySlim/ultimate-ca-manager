@@ -151,7 +151,13 @@ def scheduled_acme_renewal():
     Called by scheduler service.
     """
     logger.info("Starting ACME auto-renewal check...")
-    
+
+    # The Let's Encrypt tab's global switch; each order also has its own.
+    switch = SystemConfig.query.filter_by(key='acme.client.renewal_enabled').first()
+    if switch is not None and str(switch.value).lower() != 'true':
+        logger.info("ACME auto-renewal is turned off")
+        return
+
     try:
         # Get renewal threshold from settings or use default
         renewal_days = DEFAULT_RENEWAL_DAYS
