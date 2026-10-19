@@ -22,6 +22,7 @@ from models import db, Certificate, CA
 from services.cert_service import CertificateService
 from services.deletion_blockers import parse_bulk_ids
 from services.policy_service import PolicyViolation
+from utils.csr_extensions import csr_extensions
 from fips_mode import FipsRestricted
 from utils.san_parse import (general_names_from_buckets, parse_extra_san_payload,
                              san_buckets_from_general_names)
@@ -112,7 +113,7 @@ def _csr_identity(cert):
     cn_attrs = csr_obj.subject.get_attributes_for_oid(_NameOID.COMMON_NAME)
     csr_cn = cn_attrs[0].value if cn_attrs else None
     try:
-        csr_dns = list(csr_obj.extensions.get_extension_for_oid(
+        csr_dns = list(csr_extensions(csr_obj).get_extension_for_oid(
             _ExtOID.SUBJECT_ALTERNATIVE_NAME).value.get_values_for_type(_x509.DNSName))
     except _x509.ExtensionNotFound:
         csr_dns = []
@@ -129,7 +130,6 @@ def _san_type_refusal(cert, template_id, extra_san=None):
     if allowed is None:
         return None
     from cryptography import x509 as _x509
-    from utils.csr_extensions import csr_extensions
     raw = cert.csr if cert.csr.startswith('-----BEGIN') else base64.b64decode(cert.csr).decode()
     try:
         names = list(csr_extensions(_x509.load_pem_x509_csr(raw.encode())).get_extension_for_class(
@@ -398,7 +398,7 @@ def upload_csr():
         # Extract SANs from CSR
         san_dns, san_ip, san_email, san_uri = [], [], [], []
         try:
-            san_ext = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            san_ext = csr_extensions(csr).get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
             for name_entry in san_ext.value:
                 if isinstance(name_entry, x509.DNSName):
                     san_dns.append(name_entry.value)
@@ -520,7 +520,7 @@ def import_csr():
         san_email = []
         san_uri = []
         try:
-            san_ext = csr.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
+            san_ext = csr_extensions(csr).get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME)
             for name_entry in san_ext.value:
                 if isinstance(name_entry, x509.DNSName):
                     san_dns.append(name_entry.value)
@@ -595,7 +595,7 @@ def resubmit_csr(csr_id):
     try:
         csr = x509.load_pem_x509_csr(base64.b64decode(signed.csr), default_backend())
         try:
-            names = csr.extensions.get_extension_for_oid(
+            names = csr_extensions(csr).get_extension_for_oid(
                 x509.oid.ExtensionOID.SUBJECT_ALTERNATIVE_NAME).value
         except x509.ExtensionNotFound:
             names = []

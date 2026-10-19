@@ -83,6 +83,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Docs: the admin guide gave native installs the Docker-only `UCM_*` variable names (`UCM_SECRET_KEY`, `UCM_DATA_DIR`...), which ucm.env does not read; it now lists both names.
 - Templates: the "Subject Alternative Names" types of a template were never enforced. A new "Enforce the allowed SAN types" switch makes the issue form, Sign CSR, ACME profiles, SCEP, WSTEP, renewals and approvals refuse a request carrying another name type, naming it. Upgrade note: existing and built-in templates keep accepting every type until the switch is turned on (the built-in client, VPN client and smartcard lists now include the names those certificates carry); new templates have it on.
 - OCSP: on PostgreSQL, the response for a certificate revoked with a reason was never cached, its reason name going into an integer column, and a SQLite database holding such rows could not be migrated to PostgreSQL. The cache stores the CRLReason code, and existing rows are converted at upgrade.
+- CSRs: a Windows or Intune request (CA:FALSE with a path length) failed to upload with an error 500 and could not be signed or approved; it now goes through like any other, and so does an ACME order finalized with such a request.
 
 ### Security
 
