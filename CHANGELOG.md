@@ -37,7 +37,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Settings: the internal `app.initialized` and `https.enabled` keys were seeded at startup and never read; they are no longer created and the upgrade deletes them. Nothing to do.
 - Notifications: the `subject_template` field of a notification setting was never read or written; it is no longer exposed. Nothing to do.
 - Packaging: the DEB and RPM packages, the native setup, the Docker image and the Helm chart no longer generate a JWT secret (`JWT_SECRET_KEY`, `UCM_JWT_SECRET`, `secrets.jwtSecret`), which nothing used. An existing value is ignored and can be deleted.
-- Configuration: the `SCEP_*` environment variables were loaded at startup and never used; SCEP is configured in Protocols > SCEP only. Existing lines in ucm.env are ignored.
+- Configuration: the `SCEP_*` environment variables were loaded at startup and never used; in particular `SCEP_ENABLED=false` never turned SCEP off. SCEP is enabled or disabled in Protocols > SCEP only; existing lines in ucm.env are ignored.
 - Docker: `.env.docker.example` offered data directories, PostgreSQL credentials and resource limits that no compose file uses, and the dev compose set `SQL_DEBUG`, which nothing read; they are gone. Nothing to do: data lives in the `ucm-data` volume.
 
 ### Fixed
