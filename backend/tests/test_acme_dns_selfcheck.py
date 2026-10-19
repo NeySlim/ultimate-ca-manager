@@ -144,8 +144,9 @@ def test_auto_poll_spawns_thread_when_not_testing(app, monkeypatch):
             started.append(True)
 
     monkeypatch.setattr(orders_mod.threading, 'Thread', _SpyThread)
+    # Scoped to this test: a session-wide TESTING=False sends later tests' work to threads
+    monkeypatch.setitem(app.config, 'TESTING', False)
     with app.test_request_context():
-        app.config['TESTING'] = False
         orders_mod._run_auto_poll_background(999999, 'staging')
     assert started == [True], 'a background thread must be spawned outside TESTING'
 
