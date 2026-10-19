@@ -77,6 +77,13 @@ def _request(app, approval_id):
         return db.session.get(ApprovalRequest, approval_id)
 
 
+def _assert_cancellation_audited(app, approval_id):
+    from models import AuditLog
+    with app.app_context():
+        entry = AuditLog.query.filter_by(action='approval_cancelled').order_by(AuditLog.id.desc()).first()
+        assert entry is not None and entry.resource_id == str(approval_id), entry
+
+
 @pytest.fixture
 def scoped(app, create_ca):
     """A CA with a revocation policy that requires approval, and a cleanup."""
@@ -270,6 +277,31 @@ class TestRevocation:
             CertificateService.revoke_certificate(cert_id=cid, reason='superseded', username=user['username'])
         ap = _request(app, approval_id)
         assert ap.status == 'cancelled' and ap.get_approvals() == []
+        _assert_cancellation_audited(app, approval_id)
+        stats = auth_client.get('/api/v2/approvals/stats').get_json()['data']
+        with app.app_context():
+            assert stats['cancelled'] == ApprovalRequest.query.filter_by(status='cancelled').count() >= 1
+            assert stats['total'] == ApprovalRequest.query.count()
+
+    def test_a_cancellation_rolled_back_is_not_audited(self, app, create_user, scoped):
+        from models import AuditLog
+        from services.approval_gate import record_cancellations, resolve_moot_requests
+        ca, _pid = scoped('rv-rollback')
+        cid = scoped.cert(ca, 'rv-rollback.example.test')
+        operator, user = _login(app, create_user)
+        approval_id = _json(operator, 'post', f'/api/v2/certificates/{cid}/revoke',
+                            {'reason': 'superseded'}).get_json()['data']['approval_id']
+        with app.app_context():
+            last = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+            resolve_moot_requests('revocation', 'certificate_id', cid, outcome='approved',
+                                  username=user['username'], user_id=user['id'],
+                                  reason='Revoked directly', commit=False)
+            db.session.rollback()
+            db.session.commit()
+            record_cancellations()
+            assert AuditLog.query.filter(AuditLog.id > last,
+                                         AuditLog.action == 'approval_cancelled').count() == 0
+        assert _request(app, approval_id).status == 'pending'
 
     def test_a_duplicate_of_the_approver_is_cancelled(self, app, auth_client, create_user, scoped):
         ca, _pid = scoped('rv-dup')
@@ -283,6 +315,7 @@ class TestRevocation:
         assert _request(app, one).status == 'approved'
         ap = _request(app, two)
         assert ap.status == 'cancelled' and ap.get_approvals() == []
+        _assert_cancellation_audited(app, two)
 
     def test_policy_evaluation_failure_revokes_nothing(self, app, create_user, scoped, monkeypatch):
         from services.policy_service import PolicyEvaluationService
@@ -575,6 +608,20 @@ class TestRenewal:
             if row:
                 db.session.delete(row)
                 db.session.commit()
+
+
+    def test_the_approver_of_a_duplicate_renewal_has_their_own_cancelled(self, app, create_user, scoped):
+        ca, _pid = scoped('rn-dup', operations=('renewal',))
+        cid = scoped.cert(ca, 'rn-dup.example.test')
+        first, _ = _login(app, create_user)
+        second, _ = _login(app, create_user)
+        one = _json(first, 'post', f'/api/v2/certificates/{cid}/renew', {}).get_json()['data']['approval_id']
+        two = _json(second, 'post', f'/api/v2/certificates/{cid}/renew', {}).get_json()['data']['approval_id']
+        r = _json(second, 'post', f'/api/v2/approvals/{one}/approve', {})
+        assert r.status_code == 200, r.get_json()
+        assert _request(app, one).status == 'approved'
+        assert _request(app, two).status == 'cancelled'
+        _assert_cancellation_audited(app, two)
 
 
 class TestBackup:

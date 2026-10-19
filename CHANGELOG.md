@@ -12,7 +12,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Added
 
 - A policy can now govern revocations and renewals as well as issuance: revoking a certificate (alone, in bulk, a user certificate) or an intermediate CA, and renewals by an operator or the scheduler, are queued for approval and performed with the requested parameters once approved; ACME revocations it covers are refused, and so is removing an mTLS enrolment (409) until its certificate is revoked. Existing policies keep governing what they did.
-- The policy setting "Notify on policy violation" now sends its e-mail: when the policy refuses an operation or holds one for approval, to the policy's new notification addresses or else its approvers, with a repeated refusal reported once per hour.
+- The policy setting "Notify on policy violation", on by default, now sends its e-mail: existing policies start mailing on upgrade when the policy refuses an operation or holds one for approval, to the policy's new notification addresses, else its approval group, else every user with `write:approvals` (untick the setting to stop it). A repeated refusal is reported once per hour.
 
 ## [2.242] - 2026-10-18
 

@@ -14,6 +14,9 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID, NameOID
 
+from sqlalchemy import event
+from sqlalchemy.orm import Session
+
 from models import db
 from models.policy import ApprovalRequest, CertificatePolicy
 from services.policy_service import (APPROVAL_REQUEST_LIFETIME, RENEWAL_OPERATIONS,
@@ -280,6 +283,35 @@ def notify_rejected(snapshots: list, *, reason: str, actor: str) -> None:
         emit_csr_rejected(snapshot, reason=reason, actor=actor)
 
 
+_UNCOMMITTED = 'approval_cancellations_pending'
+_CANCELLED = 'approval_cancellations'
+
+
+@event.listens_for(Session, 'after_commit')
+def _cancellations_committed(session):
+    pending = session.info.pop(_UNCOMMITTED, None)
+    if pending:
+        session.info.setdefault(_CANCELLED, []).extend(pending)
+
+
+@event.listens_for(Session, 'after_rollback')
+def _cancellations_rolled_back(session):
+    session.info.pop(_UNCOMMITTED, None)
+
+
+def record_cancellations() -> None:
+    """Audit the requests a direct action cancelled, once that action is
+    committed: after the commit here, after each request for the callers
+    that own their transaction. A cancellation rolled back is never audited."""
+    from services.audit_service import AuditService
+    for approval_id, request_type, actor, reason in db.session.info.pop(_CANCELLED, []):
+        AuditService.log_action(
+            action='approval_cancelled', resource_type='approval', resource_id=str(approval_id),
+            resource_name=f'{request_type} request #{approval_id}',
+            details=f'Cancelled: its requester acted directly ({reason})',
+            success=True, username=actor)
+
+
 def _acted_by_requester(approval, user_id, username) -> bool:
     if user_id is not None:
         return approval.requester_id == user_id
@@ -317,6 +349,8 @@ def _resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: s
             # Nobody approves their own request: it is withdrawn, without a vote
             approval.status = 'cancelled'
             approval.resolved_at = utc_now()
+            db.session.info.setdefault(_UNCOMMITTED, []).append(
+                (approval.id, approval.request_type, username, reason))
             logger.info("Approval request #%s cancelled by its requester: %s", approval.id, reason)
             continue
         approval.add_approval(user_id=user_id, username=username,
@@ -330,7 +364,8 @@ def _resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: s
         logger.info("Approval request #%s resolved as %s: %s", approval.id, outcome, reason)
     if touched and commit:
         from utils.db_transaction import safe_commit
-        safe_commit(logger, "Failed to resolve superseded approval requests")
+        if safe_commit(logger, "Failed to resolve superseded approval requests")[0]:
+            record_cancellations()
     return resolved
 
 

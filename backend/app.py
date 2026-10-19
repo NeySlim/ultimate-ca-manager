@@ -943,6 +943,16 @@ def create_app(config_name=None):
         clear_request_caches()
 
     @app.after_request
+    def _audit_approval_cancellations(response):
+        # Requests cancelled in a transaction the route committed itself
+        try:
+            from services.approval_gate import record_cancellations
+            record_cancellations()
+        except Exception as e:  # never fails the response
+            app.logger.warning(f"Approval cancellation audit failed: {e}")
+        return response
+
+    @app.after_request
     def add_security_headers(response):
         """Add security headers and fix deprecated headers"""
         # Set Permissions-Policy without deprecated features

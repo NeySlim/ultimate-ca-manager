@@ -102,6 +102,9 @@ class TestViolation:
         policy_notifications._recent.clear()  # as seen from another process
         assert _issue(auth_client, ca['id'], 'worker.notify.test').status_code == 400
         assert len(sent) == 1
+        with app.app_context():
+            NotificationLog.query.filter_by(resource_id=sent[0]['resource_id']).delete()
+            db.session.commit()
 
 
 class TestApprovalQueued:
@@ -173,3 +176,98 @@ class TestPolicyEmailsField:
             with app.app_context():
                 CertificatePolicy.query.filter_by(name=name).delete()
                 db.session.commit()
+
+
+@pytest.fixture
+def smtp_on(app):
+    """An enabled SMTP configuration, the previous one restored afterwards."""
+    from models.email_notification import SMTPConfig
+    fields = ('enabled', 'smtp_host', 'smtp_port', 'smtp_from', 'smtp_auth', 'smtp_user',
+              'smtp_use_tls', 'smtp_use_ssl', 'smtp_auth_method')
+    with app.app_context():
+        row = SMTPConfig.query.first()
+        created = row is None
+        if created:
+            row = SMTPConfig()
+            db.session.add(row)
+        saved = {f: getattr(row, f) for f in fields}
+        row.enabled, row.smtp_host, row.smtp_port, row.smtp_from = True, 'smtp.example.test', 25, 'ucm@example.test'
+        row.smtp_auth, row.smtp_user, row.smtp_use_tls, row.smtp_use_ssl = False, None, False, False
+        row.smtp_auth_method = 'password'
+        db.session.commit()
+    yield
+    with app.app_context():
+        row = SMTPConfig.query.first()
+        if created:
+            db.session.delete(row)
+        else:
+            for f, v in saved.items():
+                setattr(row, f, v)
+        db.session.commit()
+
+
+class TestOwnSession:
+    """The production path: a thread with its own session."""
+
+    @pytest.fixture
+    def threaded(self, app, monkeypatch):
+        class SyncThread:
+            def __init__(self, target, **_kw):
+                self.target = target
+
+            def start(self):
+                self.target()
+        monkeypatch.setitem(app.config, 'TESTING', False)
+        monkeypatch.setattr(policy_notifications.threading, 'Thread', SyncThread)
+        policy_notifications._recent.clear()
+        yield
+        policy_notifications._recent.clear()
+
+    def _violate(self, app, pid, subject):
+        with app.app_context():
+            pol = db.session.get(CertificatePolicy, pid)
+            policy_notifications.violation([pol], {id(pol): ['Key type RSA-2048 is not allowed']},
+                                           {'operation': 'issuance', 'subject': subject})
+
+    def test_no_connection_is_held_during_smtp_and_one_log_remains(
+            self, app, create_ca, policies, smtp_on, threaded, monkeypatch):
+        exchanges = []
+
+        class FakeSMTP:
+            def sendmail(self, *_a):
+                pass
+
+            def quit(self):
+                pass
+
+        def connect(_config, timeout):
+            exchanges.append(db.session.registry.has())
+            return FakeSMTP()
+        monkeypatch.setattr('services.email_service._smtp_connect', connect)
+        ca = create_ca(cn='notify thread CA')
+        pid, _name = policies(ca['id'], emails=['pki@example.test'])
+        self._violate(app, pid, 'thread.notify.test')
+        assert exchanges == [False]  # a mail went out, with no session open
+        with app.app_context():
+            logs = NotificationLog.query.filter(
+                NotificationLog.type == policy_notifications.VIOLATION,
+                NotificationLog.resource_id.like(f'{pid}:%')).all()
+            assert [log.status for log in logs] == ['sent']
+            assert NotificationLog.query.filter_by(status='pending', resource_type='policy').count() == 0
+            resource_id = logs[0].resource_id
+        # Another worker (empty memory) sees the record and stays silent
+        policy_notifications._recent.clear()
+        self._violate(app, pid, 'thread.notify.test')
+        assert exchanges == [False]
+        with app.app_context():
+            NotificationLog.query.filter_by(resource_id=resource_id).delete()
+            db.session.commit()
+
+    def test_the_record_comes_first_and_only_one_claim_wins(self, app):
+        with app.app_context():
+            first = policy_notifications._claim_in_db(policy_notifications.VIOLATION, 'test:claim', 'a@example.test')
+            second = policy_notifications._claim_in_db(policy_notifications.VIOLATION, 'test:claim', 'a@example.test')
+            assert first is not None and second is None
+            assert NotificationLog.query.filter_by(resource_id='test:claim').count() == 1
+            NotificationLog.query.filter_by(resource_id='test:claim').delete()
+            db.session.commit()

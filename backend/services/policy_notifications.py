@@ -158,28 +158,60 @@ def _dispatch(policy_id, kind, resource_id, details):
     from flask import current_app
     app = current_app._get_current_object()
     if app.config.get('TESTING'):
-        _send(policy_id, kind, resource_id, details)
+        # Inline on the caller's session (a single shared connection in tests)
+        _send(policy_id, kind, resource_id, details, own_session=False)
         return
 
     def run():
         with app.app_context():
-            _send(policy_id, kind, resource_id, details)
+            _send(policy_id, kind, resource_id, details, own_session=True)
     # Its own thread and session: the caller's transaction is never committed here
     threading.Thread(target=run, name=f'policy-notify-{policy_id}', daemon=True).start()
 
 
-def _send(policy_id, kind, resource_id, details):
+def _recently_logged(kind, resource_id, exclude_id=None):
+    from models.email_notification import NotificationLog
+    from utils.datetime_utils import utc_now
+    query = NotificationLog.query.filter(
+        NotificationLog.type == kind, NotificationLog.resource_type == 'policy',
+        NotificationLog.resource_id == resource_id,
+        NotificationLog.sent_at >= utc_now() - DEDUP_WINDOW)
+    if exclude_id is not None:
+        query = query.filter(NotificationLog.id != exclude_id)
+    return query.first() is not None
+
+
+def _claim_in_db(kind, resource_id, recipients_label):
+    """Record the notification before sending it; the id of that record, or
+    None when another worker's falls in the window. The insert holds the
+    SQLite write lock and PostgreSQL takes an advisory lock, so of two
+    workers checking at once the second sees the first."""
+    from sqlalchemy import text
+    from models import db
+    from models.email_notification import NotificationLog
+    from utils.datetime_utils import utc_now
+    if db.engine.dialect.name == 'postgresql':
+        lock = int(hashlib.sha256(f'{kind}:{resource_id}'.encode()).hexdigest()[:15], 16)
+        db.session.execute(text('SELECT pg_advisory_xact_lock(:k)'), {'k': lock})
+    claim = NotificationLog(type=kind, recipient=recipients_label[:255], status='pending',
+                            resource_type='policy', resource_id=resource_id, sent_at=utc_now())
+    db.session.add(claim)
+    db.session.flush()
+    if _recently_logged(kind, resource_id, exclude_id=claim.id):
+        db.session.rollback()
+        return None
+    db.session.commit()
+    return claim.id
+
+
+def _send(policy_id, kind, resource_id, details, *, own_session):
     from models import db
     from models.email_notification import NotificationLog
     from models.policy import CertificatePolicy
     from services.email_service import EmailService
-    from utils.datetime_utils import utc_now
     try:
-        if NotificationLog.query.filter(
-                NotificationLog.type == kind, NotificationLog.resource_type == 'policy',
-                NotificationLog.resource_id == resource_id,
-                NotificationLog.sent_at >= utc_now() - DEDUP_WINDOW).first() is not None:
-            return  # another worker told them already
+        if not own_session and _recently_logged(kind, resource_id):
+            return
         policy = db.session.get(CertificatePolicy, policy_id)
         if policy is None:
             return
@@ -188,10 +220,19 @@ def _send(policy_id, kind, resource_id, details):
             logger.info("Policy %s: nobody to notify (%s)", policy.name, kind)
             return
         subject, body = _render(policy, kind, details)
+        claim_id = _claim_in_db(kind, resource_id, ', '.join(to)) if own_session else None
+        if own_session and claim_id is None:
+            return  # another worker told them already
         EmailService.send_email(recipients=to, subject=subject, body_html=body,
                                 notification_type=kind, resource_type='policy',
-                                resource_id=resource_id)
+                                resource_id=resource_id, release_session=own_session)
+        if claim_id is not None:
+            # The service logged the outcome per recipient; the claim has served
+            NotificationLog.query.filter_by(id=claim_id).delete()
+            db.session.commit()
     except Exception as e:  # a notification never fails the operation
+        if own_session:
+            db.session.rollback()
         logger.warning("Policy notification failed: %s", e)
 
 

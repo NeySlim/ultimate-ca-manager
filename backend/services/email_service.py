@@ -132,6 +132,7 @@ class EmailService:
         resource_type: Optional[str] = None,
         resource_id: Optional[str] = None,
         threshold_days: Optional[int] = None,
+        release_session: bool = False,
     ) -> tuple[bool, str]:
         """
         Send email to recipients
@@ -144,7 +145,9 @@ class EmailService:
             notification_type: Type of notification for logging
             resource_type: Type of resource (certificate, ca, crl)
             resource_id: ID of resource
-            
+            release_session: return the session's connection to the pool before
+                the SMTP exchange (callers that own their session only)
+
         Returns:
             (success: bool, message: str)
         """
@@ -170,6 +173,11 @@ class EmailService:
             return False, "No valid recipient address"
 
         subject = _sanitize_header_value(subject)
+        if release_session:
+            # A caller that owns its session hands the pool connection back
+            # for the SMTP exchange; the loaded settings stay readable
+            db.session.expunge(config)
+            db.session.remove()
 
         try:
             # Determine content type from config

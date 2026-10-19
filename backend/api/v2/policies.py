@@ -1301,13 +1301,10 @@ def approval_stats():
     """Get approval statistics"""
     from services.approval_gate import expire_stale_requests
     expire_stale_requests()
-    pending = ApprovalRequest.query.filter_by(status='pending').count()
-    approved = ApprovalRequest.query.filter_by(status='approved').count()
-    rejected = ApprovalRequest.query.filter_by(status='rejected').count()
-    
-    return success_response(data={
-        'pending': pending,
-        'approved': approved,
-        'rejected': rejected,
-        'total': pending + approved + rejected
-    })
+    counts = dict(db.session.query(ApprovalRequest.status, db.func.count(ApprovalRequest.id))
+                  .group_by(ApprovalRequest.status).all())
+    stats = {status: counts.get(status, 0)
+             for status in ('pending', 'approved', 'rejected', 'expired', 'cancelled')}
+    # The "all" list shows every request, whatever its status
+    stats['total'] = sum(counts.values())
+    return success_response(data=stats)

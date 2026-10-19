@@ -169,6 +169,8 @@ class CAOperationsMixin:
             f'Revoked CA: {ca.descr} - Reason: {reason} (issuer: {parent.descr})',
             username=username,
         )
+        from services.approval_gate import record_cancellations
+        record_cancellations()
 
         # The parent publishes the revocation: CRL now, OCSP on next answer.
         # Each warning comes with a code the UI can translate

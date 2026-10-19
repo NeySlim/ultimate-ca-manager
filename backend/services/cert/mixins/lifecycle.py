@@ -500,6 +500,8 @@ class LifecycleMixin:
             # Audit log
             from services.audit_service import AuditService
             AuditService.log_certificate('cert_revoked', certificate, f'Revoked certificate: {certificate.descr} - Reason: {reason}')
+            from services.approval_gate import record_cancellations
+            record_cancellations()
 
             # Auto-generate CRL if CA has CDP enabled
             ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None

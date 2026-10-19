@@ -29,13 +29,18 @@ def fake_dns(monkeypatch):
             raise Exception('NXDOMAIN')
         return [_RData(vals)]
 
-    fake_resolver = types.SimpleNamespace(resolve=resolve)
-    fake_dns_mod = types.ModuleType('dns')
+    # Only the resolver is faked: the real package keeps dns.flags & co importable
+    # whatever ran before, and a fake without Resolver keeps the network out
+    import dns
+    import dns.flags  # noqa: F401
+    import dns.rdatatype  # noqa: F401
+    import dns.resolver as real_resolver
     fake_resolver_mod = types.ModuleType('dns.resolver')
     fake_resolver_mod.resolve = resolve
-    fake_dns_mod.resolver = fake_resolver_mod
-    monkeypatch.setitem(sys.modules, 'dns', fake_dns_mod)
+    fake_resolver_mod.NXDOMAIN = real_resolver.NXDOMAIN
+    fake_resolver_mod.NoAnswer = real_resolver.NoAnswer
     monkeypatch.setitem(sys.modules, 'dns.resolver', fake_resolver_mod)
+    monkeypatch.setattr(dns, 'resolver', fake_resolver_mod)
     return state
 
 
