@@ -137,6 +137,11 @@ class User(db.Model):
         import json
         self.preferences = json.dumps(value or {}, separators=(',', ':'))
     
+    def second_factor_required(self):
+        """Whether a password login asks this user for TOTP or a security key."""
+        from auth.twofa_enforcement import second_factor_methods  # circular at import
+        return bool(self.totp_confirmed) or bool(second_factor_methods(self))
+
     def to_dict(self):
         """Convert to dictionary"""
         result = {
@@ -148,7 +153,7 @@ class User(db.Model):
             "custom_role_id": self.custom_role_id,
             "active": self.active,
             "totp_enabled": self.totp_confirmed,
-            "two_factor_enabled": self.totp_confirmed,
+            "two_factor_enabled": self.second_factor_required(),
             "totp_exempt": bool(self.totp_exempt),
             "webauthn_2fa": bool(self.webauthn_2fa),
             "force_password_change": self.force_password_change or False,

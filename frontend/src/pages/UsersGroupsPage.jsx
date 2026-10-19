@@ -200,6 +200,16 @@ export default function UsersGroupsPage() {
     }
   }
 
+  // The 2FA state depends on enforcement and keys: read it back, never guess it
+  const refreshSelectedUser = async (id) => {
+    try {
+      const res = await usersService.getById(id)
+      if (res?.data) setSelectedUser(res.data)
+    } catch {
+      setSelectedUser(null)  // the change applied; only the detail could not be reread
+    }
+  }
+
   const handleReset2FA = async (user) => {
     const confirmed = await showConfirm(t('users.confirmReset2fa', { name: user.username }), {
       title: t('users.reset2fa'),
@@ -210,9 +220,7 @@ export default function UsersGroupsPage() {
       await usersService.reset2FA(user.id)
       showSuccess(t('users.reset2faSuccess'))
       loadData()
-      if (selectedUser?.id === user.id) {
-        setSelectedUser({ ...selectedUser, totp_enabled: false, two_factor_enabled: false })
-      }
+      if (selectedUser?.id === user.id) await refreshSelectedUser(user.id)
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.user'))
     }
@@ -224,9 +232,7 @@ export default function UsersGroupsPage() {
       await usersService.update(user.id, { totp_exempt: next })
       showSuccess(next ? t('users.exempt2faOn') : t('users.exempt2faOff'))
       loadData()
-      if (selectedUser?.id === user.id) {
-        setSelectedUser({ ...selectedUser, totp_exempt: next })
-      }
+      if (selectedUser?.id === user.id) await refreshSelectedUser(user.id)
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.user'))
     }
