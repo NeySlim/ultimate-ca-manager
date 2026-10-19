@@ -16,5 +16,5 @@ def test_template_is_found():
 
 
 def test_no_dead_scep_variables():
-    # SCEP lives in the database (Protocols > SCEP); SCEP_* in ucm.env are never read.
+    # SCEP lives in the database (Protocols > SCEP); SCEP_* in ucm.env have no effect.
     assert not {k for k in _template_keys() if k.startswith('SCEP_')}
