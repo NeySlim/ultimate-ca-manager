@@ -758,7 +758,17 @@ def _auto_poll_and_finalize(client, order) -> dict:
                 break
 
             if le_status == 'invalid':
-                result['error'] = f'Order became invalid: {le_data.get("error", {}).get("detail", "Unknown")}'
+                order_error = le_data.get('error') or {}
+                order_detail = order_error.get('detail') if isinstance(order_error, dict) else None
+                invalid = None if order_detail else client.find_invalid_authorization(order)
+                if invalid:
+                    domain, result['error'] = invalid
+                    logger.warning(
+                        f'Authorization invalid for {domain} on order {order.id}: '
+                        f'{result["error"]}'
+                    )
+                else:
+                    result['error'] = f'Order became invalid: {order_detail or "Unknown"}'
                 _set_status('invalid', result['error'])
                 break
 

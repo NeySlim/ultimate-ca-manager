@@ -62,6 +62,7 @@ from .hurricane import HurricaneDnsProvider
 from .mythicbeasts import MythicBeastsDnsProvider
 from .rcodezero import RcodeZeroDnsProvider
 from .rfc2136 import Rfc2136DnsProvider
+from .plesk import PleskDnsProvider
 
 logger = logging.getLogger(__name__)
 
@@ -128,6 +129,7 @@ PROVIDER_REGISTRY: Dict[str, Type[BaseDnsProvider]] = {
     'rcodezero': RcodeZeroDnsProvider,
     # Self-hosted / Protocol-based
     'rfc2136': Rfc2136DnsProvider,
+    'plesk': PleskDnsProvider,
 }
 
 

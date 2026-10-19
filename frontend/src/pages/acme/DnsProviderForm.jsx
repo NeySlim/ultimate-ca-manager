@@ -81,6 +81,19 @@ export default function DnsProviderForm({ provider, providerTypes, onSubmit, onC
                     options={field.options || []}
                     required={field.required && !hasExistingValue}
                   />
+                ) : field.type === 'checkbox' ? (
+                  <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-tertiary-op50 transition-colors">
+                    <input
+                      type="checkbox"
+                      checked={formData.credentials[field.name] ?? field.default ?? false}
+                      onChange={(e) => updateCredential(field.name, e.target.checked)}
+                      className="w-4 h-4 mt-0.5 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary-op50"
+                    />
+                    <span>
+                      <span className="block text-sm text-text-primary">{field.label}</span>
+                      {field.help && <span className="block text-xs text-text-secondary mt-1">{field.help}</span>}
+                    </span>
+                  </label>
                 ) : (
                   <Input
                     label={field.label}
