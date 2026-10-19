@@ -87,12 +87,10 @@ export default function ACMEPage() {
   const [localDirectoryUrl, setLocalDirectoryUrl] = useState('')
   const [localEabKid, setLocalEabKid] = useState('')
   const [localProxyUpstreamUrl, setLocalProxyUpstreamUrl] = useState('')
-  const [localProxyEabKid, setLocalProxyEabKid] = useState('')
   const [localDnsTimeout, setLocalDnsTimeout] = useState('')
   const [localRenewalDays, setLocalRenewalDays] = useState('30')
   const [localDnsDelay, setLocalDnsDelay] = useState('')
   const [localDnsNameservers, setLocalDnsNameservers] = useState('')
-  const [proxyEabHmacInput, setProxyEabHmacInput] = useState(null)
   const [testingConnection, setTestingConnection] = useState(false)
   const [connectionResult, setConnectionResult] = useState(null)
 
@@ -187,7 +185,6 @@ export default function ACMEPage() {
       setLocalDirectoryUrl(cs.directory_url || '')
       setLocalEabKid(cs.eab_kid || '')
       setLocalProxyUpstreamUrl(cs.proxy_upstream_url || '')
-      setLocalProxyEabKid(cs.proxy_eab_kid || '')
       setLocalDnsTimeout(String(cs.dns_propagation_timeout ?? 120))
       setLocalRenewalDays(String(cs.renewal_days ?? 30))
       setLocalDnsDelay(String(cs.dns_propagation_delay ?? 10))
@@ -1160,10 +1157,6 @@ export default function ACMEPage() {
             onLocalEabKidChange={setLocalEabKid}
             localProxyUpstreamUrl={localProxyUpstreamUrl}
             onLocalProxyUpstreamUrlChange={setLocalProxyUpstreamUrl}
-            localProxyEabKid={localProxyEabKid}
-            onLocalProxyEabKidChange={setLocalProxyEabKid}
-            proxyEabHmacInput={proxyEabHmacInput}
-            onProxyEabHmacInputChange={setProxyEabHmacInput}
             eabHmacInput={eabHmacInput}
             onEabHmacInputChange={setEabHmacInput}
             proxyEmail={proxyEmail}

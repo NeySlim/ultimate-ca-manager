@@ -46,10 +46,6 @@ const renderTab = (props = {}) => render(
     onLocalContactEmailChange={noop}
     localProxyUpstreamUrl=""
     onLocalProxyUpstreamUrlChange={noop}
-    localProxyEabKid=""
-    onLocalProxyEabKidChange={noop}
-    proxyEabHmacInput=""
-    onProxyEabHmacInputChange={noop}
     proxyEmail=""
     onProxyEmailChange={noop}
     testingConnection={false}

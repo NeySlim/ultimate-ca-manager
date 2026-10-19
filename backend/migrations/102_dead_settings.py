@@ -10,6 +10,10 @@ pg_compatible = True
 DEAD_KEYS = (
     'admin_bypass_password_policy',
     'acme.proxy_enabled',
+    'acme.proxy.eab_kid',
+    'acme.proxy.eab_hmac_key',
+    'acme.proxy.account_url',
+    'acme.proxy.account_key',
 )
 
 

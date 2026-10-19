@@ -574,7 +574,26 @@ class TestAcmeClientSettings:
         assert 'proxy_upstream_url' in data
         assert 'proxy_acme_account_id' in data
 
-    def test_patch_proxy_eab_kid(self, auth_client):
+    @pytest.fixture
+    def linked_proxy_account(self, app):
+        """The proxy's EAB lives on the CA account it uses."""
+        from models import db, SystemConfig, AcmeClientAccount
+        from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+        with app.app_context():
+            acct = AcmeClientAccount(directory_url='https://proxy-eab-test.example/directory',
+                                     label='Proxy EAB test', email='ops@example.com')
+            db.session.add(acct)
+            db.session.commit()
+            acct_id = acct.id
+            db.session.add(SystemConfig(key=PROXY_ACCOUNT_ID_KEY, value=str(acct_id)))
+            db.session.commit()
+        yield acct_id
+        with app.app_context():
+            SystemConfig.query.filter_by(key=PROXY_ACCOUNT_ID_KEY).delete()
+            AcmeClientAccount.query.filter_by(id=acct_id).delete()
+            db.session.commit()
+
+    def test_patch_proxy_eab_kid(self, auth_client, linked_proxy_account):
         r = patch_json(auth_client, '/api/v2/acme/client/settings',
                        {'proxy_eab_kid': 'test-kid-123'})
         assert_success(r)
@@ -582,7 +601,7 @@ class TestAcmeClientSettings:
         data2 = assert_success(r2)
         assert data2['proxy_eab_kid'] == 'test-kid-123'
 
-    def test_patch_proxy_eab_hmac_key(self, auth_client):
+    def test_patch_proxy_eab_hmac_key(self, auth_client, linked_proxy_account):
         r = patch_json(auth_client, '/api/v2/acme/client/settings',
                        {'proxy_eab_hmac_key': 'dGVzdC1obWFjLWtleQ'})
         assert_success(r)
@@ -590,7 +609,7 @@ class TestAcmeClientSettings:
         data2 = assert_success(r2)
         assert data2['proxy_eab_hmac_key_set'] is True
 
-    def test_patch_proxy_eab_clear(self, auth_client):
+    def test_patch_proxy_eab_clear(self, auth_client, linked_proxy_account):
         patch_json(auth_client, '/api/v2/acme/client/settings',
                    {'proxy_eab_kid': 'temp-kid', 'proxy_eab_hmac_key': 'temp-hmac'})
         r = patch_json(auth_client, '/api/v2/acme/client/settings',
@@ -598,7 +617,7 @@ class TestAcmeClientSettings:
         assert_success(r)
         r2 = auth_client.get('/api/v2/acme/client/settings')
         data2 = assert_success(r2)
-        assert data2['proxy_eab_kid'] == ''
+        assert data2['proxy_eab_kid'] is None
         assert data2['proxy_eab_hmac_key_set'] is False
 
     def test_get_client_settings_has_proxy_eab_fields(self, auth_client):

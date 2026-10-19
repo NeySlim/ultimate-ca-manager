@@ -16,6 +16,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Settings > Audit: the "Enable audit logging" switch and the "Events to log" checkboxes were stored nowhere and changed nothing; they are gone. The audit log always records every event; use the remote syslog categories to forward a subset.
 - Groups: the per-member `role` (`member`/`admin`) of the API was stored but never applied, since managing a group always takes the global admin role; it is no longer accepted or returned. Nothing to do: API clients that still send it are not refused.
 - ACME: the global "Enable ACME proxy" switch of the Let's Encrypt tab is gone, since turning it off never stopped the proxy, and the upgrade deletes the setting. To stop a proxy endpoint, turn off "Expose via ACME proxy" on its CA account, or clear the CA account selected for the default proxy path.
+- ACME proxy: the copies of the upstream account URL and EAB credentials kept in settings beside the proxy's CA account are gone and the upgrade deletes them; `proxy_eab_kid` and `proxy_eab_hmac_key` of the client settings API now write the selected CA account and are refused when none is selected. Nothing to do from the UI, which edits EAB on the CA account.
 
 ### Fixed
 
