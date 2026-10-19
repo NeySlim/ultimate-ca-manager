@@ -89,6 +89,8 @@ Registra chiavi di sicurezza hardware o autenticatori biometrici:
 3. Segui la richiesta del browser per l'autenticazione
 4. La chiave appare nell'elenco delle credenziali registrate
 
+Con il 2FA attivo o imposto, una chiave registrata può anche completare il secondo passaggio di un accesso con password: scegli **Usa una chiave di sicurezza**.
+
 ### Certificati mTLS
 Gestisci i certificati client per l'autenticazione TLS reciproca:
 - Carica un certificato client

@@ -118,7 +118,7 @@ Bestimmte IPs oder CIDR-Bereiche blockieren. Alle anderen IPs sind erlaubt.
 ## Zwei-Faktor-Authentifizierung
 
 ### Durchsetzung
-Verlangt von allen Benutzern, 2FA zu aktivieren. Benutzer, die 2FA nicht eingerichtet haben, werden bei der nächsten Anmeldung dazu aufgefordert.
+Verlangt von allen Benutzern, 2FA zu aktivieren. Benutzer, die 2FA nicht eingerichtet haben, werden bei der nächsten Anmeldung dazu aufgefordert. Ein Benutzer mit registriertem Sicherheitsschlüssel bestätigt damit, statt TOTP einzurichten.
 
 ### Unterstützte Methoden
 - **TOTP**: Zeitbasierte Einmalpasswörter (Authenticator-Apps)

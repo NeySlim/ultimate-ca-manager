@@ -122,6 +122,20 @@ Content-Type: application/json
 }
 ```
 
+### Second factor after a password
+When the password login answers `"requires_2fa": true`, its `methods` list says which second factors the account has: `totp` (code or recovery code) and/or `webauthn` (a registered security key). A security key also satisfies enforced 2FA in place of enrolling TOTP.
+```http
+# TOTP code or recovery code
+POST /api/v2/auth/login/2fa
+{ "code": "123456" }
+
+# Security key: options bound to this login session, then one verification attempt per challenge
+POST /api/v2/auth/login/2fa/webauthn/options
+POST /api/v2/auth/login/2fa/webauthn/verify
+{ "response": { ... } }  // from navigator.credentials.get()
+```
+Failures with either factor count toward the same 2FA lockout.
+
 ### Login with mTLS
 ```http
 POST /api/v2/auth/login/mtls

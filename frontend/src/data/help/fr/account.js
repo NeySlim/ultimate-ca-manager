@@ -89,6 +89,8 @@ Enregistrez des clés de sécurité matérielles ou des authentificateurs biomé
 3. Suivez l'invite du navigateur pour vous authentifier
 4. La clé apparaît dans la liste de vos identifiants enregistrés
 
+Avec la 2FA activée ou imposée, une clé enregistrée peut aussi valider la seconde étape d'une connexion par mot de passe : choisissez **Utiliser une clé de sécurité**.
+
 ### Certificats mTLS
 Gérez les certificats client pour l'authentification TLS mutuel :
 - Téléverser un certificat client

@@ -118,7 +118,7 @@ Bloquear IPs ou faixas CIDR específicas. Todos os outros IPs são permitidos.
 ## Autenticação de Dois Fatores
 
 ### Aplicação
-Exigir que todos os usuários ativem 2FA. Usuários que não configuraram 2FA serão solicitados no próximo login.
+Exigir que todos os usuários ativem 2FA. Usuários que não configuraram 2FA serão solicitados no próximo login. Um usuário com uma chave de segurança registrada confirma com ela em vez de configurar TOTP.
 
 ### Métodos Suportados
 - **TOTP**: Senhas únicas baseadas em tempo (aplicativos autenticadores)

@@ -214,6 +214,8 @@ Configure SSO in **Settings** → **SSO** tab (admin only). Each provider type s
 3. Insert and touch your hardware key
 4. Name the key for identification
 
+With 2FA enabled (or enforced by an administrator), a registered key can answer the second step of a password login: choose **Use a security key** instead of typing a code.
+
 ---
 
 ## Protocol Configuration

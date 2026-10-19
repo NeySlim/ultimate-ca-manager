@@ -89,6 +89,8 @@ Registrieren Sie Hardware-Sicherheitsschlüssel oder biometrische Authentifikato
 3. Folgen Sie der Browseraufforderung zur Authentifizierung
 4. Der Schlüssel erscheint in Ihrer Liste der registrierten Anmeldeinformationen
 
+Ist 2FA aktiviert oder erzwungen, kann ein registrierter Schlüssel auch den zweiten Schritt einer Passwortanmeldung bestätigen: wählen Sie **Sicherheitsschlüssel verwenden**.
+
 ### mTLS-Zertifikate
 Verwalten Sie Client-Zertifikate für die gegenseitige TLS-Authentifizierung:
 - Laden Sie ein Client-Zertifikat hoch

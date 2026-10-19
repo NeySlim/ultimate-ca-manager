@@ -2166,6 +2166,8 @@ Register hardware security keys or biometric authenticators:
 3. Follow the browser prompt to authenticate
 4. The key appears in your registered credentials list
 
+With 2FA enabled or enforced, a registered key can also answer the second step of a password login: choose **Use a security key**.
+
 ### mTLS Certificates
 Manage client certificates for mutual TLS authentication:
 - Upload a client certificate
@@ -2669,7 +2671,7 @@ Block specific IPs or CIDR ranges. All other IPs are allowed.
 ## Two-Factor Authentication
 
 ### Enforcement
-Require all users to enable 2FA. Users who haven't set up 2FA will be prompted on their next login.
+Require all users to enable 2FA. Users who haven't set up 2FA will be prompted on their next login. A user with a registered security key confirms with it instead of enrolling TOTP.
 
 ### Supported Methods
 - **TOTP**: Time-based one-time passwords (authenticator apps)

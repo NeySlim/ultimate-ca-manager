@@ -45,6 +45,20 @@ class AuthMethodsService {
   }
 
   /**
+   * Complete login with a security key as the second factor
+   * @returns {Promise<Object>} User data + permissions
+   */
+  async login2FAWebAuthn() {
+    if (!this.isWebAuthnSupported()) {
+      throw new Error('WebAuthn not supported by this browser')
+    }
+    const { data } = await apiClient.post('/auth/login/2fa/webauthn/options', {})
+    const credentialData = await this.getAssertion(data.options)
+    const response = await apiClient.post('/auth/login/2fa/webauthn/verify', { response: credentialData })
+    return response.data
+  }
+
+  /**
    * Login with mTLS (client certificate)
    * Certificate must already be presented in request
    * @returns {Promise<Object>} User data + permissions
@@ -99,7 +113,18 @@ class AuthMethodsService {
 
     // Start authentication (get challenge)
     const { options } = await this.startWebAuthn(username)
+    const credentialData = await this.getAssertion(options)
 
+    // Verify with backend
+    return await this.verifyWebAuthn(username, credentialData)
+  }
+
+  /**
+   * Ask the authenticator to sign the server's options, encoded for the backend
+   * @param {Object} options - publicKey request options from the server
+   * @returns {Promise<Object>} Assertion with base64url fields
+   */
+  async getAssertion(options) {
     // Convert base64url strings to ArrayBuffers
     const publicKeyOptions = {
       ...options,
@@ -143,8 +168,7 @@ class AuthMethodsService {
       }
     }
 
-    // Verify with backend
-    return await this.verifyWebAuthn(username, credentialData)
+    return credentialData
   }
 
   /**

@@ -89,6 +89,8 @@ Registra claves de seguridad de hardware o autenticadores biométricos:
 3. Sigue la solicitud del navegador para autenticarte
 4. La clave aparece en tu lista de credenciales registradas
 
+Con 2FA activada o impuesta, una llave registrada también puede completar el segundo paso de un inicio de sesión con contraseña: elija **Usar una llave de seguridad**.
+
 ### Certificados mTLS
 Gestiona certificados de cliente para autenticación TLS mutua:
 - Sube un certificado de cliente
