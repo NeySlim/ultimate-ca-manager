@@ -30,8 +30,12 @@ def test_sqlite_upgrade_is_idempotent():
     conn = sqlite3.connect(':memory:')
     conn.execute(_PROVIDERS)
     conn.execute("INSERT INTO pro_sso_providers VALUES (1, 'kc', 'saml', 1)")
-    for _ in range(2):
-        migration.upgrade(conn)
+    migration.upgrade(conn)
+    # The sign flag was never applied: reset once, then the operator's choice stays.
+    assert conn.execute('SELECT saml_sign_requests FROM pro_sso_providers').fetchone() == (0,)
+    conn.execute('UPDATE pro_sso_providers SET saml_sign_requests = 1')
+    migration.upgrade(conn)
+    assert conn.execute('SELECT saml_sign_requests FROM pro_sso_providers').fetchone() == (1,)
     assert 'saml_allow_idp_initiated' in _provider_columns(conn)
     assert conn.execute('SELECT saml_allow_idp_initiated FROM pro_sso_providers').fetchone() == (0,)
     conn.execute("INSERT INTO pro_sso_saml_message_ids (kind, message_id, provider_id, expires_at) "
@@ -64,10 +68,13 @@ def test_postgresql_upgrade_is_idempotent():
             conn.execute(text(f'SET search_path TO {schema}'))
             conn.execute(text(_PROVIDERS))
             conn.execute(text("INSERT INTO pro_sso_providers VALUES (1, 'kc', 'saml', TRUE)"))
-        for _ in range(2):
+        for wanted_sign in (False, True):
             with engine.begin() as conn:
                 conn.execute(text(f'SET search_path TO {schema}'))
                 migration.upgrade(conn)
+                sign = conn.execute(text('SELECT saml_sign_requests FROM pro_sso_providers')).scalar()
+                assert sign is wanted_sign
+                conn.execute(text('UPDATE pro_sso_providers SET saml_sign_requests = TRUE'))
         with engine.begin() as conn:
             conn.execute(text(f'SET search_path TO {schema}'))
             row = conn.execute(text('SELECT saml_allow_idp_initiated FROM pro_sso_providers')).one()

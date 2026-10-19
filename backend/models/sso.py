@@ -30,7 +30,7 @@ class SSOProvider(db.Model):
     saml_sso_url = db.Column(db.String(500))
     saml_slo_url = db.Column(db.String(500))
     saml_certificate = db.Column(db.Text)  # Public cert, not secret
-    saml_sign_requests = db.Column(db.Boolean, default=True)
+    saml_sign_requests = db.Column(db.Boolean, default=False)
     saml_sp_cert_source = db.Column(db.String(50), default='https')  # 'https' or cert ID
     # Unsolicited (IdP-initiated) responses carry no InResponseTo to check.
     saml_allow_idp_initiated = db.Column(db.Boolean, default=False, nullable=False)

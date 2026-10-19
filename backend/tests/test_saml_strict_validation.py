@@ -330,3 +330,121 @@ def test_message_ids_on_postgresql(monkeypatch):
         with admin.begin() as conn:
             conn.execute(text(f'DROP SCHEMA IF EXISTS {schema} CASCADE'))
         admin.dispose()
+
+
+# ---- AuthnRequest signing (saml_sign_requests) ----
+
+def _keypair(kind):
+    from cryptography.hazmat.primitives.asymmetric import ec
+    key = (rsa.generate_private_key(public_exponent=65537, key_size=2048) if kind == 'rsa'
+           else ec.generate_private_key(ec.SECP256R1()))
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'ucm.example.test')])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - datetime.timedelta(minutes=5))
+            .not_valid_after(now + datetime.timedelta(days=1)).sign(key, hashes.SHA256()))
+    return key, cert
+
+
+@pytest.fixture
+def https_identity(tmp_path, monkeypatch):
+    """Point the HTTPS certificate and key at a fresh pair of the given kind."""
+    from config.settings import Config
+
+    def _install(kind='rsa'):
+        key, cert = _keypair(kind)
+        cert_path, key_path = tmp_path / f'{kind}.crt', tmp_path / f'{kind}.key'
+        cert_path.write_bytes(cert.public_bytes(serialization.Encoding.PEM))
+        key_path.write_bytes(key.private_bytes(serialization.Encoding.PEM,
+                                               serialization.PrivateFormat.PKCS8,
+                                               serialization.NoEncryption()))
+        monkeypatch.setattr(Config, 'HTTPS_CERT_PATH', cert_path)
+        monkeypatch.setattr(Config, 'HTTPS_KEY_PATH', key_path)
+        return cert
+    return _install
+
+
+def _configure(app, provider_id, **fields):
+    with app.app_context():
+        row = db.session.get(SSOProvider, provider_id)
+        for k, v in fields.items():
+            setattr(row, k, v)
+        db.session.commit()
+
+
+def _redirect_query(app):
+    r = app.test_client().get('/api/v2/sso/login/saml', base_url=SP_BASE)
+    assert r.status_code == 302, r.get_data(as_text=True)
+    return r.headers['Location'].split('?', 1)[1]
+
+
+def _assert_signed_by(query, cert):
+    import urllib.parse
+    from cryptography.hazmat.primitives.asymmetric import padding
+    parts = query.split('&')
+    params = dict(p.split('=', 1) for p in parts)
+    assert urllib.parse.unquote(params['SigAlg']) == K.RSA_SHA256
+    signed = '&'.join(p for p in parts if not p.startswith('Signature='))
+    signature = base64.b64decode(urllib.parse.unquote(params['Signature']))
+    cert.public_key().verify(signature, signed.encode(), padding.PKCS1v15(), hashes.SHA256())
+
+
+@pytest.fixture
+def signing_off(app, provider):
+    yield provider
+    _configure(app, provider, saml_sign_requests=False, saml_sp_cert_source='https')
+
+
+def test_request_is_signed_with_the_https_key(app, signing_off, https_identity):
+    cert = https_identity('rsa')
+    _configure(app, signing_off, saml_sign_requests=True, saml_sp_cert_source='https')
+    _assert_signed_by(_redirect_query(app), cert)
+
+
+def test_request_is_unsigned_when_the_option_is_off(app, signing_off, https_identity):
+    https_identity('rsa')
+    query = _redirect_query(app)
+    assert 'Signature=' not in query and 'SigAlg=' not in query
+
+
+def test_request_is_signed_with_a_certificate_held_by_ucm(app, signing_off, create_cert):
+    from models import Certificate
+    cert_id = create_cert(cn='saml-sp.example.test')['id']
+    with app.app_context():
+        pem = base64.b64decode(db.session.get(Certificate, cert_id).crt)
+    _configure(app, signing_off, saml_sign_requests=True, saml_sp_cert_source=str(cert_id))
+    _assert_signed_by(_redirect_query(app), x509.load_pem_x509_certificate(pem))
+
+
+def test_metadata_advertises_what_the_login_does(app, signing_off, https_identity):
+    cert = https_identity('rsa')
+    body = ''.join(cert.public_bytes(serialization.Encoding.PEM).decode().splitlines()[1:-1])
+    client = app.test_client()
+    xml = client.get('/api/v2/sso/saml/metadata', base_url=SP_BASE).get_data(as_text=True)
+    assert 'AuthnRequestsSigned="false"' in xml
+    _configure(app, signing_off, saml_sign_requests=True)
+    xml = client.get('/api/v2/sso/saml/metadata', base_url=SP_BASE).get_data(as_text=True)
+    assert 'AuthnRequestsSigned="true"' in xml and body in xml
+    assert f'entityID="{SP_BASE}/api/v2/sso"' in xml
+
+
+def test_a_non_rsa_key_is_refused_when_signing_is_turned_on(app, auth_client, signing_off, https_identity):
+    https_identity('ec')
+    r = auth_client.put(f'/api/v2/sso/providers/{signing_off}', json={'saml_sign_requests': True})
+    assert r.status_code == 400 and 'RSA' in r.get_json()['message']
+    with app.app_context():
+        assert db.session.get(SSOProvider, signing_off).saml_sign_requests is False
+
+
+def test_a_key_that_does_not_match_the_certificate_is_refused(app, auth_client, signing_off,
+                                                             https_identity, tmp_path, monkeypatch):
+    from config.settings import Config
+    https_identity('rsa')
+    other_key, _ = _keypair('rsa')
+    stray = tmp_path / 'stray.key'
+    stray.write_bytes(other_key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                              serialization.NoEncryption()))
+    monkeypatch.setattr(Config, 'HTTPS_KEY_PATH', stray)
+    r = auth_client.put(f'/api/v2/sso/providers/{signing_off}', json={'saml_sign_requests': True})
+    assert r.status_code == 400 and 'does not match' in r.get_json()['message']

@@ -135,7 +135,7 @@ def initiate_sso_login(provider_type):
             return error_response("SAML SSO URL not configured", 400)
 
         try:
-            saml_auth = _get_saml_auth(request, provider, state)
+            saml_auth = _get_saml_auth(request, provider, state, sign_request=True)
             redirect_url = saml_auth.login()
             request_id = saml_auth.get_last_request_id()
             saml_sp.remember_request(request_id, provider.id)

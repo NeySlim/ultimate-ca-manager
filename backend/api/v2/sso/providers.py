@@ -11,6 +11,7 @@ from .helpers import _encrypt_ldap_password, _parse_json_field, _parse_group_lis
 from .connection_tests import _test_ldap_connection, _test_oauth2_connection, _test_saml_connection
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from services.oidc_id_token import clear_oidc_cache
+from . import saml_sp
 
 
 # SSO provider URL fields that the backend will dereference (metadata fetch,
@@ -62,6 +63,20 @@ def get_provider(provider_id):
     if include_secrets and not has_permission('admin:system', getattr(g, 'permissions', [])):
         return error_response('Secrets available to administrators only', 403)
     return success_response(data=provider.to_dict(include_secrets=include_secrets))
+
+
+def _sp_signing_error(provider):
+    """Refusal message when the provider signs requests with an unusable SP key, else None."""
+    if provider.provider_type != 'saml' or not provider.saml_sign_requests:
+        return None
+    try:
+        saml_sp.load_sp_credentials(provider, with_key=True)
+    except ValueError as e:
+        return f"Cannot sign SAML requests: {e}"
+    except Exception as e:
+        logger.warning(f"SAML SP key for provider {provider.name} cannot be loaded: {e}")
+        return "Cannot sign SAML requests: the SP certificate or its private key cannot be loaded"
+    return None
 
 
 @bp.route('/api/v2/sso/providers', methods=['POST'])
@@ -116,7 +131,7 @@ def create_provider():
         provider.saml_sso_url = data.get('saml_sso_url')
         provider.saml_slo_url = data.get('saml_slo_url')
         provider.saml_certificate = data.get('saml_certificate')
-        provider.saml_sign_requests = data.get('saml_sign_requests', True)
+        provider.saml_sign_requests = bool(data.get('saml_sign_requests', False))
         provider.saml_sp_cert_source = data.get('saml_sp_cert_source', 'https')
         provider.saml_verify_ssl = data.get('saml_verify_ssl', True)
         provider.saml_allow_idp_initiated = bool(data.get('saml_allow_idp_initiated', False))
@@ -170,6 +185,11 @@ def create_provider():
         if isinstance(val, str):
             val = json.loads(val)
         provider.role_mapping = json.dumps(val)
+
+    signing_error = _sp_signing_error(provider)
+    if signing_error:
+        db.session.rollback()
+        return error_response(signing_error, 400)
 
     db.session.add(provider)
     ok, _err = safe_commit(logger, "Failed to create SSO provider")
@@ -303,6 +323,12 @@ def update_provider(provider_id=None, provider_type_name=None):
         if isinstance(val, str):
             val = json.loads(val)
         provider.role_mapping = json.dumps(val)
+
+    if 'saml_sign_requests' in data or 'saml_sp_cert_source' in data:
+        signing_error = _sp_signing_error(provider)
+        if signing_error:
+            db.session.rollback()
+            return error_response(signing_error, 400)
 
     ok, _err = safe_commit(logger, "Failed to update SSO provider")
     if not ok:

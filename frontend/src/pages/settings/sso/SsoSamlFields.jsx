@@ -67,7 +67,12 @@ export default function SsoSamlFields({
             placeholder="-----BEGIN CERTIFICATE-----..."
             className="font-mono text-xs"
           />
-          <ToggleSwitch checked={formData.saml_sign_requests} onChange={(val) => handleChange('saml_sign_requests', val)} label={t('sso.signRequests')} />
+          <ToggleSwitch
+            checked={formData.saml_sign_requests}
+            onChange={(val) => handleChange('saml_sign_requests', val)}
+            label={t('sso.signRequests')}
+            description={t('sso.signRequestsHelp')}
+          />
           <ToggleSwitch
             checked={formData.saml_allow_idp_initiated}
             onChange={(val) => handleChange('saml_allow_idp_initiated', val)}

@@ -73,7 +73,7 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     saml_sso_url: provider?.saml_sso_url || '',
     saml_slo_url: provider?.saml_slo_url || '',
     saml_certificate: provider?.saml_certificate || '',
-    saml_sign_requests: provider?.saml_sign_requests ?? true,
+    saml_sign_requests: provider?.saml_sign_requests ?? false,
     saml_sp_cert_source: provider?.saml_sp_cert_source || 'https',
     saml_allow_idp_initiated: provider?.saml_allow_idp_initiated ?? false,
     saml_verify_ssl: provider?.saml_verify_ssl ?? true,

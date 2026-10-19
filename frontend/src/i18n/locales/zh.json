@@ -3424,6 +3424,7 @@
     "roleMapping": "角色映射",
     "roleMappingHelp": "将外部组或角色映射到 UCM 角色。匹配组中的用户将被分配相应的 UCM 角色。如果匹配多个组，将采用权限最高的角色（admin > operator > auditor > viewer）。",
     "signRequests": "签名认证请求",
+    "signRequestsHelp": "使用下方 SP 证书的密钥（必须为 RSA）对每个认证请求签名。启用前，请先将 SP 元数据中的该证书提供给身份提供商。",
     "allowIdpInitiated": "允许由 IdP 发起的登录",
     "allowIdpInitiatedHelp": "接受 UCM 未请求的响应，例如从身份提供商门户发起的登录。默认关闭：此类响应无法与在此浏览器中发起的登录关联。",
     "spEntityId": "SP 实体 ID",

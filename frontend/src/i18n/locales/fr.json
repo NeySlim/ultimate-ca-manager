@@ -3274,6 +3274,7 @@
     "isDefault": "Fournisseur de connexion par défaut",
     "lastUsed": "Dernière utilisation",
     "signRequests": "Signer les requêtes d'authentification",
+    "signRequestsHelp": "Signe chaque requête d'authentification avec la clé du certificat SP ci-dessous, qui doit être RSA. Fournissez ce certificat au fournisseur d'identité, depuis les métadonnées SP, avant d'activer cette option.",
     "allowIdpInitiated": "Autoriser la connexion initiée par l'IdP",
     "allowIdpInitiatedHelp": "Accepte les réponses qu'UCM n'a pas demandées, comme une connexion lancée depuis le portail du fournisseur d'identité. Désactivé par défaut : une telle réponse ne peut pas être rattachée à une connexion lancée dans ce navigateur.",
     "spCertificate": "Certificat SP (Métadonnées)",

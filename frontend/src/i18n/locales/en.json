@@ -3413,6 +3413,7 @@
     "isDefault": "Default login provider",
     "lastUsed": "Last used",
     "signRequests": "Sign authentication requests",
+    "signRequestsHelp": "Signs each authentication request with the key of the SP certificate below, which must be RSA. Give the identity provider that certificate, from the SP metadata, before turning this on.",
     "allowIdpInitiated": "Allow IdP-initiated login",
     "allowIdpInitiatedHelp": "Accept responses UCM did not request, such as a login started from the identity provider's portal. Off by default: such a response cannot be tied to a login started in this browser.",
     "spCertificate": "SP Certificate (Metadata)",

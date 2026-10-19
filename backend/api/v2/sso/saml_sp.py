@@ -1,15 +1,21 @@
 """SAML service-provider side: public URLs, python3-saml settings, message ids."""
 
+import base64
 import logging
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
+from cryptography import x509
+from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives.asymmetric import rsa
 from onelogin.saml2.constants import OneLogin_Saml2_Constants
 from sqlalchemy import delete
 from sqlalchemy.exc import IntegrityError
 
-from models import db
+from config.settings import Config
+from models import Certificate, db
 from models.sso import SAMLMessageId
+from utils.key_codec import load_pem_bytes
 from utils.datetime_utils import utc_now
 from utils.public_endpoints import get_admin_base_url, get_admin_canonical_origin
 
@@ -68,8 +74,61 @@ def request_data(flask_request, base):
     }
 
 
-def build_settings(provider, base):
-    """python3-saml settings: strict validation, SHA-1 refused."""
+def _first_cert_pem(pem_bytes):
+    cert = x509.load_pem_x509_certificate(pem_bytes)
+    return cert, cert.public_bytes(serialization.Encoding.PEM).decode()
+
+
+def load_sp_credentials(provider, with_key=False):
+    """SP certificate and, when asked, its key (PEM), from `saml_sp_cert_source`.
+
+    python3-saml signs redirect-binding requests with RSA only: any other key,
+    or one that does not match the certificate, raises ValueError.
+    """
+    source = (getattr(provider, 'saml_sp_cert_source', None) or 'https') if provider else 'https'
+    cert = key_pem = None
+    if source != 'https':
+        row = None
+        try:
+            row = Certificate.query.filter(
+                Certificate.id == int(source),
+                Certificate.revoked == False,  # noqa: E712
+                Certificate.valid_to > utc_now(),
+                Certificate.crt.isnot(None),
+            ).first()
+        except (TypeError, ValueError):
+            pass
+        if row is None:
+            logger.warning("SAML SP certificate #%s unusable, falling back to the HTTPS certificate", source)
+            source = 'https'
+        else:
+            cert, cert_pem = _first_cert_pem(base64.b64decode(row.crt))
+            if with_key:
+                if not row.prv:
+                    raise ValueError(f'certificate #{row.id} has no private key in UCM')
+                key_pem = load_pem_bytes(row.prv, context=f'certificate {row.id}')
+    if source == 'https':
+        with open(Config.HTTPS_CERT_PATH, 'rb') as f:
+            cert, cert_pem = _first_cert_pem(f.read())
+        if with_key:
+            with open(Config.HTTPS_KEY_PATH, 'rb') as f:
+                key_pem = f.read()
+    if not with_key:
+        return cert_pem, None
+    key = serialization.load_pem_private_key(key_pem, password=None)
+    if not isinstance(key, rsa.RSAPrivateKey):
+        raise ValueError('signing SAML requests needs an RSA key; choose an RSA SP certificate')
+    if key.public_key().public_numbers() != cert.public_key().public_numbers():
+        raise ValueError('the SP private key does not match the SP certificate')
+    return cert_pem, key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                       serialization.NoEncryption()).decode()
+
+
+def build_settings(provider, base, sp_cert=None, sp_key=None):
+    """python3-saml settings: strict validation, SHA-1 refused.
+
+    Requests are signed when the provider asks for it and `sp_key` is given.
+    """
     endpoints = sp_endpoints(base)
     settings = {
         'strict': True,
@@ -90,7 +149,7 @@ def build_settings(provider, base):
             # required; demanding one place would refuse IdPs that sign the other.
             'wantAssertionsSigned': False,
             'wantMessagesSigned': False,
-            'authnRequestsSigned': False,
+            'authnRequestsSigned': bool(sp_key and provider.saml_sign_requests),
             'wantNameIdEncrypted': False,
             'wantAssertionsEncrypted': False,
             # The username falls back to the NameID when no attribute is sent.
@@ -103,6 +162,10 @@ def build_settings(provider, base):
             'rejectDeprecatedAlgorithm': True,
         },
     }
+    if sp_cert:
+        settings['sp']['x509cert'] = sp_cert
+    if sp_key:
+        settings['sp']['privateKey'] = sp_key
     if provider.saml_slo_url:
         settings['idp']['singleLogoutService'] = {'url': provider.saml_slo_url, 'binding': BINDING_REDIRECT}
     return settings

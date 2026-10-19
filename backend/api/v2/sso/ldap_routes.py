@@ -220,13 +220,16 @@ def ldap_login():
     )
 
 
-def _get_saml_auth(flask_request, provider, relay_state=None):
+def _get_saml_auth(flask_request, provider, relay_state=None, sign_request=False):
     """Build a OneLogin_Saml2_Auth from Flask request and SSO provider config."""
     from onelogin.saml2.auth import OneLogin_Saml2_Auth
 
     base = saml_sp.sp_base_url(flask_request)
+    sp_cert = sp_key = None
+    if sign_request and provider.saml_sign_requests:
+        sp_cert, sp_key = saml_sp.load_sp_credentials(provider, with_key=True)
     return OneLogin_Saml2_Auth(saml_sp.request_data(flask_request, base),
-                               saml_sp.build_settings(provider, base))
+                               saml_sp.build_settings(provider, base, sp_cert, sp_key))
 
 
 def _extract_external_id(provider, external_data):

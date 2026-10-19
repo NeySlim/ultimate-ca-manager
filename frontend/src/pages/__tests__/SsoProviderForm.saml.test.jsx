@@ -54,4 +54,12 @@ describe('SsoProviderForm SAML strict options', () => {
     const payload = await submit(onSave)
     expect(payload.saml_allow_idp_initiated).toBe(true)
   })
+
+  it('leaves request signing off for a new provider', async () => {
+    const onSave = vi.fn()
+    render(<SsoProviderForm forcedType="saml" onSave={onSave} onCancel={vi.fn()} />)
+    expect(switchFor('sso.signRequests')).toHaveAttribute('aria-checked', 'false')
+    const payload = await submit(onSave)
+    expect(payload.saml_sign_requests).toBe(false)
+  })
 })

@@ -3,6 +3,8 @@
 `pro_sso_saml_message_ids` holds the AuthnRequest ids awaiting a response and
 the assertion ids already consumed, shared by every worker. IdP-initiated
 logins become an explicit per-provider opt-in, off by default.
+`saml_sign_requests` was stored but never applied: existing rows are set to
+what UCM actually did (unsigned) when the option first takes effect.
 """
 
 import sqlite3
@@ -44,6 +46,7 @@ def _upgrade_sqlite(conn):
         if 'saml_allow_idp_initiated' not in columns:
             conn.execute("ALTER TABLE pro_sso_providers ADD COLUMN "
                          "saml_allow_idp_initiated BOOLEAN NOT NULL DEFAULT 0")
+            conn.execute("UPDATE pro_sso_providers SET saml_sign_requests = 0")
     conn.commit()
 
 
@@ -52,10 +55,14 @@ def _upgrade_pg(conn):
 
     conn.execute(text(_TABLE_PG))
     conn.execute(text(_INDEX))
-    if 'pro_sso_providers' in inspect(conn).get_table_names():
-        conn.execute(text(
-            "ALTER TABLE pro_sso_providers ADD COLUMN IF NOT EXISTS "
-            "saml_allow_idp_initiated BOOLEAN NOT NULL DEFAULT FALSE"))
+    inspector = inspect(conn)
+    if 'pro_sso_providers' in inspector.get_table_names():
+        columns = {c['name'] for c in inspector.get_columns('pro_sso_providers')}
+        if 'saml_allow_idp_initiated' not in columns:
+            conn.execute(text(
+                "ALTER TABLE pro_sso_providers ADD COLUMN "
+                "saml_allow_idp_initiated BOOLEAN NOT NULL DEFAULT FALSE"))
+            conn.execute(text("UPDATE pro_sso_providers SET saml_sign_requests = FALSE"))
 
 
 def upgrade(conn):

@@ -5,8 +5,8 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, Certificate
 from models.sso import SSOProvider
-import base64
 import urllib.parse
+from types import SimpleNamespace
 import requests as http_requests
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from utils.datetime_utils import utc_now, utc_isoformat
@@ -76,112 +76,38 @@ def list_saml_certificates():
 def get_sp_metadata():
     """Generate schema-valid SAML 2.0 SP metadata XML for configuring the IDP.
 
-    Uses python3-saml's metadata builder to ensure compliance with
-    the SAML 2.0 Metadata XSD (correct element ordering, validUntil, etc.).
-    Includes SP signing certificate (HTTPS cert) in KeyDescriptor.
-    Works with strict IDPs like Omnissa Workspace ONE Access, ADFS, Shibboleth.
+    Built with python3-saml from the same settings as the login, so the entity
+    ID, ACS URL, signing certificate and AuthnRequestsSigned match what UCM sends.
     """
-    import os
     from onelogin.saml2.settings import OneLogin_Saml2_Settings
 
-    endpoints = saml_sp.sp_endpoints(saml_sp.sp_base_url(request))
-    entity_id = endpoints['entity_id']
-    acs_url = endpoints['acs_url']
-    slo_url = endpoints['slo_url']
+    base = saml_sp.sp_base_url(request)
+    endpoints = saml_sp.sp_endpoints(base)
+    provider = (SSOProvider.query.filter_by(provider_type='saml', enabled=True).first()
+                or SSOProvider.query.filter_by(provider_type='saml').first())
+    sign = bool(provider and provider.saml_sign_requests)
 
-    # Load SAML provider config if available (for NameIDFormat override + cert source)
-    provider = SSOProvider.query.filter_by(provider_type='saml').first()
+    sp_cert = sp_key = None
+    try:
+        sp_cert, sp_key = saml_sp.load_sp_credentials(provider, with_key=sign)
+    except Exception as e:
+        logger.warning(f"SAML SP credentials unusable for metadata: {e}")
+        try:
+            sp_cert, _ = saml_sp.load_sp_credentials(provider)
+        except Exception:
+            pass
     name_id_format = (getattr(provider, 'saml_name_id_format', None)
-                      if provider else None) or 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'
+                      if provider else None) or saml_sp.NAMEID_UNSPECIFIED
 
-    # Determine certificate source
-    cert_source = (getattr(provider, 'saml_sp_cert_source', None)
-                   if provider else None) or 'https'
-
-    # Load SP certificate for KeyDescriptor
-    sp_cert = ''
-    data_path = os.environ.get('DATA_PATH', '/opt/ucm/data')
-
-    if cert_source != 'https':
-        # Load certificate from database by ID (must be valid and not revoked)
-        try:
-            from datetime import datetime as dt
-            db_cert = Certificate.query.filter(
-                Certificate.id == int(cert_source),
-                Certificate.revoked == False,
-                Certificate.valid_to > utc_now(),
-                Certificate.crt.isnot(None)
-            ).first()
-            if db_cert:
-                cert_content = base64.b64decode(db_cert.crt).decode('utf-8')
-                in_cert = False
-                cert_lines = []
-                for line in cert_content.splitlines():
-                    if '-----BEGIN CERTIFICATE-----' in line:
-                        in_cert = True
-                        continue
-                    if '-----END CERTIFICATE-----' in line:
-                        break
-                    if in_cert:
-                        cert_lines.append(line.strip())
-                sp_cert = ''.join(cert_lines)
-                logger.info(f"Using database certificate #{cert_source} for SP metadata")
-            else:
-                logger.warning(f"Certificate #{cert_source} not found, falling back to HTTPS cert")
-                cert_source = 'https'
-        except Exception as e:
-            logger.warning(f"Could not load certificate #{cert_source}: {e}, falling back to HTTPS cert")
-            cert_source = 'https'
-
-    if cert_source == 'https':
-        # Default: use HTTPS certificate
-        cert_path = os.path.join(data_path, 'https_cert.pem')
-        try:
-            with open(cert_path, 'r') as f:
-                cert_content = f.read()
-            in_cert = False
-            cert_lines = []
-            for line in cert_content.splitlines():
-                if '-----BEGIN CERTIFICATE-----' in line:
-                    in_cert = True
-                    continue
-                if '-----END CERTIFICATE-----' in line:
-                    break
-                if in_cert:
-                    cert_lines.append(line.strip())
-            sp_cert = ''.join(cert_lines)
-        except Exception as e:
-            logger.warning(f"Could not load SP certificate from {cert_path}: {e}")
-
-    settings_data = {
-        'strict': False,
-        'sp': {
-            'entityId': entity_id,
-            'assertionConsumerService': {
-                'url': acs_url,
-                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
-            },
-            'singleLogoutService': {
-                'url': slo_url,
-                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
-            },
-            'NameIDFormat': name_id_format,
-        },
-        'idp': {
-            'entityId': 'https://idp.placeholder.local',
-            'singleSignOnService': {
-                'url': 'https://idp.placeholder.local/sso',
-                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
-            },
-        },
-    }
-
-    # Include SP cert if available — generates KeyDescriptor in metadata
-    if sp_cert:
-        settings_data['sp']['x509cert'] = sp_cert
+    idp = provider or SimpleNamespace(
+        saml_entity_id='https://idp.placeholder.local', saml_sso_url='https://idp.placeholder.local/sso',
+        saml_slo_url=None, saml_certificate=None, saml_sign_requests=False, saml_name_id_format=None)
+    settings_data = saml_sp.build_settings(idp, base, sp_cert, sp_key)
+    # Advertised as configured even if the key is unusable: the login then fails loudly.
+    settings_data['security']['authnRequestsSigned'] = sign
 
     try:
-        settings = OneLogin_Saml2_Settings(settings_data, custom_base_path='/tmp')
+        settings = OneLogin_Saml2_Settings(settings_data, sp_validation_only=True)
         metadata = settings.get_sp_metadata()
         if isinstance(metadata, bytes):
             metadata = metadata.decode('utf-8')
@@ -195,27 +121,28 @@ def get_sp_metadata():
     except Exception as e:
         logger.error(f"Failed to generate SP metadata via python3-saml: {e}")
         # Fallback: hand-crafted but schema-compliant (correct element order per XSD)
+        cert_body = ''.join(line for line in (sp_cert or '').splitlines() if '-----' not in line)
         key_descriptor = ''
-        if sp_cert:
+        if cert_body:
             key_descriptor = f'''    <md:KeyDescriptor use="signing">
       <ds:KeyInfo xmlns:ds="http://www.w3.org/2000/09/xmldsig#">
         <ds:X509Data>
-          <ds:X509Certificate>{sp_cert}</ds:X509Certificate>
+          <ds:X509Certificate>{cert_body}</ds:X509Certificate>
         </ds:X509Data>
       </ds:KeyInfo>
     </md:KeyDescriptor>
 '''
         metadata_xml = f'''<?xml version="1.0" encoding="UTF-8"?>
 <md:EntityDescriptor xmlns:md="urn:oasis:names:tc:SAML:2.0:metadata"
-                     entityID="{entity_id}">
-  <md:SPSSODescriptor AuthnRequestsSigned="false"
-                      WantAssertionsSigned="true"
+                     entityID="{endpoints['entity_id']}">
+  <md:SPSSODescriptor AuthnRequestsSigned="{'true' if sign else 'false'}"
+                      WantAssertionsSigned="false"
                       protocolSupportEnumeration="urn:oasis:names:tc:SAML:2.0:protocol">
 {key_descriptor}    <md:SingleLogoutService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect"
-                            Location="{slo_url}"/>
+                            Location="{endpoints['slo_url']}"/>
     <md:NameIDFormat>{name_id_format}</md:NameIDFormat>
     <md:AssertionConsumerService Binding="urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST"
-                                Location="{acs_url}"
+                                Location="{endpoints['acs_url']}"
                                 index="1"
                                 isDefault="true"/>
   </md:SPSSODescriptor>
