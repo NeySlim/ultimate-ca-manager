@@ -18,6 +18,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME: the global "Enable ACME proxy" switch of the Let's Encrypt tab is gone, since turning it off never stopped the proxy, and the upgrade deletes the setting. To stop a proxy endpoint, turn off "Expose via ACME proxy" on its CA account, or clear the CA account selected for the default proxy path.
 - ACME proxy: the copies of the upstream account URL and EAB credentials kept in settings beside the proxy's CA account are gone and the upgrade deletes them; `proxy_eab_kid` and `proxy_eab_hmac_key` of the client settings API now write the selected CA account and are refused when none is selected. Nothing to do from the UI, which edits EAB on the CA account.
 - ACME DNS providers: the `zones` list of the API was stored but never used, since ACME > Domains decides which provider answers for a domain; it is no longer accepted or returned. Map each domain in ACME > Domains instead.
+- Policies: the `required_extensions` and `san_restrictions.require_approval_for_external` rules were saved but never enforced; they are dropped on save and the upgrade removes them from existing policies. Nothing to do: approval is set per policy with "Requires approval".
 
 ### Fixed
 

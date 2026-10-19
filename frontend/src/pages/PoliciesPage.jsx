@@ -72,11 +72,9 @@ const DEFAULT_FORM = {
     max_validity_days: 397,
     allowed_key_types: [],
     allowed_digests: [],
-    required_extensions: [],
     san_restrictions: {
       max_dns_names: 50,
       dns_pattern: '',
-      require_approval_for_external: false,
     },
   },
   notification_emails: [],
@@ -300,11 +298,9 @@ export default function PoliciesPage() {
         max_validity_days: policy.rules?.max_validity_days || 397,
         allowed_key_types: policy.rules?.allowed_key_types || [],
         allowed_digests: policy.rules?.allowed_digests || [],
-        required_extensions: policy.rules?.required_extensions || [],
         san_restrictions: {
           max_dns_names: policy.rules?.san_restrictions?.max_dns_names || 50,
           dns_pattern: policy.rules?.san_restrictions?.dns_pattern || '',
-          require_approval_for_external: policy.rules?.san_restrictions?.require_approval_for_external || false,
         },
       },
       notification_emails: policy.notification_emails || [],

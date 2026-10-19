@@ -657,11 +657,11 @@ def _issue_approved_certificate(approval):
 
 def _validated_rules(rules):
     """``(rules, error)``: key-type and digest lists normalised, unknown values refused."""
-    from services.policy_service import normalize_digest
+    from services.policy_service import normalize_digest, strip_dead_rules
     from services.template_service import _normalize_key_type_label
     if not isinstance(rules, dict):
         return None, 'rules must be an object'
-    rules = dict(rules)
+    rules = strip_dead_rules(rules)
     key_types = rules.get('allowed_key_types')
     if key_types is not None:
         if not isinstance(key_types, list):

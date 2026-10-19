@@ -1,5 +1,6 @@
 """Migration 102 deletes the settings nothing reads any more, on both backends."""
 import importlib
+import json
 import os
 import sqlite3
 
@@ -43,6 +44,50 @@ def test_postgres_deletes_only_the_dead_keys():
         m.upgrade(conn)
         left = {r[0] for r in conn.execute(text("SELECT key FROM system_config"))}
         assert left == set(KEPT)
+    finally:
+        conn.rollback()
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.commit()
+        conn.close()
+        engine.dispose()
+
+
+RULES = json.dumps({'max_validity_days': 90, 'required_extensions': ['keyUsage'],
+                    'forbidden_extensions': [],
+                    'san_restrictions': {'max_dns_names': 5, 'dns_pattern': '',
+                                         'require_approval_for_external': True}})
+CLEAN = {'max_validity_days': 90, 'san_restrictions': {'max_dns_names': 5, 'dns_pattern': ''}}
+
+
+def test_sqlite_drops_the_dead_policy_rules():
+    m = _migration()
+    conn = sqlite3.connect(':memory:')
+    conn.execute("CREATE TABLE certificate_policies (id INTEGER PRIMARY KEY, rules TEXT)")
+    conn.execute("INSERT INTO certificate_policies VALUES (1, ?)", (RULES,))
+    conn.execute("INSERT INTO certificate_policies VALUES (2, 'not json')")
+    m.upgrade(conn)
+    m.upgrade(conn)
+    assert json.loads(conn.execute("SELECT rules FROM certificate_policies WHERE id = 1").fetchone()[0]) == CLEAN
+    assert conn.execute("SELECT rules FROM certificate_policies WHERE id = 2").fetchone()[0] == 'not json'
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_postgres_drops_the_dead_policy_rules():
+    m = _migration()
+    schema = f"migtest_102p_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
+    engine = create_engine(PG_URL)
+    conn = engine.connect()
+    try:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.execute(text(f"CREATE SCHEMA {schema}"))
+        conn.execute(text(f"SET search_path TO {schema}"))
+        conn.execute(text("CREATE TABLE certificate_policies (id INTEGER PRIMARY KEY, rules TEXT NOT NULL)"))
+        conn.execute(text("INSERT INTO certificate_policies VALUES (1, :r)"), {'r': RULES})
+        m.upgrade(conn)
+        m.upgrade(conn)
+        stored = conn.execute(text("SELECT rules FROM certificate_policies WHERE id = 1")).scalar()
+        assert json.loads(stored) == CLEAN
     finally:
         conn.rollback()
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
