@@ -14,16 +14,25 @@ from datetime import datetime, timezone
 logger = logging.getLogger(__name__)
 
 
+_PEM_CERT = re.compile(r'-----BEGIN CERTIFICATE-----(.*?)-----END CERTIFICATE-----', re.S)
+
+
 def decode_forwarded_pem(value):
-    """A client certificate as a proxy forwards it: raw PEM, PEM with escaped
-    newlines, or URL-encoded PEM (nginx ``$ssl_client_escaped_cert``)."""
+    """A client certificate as a proxy forwards it, as one well-formed PEM: raw PEM,
+    escaped newlines, URL-encoded (nginx ``$ssl_client_escaped_cert``), newlines
+    folded to spaces (Apache ``%{SSL_CLIENT_CERT}s``) or bare base64 DER."""
     if isinstance(value, bytes):
         value = value.decode('ascii', errors='replace')
     if not value:
         return value
     if '%' in value:  # never part of a PEM; '+' is base64, so not unquote_plus
         value = unquote(value)
-    return value.replace('\\n', '\n')
+    match = _PEM_CERT.search(value.replace('\\n', '\n'))
+    body = ''.join((match.group(1) if match else value).split())
+    if not body:
+        return value
+    lines = '\n'.join(body[i:i + 64] for i in range(0, len(body), 64))
+    return f'-----BEGIN CERTIFICATE-----\n{lines}\n-----END CERTIFICATE-----\n'
 
 
 class CertificateParser:

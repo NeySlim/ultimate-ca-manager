@@ -75,3 +75,37 @@ def test_est_untrusted_peer_escaped_cert_still_ignored(bare_app, pem):
         headers={'X-SSL-Client-Verify': 'SUCCESS', 'X-SSL-Client-Cert': nginx_escaped(pem)},
     ):
         assert est_protocol._trusted_client_cert() is None
+
+
+def apache_folded(pem):
+    return pem.replace('\n', ' ').strip()
+
+
+def bare_der_base64(pem):
+    return ''.join(pem.splitlines()[1:-1])
+
+
+@pytest.mark.parametrize('form', [apache_folded, bare_der_base64])
+def test_parser_reads_apache_and_bare_forms(pem, form):
+    info = CertificateParser.extract_from_apache_headers(
+        {'X-SSL-Client-Verify': 'SUCCESS', 'X-SSL-Client-Cert': form(pem)})
+    assert info['common_name'] == 'proxied-client'
+
+
+@pytest.mark.parametrize('form', [apache_folded, bare_der_base64])
+def test_est_reads_apache_and_bare_forms(bare_app, pem, form):
+    with bare_app.test_request_context(
+        '/.well-known/est/simpleenroll', environ_base={'REMOTE_ADDR': '127.0.0.1'},
+        headers={'X-SSL-Client-Verify': 'SUCCESS', 'X-SSL-Client-Cert': form(pem)},
+    ):
+        presented = est_protocol._trusted_client_cert()
+    assert x509.load_pem_x509_certificate(presented.encode()).subject.rfc4514_string() == 'CN=proxied-client'
+
+
+@pytest.mark.parametrize('form', [apache_folded, bare_der_base64])
+def test_est_untrusted_peer_other_forms_still_ignored(bare_app, pem, form):
+    with bare_app.test_request_context(
+        '/.well-known/est/simpleenroll', environ_base={'REMOTE_ADDR': '203.0.113.7'},
+        headers={'X-SSL-Client-Verify': 'SUCCESS', 'X-SSL-Client-Cert': form(pem)},
+    ):
+        assert est_protocol._trusted_client_cert() is None
