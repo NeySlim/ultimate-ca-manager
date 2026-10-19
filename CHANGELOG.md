@@ -28,6 +28,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - SCEP: the "CA Identifier" and SCEP URL settings were never read by any SCEP exchange; they are gone and the upgrade deletes them. Nothing to do: use a profile URL to target a specific CA.
 - Settings: `site_name` was only shown in place of an empty "System Name", which is in fact the syslog HOSTNAME; the field is now labelled "Syslog hostname" and the upgrade carries `site_name` into it when it was empty, then deletes it.
 - Settings: the ACME public vhost "TLS certificate" was stored as a note and never applied to any listener or deployment; it is gone and the upgrade deletes it. Deploy that certificate to the reverse proxy with a deployment binding instead.
+- Settings: the internal `app.initialized` and `https.enabled` keys were seeded at startup and never read; they are no longer created and the upgrade deletes them. Nothing to do.
 
 ### Fixed
 

@@ -1325,12 +1325,8 @@ def init_database(app):
 
             # Add initial system config
             configs = [
-                SystemConfig(key="app.initialized", value="true", 
-                            description="Application initialized"),
                 SystemConfig(key="app.version", value=app.config["APP_VERSION"],
                             description="Application version"),
-                SystemConfig(key="https.enabled", value="true",
-                            description="HTTPS enforcement enabled"),
             ]
             
             for config in configs:
