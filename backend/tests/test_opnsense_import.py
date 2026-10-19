@@ -133,6 +133,9 @@ def test_opnsense_ca_import_requires_write_cas(app, auth_client, monkeypatch):
         lambda verify_ssl=True: _Session(ca_rows, []),
     )
 
+    # The session-wide admin collects keys from earlier files on this worker;
+    # the 10-key cap would otherwise refuse this one depending on test order.
+    monkeypatch.setitem(app.config, 'API_KEY_MAX_PER_USER', 1000)
     r_key = auth_client.post(
         '/api/v2/account/apikeys',
         data=json.dumps({
@@ -141,6 +144,7 @@ def test_opnsense_ca_import_requires_write_cas(app, auth_client, monkeypatch):
         }),
         content_type='application/json',
     )
+    assert r_key.status_code == 201, r_key.data
     api_key = json.loads(r_key.data)['data']['key']
 
     client = app.test_client()
