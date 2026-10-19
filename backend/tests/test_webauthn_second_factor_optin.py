@@ -132,8 +132,11 @@ def _switched_on(app, make_user, keys=1):
 def test_admin_removing_the_last_key_turns_the_switch_off(app, auth_client, make_user, how):
     username = _switched_on(app, make_user)
     key_id, = _key_ids(app, username)
-    r = (auth_client.delete(f'/api/v2/webauthn/credentials/{key_id}') if how == 'delete' else
-         _post(auth_client, f'/api/v2/webauthn/credentials/{key_id}/toggle', {'enabled': False}))
+    with app.app_context():
+        url = f'/api/v2/users/{User.query.filter_by(username=username).first().id}/webauthn/{key_id}'
+    url += '?confirm=last_factor'
+    r = (auth_client.delete(url) if how == 'delete' else
+         auth_client.patch(url, json={'enabled': False}))
     assert r.status_code == 200
     assert _flag(app, username) is False
 
@@ -141,5 +144,7 @@ def test_admin_removing_the_last_key_turns_the_switch_off(app, auth_client, make
 def test_admin_removing_one_of_two_keys_keeps_the_switch(app, auth_client, make_user):
     username = _switched_on(app, make_user, keys=2)
     first, _second = _key_ids(app, username)
-    assert auth_client.delete(f'/api/v2/webauthn/credentials/{first}').status_code == 200
+    with app.app_context():
+        uid = User.query.filter_by(username=username).first().id
+    assert auth_client.delete(f'/api/v2/users/{uid}/webauthn/{first}').status_code == 200
     assert _flag(app, username) is True

@@ -1210,6 +1210,18 @@
     "pinnedCount": "{{count}} de {{total}} plantillas fijadas"
   },
   "users": {
+    "securityKeys": {
+      "title": "Llaves de seguridad",
+      "description": "Desactive o elimine una llave perdida: de lo contrario, aún permite iniciar sesión sin contraseña",
+      "none": "Ninguna llave de seguridad registrada",
+      "removeConfirm": "¿Eliminar la llave de seguridad «{{key}}» de {{name}}?",
+      "lastFactorConfirm": "Esta llave es el último segundo factor de {{name}}, cuya cuenta exige uno. Sin ella, {{name}} deberá registrar de nuevo un segundo factor en el próximo inicio de sesión. ¿Continuar?",
+      "removed": "Llave de seguridad eliminada",
+      "enabled": "Llave de seguridad activada",
+      "disabled": "Llave de seguridad desactivada",
+      "loadFailed": "No se pudieron cargar las llaves de seguridad",
+      "updateFailed": "No se pudo modificar la llave de seguridad"
+    },
     "createUser": "Crear usuario",
     "editUser": "Editar usuario",
     "deleteUser": "Eliminar usuario",

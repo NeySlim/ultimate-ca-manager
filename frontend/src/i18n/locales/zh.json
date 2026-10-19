@@ -1210,6 +1210,18 @@
     "pinnedCount": "已置顶 {{count}} / {{total}} 个模板"
   },
   "users": {
+    "securityKeys": {
+      "title": "安全密钥",
+      "description": "停用或删除丢失的密钥：否则它仍可在无密码的情况下登录",
+      "none": "未注册安全密钥",
+      "removeConfirm": "删除 {{name}} 的安全密钥“{{key}}”？",
+      "lastFactorConfirm": "此密钥是 {{name}} 的最后一个第二因素，而该账户要求必须有第二因素。删除后，{{name}} 下次登录时需要重新注册第二因素。是否继续？",
+      "removed": "安全密钥已删除",
+      "enabled": "安全密钥已启用",
+      "disabled": "安全密钥已停用",
+      "loadFailed": "无法加载安全密钥",
+      "updateFailed": "无法更新安全密钥"
+    },
     "createUser": "创建用户",
     "editUser": "编辑用户",
     "deleteUser": "删除用户",

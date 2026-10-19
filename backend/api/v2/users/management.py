@@ -107,8 +107,9 @@ def reset_user_2fa(user_id):
     POST /api/v2/users/{user_id}/reset-2fa
 
     TOTP and the key-as-second-factor choice are cleared; registered keys stay
-    (an administrator can remove a lost one). Under enforcement, a user left
-    without a key re-enrols on next login; ``totp_exempt`` lets them in without 2FA.
+    (a lost one is removed with DELETE /api/v2/users/{id}/webauthn/{key}). Under
+    enforcement, a user left without a key re-enrols on next login; ``totp_exempt``
+    lets them in without 2FA.
     """
     # SECURITY: only admins may reset another user's 2FA
     if g.current_user.role != 'admin':
@@ -464,3 +465,117 @@ def import_users():
         db.session.rollback()
         logger.error(f"Failed to import users: {e}", exc_info=True)
         return error_response('Failed to import users', 500)
+
+
+# ============================================================================
+# Security keys of another user (lost-key recovery)
+# ============================================================================
+
+_CONFIRM_LAST_FACTOR = 'last_factor'
+
+
+def _users_key(user_id, credential_id):
+    """(user, credential, None), or an error response in third place."""
+    user = db.session.get(User, user_id)
+    if not user:
+        return None, None, error_response('User not found', 404)
+    from models.webauthn import WebAuthnCredential
+    credential = db.session.get(WebAuthnCredential, credential_id) if credential_id else None
+    if credential_id and (not credential or credential.user_id != user.id):
+        return None, None, error_response('Security key not found', 404)
+    return user, credential, None
+
+
+def _refuse_last_factor(user, credential):
+    """409 unless confirmed: the account's last factor of required 2FA is going.
+
+    Confirmed, the account is left as after a 2FA reset: under enforcement it
+    enrols a factor again at its next login.
+    """
+    from auth.twofa_enforcement import lock_for_factor_change
+    _user, refused = lock_for_factor_change(user.id, dropping_key=credential.id)
+    if not refused or not credential.enabled or request.args.get('confirm') == _CONFIRM_LAST_FACTOR:
+        return None
+    db.session.rollback()
+    return error_response(
+        'This is the last second factor of an account that requires one; confirm with '
+        f'?confirm={_CONFIRM_LAST_FACTOR} and the user enrols again at next login',
+        409, {'reason': 'last_second_factor'})
+
+
+def _audit_key(action, user, credential, verb):
+    AuditService.log_action(
+        action=action,
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=(f'Security key "{credential.name}" (id {credential.id}) of {user.username} '
+                 f'{verb} by {g.current_user.username}'),
+        success=True,
+    )
+
+
+@bp.route('/api/v2/users/<int:user_id>/webauthn', methods=['GET'])
+@require_auth(['write:users'])
+def list_user_security_keys(user_id):
+    """
+    List another user's security keys (WebAuthn).
+
+    GET /api/v2/users/{user_id}/webauthn
+    """
+    user, _none, err = _users_key(user_id, None)
+    if err:
+        return err
+    from services.webauthn_service import WebAuthnService
+    return success_response(data=[c.to_dict() for c in WebAuthnService.get_user_credentials(user.id)])
+
+
+@bp.route('/api/v2/users/<int:user_id>/webauthn/<int:credential_id>', methods=['DELETE'])
+@require_auth(['write:users'])
+def delete_user_security_key(user_id, credential_id):
+    """
+    Remove another user's security key, e.g. a lost one.
+
+    DELETE /api/v2/users/{user_id}/webauthn/{credential_id}[?confirm=last_factor]
+    """
+    user, credential, err = _users_key(user_id, credential_id)
+    if err:
+        return err
+    refusal = _refuse_last_factor(user, credential)
+    if refusal:
+        return refusal
+    from services.webauthn_service import WebAuthnService
+    ok, message = WebAuthnService.remove_credential(credential)
+    if not ok:
+        return error_response(message, 500)
+    _audit_key('webauthn_admin_delete', user, credential, 'removed')
+    return success_response(message=f'Security key removed from {user.username}')
+
+
+@bp.route('/api/v2/users/<int:user_id>/webauthn/<int:credential_id>', methods=['PATCH'])
+@require_auth(['write:users'])
+def toggle_user_security_key(user_id, credential_id):
+    """
+    Enable or disable another user's security key.
+
+    PATCH /api/v2/users/{user_id}/webauthn/{credential_id}[?confirm=last_factor]
+    Body: {"enabled": false}
+    """
+    data = request.get_json(silent=True)
+    enabled = data.get('enabled') if isinstance(data, dict) else None
+    if not isinstance(enabled, bool):
+        return error_response('enabled must be true or false', 400)
+    user, credential, err = _users_key(user_id, credential_id)
+    if err:
+        return err
+    if not enabled:
+        refusal = _refuse_last_factor(user, credential)
+        if refusal:
+            return refusal
+    from services.webauthn_service import WebAuthnService
+    ok, message = WebAuthnService.set_credential_enabled(credential, enabled)
+    if not ok:
+        return error_response(message, 500)
+    _audit_key('webauthn_admin_enable' if enabled else 'webauthn_admin_disable', user, credential,
+               'enabled' if enabled else 'disabled')
+    return success_response(data=credential.to_dict())

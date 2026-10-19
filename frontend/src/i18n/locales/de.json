@@ -1210,6 +1210,18 @@
     "pinnedCount": "{{count}} von {{total}} Vorlagen angeheftet"
   },
   "users": {
+    "securityKeys": {
+      "title": "Sicherheitsschlüssel",
+      "description": "Deaktivieren oder entfernen Sie einen verlorenen Schlüssel: Sonst ermöglicht er weiterhin die Anmeldung ohne Passwort",
+      "none": "Kein Sicherheitsschlüssel registriert",
+      "removeConfirm": "Den Sicherheitsschlüssel „{{key}}“ von {{name}} entfernen?",
+      "lastFactorConfirm": "Dieser Schlüssel ist der letzte zweite Faktor von {{name}}, dessen Konto einen verlangt. Ohne ihn muss {{name}} bei der nächsten Anmeldung erneut einen zweiten Faktor einrichten. Fortfahren?",
+      "removed": "Sicherheitsschlüssel entfernt",
+      "enabled": "Sicherheitsschlüssel aktiviert",
+      "disabled": "Sicherheitsschlüssel deaktiviert",
+      "loadFailed": "Die Sicherheitsschlüssel konnten nicht geladen werden",
+      "updateFailed": "Der Sicherheitsschlüssel konnte nicht geändert werden"
+    },
     "createUser": "Benutzer erstellen",
     "editUser": "Benutzer bearbeiten",
     "deleteUser": "Benutzer löschen",

@@ -1210,6 +1210,18 @@
     "pinnedCount": "{{count}} modelli su {{total}} fissati"
   },
   "users": {
+    "securityKeys": {
+      "title": "Chiavi di sicurezza",
+      "description": "Disattiva o rimuovi una chiave smarrita: altrimenti permette ancora di accedere senza password",
+      "none": "Nessuna chiave di sicurezza registrata",
+      "removeConfirm": "Rimuovere la chiave di sicurezza «{{key}}» di {{name}}?",
+      "lastFactorConfirm": "Questa chiave è l'ultimo secondo fattore di {{name}}, il cui account ne richiede uno. Senza di essa, {{name}} dovrà registrare di nuovo un secondo fattore al prossimo accesso. Continuare?",
+      "removed": "Chiave di sicurezza rimossa",
+      "enabled": "Chiave di sicurezza attivata",
+      "disabled": "Chiave di sicurezza disattivata",
+      "loadFailed": "Impossibile caricare le chiavi di sicurezza",
+      "updateFailed": "Impossibile modificare la chiave di sicurezza"
+    },
     "createUser": "Crea utente",
     "editUser": "Modifica utente",
     "deleteUser": "Elimina utente",

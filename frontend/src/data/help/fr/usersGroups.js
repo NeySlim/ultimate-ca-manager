@@ -58,6 +58,9 @@ Basculez le statut d'un utilisateur sans supprimer son compte.
 ### Réinitialisation du mot de passe
 Les administrateurs peuvent réinitialiser le mot de passe de tout utilisateur. L'utilisateur sera invité à le changer lors de sa prochaine connexion.
 
+### Clés de sécurité
+Dans la fiche d'un utilisateur, les administrateurs voient ses clés de sécurité et peuvent en désactiver ou en retirer une, typiquement une clé perdue, qui sinon permet toujours de se connecter sans mot de passe. Retirer le dernier second facteur d'un compte qui en exige un demande une seconde confirmation ; l'utilisateur enrôle alors à nouveau un facteur à la prochaine connexion.
+
 ### Clés API
 Chaque utilisateur peut avoir plusieurs clés API pour l'accès programmatique. Les clés API héritent des permissions du rôle de l'utilisateur. Voir la page Compte pour gérer vos propres clés.
 
