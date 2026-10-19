@@ -67,13 +67,13 @@ Les permissions sont organisées par catégorie :
 - **ACME** : Configurer, gérer les comptes
 - **SCEP** : Configurer, approuver les requêtes
 - **Magasin de confiance** : Gérer les certificats de confiance
-- **HSM** : Gérer les fournisseurs et les clés
+- **HSM** : Consulter, supprimer (ajouter ou modifier un fournisseur est réservé aux administrateurs)
 - **SSH** : Gérer les CA et certificats SSH
 - **Politiques** : Consulter les politiques de certificat
 - **Approbations** : Consulter et décider des demandes d'approbation
 - **Récupération de clés** : Demander des récupérations et consulter les demandes (l'approbation est réservée aux administrateurs)
 
-Un rôle personnalisé peut accorder toute permission vérifiée par UCM, sauf celles réservées aux administrateurs : l'accès complet et les jokers, toute action d'administration (approbation des récupérations de clés, administration du système et des utilisateurs), la gestion des comptes, le SSO, les déploiements, les événements système et la suppression du journal d'audit. Une permission enregistrée que le rôle ne peut pas accorder est affichée comme ignorée et conservée telle quelle.
+Un rôle personnalisé peut accorder toute permission vérifiée par UCM, sauf celles réservées aux administrateurs : l'accès complet et les jokers, toute action d'administration (approbation des récupérations de clés, administration du système et des utilisateurs), la gestion des comptes, le SSO, les déploiements, la modification du connecteur AD et des fournisseurs HSM, les événements système et la suppression du journal d'audit. Une permission enregistrée que le rôle ne peut pas accorder est affichée comme ignorée et conservée telle quelle.
 
 ### Bascules de catégorie
 Cliquez sur un en-tête de catégorie pour activer/désactiver toutes les permissions de cette catégorie d'un coup.

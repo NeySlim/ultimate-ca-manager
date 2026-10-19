@@ -15,6 +15,11 @@ describe('custom role matrix follows the server list', () => {
     expect(groups.find(g => g.key === 'cas').labelKey).toBe('rbac.categories.certificateAuthorities')
   })
 
+  it('labels the users category', () => {
+    const [group] = groupPermissions(['read:users'])
+    expect(group.labelKey).toBe('rbac.categories.userManagement')
+  })
+
   it('labels an unknown resource by its name rather than dropping it', () => {
     const [group] = groupPermissions(['read:widgets'])
     expect(group).toMatchObject({ key: 'widgets', labelKey: null, label: 'widgets' })

@@ -884,6 +884,13 @@ def delete_intune_app(app_id):
     return success_response(message='Intune app registration deleted')
 
 
+def _saved_intune_secret(app, tenant, client):
+    """The stored secret, only for the tenant and client it was stored with."""
+    if app and tenant == (app.tenant_id or '').strip() and client == (app.client_id or '').strip():
+        return app.decrypted_secret()
+    return ''
+
+
 @bp.route('/api/v2/scep/intune-apps/test', methods=['POST'])
 @require_auth(['write:scep'])
 def test_intune_app():
@@ -896,7 +903,7 @@ def test_intune_app():
         return error_response('Intune app registration not found', 404)
     tenant = (data.get('tenant_id') or (app.tenant_id if app else '')).strip()
     client = (data.get('client_id') or (app.client_id if app else '')).strip()
-    secret = (data.get('client_secret') or '').strip() or (app.decrypted_secret() if app else '')
+    secret = (data.get('client_secret') or '').strip() or _saved_intune_secret(app, tenant, client)
     if not tenant or not client or not secret:
         return error_response('Tenant ID, client ID and client secret are all required', 400)
     result = _test_intune_credentials(tenant, client, secret)
@@ -921,7 +928,7 @@ def test_intune_connection():
         app = db.session.get(IntuneApp, data['intune_app_id'])
     tenant = (data.get('intune_tenant_id') or (app.tenant_id if app else '')).strip()
     client = (data.get('intune_client_id') or (app.client_id if app else '')).strip()
-    secret = (data.get('intune_client_secret') or '').strip() or (app.decrypted_secret() if app else '')
+    secret = (data.get('intune_client_secret') or '').strip() or _saved_intune_secret(app, tenant, client)
     if not tenant or not client or not secret:
         return error_response('Tenant ID, client ID and client secret are all required', 400)
     result = _test_intune_credentials(tenant, client, secret)

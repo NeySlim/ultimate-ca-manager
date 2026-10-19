@@ -188,10 +188,20 @@ def test_connection_inline():
     if not (data.get('bind_dn') or '').strip():
         return error_response('bind_dn is required', 400)
 
+    port = int(data['port']) if data.get('port') else 389
+    use_ssl = bool(data.get('use_ssl'))
+    verify_ssl = data.get('verify_ssl', True)
+    ca_bundle = data.get('ca_bundle') or None
+
     bind_password = data.get('bind_password')
     if not bind_password:
+        # The saved secret only goes to the saved target, trusted the saved way
         saved = ADConnectorConfig.get_singleton()
-        if saved and saved.bind_password:
+        if (saved and saved.bind_password
+                and set(lookup.split_servers(joined)) <= set(lookup.split_servers(saved.server))
+                and (saved.port or 389, bool(saved.use_ssl), bool(saved.verify_ssl),
+                     saved.ca_bundle or None)
+                == (port, use_ssl, bool(verify_ssl), ca_bundle)):
             bind_password = saved.bind_password
     if not bind_password:
         # Same rule as the save: an anonymous bind is not a connection this
@@ -201,10 +211,10 @@ def test_connection_inline():
 
     cfg = SimpleNamespace(
         server=joined,
-        port=int(data['port']) if data.get('port') else 389,
-        use_ssl=bool(data.get('use_ssl')),
-        verify_ssl=data.get('verify_ssl', True),
-        ca_bundle=data.get('ca_bundle') or None,
+        port=port,
+        use_ssl=use_ssl,
+        verify_ssl=verify_ssl,
+        ca_bundle=ca_bundle,
         bind_dn=data.get('bind_dn'),
         bind_password=bind_password,
     )

@@ -67,13 +67,13 @@ Berechtigungen sind nach Kategorie organisiert:
 - **ACME**: Konfigurieren, Konten verwalten
 - **SCEP**: Konfigurieren, Anfragen genehmigen
 - **Vertrauensspeicher**: Vertrauenswürdige Zertifikate verwalten
-- **HSM**: Anbieter und Schlüssel verwalten
+- **HSM**: Anzeigen, Löschen (Anbieter hinzufügen oder ändern ist Administratoren vorbehalten)
 - **SSH**: SSH-CAs und -Zertifikate verwalten
 - **Richtlinien**: Zertifikatsrichtlinien anzeigen
 - **Genehmigungen**: Genehmigungsanfragen anzeigen und entscheiden
 - **Schlüsselwiederherstellung**: Wiederherstellungen beantragen und Anfragen einsehen (Genehmigung nur durch Admins)
 
-Eine benutzerdefinierte Rolle kann jede von UCM geprüfte Berechtigung gewähren, außer den Administratoren vorbehaltenen: Vollzugriff und Platzhalter, jede Verwaltungsaktion (Genehmigung von Schlüsselwiederherstellungen, System- und Benutzerverwaltung), Kontenverwaltung, SSO, Bereitstellungen, systemweite Ereignisse und das Löschen des Audit-Protokolls. Eine gespeicherte Berechtigung, die die Rolle nicht gewähren kann, wird als ignoriert angezeigt und unverändert beibehalten.
+Eine benutzerdefinierte Rolle kann jede von UCM geprüfte Berechtigung gewähren, außer den Administratoren vorbehaltenen: Vollzugriff und Platzhalter, jede Verwaltungsaktion (Genehmigung von Schlüsselwiederherstellungen, System- und Benutzerverwaltung), Kontenverwaltung, SSO, Bereitstellungen, Änderungen am AD-Connector und an HSM-Anbietern, systemweite Ereignisse und das Löschen des Audit-Protokolls. Eine gespeicherte Berechtigung, die die Rolle nicht gewähren kann, wird als ignoriert angezeigt und unverändert beibehalten.
 
 ### Kategorie-Schalter
 Klicken Sie auf eine Kategorieüberschrift, um alle Berechtigungen in dieser Kategorie gleichzeitig zu aktivieren/deaktivieren.

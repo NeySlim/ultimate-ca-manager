@@ -67,13 +67,13 @@ I permessi sono organizzati per categoria:
 - **ACME**: Configurazione, gestione account
 - **SCEP**: Configurazione, approvazione richieste
 - **Trust Store**: Gestione certificati di fiducia
-- **HSM**: Gestione provider e chiavi
+- **HSM**: Visualizzazione, eliminazione (aggiungere o modificare provider è riservato agli amministratori)
 - **SSH**: Gestione delle CA e dei certificati SSH
 - **Politiche**: Visualizzazione delle politiche dei certificati
 - **Approvazioni**: Visualizzazione e decisione delle richieste di approvazione
 - **Recupero delle chiavi**: Richiesta di recuperi e consultazione delle richieste (l'approvazione è riservata agli admin)
 
-Un ruolo personalizzato può concedere qualsiasi permesso verificato da UCM, tranne quelli riservati agli amministratori: accesso completo e caratteri jolly, ogni azione di amministrazione (approvazione dei recuperi di chiavi, amministrazione di sistema e utenti), gestione degli account, SSO, distribuzioni, eventi di sistema ed eliminazione del registro di audit. Un permesso salvato che il ruolo non può concedere viene mostrato come ignorato e conservato così com'è.
+Un ruolo personalizzato può concedere qualsiasi permesso verificato da UCM, tranne quelli riservati agli amministratori: accesso completo e caratteri jolly, ogni azione di amministrazione (approvazione dei recuperi di chiavi, amministrazione di sistema e utenti), gestione degli account, SSO, distribuzioni, modifiche al connettore AD e ai provider HSM, eventi di sistema ed eliminazione del registro di audit. Un permesso salvato che il ruolo non può concedere viene mostrato come ignorato e conservato così com'è.
 
 ### Attivazione per categoria
 Clicca sull'intestazione di una categoria per abilitare/disabilitare tutti i permessi in quella categoria contemporaneamente.

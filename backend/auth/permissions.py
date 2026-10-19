@@ -136,6 +136,8 @@ RESERVED_PERMISSIONS = {
     'delete:deploy': 'removes deployments other services rely on',
     'read:system': 'receives system-wide events over the WebSocket',
     'delete:audit': 'erases the audit trail',
+    'write:ad_connector': 'handles the bind secret of the AD service account',
+    'write:hsm': 'loads native PKCS#11 modules into the UCM process',
 }
 
 
@@ -149,7 +151,7 @@ def is_reserved_permission(perm) -> bool:
 # tests/test_custom_role_grantable.py fails when a new scope is left unclassified.
 CUSTOM_ROLE_GRANTABLE_PERMISSIONS = sorted({
     'read:acme', 'write:acme', 'delete:acme',
-    'read:ad_connector', 'write:ad_connector',
+    'read:ad_connector',
     'read:approvals', 'write:approvals',
     'read:audit', 'export:audit',
     'read:cas', 'write:cas', 'delete:cas',
@@ -158,7 +160,7 @@ CUSTOM_ROLE_GRANTABLE_PERMISSIONS = sorted({
     'read:csrs', 'write:csrs', 'delete:csrs',
     'read:est', 'write:est',
     'read:groups', 'write:groups', 'delete:groups',
-    'read:hsm', 'write:hsm', 'delete:hsm',
+    'read:hsm', 'delete:hsm',
     'read:kerberos', 'write:kerberos',
     'read:key_recovery', 'write:key_recovery',
     'read:policies', 'write:policies', 'delete:policies',

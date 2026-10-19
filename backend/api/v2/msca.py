@@ -110,6 +110,11 @@ _WINRM_OVERRIDE_FIELDS = ('winrm_enabled', 'winrm_host', 'winrm_port', 'winrm_us
                           'winrm_password', 'ca_config')
 
 
+def _winrm_target(cfg):
+    return ((cfg.winrm_host or cfg.server or '').strip().lower(), cfg.winrm_port,
+            bool(cfg.winrm_use_ssl), bool(cfg.winrm_verify_ssl), cfg.winrm_transport or 'kerberos')
+
+
 def _transient_winrm_config(msca, overrides):
     """Build a transient config for the admin-channel test: saved connection
     values + unsaved form overrides. Plain attributes (no ORM, no encryption
@@ -141,9 +146,14 @@ def _transient_winrm_config(msca, overrides):
     # Empty or masked password means "use the saved one".
     if not data.get('winrm_password') or data.get('winrm_password') == '***':
         data.pop('winrm_password', None)
+    saved_target = _winrm_target(cfg)
     err = _apply_winrm_fields(cfg, data)
     if err:
         return None, err
+    # A saved password only goes to the saved target, trusted the saved way
+    if 'winrm_password' not in data and _winrm_target(cfg) != saved_target:
+        return None, error_response(
+            "Enter the WinRM password to test a host, port or transport other than the saved one", 400)
 
     # Mirror MicrosoftCA.winrm_effective_* on the transient object.
     cfg.winrm_effective_host = cfg.winrm_host or cfg.server

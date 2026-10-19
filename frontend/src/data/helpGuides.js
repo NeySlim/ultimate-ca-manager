@@ -1653,13 +1653,13 @@ Permissions are organized by category:
 - **ACME**: Configure, manage accounts
 - **SCEP**: Configure, approve requests
 - **Trust Store**: Manage trusted certificates
-- **HSM**: Manage providers and keys
+- **HSM**: View, delete (adding or changing providers is reserved for administrators)
 - **SSH**: Manage SSH CAs and certificates
 - **Policies**: View certificate policies
 - **Approvals**: View and decide approval requests
 - **Key Recovery**: Request recoveries and view requests (approval is admin-only)
 
-A custom role can grant every permission UCM checks except those kept for administrators: full access and wildcards, every administration action (approving key recoveries, system and user administration), account management, SSO, deployments, system-wide events and deleting the audit trail. A stored permission the role cannot grant is shown as ignored and kept as it is.
+A custom role can grant every permission UCM checks except those kept for administrators: full access and wildcards, every administration action (approving key recoveries, system and user administration), account management, SSO, deployments, AD connector and HSM provider changes, system-wide events and deleting the audit trail. A stored permission the role cannot grant is shown as ignored and kept as it is.
 
 ### Category Toggles
 Click a category header to enable/disable all permissions in that category at once.

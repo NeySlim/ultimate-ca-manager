@@ -67,13 +67,13 @@ Los permisos están organizados por categoría:
 - **ACME**: Configurar, gestionar cuentas
 - **SCEP**: Configurar, aprobar solicitudes
 - **Almacén de confianza**: Gestionar certificados de confianza
-- **HSM**: Gestionar proveedores y claves
+- **HSM**: Ver, eliminar (añadir o modificar proveedores está reservado a los administradores)
 - **SSH**: Gestionar CA SSH y certificados SSH
 - **Políticas**: Ver políticas de certificados
 - **Aprobaciones**: Ver y decidir solicitudes de aprobación
 - **Recuperación de claves**: Solicitar recuperaciones y ver solicitudes (la aprobación es solo para administradores)
 
-Un rol personalizado puede conceder cualquier permiso que UCM comprueba, salvo los reservados a los administradores: acceso completo y comodines, toda acción de administración (aprobación de recuperaciones de claves, administración del sistema y de usuarios), gestión de cuentas, SSO, despliegues, eventos del sistema y borrado del registro de auditoría. Un permiso guardado que el rol no puede conceder se muestra como ignorado y se conserva tal cual.
+Un rol personalizado puede conceder cualquier permiso que UCM comprueba, salvo los reservados a los administradores: acceso completo y comodines, toda acción de administración (aprobación de recuperaciones de claves, administración del sistema y de usuarios), gestión de cuentas, SSO, despliegues, cambios del conector AD y de los proveedores HSM, eventos del sistema y borrado del registro de auditoría. Un permiso guardado que el rol no puede conceder se muestra como ignorado y se conserva tal cual.
 
 ### Alternar categorías
 Haga clic en el encabezado de una categoría para activar/desactivar todos los permisos de esa categoría de una vez.

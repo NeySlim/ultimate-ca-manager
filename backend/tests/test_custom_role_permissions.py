@@ -109,7 +109,8 @@ class TestAssignedRoleApplies:
 
 class TestNoPathToAdministrator:
     @pytest.mark.parametrize('perm', ['*', 'read:*', 'admin:system', 'admin:users',
-                                      'write:users', 'read:sso', 'write:deploy', 'sign:csrs'])
+                                      'write:users', 'read:sso', 'write:deploy', 'sign:csrs',
+                                      'write:ad_connector', 'write:hsm'])
     def test_scope_is_refused(self, auth_client, perm):
         r = auth_client.post(ROLES, data=json.dumps({'name': f'Refused {perm.replace(":", " ").replace("*", "x")}',
                                                      'permissions': [perm]}),

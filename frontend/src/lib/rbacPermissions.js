@@ -26,6 +26,7 @@ const CATEGORY_LABELS = [
   ['approvals', 'common.approvals'],
   ['key_recovery', 'common.keyRecovery'],
   ['audit', 'rbac.categories.auditLogs'],
+  ['users', 'rbac.categories.userManagement'],
   ['groups', 'rbac.categories.groups'],
   ['settings', 'rbac.categories.settings'],
 ]

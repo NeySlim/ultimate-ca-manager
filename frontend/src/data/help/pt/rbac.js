@@ -67,13 +67,13 @@ As permissões são organizadas por categoria:
 - **ACME**: Configurar, gerenciar contas
 - **SCEP**: Configurar, aprovar solicitações
 - **Armazenamento de Confiança**: Gerenciar certificados confiáveis
-- **HSM**: Gerenciar provedores e chaves
+- **HSM**: Ver, excluir (adicionar ou alterar provedores é reservado aos administradores)
 - **SSH**: Gerenciar CAs e certificados SSH
 - **Políticas**: Ver políticas de certificado
 - **Aprovações**: Ver e decidir solicitações de aprovação
 - **Recuperação de Chaves**: Solicitar recuperações e ver solicitações (a aprovação é somente admin)
 
-Uma função personalizada pode conceder qualquer permissão verificada pelo UCM, exceto as reservadas aos administradores: acesso total e curingas, toda ação de administração (aprovação de recuperações de chaves, administração do sistema e de usuários), gerenciamento de contas, SSO, implantações, eventos do sistema e exclusão do log de auditoria. Uma permissão armazenada que a função não pode conceder é exibida como ignorada e mantida como está.
+Uma função personalizada pode conceder qualquer permissão verificada pelo UCM, exceto as reservadas aos administradores: acesso total e curingas, toda ação de administração (aprovação de recuperações de chaves, administração do sistema e de usuários), gerenciamento de contas, SSO, implantações, alterações do conector AD e dos provedores HSM, eventos do sistema e exclusão do log de auditoria. Uma permissão armazenada que a função não pode conceder é exibida como ignorada e mantida como está.
 
 ### Alternância de Categorias
 Clique no cabeçalho de uma categoria para ativar/desativar todas as permissões daquela categoria de uma vez.
