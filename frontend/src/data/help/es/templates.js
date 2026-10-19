@@ -14,7 +14,7 @@ export default {
       {
         title: 'Características',
         items: [
-          { label: 'Tipo', text: 'Web Server, Email, VPN Server o Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon o Custom. Define los valores predeterminados de uso de clave y EKU' },
+          { label: 'Tipo', text: 'Web Server, Email, VPN Server o Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon o Custom. Define los valores predeterminados de uso de clave, EKU y SAN' },
           { label: 'Valores predeterminados del sujeto', text: 'Prellenar Organización, OU, País, Estado, Ciudad y Email. En los certificados de Correo electrónico y Servidor + Cliente (Combinado), el Email también se convierte en un SAN' },
           { label: 'Uso de clave', text: 'Firma digital, cifrado de clave, etc.' },
           { label: 'Uso extendido de clave', text: 'Autenticación de servidor, autenticación de cliente, firma de código, protección de correo' },
@@ -65,7 +65,7 @@ Las autoridades de certificación no se crean a partir de plantillas: créelas e
 
 1. Haga clic en **Crear plantilla**
 2. Ingrese un **nombre** y una descripción opcional
-3. Seleccione el **tipo** de plantilla: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon o Custom. Define los valores predeterminados de uso de clave y uso extendido de clave, que luego puede cambiar
+3. Seleccione el **tipo** de plantilla: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon o Custom. Define los valores predeterminados de uso de clave, uso extendido de clave y SAN, que luego puede cambiar
 4. Configure los **valores predeterminados del sujeto** (O, OU, C, ST, L, CN, Email). En los certificados de Correo electrónico y Servidor + Cliente (Combinado), el Email también se convierte en un SAN de email
 5. Seleccione las opciones de **uso de clave**
 6. Seleccione los valores de **uso extendido de clave**

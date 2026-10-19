@@ -96,49 +96,6 @@ def test_postgres_drops_the_dead_policy_rules():
         engine.dispose()
 
 
-EXT = json.dumps({'key_usage': ['digitalSignature'], 'extended_key_usage': ['serverAuth'],
-                  'basic_constraints': {'ca': False}, 'san_types': ['dns', 'ip']})
-EXT_CLEAN = {'key_usage': ['digitalSignature'], 'extended_key_usage': ['serverAuth']}
-
-
-def test_sqlite_drops_the_dead_template_extensions():
-    m = _migration()
-    conn = sqlite3.connect(':memory:')
-    conn.execute("CREATE TABLE certificate_templates (id INTEGER PRIMARY KEY, extensions_template TEXT)")
-    conn.execute("INSERT INTO certificate_templates VALUES (1, ?)", (EXT,))
-    conn.execute("INSERT INTO certificate_templates VALUES (2, ?)", (json.dumps(EXT),))
-    m.upgrade(conn)
-    m.upgrade(conn)
-    for rid in (1, 2):
-        stored = conn.execute("SELECT extensions_template FROM certificate_templates WHERE id = ?", (rid,)).fetchone()[0]
-        assert json.loads(stored) == EXT_CLEAN
-
-
-@pytest.mark.postgres
-@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
-def test_postgres_drops_the_dead_template_extensions():
-    m = _migration()
-    schema = f"migtest_102t_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
-    engine = create_engine(PG_URL)
-    conn = engine.connect()
-    try:
-        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
-        conn.execute(text(f"CREATE SCHEMA {schema}"))
-        conn.execute(text(f"SET search_path TO {schema}"))
-        conn.execute(text("CREATE TABLE certificate_templates (id INTEGER PRIMARY KEY, extensions_template TEXT)"))
-        conn.execute(text("INSERT INTO certificate_templates VALUES (1, :e)"), {'e': EXT})
-        m.upgrade(conn)
-        m.upgrade(conn)
-        stored = conn.execute(text("SELECT extensions_template FROM certificate_templates WHERE id = 1")).scalar()
-        assert json.loads(stored) == EXT_CLEAN
-    finally:
-        conn.rollback()
-        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
-        conn.commit()
-        conn.close()
-        engine.dispose()
-
-
 def test_sqlite_adds_the_discovery_notify_email_column():
     m = _migration()
     conn = sqlite3.connect(':memory:')

@@ -596,7 +596,7 @@ Certificate authorities are not made from templates: create them on the **CAs** 
 
 1. Click **Create Template**
 2. Enter a **name** and optional description
-3. Select the template **type**: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon or Custom. It sets the Key Usage and Extended Key Usage defaults, which you can then change
+3. Select the template **type**: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon or Custom. It sets the Key Usage, Extended Key Usage and SAN defaults, which you can then change
 4. Configure **Subject defaults** (O, OU, C, ST, L, CN, Email). On Email and combined certificates, the Email also becomes an email SAN
 5. Select **Key Usage** flags
 6. Select **Extended Key Usage** values

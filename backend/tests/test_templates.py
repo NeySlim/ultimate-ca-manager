@@ -182,6 +182,7 @@ class TestListTemplates:
         if isinstance(ext, str):
             ext = json.loads(ext)
         assert ext['extended_key_usage'] == ['clientAuth', 'msSmartcardLogin']
+        assert ext['san_types'] == ['upn']
 
     def test_create_smartcard_logon_template(self, auth_client):
         """smartcard_logon is an accepted template_type over the API."""
@@ -1022,10 +1023,7 @@ class TestExportImportFidelity:
 
     def _assert_not_double_encoded(self, tpl):
         assert tpl['dn_template'] == json.loads(self.EXPORT_SHAPED['dn_template'])
-        # An older export's SAN types and basic constraints are dropped on the way in
-        expected = json.loads(self.EXPORT_SHAPED['extensions_template'])
-        expected.pop('san_types'); expected.pop('basic_constraints')
-        assert tpl['extensions_template'] == expected
+        assert tpl['extensions_template'] == json.loads(self.EXPORT_SHAPED['extensions_template'])
 
     def test_create_accepts_export_shaped_payload(self, auth_client):
         payload = {**self.EXPORT_SHAPED, 'name': 'Fidelity Create Export Shape'}

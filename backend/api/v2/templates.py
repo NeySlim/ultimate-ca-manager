@@ -18,7 +18,7 @@ from services.audit_service import AuditService
 from services.deletion_blockers import (
     first_blocker, parse_bulk_ids, template_deletion_blockers,
 )
-from services.template_service import TemplateService, template_key_type_label, without_dead_extension_keys
+from services.template_service import TemplateService, template_key_type_label
 from utils.dn_validation import validate_dn_field
 from datetime import datetime
 import traceback
@@ -249,7 +249,9 @@ def create_template():
         },
         "extensions_template": {
             "key_usage": ["digitalSignature", "keyEncipherment"],
-            "extended_key_usage": ["serverAuth"]
+            "extended_key_usage": ["serverAuth"],
+            "basic_constraints": {"ca": false},
+            "san_types": ["dns", "ip"]
         }
     }
     """
@@ -277,22 +279,26 @@ def create_template():
         if data['template_type'] == 'web_server':
             extensions = {
                 "key_usage": ["digitalSignature", "keyEncipherment"],
-                "extended_key_usage": ["serverAuth"]
+                "extended_key_usage": ["serverAuth"],
+                "basic_constraints": {"ca": False}
             }
         elif data['template_type'] == 'email':
             extensions = {
                 "key_usage": ["digitalSignature", "keyEncipherment"],
-                "extended_key_usage": ["emailProtection"]
+                "extended_key_usage": ["emailProtection"],
+                "basic_constraints": {"ca": False}
             }
         elif data['template_type'] == 'code_signing':
             extensions = {
                 "key_usage": ["digitalSignature"],
-                "extended_key_usage": ["codeSigning"]
+                "extended_key_usage": ["codeSigning"],
+                "basic_constraints": {"ca": False}
             }
         elif data['template_type'] == 'ocsp_signing':
             extensions = {
                 "key_usage": ["digitalSignature"],
-                "extended_key_usage": ["OCSPSigning"]
+                "extended_key_usage": ["OCSPSigning"],
+                "basic_constraints": {"ca": False}
             }
     
     # Create template
@@ -305,7 +311,7 @@ def create_template():
                                 DEFAULT_TEMPLATE_VALIDITY_DAYS),
         digest=data.get('digest', 'sha256'),
         dn_template=json.dumps(data.get('dn_template', {})),
-        extensions_template=json.dumps(without_dead_extension_keys(extensions)),
+        extensions_template=json.dumps(extensions),
         is_system=False,  # User-created templates are never system
         is_active=True,
         ad_derived_subject=bool(data.get('ad_derived_subject', False)),
@@ -411,7 +417,7 @@ def update_template(template_id):
         template.dn_template = json.dumps(data['dn_template'])
     
     if 'extensions_template' in data:
-        template.extensions_template = json.dumps(without_dead_extension_keys(data['extensions_template']))
+        template.extensions_template = json.dumps(data['extensions_template'])
     
     if 'is_active' in data:
         template.is_active = bool(data['is_active'])
@@ -738,8 +744,7 @@ def import_template():
                 if 'dn_template' in tpl_data:
                     existing.dn_template = json.dumps(tpl_data['dn_template'])
                 if 'extensions_template' in tpl_data:
-                    existing.extensions_template = json.dumps(
-                        without_dead_extension_keys(tpl_data['extensions_template']))
+                    existing.extensions_template = json.dumps(tpl_data['extensions_template'])
                 existing.is_active = tpl_data.get('is_active', existing.is_active)
                 if 'ad_derived_subject' in tpl_data:
                     existing.ad_derived_subject = bool(tpl_data['ad_derived_subject'])
@@ -762,8 +767,7 @@ def import_template():
                         'validity_days', DEFAULT_TEMPLATE_VALIDITY_DAYS),
                     digest=tpl_data.get('digest', 'sha256'),
                     dn_template=json.dumps(tpl_data.get('dn_template') or {}),
-                    extensions_template=json.dumps(
-                        without_dead_extension_keys(tpl_data.get('extensions_template') or {})),
+                    extensions_template=json.dumps(tpl_data.get('extensions_template') or {}),
                     is_system=False,
                     is_active=tpl_data.get('is_active', True),
                     ad_derived_subject=bool(tpl_data.get('ad_derived_subject', False)),

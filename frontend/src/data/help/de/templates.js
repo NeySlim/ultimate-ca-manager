@@ -14,7 +14,7 @@ export default {
       {
         title: 'Funktionen',
         items: [
-          { label: 'Typ', text: 'Web Server, Email, VPN Server oder Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon oder Custom. Legt die Standardwerte für Key Usage und EKU fest' },
+          { label: 'Typ', text: 'Web Server, Email, VPN Server oder Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon oder Custom. Legt die Standardwerte für Key Usage, EKU und SAN fest' },
           { label: 'Betreffsstandards', text: 'Organisation, OU, Land, Bundesland, Stadt und E-Mail vorausfüllen. Bei „E-Mail"- und „Server + Client (Kombiniert)"-Zertifikaten wird die E-Mail zusätzlich zum SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, usw.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
@@ -65,7 +65,7 @@ Zertifizierungsstellen werden nicht aus Templates erstellt: legen Sie sie auf de
 
 1. Klicken Sie auf **Template erstellen**
 2. Geben Sie einen **Namen** und eine optionale Beschreibung ein
-3. Wählen Sie den Template-**Typ**: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon oder Custom. Er legt die Standardwerte für Key Usage und Extended Key Usage fest, die Sie anschließend ändern können
+3. Wählen Sie den Template-**Typ**: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon oder Custom. Er legt die Standardwerte für Key Usage, Extended Key Usage und SAN fest, die Sie anschließend ändern können
 4. Konfigurieren Sie **Betreffsstandards** (O, OU, C, ST, L, CN, E-Mail). Bei „E-Mail"- und „Server + Client (Kombiniert)"-Zertifikaten wird die E-Mail zusätzlich zu einem E-Mail-SAN
 5. Wählen Sie **Key Usage**-Flags
 6. Wählen Sie **Extended Key Usage**-Werte

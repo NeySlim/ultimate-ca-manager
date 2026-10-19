@@ -14,7 +14,7 @@ export default {
       {
         title: '功能',
         items: [
-          { label: '类型', text: 'Web Server、Email、VPN Server 或 Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon 或自定义。决定密钥用途和扩展密钥用途的默认值' },
+          { label: '类型', text: 'Web Server、Email、VPN Server 或 Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon 或自定义。决定密钥用途、扩展密钥用途和 SAN 的默认值' },
           { label: '主题默认值', text: '预填组织、OU、国家、省/州、城市和 Email。在电子邮件及服务器 + 客户端（组合）证书上，Email 也会成为 SAN' },
           { label: '密钥用途', text: '数字签名、密钥加密等' },
           { label: '扩展密钥用途', text: '服务器认证、客户端认证、代码签名、邮件保护' },
@@ -65,7 +65,7 @@ export default {
 
 1. 点击**创建模板**
 2. 输入**名称**和可选描述
-3. 选择模板**类型**：Web Server、Email、VPN Server、VPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon 或自定义。它决定密钥用途和扩展密钥用途的默认值，之后您可以再修改
+3. 选择模板**类型**：Web Server、Email、VPN Server、VPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon 或自定义。它决定密钥用途、扩展密钥用途和 SAN 的默认值，之后您可以再修改
 4. 配置**主题默认值**（O、OU、C、ST、L、CN、Email）。在电子邮件及服务器 + 客户端（组合）证书上，Email 也会成为 SAN
 5. 选择**密钥用途**（数字签名、密钥加密等）
 6. 选择**扩展密钥用途**（服务器认证、客户端认证等）

@@ -2,7 +2,7 @@
 
 Each key below lost its reader or its screen in the same release; leaving the
 row would only keep a stale value (some of them secrets) in backups. Policy
-rules and template extensions lose the JSON keys nothing ever read, and
+rules lose the JSON keys no evaluation ever read, and
 discovery profiles gain the notification address their form always sent.
 """
 import json
@@ -67,26 +67,13 @@ DEAD_RULE_KEYS = ('required_extensions', 'forbidden_extensions')
 DEAD_SAN_RULE_KEYS = ('require_approval_for_external',)
 
 
-DEAD_EXTENSION_KEYS = ('san_types', 'basic_constraints')
-
-
-def _load(text):
-    """A JSON object, tolerating the double encoding older imports wrote; None otherwise."""
-    value = text
-    for _ in range(2):
-        if not isinstance(value, str):
-            break
-        try:
-            value = json.loads(value or '{}')
-        except (TypeError, ValueError):
-            return None
-    return value if isinstance(value, dict) else None
-
-
 def _cleaned_rules(text):
     """The rules without the dead keys, or None when nothing changes."""
-    rules = _load(text)
-    if rules is None:
+    try:
+        rules = json.loads(text or '{}')
+    except (TypeError, ValueError):
+        return None
+    if not isinstance(rules, dict):
         return None
     cleaned = {k: v for k, v in rules.items() if k not in DEAD_RULE_KEYS}
     san = cleaned.get('san_restrictions')
@@ -95,17 +82,9 @@ def _cleaned_rules(text):
     return None if cleaned == rules else json.dumps(cleaned)
 
 
-def _cleaned_extensions(text):
-    ext = _load(text)
-    if ext is None or not any(k in ext for k in DEAD_EXTENSION_KEYS):
-        return None
-    return json.dumps({k: v for k, v in ext.items() if k not in DEAD_EXTENSION_KEYS})
-
-
 # (table, column, cleaner)
 JSON_COLUMNS = (
     ('certificate_policies', 'rules', _cleaned_rules),
-    ('certificate_templates', 'extensions_template', _cleaned_extensions),
 )
 
 

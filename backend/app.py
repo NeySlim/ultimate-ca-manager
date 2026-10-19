@@ -1363,7 +1363,9 @@ def init_database(app):
                     "dn_template": json.dumps({"CN": "{hostname}", "O": "Organization", "OU": "IT"}),
                     "extensions_template": json.dumps({
                         "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["serverAuth"]
+                        "extended_key_usage": ["serverAuth"],
+                        "basic_constraints": {"ca": False},
+                        "san_types": ["dns", "ip"]
                     }),
                     "is_system": True
                 },
@@ -1377,7 +1379,9 @@ def init_database(app):
                     "dn_template": json.dumps({"CN": "{username}", "emailAddress": "{email}"}),
                     "extensions_template": json.dumps({
                         "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["clientAuth"]
+                        "extended_key_usage": ["clientAuth"],
+                        "basic_constraints": {"ca": False},
+                        "san_types": ["email"]
                     }),
                     "is_system": True
                 },
@@ -1391,7 +1395,9 @@ def init_database(app):
                     "dn_template": json.dumps({"CN": "{hostname}", "O": "Organization"}),
                     "extensions_template": json.dumps({
                         "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["serverAuth"]
+                        "extended_key_usage": ["serverAuth"],
+                        "basic_constraints": {"ca": False},
+                        "san_types": ["dns", "ip"]
                     }),
                     "is_system": True
                 },
@@ -1405,7 +1411,9 @@ def init_database(app):
                     "dn_template": json.dumps({"CN": "{username}", "emailAddress": "{email}"}),
                     "extensions_template": json.dumps({
                         "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["emailProtection"]
+                        "extended_key_usage": ["emailProtection"],
+                        "basic_constraints": {"ca": False},
+                        "san_types": ["email"]
                     }),
                     "is_system": True
                 },
@@ -1420,7 +1428,9 @@ def init_database(app):
                     "dn_template": json.dumps({"CN": "{username}", "O": "Organization"}),
                     "extensions_template": json.dumps({
                         "key_usage": ["digitalSignature"],
-                        "extended_key_usage": ["codeSigning"]
+                        "extended_key_usage": ["codeSigning"],
+                        "basic_constraints": {"ca": False},
+                        "san_types": []
                     }),
                     "is_system": True
                 },
@@ -1434,7 +1444,9 @@ def init_database(app):
                     "dn_template": json.dumps({"CN": "{username}", "OU": "Users"}),
                     "extensions_template": json.dumps({
                         "key_usage": ["digitalSignature", "keyEncipherment"],
-                        "extended_key_usage": ["clientAuth", "msSmartcardLogin"]
+                        "extended_key_usage": ["clientAuth", "msSmartcardLogin"],
+                        "basic_constraints": {"ca": False},
+                        "san_types": ["upn"]
                     }),
                     "is_system": True
                 }
