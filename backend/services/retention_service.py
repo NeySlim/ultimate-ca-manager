@@ -5,7 +5,9 @@ Configurable retention policy with scheduled cleanup
 import logging
 from datetime import datetime, timedelta
 from typing import Dict, Any, Optional
+from flask import g, has_request_context
 from models import db, AuditLog
+from services.audit.staging import stage_audit_entry
 from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
@@ -143,6 +145,44 @@ def _purge_boundary(cutoff) -> int:
     return (db.session.query(db.func.max(AuditLog.id)).scalar() or 0) + 1
 
 
+def purge_older_than(cutoff, retention_days) -> int:
+    """Delete the entries older than `cutoff` that open the chain; raises on failure."""
+    progress = {'deleted': 0}
+    _purge(cutoff, retention_days, progress)
+    return progress['deleted']
+
+
+def _purge(cutoff, retention_days, progress):
+    boundary = _purge_boundary(cutoff)
+    pending = db.session.query(db.func.count(AuditLog.id)).filter(
+        AuditLog.id < boundary).scalar() or 0
+    if not pending:
+        return
+    # The purge's only audit entry, sealed and committed with the first batch:
+    # it names the first id kept, which tells this purge from a prefix deleted by hand.
+    user = getattr(g, 'current_user', None) if has_request_context() else None
+    record = stage_audit_entry(
+        action='audit_cleanup', resource_type='audit_log',
+        username=getattr(user, 'username', None) or 'system',
+        purge_from=boundary,
+        details=f'Deleted {pending} audit logs older than {retention_days} days')
+    if record is None:
+        raise RuntimeError('The purge record could not be written')
+
+    while True:
+        ids = [row_id for (row_id,) in db.session.query(AuditLog.id).filter(
+            AuditLog.id < boundary
+        ).order_by(AuditLog.id).limit(CLEANUP_BATCH_SIZE).all()]
+        if not ids:
+            break
+        progress['deleted'] += db.session.query(AuditLog).filter(
+            AuditLog.id.in_(ids)
+        ).delete(synchronize_session=False)
+        db.session.commit()
+        if len(ids) < CLEANUP_BATCH_SIZE:
+            break
+
+
 def cleanup_audit_logs(retention_days: Optional[int] = None) -> Dict[str, Any]:
     """
     Delete audit logs older than the retention, oldest first, in batches.
@@ -165,24 +205,11 @@ def cleanup_audit_logs(retention_days: Optional[int] = None) -> Dict[str, Any]:
         retention_days = RetentionPolicy.validate_days(retention_days, allow_zero=False)
 
     cutoff = utc_now() - timedelta(days=retention_days)
-    total_deleted = 0
+    progress = {'deleted': 0}
 
     try:
-        boundary = _purge_boundary(cutoff)
-        batch_size = CLEANUP_BATCH_SIZE
-
-        while True:
-            ids = [row_id for (row_id,) in db.session.query(AuditLog.id).filter(
-                AuditLog.id < boundary
-            ).order_by(AuditLog.id).limit(batch_size).all()]
-            if not ids:
-                break
-            total_deleted += db.session.query(AuditLog).filter(
-                AuditLog.id.in_(ids)
-            ).delete(synchronize_session=False)
-            db.session.commit()
-            if len(ids) < batch_size:
-                break
+        _purge(cutoff, retention_days, progress)
+        total_deleted = progress['deleted']
 
         RetentionPolicy._stats['last_cleanup'] = utc_now().isoformat()
         if total_deleted == 0:
@@ -202,28 +229,18 @@ def cleanup_audit_logs(retention_days: Optional[int] = None) -> Dict[str, Any]:
         logger.error(f"Failed to clean up audit logs: {e}")
         return {
             # Batches committed before the failure are gone for good.
-            'deleted': total_deleted,
+            'deleted': progress['deleted'],
             'error': str(e),
             'message': 'Failed to clean up audit logs'
         }
     finally:
-        RetentionPolicy._stats['total_deleted'] += total_deleted
+        RetentionPolicy._stats['total_deleted'] += progress['deleted']
 
 
 def scheduled_audit_cleanup():
     """Scheduled task for automatic audit log cleanup (no-op without a retention)"""
     result = cleanup_audit_logs()
     logger.info(f"Scheduled audit cleanup: {result}")
-    if result.get('deleted'):
-        from services.audit_service import AuditService
-        AuditService.log_action(
-            action='audit_cleanup',
-            resource_type='audit_log',
-            details=f"Deleted {result['deleted']} audit logs older than "
-                    f"{result.get('retention_days')} days",
-            success='error' not in result,
-            username='system',
-        )
     if 'error' in result:
         # Reported to the scheduler, which otherwise records the run as ok.
         return {'status': 'failed', 'reason': result['error']}

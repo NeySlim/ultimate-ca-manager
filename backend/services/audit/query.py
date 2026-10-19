@@ -140,13 +140,14 @@ class AuditQueryMixin:
 
     @staticmethod
     def cleanup_old_logs(retention_days: int = 90) -> int:
+        # The retention purge: a prefix of the chain and a sealed record of it.
+        from services.retention_service import purge_older_than
         cutoff = utc_now() - timedelta(days=retention_days)
-        deleted = AuditLog.query.filter(AuditLog.timestamp < cutoff).delete()
         try:
-            db.session.commit()
-        except Exception as _commit_err:
+            deleted = purge_older_than(cutoff, retention_days)
+        except Exception as e:
             db.session.rollback()
-            logger.error(f"Commit failed in services/audit/query.py:139: {_commit_err}", exc_info=True)
+            logger.error(f"Audit log cleanup failed: {e}", exc_info=True)
             raise
         logger.info(f"Cleaned up {deleted} audit logs older than {retention_days} days")
         return deleted

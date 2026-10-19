@@ -2311,7 +2311,13 @@
     "verifyIntegrity": "整合性を検証",
     "integrityVerified": "監査ログの整合性を検証しました（{{count}} 件のエントリを確認）",
     "integrityFailed": "監査ログの整合性チェックに失敗しました（{{errors}} 件のエラーが見つかりました）",
-    "integrityError": "監査ログの整合性の検証に失敗しました"
+    "integrityError": "監査ログの整合性の検証に失敗しました",
+    "integrityBroken": "監査ログのチェーンがエントリ #{{id}} で破損しています（{{errors}} 件のエラーが見つかりました）",
+    "integrityUnprotected": "{{count}} 件のエントリで違反は見つかりませんでしたが、監査ログは保護されていません: {{unprotected}} 件のエントリがマスターキーで封印されていません",
+    "integrityIntactPartial": "監査ログはエントリ #{{id}} 以降は正常です（マスターキーで封印された {{count}} 件のエントリ）。それ以前の {{older}} 件のエントリは証明できません",
+    "integrityUnsealedAfterKey": "監査ログのチェーンがエントリ #{{id}} で破損しています。このエントリはマスターキーで封印されておらず、マスターキーなしで書き込まれたか書き換えられています（{{errors}} 件のエラーが見つかりました）",
+    "integrityIntactRotated": "監査ログはエントリ #{{id}} 以降は正常です。マスターキーはエントリ #{{rotation}} で変更されており、以前のキーで封印された {{older}} 件のエントリはもう証明できません",
+    "integrityRotationUnattested": "違反は見つかりませんでしたが、マスターキーがエントリ #{{rotation}} で変更されており、このサーバーにはその記録がありません。別のキーで封印されたそれ以前の {{older}} 件のエントリは証明できません"
   },
   "settings": {
     "appearanceSubtitle": "UCMの外観と言語をカスタマイズ",

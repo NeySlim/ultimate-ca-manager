@@ -2311,7 +2311,13 @@
     "verifyIntegrity": "Verify Integrity",
     "integrityVerified": "Audit log integrity verified ({{count}} entries checked)",
     "integrityFailed": "Audit log integrity check failed ({{errors}} errors found)",
-    "integrityError": "Failed to verify audit log integrity"
+    "integrityError": "Failed to verify audit log integrity",
+    "integrityBroken": "Audit log chain broken at entry #{{id}} ({{errors}} errors found)",
+    "integrityUnprotected": "No violation found in {{count}} entries, but the audit log is not protected: {{unprotected}} entries are not sealed by the master key",
+    "integrityIntactPartial": "Audit log intact from entry #{{id}} ({{count}} entries sealed by the master key); {{older}} earlier entries can no longer be attested",
+    "integrityUnsealedAfterKey": "Audit log chain broken at entry #{{id}}: it is not sealed by the master key, so it was written or rewritten without it ({{errors}} errors found)",
+    "integrityIntactRotated": "Audit log intact from entry #{{id}}; the master key was changed at entry #{{rotation}}, and the {{older}} earlier entries sealed under a previous key can no longer be attested",
+    "integrityRotationUnattested": "No violation found, but the master key changed at entry #{{rotation}} without this server having a record of it: the {{older}} earlier entries under another key cannot be attested"
   },
   "settings": {
     "appearance": {},

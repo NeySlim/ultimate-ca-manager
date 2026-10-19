@@ -45,6 +45,7 @@ import {
   CompactStats
 } from '../components';
 import { useNotification } from '../contexts';
+import { integrityMessage } from '../lib/auditIntegrity';
 import { usePermission, usePersistedState } from '../hooks';
 import auditService from '../services/audit.service';
 import { formatRelativeTime, formatDate, downloadBlob } from '../lib/utils';
@@ -94,7 +95,7 @@ const getActionCategory = (action) => {
 
 export default function AuditLogsPage() {
   const { t } = useTranslation();
-  const { showError, showSuccess } = useNotification();
+  const { showError, showSuccess, showWarning } = useNotification();
   const { canDelete } = usePermission();
   
   // State
@@ -216,11 +217,9 @@ export default function AuditLogsPage() {
     try {
       const response = await auditService.verifyIntegrity();
       const data = response.data || response;
-      if (data.valid) {
-        showSuccess(t('audit.integrityVerified', { count: data.checked }));
-      } else {
-        showError(t('audit.integrityFailed', { errors: data.errors?.length || 0 }));
-      }
+      const { level, key, params } = integrityMessage(data);
+      const show = { error: showError, warning: showWarning, success: showSuccess }[level];
+      show(t(key, params));
     } catch (error) {
       showError(t('audit.integrityError'));
     } finally {

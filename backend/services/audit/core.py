@@ -5,6 +5,7 @@ from flask import request, g, has_request_context
 from models import db, AuditLog
 from utils.datetime_utils import utc_now
 from utils.trusted_proxy import client_ip
+from .chain import append_entry, verify_chain
 
 logger = logging.getLogger(__name__)
 
@@ -61,14 +62,7 @@ class AuditCoreLoggingMixin:
                 success=success
             )
 
-            db.session.add(audit_log)
-            db.session.flush()
-
-            prev_log = AuditLog.query.filter(AuditLog.id < audit_log.id).order_by(AuditLog.id.desc()).first()
-            prev_hash = prev_log.entry_hash if prev_log and prev_log.entry_hash else '0' * 64
-            audit_log.prev_hash = prev_hash
-            audit_log.entry_hash = audit_log.compute_hash(prev_hash)
-
+            append_entry(audit_log)
             db.session.commit()
 
             log_msg = f"AUDIT: {action} by {username} - {details}"
@@ -100,58 +94,7 @@ class AuditCoreLoggingMixin:
         if end_id:
             query = query.filter(AuditLog.id <= end_id)
 
-        logs = query.all()
-        if not logs:
-            return {'valid': True, 'checked': 0, 'errors': []}
-
-        errors = []
-        # Rows carrying no hash at all. Eight places used to build an entry by
-        # hand and add it to the session without sealing it, and the loop
-        # below skipped each one and restarted its chain there: the ledger
-        # verified clean straight across the gap, and a row inserted between
-        # two unsealed ones could not be told from a genuine record. They are
-        # reported now instead of being stepped over.
-        unsealed = []
-        # The first log in the verified range may NOT chain back to the
-        # genesis (prev_hash = '0' * 64) when audit cleanup has purged
-        # earlier records. Treat its stored prev_hash as the chain anchor
-        # for this verification window — we can only attest integrity
-        # of records that still exist.
-        prev_hash = logs[0].prev_hash or '0' * 64
-
-        for log in logs:
-            if not log.entry_hash:
-                unsealed.append(log.id)
-                prev_hash = '0' * 64
-                continue
-
-            if log.prev_hash and log.prev_hash != prev_hash:
-                errors.append({
-                    'id': log.id,
-                    'error': 'prev_hash mismatch',
-                    'expected': prev_hash,
-                    'actual': log.prev_hash
-                })
-
-            computed = log.compute_hash(log.prev_hash)
-            if computed != log.entry_hash:
-                errors.append({
-                    'id': log.id,
-                    'error': 'entry_hash mismatch (tampered)',
-                    'expected': computed,
-                    'actual': log.entry_hash
-                })
-
-            prev_hash = log.entry_hash
-
-        return {
-            # `valid` still means "every sealed entry verifies", so an
-            # installation carrying rows from before they were sealed does
-            # not suddenly read as tampered with. `unsealed` is what the
-            # chain cannot attest, and `attested` is what it can.
-            'valid': len(errors) == 0,
-            'checked': len(logs),
-            'attested': len(logs) - len(unsealed),
-            'unsealed': unsealed,
-            'errors': errors
-        }
+        # Streamed: memory stays flat on a large ledger. Only a check from the
+        # first row can tell a purge from a prefix deleted by hand.
+        return verify_chain(query.yield_per(2000),
+                            whole_table=start_id is None and end_id is None)

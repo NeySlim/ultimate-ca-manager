@@ -1757,12 +1757,46 @@ GET /api/v2/audit/verify?start_id=1&end_id=1000
 ```json
 {
   "data": {
+    "status": "intact",
     "valid": true,
+    "first_error_id": null,
+    "first_error_code": null,
     "checked": 1000,
-    "errors": []
+    "attested": 998,
+    "unsealed": [12, 13],
+    "error_count": 0,
+    "errors": [],
+    "protection": {
+      "key_available": true,
+      "protected": 600,
+      "protected_from_id": 401,
+      "not_attested": 400,
+      "retired_key": 390,
+      "key_rotation_id": 405,
+      "rotation_attested": true
+    }
   }
 }
 ```
+
+`status` is one of:
+
+- `intact`: every entry from `protected_from_id` on is sealed by the master key, or bound by
+  the first entry it sealed. `key_rotation_id` names the first entry under the current key
+  when the key was changed; the `not_attested` entries before `protected_from_id` (sealed
+  under a previous key, or never sealed) can no longer be attested.
+- `broken`: `first_error_id` names the first entry that fails, `first_error_code` says how:
+  `tampered`, `link` (does not follow the entry before it), `not_sealed_by_key` (written
+  without the key after it took over), `unattested_key` (claims a key no rotation of the
+  current one recorded), `truncated` (entries removed from the start outside a purge),
+  `before_start` (an entry added before where the log started) or `unknown_version`. `errors` lists up to 1000 of the `error_count` violations.
+- `unprotected`: no master key, or no entry sealed under it yet (entries are sealed with
+  SHA-256 then, which anyone able to write the database can recompute), or entries under
+  another key that this server has no record of rotating from (`rotation_attested: false`,
+  for instance after a restore on another host).
+
+`unsealed` lists entries written with no seal at all by older versions. The checks of where
+the log starts apply only without `start_id` and `end_id`.
 
 ---
 

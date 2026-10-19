@@ -172,6 +172,36 @@ POST /api/v2/system/audit/cleanup
 
 Default: 90 days, auto-cleanup daily at midnight.
 
+#### Integrity
+Each entry is chained to the previous one. With a master key (`/etc/ucm/master.key` or
+`KEY_ENCRYPTION_KEY`), entries are sealed with HMAC-SHA256 under a key derived from it
+(HKDF-SHA256). Without that key, an entry sealed under it cannot be edited, inserted,
+relabelled or removed from the middle or the start of the log without the check reporting
+it. Without a master key, entries are sealed with SHA-256, which anyone able to write the
+database can recompute, and the check reports the log as not protected. A retention purge
+removes the oldest entries only and records, sealed, where the log now starts.
+
+`GET /api/v2/audit/verify` (Audit Logs > Verify Integrity) reports `intact`, `broken` at
+entry N, or `unprotected`. Once the key has sealed an entry, an entry written after it
+without the key is a break.
+
+Changing the master key re-anchors the chain. UCM keeps the ids of the keys it has sealed
+with in `audit-chain.keys`, beside `master.key` (in the same directory when the key comes
+from `KEY_ENCRYPTION_KEY`), outside the database. The first entry under a new key records
+the entries of the previous keys listed there: they are reported as no longer attested,
+not as verified, until retention removes them. Entries under a key that file does not list
+are a break. Every entry sealed under the key brings the file up to date, so a missing or
+older file is rewritten on the next entry. Without the file when the first entry under the
+key is written (a new host, for instance), that entry is the starting point, and entries
+under other keys leave the log reported as not protected. A database restored on a host
+that has already sealed under another key, or a backup taken before a rotation, is reported
+as a break: the file there does not list the keys of those entries. To start again, change
+the master key, after removing `audit-chain.keys` in the first case. Back the file up with
+`master.key`. Going back to an earlier master key is reported as a break: use a new key.
+
+Removing the most recent entries cannot be detected from the database alone: keep a copy
+outside it, for example with syslog forwarding.
+
 ---
 
 ### 6. Certificate Expiry Alerts

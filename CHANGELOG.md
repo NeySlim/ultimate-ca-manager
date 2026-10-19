@@ -16,6 +16,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Testing the AD connector, a Microsoft CA admin channel or an Intune app registration with the secret left blank reused the saved secret with the server, port, TLS settings, tenant or client typed in the request, so it could be sent to a server of the caller's choosing. The saved secret now goes only to the saved target; any other target needs it typed in.
 - Saving the SMTP, webhook, DNS provider, SSO, Microsoft CA, AD connector, HSM provider or Intune settings with a new server, URL, port, TLS setting, tenant or account kept the saved secret, which then went to the new target. Such a save is now refused until the secret is typed again (the forms ask for it), and a Microsoft CA connection password is no longer reused for a WinRM host other than the CA's own.
 - Moving the SMTP server, port, security or account now drops the saved secret the chosen authentication method does not use and the OAuth refresh token, so OAuth needs a new consent.
+- Audit log: the hash chain was plain SHA-256, so anyone able to write the database could edit an entry and recompute the chain behind it. With a master key, entries are now sealed with HMAC-SHA256 under a key derived from it (existing entries still verify), the integrity check reports intact, broken at entry N or not protected, and a purge leaves a sealed record so the chain still verifies after it.
+
+### Fixed
+
+- `POST /api/v2/audit/cleanup` deleted every entry older than the retention, even one behind a newer entry, which broke the chain; it now purges the oldest entries as the scheduled retention does.
 
 ## [2.242] - 2026-10-18
 

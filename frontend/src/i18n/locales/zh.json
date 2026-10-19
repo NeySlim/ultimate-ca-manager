@@ -2311,7 +2311,13 @@
     "verifyIntegrity": "校验完整性",
     "integrityVerified": "审计日志完整性校验通过 (已检查 {{count}} 条记录)",
     "integrityFailed": "审计日志完整性校验失败 (发现 {{errors}} 处错误)",
-    "integrityError": "审计日志完整性校验失败"
+    "integrityError": "审计日志完整性校验失败",
+    "integrityBroken": "审计日志链在记录 #{{id}} 处中断 (发现 {{errors}} 处错误)",
+    "integrityUnprotected": "在 {{count}} 条记录中未发现违规，但审计日志未受保护: {{unprotected}} 条记录未由主密钥封印",
+    "integrityIntactPartial": "审计日志自记录 #{{id}} 起完整 ({{count}} 条记录由主密钥封印); 之前的 {{older}} 条记录已无法证明",
+    "integrityUnsealedAfterKey": "审计日志链在记录 #{{id}} 处中断: 该记录未由主密钥封印，因此是在没有主密钥的情况下写入或改写的 (发现 {{errors}} 处错误)",
+    "integrityIntactRotated": "审计日志自记录 #{{id}} 起完整; 主密钥已在记录 #{{rotation}} 处更换，之前由旧密钥封印的 {{older}} 条记录已无法证明",
+    "integrityRotationUnattested": "未发现违规，但主密钥在记录 #{{rotation}} 处发生了更换，而本服务器没有相关记录: 之前由另一密钥封印的 {{older}} 条记录无法证明"
   },
   "settings": {
     "appearanceSubtitle": "自定义UCM的外观和语言",

@@ -116,6 +116,7 @@ class SmartImporter:
         self.chain_builder = ChainBuilder()
         self.matcher = KeyMatcher()
         self.validator = ImportValidator()
+        self._pending_audit = []
     
     def analyze(self, content: str | bytes, password: Optional[str] = None) -> AnalysisResult:
         """
@@ -201,7 +202,8 @@ class SmartImporter:
         desc_prefix = options.get("description_prefix", "Imported: ")
         
         result = ImportResult()
-        
+        self._pending_audit = []
+
         try:
             # Parse
             objects = self.parser.parse(content, password)
@@ -223,7 +225,8 @@ class SmartImporter:
             # Import CSRs
             if import_csrs:
                 self._import_csrs(objects, matching, result, desc_prefix, username)
-            
+
+            self._stage_audit()
             db.session.commit()
 
             # Fire certificate.imported for each successfully imported certificate
@@ -535,17 +538,13 @@ class SmartImporter:
     
     def _log_audit(self, action: str, resource_id: int, resource_name: str,
                    username: str, details: str = None):
-        """Stage an audit entry, sealed, to ride the bundle's own commit.
+        """Note an audit entry; `_stage_audit` stages them just before the commit.
 
-        Staged rather than written through `AuditService.log_action` because
-        that one commits the session it is given, and this import is one
-        transaction on purpose: an entry per object would commit the bundle
-        piece by piece, and a failure half way would leave part of it
-        standing.
+        Staged rather than written through `AuditService.log_action`, which
+        commits: the import is one transaction on purpose. Staged last because
+        appending to the chain holds its lock until the commit.
         """
-        from services.audit.staging import stage_audit_entry
-
-        stage_audit_entry(
+        self._pending_audit.append(dict(
             action=action,
             resource_type=("certificate"
                            if "csr" in action or "certificate" in action
@@ -555,4 +554,11 @@ class SmartImporter:
             details=details,
             username=username,
             success=True,
-        )
+        ))
+
+    def _stage_audit(self):
+        from services.audit.staging import stage_audit_entry
+
+        pending, self._pending_audit = self._pending_audit, []
+        for fields in pending:
+            stage_audit_entry(**fields)
