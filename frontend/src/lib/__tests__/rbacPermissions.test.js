@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest'
-import { editablePermissions, groupPermissions, normalizePermission } from '../rbacPermissions'
+import {
+  appliedPermissions, groupPermissions, ignoredPermissions, normalizePermission, normalizePermissions,
+} from '../rbacPermissions'
 
 // Shape of GET /api/v2/rbac/permissions
 const GRANTABLE = ['read:cas', 'write:cas', 'read:certificates', 'write:certificates',
@@ -23,8 +25,10 @@ describe('custom role matrix follows the server list', () => {
     expect(normalizePermission('read:cas')).toBe('read:cas')
   })
 
-  it('saves only what the server grants, legacy names normalised', () => {
+  it('never drops a stored permission, and tells applied from ignored', () => {
     const stored = ['read:certs', 'read:certificates', '*', 'admin:users', 'read:dashboard', 'read:cas']
-    expect(editablePermissions(stored, GRANTABLE)).toEqual(['read:certificates', 'read:cas'])
+    expect(normalizePermissions(stored)).toEqual(['read:certificates', '*', 'admin:users', 'read:dashboard', 'read:cas'])
+    expect(appliedPermissions(stored, GRANTABLE)).toEqual(['read:certificates', 'read:cas'])
+    expect(ignoredPermissions(stored, GRANTABLE)).toEqual(['*', 'admin:users', 'read:dashboard'])
   })
 })

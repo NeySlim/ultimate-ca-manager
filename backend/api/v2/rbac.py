@@ -44,7 +44,7 @@ MAX_ROLE_DESC_LEN = 500
 MAX_ROLE_PERMS = 200
 
 
-def _validate_role_payload(data, *, partial=False, role_id=None):
+def _validate_role_payload(data, *, partial=False, role_id=None, stored=()):
     """Returns (cleaned_dict, error_response_or_None).
 
     Validates name (length, charset, reserved), description length,
@@ -82,6 +82,8 @@ def _validate_role_payload(data, *, partial=False, role_id=None):
         if len(perms) > MAX_ROLE_PERMS:
             return None, error_response(f"Too many permissions (max {MAX_ROLE_PERMS})", 400)
         valid_keys = set(AVAILABLE_PERMISSIONS)
+        # A permission the role already holds stays, ignored, rather than block the save
+        kept = set(stored or ())
         normalized = []
         for p in perms:
             if not isinstance(p, str) or not p.strip():
@@ -89,8 +91,9 @@ def _validate_role_payload(data, *, partial=False, role_id=None):
             if len(p) > 100:
                 return None, error_response("permission too long", 400)
             # Wildcards and admin-only scopes are refused: assigned roles now apply
-            p = normalize_permission(p)
-            if p not in valid_keys:
+            if normalize_permission(p) in valid_keys:
+                p = normalize_permission(p)
+            elif p not in kept:
                 return None, error_response(f"Permission not grantable by a custom role: {p}", 400)
             if p not in normalized:
                 normalized.append(p)
@@ -165,7 +168,8 @@ def update_custom_role(role_id):
     if getattr(role, 'is_system', False):
         return error_response("System roles cannot be modified", 403)
 
-    cleaned, err = _validate_role_payload(data, partial=True, role_id=role_id)
+    cleaned, err = _validate_role_payload(data, partial=True, role_id=role_id,
+                                          stored=role.permissions or [])
     if err:
         return err
 

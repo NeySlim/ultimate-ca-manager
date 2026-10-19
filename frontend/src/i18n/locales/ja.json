@@ -3264,7 +3264,9 @@
       "read:ssh": "SSH CAと証明書を表示",
       "write:ssh": "SSH証明書を作成・署名",
       "delete:ssh": "SSH CAと証明書を削除"
-    }
+    },
+    "ignoredPermissions": "無視される権限",
+    "ignoredPermissionsHint": "このロールに保存されていますが適用されません（管理者専用または不明な権限）。そのまま保持されます。"
   },
   "hsm": {
     "statusUnavailable": "HSM機能は利用できません",

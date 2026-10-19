@@ -12,7 +12,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Security
 
 - An Operator, or any account or API key holding `write:cas`, could export the private key of any CA (PKCS#12, PFX, JKS, key file, PEM with key) or take it as a file by taking the CA offline. Both now also require `read:private_keys`, as a certificate key export does: an account or API key that exports CA keys now needs that scope, held by administrators or granted by a custom role.
-- A custom role assigned to a user granted none of its permissions, while the effective-permissions view listed them. Assigned custom roles now add their permissions to the built-in role, inherited ones included, and can no longer hold full access or user, system, SSO or deployment rights: review existing roles and their assignments before upgrading.
+- A custom role assigned to a user granted none of its permissions, while the effective-permissions view listed them. Assigned custom roles now add their permissions to the built-in role, inherited ones included, except those kept for administrators (full access, wildcards, `admin:*`, account management, SSO, deployments, system events, audit deletion), which stay stored but ignored: review existing roles and their assignments before upgrading.
 
 ## [2.242] - 2026-10-18
 

@@ -60,8 +60,19 @@ export function normalizePermission(perm) {
   return resource === 'certs' ? `${action}:certificates` : perm
 }
 
-/** The stored permissions a save can carry: those the server still grants. */
-export function editablePermissions(stored = [], grantable = []) {
+/** Stored permissions, legacy names normalised; none is ever dropped. */
+export function normalizePermissions(stored = []) {
+  return [...new Set((stored || []).map(normalizePermission))]
+}
+
+/** Stored permissions the server keeps but does not apply (reserved or unknown). */
+export function ignoredPermissions(stored = [], grantable = []) {
   const allowed = new Set(grantable)
-  return [...new Set(stored.map(normalizePermission))].filter(p => allowed.has(p))
+  return normalizePermissions(stored).filter(p => !allowed.has(p))
+}
+
+/** Stored permissions the role actually grants. */
+export function appliedPermissions(stored = [], grantable = []) {
+  const allowed = new Set(grantable)
+  return normalizePermissions(stored).filter(p => allowed.has(p))
 }

@@ -60,9 +60,10 @@ I permessi sono organizzati per categoria:
 - **Chiavi private**: Esportazione diretta della chiave privata di un certificato o di una CA (\`read:private_keys\`). Nessun ruolo predefinito la possiede tranne Admin; un ruolo personalizzato può concederla. I ruoli che ne sono privi passano dal Recupero delle chiavi
 - **CSR**: Creazione, lettura, firma, eliminazione
 - **Template**: Creazione, lettura, aggiornamento, eliminazione
+- **Utenti**: Lettura (la gestione degli account è riservata agli amministratori)
 - **Gruppi**: Creazione, lettura, aggiornamento, eliminazione
 - **Impostazioni**: Lettura, aggiornamento
-- **Audit**: Lettura, esportazione, pulizia
+- **Audit**: Lettura, esportazione (la pulizia è riservata agli amministratori)
 - **ACME**: Configurazione, gestione account
 - **SCEP**: Configurazione, approvazione richieste
 - **Trust Store**: Gestione certificati di fiducia
@@ -72,7 +73,7 @@ I permessi sono organizzati per categoria:
 - **Approvazioni**: Visualizzazione e decisione delle richieste di approvazione
 - **Recupero delle chiavi**: Richiesta di recuperi e consultazione delle richieste (l'approvazione è riservata agli admin)
 
-Un ruolo personalizzato concede al massimo ciò che può avere il ruolo predefinito Operator, più le chiavi private: mai accesso completo, gestione utenti, amministrazione di sistema, SSO o distribuzioni. I caratteri jolly sono rifiutati.
+Un ruolo personalizzato può concedere qualsiasi permesso verificato da UCM, tranne quelli riservati agli amministratori: accesso completo e caratteri jolly, ogni azione di amministrazione (approvazione dei recuperi di chiavi, amministrazione di sistema e utenti), gestione degli account, SSO, distribuzioni, eventi di sistema ed eliminazione del registro di audit. Un permesso salvato che il ruolo non può concedere viene mostrato come ignorato e conservato così com'è.
 
 ### Attivazione per categoria
 Clicca sull'intestazione di una categoria per abilitare/disabilitare tutti i permessi in quella categoria contemporaneamente.

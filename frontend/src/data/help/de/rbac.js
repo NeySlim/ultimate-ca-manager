@@ -60,9 +60,10 @@ Berechtigungen sind nach Kategorie organisiert:
 - **Private Schlüssel**: Direkter Export des privaten Schlüssels eines Zertifikats oder einer CA (\`read:private_keys\`). Keine eingebaute Rolle außer Admin besitzt sie; eine benutzerdefinierte Rolle kann sie gewähren. Rollen ohne diese Berechtigung gehen über die Schlüsselwiederherstellung
 - **CSRs**: Erstellen, Lesen, Signieren, Löschen
 - **Templates**: Erstellen, Lesen, Aktualisieren, Löschen
+- **Benutzer**: Lesen (die Kontenverwaltung ist Administratoren vorbehalten)
 - **Gruppen**: Erstellen, Lesen, Aktualisieren, Löschen
 - **Einstellungen**: Lesen, Aktualisieren
-- **Audit**: Lesen, Exportieren, Bereinigen
+- **Audit**: Lesen, Exportieren (das Bereinigen ist Administratoren vorbehalten)
 - **ACME**: Konfigurieren, Konten verwalten
 - **SCEP**: Konfigurieren, Anfragen genehmigen
 - **Vertrauensspeicher**: Vertrauenswürdige Zertifikate verwalten
@@ -72,7 +73,7 @@ Berechtigungen sind nach Kategorie organisiert:
 - **Genehmigungen**: Genehmigungsanfragen anzeigen und entscheiden
 - **Schlüsselwiederherstellung**: Wiederherstellungen beantragen und Anfragen einsehen (Genehmigung nur durch Admins)
 
-Eine benutzerdefinierte Rolle gewährt höchstens, was die eingebaute Rolle Operator besitzen kann, zuzüglich privater Schlüssel: niemals Vollzugriff, Benutzerverwaltung, Systemverwaltung, SSO oder Bereitstellungen. Platzhalter werden abgelehnt.
+Eine benutzerdefinierte Rolle kann jede von UCM geprüfte Berechtigung gewähren, außer den Administratoren vorbehaltenen: Vollzugriff und Platzhalter, jede Verwaltungsaktion (Genehmigung von Schlüsselwiederherstellungen, System- und Benutzerverwaltung), Kontenverwaltung, SSO, Bereitstellungen, systemweite Ereignisse und das Löschen des Audit-Protokolls. Eine gespeicherte Berechtigung, die die Rolle nicht gewähren kann, wird als ignoriert angezeigt und unverändert beibehalten.
 
 ### Kategorie-Schalter
 Klicken Sie auf eine Kategorieüberschrift, um alle Berechtigungen in dieser Kategorie gleichzeitig zu aktivieren/deaktivieren.

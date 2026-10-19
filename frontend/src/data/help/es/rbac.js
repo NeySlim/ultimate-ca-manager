@@ -60,9 +60,10 @@ Los permisos están organizados por categoría:
 - **Claves privadas**: Exportación directa de la clave privada de un certificado o de una CA (\`read:private_keys\`). Ningún rol integrado salvo Admin la posee; un rol personalizado puede concederla. Los roles sin ella pasan por la Recuperación de claves
 - **CSR**: Crear, leer, firmar, eliminar
 - **Plantillas**: Crear, leer, actualizar, eliminar
+- **Usuarios**: Leer (la gestión de cuentas está reservada a los administradores)
 - **Grupos**: Crear, leer, actualizar, eliminar
 - **Configuración**: Leer, actualizar
-- **Auditoría**: Leer, exportar, limpiar
+- **Auditoría**: Leer, exportar (la limpieza está reservada a los administradores)
 - **ACME**: Configurar, gestionar cuentas
 - **SCEP**: Configurar, aprobar solicitudes
 - **Almacén de confianza**: Gestionar certificados de confianza
@@ -72,7 +73,7 @@ Los permisos están organizados por categoría:
 - **Aprobaciones**: Ver y decidir solicitudes de aprobación
 - **Recuperación de claves**: Solicitar recuperaciones y ver solicitudes (la aprobación es solo para administradores)
 
-Un rol personalizado concede como máximo lo que puede tener el rol integrado Operator, más las claves privadas: nunca acceso completo, gestión de usuarios, administración del sistema, SSO ni despliegues. Los comodines se rechazan.
+Un rol personalizado puede conceder cualquier permiso que UCM comprueba, salvo los reservados a los administradores: acceso completo y comodines, toda acción de administración (aprobación de recuperaciones de claves, administración del sistema y de usuarios), gestión de cuentas, SSO, despliegues, eventos del sistema y borrado del registro de auditoría. Un permiso guardado que el rol no puede conceder se muestra como ignorado y se conserva tal cual.
 
 ### Alternar categorías
 Haga clic en el encabezado de una categoría para activar/desactivar todos los permisos de esa categoría de una vez.

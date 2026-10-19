@@ -18,7 +18,9 @@ import { ResponsiveLayout, ResponsiveDataTable } from '../components/ui/responsi
 import { useNotification, useMobile } from '../contexts'
 import { useModals, usePersistedState } from '../hooks'
 import { rolesService } from '../services'
-import { groupPermissions, editablePermissions } from '../lib/rbacPermissions'
+import {
+  groupPermissions, normalizePermissions, ignoredPermissions, appliedPermissions,
+} from '../lib/rbacPermissions'
 
 export default function RBACPage() {
   const { t } = useTranslation()
@@ -33,6 +35,10 @@ export default function RBACPage() {
   const categories = useMemo(() => groupPermissions(grantable), [grantable])
   const totalPermissions = grantable.length || 1
   const [selectedRole, setSelectedRole] = useState(null)
+  // Legacy names normalised once, so toggles and display read the same list
+  const selectRole = useCallback((role) => {
+    setSelectedRole(role ? { ...role, permissions: normalizePermissions(role.permissions) } : null)
+  }, [])
   const [filterType, setFilterType] = usePersistedState('ucm-filter-rbac-type', [])
   
   const [formData, setFormData] = useState({
@@ -85,7 +91,7 @@ export default function RBACPage() {
     try {
       await rolesService.updateRole(selectedRole.id, {
         ...selectedRole,
-        permissions: editablePermissions(selectedRole.permissions, grantable)
+        permissions: normalizePermissions(selectedRole.permissions)
       })
       showSuccess(t('messages.success.update.role'))
       loadRoles()
@@ -195,7 +201,7 @@ export default function RBACPage() {
       priority: 2,
       hideOnMobile: true,
       render: (val, row) => {
-        const permCount = row.all_permissions?.length || val?.length || 0
+        const permCount = row.all_permissions?.length ?? 0
         const percentage = Math.round((permCount / totalPermissions) * 100)
         return (
           <div className="flex items-center gap-2">
@@ -207,7 +213,7 @@ export default function RBACPage() {
         )
       },
       mobileRender: (val, row) => {
-        const permCount = row.all_permissions?.length || val?.length || 0
+        const permCount = row.all_permissions?.length ?? 0
         return (
           <div className="flex items-center gap-2 text-xs">
             <span className="text-text-tertiary">{t('common.permissions')}:</span>
@@ -272,7 +278,7 @@ export default function RBACPage() {
       />
 
       <CompactStats stats={[
-        { icon: CheckCircle, value: t('rbac.permissionCount', { count: role.permissions?.length || 0 }) },
+        { icon: CheckCircle, value: t('rbac.permissionCount', { count: appliedPermissions(role.permissions, grantable).length }) },
         { icon: UsersThree, value: t('rbac.userCount', { count: role.user_count || 0 }) },
       ]} />
 
@@ -312,7 +318,7 @@ export default function RBACPage() {
           {categories.map(category => {
             const key = category.key
             const categoryPerms = category.permissions
-            const directPerms = editablePermissions(role.permissions, grantable)
+            const directPerms = appliedPermissions(role.permissions, grantable)
             const allPerms = role.all_permissions || directPerms
             const allSelected = categoryPerms.every(p => allPerms.includes(p))
             const someSelected = categoryPerms.some(p => allPerms.includes(p))
@@ -365,12 +371,25 @@ export default function RBACPage() {
         </div>
       </CompactSection>
 
+      {ignoredPermissions(role.permissions, grantable).length > 0 && (
+        <CompactSection title={t('rbac.ignoredPermissions')}>
+          <p className="text-xs text-text-secondary mb-2">{t('rbac.ignoredPermissionsHint')}</p>
+          <div className="flex flex-wrap gap-1.5" data-testid="rbac-ignored-permissions">
+            {ignoredPermissions(role.permissions, grantable).map(perm => (
+              <span key={perm} className="px-2 py-1 rounded text-2xs bg-bg-tertiary text-text-tertiary">
+                {perm}
+              </span>
+            ))}
+          </div>
+        </CompactSection>
+      )}
+
       <CompactSection title={t('rbac.coverage')}>
         <div className="flex items-center gap-4">
           <div className="flex-1 bg-bg-tertiary rounded-full h-2 overflow-hidden">
-            <div className="h-full bg-accent-primary transition-all" style={{ width: `${((role.permissions?.length || 0) / totalPermissions) * 100}%` }} />
+            <div className="h-full bg-accent-primary transition-all" style={{ width: `${(appliedPermissions(role.permissions, grantable).length / totalPermissions) * 100}%` }} />
           </div>
-          <span className="text-xs text-text-secondary">{role.permissions?.length || 0}/{grantable.length}</span>
+          <span className="text-xs text-text-secondary">{appliedPermissions(role.permissions, grantable).length}/{grantable.length}</span>
         </div>
       </CompactSection>
     </div>
@@ -404,7 +423,7 @@ export default function RBACPage() {
             data={filteredRoles}
             columns={columns}
             loading={loading}
-            onRowClick={setSelectedRole}
+            onRowClick={selectRole}
             selectedId={selectedRole?.id}
             searchable
             searchPlaceholder={t('rbac.searchRoles')}

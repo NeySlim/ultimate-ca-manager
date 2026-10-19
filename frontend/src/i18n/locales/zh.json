@@ -3264,7 +3264,9 @@
       "read:ssh": "查看SSH CA和证书",
       "write:ssh": "创建和签署SSH证书",
       "delete:ssh": "删除SSH CA和证书"
-    }
+    },
+    "ignoredPermissions": "已忽略的权限",
+    "ignoredPermissionsHint": "已保存在此角色中但不生效：仅限管理员或未知的权限。它们会按原样保留。"
   },
   "hsm": {
     "statusUnavailable": "HSM功能不可用",

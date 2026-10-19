@@ -3264,7 +3264,9 @@
       "read:ssh": "SSH-CAs und Zertifikate anzeigen",
       "write:ssh": "SSH-Zertifikate erstellen und signieren",
       "delete:ssh": "SSH-CAs und Zertifikate löschen"
-    }
+    },
+    "ignoredPermissions": "Ignorierte Berechtigungen",
+    "ignoredPermissionsHint": "In dieser Rolle gespeichert, aber nicht angewendet: Administratoren vorbehalten oder unbekannt. Sie bleiben unverändert erhalten."
   },
   "hsm": {
     "statusUnavailable": "HSM-Funktionen sind nicht verfügbar",

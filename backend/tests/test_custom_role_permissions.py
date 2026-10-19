@@ -168,3 +168,46 @@ class TestInheritanceIsBounded:
         parent = _role(auth_client, 'Deletion Parent', ['read:cas'])
         _role(auth_client, 'Deletion Child', ['read:crl'], inherits_from=parent)
         assert auth_client.delete(f'{ROLES}/{parent}').status_code == 409
+
+
+class _Link:
+    def __init__(self, role_id, parent=None):
+        self.id, self.parent, self.permissions = role_id, parent, []
+
+
+class TestChainIsBounded:
+    def test_a_cycle_yields_each_role_once(self):
+        from auth.permissions import custom_role_chain
+        a = _Link(1)
+        b = _Link(2, a)
+        a.parent = b
+        assert [r.id for r in custom_role_chain(b)] == [2, 1]
+
+    def test_a_long_chain_stops_at_the_depth_bound(self):
+        from auth.permissions import MAX_ROLE_DEPTH, custom_role_chain
+        role = None
+        for i in range(MAX_ROLE_DEPTH + 10):
+            role = _Link(i, role)
+        assert len(custom_role_chain(role)) == MAX_ROLE_DEPTH
+
+
+class TestStoredPermissionsAreKept:
+    def test_a_save_keeps_an_ignored_permission(self, app, auth_client):
+        with app.app_context():
+            role = CustomRole(name='Kept Ignored Probe', permissions=['*', 'read:dashboard'])
+            db.session.add(role)
+            db.session.commit()
+            role_id = role.id
+        r = auth_client.put(f'{ROLES}/{role_id}',
+                            data=json.dumps({'permissions': ['*', 'read:dashboard', 'read:certs']}),
+                            content_type='application/json')
+        assert r.status_code == 200, r.data
+        data = json.loads(r.data)['data']
+        assert data['permissions'] == ['*', 'read:dashboard', 'read:certificates']
+        assert data['all_permissions'] == ['read:certificates']
+
+    def test_a_save_cannot_add_a_reserved_permission(self, auth_client):
+        role_id = _role(auth_client, 'No New Wildcard Probe', ['read:cas'])
+        r = auth_client.put(f'{ROLES}/{role_id}', data=json.dumps({'permissions': ['read:cas', '*']}),
+                            content_type='application/json')
+        assert r.status_code == 400

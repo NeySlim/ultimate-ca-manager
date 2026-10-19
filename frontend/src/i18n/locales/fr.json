@@ -2327,7 +2327,9 @@
       "read:ssh": "Voir les CA et certificats SSH",
       "write:ssh": "Créer et signer des certificats SSH",
       "delete:ssh": "Supprimer les CA et certificats SSH"
-    }
+    },
+    "ignoredPermissions": "Permissions ignorées",
+    "ignoredPermissionsHint": "Enregistrées sur ce rôle mais non appliquées : réservées aux administrateurs ou inconnues. Elles sont conservées telles quelles."
   },
   "scep": {
     "title": "Protocole SCEP",

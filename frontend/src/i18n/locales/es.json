@@ -3264,7 +3264,9 @@
       "read:ssh": "Ver CAs y certificados SSH",
       "write:ssh": "Crear y firmar certificados SSH",
       "delete:ssh": "Eliminar CAs y certificados SSH"
-    }
+    },
+    "ignoredPermissions": "Permisos ignorados",
+    "ignoredPermissionsHint": "Guardados en este rol pero no aplicados: reservados a los administradores o desconocidos. Se conservan tal cual."
   },
   "hsm": {
     "statusUnavailable": "Las funciones HSM no están disponibles",

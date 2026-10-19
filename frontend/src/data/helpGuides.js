@@ -1646,9 +1646,10 @@ Permissions are organized by category:
 - **Private Keys**: Direct private-key export of a certificate or a CA (\`read:private_keys\`). No built-in role except Admin holds it; a custom role can grant it. Roles without it go through Key Recovery
 - **CSRs**: Create, read, sign, delete
 - **Templates**: Create, read, update, delete
+- **Users**: Read (account management is reserved for administrators)
 - **Groups**: Create, read, update, delete
 - **Settings**: Read, update
-- **Audit**: Read, export, cleanup
+- **Audit**: Read, export (cleanup is reserved for administrators)
 - **ACME**: Configure, manage accounts
 - **SCEP**: Configure, approve requests
 - **Trust Store**: Manage trusted certificates
@@ -1658,7 +1659,7 @@ Permissions are organized by category:
 - **Approvals**: View and decide approval requests
 - **Key Recovery**: Request recoveries and view requests (approval is admin-only)
 
-A custom role grants at most what the built-in Operator role can hold, plus Private Keys: never full access, user management, system administration, SSO or deployments. Wildcards are refused.
+A custom role can grant every permission UCM checks except those kept for administrators: full access and wildcards, every administration action (approving key recoveries, system and user administration), account management, SSO, deployments, system-wide events and deleting the audit trail. A stored permission the role cannot grant is shown as ignored and kept as it is.
 
 ### Category Toggles
 Click a category header to enable/disable all permissions in that category at once.

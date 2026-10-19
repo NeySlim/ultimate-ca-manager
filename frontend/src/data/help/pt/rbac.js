@@ -60,9 +60,10 @@ As permissões são organizadas por categoria:
 - **Chaves Privadas**: Exportação direta da chave privada de um certificado ou de uma CA (\`read:private_keys\`). Nenhuma função integrada além de Admin a possui; uma função personalizada pode concedê-la. As funções sem ela passam pela Recuperação de chaves
 - **CSRs**: Criar, ler, assinar, excluir
 - **Modelos**: Criar, ler, atualizar, excluir
+- **Usuários**: Ler (o gerenciamento de contas é reservado aos administradores)
 - **Grupos**: Criar, ler, atualizar, excluir
 - **Configurações**: Ler, atualizar
-- **Auditoria**: Ler, exportar, limpeza
+- **Auditoria**: Ler, exportar (a limpeza é reservada aos administradores)
 - **ACME**: Configurar, gerenciar contas
 - **SCEP**: Configurar, aprovar solicitações
 - **Armazenamento de Confiança**: Gerenciar certificados confiáveis
@@ -72,7 +73,7 @@ As permissões são organizadas por categoria:
 - **Aprovações**: Ver e decidir solicitações de aprovação
 - **Recuperação de Chaves**: Solicitar recuperações e ver solicitações (a aprovação é somente admin)
 
-Uma função personalizada concede no máximo o que a função integrada Operador pode ter, mais as chaves privadas: nunca acesso total, gerenciamento de usuários, administração do sistema, SSO ou implantações. Curingas são recusados.
+Uma função personalizada pode conceder qualquer permissão verificada pelo UCM, exceto as reservadas aos administradores: acesso total e curingas, toda ação de administração (aprovação de recuperações de chaves, administração do sistema e de usuários), gerenciamento de contas, SSO, implantações, eventos do sistema e exclusão do log de auditoria. Uma permissão armazenada que a função não pode conceder é exibida como ignorada e mantida como está.
 
 ### Alternância de Categorias
 Clique no cabeçalho de uma categoria para ativar/desativar todas as permissões daquela categoria de uma vez.

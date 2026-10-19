@@ -3264,7 +3264,9 @@
       "read:ssh": "Ver CAs e certificados SSH",
       "write:ssh": "Criar e assinar certificados SSH",
       "delete:ssh": "Excluir CAs e certificados SSH"
-    }
+    },
+    "ignoredPermissions": "Permissões ignoradas",
+    "ignoredPermissionsHint": "Armazenadas nesta função, mas não aplicadas: reservadas aos administradores ou desconhecidas. São mantidas como estão."
   },
   "hsm": {
     "statusUnavailable": "Funcionalidades HSM não estão disponíveis",
