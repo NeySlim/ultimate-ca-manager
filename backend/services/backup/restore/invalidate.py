@@ -190,12 +190,6 @@ def _purge_fingerprint_cache() -> None:
     FingerprintMixin.invalidate_fingerprint_cache()
 
 
-def _purge_password_policy_cache() -> None:
-    """The password policy read from SystemConfig, which the restore replaced."""
-    from security.password_policy import _invalidate_policy_cache
-    _invalidate_policy_cache()
-
-
 def _purge_oidc_cache() -> None:
     """OIDC discovery documents and JWKS of the SSO providers.
 
@@ -241,7 +235,6 @@ CACHE_PURGES: Tuple[Tuple[str, Callable[[], None]], ...] = (
     ('external_crl_entries', _purge_external_crl_cache),
     ('ocsp_responses', _purge_ocsp_responses),
     ('certificate_fingerprints', _purge_fingerprint_cache),
-    ('password_policy', _purge_password_policy_cache),
     ('oidc_discovery', _purge_oidc_cache),
     ('smtp_oauth_tokens', _purge_smtp_oauth_tokens),
     ('kerberos_contexts', _purge_kerberos_contexts),

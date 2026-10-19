@@ -12,6 +12,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - Helm: `initialAdminPassword` had no effect and every install started with the default `changeme123`; the chart now passes it under the name the image reads, and the image also honours `INITIAL_ADMIN_PASSWORD`.
+- A change to the password policy (minimum length, character classes) only applied after a restart; it now applies at once in every worker.
 
 ## [2.242] - 2026-10-18
 
