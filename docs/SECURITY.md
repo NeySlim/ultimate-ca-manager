@@ -190,10 +190,14 @@ with in `audit-chain.keys`, beside `master.key` (in the same directory when the 
 from `KEY_ENCRYPTION_KEY`), outside the database. The first entry under a new key records
 the entries of the previous keys listed there: they are reported as no longer attested,
 not as verified, until retention removes them. Entries under a key that file does not list
-are a break. Without the file (a new host, or a database restored elsewhere), the first
-entry under the key is the starting point, and entries under other keys leave the log
-reported as not protected. Back the file up with `master.key`. Going back to an earlier
-master key is reported as a break: use a new key.
+are a break. Every entry sealed under the key brings the file up to date, so a missing or
+older file is rewritten on the next entry. Without the file when the first entry under the
+key is written (a new host, for instance), that entry is the starting point, and entries
+under other keys leave the log reported as not protected. A database restored on a host
+that has already sealed under another key, or a backup taken before a rotation, is reported
+as a break: the file there does not list the keys of those entries. To start again, change
+the master key, after removing `audit-chain.keys` in the first case. Back the file up with
+`master.key`. Going back to an earlier master key is reported as a break: use a new key.
 
 Removing the most recent entries cannot be detected from the database alone: keep a copy
 outside it, for example with syslog forwarding.

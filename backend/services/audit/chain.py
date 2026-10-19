@@ -9,6 +9,7 @@ import hmac as _hmac
 import json
 import logging
 import os
+import tempfile
 
 from sqlalchemy import event, func, text
 from sqlalchemy.orm import Session
@@ -62,17 +63,23 @@ def _write_keyring(data):
     path = keyring_path()
     try:
         path.parent.mkdir(parents=True, exist_ok=True)
-        tmp = path.with_suffix('.tmp')
-        fd = os.open(tmp, os.O_WRONLY | os.O_CREAT | os.O_TRUNC, 0o600)
-        with os.fdopen(fd, 'w') as handle:
-            json.dump(data, handle)
+        # A file of its own (mkstemp: 0600), on disk before it replaces the old one
+        fd, tmp = tempfile.mkstemp(dir=path.parent, prefix='.audit-chain.', suffix='.tmp')
         try:
-            import pwd
-            ucm = pwd.getpwnam('ucm')
-            os.chown(tmp, ucm.pw_uid, ucm.pw_gid)
-        except (KeyError, OSError):
-            pass
-        os.replace(tmp, path)
+            with os.fdopen(fd, 'w') as handle:
+                json.dump(data, handle)
+                handle.flush()
+                os.fsync(handle.fileno())
+            try:
+                import pwd
+                ucm = pwd.getpwnam('ucm')
+                os.chown(tmp, ucm.pw_uid, ucm.pw_gid)
+            except (KeyError, OSError):
+                pass
+            os.replace(tmp, path)
+        except OSError:
+            os.unlink(tmp)
+            raise
     except OSError as e:
         logger.error(f"Could not write {path}: {e}; the next key change will not be attested")
 
@@ -90,7 +97,24 @@ def _keyring_after_rollback(session):
     session.info.pop(_PENDING_KEYRING, None)
 
 
-def _rotation(session, entry, key_id):
+def _reconcile_keyring(session, ring, key_id):
+    """Make `key_id` the current key of the history once this transaction commits.
+
+    Also run on an entry that is not the first under its key: a history that
+    is missing or names another key (older build, recreated volume, file
+    restored) is brought up to date, the previous current key kept in it.
+    """
+    if ring is not None and ring.get('current') == key_id:
+        return
+    history = list((ring or {}).get('history', []))
+    current = (ring or {}).get('current')
+    if current and current not in history:
+        history.append(current)
+    history = [k for k in history if k != key_id] + [key_id]
+    session.info[_PENDING_KEYRING] = {'current': key_id, 'history': history}
+
+
+def _rotation(session, entry, key_id, ring):
     """What the first entry under `key_id` says about the other keys in the ledger.
 
     A rotation is attested only when the key history outside the database
@@ -102,7 +126,6 @@ def _rotation(session, entry, key_id):
                      .filter(AuditLog.hash_version == KEYED_CHAIN,
                              AuditLog.hash_key_id != key_id, AuditLog.id < entry.id)
                      .group_by(AuditLog.hash_key_id).all())
-    ring = read_keyring()
     if ring is None:
         rotation = {'attested': False, 'keys': in_ledger} if in_ledger else None
     elif ring.get('current') != key_id:
@@ -111,9 +134,6 @@ def _rotation(session, entry, key_id):
         rotation = {'attested': True, 'keys': keys} if keys else None
     else:
         rotation = None     # same key as before: nothing was rotated
-    if ring is None or ring.get('current') != key_id:
-        history = [k for k in (ring or {}).get('history', []) if k != key_id]
-        session.info[_PENDING_KEYRING] = {'current': key_id, 'history': history + [key_id]}
     return json.dumps(rotation, sort_keys=True) if rotation else None
 
 
@@ -147,13 +167,15 @@ def append_entry(entry, session=None, purge_from=None):
 
     entry.hash_version = KEYED_CHAIN
     entry.hash_key_id = key[1]
+    ring = read_keyring()
     if not (previous is not None and previous.hash_version == KEYED_CHAIN
             and previous.hash_key_id == key[1]):
         # First entry under this key: it records where the ledger starts and
         # what it attests of the other keys in it.
         if entry.chain_start is None:
             entry.chain_start = session.query(func.min(AuditLog.id)).scalar()
-        entry.retired_keys = _rotation(session, entry, key[1])
+        entry.retired_keys = _rotation(session, entry, key[1], ring)
+    _reconcile_keyring(session, ring, key[1])
     entry.entry_hash = entry.compute_hash(prev_hash, key[0])
     return entry
 

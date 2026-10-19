@@ -428,6 +428,81 @@ class TestKeyRotation:
                 assert report['protection']['rotation_attested'] is True
             encryption_enabled.key_encryption.reload()
 
+    def test_a_missing_key_history_is_rebuilt_by_the_next_entry(
+            self, app, encryption_enabled, empty_ledger):
+        """Entries under the key, no history (older build, recreated volume):
+        the next entry writes it, so relabelling the ledger is still a break."""
+        from services.audit.chain import keyring_path, read_keyring
+        with app.app_context():
+            [_log(f'chain_k_{i}') for i in range(2)]
+            keyring_path().unlink()
+            _log('chain_k_next')
+            assert read_keyring() == {'current': chain_key()[1], 'history': [chain_key()[1]]}
+            _relabel([i for (i,) in db.session.query(AuditLog.id)])
+            _log('chain_k_after')
+            assert AuditService.verify_integrity()['status'] == 'broken'
+
+    def test_a_stale_key_history_is_brought_up_to_date(
+            self, app, encryption_enabled, empty_ledger, monkeypatch):
+        """A history naming another key (restored file, copied master key):
+        the next entry records the key in use, and its rotation is attested."""
+        from services.audit.chain import keyring_path, read_keyring
+        with app.app_context():
+            _log('chain_k1')
+            keyring_path().write_text(json.dumps({'current': 'a' * 16, 'history': ['a' * 16]}))
+            _log('chain_k1_next')
+            key_id = chain_key()[1]
+            assert read_keyring() == {'current': key_id, 'history': ['a' * 16, key_id]}
+            with monkeypatch.context() as patch:
+                self._rotate(encryption_enabled, patch)
+                _log('chain_k2')
+                report = AuditService.verify_integrity()
+                assert report['status'] == 'intact', report
+                assert report['protection']['rotation_attested'] is True
+                assert report['protection']['retired_key'] == 2
+            encryption_enabled.key_encryption.reload()
+
+    def test_a_ledger_restored_on_a_host_with_its_own_key_breaks_until_the_key_changes(
+            self, app, encryption_enabled, empty_ledger, monkeypatch):
+        from services.audit.chain import keyring_path
+        with app.app_context():
+            [_log(f'chain_restored_{i}') for i in range(2)]
+            with monkeypatch.context() as patch:
+                # The other host: its own key, and a history that names only it
+                patch.setenv('KEY_ENCRYPTION_KEY', Fernet.generate_key().decode())
+                encryption_enabled.key_encryption.reload()
+                own = chain_key()[1]
+                keyring_path().write_text(json.dumps({'current': own, 'history': [own]}))
+                _log('chain_restored_host')
+                assert AuditService.verify_integrity()['status'] == 'broken'
+
+                keyring_path().unlink()
+                self._rotate(encryption_enabled, patch)
+                _log('chain_restored_new_key')
+                assert AuditService.verify_integrity()['status'] == 'unprotected'
+            encryption_enabled.key_encryption.reload()
+
+    def test_a_backup_from_before_a_rotation_breaks_until_the_key_changes(
+            self, app, encryption_enabled, empty_ledger, monkeypatch):
+        from services.audit.chain import keyring_path, read_keyring
+        with app.app_context():
+            [_log(f'chain_backup_{i}') for i in range(2)]
+            with monkeypatch.context() as patch:
+                self._rotate(encryption_enabled, patch)
+                # The database came back from before the rotation; the history did not
+                k1 = read_keyring()['current']
+                keyring_path().write_text(json.dumps(
+                    {'current': chain_key()[1], 'history': [k1, chain_key()[1]]}))
+                _log('chain_backup_k2')
+                assert AuditService.verify_integrity()['status'] == 'broken'
+
+                self._rotate(encryption_enabled, patch)
+                _log('chain_backup_k3')
+                report = AuditService.verify_integrity()
+                assert report['status'] == 'intact', report
+                assert report['protection']['rotation_attested'] is True
+            encryption_enabled.key_encryption.reload()
+
     def test_the_key_history_is_kept_beside_the_master_key(
             self, app, encryption_enabled, empty_ledger):
         from services.audit.chain import keyring_path, read_keyring
