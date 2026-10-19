@@ -1069,7 +1069,7 @@ class TestLastFollowUps:
                 finally:
                     AutoRenewalService.set_renewal_config(previous)
                 stats.pop('waiting')
-                assert stats == {'renewed': 0, 'failed': 0, 'skipped': 1, 'errors': []}, stats
+                assert stats == {'renewed': 0, 'failed': 0, 'skipped': 1, 'queued': 0, 'errors': []}, stats
         finally:
             _drop_rows(app, cert_id)
 

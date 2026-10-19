@@ -1812,7 +1812,28 @@ def revoke_cert():
                 success=False,
             )
             return acme_error('unauthorized', 'Not authorized to revoke this certificate', 403)
-        
+
+        # A client cannot wait for a human decision: a revocation a policy
+        # holds for approval is refused, and left to the CA operators
+        try:
+            from services.approval_gate import revocation_policy_for
+            held_by = revocation_policy_for(cert)
+        except Exception as e:
+            logger.error(f"ACME revocation policy evaluation failed: {e}", exc_info=True)
+            return acme_error('serverInternal', 'Revocation policy could not be evaluated', 500)
+        if held_by is not None:
+            _audit_acme(
+                'acme.cert.revoke',
+                resource_type='certificate',
+                resource_id=cert.id,
+                details=f"held serial={serial_hex_lower}: approval required by policy {held_by.name}",
+                success=False,
+            )
+            return acme_error(
+                'unauthorized',
+                f'Revoking this certificate requires approval per policy "{held_by.name}"; '
+                'ask the certificate authority operators to revoke it', 403)
+
         # Revoke certificate
         try:
             from services.cert_service import CertificateService

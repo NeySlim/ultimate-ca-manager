@@ -242,15 +242,17 @@ def create_certificate():
         policies = PolicyEvaluationService.applicable_policies(
             ca.id, data.get('template_id'), data.get('cn'), requested_dns)
         requested_validity = validity_days
+        rule_context = {'operation': 'issuance', 'subject': data.get('cn'), 'ca_id': ca.id}
         violations, validity_days, capped_by = PolicyEvaluationService.enforce_rules(
             policies, key_type=normalized_key,
             dns_name_count=len(set(requested_dns) | set(implicit_dns)),
-            validity_days=validity_days,
+            validity_days=validity_days, context=rule_context,
         )
         # The template's digest is a choice, checked; without one the default yields
         template_digest = template.digest if template and template.digest else None
         sign_hash, digest_violations = PolicyEvaluationService.checked_signing_hash(
-            policies, ca_key, template_digest, explicit=template_digest is not None)
+            policies, ca_key, template_digest, explicit=template_digest is not None,
+            context=rule_context)
         violations += digest_violations
         if violations:
             return error_response('Policy violation: ' + '; '.join(violations), 400)

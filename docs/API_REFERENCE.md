@@ -3126,7 +3126,7 @@ Content-Type: application/json
 {
   "name": "Production Certificate Policy",
   "description": "Requires approval for production certificates",
-  "policy_type": "issuance",
+  "operations": ["issuance", "renewal", "revocation"],
   "ca_id": 2,
   "template_id": 1,
   "requires_approval": true,
@@ -3139,6 +3139,12 @@ Content-Type: application/json
   "notification_emails": ["security@example.com"]
 }
 ```
+
+`operations` lists what the policy governs: `issuance` (issue form, Sign CSR, bulk signing and the renewals an operator performs), `renewal` (operator renewals and the renewal scheduler) and `revocation` (certificate, bulk, user certificate and intermediate CA revocations). Without it, the legacy `policy_type` names a single operation; with neither, the policy governs `issuance`.
+
+With `notify_on_violation`, a refusal by the policy's rules or a request held for approval is e-mailed to `notification_emails` (mailbox addresses, checked: `400` otherwise), or when empty to the policy's approvers; the same refusal is reported once per hour.
+
+When a policy requires approval, `POST /certificates/{id}/revoke`, `POST /certificates/bulk/revoke` (under `pending_approval`), `POST /user-certificates/{id}/revoke` and `POST /cas/{id}/revoke` (held by the policies of the parent CA and of the CA itself) answer `approval_required: true` with the `approval_id` and the `request_type` (`revocation` or `ca_revocation`) instead of revoking; the approval revokes with the stored reason and invalidity date. ACME `revokeCert` answers `403 unauthorized` for such a certificate, and removing an mTLS enrolment `409` until its certificate is revoked (administrators bypass). A pending request whose requester performs the action directly, or approves a duplicate, is closed as `cancelled`.
 
 ### Update Policy
 ```http

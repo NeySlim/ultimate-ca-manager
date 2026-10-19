@@ -898,7 +898,8 @@
     "offlineKeyFileTooLarge": "Fichier de clé trop volumineux (max 256 Ko)",
     "restorePasswordHint": "Le mot de passe utilisé lors de la mise hors ligne de l'AC.",
     "namedUrls": "Utiliser le nom de la CA dans les URLs protocole",
-    "namedUrlsHint": "Les chemins CDP/OCSP/AIA utilisent un slug issu du nom de la CA au lieu de l'identifiant aléatoire. Plus simple à configurer manuellement ; révèle le nom de la CA dans les URLs. Peut aussi être activé plus tard ; une fois activé, c'est irréversible."
+    "namedUrlsHint": "Les chemins CDP/OCSP/AIA utilisent un slug issu du nom de la CA au lieu de l'identifiant aléatoire. Plus simple à configurer manuellement ; révèle le nom de la CA dans les URLs. Peut aussi être activé plus tard ; une fois activé, c'est irréversible.",
+    "revocationApprovalRequired": "Révocation de la CA soumise à approbation (politique : {{policy}})"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",
@@ -1060,7 +1061,8 @@
     "templateOverridesHint": "Diverge du modèle « {{name}} » sur : {{fields}}",
     "deleteNeedsRevoke": "Ce certificat est encore valide, il ne peut donc pas être supprimé seul : le supprimer le retirerait d'UCM alors qu'il reste approuvé par tout client qui ne vérifie pas la révocation. Révoquez-le d'abord, pour que la CRL et le répondeur OCSP portent le retrait, puis il sera supprimé.",
     "revokeThenDelete": "Révoquer, puis supprimer",
-    "noKeyTypeAllowedByPolicy": "Aucun type de clé n'est autorisé par les politiques de cette CA et de ce modèle."
+    "noKeyTypeAllowedByPolicy": "Aucun type de clé n'est autorisé par les politiques de cette CA et de ce modèle.",
+    "revocationApprovalRequired": "Révocation soumise à approbation (politique : {{policy}})"
   },
   "common": {
     "saved": "Paramètres enregistrés",
@@ -3985,6 +3987,10 @@
     "selectGroup": "Sélectionner un groupe...",
     "minApprovers": "Approbateurs min",
     "notifyOnViolation": "Notifier en cas de violation",
+    "notifyHelp": "E-mail lorsque cette politique refuse une opération ou en retient une pour approbation",
+    "notificationEmails": "Adresses de notification",
+    "notificationEmailsHelp": "Une par ligne. Vide : les approbateurs de la politique",
+    "invalidEmails": "Adresses invalides : {{emails}}",
     "enable": "Activer",
     "disable": "Désactiver",
     "noPolicies": "Aucune politique définie",
@@ -4007,7 +4013,16 @@
     },
     "allowedDigests": "Algorithmes de hachage de signature autorisés",
     "allowedKeyTypesHelp": "Aucun sélectionné : tous les types de clés sont autorisés.",
-    "allowedDigestsHelp": "Aucun sélectionné : tous les hachages sont autorisés."
+    "allowedDigestsHelp": "Aucun sélectionné : tous les hachages sont autorisés.",
+    "operations": "Opérations",
+    "operationHelp": {
+      "issuance": "Le formulaire d'émission, la signature de CSR et la signature en masse, ainsi que les renouvellements effectués par un opérateur",
+      "renewal": "Renouvellements par un opérateur, un seul ou en masse, et par le planificateur, qui met alors son renouvellement en file",
+      "revocation": "Révocations de certificats et de CA intermédiaires par un opérateur ; refusées via ACME, qui ne peut pas attendre une décision"
+    },
+    "operationsRequired": "Sélectionnez au moins une opération",
+    "noOperation": "Aucune opération",
+    "rulesRevocationOnly": "Les règles s'appliquent uniquement à l'émission et au renouvellement : une politique de révocation est limitée par sa CA, son modèle et son motif DNS."
   },
   "approvals": {
     "title": "Demandes d'approbation",
@@ -4048,7 +4063,19 @@
     "searchPlaceholder": "Rechercher des demandes...",
     "loadFailed": "Échec du chargement des demandes d'approbation",
     "certificateRequest": "Demande de certificat",
-    "certificateIssued": "Certificat émis avec succès"
+    "certificateIssued": "Certificat émis avec succès",
+    "requestType": {
+      "certificate": "Certificat",
+      "csr": "Signature de CSR",
+      "renewal": "Renouvellement",
+      "revocation": "Révocation",
+      "ca_revocation": "Révocation de CA"
+    },
+    "revocationPerformed": "Approuvée : la révocation a été effectuée",
+    "summarySerial": "Numéro de série",
+    "summaryInvalidity": "Date d'invalidité",
+    "summaryTrigger": "Demandé par",
+    "triggerScheduler": "Planificateur de renouvellement"
   },
   "reports": {
     "title": "Rapports",

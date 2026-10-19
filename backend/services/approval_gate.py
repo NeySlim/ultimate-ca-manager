@@ -1,11 +1,9 @@
-"""The approval gate shared by every operator issuance path.
+"""The approval gate shared by the operator paths that issue, renew or revoke.
 
-An issuance policy with ``requires_approval`` used to be consulted by the
-issue form only: an operator signed a stored request, in bulk or one by one,
-or renewed a certificate, without any approval. The gate below evaluates the
-same policies (CA, template, name pattern scoping) for those paths and
-queues an ``ApprovalRequest`` typed after the operation, which the approval
-route then performs.
+A policy with ``requires_approval`` governs the operations it lists
+(issuance, renewal, revocation). The gate evaluates its scope (CA, template,
+name pattern) and queues an ``ApprovalRequest`` typed after the operation,
+which the approval route then performs.
 """
 
 import base64
@@ -16,9 +14,13 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID, NameOID
 
+from sqlalchemy import event
+from sqlalchemy.orm import Session
+
 from models import db
 from models.policy import ApprovalRequest, CertificatePolicy
-from services.policy_service import APPROVAL_REQUEST_LIFETIME, PolicyEvaluationService
+from services.policy_service import (APPROVAL_REQUEST_LIFETIME, RENEWAL_OPERATIONS,
+                                     PolicyEvaluationService)
 
 logger = logging.getLogger(__name__)
 
@@ -42,32 +44,118 @@ def certificate_identity(pem_b64: str) -> Tuple[Optional[str], list]:
 
 def queue_if_approval_required(user, *, ca_id, template_id, cn, san_list,
                                request_type: str, request_data: dict,
-                               comment: Optional[str] = None
+                               comment: Optional[str] = None,
+                               operation='issuance',
                                ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
-    """``(policy, approval)`` when a policy requires approval for this
-    request (queued), else ``(None, None)``. Administrators bypass, as on
-    the issue form. Any evaluation error propagates: the caller must fail
-    closed (never issue on a policy it could not evaluate)."""
+    """``(policy, approval)`` when a policy governing *operation* (a name or
+    a tuple of them) requires approval for this request (queued), else
+    ``(None, None)``. Administrators bypass, as on the issue form; ``user``
+    None is the renewal scheduler, which never does. Any evaluation error propagates: the caller must fail
+    closed (never act on a policy it could not evaluate)."""
     if getattr(user, 'role', None) == 'admin':
         return None, None
     policy = PolicyEvaluationService.check_approval_required(
-        ca_id=ca_id, template_id=template_id, cn=cn, san_list=list(san_list or []))
+        ca_id=ca_id, template_id=template_id, cn=cn, san_list=list(san_list or []),
+        operation=operation)
     if policy is None:
         return None, None
     approval = PolicyEvaluationService.create_approval_request(
-        policy=policy, request_data=request_data, requester_id=user.id,
-        comment=comment, request_type=request_type)
+        policy=policy, request_data=request_data,
+        requester_id=getattr(user, 'id', None), comment=comment, request_type=request_type)
     return policy, approval
 
 
+def certificate_scope(cert) -> Tuple[Optional[int], Optional[int], Optional[str], list]:
+    """``(ca_id, template_id, cn, dns_names)`` a policy scopes an issued
+    certificate by: its issuing CA (None when not held here), its template
+    and its names."""
+    from services.cert.renewal import resolve_issuing_ca
+    ca = resolve_issuing_ca(cert)
+    cn, dns = certificate_identity(cert.crt) if cert.crt else (None, [])
+    return (ca.id if ca else None), getattr(cert, 'template_id', None), cn, dns
+
+
+def queue_renewal(user, cert, *, validity_days=None, comment: Optional[str] = None,
+                  scheduled_by: Optional[str] = None
+                  ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
+    """Queue the renewal of ``cert`` when a policy requires approval for it:
+    ``(policy, approval)``, else ``(None, None)``. ``scheduled_by`` names the
+    scheduler for the requests it queues (no user, the held key re-signed),
+    which only renewal policies hold."""
+    ca_id, template_id, cn, dns = certificate_scope(cert)
+    data = {'certificate_id': cert.id, 'ca_id': ca_id, 'cn': cn,
+            'cert_type': cert.cert_type, 'validity_days': validity_days}
+    if scheduled_by:
+        data.update(trigger='auto', requested_by=scheduled_by, serial_number=cert.serial_number)
+    return queue_if_approval_required(
+        user, ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns,
+        request_type='renewal', request_data=data, comment=comment,
+        operation='renewal' if scheduled_by else RENEWAL_OPERATIONS)
+
+
+def revocation_policy_for(cert) -> Optional[CertificatePolicy]:
+    """The policy that requires approval to revoke ``cert``, whoever asks
+    (for the callers that cannot queue a request: ACME, enrolment removal)."""
+    ca_id, template_id, cn, dns = certificate_scope(cert)
+    return PolicyEvaluationService.check_approval_required(
+        ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns, operation='revocation')
+
+
+def queue_revocation(user, cert, *, reason: str, invalidity_at=None,
+                     comment: Optional[str] = None, auth_certificate_id=None
+                     ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
+    """Queue the revocation of ``cert`` when a policy requires approval for
+    it: ``(policy, approval)``, else ``(None, None)``. The serial is kept so
+    the approval revokes the certificate that was asked about, never one
+    renewed in its place."""
+    from utils.datetime_utils import utc_isoformat
+    ca_id, template_id, cn, dns = certificate_scope(cert)
+    return queue_if_approval_required(
+        user, ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns,
+        request_type='revocation', operation='revocation', comment=comment,
+        request_data={'certificate_id': cert.id, 'serial_number': cert.serial_number,
+                      'ca_id': ca_id, 'cn': cn or cert.common_name, 'reason': reason,
+                      'invalidity_at': utc_isoformat(invalidity_at) if invalidity_at else None,
+                      'auth_certificate_id': auth_certificate_id})
+
+
+def ca_certificate_serial(ca) -> Optional[str]:
+    """Decimal serial of the certificate ``ca`` holds now (the column can lag)."""
+    if not ca.crt:
+        return None
+    return str(x509.load_pem_x509_certificate(base64.b64decode(ca.crt)).serial_number)
+
+
+def queue_ca_revocation(user, ca, parent, *, reason: str, invalidity_at=None,
+                        comment: Optional[str] = None
+                        ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
+    """Queue the revocation of an intermediate CA, held by the policies of the
+    ``parent`` whose CRL will carry it and by those scoped on the CA itself
+    (every certificate it issued falls with it); ``(None, None)`` when none
+    requires approval."""
+    from utils.datetime_utils import utc_isoformat
+    return queue_if_approval_required(
+        user, ca_id=(parent.id, ca.id), template_id=None, cn=ca.common_name, san_list=[],
+        request_type='ca_revocation', operation='revocation', comment=comment,
+        request_data={'target_ca_id': ca.id, 'serial_number': ca_certificate_serial(ca),
+                      'ca_id': parent.id, 'cn': ca.common_name, 'reason': reason,
+                      'invalidity_at': utc_isoformat(invalidity_at) if invalidity_at else None})
+
+
+_PAYLOAD_SUBJECTS = {'renewal': 'Certificate renewal', 'revocation': 'Certificate revocation',
+                     'ca_revocation': 'CA revocation'}
+
+
 def approval_payload(policy: CertificatePolicy, approval: ApprovalRequest) -> dict:
-    """The response body the issue form returns when a request is queued."""
+    """The response body of a request queued for approval."""
+    subject = _PAYLOAD_SUBJECTS.get(approval.request_type, 'Certificate request')
     return {
         'approval_required': True,
         'approval_id': approval.id,
+        'request_type': approval.request_type,
         'policy_name': policy.name,
         'status': 'pending_approval',
-        'message': f'Certificate request requires approval per policy "{policy.name}"',
+        'message': f'{subject} requires approval per policy "{policy.name}"',
     }
 
 
@@ -195,6 +283,41 @@ def notify_rejected(snapshots: list, *, reason: str, actor: str) -> None:
         emit_csr_rejected(snapshot, reason=reason, actor=actor)
 
 
+_UNCOMMITTED = 'approval_cancellations_pending'
+_CANCELLED = 'approval_cancellations'
+
+
+@event.listens_for(Session, 'after_commit')
+def _cancellations_committed(session):
+    pending = session.info.pop(_UNCOMMITTED, None)
+    if pending:
+        session.info.setdefault(_CANCELLED, []).extend(pending)
+
+
+@event.listens_for(Session, 'after_rollback')
+def _cancellations_rolled_back(session):
+    session.info.pop(_UNCOMMITTED, None)
+
+
+def record_cancellations() -> None:
+    """Audit the requests a direct action cancelled, once that action is
+    committed: after the commit here, after each request for the callers
+    that own their transaction. A cancellation rolled back is never audited."""
+    from services.audit_service import AuditService
+    for approval_id, request_type, actor, reason in db.session.info.pop(_CANCELLED, []):
+        AuditService.log_action(
+            action='approval_cancelled', resource_type='approval', resource_id=str(approval_id),
+            resource_name=f'{request_type} request #{approval_id}',
+            details=f'Cancelled: its requester acted directly ({reason})',
+            success=True, username=actor)
+
+
+def _acted_by_requester(approval, user_id, username) -> bool:
+    if user_id is not None:
+        return approval.requester_id == user_id
+    return bool(username) and approval.requester is not None and approval.requester.username == username
+
+
 def _resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: str,
                           username: str, user_id=None, certificate_id=None,
                           reason: str, commit: bool = True) -> list:
@@ -206,7 +329,8 @@ def _resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: s
     as approved, ``username`` recorded as its approver, and linked to the
     certificate when one is given. ``'rejected'``: the target is gone or
     revoked; the request is closed as rejected with the reason. A request
-    past its expiry is closed as expired instead, without a vote. Returns
+    past its expiry is closed as expired instead, and one the actor made
+    as cancelled, both without a vote. Returns
     the requests approved or rejected; the caller commits when ``commit``
     is False (the resolution then rides the caller's own transaction)."""
     from utils.datetime_utils import utc_now
@@ -221,6 +345,14 @@ def _resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: s
             approval.resolved_at = utc_now()
             logger.info("Approval request #%s expired before %s", approval.id, reason.lower())
             continue
+        if outcome == 'approved' and _acted_by_requester(approval, user_id, username):
+            # Nobody approves their own request: it is withdrawn, without a vote
+            approval.status = 'cancelled'
+            approval.resolved_at = utc_now()
+            db.session.info.setdefault(_UNCOMMITTED, []).append(
+                (approval.id, approval.request_type, username, reason))
+            logger.info("Approval request #%s cancelled by its requester: %s", approval.id, reason)
+            continue
         approval.add_approval(user_id=user_id, username=username,
                               action='approve' if outcome == 'approved' else 'reject',
                               comment=reason)
@@ -232,7 +364,8 @@ def _resolve_moot_requests(request_type: str, key: str, target_id, *, outcome: s
         logger.info("Approval request #%s resolved as %s: %s", approval.id, outcome, reason)
     if touched and commit:
         from utils.db_transaction import safe_commit
-        safe_commit(logger, "Failed to resolve superseded approval requests")
+        if safe_commit(logger, "Failed to resolve superseded approval requests")[0]:
+            record_cancellations()
     return resolved
 
 

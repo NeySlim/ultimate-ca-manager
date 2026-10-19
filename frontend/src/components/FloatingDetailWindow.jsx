@@ -142,10 +142,12 @@ export function FloatingDetailWindow({ windowInfo }) {
   const handleRevokeConfirm = async (reason) => {
     setRevokeOpen(false)
     try {
+      let queued = null
       if (windowInfo.type === 'ca') {
         // Intermediate CA revoked from its parent (#343)
         const res = await casService.revoke(windowInfo.entityId, { reason })
-        showSuccess(t('cas.revokeSuccess', 'CA revoked'))
+        if (res?.data?.approval_required) queued = t('cas.revocationApprovalRequired', { policy: res.data.policy_name })
+        else showSuccess(t('cas.revokeSuccess', 'CA revoked'))
         // The parent could not publish the revocation (offline parent, CDP off)
         const revoked = res?.data || res
         const codes = revoked?.warning_codes || []
@@ -154,13 +156,19 @@ export function FloatingDetailWindow({ windowInfo }) {
       } else if (windowInfo.type === 'user_certificate') {
         // entityId is the enrolment id, which only this route resolves; the
         // certificates route would look it up in a different table.
-        await userCertificatesService.revoke(windowInfo.entityId, reason)
-        showSuccess(t('certificates.revoked', 'Certificate revoked'))
+        const res = await userCertificatesService.revoke(windowInfo.entityId, reason)
+        if (res?.data?.approval_required) queued = t('certificates.revocationApprovalRequired', { policy: res.data.policy_name })
+        else showSuccess(t('certificates.revoked', 'Certificate revoked'))
       } else {
-        await certificatesService.revoke(windowInfo.entityId, reason)
-        showSuccess(t('certificates.revoked', 'Certificate revoked'))
+        const res = await certificatesService.revoke(windowInfo.entityId, reason)
+        if (res?.data?.approval_required) queued = t('certificates.revocationApprovalRequired', { policy: res.data.policy_name })
+        else showSuccess(t('certificates.revoked', 'Certificate revoked'))
       }
-      if (deleteAfterRevoke) {
+      if (queued) {
+        // Held by a revocation policy: nothing was revoked, so nothing is deleted
+        showWarning(queued)
+        setDeleteAfterRevoke(false)
+      } else if (deleteAfterRevoke) {
         setDeleteAfterRevoke(false)
         try {
           await config.service().delete(windowInfo.entityId)

@@ -20,12 +20,27 @@ import { formatDate, cn } from '../lib/utils'
 import { pickerCas } from '../lib/caSelection'
 import { useFipsMode } from '../lib/policyAlgorithms'
 
-// Policy type options — labels resolved via t() inside component
+// Operations a policy governs: labels resolved via t() inside component
 const POLICY_TYPES = [
-  { value: 'issuance', labelKey: 'policies.policyType.issuance' },
-  { value: 'renewal', labelKey: 'policies.policyType.renewal' },
-  { value: 'revocation', labelKey: 'policies.policyType.revocation' },
+  { value: 'issuance', labelKey: 'policies.policyType.issuance', helpKey: 'policies.operationHelp.issuance', variant: 'info' },
+  { value: 'renewal', labelKey: 'policies.policyType.renewal', helpKey: 'policies.operationHelp.renewal', variant: 'success' },
+  { value: 'revocation', labelKey: 'policies.policyType.revocation', helpKey: 'policies.operationHelp.revocation', variant: 'warning' },
 ]
+
+// One badge per operation; a policy left with none (an old renewal or
+// revocation type, never enforced) says so
+function OperationBadges({ operations, t }) {
+  if (!operations?.length) {
+    return <Badge variant="danger">{t('policies.noOperation')}</Badge>
+  }
+  return (
+    <div className="flex flex-wrap gap-1">
+      {POLICY_TYPES.filter(o => operations.includes(o.value)).map(o => (
+        <Badge key={o.value} variant={o.variant}>{t(o.labelKey)}</Badge>
+      ))}
+    </div>
+  )
+}
 
 // Key type options — labels resolved via t() inside component.
 // RSA-3072 was missing here while `api/v2/templates._VALID_KEY_TYPES`
@@ -59,7 +74,7 @@ const DIGEST_OPTIONS = [
 const DEFAULT_FORM = {
   name: '',
   description: '',
-  policy_type: 'issuance',
+  operations: ['issuance'],
   ca_id: null,
   template_id: null,
   requires_approval: false,
@@ -80,6 +95,14 @@ const DEFAULT_FORM = {
     },
   },
   notification_emails: [],
+}
+
+// Same shape the server accepts: one mailbox, no separators or brackets
+const EMAIL_RE = /^[^@\s,;<>"]+@[^@\s,;<>"]+$/
+
+function parseEmails(text) {
+  const emails = (text || '').split(/[\s,;]+/).filter(Boolean)
+  return { emails, invalid: emails.filter(e => !EMAIL_RE.test(e)) }
 }
 
 export default function PoliciesPage() {
@@ -124,6 +147,8 @@ export default function PoliciesPage() {
 
   // Modal state (page-specific)
   const [formData, setFormData] = useState({ ...DEFAULT_FORM })
+  const [emailsText, setEmailsText] = useState('')
+  const parsedEmails = parseEmails(emailsText)
   const [actionInProgress, setActionInProgress] = useState(false)
 
   // Filters
@@ -133,7 +158,7 @@ export default function PoliciesPage() {
   // Filtered policies
   const filteredPolicies = useMemo(() => {
     let result = policies
-    if (filterType.length > 0) result = result.filter(p => filterType.includes(p.policy_type))
+    if (filterType.length > 0) result = result.filter(p => (p.operations || []).some(op => filterType.includes(op)))
     if (filterStatus.length > 0) {
       result = result.filter(p => {
         if (p.is_active && filterStatus.includes('active')) return true
@@ -197,15 +222,10 @@ export default function PoliciesPage() {
       ),
     },
     {
-      key: 'policy_type',
-      header: t('common.type'),
+      key: 'operations',
+      header: t('policies.operations'),
       priority: 2,
-      sortable: true,
-      render: (val) => (
-        <Badge variant={val === 'issuance' ? 'info' : val === 'renewal' ? 'success' : 'warning'}>
-          {val}
-        </Badge>
-      ),
+      render: (val) => <OperationBadges operations={val} t={t} />,
     },
     {
       key: 'ca_name',
@@ -279,6 +299,7 @@ export default function PoliciesPage() {
   const openCreateModal = () => {
     setEditing(null)
     setFormData({ ...DEFAULT_FORM, rules: { ...DEFAULT_FORM.rules, san_restrictions: { ...DEFAULT_FORM.rules.san_restrictions } } })
+    setEmailsText('')
     setShowModal(true)
   }
 
@@ -287,7 +308,7 @@ export default function PoliciesPage() {
     setFormData({
       name: policy.name || '',
       description: policy.description || '',
-      policy_type: policy.policy_type || 'issuance',
+      operations: Array.isArray(policy.operations) ? policy.operations : ['issuance'],
       ca_id: policy.ca_id || null,
       template_id: policy.template_id || null,
       requires_approval: policy.requires_approval || false,
@@ -309,20 +330,23 @@ export default function PoliciesPage() {
       },
       notification_emails: policy.notification_emails || [],
     })
+    setEmailsText((policy.notification_emails || []).join('\n'))
     setShowModal(true)
   }
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!formData.name.trim()) return
+    if (!formData.name.trim() || !(formData.operations || []).length) return
+    if (parsedEmails.invalid.length) return
+    const payload = { ...formData, notification_emails: parsedEmails.emails }
 
     try {
       setSaving(true)
       if (editing) {
-        await policiesService.update(editing.id, formData)
+        await policiesService.update(editing.id, payload)
         showSuccess(t('policies.updated'))
       } else {
-        await policiesService.create(formData)
+        await policiesService.create(payload)
         showSuccess(t('policies.created'))
       }
       setShowModal(false)
@@ -378,6 +402,14 @@ export default function PoliciesPage() {
     })
   }
 
+  const toggleOperation = (operation) => {
+    setFormData(prev => {
+      const current = prev.operations || []
+      const next = current.includes(operation) ? current.filter(o => o !== operation) : [...current, operation]
+      return { ...prev, operations: next }
+    })
+  }
+
   const toggleKeyType = (keyType) => {
     setFormData(prev => {
       const current = prev.rules.allowed_key_types || []
@@ -396,9 +428,7 @@ export default function PoliciesPage() {
         <Badge variant={selectedPolicy.is_active ? 'success' : 'warning'} size="lg">
           {selectedPolicy.is_active ? t('policies.active') : t('policies.inactive')}
         </Badge>
-        <Badge variant={selectedPolicy.policy_type === 'issuance' ? 'info' : selectedPolicy.policy_type === 'renewal' ? 'success' : 'warning'}>
-          {selectedPolicy.policy_type}
-        </Badge>
+        <OperationBadges operations={selectedPolicy.operations} t={t} />
       </div>
 
       {selectedPolicy.description && (
@@ -610,21 +640,36 @@ export default function PoliciesPage() {
       >
         <form onSubmit={handleSubmit} className="p-4 space-y-4">
           {/* Basic Info */}
-          <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
-            <Input
-              label={t('policies.policyName')}
-              value={formData.name}
-              onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
-              placeholder={t('policies.policyNamePlaceholder')}
-              required
-            />
-            <Select
-              label={t('common.type')}
-              value={formData.policy_type}
-              onChange={(val) => setFormData(p => ({ ...p, policy_type: val }))}
-              options={policyTypeOptions}
-            />
-          </div>
+          <Input
+            label={t('policies.policyName')}
+            value={formData.name}
+            onChange={(e) => setFormData(p => ({ ...p, name: e.target.value }))}
+            placeholder={t('policies.policyNamePlaceholder')}
+            required
+          />
+
+          <fieldset>
+            <legend className="text-sm font-medium text-text-primary mb-2">{t('policies.operations')}</legend>
+            <div className="space-y-2">
+              {POLICY_TYPES.map(op => (
+                <label key={op.value} className="flex items-start gap-2 cursor-pointer">
+                  <input
+                    type="checkbox"
+                    checked={(formData.operations || []).includes(op.value)}
+                    onChange={() => toggleOperation(op.value)}
+                    className="rounded border-border mt-0.5"
+                  />
+                  <span>
+                    <span className="text-sm text-text-primary">{t(op.labelKey)}</span>
+                    <span className="block text-xs text-text-tertiary">{t(op.helpKey)}</span>
+                  </span>
+                </label>
+              ))}
+            </div>
+            {!(formData.operations || []).length && (
+              <p className="text-xs text-status-danger mt-1">{t('policies.operationsRequired')}</p>
+            )}
+          </fieldset>
 
           <Textarea
             label={t('common.description')}
@@ -666,6 +711,9 @@ export default function PoliciesPage() {
               <Gavel size={16} /> {t('policies.rules')}
             </h4>
             <p className="text-xs text-text-tertiary mb-3">{t('policies.rulesEnforcedHelp')}</p>
+            {!(formData.operations || []).some(op => op === 'issuance' || op === 'renewal') && (
+              <p className="text-xs text-status-warning mb-3">{t('policies.rulesRevocationOnly')}</p>
+            )}
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
               <Input
                 label={t('policies.maxValidity')}
@@ -819,6 +867,25 @@ export default function PoliciesPage() {
               <Bell size={16} className="text-text-secondary" />
               <span className="text-sm text-text-primary">{t('policies.notifyOnViolation')}</span>
             </label>
+            <p className="text-xs text-text-secondary mt-1">{t('policies.notifyHelp')}</p>
+            {formData.notify_on_violation && (
+              <div className="mt-3">
+                <Textarea
+                  label={t('policies.notificationEmails')}
+                  value={emailsText}
+                  onChange={(e) => setEmailsText(e.target.value)}
+                  placeholder="pki-team@example.com"
+                  rows={2}
+                />
+                {parsedEmails.invalid.length > 0 ? (
+                  <p className="text-xs text-status-danger mt-1">
+                    {t('policies.invalidEmails', { emails: parsedEmails.invalid.join(', ') })}
+                  </p>
+                ) : (
+                  <p className="text-xs text-text-secondary mt-1">{t('policies.notificationEmailsHelp')}</p>
+                )}
+              </div>
+            )}
           </div>
 
           {/* Footer */}
@@ -826,7 +893,7 @@ export default function PoliciesPage() {
             <Button type="button" variant="secondary" onClick={() => { setShowModal(false); setEditing(null) }}>
               {t('common.cancel')}
             </Button>
-            <Button type="submit" disabled={saving || !formData.name.trim()}>
+            <Button type="submit" disabled={saving || !formData.name.trim() || !(formData.operations || []).length || parsedEmails.invalid.length > 0}>
               {saving ? <LoadingSpinner size="sm" /> : (editing ? t('common.update') : t('common.create'))}
             </Button>
           </div>

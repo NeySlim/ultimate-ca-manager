@@ -822,7 +822,8 @@
     "templateOverridesHint": "与模板 '{{name}}' 的差异项：{{fields}}",
     "deleteNeedsRevoke": "此证书仍然有效，因此无法单独删除：删除后它会从 UCM 中消失，但对任何不检查吊销状态的客户端而言仍受信任。请先吊销，使 CRL 和 OCSP 响应程序反映该撤回，然后再删除。",
     "revokeThenDelete": "先吊销，再删除",
-    "noKeyTypeAllowedByPolicy": "此 CA 和模板的策略不允许任何密钥类型。"
+    "noKeyTypeAllowedByPolicy": "此 CA 和模板的策略不允许任何密钥类型。",
+    "revocationApprovalRequired": "吊销已提交审批（策略：{{policy}}）"
   },
   "cas": {
     "chainRevoked": "上游已吊销",
@@ -1005,7 +1006,8 @@
     "offlineKeyFileTooLarge": "密钥文件过大（最大 256 KB）",
     "restorePasswordHint": "将 CA 设为离线时使用的密码。",
     "namedUrls": "在协议URL中使用CA名称",
-    "namedUrlsHint": "CDP/OCSP/AIA 路径使用由 CA 名称生成的短标识替代随机 ID。便于手动配置;但会在 URL 中暴露 CA 名称。也可以稍后启用;一旦启用便无法撤销。"
+    "namedUrlsHint": "CDP/OCSP/AIA 路径使用由 CA 名称生成的短标识替代随机 ID。便于手动配置;但会在 URL 中暴露 CA 名称。也可以稍后启用;一旦启用便无法撤销。",
+    "revocationApprovalRequired": "CA 吊销已提交审批（策略：{{policy}}）"
   },
   "csrs": {
     "uploadCSR": "上传CSR",
@@ -3987,7 +3989,19 @@
     "title": "审批请求",
     "total": "总计",
     "certificateRequest": "证书请求",
-    "certificateIssued": "证书已成功颁发"
+    "certificateIssued": "证书已成功颁发",
+    "requestType": {
+      "certificate": "证书",
+      "csr": "CSR 签署",
+      "renewal": "续期",
+      "revocation": "吊销",
+      "ca_revocation": "CA 吊销"
+    },
+    "revocationPerformed": "已批准：吊销已执行",
+    "summarySerial": "序列号",
+    "summaryInvalidity": "失效日期",
+    "summaryTrigger": "请求方",
+    "triggerScheduler": "续期调度器"
   },
   "messages": {
     "confirm": {
@@ -4274,6 +4288,10 @@
     "noPolicies": "暂无策略",
     "noPoliciesDesc": "创建证书策略以强制执行签发规则、密钥要求和审批工作流。",
     "notifyOnViolation": "策略违规时发送通知",
+    "notifyHelp": "策略拒绝某项操作或将其挂起等待审批时发送电子邮件",
+    "notificationEmails": "通知地址",
+    "notificationEmailsHelp": "每行一个。留空则发送给该策略的审批人",
+    "invalidEmails": "无效的地址：{{emails}}",
     "policyName": "策略名称",
     "policyNamePlaceholder": "例如：生产环境 TLS 策略",
     "priority": "优先级",
@@ -4299,7 +4317,16 @@
     },
     "allowedDigests": "允许的签名摘要",
     "allowedKeyTypesHelp": "未选择任何项：允许所有密钥类型。",
-    "allowedDigestsHelp": "未选择任何项：允许所有摘要。"
+    "allowedDigestsHelp": "未选择任何项：允许所有摘要。",
+    "operations": "操作",
+    "operationHelp": {
+      "issuance": "签发表单、CSR 签署和批量签署，以及操作员执行的续期",
+      "renewal": "操作员执行的续期（单个或批量），以及调度器的续期，此时调度器会将续期排队",
+      "revocation": "操作员对证书和中间 CA 的吊销；ACME 无法等待决定，因此会被拒绝"
+    },
+    "operationsRequired": "请至少选择一项操作",
+    "noOperation": "无操作",
+    "rulesRevocationOnly": "规则仅适用于签发和续期：吊销策略仅按其 CA、模板和 DNS 模式限定范围。"
   },
   "reports": {
     "complianceReport": "合规报告",

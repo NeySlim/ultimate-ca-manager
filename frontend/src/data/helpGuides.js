@@ -2700,16 +2700,20 @@ Security-sensitive settings: session, lockout, HSTS, public URL, and password po
 
 Certificate policies define the rules and constraints enforced when certificates are issued, renewed, or revoked. Policies are evaluated in **priority order** (lower number = higher precedence) and can be scoped to specific CAs.
 
-## Policy Types
+## Operations
 
-### Issuance Policies
-Rules applied when new certificates are created. This is the most common type. Controls key types, validity periods, SAN restrictions, and whether approval is required.
+A policy governs one or more operations: its approval requirement and its rules apply to those.
 
-### Renewal Policies
-Rules applied when certificates are renewed. Can enforce shorter validity on renewal or require re-approval.
+### Issuance
+The issue form, CSR signing and bulk signing, and the renewals an operator performs. This is the most common choice. Controls key types, validity periods, SAN restrictions, and whether approval is required.
 
-### Revocation Policies
-Rules applied when certificates are revoked. Can require approval before revocation of critical certificates.
+### Renewal
+Renewals by an operator, one or in bulk, and by the scheduler. Under a renewal policy that requires approval, the scheduler queues the renewal instead of performing it, and the approval re-signs the key the server holds.
+
+### Revocation
+Revocations of certificates (one, in bulk, from the user certificates) and of intermediate CAs. Scoped by the issuing CA, the template and the DNS pattern; a CA's revocation is also held by the policies scoped on that CA, since every certificate it issued falls with it. The other rules do not apply. An ACME client cannot wait for a decision: its revocation is refused, and left to the operators. Removing an mTLS enrolment is refused until its certificate is revoked, whoever holds it; administrators bypass.
+
+A policy created before operations existed keeps what it did: an issuance policy stays one, and a renewal or revocation type, never enforced, governs nothing until you choose its operations.
 
 ## Rules Configuration
 
@@ -2739,7 +2743,7 @@ When **Require Approval** is enabled, certificate issuance is paused until the r
 ### Configuration
 - **Approval Group**: Select a user group responsible for approvals
 - **Min Approvers**: Number of approvals required (e.g. 2 of 3 group members)
-- **Notifications**: Alert administrators when policies are violated
+- **Notifications**: e-mail when the policy refuses an operation (a rule broken) or holds one for approval. They go to the policy's notification addresses, else to its approvers (the members of its approval group, or every user who may approve). Each held request is reported once, with a link to it; the same refusal repeated, by an ACME client retrying for instance, once per hour. SMTP must be configured
 
 > 💡 Use approval workflows for high-value certificates like code signing and wildcard certificates.
 
@@ -2794,10 +2798,15 @@ Any single rejection immediately stops the request. The certificate will not be 
 ### Expired
 The request was not decided within seven days. Expired requests must be re-submitted.
 
+### Cancelled
+Its requester performed the action directly, or approved another request for the same target: nobody approves their own request, so it is closed without a vote.
+
 ## Where requests come from
 Beyond the issue form, a policy that requires approval also queues:
 - **Sign CSR** and **bulk signing** from Operations: the approval performs the signing
 - **Renew** and **bulk renew**: the approval performs the renewal; a renewal that could not be honoured (revoked certificate, key not held by the server) is refused at once instead of queued
+- **Revoke** (a certificate, in bulk, a user certificate, an intermediate CA) under a revocation policy: the approval revokes with the reason and invalidity date asked for, once checked again (a certificate renewed since the request is not revoked)
+- The **renewal scheduler**, under a renewal policy: it queues the renewal once, and the approval performs it as the scheduler would have
 
 Administrators bypass the queue on every path.
 
@@ -2806,11 +2815,12 @@ Administrators bypass the queue on every path.
 - A request whose target was **deleted or revoked** is closed as rejected; a certificate hold keeps the renewal request waiting for the unhold
 - Approving a request **already satisfied** closes it on the existing certificate; approving one of several requests for the same target closes the others as approved by you
 - Approving a request whose stored request, certificate or CA **no longer exists** closes it as rejected
+- A queued revocation whose certificate was **revoked directly** is closed as approved (cancelled when its requester revoked it); one whose certificate was **renewed** since is closed as rejected when approved; during a certificate hold it waits for the unhold
 
 Webhooks are told of these closures as for a rejection.
 
 ## Deadline
-A request waits **seven days** for a decision. Past that it is closed as expired, is never counted as pending, and the renewal scheduler resumes for its certificate. While a renewal awaits approval, the scheduler leaves the certificate to that decision, as long as it can come before the certificate expires.
+A request waits **seven days** for a decision. Past that it is closed as expired, is never counted as pending, and the renewal scheduler resumes for its certificate. While a renewal awaits approval, the scheduler leaves the certificate to that decision, as long as it can come before the certificate expires; under a renewal policy it never renews without one.
 
 ## Approving a Request
 

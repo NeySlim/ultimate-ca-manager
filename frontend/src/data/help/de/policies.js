@@ -5,11 +5,12 @@ export default {
     overview: 'Definieren und verwalten Sie Zertifikatsrichtlinien, die Ausstellungsregeln, Schlüsselanforderungen, Gültigkeitsgrenzen und Genehmigungsworkflows steuern. Richtlinien werden in Prioritätsreihenfolge ausgewertet, wenn Zertifikate angefordert werden.',
     sections: [
       {
-        title: 'Richtlinientypen',
+        title: 'Operationen',
         items: [
-          { label: 'Ausstellung', text: 'Regeln, die bei der Erstellung neuer Zertifikate angewendet werden' },
-          { label: 'Erneuerung', text: 'Regeln, die bei der Erneuerung von Zertifikaten angewendet werden' },
-          { label: 'Widerruf', text: 'Regeln, die beim Widerruf von Zertifikaten angewendet werden' },
+          { label: 'Ausstellung', text: 'Das Ausstellungsformular, CSR-Signierung und Massensignierung sowie die von einem Operator ausgeführten Erneuerungen' },
+          { label: 'Erneuerung', text: 'Erneuerungen durch einen Operator, einzeln oder in Masse, und durch den Planer, der seine Erneuerung einreiht, statt sie auszuführen' },
+          { label: 'Widerruf', text: 'Widerrufe von Zertifikaten und Zwischen-CAs durch einen Operator (bei einer CA auch unter den auf sie eingegrenzten Richtlinien); ein ACME-Client kann nicht auf eine Entscheidung warten, daher wird sein Widerruf abgelehnt' },
+          { label: 'Mehrere gleichzeitig', text: 'Eine Richtlinie kann mehrere Operationen steuern; eine ohne Operation (ein alter, nie durchgesetzter Erneuerungs- oder Widerrufstyp) steuert nichts, bis Sie eine wählen' },
         ]
       },
       {
@@ -25,7 +26,7 @@ export default {
         items: [
           { label: 'Genehmigungsgruppen', text: 'Eine Benutzergruppe zuweisen, die für die Genehmigung von Anfragen verantwortlich ist' },
           { label: 'Min. Genehmiger', text: 'Anzahl der erforderlichen Genehmigungen vor der Ausstellung' },
-          { label: 'Benachrichtigungen', text: 'Administratoren bei Richtlinienverstößen benachrichtigen' },
+          { label: 'Benachrichtigungen', text: 'E-Mail, wenn die Richtlinie einen Vorgang ablehnt oder zur Genehmigung zurückhält; an die aufgeführten Adressen, sonst an ihre Genehmiger. Eine wiederholte Ablehnung wird nur einmal pro Stunde gemeldet' },
         ]
       },
     ],
@@ -42,16 +43,20 @@ export default {
 
 Zertifikatsrichtlinien definieren die Regeln und Einschränkungen, die bei der Ausstellung, Erneuerung oder dem Widerruf von Zertifikaten durchgesetzt werden. Richtlinien werden in **Prioritätsreihenfolge** ausgewertet (niedrigere Nummer = höhere Priorität) und können auf bestimmte CAs beschränkt werden.
 
-## Richtlinientypen
+## Operationen
 
-### Ausstellungsrichtlinien
-Regeln, die bei der Erstellung neuer Zertifikate angewendet werden. Dies ist der häufigste Typ. Steuert Schlüsseltypen, Gültigkeitszeiträume, SAN-Einschränkungen und ob eine Genehmigung erforderlich ist.
+Eine Richtlinie steuert eine oder mehrere Operationen: Ihre Genehmigungspflicht und ihre Regeln gelten für diese.
 
-### Erneuerungsrichtlinien
-Regeln, die bei der Erneuerung von Zertifikaten angewendet werden. Können kürzere Gültigkeitsdauern bei der Erneuerung erzwingen oder eine erneute Genehmigung erfordern.
+### Ausstellung
+Das Ausstellungsformular, CSR-Signierung und Massensignierung sowie die von einem Operator ausgeführten Erneuerungen. Dies ist die häufigste Wahl. Steuert Schlüsseltypen, Gültigkeitszeiträume, SAN-Einschränkungen und ob eine Genehmigung erforderlich ist.
 
-### Widerrufsrichtlinien
-Regeln, die beim Widerruf von Zertifikaten angewendet werden. Können eine Genehmigung vor dem Widerruf kritischer Zertifikate erfordern.
+### Erneuerung
+Erneuerungen durch einen Operator, einzeln oder in Masse, und durch den Planer. Bei einer Erneuerungsrichtlinie mit Genehmigungspflicht reiht der Planer die Erneuerung ein, statt sie auszuführen, und die Genehmigung signiert den vom Server gehaltenen Schlüssel neu.
+
+### Widerruf
+Widerrufe von Zertifikaten (einzeln, in Masse, aus den Benutzerzertifikaten) und von Zwischen-CAs. Eingegrenzt durch die ausstellende CA, die Vorlage und das DNS-Muster; der Widerruf einer CA wird auch von den auf diese CA eingegrenzten Richtlinien angehalten, da alle von ihr ausgestellten Zertifikate mit fallen. Die übrigen Regeln gelten nicht. Ein ACME-Client kann nicht auf eine Entscheidung warten: Sein Widerruf wird abgelehnt und den Operatoren überlassen. Das Entfernen einer mTLS-Registrierung wird abgelehnt, bis ihr Zertifikat widerrufen ist, unabhängig davon, wem sie gehört; Administratoren umgehen dies.
+
+Eine Richtlinie, die vor den Operationen erstellt wurde, behält ihr Verhalten: Eine Ausstellungsrichtlinie bleibt eine solche, und ein nie durchgesetzter Erneuerungs- oder Widerrufstyp steuert nichts, bis Sie seine Operationen wählen.
 
 ## Regelkonfiguration
 
@@ -81,7 +86,7 @@ Wenn **Genehmigung erforderlich** aktiviert ist, wird die Zertifikatsausstellung
 ### Konfiguration
 - **Genehmigungsgruppe**: Eine Benutzergruppe auswählen, die für Genehmigungen verantwortlich ist
 - **Min. Genehmiger**: Anzahl der erforderlichen Genehmigungen (z.B. 2 von 3 Gruppenmitgliedern)
-- **Benachrichtigungen**: Administratoren bei Richtlinienverstößen benachrichtigen
+- **Benachrichtigungen**: E-Mail, wenn die Richtlinie einen Vorgang ablehnt (eine Regel verletzt) oder zur Genehmigung zurückhält. Sie gehen an die Benachrichtigungsadressen der Richtlinie, sonst an ihre Genehmiger (die Mitglieder ihrer Genehmigungsgruppe oder alle Benutzer, die genehmigen dürfen). Jede zurückgehaltene Anfrage wird einmal mit einem Link darauf gemeldet; dieselbe wiederholte Ablehnung, etwa durch einen ACME-Client mit Wiederholungsversuchen, einmal pro Stunde. SMTP muss konfiguriert sein
 
 > 💡 Verwenden Sie Genehmigungsworkflows für hochwertige Zertifikate wie Code-Signierung und Wildcard-Zertifikate.
 

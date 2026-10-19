@@ -27,17 +27,9 @@ def _requested_validity(data):
 def _approval_for_renewal(user, cert, data, validity_days=None):
     """Queue the renewal for approval when a policy requires it: ``(policy,
     approval)`` or ``(None, None)``. Raises on evaluation error."""
-    from services.approval_gate import certificate_identity, queue_if_approval_required
-    from services.cert.renewal import resolve_issuing_ca
-    ca = resolve_issuing_ca(cert)
-    cn, dns = certificate_identity(cert.crt)
-    return queue_if_approval_required(
-        user, ca_id=ca.id if ca else None, template_id=getattr(cert, 'template_id', None),
-        cn=cn, san_list=dns, request_type='renewal',
-        request_data={'certificate_id': cert.id, 'ca_id': ca.id if ca else None, 'cn': cn,
-                      'cert_type': cert.cert_type, 'validity_days': validity_days},
-        comment=(data or {}).get('approval_comment'),
-    )
+    from services.approval_gate import queue_renewal
+    return queue_renewal(user, cert, validity_days=validity_days,
+                         comment=(data or {}).get('approval_comment'))
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>/renew', methods=['POST'])
@@ -76,8 +68,8 @@ def renew_certificate(cert_id):
             return error_response('The Microsoft CA sets the duration of a certificate it renews', 400)
         return _renew_msca_certificate(cert)
     # Refused outright when no renewal could honour the request; only then
-    # an issuance policy that requires approval binds a renewal as it binds
-    # the issue form (administrators bypass). Fail closed on any error.
+    # a policy that requires approval for renewals queues it (administrators
+    # bypass). Fail closed on any error.
     try:
         check_renewable(cert)
     except RenewalError as e:

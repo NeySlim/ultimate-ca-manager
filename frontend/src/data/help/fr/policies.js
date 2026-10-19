@@ -5,11 +5,12 @@ export default {
     overview: 'Définissez et gérez les politiques de certificat qui contrôlent les règles d\'émission, les exigences de clés, les limites de validité et les flux d\'approbation. Les politiques sont évaluées par ordre de priorité lors des demandes de certificats.',
     sections: [
       {
-        title: 'Types de politiques',
+        title: 'Opérations',
         items: [
-          { label: 'Émission', text: 'Règles appliquées lors de la création de nouveaux certificats' },
-          { label: 'Renouvellement', text: 'Règles appliquées lors du renouvellement de certificats' },
-          { label: 'Révocation', text: 'Règles appliquées lors de la révocation de certificats' },
+          { label: 'Émission', text: 'Le formulaire d\'émission, la signature de CSR et la signature en masse, ainsi que les renouvellements effectués par un opérateur' },
+          { label: 'Renouvellement', text: 'Renouvellements par un opérateur, un seul ou en masse, et par le planificateur, qui met son renouvellement en file au lieu de l\'effectuer' },
+          { label: 'Révocation', text: 'Révocations de certificats et de CA intermédiaires par un opérateur (une CA aussi sous les politiques qui la ciblent) ; un client ACME ne peut pas attendre une décision, sa révocation est donc refusée' },
+          { label: 'Plusieurs à la fois', text: 'Une politique peut couvrir plusieurs opérations ; une politique sans aucune (ancien type renouvellement ou révocation, jamais appliqué) ne couvre rien tant que vous n\'en choisissez pas' },
         ]
       },
       {
@@ -25,7 +26,7 @@ export default {
         items: [
           { label: 'Groupes d\'approbation', text: 'Assigner un groupe d\'utilisateurs responsable de l\'approbation des demandes' },
           { label: 'Approbateurs min', text: 'Nombre d\'approbations requises avant l\'émission' },
-          { label: 'Notifications', text: 'Alerter les administrateurs lors de violations de politique' },
+          { label: 'Notifications', text: "E-mail lorsque la politique refuse une opération ou en retient une pour approbation ; envoyé aux adresses listées, sinon à ses approbateurs. Un refus répété n'est signalé qu'une fois par heure" },
         ]
       },
     ],
@@ -42,16 +43,20 @@ export default {
 
 Les politiques de certificat définissent les règles et contraintes appliquées lors de l'émission, du renouvellement ou de la révocation de certificats. Les politiques sont évaluées par **ordre de priorité** (nombre plus bas = priorité plus élevée) et peuvent être scopées à des CA spécifiques.
 
-## Types de politiques
+## Opérations
 
-### Politiques d'émission
-Règles appliquées lors de la création de nouveaux certificats. C'est le type le plus courant. Contrôle les types de clés, les périodes de validité, les restrictions SAN et si l'approbation est requise.
+Une politique couvre une ou plusieurs opérations : son exigence d'approbation et ses règles s'appliquent à celles-ci.
 
-### Politiques de renouvellement
-Règles appliquées lors du renouvellement de certificats. Peuvent imposer une validité plus courte au renouvellement ou exiger une réapprobation.
+### Émission
+Le formulaire d'émission, la signature de CSR et la signature en masse, ainsi que les renouvellements effectués par un opérateur. C'est le choix le plus courant. Contrôle les types de clés, les périodes de validité, les restrictions SAN et si l'approbation est requise.
 
-### Politiques de révocation
-Règles appliquées lors de la révocation de certificats. Peuvent exiger une approbation avant la révocation de certificats critiques.
+### Renouvellement
+Renouvellements par un opérateur, un seul ou en masse, et par le planificateur. Sous une politique de renouvellement qui exige une approbation, le planificateur met le renouvellement en file au lieu de l'effectuer, et l'approbation re-signe la clé détenue par le serveur.
+
+### Révocation
+Révocations de certificats (un seul, en masse, depuis les certificats utilisateur) et de CA intermédiaires. Limitée par la CA émettrice, le modèle et le motif DNS ; la révocation d'une CA est aussi retenue par les politiques limitées à cette CA, puisque tous les certificats qu'elle a émis tombent avec elle. Les autres règles ne s'appliquent pas. Un client ACME ne peut pas attendre une décision : sa révocation est refusée et laissée aux opérateurs. Supprimer une inscription mTLS est refusé tant que son certificat n'est pas révoqué, quel qu'en soit le titulaire ; les administrateurs contournent.
+
+Une politique créée avant l'existence des opérations conserve son comportement : une politique d'émission le reste, et un type renouvellement ou révocation, jamais appliqué, ne couvre rien tant que vous n'en choisissez pas les opérations.
 
 ## Configuration des règles
 
@@ -81,7 +86,7 @@ Lorsque **Approbation requise** est activé, l'émission de certificat est suspe
 ### Configuration
 - **Groupe d'approbation** : Sélectionner un groupe d'utilisateurs responsable des approbations
 - **Approbateurs min** : Nombre d'approbations requises (par ex. 2 sur 3 membres du groupe)
-- **Notifications** : Alerter les administrateurs lors de violations de politique
+- **Notifications** : e-mail lorsque la politique refuse une opération (règle enfreinte) ou en retient une pour approbation. Il est envoyé aux adresses de notification de la politique, sinon à ses approbateurs (les membres de son groupe d'approbation, ou tous les utilisateurs pouvant approuver). Chaque demande retenue est signalée une fois, avec un lien vers elle ; un même refus répété, par exemple par un client ACME qui réessaie, une fois par heure. SMTP doit être configuré
 
 > 💡 Utilisez les flux d'approbation pour les certificats de haute valeur comme la signature de code et les certificats génériques.
 

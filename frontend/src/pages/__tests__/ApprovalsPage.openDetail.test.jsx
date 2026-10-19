@@ -39,12 +39,14 @@ const list = vi.fn()
 const getStats = vi.fn()
 const approve = vi.fn()
 const reject = vi.fn()
+const getById = vi.fn()
 vi.mock('../../services', () => ({
   approvalsService: {
     list: (...args) => list(...args),
     getStats: (...args) => getStats(...args),
     approve: (...args) => approve(...args),
     reject: (...args) => reject(...args),
+    getById: (...args) => getById(...args),
   },
 }))
 
@@ -120,5 +122,31 @@ describe('ApprovalsPage — opening what an approval issued', () => {
     await clickApproveOrReject('approve')
     await waitFor(() => expect(approve).toHaveBeenCalled())
     expect(openWindow).not.toHaveBeenCalled()
+  })
+})
+
+describe('ApprovalsPage — what a request asks for', () => {
+  beforeEach(() => {
+    list.mockReset(); getStats.mockReset()
+    getStats.mockResolvedValue({ data: { pending: 1, approved: 0, rejected: 0, total: 1 } })
+  })
+
+  it('names a revocation, not the raw type', async () => {
+    list.mockResolvedValue({ data: [{ ...REQUEST, id: 5, request_type: 'ca_revocation',
+      request_summary: { cn: 'Issuing CA 2', target_ca_id: 3, reason: 'cACompromise' } }] })
+    renderPage()
+    expect(await screen.findByText('approvals.requestType.ca_revocation')).toBeTruthy()
+    expect(screen.queryByText('ca_revocation')).toBeNull()
+  })
+})
+
+describe('ApprovalsPage deep link', () => {
+  it('opens the request named in the link', async () => {
+    list.mockResolvedValue({ data: [] })
+    getStats.mockResolvedValue({ data: {} })
+    getById.mockResolvedValue({ data: { ...REQUEST, id: 42, requester_username: 'linked-bob' } })
+    render(<MemoryRouter initialEntries={['/approvals?id=42']}><ApprovalsPage /></MemoryRouter>)
+    await waitFor(() => expect(getById).toHaveBeenCalledWith('42'))
+    expect(await screen.findByText('linked-bob')).toBeTruthy()
   })
 })

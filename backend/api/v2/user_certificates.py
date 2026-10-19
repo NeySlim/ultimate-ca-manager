@@ -21,6 +21,7 @@ from models import CA, AuthCertificate, Certificate, User, db
 from utils.key_codec import load_pem_bytes
 from services.audit_service import AuditService
 from services.cert_service import CertificateService
+from services.approval_gate import approval_payload, queue_revocation
 from services.mtls_enrollment import remove_enrolment
 from utils.pagination import parse_request_pagination
 from utils.days_remaining import days_remaining as compute_days_remaining
@@ -520,6 +521,18 @@ def revoke_user_certificate(cert_id):
         return error_response(invalid_reason_message(data.get('reason')), 400)
 
     try:
+        policy, approval = queue_revocation(user, cert, reason=reason,
+                                            comment=data.get('approval_comment'),
+                                            auth_certificate_id=auth_cert.id)
+    except Exception as e:
+        logger.error(f"Policy evaluation failed for revocation of user certificate {cert_id}: {e}",
+                     exc_info=True)
+        return error_response('Policy evaluation failed; the certificate was not revoked', 500)
+    if approval is not None:
+        return success_response(data=approval_payload(policy, approval),
+                                message='Certificate revocation submitted for approval')
+
+    try:
         cert = CertificateService.revoke_certificate(
             cert_id=cert.id,
             reason=reason,
@@ -570,10 +583,9 @@ def delete_user_certificate(cert_id):
 
     cert_name = auth_cert.name or f'User Certificate #{cert_id}'
 
-    # No revocation gate here, unlike the certificate routes: removing the
-    # enrolment is what withdraws the access, and a person removing their own
-    # certificate from their account has always been able to.
-    removed, failure = remove_enrolment(auth_cert, username=user.username)
+    # Refused while a policy requires approval to revoke its certificate,
+    # whoever holds it (administrators bypass)
+    removed, failure = remove_enrolment(auth_cert, username=user.username, actor=user)
     if not removed:
         return failure
 

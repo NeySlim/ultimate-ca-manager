@@ -152,6 +152,7 @@ class LifecycleMixin:
             PolicyEvaluationService.applicable_policies(
                 ca.id, template_id, (dn or {}).get('CN'), san_dns),
             ca_private_key, digest, explicit=digest_explicit,
+            context={'operation': 'issuance', 'subject': (dn or {}).get('CN'), 'ca_id': ca.id},
             key_type=_normalize_key_type_label(key_type) or key_type)
         if violations:
             raise PolicyViolation('Policy violation: ' + '; '.join(violations))
@@ -458,12 +459,18 @@ class LifecycleMixin:
         # certificate is not renewed (same transaction as the revocation).
         # A hold is temporary: the request waits for the unhold (approving
         # it meanwhile is refused, the certificate being revoked)
+        # A revocation waiting for approval is closed as approved by this one,
+        # unless it is a hold (the request then waits for the unhold)
         closed_requests = []
         if reason not in ('certificateHold', 'certificate_hold'):
             from services.approval_gate import request_snapshots, resolve_moot_requests
             closed_requests = request_snapshots(resolve_moot_requests(
                 'renewal', 'certificate_id', certificate.id, outcome='rejected',
                 username=username, reason='Certificate revoked', commit=False))
+            resolve_moot_requests(
+                'revocation', 'certificate_id', certificate.id, outcome='approved',
+                username=username, certificate_id=certificate.id,
+                reason='Revoked directly', commit=False)
 
         # Single atomic commit — certificate revocation + RevokedSerial
         # either both persist or both roll back.
@@ -493,6 +500,8 @@ class LifecycleMixin:
             # Audit log
             from services.audit_service import AuditService
             AuditService.log_certificate('cert_revoked', certificate, f'Revoked certificate: {certificate.descr} - Reason: {reason}')
+            from services.approval_gate import record_cancellations
+            record_cancellations()
 
             # Auto-generate CRL if CA has CDP enabled
             ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
@@ -562,6 +571,9 @@ class LifecycleMixin:
                 reason='Request deleted', commit=False))
             closed_renewal_requests = request_snapshots(resolve_moot_requests(
                 'renewal', 'certificate_id', cert_id, outcome='rejected',
+                username=username, reason='Certificate deleted', commit=False))
+            closed_renewal_requests += request_snapshots(resolve_moot_requests(
+                'revocation', 'certificate_id', cert_id, outcome='rejected',
                 username=username, reason='Certificate deleted', commit=False))
             ApprovalRequest.query.filter_by(certificate_id=cert_id).delete()
         except Exception as e:

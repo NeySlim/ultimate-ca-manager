@@ -1184,7 +1184,9 @@ class SCEPService:
             cn_attrs[0].value if cn_attrs else None, list(dns))
         sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
             policies, self.ca_key, explicit=False,
-            key_type=key_label_for_public_key(csr.public_key()))
+            key_type=key_label_for_public_key(csr.public_key()),
+            context={'operation': 'issuance', 'ca_id': self.ca.id,
+                     'subject': cn_attrs[0].value if cn_attrs else None})
         return sign_hash, violations
 
     def _auto_approve_request(

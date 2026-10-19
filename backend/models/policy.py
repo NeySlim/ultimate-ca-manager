@@ -7,6 +7,18 @@ from models import db
 import json
 from utils.datetime_utils import utc_now, utc_isoformat
 
+# Operations a policy can govern
+OPERATIONS = ('issuance', 'renewal', 'revocation')
+
+
+def legacy_operations(policy_type):
+    """The operations a policy of the old single type governed (the backfill
+    of migration 099, also applied to rows restored from older backups): a
+    renewal or revocation type was never enforced."""
+    if policy_type in (None, '', 'issuance'):
+        return ['issuance']
+    return []
+
 
 class CertificatePolicy(db.Model):
     """
@@ -19,8 +31,11 @@ class CertificatePolicy(db.Model):
     name = db.Column(db.String(100), unique=True, nullable=False, index=True)
     description = db.Column(db.Text)
     
-    # Policy Type
-    policy_type = db.Column(db.String(50), default='issuance')  # issuance, renewal, revocation
+    # Legacy single type, kept in step with ``operations`` for older clients
+    policy_type = db.Column(db.String(50), default='issuance')
+    # JSON list of the operations governed (OPERATIONS); NULL reads as the
+    # legacy type did (see legacy_operations)
+    operations = db.Column(db.Text)
     
     # Scope
     ca_id = db.Column(db.Integer, db.ForeignKey('certificate_authorities.id'), nullable=True)
@@ -72,6 +87,23 @@ class CertificatePolicy(db.Model):
     def set_rules(self, rules_dict):
         """Set rules from dict"""
         self.rules = json.dumps(rules_dict)
+
+    def get_operations(self):
+        if self.operations is None:
+            return legacy_operations(self.policy_type)
+        try:
+            ops = json.loads(self.operations)
+        except (TypeError, ValueError):
+            return []
+        return [op for op in OPERATIONS if isinstance(ops, list) and op in ops]
+
+    def set_operations(self, operations):
+        ops = [op for op in OPERATIONS if op in operations]
+        self.operations = json.dumps(ops)
+        self.policy_type = ops[0] if ops else self.policy_type
+
+    def applies_to(self, operation):
+        return operation in self.get_operations()
     
     def to_dict(self):
         return {
@@ -79,6 +111,7 @@ class CertificatePolicy(db.Model):
             'name': self.name,
             'description': self.description,
             'policy_type': self.policy_type,
+            'operations': self.get_operations(),
             'ca_id': self.ca_id,
             'ca_name': self.ca.common_name if self.ca else None,
             'template_id': self.template_id,
@@ -108,7 +141,7 @@ class ApprovalRequest(db.Model):
     )
 
     id = db.Column(db.Integer, primary_key=True)
-    request_type = db.Column(db.String(50), nullable=False)  # certificate, csr, renewal
+    request_type = db.Column(db.String(50), nullable=False)  # certificate, csr, renewal, revocation, ca_revocation
     
     # What needs approval (certificate ID, which can be a CSR or issued cert)
     certificate_id = db.Column(db.Integer, db.ForeignKey('certificates.id'), nullable=True)
@@ -120,11 +153,12 @@ class ApprovalRequest(db.Model):
     policy_id = db.Column(db.Integer, db.ForeignKey('certificate_policies.id'), nullable=True)
     
     # Requester
-    requester_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=False)
+    # None for a request the renewal scheduler queued (migration 099)
+    requester_id = db.Column(db.Integer, db.ForeignKey('users.id'), nullable=True)
     requester_comment = db.Column(db.Text)
     
     # Status
-    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected, expired
+    status = db.Column(db.String(20), default='pending')  # pending, approved, rejected, expired, cancelled
     
     # Approvals received (JSON array)
     # Example: [{"user_id": 1, "username": "admin", "action": "approve", "comment": "OK", "timestamp": "..."}]
@@ -201,7 +235,15 @@ class ApprovalRequest(db.Model):
                     # Names the requester added to a CSR's own (#389)
                     'extra_san': [v for vs in rd['extra_san'].values() for v in vs]
                     if isinstance(rd.get('extra_san'), dict) else [],
+                    # Revocations: what is revoked, why, from when
+                    'serial_number': rd.get('serial_number'),
+                    'target_ca_id': rd.get('target_ca_id'),
+                    'reason': rd.get('reason'),
+                    'invalidity_at': rd.get('invalidity_at'),
+                    'trigger': rd.get('trigger'),
                 }
+                if self.requester is None and rd.get('requested_by'):
+                    result['requester_username'] = rd['requested_by']
             except Exception:
                 pass
         return result

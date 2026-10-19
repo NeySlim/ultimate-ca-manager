@@ -29,13 +29,18 @@ def fake_dns(monkeypatch):
             raise Exception('NXDOMAIN')
         return [_RData(vals)]
 
-    fake_resolver = types.SimpleNamespace(resolve=resolve)
-    fake_dns_mod = types.ModuleType('dns')
+    # Only the resolver is faked: the real package keeps dns.flags & co importable
+    # whatever ran before, and a fake without Resolver keeps the network out
+    import dns
+    import dns.flags  # noqa: F401
+    import dns.rdatatype  # noqa: F401
+    import dns.resolver as real_resolver
     fake_resolver_mod = types.ModuleType('dns.resolver')
     fake_resolver_mod.resolve = resolve
-    fake_dns_mod.resolver = fake_resolver_mod
-    monkeypatch.setitem(sys.modules, 'dns', fake_dns_mod)
+    fake_resolver_mod.NXDOMAIN = real_resolver.NXDOMAIN
+    fake_resolver_mod.NoAnswer = real_resolver.NoAnswer
     monkeypatch.setitem(sys.modules, 'dns.resolver', fake_resolver_mod)
+    monkeypatch.setattr(dns, 'resolver', fake_resolver_mod)
     return state
 
 
@@ -144,8 +149,9 @@ def test_auto_poll_spawns_thread_when_not_testing(app, monkeypatch):
             started.append(True)
 
     monkeypatch.setattr(orders_mod.threading, 'Thread', _SpyThread)
+    # Scoped to this test: a session-wide TESTING=False sends later tests' work to threads
+    monkeypatch.setitem(app.config, 'TESTING', False)
     with app.test_request_context():
-        app.config['TESTING'] = False
         orders_mod._run_auto_poll_background(999999, 'staging')
     assert started == [True], 'a background thread must be spawned outside TESTING'
 

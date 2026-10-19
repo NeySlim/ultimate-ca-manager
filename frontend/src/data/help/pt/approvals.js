@@ -11,6 +11,7 @@ export default {
           { label: 'Aprovada', text: 'Todas as aprovações necessárias foram recebidas, o certificado pode ser emitido' },
           { label: 'Rejeitada', text: 'Qualquer rejeição interrompe imediatamente a solicitação' },
           { label: 'Expirada', text: 'Não decidida em sete dias; encerrada como expirada e nunca contada como pendente' },
+          { label: 'Cancelada', text: 'O solicitante executou a ação diretamente ou aprovou uma duplicata dela: ninguém aprova a própria solicitação' },
         ]
       },
       {
@@ -19,6 +20,8 @@ export default {
           { label: 'Formulário de emissão', text: 'Uma solicitação de certificado que corresponde a uma política que exige aprovação' },
           { label: 'Assinar CSR e assinatura em lote', text: 'Assinar uma solicitação armazenada, sozinha ou a partir de Operações, entra na fila da mesma forma; a aprovação executa a assinatura' },
           { label: 'Renovação', text: 'Renovar um certificado, sozinho ou em lote, também entra na fila; uma renovação que não poderia ser atendida (revogado, chave não detida pelo servidor) é recusada de imediato' },
+          { label: 'Revogação', text: 'Revogar um certificado (sozinho, em lote, a partir dos certificados de usuário) ou uma CA intermédia sob uma política de revogação entra na fila; a aprovação revoga com o motivo pedido' },
+          { label: 'Agendador', text: 'Sob uma política de renovação, o agendador coloca a renovação na fila; a aprovação reassina a chave detida pelo servidor, como o agendador teria feito' },
           { label: 'Administradores', text: 'Ignoram a fila em todos os caminhos, como no formulário de emissão' },
         ]
       },
@@ -29,13 +32,14 @@ export default {
           { label: 'Excluído ou revogado', text: 'Uma solicitação cujo alvo foi excluído ou revogado é encerrada como rejeitada; uma suspensão de certificado mantém a solicitação de renovação aguardando a remoção da suspensão' },
           { label: 'Já atendida', text: 'Aprovar uma solicitação já atendida encerra-a sobre o certificado existente; aprovar uma de várias solicitações para o mesmo alvo encerra as outras como aprovadas por você' },
           { label: 'Alvo inexistente', text: 'Aprovar uma solicitação cuja solicitação armazenada, certificado ou CA não existe mais encerra-a como rejeitada' },
+          { label: 'Revogada ou renovada entretanto', text: 'Uma revogação na fila cujo certificado foi revogado diretamente é encerrada como aprovada; uma cujo certificado foi renovado desde então é encerrada como rejeitada quando aprovada' },
           { label: 'Prazo', text: 'Uma solicitação aguarda sete dias; passado esse prazo, é encerrada como expirada, nunca contada como pendente, e o agendador de renovação retoma o seu certificado' },
         ]
       },
     ],
     tips: [
       'Qualquer rejeição única interrompe imediatamente a aprovação: isso é intencional por segurança.',
-      'Enquanto uma renovação aguarda aprovação, o agendador deixa o certificado a essa decisão, desde que ela possa ocorrer antes de o certificado expirar.',
+      'Enquanto uma renovação aguarda aprovação, o agendador deixa o certificado a essa decisão, desde que ela possa ocorrer antes de o certificado expirar; sob uma política de renovação, nunca renova sem uma.',
       'Os comentários de aprovação são registrados na trilha de auditoria para conformidade.',
     ],
   },
@@ -60,10 +64,15 @@ Qualquer rejeição única interrompe imediatamente a solicitação. O certifica
 ### Expirada
 A solicitação não foi decidida em sete dias. Solicitações expiradas devem ser reenviadas.
 
+### Cancelada
+O solicitante executou a ação diretamente, ou aprovou outra solicitação para o mesmo alvo: ninguém aprova a própria solicitação, por isso é encerrada sem votação.
+
 ## De onde vêm as solicitações
 Além do formulário de emissão, uma política que exige aprovação também coloca na fila:
 - **Assinar CSR** e **assinatura em lote** a partir de Operações: a aprovação executa a assinatura
 - **Renovar** e **renovação em lote**: a aprovação executa a renovação; uma renovação que não poderia ser atendida (certificado revogado, chave não detida pelo servidor) é recusada de imediato em vez de entrar na fila
+- **Revogar** (um certificado, em lote, um certificado de usuário, uma CA intermédia) sob uma política de revogação: a aprovação revoga com o motivo e a data de invalidade pedidos, após nova verificação (um certificado renovado desde a solicitação não é revogado)
+- O **agendador de renovação**, sob uma política de renovação: coloca a renovação na fila uma vez, e a aprovação executa-a como o agendador teria feito
 
 Os administradores ignoram a fila em todos os caminhos.
 
@@ -72,11 +81,12 @@ Os administradores ignoram a fila em todos os caminhos.
 - Uma solicitação cujo alvo foi **excluído ou revogado** é encerrada como rejeitada; uma suspensão de certificado mantém a solicitação de renovação aguardando a remoção da suspensão
 - Aprovar uma solicitação **já atendida** encerra-a sobre o certificado existente; aprovar uma de várias solicitações para o mesmo alvo encerra as outras como aprovadas por você
 - Aprovar uma solicitação cuja solicitação armazenada, certificado ou CA **não existe mais** encerra-a como rejeitada
+- Uma revogação na fila cujo certificado foi **revogado diretamente** é encerrada como aprovada (cancelada quando o seu solicitante a revogou); uma cujo certificado foi **renovado** desde então é encerrada como rejeitada quando aprovada; durante uma suspensão de certificado, aguarda a remoção da suspensão
 
 Os webhooks são notificados desses encerramentos como para uma rejeição.
 
 ## Prazo
-Uma solicitação aguarda **sete dias** por uma decisão. Passado esse prazo, é encerrada como expirada, nunca é contada como pendente e o agendador de renovação retoma o seu certificado. Enquanto uma renovação aguarda aprovação, o agendador deixa o certificado a essa decisão, desde que ela possa ocorrer antes de o certificado expirar.
+Uma solicitação aguarda **sete dias** por uma decisão. Passado esse prazo, é encerrada como expirada, nunca é contada como pendente e o agendador de renovação retoma o seu certificado. Enquanto uma renovação aguarda aprovação, o agendador deixa o certificado a essa decisão, desde que ela possa ocorrer antes de o certificado expirar; sob uma política de renovação, nunca renova sem uma.
 
 ## Aprovando uma Solicitação
 

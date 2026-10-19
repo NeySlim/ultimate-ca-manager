@@ -11,6 +11,7 @@ export default {
           { label: 'Approvata', text: 'Tutte le approvazioni richieste sono state ricevute, il certificato può essere emesso' },
           { label: 'Rifiutata', text: 'Qualsiasi rifiuto blocca immediatamente la richiesta' },
           { label: 'Scaduta', text: 'Nessuna decisione entro sette giorni; chiusa come scaduta e mai conteggiata tra quelle in attesa' },
+          { label: 'Annullata', text: 'Il richiedente ha eseguito direttamente l\'azione o ne ha approvato un duplicato: nessuno approva la propria richiesta' },
         ]
       },
       {
@@ -19,6 +20,8 @@ export default {
           { label: 'Modulo di emissione', text: 'Una richiesta di certificato corrispondente a una politica che richiede l\'approvazione' },
           { label: 'Firma CSR e firma massiva', text: 'La firma di una richiesta memorizzata, singola o da Operazioni, viene messa in coda allo stesso modo; l\'approvazione esegue la firma' },
           { label: 'Rinnovo', text: 'Anche il rinnovo di un certificato, singolo o massivo, viene messo in coda; un rinnovo che non potrebbe essere soddisfatto (revocato, chiave non detenuta dal server) viene rifiutato subito' },
+          { label: 'Revoca', text: 'La revoca di un certificato (singola, massiva, dai certificati utente) o di una CA intermedia con una politica di revoca viene messa in coda; l\'approvazione revoca con il motivo richiesto' },
+          { label: 'Scheduler', text: 'Con una politica di rinnovo lo scheduler mette in coda il rinnovo; l\'approvazione rifirma la chiave detenuta dal server, come avrebbe fatto lo scheduler' },
           { label: 'Amministratori', text: 'Saltano la coda su ogni percorso, come nel modulo di emissione' },
         ]
       },
@@ -29,13 +32,14 @@ export default {
           { label: 'Eliminato o revocato', text: 'Una richiesta il cui oggetto è stato eliminato o revocato viene chiusa come rifiutata; una sospensione del certificato lascia la richiesta di rinnovo in attesa della rimozione della sospensione' },
           { label: 'Già soddisfatta', text: 'Approvare una richiesta già soddisfatta la chiude sul certificato esistente; approvare una di più richieste per lo stesso oggetto chiude le altre come approvate da te' },
           { label: 'Oggetto scomparso', text: 'Approvare una richiesta la cui richiesta memorizzata, certificato o CA non esiste più la chiude come rifiutata' },
+          { label: 'Revocato o rinnovato nel frattempo', text: 'Una revoca in coda il cui certificato è stato revocato direttamente viene chiusa come approvata; se il certificato è stato rinnovato nel frattempo, viene chiusa come rifiutata all\'approvazione' },
           { label: 'Termine ultimo', text: 'Una richiesta attende sette giorni; oltre quel termine viene chiusa come scaduta, mai conteggiata tra quelle in attesa, e lo scheduler dei rinnovi riprende per il suo certificato' },
         ]
       },
     ],
     tips: [
       'Un singolo rifiuto blocca immediatamente l\'approvazione: questo è intenzionale per la sicurezza.',
-      'Mentre un rinnovo attende l\'approvazione, lo scheduler lascia il certificato a quella decisione, purché possa arrivare prima della scadenza del certificato.',
+      'Mentre un rinnovo attende l\'approvazione, lo scheduler lascia il certificato a quella decisione, purché possa arrivare prima della scadenza del certificato; con una politica di rinnovo non rinnova mai senza di essa.',
       'I commenti di approvazione vengono registrati nella traccia di audit per la conformità.',
     ],
   },
@@ -60,10 +64,15 @@ Un singolo rifiuto blocca immediatamente la richiesta. Il certificato non verrà
 ### Scaduta
 La richiesta non è stata decisa entro sette giorni. Le richieste scadute devono essere ripresentate.
 
+### Annullata
+Il richiedente ha eseguito direttamente l'azione, oppure ha approvato un'altra richiesta per lo stesso oggetto: nessuno approva la propria richiesta, quindi viene chiusa senza voto.
+
 ## Da dove arrivano le richieste
 Oltre al modulo di emissione, una politica che richiede l'approvazione mette in coda anche:
 - **Firma CSR** e **firma massiva** da Operazioni: l'approvazione esegue la firma
 - **Rinnova** e **rinnovo massivo**: l'approvazione esegue il rinnovo; un rinnovo che non potrebbe essere soddisfatto (certificato revocato, chiave non detenuta dal server) viene rifiutato subito invece di essere messo in coda
+- **Revoca** (un certificato, massiva, un certificato utente, una CA intermedia) con una politica di revoca: l'approvazione revoca con il motivo e la data di invalidità richiesti, dopo un nuovo controllo (un certificato rinnovato dopo la richiesta non viene revocato)
+- Lo **scheduler dei rinnovi**, con una politica di rinnovo: mette in coda il rinnovo una sola volta e l'approvazione lo esegue come lo avrebbe eseguito lo scheduler
 
 Gli amministratori saltano la coda su ogni percorso.
 
@@ -72,11 +81,12 @@ Gli amministratori saltano la coda su ogni percorso.
 - Una richiesta il cui oggetto è stato **eliminato o revocato** viene chiusa come rifiutata; una sospensione del certificato lascia la richiesta di rinnovo in attesa della rimozione della sospensione
 - Approvare una richiesta **già soddisfatta** la chiude sul certificato esistente; approvare una di più richieste per lo stesso oggetto chiude le altre come approvate da te
 - Approvare una richiesta la cui richiesta memorizzata, certificato o CA **non esiste più** la chiude come rifiutata
+- Una revoca in coda il cui certificato è stato **revocato direttamente** viene chiusa come approvata (annullata se a revocarlo è stato il richiedente); se il certificato è stato **rinnovato** nel frattempo, viene chiusa come rifiutata all'approvazione; durante una sospensione del certificato attende la rimozione della sospensione
 
 I webhook vengono informati di queste chiusure come per un rifiuto.
 
 ## Termine ultimo
-Una richiesta attende **sette giorni** una decisione. Oltre quel termine viene chiusa come scaduta, non viene mai conteggiata tra quelle in attesa e lo scheduler dei rinnovi riprende per il suo certificato. Mentre un rinnovo attende l'approvazione, lo scheduler lascia il certificato a quella decisione, purché possa arrivare prima della scadenza del certificato.
+Una richiesta attende **sette giorni** una decisione. Oltre quel termine viene chiusa come scaduta, non viene mai conteggiata tra quelle in attesa e lo scheduler dei rinnovi riprende per il suo certificato. Mentre un rinnovo attende l'approvazione, lo scheduler lascia il certificato a quella decisione, purché possa arrivare prima della scadenza del certificato; con una politica di rinnovo non rinnova mai senza di essa.
 
 ## Approvazione di una richiesta
 

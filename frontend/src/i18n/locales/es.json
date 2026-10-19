@@ -822,7 +822,8 @@
     "templateOverridesHint": "Difiere de la plantilla '{{name}}' en: {{fields}}",
     "deleteNeedsRevoke": "Este certificado sigue siendo válido, por lo que no puede eliminarse por sí solo: se retiraría de UCM mientras sigue siendo de confianza para cualquier cliente que no compruebe la revocación. Revóquelo primero, para que la CRL y el respondedor OCSP reflejen la retirada, y luego se eliminará.",
     "revokeThenDelete": "Revocar y luego eliminar",
-    "noKeyTypeAllowedByPolicy": "Ningún tipo de clave está permitido por las políticas de esta CA y de esta plantilla."
+    "noKeyTypeAllowedByPolicy": "Ningún tipo de clave está permitido por las políticas de esta CA y de esta plantilla.",
+    "revocationApprovalRequired": "Revocación enviada para aprobación (política: {{policy}})"
   },
   "cas": {
     "chainRevoked": "Revocada aguas arriba",
@@ -1005,7 +1006,8 @@
     "offlineKeyFileTooLarge": "El archivo de clave es demasiado grande (máx. 256 KB)",
     "restorePasswordHint": "La contraseña utilizada al poner la CA fuera de línea.",
     "namedUrls": "Usar el nombre de la CA en las URLs de protocolo",
-    "namedUrlsHint": "Las rutas CDP/OCSP/AIA usan un slug derivado del nombre de la CA en lugar del id aleatorio. Más fácil de configurar manualmente; revela el nombre de la CA en las URLs. También puede activarse más tarde; una vez activado, es irreversible."
+    "namedUrlsHint": "Las rutas CDP/OCSP/AIA usan un slug derivado del nombre de la CA en lugar del id aleatorio. Más fácil de configurar manualmente; revela el nombre de la CA en las URLs. También puede activarse más tarde; una vez activado, es irreversible.",
+    "revocationApprovalRequired": "Revocación de la CA enviada para aprobación (política: {{policy}})"
   },
   "csrs": {
     "uploadCSR": "Subir CSR",
@@ -3987,7 +3989,19 @@
     "title": "Solicitudes de aprobación",
     "total": "Total",
     "certificateRequest": "Solicitud de certificado",
-    "certificateIssued": "Certificado emitido con éxito"
+    "certificateIssued": "Certificado emitido con éxito",
+    "requestType": {
+      "certificate": "Certificado",
+      "csr": "Firma de CSR",
+      "renewal": "Renovación",
+      "revocation": "Revocación",
+      "ca_revocation": "Revocación de CA"
+    },
+    "revocationPerformed": "Aprobada: la revocación se ha realizado",
+    "summarySerial": "Número de serie",
+    "summaryInvalidity": "Fecha de invalidez",
+    "summaryTrigger": "Solicitado por",
+    "triggerScheduler": "Planificador de renovaciones"
   },
   "messages": {
     "confirm": {
@@ -4274,6 +4288,10 @@
     "noPolicies": "No hay políticas definidas",
     "noPoliciesDesc": "Cree políticas de certificados para aplicar reglas de emisión, requisitos de claves y flujos de aprobación.",
     "notifyOnViolation": "Notificar en caso de violación de política",
+    "notifyHelp": "Enviar un correo cuando esta política rechaza una operación o la retiene para aprobación",
+    "notificationEmails": "Direcciones de notificación",
+    "notificationEmailsHelp": "Una por línea. Vacío: los aprobadores de la política",
+    "invalidEmails": "Direcciones no válidas: {{emails}}",
     "policyName": "Nombre de la política",
     "policyNamePlaceholder": "ej. Política TLS de producción",
     "priority": "Prioridad",
@@ -4299,7 +4317,16 @@
     },
     "allowedDigests": "Hashes de firma permitidos",
     "allowedKeyTypesHelp": "Ninguno seleccionado: se permite cualquier tipo de clave.",
-    "allowedDigestsHelp": "Ninguno seleccionado: se permite cualquier hash."
+    "allowedDigestsHelp": "Ninguno seleccionado: se permite cualquier hash.",
+    "operations": "Operaciones",
+    "operationHelp": {
+      "issuance": "El formulario de emisión, la firma de CSR y la firma masiva, y las renovaciones que realiza un operador",
+      "renewal": "Renovaciones por un operador, una o masivas, y por el planificador, que entonces encola su renovación",
+      "revocation": "Revocaciones de certificados y de CA intermedias por un operador; rechazadas por ACME, que no puede esperar una decisión"
+    },
+    "operationsRequired": "Selecciona al menos una operación",
+    "noOperation": "Ninguna operación",
+    "rulesRevocationOnly": "Las reglas se aplican solo a la emisión y la renovación: una política de revocación se limita por su CA, plantilla y patrón DNS."
   },
   "reports": {
     "complianceReport": "Reporte de cumplimiento",

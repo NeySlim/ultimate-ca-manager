@@ -822,7 +822,8 @@
     "templateOverridesHint": "Weicht von Vorlage '{{name}}' ab in: {{fields}}",
     "deleteNeedsRevoke": "Dieses Zertifikat ist noch gültig und kann daher nicht allein gelöscht werden: Es würde aus UCM verschwinden, während jeder Client, der den Sperrstatus nicht prüft, ihm weiter vertraut. Widerrufen Sie es zuerst, damit CRL und OCSP-Responder den Widerruf tragen, danach wird es gelöscht.",
     "revokeThenDelete": "Widerrufen, dann löschen",
-    "noKeyTypeAllowedByPolicy": "Die Richtlinien dieser CA und dieser Vorlage erlauben keinen Schlüsseltyp."
+    "noKeyTypeAllowedByPolicy": "Die Richtlinien dieser CA und dieser Vorlage erlauben keinen Schlüsseltyp.",
+    "revocationApprovalRequired": "Widerruf zur Genehmigung eingereicht (Richtlinie: {{policy}})"
   },
   "cas": {
     "chainRevoked": "Übergeordnet gesperrt",
@@ -1005,7 +1006,8 @@
     "offlineKeyFileTooLarge": "Schlüsseldatei zu groß (max 256 KB)",
     "restorePasswordHint": "Das beim Offline-Schalten der CA verwendete Passwort.",
     "namedUrls": "CA Namen in Protokoll URLs verwenden",
-    "namedUrlsHint": "CDP/OCSP/AIA-Pfade verwenden einen aus dem CA-Namen abgeleiteten Slug statt der zufälligen ID. Einfacher manuell zu konfigurieren; der CA-Name wird in URLs sichtbar. Kann auch später aktiviert werden; einmal aktiviert, nicht rückgängig zu machen."
+    "namedUrlsHint": "CDP/OCSP/AIA-Pfade verwenden einen aus dem CA-Namen abgeleiteten Slug statt der zufälligen ID. Einfacher manuell zu konfigurieren; der CA-Name wird in URLs sichtbar. Kann auch später aktiviert werden; einmal aktiviert, nicht rückgängig zu machen.",
+    "revocationApprovalRequired": "CA-Widerruf zur Genehmigung eingereicht (Richtlinie: {{policy}})"
   },
   "csrs": {
     "uploadCSR": "CSR hochladen",
@@ -3987,7 +3989,19 @@
     "title": "Genehmigungsanfragen",
     "total": "Gesamt",
     "certificateRequest": "Zertifikatsanfrage",
-    "certificateIssued": "Zertifikat erfolgreich ausgestellt"
+    "certificateIssued": "Zertifikat erfolgreich ausgestellt",
+    "requestType": {
+      "certificate": "Zertifikat",
+      "csr": "CSR-Signierung",
+      "renewal": "Erneuerung",
+      "revocation": "Widerruf",
+      "ca_revocation": "CA-Widerruf"
+    },
+    "revocationPerformed": "Genehmigt: der Widerruf wurde ausgeführt",
+    "summarySerial": "Seriennummer",
+    "summaryInvalidity": "Ungültigkeitsdatum",
+    "summaryTrigger": "Angefordert von",
+    "triggerScheduler": "Erneuerungsplaner"
   },
   "messages": {
     "confirm": {
@@ -4274,6 +4288,10 @@
     "noPolicies": "Keine Richtlinien definiert",
     "noPoliciesDesc": "Erstellen Sie Zertifikatsrichtlinien, um Ausstellungsregeln, Schlüsselanforderungen und Genehmigungsworkflows durchzusetzen.",
     "notifyOnViolation": "Bei Richtlinienverstoß benachrichtigen",
+    "notifyHelp": "E-Mail, wenn diese Richtlinie einen Vorgang ablehnt oder zur Genehmigung zurückhält",
+    "notificationEmails": "Benachrichtigungsadressen",
+    "notificationEmailsHelp": "Eine pro Zeile. Leer: die Genehmiger der Richtlinie",
+    "invalidEmails": "Ungültige Adressen: {{emails}}",
     "policyName": "Richtlinienname",
     "policyNamePlaceholder": "z.B. Produktions-TLS-Richtlinie",
     "priority": "Priorität",
@@ -4299,7 +4317,16 @@
     },
     "allowedDigests": "Erlaubte Signatur-Hashes",
     "allowedKeyTypesHelp": "Keine Auswahl: Jeder Schlüsseltyp ist erlaubt.",
-    "allowedDigestsHelp": "Keine Auswahl: Jeder Hash ist erlaubt."
+    "allowedDigestsHelp": "Keine Auswahl: Jeder Hash ist erlaubt.",
+    "operations": "Operationen",
+    "operationHelp": {
+      "issuance": "Das Ausstellungsformular, CSR-Signierung und Massensignierung sowie die von einem Operator ausgeführten Erneuerungen",
+      "renewal": "Erneuerungen durch einen Operator, einzeln oder in Masse, und durch den Planer, der seine Erneuerung dann einreiht",
+      "revocation": "Widerrufe von Zertifikaten und Zwischen-CAs durch einen Operator; über ACME abgelehnt, da es nicht auf eine Entscheidung warten kann"
+    },
+    "operationsRequired": "Wählen Sie mindestens eine Operation aus",
+    "noOperation": "Keine Operation",
+    "rulesRevocationOnly": "Die Regeln gelten nur für Ausstellung und Erneuerung: eine Widerrufsrichtlinie wird durch ihre CA, Vorlage und ihr DNS-Muster eingegrenzt."
   },
   "reports": {
     "complianceReport": "Compliance-Bericht",

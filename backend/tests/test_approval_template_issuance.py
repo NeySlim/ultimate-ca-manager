@@ -55,9 +55,11 @@ def _requester_id(app):
 def _mk_approval_id(app, requester_id, request_data):
     """Persist a pending approval storing request_data (as cert_create does)."""
     with app.app_context():
+        # Inactive: left behind, an active global policy would hold every
+        # later issuance and renewal of the session
         pol = CertificatePolicy(name=f'approval-tpl-pol-{next(_SEQ)}', policy_type='issuance',
                                 requires_approval=True, min_approvers=1,
-                                is_active=True)
+                                is_active=False)
         db.session.add(pol)
         db.session.commit()
         approval = PolicyEvaluationService.create_approval_request(

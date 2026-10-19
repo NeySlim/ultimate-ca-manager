@@ -923,6 +923,19 @@ def delete_ca(ca_id):
         return error_response('Failed to delete CA', 500)
 
 
+def announce_ca_revoked(ca, username, reason):
+    """Webhook and WebSocket notice of a CA revocation; returns the CA's
+    snapshot, taken before the emit (subscribers may commit)."""
+    ca_dict = ca.to_dict()
+    from services.webhook_service import emit_ca_updated
+    emit_ca_updated(ca_dict, actor=username, changes={'revoked': True, 'reason': reason})
+    try:
+        on_ca_updated(ca.id, ca_dict.get('descr'), {'revoked': True, 'reason': reason})
+    except Exception:
+        pass
+    return ca_dict
+
+
 @bp.route('/api/v2/cas/<int:ca_id>/revoke', methods=['POST'])
 @require_auth(['write:cas'])
 def revoke_ca(ca_id):
@@ -965,6 +978,26 @@ def revoke_ca(ca_id):
         if invalidity_at > utc_now() + timedelta(minutes=5):
             return error_response('invalidity_date cannot be in the future', 400)
 
+    # Refused at once when no revocation could honour it, then queued when a
+    # policy requires approval for revocations under the parent (fail closed).
+    # A CA the parent already revoked is left to revoke_ca (409, flag restored)
+    if not ca.is_revoked:
+        try:
+            parent = CAService.revocation_issuer(ca, reason)
+        except ValueError as e:
+            return error_response(str(e), 400)
+        try:
+            from services.approval_gate import approval_payload, queue_ca_revocation
+            policy, approval = queue_ca_revocation(
+                g.current_user, ca, parent, reason=reason, invalidity_at=invalidity_at,
+                comment=data.get('approval_comment'))
+        except Exception as e:
+            logger.error(f"Policy evaluation failed for revocation of CA {ca_id}: {e}", exc_info=True)
+            return error_response('Policy evaluation failed; the CA was not revoked', 500)
+        if approval is not None:
+            return success_response(data=approval_payload(policy, approval),
+                                    message='CA revocation submitted for approval')
+
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
     try:
         ca, warnings = CAService.revoke_ca(
@@ -979,14 +1012,7 @@ def revoke_ca(ca_id):
         logger.error(f"Failed to revoke CA {ca_id}: {e}", exc_info=True)
         return error_response('Failed to revoke CA', 500)
 
-    # Snapshot before emit — subscribers may commit and expire the instance
-    ca_dict = ca.to_dict()
-    from services.webhook_service import emit_ca_updated
-    emit_ca_updated(ca_dict, actor=username, changes={'revoked': True, 'reason': reason})
-    try:
-        on_ca_updated(ca.id, ca_dict.get('descr'), {'revoked': True, 'reason': reason})
-    except Exception:
-        pass
+    ca_dict = announce_ca_revoked(ca, username, reason)
     message = 'CA revoked'
     if warnings:
         message = 'CA revoked, but not fully published: ' + ' '.join(warnings)

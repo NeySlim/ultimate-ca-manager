@@ -46,6 +46,11 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
     setRevoking(true)
     try {
       const res = await casService.revoke(ca.id, { reason })
+      if (res?.data?.approval_required) {
+        showWarning(t('cas.revocationApprovalRequired', { policy: res.data.policy_name }))
+        setShowRevokeModal(false)
+        return
+      }
       const updated = res?.data || res
       showSuccess(t('cas.revokeSuccess'))
       // The parent could not publish the revocation (offline parent, CDP off)

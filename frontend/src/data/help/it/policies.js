@@ -5,11 +5,12 @@ export default {
     overview: 'Definisci e gestisci le politiche dei certificati che controllano le regole di emissione, i requisiti delle chiavi, i limiti di validità e i flussi di approvazione. Le politiche vengono valutate in ordine di priorità quando i certificati vengono richiesti.',
     sections: [
       {
-        title: 'Tipi di politica',
+        title: 'Operazioni',
         items: [
-          { label: 'Emissione', text: 'Regole applicate quando vengono creati nuovi certificati' },
-          { label: 'Rinnovo', text: 'Regole applicate quando i certificati vengono rinnovati' },
-          { label: 'Revoca', text: 'Regole applicate quando i certificati vengono revocati' },
+          { label: 'Emissione', text: 'Il modulo di emissione, la firma CSR e la firma massiva, e i rinnovi eseguiti da un operatore' },
+          { label: 'Rinnovo', text: 'Rinnovi da parte di un operatore, singoli o massivi, e dello scheduler, che mette in coda il proprio rinnovo invece di eseguirlo' },
+          { label: 'Revoca', text: 'Revoche di certificati e CA intermedie da parte di un operatore (una CA anche dalle politiche limitate a essa); un client ACME non può attendere una decisione, quindi la sua revoca viene rifiutata' },
+          { label: 'Più operazioni', text: 'Una politica può governare più operazioni; una senza operazioni (un vecchio tipo rinnovo o revoca, mai applicato) non governa nulla finché non ne scegli' },
         ]
       },
       {
@@ -25,7 +26,7 @@ export default {
         items: [
           { label: 'Gruppi di approvazione', text: 'Assegna un gruppo di utenti responsabile dell\'approvazione delle richieste' },
           { label: 'Approvatori minimi', text: 'Numero di approvazioni richieste prima dell\'emissione' },
-          { label: 'Notifiche', text: 'Avvisa gli amministratori quando le politiche vengono violate' },
+          { label: 'Notifiche', text: "E-mail quando la politica rifiuta un'operazione o la mette in attesa di approvazione; agli indirizzi indicati, altrimenti ai suoi approvatori. Un rifiuto ripetuto viene segnalato una volta all'ora" },
         ]
       },
     ],
@@ -42,16 +43,20 @@ export default {
 
 Le politiche dei certificati definiscono le regole e i vincoli applicati quando i certificati vengono emessi, rinnovati o revocati. Le politiche vengono valutate in **ordine di priorità** (numero più basso = precedenza più alta) e possono essere limitate a CA specifiche.
 
-## Tipi di politica
+## Operazioni
 
-### Politiche di emissione
-Regole applicate quando vengono creati nuovi certificati. Questo è il tipo più comune. Controlla i tipi di chiave, i periodi di validità, le restrizioni SAN e se è richiesta l'approvazione.
+Una politica governa una o più operazioni: il requisito di approvazione e le regole si applicano a quelle.
 
-### Politiche di rinnovo
-Regole applicate quando i certificati vengono rinnovati. Possono imporre una validità più breve al rinnovo o richiedere una nuova approvazione.
+### Emissione
+Il modulo di emissione, la firma CSR e la firma massiva, e i rinnovi eseguiti da un operatore. È la scelta più comune. Controlla i tipi di chiave, i periodi di validità, le restrizioni SAN e se è richiesta l'approvazione.
 
-### Politiche di revoca
-Regole applicate quando i certificati vengono revocati. Possono richiedere l'approvazione prima della revoca di certificati critici.
+### Rinnovo
+Rinnovi da parte di un operatore, singoli o massivi, e dello scheduler. Con una politica di rinnovo che richiede l'approvazione, lo scheduler mette in coda il rinnovo invece di eseguirlo, e l'approvazione rifirma la chiave detenuta dal server.
+
+### Revoca
+Revoche di certificati (singole, massive, dai certificati utente) e di CA intermedie. Limitata dalla CA emittente, dal template e dal pattern DNS; la revoca di una CA è trattenuta anche dalle politiche limitate a quella CA, perché cadono con essa tutti i certificati che ha emesso. Le altre regole non si applicano. Un client ACME non può attendere una decisione: la sua revoca viene rifiutata e lasciata agli operatori. Rimuovere un enrollment mTLS viene rifiutato finché il suo certificato non è revocato, chiunque lo detenga; gli amministratori aggirano il blocco.
+
+Una politica creata prima dell'introduzione delle operazioni conserva ciò che faceva: una politica di emissione resta tale, mentre un tipo rinnovo o revoca, mai applicato, non governa nulla finché non ne scegli le operazioni.
 
 ## Configurazione delle regole
 
@@ -81,7 +86,7 @@ Quando **Richiedi approvazione** è abilitato, l'emissione del certificato viene
 ### Configurazione
 - **Gruppo di approvazione**: Seleziona un gruppo di utenti responsabile delle approvazioni
 - **Approvatori minimi**: Numero di approvazioni richieste (es. 2 su 3 membri del gruppo)
-- **Notifiche**: Avvisa gli amministratori quando le politiche vengono violate
+- **Notifiche**: e-mail quando la politica rifiuta un'operazione (una regola violata) o la mette in attesa di approvazione. Vengono inviate agli indirizzi di notifica della politica, altrimenti ai suoi approvatori (i membri del suo gruppo di approvazione, o ogni utente che può approvare). Ogni richiesta in attesa viene segnalata una sola volta, con un link; lo stesso rifiuto ripetuto, ad esempio da un client ACME che riprova, una volta all'ora. SMTP deve essere configurato
 
 > 💡 Usa i flussi di approvazione per certificati di alto valore come la firma del codice e i certificati con carattere jolly.
 

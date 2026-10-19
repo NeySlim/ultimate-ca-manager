@@ -26,7 +26,7 @@ import { downloadExport } from '../lib/exportDownload'
 export default function UserCertificatesPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
-  const { showSuccess, showError, showConfirm } = useNotification()
+  const { showSuccess, showError, showConfirm, showWarning } = useNotification()
   const { openWindow } = useWindowManager()
   const { canWrite, canDelete, hasPermission } = usePermission()
 
@@ -171,8 +171,12 @@ export default function UserCertificatesPage() {
     if (!revokingCert) return
     setRevoking(true)
     try {
-      await userCertificatesService.revoke(revokingCert.id, reason)
-      showSuccess(t('userCertificates.revokeSuccess'))
+      const res = await userCertificatesService.revoke(revokingCert.id, reason)
+      if (res?.data?.approval_required) {
+        showWarning(t('certificates.revocationApprovalRequired', { policy: res.data.policy_name }))
+      } else {
+        showSuccess(t('userCertificates.revokeSuccess'))
+      }
       setRevokingCert(null)
       setSelectedCert(null)
       loadData()
