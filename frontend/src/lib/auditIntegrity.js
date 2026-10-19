@@ -11,6 +11,12 @@ export function integrityMessage(data) {
     }
     return { level: 'error', key: 'audit.integrityFailed', params: { errors } };
   }
+  if (data.status === 'unprotected' && protection.key_rotation_id && protection.rotation_attested === false) {
+    return {
+      level: 'warning', key: 'audit.integrityRotationUnattested',
+      params: { rotation: protection.key_rotation_id, older: protection.not_attested },
+    };
+  }
   if (data.status === 'unprotected') {
     return {
       level: 'warning', key: 'audit.integrityUnprotected',

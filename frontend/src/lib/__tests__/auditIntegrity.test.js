@@ -22,6 +22,13 @@ describe('integrityMessage', () => {
     expect(m.key).toBe('audit.integrityUnprotected')
   })
 
+  it('warns when the key changed without this server recording it', () => {
+    const m = integrityMessage({ valid: true, status: 'unprotected', checked: 9,
+      protection: { key_rotation_id: 6, rotation_attested: false, not_attested: 5 } })
+    expect(m).toEqual({ level: 'warning', key: 'audit.integrityRotationUnattested',
+      params: { rotation: 6, older: 5 } })
+  })
+
   it('says where a key rotation re-anchored the chain', () => {
     const m = integrityMessage({ valid: true, status: 'intact', checked: 9,
       protection: { protected_from_id: 5, key_rotation_id: 6, not_attested: 4, protected: 5 } })

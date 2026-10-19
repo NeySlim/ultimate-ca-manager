@@ -2315,7 +2315,8 @@
     "integrityUnprotected": "No se encontró ninguna infracción en {{count}} entradas, pero el registro de auditoría no está protegido: {{unprotected}} entradas no están selladas por la clave maestra",
     "integrityIntactPartial": "Registro de auditoría íntegro desde la entrada #{{id}} ({{count}} entradas selladas por la clave maestra); {{older}} entradas anteriores ya no se pueden certificar",
     "integrityUnsealedAfterKey": "Cadena del registro de auditoría rota en la entrada #{{id}}: no está sellada por la clave maestra, por lo que se escribió o se reescribió sin ella ({{errors}} errores encontrados)",
-    "integrityIntactRotated": "Registro de auditoría íntegro desde la entrada #{{id}}; la clave maestra se cambió en la entrada #{{rotation}}, y las {{older}} entradas anteriores selladas con una clave previa ya no se pueden certificar"
+    "integrityIntactRotated": "Registro de auditoría íntegro desde la entrada #{{id}}; la clave maestra se cambió en la entrada #{{rotation}}, y las {{older}} entradas anteriores selladas con una clave previa ya no se pueden certificar",
+    "integrityRotationUnattested": "No se encontró ninguna infracción, pero la clave maestra cambió en la entrada #{{rotation}} sin que este servidor tenga constancia de ello: las {{older}} entradas anteriores bajo otra clave no se pueden certificar"
   },
   "settings": {
     "appearanceSubtitle": "Personalice la apariencia y el idioma de UCM",

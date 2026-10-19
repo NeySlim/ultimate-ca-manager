@@ -2315,7 +2315,8 @@
     "integrityUnprotected": "Nessuna violazione trovata in {{count}} voci, ma il log di audit non è protetto: {{unprotected}} voci non sono sigillate dalla chiave principale",
     "integrityIntactPartial": "Log di audit integro dalla voce #{{id}} ({{count}} voci sigillate dalla chiave principale); {{older}} voci precedenti non possono più essere attestate",
     "integrityUnsealedAfterKey": "Catena del log di audit interrotta alla voce #{{id}}: non è sigillata dalla chiave principale, quindi è stata scritta o riscritta senza di essa ({{errors}} errori trovati)",
-    "integrityIntactRotated": "Log di audit integro dalla voce #{{id}}; la chiave principale è stata cambiata alla voce #{{rotation}} e le {{older}} voci precedenti sigillate con una chiave anteriore non possono più essere attestate"
+    "integrityIntactRotated": "Log di audit integro dalla voce #{{id}}; la chiave principale è stata cambiata alla voce #{{rotation}} e le {{older}} voci precedenti sigillate con una chiave anteriore non possono più essere attestate",
+    "integrityRotationUnattested": "Nessuna violazione trovata, ma la chiave principale è stata cambiata alla voce #{{rotation}} senza che questo server ne abbia traccia: le {{older}} voci precedenti sigillate con un'altra chiave non possono essere attestate"
   },
   "settings": {
     "appearanceSubtitle": "Personalizza l'aspetto e la lingua di UCM",
