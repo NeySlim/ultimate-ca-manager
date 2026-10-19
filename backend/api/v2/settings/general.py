@@ -457,9 +457,13 @@ def update_ct_settings():
     if 'enabled' in data:
         set_config('ct_enabled', 'true' if data['enabled'] else 'false')
     if 'log_urls' in data:
-        if not isinstance(data['log_urls'], list):
-            return error_response('log_urls must be a list', 400)
-        set_config('ct_log_urls', json.dumps(data['log_urls']))
+        # null is what GET answers when no list is set: it keeps the built-in logs.
+        if data['log_urls'] is None:
+            set_config('ct_log_urls', None)
+        elif not isinstance(data['log_urls'], list):
+            return error_response('log_urls must be a list or null', 400)
+        else:
+            set_config('ct_log_urls', json.dumps(data['log_urls']))
     if 'auto_submit' in data:
         set_config('ct_auto_submit', 'true' if data['auto_submit'] else 'false')
     if 'embed_sct' in data:
