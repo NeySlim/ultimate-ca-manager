@@ -12,6 +12,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - Locking an account after too many failed password or LDAP logins never sent the security alert e-mail; it is now sent once per lockout.
+- Exporting a certificate or CA private key (PEM, PKCS#12, PFX, JKS or bare key) left no audit entry; each export is now recorded with the user, the format and whether it was password-protected.
 
 ## [2.242] - 2026-10-18
 
