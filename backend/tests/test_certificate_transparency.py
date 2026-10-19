@@ -194,3 +194,29 @@ def test_required_ct_failure_refuses_issuance(app, create_ca, ct_config):
                 )
             after = Certificate.query.filter_by(descr="CT required leaf").count()
             assert after == before
+
+
+@pytest.mark.parametrize("required", [False, True])
+def test_embedding_is_off_while_ct_is_disabled(app, create_ca, ct_config, required):
+    """Embed SCTs (and Require SCTs) do nothing unless CT itself is enabled."""
+    from models import CA
+    from services.cert_service import CertificateService
+
+    ca_data = create_ca(cn=f"CT Disabled CA {required}")
+    ca_id = ca_data.get("id", ca_data.get("ca_id"))
+    ct_config(ct_enabled=False, ct_required=required)
+
+    with patch("utils.ct_client.collect_precert_scts", return_value=[]) as collect:
+        with app.app_context():
+            ca = CA.query.filter_by(id=ca_id).first()
+            issued = CertificateService.create_certificate(
+                descr="CT disabled leaf",
+                caref=ca.refid,
+                dn={"CN": f"ct-disabled-{required}.example.com"},
+                validity_days=30,
+                username="tester",
+            )
+            final_cert = x509.load_pem_x509_certificate(base64.b64decode(issued.crt))
+    assert collect.call_count == 0
+    with pytest.raises(x509.ExtensionNotFound):
+        final_cert.extensions.get_extension_for_oid(SCT_LIST_OID)

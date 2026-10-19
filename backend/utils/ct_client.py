@@ -12,12 +12,14 @@ from cryptography.hazmat.primitives import serialization
 
 logger = logging.getLogger(__name__)
 
-# Temporally-sharded logs: entries must land in the shard covering the
-# certificate's notAfter. Keep both current-year shards listed; operators
-# should override via ct_log_urls as shards roll over.
+# Temporally-sharded logs accept only certificates whose notAfter falls in
+# their window: two operators (Chrome policy), shards covering the next 200 days
+# as of October 2026. Shards retire as they age; override via ct_log_urls.
 DEFAULT_CT_LOGS = [
-    "https://ct.googleapis.com/logs/us1/argon2026h1/",
     "https://ct.googleapis.com/logs/us1/argon2026h2/",
+    "https://ct.googleapis.com/logs/us1/argon2027h1/",
+    "https://ct.cloudflare.com/logs/nimbus2026/",
+    "https://ct.cloudflare.com/logs/nimbus2027/",
 ]
 
 SCT_LIST_OID = "1.3.6.1.4.1.11129.2.4.2"
@@ -264,7 +266,7 @@ def embed_scts_in_certificate(
 
 def apply_ct_policy(certificate, issuer_certificate, issuer_private_key):
     """Apply the configured Certificate Transparency policy to a freshly signed
-    leaf certificate. Reads ``ct_embed_sct`` / ``ct_required`` / ``ct_log_urls``
+    leaf certificate. Reads ``ct_enabled`` / ``ct_embed_sct`` / ``ct_required`` / ``ct_log_urls``
     from SystemConfig and, when embedding is enabled, re-issues the certificate
     with an embedded SCT list via the pre-certificate flow.
 
@@ -283,14 +285,15 @@ def apply_ct_policy(certificate, issuer_certificate, issuer_private_key):
 
     from models import SystemConfig
 
-    ct_embed = SystemConfig.query.filter_by(key='ct_embed_sct').first()
-    if not (ct_embed and str(ct_embed.value).lower() == 'true'):
+    def _on(key):
+        row = SystemConfig.query.filter_by(key=key).first()
+        return bool(row and str(row.value).lower() == 'true')
+
+    # Embedding (and "required") only apply while CT itself is enabled.
+    if not (_on('ct_enabled') and _on('ct_embed_sct')):
         return certificate, []
 
-    ct_required_config = SystemConfig.query.filter_by(key='ct_required').first()
-    ct_required = bool(
-        ct_required_config and str(ct_required_config.value).lower() == 'true'
-    )
+    ct_required = _on('ct_required')
 
     ct_log_urls = None
     ct_log_urls_config = SystemConfig.query.filter_by(key='ct_log_urls').first()

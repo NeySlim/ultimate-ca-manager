@@ -15,6 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Exporting a certificate or CA private key (PEM, PKCS#12, PFX, JKS or bare key) left no audit entry; each export is now recorded with the user, the format and whether it was password-protected.
 - Docker: the bundled compose files left `/etc/ucm` (master.key) on an anonymous volume, so `docker compose down` then `up` lost the key to every encrypted private key; they now mount the named volume `ucm-config` (see UPGRADE.md before switching).
 - Without `UCM_DB_ENCRYPTION_KEY`, an empty `/etc/machine-id` (common in containers) made UCM derive a new key at every start, so stored integration secrets (SMTP, LDAP, DNS, SSO, webhooks) became unreadable after a restart; the persisted `.machine-key` is now used.
+- Certificate Transparency: the built-in log list named Google's retired Argon 2026h1 shard; it now lists Google Argon and Cloudflare Nimbus shards accepted today. Embed SCTs and Require SCTs applied even with CT disabled; they now apply only while CT is enabled, and the settings page hides them otherwise.
 
 ## [2.242] - 2026-10-18
 
