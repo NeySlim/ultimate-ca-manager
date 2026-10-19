@@ -435,7 +435,7 @@ A guia rastreia o que está configurado versus o que ainda falta, tanto para o c
 ### Descoberta de Diretiva (XCEP)
 
 - **Autoridade de Certificação**: A CA cujos modelos são anunciados e que emite certificados por meio desta configuração
-- **Validade (dias)**: Validade padrão aplicada aos certificados emitidos via WSTEP
+- **Validade (dias)**: Validade dos certificados emitidos via WSTEP quando o pedido não corresponde a nenhum modelo; caso contrário, aplica-se a validade do modelo correspondente
 
 ### Kerberos / SPNEGO
 

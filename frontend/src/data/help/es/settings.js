@@ -434,7 +434,7 @@ La pestaña realiza un seguimiento de lo que está configurado frente a lo que a
 ### Descubrimiento de directivas (XCEP)
 
 - **Autoridad de certificación**: La CA cuyas plantillas se anuncian y que emite certificados mediante esta configuración
-- **Validez (días)**: Validez predeterminada aplicada a los certificados emitidos mediante WSTEP
+- **Validez (días)**: Validez de los certificados emitidos mediante WSTEP cuando la solicitud no coincide con ninguna plantilla; en caso contrario se aplica la validez de la plantilla coincidente
 
 ### Kerberos / SPNEGO
 

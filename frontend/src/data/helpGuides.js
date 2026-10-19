@@ -2095,7 +2095,7 @@ The tab tracks what's configured versus what's still needed, for both manual and
 ### Policy Discovery (XCEP)
 
 - **Certificate Authority**: The CA whose templates are advertised and that issues certificates through this configuration
-- **Validity (days)**: Default validity applied to certificates issued via WSTEP
+- **Validity (days)**: Validity of certificates issued via WSTEP when the request matches no template; a matched template's own validity applies otherwise
 
 ### Kerberos / SPNEGO
 

@@ -525,6 +525,12 @@ def _user_ad_derivation_enabled(ca):
     return any(getattr(t, 'ad_derived_subject', False) for t in candidates)
 
 
+def _template_validity(template, default_days):
+    """The matched template's validity, which XCEP advertises; *default_days* without one."""
+    days = getattr(template, 'validity_days', None)
+    return int(days) if days else default_days
+
+
 def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos_principal=None,
           outer_signed_data=None):
     """UsernamePassword- or Kerberos-bound initial enrollment. Returns
@@ -747,8 +753,8 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
 
     try:
         cert_pem, _serial = CAService.sign_csr_from_crypto(
-            ca=ca, csr=csr, validity_days=validity_days, source=source,
-            require_pop=require_pop,
+            ca=ca, csr=csr, validity_days=_template_validity(matched_template, validity_days),
+            source=source, require_pop=require_pop,
             ms_certificate_template_oid=template_oid,
             override_subject=override_subject,
             override_san=override_san,
@@ -833,8 +839,8 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
 
     try:
         cert_pem, _serial = CAService.sign_csr_from_crypto(
-            ca=ca, csr=csr, validity_days=validity_days, source=source,
-            renewal_of=signing_cert, require_pop=require_pop,
+            ca=ca, csr=csr, validity_days=_template_validity(matched_template, validity_days),
+            source=source, renewal_of=signing_cert, require_pop=require_pop,
             supersedes=db_cert,
             ms_certificate_template_oid=template_oid,
             # See issue()'s matching kwarg for why.

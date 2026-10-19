@@ -436,7 +436,7 @@ L'onglet suit ce qui est configuré par rapport à ce qui manque encore, pour le
 ### Découverte de stratégie (XCEP)
 
 - **Autorité de certification** : L'AC dont les modèles sont annoncés et qui émet des certificats via cette configuration
-- **Validité (jours)** : Validité par défaut appliquée aux certificats émis via WSTEP
+- **Validité (jours)** : Validité des certificats émis via WSTEP quand la demande ne correspond à aucun modèle ; sinon, la validité du modèle correspondant s'applique
 
 ### Kerberos / SPNEGO
 
