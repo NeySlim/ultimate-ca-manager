@@ -13,6 +13,7 @@ export default {
           { label: 'Entity ID', text: 'UCM 服务提供商实体标识符' },
           { label: 'ACS URL', text: '断言消费者服务回调 URL' },
           { label: '属性映射', text: '将 IDP 属性映射到 UCM 用户字段' },
+          { label: '由 IdP 发起的登录', text: '接受从 IdP 门户发起的登录，与其他响应一样进行校验。2.243 之前创建的提供商默认开启，新提供商默认关闭：仅当用户从 IdP 门户开始登录时才开启。' },
         ]
       },
       {
@@ -98,6 +99,9 @@ https://your-ucm-host:8443/api/v2/sso/saml/metadata
 - \`username\` → UCM 用户名（必需）
 - \`email\` → UCM 邮箱（必需）
 - \`groups\` → UCM 组成员关系（可选）
+
+### 由 IdP 发起的登录
+从 IdP 门户发起的登录到达 UCM 时，并没有 UCM 发出的请求。**允许由 IdP 发起的登录** 会接受它，并同样校验签名、受众、Destination、有效期和防重放。2.243 之前创建的提供商保持开启；新提供商默认关闭。仅当用户从 IdP 门户开始登录时才开启。
 
 ## OAuth2 / OIDC
 

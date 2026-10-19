@@ -13,6 +13,7 @@ export default {
           { label: 'Entity ID', text: 'UCM Service Provider Entity-Kennung' },
           { label: 'ACS-URL', text: 'Assertion Consumer Service Callback-URL' },
           { label: 'Attributzuordnung', text: 'IDP-Attribute UCM-Benutzerfeldern zuordnen' },
+          { label: 'IdP-initiierte Anmeldung', text: 'Akzeptiert Anmeldungen aus dem IdP-Portal, geprüft wie jede andere Antwort. Aktiv für Provider, die vor 2.243 angelegt wurden, aus für neue: nur aktivieren, wenn Benutzer im IdP-Portal starten.' },
         ]
       },
       {
@@ -98,6 +99,9 @@ Ordnen Sie IDP-SAML-Attribute UCM-Benutzerfeldern zu:
 - \`username\` → UCM-Benutzername (erforderlich)
 - \`email\` → UCM-E-Mail (erforderlich)
 - \`groups\` → UCM-Gruppenmitgliedschaft (optional)
+
+### IdP-initiierte Anmeldung
+Eine im IdP-Portal gestartete Anmeldung erreicht UCM ohne Anfrage von UCM. **IdP-initiierte Anmeldung zulassen** akzeptiert sie, mit denselben Prüfungen von Signatur, Zielgruppe, Destination, Gültigkeit und Wiederholung. Vor 2.243 angelegte Provider behalten die Option aktiv; neue haben sie aus. Aktivieren Sie sie nur, wenn Benutzer im IdP-Portal starten.
 
 ## OAuth2 / OIDC
 

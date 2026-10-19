@@ -13,6 +13,7 @@ export default {
           { label: 'Entity ID', text: 'Identifiant d\'entité du fournisseur de services UCM' },
           { label: 'URL ACS', text: 'URL de callback du service de consommation d\'assertions (Assertion Consumer Service)' },
           { label: 'Mappage d\'attributs', text: 'Mapper les attributs IDP aux champs utilisateur UCM' },
+          { label: 'Connexion initiée par l\'IdP', text: 'Accepte les connexions lancées depuis le portail de l\'IdP, contrôlées comme toute autre réponse. Activée pour les providers créés avant la 2.243, désactivée pour les nouveaux : à activer seulement si les utilisateurs partent du portail de l\'IdP.' },
         ]
       },
       {
@@ -98,6 +99,9 @@ Mappez les attributs SAML de l'IDP aux champs utilisateur UCM :
 - \`username\` → Nom d'utilisateur UCM (requis)
 - \`email\` → E-mail UCM (requis)
 - \`groups\` → Appartenance aux groupes UCM (optionnel)
+
+### Connexion initiée par l'IdP
+Une connexion lancée depuis le portail de l'IdP arrive sans requête d'UCM. **Autoriser la connexion initiée par l'IdP** l'accepte, avec les mêmes contrôles de signature, d'audience, de Destination, de validité et d'anti-rejeu. Les providers créés avant la 2.243 la gardent activée ; les nouveaux l'ont désactivée. Activez-la seulement si les utilisateurs partent du portail de l'IdP.
 
 ## OAuth2 / OIDC
 

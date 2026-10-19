@@ -33,8 +33,9 @@ class SSOProvider(db.Model):
     saml_sign_requests = db.Column(db.Boolean, default=False)
     saml_sp_cert_source = db.Column(db.String(50), default='https')  # 'https' or cert ID
     saml_name_id_format = db.Column(db.String(255))  # None = unspecified
-    # Unsolicited (IdP-initiated) responses carry no InResponseTo to check.
-    saml_allow_idp_initiated = db.Column(db.Boolean, default=False, nullable=False)
+    # Unsolicited (IdP-initiated) responses carry no InResponseTo; every other check applies.
+    # Off for new providers; migration 103 kept it on for those that existed.
+    saml_allow_idp_initiated = db.Column(db.Boolean, default=False, server_default=db.false(), nullable=False)
     saml_verify_ssl = db.Column(db.Boolean, default=True)
     saml_ca_bundle = db.Column(db.Text)  # PEM content
     

@@ -37,7 +37,10 @@ def test_sqlite_upgrade_is_idempotent():
     migration.upgrade(conn)
     assert conn.execute('SELECT saml_sign_requests FROM pro_sso_providers').fetchone() == (1,)
     assert {'saml_allow_idp_initiated', 'saml_name_id_format'} <= _provider_columns(conn)
-    assert conn.execute('SELECT saml_allow_idp_initiated FROM pro_sso_providers').fetchone() == (0,)
+    # Existing providers keep IdP-initiated logins; a row added later does not get them.
+    assert conn.execute('SELECT saml_allow_idp_initiated FROM pro_sso_providers').fetchone() == (1,)
+    conn.execute("INSERT INTO pro_sso_providers (id, name, provider_type) VALUES (2, 'new', 'saml')")
+    assert conn.execute('SELECT saml_allow_idp_initiated FROM pro_sso_providers WHERE id = 2').fetchone() == (0,)
     conn.execute("INSERT INTO pro_sso_saml_message_ids (kind, message_id, provider_id, expires_at) "
                  "VALUES ('assertion', '_a1', 1, '2030-01-01 00:00:00')")
     with pytest.raises(sqlite3.IntegrityError):
@@ -79,7 +82,10 @@ def test_postgresql_upgrade_is_idempotent():
             conn.execute(text(f'SET search_path TO {schema}'))
             row = conn.execute(text('SELECT saml_allow_idp_initiated, saml_name_id_format '
                                     'FROM pro_sso_providers')).one()
-            assert row == (False, None)
+            assert row == (True, None)
+            conn.execute(text("INSERT INTO pro_sso_providers (id, name, provider_type) VALUES (2, 'new', 'saml')"))
+            added = conn.execute(text('SELECT saml_allow_idp_initiated FROM pro_sso_providers WHERE id = 2')).scalar()
+            assert added is False
             conn.execute(insert)
         with pytest.raises(IntegrityError):
             with engine.begin() as conn:

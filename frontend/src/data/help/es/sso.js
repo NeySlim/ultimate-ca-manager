@@ -13,6 +13,7 @@ export default {
           { label: 'Entity ID', text: 'Identificador de entidad del proveedor de servicios UCM' },
           { label: 'URL ACS', text: 'URL de devolución del Assertion Consumer Service' },
           { label: 'Mapeo de atributos', text: 'Mapee atributos del IDP a campos de usuario de UCM' },
+          { label: 'Inicio de sesión iniciado por el IdP', text: 'Acepta inicios de sesión lanzados desde el portal del IdP, verificados como cualquier otra respuesta. Activado para los proveedores creados antes de la 2.243, desactivado para los nuevos: actívelo solo si los usuarios parten del portal del IdP.' },
         ]
       },
       {
@@ -98,6 +99,9 @@ Mapee los atributos SAML del IDP a los campos de usuario de UCM:
 - \`username\` → Nombre de usuario UCM (obligatorio)
 - \`email\` → Correo electrónico UCM (obligatorio)
 - \`groups\` → Membresía de grupo UCM (opcional)
+
+### Inicio de sesión iniciado por el IdP
+Un inicio de sesión lanzado desde el portal del IdP llega sin solicitud de UCM. **Permitir el inicio de sesión iniciado por el IdP** lo acepta, con las mismas comprobaciones de firma, audiencia, Destination, validez y reutilización. Los proveedores creados antes de la 2.243 lo mantienen activado; los nuevos lo tienen desactivado. Actívelo solo si los usuarios parten del portal del IdP.
 
 ## OAuth2 / OIDC
 

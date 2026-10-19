@@ -79,7 +79,7 @@ def provider(app, _module_provider, monkeypatch):
     # No configured origin: the SP origin follows each test's request.
     monkeypatch.setattr(saml_sp, 'get_admin_base_url', lambda: None)
     monkeypatch.setattr(saml_sp, 'get_admin_canonical_origin', lambda: None)
-    _set_idp_initiated(app, _module_provider, False)
+    _set_idp_initiated(app, _module_provider, True)
     return _module_provider
 
 
@@ -249,15 +249,47 @@ def test_sp_initiated_response_cannot_be_posted_twice(app, provider, idp_signer)
     assert _post(client, resp) == EXPIRED
 
 
-def test_idp_initiated_is_refused_by_default(app, provider, idp_signer, caplog):
+def test_idp_initiated_is_refused_when_switched_off(app, provider, idp_signer, caplog):
+    _set_idp_initiated(app, provider, False)
     _refused(caplog, app.test_client(), _response(idp_signer), 'IdP-initiated login is disabled')
 
 
-def test_idp_initiated_opt_in_accepts_once(app, provider, idp_signer, caplog):
-    _set_idp_initiated(app, provider, True)
+def test_idp_initiated_is_accepted_once(app, provider, idp_signer, caplog):
     resp = _response(idp_signer)
     assert _post(app.test_client(), resp) == OK
     _refused(caplog, app.test_client(), resp, 'assertion already consumed')
+
+
+def test_idp_initiated_keeps_the_other_checks(app, provider, idp_signer, caplog):
+    client = app.test_client()
+    _refused(caplog, client, _response(idp_signer, audience='https://other-sp.example.test/saml'),
+             'is not a valid audience')
+    _refused(caplog, client, _response(idp_signer, destination='https://other-sp.example.test/acs'),
+             'The response was received at')
+    _refused(caplog, client, _response(idp_signer, issued=-30, expires=-20),
+             'Could not validate timestamp: expired')
+
+
+def test_new_saml_providers_refuse_idp_initiated(app, auth_client):
+    # Park the existing SAML rows: the API allows one provider per type.
+    with app.app_context():
+        parked = [p.id for p in SSOProvider.query.filter_by(provider_type='saml').all()]
+        SSOProvider.query.filter(SSOProvider.id.in_(parked)).update(
+            {'provider_type': 'saml-parked'}, synchronize_session=False)
+        db.session.commit()
+    try:
+        r = auth_client.post('/api/v2/sso/providers', json={
+            'name': f'idp-default-{uuid.uuid4().hex[:8]}', 'provider_type': 'saml', 'enabled': False,
+            'saml_entity_id': IDP_ENTITY, 'saml_sso_url': 'https://idp.example.test/sso'})
+        assert r.status_code in (200, 201), r.get_data(as_text=True)
+        created = r.get_json()['data']
+        assert created['saml_allow_idp_initiated'] is False
+        auth_client.delete(f"/api/v2/sso/providers/{created['id']}")
+    finally:
+        with app.app_context():
+            SSOProvider.query.filter(SSOProvider.id.in_(parked)).update(
+                {'provider_type': 'saml'}, synchronize_session=False)
+            db.session.commit()
 
 
 def test_replay_cache_is_shared_through_the_database(app, provider):
