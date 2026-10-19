@@ -3,7 +3,8 @@
 ``hash_version`` is NULL or 1 for SHA-256 (every entry written so far, which
 stays verifiable as it is) and 2 for HMAC-SHA256 under a key derived from the
 master key, named by ``hash_key_id``. ``chain_start`` records the first id the
-ledger holds, on the first entry under a key and on each purge record.
+ledger holds, on the first entry under a key and on each purge record, and
+``retired_keys`` the other keys a rotation found, with their last entry.
 
 Dual-backend (SQLite + PostgreSQL).
 """
@@ -17,6 +18,7 @@ _COLUMNS = (
     ('hash_version', 'INTEGER'),
     ('hash_key_id', 'VARCHAR(16)'),
     ('chain_start', 'INTEGER'),
+    ('retired_keys', 'TEXT'),
 )
 
 

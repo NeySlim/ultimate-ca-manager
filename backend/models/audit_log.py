@@ -34,6 +34,9 @@ class AuditLog(db.Model):
     # Set on the first entry under a key and on a purge record: the first id
     # the ledger holds from then on, so a prefix removed otherwise is seen.
     chain_start = db.Column(db.Integer)
+    # On the first entry under a key: JSON {key id: last entry id} of the
+    # other keys in the ledger, the only entries left unattested after a rotation.
+    retired_keys = db.Column(db.Text)
 
     def compute_hash(self, prev_hash: str = None, key: bytes = None) -> str:
         """Seal of this entry: SHA-256 without a key, HMAC-SHA256 with one."""
@@ -44,7 +47,7 @@ class AuditLog(db.Model):
         # text move from one field to the next under the same seal.
         timestamp = to_naive_utc(self.timestamp)
         message = json.dumps([
-            'ucm-audit/2', self.hash_key_id, self.id, self.chain_start,
+            'ucm-audit/2', self.hash_key_id, self.id, self.chain_start, self.retired_keys,
             timestamp.isoformat(timespec='microseconds') if timestamp else None,
             self.username, self.action, self.resource_type, self.resource_id,
             self.resource_name, self.details, self.ip_address, self.user_agent,

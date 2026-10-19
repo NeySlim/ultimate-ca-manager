@@ -5,7 +5,7 @@ from flask import request, g, has_request_context
 from models import db, AuditLog
 from utils.datetime_utils import utc_now
 from utils.trusted_proxy import client_ip
-from .chain import seal, verify_chain
+from .chain import append_entry, verify_chain
 
 logger = logging.getLogger(__name__)
 
@@ -62,9 +62,7 @@ class AuditCoreLoggingMixin:
                 success=success
             )
 
-            db.session.add(audit_log)
-            db.session.flush()
-            seal(audit_log)
+            append_entry(audit_log)
             db.session.commit()
 
             log_msg = f"AUDIT: {action} by {username} - {details}"
@@ -96,6 +94,7 @@ class AuditCoreLoggingMixin:
         if end_id:
             query = query.filter(AuditLog.id <= end_id)
 
-        logs = query.all()
-        # Only a check from the first row can tell a purge from a prefix deleted by hand.
-        return verify_chain(logs, whole_table=start_id is None and end_id is None)
+        # Streamed: memory stays flat on a large ledger. Only a check from the
+        # first row can tell a purge from a prefix deleted by hand.
+        return verify_chain(query.yield_per(2000),
+                            whole_table=start_id is None and end_id is None)

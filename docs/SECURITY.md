@@ -175,16 +175,21 @@ Default: 90 days, auto-cleanup daily at midnight.
 #### Integrity
 Each entry is chained to the previous one. With a master key (`/etc/ucm/master.key` or
 `KEY_ENCRYPTION_KEY`), entries are sealed with HMAC-SHA256 under a key derived from it
-(HKDF-SHA256), so editing, inserting or deleting entries cannot go unnoticed without that
-key. Without a master key, entries are sealed with SHA-256 and the check reports the log as
-not protected. A retention purge removes the oldest entries only and leaves a sealed record
-of where the log now starts.
+(HKDF-SHA256). Without that key, an entry cannot be edited, inserted, relabelled or removed
+from the middle or the start of the log without the check reporting it. Without a master key,
+entries are sealed with SHA-256, which anyone able to write the database can recompute, and
+the check reports the log as not protected. A retention purge removes the oldest entries
+only and records, sealed, where the log now starts.
 
 `GET /api/v2/audit/verify` (Audit Logs > Verify Integrity) reports `intact`, `broken` at
-entry N, or `unprotected`. Changing the master key re-anchors the chain: entries sealed under
-the previous key can no longer be attested and are reported as such until retention removes
-them. Deleting the most recent entries is not detectable from the database alone; syslog
-forwarding keeps a copy outside it.
+entry N, or `unprotected` (no master key, or no entry sealed under it yet). Once the key has
+sealed an entry, an entry written after it without the key is a break. Changing the master
+key re-anchors the chain: the first entry under the new key records the entries sealed under
+the previous one, which can no longer be attested and are reported as such until retention
+removes them.
+
+Removing the most recent entries cannot be detected from the database alone: keep a copy
+outside it, for example with syslog forwarding.
 
 ---
 

@@ -189,14 +189,7 @@ def cleanup_logs():
     except Exception:
         return error_response("Failed to clean up audit logs", 500)
     
-    # Log the cleanup action
-    AuditService.log_action(
-        action='audit_cleanup',
-        resource_type='audit_log',
-        details=f'Cleaned up {deleted} logs older than {retention_days} days',
-        success=True
-    )
-    
+    # The purge records itself, sealed, with the first batch it deletes
     return success_response(
         data={'deleted': deleted},
         message=f'Cleaned up {deleted} old audit logs'

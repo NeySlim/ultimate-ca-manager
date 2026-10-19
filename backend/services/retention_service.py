@@ -158,15 +158,14 @@ def _purge(cutoff, retention_days, progress):
         AuditLog.id < boundary).scalar() or 0
     if not pending:
         return
-    # Sealed with the first batch: it names the first id kept, which is how
-    # the verification tells this purge from a prefix deleted by hand.
+    # The purge's only audit entry, sealed and committed with the first batch:
+    # it names the first id kept, which tells this purge from a prefix deleted by hand.
     user = getattr(g, 'current_user', None) if has_request_context() else None
     record = stage_audit_entry(
-        action='audit_purge', resource_type='audit_log',
+        action='audit_cleanup', resource_type='audit_log',
         username=getattr(user, 'username', None) or 'system',
-        chain_start=boundary,
-        details=f'Purging {pending} audit logs before #{boundary} '
-                f'(older than {retention_days} days)')
+        purge_from=boundary,
+        details=f'Deleted {pending} audit logs older than {retention_days} days')
     if record is None:
         raise RuntimeError('The purge record could not be written')
 
@@ -242,16 +241,6 @@ def scheduled_audit_cleanup():
     """Scheduled task for automatic audit log cleanup (no-op without a retention)"""
     result = cleanup_audit_logs()
     logger.info(f"Scheduled audit cleanup: {result}")
-    if result.get('deleted'):
-        from services.audit_service import AuditService
-        AuditService.log_action(
-            action='audit_cleanup',
-            resource_type='audit_log',
-            details=f"Deleted {result['deleted']} audit logs older than "
-                    f"{result.get('retention_days')} days",
-            success='error' not in result,
-            username='system',
-        )
     if 'error' in result:
         # Reported to the scheduler, which otherwise records the run as ok.
         return {'status': 'failed', 'reason': result['error']}

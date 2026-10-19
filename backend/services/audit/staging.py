@@ -20,18 +20,18 @@ from flask import has_request_context, request
 from models import db, AuditLog
 from utils.datetime_utils import utc_now
 from utils.trusted_proxy import client_ip
-from .chain import seal
+from .chain import append_entry
 
 logger = logging.getLogger(__name__)
 
 
-def stage_audit_entry(**fields):
+def stage_audit_entry(purge_from=None, **fields):
     """Add a sealed audit entry to the session. The caller commits.
 
     Returns the entry, or None when it could not be built: an import that
     cannot record itself still has to finish, and a protocol handler that has
     already issued a certificate must not answer an error because of its own
-    ledger.
+    ledger. `purge_from` marks a purge record (see `append_entry`).
     """
     try:
         fields.setdefault('timestamp', utc_now())
@@ -44,9 +44,7 @@ def stage_audit_entry(**fields):
             if entry.user_agent is None:
                 entry.user_agent = request.headers.get('User-Agent', '')[:500]
 
-        db.session.add(entry)
-        db.session.flush()
-        return seal(entry)
+        return append_entry(entry, purge_from=purge_from)
     except Exception:
         logger.warning("An audit entry could not be staged", exc_info=True)
         return None
