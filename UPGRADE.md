@@ -51,9 +51,12 @@ docker run -d \
   --name ucm \
   -p 8443:8443 \
   -v ucm-data:/opt/ucm/data \
+  -v ucm-config:/etc/ucm \
   -e UCM_FQDN=ucm.example.com \
   neyslim/ultimate-ca-manager:latest
 ```
+
+`/etc/ucm` holds `master.key`. If the old container ran without a volume there, copy the key out before `docker rm` (`docker cp ucm:/etc/ucm/master.key ./master.key`) and into the new container afterwards.
 
 ---
 
@@ -156,6 +159,21 @@ Database migrations run automatically at startup.
 ---
 
 ## Version-Specific Notes
+
+### Docker Compose: `/etc/ucm` is now a named volume
+
+The bundled compose files now mount `ucm-config` at `/etc/ucm`, which holds `master.key`. Before, it lived in an anonymous volume that `docker compose down` left behind. If your compose file had no `/etc/ucm` volume, copy the key out before switching, then into the new volume:
+
+```bash
+docker compose cp ucm:/etc/ucm/master.key ./master.key   # old file, container running
+docker compose down && docker compose up -d                # new file
+docker compose cp ./master.key ucm:/etc/ucm/master.key
+docker compose exec -u root ucm chown 1000:1000 /etc/ucm/master.key
+docker compose exec -u root ucm chmod 600 /etc/ucm/master.key
+docker compose restart ucm
+```
+
+With `docker-compose.simple.yml` the service is `ultimate-ca-manager` rather than `ucm`. Without the key UCM starts in safe mode and says so; the key stays in the old anonymous volume (`docker volume ls`) until you prune it.
 
 ### Upgrading past v2.200 (protocol conformance sweep)
 

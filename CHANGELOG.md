@@ -13,6 +13,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Locking an account after too many failed password or LDAP logins never sent the security alert e-mail; it is now sent once per lockout.
 - Exporting a certificate or CA private key (PEM, PKCS#12, PFX, JKS or bare key) left no audit entry; each export is now recorded with the user, the format and whether it was password-protected.
+- Docker: the bundled compose files left `/etc/ucm` (master.key) on an anonymous volume, so `docker compose down` then `up` lost the key to every encrypted private key; they now mount the named volume `ucm-config` (see UPGRADE.md before switching).
 
 ## [2.242] - 2026-10-18
 
