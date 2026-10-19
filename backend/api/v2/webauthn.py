@@ -28,8 +28,8 @@ _LAST_FACTOR_MESSAGE = ('Your account requires a second factor: keep TOTP or ano
 def _strips_last_factor(user, credential_id):
     """Own enabled key whose removal would leave required 2FA without a factor.
 
-    Read under the user row lock, held until the removal commits. An administrator
-    acting on someone else's key is not blocked (recovery of a lost key).
+    Read under the user row lock, held until the removal commits. Someone else's
+    key is left to the service, which refuses it.
     """
     credential = db.session.get(WebAuthnCredential, credential_id)
     if not credential or credential.user_id != user.id or not credential.enabled:

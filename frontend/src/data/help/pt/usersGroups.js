@@ -58,6 +58,9 @@ Alterne o status de um usuário sem excluir sua conta.
 ### Redefinir Senha
 Administradores podem redefinir a senha de qualquer usuário. O usuário será solicitado a alterá-la no próximo login.
 
+### Chaves de segurança
+Nos detalhes de um usuário, os administradores veem as chaves de segurança dele e podem desativar ou remover uma, normalmente uma chave perdida, que caso contrário ainda permite entrar sem senha. Remover o último segundo fator de uma conta que exige um pede uma segunda confirmação; o usuário registra então novamente um fator no próximo login.
+
 ### Chaves de API
 Cada usuário pode ter múltiplas chaves de API para acesso programático. As chaves de API herdam as permissões da função do usuário. Veja a página Conta para gerenciar suas próprias chaves.
 

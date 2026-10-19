@@ -3712,6 +3712,18 @@
     "trustStoreExpiringDesc": "{{count}} certificat(s) de confiance expirent dans {{days}} jours"
   },
   "users": {
+    "securityKeys": {
+      "title": "Clés de sécurité",
+      "description": "Désactivez ou retirez une clé perdue : sinon, elle permet toujours de se connecter sans mot de passe",
+      "none": "Aucune clé de sécurité enregistrée",
+      "removeConfirm": "Retirer la clé de sécurité « {{key}} » de {{name}} ?",
+      "lastFactorConfirm": "Cette clé est le dernier second facteur de {{name}}, dont le compte en exige un. Sans elle, {{name}} devra enrôler à nouveau un second facteur à la prochaine connexion. Continuer ?",
+      "removed": "Clé de sécurité retirée",
+      "enabled": "Clé de sécurité activée",
+      "disabled": "Clé de sécurité désactivée",
+      "loadFailed": "Impossible de charger les clés de sécurité",
+      "updateFailed": "Impossible de modifier la clé de sécurité"
+    },
     "createUser": "Créer un utilisateur",
     "editUser": "Modifier l'utilisateur",
     "deleteUser": "Supprimer l'utilisateur",

@@ -102,7 +102,10 @@ def test_last_key_can_go_without_enforcement(app, make_user):
 def test_admin_can_remove_a_lost_key(app, auth_client, make_user, enforce_2fa):
     username, _key, _ = make_user(totp=False)
     key_id, = _key_ids(app, username)
-    assert auth_client.delete(f'/api/v2/webauthn/credentials/{key_id}').status_code == 200
+    with app.app_context():
+        uid = User.query.filter_by(username=username).first().id
+    url = f'/api/v2/users/{uid}/webauthn/{key_id}?confirm=last_factor'
+    assert auth_client.delete(url).status_code == 200
 
 
 def test_a_key_counts_as_enrolled_for_every_login_door(app, make_user, enforce_2fa):

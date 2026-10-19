@@ -1570,6 +1570,9 @@ Toggle a user's status without deleting their account.
 ### Password Reset
 Admins can reset any user's password. The user will be prompted to change it on next login.
 
+### Security Keys
+In a user's details, administrators see that user's security keys and can disable or remove one, typically a lost key, which otherwise still signs in without a password. Removing the last second factor of an account that requires one asks for a second confirmation; the user then enrols a factor again at the next login.
+
 ### API Keys
 Each user can have multiple API keys for programmatic access. API keys inherit the user's role permissions. See the Account page for managing your own keys.
 

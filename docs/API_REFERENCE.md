@@ -144,7 +144,15 @@ PUT /api/v2/account/2fa/webauthn
 ```
 `GET /api/v2/account/profile` reports `webauthn_2fa`, `two_factor_enforced` and `two_factor_methods` (the factors a password login asks for).
 
-Under enforced 2FA, a forced-enrolment session may register a key (`/api/v2/webauthn/register/*`) instead of confirming TOTP. `POST /api/v2/account/2fa/disable` and removing or disabling one's own last key answer 403 when required 2FA (enforced, or a key turned on as second factor) would be left with neither TOTP nor an enabled key; an administrator can still remove another user's lost key, and `POST /api/v2/users/{id}/reset-2fa` also turns the key second factor off, as does removing or disabling the account's last enabled key.
+Under enforced 2FA, a forced-enrolment session may register a key (`/api/v2/webauthn/register/*`) instead of confirming TOTP. `POST /api/v2/account/2fa/disable` and removing or disabling one's own last key answer 403 when required 2FA (enforced, or a key turned on as second factor) would be left with neither TOTP nor an enabled key. `POST /api/v2/users/{id}/reset-2fa` also turns the key second factor off, as does removing or disabling the account's last enabled key.
+
+An administrator (`write:users`) manages another user's keys, for instance to cut off a lost one, which would otherwise still sign in without a password:
+```http
+GET    /api/v2/users/{id}/webauthn                     // the user's keys
+PATCH  /api/v2/users/{id}/webauthn/{key_id}            // { "enabled": false }
+DELETE /api/v2/users/{id}/webauthn/{key_id}
+```
+Removing or disabling the last second factor of an account whose 2FA is required answers 409 (`reason: last_second_factor`); repeating the request with `?confirm=last_factor` goes ahead, and the user enrols a factor again at the next login, as after a 2FA reset. Each change is audited with the administrator, the account and the key. The own-key routes under `/api/v2/webauthn/credentials` only reach the caller's keys.
 
 ### Login with mTLS
 ```http

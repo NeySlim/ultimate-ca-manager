@@ -19,6 +19,7 @@ import {
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
 import { usersService, groupsService, rolesService, casService, accountService, ssoService } from '../services'
+import UserSecurityKeys from '../components/UserSecurityKeys'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useWebSocket, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
@@ -867,6 +868,8 @@ export default function UsersGroupsPage() {
           <CompactField autoIcon="totp" label={t('users.exempt2faLabel')} value={selectedUser.totp_exempt ? t('common.yes') : t('common.no')} />
         </CompactGrid>
       </CompactSection>
+
+      {canWrite('users') && <UserSecurityKeys user={selectedUser} />}
 
       {/* mTLS Certificates (admin only) */}
       {canWrite('users') && (

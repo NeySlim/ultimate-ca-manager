@@ -58,6 +58,9 @@ Schalten Sie den Status eines Benutzers um, ohne sein Konto zu löschen.
 ### Passwort zurücksetzen
 Administratoren können das Passwort jedes Benutzers zurücksetzen. Der Benutzer wird bei der nächsten Anmeldung zur Änderung aufgefordert.
 
+### Sicherheitsschlüssel
+In den Details eines Benutzers sehen Administratoren dessen Sicherheitsschlüssel und können einen deaktivieren oder entfernen, typischerweise einen verlorenen Schlüssel, der sonst weiterhin die Anmeldung ohne Passwort erlaubt. Das Entfernen des letzten zweiten Faktors eines Kontos, das einen verlangt, erfordert eine zweite Bestätigung; der Benutzer richtet dann bei der nächsten Anmeldung erneut einen Faktor ein.
+
 ### API-Schlüssel
 Jeder Benutzer kann mehrere API-Schlüssel für programmatischen Zugriff haben. API-Schlüssel erben die Berechtigungen der Benutzerrolle. Weitere Informationen zur Verwaltung eigener Schlüssel finden Sie auf der Kontoseite.
 

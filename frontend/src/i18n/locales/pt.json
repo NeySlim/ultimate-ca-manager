@@ -1203,6 +1203,18 @@
     "pinnedCount": "{{count}} de {{total}} modelos fixados"
   },
   "users": {
+    "securityKeys": {
+      "title": "Chaves de segurança",
+      "description": "Desative ou remova uma chave perdida: caso contrário, ela ainda permite entrar sem senha",
+      "none": "Nenhuma chave de segurança registrada",
+      "removeConfirm": "Remover a chave de segurança \"{{key}}\" de {{name}}?",
+      "lastFactorConfirm": "Esta chave é o último segundo fator de {{name}}, cuja conta exige um. Sem ela, {{name}} terá de registrar novamente um segundo fator no próximo login. Continuar?",
+      "removed": "Chave de segurança removida",
+      "enabled": "Chave de segurança ativada",
+      "disabled": "Chave de segurança desativada",
+      "loadFailed": "Não foi possível carregar as chaves de segurança",
+      "updateFailed": "Não foi possível alterar a chave de segurança"
+    },
     "createUser": "Criar utilizador",
     "editUser": "Editar utilizador",
     "deleteUser": "Eliminar utilizador",

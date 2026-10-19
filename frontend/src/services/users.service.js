@@ -34,6 +34,19 @@ export const usersService = {
     return apiClient.post(`/users/${id}/reset-2fa`)
   },
 
+  // Another user's security keys (administrators): lost-key recovery
+  async getSecurityKeys(id) {
+    return apiClient.get(`/users/${id}/webauthn`)
+  },
+
+  async deleteSecurityKey(id, keyId, { confirmLastFactor = false } = {}) {
+    return apiClient.delete(`/users/${id}/webauthn/${keyId}${confirmLastFactor ? '?confirm=last_factor' : ''}`)
+  },
+
+  async setSecurityKeyEnabled(id, keyId, enabled, { confirmLastFactor = false } = {}) {
+    return apiClient.patch(`/users/${id}/webauthn/${keyId}${confirmLastFactor ? '?confirm=last_factor' : ''}`, { enabled })
+  },
+
   async getPasswordPolicy() {
     return apiClient.get('/users/password-policy')
   },

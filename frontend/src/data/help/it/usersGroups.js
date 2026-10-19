@@ -58,6 +58,9 @@ Cambia lo stato di un utente senza eliminare il suo account.
 ### Reset password
 Gli amministratori possono reimpostare la password di qualsiasi utente. L'utente verrà invitato a cambiarla al prossimo accesso.
 
+### Chiavi di sicurezza
+Nella scheda di un utente, gli amministratori vedono le sue chiavi di sicurezza e possono disattivarne o rimuoverne una, in genere una chiave smarrita, che altrimenti permette ancora di accedere senza password. Rimuovere l'ultimo secondo fattore di un account che ne richiede uno chiede una seconda conferma; l'utente registra poi di nuovo un fattore al prossimo accesso.
+
 ### Chiavi API
 Ogni utente può avere più chiavi API per l'accesso programmatico. Le chiavi API ereditano i permessi del ruolo dell'utente. Vedi la pagina Account per gestire le tue chiavi.
 

@@ -1203,6 +1203,18 @@
     "pinnedCount": "{{count}} of {{total}} templates pinned"
   },
   "users": {
+    "securityKeys": {
+      "title": "Security keys",
+      "description": "Disable or remove a lost key: it can otherwise still sign in without a password",
+      "none": "No security key registered",
+      "removeConfirm": "Remove the security key \"{{key}}\" of {{name}}?",
+      "lastFactorConfirm": "This key is the last second factor of {{name}}, whose account requires one. Without it, {{name}} will have to enrol a second factor again at the next login. Continue?",
+      "removed": "Security key removed",
+      "enabled": "Security key enabled",
+      "disabled": "Security key disabled",
+      "loadFailed": "Could not load the security keys",
+      "updateFailed": "Could not update the security key"
+    },
     "createUser": "Create User",
     "editUser": "Edit User",
     "deleteUser": "Delete User",

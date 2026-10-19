@@ -404,44 +404,37 @@ class WebAuthnService:
     
     @staticmethod
     def delete_credential(credential_id: int, user_id: int) -> Tuple[bool, str]:
-        """Delete a WebAuthn credential"""
+        """Delete one of the user's own credentials (administrators use the users API)."""
         credential = db.session.get(WebAuthnCredential, credential_id)
-        
-        if not credential:
+        if not credential or credential.user_id != user_id:
             return False, "Credential not found"
-        
-        if credential.user_id != user_id:
-            user = db.session.get(User, user_id)
-            if not user or user.role != 'admin':
-                return False, "Not authorized"
-        
+        return WebAuthnService.remove_credential(credential)
+
+    @staticmethod
+    def toggle_credential(credential_id: int, user_id: int, enabled: bool) -> Tuple[bool, str]:
+        """Enable or disable one of the user's own credentials."""
+        credential = db.session.get(WebAuthnCredential, credential_id)
+        if not credential or credential.user_id != user_id:
+            return False, "Credential not found"
+        return WebAuthnService.set_credential_enabled(credential, enabled)
+
+    @staticmethod
+    def remove_credential(credential: WebAuthnCredential) -> Tuple[bool, str]:
+        credential_id = credential.id
         _drop_key_second_factor_if_last(credential)
         db.session.delete(credential)
         if not commit_or_rollback(logger, f"Failed to delete WebAuthn credential id={credential_id}"):
             return False, "Failed to delete credential"
-        
         logger.info(f"WebAuthn credential deleted: id={credential_id}")
         return True, "Credential deleted successfully"
-    
+
     @staticmethod
-    def toggle_credential(credential_id: int, user_id: int, enabled: bool) -> Tuple[bool, str]:
-        """Enable or disable a WebAuthn credential"""
-        credential = db.session.get(WebAuthnCredential, credential_id)
-        
-        if not credential:
-            return False, "Credential not found"
-        
-        if credential.user_id != user_id:
-            user = db.session.get(User, user_id)
-            if not user or user.role != 'admin':
-                return False, "Not authorized"
-        
+    def set_credential_enabled(credential: WebAuthnCredential, enabled: bool) -> Tuple[bool, str]:
         if not enabled:
             _drop_key_second_factor_if_last(credential)
         credential.enabled = enabled
-        if not commit_or_rollback(logger, f"Failed to toggle WebAuthn credential id={credential_id}"):
+        if not commit_or_rollback(logger, f"Failed to toggle WebAuthn credential id={credential.id}"):
             return False, "Failed to update credential"
-        
         action = "enabled" if enabled else "disabled"
-        logger.info(f"WebAuthn credential {action}: id={credential_id}")
+        logger.info(f"WebAuthn credential {action}: id={credential.id}")
         return True, f"Credential {action} successfully"
