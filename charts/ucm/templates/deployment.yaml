@@ -58,11 +58,6 @@ spec:
                 secretKeyRef:
                   name: {{ include "ucm.secretName" . }}
                   key: UCM_SECRET_KEY
-            - name: UCM_JWT_SECRET
-              valueFrom:
-                secretKeyRef:
-                  name: {{ include "ucm.secretName" . }}
-                  key: UCM_JWT_SECRET
             {{- if .Values.initialAdminPassword }}
             - name: UCM_INITIAL_ADMIN_PASSWORD
               valueFrom:

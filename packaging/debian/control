@@ -40,7 +40,7 @@ Description: Ultimate CA Manager - Certificate Authority Management System
   * SCEP protocol support - Device enrollment
   * mTLS authentication
   * WebAuthn/FIDO2 passwordless login
-  * REST API with JWT authentication
+  * REST API with session, API key and mTLS authentication
   * Email notifications
   * 8 beautiful themes (light/dark variants)
  .

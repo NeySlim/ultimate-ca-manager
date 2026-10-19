@@ -106,7 +106,6 @@ SUDOERS
         if [ ! -f "$UCM_CONFIG/ucm.env" ]; then
             NEW_CONFIG=1
             SECRET_KEY=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
-            JWT_SECRET=$(python3 -c 'import secrets; print(secrets.token_hex(32))')
             ADMIN_PASS="changeme123"
             
             cat > "$UCM_CONFIG/ucm.env" << ENVEOF
@@ -118,7 +117,6 @@ SUDOERS
 
 # ============ REQUIRED (auto-generated) ============
 SECRET_KEY=$SECRET_KEY
-JWT_SECRET_KEY=$JWT_SECRET
 DATABASE_PATH=$UCM_DATA/ucm.db
 
 # ============ NETWORK ============
@@ -132,8 +130,6 @@ LOG_LEVEL=INFO
 
 # ============ SECURITY ============
 # SESSION_TIMEOUT=3600
-# JWT_ACCESS_TOKEN_EXPIRES=900
-# JWT_REFRESH_TOKEN_EXPIRES=604800
 # RATE_LIMIT_ENABLED=true
 # RATE_LIMIT_PER_MINUTE=60
 # RATE_LIMIT_PER_HOUR=1000

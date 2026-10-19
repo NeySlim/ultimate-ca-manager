@@ -44,7 +44,6 @@ services:
       
       # Auto-generated if not provided
       - UCM_SECRET_KEY=${UCM_SECRET_KEY:-}
-      - UCM_JWT_SECRET=${UCM_JWT_SECRET:-}
       
       # ========================================
       # DATABASE

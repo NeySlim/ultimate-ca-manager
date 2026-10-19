@@ -34,6 +34,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Settings: the ACME public vhost "TLS certificate" was stored as a note and never applied to any listener or deployment; it is gone and the upgrade deletes it. Deploy that certificate to the reverse proxy with a deployment binding instead.
 - Settings: the internal `app.initialized` and `https.enabled` keys were seeded at startup and never read; they are no longer created and the upgrade deletes them. Nothing to do.
 - Notifications: the `subject_template` field of a notification setting was never read or written; it is no longer exposed. Nothing to do.
+- Packaging: the DEB and RPM packages, the native setup, the Docker image and the Helm chart no longer generate a JWT secret (`JWT_SECRET_KEY`, `UCM_JWT_SECRET`, `secrets.jwtSecret`), which nothing used. An existing value is ignored and can be deleted.
 
 ### Fixed
 

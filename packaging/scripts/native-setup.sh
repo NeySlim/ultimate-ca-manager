@@ -173,10 +173,8 @@ cmd_env() {
     touch "$file"
     env_has "$file" SECRET_KEY && had_secret=1
     # Restricted before the first secret is written
-    env_has "$file" SECRET_KEY && env_has "$file" JWT_SECRET_KEY || chmod 600 "$file"
-    for key in SECRET_KEY JWT_SECRET_KEY; do
-        env_has "$file" "$key" || env_fill "$file" "$key" "$(openssl rand -hex 32)"
-    done
+    env_has "$file" SECRET_KEY || chmod 600 "$file"
+    env_has "$file" SECRET_KEY || env_fill "$file" SECRET_KEY "$(openssl rand -hex 32)"
     # A file the package never completed (written by hand before the install) gets the defaults too.
     if [ -z "$had_secret" ]; then
         env_has "$file" DATABASE_PATH || env_fill "$file" DATABASE_PATH "$data/ucm.db"
