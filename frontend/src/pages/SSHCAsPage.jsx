@@ -24,15 +24,10 @@ import { SSH_EDDSA_KEY_TYPES, SSH_FIPS_DEFAULT_KEY_TYPE, sshKeyOptions, useFipsM
 
 const KEY_ALGORITHM_OPTIONS = [
   { value: 'ed25519', label: 'Ed25519' },
-  { value: 'rsa', label: 'RSA' },
+  { value: 'rsa', label: 'RSA 4096' },
   { value: 'ecdsa-p256', label: 'ECDSA P-256' },
   { value: 'ecdsa-p384', label: 'ECDSA P-384' },
   { value: 'ecdsa-p521', label: 'ECDSA P-521' },
-]
-
-const RSA_KEY_SIZE_OPTIONS = [
-  { value: '2048', label: '2048' },
-  { value: '4096', label: '4096' },
 ]
 
 const DEFAULT_EXTENSIONS = [
@@ -673,7 +668,6 @@ function SSHCAModal({ ca, onSave, onClose }) {
     description: ca?.descr || '',
     ca_type: ca?.ca_type || 'user',
     key_algorithm: ca?.key_algorithm || 'ed25519',
-    key_size: ca?.key_size || '4096',
     default_ttl: ca?.default_ttl || '',
     max_ttl: ca?.max_ttl || '',
     default_extensions: ca?.default_extensions || ['permit-pty', 'permit-agent-forwarding'],
@@ -704,8 +698,6 @@ function SSHCAModal({ ca, onSave, onClose }) {
     })
   }
 
-  const showKeySize = formData.key_algorithm === 'rsa'
-
   const handleSubmit = async () => {
     setLoading(true)
     try {
@@ -717,7 +709,6 @@ function SSHCAModal({ ca, onSave, onClose }) {
         descr: formData.description,
         ca_type: formData.ca_type,
         key_type: formData.key_algorithm,
-        ...(showKeySize && { key_size: parseInt(formData.key_size) }),
         default_ttl: formData.default_ttl || undefined,
         max_ttl: formData.max_ttl || undefined,
         default_extensions: formData.ca_type === 'user' ? formData.default_extensions : [],
@@ -763,24 +754,11 @@ function SSHCAModal({ ca, onSave, onClose }) {
         <Select
           label={t('sshCas.keyAlgorithm')}
           value={formData.key_algorithm}
-          onChange={value => {
-            handleChange('key_algorithm', value)
-            if (value === 'rsa') handleChange('key_size', '4096')
-          }}
+          onChange={value => handleChange('key_algorithm', value)}
           options={ca ? KEY_ALGORITHM_OPTIONS : sshKeyOptions(KEY_ALGORITHM_OPTIONS, fips)}
           disabled={!!ca}
         />
       </div>
-
-      {showKeySize && (
-        <Select
-          label={t('sshCas.keySize')}
-          value={formData.key_size}
-          onChange={value => handleChange('key_size', value)}
-          options={RSA_KEY_SIZE_OPTIONS}
-          disabled={!!ca}
-        />
-      )}
 
       <div className="grid grid-cols-2 gap-4">
         <Input

@@ -5090,7 +5090,6 @@
     "caType": "CA 类型",
     "keyType": "密钥类型",
     "keyAlgorithm": "密钥算法",
-    "keySize": "密钥大小",
     "fingerprint": "指纹",
     "serialCounter": "序列号计数器",
     "typeUser": "用户",

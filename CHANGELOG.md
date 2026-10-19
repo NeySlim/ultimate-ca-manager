@@ -22,6 +22,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Templates: the "Subject Alternative Names" types and the stored basic constraints were never applied at issuance; the form no longer offers them and the upgrade removes them from existing templates. Nothing to do: the names come from the request.
 - Reports: the legacy expiry and compliance report switches made the Reports page show a daily expiry report that never ran. The upgrade turns one switched on with recipients into a real schedule and removes the rest; check Reports > Schedule after upgrading.
 - HSM: the "Enable provider" switch of the provider form was never sent; it is gone. Nothing to do: a provider shows as enabled once its connection test succeeds.
+- SSH CAs: the RSA key size selector was ignored and every RSA SSH CA was 4096-bit; the selector is gone and the algorithm reads "RSA 4096". Nothing to do.
 
 ### Fixed
 

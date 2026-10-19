@@ -5093,7 +5093,6 @@
     "caType": "Type de CA",
     "keyType": "Type de clé",
     "keyAlgorithm": "Algorithme de clé",
-    "keySize": "Taille de clé",
     "fingerprint": "Empreinte",
     "serialCounter": "Compteur de série",
     "typeUser": "Utilisateur",

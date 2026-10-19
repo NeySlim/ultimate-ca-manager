@@ -5090,7 +5090,6 @@
     "caType": "CAタイプ",
     "keyType": "鍵タイプ",
     "keyAlgorithm": "鍵アルゴリズム",
-    "keySize": "鍵サイズ",
     "fingerprint": "フィンガープリント",
     "serialCounter": "シリアルカウンター",
     "typeUser": "ユーザー",

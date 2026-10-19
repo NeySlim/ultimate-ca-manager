@@ -5090,7 +5090,6 @@
     "caType": "Tipo di CA",
     "keyType": "Tipo di chiave",
     "keyAlgorithm": "Algoritmo di chiave",
-    "keySize": "Dimensione chiave",
     "fingerprint": "Impronta",
     "serialCounter": "Contatore di serie",
     "typeUser": "Utente",

@@ -5144,7 +5144,6 @@
     "caType": "Тип CA",
     "keyType": "Тип ключа",
     "keyAlgorithm": "Алгоритм ключа",
-    "keySize": "Розмір ключа",
     "fingerprint": "Відбиток",
     "serialCounter": "Лічильник серійних номерів",
     "typeUser": "Користувач",
