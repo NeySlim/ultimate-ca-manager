@@ -3413,6 +3413,7 @@
     "isDefault": "Default login provider",
     "lastUsed": "Last used",
     "signRequests": "Sign authentication requests",
+    "spOriginNotConfigured": "No Base URL (Settings > General) and no FQDN is configured: the SAML entity ID and ACS URL follow the address this page was opened with. Set the Base URL so that the identity provider always sees the same URLs.",
     "nameIdFormat": "NameID format",
     "nameIdFormatHelp": "Format UCM asks the identity provider for. Persistent gives a stable identifier; a transient NameID changes at every login and is never used to recognise the account.",
     "nameIdUnspecified": "Unspecified (IdP default)",

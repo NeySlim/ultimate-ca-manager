@@ -3424,6 +3424,7 @@
     "roleMapping": "角色映射",
     "roleMappingHelp": "将外部组或角色映射到 UCM 角色。匹配组中的用户将被分配相应的 UCM 角色。如果匹配多个组，将采用权限最高的角色（admin > operator > auditor > viewer）。",
     "signRequests": "签名认证请求",
+    "spOriginNotConfigured": "未配置基础 URL（设置 > 常规），也未配置 FQDN：SAML 实体 ID 和 ACS URL 取决于打开此页面所用的地址。请设置基础 URL，使身份提供商始终看到相同的 URL。",
     "nameIdFormat": "NameID 格式",
     "nameIdFormatHelp": "UCM 向身份提供商请求的格式。持久 (persistent) 提供稳定的标识符；临时 (transient) NameID 每次登录都会变化，永远不会用于识别账户。",
     "nameIdUnspecified": "未指定（IdP 默认）",

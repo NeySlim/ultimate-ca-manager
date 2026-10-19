@@ -2,6 +2,7 @@
 
 import base64
 import logging
+import os
 from datetime import datetime, timedelta, timezone
 from urllib.parse import urlsplit
 
@@ -38,18 +39,31 @@ REQUEST_TTL = timedelta(minutes=10)
 MAX_MESSAGE_ID_LENGTH = 256
 
 
+def configured_origin():
+    """Public origin set by the operator: admin Base URL, else FQDN; None if neither."""
+    canonical = get_admin_canonical_origin()
+    if not canonical:
+        return None
+    if get_admin_base_url():
+        return canonical.rstrip('/')
+    fqdn = (os.getenv('UCM_FQDN') or os.getenv('FQDN') or '').strip().lower()
+    return canonical.rstrip('/') if fqdn and urlsplit(canonical).hostname == fqdn else None
+
+
 def sp_base_url(flask_request):
     """Origin the IdP knows UCM by.
 
-    The request's own origin (X-Forwarded-* applied by ProxyFix), unless it
-    reached UCM under another host than the configured admin base URL.
+    The configured origin; on its own host the request keeps its port and path
+    prefix (a proxy on 443). Nothing configured: the request's origin.
     """
     origin = flask_request.url_root.rstrip('/')
-    if get_admin_base_url():
-        canonical = get_admin_canonical_origin()
-        if canonical and urlsplit(origin).hostname != urlsplit(canonical).hostname:
-            return canonical.rstrip('/')
-    return origin
+    canonical = configured_origin()
+    if not canonical:
+        return origin
+    want, got = urlsplit(canonical), urlsplit(origin)
+    if got.hostname == want.hostname:
+        return f'{want.scheme}://{got.netloc}{got.path}'.rstrip('/')
+    return canonical
 
 
 def sp_endpoints(base):

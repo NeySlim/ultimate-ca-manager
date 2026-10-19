@@ -72,6 +72,18 @@ def list_saml_certificates():
     return success_response(data=certs)
 
 
+@bp.route('/api/v2/sso/saml/sp-info', methods=['GET'])
+@require_auth(['read:sso'])
+def get_sp_info():
+    """SP URLs as UCM computes them, and whether they rest on a configured origin."""
+    base = saml_sp.sp_base_url(request)
+    return success_response(data={
+        **saml_sp.sp_endpoints(base),
+        'metadata_url': f'{base}/api/v2/sso/saml/metadata',
+        'origin_configured': saml_sp.configured_origin() is not None,
+    })
+
+
 @bp.route('/api/v2/sso/saml/metadata', methods=['GET'])
 def get_sp_metadata():
     """Generate schema-valid SAML 2.0 SP metadata XML for configuring the IDP.

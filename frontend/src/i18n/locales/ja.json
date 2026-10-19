@@ -3424,6 +3424,7 @@
     "roleMapping": "ロールマッピング",
     "roleMappingHelp": "外部グループまたはロールをUCMロールにマッピングします。一致するグループのユーザーには対応するUCMロールが割り当てられます。複数のグループが一致する場合、最も権限の高いロールが適用されます（admin > operator > auditor > viewer）。",
     "signRequests": "認証リクエストに署名",
+    "spOriginNotConfigured": "ベース URL (設定 > 一般) も FQDN も設定されていません。SAML のエンティティ ID と ACS URL は、このページを開いたアドレスに従います。ID プロバイダーが常に同じ URL を受け取るよう、ベース URL を設定してください。",
     "nameIdFormat": "NameID 形式",
     "nameIdFormatHelp": "UCM が ID プロバイダーに要求する形式です。永続 (persistent) は安定した識別子を返します。一時 (transient) の NameID はログインごとに変わり、アカウントの識別には使われません。",
     "nameIdUnspecified": "指定なし (IdP の既定)",

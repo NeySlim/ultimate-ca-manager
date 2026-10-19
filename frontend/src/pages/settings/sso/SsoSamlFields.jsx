@@ -24,8 +24,9 @@ export default function SsoSamlFields({
   fetchIdpMetadata,
   availableCerts,
   roleOptions,
-  baseUrl,
   spEntityId,
+  spMetadataUrl,
+  spOriginUnconfigured,
   samlAcsUrl,
   samlSloUrl,
   handleTestConnection,
@@ -34,6 +35,9 @@ export default function SsoSamlFields({
 
   return (
     <div className="space-y-3">
+      {spOriginUnconfigured && (
+        <HelpCard variant="warning" className="text-xs">{t('sso.spOriginNotConfigured')}</HelpCard>
+      )}
       {/* Identity Provider */}
       <CompactSection
         title={<span className="flex items-center">{t('sso.idpSection')}{connectionBadge}</span>}
@@ -132,7 +136,7 @@ export default function SsoSamlFields({
       <CompactSection title={t('sso.spSection')} icon={Globe} collapsible defaultOpen={false}>
         <div className="space-y-3">
           <HelpCard variant="info" className="text-xs">{t('sso.spMetadataHelp')}</HelpCard>
-          <CopyableUrl label={t('sso.spMetadataXml')} value={`${baseUrl}/api/v2/sso/saml/metadata`} description={t('sso.spMetadataXmlDesc')} />
+          <CopyableUrl label={t('sso.spMetadataXml')} value={spMetadataUrl} description={t('sso.spMetadataXmlDesc')} />
           <CopyableUrl label={t('sso.spEntityId')} value={spEntityId} />
           <CopyableUrl label={t('sso.acsUrl')} value={samlAcsUrl} description={t('sso.acsUrlDesc')} />
           <CopyableUrl label={t('sso.spSloUrl')} value={samlSloUrl} />

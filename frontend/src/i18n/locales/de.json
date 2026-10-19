@@ -3424,6 +3424,7 @@
     "roleMapping": "Rollenzuordnung",
     "roleMappingHelp": "Ordnen Sie externe Gruppen oder Rollen den UCM-Rollen zu. Benutzer in zugeordneten Gruppen erhalten die entsprechende UCM-Rolle. Wenn mehrere Gruppen zutreffen, gewinnt die Rolle mit den höchsten Rechten (admin > operator > auditor > viewer).",
     "signRequests": "Authentifizierungsanfragen signieren",
+    "spOriginNotConfigured": "Weder eine Basis-URL (Einstellungen > Allgemein) noch ein FQDN ist konfiguriert: SAML-Entity-ID und ACS-URL folgen der Adresse, unter der diese Seite geöffnet wurde. Legen Sie die Basis-URL fest, damit der Identitätsanbieter immer dieselben URLs sieht.",
     "nameIdFormat": "NameID-Format",
     "nameIdFormatHelp": "Format, das UCM beim Identitätsanbieter anfordert. Persistent liefert eine stabile Kennung; eine transiente NameID ändert sich bei jeder Anmeldung und dient nie zur Wiedererkennung des Kontos.",
     "nameIdUnspecified": "Nicht angegeben (IdP-Standard)",

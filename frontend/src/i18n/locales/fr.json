@@ -3274,6 +3274,7 @@
     "isDefault": "Fournisseur de connexion par défaut",
     "lastUsed": "Dernière utilisation",
     "signRequests": "Signer les requêtes d'authentification",
+    "spOriginNotConfigured": "Aucune URL de base (Paramètres > Général) ni aucun FQDN n'est configuré : l'entity ID SAML et l'URL ACS suivent l'adresse avec laquelle cette page a été ouverte. Configurez l'URL de base pour que le fournisseur d'identité voie toujours les mêmes URL.",
     "nameIdFormat": "Format du NameID",
     "nameIdFormatHelp": "Format qu'UCM demande au fournisseur d'identité. Persistent donne un identifiant stable ; un NameID transitoire change à chaque connexion et ne sert jamais à reconnaître le compte.",
     "nameIdUnspecified": "Non spécifié (défaut de l'IdP)",

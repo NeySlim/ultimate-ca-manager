@@ -12,11 +12,18 @@ from flask import request
 from onelogin.saml2.constants import OneLogin_Saml2_Constants as K
 from onelogin.saml2.utils import OneLogin_Saml2_Utils
 
+from api.v2.sso import saml_sp
 from api.v2.sso.ldap_routes import _get_saml_auth
 
 
 IDP_ENTITY = 'https://idp.example.test/saml'
 ACS_PATH = '/api/v2/sso/callback/saml'
+
+
+@pytest.fixture(autouse=True)
+def _request_origin(monkeypatch):
+    # No Base URL or FQDN from the host's environment: the SP is the test's origin.
+    monkeypatch.setattr(saml_sp, 'configured_origin', lambda: None)
 
 
 @pytest.fixture(scope='module')

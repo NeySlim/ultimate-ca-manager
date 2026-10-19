@@ -82,6 +82,7 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
   })
   const [fetchingMetadata, setFetchingMetadata] = useState(false)
   const [availableCerts, setAvailableCerts] = useState([])
+  const [spInfo, setSpInfo] = useState(null)
   const [testingConnection, setTestingConnection] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState(null)
   const [testingMapping, setTestingMapping] = useState(false)
@@ -97,6 +98,9 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
           setAvailableCerts(Array.isArray(certs) ? certs : [])
         })
         .catch(() => setAvailableCerts([]))
+      ssoService.getSamlSpInfo()
+        .then(res => setSpInfo(res.data || res))
+        .catch(() => setSpInfo(null))
     }
   }, [formData.provider_type])
 
@@ -216,9 +220,10 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
   }
 
   const baseUrl = window.location.origin
-  const spEntityId = `${baseUrl}/api/v2/sso`
-  const samlAcsUrl = `${baseUrl}/api/v2/sso/callback/saml`
-  const samlSloUrl = `${baseUrl}/api/v2/sso/callback/saml`
+  // The SAML URLs as the server computes them; the page origin until they load.
+  const spEntityId = spInfo?.entity_id || `${baseUrl}/api/v2/sso`
+  const samlAcsUrl = spInfo?.acs_url || `${baseUrl}/api/v2/sso/callback/saml`
+  const samlSloUrl = spInfo?.slo_url || `${baseUrl}/api/v2/sso/callback/saml`
   const oauthCallbackUrl = `${baseUrl}/api/v2/sso/callback/oauth2`
 
   const roleOptions = [
@@ -306,8 +311,9 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
           fetchingMetadata={fetchingMetadata}
           fetchIdpMetadata={fetchIdpMetadata}
           availableCerts={availableCerts}
-          baseUrl={baseUrl}
           spEntityId={spEntityId}
+          spMetadataUrl={spInfo?.metadata_url || `${baseUrl}/api/v2/sso/saml/metadata`}
+          spOriginUnconfigured={spInfo ? !spInfo.origin_configured : false}
           samlAcsUrl={samlAcsUrl}
           samlSloUrl={samlSloUrl}
         />

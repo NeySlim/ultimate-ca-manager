@@ -3424,6 +3424,7 @@
     "roleMapping": "Mapeo de roles",
     "roleMappingHelp": "Mapee grupos o roles externos a roles de UCM. Los usuarios en grupos coincidentes recibirán el rol de UCM correspondiente. Si varios grupos coinciden, gana el rol con mayores privilegios (admin > operator > auditor > viewer).",
     "signRequests": "Firmar solicitudes de autenticación",
+    "spOriginNotConfigured": "No hay ninguna URL base (Ajustes > General) ni ningún FQDN configurado: el entity ID SAML y la URL ACS siguen la dirección con la que se abrió esta página. Configure la URL base para que el proveedor de identidad vea siempre las mismas URL.",
     "nameIdFormat": "Formato de NameID",
     "nameIdFormatHelp": "Formato que UCM solicita al proveedor de identidad. Persistente da un identificador estable; un NameID transitorio cambia en cada inicio de sesión y nunca se usa para reconocer la cuenta.",
     "nameIdUnspecified": "No especificado (predeterminado del IdP)",

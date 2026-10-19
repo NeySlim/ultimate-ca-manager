@@ -18,8 +18,12 @@ vi.mock('../../contexts', () => ({
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
 }))
 
+let mockSpInfo = { entity_id: 'https://ucm.example.test/api/v2/sso', acs_url: 'https://ucm.example.test/acs', origin_configured: true }
 vi.mock('../../services', () => ({
-  ssoService: { getSamlCertificates: vi.fn(() => Promise.resolve({ data: [] })) },
+  ssoService: {
+    getSamlCertificates: vi.fn(() => Promise.resolve({ data: [] })),
+    getSamlSpInfo: vi.fn(() => Promise.resolve({ data: mockSpInfo })),
+  },
 }))
 
 import SsoProviderForm from '../settings/SsoProviderForm'
@@ -72,5 +76,20 @@ describe('SsoProviderForm SAML strict options', () => {
     const onSave2 = vi.fn()
     render(<SsoProviderForm provider={{ ...PROVIDER, saml_name_id_format: persistent }} onSave={onSave2} onCancel={vi.fn()} />)
     expect((await submit(onSave2)).saml_name_id_format).toBe(persistent)
+  })
+
+  it('shows the SP URLs the server computes and explains the NameID choice', async () => {
+    mockSpInfo = { entity_id: 'https://ucm.example.test/api/v2/sso', acs_url: 'https://ucm.example.test/acs', origin_configured: true }
+    render(<SsoProviderForm provider={PROVIDER} onSave={vi.fn()} onCancel={vi.fn()} />)
+    fireEvent.click(screen.getByText('sso.spSection'))
+    expect(await screen.findByText('https://ucm.example.test/api/v2/sso')).toBeInTheDocument()
+    expect(screen.queryByText('sso.spOriginNotConfigured')).not.toBeInTheDocument()
+    expect(screen.getByText('sso.nameIdFormatHelp')).toBeInTheDocument()
+  })
+
+  it('warns when no Base URL or FQDN fixes the SP URLs', async () => {
+    mockSpInfo = { entity_id: 'https://10.0.0.5:8443/api/v2/sso', origin_configured: false }
+    render(<SsoProviderForm provider={PROVIDER} onSave={vi.fn()} onCancel={vi.fn()} />)
+    expect(await screen.findByText('sso.spOriginNotConfigured')).toBeInTheDocument()
   })
 })

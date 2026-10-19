@@ -75,7 +75,9 @@ def _module_provider(app, idp_signer):
 
 @pytest.fixture
 def provider(app, _module_provider, monkeypatch):
+    # No configured origin: the SP origin follows each test's request.
     monkeypatch.setattr(saml_sp, 'get_admin_base_url', lambda: None)
+    monkeypatch.setattr(saml_sp, 'get_admin_canonical_origin', lambda: None)
     _set_idp_initiated(app, _module_provider, False)
     return _module_provider
 
@@ -274,15 +276,58 @@ def test_destination_keeps_the_path_prefix(app, provider, idp_signer):
     assert _post(client, resp, base=base) == OK
 
 
-def test_sp_base_keeps_request_origin_on_the_canonical_host(app, monkeypatch):
+def _sp_base(app, base):
+    from flask import request
+    with app.test_request_context('/', base_url=base):
+        return saml_sp.sp_base_url(request)
+
+
+def test_sp_base_keeps_request_port_on_the_canonical_host(app, monkeypatch):
     monkeypatch.setattr(saml_sp, 'get_admin_base_url', lambda: 'https://ucm.example.test')
     monkeypatch.setattr(saml_sp, 'get_admin_canonical_origin', lambda: 'https://ucm.example.test:8443')
-    with app.test_request_context('/', base_url='https://ucm.example.test'):
-        from flask import request
-        assert saml_sp.sp_base_url(request) == 'https://ucm.example.test'
-    with app.test_request_context('/', base_url='https://10.0.0.5:8443'):
-        from flask import request
-        assert saml_sp.sp_base_url(request) == 'https://ucm.example.test:8443'
+    assert _sp_base(app, 'https://ucm.example.test') == 'https://ucm.example.test'
+    assert _sp_base(app, 'https://10.0.0.5:8443') == 'https://ucm.example.test:8443'
+
+
+def test_sp_base_takes_the_scheme_of_the_base_url(app, monkeypatch):
+    # A TLS proxy that keeps Host but is not declared: UCM sees http.
+    monkeypatch.setattr(saml_sp, 'get_admin_base_url', lambda: 'https://ucm.example.test')
+    monkeypatch.setattr(saml_sp, 'get_admin_canonical_origin', lambda: 'https://ucm.example.test:8443')
+    assert _sp_base(app, 'http://ucm.example.test') == 'https://ucm.example.test'
+
+
+def test_sp_base_follows_the_fqdn_without_base_url(app, monkeypatch):
+    monkeypatch.setattr(saml_sp, 'get_admin_base_url', lambda: None)
+    monkeypatch.setattr(saml_sp, 'get_admin_canonical_origin', lambda: 'https://ucm.example.test:8443')
+    monkeypatch.delenv('UCM_FQDN', raising=False)
+    monkeypatch.setenv('FQDN', 'ucm.example.test')
+    assert _sp_base(app, 'https://forged.example') == 'https://ucm.example.test:8443'
+    # A canonical host guessed from the machine name is not a configuration.
+    monkeypatch.setenv('FQDN', 'other.example.test')
+    assert _sp_base(app, 'https://forged.example') == 'https://forged.example'
+
+
+def test_forged_host_cannot_borrow_another_sp_identity(app, provider, idp_signer, monkeypatch, caplog):
+    # A response the IdP issued to another SP, posted with that SP's Host.
+    monkeypatch.setattr(saml_sp, 'get_admin_canonical_origin', lambda: SP_BASE)
+    monkeypatch.delenv('UCM_FQDN', raising=False)
+    monkeypatch.setenv('FQDN', 'ucm.example.test')
+    _set_idp_initiated(app, provider, True)
+    other = 'https://other-sp.example.test'
+    _refused(caplog, app.test_client(), _response(idp_signer, sp_base=other),
+             'The response was received at', base=other)
+
+
+def test_sp_info_reports_whether_the_origin_is_configured(app, auth_client, monkeypatch):
+    monkeypatch.setattr(saml_sp, 'get_admin_base_url', lambda: None)
+    monkeypatch.setattr(saml_sp, 'get_admin_canonical_origin', lambda: None)
+    data = auth_client.get('/api/v2/sso/saml/sp-info').get_json()['data']
+    assert data['origin_configured'] is False
+    monkeypatch.setattr(saml_sp, 'get_admin_base_url', lambda: SP_BASE)
+    monkeypatch.setattr(saml_sp, 'get_admin_canonical_origin', lambda: SP_BASE)
+    data = auth_client.get('/api/v2/sso/saml/sp-info').get_json()['data']
+    assert data['origin_configured'] is True
+    assert data['entity_id'] == f'{SP_BASE}/api/v2/sso' and data['acs_url'] == f'{SP_BASE}{ACS}'
 
 
 def test_idp_initiated_option_is_saved_and_returned(auth_client, provider):
