@@ -6,6 +6,14 @@ import CopyableUrl from '../CopyableUrl'
 import MappingEditor from '../MappingEditor'
 import { formatDate } from '../../../lib/utils'
 
+export const NAMEID_UNSPECIFIED = 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'
+const NAME_ID_FORMATS = [
+  { value: NAMEID_UNSPECIFIED, labelKey: 'sso.nameIdUnspecified' },
+  { value: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent', labelKey: 'sso.nameIdPersistent' },
+  { value: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress', labelKey: 'sso.nameIdEmail' },
+  { value: 'urn:oasis:names:tc:SAML:2.0:nameid-format:transient', labelKey: 'sso.nameIdTransient' },
+]
+
 export default function SsoSamlFields({
   formData,
   handleChange,
@@ -90,6 +98,13 @@ export default function SsoSamlFields({
                 }))
               : [{ value: 'https', label: t('sso.httpsDefault') }]
             }
+          />
+          <Select
+            label={t('sso.nameIdFormat')}
+            value={formData.saml_name_id_format}
+            onChange={value => handleChange('saml_name_id_format', value)}
+            options={NAME_ID_FORMATS.map(f => ({ value: f.value, label: t(f.labelKey) }))}
+            helperText={t('sso.nameIdFormatHelp')}
           />
           <ToggleSwitch checked={formData.saml_verify_ssl} onChange={(val) => handleChange('saml_verify_ssl', val)} label={t('sso.verifySsl')} size="sm" />
           {!formData.saml_verify_ssl && <p className="text-xs text-amber-500">{t('sso.sslWarning')}</p>}

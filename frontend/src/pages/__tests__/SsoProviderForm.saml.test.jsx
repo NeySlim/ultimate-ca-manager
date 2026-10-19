@@ -62,4 +62,15 @@ describe('SsoProviderForm SAML strict options', () => {
     const payload = await submit(onSave)
     expect(payload.saml_sign_requests).toBe(false)
   })
+
+  it('asks for an unspecified NameID unless the provider chose a format', async () => {
+    const onSave = vi.fn()
+    const { unmount } = render(<SsoProviderForm forcedType="saml" onSave={onSave} onCancel={vi.fn()} />)
+    expect((await submit(onSave)).saml_name_id_format).toBe('urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified')
+    unmount()
+    const persistent = 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent'
+    const onSave2 = vi.fn()
+    render(<SsoProviderForm provider={{ ...PROVIDER, saml_name_id_format: persistent }} onSave={onSave2} onCancel={vi.fn()} />)
+    expect((await submit(onSave2)).saml_name_id_format).toBe(persistent)
+  })
 })

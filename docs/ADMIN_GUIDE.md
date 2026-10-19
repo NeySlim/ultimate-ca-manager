@@ -180,6 +180,7 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 - Responses are validated strictly: signature (SHA-256 or stronger), issuer, audience (the SP entity ID `https://your-server:8443/api/v2/sso`), Destination and Recipient (the ACS URL), validity window (five minutes of clock skew) and InResponseTo of the login started in the same browser; each assertion is accepted once. Behind a reverse proxy, set the admin Base URL or `UCM_BEHIND_PROXY=1` so that these URLs are the public ones, and compare them with `/api/v2/sso/saml/metadata`.
 - IdP-initiated logins (started from the IdP portal) are refused unless *Allow IdP-initiated login* is on.
 - *Sign authentication requests* signs each AuthnRequest with the key of the SP certificate (the HTTPS certificate or one held by UCM, RSA only); register that certificate at the IdP from the SP metadata first.
+- *NameID format* is asked of the IdP in each request and published in the metadata; *persistent* gives UCM a stable identifier, a transient NameID is never used to recognise the account.
 
 **Role mapping resolution:** when a user belongs to several groups that each match a mapping entry, the highest-privilege role wins (`admin` > `operator` > `auditor` > `viewer`); the order of the entries does not matter. This lets you map a broad access group to a low role and grant higher privileges through narrower groups. Users with no matching entry get the provider's default role at account creation; on later logins their stored role is kept unless *Sync role on each login* is enabled.
 

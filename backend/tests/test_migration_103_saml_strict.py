@@ -36,7 +36,7 @@ def test_sqlite_upgrade_is_idempotent():
     conn.execute('UPDATE pro_sso_providers SET saml_sign_requests = 1')
     migration.upgrade(conn)
     assert conn.execute('SELECT saml_sign_requests FROM pro_sso_providers').fetchone() == (1,)
-    assert 'saml_allow_idp_initiated' in _provider_columns(conn)
+    assert {'saml_allow_idp_initiated', 'saml_name_id_format'} <= _provider_columns(conn)
     assert conn.execute('SELECT saml_allow_idp_initiated FROM pro_sso_providers').fetchone() == (0,)
     conn.execute("INSERT INTO pro_sso_saml_message_ids (kind, message_id, provider_id, expires_at) "
                  "VALUES ('assertion', '_a1', 1, '2030-01-01 00:00:00')")
@@ -77,8 +77,9 @@ def test_postgresql_upgrade_is_idempotent():
                 conn.execute(text('UPDATE pro_sso_providers SET saml_sign_requests = TRUE'))
         with engine.begin() as conn:
             conn.execute(text(f'SET search_path TO {schema}'))
-            row = conn.execute(text('SELECT saml_allow_idp_initiated FROM pro_sso_providers')).one()
-            assert row == (False,)
+            row = conn.execute(text('SELECT saml_allow_idp_initiated, saml_name_id_format '
+                                    'FROM pro_sso_providers')).one()
+            assert row == (False, None)
             conn.execute(insert)
         with pytest.raises(IntegrityError):
             with engine.begin() as conn:

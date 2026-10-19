@@ -2,7 +2,8 @@
 
 `pro_sso_saml_message_ids` holds the AuthnRequest ids awaiting a response and
 the assertion ids already consumed, shared by every worker. IdP-initiated
-logins become an explicit per-provider opt-in, off by default.
+logins become an explicit per-provider opt-in, off by default, and the
+NameID format asked of the IdP gets a column (it was read but never stored).
 `saml_sign_requests` was stored but never applied: existing rows are set to
 what UCM actually did (unsigned) when the option first takes effect.
 """
@@ -47,6 +48,8 @@ def _upgrade_sqlite(conn):
             conn.execute("ALTER TABLE pro_sso_providers ADD COLUMN "
                          "saml_allow_idp_initiated BOOLEAN NOT NULL DEFAULT 0")
             conn.execute("UPDATE pro_sso_providers SET saml_sign_requests = 0")
+        if 'saml_name_id_format' not in columns:
+            conn.execute("ALTER TABLE pro_sso_providers ADD COLUMN saml_name_id_format VARCHAR(255)")
     conn.commit()
 
 
@@ -63,6 +66,8 @@ def _upgrade_pg(conn):
                 "ALTER TABLE pro_sso_providers ADD COLUMN "
                 "saml_allow_idp_initiated BOOLEAN NOT NULL DEFAULT FALSE"))
             conn.execute(text("UPDATE pro_sso_providers SET saml_sign_requests = FALSE"))
+        conn.execute(text("ALTER TABLE pro_sso_providers ADD COLUMN IF NOT EXISTS "
+                          "saml_name_id_format VARCHAR(255)"))
 
 
 def upgrade(conn):

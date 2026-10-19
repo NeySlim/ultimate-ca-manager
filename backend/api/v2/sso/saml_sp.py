@@ -24,6 +24,12 @@ logger = logging.getLogger(__name__)
 ENTITY_PATH = '/api/v2/sso'
 ACS_PATH = '/api/v2/sso/callback/saml'
 NAMEID_UNSPECIFIED = 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'
+NAMEID_FORMATS = (
+    NAMEID_UNSPECIFIED,
+    'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent',
+    'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress',
+    'urn:oasis:names:tc:SAML:2.0:nameid-format:transient',
+)
 BINDING_POST = 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST'
 BINDING_REDIRECT = 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect'
 
@@ -137,7 +143,7 @@ def build_settings(provider, base, sp_cert=None, sp_key=None):
             'entityId': endpoints['entity_id'],
             'assertionConsumerService': {'url': endpoints['acs_url'], 'binding': BINDING_POST},
             'singleLogoutService': {'url': endpoints['slo_url'], 'binding': BINDING_REDIRECT},
-            'NameIDFormat': getattr(provider, 'saml_name_id_format', None) or NAMEID_UNSPECIFIED,
+            'NameIDFormat': provider.saml_name_id_format or NAMEID_UNSPECIFIED,
         },
         'idp': {
             'entityId': provider.saml_entity_id,

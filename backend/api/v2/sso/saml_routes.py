@@ -96,8 +96,7 @@ def get_sp_metadata():
             sp_cert, _ = saml_sp.load_sp_credentials(provider)
         except Exception:
             pass
-    name_id_format = (getattr(provider, 'saml_name_id_format', None)
-                      if provider else None) or saml_sp.NAMEID_UNSPECIFIED
+    name_id_format = (provider.saml_name_id_format if provider else None) or saml_sp.NAMEID_UNSPECIFIED
 
     idp = provider or SimpleNamespace(
         saml_entity_id='https://idp.placeholder.local', saml_sso_url='https://idp.placeholder.local/sso',

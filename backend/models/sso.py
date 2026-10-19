@@ -32,6 +32,7 @@ class SSOProvider(db.Model):
     saml_certificate = db.Column(db.Text)  # Public cert, not secret
     saml_sign_requests = db.Column(db.Boolean, default=False)
     saml_sp_cert_source = db.Column(db.String(50), default='https')  # 'https' or cert ID
+    saml_name_id_format = db.Column(db.String(255))  # None = unspecified
     # Unsolicited (IdP-initiated) responses carry no InResponseTo to check.
     saml_allow_idp_initiated = db.Column(db.Boolean, default=False, nullable=False)
     saml_verify_ssl = db.Column(db.Boolean, default=True)
@@ -182,6 +183,7 @@ class SSOProvider(db.Model):
                 'saml_sign_requests': self.saml_sign_requests,
                 'saml_sp_cert_source': self.saml_sp_cert_source or 'https',
                 'saml_allow_idp_initiated': bool(self.saml_allow_idp_initiated),
+                'saml_name_id_format': self.saml_name_id_format or '',
                 'saml_certificate': self.saml_certificate,
                 'saml_verify_ssl': self.saml_verify_ssl if self.saml_verify_ssl is not None else True,
                 'saml_ca_bundle': self.saml_ca_bundle or '',

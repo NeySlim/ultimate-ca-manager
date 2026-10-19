@@ -448,3 +448,60 @@ def test_a_key_that_does_not_match_the_certificate_is_refused(app, auth_client, 
     monkeypatch.setattr(Config, 'HTTPS_KEY_PATH', stray)
     r = auth_client.put(f'/api/v2/sso/providers/{signing_off}', json={'saml_sign_requests': True})
     assert r.status_code == 400 and 'does not match' in r.get_json()['message']
+
+
+# ---- NameID format ----
+
+PERSISTENT = 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent'
+
+
+def _authn_request_xml(query):
+    import urllib.parse
+    import zlib
+    params = dict(p.split('=', 1) for p in query.split('&'))
+    raw = base64.b64decode(urllib.parse.unquote(params['SAMLRequest']))
+    return zlib.decompress(raw, -15).decode()
+
+
+@pytest.fixture
+def name_id_reset(app, provider):
+    yield provider
+    _configure(app, provider, saml_name_id_format=None)
+
+
+def test_the_chosen_name_id_format_is_requested_and_published(app, auth_client, name_id_reset):
+    r = auth_client.put(f'/api/v2/sso/providers/{name_id_reset}', json={'saml_name_id_format': PERSISTENT})
+    assert r.status_code == 200, r.get_data(as_text=True)
+    assert r.get_json()['data']['saml_name_id_format'] == PERSISTENT
+    assert f'Format="{PERSISTENT}"' in _authn_request_xml(_redirect_query(app))
+    xml = app.test_client().get('/api/v2/sso/saml/metadata', base_url=SP_BASE).get_data(as_text=True)
+    assert f'<md:NameIDFormat>{PERSISTENT}</md:NameIDFormat>' in xml
+
+
+def test_unspecified_is_stored_as_the_default(app, auth_client, name_id_reset):
+    unspecified = saml_sp.NAMEID_UNSPECIFIED
+    r = auth_client.put(f'/api/v2/sso/providers/{name_id_reset}', json={'saml_name_id_format': unspecified})
+    assert r.status_code == 200 and r.get_json()['data']['saml_name_id_format'] == ''
+    assert f'Format="{unspecified}"' in _authn_request_xml(_redirect_query(app))
+
+
+def test_an_unknown_name_id_format_is_refused(app, auth_client, name_id_reset):
+    r = auth_client.put(f'/api/v2/sso/providers/{name_id_reset}',
+                        json={'saml_name_id_format': 'urn:example:not-a-format'})
+    assert r.status_code == 400
+    with app.app_context():
+        assert db.session.get(SSOProvider, name_id_reset).saml_name_id_format is None
+
+
+def test_fallback_metadata_says_the_same(app, name_id_reset, signing_off, https_identity, monkeypatch):
+    from onelogin.saml2.settings import OneLogin_Saml2_Settings
+
+    def _broken(self):
+        raise RuntimeError('builder unavailable')
+    monkeypatch.setattr(OneLogin_Saml2_Settings, 'get_sp_metadata', _broken)
+    https_identity('rsa')
+    _configure(app, name_id_reset, saml_name_id_format=PERSISTENT, saml_sign_requests=True)
+    xml = app.test_client().get('/api/v2/sso/saml/metadata', base_url=SP_BASE).get_data(as_text=True)
+    assert f'<md:NameIDFormat>{PERSISTENT}</md:NameIDFormat>' in xml
+    assert 'AuthnRequestsSigned="true"' in xml and 'WantAssertionsSigned="false"' in xml
+    assert f'entityID="{SP_BASE}/api/v2/sso"' in xml

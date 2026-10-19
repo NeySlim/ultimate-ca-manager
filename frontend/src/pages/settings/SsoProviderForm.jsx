@@ -7,7 +7,7 @@ import { ssoService } from '../../services'
 import { useNotification } from '../../contexts'
 import SsoLdapFields from './sso/SsoLdapFields'
 import SsoOAuth2Fields from './sso/SsoOAuth2Fields'
-import SsoSamlFields from './sso/SsoSamlFields'
+import SsoSamlFields, { NAMEID_UNSPECIFIED } from './sso/SsoSamlFields'
 
 // Stored as JSON array string in DB — display as comma-separated text
 const requiredGroupsToText = (raw) => {
@@ -76,6 +76,7 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     saml_sign_requests: provider?.saml_sign_requests ?? false,
     saml_sp_cert_source: provider?.saml_sp_cert_source || 'https',
     saml_allow_idp_initiated: provider?.saml_allow_idp_initiated ?? false,
+    saml_name_id_format: provider?.saml_name_id_format || NAMEID_UNSPECIFIED,
     saml_verify_ssl: provider?.saml_verify_ssl ?? true,
     saml_ca_bundle: '',
   })
