@@ -64,7 +64,6 @@ jobs:
         run: |
           docker run -d --name ucm-smoke -p 8443:8443 \
             -e SECRET_KEY=ci_smoke_secret_key \
-            -e JWT_SECRET_KEY=ci_smoke_jwt_key \
             -e INITIAL_ADMIN_PASSWORD=changeme123 \
             "${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}"
           # Wait for /api/v2/health
@@ -146,7 +145,6 @@ jobs:
         run: |
           docker run -d --name ucm-smoke --network host \
             -e SECRET_KEY=ci_smoke_secret_key \
-            -e JWT_SECRET_KEY=ci_smoke_jwt_key \
             -e INITIAL_ADMIN_PASSWORD=changeme123 \
             -e DATABASE_URL=postgresql://ucm:ucm_ci_password@localhost:5432/ucm \
             "${{ steps.ver.outputs.image }}:${{ steps.ver.outputs.version }}"

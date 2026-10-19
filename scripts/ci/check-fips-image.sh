@@ -25,7 +25,6 @@ fail() {
 docker run -d --name "$name" -p "127.0.0.1:$port:8443" \
     -e UCM_FIPS=1 \
     -e SECRET_KEY=ci_fips_secret_key \
-    -e JWT_SECRET_KEY=ci_fips_jwt_key \
     -e UCM_INITIAL_ADMIN_PASSWORD=changeme123 \
     "$image" >/dev/null
 

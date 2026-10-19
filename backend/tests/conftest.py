@@ -30,7 +30,7 @@ if int(cryptography.__version__.split('.')[0]) < 49:
                 '(49 or newer, as in requirements.txt): run it with the project venv', returncode=4)
 
 # Set required env vars at MODULE LOAD time, before any test file is collected.
-# settings.py reads SECRET_KEY / JWT_SECRET_KEY at class-body load time, so they
+# settings.py reads SECRET_KEY at class-body load time, so it
 # must be present before the first `from app import create_app` (which can be
 # triggered by any test module's import or fixture).
 # A Redis URL from the shell or /etc/ucm/ucm.env would switch sessions and Socket.IO
@@ -38,7 +38,6 @@ if int(cryptography.__version__.split('.')[0]) < 49:
 os.environ['REDIS_URL'] = ''
 os.environ['UCM_REDIS_URL'] = ''
 os.environ.setdefault('SECRET_KEY', 'test-secret-key-for-testing')
-os.environ.setdefault('JWT_SECRET_KEY', 'test-jwt-secret-key-for-testing')
 os.environ.setdefault('UCM_ENV', 'test')
 os.environ.setdefault('HTTP_REDIRECT', 'false')
 os.environ.setdefault('INITIAL_ADMIN_PASSWORD', 'changeme123')
@@ -254,7 +253,6 @@ def encryption_enabled(monkeypatch, tmp_path, app):
 def app():
     """Create Flask app with test configuration (shared across all tests)."""
     os.environ['SECRET_KEY'] = 'test-secret-key-for-testing'
-    os.environ['JWT_SECRET_KEY'] = 'test-jwt-secret-key-for-testing'
     os.environ['UCM_ENV'] = 'test'
     os.environ['HTTP_REDIRECT'] = 'false'
     os.environ['INITIAL_ADMIN_PASSWORD'] = 'changeme123'
