@@ -1788,7 +1788,7 @@
     "autoApproveDesc": "Gültige SCEP-Anfragen automatisch genehmigen",
     "autoApproveWarning": "Automatische Genehmigung aktiviert.",
     "challengeValidity": "Challenge-Passwort-Gültigkeit",
-    "challengeValidityHelp": "Stunden bis Ablauf (1-168)",
+    "challengeValidityHelp": "Stunden bis Ablauf ({{min}}-{{max}})",
     "hours": "Stunden",
     "scepDisabled": "SCEP ist deaktiviert",
     "scepDisabledDesc": "SCEP im Konfigurations-Tab aktivieren.",

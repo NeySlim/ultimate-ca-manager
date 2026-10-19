@@ -1788,7 +1788,7 @@
     "autoApproveDesc": "自动批准有效的 SCEP 请求",
     "autoApproveWarning": "自动批准已启用。请确保挑战密码已安全分发。",
     "challengeValidity": "挑战密码有效期",
-    "challengeValidityHelp": "挑战密码过期前的小时数 (1-168)",
+    "challengeValidityHelp": "挑战密码过期前的小时数 ({{min}}-{{max}})",
     "hours": "小时",
     "scepDisabled": "SCEP 已禁用",
     "scepDisabledDesc": "在配置选项卡中启用 SCEP 以使用挑战密码。",

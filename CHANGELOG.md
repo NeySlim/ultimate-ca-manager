@@ -19,6 +19,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - mTLS and EST behind a reverse proxy: a client certificate forwarded URL-encoded in `X-SSL-Client-Cert` (nginx `$ssl_client_escaped_cert`) could not be read; raw and URL-encoded PEM are both accepted, still only from trusted proxies.
 - Settings > Security showed an "API Rate Limit" field that was never saved nor applied; it is removed. Rate limits are set with the `RATE_LIMIT_*` environment variables.
 - HSM: an AWS CloudHSM provider created from the form could not connect, since neither its token label nor its crypto user reached the PKCS#11 login. The form now asks for the token label and logs in as `<crypto user>:<password>`; the unused Region and AWS access key fields are gone.
+- SCEP: the challenge password validity field stopped at 168 hours while the API accepted up to 720; the form now takes its bounds (1 to 720 hours) from the API.
 
 ## [2.242] - 2026-10-18
 

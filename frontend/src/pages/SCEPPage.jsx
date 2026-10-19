@@ -557,10 +557,12 @@ export default function SCEPPage() {
                 type="number"
                 value={config.challenge_validity || 24}
                 onChange={(e) => setConfig({ ...config, challenge_validity: parseInt(e.target.value) })}
-                min="1"
-                max="168"
+                min={config.challenge_validity_range?.[0]}
+                max={config.challenge_validity_range?.[1]}
                 disabled={!config.enabled}
-                helperText={t('scep.challengeValidityHelp')}
+                helperText={config.challenge_validity_range ? t('scep.challengeValidityHelp', {
+                  min: config.challenge_validity_range[0], max: config.challenge_validity_range[1],
+                }) : undefined}
                 suffix={t('scep.hours')}
               />
 

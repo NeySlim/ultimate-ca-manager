@@ -1788,7 +1788,7 @@
     "autoApproveDesc": "Automatically approve valid SCEP requests",
     "autoApproveWarning": "Auto-approve enabled. Ensure challenge passwords are securely distributed.",
     "challengeValidity": "Challenge Password Validity",
-    "challengeValidityHelp": "Hours before challenge passwords expire (1-168)",
+    "challengeValidityHelp": "Hours before challenge passwords expire ({{min}}-{{max}})",
     "hours": "hours",
     "scepDisabled": "SCEP is disabled",
     "scepDisabledDesc": "Enable SCEP in Configuration tab to use challenge passwords.",

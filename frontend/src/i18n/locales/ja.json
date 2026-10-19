@@ -1788,7 +1788,7 @@
     "autoApproveDesc": "有効なSCEPリクエストを自動的に承認する",
     "autoApproveWarning": "自動承認が有効です。チャレンジパスワードが安全に配布されていることを確認してください。",
     "challengeValidity": "チャレンジパスワードの有効期間",
-    "challengeValidityHelp": "チャレンジパスワードが期限切れになるまでの時間（1～168時間）",
+    "challengeValidityHelp": "チャレンジパスワードが期限切れになるまでの時間（{{min}}～{{max}}時間）",
     "hours": "時間",
     "scepDisabled": "SCEPは無効です",
     "scepDisabledDesc": "チャレンジパスワードを使用するには、設定タブでSCEPを有効にしてください。",

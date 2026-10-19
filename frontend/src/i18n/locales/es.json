@@ -1788,7 +1788,7 @@
     "autoApproveDesc": "Aprobar automáticamente las solicitudes SCEP válidas",
     "autoApproveWarning": "Aprobación automática habilitada. Asegúrese de que las contraseñas de desafío se distribuyan de forma segura.",
     "challengeValidity": "Validez de la contraseña de desafío",
-    "challengeValidityHelp": "Horas antes de que expiren las contraseñas de desafío (1-168)",
+    "challengeValidityHelp": "Horas antes de que expiren las contraseñas de desafío ({{min}}-{{max}})",
     "hours": "horas",
     "scepDisabled": "SCEP está deshabilitado",
     "scepDisabledDesc": "Habilite SCEP en la pestaña Configuración para usar contraseñas de desafío.",

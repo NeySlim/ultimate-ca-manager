@@ -2354,7 +2354,7 @@
     "autoApproveDesc": "Approuver automatiquement les demandes SCEP valides",
     "autoApproveWarning": "Approbation automatique activée.",
     "challengeValidity": "Validité du mot de passe de défi",
-    "challengeValidityHelp": "Heures avant l'expiration (1-168)",
+    "challengeValidityHelp": "Heures avant l'expiration ({{min}}-{{max}})",
     "hours": "heures",
     "scepDisabled": "SCEP est désactivé",
     "scepDisabledDesc": "Activez SCEP dans l'onglet Configuration.",

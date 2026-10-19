@@ -1814,7 +1814,7 @@
     "autoApproveDesc": "Automatically approve дійсний SCEP requests",
     "autoApproveWarning": "Auto-approve увімкнено. Ensure challenge passwords are securely distributed.",
     "challengeValidity": "Challenge Пароль Validity",
-    "challengeValidityHelp": "Годин до закінчення терміну дії паролів виклику (1-168)",
+    "challengeValidityHelp": "Годин до закінчення терміну дії паролів виклику ({{min}}-{{max}})",
     "hours": "годин",
     "scepDisabled": "SCEP is вимкнено",
     "scepDisabledDesc": "Увімкніть SCEP на вкладці Конфігурація, щоб використовувати паролі виклику.",
