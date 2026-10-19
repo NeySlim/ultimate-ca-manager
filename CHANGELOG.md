@@ -21,6 +21,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - HSM: an AWS CloudHSM provider created from the form could not connect, since neither its token label nor its crypto user reached the PKCS#11 login. The form now asks for the token label and logs in as `<crypto user>:<password>`; the unused Region and AWS access key fields are gone.
 - SCEP: the challenge password validity field stopped at 168 hours while the API accepted up to 720; the form now takes its bounds (1 to 720 hours) from the API.
 - DEB: the generated `ucm.env` still offered `SCEP_*` variables that UCM never reads (SCEP is configured under Protocols > SCEP); they are removed. The in-app help no longer lists Buypass, which stopped issuing certificates on 15 October 2025.
+- docs/HSM_DOCKER.md said a key sync against an empty SoftHSM token removes every key record; since 2.240 it keeps the keys a CA uses, and the page now says so.
 
 ## [2.242] - 2026-10-18
 
