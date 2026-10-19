@@ -720,7 +720,6 @@ def update_ca(ca_id):
         ocsp_url: string - OCSP responder URL
         cdp_enabled: bool - Enable CRL Distribution Point
         cdp_url: string - CRL Distribution Point URL
-        is_active: bool - Active status
     """
 
     ca = db.session.get(CA, ca_id)
@@ -851,11 +850,6 @@ def update_ca(ca_id):
                 return error_response('cps_oid must be a valid OID (e.g. 2.5.29.32.0)', 400)
         ca.cps_oid = oid or '2.5.29.32.0'
         changed.append('cps_oid')
-    if 'is_active' in data:
-        new_val = bool(data['is_active'])
-        if new_val != bool(getattr(ca, 'is_active', None)):
-            changed.append('is_active')
-        ca.is_active = new_val
     # Offline state is mutated EXCLUSIVELY through the dedicated /offline and
     # /restore endpoints (they enforce password complexity + real key
     # encryption / decryption). Silently ignore any attempt to set

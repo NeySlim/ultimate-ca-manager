@@ -412,7 +412,6 @@ GET /api/v2/cas?page=1&per_page=20
       "valid_until": "2035-01-01T00:00:00",
       "key_size": 4096,
       "signature_algorithm": "sha256WithRSAEncryption",
-      "is_active": true,
       "certificates_count": 42
     }
   ],
@@ -497,8 +496,7 @@ PATCH /api/v2/cas/{ca_id}
 Content-Type: application/json
 
 {
-  "name": "Updated Name",
-  "is_active": true
+  "name": "Updated Name"
 }
 ```
 

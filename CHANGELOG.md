@@ -24,6 +24,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - HSM: the "Enable provider" switch of the provider form was never sent; it is gone. Nothing to do: a provider shows as enabled once its connection test succeeds.
 - SSH CAs: the RSA key size selector was ignored and every RSA SSH CA was 4096-bit; the selector is gone and the algorithm reads "RSA 4096". Nothing to do.
 - API: `owner_group_id` on SSH CAs and SSH certificates was stored, and returned for CAs and certificates, but no access control read it; it is no longer accepted or returned. Use roles to restrict access.
+- API: `PATCH /api/v2/cas/<id>` accepted `is_active` and logged it as a change, but CAs have no such flag and nothing was stored; the field is now ignored. Take a CA offline to stop it signing.
 
 ### Fixed
 
