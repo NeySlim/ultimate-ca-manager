@@ -279,12 +279,55 @@ def _configured_log_urls():
         return []
 
 
+AUTO_SUBMIT_THREAD = 'ct-auto-submit'
+
+
+def _store_auto_submitted(serial, scts, wait_seconds=10):
+    """Record the SCTs as ``cert_scts_<id>`` of the certificate with *serial* (an int)."""
+    import time
+    from models import Certificate, SystemConfig, db
+
+    deadline = time.monotonic() + wait_seconds
+    while True:
+        # Stored in decimal or in hex depending on the issuance path
+        row = Certificate.query.filter(Certificate.serial_number.in_(
+            (str(serial), format(serial, 'x'), format(serial, 'X')))).first()
+        if row is not None or time.monotonic() >= deadline:
+            break
+        db.session.rollback()
+        time.sleep(0.2)
+    if row is None:
+        logger.warning(f"CT: no certificate with serial {serial} to attach its SCTs to")
+        return
+    key = f'cert_scts_{row.id}'
+    config = SystemConfig.query.filter_by(key=key).first() or SystemConfig(key=key)
+    config.value = json.dumps(scts)
+    db.session.add(config)
+    db.session.commit()
+
+
+def _submit_in_background(app, chain, log_urls, serial):
+    try:
+        with app.app_context():
+            scts = collect_scts(chain, log_urls)
+            if not scts:
+                logger.warning("No CT log accepted the issued certificate")
+                return
+            _store_auto_submitted(serial, scts)
+    except Exception as e:
+        logger.warning(f"CT auto-submission failed: {e}")
+
+
 def _auto_submit(certificate, issuer_certificate):
     """Post-issuance ``add-chain`` when ``ct_enabled`` and ``ct_auto_submit`` are on.
 
-    Best effort: a log that refuses or times out never fails the issuance.
+    Runs in a background thread once the issuing transaction commits: a slow or
+    refusing log never delays nor fails the issuance. Returns no SCT.
     """
-    from models import SystemConfig
+    import threading
+    from flask import current_app
+    from sqlalchemy import event
+    from models import SystemConfig, db
 
     def on(key):
         row = SystemConfig.query.filter_by(key=key).first()
@@ -294,14 +337,23 @@ def _auto_submit(certificate, issuer_certificate):
         return []
     chain = [c.public_bytes(serialization.Encoding.PEM).decode('ascii')
              for c in (certificate, issuer_certificate)]
-    try:
-        scts = collect_scts(chain, _configured_log_urls())
-    except Exception as e:
-        logger.warning(f"CT auto-submission failed: {e}")
-        return []
-    if not scts:
-        logger.warning("No CT log accepted the issued certificate")
-    return scts
+    args = (current_app._get_current_object(), chain, _configured_log_urls(),
+            certificate.serial_number)
+    session = db.session()
+
+    state = {'open': True}
+
+    def committed(_session):
+        if state.pop('open', False):
+            threading.Thread(target=_submit_in_background, args=args,
+                             name=AUTO_SUBMIT_THREAD, daemon=True).start()
+
+    def rolled_back(_session):
+        state.pop('open', None)
+
+    event.listen(session, 'after_commit', committed, once=True)
+    event.listen(session, 'after_rollback', rolled_back, once=True)
+    return []
 
 
 def apply_ct_policy(certificate, issuer_certificate, issuer_private_key):
@@ -311,8 +363,8 @@ def apply_ct_policy(certificate, issuer_certificate, issuer_private_key):
     with an embedded SCT list via the pre-certificate flow.
 
     Returns ``(certificate, scts)`` — the (possibly re-issued) certificate and
-    its SCTs: embedded ones, or those of the post-issuance submission
-    (``ct_auto_submit``) when embedding is off. Raises ValueError when ``ct_required`` is set but no CT log
+    its embedded SCTs; with embedding off, ``ct_auto_submit`` submits the
+    certificate in the background once the issuance commits. Raises ValueError when ``ct_required`` is set but no CT log
     accepted the pre-certificate — so the policy is enforced identically on
     every issuance path (web, ACME, EST).
     """
