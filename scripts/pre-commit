@@ -44,6 +44,8 @@ if echo "$FRONT_RESULT" | grep -q "passed" && ! echo "$FRONT_RESULT" | grep -qE 
     echo -e "${GREEN}✅${NC} $FRONT_RESULT"
 else
     echo -e "${RED}❌${NC} $FRONT_RESULT"
+    # A crashed run (worker killed under load) prints no summary line: show its tail.
+    [ -n "$FRONT_RESULT" ] || echo "$FRONT_OUT" | tail -15 | sed 's/^/    /'
     echo -e "${YELLOW}    Run 'cd frontend && npx vitest run' for details${NC}"
     FAILED=1
 fi
