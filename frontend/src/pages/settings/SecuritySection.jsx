@@ -334,16 +334,6 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
               disabled={!canAdminSettings}
             />
           </div>
-          <div className="col-span-full md:col-span-1">
-            <Input
-              label={t('settings.apiRateLimit')}
-              type="number"
-              value={settings.api_rate_limit || 60}
-              onChange={(e) => updateSetting('api_rate_limit', parseInt(e.target.value))}
-              min="10"
-              max="1000"
-            />
-          </div>
         </DetailGrid>
         {canWriteSettings && (
           <div className="pt-4">

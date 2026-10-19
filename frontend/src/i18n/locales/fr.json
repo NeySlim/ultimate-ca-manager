@@ -2695,7 +2695,6 @@
     "keyRecoveryDualControlLocked": "Ce paramètre est contrôlé par la variable d'environnement KEY_RECOVERY_DUAL_CONTROL et ne peut pas être modifié ici.",
     "sessionRateLimits": "Session et limites de débit",
     "sessionDuration": "Durée de session (heures)",
-    "apiRateLimit": "Limite de débit API (requêtes/minute)",
     "backupSubtitle": "Options de sauvegarde et de récupération des données",
     "enableAutoBackups": "Activer les sauvegardes automatiques",
     "autoBackupsDesc": "Sauvegardes quotidiennes chiffrées enregistrées dans /opt/ucm/data/backups",

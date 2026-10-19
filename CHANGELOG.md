@@ -17,6 +17,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Without `UCM_DB_ENCRYPTION_KEY`, an empty `/etc/machine-id` (common in containers) made UCM derive a new key at every start, so stored integration secrets (SMTP, LDAP, DNS, SSO, webhooks) became unreadable after a restart; the persisted `.machine-key` is now used.
 - Certificate Transparency: the built-in log list named Google's retired Argon 2026h1 shard; it now lists Google Argon and Cloudflare Nimbus shards accepted today. Embed SCTs and Require SCTs applied even with CT disabled; they now apply only while CT is enabled, and the settings page hides them otherwise.
 - mTLS and EST behind a reverse proxy: a client certificate forwarded URL-encoded in `X-SSL-Client-Cert` (nginx `$ssl_client_escaped_cert`) could not be read; raw and URL-encoded PEM are both accepted, still only from trusted proxies.
+- Settings > Security showed an "API Rate Limit" field that was never saved nor applied; it is removed. Rate limits are set with the `RATE_LIMIT_*` environment variables.
 
 ## [2.242] - 2026-10-18
 

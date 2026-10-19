@@ -2355,7 +2355,6 @@
     "applyAndRestart": "適用して再起動",
     "regenerateCertConfirm": "HTTPS証明書を再生成しますか？サーバーが再起動されます。",
     "regenerateAndRestart": "再生成して再起動",
-    "apiRateLimit": "APIレート制限（リクエスト/分）",
     "applyCustomCert": "カスタム証明書を適用",
     "applyCustomCertificateDesc": "独自の証明書と秘密鍵をアップロード（PEM形式）。",
     "applySelectedCertificate": "選択した証明書を適用",

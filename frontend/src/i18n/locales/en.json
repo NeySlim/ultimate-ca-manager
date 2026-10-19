@@ -2356,7 +2356,6 @@
     "applyAndRestart": "Apply & Restart",
     "regenerateCertConfirm": "Regenerate HTTPS certificate? This will restart the server.",
     "regenerateAndRestart": "Regenerate & Restart",
-    "apiRateLimit": "API Rate Limit (requests/minute)",
     "applyCustomCert": "Apply Custom Certificate",
     "applyCustomCertificateDesc": "Upload your own certificate and private key (PEM format).",
     "applySelectedCertificate": "Apply Selected Certificate",

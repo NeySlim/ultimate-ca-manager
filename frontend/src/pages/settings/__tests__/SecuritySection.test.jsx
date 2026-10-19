@@ -126,3 +126,11 @@ describe('SecuritySection disabling encryption', () => {
     expect(screen.queryByText('settings.disableEncryption')).not.toBeInTheDocument()
   })
 })
+
+describe('SecuritySection session settings', () => {
+  it('offers no API rate limit field: nothing stores or reads it', () => {
+    renderSection({ enabled: false })
+    expect(screen.getByText('settings.sessionDuration')).toBeInTheDocument()
+    expect(screen.queryByText('settings.apiRateLimit')).not.toBeInTheDocument()
+  })
+})

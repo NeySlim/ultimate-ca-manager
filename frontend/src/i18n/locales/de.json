@@ -2355,7 +2355,6 @@
     "applyAndRestart": "Anwenden & neu starten",
     "regenerateCertConfirm": "HTTPS-Zertifikat neu generieren? Der Server wird dadurch neu gestartet.",
     "regenerateAndRestart": "Neu generieren & neu starten",
-    "apiRateLimit": "API-Ratenlimit (Anfragen/Minute)",
     "applyCustomCert": "Benutzerdefiniertes Zertifikat anwenden",
     "applyCustomCertificateDesc": "Laden Sie Ihr eigenes Zertifikat und Ihren privaten Schlüssel hoch (PEM-Format).",
     "applySelectedCertificate": "Ausgewähltes Zertifikat anwenden",

@@ -2355,7 +2355,6 @@
     "applyAndRestart": "应用并重启",
     "regenerateCertConfirm": "重新生成 HTTPS 证书？ 操作将重启服务。",
     "regenerateAndRestart": "重新生成并重启",
-    "apiRateLimit": "API速率限制（请求/分钟）",
     "applyCustomCert": "应用自定义证书",
     "applyCustomCertificateDesc": "上传您自己的证书和私钥（PEM格式）。",
     "applySelectedCertificate": "应用所选证书",

@@ -2387,7 +2387,6 @@
     "applyAndRestart": "Застосувати та перезапустити",
     "regenerateCertConfirm": "Перегенерувати сертифікат HTTPS? Сервер буде перезапущено.",
     "regenerateAndRestart": "Перегенерувати та перезапустити",
-    "apiRateLimit": "Обмеження частоти API (запитів/хвилину)",
     "applyCustomCert": "Застосувати власний сертифікат",
     "applyCustomCertificateDesc": "Завантажте власний сертифікат та приватний ключ (формат PEM).",
     "applySelectedCertificate": "Застосувати вибраний сертифікат",
