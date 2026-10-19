@@ -1494,7 +1494,7 @@
     "wildcard": "Wildcard",
     "autoApprove": "Auto-Approve",
     "allowWildcard": "Allow Wildcard Certificates",
-    "allowWildcardDesc": "Allow requesting *.domain.com certificates",
+    "allowWildcardDesc": "Allow *.domain.com certificates for this zone; when off, the ACME server and the ACME proxy refuse wildcard orders for it",
     "autoApproveRequests": "Auto-approve Certificate Requests",
     "autoApproveDesc": "Skip ACME challenge validation for this domain. Certificates are issued immediately without verifying domain control.",
     "issuingCA": "Issuing CA",

@@ -1494,7 +1494,7 @@
     "wildcard": "通配符",
     "autoApprove": "自动批准",
     "allowWildcard": "允许通配符证书",
-    "allowWildcardDesc": "允许请求 *.domain.com 证书",
+    "allowWildcardDesc": "允许此区域的 *.domain.com 证书；关闭时，ACME 服务器和 ACME 代理会拒绝针对它的通配符订单",
     "autoApproveRequests": "自动批准证书请求",
     "autoApproveDesc": "跳过此域名的 ACME 质询验证。证书将立即颁发，不验证域名控制权。",
     "issuingCA": "签发CA",

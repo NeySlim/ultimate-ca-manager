@@ -1516,7 +1516,7 @@
     "wildcard": "Wildcard",
     "autoApprove": "Автоматичне схвалення",
     "allowWildcard": "Дозволити Wildcard сертифікати",
-    "allowWildcardDesc": "Дозволити запити сертифікатів *.domain.com",
+    "allowWildcardDesc": "Дозволити сертифікати *.domain.com для цієї зони; якщо вимкнено, сервер ACME і проксі ACME відхиляють wildcard-замовлення для неї",
     "autoApproveRequests": "Автоматично схвалювати запити сертифікатів",
     "autoApproveDesc": "Пропустити перевірку виклику ACME для цього домену. Сертифікати видаються негайно без перевірки контролю над доменом.",
     "issuingCA": "CA-емітент",

@@ -1494,7 +1494,7 @@
     "wildcard": "Comodín",
     "autoApprove": "Auto-aprobar",
     "allowWildcard": "Allow Wildcard Certificados",
-    "allowWildcardDesc": "Allow requesting *.domain.com certificados",
+    "allowWildcardDesc": "Permitir certificados *.dominio.com para esta zona; desactivado, el servidor ACME y el proxy ACME rechazan los pedidos wildcard que la afectan",
     "autoApproveRequests": "Auto-approve Certificado Requests",
     "autoApproveDesc": "Omitir la validación de challenge ACME para este dominio. Los certificados se emiten inmediatamente sin verificar el control del dominio.",
     "issuingCA": "CA emisora",

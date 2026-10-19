@@ -1494,7 +1494,7 @@
     "wildcard": "ワイルドカード",
     "autoApprove": "自動承認",
     "allowWildcard": "ワイルドカード証明書を許可",
-    "allowWildcardDesc": "*.domain.com 証明書のリクエストを許可する",
+    "allowWildcardDesc": "このゾーンで *.domain.com 証明書を許可します。オフの場合、ACME サーバーと ACME プロキシはこのゾーンのワイルドカード注文を拒否します",
     "autoApproveRequests": "証明書リクエストを自動承認",
     "autoApproveDesc": "このドメインのACMEチャレンジ検証をスキップします。ドメイン制御を確認せずに証明書が即座に発行されます。",
     "issuingCA": "発行CA",

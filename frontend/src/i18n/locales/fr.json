@@ -332,7 +332,7 @@
     "wildcard": "Générique",
     "autoApprove": "Auto-approbation",
     "allowWildcard": "Autoriser les certificats wildcard",
-    "allowWildcardDesc": "Autoriser les demandes de certificats *.domaine.com",
+    "allowWildcardDesc": "Autoriser les certificats *.domaine.com pour cette zone ; désactivé, le serveur ACME et le proxy ACME refusent les commandes wildcard qui la visent",
     "autoApproveRequests": "Approuver automatiquement les demandes",
     "autoApproveDesc": "Ignorer la validation des challenges ACME pour ce domaine. Les certificats sont émis immédiatement sans vérifier le contrôle du domaine.",
     "issuingCA": "CA émettrice",

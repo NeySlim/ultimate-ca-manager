@@ -1494,7 +1494,7 @@
     "wildcard": "Wildcard",
     "autoApprove": "Aprovação Automática",
     "allowWildcard": "Allow Wildcard Certificados",
-    "allowWildcardDesc": "Permitir pedir certificados *.dominio.com",
+    "allowWildcardDesc": "Permitir certificados *.dominio.com para esta zona; desativado, o servidor ACME e o proxy ACME recusam os pedidos wildcard que a visam",
     "autoApproveRequests": "Aprovar Pedidos de Certificado Automaticamente",
     "autoApproveDesc": "Ignorar a validação de challenge ACME para este domínio. Os certificados são emitidos imediatamente sem verificar o controlo do domínio.",
     "issuingCA": "CA emissora",
