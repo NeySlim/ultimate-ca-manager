@@ -423,9 +423,9 @@ certificates embed the port-80 form of the URL.
 **Regenerate via API** (requires `write:crl`):
 
 ```bash
-curl -k -X POST -H "Authorization: Bearer $TOKEN" \
+curl -k -X POST -H "Authorization: Bearer $UCM_API_KEY" \
   https://your-server:8443/api/v2/crl/<ca_id>/regenerate
-curl -k -X POST -H "Authorization: Bearer $TOKEN" \
+curl -k -X POST -H "Authorization: Bearer $UCM_API_KEY" \
   https://your-server:8443/api/v2/crl/<ca_id>/delta/regenerate
 ```
 
@@ -537,7 +537,7 @@ UCM can select an *alternate* chain advertised by the CA via `Link: rel="alterna
 **API (example)**
 - Update via `PATCH /api/v2/acme/client/accounts/<id>` (requires `write:acme`):
 ```bash
-curl -k -X PATCH -H "Authorization: Bearer $TOKEN" -H "Content-Type: application/json" \
+curl -k -X PATCH -H "Authorization: Bearer $UCM_API_KEY" -H "Content-Type: application/json" \
   -d '{"preferred_chain":"ISRG Root X1"}' \
   https://localhost:8443/api/v2/acme/client/accounts/<id>
 ```
@@ -622,7 +622,7 @@ Users can create API keys for automation:
 1. Go to **Account** > **API Keys**
 2. Click **Generate Key**
 3. Copy key (shown only once)
-4. Use in the `X-API-Key` header, or as `Authorization: Bearer <key>`
+4. Use in the `X-API-Key` header, or as `Authorization: Bearer <key>` (keys start with `ucm_ak_`; another bearer token, such as one an authenticating proxy relays, is ignored)
 
 ---
 

@@ -17,7 +17,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - A security key can also be turned on as second factor without enforced 2FA (My Account, once a key is registered): password logins then ask for it, the last factor cannot be removed, and a key that became the second factor stays when an administrator lifts enforcement.
 - Administrators can list, disable and remove another user's security keys from the user's details (Users), so a lost key stops signing in without a password; removing the last factor of required 2FA asks for a second confirmation.
 - Reports: a Revoked Certificates report (period, optional reason filter) can be generated, downloaded and scheduled.
-- API keys are also accepted as `Authorization: Bearer <key>`, with the same scopes and CSRF exemption as `X-API-Key`; a key that fails is now refused instead of falling back to the browser session.
+- API keys are also accepted as `Authorization: Bearer ucm_ak_...`, with the same scopes and CSRF exemption as `X-API-Key`; a key that fails is now refused instead of falling back to the browser session. A bearer token without the `ucm_ak_` prefix, such as an IdP token relayed by an authenticating proxy, is ignored and the session applies as before.
 - SAML providers have a NameID format setting (unspecified, persistent, email address or transient), sent in each AuthnRequest and published in the SP metadata; the format used to be read from a setting that could not be saved, so UCM always asked for "unspecified".
 - Settings > Security: the OCSP responder certificate auto-renewal switch and its window (days before expiry), which the daily task already read but nothing could set.
 

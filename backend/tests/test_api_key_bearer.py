@@ -1,8 +1,10 @@
 """`Authorization: Bearer <api key>` is an alias of `X-API-Key`.
 
 Same key lookup, same scopes, same CSRF exemption, and a presented key that
-fails is refused rather than falling back to the browser session. `/metrics`
-keeps its own bearer token and never accepts an API key.
+fails is refused rather than falling back to the browser session. A bearer
+token without the `ucm_ak_` prefix is someone else's (an authenticating proxy
+relaying the IdP token): it is ignored, with neither refusal nor CSRF
+exemption. `/metrics` keeps its own bearer token and never accepts an API key.
 """
 import json
 
@@ -66,11 +68,25 @@ def test_failed_key_does_not_fall_back_to_the_session(auth_client, header):
     assert auth_client.get('/api/v2/certificates').status_code == 200
 
 
+IDP_TOKEN = 'Bearer eyJhbGciOiJSUzI1NiJ9.eyJzdWIiOiJhbGljZSJ9.c2ln'
+
+
+def test_a_relayed_idp_token_keeps_the_session(auth_client):
+    """oauth2-proxy, Pomerium or Authelia forward the IdP token with the session cookie."""
+    assert auth_client.get('/api/v2/certificates', headers={'Authorization': IDP_TOKEN}).status_code == 200
+
+
+def test_a_relayed_idp_token_alone_is_not_authenticated(app):
+    r = app.test_client().get('/api/v2/certificates', headers={'Authorization': IDP_TOKEN})
+    assert r.status_code == 401
+
+
 def _csrf_middleware(app):
     return next(f for f in app.before_request_funcs.get(None, []) if f.__name__ == 'check_csrf')
 
 
-@pytest.mark.parametrize('auth, refused', [('Bearer ucm_ak_x', False), ('Basic dXNlcjpwdw==', True)])
+@pytest.mark.parametrize('auth, refused', [('Bearer ucm_ak_x', False), ('Basic dXNlcjpwdw==', True),
+                                           ('Bearer eyJhbGciOiJSUzI1NiJ9.idp.token', True)])
 def test_bearer_request_skips_csrf(app, monkeypatch, auth, refused):
     monkeypatch.setenv('CSRF_DISABLED', 'false')
     with app.test_request_context('/api/v2/users', method='POST', headers={'Authorization': auth}):

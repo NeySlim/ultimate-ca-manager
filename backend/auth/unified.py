@@ -28,14 +28,21 @@ except ImportError:
 logger = logging.getLogger(__name__)
 
 
+# Every UCM API key starts with it; a bearer token without it is not ours.
+API_KEY_PREFIX = 'ucm_ak_'
+
+
 def presented_api_key(request_obj):
-    """API key from ``X-API-Key``, or from ``Authorization: Bearer`` as an alias."""
+    """API key from ``X-API-Key``, or from ``Authorization: Bearer`` when the token
+    carries the UCM key prefix; any other bearer token (an IdP token relayed by an
+    authenticating proxy) is ignored."""
     key = (request_obj.headers.get('X-API-Key') or '').strip()
     if key:
         return key
     scheme, _, token = (request_obj.headers.get('Authorization') or '').partition(' ')
-    if scheme.lower() == 'bearer' and token.strip():
-        return token.strip()
+    token = token.strip()
+    if scheme.lower() == 'bearer' and token.startswith(API_KEY_PREFIX):
+        return token
     return None
 
 
@@ -277,7 +284,7 @@ class AuthManager:
             raise Exception("APIKey model not available")
 
         # Generate secure random key
-        key = f"ucm_ak_{secrets.token_urlsafe(32)}"
+        key = f"{API_KEY_PREFIX}{secrets.token_urlsafe(32)}"
         key_hash = hashlib.sha256(key.encode()).hexdigest()
         # First 12 chars are enough to identify a key in the UI
         # (e.g. 'ucm_ak_AbC1') without revealing it.

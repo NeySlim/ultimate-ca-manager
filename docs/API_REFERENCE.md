@@ -322,7 +322,7 @@ POST /api/v2/account/apikeys/{key_id}/regenerate
 DELETE /api/v2/account/apikeys/{key_id}
 ```
 
-A key is sent as `X-API-Key: ucm_ak_...` or, equivalently, `Authorization: Bearer ucm_ak_...`. Both get the key's scopes and need no CSRF token; a key that fails is refused (401) even when a session cookie is present.
+A key is sent as `X-API-Key: ucm_ak_...` or, equivalently, `Authorization: Bearer ucm_ak_...`. Both get the key's scopes and need no CSRF token; a key that fails is refused (401) even when a session cookie is present. A bearer token that does not start with `ucm_ak_` (an IdP token relayed by an authenticating proxy, for instance) is not taken for a key: it is ignored, gets no CSRF exemption, and the session cookie applies.
 
 ### WebAuthn Credentials
 
