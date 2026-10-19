@@ -620,7 +620,6 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
   const [formData, setFormData] = useState({
     name: provider?.name || '',
     provider_type: provider?.provider_type || 'pkcs11',
-    enabled: provider?.enabled ?? false,
     connection_timeout: provider?.connection_timeout || 30,
     pkcs11_library_path: provider?.pkcs11_library_path || '',
     pkcs11_slot_id: provider?.pkcs11_slot_id ?? '',
@@ -779,12 +778,6 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
           />
         </div>
       )}
-
-      <ToggleSwitch
-        checked={formData.enabled}
-        onChange={(val) => handleChange('enabled', val)}
-        label={t('common.enableProvider')}
-      />
     </FormModal>
   )
 }

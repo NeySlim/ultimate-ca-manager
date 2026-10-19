@@ -26,4 +26,8 @@ describe('HSM provider form, stored secrets', () => {
     expect(onSave.mock.calls[0][0].config[key]).toBe('***')
   })
 
+  it('offers no "Enable provider" switch: the state follows the connection test', () => {
+    render(<ProviderModal provider={null} hsmStatus={null} onSave={() => {}} onClose={() => {}} />)
+    expect(screen.queryByText('common.enableProvider')).toBeNull()
+  })
 })
