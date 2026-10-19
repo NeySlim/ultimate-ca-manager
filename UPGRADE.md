@@ -160,6 +160,17 @@ Database migrations run automatically at startup.
 
 ## Version-Specific Notes
 
+### Upgrading to v2.243
+
+Several fixes change what an existing installation does once upgraded. The CHANGELOG lists them under **Upgrade notes**; before upgrading:
+
+- Back up `audit-chain.keys` with `master.key` from now on (same directory), and on Docker Compose follow the `ucm-config` volume steps below.
+- Review custom roles and their assignments: they now grant their permissions.
+- SAML: set the admin Base URL and check that the IdP matches `/api/v2/sso/saml/metadata` and that its clock is within five minutes.
+- Check policies (notification e-mails, 50-name maximum now applied to ACME and the other protocols), ACME "Allow wildcard" per domain, discovery profile notifications and Reports > Schedule.
+- Integrations whose server or account changes ask for their secret again; SMTP OAuth needs a new consent after such a change.
+- API clients: a failing key is refused even with a session, and `Authorization: Bearer` is read as a key only for `ucm_ak_` tokens; exporting a CA private key needs `read:private_keys`.
+
 ### Docker Compose: `/etc/ucm` is now a named volume
 
 The bundled compose files now mount `ucm-config` at `/etc/ucm`, which holds `master.key`. Before, it lived in an anonymous volume that `docker compose down` left behind. If your compose file had no `/etc/ucm` volume, copy the key out before switching, then into the new volume:

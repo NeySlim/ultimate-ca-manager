@@ -9,6 +9,23 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Upgrade notes
+
+- SAML: responses are now validated strictly; check the IdP clock and that its SP entity ID, ACS URL and issuer match the SP metadata (set the Base URL). Existing providers keep IdP-initiated logins and have request signing turned off; new providers start with IdP-initiated login off (see Security).
+- Policies: "Notify on policy violation" is on by default, so existing policies start e-mailing their addresses, approval group or approvers (see Added).
+- Policies: the maximum validity and maximum number of DNS names now also bind ACME, SCEP, EST and WSTEP; the default 50-name maximum makes larger ACME orders fail (see Fixed).
+- ACME: "Allow wildcard" is now enforced by the server and the proxy; check it is on for every domain that issues wildcards (see Fixed).
+- Discovery: existing scan profiles start sending notifications; set the address or clear the switches to stop them (see Fixed).
+- Reports: the legacy expiry and compliance switches become schedules at 08:00 UTC; check Reports > Schedule (see Removed).
+- Integrations: a saved secret no longer follows a new server, URL, port, TLS setting, tenant or account, so such a change asks for the secret again; moving the SMTP server also drops the OAuth refresh token, which needs a new consent (see Security).
+- API keys: a key that fails is refused even with a session cookie, and a bearer token counts as a key only with the `ucm_ak_` prefix (see Added).
+- CA private keys: exporting one or taking a CA offline with its key now needs `read:private_keys` as well as `write:cas` (see Security).
+- Passwords: the `admin_bypass_password_policy` setting is deleted and administrators follow the password policy (see Removed).
+- Templates: allowed SAN types are enforced only once "Enforce the allowed SAN types" is on; existing templates keep it off, new ones have it on (see Fixed).
+- Custom roles: assigned roles now grant their permissions, the administrator-only ones excepted; review roles and assignments before upgrading (see Security).
+- Audit log: back up `audit-chain.keys` with `master.key`, beside which it is written (see Security and docs/SECURITY.md).
+- Docker Compose: `/etc/ucm` is now the named volume `ucm-config`; copy `master.key` out before switching (see Fixed and UPGRADE.md).
+
 ### Added
 
 - A policy can now govern revocations and renewals as well as issuance: revoking a certificate (alone, in bulk, a user certificate) or an intermediate CA, and renewals by an operator or the scheduler, are queued for approval and performed with the requested parameters once approved; ACME revocations it covers are refused, and so is removing an mTLS enrolment (409) until its certificate is revoked. Existing policies keep governing what they did.
