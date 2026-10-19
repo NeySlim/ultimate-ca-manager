@@ -113,6 +113,8 @@ X-API-Key: <your-api-key>
 
 ### 权限
 API 密钥继承您的用户角色权限，不能拥有超出您账户的访问权限。
+也可以作为 Bearer 令牌发送：\`Authorization: Bearer <your-api-key>\`
+
 
 ### 吊销密钥
 点击**删除**可立即使 API 密钥失效。使用该密钥的活跃会话将被终止。

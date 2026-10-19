@@ -113,6 +113,8 @@ X-API-Key: <la-tua-chiave-api>
 
 ### Permessi
 Le chiavi API ereditano i permessi del ruolo del tuo utente. Non possono avere più accesso del tuo account.
+Oppure inviala come token bearer: \`Authorization: Bearer <la-tua-chiave-api>\`.
+
 
 ### Revoca delle chiavi
 Clicca **Elimina** per invalidare immediatamente una chiave API. Le sessioni attive che utilizzano la chiave verranno terminate.

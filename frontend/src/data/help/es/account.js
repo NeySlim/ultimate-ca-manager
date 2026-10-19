@@ -113,6 +113,8 @@ X-API-Key: <tu-clave-api>
 
 ### Permisos
 Las claves API heredan los permisos del rol de tu usuario. No pueden tener más acceso que tu cuenta.
+O envíala como token bearer: \`Authorization: Bearer <tu-clave-api>\`.
+
 
 ### Revocar claves
 Haz clic en **Eliminar** para invalidar inmediatamente una clave API. Las sesiones activas que usen la clave serán terminadas.

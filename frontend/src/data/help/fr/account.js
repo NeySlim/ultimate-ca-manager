@@ -113,6 +113,8 @@ X-API-Key: <votre-cle-api>
 
 ### Permissions
 Les clés API héritent des permissions du rôle de votre utilisateur. Elles ne peuvent pas avoir plus d'accès que votre compte.
+Ou envoyez-la comme jeton bearer : \`Authorization: Bearer <votre-cle-api>\`.
+
 
 ### Révoquer des clés
 Cliquez sur **Supprimer** pour invalider immédiatement une clé API. Les sessions actives utilisant la clé seront terminées.
