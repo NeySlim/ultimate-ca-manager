@@ -13,6 +13,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Settings > Security: the OCSP responder certificate auto-renewal switch and its window (days before expiry), which the daily task already read but nothing could set.
 
+### Changed
+
+- Packaging: the DEB ucm.env offered `SESSION_TIMEOUT` and `RATE_LIMIT_PER_MINUTE`/`RATE_LIMIT_PER_HOUR`, which nothing applied; it now offers the `RATE_LIMIT_*_RPM` and `*_BURST` limits UCM reads. Session lifetime is set in Settings > Security.
+
 ### Removed
 
 - ACME: EAB keys still kept in the pre-2.139 `acme_eab_keys` setting registered accounts without appearing anywhere; the upgrade moves them to ACME > EAB as active credentials, where they can be seen and revoked, and the old setting is no longer read. Nothing to do.

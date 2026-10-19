@@ -211,8 +211,6 @@ class Config:
     
     # Rate Limiting
     RATE_LIMIT_ENABLED = os.getenv("RATE_LIMIT_ENABLED", "true").lower() == "true"
-    RATE_LIMIT_PER_MINUTE = int(os.getenv("RATE_LIMIT_PER_MINUTE", "60"))
-    RATE_LIMIT_PER_HOUR = int(os.getenv("RATE_LIMIT_PER_HOUR", "1000"))
     
     # Logging. LOG_FILE is the fallback application log path (utils.app_log):
     # the data directory is writable on every deployment, unlike /var/log/ucm.
