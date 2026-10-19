@@ -2188,10 +2188,10 @@ Include the key in the \`X-API-Key\` header:
 X-API-Key: <your-api-key>
 \`\`\`
 
-### Permissions
-API keys inherit your user role's permissions. They cannot have more access than your account.
 Or send it as a bearer token: \`Authorization: Bearer <your-api-key>\`.
 
+### Permissions
+API keys inherit your user role's permissions. They cannot have more access than your account.
 
 ### Revoking Keys
 Click **Delete** to immediately invalidate an API key. Active sessions using the key will be terminated.

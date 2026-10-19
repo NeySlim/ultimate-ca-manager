@@ -290,6 +290,8 @@ POST /api/v2/account/apikeys/{key_id}/regenerate
 DELETE /api/v2/account/apikeys/{key_id}
 ```
 
+A key is sent as `X-API-Key: ucm_ak_...` or, equivalently, `Authorization: Bearer ucm_ak_...`. Both get the key's scopes and need no CSRF token; a key that fails is refused (401) even when a session cookie is present.
+
 ### WebAuthn Credentials
 
 ```http
@@ -304,8 +306,6 @@ POST /api/v2/account/webauthn/register/options
 
 # Register new credential - Step 2
 POST /api/v2/account/webauthn/register/verify
-A key is sent as `X-API-Key: ucm_ak_...` or, equivalently, `Authorization: Bearer ucm_ak_...`. Both get the key's scopes and need no CSRF token; a key that fails is refused (401) even when a session cookie is present.
-
 Content-Type: application/json
 
 {

@@ -111,10 +111,10 @@ Fügen Sie den Schlüssel im \`X-API-Key\`-Header ein:
 X-API-Key: <ihr-api-schlüssel>
 \`\`\`
 
-### Berechtigungen
-API-Schlüssel erben die Berechtigungen Ihrer Benutzerrolle. Sie können nicht mehr Zugriff haben als Ihr Konto.
 Oder senden Sie ihn als Bearer-Token: \`Authorization: Bearer <ihr-api-schlüssel>\`.
 
+### Berechtigungen
+API-Schlüssel erben die Berechtigungen Ihrer Benutzerrolle. Sie können nicht mehr Zugriff haben als Ihr Konto.
 
 ### Schlüssel widerrufen
 Klicken Sie auf **Löschen**, um einen API-Schlüssel sofort ungültig zu machen. Aktive Sitzungen, die den Schlüssel verwenden, werden beendet.

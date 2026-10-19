@@ -111,10 +111,10 @@ Inclua a chave no cabeçalho \`X-API-Key\`:
 X-API-Key: <sua-chave-de-api>
 \`\`\`
 
-### Permissões
-As chaves de API herdam as permissões do perfil do seu usuário. Elas não podem ter mais acesso do que sua conta.
 Ou envie-a como token bearer: \`Authorization: Bearer <sua-chave-de-api>\`.
 
+### Permissões
+As chaves de API herdam as permissões do perfil do seu usuário. Elas não podem ter mais acesso do que sua conta.
 
 ### Revogando Chaves
 Clique em **Excluir** para invalidar imediatamente uma chave de API. Sessões ativas usando a chave serão encerradas.
