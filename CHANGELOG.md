@@ -15,6 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Policies: "Notify on policy violation" is on by default, so existing policies start e-mailing their addresses, approval group or approvers (see Added).
 - Policies: the maximum validity and maximum number of DNS names now also bind ACME, SCEP, EST and WSTEP; the default 50-name maximum makes larger ACME orders fail (see Fixed).
 - ACME: "Allow wildcard" is now enforced by the server and the proxy; check it is on for every domain that issues wildcards (see Fixed).
+- ACME client: turning "Auto-renewal" off now stops every scheduled renewal; if it was off, check the Let's Encrypt tab before upgrading (see Fixed).
 - Discovery: existing scan profiles start sending notifications; set the address or clear the switches to stop them (see Fixed).
 - Reports: the legacy expiry and compliance switches become schedules at 08:00 UTC; check Reports > Schedule (see Removed).
 - Integrations: a saved secret no longer follows a new server, URL, port, TLS setting, tenant or account, so such a change asks for the secret again; moving the SMTP server also drops the OAuth refresh token, which needs a new consent (see Security).
