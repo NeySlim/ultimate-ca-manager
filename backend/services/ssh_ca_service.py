@@ -305,7 +305,7 @@ class SSHCAService:
         if not ca:
             raise ValueError(f"SSH CA not found: {ca_id}")
 
-        allowed_fields = {'descr', 'default_ttl', 'max_ttl', 'comment', 'owner_group_id'}
+        allowed_fields = {'descr', 'default_ttl', 'max_ttl', 'comment'}
         for field, value in kwargs.items():
             if field in allowed_fields:
                 # Normalize TTL fields (seconds or duration strings like

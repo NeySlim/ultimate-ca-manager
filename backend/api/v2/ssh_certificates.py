@@ -301,7 +301,6 @@ def sign_ssh_certificate():
             descr=data.get('descr'),
             source='web',
             username=username,
-            owner_group_id=data.get('owner_group_id'),
         )
 
         AuditService.log_action(
@@ -367,7 +366,6 @@ def generate_ssh_certificate():
             descr=data.get('descr'),
             source='web',
             username=username,
-            owner_group_id=data.get('owner_group_id'),
         )
 
         cert = result['certificate']

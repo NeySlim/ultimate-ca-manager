@@ -86,6 +86,7 @@ class Certificate(db.Model):
     template_overrides = db.Column(db.Text, nullable=True)
     
     # Ownership (Pro feature - group-based access control)
+    # No access control reads it; kept for older databases and backups
     owner_group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
     owner_group = db.relationship('Group', backref='owned_certificates')
     
@@ -489,7 +490,6 @@ class Certificate(db.Model):
             "san_combined": ', '.join(san_entries),
             "san_count": len(san_entries),
             # Ownership (Pro feature)
-            "owner_group_id": self.owner_group_id,
             "owner_group_name": self.owner_group.name if self.owner_group else None,
             # Template linkage + divergence record (#258)
             "template_id": self.template_id,

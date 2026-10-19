@@ -92,7 +92,6 @@ def import_ssh_ca():
             default_ttl=data.get('default_ttl'),
             max_ttl=data.get('max_ttl', 0),
             comment=data.get('comment'),
-            owner_group_id=data.get('owner_group_id'),
         )
 
         AuditService.log_action(
@@ -165,7 +164,6 @@ def create_ssh_ca():
             default_extensions=data.get('default_extensions'),
             allowed_principals=data.get('allowed_principals'),
             comment=data.get('comment'),
-            owner_group_id=data.get('owner_group_id'),
         )
 
         AuditService.log_action(
@@ -217,8 +215,6 @@ def update_ssh_ca(ca_id):
             kwargs['max_ttl'] = data['max_ttl']
         if 'comment' in data:
             kwargs['comment'] = data['comment']
-        if 'owner_group_id' in data:
-            kwargs['owner_group_id'] = data['owner_group_id']
         if 'default_extensions' in data:
             kwargs['default_extensions'] = data['default_extensions']
         if 'allowed_principals' in data:
