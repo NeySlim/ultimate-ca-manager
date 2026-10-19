@@ -118,7 +118,7 @@ Blocca IP o intervalli CIDR specifici. Tutti gli altri IP sono consentiti.
 ## Autenticazione a due fattori
 
 ### Imposizione
-Richiedi a tutti gli utenti di abilitare il 2FA. Gli utenti che non hanno configurato il 2FA riceveranno una richiesta al prossimo accesso. Un utente con una chiave di sicurezza registrata conferma con essa invece di configurare TOTP.
+Richiedi a tutti gli utenti di abilitare il 2FA. Gli utenti che non hanno configurato il 2FA riceveranno una richiesta al prossimo accesso. Un'app TOTP o una chiave di sicurezza registrata la soddisfa, sia in fase di configurazione sia all'accesso. Finché è imposta, il TOTP può essere disattivato solo se resta una chiave di sicurezza, e l'ultima chiave rimossa solo se resta il TOTP.
 
 ### Metodi supportati
 - **TOTP**: Password monouso basate sul tempo (app di autenticazione)

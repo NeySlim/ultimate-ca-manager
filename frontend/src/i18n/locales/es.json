@@ -3199,6 +3199,7 @@
     "expiresInDaysPlaceholder": "ej. 365 (vacío = sin caducidad)",
     "enroll2faRequired": "Se requiere autenticación de dos factores",
     "enroll2faReason": "Su administrador exige 2FA en su cuenta. Configúrela ahora para continuar.",
+    "enroll2faOrKey": "O registre una llave de seguridad en su lugar",
     "twoFaSetupFailed": "No se pudo iniciar la configuración de 2FA",
     "twoFaEnabled": "Autenticación de dos factores activada",
     "backupCodesHint": "Guarde estos códigos de respaldo en un lugar seguro. Cada uno puede usarse una vez si pierde el acceso a su autenticador.",

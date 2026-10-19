@@ -3,12 +3,13 @@
  *
  * Shown after login whenever the session is flagged `must_enroll_2fa`
  * (local accounts under global enforcement, or SSO accounts whose provider
- * enforces 2FA). Cannot be dismissed: the only escape is to log out. Survives
+ * enforces 2FA). A confirmed TOTP app or a registered security key lifts it.
+ * Cannot be dismissed: the only escape is to log out. Survives
  * reloads because AuthContext.checkSession re-reads the flag from /auth/verify.
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, Warning, SignOut } from '@phosphor-icons/react'
+import { ShieldCheck, Warning, SignOut, Fingerprint } from '@phosphor-icons/react'
 import { Modal, Button, Input } from '../components'
 import { useAuth, useNotification } from '../contexts'
 import { accountService } from '../services'
@@ -21,6 +22,9 @@ export function ForceEnroll2FA({ onComplete }) {
   const [code, setCode] = useState('')
   const [backupCodes, setBackupCodes] = useState(null)
   const [loading, setLoading] = useState(false)
+  const [keyName, setKeyName] = useState('')
+  const [registeringKey, setRegisteringKey] = useState(false)
+  const keySupported = typeof window !== 'undefined' && window.PublicKeyCredential !== undefined
 
   // Kick off enrolment on mount: fetch the TOTP secret + QR.
   useEffect(() => {
@@ -44,6 +48,22 @@ export function ForceEnroll2FA({ onComplete }) {
       setCode('')
     } finally {
       setLoading(false)
+    }
+  }
+
+  // A registered security key satisfies the requirement too: the backend lifts the gate.
+  const handleRegisterKey = async () => {
+    setRegisteringKey(true)
+    try {
+      await accountService.registerWebAuthnKey(keyName.trim() || t('account.securityKey'))
+      showSuccess(t('account.keyRegistered'))
+      await onComplete?.()
+    } catch (error) {
+      showError(error.name === 'NotAllowedError'
+        ? t('account.registrationCancelled')
+        : (error.message || t('account.registrationFailed')))
+    } finally {
+      setRegisteringKey(false)
     }
   }
 
@@ -85,6 +105,24 @@ export function ForceEnroll2FA({ onComplete }) {
               />
             </div>
           </>
+        )}
+
+        {!backupCodes && keySupported && (
+          <div className="pt-3 border-t border-border space-y-2">
+            <p className="text-sm text-text-secondary">{t('account.enroll2faOrKey')}</p>
+            <Input
+              type="text"
+              label={t('account.keyName')}
+              placeholder={t('account.keyNamePlaceholder')}
+              value={keyName}
+              onChange={(e) => setKeyName(e.target.value)}
+              disabled={registeringKey}
+            />
+            <Button type="button" variant="secondary" className="w-full" onClick={handleRegisterKey} disabled={registeringKey}>
+              <Fingerprint size={16} />
+              {registeringKey ? t('account.waitingForKey') : t('account.registerKey')}
+            </Button>
+          </div>
         )}
 
         {backupCodes && (

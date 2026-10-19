@@ -3199,6 +3199,7 @@
     "expiresInDaysPlaceholder": "例: 365 (空欄 = 無期限)",
     "enroll2faRequired": "二要素認証が必要です",
     "enroll2faReason": "管理者がアカウントに2FAを要求しています。続行するには今すぐ設定してください。",
+    "enroll2faOrKey": "または、代わりにセキュリティキーを登録してください",
     "twoFaSetupFailed": "2FAのセットアップを開始できませんでした",
     "twoFaEnabled": "二要素認証が有効になりました",
     "backupCodesHint": "これらのバックアップコードを安全な場所に保管してください。認証アプリにアクセスできなくなった場合、各コードは一度だけ使用できます。",

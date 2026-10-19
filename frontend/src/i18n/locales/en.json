@@ -3200,6 +3200,7 @@
     "expiresInDaysPlaceholder": "e.g. 365 (empty = no expiration)",
     "enroll2faRequired": "Two-factor authentication required",
     "enroll2faReason": "Your administrator requires 2FA on your account. Set it up now to continue.",
+    "enroll2faOrKey": "Or register a security key instead",
     "twoFaSetupFailed": "Failed to start 2FA setup",
     "twoFaEnabled": "Two-factor authentication enabled",
     "backupCodesHint": "Store these backup codes somewhere safe. Each can be used once if you lose access to your authenticator.",

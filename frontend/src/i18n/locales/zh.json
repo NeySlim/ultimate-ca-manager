@@ -3199,6 +3199,7 @@
     "expiresInDaysPlaceholder": "例如 365 (留空 = 永不过期)",
     "enroll2faRequired": "需要双重身份验证",
     "enroll2faReason": "您的管理员要求为您的账户启用双重验证。请立即设置以继续。",
+    "enroll2faOrKey": "或者改为注册安全密钥",
     "twoFaSetupFailed": "无法启动双重验证设置",
     "twoFaEnabled": "双重身份验证已启用",
     "backupCodesHint": "请将这些备份码保存在安全的地方。如果您无法访问身份验证器，每个备份码可使用一次。",

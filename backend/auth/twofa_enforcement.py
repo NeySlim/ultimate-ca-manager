@@ -10,7 +10,7 @@ import logging
 logger = logging.getLogger(__name__)
 
 # Session flag marking a partially-authenticated session that may only reach the
-# 2FA enrolment endpoints until TOTP is confirmed.
+# 2FA enrolment endpoints until TOTP is confirmed or a security key registered.
 ENROLL_SESSION_KEY = 'must_enroll_2fa'
 
 # Exact request paths reachable while in the forced-enrolment state. Everything
@@ -18,6 +18,8 @@ ENROLL_SESSION_KEY = 'must_enroll_2fa'
 ENROLL_ALLOWED_PATHS = frozenset({
     '/api/v2/account/2fa/enable',
     '/api/v2/account/2fa/confirm',
+    '/api/v2/webauthn/register/options',
+    '/api/v2/webauthn/register/verify',
     '/api/v2/auth/logout',
 })
 
@@ -54,13 +56,30 @@ def enforcement_active_for(user, *, provider=None):
     return bool(prov is not None and getattr(prov, 'enforce_2fa', False))
 
 
-def must_enroll_2fa(user, *, auth_method='password', provider=None):
-    """Whether ``user`` must enrol TOTP before receiving a full session.
+def has_security_key(user, *, excluding=None):
+    """Whether ``user`` keeps an enabled WebAuthn key (other than ``excluding``)."""
+    from models.webauthn import WebAuthnCredential
+    query = WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True)
+    if excluding is not None:
+        query = query.filter(WebAuthnCredential.id != excluding)
+    return query.first() is not None
 
-    Returns False for users already enrolled, explicitly exempt, or logging in
-    via a strong second factor (mTLS/WebAuthn).
+
+def would_leave_no_second_factor(user, *, dropping_totp=False, dropping_key=None):
+    """True when enforced 2FA would be left with neither TOTP nor an enabled key."""
+    if not enforcement_active_for(user):
+        return False
+    totp_left = bool(getattr(user, 'totp_confirmed', False)) and not dropping_totp
+    return not totp_left and not has_security_key(user, excluding=dropping_key)
+
+
+def must_enroll_2fa(user, *, auth_method='password', provider=None):
+    """Whether ``user`` must enrol a second factor before receiving a full session.
+
+    Returns False for users already enrolled (TOTP or a security key), explicitly
+    exempt, or logging in via a strong second factor (mTLS/WebAuthn).
     """
-    if getattr(user, 'totp_confirmed', False):
+    if getattr(user, 'totp_confirmed', False) or has_security_key(user):
         return False
     if auth_method in _EXEMPT_AUTH_METHODS:
         return False

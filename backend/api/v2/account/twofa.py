@@ -136,12 +136,11 @@ def disable_2fa():
     if not user:
         return error_response('User not found', 404)
 
-    # Block self-disable while 2FA is enforced for this account (#141) — would
-    # otherwise be a trivial bypass of the enforcement.
-    from auth.twofa_enforcement import enforcement_active_for
-    if enforcement_active_for(user):
+    # Under enforced 2FA (#141), TOTP may go only if a security key remains.
+    from auth.twofa_enforcement import would_leave_no_second_factor
+    if would_leave_no_second_factor(user, dropping_totp=True):
         return error_response(
-            '2FA is enforced for your account and cannot be disabled', 403)
+            '2FA is enforced for your account: register a security key before disabling TOTP', 403)
 
     # Verify with TOTP code
     if code:

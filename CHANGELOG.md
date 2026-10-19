@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
-- A registered security key (WebAuthn) can now complete a password login as the second factor, next to the TOTP code and recovery codes, and satisfies enforced 2FA without enrolling TOTP.
+- A registered security key (WebAuthn) can now complete a password login as the second factor, next to the TOTP code and recovery codes. It also satisfies enforced 2FA: it can be registered instead of TOTP at forced enrolment, TOTP can be turned off while a key remains, and the last key cannot be removed while TOTP is absent.
 - Reports: a Revoked Certificates report (period, optional reason filter) can be generated, downloaded and scheduled.
 - API keys are also accepted as `Authorization: Bearer <key>`, with the same scopes and CSRF exemption as `X-API-Key`; a key that fails is now refused instead of falling back to the browser session.
 

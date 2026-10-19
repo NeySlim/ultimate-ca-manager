@@ -38,6 +38,21 @@ class SoftKey:
                                  -2: nums.x.to_bytes(32, 'big'),
                                  -3: nums.y.to_bytes(32, 'big')})
 
+    def attest(self, challenge, origin=ORIGIN, rp_id='localhost'):
+        """Registration response, 'none' attestation."""
+        auth_data = (hashlib.sha256(rp_id.encode()).digest() + bytes([0x45]) + (0).to_bytes(4, 'big')
+                     + bytes(16) + len(self.credential_id).to_bytes(2, 'big')
+                     + self.credential_id + self.cose)
+        client_data = json.dumps({'type': 'webauthn.create', 'challenge': challenge,
+                                  'origin': origin, 'crossOrigin': False}).encode()
+        attestation = cbor2.dumps({'fmt': 'none', 'attStmt': {}, 'authData': auth_data})
+        return {
+            'id': _b64url(self.credential_id), 'rawId': _b64url(self.credential_id),
+            'type': 'public-key',
+            'response': {'clientDataJSON': _b64url(client_data),
+                         'attestationObject': _b64url(attestation)},
+        }
+
     def assert_(self, challenge, origin=ORIGIN, rp_id='localhost'):
         auth_data = hashlib.sha256(rp_id.encode()).digest() + bytes([0x05]) + (0).to_bytes(4, 'big')
         client_data = json.dumps({'type': 'webauthn.get', 'challenge': challenge,
@@ -124,6 +139,16 @@ def test_key_completes_a_password_login(app, make_user):
     assert r.status_code == 200, r.data
     assert get_json(r)['data']['auth_method'] == 'password'
     assert _logged_in(c)
+
+
+def test_used_challenge_is_deleted(app, make_user):
+    username, key, _ = make_user()
+    c = app.test_client()
+    _password(c, username)
+    assert _verify(c, key.assert_(_challenge(c))).status_code == 200
+    with app.app_context():
+        uid = User.query.filter_by(username=username).first().id
+        assert WebAuthnChallenge.query.filter_by(user_id=uid, challenge_type='2fa').count() == 0
 
 
 def test_wrong_challenge_is_refused_and_burns_the_issued_one(app, make_user):

@@ -136,6 +136,8 @@ POST /api/v2/auth/login/2fa/webauthn/verify
 ```
 Failures with either factor count toward the same 2FA lockout.
 
+Under enforced 2FA, a forced-enrolment session may register a key (`/api/v2/webauthn/register/*`) instead of confirming TOTP. `POST /api/v2/account/2fa/disable` and removing or disabling one's own last key answer 403 when the account would be left with neither TOTP nor an enabled key; an administrator can still remove another user's lost key.
+
 ### Login with mTLS
 ```http
 POST /api/v2/auth/login/mtls

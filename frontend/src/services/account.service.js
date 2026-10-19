@@ -75,6 +75,67 @@ export const accountService = {
     return apiClient.post('/webauthn/register/verify', data)
   },
 
+  /**
+   * Run the browser registration ceremony and store the new key
+   * @param {string} name - Label shown in the key list
+   */
+  async registerWebAuthnKey(name) {
+    const response = await this.startWebAuthnRegistration()
+    const options = response.data
+    
+    const base64urlToUint8Array = (base64url) => {
+      let base64 = base64url.replace(/-/g, '+').replace(/_/g, '/')
+      while (base64.length % 4) base64 += '='
+      return Uint8Array.from(atob(base64), c => c.charCodeAt(0))
+    }
+    
+    const stringToUint8Array = (str) => new TextEncoder().encode(str)
+    
+    const publicKeyOptions = {
+      challenge: base64urlToUint8Array(options.challenge),
+      rp: options.rp,
+      user: {
+        id: stringToUint8Array(String(options.user.id)),
+        name: options.user.name,
+        displayName: options.user.displayName
+      },
+      pubKeyCredParams: options.pubKeyCredParams,
+      timeout: options.timeout || 60000,
+      authenticatorSelection: options.authenticatorSelection,
+      attestation: options.attestation || 'none'
+    }
+    
+    if (options.excludeCredentials?.length > 0) {
+      publicKeyOptions.excludeCredentials = options.excludeCredentials.map(c => ({
+        type: c.type,
+        id: base64urlToUint8Array(c.id),
+        transports: c.transports
+      }))
+    }
+    
+    const credential = await navigator.credentials.create({ publicKey: publicKeyOptions })
+    
+    const uint8ArrayToBase64url = (arr) => {
+      const str = String.fromCharCode.apply(null, new Uint8Array(arr))
+      return btoa(str).replace(/\+/g, '-').replace(/\//g, '_').replace(/=/g, '')
+    }
+    
+    const attestationResponse = {
+      id: credential.id,
+      rawId: uint8ArrayToBase64url(credential.rawId),
+      type: credential.type,
+      response: {
+        clientDataJSON: uint8ArrayToBase64url(credential.response.clientDataJSON),
+        attestationObject: uint8ArrayToBase64url(credential.response.attestationObject)
+      }
+    }
+    
+    return this.completeWebAuthnRegistration({
+      credential: attestationResponse,
+      name
+    })
+  },
+
   async deleteWebAuthnCredential(credentialId) {
     return apiClient.delete(`/webauthn/credentials/${credentialId}`)
   },

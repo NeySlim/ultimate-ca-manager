@@ -2671,7 +2671,7 @@ Block specific IPs or CIDR ranges. All other IPs are allowed.
 ## Two-Factor Authentication
 
 ### Enforcement
-Require all users to enable 2FA. Users who haven't set up 2FA will be prompted on their next login. A user with a registered security key confirms with it instead of enrolling TOTP.
+Require all users to enable 2FA. Users who haven't set up 2FA will be prompted on their next login. A TOTP app or a registered security key satisfies it, at enrolment and at login. While it is enforced, TOTP can be turned off only if a security key remains, and the last key removed only if TOTP remains.
 
 ### Supported Methods
 - **TOTP**: Time-based one-time passwords (authenticator apps)

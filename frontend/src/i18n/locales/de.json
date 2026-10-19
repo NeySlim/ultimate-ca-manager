@@ -3199,6 +3199,7 @@
     "expiresInDaysPlaceholder": "z. B. 365 (leer = kein Ablaufdatum)",
     "enroll2faRequired": "Zwei-Faktor-Authentifizierung erforderlich",
     "enroll2faReason": "Ihr Administrator verlangt 2FA für Ihr Konto. Richten Sie sie jetzt ein, um fortzufahren.",
+    "enroll2faOrKey": "Oder registrieren Sie stattdessen einen Sicherheitsschlüssel",
     "twoFaSetupFailed": "2FA-Einrichtung konnte nicht gestartet werden",
     "twoFaEnabled": "Zwei-Faktor-Authentifizierung aktiviert",
     "backupCodesHint": "Bewahren Sie diese Backup-Codes sicher auf. Jeder kann einmal verwendet werden, falls Sie den Zugriff auf Ihre Authentifizierungs-App verlieren.",
