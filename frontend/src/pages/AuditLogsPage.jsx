@@ -45,6 +45,7 @@ import {
   CompactStats
 } from '../components';
 import { useNotification } from '../contexts';
+import { integrityMessage } from '../lib/auditIntegrity';
 import { usePermission, usePersistedState } from '../hooks';
 import auditService from '../services/audit.service';
 import { formatRelativeTime, formatDate, downloadBlob } from '../lib/utils';
@@ -216,20 +217,9 @@ export default function AuditLogsPage() {
     try {
       const response = await auditService.verifyIntegrity();
       const data = response.data || response;
-      const protection = data.protection || {};
-      if (!data.valid) {
-        showError(data.first_error_id
-          ? t('audit.integrityBroken', { id: data.first_error_id, errors: data.errors?.length || 0 })
-          : t('audit.integrityFailed', { errors: data.errors?.length || 0 }));
-      } else if (data.status === 'unprotected') {
-        showWarning(t('audit.integrityUnprotected', {
-          count: data.checked, unprotected: protection.not_attested ?? data.checked }));
-      } else if (protection.not_attested) {
-        showSuccess(t('audit.integrityIntactPartial', {
-          id: protection.protected_from_id, count: protection.protected, older: protection.not_attested }));
-      } else {
-        showSuccess(t('audit.integrityVerified', { count: data.checked }));
-      }
+      const { level, key, params } = integrityMessage(data);
+      const show = { error: showError, warning: showWarning, success: showSuccess }[level];
+      show(t(key, params));
     } catch (error) {
       showError(t('audit.integrityError'));
     } finally {

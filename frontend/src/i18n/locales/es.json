@@ -2313,7 +2313,9 @@
     "integrityError": "Error al verificar la integridad del registro de auditoría",
     "integrityBroken": "Cadena del registro de auditoría rota en la entrada #{{id}} ({{errors}} errores encontrados)",
     "integrityUnprotected": "No se encontró ninguna infracción en {{count}} entradas, pero el registro de auditoría no está protegido: {{unprotected}} entradas no están selladas por la clave maestra",
-    "integrityIntactPartial": "Registro de auditoría íntegro desde la entrada #{{id}} ({{count}} entradas selladas por la clave maestra); {{older}} entradas anteriores ya no se pueden certificar"
+    "integrityIntactPartial": "Registro de auditoría íntegro desde la entrada #{{id}} ({{count}} entradas selladas por la clave maestra); {{older}} entradas anteriores ya no se pueden certificar",
+    "integrityUnsealedAfterKey": "Cadena del registro de auditoría rota en la entrada #{{id}}: no está sellada por la clave maestra, por lo que se escribió o se reescribió sin ella ({{errors}} errores encontrados)",
+    "integrityIntactRotated": "Registro de auditoría íntegro desde la entrada #{{id}}; la clave maestra se cambió en la entrada #{{rotation}}, y las {{older}} entradas anteriores selladas con una clave previa ya no se pueden certificar"
   },
   "settings": {
     "appearanceSubtitle": "Personalice la apariencia y el idioma de UCM",
