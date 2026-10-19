@@ -1567,8 +1567,6 @@
     "proxyEabHmacKeyHelper": "アップストリーム CA の EAB HMAC キー (base64url エンコード)",
     "proxyEabHmacKeyPlaceholder": "アップストリーム CA の HMAC キーを入力",
     "acmeProxy": "ACMEプロキシ",
-    "enableAcmeProxy": "ACMEプロキシを有効化",
-    "enableAcmeProxyDesc": "DNS-01チャレンジの自動処理と一元的な監査ログを使用して、ACMEリクエストをアップストリームCAに転送します",
     "upstreamCA": "アップストリームCA",
     "letsEncryptStaging": "Let's Encrypt（ステージング）",
     "letsEncryptProduction": "Let's Encrypt（プロダクション）",

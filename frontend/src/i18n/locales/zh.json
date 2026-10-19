@@ -1567,8 +1567,6 @@
     "proxyEabHmacKeyHelper": "上游 CA 的 EAB HMAC 密钥（base64url 编码）",
     "proxyEabHmacKeyPlaceholder": "输入上游 CA 的 HMAC 密钥",
     "acmeProxy": "ACME 代理",
-    "enableAcmeProxy": "启用 ACME 代理",
-    "enableAcmeProxyDesc": "将 ACME 请求转发到上游 CA，自动处理 DNS-01 挑战并集中审计日志",
     "upstreamCA": "上游 CA",
     "letsEncryptStaging": "Let's Encrypt（测试）",
     "letsEncryptProduction": "Let's Encrypt（生产）",

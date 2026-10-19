@@ -444,7 +444,6 @@ class TestAcmeClientSettings:
         data = assert_success(r)
         assert 'has_staging_account' in data
         assert 'has_production_account' in data
-        assert 'proxy_enabled' in data
 
     def test_patch_client_settings_email(self, auth_client):
         r = patch_json(auth_client, '/api/v2/acme/client/settings',
@@ -520,11 +519,6 @@ class TestAcmeClientSettings:
         r = auth_client.patch('/api/v2/acme/client/settings',
                               data=None, content_type=CONTENT_JSON)
         assert r.status_code in (400, 200)
-
-    def test_patch_client_settings_proxy_enabled(self, auth_client):
-        r = patch_json(auth_client, '/api/v2/acme/client/settings',
-                       {'proxy_enabled': True})
-        assert_success(r)
 
     def test_patch_client_settings_verify_ssl(self, auth_client):
         r = patch_json(auth_client, '/api/v2/acme/client/settings',

@@ -1000,11 +1000,10 @@ ACME Proxy lets internal clients request certificates from a public CA (Let's En
 ### Configuration
 1. Go to **ACME** → **Let's Encrypt** tab
 2. Scroll down to the **ACME Proxy** section
-3. Enable the **ACME Proxy** toggle
-4. Select an **Upstream CA account** from **External CA Accounts** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
-5. Click **Test Connection** to verify connectivity with the upstream CA
-6. Register the upstream account if needed (email + **Register Account**)
-7. UCM automatically registers an account on first proxy request if not already done
+3. Select an **Upstream CA account** from **External CA Accounts** (Let's Encrypt, Actalis, ZeroSSL, custom directory URL, EAB)
+4. Click **Test Connection** to verify connectivity with the upstream CA
+5. Register the upstream account if needed (email + **Register Account**)
+6. UCM automatically registers an account on first proxy request if not already done
 
 ### Dedicated proxy paths (multi-CA)
 Each external CA account can expose its own ACME proxy endpoint:

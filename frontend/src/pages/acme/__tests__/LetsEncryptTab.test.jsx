@@ -114,3 +114,11 @@ describe('LetsEncryptTab renewal threshold', () => {
     expect(onBlurSaveInt).toHaveBeenCalledWith('renewal_days', '45', expect.any(Function), { min: 1, max: 60, fallback: 30 })
   })
 })
+
+describe('LetsEncryptTab proxy section', () => {
+  it('has no global proxy switch and always shows the proxy settings', () => {
+    renderTab({ clientSettings: {} })
+    expect(screen.queryByText('acme.enableAcmeProxy')).not.toBeInTheDocument()
+    expect(screen.getByText('acme.testConnection')).toBeInTheDocument()
+  })
+})

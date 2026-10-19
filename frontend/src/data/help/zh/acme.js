@@ -268,11 +268,10 @@ ACME代理允许内部客户端通过UCM从公共CA（Let's Encrypt、ZeroSSL等
 ### 配置
 1. 转到 **ACME** → **Let's Encrypt** 选项卡
 2. 滚动到 **ACME代理** 部分
-3. 启用 **ACME代理** 开关
-4. 在 **外部 CA 账户** 中选择 **上游 CA 账户**（Let's Encrypt、Actalis、ZeroSSL、自定义 URL、EAB）
-5. 点击 **测试连接** 验证与上游 CA 的连接
-6. 如需要，注册上游账户（邮箱 + **注册账户**）
-7. 若尚未注册，UCM 在首次代理请求时自动注册
+3. 在 **外部 CA 账户** 中选择 **上游 CA 账户**（Let's Encrypt、Actalis、ZeroSSL、自定义 URL、EAB）
+4. 点击 **测试连接** 验证与上游 CA 的连接
+5. 如需要，注册上游账户（邮箱 + **注册账户**）
+6. 若尚未注册，UCM 在首次代理请求时自动注册
 
 ### 专用代理路径（多 CA）
 每个外部 CA 账户可暴露自己的 ACME 代理端点：

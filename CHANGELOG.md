@@ -15,6 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - The undocumented `admin_bypass_password_policy` setting, which let administrators skip the password policy when set in the database, is gone and the upgrade deletes it; administrators now follow the policy like everyone else. Nothing to do.
 - Settings > Audit: the "Enable audit logging" switch and the "Events to log" checkboxes were stored nowhere and changed nothing; they are gone. The audit log always records every event; use the remote syslog categories to forward a subset.
 - Groups: the per-member `role` (`member`/`admin`) of the API was stored but never applied, since managing a group always takes the global admin role; it is no longer accepted or returned. Nothing to do: API clients that still send it are not refused.
+- ACME: the global "Enable ACME proxy" switch of the Let's Encrypt tab is gone, since turning it off never stopped the proxy, and the upgrade deletes the setting. To stop a proxy endpoint, turn off "Expose via ACME proxy" on its CA account, or clear the CA account selected for the default proxy path.
 
 ### Fixed
 

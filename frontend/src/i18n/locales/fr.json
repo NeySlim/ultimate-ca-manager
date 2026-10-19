@@ -407,8 +407,6 @@
     "proxyEabHmacKeyHelper": "Clé HMAC EAB du CA en amont (encodée en base64url)",
     "proxyEabHmacKeyPlaceholder": "Entrer la clé HMAC du CA en amont",
     "acmeProxy": "Proxy ACME",
-    "enableAcmeProxy": "Activer le proxy ACME",
-    "enableAcmeProxyDesc": "Transférer les requêtes ACME vers une CA en amont avec gestion automatique des défis DNS-01 et journalisation centralisée",
     "upstreamCA": "CA en amont",
     "letsEncryptStaging": "Let's Encrypt (Staging)",
     "letsEncryptProduction": "Let's Encrypt (Production)",

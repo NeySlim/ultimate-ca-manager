@@ -1567,8 +1567,6 @@
     "proxyEabHmacKeyHelper": "Chave HMAC EAB da CA upstream (codificada em base64url)",
     "proxyEabHmacKeyPlaceholder": "Insira a chave HMAC da CA upstream",
     "acmeProxy": "Proxy ACME",
-    "enableAcmeProxy": "Ativar proxy ACME",
-    "enableAcmeProxyDesc": "Encaminhar solicitações ACME para uma CA upstream com tratamento automático de desafios DNS-01 e registro centralizado",
     "upstreamCA": "CA upstream",
     "letsEncryptStaging": "Let's Encrypt (Staging)",
     "letsEncryptProduction": "Let's Encrypt (Production)",

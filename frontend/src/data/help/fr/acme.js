@@ -268,11 +268,10 @@ Le proxy ACME permet aux clients internes de demander des certificats à un CA p
 ### Configuration
 1. Allez dans **ACME** → onglet **Let's Encrypt**
 2. Faites défiler jusqu'à la section **Proxy ACME**
-3. Activez le bouton **Proxy ACME**
-4. Sélectionnez un **Compte CA en amont** dans **Comptes CA externes** (Let's Encrypt, Actalis, ZeroSSL, URL personnalisée, EAB)
-5. Cliquez sur **Tester la connexion** pour vérifier la connectivité avec le CA en amont
-6. Enregistrez le compte amont si nécessaire (email + **Enregistrer le compte**)
-7. UCM enregistre automatiquement un compte à la première requête proxy si ce n'est pas déjà fait
+3. Sélectionnez un **Compte CA en amont** dans **Comptes CA externes** (Let's Encrypt, Actalis, ZeroSSL, URL personnalisée, EAB)
+4. Cliquez sur **Tester la connexion** pour vérifier la connectivité avec le CA en amont
+5. Enregistrez le compte amont si nécessaire (email + **Enregistrer le compte**)
+6. UCM enregistre automatiquement un compte à la première requête proxy si ce n'est pas déjà fait
 
 ### Chemins proxy dédiés (multi-CA)
 Chaque compte CA externe peut exposer son propre endpoint proxy ACME :

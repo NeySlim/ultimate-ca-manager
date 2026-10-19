@@ -1593,8 +1593,6 @@
     "proxyEabHmacKeyHelper": "EAB HMAC ключ від вищестоячого CA (кодування base64url)",
     "proxyEabHmacKeyPlaceholder": "Введіть HMAC ключ від вищестоячого CA",
     "acmeProxy": "Проксі ACME",
-    "enableAcmeProxy": "Увімкнути проксі ACME",
-    "enableAcmeProxyDesc": "Пересилати ACME-запити до вищестоящого CA з автоматичною обробкою DNS-01 викликів та централізованим журналюванням",
     "upstreamCA": "Вищестоящий CA",
     "letsEncryptStaging": "Let's Encrypt (тестове середовище)",
     "letsEncryptProduction": "Let's Encrypt (робоче середовище)",

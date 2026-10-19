@@ -253,16 +253,7 @@ export default function LetsEncryptTab({
       {/* ACME Proxy */}
       <CompactSection title={t('acme.acmeProxy')} icon={ShieldCheck}>
         <div className="space-y-3">
-          <ToggleSwitch
-            checked={clientSettings.proxy_enabled || false}
-            onChange={(val) => onUpdateClientSetting('proxy_enabled', val)}
-            disabled={!canWrite}
-            label={t('acme.enableAcmeProxy')}
-            description={t('acme.enableAcmeProxyDesc')}
-          />
-
-          {clientSettings.proxy_enabled && (
-            <>
+          <>
               <Select
                 label={t('acme.proxyUpstreamCAAccount')}
                 value={proxyAccountId != null ? String(proxyAccountId) : ''}
@@ -474,8 +465,7 @@ export default function LetsEncryptTab({
                   </Button>
                 </div>
               ) : null}
-            </>
-          )}
+          </>
         </div>
       </CompactSection>
     </div>

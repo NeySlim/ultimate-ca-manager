@@ -54,7 +54,6 @@ def get_settings():
 
     # LE Proxy settings
     proxy_email_cfg = SystemConfig.query.filter_by(key='acme.proxy_email').first()
-    proxy_enabled_cfg = SystemConfig.query.filter_by(key='acme.proxy_enabled').first()
 
     # EAB settings
     eab_kid_cfg = SystemConfig.query.filter_by(key='acme.client.eab_kid').first()
@@ -133,7 +132,6 @@ def get_settings():
         'allow_loopback_upstream': _coerce_bool(allow_loopback_cfg.value if allow_loopback_cfg else None, False),
         'has_staging_account': bool(staging_account and staging_account.is_registered()),
         'has_production_account': bool(production_account and production_account.is_registered()),
-        'proxy_enabled': proxy_enabled_cfg.value == 'true' if proxy_enabled_cfg else False,
         'verify_ssl': _coerce_bool(client_verify_ssl_cfg.value if client_verify_ssl_cfg else None, True),
         'proxy_email': proxy_email_cfg.value if proxy_email_cfg else None,
         'proxy_registered': bool(proxy_email_cfg),
@@ -293,12 +291,6 @@ def update_settings():
             'Allow ACME upstream traffic to a loopback address (colocated Pebble/step-ca)',
         )
         updates.append('allow_loopback_upstream')
-
-    if 'proxy_enabled' in data:
-        _set_config('acme.proxy_enabled',
-                    'true' if data['proxy_enabled'] else 'false',
-                    'Let\'s Encrypt proxy enabled')
-        updates.append('proxy_enabled')
 
     if 'verify_ssl' in data:
         try:
