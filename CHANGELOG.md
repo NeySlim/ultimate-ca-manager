@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+
+- Locking an account after too many failed password or LDAP logins never sent the security alert e-mail; it is now sent once per lockout.
+
 ## [2.242] - 2026-10-18
 
 ### Added

@@ -243,12 +243,16 @@ def login_password():
     if not user.check_password(password):
         # Increment failed login counter
         user.failed_logins = (user.failed_logins or 0) + 1
-        if user.failed_logins >= max_attempts:
+        locked = user.failed_logins >= max_attempts
+        if locked:
             user.locked_until = utc_now() + timedelta(seconds=lockout_seconds)
             logger.warning(f"Account {username} locked after {max_attempts} failed attempts")
         ok, _err = safe_commit(logger, "Failed to record failed login")
         if not ok:
             return _err
+        if locked:
+            from api.v2.sso.helpers import notify_account_locked
+            notify_account_locked(username)
         AuditService.log_action(
             action='login_failure',
             resource_type='user',
