@@ -588,7 +588,8 @@
     "checkEmailDescBefore": "",
     "checkEmailDescAfter": "のアカウントが存在する場合、パスワードリセットリンクが送信されます。",
     "accountDisabled": "このアカウントは無効化されています",
-    "samlValidationFailed": "SAML認証に失敗しました"
+    "samlValidationFailed": "SAML認証に失敗しました",
+    "samlLoginExpired": "このサインインは期限切れか、別のタブまたはブラウザーで開始されました。このページからやり直してください。"
   },
   "dashboard": {
     "goodMorning": "おはようございます",
@@ -3447,6 +3448,16 @@
     "roleMapping": "ロールマッピング",
     "roleMappingHelp": "外部グループまたはロールをUCMロールにマッピングします。一致するグループのユーザーには対応するUCMロールが割り当てられます。複数のグループが一致する場合、最も権限の高いロールが適用されます（admin > operator > auditor > viewer）。",
     "signRequests": "認証リクエストに署名",
+    "spOriginNotConfigured": "ベース URL (設定 > 一般) も FQDN も設定されていません。SAML のエンティティ ID と ACS URL は、このページを開いたアドレスに従います。ID プロバイダーが常に同じ URL を受け取るよう、ベース URL を設定してください。",
+    "nameIdFormat": "NameID 形式",
+    "nameIdFormatHelp": "UCM が ID プロバイダーに要求する形式です。永続 (persistent) は安定した識別子を返します。一時 (transient) の NameID はログインごとに変わり、アカウントの識別には使われません。",
+    "nameIdUnspecified": "指定なし (IdP の既定)",
+    "nameIdPersistent": "永続 (persistent)",
+    "nameIdEmail": "メールアドレス",
+    "nameIdTransient": "一時 (transient)",
+    "signRequestsHelp": "各認証リクエストを下の SP 証明書の鍵で署名します (RSA 鍵が必要)。有効にする前に、SP メタデータのその証明書を ID プロバイダーに登録してください。",
+    "allowIdpInitiated": "IdP 起点のログインを許可",
+    "allowIdpInitiatedHelp": "UCM が要求していない応答 (ID プロバイダーのポータルから開始されたログインなど) を受け入れます。既定ではオフ: このような応答は、このブラウザーで開始されたログインと関連付けられません。",
     "spEntityId": "SPエンティティID",
     "spMetadata": "サービスプロバイダー（SP）メタデータ",
     "spMetadataHelp": "SAML信頼を設定するために、これらのURLをIDプロバイダー（IdP）設定にコピーしてください。",

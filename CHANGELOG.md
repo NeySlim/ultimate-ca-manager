@@ -17,6 +17,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - A security key can also be turned on as second factor without enforced 2FA (My Account, once a key is registered): password logins then ask for it, the last factor cannot be removed, and a key that became the second factor stays when an administrator lifts enforcement.
 - Reports: a Revoked Certificates report (period, optional reason filter) can be generated, downloaded and scheduled.
 - API keys are also accepted as `Authorization: Bearer <key>`, with the same scopes and CSRF exemption as `X-API-Key`; a key that fails is now refused instead of falling back to the browser session.
+- SAML providers have a NameID format setting (unspecified, persistent, email address or transient), sent in each AuthnRequest and published in the SP metadata; the format used to be read from a setting that could not be saved, so UCM always asked for "unspecified".
 
 ### Fixed
 
@@ -45,6 +46,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Saving the SMTP, webhook, DNS provider, SSO, Microsoft CA, AD connector, HSM provider or Intune settings with a new server, URL, port, TLS setting, tenant or account kept the saved secret, which then went to the new target. Such a save is now refused until the secret is typed again (the forms ask for it), and a Microsoft CA connection password is no longer reused for a WinRM host other than the CA's own.
 - Moving the SMTP server, port, security or account now drops the saved secret the chosen authentication method does not use and the OAuth refresh token, so OAuth needs a new consent.
 - Audit log: the hash chain was plain SHA-256, so anyone able to write the database could edit an entry and recompute the chain behind it. With a master key, entries are now sealed with HMAC-SHA256 under a key derived from it (existing entries still verify), the integrity check reports intact, broken at entry N or not protected, and a purge leaves a sealed record so the chain still verifies after it.
+- SAML responses were accepted on their signature alone (no audience, Destination, validity window or InResponseTo check, replays possible); they are now validated strictly, tied to the login started in the same browser (a refused POST does not cancel it) and accepted once. Check that the IdP clock is within five minutes and that its SP entity ID, ACS URL and issuer match `/api/v2/sso/saml/metadata` (they come from the admin Base URL, else `FQDN`, else the request's address, so set the Base URL); existing providers keep accepting IdP-initiated logins, while new ones have "Allow IdP-initiated login" off: turn it on when users start from the IdP portal.
+- SAML "Sign authentication requests" was saved but never applied, and the SP metadata always announced unsigned requests. Requests are now signed with the key of the chosen SP certificate (RSA only) when the option is on; it has been turned off on existing providers, matching what UCM actually sent.
 
 ## [2.242] - 2026-10-18
 

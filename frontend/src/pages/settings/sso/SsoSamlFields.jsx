@@ -6,6 +6,14 @@ import CopyableUrl from '../CopyableUrl'
 import MappingEditor from '../MappingEditor'
 import { formatDate } from '../../../lib/utils'
 
+export const NAMEID_UNSPECIFIED = 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'
+const NAME_ID_FORMATS = [
+  { value: NAMEID_UNSPECIFIED, labelKey: 'sso.nameIdUnspecified' },
+  { value: 'urn:oasis:names:tc:SAML:2.0:nameid-format:persistent', labelKey: 'sso.nameIdPersistent' },
+  { value: 'urn:oasis:names:tc:SAML:1.1:nameid-format:emailAddress', labelKey: 'sso.nameIdEmail' },
+  { value: 'urn:oasis:names:tc:SAML:2.0:nameid-format:transient', labelKey: 'sso.nameIdTransient' },
+]
+
 export default function SsoSamlFields({
   formData,
   handleChange,
@@ -16,8 +24,9 @@ export default function SsoSamlFields({
   fetchIdpMetadata,
   availableCerts,
   roleOptions,
-  baseUrl,
   spEntityId,
+  spMetadataUrl,
+  spOriginUnconfigured,
   samlAcsUrl,
   samlSloUrl,
   handleTestConnection,
@@ -26,6 +35,9 @@ export default function SsoSamlFields({
 
   return (
     <div className="space-y-3">
+      {spOriginUnconfigured && (
+        <HelpCard variant="warning" className="text-xs">{t('sso.spOriginNotConfigured')}</HelpCard>
+      )}
       {/* Identity Provider */}
       <CompactSection
         title={<span className="flex items-center">{t('sso.idpSection')}{connectionBadge}</span>}
@@ -67,7 +79,18 @@ export default function SsoSamlFields({
             placeholder="-----BEGIN CERTIFICATE-----..."
             className="font-mono text-xs"
           />
-          <ToggleSwitch checked={formData.saml_sign_requests} onChange={(val) => handleChange('saml_sign_requests', val)} label={t('sso.signRequests')} />
+          <ToggleSwitch
+            checked={formData.saml_sign_requests}
+            onChange={(val) => handleChange('saml_sign_requests', val)}
+            label={t('sso.signRequests')}
+            description={t('sso.signRequestsHelp')}
+          />
+          <ToggleSwitch
+            checked={formData.saml_allow_idp_initiated}
+            onChange={(val) => handleChange('saml_allow_idp_initiated', val)}
+            label={t('sso.allowIdpInitiated')}
+            description={t('sso.allowIdpInitiatedHelp')}
+          />
           <Select
             label={t('sso.spCertificate')}
             value={formData.saml_sp_cert_source}
@@ -79,6 +102,13 @@ export default function SsoSamlFields({
                 }))
               : [{ value: 'https', label: t('sso.httpsDefault') }]
             }
+          />
+          <Select
+            label={t('sso.nameIdFormat')}
+            value={formData.saml_name_id_format}
+            onChange={value => handleChange('saml_name_id_format', value)}
+            options={NAME_ID_FORMATS.map(f => ({ value: f.value, label: t(f.labelKey) }))}
+            helperText={t('sso.nameIdFormatHelp')}
           />
           <ToggleSwitch checked={formData.saml_verify_ssl} onChange={(val) => handleChange('saml_verify_ssl', val)} label={t('sso.verifySsl')} size="sm" />
           {!formData.saml_verify_ssl && <p className="text-xs text-amber-500">{t('sso.sslWarning')}</p>}
@@ -106,7 +136,7 @@ export default function SsoSamlFields({
       <CompactSection title={t('sso.spSection')} icon={Globe} collapsible defaultOpen={false}>
         <div className="space-y-3">
           <HelpCard variant="info" className="text-xs">{t('sso.spMetadataHelp')}</HelpCard>
-          <CopyableUrl label={t('sso.spMetadataXml')} value={`${baseUrl}/api/v2/sso/saml/metadata`} description={t('sso.spMetadataXmlDesc')} />
+          <CopyableUrl label={t('sso.spMetadataXml')} value={spMetadataUrl} description={t('sso.spMetadataXmlDesc')} />
           <CopyableUrl label={t('sso.spEntityId')} value={spEntityId} />
           <CopyableUrl label={t('sso.acsUrl')} value={samlAcsUrl} description={t('sso.acsUrlDesc')} />
           <CopyableUrl label={t('sso.spSloUrl')} value={samlSloUrl} />

@@ -16,7 +16,7 @@ const SECRET_TARGETS = {
 }
 import SsoLdapFields from './sso/SsoLdapFields'
 import SsoOAuth2Fields from './sso/SsoOAuth2Fields'
-import SsoSamlFields from './sso/SsoSamlFields'
+import SsoSamlFields, { NAMEID_UNSPECIFIED } from './sso/SsoSamlFields'
 
 // Stored as JSON array string in DB — display as comma-separated text
 const requiredGroupsToText = (raw) => {
@@ -82,8 +82,10 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
     saml_sso_url: provider?.saml_sso_url || '',
     saml_slo_url: provider?.saml_slo_url || '',
     saml_certificate: provider?.saml_certificate || '',
-    saml_sign_requests: provider?.saml_sign_requests ?? true,
+    saml_sign_requests: provider?.saml_sign_requests ?? false,
     saml_sp_cert_source: provider?.saml_sp_cert_source || 'https',
+    saml_allow_idp_initiated: provider?.saml_allow_idp_initiated ?? false,
+    saml_name_id_format: provider?.saml_name_id_format || NAMEID_UNSPECIFIED,
     saml_verify_ssl: provider?.saml_verify_ssl ?? true,
     saml_ca_bundle: '',
   })
@@ -91,6 +93,7 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
   const [savedForm] = useState(formData)
   const [fetchingMetadata, setFetchingMetadata] = useState(false)
   const [availableCerts, setAvailableCerts] = useState([])
+  const [spInfo, setSpInfo] = useState(null)
   const [testingConnection, setTestingConnection] = useState(false)
   const [connectionStatus, setConnectionStatus] = useState(null)
   const [testingMapping, setTestingMapping] = useState(false)
@@ -106,6 +109,9 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
           setAvailableCerts(Array.isArray(certs) ? certs : [])
         })
         .catch(() => setAvailableCerts([]))
+      ssoService.getSamlSpInfo()
+        .then(res => setSpInfo(res.data || res))
+        .catch(() => setSpInfo(null))
     }
   }, [formData.provider_type])
 
@@ -236,9 +242,10 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
   }
 
   const baseUrl = window.location.origin
-  const spEntityId = `${baseUrl}/api/v2/sso`
-  const samlAcsUrl = `${baseUrl}/api/v2/sso/callback/saml`
-  const samlSloUrl = `${baseUrl}/api/v2/sso/callback/saml`
+  // The SAML URLs as the server computes them; the page origin until they load.
+  const spEntityId = spInfo?.entity_id || `${baseUrl}/api/v2/sso`
+  const samlAcsUrl = spInfo?.acs_url || `${baseUrl}/api/v2/sso/callback/saml`
+  const samlSloUrl = spInfo?.slo_url || `${baseUrl}/api/v2/sso/callback/saml`
   const oauthCallbackUrl = `${baseUrl}/api/v2/sso/callback/oauth2`
 
   const roleOptions = [
@@ -327,8 +334,9 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
           fetchingMetadata={fetchingMetadata}
           fetchIdpMetadata={fetchIdpMetadata}
           availableCerts={availableCerts}
-          baseUrl={baseUrl}
           spEntityId={spEntityId}
+          spMetadataUrl={spInfo?.metadata_url || `${baseUrl}/api/v2/sso/saml/metadata`}
+          spOriginUnconfigured={spInfo ? !spInfo.origin_configured : false}
           samlAcsUrl={samlAcsUrl}
           samlSloUrl={samlSloUrl}
         />

@@ -2552,6 +2552,9 @@ Map IDP SAML attributes to UCM user fields:
 - \`email\` → UCM email (required)
 - \`groups\` → UCM group membership (optional)
 
+### IdP-initiated login
+A login started from the IdP portal reaches UCM without a request from UCM. **Allow IdP-initiated login** accepts it, with the same signature, audience, Destination, validity and replay checks. Providers created before 2.243 keep it on; new providers have it off. Turn it on only if users start from the IdP portal.
+
 ## OAuth2 / OIDC
 
 ### Configuration

@@ -177,6 +177,10 @@ Configure SSO under **Settings → SSO**. UCM supports three SSO providers:
 - IdP Metadata URL or manual XML upload
 - Entity ID, ACS URL, certificate configuration
 - Attribute mapping for username, email, roles
+- Responses are validated strictly: signature (SHA-256 or stronger), issuer, audience (the SP entity ID `https://your-server:8443/api/v2/sso`), Destination and Recipient (the ACS URL), validity window (five minutes of clock skew) and InResponseTo of the login started in the same browser; each assertion is accepted once. These URLs come from the admin Base URL (Settings > General), else from the `FQDN` setting, and only when neither is set from the address the request arrived with; set the Base URL, especially behind a reverse proxy, and compare them with `/api/v2/sso/saml/metadata`. Serve UCM on a host name of its own: the login is tied to the browser by a cookie, which a sibling site under the same parent domain could set.
+- *Allow IdP-initiated login* accepts logins started from the IdP portal; such a response is checked like any other but cannot be tied to the browser. Providers that existed before this option keep it on, new providers have it off: turn it on only if users start from the IdP portal.
+- *Sign authentication requests* signs each AuthnRequest with the key of the SP certificate (the HTTPS certificate or one held by UCM, RSA only); register that certificate at the IdP from the SP metadata first.
+- *NameID format* is asked of the IdP in each request and published in the metadata; *persistent* gives UCM a stable identifier, a transient NameID is never used to recognise the account.
 
 **Role mapping resolution:** when a user belongs to several groups that each match a mapping entry, the highest-privilege role wins (`admin` > `operator` > `auditor` > `viewer`); the order of the entries does not matter. This lets you map a broad access group to a low role and grant higher privileges through narrower groups. Users with no matching entry get the provider's default role at account creation; on later logins their stored role is kept unless *Sync role on each login* is enabled.
 

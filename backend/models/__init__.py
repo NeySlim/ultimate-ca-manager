@@ -26,7 +26,7 @@ from models.ocsp import OCSPResponse
 from models.webauthn import WebAuthnCredential, WebAuthnChallenge
 from models.hsm import HsmProvider, HsmKey
 from models.rbac import CustomRole, RolePermission
-from models.sso import SSOProvider, SSOSession
+from models.sso import SSOProvider, SSOSession, SAMLMessageId
 from models.policy import CertificatePolicy, ApprovalRequest
 from models.ssh import SSHCertificateAuthority, SSHCertificate
 from models.msca import MicrosoftCA, MSCARequest

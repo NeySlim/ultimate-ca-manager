@@ -588,7 +588,8 @@
     "checkEmailDescBefore": "Wenn ein Konto mit",
     "checkEmailDescAfter": " existiert, erhalten Sie in Kürze einen Link zum Zurücksetzen.",
     "accountDisabled": "Dieses Konto wurde deaktiviert",
-    "samlValidationFailed": "SAML-Authentifizierung fehlgeschlagen"
+    "samlValidationFailed": "SAML-Authentifizierung fehlgeschlagen",
+    "samlLoginExpired": "Diese Anmeldung ist abgelaufen oder wurde in einem anderen Tab oder Browser gestartet. Starten Sie sie auf dieser Seite erneut."
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",
@@ -3447,6 +3448,16 @@
     "roleMapping": "Rollenzuordnung",
     "roleMappingHelp": "Ordnen Sie externe Gruppen oder Rollen den UCM-Rollen zu. Benutzer in zugeordneten Gruppen erhalten die entsprechende UCM-Rolle. Wenn mehrere Gruppen zutreffen, gewinnt die Rolle mit den höchsten Rechten (admin > operator > auditor > viewer).",
     "signRequests": "Authentifizierungsanfragen signieren",
+    "spOriginNotConfigured": "Weder eine Basis-URL (Einstellungen > Allgemein) noch ein FQDN ist konfiguriert: SAML-Entity-ID und ACS-URL folgen der Adresse, unter der diese Seite geöffnet wurde. Legen Sie die Basis-URL fest, damit der Identitätsanbieter immer dieselben URLs sieht.",
+    "nameIdFormat": "NameID-Format",
+    "nameIdFormatHelp": "Format, das UCM beim Identitätsanbieter anfordert. Persistent liefert eine stabile Kennung; eine transiente NameID ändert sich bei jeder Anmeldung und dient nie zur Wiedererkennung des Kontos.",
+    "nameIdUnspecified": "Nicht angegeben (IdP-Standard)",
+    "nameIdPersistent": "Persistent",
+    "nameIdEmail": "E-Mail-Adresse",
+    "nameIdTransient": "Transient",
+    "signRequestsHelp": "Signiert jede Authentifizierungsanfrage mit dem Schlüssel des unten gewählten SP-Zertifikats, der ein RSA-Schlüssel sein muss. Hinterlegen Sie dieses Zertifikat aus den SP-Metadaten beim Identitätsanbieter, bevor Sie die Option aktivieren.",
+    "allowIdpInitiated": "IdP-initiierte Anmeldung zulassen",
+    "allowIdpInitiatedHelp": "Akzeptiert Antworten, die UCM nicht angefordert hat, etwa eine Anmeldung aus dem Portal des Identitätsanbieters. Standardmäßig aus: Eine solche Antwort lässt sich keiner in diesem Browser gestarteten Anmeldung zuordnen.",
     "spEntityId": "SP Entity ID",
     "spMetadata": "Service Provider (SP) Metadaten",
     "spMetadataHelp": "Kopieren Sie diese URLs in Ihre Identity Provider (IdP) Konfiguration, um die SAML-Vertrauensstellung einzurichten.",

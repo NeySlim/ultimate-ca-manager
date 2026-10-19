@@ -20,7 +20,7 @@ import ldap3
 from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
 import ssl
-import urllib.parse
+from . import saml_sp
 from .helpers import _check_ldap_lockout, _clear_ldap_failed_attempts, _record_ldap_failed_attempt, _resolve_role_from_mapping, _resolve_role, _build_ldap_tls, _decrypt_ldap_password
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
@@ -220,68 +220,16 @@ def ldap_login():
     )
 
 
-def _get_saml_auth(flask_request, provider, relay_state=None):
+def _get_saml_auth(flask_request, provider, relay_state=None, sign_request=False):
     """Build a OneLogin_Saml2_Auth from Flask request and SSO provider config."""
     from onelogin.saml2.auth import OneLogin_Saml2_Auth
 
-    # Build request dict for python3-saml
-    url_data = urllib.parse.urlparse(flask_request.url)
-    req = {
-        'https': 'on' if url_data.scheme == 'https' else 'off',
-        'http_host': flask_request.host,
-        'script_name': flask_request.path,
-        'get_data': flask_request.args.copy(),
-        'post_data': flask_request.form.copy(),
-        'server_port': url_data.port or (443 if url_data.scheme == 'https' else 80),
-    }
-
-    sp_base = flask_request.url_root.rstrip('/')
-
-    saml_settings = {
-        'strict': False,
-        'debug': True,
-        'sp': {
-            'entityId': f'{sp_base}/api/v2/sso',
-            'assertionConsumerService': {
-                'url': f'{sp_base}/api/v2/sso/callback/saml',
-                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-POST',
-            },
-            'singleLogoutService': {
-                'url': f'{sp_base}/api/v2/sso/callback/saml',
-                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
-            },
-            'NameIDFormat': getattr(provider, 'saml_name_id_format', None) or 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified',
-        },
-        'idp': {
-            'entityId': provider.saml_entity_id,
-            'singleSignOnService': {
-                'url': provider.saml_sso_url,
-                'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
-            },
-            'x509cert': provider.saml_certificate or '',
-        },
-        'security': {
-            'wantAssertionsSigned': False,
-            'wantMessagesSigned': False,
-            'authnRequestsSigned': False,
-            'wantNameIdEncrypted': False,
-            'wantAssertionsEncrypted': False,
-            'requestedAuthnContext': False,
-            'allowSingleLabelDomains': True,
-            # SHA-256 for anything the SP signs; IdP signatures or digests in SHA-1 are refused.
-            'signatureAlgorithm': 'http://www.w3.org/2001/04/xmldsig-more#rsa-sha256',
-            'digestAlgorithm': 'http://www.w3.org/2001/04/xmlenc#sha256',
-            'rejectDeprecatedAlgorithm': True,
-        },
-    }
-
-    if provider.saml_slo_url:
-        saml_settings['idp']['singleLogoutService'] = {
-            'url': provider.saml_slo_url,
-            'binding': 'urn:oasis:names:tc:SAML:2.0:bindings:HTTP-Redirect',
-        }
-
-    return OneLogin_Saml2_Auth(req, saml_settings)
+    base = saml_sp.sp_base_url(flask_request)
+    sp_cert = sp_key = None
+    if sign_request and provider.saml_sign_requests:
+        sp_cert, sp_key = saml_sp.load_sp_credentials(provider, with_key=True)
+    return OneLogin_Saml2_Auth(saml_sp.request_data(flask_request, base),
+                               saml_sp.build_settings(provider, base, sp_cert, sp_key))
 
 
 def _extract_external_id(provider, external_data):

@@ -588,7 +588,8 @@
     "checkEmailDescBefore": "Si existe una cuenta con",
     "checkEmailDescAfter": ", recibirá un enlace para restablecer en breve.",
     "accountDisabled": "Esta cuenta ha sido deshabilitada",
-    "samlValidationFailed": "La autenticación SAML falló"
+    "samlValidationFailed": "La autenticación SAML falló",
+    "samlLoginExpired": "Este inicio de sesión ha caducado o se inició en otra pestaña o navegador. Vuelva a empezar desde esta página."
   },
   "dashboard": {
     "goodMorning": "Buenos días",
@@ -3447,6 +3448,16 @@
     "roleMapping": "Mapeo de roles",
     "roleMappingHelp": "Mapee grupos o roles externos a roles de UCM. Los usuarios en grupos coincidentes recibirán el rol de UCM correspondiente. Si varios grupos coinciden, gana el rol con mayores privilegios (admin > operator > auditor > viewer).",
     "signRequests": "Firmar solicitudes de autenticación",
+    "spOriginNotConfigured": "No hay ninguna URL base (Ajustes > General) ni ningún FQDN configurado: el entity ID SAML y la URL ACS siguen la dirección con la que se abrió esta página. Configure la URL base para que el proveedor de identidad vea siempre las mismas URL.",
+    "nameIdFormat": "Formato de NameID",
+    "nameIdFormatHelp": "Formato que UCM solicita al proveedor de identidad. Persistente da un identificador estable; un NameID transitorio cambia en cada inicio de sesión y nunca se usa para reconocer la cuenta.",
+    "nameIdUnspecified": "No especificado (predeterminado del IdP)",
+    "nameIdPersistent": "Persistente",
+    "nameIdEmail": "Dirección de correo",
+    "nameIdTransient": "Transitorio",
+    "signRequestsHelp": "Firma cada solicitud de autenticación con la clave del certificado SP de abajo, que debe ser RSA. Proporcione ese certificado, desde los metadatos SP, al proveedor de identidad antes de activar esta opción.",
+    "allowIdpInitiated": "Permitir el inicio de sesión iniciado por el IdP",
+    "allowIdpInitiatedHelp": "Acepta respuestas que UCM no ha solicitado, como un inicio de sesión lanzado desde el portal del proveedor de identidad. Desactivado por defecto: esa respuesta no puede vincularse a un inicio de sesión iniciado en este navegador.",
     "spEntityId": "ID de entidad SP",
     "spMetadata": "Metadatos del proveedor de servicios (SP)",
     "spMetadataHelp": "Copie estas URLs en la configuración de su proveedor de identidad (IdP) para establecer la confianza SAML.",

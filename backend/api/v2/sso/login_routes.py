@@ -1,7 +1,8 @@
 from . import bp, VALID_ROLES
 from .helpers import _get_ssl_verify, _cleanup_ssl_verify, _parse_json_field
 from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
-from flask import request, redirect, session, Response
+from . import saml_sp
+from flask import request, redirect, session, Response, after_this_request
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
@@ -52,6 +53,22 @@ def _reject_oidc_login(provider, reason):
     except Exception as audit_error:
         logger.error("Failed to audit OIDC login rejection: %s", audit_error)
     return redirect('/login?error=invalid_credentials')
+
+
+# Shown as "the login expired or was started elsewhere, start again".
+SAML_LOGIN_EXPIRED = 'saml_login_expired'
+
+
+def _reject_saml_login(provider, reason, error='saml_validation_failed'):
+    """Refuse a SAML response with a generic client error and an audited reason."""
+    logger.error("SAML login rejected for provider %s: %s", provider.name, reason)
+    AuditService.log_action(
+        action='login_failure',
+        resource_type='sso',
+        details=f'SAML response rejected for provider {provider.name}: {reason}',
+        success=False
+    )
+    return redirect(f'/login?error={error}')
 
 # ============ Public SSO Endpoints (no auth) ============
 
@@ -122,10 +139,15 @@ def initiate_sso_login(provider_type):
             return error_response("SAML SSO URL not configured", 400)
 
         try:
-            saml_auth = _get_saml_auth(request, provider, state)
+            saml_auth = _get_saml_auth(request, provider, state, sign_request=True)
             redirect_url = saml_auth.login()
-            return redirect(redirect_url)
+            request_id = saml_auth.get_last_request_id()
+            saml_sp.remember_request(request_id, provider.id)
+            response = redirect(redirect_url)
+            saml_sp.set_request_cookie(response, request_id, saml_sp.sp_base_url(request))
+            return response
         except Exception as e:
+            db.session.rollback()
             logger.error(f"SAML login initiation error: {e}")
             return error_response("SAML login failed. Check SAML configuration.", 500)
 
@@ -336,17 +358,35 @@ def sso_callback(provider_type):
             _cleanup_ssl_verify(verify)
 
     elif provider.provider_type == 'saml':
+        sp_base = saml_sp.sp_base_url(request)
+
+        # Dropped once the request is used up or gone, never by a refused POST.
+        drop_cookie = []
+
+        @after_this_request
+        def _drop_request_cookie(response):
+            if drop_cookie:
+                saml_sp.clear_request_cookie(response, sp_base)
+            return response
+
         try:
             saml_auth = _get_saml_auth(request, provider)
             attrs = {}
             name_id = ''
+
+            # The AuthnRequest this browser started; consumed only by a valid response.
+            request_id = request.cookies.get(saml_sp.REQUEST_COOKIE) or None
+            if request_id and not saml_sp.request_pending(request_id, provider.id):
+                drop_cookie.append(True)
+                return _reject_saml_login(provider, 'unknown, expired or already used AuthnRequest',
+                                          SAML_LOGIN_EXPIRED)
 
             # SECURITY: NEVER fall back to an unsigned XML parser here.
             # python3-saml handles signature + assertion validation. If it raises,
             # the response is untrusted — we must reject, not parse manually.
             # (Previous fallback allowed SAML auth bypass — CVE-level issue.)
             try:
-                saml_auth.process_response()
+                saml_auth.process_response(request_id=request_id)
             except Exception as saml_err:
                 logger.error(f"SAML response processing failed: {saml_err}")
                 AuditService.log_action(
@@ -359,14 +399,42 @@ def sso_callback(provider_type):
 
             errors = saml_auth.get_errors()
             if errors:
-                logger.error(f"SAML errors: {errors}, reason: {saml_auth.get_last_error_reason()}")
+                reason = saml_auth.get_last_error_reason() or ''
+                logger.error(f"SAML errors: {errors}, reason: {reason}")
                 AuditService.log_action(
                     action='login_failure',
                     resource_type='sso',
                     details=f'SAML validation errors for provider {provider.name}: {errors}',
                     success=False
                 )
-                return redirect('/login?error=saml_validation_failed')
+                # A response to another AuthnRequest: a second tab, or a login started elsewhere.
+                code = SAML_LOGIN_EXPIRED if 'InResponseTo' in reason else 'saml_validation_failed'
+                return redirect(f'/login?error={code}')
+
+            # python3-saml matched InResponseTo against request_id when both exist.
+            in_response_to = saml_auth.get_last_response_in_response_to()
+            if in_response_to is None:
+                if not provider.saml_allow_idp_initiated:
+                    return _reject_saml_login(provider, 'unsolicited response (IdP-initiated login is disabled)')
+            elif request_id is None:
+                return _reject_saml_login(provider, 'InResponseTo matches no AuthnRequest from this browser',
+                                          SAML_LOGIN_EXPIRED)
+            elif not saml_sp.take_request(request_id, provider.id):
+                drop_cookie.append(True)
+                return _reject_saml_login(provider, 'unknown, expired or already used AuthnRequest',
+                                          SAML_LOGIN_EXPIRED)
+            else:
+                drop_cookie.append(True)
+
+            not_on_or_after = saml_auth.get_last_assertion_not_on_or_after()
+            if not not_on_or_after:
+                return _reject_saml_login(provider, 'SubjectConfirmationData has no NotOnOrAfter')
+            assertion_id = saml_auth.get_last_assertion_id()
+            if not assertion_id or len(assertion_id) > saml_sp.MAX_MESSAGE_ID_LENGTH:
+                return _reject_saml_login(
+                    provider, f'assertion ID missing or longer than {saml_sp.MAX_MESSAGE_ID_LENGTH} characters')
+            if not saml_sp.consume_assertion(assertion_id, provider.id, not_on_or_after):
+                return _reject_saml_login(provider, 'assertion already consumed (replay)')
 
             # Only reached after signature + assertion verification succeeded
             attrs = saml_auth.get_attributes()

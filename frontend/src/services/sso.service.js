@@ -33,6 +33,9 @@ const ssoService = {
 
   getSamlCertificates: () =>
     apiClient.get('/sso/saml/certificates'),
+
+  getSamlSpInfo: () =>
+    apiClient.get('/sso/saml/sp-info'),
 }
 
 export { ssoService }

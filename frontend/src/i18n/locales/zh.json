@@ -588,7 +588,8 @@
     "checkEmailDescBefore": "如果存在与",
     "checkEmailDescAfter": " 关联的账户，您将很快收到密码重置链接。",
     "accountDisabled": "此帐户已被禁用",
-    "samlValidationFailed": "SAML 身份验证失败"
+    "samlValidationFailed": "SAML 身份验证失败",
+    "samlLoginExpired": "此次登录已过期，或是在其他标签页或浏览器中发起的。请从此页面重新开始。"
   },
   "dashboard": {
     "goodMorning": "早上好",
@@ -3447,6 +3448,16 @@
     "roleMapping": "角色映射",
     "roleMappingHelp": "将外部组或角色映射到 UCM 角色。匹配组中的用户将被分配相应的 UCM 角色。如果匹配多个组，将采用权限最高的角色（admin > operator > auditor > viewer）。",
     "signRequests": "签名认证请求",
+    "spOriginNotConfigured": "未配置基础 URL（设置 > 常规），也未配置 FQDN：SAML 实体 ID 和 ACS URL 取决于打开此页面所用的地址。请设置基础 URL，使身份提供商始终看到相同的 URL。",
+    "nameIdFormat": "NameID 格式",
+    "nameIdFormatHelp": "UCM 向身份提供商请求的格式。持久 (persistent) 提供稳定的标识符；临时 (transient) NameID 每次登录都会变化，永远不会用于识别账户。",
+    "nameIdUnspecified": "未指定（IdP 默认）",
+    "nameIdPersistent": "持久 (persistent)",
+    "nameIdEmail": "电子邮件地址",
+    "nameIdTransient": "临时 (transient)",
+    "signRequestsHelp": "使用下方 SP 证书的密钥（必须为 RSA）对每个认证请求签名。启用前，请先将 SP 元数据中的该证书提供给身份提供商。",
+    "allowIdpInitiated": "允许由 IdP 发起的登录",
+    "allowIdpInitiatedHelp": "接受 UCM 未请求的响应，例如从身份提供商门户发起的登录。默认关闭：此类响应无法与在此浏览器中发起的登录关联。",
     "spEntityId": "SP 实体 ID",
     "spMetadata": "服务提供者 (SP) 元数据",
     "spMetadataHelp": "将这些 URL 复制到您的身份提供者 (IdP) 配置中以建立 SAML 信任关系。",

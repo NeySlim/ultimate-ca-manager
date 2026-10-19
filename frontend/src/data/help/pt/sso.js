@@ -13,6 +13,7 @@ export default {
           { label: 'Entity ID', text: 'Identificador de entidade do provedor de serviço UCM' },
           { label: 'URL ACS', text: 'URL de callback do Assertion Consumer Service' },
           { label: 'Mapeamento de Atributos', text: 'Mapear atributos do IDP para campos de usuário UCM' },
+          { label: 'Login iniciado pelo IdP', text: 'Aceita logins iniciados no portal do IdP, verificados como qualquer outra resposta. Ativado para provedores criados antes da 2.243, desativado para os novos: ative apenas se os usuários partirem do portal do IdP.' },
         ]
       },
       {
@@ -98,6 +99,9 @@ Mapeie atributos SAML do IDP para campos de usuário UCM:
 - \`username\` → Nome de usuário UCM (obrigatório)
 - \`email\` → E-mail UCM (obrigatório)
 - \`groups\` → Associação a grupos UCM (opcional)
+
+### Login iniciado pelo IdP
+Um login iniciado no portal do IdP chega ao UCM sem uma solicitação do UCM. **Permitir login iniciado pelo IdP** o aceita, com as mesmas verificações de assinatura, audiência, Destination, validade e reutilização. Provedores criados antes da 2.243 o mantêm ativado; os novos o têm desativado. Ative apenas se os usuários partirem do portal do IdP.
 
 ## OAuth2 / OIDC
 

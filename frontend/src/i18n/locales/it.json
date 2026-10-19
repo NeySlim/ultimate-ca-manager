@@ -588,7 +588,8 @@
     "checkEmailDescBefore": "Se esiste un account con",
     "checkEmailDescAfter": ", riceverai un link per reimpostare a breve.",
     "accountDisabled": "Questo account è stato disabilitato",
-    "samlValidationFailed": "Autenticazione SAML fallita"
+    "samlValidationFailed": "Autenticazione SAML fallita",
+    "samlLoginExpired": "Questo accesso è scaduto o è stato avviato in un'altra scheda o in un altro browser. Ricomincia da questa pagina."
   },
   "dashboard": {
     "goodMorning": "Buongiorno",
@@ -3447,6 +3448,16 @@
     "roleMapping": "Mappatura ruoli",
     "roleMappingHelp": "Mappa gruppi o ruoli esterni ai ruoli UCM. Gli utenti nei gruppi corrispondenti riceveranno il ruolo UCM associato. Se più gruppi corrispondono, vince il ruolo con i privilegi più elevati (admin > operator > auditor > viewer).",
     "signRequests": "Firma le richieste di autenticazione",
+    "spOriginNotConfigured": "Non è configurato alcun URL di base (Impostazioni > Generale) né alcun FQDN: l'entity ID SAML e l'URL ACS seguono l'indirizzo con cui è stata aperta questa pagina. Imposta l'URL di base perché il provider di identità veda sempre gli stessi URL.",
+    "nameIdFormat": "Formato NameID",
+    "nameIdFormatHelp": "Formato che UCM richiede al provider di identità. Persistente fornisce un identificatore stabile; un NameID transitorio cambia a ogni accesso e non viene mai usato per riconoscere l'account.",
+    "nameIdUnspecified": "Non specificato (predefinito dell'IdP)",
+    "nameIdPersistent": "Persistente",
+    "nameIdEmail": "Indirizzo e-mail",
+    "nameIdTransient": "Transitorio",
+    "signRequestsHelp": "Firma ogni richiesta di autenticazione con la chiave del certificato SP qui sotto, che deve essere RSA. Fornisci quel certificato, dai metadati SP, al provider di identità prima di attivare questa opzione.",
+    "allowIdpInitiated": "Consenti l'accesso avviato dall'IdP",
+    "allowIdpInitiatedHelp": "Accetta risposte che UCM non ha richiesto, ad esempio un accesso avviato dal portale del provider di identità. Disattivato per impostazione predefinita: una risposta simile non può essere collegata a un accesso avviato in questo browser.",
     "spEntityId": "SP Entity ID",
     "spMetadata": "Metadati Service Provider (SP)",
     "spMetadataHelp": "Copiare questi URL nella configurazione dell'Identity Provider (IdP) per configurare il trust SAML.",
