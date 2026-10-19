@@ -30,20 +30,14 @@ class NotificationsMixin:
 
         try:
             from services.email_service import EmailService
-            from models import SystemConfig
 
-            # Get SMTP config
-            smtp_row = SystemConfig.query.filter_by(key='smtp_config').first()
-            if not smtp_row:
+            # The profile's address, else the SMTP sender, as the form says
+            smtp = EmailService.get_smtp_config()
+            recipient = profile.notify_email or (smtp.smtp_from if smtp else None)
+            if not recipient:
+                logger.info("Discovery notification skipped: no recipient configured")
                 return
-
-            import json
-            smtp_config = json.loads(smtp_row.value)
-            recipients = smtp_config.get('notification_recipients', [])
-            if not recipients and smtp_config.get('smtp_from'):
-                recipients = [smtp_config['smtp_from']]
-            if not recipients:
-                return
+            recipients = [recipient]
 
             parts = []
             if new_certs > 0:

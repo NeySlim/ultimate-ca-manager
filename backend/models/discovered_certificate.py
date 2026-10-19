@@ -21,6 +21,7 @@ class ScanProfile(db.Model):
     notify_on_new = db.Column(db.Boolean, nullable=False, default=True)
     notify_on_change = db.Column(db.Boolean, nullable=False, default=True)
     notify_on_expiry = db.Column(db.Boolean, nullable=False, default=True)
+    notify_email = db.Column(db.String(255))  # empty: the SMTP sender address
     timeout = db.Column(db.Integer, nullable=False, default=5)
     max_workers = db.Column(db.Integer, nullable=False, default=20)
     resolve_dns = db.Column(db.Boolean, nullable=False, default=False)
@@ -66,6 +67,7 @@ class ScanProfile(db.Model):
             'notify_on_new': self.notify_on_new,
             'notify_on_change': self.notify_on_change,
             'notify_on_expiry': self.notify_on_expiry,
+            'notify_email': self.notify_email,
             'timeout': self.timeout,
             'max_workers': self.max_workers,
             'resolve_dns': self.resolve_dns,

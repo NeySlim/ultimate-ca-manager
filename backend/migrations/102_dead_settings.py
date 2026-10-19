@@ -2,7 +2,8 @@
 
 Each key below lost its reader or its screen in the same release; leaving the
 row would only keep a stale value (some of them secrets) in backups. Policy
-rules and template extensions lose the JSON keys nothing ever read.
+rules and template extensions lose the JSON keys nothing ever read, and
+discovery profiles gain the notification address their form always sent.
 """
 import json
 import sqlite3
@@ -69,6 +70,10 @@ def _upgrade_sqlite(conn):
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if 'system_config' in tables:
         conn.executemany("DELETE FROM system_config WHERE key = ?", [(k,) for k in DEAD_KEYS])
+    if 'discovery_scan_profiles' in tables:
+        columns = {r[1] for r in conn.execute("PRAGMA table_info(discovery_scan_profiles)")}
+        if 'notify_email' not in columns:
+            conn.execute("ALTER TABLE discovery_scan_profiles ADD COLUMN notify_email VARCHAR(255)")
     for table, column, clean in JSON_COLUMNS:
         if table not in tables:
             continue
@@ -86,6 +91,9 @@ def _upgrade_pg(conn):
     if 'system_config' in tables:
         conn.execute(text("DELETE FROM system_config WHERE key IN :keys").bindparams(
             bindparam('keys', expanding=True)), {'keys': list(DEAD_KEYS)})
+    if 'discovery_scan_profiles' in tables:
+        conn.execute(text("ALTER TABLE discovery_scan_profiles "
+                          "ADD COLUMN IF NOT EXISTS notify_email VARCHAR(255)"))
     for table, column, clean in JSON_COLUMNS:
         if table not in tables:
             continue
