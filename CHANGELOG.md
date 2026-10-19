@@ -57,6 +57,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - WSTEP: certificates were issued for the global WSTEP validity even when the request matched a template whose own validity XCEP advertises; the matched template's validity now applies, the global value only when no template matches.
 - Discovery: scan notifications were never sent and the profile's Notification Email was not saved; the digest now goes to that address, or to the SMTP sender address when it is empty.
 - HSM: a Google Cloud KMS provider could only use the server's ambient credentials, the form having no field for a service account key; it now takes one, kept encrypted and masked like the other secrets.
+- Docs: the admin guide gave native installs the Docker-only `UCM_*` variable names (`UCM_SECRET_KEY`, `UCM_DATA_DIR`...), which ucm.env does not read; it now lists both names.
 
 ## [2.242] - 2026-10-18
 
