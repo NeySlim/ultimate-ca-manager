@@ -250,6 +250,39 @@ def encryption_enabled(monkeypatch, tmp_path, app):
     _drop_unreadable_key_material(app)
 
 
+_SESSION_APP = []
+
+
+def _admin_api_key_ids():
+    """Ids of the session admin's API keys, or None before the app exists."""
+    if not _SESSION_APP:
+        return None
+    from models import User, db
+    from models.api_key import APIKey
+    with _SESSION_APP[0].app_context():
+        db.session.rollback()
+        admin = User.query.filter_by(username='admin').first()
+        if admin is None:
+            return set()
+        return {key.id for key in APIKey.query.filter_by(user_id=admin.id)}
+
+
+@pytest.fixture(autouse=True, scope='module')
+def _admin_api_keys_stay_in_their_module():
+    """Keys a module creates for the shared admin are deleted after it: they count
+    toward the per-user cap, which made later modules depend on worker order."""
+    before = _admin_api_key_ids() or set()
+    yield
+    after = _admin_api_key_ids()
+    if not after or not after - before:
+        return
+    from models import db
+    from models.api_key import APIKey
+    with _SESSION_APP[0].app_context():
+        APIKey.query.filter(APIKey.id.in_(after - before)).delete(synchronize_session=False)
+        db.session.commit()
+
+
 @pytest.fixture(scope='session')
 def app():
     """Create Flask app with test configuration (shared across all tests)."""
@@ -300,7 +333,9 @@ def app():
     # configured protocol_base_url).
     application.config['FQDN'] = 'ucm.test'
 
+    _SESSION_APP.append(application)
     yield application
+    _SESSION_APP.clear()
 
     if os.path.exists(temp_db):
         os.unlink(temp_db)
