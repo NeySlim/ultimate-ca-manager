@@ -5,11 +5,12 @@ export default {
     overview: 'Defina y gestione políticas de certificados que controlan las reglas de emisión, requisitos de clave, límites de validez y flujos de aprobación. Las políticas se evalúan en orden de prioridad cuando se solicitan certificados.',
     sections: [
       {
-        title: 'Tipos de políticas',
+        title: 'Operaciones',
         items: [
-          { label: 'Emisión', text: 'Reglas aplicadas cuando se crean nuevos certificados' },
-          { label: 'Renovación', text: 'Reglas aplicadas cuando se renuevan certificados' },
-          { label: 'Revocación', text: 'Reglas aplicadas cuando se revocan certificados' },
+          { label: 'Emisión', text: 'El formulario de emisión, la firma de CSR y la firma masiva, y las renovaciones que realiza un operador' },
+          { label: 'Renovación', text: 'Renovaciones por un operador, una o masivas, y por el planificador, que encola su renovación en lugar de realizarla' },
+          { label: 'Revocación', text: 'Revocaciones de certificados y de CA intermedias por un operador; un cliente ACME no puede esperar una decisión, por lo que su revocación se rechaza' },
+          { label: 'Varias a la vez', text: 'Una política puede regir varias operaciones; una sin ninguna (un antiguo tipo de renovación o revocación, nunca aplicado) no rige nada hasta que elijas' },
         ]
       },
       {
@@ -42,16 +43,20 @@ export default {
 
 Las políticas de certificados definen las reglas y restricciones aplicadas cuando se emiten, renuevan o revocan certificados. Las políticas se evalúan en **orden de prioridad** (número menor = mayor precedencia) y pueden aplicarse a CA específicas.
 
-## Tipos de políticas
+## Operaciones
 
-### Políticas de emisión
-Reglas aplicadas cuando se crean nuevos certificados. Es el tipo más común. Controla tipos de clave, períodos de validez, restricciones de SAN y si se requiere aprobación.
+Una política rige una o varias operaciones: su requisito de aprobación y sus reglas se aplican a ellas.
 
-### Políticas de renovación
-Reglas aplicadas cuando se renuevan certificados. Pueden imponer una validez más corta en la renovación o requerir una nueva aprobación.
+### Emisión
+El formulario de emisión, la firma de CSR y la firma masiva, y las renovaciones que realiza un operador. Es la opción más común. Controla tipos de clave, períodos de validez, restricciones de SAN y si se requiere aprobación.
 
-### Políticas de revocación
-Reglas aplicadas cuando se revocan certificados. Pueden requerir aprobación antes de revocar certificados críticos.
+### Renovación
+Renovaciones por un operador, una o masivas, y por el planificador. Con una política de renovación que requiere aprobación, el planificador encola la renovación en lugar de realizarla, y la aprobación vuelve a firmar la clave que conserva el servidor.
+
+### Revocación
+Revocaciones de certificados (uno, masivas, desde los certificados de usuario) y de CA intermedias. Se limita por la CA emisora, la plantilla y el patrón DNS; las demás reglas no se aplican. Un cliente ACME no puede esperar una decisión: su revocación se rechaza y se deja a los operadores. Eliminar el registro mTLS de otra persona se rechaza hasta que se revoque su certificado; eliminar el propio nunca se retiene.
+
+Una política creada antes de que existieran las operaciones conserva lo que hacía: una política de emisión sigue siéndolo, y un tipo de renovación o revocación, nunca aplicado, no rige nada hasta que elijas sus operaciones.
 
 ## Configuración de reglas
 

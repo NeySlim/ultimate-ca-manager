@@ -17,6 +17,7 @@ from utils.cert_status import issued_certificates
 from services.cert_service import CertificateService
 from services.cert.renewal import RenewalError, check_renewable, renew_certificate_in_place
 from services.msca.propagation import propagate_revocation, PROPAGATED
+from services.approval_gate import queue_revocation
 from services.audit_service import AuditService
 from services.deletion_blockers import (
     certificate_deletion_blockers, first_blocker, parse_bulk_ids,
@@ -58,6 +59,17 @@ def bulk_revoke_certificates():
                 continue
             if cert.revoked:
                 results['failed'].append({'id': cert_id, 'error': 'Already revoked'})
+                continue
+            try:
+                policy, approval = queue_revocation(g.current_user, cert, reason=reason)
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Policy evaluation failed for revocation of {cert_id}: {e}", exc_info=True)
+                results['failed'].append({'id': cert_id, 'error': 'Policy evaluation failed'})
+                continue
+            if approval is not None:
+                results.setdefault('pending_approval', []).append(
+                    {'id': cert_id, 'approval_id': approval.id, 'policy_name': policy.name})
                 continue
             cert = CertificateService.revoke_certificate(
                 cert_id=cert_id, reason=reason, username=username)

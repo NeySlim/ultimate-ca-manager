@@ -287,7 +287,15 @@ export default function CertificatesPage() {
     setRevoking(true)
     try {
       muteToasts()
-      await certificatesService.revoke(revokingCert.id, reason)
+      const res = await certificatesService.revoke(revokingCert.id, reason)
+      if (res?.data?.approval_required) {
+        // Queued by a revocation policy: nothing is revoked, so nothing is deleted
+        showWarning(t('certificates.revocationApprovalRequired', { policy: res.data.policy_name }))
+        setRevokingCert(null)
+        setDeleteAfterRevoke(false)
+        loadData()
+        return
+      }
       const alsoDelete = deleteAfterRevoke ? revokingCert.id : null
       showSuccess(t('messages.success.other.revoked'))
       setRevokingCert(null)

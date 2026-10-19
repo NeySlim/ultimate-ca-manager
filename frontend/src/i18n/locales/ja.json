@@ -821,7 +821,8 @@
     "templateOverridesHint": "テンプレート '{{name}}' との相違: {{fields}}",
     "deleteNeedsRevoke": "この証明書はまだ有効なため、単独では削除できません。削除すると UCM からは消えますが、失効を確認しないクライアントからは引き続き信頼されます。まず失効させて CRL と OCSP レスポンダに反映させ、そのうえで削除します。",
     "revokeThenDelete": "失効させてから削除",
-    "noKeyTypeAllowedByPolicy": "この CA とテンプレートのポリシーで許可されている鍵タイプはありません。"
+    "noKeyTypeAllowedByPolicy": "この CA とテンプレートのポリシーで許可されている鍵タイプはありません。",
+    "revocationApprovalRequired": "失効を承認に提出しました（ポリシー: {{policy}}）"
   },
   "cas": {
     "chainRevoked": "上位で失効",
@@ -1004,7 +1005,8 @@
     "offlineKeyFileTooLarge": "鍵ファイルが大きすぎます（最大 256 KB）",
     "restorePasswordHint": "CA をオフラインにしたときに使用したパスワード。",
     "namedUrls": "プロトコルURLにCA名を使用",
-    "namedUrlsHint": "CDP/OCSP/AIAパスにランダムIDの代わりにCA名から生成されたスラッグを使用します。手動設定が容易になりますが、URLにCA名が表示されます。後から有効にすることもできますが、一度有効にすると元に戻せません。"
+    "namedUrlsHint": "CDP/OCSP/AIAパスにランダムIDの代わりにCA名から生成されたスラッグを使用します。手動設定が容易になりますが、URLにCA名が表示されます。後から有効にすることもできますが、一度有効にすると元に戻せません。",
+    "revocationApprovalRequired": "CA の失効を承認に提出しました（ポリシー: {{policy}}）"
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",
@@ -3975,7 +3977,19 @@
     "title": "承認リクエスト",
     "total": "合計",
     "certificateRequest": "証明書リクエスト",
-    "certificateIssued": "証明書が正常に発行されました"
+    "certificateIssued": "証明書が正常に発行されました",
+    "requestType": {
+      "certificate": "証明書",
+      "csr": "CSR 署名",
+      "renewal": "更新",
+      "revocation": "失効",
+      "ca_revocation": "CA の失効"
+    },
+    "revocationPerformed": "承認済み: 失効が実行されました",
+    "summarySerial": "シリアル番号",
+    "summaryInvalidity": "無効日",
+    "summaryTrigger": "要求元",
+    "triggerScheduler": "更新スケジューラ"
   },
   "messages": {
     "confirm": {
@@ -4287,7 +4301,16 @@
     },
     "allowedDigests": "許可する署名ハッシュ",
     "allowedKeyTypesHelp": "未選択の場合: すべての鍵タイプが許可されます。",
-    "allowedDigestsHelp": "未選択の場合: すべてのハッシュが許可されます。"
+    "allowedDigestsHelp": "未選択の場合: すべてのハッシュが許可されます。",
+    "operations": "オペレーション",
+    "operationHelp": {
+      "issuance": "発行フォーム、CSR 署名と一括署名、およびオペレーターが行う更新",
+      "renewal": "オペレーターによる単独または一括の更新と、スケジューラによる更新（スケジューラの場合は更新がキューに入ります）",
+      "revocation": "オペレーターによる証明書と中間 CA の失効。ACME では決定を待てないため拒否されます"
+    },
+    "operationsRequired": "オペレーションを 1 つ以上選択してください",
+    "noOperation": "オペレーションなし",
+    "rulesRevocationOnly": "ルールは発行と更新にのみ適用されます。失効ポリシーは CA、テンプレート、DNS パターンでスコープされます。"
   },
   "reports": {
     "complianceReport": "コンプライアンスレポート",

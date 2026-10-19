@@ -1423,12 +1423,13 @@ export const helpContent = {
     overview: 'Define and manage certificate policies that control issuance rules, key requirements, validity limits, and approval workflows. Policies are evaluated in priority order when certificates are requested.',
     sections: [
       {
-        title: 'Policy Types',
+        title: 'Operations',
         icon: Gavel,
         items: [
-          { label: 'Issuance', text: 'Rules applied when new certificates are created' },
-          { label: 'Renewal', text: 'Rules applied when certificates are renewed' },
-          { label: 'Revocation', text: 'Rules applied when certificates are revoked' },
+          { label: 'Issuance', text: 'The issue form, CSR signing and bulk signing, and the renewals an operator performs' },
+          { label: 'Renewal', text: 'Renewals by an operator, one or in bulk, and by the scheduler, which queues its renewal instead of performing it' },
+          { label: 'Revocation', text: 'Revocations of certificates and intermediate CAs by an operator; an ACME client cannot wait for a decision, so its revocation is refused' },
+          { label: 'Several at once', text: 'A policy can govern several operations; one with none (an old renewal or revocation type, never enforced) governs nothing until you choose' },
         ]
       },
       {
@@ -1481,6 +1482,8 @@ export const helpContent = {
           { label: 'Issue form', text: 'A certificate request matching a policy that requires approval' },
           { label: 'Sign CSR and bulk signing', text: 'Signing a stored request, alone or from Operations, is queued the same way; the approval performs the signing' },
           { label: 'Renewal', text: 'Renewing a certificate, alone or in bulk, is queued too; a renewal that could not be honoured (revoked, key not held by the server) is refused at once' },
+          { label: 'Revocation', text: 'Revoking a certificate (alone, in bulk, from the user certificates) or an intermediate CA under a revocation policy is queued; the approval revokes with the reason asked for' },
+          { label: 'Scheduler', text: 'Under a renewal policy the scheduler queues the renewal; the approval re-signs the key the server holds, as the scheduler would have' },
           { label: 'Administrators', text: 'Bypass the queue on every path, as on the issue form' },
         ]
       },
@@ -1492,13 +1495,14 @@ export const helpContent = {
           { label: 'Deleted or revoked', text: 'A request whose target was deleted or revoked is closed as rejected; a certificate hold keeps the renewal request waiting for the unhold' },
           { label: 'Already satisfied', text: 'Approving a request already fulfilled closes it on the existing certificate; approving one of several requests for the same target closes the others as approved by you' },
           { label: 'Target gone', text: 'Approving a request whose stored request, certificate or CA no longer exists closes it as rejected' },
+          { label: 'Revoked or renewed meanwhile', text: 'A queued revocation whose certificate was revoked directly is closed as approved; one whose certificate was renewed since is closed as rejected when approved' },
           { label: 'Deadline', text: 'A request waits seven days; past that it is closed as expired, never counted as pending, and the renewal scheduler resumes for its certificate' },
         ]
       },
     ],
     tips: [
       'Any single rejection immediately stops the approval: this is intentional for security.',
-      'While a renewal awaits approval, the scheduler leaves the certificate to that decision, as long as it can come before the certificate expires.',
+      'While a renewal awaits approval, the scheduler leaves the certificate to that decision, as long as it can come before the certificate expires; under a renewal policy it never renews without one.',
       'Approval comments are logged in the audit trail for compliance.',
     ],
     related: ['Policies', 'Certificates', 'Audit Logs']

@@ -5,11 +5,12 @@ export default {
     overview: 'Definisci e gestisci le politiche dei certificati che controllano le regole di emissione, i requisiti delle chiavi, i limiti di validità e i flussi di approvazione. Le politiche vengono valutate in ordine di priorità quando i certificati vengono richiesti.',
     sections: [
       {
-        title: 'Tipi di politica',
+        title: 'Operazioni',
         items: [
-          { label: 'Emissione', text: 'Regole applicate quando vengono creati nuovi certificati' },
-          { label: 'Rinnovo', text: 'Regole applicate quando i certificati vengono rinnovati' },
-          { label: 'Revoca', text: 'Regole applicate quando i certificati vengono revocati' },
+          { label: 'Emissione', text: 'Il modulo di emissione, la firma CSR e la firma massiva, e i rinnovi eseguiti da un operatore' },
+          { label: 'Rinnovo', text: 'Rinnovi da parte di un operatore, singoli o massivi, e dello scheduler, che mette in coda il proprio rinnovo invece di eseguirlo' },
+          { label: 'Revoca', text: 'Revoche di certificati e CA intermedie da parte di un operatore; un client ACME non può attendere una decisione, quindi la sua revoca viene rifiutata' },
+          { label: 'Più operazioni', text: 'Una politica può governare più operazioni; una senza operazioni (un vecchio tipo rinnovo o revoca, mai applicato) non governa nulla finché non ne scegli' },
         ]
       },
       {
@@ -42,16 +43,20 @@ export default {
 
 Le politiche dei certificati definiscono le regole e i vincoli applicati quando i certificati vengono emessi, rinnovati o revocati. Le politiche vengono valutate in **ordine di priorità** (numero più basso = precedenza più alta) e possono essere limitate a CA specifiche.
 
-## Tipi di politica
+## Operazioni
 
-### Politiche di emissione
-Regole applicate quando vengono creati nuovi certificati. Questo è il tipo più comune. Controlla i tipi di chiave, i periodi di validità, le restrizioni SAN e se è richiesta l'approvazione.
+Una politica governa una o più operazioni: il requisito di approvazione e le regole si applicano a quelle.
 
-### Politiche di rinnovo
-Regole applicate quando i certificati vengono rinnovati. Possono imporre una validità più breve al rinnovo o richiedere una nuova approvazione.
+### Emissione
+Il modulo di emissione, la firma CSR e la firma massiva, e i rinnovi eseguiti da un operatore. È la scelta più comune. Controlla i tipi di chiave, i periodi di validità, le restrizioni SAN e se è richiesta l'approvazione.
 
-### Politiche di revoca
-Regole applicate quando i certificati vengono revocati. Possono richiedere l'approvazione prima della revoca di certificati critici.
+### Rinnovo
+Rinnovi da parte di un operatore, singoli o massivi, e dello scheduler. Con una politica di rinnovo che richiede l'approvazione, lo scheduler mette in coda il rinnovo invece di eseguirlo, e l'approvazione rifirma la chiave detenuta dal server.
+
+### Revoca
+Revoche di certificati (singole, massive, dai certificati utente) e di CA intermedie. Limitata dalla CA emittente, dal template e dal pattern DNS; le altre regole non si applicano. Un client ACME non può attendere una decisione: la sua revoca viene rifiutata e lasciata agli operatori. Rimuovere l'enrollment mTLS di un altro utente viene rifiutato finché il suo certificato non è revocato; rimuovere il proprio non viene mai trattenuto.
+
+Una politica creata prima dell'introduzione delle operazioni conserva ciò che faceva: una politica di emissione resta tale, mentre un tipo rinnovo o revoca, mai applicato, non governa nulla finché non ne scegli le operazioni.
 
 ## Configurazione delle regole
 

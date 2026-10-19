@@ -545,19 +545,16 @@ class RestoreExtendedMixin:
                                     required=True)
             certificate_id = _reference(where, 'approval_requests', ar_data,
                                         'certificate_id', plan)
+            # None only when the archive names none (a request the renewal
+            # scheduler queued); a requester this installation lacks stops it
             requester_id = _reference(where, 'approval_requests', ar_data,
                                       'requester_id', plan)
-            if requester_id is None:
-                raise RestoreValidationError(
-                    f"Invalid backup: {where} names no requester; an approval "
-                    "cannot be restored without the user who asked for it")
 
             request = _existing_row('approval_requests',
                                     {'certificate_id': certificate_id,
                                      'created_at': created_at})
             if request is None:
-                # request_type and requester_id are NOT NULL; both are
-                # overwritten by apply_columns.
+                # request_type is NOT NULL; apply_columns overwrites it and requester_id
                 request = ApprovalRequest(
                     request_type=ar_data.get('request_type') or 'certificate',
                     requester_id=requester_id)

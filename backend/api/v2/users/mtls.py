@@ -246,7 +246,8 @@ def delete_user_mtls_certificate(user_id, cert_id):
 
     cert_name = auth_cert.name or f'Certificate #{cert_id}'
     removed, failure = remove_enrolment(
-        auth_cert, username=getattr(g.current_user, 'username', 'system'))
+        auth_cert, username=getattr(g.current_user, 'username', 'system'),
+        actor=g.current_user)
     if not removed:
         return failure
 

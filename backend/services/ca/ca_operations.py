@@ -33,6 +33,39 @@ class CAOperationsMixin:
         return True
 
     @staticmethod
+    def revocation_issuer(ca, reason=None):
+        """The CA whose CRL will carry ``ca``'s revocation; ValueError when
+        ``ca`` cannot be revoked here (hold, pending, root, issuer not held)."""
+        if reason in ('certificateHold', 'certificate_hold'):
+            # No route lifts a hold on a CA, and the parent's CRL would carry
+            # a "hold" that never ends: CA revocation is permanent
+            raise ValueError("A CA cannot be put on hold: CA revocation is permanent")
+        if ca.is_pending or not ca.crt:
+            raise ValueError("CA is awaiting its certificate")
+        # The issuer whose key actually signed the certificate the CA holds
+        # now: caref can point at the CA that signed a previous certificate
+        # (renewal, cross-sign), and the revocation must reach the issuer
+        # whose CRL and OCSP answer for this certificate (#343 review)
+        parent = ca.issuing_ca()
+        if parent is None:
+            if ca.is_root:
+                raise ValueError(
+                    "A root CA cannot be revoked: relying parties remove it from their trust stores"
+                )
+            recorded = CA.query.filter_by(refid=ca.caref).first() if ca.caref else None
+            if recorded is not None:
+                raise ValueError(
+                    f"The recorded issuing CA '{recorded.descr}' did not sign the certificate "
+                    f"this CA holds now (the issuer was re-keyed or replaced): import the "
+                    f"issuer's current certificate, or revoke this CA at that issuer"
+                )
+            raise ValueError(
+                "The issuing CA is not held in UCM: revoke this CA at that root "
+                "(its CRL can then be served from UCM)"
+            )
+        return parent
+
+    @staticmethod
     def revoke_ca(
         ca_id: int,
         reason: str = 'unspecified',
@@ -64,10 +97,6 @@ class CAOperationsMixin:
         ca = db.session.get(CA, ca_id)
         if not ca:
             raise ValueError("CA not found")
-        if reason in ('certificateHold', 'certificate_hold'):
-            # No route lifts a hold on a CA, and the parent's CRL would carry
-            # a "hold" that never ends: CA revocation is permanent
-            raise ValueError("A CA cannot be put on hold: CA revocation is permanent")
         if ca.is_revoked:
             # The parent's record is authoritative: a row whose flag was lost
             # (restore, import before its parent) gets it back rather than a
@@ -78,29 +107,7 @@ class CAOperationsMixin:
                 except Exception:
                     db.session.rollback()
             raise ValueError("CA is already revoked")
-        if ca.is_pending or not ca.crt:
-            raise ValueError("CA is awaiting its certificate")
-        # The issuer whose key actually signed the certificate the CA holds
-        # now: caref can point at the CA that signed a previous certificate
-        # (renewal, cross-sign), and the revocation must reach the issuer
-        # whose CRL and OCSP answer for this certificate (#343 review)
-        parent = ca.issuing_ca()
-        if parent is None:
-            if ca.is_root:
-                raise ValueError(
-                    "A root CA cannot be revoked: relying parties remove it from their trust stores"
-                )
-            recorded = CA.query.filter_by(refid=ca.caref).first() if ca.caref else None
-            if recorded is not None:
-                raise ValueError(
-                    f"The recorded issuing CA '{recorded.descr}' did not sign the certificate "
-                    f"this CA holds now (the issuer was re-keyed or replaced): import the "
-                    f"issuer's current certificate, or revoke this CA at that issuer"
-                )
-            raise ValueError(
-                "The issuing CA is not held in UCM: revoke this CA at that root "
-                "(its CRL can then be served from UCM)"
-            )
+        parent = CAOperationsMixin.revocation_issuer(ca, reason)
 
         # The serial of the certificate the CA holds now, never the stored
         # column: after a renewal that column can still name the previous
@@ -142,6 +149,10 @@ class CAOperationsMixin:
                 valid_to=valid_to,
                 certificate_id=None,
             ))
+        # A revocation of this CA waiting for approval is closed by this one
+        from services.approval_gate import resolve_moot_requests
+        resolve_moot_requests('ca_revocation', 'target_ca_id', ca.id, outcome='approved',
+                              username=username, reason='Revoked directly', commit=False)
 
         try:
             db.session.commit()

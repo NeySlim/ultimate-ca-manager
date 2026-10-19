@@ -3092,7 +3092,7 @@ Content-Type: application/json
 {
   "name": "Production Certificate Policy",
   "description": "Requires approval for production certificates",
-  "policy_type": "issuance",
+  "operations": ["issuance", "renewal", "revocation"],
   "ca_id": 2,
   "template_id": 1,
   "requires_approval": true,
@@ -3105,6 +3105,10 @@ Content-Type: application/json
   "notification_emails": ["security@example.com"]
 }
 ```
+
+`operations` lists what the policy governs: `issuance` (issue form, Sign CSR, bulk signing and the renewals an operator performs), `renewal` (operator renewals and the renewal scheduler) and `revocation` (certificate, bulk, user certificate and intermediate CA revocations). Without it, the legacy `policy_type` names a single operation; with neither, the policy governs `issuance`.
+
+When a policy requires approval, `POST /certificates/{id}/revoke`, `POST /certificates/bulk/revoke` (under `pending_approval`), `POST /user-certificates/{id}/revoke` and `POST /cas/{id}/revoke` answer `approval_required: true` with the `approval_id` and the `request_type` (`revocation` or `ca_revocation`) instead of revoking; the approval revokes with the stored reason and invalidity date. ACME `revokeCert` answers `403 unauthorized` for such a certificate.
 
 ### Update Policy
 ```http

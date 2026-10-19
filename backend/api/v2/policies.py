@@ -8,7 +8,7 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils import key_algorithms, notices as notices_mod
 from models import db, CA, Certificate
-from models.policy import CertificatePolicy, ApprovalRequest
+from models.policy import CertificatePolicy, ApprovalRequest, OPERATIONS, legacy_operations
 from models.certificate_template import CertificateTemplate
 from datetime import datetime, timedelta
 import json
@@ -140,9 +140,10 @@ def _ca_for_request(data):
 
 def _approval_target_gone(approval):
     """The reason nothing can satisfy a stored-request approval any more
-    (its request row, certificate or signing CA is gone), else None."""
+    (its request row, certificate or signing CA is gone, or the certificate
+    to revoke was replaced since the request), else None."""
     from services.policy_service import PolicyEvaluationService
-    if approval.request_type not in ('csr', 'renewal'):
+    if approval.request_type not in ('csr', 'renewal', 'revocation', 'ca_revocation'):
         return None
     data = PolicyEvaluationService.get_request_data(approval) or {}
     if approval.request_type == 'csr':
@@ -152,9 +153,20 @@ def _approval_target_gone(approval):
         if _ca_for_request(data) is None:
             return 'The signing CA no longer exists'
         return None
+    if approval.request_type == 'ca_revocation':
+        from services.approval_gate import ca_certificate_serial
+        ca = _row(CA, data.get('target_ca_id'))
+        if ca is None:
+            return 'The CA to revoke no longer exists'
+        if ca_certificate_serial(ca) != data.get('serial_number'):
+            return 'The CA certificate changed since the request; request its revocation again'
+        return None
     cert = _row(Certificate, data.get('certificate_id'))
     if cert is None or not cert.crt:
-        return 'The certificate to renew no longer exists'
+        return ('The certificate to revoke no longer exists' if approval.request_type == 'revocation'
+                else 'The certificate to renew no longer exists')
+    if approval.request_type == 'revocation' and cert.serial_number != data.get('serial_number'):
+        return 'The certificate was renewed since the request; request its revocation again'
     return None
 
 
@@ -250,11 +262,14 @@ def _issue_approved_renewal(approval, data):
                 'valid_from': utc_isoformat(cert.valid_from), 'valid_to': utc_isoformat(cert.valid_to),
                 'already_issued': True}
     duplicate_ids = _close_duplicate_requests(approval, 'certificate_id', cert.id)
+    # A renewal the scheduler queued is performed as the scheduler would
+    # have: the held key pair re-signed, recorded as an automatic renewal
+    scheduled = data.get('trigger') == 'auto'
     outcome = renew_certificate_in_place(
         cert,
-        username=approval.requester.username if approval.requester else 'system',
+        username=_requester_name(approval, data),
         actor_user_id=approval.requester_id,
-        rekey=True, regenerate_crl=True, trigger='manual',
+        rekey=not scheduled, regenerate_crl=True, trigger='auto' if scheduled else 'manual',
         validity_days=data.get('validity_days'),
     )
     _link_duplicates(duplicate_ids, cert.id)
@@ -268,6 +283,91 @@ def _issue_approved_renewal(approval, data):
         'valid_to': utc_isoformat(cert.valid_to),
         'notices': outcome.get('notices') or [],
     }
+
+
+def _requester_name(approval, data):
+    """Who asked: the requester, the scheduler for its own requests."""
+    if approval.requester:
+        return approval.requester.username
+    return data.get('requested_by') or 'system'
+
+
+_HOLD_REASONS = ('certificateHold', 'certificate_hold')
+
+
+def _approved_revocation_params(data):
+    """``(reason, invalidity_at)`` stored with a revocation request, checked again."""
+    from utils.revocation_reasons import normalize_revocation_reason
+    reason = normalize_revocation_reason(data.get('reason') or 'unspecified')
+    if reason is None:
+        raise ValueError('The revocation reason stored with the request is not valid')
+    invalidity_at = None
+    if data.get('invalidity_at'):
+        from utils.datetime_utils import to_naive_utc
+        invalidity_at = to_naive_utc(datetime.fromisoformat(
+            str(data['invalidity_at']).replace('Z', '+00:00')))
+    return reason, invalidity_at
+
+
+def _revoke_approved_certificate(approval, data):
+    """Revoke the certificate an approved 'revocation' request names, with
+    the stored reason, exactly as the revoke route would have."""
+    from services.cert_service import CertificateService
+    cert = _row(Certificate, data.get('certificate_id'))
+    if cert is None or not cert.crt:
+        raise ValueError('The certificate to revoke no longer exists')
+    if cert.serial_number != data.get('serial_number'):
+        raise ValueError('The certificate was renewed since the request; request its revocation again')
+    if cert.revoked:
+        if cert.revoke_reason in _HOLD_REASONS and data.get('reason') not in _HOLD_REASONS:
+            raise ValueError('The certificate is on hold: approve its revocation once the hold is lifted')
+        # Revoked meanwhile: the approval is closed on the revoked certificate
+        _link_approval(approval, cert.id)
+        return {'id': cert.id, 'cn': data.get('cn'), 'serial_number': cert.serial_number,
+                'revoked': True, 'already_revoked': True}
+    reason, invalidity_at = _approved_revocation_params(data)
+    duplicate_ids = _close_duplicate_requests(approval, 'certificate_id', cert.id)
+    cert = CertificateService.revoke_certificate(
+        cert_id=cert.id, reason=reason, username=_requester_name(approval, data),
+        invalidity_at=invalidity_at)
+    cert_id, serial, msca = cert.id, cert.serial_number, cert.source == 'msca'
+    msca_local_only = False
+    if msca:
+        from services.msca.propagation import propagate_revocation, PROPAGATED
+        msca_local_only = propagate_revocation(cert, reason)[0] != PROPAGATED
+    if data.get('auth_certificate_id'):
+        # Revoked from the user certificates page: the enrolment is disabled too
+        from models import AuthCertificate
+        auth_cert = db.session.get(AuthCertificate, data['auth_certificate_id'])
+        if auth_cert is not None:
+            auth_cert.enabled = False
+    _link_duplicates(duplicate_ids, cert_id)
+    _link_approval(approval, cert_id)
+    logger.info(f"Certificate {cert_id} revoked via approval #{approval.id}")
+    return {'id': cert_id, 'cn': data.get('cn'), 'serial_number': serial,
+            'revoked': True, 'reason': reason, 'msca_local_only': msca_local_only}
+
+
+def _revoke_approved_ca(approval, data):
+    """Revoke the intermediate CA an approved 'ca_revocation' request names."""
+    from services.ca_service import CAService
+    from api.v2.cas.crud import announce_ca_revoked
+    ca = _row(CA, data.get('target_ca_id'))
+    if ca is None:
+        raise ValueError('The CA to revoke no longer exists')
+    if ca.is_revoked:
+        return {'id': None, 'ca_id': ca.id, 'cn': data.get('cn'),
+                'revoked': True, 'already_revoked': True}
+    reason, invalidity_at = _approved_revocation_params(data)
+    _close_duplicate_requests(approval, 'target_ca_id', ca.id)
+    username = _requester_name(approval, data)
+    ca, warnings = CAService.revoke_ca(ca.id, reason=reason, username=username,
+                                       invalidity_at=invalidity_at)
+    ca_id = ca.id
+    announce_ca_revoked(ca, username, reason)
+    logger.info(f"CA {ca_id} revoked via approval #{approval.id}")
+    return {'id': None, 'ca_id': ca_id, 'cn': data.get('cn'), 'revoked': True,
+            'reason': reason, 'warnings': warnings}
 
 
 def _issue_approved_certificate(approval):
@@ -291,6 +391,10 @@ def _issue_approved_certificate(approval):
         return _issue_approved_csr(approval, data)
     if approval.request_type == 'renewal':
         return _issue_approved_renewal(approval, data)
+    if approval.request_type == 'revocation':
+        return _revoke_approved_certificate(approval, data)
+    if approval.request_type == 'ca_revocation':
+        return _revoke_approved_ca(approval, data)
 
     # Resolve the template the request was made against (issue #226 semantics:
     # templates govern issuance — KU/EKU, digest, and the defaults for key
@@ -685,6 +789,22 @@ def _validated_rules(rules):
     return rules, None
 
 
+def _validated_operations(data):
+    """``(operations, error)`` from ``operations``, else from the legacy
+    ``policy_type``; operations None when the body names neither."""
+    if 'operations' in data:
+        ops = data['operations']
+        if (not isinstance(ops, list) or not ops
+                or any(not isinstance(op, str) or op not in OPERATIONS for op in ops)):
+            return None, f'operations must be a non-empty list of: {", ".join(OPERATIONS)}'
+        return ops, None
+    if 'policy_type' in data:
+        if data['policy_type'] not in OPERATIONS:
+            return None, f'policy_type must be one of: {", ".join(OPERATIONS)}'
+        return [data['policy_type']], None
+    return None, None
+
+
 @bp.route('/api/v2/policies/effective', methods=['GET'])
 @require_auth()
 def effective_policy_algorithms():
@@ -728,10 +848,13 @@ def create_policy():
     if CertificatePolicy.query.filter_by(name=data['name']).first():
         return error_response("Policy name already exists", 400)
     
+    operations, operations_error = _validated_operations(data)
+    if operations_error:
+        return error_response(operations_error, 400)
+
     policy = CertificatePolicy(
         name=data['name'],
         description=data.get('description'),
-        policy_type=data.get('policy_type', 'issuance'),
         ca_id=data.get('ca_id'),
         template_id=data.get('template_id'),
         requires_approval=data.get('requires_approval', False),
@@ -748,6 +871,7 @@ def create_policy():
         if rules_error:
             return error_response(rules_error, 400)
         policy.set_rules(rules)
+    policy.set_operations(operations or legacy_operations('issuance'))
     
     if data.get('notification_emails'):
         policy.notification_emails = json.dumps(data['notification_emails'])
@@ -782,7 +906,10 @@ def update_policy(policy_id):
         rules, rules_error = _validated_rules(data['rules'] or {})
         if rules_error:
             return error_response(rules_error, 400)
-    
+    operations, operations_error = _validated_operations(data)
+    if operations_error:
+        return error_response(operations_error, 400)
+
     # Update fields
     if 'name' in data:
         existing = CertificatePolicy.query.filter_by(name=data['name']).first()
@@ -792,8 +919,8 @@ def update_policy(policy_id):
     
     if 'description' in data:
         policy.description = data['description']
-    if 'policy_type' in data:
-        policy.policy_type = data['policy_type']
+    if operations is not None:
+        policy.set_operations(operations)
     if 'ca_id' in data:
         policy.ca_id = data['ca_id']
     if 'template_id' in data:

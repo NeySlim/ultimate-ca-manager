@@ -458,12 +458,18 @@ class LifecycleMixin:
         # certificate is not renewed (same transaction as the revocation).
         # A hold is temporary: the request waits for the unhold (approving
         # it meanwhile is refused, the certificate being revoked)
+        # A revocation waiting for approval is closed as approved by this one,
+        # unless it is a hold (the request then waits for the unhold)
         closed_requests = []
         if reason not in ('certificateHold', 'certificate_hold'):
             from services.approval_gate import request_snapshots, resolve_moot_requests
             closed_requests = request_snapshots(resolve_moot_requests(
                 'renewal', 'certificate_id', certificate.id, outcome='rejected',
                 username=username, reason='Certificate revoked', commit=False))
+            resolve_moot_requests(
+                'revocation', 'certificate_id', certificate.id, outcome='approved',
+                username=username, certificate_id=certificate.id,
+                reason='Revoked directly', commit=False)
 
         # Single atomic commit — certificate revocation + RevokedSerial
         # either both persist or both roll back.
@@ -562,6 +568,9 @@ class LifecycleMixin:
                 reason='Request deleted', commit=False))
             closed_renewal_requests = request_snapshots(resolve_moot_requests(
                 'renewal', 'certificate_id', cert_id, outcome='rejected',
+                username=username, reason='Certificate deleted', commit=False))
+            closed_renewal_requests += request_snapshots(resolve_moot_requests(
+                'revocation', 'certificate_id', cert_id, outcome='rejected',
                 username=username, reason='Certificate deleted', commit=False))
             ApprovalRequest.query.filter_by(certificate_id=cert_id).delete()
         except Exception as e:

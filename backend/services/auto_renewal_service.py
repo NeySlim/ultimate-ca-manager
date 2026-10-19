@@ -258,6 +258,23 @@ class AutoRenewalService:
             db.session.rollback()
 
     @staticmethod
+    def _held_for_approval(cert, *, already_queued: bool) -> bool:
+        """True when a policy requires approval to renew ``cert``: its
+        renewal is queued unless a request already waits for it."""
+        from services.approval_gate import certificate_scope, queue_renewal
+        from services.policy_service import PolicyEvaluationService
+        if already_queued:
+            ca_id, template_id, cn, dns = certificate_scope(cert)
+            return PolicyEvaluationService.check_approval_required(
+                ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns,
+                operation='renewal') is not None
+        _policy, approval = queue_renewal(None, cert, scheduled_by=AUTO_RENEWAL_ACTOR)
+        if approval is None:
+            return False
+        logger.info(f"Auto-renewal of cert {cert.id} queued for approval (request #{approval.id})")
+        return True
+
+    @staticmethod
     def run_auto_renewal():
         """
         Run auto-renewal for all eligible certificates.
@@ -277,7 +294,7 @@ class AutoRenewalService:
 
         # Counted before the batch: a short certificate renewed here would
         # otherwise come back as not yet due
-        stats = {'renewed': 0, 'failed': 0, 'skipped': 0, 'errors': [],
+        stats = {'renewed': 0, 'failed': 0, 'skipped': 0, 'queued': 0, 'errors': [],
                  'waiting': AutoRenewalService.waiting_certificates(config)}
         # CRLs are published once per CA after the batch — every renewal adds a
         # superseded serial that only reaches relying parties through a CRL.
@@ -310,6 +327,23 @@ class AutoRenewalService:
             if deadline is not None and valid_to is not None and deadline < valid_to:
                 logger.info(f"Auto-renewal skipped cert {cert.id}: renewal awaiting approval")
                 stats['skipped'] += 1
+                continue
+            # A policy that requires approval for renewals holds the scheduler
+            # too: the renewal is queued once, and performed on approval only
+            try:
+                held = AutoRenewalService._held_for_approval(
+                    cert, already_queued=str(cert.id) in awaiting_approval)
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Auto-renewal policy evaluation failed for cert {cert_id}: {e}",
+                             exc_info=True)
+                AutoRenewalService._log_failure(cert_id, common_name, 'Policy evaluation failed')
+                stats['failed'] += 1
+                stats['errors'].append({'cert_id': cert_id, 'common_name': common_name,
+                                        'error': 'Policy evaluation failed'})
+                continue
+            if held:
+                stats['queued'] += 1
                 continue
 
             success, result = AutoRenewalService.renew_certificate(

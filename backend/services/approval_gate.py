@@ -1,11 +1,9 @@
-"""The approval gate shared by every operator issuance path.
+"""The approval gate shared by the operator paths that issue, renew or revoke.
 
-An issuance policy with ``requires_approval`` used to be consulted by the
-issue form only: an operator signed a stored request, in bulk or one by one,
-or renewed a certificate, without any approval. The gate below evaluates the
-same policies (CA, template, name pattern scoping) for those paths and
-queues an ``ApprovalRequest`` typed after the operation, which the approval
-route then performs.
+A policy with ``requires_approval`` governs the operations it lists
+(issuance, renewal, revocation). The gate evaluates its scope (CA, template,
+name pattern) and queues an ``ApprovalRequest`` typed after the operation,
+which the approval route then performs.
 """
 
 import base64
@@ -18,7 +16,8 @@ from cryptography.x509.oid import ExtensionOID, NameOID
 
 from models import db
 from models.policy import ApprovalRequest, CertificatePolicy
-from services.policy_service import APPROVAL_REQUEST_LIFETIME, PolicyEvaluationService
+from services.policy_service import (APPROVAL_REQUEST_LIFETIME, RENEWAL_OPERATIONS,
+                                     PolicyEvaluationService)
 
 logger = logging.getLogger(__name__)
 
@@ -42,32 +41,116 @@ def certificate_identity(pem_b64: str) -> Tuple[Optional[str], list]:
 
 def queue_if_approval_required(user, *, ca_id, template_id, cn, san_list,
                                request_type: str, request_data: dict,
-                               comment: Optional[str] = None
+                               comment: Optional[str] = None,
+                               operation='issuance',
                                ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
-    """``(policy, approval)`` when a policy requires approval for this
-    request (queued), else ``(None, None)``. Administrators bypass, as on
-    the issue form. Any evaluation error propagates: the caller must fail
-    closed (never issue on a policy it could not evaluate)."""
+    """``(policy, approval)`` when a policy governing *operation* (a name or
+    a tuple of them) requires approval for this request (queued), else
+    ``(None, None)``. Administrators bypass, as on the issue form; ``user``
+    None is the renewal scheduler, which never does. Any evaluation error propagates: the caller must fail
+    closed (never act on a policy it could not evaluate)."""
     if getattr(user, 'role', None) == 'admin':
         return None, None
     policy = PolicyEvaluationService.check_approval_required(
-        ca_id=ca_id, template_id=template_id, cn=cn, san_list=list(san_list or []))
+        ca_id=ca_id, template_id=template_id, cn=cn, san_list=list(san_list or []),
+        operation=operation)
     if policy is None:
         return None, None
     approval = PolicyEvaluationService.create_approval_request(
-        policy=policy, request_data=request_data, requester_id=user.id,
-        comment=comment, request_type=request_type)
+        policy=policy, request_data=request_data,
+        requester_id=getattr(user, 'id', None), comment=comment, request_type=request_type)
     return policy, approval
 
 
+def certificate_scope(cert) -> Tuple[Optional[int], Optional[int], Optional[str], list]:
+    """``(ca_id, template_id, cn, dns_names)`` a policy scopes an issued
+    certificate by: its issuing CA (None when not held here), its template
+    and its names."""
+    from services.cert.renewal import resolve_issuing_ca
+    ca = resolve_issuing_ca(cert)
+    cn, dns = certificate_identity(cert.crt) if cert.crt else (None, [])
+    return (ca.id if ca else None), getattr(cert, 'template_id', None), cn, dns
+
+
+def queue_renewal(user, cert, *, validity_days=None, comment: Optional[str] = None,
+                  scheduled_by: Optional[str] = None
+                  ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
+    """Queue the renewal of ``cert`` when a policy requires approval for it:
+    ``(policy, approval)``, else ``(None, None)``. ``scheduled_by`` names the
+    scheduler for the requests it queues (no user, the held key re-signed),
+    which only renewal policies hold."""
+    ca_id, template_id, cn, dns = certificate_scope(cert)
+    data = {'certificate_id': cert.id, 'ca_id': ca_id, 'cn': cn,
+            'cert_type': cert.cert_type, 'validity_days': validity_days}
+    if scheduled_by:
+        data.update(trigger='auto', requested_by=scheduled_by, serial_number=cert.serial_number)
+    return queue_if_approval_required(
+        user, ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns,
+        request_type='renewal', request_data=data, comment=comment,
+        operation='renewal' if scheduled_by else RENEWAL_OPERATIONS)
+
+
+def revocation_policy_for(cert) -> Optional[CertificatePolicy]:
+    """The policy that requires approval to revoke ``cert``, whoever asks
+    (for the callers that cannot queue a request: ACME, enrolment removal)."""
+    ca_id, template_id, cn, dns = certificate_scope(cert)
+    return PolicyEvaluationService.check_approval_required(
+        ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns, operation='revocation')
+
+
+def queue_revocation(user, cert, *, reason: str, invalidity_at=None,
+                     comment: Optional[str] = None, auth_certificate_id=None
+                     ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
+    """Queue the revocation of ``cert`` when a policy requires approval for
+    it: ``(policy, approval)``, else ``(None, None)``. The serial is kept so
+    the approval revokes the certificate that was asked about, never one
+    renewed in its place."""
+    from utils.datetime_utils import utc_isoformat
+    ca_id, template_id, cn, dns = certificate_scope(cert)
+    return queue_if_approval_required(
+        user, ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns,
+        request_type='revocation', operation='revocation', comment=comment,
+        request_data={'certificate_id': cert.id, 'serial_number': cert.serial_number,
+                      'ca_id': ca_id, 'cn': cn or cert.common_name, 'reason': reason,
+                      'invalidity_at': utc_isoformat(invalidity_at) if invalidity_at else None,
+                      'auth_certificate_id': auth_certificate_id})
+
+
+def ca_certificate_serial(ca) -> Optional[str]:
+    """Decimal serial of the certificate ``ca`` holds now (the column can lag)."""
+    if not ca.crt:
+        return None
+    return str(x509.load_pem_x509_certificate(base64.b64decode(ca.crt)).serial_number)
+
+
+def queue_ca_revocation(user, ca, parent, *, reason: str, invalidity_at=None,
+                        comment: Optional[str] = None
+                        ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
+    """Queue the revocation of an intermediate CA, scoped by the ``parent``
+    whose CRL will carry it; ``(None, None)`` when no policy requires approval."""
+    from utils.datetime_utils import utc_isoformat
+    return queue_if_approval_required(
+        user, ca_id=parent.id, template_id=None, cn=ca.common_name, san_list=[],
+        request_type='ca_revocation', operation='revocation', comment=comment,
+        request_data={'target_ca_id': ca.id, 'serial_number': ca_certificate_serial(ca),
+                      'ca_id': parent.id, 'cn': ca.common_name, 'reason': reason,
+                      'invalidity_at': utc_isoformat(invalidity_at) if invalidity_at else None})
+
+
+_PAYLOAD_SUBJECTS = {'renewal': 'Certificate renewal', 'revocation': 'Certificate revocation',
+                     'ca_revocation': 'CA revocation'}
+
+
 def approval_payload(policy: CertificatePolicy, approval: ApprovalRequest) -> dict:
-    """The response body the issue form returns when a request is queued."""
+    """The response body of a request queued for approval."""
+    subject = _PAYLOAD_SUBJECTS.get(approval.request_type, 'Certificate request')
     return {
         'approval_required': True,
         'approval_id': approval.id,
+        'request_type': approval.request_type,
         'policy_name': policy.name,
         'status': 'pending_approval',
-        'message': f'Certificate request requires approval per policy "{policy.name}"',
+        'message': f'{subject} requires approval per policy "{policy.name}"',
     }
 
 

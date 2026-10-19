@@ -821,7 +821,8 @@
     "templateOverridesHint": "Diverge do modelo '{{name}}' em: {{fields}}",
     "deleteNeedsRevoke": "Este certificado ainda é válido, por isso não pode ser eliminado sozinho: desapareceria do UCM continuando a ser confiável para qualquer cliente que não verifique a revogação. Revogue-o primeiro, para que a CRL e o respondedor OCSP levem a retirada, e depois será eliminado.",
     "revokeThenDelete": "Revogar e depois eliminar",
-    "noKeyTypeAllowedByPolicy": "Nenhum tipo de chave é permitido pelas políticas desta CA e deste modelo."
+    "noKeyTypeAllowedByPolicy": "Nenhum tipo de chave é permitido pelas políticas desta CA e deste modelo.",
+    "revocationApprovalRequired": "Revogação enviada para aprovação (política: {{policy}})"
   },
   "cas": {
     "chainRevoked": "Revogada a montante",
@@ -1004,7 +1005,8 @@
     "offlineKeyFileTooLarge": "Arquivo de chave muito grande (máx. 256 KB)",
     "restorePasswordHint": "A senha usada quando a CA foi colocada offline.",
     "namedUrls": "Usar o nome da CA nas URLs de protocolo",
-    "namedUrlsHint": "Os caminhos CDP/OCSP/AIA usam um slug derivado do nome da CA em vez do id aleatório. Mais fácil de configurar manualmente; revela o nome da CA nas URLs. Também pode ser ativado mais tarde; uma vez ativado, é irreversível."
+    "namedUrlsHint": "Os caminhos CDP/OCSP/AIA usam um slug derivado do nome da CA em vez do id aleatório. Mais fácil de configurar manualmente; revela o nome da CA nas URLs. Também pode ser ativado mais tarde; uma vez ativado, é irreversível.",
+    "revocationApprovalRequired": "Revogação da CA enviada para aprovação (política: {{policy}})"
   },
   "csrs": {
     "uploadCSR": "Carregar CSR",
@@ -3975,7 +3977,19 @@
     "title": "Solicitações de Aprovação",
     "total": "Total",
     "certificateRequest": "Solicitação de certificado",
-    "certificateIssued": "Certificado emitido com sucesso"
+    "certificateIssued": "Certificado emitido com sucesso",
+    "requestType": {
+      "certificate": "Certificado",
+      "csr": "Assinatura de CSR",
+      "renewal": "Renovação",
+      "revocation": "Revogação",
+      "ca_revocation": "Revogação de CA"
+    },
+    "revocationPerformed": "Aprovada: a revogação foi executada",
+    "summarySerial": "Número de série",
+    "summaryInvalidity": "Data de invalidade",
+    "summaryTrigger": "Solicitada por",
+    "triggerScheduler": "Agendador de renovação"
   },
   "messages": {
     "confirm": {
@@ -4287,7 +4301,16 @@
     },
     "allowedDigests": "Hashes de Assinatura Permitidos",
     "allowedKeyTypesHelp": "Nenhum selecionado: qualquer tipo de chave é permitido.",
-    "allowedDigestsHelp": "Nenhum selecionado: qualquer hash é permitido."
+    "allowedDigestsHelp": "Nenhum selecionado: qualquer hash é permitido.",
+    "operations": "Operações",
+    "operationHelp": {
+      "issuance": "O formulário de emissão, a assinatura de CSR e em lote, e as renovações feitas por um operador",
+      "renewal": "Renovações por um operador, uma ou em lote, e pelo agendador, que então coloca a sua renovação na fila",
+      "revocation": "Revogações de certificados e de CAs intermédias por um operador; recusadas via ACME, que não pode aguardar uma decisão"
+    },
+    "operationsRequired": "Selecione pelo menos uma operação",
+    "noOperation": "Nenhuma operação",
+    "rulesRevocationOnly": "As regras aplicam-se apenas à emissão e à renovação: uma política de revogação é delimitada pela sua CA, modelo e padrão DNS."
   },
   "reports": {
     "complianceReport": "Relatório de Conformidade",

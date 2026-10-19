@@ -459,7 +459,7 @@ def renew_certificate_in_place(
         orig_duration = orig_cert.not_valid_after_utc - orig_cert.not_valid_before_utc
         validity_days = orig_duration.days if orig_duration.days > 0 else DEFAULT_RENEWAL_DAYS
     validity_days = min(validity_days, MAX_RENEWAL_DAYS)
-    # Issuance policy rules (#335) bind a renewal as they bind an issuance
+    # The rules (#335) of the issuance and renewal policies bind a renewal
     from services.policy_service import PolicyEvaluationService
     cn_attrs = orig_cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
     try:
@@ -467,11 +467,11 @@ def renew_certificate_in_place(
             ExtensionOID.SUBJECT_ALTERNATIVE_NAME).value.get_values_for_type(x509.DNSName))
     except x509.ExtensionNotFound:
         orig_dns = []
-    from services.policy_service import key_label_for_public_key
+    from services.policy_service import RENEWAL_OPERATIONS, key_label_for_public_key
     requested_validity = validity_days
     policies = PolicyEvaluationService.applicable_policies(
         ca.id, getattr(cert, 'template_id', None),
-        cn_attrs[0].value if cn_attrs else None, orig_dns)
+        cn_attrs[0].value if cn_attrs else None, orig_dns, operation=RENEWAL_OPERATIONS)
     violations, validity_days, capped_by = PolicyEvaluationService.enforce_rules(
         policies, key_type=key_label_for_public_key(orig_pub_key),
         dns_name_count=len(set(orig_dns)), validity_days=validity_days)

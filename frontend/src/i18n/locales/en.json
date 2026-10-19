@@ -821,7 +821,8 @@
     "templateOverridesHint": "Diverges from template '{{name}}' on: {{fields}}",
     "deleteNeedsRevoke": "This certificate is still valid, so it cannot be deleted on its own: deleting it would remove it from UCM while it stays trusted by every client that does not check revocation. Revoke it first, so the CRL and the OCSP responder carry the withdrawal, and it is then deleted.",
     "revokeThenDelete": "Revoke, then delete",
-    "noKeyTypeAllowedByPolicy": "No key type is allowed by the policies of this CA and template."
+    "noKeyTypeAllowedByPolicy": "No key type is allowed by the policies of this CA and template.",
+    "revocationApprovalRequired": "Revocation submitted for approval (policy: {{policy}})"
   },
   "cas": {
     "chainRevoked": "Revoked upstream",
@@ -1004,7 +1005,8 @@
     "offlineKeyFileTooLarge": "Key file is too large (max 256 KB)",
     "restorePasswordHint": "The password used when the CA was taken offline.",
     "namedUrls": "Use CA name in protocol URLs",
-    "namedUrlsHint": "CDP/OCSP/AIA paths use a slug from the CA name instead of the random id. Easier to configure manually; reveals the CA name in URLs. Can also be enabled later; once enabled it cannot be undone."
+    "namedUrlsHint": "CDP/OCSP/AIA paths use a slug from the CA name instead of the random id. Easier to configure manually; reveals the CA name in URLs. Can also be enabled later; once enabled it cannot be undone.",
+    "revocationApprovalRequired": "CA revocation submitted for approval (policy: {{policy}})"
   },
   "csrs": {
     "uploadCSR": "Upload CSR",
@@ -3982,7 +3984,16 @@
     },
     "allowedDigests": "Allowed Signature Hashes",
     "allowedKeyTypesHelp": "None selected: any key type is allowed.",
-    "allowedDigestsHelp": "None selected: any hash is allowed."
+    "allowedDigestsHelp": "None selected: any hash is allowed.",
+    "operations": "Operations",
+    "operationHelp": {
+      "issuance": "The issue form, CSR signing and bulk signing, and the renewals an operator performs",
+      "renewal": "Renewals by an operator, one or in bulk, and by the scheduler, which then queues its renewal",
+      "revocation": "Revocations of certificates and intermediate CAs by an operator; refused over ACME, which cannot wait for a decision"
+    },
+    "operationsRequired": "Select at least one operation",
+    "noOperation": "No operation",
+    "rulesRevocationOnly": "Rules apply to issuance and renewal only: a revocation policy is scoped by its CA, template and DNS pattern."
   },
   "approvals": {
     "title": "Approval Requests",
@@ -4023,7 +4034,19 @@
     "searchPlaceholder": "Search requests...",
     "loadFailed": "Failed to load approval requests",
     "certificateRequest": "Certificate Request",
-    "certificateIssued": "Certificate issued successfully"
+    "certificateIssued": "Certificate issued successfully",
+    "requestType": {
+      "certificate": "Certificate",
+      "csr": "CSR signing",
+      "renewal": "Renewal",
+      "revocation": "Revocation",
+      "ca_revocation": "CA revocation"
+    },
+    "revocationPerformed": "Approved: the revocation was performed",
+    "summarySerial": "Serial number",
+    "summaryInvalidity": "Invalidity date",
+    "summaryTrigger": "Requested by",
+    "triggerScheduler": "Renewal scheduler"
   },
   "reports": {
     "title": "Reports",

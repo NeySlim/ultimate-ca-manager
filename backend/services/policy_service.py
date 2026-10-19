@@ -15,9 +15,18 @@ import fips_mode
 
 logger = logging.getLogger(__name__)
 
+# A renewal an operator performs re-issues the certificate: issuance
+# policies have bound it since 2.228, renewal policies bind it too. The
+# scheduler is held by renewal policies only.
+RENEWAL_OPERATIONS = ('issuance', 'renewal')
+
 # A request waits this long for a decision (a stored request without an
 # expiry, from a restored backup, is given the same lifetime)
 APPROVAL_REQUEST_LIFETIME = timedelta(days=7)
+
+
+_REQUEST_LABELS = {'renewal': 'Renewal', 'revocation': 'Revocation',
+                   'ca_revocation': 'CA revocation'}
 
 
 class PolicyViolation(ValueError):
@@ -100,54 +109,18 @@ class PolicyEvaluationService:
     """Evaluates certificate requests against policies"""
 
     @staticmethod
-    def check_approval_required(ca_id: int, template_id: int = None,
-                                cn: str = None, san_list: list = None) -> Optional[CertificatePolicy]:
-        """
-        Check if any active policy requires approval for this CA/template/request.
-        
-        Also evaluates policy rules against the actual request:
-        - san_restrictions.dns_pattern: only matches if CN or a SAN matches the pattern
-        
-        Returns the matching policy if approval is required, None otherwise.
-        Policies are checked by priority (lower number = higher priority).
-        """
-        query = CertificatePolicy.query.filter_by(
-            is_active=True,
-            requires_approval=True,
-            policy_type='issuance'
-        ).order_by(CertificatePolicy.priority.asc())
-
-        policies = query.all()
-        
-        for policy in policies:
-            # Check CA scope
-            if policy.ca_id is not None and policy.ca_id != ca_id:
-                continue
-            # Check template scope
-            if policy.template_id is not None and policy.template_id != template_id:
-                continue
-            # Check rules-based filtering (e.g. wildcard pattern)
-            if not PolicyEvaluationService._matches_rules(policy, cn, san_list):
-                continue
-            return policy
-        
-        return None
-
-    @staticmethod
-    def applicable_policies(ca_id: int, template_id: int = None,
-                            cn: str = None, san_list: list = None) -> list:
-        """Active issuance policies whose scope covers this request (#335).
-
-        Same CA / template / dns_pattern scoping as ``check_approval_required``
-        but regardless of ``requires_approval``: a policy's Rules bind every
-        request in its scope, not only the ones routed through approval.
-        Ordered by priority (lower number first), the system policies first.
-        """
-        query = CertificatePolicy.query.filter_by(
-            is_active=True, policy_type='issuance'
-        ).order_by(CertificatePolicy.priority.asc())
+    def _in_scope(operation, ca_id, template_id, cn, san_list, *, approval: bool) -> list:
+        """Active policies governing *operation* (a name or a tuple of them)
+        whose CA, template and name pattern cover the request, by priority
+        (lower number first)."""
+        operations = (operation,) if isinstance(operation, str) else tuple(operation)
+        query = CertificatePolicy.query.filter_by(is_active=True)
+        if approval:
+            query = query.filter_by(requires_approval=True)
         matching = []
-        for policy in query.all():
+        for policy in query.order_by(CertificatePolicy.priority.asc()).all():
+            if not any(policy.applies_to(op) for op in operations):
+                continue
             if policy.ca_id is not None and policy.ca_id != ca_id:
                 continue
             if policy.template_id is not None and policy.template_id != template_id:
@@ -155,7 +128,32 @@ class PolicyEvaluationService:
             if not PolicyEvaluationService._matches_rules(policy, cn, san_list):
                 continue
             matching.append(policy)
-        return with_system_policies(matching)
+        return matching
+
+    @staticmethod
+    def check_approval_required(ca_id: int, template_id: int = None,
+                                cn: str = None, san_list: list = None,
+                                operation='issuance') -> Optional[CertificatePolicy]:
+        """The first active policy governing *operation* that requires
+        approval for this CA / template / name (dns_pattern), None otherwise.
+        For a revocation or renewal, *ca_id* is the issuing CA."""
+        matching = PolicyEvaluationService._in_scope(
+            operation, ca_id, template_id, cn, san_list, approval=True)
+        return matching[0] if matching else None
+
+    @staticmethod
+    def applicable_policies(ca_id: int, template_id: int = None,
+                            cn: str = None, san_list: list = None,
+                            operation='issuance') -> list:
+        """Active policies governing *operation* whose scope covers this request (#335).
+
+        Same CA / template / dns_pattern scoping as ``check_approval_required``
+        but regardless of ``requires_approval``: a policy's Rules bind every
+        request in its scope, not only the ones routed through approval.
+        Ordered by priority (lower number first), the system policies first.
+        """
+        return with_system_policies(PolicyEvaluationService._in_scope(
+            operation, ca_id, template_id, cn, san_list, approval=False))
 
     @staticmethod
     def enforce_rules(policies: list, *, key_type=None, dns_name_count=None,
@@ -334,7 +332,7 @@ class PolicyEvaluationService:
     def create_approval_request(
         policy: CertificatePolicy,
         request_data: dict,
-        requester_id: int,
+        requester_id: Optional[int],
         comment: str = None,
         request_type: str = 'certificate',
     ) -> ApprovalRequest:
@@ -355,7 +353,7 @@ class PolicyEvaluationService:
             policy_id=policy.id,
             requester_id=requester_id,
             requester_comment=comment or (
-                f"{'Renewal' if request_type == 'renewal' else 'Certificate'} request: "
+                f"{_REQUEST_LABELS.get(request_type, 'Certificate')} request: "
                 f"{request_data.get('cn', 'unknown')}"),
             request_data=json.dumps(request_data),
             required_approvals=policy.min_approvers or 1,
@@ -366,7 +364,7 @@ class PolicyEvaluationService:
             db.session.commit()
         except Exception as _commit_err:
             db.session.rollback()
-            logger.error(f"Commit failed in services/policy_service.py:118: {_commit_err}", exc_info=True)
+            logger.error(f"Failed to queue approval request: {_commit_err}", exc_info=True)
             raise
         
         logger.info(

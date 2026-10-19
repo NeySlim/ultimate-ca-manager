@@ -142,7 +142,15 @@ def certificate_row_for(auth_cert) -> Optional[Certificate]:
 REMOVAL_REASON = 'cessationOfOperation'
 
 
-def remove_enrolment(auth_cert, username: str = 'system'):
+def _revocation_held(auth_cert, actor) -> bool:
+    """Whether the revocation policies apply: removing one's own enrolment
+    stays a single gesture, administrators bypass, anyone else is gated."""
+    if actor is None or getattr(actor, 'role', None) == 'admin':
+        return False
+    return auth_cert.user_id != getattr(actor, 'id', None)
+
+
+def remove_enrolment(auth_cert, username: str = 'system', actor=None):
     """Revoke the certificate an enrolment names, then delete both.
 
     Returns ``(True, None)`` or ``(False, response)``. Deleting the
@@ -167,6 +175,18 @@ def remove_enrolment(auth_cert, username: str = 'system'):
         and not certificate.revoked
         and (not certificate.valid_to or certificate.valid_to >= utc_now())
     )
+    if needs_revoking and _revocation_held(auth_cert, actor):
+        try:
+            from services.approval_gate import revocation_policy_for
+            policy = revocation_policy_for(certificate)
+        except Exception as error:
+            logger.error('Enrolment %s: policy evaluation failed: %s', auth_cert.id, error)
+            return False, error_response(
+                'Policy evaluation failed; the enrolment was not removed', 500)
+        if policy is not None:
+            return False, error_response(
+                f'Revoking this certificate requires approval per policy "{policy.name}": '
+                'request its revocation, then remove the enrolment once it is revoked', 409)
     if needs_revoking:
         try:
             CertificateService.revoke_certificate(

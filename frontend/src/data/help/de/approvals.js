@@ -19,6 +19,8 @@ export default {
           { label: 'Ausstellungsformular', text: 'Eine Zertifikatsanfrage, die einer Richtlinie mit Genehmigungspflicht entspricht' },
           { label: 'CSR signieren und Massensignierung', text: 'Das Signieren einer gespeicherten Anfrage, einzeln oder aus Operationen, wird auf dieselbe Weise eingereiht; die Genehmigung führt die Signierung aus' },
           { label: 'Erneuerung', text: 'Das Erneuern eines Zertifikats, einzeln oder in Masse, wird ebenfalls eingereiht; eine Erneuerung, die nicht ausgeführt werden könnte (widerrufen, Schlüssel nicht vom Server gehalten), wird sofort abgelehnt' },
+          { label: 'Widerruf', text: 'Das Widerrufen eines Zertifikats (einzeln, in Masse, aus den Benutzerzertifikaten) oder einer Zwischen-CA unter einer Widerrufsrichtlinie wird eingereiht; die Genehmigung widerruft mit dem angegebenen Grund' },
+          { label: 'Planer', text: 'Unter einer Erneuerungsrichtlinie reiht der Planer die Erneuerung ein; die Genehmigung signiert den vom Server gehaltenen Schlüssel neu, wie es der Planer getan hätte' },
           { label: 'Administratoren', text: 'Umgehen die Warteschlange auf jedem Pfad, wie im Ausstellungsformular' },
         ]
       },
@@ -29,13 +31,14 @@ export default {
           { label: 'Gelöscht oder widerrufen', text: 'Eine Anfrage, deren Ziel gelöscht oder widerrufen wurde, wird als abgelehnt geschlossen; bei „Zertifikat gesperrt" wartet die Erneuerungsanfrage, bis die Sperre aufgehoben wird' },
           { label: 'Bereits erfüllt', text: 'Das Genehmigen einer bereits erfüllten Anfrage schließt sie auf dem vorhandenen Zertifikat; das Genehmigen einer von mehreren Anfragen für dasselbe Ziel schließt die anderen als von Ihnen genehmigt' },
           { label: 'Ziel nicht mehr vorhanden', text: 'Das Genehmigen einer Anfrage, deren gespeicherte Anfrage, Zertifikat oder CA nicht mehr existiert, schließt sie als abgelehnt' },
+          { label: 'Zwischenzeitlich widerrufen oder erneuert', text: 'Ein eingereihter Widerruf, dessen Zertifikat direkt widerrufen wurde, wird als genehmigt geschlossen; einer, dessen Zertifikat seither erneuert wurde, wird bei der Genehmigung als abgelehnt geschlossen' },
           { label: 'Frist', text: 'Eine Anfrage wartet sieben Tage; danach wird sie als abgelaufen geschlossen, nie als ausstehend gezählt, und der Erneuerungsplaner nimmt die Arbeit für ihr Zertifikat wieder auf' },
         ]
       },
     ],
     tips: [
       'Jede einzelne Ablehnung stoppt die Genehmigung sofort: dies ist aus Sicherheitsgründen beabsichtigt.',
-      'Während eine Erneuerung auf Genehmigung wartet, überlässt der Planer das Zertifikat dieser Entscheidung, solange sie vor dem Ablauf des Zertifikats fallen kann.',
+      'Während eine Erneuerung auf Genehmigung wartet, überlässt der Planer das Zertifikat dieser Entscheidung, solange sie vor dem Ablauf des Zertifikats fallen kann; unter einer Erneuerungsrichtlinie erneuert er nie ohne eine solche.',
       'Genehmigungskommentare werden im Audit-Trail für die Compliance protokolliert.',
     ],
   },
@@ -64,6 +67,8 @@ Die Anfrage wurde nicht innerhalb von sieben Tagen entschieden. Abgelaufene Anfr
 Neben dem Ausstellungsformular reiht eine Richtlinie mit Genehmigungspflicht auch ein:
 - **CSR signieren** und **Massensignierung** aus Operationen: die Genehmigung führt die Signierung aus
 - **Erneuern** und **Massenerneuerung**: die Genehmigung führt die Erneuerung aus; eine Erneuerung, die nicht ausgeführt werden könnte (widerrufenes Zertifikat, Schlüssel nicht vom Server gehalten), wird sofort abgelehnt statt eingereiht
+- **Widerrufen** (ein Zertifikat, in Masse, ein Benutzerzertifikat, eine Zwischen-CA) unter einer Widerrufsrichtlinie: die Genehmigung widerruft mit dem angegebenen Grund und Ungültigkeitsdatum, nach erneuter Prüfung (ein seit der Anfrage erneuertes Zertifikat wird nicht widerrufen)
+- Der **Erneuerungsplaner** unter einer Erneuerungsrichtlinie: er reiht die Erneuerung einmal ein, und die Genehmigung führt sie aus, wie es der Planer getan hätte
 
 Administratoren umgehen die Warteschlange auf jedem Pfad.
 
@@ -72,11 +77,12 @@ Administratoren umgehen die Warteschlange auf jedem Pfad.
 - Eine Anfrage, deren Ziel **gelöscht oder widerrufen** wurde, wird als abgelehnt geschlossen; bei „Zertifikat gesperrt" wartet die Erneuerungsanfrage, bis die Sperre aufgehoben wird
 - Das Genehmigen einer **bereits erfüllten** Anfrage schließt sie auf dem vorhandenen Zertifikat; das Genehmigen einer von mehreren Anfragen für dasselbe Ziel schließt die anderen als von Ihnen genehmigt
 - Das Genehmigen einer Anfrage, deren gespeicherte Anfrage, Zertifikat oder CA **nicht mehr existiert**, schließt sie als abgelehnt
+- Ein eingereihter Widerruf, dessen Zertifikat **direkt widerrufen** wurde, wird als genehmigt geschlossen; einer, dessen Zertifikat seither **erneuert** wurde, wird bei der Genehmigung als abgelehnt geschlossen; während einer Zertifikatssperre wartet er, bis die Sperre aufgehoben wird
 
 Webhooks werden über diese Schließungen wie über eine Ablehnung informiert.
 
 ## Frist
-Eine Anfrage wartet **sieben Tage** auf eine Entscheidung. Danach wird sie als abgelaufen geschlossen, nie als ausstehend gezählt, und der Erneuerungsplaner nimmt die Arbeit für ihr Zertifikat wieder auf. Während eine Erneuerung auf Genehmigung wartet, überlässt der Planer das Zertifikat dieser Entscheidung, solange sie vor dem Ablauf des Zertifikats fallen kann.
+Eine Anfrage wartet **sieben Tage** auf eine Entscheidung. Danach wird sie als abgelaufen geschlossen, nie als ausstehend gezählt, und der Erneuerungsplaner nimmt die Arbeit für ihr Zertifikat wieder auf. Während eine Erneuerung auf Genehmigung wartet, überlässt der Planer das Zertifikat dieser Entscheidung, solange sie vor dem Ablauf des Zertifikats fallen kann; unter einer Erneuerungsrichtlinie erneuert er nie ohne eine solche.
 
 ## Eine Anfrage genehmigen
 

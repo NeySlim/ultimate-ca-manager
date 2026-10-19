@@ -19,6 +19,8 @@ export default {
           { label: 'Formulario de emisión', text: 'Una solicitud de certificado que coincide con una política que requiere aprobación' },
           { label: 'Firmar CSR y firma masiva', text: 'Firmar una solicitud almacenada, sola o desde Operaciones, se encola del mismo modo; la aprobación realiza la firma' },
           { label: 'Renovación', text: 'Renovar un certificado, solo o de forma masiva, también se encola; una renovación que no podría atenderse (revocado, clave no en poder del servidor) se rechaza de inmediato' },
+          { label: 'Revocación', text: 'Revocar un certificado (solo, de forma masiva, desde los certificados de usuario) o una CA intermedia bajo una política de revocación se encola; la aprobación revoca con el motivo indicado' },
+          { label: 'Planificador', text: 'Bajo una política de renovación el planificador encola la renovación; la aprobación vuelve a firmar la clave que conserva el servidor, como habría hecho el planificador' },
           { label: 'Administradores', text: 'Omiten la cola en todas las rutas, como en el formulario de emisión' },
         ]
       },
@@ -29,13 +31,14 @@ export default {
           { label: 'Eliminado o revocado', text: 'Una solicitud cuyo objetivo fue eliminado o revocado se cierra como rechazada; una suspensión de certificado mantiene la solicitud de renovación en espera hasta que se levante la suspensión' },
           { label: 'Ya satisfecha', text: 'Aprobar una solicitud ya atendida la cierra sobre el certificado existente; aprobar una de varias solicitudes para el mismo objetivo cierra las demás como aprobadas por ti' },
           { label: 'Objetivo desaparecido', text: 'Aprobar una solicitud cuya solicitud almacenada, certificado o CA ya no existe la cierra como rechazada' },
+          { label: 'Revocada o renovada entretanto', text: 'Una revocación en cola cuyo certificado se revocó directamente se cierra como aprobada; si el certificado se renovó desde entonces, se cierra como rechazada al aprobarla' },
           { label: 'Fecha límite', text: 'Una solicitud espera siete días; pasado ese plazo se cierra como expirada, nunca se cuenta como pendiente y el planificador de renovaciones se reanuda para su certificado' },
         ]
       },
     ],
     tips: [
       'Cualquier rechazo individual detiene inmediatamente la aprobación: esto es intencional por seguridad.',
-      'Mientras una renovación espera aprobación, el planificador deja el certificado a esa decisión, siempre que pueda llegar antes de que expire el certificado.',
+      'Mientras una renovación espera aprobación, el planificador deja el certificado a esa decisión, siempre que pueda llegar antes de que expire el certificado; bajo una política de renovación nunca renueva sin una.',
       'Los comentarios de aprobación se registran en la pista de auditoría para cumplimiento normativo.',
     ],
   },
@@ -64,6 +67,8 @@ La solicitud no fue decidida en siete días. Las solicitudes expiradas deben ser
 Más allá del formulario de emisión, una política que requiere aprobación también encola:
 - **Firmar CSR** y **firma masiva** desde Operaciones: la aprobación realiza la firma
 - **Renovar** y **renovación masiva**: la aprobación realiza la renovación; una renovación que no podría atenderse (certificado revocado, clave no en poder del servidor) se rechaza de inmediato en lugar de encolarse
+- **Revocar** (un certificado, de forma masiva, un certificado de usuario, una CA intermedia) bajo una política de revocación: la aprobación revoca con el motivo y la fecha de invalidez indicados, tras una nueva comprobación (un certificado renovado desde la solicitud no se revoca)
+- El **planificador de renovaciones**, bajo una política de renovación: encola la renovación una sola vez y la aprobación la realiza como lo habría hecho el planificador
 
 Los administradores omiten la cola en todas las rutas.
 
@@ -72,11 +77,12 @@ Los administradores omiten la cola en todas las rutas.
 - Una solicitud cuyo objetivo fue **eliminado o revocado** se cierra como rechazada; una suspensión de certificado mantiene la solicitud de renovación en espera hasta que se levante la suspensión
 - Aprobar una solicitud **ya satisfecha** la cierra sobre el certificado existente; aprobar una de varias solicitudes para el mismo objetivo cierra las demás como aprobadas por ti
 - Aprobar una solicitud cuya solicitud almacenada, certificado o CA **ya no existe** la cierra como rechazada
+- Una revocación en cola cuyo certificado fue **revocado directamente** se cierra como aprobada; si el certificado fue **renovado** desde entonces, se cierra como rechazada al aprobarla; durante una suspensión de certificado espera a que se levante
 
 Los webhooks reciben aviso de estos cierres igual que de un rechazo.
 
 ## Fecha límite
-Una solicitud espera **siete días** una decisión. Pasado ese plazo se cierra como expirada, nunca se cuenta como pendiente y el planificador de renovaciones se reanuda para su certificado. Mientras una renovación espera aprobación, el planificador deja el certificado a esa decisión, siempre que pueda llegar antes de que expire el certificado.
+Una solicitud espera **siete días** una decisión. Pasado ese plazo se cierra como expirada, nunca se cuenta como pendiente y el planificador de renovaciones se reanuda para su certificado. Mientras una renovación espera aprobación, el planificador deja el certificado a esa decisión, siempre que pueda llegar antes de que expire el certificado; bajo una política de renovación nunca renueva sin una.
 
 ## Aprobar una solicitud
 

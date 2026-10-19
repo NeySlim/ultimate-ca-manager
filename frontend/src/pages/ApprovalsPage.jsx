@@ -19,6 +19,20 @@ import { useOpenEntity } from '../hooks/useOpenEntity'
 import { formatDate, cn } from '../lib/utils'
 import { showNotices } from '../lib/notices'
 
+// What a request asks for: labels resolved via t() inside component
+const REQUEST_TYPES = {
+  certificate: { labelKey: 'approvals.requestType.certificate', variant: 'info' },
+  csr: { labelKey: 'approvals.requestType.csr', variant: 'info' },
+  renewal: { labelKey: 'approvals.requestType.renewal', variant: 'success' },
+  revocation: { labelKey: 'approvals.requestType.revocation', variant: 'danger' },
+  ca_revocation: { labelKey: 'approvals.requestType.ca_revocation', variant: 'danger' },
+}
+
+function RequestTypeBadge({ type, t }) {
+  const known = REQUEST_TYPES[type]
+  return <Badge variant={known?.variant || 'default'}>{known ? t(known.labelKey) : type}</Badge>
+}
+
 const STATUS_VARIANTS = {
   pending: 'warning',
   approved: 'success',
@@ -121,9 +135,7 @@ export default function ApprovalsPage() {
       sortable: true,
       render: (val, row) => (
         <div>
-          <Badge variant={val === 'certificate' ? 'info' : val === 'revocation' ? 'danger' : 'default'}>
-            {val}
-          </Badge>
+          <RequestTypeBadge type={val} t={t} />
           {row.request_summary?.cn && (
             <div className="text-xs text-text-muted mt-0.5 font-mono truncate max-w-48">{row.request_summary.cn}</div>
           )}
@@ -210,7 +222,9 @@ export default function ApprovalsPage() {
       let result
       if (type === 'approve') {
         result = await approvalsService.approve(req.id, comment || undefined)
-        if (result?.data?.certificate_issued) {
+        if (result?.data?.certificate_issued && result.data.certificate?.revoked) {
+          showSuccess(t('approvals.revocationPerformed'))
+        } else if (result?.data?.certificate_issued) {
           showSuccess(t('approvals.certificateIssued'))
           showNotices(result, showWarning)
         } else if (result?.data?.request_closed) {
@@ -251,9 +265,7 @@ export default function ApprovalsPage() {
         <Badge variant={STATUS_VARIANTS[selectedRequest.status]} size="lg">
           {selectedRequest.status}
         </Badge>
-        <Badge variant={['certificate', 'csr', 'renewal'].includes(selectedRequest.request_type) ? 'info' : 'danger'}>
-          {selectedRequest.request_type}
-        </Badge>
+        <RequestTypeBadge type={selectedRequest.request_type} t={t} />
       </div>
 
       {/* Request Info */}
@@ -270,12 +282,40 @@ export default function ApprovalsPage() {
               <div className="text-text-primary font-mono">
                 {selectedRequest.request_summary.csr_id
                   ? `CSR #${selectedRequest.request_summary.csr_id}`
-                  : selectedRequest.request_summary.certificate_id
+                  : selectedRequest.request_summary.target_ca_id
+                    ? `CA #${selectedRequest.request_summary.target_ca_id}`
+                    : selectedRequest.request_summary.certificate_id
                     ? `#${selectedRequest.request_summary.certificate_id}`
                     : (selectedRequest.request_summary.cn || '—')}
-                {selectedRequest.request_summary.cn && (selectedRequest.request_summary.csr_id || selectedRequest.request_summary.certificate_id)
+                {selectedRequest.request_summary.cn && (selectedRequest.request_summary.csr_id || selectedRequest.request_summary.certificate_id || selectedRequest.request_summary.target_ca_id)
                   ? ` (${selectedRequest.request_summary.cn})` : ''}
               </div>
+              {selectedRequest.request_summary.serial_number && (
+                <>
+                  <div className="text-text-muted">{t('approvals.summarySerial')}</div>
+                  <div className="text-text-primary font-mono break-all">{selectedRequest.request_summary.serial_number}</div>
+                </>
+              )}
+              {selectedRequest.request_summary.reason && (
+                <>
+                  <div className="text-text-muted">{t('revocation.reasonLabel')}</div>
+                  <div className="text-text-primary">
+                    {t(`revocation.reasons.${selectedRequest.request_summary.reason}`, selectedRequest.request_summary.reason)}
+                  </div>
+                </>
+              )}
+              {selectedRequest.request_summary.invalidity_at && (
+                <>
+                  <div className="text-text-muted">{t('approvals.summaryInvalidity')}</div>
+                  <div className="text-text-primary">{formatDate(selectedRequest.request_summary.invalidity_at)}</div>
+                </>
+              )}
+              {selectedRequest.request_summary.trigger === 'auto' && (
+                <>
+                  <div className="text-text-muted">{t('approvals.summaryTrigger')}</div>
+                  <div className="text-text-primary">{t('approvals.triggerScheduler')}</div>
+                </>
+              )}
               {selectedRequest.request_summary.validity_days && (
                 <>
                   <div className="text-text-muted">{t('approvals.summaryValidity')}</div>
@@ -387,7 +427,7 @@ export default function ApprovalsPage() {
         onStatClick={(stat) => setStatusFilter(stat.filterValue || 'pending')}
         helpPageKey="approvals"
         slideOverOpen={!!selectedRequest}
-        slideOverTitle={selectedRequest ? `#${selectedRequest.id}: ${selectedRequest.request_type}` : ''}
+        slideOverTitle={selectedRequest ? `#${selectedRequest.id}: ${REQUEST_TYPES[selectedRequest.request_type] ? t(REQUEST_TYPES[selectedRequest.request_type].labelKey) : selectedRequest.request_type}` : ''}
         slideOverContent={slideOverContent}
         onSlideOverClose={() => setSelectedRequest(null)}
         loading={loading}
