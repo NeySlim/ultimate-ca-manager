@@ -12,6 +12,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from models import CA, Certificate, db
+from models.certificate_template import CertificateTemplate
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
 from .helpers import get_ca_cert_pem
@@ -89,7 +90,8 @@ class CASigningMixin:
                 own configured EKUs (e.g. Smartcard Logon) that a CSR-EKU
                 cap keyed off cert_type could otherwise never let through.
             policy_template_id: template scoping the issuance policies (the
-                WSTEP matched template), none for EST.
+                WSTEP matched template), none for EST; its SAN types bind
+                the request's names.
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -135,6 +137,8 @@ class CASigningMixin:
             extra_ekus=extra_ekus,
             policy_scope={'ca_id': ca.id, 'template_id': policy_template_id,
                           'digest_explicit': False},
+            san_template=(db.session.get(CertificateTemplate, policy_template_id)
+                          if policy_template_id else None),
         )
 
         # Extract serial number

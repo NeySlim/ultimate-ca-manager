@@ -90,6 +90,12 @@ class LifecycleMixin:
                     validity_days = template.validity_days or validity_days
                 if digest is None:
                     digest = template.digest or digest
+                from services.template_service import bucket_san_refusal
+                san_refusal = bucket_san_refusal(template, {
+                    'san_dns': san_dns, 'san_ip': san_ip, 'san_uri': san_uri, 'san_email': san_email})
+                if san_refusal:
+                    from services.policy_service import PolicyViolation
+                    raise PolicyViolation(san_refusal)
 
         if key_type is None:
             key_type = '2048'

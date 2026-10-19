@@ -992,6 +992,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
               </label>
             ))}
           </div>
+          <p className="text-xs text-text-secondary mt-1">{t('templates.sanTypesHint')}</p>
         </div>
       </div>
 

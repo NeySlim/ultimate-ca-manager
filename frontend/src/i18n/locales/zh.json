@@ -1151,6 +1151,8 @@
     "systemNotDeletable": "系统模板无法删除。",
     "defaultValidity": "默认有效期 (天)",
     "maxValidityHint": "如需限制使用此模板签发的证书的有效期，请使用签发策略（策略，最长有效期）。",
+    "sanTypesHint": "使用此模板的请求可包含的名称类型；包含其他类型的请求将被拒绝。未勾选任何项：允许所有类型。",
+    "sanTypesAny": "任意类型",
     "certsIssued": "{{count}} 个证书",
     "certificatesIssued": "已颁发 {{count}} 个证书",
     "basicInfo": "基本信息",

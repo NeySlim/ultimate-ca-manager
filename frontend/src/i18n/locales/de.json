@@ -1151,6 +1151,8 @@
     "systemNotDeletable": "Systemvorlagen können nicht gelöscht werden.",
     "defaultValidity": "Standard-Gültigkeit (Tage)",
     "maxValidityHint": "Um die Gültigkeit der mit dieser Vorlage ausgestellten Zertifikate zu begrenzen, verwenden Sie eine Ausstellungsrichtlinie (Richtlinien, maximale Gültigkeit).",
+    "sanTypesHint": "Namenstypen, die eine Anfrage mit dieser Vorlage enthalten darf; eine Anfrage mit einem anderen Typ wird abgelehnt. Nichts ausgewählt: alle Typen sind erlaubt.",
+    "sanTypesAny": "Alle Typen",
     "certsIssued": "{{count}} Zerts",
     "certificatesIssued": "{{count}} Zertifikate ausgestellt",
     "basicInfo": "Grundinformationen",

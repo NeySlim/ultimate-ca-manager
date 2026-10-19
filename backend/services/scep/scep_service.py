@@ -1193,7 +1193,20 @@ class SCEPService:
             key_type=key_label_for_public_key(csr.public_key()))
         limit_violations, _, _ = PolicyEvaluationService.enforce_rules(
             policies, dns_name_count=len(dns))
-        return sign_hash, list(violations) + limit_violations
+        return sign_hash, list(violations) + limit_violations + self._san_type_violations(csr)
+
+    def _san_type_violations(self, csr):
+        """The profile template's refusal of the CSR's SAN types, as a list."""
+        from services.template_service import allowed_san_types, san_type_of, san_type_refusal
+        if self.template is None:
+            return []
+        try:
+            names = csr.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_ALTERNATIVE_NAME).value
+        except x509.ExtensionNotFound:
+            return []
+        refusal = san_type_refusal(allowed_san_types(self.template),
+                                   [san_type_of(n) for n in names], self.template.name)
+        return [refusal] if refusal else []
 
     def _policy_validity(self, csr, validity_days):
         """*validity_days* under the policies' ``max_validity_days``."""

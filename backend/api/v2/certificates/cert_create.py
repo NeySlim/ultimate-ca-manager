@@ -91,6 +91,10 @@ def create_certificate():
             return error_response('Template not found', 404)
         if not template.is_active:
             return error_response(f"Template '{template.name}' is disabled", 400)
+        from services.template_service import bucket_san_refusal
+        san_refusal = bucket_san_refusal(template, data)
+        if san_refusal:
+            return error_response(san_refusal, 400)
 
     if not ca.has_private_key:
         return error_response('CA private key not available', 400)
@@ -236,11 +240,12 @@ def create_certificate():
         # workflow, not the issuance rules an operator configured for the CA.
         from services.policy_service import PolicyEvaluationService
         from utils.san_parse import auto_san_buckets_from_cn
+        from services.template_service import allowed_implicit_buckets
         requested_dns = list(data.get('san_dns') or [])
-        implicit_dns = auto_san_buckets_from_cn(
+        implicit_dns = allowed_implicit_buckets(template, auto_san_buckets_from_cn(
             data.get('cn') or '', data.get('cert_type', 'server'),
             subject_email=data.get('email'),
-        ).get('san_dns') or []
+        )).get('san_dns') or []
         policies = PolicyEvaluationService.applicable_policies(
             ca.id, data.get('template_id'), data.get('cn'), requested_dns)
         requested_validity = validity_days
@@ -389,11 +394,12 @@ def create_certificate():
         from utils.san_parse import auto_san_buckets_from_cn
 
         cn = data['cn']
-        implicit = auto_san_buckets_from_cn(
+        from services.template_service import allowed_implicit_buckets
+        implicit = allowed_implicit_buckets(template, auto_san_buckets_from_cn(
             cn,
             cert_type,
             subject_email=data.get('email'),
-        )
+        ))
         for key in ('san_dns', 'san_ip', 'san_email'):
             existing = set(data.get(key) or [])
             for val in implicit.get(key) or []:

@@ -3445,6 +3445,8 @@
     "systemNotDeletable": "Les modèles système ne peuvent pas être supprimés.",
     "defaultValidity": "Validité par défaut (jours)",
     "maxValidityHint": "Pour plafonner la validité des certificats émis avec ce modèle, utilisez une politique d'émission (Politiques, validité maximale).",
+    "sanTypesHint": "Types de noms qu'une demande faite avec ce modèle peut porter ; une demande avec un autre type est refusée. Aucune case cochée : tous les types sont permis.",
+    "sanTypesAny": "Tous les types",
     "certsIssued": "{{count}} certs",
     "certificatesIssued": "{{count}} certificats émis",
     "basicInfo": "Informations de base",

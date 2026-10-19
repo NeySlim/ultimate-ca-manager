@@ -36,20 +36,26 @@ function PreviewField({ label, value, icon: Icon, mono = false, badge = false })
   )
 }
 
-// Sample SAN preview
-function SANPreview({ template }) {
-  const sans = []
-  if (template?.allow_any_cn) {
-    sans.push('DNS: server.example.com')
-    sans.push('DNS: *.example.com')
+const SAN_SAMPLES = {
+  dns: 'DNS: server.example.com',
+  ip: 'IP: 192.0.2.10',
+  email: 'Email: admin@example.com',
+  uri: 'URI: https://example.com/',
+  upn: 'UPN: user@example.com',
+}
+
+// The SAN types the template allows (extensions_template.san_types); [] allows all
+export function templateSanTypes(template) {
+  let ext = template?.extensions_template
+  if (typeof ext === 'string') {
+    try { ext = JSON.parse(ext) } catch { ext = null }
   }
-  if (template?.san_types?.includes('email') || template?.san_types?.includes('rfc822Name')) {
-    sans.push('Email: admin@example.com')
-  }
-  if (template?.san_types?.includes('ip') || template?.san_types?.includes('iPAddress')) {
-    sans.push('IP: 192.168.1.100')
-  }
-  return sans.length > 0 ? sans.join('\n') : 'None configured'
+  return Array.isArray(ext?.san_types) ? ext.san_types : []
+}
+
+function SANPreview({ template, t }) {
+  const types = templateSanTypes(template).filter(type => SAN_SAMPLES[type])
+  return types.length ? types.map(type => SAN_SAMPLES[type]).join('\n') : t('templates.sanTypesAny')
 }
 
 export function TemplatePreviewModal({ open, onClose, template }) {
@@ -149,7 +155,7 @@ export function TemplatePreviewModal({ open, onClose, template }) {
             <PreviewField 
               icon={Globe}
               label="Subject Alternative Names (SANs)" 
-              value={SANPreview({ template })}
+              value={SANPreview({ template, t })}
               mono
             />
           </div>

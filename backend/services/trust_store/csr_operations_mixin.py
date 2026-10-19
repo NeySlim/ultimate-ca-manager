@@ -595,6 +595,7 @@ class CSROperationsMixin:
         template_ext: Optional[dict] = None,
         extra_san: Optional[List[x509.GeneralName]] = None,
         policy_scope: Optional[dict] = None,
+        san_template=None,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
         signing renews — its names are graced by NameConstraints validation.
@@ -638,7 +639,9 @@ class CSROperationsMixin:
         CN implies, a CN that is not a hostname giving no DNS name.
         ``policy_scope``: ``{ca_id, template_id, digest_explicit}`` of the
         issuance; the policies in that scope bind the key type and the digest
-        (an implicit one yields to them). Every production caller passes it."""
+        (an implicit one yields to them). Every production caller passes it.
+        ``san_template``: template whose SAN types bind the request's names;
+        names implied by the subject alone are dropped instead of refused."""
         from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 
         # Load CSR
@@ -700,6 +703,13 @@ class CSROperationsMixin:
         if extra_san:
             effective_sans = list(effective_sans) + [
                 n for n in extra_san if n not in effective_sans]
+        if san_template is not None:
+            from services.template_service import allowed_san_types, check_san_types, san_type_of
+            check_san_types(san_template, list(csr_sans or []) + list(override_san or [])
+                            + list(extra_san or []))
+            allowed = allowed_san_types(san_template)
+            if allowed is not None and override_san is None and not has_csr_san:
+                effective_sans = [n for n in effective_sans if san_type_of(n) in allowed]
 
         ConstraintsMixin._validate_name_constraints(
             ca_cert, subject, effective_sans if effective_sans else None, renewal_of=renewal_of

@@ -18,6 +18,7 @@ export default {
           { label: 'サブジェクトデフォルト', text: '組織、OU、国、都道府県、市区町村、Emailを事前入力。メール (S/MIME) およびサーバー + クライアント (複合) 証明書では、EmailはSANにもなります' },
           { label: 'Key Usage', text: 'Digital Signature、Key Enciphermentなど' },
           { label: 'Extended Key Usage', text: 'Server Auth、Client Auth、Code Signing、Email Protection' },
+          { label: 'SAN の種類', text: 'このテンプレートで行う要求に含められる名前の種類 (DNS、IP、Email、URI、UPN) です。発行フォーム、CSR 署名、各登録プロトコルに適用されます。それ以外の種類を含む要求は拒否され、CN から推定されるだけの名前は省かれます。何も選択しない場合はすべての種類が許可されます' },
           { label: '有効期間', text: 'デフォルトの有効期間（日数）' },
           { label: '複製', text: '既存のテンプレートをクローンして修正' },
           { label: 'システムを表示', text: '組み込みテンプレートを非表示にして、自分のテンプレートだけを扱います。ブラウザごとに記憶されます' },

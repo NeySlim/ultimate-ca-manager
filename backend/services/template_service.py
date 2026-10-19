@@ -646,6 +646,79 @@ def template_extensions(template):
         return {}
     return raw if isinstance(raw, dict) else {}
 
+
+# Template SAN types, keyed by the issue form's buckets
+SAN_TYPE_BUCKETS = {'dns': 'san_dns', 'ip': 'san_ip', 'email': 'san_email',
+                    'uri': 'san_uri', 'upn': 'san_upn'}
+SAN_TYPE_LABELS = {'dns': 'DNS', 'ip': 'IP', 'email': 'email', 'uri': 'URI', 'upn': 'UPN'}
+
+
+def allowed_san_types(template):
+    """The SAN types a template (or its extensions dict) allows, None when it restricts none."""
+    ext = template if isinstance(template, dict) else template_extensions(template)
+    types = ext.get('san_types')
+    if not isinstance(types, list) or not types:
+        return None
+    return frozenset(str(t).strip().lower() for t in types)
+
+
+def san_type_of(name):
+    """Template SAN type of an x509 GeneralName; other kinds get their class name."""
+    from cryptography import x509
+    from utils.upn_san import UPN_OID
+    if isinstance(name, x509.DNSName):
+        return 'dns'
+    if isinstance(name, x509.IPAddress):
+        return 'ip'
+    if isinstance(name, x509.RFC822Name):
+        return 'email'
+    if isinstance(name, x509.UniformResourceIdentifier):
+        return 'uri'
+    if isinstance(name, x509.OtherName) and name.type_id == UPN_OID:
+        return 'upn'
+    return type(name).__name__
+
+
+def san_type_refusal(allowed, types, template_name=None):
+    """Refusal naming the SAN types outside *allowed* (None allows all), else None."""
+    if allowed is None:
+        return None
+    refused = sorted({t for t in types if t not in allowed})
+    if not refused:
+        return None
+    labels = ', '.join(SAN_TYPE_LABELS.get(t, t) for t in refused)
+    who = f"Template '{template_name}'" if template_name else 'The certificate template'
+    return f"{who} does not allow {labels} names in the Subject Alternative Name"
+
+
+def check_san_types(template, names):
+    """Raise PolicyViolation when *names* (GeneralNames) hold a type *template* refuses."""
+    if template is None:
+        return
+    refusal = san_type_refusal(allowed_san_types(template), (san_type_of(n) for n in names or ()),
+                               getattr(template, 'name', None))
+    if refusal:
+        from services.policy_service import PolicyViolation
+        raise PolicyViolation(refusal)
+
+
+def bucket_san_refusal(template, buckets):
+    """Refusal for the issue form's SAN buckets (``san_dns``...) against *template*, else None."""
+    if template is None:
+        return None
+    types = [t for t, key in SAN_TYPE_BUCKETS.items() if (buckets or {}).get(key)]
+    return san_type_refusal(allowed_san_types(template), types, template.name)
+
+
+def allowed_implicit_buckets(template, buckets):
+    """The CN-implied SAN buckets the template allows: implied names are dropped, not refused."""
+    allowed = allowed_san_types(template) if template is not None else None
+    if allowed is None:
+        return buckets
+    return {key: values for key, values in buckets.items()
+            if any(SAN_TYPE_BUCKETS[t] == key for t in allowed)}
+
+
 def _normalize_key_type_label(value):
     """Normalize a key-type value to the template format ('RSA-2048',
     'EC-P256', ...).

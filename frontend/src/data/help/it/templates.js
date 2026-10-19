@@ -18,6 +18,7 @@ export default {
           { label: 'Valori predefiniti soggetto', text: 'Precompila Organizzazione, OU, Paese, Stato, Città ed Email. Sui certificati Email (S/MIME) e Server + Client (Combinato) l\'Email diventa anche un SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, ecc.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
+          { label: 'Tipi di SAN', text: 'I tipi di nome (DNS, IP, Email, URI, UPN) che una richiesta fatta con il modello può contenere, nel modulo di emissione, nella firma di CSR e nei protocolli di enrollment. Una richiesta con un altro tipo viene rifiutata; un nome solo dedotto dal CN viene omesso. Nessuno selezionato: tutti i tipi sono consentiti' },
           { label: 'Validità', text: 'Periodo di validità predefinito in giorni' },
           { label: 'Duplica', text: 'Clona un modello esistente e modificalo' },
           { label: 'Mostra sistema', text: 'Nascondi i modelli integrati per lavorare solo con i tuoi. Memorizzato per browser' },

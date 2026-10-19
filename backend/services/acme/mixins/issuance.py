@@ -119,6 +119,19 @@ class IssuanceMixin:
         if not subject_ok:
             return False, subject_err
 
+        # The profile's template may restrict the SAN types (DNS, IP)
+        from services.acme import profiles as acme_profiles
+        from models.certificate_template import CertificateTemplate
+        from services.template_service import allowed_san_types, san_type_refusal
+        tpl_id = acme_profiles.issuance_params(getattr(order, 'profile', None)).get('template_id')
+        template = db.session.get(CertificateTemplate, tpl_id) if tpl_id else None
+        if template is not None:
+            refusal = san_type_refusal(
+                allowed_san_types(template),
+                ['dns'] * bool(order_domains_norm) + ['ip'] * bool(order_ips_norm), template.name)
+            if refusal:
+                return False, refusal
+
         # CAA record check (RFC 6844 + RFC 8555 §8.1) - only for DNS identifiers
         if order_domains:
             caa_enforce = False

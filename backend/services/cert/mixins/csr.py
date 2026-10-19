@@ -267,6 +267,11 @@ class CSRMixin:
                 )
             else:
                 template_ext = template_extensions(template)
+        # The template that scopes the policies also binds the SAN types (Sign CSR form)
+        san_template = template
+        if san_template is None and policy_template_id:
+            from models.certificate_template import CertificateTemplate
+            san_template = db.session.get(CertificateTemplate, policy_template_id)
 
         cert_pem = TrustStoreService.sign_csr(
             csr_pem=csr_pem,
@@ -284,6 +289,7 @@ class CSRMixin:
             extra_ekus=extra_ekus,
             allow_sensitive_ekus=allow_sensitive_ekus,
             template_ext=template_ext,
+            san_template=san_template,
             extra_san=extra_san,
             policy_scope={
                 'ca_id': ca.id,

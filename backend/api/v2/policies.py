@@ -304,6 +304,11 @@ def _issue_approved_certificate(approval):
             raise ValueError(f"Template {data['template_id']} not found")
         if not template.is_active:
             raise ValueError(f"Template '{template.name}' is disabled")
+        from services.template_service import bucket_san_refusal
+        san_refusal = bucket_san_refusal(template, data)
+        if san_refusal:
+            from services.policy_service import PolicyViolation
+            raise PolicyViolation(san_refusal)
 
     # Re-clamp validity at issuance time:
     #   0) template default when the request didn't pick one (digest behaves
@@ -368,10 +373,11 @@ def _issue_approved_certificate(approval):
     from services.policy_service import PolicyViolation
     from utils.san_parse import auto_san_buckets_from_cn as _implicit_sans
     _requested_dns = list(data.get('san_dns') or [])
-    _implicit_dns = _implicit_sans(
+    from services.template_service import allowed_implicit_buckets
+    _implicit_dns = allowed_implicit_buckets(template, _implicit_sans(
         data.get('cn') or '', data.get('cert_type', 'server'),
         subject_email=data.get('email'),
-    ).get('san_dns') or []
+    )).get('san_dns') or []
     _policies = PolicyEvaluationService.applicable_policies(
         data['ca_id'], data.get('template_id'), data.get('cn'), _requested_dns)
     _violations, validity_days, _capped_by = PolicyEvaluationService.enforce_rules(
@@ -513,7 +519,8 @@ def _issue_approved_certificate(approval):
     cn = data['cn']
     from utils.san_parse import auto_san_buckets_from_cn
 
-    implicit = auto_san_buckets_from_cn(cn, cert_type, subject_email=data.get('email'))
+    implicit = allowed_implicit_buckets(
+        template, auto_san_buckets_from_cn(cn, cert_type, subject_email=data.get('email')))
     for dns in implicit.get('san_dns') or []:
         if dns not in data.get('san_dns', []):
             san_list.insert(0, x509.DNSName(dns))

@@ -120,6 +120,26 @@ def _csr_identity(cert):
     return csr_cn, csr_dns, key_label_for_public_key(csr_obj.public_key())
 
 
+def _san_type_refusal(cert, template_id, extra_san=None):
+    """Refusal when the request's or the added names hold a SAN type the template refuses."""
+    from models.certificate_template import CertificateTemplate
+    from services.template_service import allowed_san_types, san_type_of, san_type_refusal, SAN_TYPE_BUCKETS
+    template = db.session.get(CertificateTemplate, template_id) if template_id else None
+    allowed = allowed_san_types(template) if template is not None else None
+    if allowed is None:
+        return None
+    from cryptography import x509 as _x509
+    raw = cert.csr if cert.csr.startswith('-----BEGIN') else base64.b64decode(cert.csr).decode()
+    try:
+        names = list(_x509.load_pem_x509_csr(raw.encode()).extensions.get_extension_for_class(
+            _x509.SubjectAlternativeName).value)
+    except _x509.ExtensionNotFound:
+        names = []
+    types = [san_type_of(n) for n in names]
+    types += [t for t, key in SAN_TYPE_BUCKETS.items() if (extra_san or {}).get(key)]
+    return san_type_refusal(allowed, types, template.name)
+
+
 def _policy_rule_refusal(ca, cert, template_id, validity_days, extra_dns=()):
     """Issuance policy rules (#335) applied to a stored request: returns
     ``(refusal_message_or_None, validity_days)`` with the validity capped by
@@ -948,6 +968,12 @@ def sign_csr(csr_id):
     disabled = disabled_template_error(data.get('template_id'))
     if disabled:
         return error_response(disabled, 400)
+    try:
+        san_refusal = _san_type_refusal(cert, data.get('template_id'), extra_san)
+    except (ValueError, TypeError) as e:
+        return error_response(f'Invalid CSR: {e}', 400)
+    if san_refusal:
+        return error_response(san_refusal, 400)
 
     refusal, validity_days, validity_notice = _policy_rule_refusal(
         ca, cert, data.get('template_id'), validity_days,
@@ -1105,6 +1131,13 @@ def bulk_sign_csrs():
                 continue
             if cert.crt:
                 results['failed'].append({'id': csr_id, 'error': 'Already signed'})
+                continue
+            try:
+                refusal = _san_type_refusal(cert, data.get('template_id'))
+            except (ValueError, TypeError) as e:
+                refusal = f'Invalid CSR: {e}'
+            if refusal:
+                results['failed'].append({'id': csr_id, 'error': refusal})
                 continue
             refusal, item_validity, _item_notice = _policy_rule_refusal(
                 ca, cert, data.get('template_id'), validity_days)
