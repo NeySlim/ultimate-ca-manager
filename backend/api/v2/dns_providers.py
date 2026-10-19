@@ -125,6 +125,11 @@ def get_provider(provider_id):
 _SECRET_HINTS = ('secret', 'token', 'password', 'key')
 
 
+def _given(value):
+    """A blank field keeps the saved value; False and 0 are values."""
+    return value is not None and value != ''
+
+
 def _credentials_retarget_error(provider, credentials):
     """Saved credential secrets stay with the server and account they were saved for."""
     if not isinstance(credentials, dict) or not credentials or not provider.credentials:
@@ -140,8 +145,9 @@ def _credentials_retarget_error(provider, credentials):
     secret = {n for n in names
               if any(f['name'] == n and f.get('type') == 'password' for f in schema)
               or any(h in n.lower() for h in _SECRET_HINTS)}
-    current = {n: existing.get(n) for n in names - secret}
-    requested = {k: v for k, v in credentials.items() if v}
+    defaults = {f['name']: f['default'] for f in schema if 'default' in f}
+    current = {n: existing.get(n, defaults.get(n)) for n in names - secret}
+    requested = {k: v for k, v in credentials.items() if _given(v)}
     keeping = any(existing.get(k) and not credentials.get(k) for k in secret)
     return retarget_error(current, requested, keeping)
 
@@ -165,9 +171,8 @@ def update_provider(provider_id):
         merged = credentials
         if provider.credentials:
             merged = json.loads(provider.credentials)
-            # Only update with non-empty values
             for key, value in credentials.items():
-                if value:  # Don't overwrite with empty values
+                if _given(value):
                     merged[key] = value
         provider_class = get_provider_class(provider.provider_type)
         if provider_class:

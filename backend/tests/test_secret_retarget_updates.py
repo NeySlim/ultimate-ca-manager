@@ -205,6 +205,44 @@ class TestDnsProvider:
                                                     'api_key': 'typed'}
 
 
+class TestDnsProviderTlsFlag:
+    """Unticking TLS verification is a value, and a change of target."""
+
+    @pytest.fixture
+    def provider_id(self, app):
+        from models import DnsProvider
+        with app.app_context():
+            row = DnsProvider(name=f'plesk-tls-{_suffix()}', provider_type='plesk',
+                              credentials=json.dumps({'server_url': 'https://plesk.example.com',
+                                                      'api_key': 'saved-key'}))
+            db.session.add(row)
+            db.session.commit()
+            return row.id
+
+    def _creds(self, app, provider_id):
+        from models import DnsProvider
+        with app.app_context():
+            return json.loads(db.session.get(DnsProvider, provider_id).credentials)
+
+    def test_unticking_without_the_key_is_refused(self, app, auth_client, provider_id):
+        before = self._creds(app, provider_id)
+        _refused(_send(auth_client, 'patch', f'/api/v2/dns-providers/{provider_id}', {
+            'credentials': {'verify_ssl': False, 'api_key': ''}}))
+        assert self._creds(app, provider_id) == before
+
+    def test_unticking_with_the_key_is_stored(self, app, auth_client, provider_id):
+        r = _send(auth_client, 'patch', f'/api/v2/dns-providers/{provider_id}', {
+            'credentials': {'verify_ssl': False, 'api_key': 'typed'}})
+        assert r.status_code == 200, r.data
+        assert self._creds(app, provider_id)['verify_ssl'] is False
+
+    def test_sending_the_default_is_not_a_change(self, app, auth_client, provider_id):
+        r = _send(auth_client, 'patch', f'/api/v2/dns-providers/{provider_id}', {
+            'credentials': {'verify_ssl': True, 'api_key': ''}})
+        assert r.status_code == 200, r.data
+        assert self._creds(app, provider_id)['api_key'] == 'saved-key'
+
+
 def _drop_sso(app, provider_id):
     from models.sso import SSOProvider
     with app.app_context():
