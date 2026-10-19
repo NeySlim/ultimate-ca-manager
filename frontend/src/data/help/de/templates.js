@@ -18,7 +18,7 @@ export default {
           { label: 'Betreffsstandards', text: 'Organisation, OU, Land, Bundesland, Stadt und E-Mail vorausfüllen. Bei „E-Mail"- und „Server + Client (Kombiniert)"-Zertifikaten wird die E-Mail zusätzlich zum SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, usw.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
-          { label: 'SAN-Typen', text: 'Die Namenstypen (DNS, IP, E-Mail, URI, UPN), die eine Anfrage mit dieser Vorlage enthalten darf, im Ausstellungsformular, beim Signieren von CSRs und in den Enrollment-Protokollen. Eine Anfrage mit einem anderen Typ wird abgelehnt; ein nur aus dem CN abgeleiteter Name wird weggelassen. Nichts ausgewählt: alle Typen sind erlaubt' },
+          { label: 'SAN-Typen', text: 'Die Namenstypen (DNS, IP, E-Mail, URI, UPN), die eine Anfrage mit dieser Vorlage enthalten darf. Ist „Erlaubte SAN-Typen durchsetzen“ aktiv, lehnen Ausstellungsformular, CSR-Signierung, Enrollment-Protokolle, Erneuerungen und Genehmigungen jeden anderen Typ ab, und ein nur aus dem CN abgeleiteter Name wird weggelassen. Neue Vorlagen haben es aktiv, ältere und die integrierten nicht. Nichts ausgewählt: alle Typen sind erlaubt' },
           { label: 'Gültigkeit', text: 'Standard-Gültigkeitsdauer in Tagen' },
           { label: 'Duplizieren', text: 'Ein vorhandenes Template klonen und modifizieren' },
           { label: 'System anzeigen', text: 'Die mitgelieferten Templates ausblenden, um nur mit Ihren eigenen zu arbeiten. Wird pro Browser gespeichert' },

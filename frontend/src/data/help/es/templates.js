@@ -18,7 +18,7 @@ export default {
           { label: 'Valores predeterminados del sujeto', text: 'Prellenar Organización, OU, País, Estado, Ciudad y Email. En los certificados de Correo electrónico y Servidor + Cliente (Combinado), el Email también se convierte en un SAN' },
           { label: 'Uso de clave', text: 'Firma digital, cifrado de clave, etc.' },
           { label: 'Uso extendido de clave', text: 'Autenticación de servidor, autenticación de cliente, firma de código, protección de correo' },
-          { label: 'Tipos de SAN', text: 'Los tipos de nombre (DNS, IP, Email, URI, UPN) que puede llevar una solicitud hecha con la plantilla, en el formulario de emisión, al firmar un CSR y en los protocolos de inscripción. Una solicitud con otro tipo se rechaza; un nombre solo deducido del CN se omite. Ninguno marcado: se permiten todos los tipos' },
+          { label: 'Tipos de SAN', text: 'Los tipos de nombre (DNS, IP, Email, URI, UPN) que puede llevar una solicitud hecha con la plantilla. Con «Aplicar los tipos de SAN permitidos» activado, el formulario de emisión, la firma de CSR, los protocolos de inscripción, las renovaciones y las aprobaciones rechazan cualquier otro tipo, y un nombre solo deducido del CN se omite. Las plantillas nuevas lo tienen activado; las anteriores y las integradas, desactivado. Ninguno marcado: se permiten todos los tipos' },
           { label: 'Validez', text: 'Período de validez predeterminado en días' },
           { label: 'Duplicar', text: 'Clonar una plantilla existente y modificarla' },
           { label: 'Mostrar sistema', text: 'Oculte las plantillas integradas para trabajar solo con las suyas. Se recuerda por navegador' },

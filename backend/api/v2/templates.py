@@ -314,6 +314,7 @@ def create_template():
         extensions_template=json.dumps(extensions),
         is_system=False,  # User-created templates are never system
         is_active=True,
+        enforce_san_types=bool(data.get('enforce_san_types', True)),
         ad_derived_subject=bool(data.get('ad_derived_subject', False)),
         autoenroll_enabled=bool(data.get('autoenroll_enabled', False)),
         allowed_ad_group=(data.get('allowed_ad_group') or '').strip()[:255] or None,
@@ -421,6 +422,9 @@ def update_template(template_id):
     
     if 'is_active' in data:
         template.is_active = bool(data['is_active'])
+
+    if 'enforce_san_types' in data:
+        template.enforce_san_types = bool(data['enforce_san_types'])
 
     if 'ad_derived_subject' in data:
         template.ad_derived_subject = bool(data['ad_derived_subject'])
@@ -573,6 +577,7 @@ def duplicate_template(template_id):
         extensions_template=template.extensions_template,
         is_system=False,
         is_active=template.is_active,
+        enforce_san_types=template.enforce_san_types,
         ad_derived_subject=template.ad_derived_subject,
         autoenroll_enabled=template.autoenroll_enabled,
         allowed_ad_group=template.allowed_ad_group,
@@ -617,6 +622,7 @@ def _template_export_dict(template):
         'extensions_template': template.extensions_template,
         'is_system': False,  # Exported templates are not system
         'is_active': template.is_active,
+        'enforce_san_types': bool(template.enforce_san_types),
         'ad_derived_subject': bool(template.ad_derived_subject),
         'autoenroll_enabled': bool(template.autoenroll_enabled),
         'allowed_ad_group': template.allowed_ad_group,
@@ -746,6 +752,8 @@ def import_template():
                 if 'extensions_template' in tpl_data:
                     existing.extensions_template = json.dumps(tpl_data['extensions_template'])
                 existing.is_active = tpl_data.get('is_active', existing.is_active)
+                if 'enforce_san_types' in tpl_data:
+                    existing.enforce_san_types = bool(tpl_data['enforce_san_types'])
                 if 'ad_derived_subject' in tpl_data:
                     existing.ad_derived_subject = bool(tpl_data['ad_derived_subject'])
                 if 'autoenroll_enabled' in tpl_data:
@@ -770,6 +778,8 @@ def import_template():
                     extensions_template=json.dumps(tpl_data.get('extensions_template') or {}),
                     is_system=False,
                     is_active=tpl_data.get('is_active', True),
+                    # A file without the switch predates it: its template enforced nothing
+                    enforce_san_types=bool(tpl_data.get('enforce_san_types', False)),
                     ad_derived_subject=bool(tpl_data.get('ad_derived_subject', False)),
                     autoenroll_enabled=bool(tpl_data.get('autoenroll_enabled', False)),
                     allowed_ad_group=(tpl_data.get('allowed_ad_group') or '').strip()[:255] or None,

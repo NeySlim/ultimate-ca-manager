@@ -60,7 +60,8 @@ class TemplateService:
                 "san_types": ["dns", "ip"]
             }),
             "is_system": True,
-            "is_active": True
+            "is_active": True,
+            "enforce_san_types": False
         },
         {
             "name": "Email Certificate (S/MIME)",
@@ -84,7 +85,8 @@ class TemplateService:
                 "san_types": ["email"]
             }),
             "is_system": True,
-            "is_active": True
+            "is_active": True,
+            "enforce_san_types": False
         },
         {
             "name": "VPN Server",
@@ -108,7 +110,8 @@ class TemplateService:
                 "san_types": ["dns", "ip"]
             }),
             "is_system": True,
-            "is_active": True
+            "is_active": True,
+            "enforce_san_types": False
         },
         {
             "name": "VPN Client",
@@ -129,10 +132,11 @@ class TemplateService:
                 "key_usage": ["digitalSignature", "keyEncipherment"],
                 "extended_key_usage": ["clientAuth", "ipsecUser"],
                 "basic_constraints": {"ca": False},
-                "san_types": ["email"]
+                "san_types": ["dns", "email", "upn"]
             }),
             "is_system": True,
-            "is_active": True
+            "is_active": True,
+            "enforce_san_types": False
         },
         {
             "name": "Code Signing",
@@ -156,7 +160,8 @@ class TemplateService:
                 "san_types": []
             }),
             "is_system": True,
-            "is_active": True
+            "is_active": True,
+            "enforce_san_types": False
         },
         {
             "name": "OCSP Signing",
@@ -180,7 +185,8 @@ class TemplateService:
                 "san_types": []
             }),
             "is_system": True,
-            "is_active": True
+            "is_active": True,
+            "enforce_san_types": False
         },
         {
             "name": "Client Authentication",
@@ -201,10 +207,11 @@ class TemplateService:
                 "key_usage": ["digitalSignature", "keyEncipherment"],
                 "extended_key_usage": ["clientAuth"],
                 "basic_constraints": {"ca": False},
-                "san_types": ["email"]
+                "san_types": ["dns", "email", "upn"]
             }),
             "is_system": True,
-            "is_active": True
+            "is_active": True,
+            "enforce_san_types": False
         },
         {
             "name": "Smartcard Logon",
@@ -225,10 +232,11 @@ class TemplateService:
                 "key_usage": ["digitalSignature", "keyEncipherment"],
                 "extended_key_usage": ["clientAuth", "msSmartcardLogin"],
                 "basic_constraints": {"ca": False},
-                "san_types": ["upn"]
+                "san_types": ["upn", "email"]
             }),
             "is_system": True,
-            "is_active": True
+            "is_active": True,
+            "enforce_san_types": False
         }
     ]
     
@@ -297,6 +305,7 @@ class TemplateService:
             extensions_template=json.dumps(data.get('extensions_template', {})),
             is_system=False,  # Custom templates are never system
             is_active=True,
+            enforce_san_types=bool(data.get('enforce_san_types', True)),
             created_by=username,
             created_at=utc_now()
         )
@@ -357,6 +366,8 @@ class TemplateService:
             template.extensions_template = json.dumps(data['extensions_template'])
         if 'is_active' in data:
             template.is_active = data['is_active']
+        if 'enforce_san_types' in data:
+            template.enforce_san_types = bool(data['enforce_san_types'])
         
         template.updated_by = username
         template.updated_at = utc_now()
@@ -655,6 +666,8 @@ SAN_TYPE_LABELS = {'dns': 'DNS', 'ip': 'IP', 'email': 'email', 'uri': 'URI', 'up
 
 def allowed_san_types(template):
     """The SAN types a template (or its extensions dict) allows, None when it restricts none."""
+    if not isinstance(template, dict) and not getattr(template, 'enforce_san_types', False):
+        return None
     ext = template if isinstance(template, dict) else template_extensions(template)
     types = ext.get('san_types')
     if not isinstance(types, list) or not types:

@@ -44,8 +44,9 @@ const SAN_SAMPLES = {
   upn: 'UPN: user@example.com',
 }
 
-// The SAN types the template allows (extensions_template.san_types); [] allows all
+// The SAN types issuance holds the template to: [] when it does not enforce them
 export function templateSanTypes(template) {
+  if (!template?.enforce_san_types) return []
   let ext = template?.extensions_template
   if (typeof ext === 'string') {
     try { ext = JSON.parse(ext) } catch { ext = null }

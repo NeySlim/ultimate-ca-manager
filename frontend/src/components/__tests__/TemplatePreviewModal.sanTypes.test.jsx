@@ -1,6 +1,7 @@
 /**
  * The SAN preview reads the template's extensions_template.san_types, the field
- * the form saves and issuance enforces; an empty list allows every type.
+ * the form saves and issuance enforces when enforce_san_types is on; an empty
+ * list, or a template that does not enforce them, allows every type.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
@@ -12,8 +13,9 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
-const preview = (extensions_template) =>
-  render(<TemplatePreviewModal open onClose={() => {}} template={{ name: 'T', extensions_template }} />)
+const preview = (extensions_template, enforce_san_types = true) =>
+  render(<TemplatePreviewModal open onClose={() => {}}
+                               template={{ name: 'T', extensions_template, enforce_san_types }} />)
 
 describe('TemplatePreviewModal SAN types', () => {
   it('shows a sample per allowed type', () => {
@@ -31,5 +33,11 @@ describe('TemplatePreviewModal SAN types', () => {
   it('says every type is allowed when none is checked', () => {
     preview({ san_types: [] })
     expect(screen.getByText('templates.sanTypesAny')).toBeInTheDocument()
+  })
+
+  it('says every type is allowed when the template does not enforce them', () => {
+    preview({ san_types: ['dns'] }, false)
+    expect(screen.getByText('templates.sanTypesAny')).toBeInTheDocument()
+    expect(screen.queryByText(/DNS: /)).not.toBeInTheDocument()
   })
 })

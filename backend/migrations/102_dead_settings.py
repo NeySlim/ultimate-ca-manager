@@ -6,6 +6,9 @@ rules lose the JSON keys no evaluation ever read, and
 discovery profiles gain the notification address their form always sent, and
 discovered certificates the fingerprint whose expiry was last reported. The
 OCSP cache's revocation reasons stored as names become CRLReason codes.
+Templates gain the switch that enforces their SAN types, off for every
+existing one, and the built-in ones still on their seeded SAN types get the
+types their certificates actually carry.
 """
 import json
 import sqlite3
@@ -90,6 +93,29 @@ JSON_COLUMNS = (
 )
 
 
+# Built-in template name: (seeded SAN types, widened SAN types)
+SYSTEM_SAN_TYPES = {
+    'VPN Client': (['email'], ['dns', 'email', 'upn']),
+    'Client Authentication': (['email'], ['dns', 'email', 'upn']),
+    'Client Certificate': (['email'], ['dns', 'email', 'upn']),
+    'Smartcard Logon': (['upn'], ['upn', 'email']),
+}
+
+
+def _widened_system_extensions(name, is_system, value):
+    """The built-in template's extensions with the widened SAN types, or None."""
+    if not is_system or name not in SYSTEM_SAN_TYPES:
+        return None
+    try:
+        ext = json.loads(value or '{}')
+    except (TypeError, ValueError):
+        return None
+    old, new = SYSTEM_SAN_TYPES[name]
+    if not isinstance(ext, dict) or ext.get('san_types') != old:
+        return None
+    return json.dumps({**ext, 'san_types': new})
+
+
 # The OCSP cache stored the reason's name in its integer column; SQLite took it
 OCSP_REASON_CODES = {
     'unspecified': 0, 'keyCompromise': 1, 'cACompromise': 2, 'affiliationChanged': 3,
@@ -123,6 +149,17 @@ def _upgrade_sqlite(conn):
             cleaned = clean(value)
             if cleaned is not None:
                 conn.execute(f"UPDATE {table} SET {column} = ? WHERE id = ?", (cleaned, rid))
+    if 'certificate_templates' in tables:
+        columns = {r[1] for r in conn.execute("PRAGMA table_info(certificate_templates)")}
+        if 'enforce_san_types' not in columns:
+            conn.execute("ALTER TABLE certificate_templates "
+                         "ADD COLUMN enforce_san_types BOOLEAN NOT NULL DEFAULT 0")
+        for tid, name, is_system, ext in conn.execute(
+                "SELECT id, name, is_system, extensions_template FROM certificate_templates").fetchall():
+            widened = _widened_system_extensions(name, is_system, ext)
+            if widened is not None:
+                conn.execute("UPDATE certificate_templates SET extensions_template = ? WHERE id = ?",
+                             (widened, tid))
     if 'ocsp_responses' in tables:
         conn.executemany("UPDATE ocsp_responses SET revocation_reason = ? WHERE revocation_reason = ?",
                          [(code, name) for name, code in OCSP_REASON_CODES.items()])
@@ -148,6 +185,15 @@ def _upgrade_pg(conn):
     if 'discovery_scan_profiles' in tables:
         conn.execute(text("ALTER TABLE discovery_scan_profiles "
                           "ADD COLUMN IF NOT EXISTS notify_email VARCHAR(255)"))
+    if 'certificate_templates' in tables:
+        conn.execute(text("ALTER TABLE certificate_templates "
+                          "ADD COLUMN IF NOT EXISTS enforce_san_types BOOLEAN NOT NULL DEFAULT FALSE"))
+        for tid, name, is_system, ext in conn.execute(text(
+                "SELECT id, name, is_system, extensions_template FROM certificate_templates")).fetchall():
+            widened = _widened_system_extensions(name, is_system, ext)
+            if widened is not None:
+                conn.execute(text("UPDATE certificate_templates SET extensions_template = :e WHERE id = :i"),
+                             {'e': widened, 'i': tid})
     if 'discovered_certificates' in tables:
         conn.execute(text("ALTER TABLE discovered_certificates "
                           "ADD COLUMN IF NOT EXISTS expiry_notified_fingerprint VARCHAR(64)"))

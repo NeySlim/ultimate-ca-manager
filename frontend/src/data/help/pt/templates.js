@@ -18,7 +18,7 @@ export default {
           { label: 'Padrões de Sujeito', text: 'Pré-preencher Organização, OU, País, Estado, Cidade e Email. Em certificados E-mail e Servidor + Cliente (Combinado), o Email também se torna um SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, etc.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
-          { label: 'Tipos de SAN', text: 'Os tipos de nome (DNS, IP, Email, URI, UPN) que um pedido feito com o modelo pode conter, no formulário de emissão, na assinatura de CSR e nos protocolos de inscrição. Um pedido com outro tipo é recusado; um nome apenas deduzido do CN é omitido. Nenhum marcado: todos os tipos são permitidos' },
+          { label: 'Tipos de SAN', text: 'Os tipos de nome (DNS, IP, Email, URI, UPN) que um pedido feito com o modelo pode conter. Com «Aplicar os tipos de SAN permitidos» ativado, o formulário de emissão, a assinatura de CSR, os protocolos de inscrição, as renovações e as aprovações recusam qualquer outro tipo, e um nome apenas deduzido do CN é omitido. Os novos modelos têm-no ativado; os anteriores e os integrados, desativado. Nenhum marcado: todos os tipos são permitidos' },
           { label: 'Validade', text: 'Período de validade padrão em dias' },
           { label: 'Duplicar', text: 'Clonar um modelo existente e modificá-lo' },
           { label: 'Mostrar sistema', text: 'Oculte os modelos incluídos para trabalhar apenas com os seus. Lembrado por navegador' },

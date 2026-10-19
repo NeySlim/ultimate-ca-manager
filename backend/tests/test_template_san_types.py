@@ -1,7 +1,8 @@
-"""A template's SAN types bind the requests made with it.
+"""A template's SAN types bind the requests made with it when it enforces them.
 
 ``extensions_template.san_types`` was offered on the template form and
-never read at issuance. An empty or absent list still allows every type.
+never read at issuance. An empty or absent list still allows every type;
+templates older than the switch, and the built-in ones, enforce nothing.
 """
 import base64
 import json
@@ -19,7 +20,7 @@ from services.policy_service import PolicyViolation
 from tests.test_csr_sign_extra_names import _csr, _upload
 
 
-def _template(app, san_types, name=None):
+def _template(app, san_types, name=None, enforce=True):
     with app.app_context():
         tpl = CertificateTemplate(
             name=name or f'san-types-{uuid.uuid4().hex[:8]}', template_type='custom',
@@ -27,7 +28,8 @@ def _template(app, san_types, name=None):
             dn_template=json.dumps({'CN': '{cn}'}),
             extensions_template=json.dumps({'key_usage': ['digitalSignature'],
                                             'extended_key_usage': ['serverAuth', 'clientAuth'],
-                                            'san_types': san_types}))
+                                            'san_types': san_types}),
+            enforce_san_types=enforce)
         db.session.add(tpl)
         db.session.commit()
         return tpl.id
@@ -46,8 +48,8 @@ def _set_types(app, tpl_id, san_types):
 def make_template(app):
     made = []
 
-    def make(san_types):
-        made.append(_template(app, san_types))
+    def make(san_types, enforce=True):
+        made.append(_template(app, san_types, enforce=enforce))
         return made[-1]
     yield make
     from tests.test_acme_profile_template import _drop_template
@@ -264,3 +266,56 @@ class TestNothingQueuedForApproval:
                 assert ApprovalRequest.query.filter_by(policy_id=pid).count() == 0
         finally:
             _drop_policy(app, pid)
+
+
+class TestEnforcementSwitch:
+    def test_a_template_that_does_not_enforce_refuses_nothing(self, app, auth_client, create_ca,
+                                                             make_template):
+        tpl_id = make_template(['dns'], enforce=False)
+        ca = create_ca(cn='SAN types not enforced CA')
+        r = auth_client.post('/api/v2/certificates', json={
+            'cn': 'loose.san.test', 'ca_id': ca['id'], 'template_id': tpl_id,
+            'san_dns': ['loose.san.test'], 'san_email': ['ops@example.com']})
+        assert r.status_code in (200, 201), r.get_json()
+
+    def test_a_new_template_enforces_and_the_switch_turns_it_off(self, app, auth_client, create_ca):
+        r = auth_client.post('/api/v2/templates', json={
+            'name': f'new-san-{uuid.uuid4().hex[:8]}', 'template_type': 'custom',
+            'extensions_template': {'key_usage': ['digitalSignature'],
+                                    'extended_key_usage': ['serverAuth'], 'san_types': ['dns']}})
+        assert r.status_code == 201, r.get_json()
+        tpl = r.get_json()['data']
+        assert tpl['enforce_san_types'] is True
+        ca = create_ca(cn='SAN types switch CA')
+        body = {'cn': 'switch.san.test', 'ca_id': ca['id'], 'template_id': tpl['id'],
+                'san_dns': ['switch.san.test'], 'san_ip': ['192.0.2.4']}
+        try:
+            assert auth_client.post('/api/v2/certificates', json=body).status_code == 400
+            r = auth_client.put(f"/api/v2/templates/{tpl['id']}", json={'enforce_san_types': False})
+            assert r.status_code == 200 and r.get_json()['data']['enforce_san_types'] is False
+            assert auth_client.post('/api/v2/certificates', json=body).status_code in (200, 201)
+        finally:
+            from tests.test_acme_profile_template import _drop_template
+            _drop_template(app, tpl['id'])
+
+    def test_an_imported_template_without_the_switch_enforces_nothing(self, app, auth_client):
+        name = f'imported-san-{uuid.uuid4().hex[:8]}'
+        r = auth_client.post('/api/v2/templates/import', data={'json_content': json.dumps({
+            'name': name, 'template_type': 'custom',
+            'extensions_template': {'key_usage': ['digitalSignature'], 'san_types': ['dns']}})})
+        assert r.status_code in (200, 201), r.get_json()
+        with app.app_context():
+            tpl = CertificateTemplate.query.filter_by(name=name).one()
+            assert tpl.enforce_san_types is False
+            tid = tpl.id
+        from tests.test_acme_profile_template import _drop_template
+        _drop_template(app, tid)
+
+    def test_built_in_templates_enforce_nothing_and_allow_their_real_names(self, app):
+        from services.template_service import TemplateService
+        by_name = {t['name']: t for t in TemplateService.SYSTEM_TEMPLATES}
+        assert not any(t.get('enforce_san_types', False) for t in by_name.values())
+        types = {name: json.loads(t['extensions_template'])['san_types'] for name, t in by_name.items()}
+        assert set(types['Client Authentication']) == {'dns', 'email', 'upn'}
+        assert set(types['VPN Client']) == {'dns', 'email', 'upn'}
+        assert set(types['Smartcard Logon']) == {'upn', 'email'}

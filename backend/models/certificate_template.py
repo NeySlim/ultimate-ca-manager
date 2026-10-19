@@ -39,6 +39,9 @@ class CertificateTemplate(db.Model):
     # Flags
     is_system = db.Column(db.Boolean, default=False)  # System templates can't be deleted
     is_active = db.Column(db.Boolean, default=True)
+    # Refuse requests carrying a SAN type outside san_types. Off for templates
+    # older than the switch and the built-in ones; the create routes turn it on.
+    enforce_san_types = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
 
     # Build the subject/SAN from the requester's Active Directory object
     # (via the AD Connector) instead of the CSR's own, for naked CSRs real
@@ -99,6 +102,7 @@ class CertificateTemplate(db.Model):
             "extensions_template": json.loads(self.extensions_template) if self.extensions_template else {},
             "is_system": self.is_system,
             "is_active": self.is_active,
+            "enforce_san_types": bool(self.enforce_san_types),
             "ad_derived_subject": bool(self.ad_derived_subject),
             "autoenroll_enabled": bool(self.autoenroll_enabled),
             "allowed_ad_group": self.allowed_ad_group,

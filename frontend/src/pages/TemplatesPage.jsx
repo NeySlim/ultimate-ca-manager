@@ -451,6 +451,7 @@ export default function TemplatesPage() {
           <CompactField autoIcon="commonName" label={t('templates.commonName')} value={selectedTemplate.dn_template?.CN || '—'} />
           <CompactField autoIcon="email" label={t('common.email')} value={selectedTemplate.dn_template?.emailAddress || '—'} />
           <CompactField autoIcon="default" label={t('templates.adDerivedSubject')} value={selectedTemplate.ad_derived_subject ? t('common.enabled') : t('common.disabled')} />
+          <CompactField autoIcon="default" label={t('templates.enforceSanTypes')} value={selectedTemplate.enforce_san_types ? t('common.enabled') : t('common.disabled')} />
         </CompactGrid>
       </CompactSection>
 
@@ -708,11 +709,11 @@ const TYPE_EXTENSION_DEFAULTS = {
   web_server:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['serverAuth'], san_types: ['dns', 'ip'] },
   email:        { key_usage: ['digitalSignature', 'keyEncipherment', 'dataEncipherment'], extended_key_usage: ['emailProtection'], san_types: ['email'] },
   vpn_server:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['serverAuth', 'ipsecEndSystem'], san_types: ['dns', 'ip'] },
-  vpn_client:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth', 'ipsecUser'], san_types: ['email'] },
+  vpn_client:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth', 'ipsecUser'], san_types: ['dns', 'email', 'upn'] },
   code_signing: { key_usage: ['digitalSignature'], extended_key_usage: ['codeSigning'], san_types: [] },
-  client_auth:  { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth'], san_types: ['email'] },
+  client_auth:  { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth'], san_types: ['dns', 'email', 'upn'] },
   ocsp_signing: { key_usage: ['digitalSignature'], extended_key_usage: ['OCSPSigning'], san_types: [] },
-  smartcard_logon: { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth', 'msSmartcardLogin'], san_types: ['upn'] },
+  smartcard_logon: { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth', 'msSmartcardLogin'], san_types: ['upn', 'email'] },
 }
 
 function buildInitialState(template) {
@@ -725,6 +726,7 @@ function buildInitialState(template) {
       key_usage: ['digitalSignature', 'keyEncipherment'],
       extended_key_usage: ['serverAuth'],
       san_types: ['dns', 'ip'],
+      enforce_san_types: true,
       ad_derived_subject: false,
       autoenroll_enabled: false,
       allowed_ad_group: '',
@@ -749,6 +751,8 @@ function buildInitialState(template) {
     key_usage: ext.key_usage || [],
     extended_key_usage: ext.extended_key_usage || [],
     san_types: ext.san_types || [],
+    // Off for templates older than the switch: a duplicate or an edit keeps it
+    enforce_san_types: template.enforce_san_types ?? true,
     ad_derived_subject: template.ad_derived_subject || false,
     autoenroll_enabled: template.autoenroll_enabled || false,
     allowed_ad_group: template.allowed_ad_group || '',
@@ -814,6 +818,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
           basic_constraints: { ca: false },
           san_types: formData.san_types
         },
+        enforce_san_types: formData.enforce_san_types,
         ad_derived_subject: formData.ad_derived_subject,
         autoenroll_enabled: formData.autoenroll_enabled,
         allowed_ad_group: formData.allowed_ad_group.trim(),
@@ -993,6 +998,16 @@ function TemplateForm({ template, onSubmit, onCancel }) {
             ))}
           </div>
           <p className="text-xs text-text-secondary mt-1">{t('templates.sanTypesHint')}</p>
+          <label className={`${checkboxCls} mt-2`}>
+            <input
+              type="checkbox"
+              checked={formData.enforce_san_types}
+              onChange={(e) => set('enforce_san_types', e.target.checked)}
+              className="accent-accent-primary"
+            />
+            {t('templates.enforceSanTypes')}
+          </label>
+          <p className="text-xs text-text-secondary mt-1">{t('templates.enforceSanTypesDescription')}</p>
         </div>
       </div>
 

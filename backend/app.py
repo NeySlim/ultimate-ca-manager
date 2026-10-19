@@ -1367,7 +1367,8 @@ def init_database(app):
                         "basic_constraints": {"ca": False},
                         "san_types": ["dns", "ip"]
                     }),
-                    "is_system": True
+                    "is_system": True,
+                    "enforce_san_types": False
                 },
                 {
                     "name": "Client Certificate",
@@ -1381,9 +1382,10 @@ def init_database(app):
                         "key_usage": ["digitalSignature", "keyEncipherment"],
                         "extended_key_usage": ["clientAuth"],
                         "basic_constraints": {"ca": False},
-                        "san_types": ["email"]
+                        "san_types": ["dns", "email", "upn"]
                     }),
-                    "is_system": True
+                    "is_system": True,
+                    "enforce_san_types": False
                 },
                 {
                     "name": "VPN Server",
@@ -1399,7 +1401,8 @@ def init_database(app):
                         "basic_constraints": {"ca": False},
                         "san_types": ["dns", "ip"]
                     }),
-                    "is_system": True
+                    "is_system": True,
+                    "enforce_san_types": False
                 },
                 {
                     "name": "Email (S/MIME)",
@@ -1415,7 +1418,8 @@ def init_database(app):
                         "basic_constraints": {"ca": False},
                         "san_types": ["email"]
                     }),
-                    "is_system": True
+                    "is_system": True,
+                    "enforce_san_types": False
                 },
                 # CA template removed — CAs are created from the CAs page, not via templates
                 {
@@ -1432,7 +1436,8 @@ def init_database(app):
                         "basic_constraints": {"ca": False},
                         "san_types": []
                     }),
-                    "is_system": True
+                    "is_system": True,
+                    "enforce_san_types": False
                 },
                 {
                     "name": "Smartcard Logon",
@@ -1446,9 +1451,10 @@ def init_database(app):
                         "key_usage": ["digitalSignature", "keyEncipherment"],
                         "extended_key_usage": ["clientAuth", "msSmartcardLogin"],
                         "basic_constraints": {"ca": False},
-                        "san_types": ["upn"]
+                        "san_types": ["upn", "email"]
                     }),
-                    "is_system": True
+                    "is_system": True,
+                    "enforce_san_types": False
                 }
             ]
             

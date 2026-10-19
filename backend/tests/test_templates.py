@@ -181,7 +181,7 @@ class TestListTemplates:
         if isinstance(ext, str):
             ext = json.loads(ext)
         assert ext['extended_key_usage'] == ['clientAuth', 'msSmartcardLogin']
-        assert ext['san_types'] == ['upn']
+        assert ext['san_types'] == ['upn', 'email']
 
     def test_create_smartcard_logon_template(self, auth_client):
         """smartcard_logon is an accepted template_type over the API."""

@@ -244,3 +244,58 @@ def test_sqlite_turns_ocsp_reason_names_into_codes():
     m.upgrade(conn)
     rows = dict(conn.execute("SELECT id, revocation_reason FROM ocsp_responses").fetchall())
     assert rows == {1: 1, 2: 10, 3: 4, 4: None, 5: None}
+
+
+TEMPLATE_ROWS = [
+    (1, 'Smartcard Logon', 1, json.dumps({'key_usage': ['digitalSignature'], 'san_types': ['upn']})),
+    (2, 'Client Authentication', 1, json.dumps({'san_types': ['dns']})),  # changed by an admin
+    (3, 'VPN Client', 0, json.dumps({'san_types': ['email']})),  # a user template of that name
+]
+TEMPLATES_AFTER = {
+    1: {'key_usage': ['digitalSignature'], 'san_types': ['upn', 'email']},
+    2: {'san_types': ['dns']},
+    3: {'san_types': ['email']},
+}
+
+
+def test_sqlite_templates_keep_their_behaviour():
+    m = _migration()
+    conn = sqlite3.connect(':memory:')
+    conn.execute("CREATE TABLE certificate_templates (id INTEGER PRIMARY KEY, name TEXT, is_system BOOLEAN, "
+                 "extensions_template TEXT)")
+    conn.executemany("INSERT INTO certificate_templates VALUES (?, ?, ?, ?)", TEMPLATE_ROWS)
+    m.upgrade(conn)
+    m.upgrade(conn)
+    rows = conn.execute("SELECT id, enforce_san_types, extensions_template FROM certificate_templates").fetchall()
+    assert {r[0]: json.loads(r[2]) for r in rows} == TEMPLATES_AFTER
+    assert {r[1] for r in rows} == {0}
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_postgres_templates_keep_their_behaviour():
+    m = _migration()
+    schema = f"migtest_102s_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
+    engine = create_engine(PG_URL)
+    conn = engine.connect()
+    try:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.execute(text(f"CREATE SCHEMA {schema}"))
+        conn.execute(text(f"SET search_path TO {schema}"))
+        conn.execute(text("CREATE TABLE certificate_templates (id INTEGER PRIMARY KEY, name TEXT, "
+                          "is_system BOOLEAN, extensions_template TEXT)"))
+        for tid, name, is_system, ext in TEMPLATE_ROWS:
+            conn.execute(text("INSERT INTO certificate_templates VALUES (:i, :n, :s, :e)"),
+                         {'i': tid, 'n': name, 's': bool(is_system), 'e': ext})
+        m.upgrade(conn)
+        m.upgrade(conn)
+        rows = conn.execute(text(
+            "SELECT id, enforce_san_types, extensions_template FROM certificate_templates")).fetchall()
+        assert {r[0]: json.loads(r[2]) for r in rows} == TEMPLATES_AFTER
+        assert {r[1] for r in rows} == {False}
+    finally:
+        conn.rollback()
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.commit()
+        conn.close()
+        engine.dispose()
