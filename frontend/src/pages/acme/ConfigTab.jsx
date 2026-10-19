@@ -197,6 +197,16 @@ export default function ConfigTab({ acmeSettings, cas, templates = [], updateSet
         </div>
       </CompactSection>
 
+      <CompactSection title={t('acme.challengeTargets')} icon={ArrowsClockwise}>
+        <ToggleSwitch
+          checked={acmeSettings.allow_private_ips ?? true}
+          onChange={(val) => updateSetting('allow_private_ips', val)}
+          disabled={!canWrite}
+          label={t('acme.allowPrivateIps')}
+          description={t('acme.allowPrivateIpsDesc')}
+        />
+      </CompactSection>
+
       <CompactSection title={t('acme.caaSection')} icon={ArrowsClockwise}>
         <div className="space-y-2">
           <Input

@@ -80,7 +80,7 @@ export default {
         title: '在内部 / 私有 IP 上的 ACME',
         content: 'HTTP-01 和 TLS-ALPN-01 验证对 RFC1918、loopback、.lan / .local / .corp 目标开箱即用, UCM 的主要部署模式。',
         items: [
-          { label: '开关', text: 'Settings → SystemConfig → acme.allow_private_ips(默认:true)' },
+          { label: '开关', text: 'ACME → ACME服务器 → 允许私有和内部地址(默认:开启)' },
           { label: '开关', text: 'Let\'s Encrypt 标签页 → 允许回环 ACME CA, 用于 127.0.0.1 上的同机 CA（默认：关闭）' },
           { label: '始终阻止', text: '云元数据 IP(169.254.169.254、fd00:ec2::254 等)无条件阻止' },
         ]

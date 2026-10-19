@@ -80,7 +80,7 @@ export default {
         title: 'ACME em IPs internos / privados',
         content: 'A validação HTTP-01 e TLS-ALPN-01 funciona nativamente para alvos RFC1918, loopback, .lan / .local / .corp, o modelo de implantação principal do UCM.',
         items: [
-          { label: 'Toggle', text: 'Settings → SystemConfig → acme.allow_private_ips (padrão: true)' },
+          { label: 'Toggle', text: 'ACME → Servidor ACME → Permitir endereços privados e internos (padrão: ativado)' },
           { label: 'Toggle', text: 'Aba Let\'s Encrypt → Permitir CA ACME em loopback, para uma CA colocalizada em 127.0.0.1 (padrão: desativado)' },
           { label: 'Sempre bloqueado', text: 'IPs de metadados cloud (169.254.169.254, fd00:ec2::254, etc.) são bloqueados incondicionalmente' },
         ]

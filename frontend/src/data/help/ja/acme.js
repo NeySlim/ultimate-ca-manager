@@ -80,7 +80,7 @@ export default {
         title: '内部 / プライベート IP 上の ACME',
         content: 'HTTP-01 および TLS-ALPN-01 検証は、RFC1918、loopback、.lan / .local / .corp ターゲットでデフォルトで動作します, UCM の主要なデプロイメントモデル。',
         items: [
-          { label: 'トグル', text: 'Settings → SystemConfig → acme.allow_private_ips(デフォルト: true)' },
+          { label: 'トグル', text: 'ACME → ACMEサーバー → プライベートおよび内部アドレスを許可(デフォルト: オン)' },
           { label: 'トグル', text: 'Let\'s Encrypt タブ → ループバック ACME CA を許可, 127.0.0.1 上の同居 CA 向け（デフォルト: オフ）' },
           { label: '常時ブロック', text: 'クラウドメタデータ IP(169.254.169.254、fd00:ec2::254 など)は無条件にブロック' },
         ]

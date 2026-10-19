@@ -19,6 +19,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - A change to the password policy (minimum length, character classes) only applied after a restart; it now applies at once in every worker.
 - ACME: "Allow wildcard" on a domain had no effect; the ACME server and the ACME proxy now refuse `*.` identifiers for a domain where it is off (`rejectedIdentifier`).
 - HSM: Azure Key Vault ignored the tenant, client ID and secret typed in the form and signed in with the host's ambient identity; it now uses them, and falls back to the managed identity only when all three are empty.
+- ACME server: whether HTTP-01 and TLS-ALPN-01 may reach private addresses could only be changed in the database, and the in-app help pointed at a page that does not exist; the switch is now under ACME > Local ACME > Challenge targets.
 
 ## [2.242] - 2026-10-18
 

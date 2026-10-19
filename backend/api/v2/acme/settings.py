@@ -123,6 +123,8 @@ def get_acme_settings():
     caa_enforce = bool(caa_enforce_cfg and caa_enforce_cfg.value == 'true')
     caa_ident_cfg = SystemConfig.query.filter_by(key='acme_caa_identifiers').first()
     caa_identifiers = caa_ident_cfg.value if caa_ident_cfg else ''
+    private_cfg = SystemConfig.query.filter_by(key='acme.allow_private_ips').first()
+    allow_private_ips = private_cfg is None or str(private_cfg.value).strip().lower() in ('1', 'true', 'yes', 'on')
 
     # Get CA name if CA ID is set
     ca_name = None
@@ -148,6 +150,8 @@ def get_acme_settings():
         'superseded_count': superseded_count,
         'caa_enforce': caa_enforce,
         'caa_identifiers': caa_identifiers,
+        # HTTP-01 / TLS-ALPN-01 towards RFC 1918, loopback and link-local targets
+        'allow_private_ips': allow_private_ips,
         'terms_of_service': terms_of_service,
         # ACME Profiles Extension (draft-ietf-acme-profiles). Returned
         # normalised (defaults filled in) so the UI shows what clients get.
@@ -215,6 +219,14 @@ def update_acme_settings():
                                    description='Fail ACME issuance on CAA DNS lookup errors')
             db.session.add(caa_cfg)
         caa_cfg.value = 'true' if data['caa_enforce'] else 'false'
+
+    if 'allow_private_ips' in data:
+        private_cfg = SystemConfig.query.filter_by(key='acme.allow_private_ips').first()
+        if not private_cfg:
+            private_cfg = SystemConfig(key='acme.allow_private_ips',
+                                       description='HTTP-01/TLS-ALPN-01 may target private addresses')
+            db.session.add(private_cfg)
+        private_cfg.value = 'true' if data['allow_private_ips'] else 'false'
 
     if 'caa_identifiers' in data:
         ident_cfg = SystemConfig.query.filter_by(key='acme_caa_identifiers').first()
