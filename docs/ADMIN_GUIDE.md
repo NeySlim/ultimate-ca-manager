@@ -266,7 +266,7 @@ UCM supports two database backends:
 
 The active backend is selected by the `DATABASE_URL` environment variable (or `/etc/ucm/ucm.env` on DEB/RPM):
 
-- **Unset** → SQLite at `UCM_DATA_DIR/ucm.db`
+- **Unset** → SQLite at `DATA_DIR/ucm.db`
 - **`postgresql://user:pass@host:5432/dbname`** → PostgreSQL
 
 ### Switching Backend (UI)

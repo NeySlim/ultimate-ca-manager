@@ -54,9 +54,6 @@ services:
       
       # Disable backups for development
       - UCM_BACKUP_ENABLED=false
-      
-      # Verbose SQL logging
-      - SQL_DEBUG=false  # Set true if needed (very verbose!)
     
     # Override command to use Flask dev server with auto-reload
     command: python3 -m flask run --host=0.0.0.0 --port=${UCM_HTTPS_PORT:-8443} --cert=data/https_cert.pem --key=data/https_key.pem --reload

@@ -240,7 +240,6 @@ class Config:
     # Docker: Uses UCM_FQDN env var
     # Native: Uses hostname -f or FQDN env var
     FQDN = get_system_fqdn()
-    HTTP_PORT = int(os.getenv("HTTP_PORT", "80"))  # For redirect URL construction
     
     # File paths
     CA_DIR = DATA_DIR / "ca"
