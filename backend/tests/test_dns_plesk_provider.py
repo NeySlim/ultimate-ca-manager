@@ -322,3 +322,24 @@ class TestDeleteTxtRecord:
             assert provider.delete_txt_record("example.com", "_acme-challenge.example.com")[0]
 
         assert post.call_count == 3
+
+class TestSavedFlags:
+    """The edit form gets saved checkbox values, never the secret or the target."""
+
+    def test_get_and_list_expose_only_checkbox_values(self, auth_client):
+        r = auth_client.post("/api/v2/dns-providers", json={
+            "name": "plesk-flags", "provider_type": "plesk",
+            "credentials": {**CREDS, "verify_ssl": "false"}})
+        assert r.status_code == 201, r.data
+        provider_id = r.get_json()["data"]["id"]
+        try:
+            one = auth_client.get(f"/api/v2/dns-providers/{provider_id}")
+            listed = auth_client.get("/api/v2/dns-providers")
+            row = next(p for p in listed.get_json()["data"] if p["id"] == provider_id)
+            for data, body in ((one.get_json()["data"], one.get_data(as_text=True)),
+                               (row, listed.get_data(as_text=True))):
+                assert data["credential_flags"] == {"verify_ssl": False}
+                assert CREDS["api_key"] not in body
+                assert CREDS["server_url"] not in body
+        finally:
+            auth_client.delete(f"/api/v2/dns-providers/{provider_id}")

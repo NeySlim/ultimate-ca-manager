@@ -23,13 +23,32 @@ logger = logging.getLogger(__name__)
 
 bp = Blueprint('dns_providers', __name__)
 
+_SECRET_HINTS = ('secret', 'token', 'password', 'key')
+
+
+def _provider_dict(provider):
+    """Key names plus the saved checkbox values, so the edit form shows them; never a secret."""
+    data = provider.to_dict(include_credentials=True)
+    provider_class = get_provider_class(provider.provider_type)
+    try:
+        saved = json.loads(provider.credentials or '{}') or {}
+    except (TypeError, ValueError):
+        saved = {}
+    if provider_class and isinstance(saved, dict):
+        data['credential_flags'] = {
+            f['name']: provider_class.parse_flag(saved[f['name']], f.get('default', False))
+            for f in provider_class.get_credential_schema()
+            if f.get('type') == 'checkbox' and f['name'] in saved
+            and not any(h in f['name'].lower() for h in _SECRET_HINTS)}
+    return data
+
 
 @bp.route('/api/v2/dns-providers', methods=['GET'])
 @require_auth(['read:acme'])
 def list_providers():
     """List all configured DNS providers"""
     providers = DnsProvider.query.order_by(DnsProvider.name).all()
-    return success_response(data=[p.to_dict(include_credentials=True) for p in providers])
+    return success_response(data=[_provider_dict(p) for p in providers])
 
 
 @bp.route('/api/v2/dns-providers/types', methods=['GET'])
@@ -121,10 +140,7 @@ def get_provider(provider_id):
     if not provider:
         return error_response('Provider not found', 404)
     
-    return success_response(data=provider.to_dict(include_credentials=True))
-
-
-_SECRET_HINTS = ('secret', 'token', 'password', 'key')
+    return success_response(data=_provider_dict(provider))
 
 
 def _given(value):

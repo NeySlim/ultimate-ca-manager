@@ -21,11 +21,16 @@ export default function DnsProviderForm({ provider, providerTypes, onSubmit, onC
   })
   
   const existingCredentialKeys = provider?.credential_keys || []
+  const savedFlags = provider?.credential_flags || {}
   const selectedType = providerTypes.find(pt => pt.type === formData.provider_type)
-  // Saved values are never shown: typing a target field asks for the saved secrets again
+  // Saved text values are never shown: typing a target field asks for the saved secrets again
   const typed = (name) => String(formData.credentials[name] || '').trim() !== ''
+  const flagValue = (field) => formData.credentials[field.name] ?? savedFlags[field.name] ?? field.default ?? false
+  const changed = (field) => field.type === 'checkbox'
+    ? field.name in formData.credentials && flagValue(field) !== (savedFlags[field.name] ?? field.default ?? false)
+    : typed(field.name)
   const schema = selectedType?.credentials_schema || []
-  const targetTyped = Boolean(provider) && schema.some(f => !isSecretField(f) && typed(f.name))
+  const targetTyped = Boolean(provider) && schema.some(f => !isSecretField(f) && changed(f))
   const secretMissing = (field) => targetTyped && isSecretField(field)
     && existingCredentialKeys.includes(field.name) && !typed(field.name)
   
@@ -101,7 +106,7 @@ export default function DnsProviderForm({ provider, providerTypes, onSubmit, onC
                   <label className="flex items-start gap-3 cursor-pointer p-2 rounded-lg hover:bg-tertiary-op50 transition-colors">
                     <input
                       type="checkbox"
-                      checked={formData.credentials[field.name] ?? field.default ?? false}
+                      checked={flagValue(field)}
                       onChange={(e) => updateCredential(field.name, e.target.checked)}
                       className="w-4 h-4 mt-0.5 rounded border-border bg-bg-tertiary text-accent-primary focus:ring-accent-primary-op50"
                     />

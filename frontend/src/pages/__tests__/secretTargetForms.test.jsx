@@ -113,6 +113,42 @@ describe('DNS provider', () => {
   })
 })
 
+describe('DNS provider checkbox', () => {
+  const TYPES = [{ type: 'plesk', name: 'Plesk', credentials_schema: [
+    { name: 'server_url', label: 'Server URL', type: 'text', required: true },
+    { name: 'api_key', label: 'API Key', type: 'password', required: true },
+    { name: 'verify_ssl', label: 'Verify TLS', type: 'checkbox', required: false, default: true },
+  ] }]
+  const PROVIDER = { id: 3, name: 'plesk', provider_type: 'plesk',
+    credential_keys: ['server_url', 'api_key', 'verify_ssl'] }
+  const renderForm = (provider, onSubmit = vi.fn()) => render(
+    <DnsProviderForm provider={provider} providerTypes={TYPES} onSubmit={onSubmit} onCancel={() => {}} />)
+
+  it('shows the saved value, not the default', () => {
+    renderForm({ ...PROVIDER, credential_flags: { verify_ssl: false } })
+    expect(screen.getByRole('checkbox', { name: /Verify TLS/ })).not.toBeChecked()
+  })
+
+  it('falls back to the default when nothing is saved', () => {
+    renderForm(PROVIDER)
+    expect(screen.getByRole('checkbox', { name: /Verify TLS/ })).toBeChecked()
+  })
+
+  it('asks for the key only when the saved value changes', () => {
+    const onSubmit = vi.fn()
+    const { container } = renderForm({ ...PROVIDER, credential_flags: { verify_ssl: true } }, onSubmit)
+    const box = screen.getByRole('checkbox', { name: /Verify TLS/ })
+    fireEvent.click(box)
+    expect(screen.getByText(MESSAGE)).toBeInTheDocument()
+    submit(container)
+    expect(onSubmit).not.toHaveBeenCalled()
+    fireEvent.click(box)
+    expect(screen.queryByText(MESSAGE)).not.toBeInTheDocument()
+    submit(container)
+    expect(onSubmit).toHaveBeenCalledTimes(1)
+  })
+})
+
 describe('Microsoft CA', () => {
   const CONNECTION = { id: 4, name: 'ADCS', server: 'adcs.corp.example', auth_method: 'basic', username: 'u',
     password: '***', use_ssl: true, verify_ssl: true, ca_bundle: '', winrm_host: '', winrm_port: 5986,
