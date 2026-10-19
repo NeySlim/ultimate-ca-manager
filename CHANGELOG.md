@@ -38,6 +38,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - API keys are also accepted as `Authorization: Bearer ucm_ak_...`, with the same scopes and CSRF exemption as `X-API-Key`; a key that fails is now refused instead of falling back to the browser session. A bearer token without the `ucm_ak_` prefix, such as an IdP token relayed by an authenticating proxy, is ignored and the session applies as before.
 - SAML providers have a NameID format setting (unspecified, persistent, email address or transient), sent in each AuthnRequest and published in the SP metadata; the format used to be read from a setting that could not be saved, so UCM always asked for "unspecified".
 - Settings > Security: the OCSP responder certificate auto-renewal switch and its window (days before expiry), which the daily task already read but nothing could set.
+- ACME DNS providers: Plesk, through its XML API; TLS verification can be turned off for a self-signed panel and a propagation delay added (#401, by @ziller-hqs).
 
 ### Changed
 
@@ -102,6 +103,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Templates: the "Subject Alternative Names" types of a template were never enforced. A new "Enforce the allowed SAN types" switch makes the issue form, Sign CSR, ACME profiles, SCEP, WSTEP, renewals and approvals refuse a request carrying another name type, naming it. Upgrade note: existing and built-in templates keep accepting every type until the switch is turned on (the built-in client, VPN client and smartcard lists now include the names those certificates carry); new templates have it on.
 - OCSP: on PostgreSQL, the response for a certificate revoked with a reason was never cached, its reason name going into an integer column, and a SQLite database holding such rows could not be migrated to PostgreSQL. The cache stores the CRLReason code, and existing rows are converted at upgrade.
 - CSRs: a Windows or Intune request (CA:FALSE with a path length) failed to upload with an error 500 and could not be signed or approved; it now goes through like any other, and so do an ACME order finalized with such a request, EST re-enrolment and server key generation, and the import of such a CSR.
+- ACME client: an order invalidated by a failed challenge said "Order became invalid: Unknown"; it now gives the error the CA reported for the challenge (#401, by @ziller-hqs).
 
 ### Security
 
