@@ -8,7 +8,7 @@ import pytest
 from sqlalchemy import create_engine, text
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
-KEPT = ('session_timeout', 'acme.enabled')
+KEPT = ('session_timeout', 'acme.enabled', 'system_name')
 
 
 def _migration():
@@ -214,6 +214,53 @@ def test_postgres_converts_the_legacy_report_switches():
         m.upgrade(conn)
         m.upgrade(conn)
         _check_legacy_reports(dict(conn.execute(text("SELECT key, value FROM system_config")).fetchall()))
+    finally:
+        conn.rollback()
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.commit()
+        conn.close()
+        engine.dispose()
+
+
+SITE = {'site_name': 'pki-site', 'system_name': ''}
+
+
+def _check_site_name(config):
+    assert 'site_name' not in config
+    assert config['system_name'] == 'pki-site'
+
+
+def test_sqlite_carries_site_name_into_system_name():
+    m = _migration()
+    conn = sqlite3.connect(':memory:')
+    conn.execute("CREATE TABLE system_config (id INTEGER PRIMARY KEY NOT NULL, key VARCHAR(100) NOT NULL, value TEXT)")
+    conn.executemany("INSERT INTO system_config (key, value) VALUES (?, ?)", list(SITE.items()))
+    m.upgrade(conn)
+    m.upgrade(conn)
+    rows = conn.execute("SELECT key, value FROM system_config").fetchall()
+    assert len(rows) == 1
+    _check_site_name(dict(rows))
+
+
+@pytest.mark.postgres
+@pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
+def test_postgres_carries_site_name_into_system_name():
+    m = _migration()
+    schema = f"migtest_102s_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
+    engine = create_engine(PG_URL)
+    conn = engine.connect()
+    try:
+        conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        conn.execute(text(f"CREATE SCHEMA {schema}"))
+        conn.execute(text(f"SET search_path TO {schema}"))
+        conn.execute(text("CREATE TABLE system_config (id SERIAL PRIMARY KEY, key VARCHAR(100) NOT NULL, value TEXT)"))
+        for k, v in SITE.items():
+            conn.execute(text("INSERT INTO system_config (key, value) VALUES (:k, :v)"), {'k': k, 'v': v})
+        m.upgrade(conn)
+        m.upgrade(conn)
+        rows = conn.execute(text("SELECT key, value FROM system_config")).fetchall()
+        assert len(rows) == 1
+        _check_site_name(dict(rows))
     finally:
         conn.rollback()
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))

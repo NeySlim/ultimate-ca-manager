@@ -42,7 +42,7 @@ class TestAuthRequired:
         assert response.status_code == 401, response.data
 
     def test_patch_general_requires_auth(self, client):
-        r = patch_json(client, '/api/v2/settings/general', {'site_name': 'X'})
+        r = patch_json(client, '/api/v2/settings/general', {'system_name': 'X'})
         assert r.status_code == 401, r.data
 
     # Backup
@@ -138,7 +138,7 @@ class TestGeneralSettings:
     def test_get_general_settings(self, auth_client):
         r = auth_client.get('/api/v2/settings/general')
         data = assert_success(r)
-        assert 'site_name' in data
+        assert 'system_name' in data
         assert 'timezone' in data
         assert 'session_timeout' in data
         assert 'max_login_attempts' in data
@@ -157,17 +157,17 @@ class TestGeneralSettings:
         assert isinstance(data['backup_retention_days'], int)
         assert isinstance(data['auto_backup_enabled'], bool)
 
-    def test_patch_general_site_name(self, auth_client):
-        r = patch_json(auth_client, '/api/v2/settings/general', {'site_name': 'Test UCM'})
+    def test_patch_general_system_name(self, auth_client):
+        r = patch_json(auth_client, '/api/v2/settings/general', {'system_name': 'Test UCM'})
         assert_success(r)
         # Verify saved
         r = auth_client.get('/api/v2/settings/general')
         data = assert_success(r)
-        assert data['site_name'] == 'Test UCM'
+        assert data['system_name'] == 'Test UCM'
 
     def test_patch_general_multiple_fields(self, auth_client):
         updates = {
-            'site_name': 'Multi-Update UCM',
+            'system_name': 'Multi-Update UCM',
             'timezone': 'America/New_York',
             'session_timeout': 7200,
             'max_login_attempts': 3,
@@ -177,7 +177,7 @@ class TestGeneralSettings:
         # Verify
         r = auth_client.get('/api/v2/settings/general')
         data = assert_success(r)
-        assert data['site_name'] == 'Multi-Update UCM'
+        assert data['system_name'] == 'Multi-Update UCM'
         assert data['timezone'] == 'America/New_York'
         assert data['session_timeout'] == 7200
         assert data['max_login_attempts'] == 3
@@ -226,13 +226,13 @@ class TestGeneralSettings:
     def test_patch_general_ignores_unknown_keys(self, auth_client):
         """Unknown keys should be silently ignored, not error."""
         r = patch_json(auth_client, '/api/v2/settings/general', {
-            'site_name': 'After Unknown',
+            'system_name': 'After Unknown',
             'nonexistent_key': 'should_be_ignored',
         })
         assert_success(r)
         r = auth_client.get('/api/v2/settings/general')
         data = assert_success(r)
-        assert data['site_name'] == 'After Unknown'
+        assert data['system_name'] == 'After Unknown'
 
 
 # ============================================================

@@ -217,13 +217,13 @@ class TestScheduledBackupKdf:
             _set('backup_kdf', 'argon2id')
         monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
         try:
-            site_name = auth_client.get('/api/v2/settings/general').get_json()['data']['site_name']
+            site_name = auth_client.get('/api/v2/settings/general').get_json()['data']['system_name']
             assert auth_client.patch('/api/v2/settings/general', json={
-                'site_name': site_name, 'backup_kdf': 'argon2id'}).status_code == 200
+                'system_name': site_name, 'backup_kdf': 'argon2id'}).status_code == 200
             with app.app_context():
                 _set('backup_kdf', 'pbkdf2')
             assert auth_client.patch('/api/v2/settings/general', json={
-                'site_name': site_name, 'backup_kdf': 'argon2id'}).status_code == 400
+                'system_name': site_name, 'backup_kdf': 'argon2id'}).status_code == 400
         finally:
             with app.app_context():
                 _delete('backup_kdf')

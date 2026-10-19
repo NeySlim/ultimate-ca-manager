@@ -87,8 +87,7 @@ def _int_config(key, default):
 def get_general_settings():
     """Get general settings from database"""
     return success_response(data={
-        'site_name': get_config('site_name', 'UCM'),
-        'system_name': get_config('system_name', get_config('site_name', 'UCM')),
+        'system_name': get_config('system_name', ''),
         'timezone': get_config('timezone', 'UTC'),
         'auto_backup_enabled': get_config('auto_backup_enabled', 'false') == 'true',
         'backup_frequency': get_config('backup_frequency', 'daily'),
@@ -183,7 +182,7 @@ def update_general_settings():
 
     # List of allowed settings
     allowed_keys = [
-        'site_name', 'system_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',
+        'system_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',
         'backup_retention_days', 'backup_password', 'backup_kdf', 'session_timeout',
         'session_max_lifetime', 'max_login_attempts', 'lockout_duration',
         'protocol_base_url', 'http_protocol_port', 'base_url', 'date_format', 'show_time',

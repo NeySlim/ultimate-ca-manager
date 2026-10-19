@@ -2603,8 +2603,8 @@
     "smtpPort": "SMTP Port",
     "smtpUsername": "SMTP Username",
     "subtitle": "System Configuration",
-    "systemName": "System Name",
-    "systemNameHelper": "Display name for the UCM system",
+    "systemName": "Syslog hostname",
+    "systemNameHelper": "Sent as HOSTNAME in forwarded syslog messages; the machine hostname when empty",
     "systemURL": "System URL",
     "tableCount": "Tables",
     "tabs": {

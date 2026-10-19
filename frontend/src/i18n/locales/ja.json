@@ -2602,8 +2602,8 @@
     "smtpPort": "SMTPポート",
     "smtpUsername": "SMTPユーザー名",
     "subtitle": "システム構成",
-    "systemName": "システム名",
-    "systemNameHelper": "UCMシステムの表示名",
+    "systemName": "Syslog ホスト名",
+    "systemNameHelper": "転送される syslog メッセージの HOSTNAME として送信されます。空欄の場合はマシンのホスト名を使用します",
     "systemURL": "システムURL",
     "tableCount": "テーブル数",
     "tabs": {

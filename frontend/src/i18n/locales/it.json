@@ -2602,8 +2602,8 @@
     "smtpPort": "Porta SMTP",
     "smtpUsername": "Utente SMTP",
     "subtitle": "Configurazione del sistema",
-    "systemName": "Nome sistema",
-    "systemNameHelper": "Nome visualizzato per il sistema UCM",
+    "systemName": "Nome host syslog",
+    "systemNameHelper": "Inviato come HOSTNAME nei messaggi syslog inoltrati; se vuoto, si usa il nome host della macchina",
     "systemURL": "URL sistema",
     "tableCount": "Tabelle",
     "tabs": {

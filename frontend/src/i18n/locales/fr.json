@@ -2464,7 +2464,7 @@
     "lightDesc": "Toujours utiliser le thème clair",
     "backup": "Sauvegarde & Restauration",
     "https": "Certificat HTTPS",
-    "systemName": "Nom du système",
+    "systemName": "Nom d'hôte syslog",
     "systemURL": "URL du système",
     "timezone": "Fuseau horaire",
     "dateFormat": "Format de date",
@@ -2560,7 +2560,7 @@
       "scheduler": "Planificateur",
       "deploy": "Déploiement"
     },
-    "systemNameHelper": "Nom d'affichage du système UCM",
+    "systemNameHelper": "Envoyé comme HOSTNAME dans les messages syslog transmis ; le nom d'hôte de la machine si vide",
     "baseUrl": "URL de base",
     "baseUrlHelper": "URL HTTPS canonique de l'admin (GUI + API). Les IP et alias redirigent vers cette URL.",
     "protocolBaseUrl": "URL de base protocole",

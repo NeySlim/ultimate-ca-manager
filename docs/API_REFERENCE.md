@@ -1773,7 +1773,7 @@ PATCH /api/v2/settings/general
 Content-Type: application/json
 
 {
-  "site_name": "My PKI",
+  "system_name": "pki-01",
   "default_validity_days": 365,
   "require_approval": false
 }

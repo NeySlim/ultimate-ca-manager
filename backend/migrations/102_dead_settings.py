@@ -23,6 +23,7 @@ DEAD_KEYS = (
     'report_compliance_recipients',
     'scep_url',
     'scep_ca_ident',
+    'site_name',
 )
 
 # Legacy report switches nothing ran: (prefix, schedule key, frequency).
@@ -30,6 +31,15 @@ LEGACY_REPORTS = (
     ('report_expiry', 'report_schedule_expiring_certificates', 'daily'),
     ('report_compliance', 'report_schedule_compliance_status', 'weekly'),
 )
+
+
+def _system_name(config):
+    """``site_name`` carried over to ``system_name``, which the settings page
+    showed in its place, when no system name is stored."""
+    site = (config.get('site_name') or '').strip()
+    if site and not (config.get('system_name') or '').strip() and site != 'UCM':
+        return {'system_name': site}
+    return {}
 
 
 def _legacy_schedules(config):
@@ -101,7 +111,10 @@ def _upgrade_sqlite(conn):
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if 'system_config' in tables:
         config = dict(conn.execute("SELECT key, value FROM system_config").fetchall())
-        for key, value in _legacy_schedules(config).items():
+        if _system_name(config):
+            conn.execute("DELETE FROM system_config WHERE key = 'system_name' AND "
+                         "(value IS NULL OR TRIM(value) = '')")
+        for key, value in {**_legacy_schedules(config), **_system_name(config)}.items():
             conn.execute("INSERT INTO system_config (key, value) VALUES (?, ?)", (key, value))
         conn.executemany("DELETE FROM system_config WHERE key = ?", [(k,) for k in DEAD_KEYS])
     if 'discovery_scan_profiles' in tables:
@@ -124,7 +137,10 @@ def _upgrade_pg(conn):
     tables = set(inspect(conn).get_table_names())
     if 'system_config' in tables:
         config = dict(conn.execute(text("SELECT key, value FROM system_config")).fetchall())
-        for key, value in _legacy_schedules(config).items():
+        if _system_name(config):
+            conn.execute(text("DELETE FROM system_config WHERE key = 'system_name' AND "
+                              "(value IS NULL OR TRIM(value) = '')"))
+        for key, value in {**_legacy_schedules(config), **_system_name(config)}.items():
             conn.execute(text("INSERT INTO system_config (key, value) VALUES (:k, :v)"),
                          {'k': key, 'v': value})
         conn.execute(text("DELETE FROM system_config WHERE key IN :keys").bindparams(

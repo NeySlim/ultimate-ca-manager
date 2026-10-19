@@ -2602,8 +2602,8 @@
     "smtpPort": "SMTP端口",
     "smtpUsername": "SMTP用户名",
     "subtitle": "系统配置",
-    "systemName": "系统名称",
-    "systemNameHelper": "UCM系统的显示名称",
+    "systemName": "Syslog 主机名",
+    "systemNameHelper": "作为转发的 syslog 消息中的 HOSTNAME 发送；留空则使用本机主机名",
     "systemURL": "系统URL",
     "tableCount": "表数",
     "tabs": {

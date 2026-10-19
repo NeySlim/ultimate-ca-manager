@@ -2634,8 +2634,8 @@
     "smtpPort": "Порт SMTP",
     "smtpUsername": "Користувач SMTP",
     "subtitle": "Конфігурація системи",
-    "systemName": "Назва системи",
-    "systemNameHelper": "Відображуване ім'я системи UCM",
+    "systemName": "Ім'я хоста syslog",
+    "systemNameHelper": "Надсилається як HOSTNAME у пересланих повідомленнях syslog; якщо порожнє, використовується ім'я хоста машини",
     "systemURL": "URL системи",
     "tableCount": "Таблиці",
     "tabs": {
