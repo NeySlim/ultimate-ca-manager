@@ -23,6 +23,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME: "Allow wildcard" on a domain had no effect; the ACME server and the ACME proxy now refuse `*.` identifiers for a domain where it is off (`rejectedIdentifier`).
 - HSM: Azure Key Vault ignored the tenant, client ID and secret typed in the form and signed in with the host's ambient identity; it now uses them, and falls back to the managed identity only when all three are empty.
 - ACME server: whether HTTP-01 and TLS-ALPN-01 may reach private addresses could only be changed in the database, and the in-app help pointed at a page that does not exist; the switch is now under ACME > Local ACME > Challenge targets.
+- Users: the user detail showed "Enable 2FA" and "TOTP" as off for every user, and never offered "Reset 2FA", because it read fields the API does not set; it now shows the real two-factor state, and the unused `mfa_enabled` field is no longer returned.
 
 ## [2.242] - 2026-10-18
 
