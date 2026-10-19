@@ -91,6 +91,8 @@ Registre chaves de segurança de hardware ou autenticadores biométricos:
 
 Com 2FA ativada ou obrigatória, uma chave registrada também pode concluir a segunda etapa de um login com senha: escolha **Usar uma chave de segurança**.
 
+Sem um aplicativo autenticador, ative **Chave de segurança como segundo fator** na seção de autenticação de dois fatores: cada login com senha passa a pedir uma das suas chaves, e a última chave não pode ser removida enquanto a opção estiver ativa.
+
 ### Certificados mTLS
 Gerencie certificados de cliente para autenticação TLS mútua:
 - Enviar um certificado de cliente

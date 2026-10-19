@@ -91,6 +91,8 @@ Registra claves de seguridad de hardware o autenticadores biométricos:
 
 Con 2FA activada o impuesta, una llave registrada también puede completar el segundo paso de un inicio de sesión con contraseña: elija **Usar una llave de seguridad**.
 
+Sin aplicación de autenticación, active **Llave de seguridad como segundo factor** en la sección de autenticación de dos factores: cada inicio de sesión con contraseña pedirá entonces una de sus llaves, y la última llave no puede eliminarse mientras esté activado.
+
 ### Certificados mTLS
 Gestiona certificados de cliente para autenticación TLS mutua:
 - Sube un certificado de cliente

@@ -269,11 +269,11 @@ def login_password():
     if not ok:
         return _err
 
-    # Second factor: TOTP (with recovery codes) and/or a security key. A key
-    # also satisfies enforced 2FA, in place of enrolling TOTP.
-    from auth.twofa_enforcement import enforcement_active_for
-    second_factors = _second_factors(user)
-    if user.totp_confirmed or ('webauthn' in second_factors and enforcement_active_for(user)):
+    # Second factor: TOTP (with recovery codes) and/or a security key, the key
+    # when 2FA is enforced or the user turned it on as second factor.
+    from auth.twofa_enforcement import second_factor_methods
+    second_factors = second_factor_methods(user)
+    if second_factors:
         session.clear()
         session['pending_2fa_user_id'] = user.id
         session['pending_2fa_username'] = user.username
@@ -444,14 +444,6 @@ def login_2fa():
 
     _clear_2fa_failures(lockout_key, _2fa_failed_attempts)
     return _complete_2fa_login(user, auth_method, f'Login successful with 2FA for {user.username}')
-
-
-def _second_factors(user):
-    """Second factors this account can answer with after its password."""
-    methods = ['totp'] if user.totp_confirmed else []
-    if WebAuthnCredential.query.filter_by(user_id=user.id, enabled=True).first():
-        methods.append('webauthn')
-    return methods
 
 
 def _pending_2fa_user():

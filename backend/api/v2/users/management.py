@@ -106,8 +106,9 @@ def reset_user_2fa(user_id):
 
     POST /api/v2/users/{user_id}/reset-2fa
 
-    The user keeps their account but must re-enrol TOTP on next login if
-    enforcement applies. To let them in without 2FA, also set ``totp_exempt``.
+    TOTP and the key-as-second-factor choice are cleared; registered keys stay
+    (an administrator can remove a lost one). Under enforcement, a user left
+    without a key re-enrols on next login; ``totp_exempt`` lets them in without 2FA.
     """
     # SECURITY: only admins may reset another user's 2FA
     if g.current_user.role != 'admin':
@@ -120,6 +121,7 @@ def reset_user_2fa(user_id):
     user.totp_confirmed = False
     user.totp_secret = None
     user.backup_codes = None
+    user.webauthn_2fa = False
     ok, _err = safe_commit(logger, "Failed to reset user 2FA")
     if not ok:
         return _err

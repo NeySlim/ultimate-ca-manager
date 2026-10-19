@@ -14,6 +14,9 @@ from utils.backup_codes import (
     verify_code_only as backup_verify,
 )
 from auth.unified import require_auth
+from auth.twofa_enforcement import (
+    enforcement_active_for, has_security_key, lock_for_factor_change, lock_user,
+)
 import pyotp
 import qrcode
 
@@ -132,15 +135,14 @@ def disable_2fa():
     if not code and not backup_code:
         return error_response('Code or backup code required', 400)
 
-    # Under enforced 2FA (#141), TOTP may go only if a security key remains;
+    # Required 2FA (#141, or a key turned on as second factor) keeps one factor;
     # checked under the user row lock so a concurrent key removal cannot race it.
-    from auth.twofa_enforcement import lock_for_factor_change
     user, refused = lock_for_factor_change(g.current_user.id, dropping_totp=True)
     if not user:
         return error_response('User not found', 404)
     if refused:
         return error_response(
-            '2FA is enforced for your account: register a security key before disabling TOTP', 403)
+            'Your account requires a second factor: register a security key before disabling TOTP', 403)
 
     # Verify with TOTP code
     if code:
@@ -154,7 +156,10 @@ def disable_2fa():
         if not backup_verify(user.backup_codes, backup_code):
             return error_response('Invalid backup code', 400)
 
-    # Disable 2FA
+    # Disable 2FA. Under enforcement the remaining key becomes the user's own
+    # second factor, so lifting enforcement later does not silently drop it.
+    if enforcement_active_for(user) and has_security_key(user):
+        user.webauthn_2fa = True
     user.totp_confirmed = False
     user.totp_secret = None
     user.backup_codes = None
@@ -172,6 +177,45 @@ def disable_2fa():
     )
 
     return success_response(message='2FA disabled successfully')
+
+
+@bp.route('/api/v2/account/2fa/webauthn', methods=['PUT'])
+@require_auth()
+def set_webauthn_second_factor():
+    """Turn a security key on or off as the second factor of password logins.
+
+    PUT /api/v2/account/2fa/webauthn
+    Body: {"enabled": true} or {"enabled": false, "password": "..."}
+    """
+    data = request.get_json(silent=True) or {}
+    enabled = data.get('enabled') if isinstance(data, dict) else None
+    if not isinstance(enabled, bool):
+        return error_response('enabled must be true or false', 400)
+
+    user = lock_user(g.current_user.id)
+    if not user:
+        return error_response('User not found', 404)
+    if enabled and not has_security_key(user):
+        return error_response('Register a security key first', 400)
+    if not enabled and (user.auth_source or 'local') == 'local':
+        password = data.get('password')
+        if not isinstance(password, str) or not user.check_password(password):
+            return error_response('Invalid password', 403)
+
+    user.webauthn_2fa = enabled
+    ok, _err = safe_commit(logger, "Failed to update the security key second factor")
+    if not ok:
+        return _err
+
+    AuditService.log_action(
+        action='mfa_webauthn_enable' if enabled else 'mfa_webauthn_disable',
+        resource_type='user',
+        resource_id=str(user.id),
+        resource_name=user.username,
+        details=f'Security key as second factor {"enabled" if enabled else "disabled"} for {user.username}',
+        success=True
+    )
+    return success_response(data={'webauthn_2fa': enabled})
 
 
 @bp.route('/api/v2/account/2fa/recovery-codes', methods=['GET'])

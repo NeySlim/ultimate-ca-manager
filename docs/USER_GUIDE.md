@@ -218,6 +218,8 @@ With 2FA enabled (or enforced by an administrator), a registered key can answer 
 
 When an administrator enforces 2FA, registering a key fulfils it as well as a TOTP app does; the account must keep at least one of the two.
 
+Without enforcement, turn on **Security key as second factor** under **Account** → **Security** to have every password login ask for one of your keys. Keys used only for passwordless login change nothing until you do.
+
 ---
 
 ## Protocol Configuration

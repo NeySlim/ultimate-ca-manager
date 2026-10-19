@@ -79,6 +79,8 @@ export default function AccountPage() {
   
   // WebAuthn state
   const [webauthnName, setWebauthnName] = useState('')
+  const hasEnabledKey = webauthnCredentials.some(c => c.enabled)
+  const activeFactors = accountData.two_factor_methods || []
   const [webauthnRegistering, setWebauthnRegistering] = useState(false)
 
   // API Key form state
@@ -206,6 +208,28 @@ export default function AccountPage() {
         setQrData(response.data || response)
         setShow2FAModal(true)
       }
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.generic'))
+    }
+  }
+
+  // Security key as the second factor of password logins (needs a registered key)
+  const handleToggleKey2FA = async () => {
+    try {
+      if (accountData.webauthn_2fa) {
+        const password = await showPrompt(t('account.enterPasswordToDisableKey2fa'), {
+          title: t('account.keyAsSecondFactor'),
+          type: 'password',
+          confirmText: t('account.turnOffKey2fa')
+        })
+        if (!password) return
+        await accountService.setWebAuthnSecondFactor(false, password)
+        showSuccess(t('account.key2faDisabled'))
+      } else {
+        await accountService.setWebAuthnSecondFactor(true)
+        showSuccess(t('account.key2faEnabled'))
+      }
+      await loadAccount()
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.generic'))
     }
@@ -613,6 +637,33 @@ export default function AccountPage() {
             {accountData.two_factor_enabled ? t('common.disable2FA') : t('common.enable2FA')}
           </Button>
         </div>
+        <div className="flex items-center justify-between pt-3 mt-3 border-t border-border">
+          <div>
+            <p className="text-sm text-text-primary">{t('account.keyAsSecondFactor')}</p>
+            <p className="text-xs text-text-tertiary mt-0.5">
+              {hasEnabledKey ? t('account.keyAsSecondFactorHint') : t('account.keyAsSecondFactorNoKey')}
+            </p>
+            <div className="flex items-center gap-2 mt-1">
+              <Badge variant={accountData.webauthn_2fa ? 'success' : 'secondary'}>
+                {accountData.webauthn_2fa ? t('common.enabled') : t('common.disabled')}
+              </Badge>
+            </div>
+          </div>
+          <Button
+            size="sm"
+            variant={accountData.webauthn_2fa ? 'danger' : 'primary'}
+            disabled={!accountData.webauthn_2fa && !hasEnabledKey}
+            onClick={handleToggleKey2FA}
+          >
+            {accountData.webauthn_2fa ? t('account.turnOffKey2fa') : t('account.turnOnKey2fa')}
+          </Button>
+        </div>
+        <p className="text-xs text-text-secondary pt-3 mt-3 border-t border-border">
+          {t('account.activeSecondFactors')}: {activeFactors.length
+            ? activeFactors.map(m => (m === 'totp' ? t('account.authenticatorApp') : t('account.securityKey'))).join(', ')
+            : t('account.noSecondFactor')}
+          {accountData.two_factor_enforced && ` (${t('account.twoFactorEnforced')})`}
+        </p>
       </DetailSection>
 
       {/* WebAuthn */}

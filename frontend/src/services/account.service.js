@@ -61,6 +61,10 @@ export const accountService = {
     return apiClient.post('/account/2fa/disable', { code })
   },
 
+  async setWebAuthnSecondFactor(enabled, password) {
+    return apiClient.put('/account/2fa/webauthn', password === undefined ? { enabled } : { enabled, password })
+  },
+
   // WebAuthn / FIDO2
   async getWebAuthnCredentials() {
     return apiClient.get('/webauthn/credentials')

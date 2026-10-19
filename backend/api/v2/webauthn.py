@@ -4,24 +4,29 @@ Manage WebAuthn credentials for passwordless login
 Uses WebAuthnService for proper cryptographic verification
 """
 
+import logging
+
 from flask import Blueprint, request, g, session
 from auth.unified import require_auth
-from auth.twofa_enforcement import ENROLL_SESSION_KEY, lock_for_factor_change
+from auth.twofa_enforcement import ENROLL_SESSION_KEY, lock_for_factor_change, lock_user
 from models import db
 from models.webauthn import WebAuthnCredential
 from services.webauthn_service import WebAuthnService
 from services.audit_service import AuditService
 from utils.response import success_response, error_response
+from utils.db_transaction import safe_commit
+
+logger = logging.getLogger(__name__)
 
 bp = Blueprint('webauthn', __name__, url_prefix='/api/v2/webauthn')
 
 
-_LAST_FACTOR_MESSAGE = ('2FA is enforced for your account: keep TOTP or another '
-                        'security key before removing this one')
+_LAST_FACTOR_MESSAGE = ('Your account requires a second factor: keep TOTP or another '
+                        'security key, or turn off the security key as second factor first')
 
 
 def _strips_last_factor(user, credential_id):
-    """Own enabled key whose removal would leave enforced 2FA without a factor.
+    """Own enabled key whose removal would leave required 2FA without a factor.
 
     Read under the user row lock, held until the removal commits. An administrator
     acting on someone else's key is not blocked (recovery of a lost key).
@@ -122,9 +127,14 @@ def verify_registration():
     if not success:
         return error_response(message, 400)
 
-    # A registered key satisfies a forced-enrolment session (#141): lift the gate.
+    # A registered key satisfies a forced-enrolment session (#141): lift the gate,
+    # and keep the key as this user's second factor if enforcement is lifted later.
     if session.pop(ENROLL_SESSION_KEY, None) is not None:
         session.modified = True
+        owner = lock_user(user.id)
+        owner.webauthn_2fa = True
+        if not safe_commit(logger, "Failed to keep the enrolled key as second factor")[0]:
+            return error_response('Failed to complete 2FA enrolment', 500)
     
     AuditService.log_action(
         action='webauthn_register',

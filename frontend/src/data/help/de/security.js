@@ -118,7 +118,7 @@ Bestimmte IPs oder CIDR-Bereiche blockieren. Alle anderen IPs sind erlaubt.
 ## Zwei-Faktor-Authentifizierung
 
 ### Durchsetzung
-Verlangt von allen Benutzern, 2FA zu aktivieren. Benutzer, die 2FA nicht eingerichtet haben, werden bei der nächsten Anmeldung dazu aufgefordert. Eine TOTP-App oder ein registrierter Sicherheitsschlüssel erfüllt sie, bei der Einrichtung wie bei der Anmeldung. Solange sie erzwungen wird, lässt sich TOTP nur deaktivieren, wenn ein Sicherheitsschlüssel bleibt, und der letzte Schlüssel nur entfernen, wenn TOTP bleibt.
+Verlangt von allen Benutzern, 2FA zu aktivieren. Benutzer, die 2FA nicht eingerichtet haben, werden bei der nächsten Anmeldung dazu aufgefordert. Eine TOTP-App oder ein registrierter Sicherheitsschlüssel erfüllt sie, bei der Einrichtung wie bei der Anmeldung. Solange sie erzwungen wird, lässt sich TOTP nur deaktivieren, wenn ein Sicherheitsschlüssel bleibt, und der letzte Schlüssel nur entfernen, wenn TOTP bleibt. Ein Benutzer, dessen Schlüssel zum zweiten Faktor geworden ist, behält ihn, wenn die Erzwingung aufgehoben wird.
 
 ### Unterstützte Methoden
 - **TOTP**: Zeitbasierte Einmalpasswörter (Authenticator-Apps)

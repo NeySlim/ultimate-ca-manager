@@ -63,6 +63,8 @@ class User(db.Model):
     # Per-user opt-out from forced 2FA enrolment (#141). Set on the initial
     # admin so global enforcement can never lock out the bootstrap account.
     totp_exempt = db.Column(db.Boolean, default=False)
+    # A security key turned on as this account's second factor (password logins).
+    webauthn_2fa = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     
     # Password management
     force_password_change = db.Column(db.Boolean, default=False)  # Must change on next login
@@ -148,6 +150,7 @@ class User(db.Model):
             "totp_enabled": self.totp_confirmed,
             "two_factor_enabled": self.totp_confirmed,
             "totp_exempt": bool(self.totp_exempt),
+            "webauthn_2fa": bool(self.webauthn_2fa),
             "force_password_change": self.force_password_change or False,
             "created_at": utc_isoformat(self.created_at),
             "last_login": utc_isoformat(self.last_login),

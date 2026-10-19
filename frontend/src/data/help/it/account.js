@@ -91,6 +91,8 @@ Registra chiavi di sicurezza hardware o autenticatori biometrici:
 
 Con il 2FA attivo o imposto, una chiave registrata può anche completare il secondo passaggio di un accesso con password: scegli **Usa una chiave di sicurezza**.
 
+Senza un'app di autenticazione, attiva **Chiave di sicurezza come secondo fattore** nella sezione Autenticazione a due fattori: ogni accesso con password richiede allora una delle tue chiavi, e l'ultima chiave non può essere rimossa finché l'opzione è attiva.
+
 ### Certificati mTLS
 Gestisci i certificati client per l'autenticazione TLS reciproca:
 - Carica un certificato client

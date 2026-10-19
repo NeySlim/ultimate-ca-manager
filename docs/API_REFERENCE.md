@@ -136,7 +136,15 @@ POST /api/v2/auth/login/2fa/webauthn/verify
 ```
 Failures with either factor count toward the same 2FA lockout.
 
-Under enforced 2FA, a forced-enrolment session may register a key (`/api/v2/webauthn/register/*`) instead of confirming TOTP. `POST /api/v2/account/2fa/disable` and removing or disabling one's own last key answer 403 when the account would be left with neither TOTP nor an enabled key; an administrator can still remove another user's lost key.
+A user can also make a key the second factor of password logins without enforcement:
+```http
+PUT /api/v2/account/2fa/webauthn
+{ "enabled": true }                          // needs an enabled key
+{ "enabled": false, "password": "..." }      // the account password (local accounts)
+```
+`GET /api/v2/account/profile` reports `webauthn_2fa`, `two_factor_enforced` and `two_factor_methods` (the factors a password login asks for).
+
+Under enforced 2FA, a forced-enrolment session may register a key (`/api/v2/webauthn/register/*`) instead of confirming TOTP. `POST /api/v2/account/2fa/disable` and removing or disabling one's own last key answer 403 when required 2FA (enforced, or a key turned on as second factor) would be left with neither TOTP nor an enabled key; an administrator can still remove another user's lost key, and `POST /api/v2/users/{id}/reset-2fa` also turns the key second factor off.
 
 ### Login with mTLS
 ```http

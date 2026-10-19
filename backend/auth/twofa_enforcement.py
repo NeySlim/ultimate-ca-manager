@@ -65,9 +65,25 @@ def has_security_key(user, *, excluding=None):
     return query.first() is not None
 
 
+def key_is_second_factor(user):
+    """A password login must also present a key: enforced 2FA or the user's own choice."""
+    return enforcement_active_for(user) or bool(getattr(user, 'webauthn_2fa', False))
+
+
+def second_factor_methods(user):
+    """Second factors a password login asks for: empty when it asks for none."""
+    methods = ['totp'] if getattr(user, 'totp_confirmed', False) else []
+    if has_security_key(user) and (methods or key_is_second_factor(user)):
+        methods.append('webauthn')
+    return methods
+
+
 def would_leave_no_second_factor(user, *, dropping_totp=False, dropping_key=None):
-    """True when enforced 2FA would be left with neither TOTP nor an enabled key."""
-    if not enforcement_active_for(user):
+    """True when required 2FA (enforced, or a key the user turned on) would be left
+    with neither TOTP nor an enabled key."""
+    required = enforcement_active_for(user) or (
+        bool(getattr(user, 'webauthn_2fa', False)) and has_security_key(user))
+    if not required:
         return False
     totp_left = bool(getattr(user, 'totp_confirmed', False)) and not dropping_totp
     return not totp_left and not has_security_key(user, excluding=dropping_key)

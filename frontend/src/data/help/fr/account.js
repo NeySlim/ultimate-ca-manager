@@ -91,6 +91,8 @@ Enregistrez des clés de sécurité matérielles ou des authentificateurs biomé
 
 Avec la 2FA activée ou imposée, une clé enregistrée peut aussi valider la seconde étape d'une connexion par mot de passe : choisissez **Utiliser une clé de sécurité**.
 
+Sans application d'authentification, activez **Clé de sécurité comme second facteur** dans la section Authentification à deux facteurs : chaque connexion par mot de passe demande alors l'une de vos clés, et la dernière clé ne peut pas être supprimée tant que l'option est active.
+
 ### Certificats mTLS
 Gérez les certificats client pour l'authentification TLS mutuel :
 - Téléverser un certificat client
