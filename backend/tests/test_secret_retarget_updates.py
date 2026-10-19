@@ -369,6 +369,26 @@ class TestMicrosoftCA:
         assert self._row(app, msca_id) == before
         assert _send(auth_client, 'put', url, {'winrm_password': '', 'password': 'typed'}).status_code == 200
 
+    @pytest.mark.parametrize('mask', ['***', '********'])
+    def test_a_masked_winrm_password_is_kept_not_stored(self, app, auth_client, mask):
+        msca_id = self._make(app, 'saved-winrm')
+        r = _send(auth_client, 'put', f'/api/v2/microsoft-cas/{msca_id}',
+                  {'winrm_password': mask, 'password': mask})
+        assert r.status_code == 200, r.data
+        assert self._row(app, msca_id)[2::3] == ('saved-basic', 'saved-winrm')
+
+    def test_winrm_fields_are_typed_strictly(self, app, auth_client):
+        from models.msca import MicrosoftCA
+        msca_id = self._make(app, 'saved-winrm')
+        url = f'/api/v2/microsoft-cas/{msca_id}'
+        assert _send(auth_client, 'put', url, {'winrm_verify_ssl': 'false', 'winrm_password': 'typed'}
+                     ).status_code == 200
+        with app.app_context():
+            assert db.session.get(MicrosoftCA, msca_id).winrm_verify_ssl is False
+        for body in ({'winrm_use_ssl': 'maybe', 'winrm_password': 'typed'},
+                     {'winrm_password': 12345}):
+            assert _send(auth_client, 'put', url, body).status_code == 400, body
+
     def test_unchanged_targets_and_typed_secrets_are_accepted(self, app, auth_client):
         msca_id = self._make(app, 'saved-winrm')
         url = f'/api/v2/microsoft-cas/{msca_id}'
@@ -526,12 +546,16 @@ class TestIntune:
             'intune_enabled': True, 'intune_app_id': app_id})
         assert r.status_code in (200, 201), r.data
         url = f"/api/v2/scep/profiles/{json.loads(r.data)['data']['id']}"
-        before = self._row(app, app_id)
-        for body in ({'intune_tenant_id': 'attacker.onmicrosoft.com'},
-                     {'intune_enabled': False, 'intune_client_id': 'other-client'}):
-            _refused(_send(auth_client, 'patch', url, body))
-            assert self._row(app, app_id) == before
-        r = _send(auth_client, 'patch', url, {'intune_tenant_id': 'new.onmicrosoft.com',
-                                              'intune_client_secret': 'typed'})
-        assert r.status_code == 200, r.data
-        assert self._row(app, app_id)[1:] == ('new.onmicrosoft.com', before[2], 'typed')
+        try:
+            before = self._row(app, app_id)
+            for body in ({'intune_tenant_id': 'attacker.onmicrosoft.com'},
+                         {'intune_enabled': False, 'intune_client_id': 'other-client'}):
+                _refused(_send(auth_client, 'patch', url, body))
+                assert self._row(app, app_id) == before
+            r = _send(auth_client, 'patch', url, {'intune_tenant_id': 'new.onmicrosoft.com',
+                                                  'intune_client_secret': 'typed'})
+            assert r.status_code == 200, r.data
+            assert self._row(app, app_id)[1:] == ('new.onmicrosoft.com', before[2], 'typed')
+        finally:
+            # Other suites count the SCEP profiles on file
+            auth_client.delete(url)

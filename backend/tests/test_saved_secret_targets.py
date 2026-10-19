@@ -98,8 +98,9 @@ class TestMicrosoftCAAdminChannelTest:
     def _test(self, client, msca_id, body):
         return _post(client, f'/api/v2/microsoft-cas/{msca_id}/admin-channel/test', body)
 
-    def test_the_saved_target_reuses_the_saved_secret(self, auth_client, msca_id, seen):
-        assert self._test(auth_client, msca_id, {'winrm_password': '***'}).status_code == 200
+    @pytest.mark.parametrize('mask', ['***', '********'])
+    def test_the_saved_target_reuses_the_saved_secret(self, auth_client, msca_id, seen, mask):
+        assert self._test(auth_client, msca_id, {'winrm_password': mask}).status_code == 200
         assert seen[-1] == ('adcs.corp.local', 'saved-winrm')
 
     @pytest.mark.parametrize('over', [
@@ -110,6 +111,11 @@ class TestMicrosoftCAAdminChannelTest:
         r = self._test(auth_client, msca_id, {**over, 'winrm_password': ''})
         assert r.status_code == 400, r.data
         assert not seen, 'a saved WinRM or basic password went to a target from the request'
+
+    def test_a_masked_secret_is_not_a_typed_one(self, auth_client, msca_id, seen):
+        r = self._test(auth_client, msca_id, {'winrm_host': 'attacker.example', 'winrm_password': '********'})
+        assert r.status_code == 400, r.data
+        assert not seen
 
     def test_a_typed_secret_may_go_anywhere(self, auth_client, msca_id, seen):
         r = self._test(auth_client, msca_id, {'winrm_host': 'other.example', 'winrm_password': 'typed'})

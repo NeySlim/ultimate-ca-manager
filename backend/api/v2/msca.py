@@ -6,6 +6,7 @@ CRUD for MS CA connections + CSR signing + request status tracking
 import logging
 from flask import Blueprint, request, g
 from auth.unified import require_auth, has_permission as _has_perm
+from services.settings_registry import as_boolean_word
 from utils.secret_target import MASKS, keeps_saved_secret, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
 from models import db
@@ -92,10 +93,12 @@ def _apply_winrm_fields(msca, data):
         if not (1 <= port <= 65535):
             return error_response("winrm_port out of range", 400)
         msca.winrm_port = port
-    if 'winrm_use_ssl' in data:
-        msca.winrm_use_ssl = bool(data['winrm_use_ssl'])
-    if 'winrm_verify_ssl' in data:
-        msca.winrm_verify_ssl = bool(data['winrm_verify_ssl'])
+    for key in ('winrm_use_ssl', 'winrm_verify_ssl'):
+        if key in data:
+            word = as_boolean_word(data[key])
+            if word is None:
+                return error_response(f"{key} must be a boolean", 400)
+            setattr(msca, key, word == 'true')
     if 'winrm_transport' in data:
         err = _winrm_transport_error(data)
         if err:
@@ -103,8 +106,12 @@ def _apply_winrm_fields(msca, data):
         msca.winrm_transport = (data['winrm_transport'] or '').strip().lower()
     if 'winrm_username' in data:
         msca.winrm_username = (data['winrm_username'] or '').strip() or None
-    if 'winrm_password' in data and data['winrm_password'] != '***':
-        msca.winrm_password = data['winrm_password'] or None
+    if 'winrm_password' in data:
+        password = data['winrm_password']
+        if password is not None and not isinstance(password, str):
+            return error_response("winrm_password must be a string", 400)
+        if (password or '').strip() not in MASKS:
+            msca.winrm_password = password or None
     if 'ca_config' in data:
         cfg = (data['ca_config'] or '').strip()
         if cfg and any(c in cfg for c in '"\r\n`$;|&'):
@@ -152,7 +159,7 @@ def _transient_winrm_config(msca, overrides):
 
     data = {k: v for k, v in (overrides or {}).items() if k in _WINRM_OVERRIDE_FIELDS}
     # Empty or masked password means "use the saved one".
-    if not data.get('winrm_password') or data.get('winrm_password') == '***':
+    if not data.get('winrm_password') or str(data['winrm_password']).strip() in MASKS:
         data.pop('winrm_password', None)
     saved_target = _winrm_target(cfg)
     err = _apply_winrm_fields(cfg, data)
@@ -453,12 +460,12 @@ def update_connection(msca_id):
         if auth == 'basic':
             if 'username' in data:
                 msca.username = data['username'].strip()
-            if 'password' in data and data['password'] != '***':
+            if 'password' in data and str(data['password'] or '').strip() not in MASKS:
                 msca.password = data['password']
         elif auth == 'certificate':
             if 'client_cert_pem' in data:
                 msca.client_cert_pem = data['client_cert_pem'].strip() or None
-            if 'client_key_pem' in data and data['client_key_pem'] != '***':
+            if 'client_key_pem' in data and str(data['client_key_pem'] or '').strip() not in MASKS:
                 msca.client_key_pem = data['client_key_pem'].strip() or None
         elif auth == 'kerberos':
             if 'kerberos_principal' in data:
