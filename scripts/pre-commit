@@ -52,8 +52,9 @@ fi
 # Single parallel run (pytest-xdist; --dist loadfile is mandatory, tests
 # share state within a file). Strict: any "failed"/"error" in the summary
 # fails the hook — "1 failed, N passed" used to be accepted.
+# UCM_PYTEST_WORKERS caps the workers when several commits run at once.
 echo -n "  Backend tests... "
-BACK_RESULT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -n auto --dist loadfile 2>&1 | tail -1)
+BACK_RESULT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -n "${UCM_PYTEST_WORKERS:-auto}" --dist loadfile 2>&1 | tail -1)
 if echo "$BACK_RESULT" | grep -q "passed" && ! echo "$BACK_RESULT" | grep -qE "failed|error"; then
     echo -e "${GREEN}✅${NC} $BACK_RESULT"
 else
