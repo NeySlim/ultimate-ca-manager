@@ -64,11 +64,11 @@ spec:
                   name: {{ include "ucm.secretName" . }}
                   key: UCM_JWT_SECRET
             {{- if .Values.initialAdminPassword }}
-            - name: INITIAL_ADMIN_PASSWORD
+            - name: UCM_INITIAL_ADMIN_PASSWORD
               valueFrom:
                 secretKeyRef:
                   name: {{ include "ucm.secretName" . }}
-                  key: INITIAL_ADMIN_PASSWORD
+                  key: UCM_INITIAL_ADMIN_PASSWORD
             {{- end }}
             {{- if .Values.database.existingSecret }}
             - name: DATABASE_URL

@@ -173,10 +173,10 @@ fi
 : "${UCM_BACKUP_ENABLED:=true}"
 : "${UCM_BACKUP_RETENTION_DAYS:=30}"
 
-# Initial Admin User
-: "${UCM_INITIAL_ADMIN_USERNAME:="admin"}"
-: "${UCM_INITIAL_ADMIN_EMAIL:="admin@${UCM_FQDN}"}"
-: "${UCM_INITIAL_ADMIN_PASSWORD:="changeme123"}"
+# Initial Admin User (the unprefixed names, as set by older Helm charts, still count)
+: "${UCM_INITIAL_ADMIN_USERNAME:="${INITIAL_ADMIN_USERNAME:-admin}"}"
+: "${UCM_INITIAL_ADMIN_EMAIL:="${INITIAL_ADMIN_EMAIL:-admin@${UCM_FQDN}}"}"
+: "${UCM_INITIAL_ADMIN_PASSWORD:="${INITIAL_ADMIN_PASSWORD:-changeme123}"}"
 
 # Application
 : "${UCM_APP_VERSION:="${UCM_VERSION}"}"
