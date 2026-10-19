@@ -583,7 +583,8 @@
     "checkEmailDescBefore": "如果存在与",
     "checkEmailDescAfter": " 关联的账户，您将很快收到密码重置链接。",
     "accountDisabled": "此帐户已被禁用",
-    "samlValidationFailed": "SAML 身份验证失败"
+    "samlValidationFailed": "SAML 身份验证失败",
+    "samlLoginExpired": "此次登录已过期，或是在其他标签页或浏览器中发起的。请从此页面重新开始。"
   },
   "dashboard": {
     "goodMorning": "早上好",

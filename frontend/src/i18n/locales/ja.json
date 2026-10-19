@@ -583,7 +583,8 @@
     "checkEmailDescBefore": "",
     "checkEmailDescAfter": "のアカウントが存在する場合、パスワードリセットリンクが送信されます。",
     "accountDisabled": "このアカウントは無効化されています",
-    "samlValidationFailed": "SAML認証に失敗しました"
+    "samlValidationFailed": "SAML認証に失敗しました",
+    "samlLoginExpired": "このサインインは期限切れか、別のタブまたはブラウザーで開始されました。このページからやり直してください。"
   },
   "dashboard": {
     "goodMorning": "おはようございます",

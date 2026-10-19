@@ -583,7 +583,8 @@
     "checkEmailDescBefore": "If an account exists with",
     "checkEmailDescAfter": ", you'll receive a password reset link shortly.",
     "accountDisabled": "This account has been disabled",
-    "samlValidationFailed": "SAML authentication failed"
+    "samlValidationFailed": "SAML authentication failed",
+    "samlLoginExpired": "This sign-in expired or was started in another tab or browser. Start it again from this page."
   },
   "dashboard": {
     "goodMorning": "Good morning",

@@ -583,7 +583,8 @@
     "checkEmailDescBefore": "Se existir uma conta com",
     "checkEmailDescAfter": ", você receberá um link para redefinir em breve.",
     "accountDisabled": "Esta conta foi desativada",
-    "samlValidationFailed": "A autenticação SAML falhou"
+    "samlValidationFailed": "A autenticação SAML falhou",
+    "samlLoginExpired": "Este login expirou ou foi iniciado em outra aba ou navegador. Comece novamente a partir desta página."
   },
   "dashboard": {
     "goodMorning": "Bom dia",

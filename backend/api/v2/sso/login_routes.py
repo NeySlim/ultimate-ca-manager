@@ -55,7 +55,11 @@ def _reject_oidc_login(provider, reason):
     return redirect('/login?error=invalid_credentials')
 
 
-def _reject_saml_login(provider, reason):
+# Shown as "the login expired or was started elsewhere, start again".
+SAML_LOGIN_EXPIRED = 'saml_login_expired'
+
+
+def _reject_saml_login(provider, reason, error='saml_validation_failed'):
     """Refuse a SAML response with a generic client error and an audited reason."""
     logger.error("SAML login rejected for provider %s: %s", provider.name, reason)
     AuditService.log_action(
@@ -64,7 +68,7 @@ def _reject_saml_login(provider, reason):
         details=f'SAML response rejected for provider {provider.name}: {reason}',
         success=False
     )
-    return redirect('/login?error=saml_validation_failed')
+    return redirect(f'/login?error={error}')
 
 # ============ Public SSO Endpoints (no auth) ============
 
@@ -374,7 +378,8 @@ def sso_callback(provider_type):
             request_id = request.cookies.get(saml_sp.REQUEST_COOKIE) or None
             if request_id and not saml_sp.request_pending(request_id, provider.id):
                 drop_cookie.append(True)
-                return _reject_saml_login(provider, 'unknown, expired or already used AuthnRequest')
+                return _reject_saml_login(provider, 'unknown, expired or already used AuthnRequest',
+                                          SAML_LOGIN_EXPIRED)
 
             # SECURITY: NEVER fall back to an unsigned XML parser here.
             # python3-saml handles signature + assertion validation. If it raises,
@@ -394,14 +399,17 @@ def sso_callback(provider_type):
 
             errors = saml_auth.get_errors()
             if errors:
-                logger.error(f"SAML errors: {errors}, reason: {saml_auth.get_last_error_reason()}")
+                reason = saml_auth.get_last_error_reason() or ''
+                logger.error(f"SAML errors: {errors}, reason: {reason}")
                 AuditService.log_action(
                     action='login_failure',
                     resource_type='sso',
                     details=f'SAML validation errors for provider {provider.name}: {errors}',
                     success=False
                 )
-                return redirect('/login?error=saml_validation_failed')
+                # A response to another AuthnRequest: a second tab, or a login started elsewhere.
+                code = SAML_LOGIN_EXPIRED if 'InResponseTo' in reason else 'saml_validation_failed'
+                return redirect(f'/login?error={code}')
 
             # python3-saml matched InResponseTo against request_id when both exist.
             in_response_to = saml_auth.get_last_response_in_response_to()
@@ -409,10 +417,12 @@ def sso_callback(provider_type):
                 if not provider.saml_allow_idp_initiated:
                     return _reject_saml_login(provider, 'unsolicited response (IdP-initiated login is disabled)')
             elif request_id is None:
-                return _reject_saml_login(provider, 'InResponseTo matches no AuthnRequest from this browser')
+                return _reject_saml_login(provider, 'InResponseTo matches no AuthnRequest from this browser',
+                                          SAML_LOGIN_EXPIRED)
             elif not saml_sp.take_request(request_id, provider.id):
                 drop_cookie.append(True)
-                return _reject_saml_login(provider, 'unknown, expired or already used AuthnRequest')
+                return _reject_saml_login(provider, 'unknown, expired or already used AuthnRequest',
+                                          SAML_LOGIN_EXPIRED)
             else:
                 drop_cookie.append(True)
 

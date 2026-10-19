@@ -583,7 +583,8 @@
     "checkEmailDescBefore": "Si existe una cuenta con",
     "checkEmailDescAfter": ", recibirá un enlace para restablecer en breve.",
     "accountDisabled": "Esta cuenta ha sido deshabilitada",
-    "samlValidationFailed": "La autenticación SAML falló"
+    "samlValidationFailed": "La autenticación SAML falló",
+    "samlLoginExpired": "Este inicio de sesión ha caducado o se inició en otra pestaña o navegador. Vuelva a empezar desde esta página."
   },
   "dashboard": {
     "goodMorning": "Buenos días",

@@ -250,6 +250,7 @@ export default function LoginPage() {
         'callback_error': t('auth.ssoCallbackError'),
         'account_disabled': t('auth.accountDisabled'),
         'saml_validation_failed': t('auth.samlValidationFailed'),
+        'saml_login_expired': t('auth.samlLoginExpired'),
       }
       showError(errorMessages[error] || t('auth.ssoError'))
     }

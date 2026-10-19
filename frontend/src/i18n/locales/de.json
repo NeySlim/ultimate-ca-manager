@@ -583,7 +583,8 @@
     "checkEmailDescBefore": "Wenn ein Konto mit",
     "checkEmailDescAfter": " existiert, erhalten Sie in Kürze einen Link zum Zurücksetzen.",
     "accountDisabled": "Dieses Konto wurde deaktiviert",
-    "samlValidationFailed": "SAML-Authentifizierung fehlgeschlagen"
+    "samlValidationFailed": "SAML-Authentifizierung fehlgeschlagen",
+    "samlLoginExpired": "Diese Anmeldung ist abgelaufen oder wurde in einem anderen Tab oder Browser gestartet. Starten Sie sie auf dieser Seite erneut."
   },
   "dashboard": {
     "goodMorning": "Guten Morgen",

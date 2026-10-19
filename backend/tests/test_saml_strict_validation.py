@@ -25,6 +25,7 @@ SP_BASE = 'https://ucm.example.test'
 ACS = saml_sp.ACS_PATH
 OK = '/login/sso-complete'
 REFUSED = '/login?error=saml_validation_failed'
+EXPIRED = '/login?error=saml_login_expired'
 
 
 @pytest.fixture(scope='module')
@@ -144,11 +145,11 @@ def _post(client, saml_response, base=SP_BASE):
     return r.headers['Location']
 
 
-def _refused(caplog, client, saml_response, reason, base=SP_BASE):
+def _refused(caplog, client, saml_response, reason, base=SP_BASE, location=REFUSED):
     """Refused, and for the stated reason rather than an earlier one."""
     caplog.clear()
     with caplog.at_level('ERROR'):
-        assert _post(client, saml_response, base) == REFUSED
+        assert _post(client, saml_response, base) == location
     assert reason in caplog.text, caplog.text
 
 
@@ -220,7 +221,7 @@ def test_unknown_in_response_to_is_refused(app, provider, idp_signer, caplog):
     # Even with IdP-initiated login allowed: a solicited response needs the request.
     _set_idp_initiated(app, provider, True)
     resp = _response(idp_signer, in_response_to='_never_issued')
-    _refused(caplog, app.test_client(), resp, 'InResponseTo matches no AuthnRequest')
+    _refused(caplog, app.test_client(), resp, 'InResponseTo matches no AuthnRequest', location=EXPIRED)
 
 
 def test_in_response_to_of_another_request_is_refused(app, provider, idp_signer, caplog):
@@ -229,14 +230,14 @@ def test_in_response_to_of_another_request_is_refused(app, provider, idp_signer,
     other = app.test_client()
     other_id = _start_login(other)
     _refused(caplog, client, _response(idp_signer, in_response_to=other_id),
-             'does not match the ID of the AuthNRequest')
+             'does not match the ID of the AuthNRequest', location=EXPIRED)
 
 
 def test_forged_request_cookie_is_refused(app, provider, idp_signer, caplog):
     client = app.test_client()
     client.set_cookie(saml_sp.REQUEST_COOKIE, '_forged', domain='ucm.example.test', path=ACS)
     _refused(caplog, client, _response(idp_signer, in_response_to='_forged'),
-             'unknown, expired or already used AuthnRequest')
+             'unknown, expired or already used AuthnRequest', location=EXPIRED)
 
 
 def test_sp_initiated_response_cannot_be_posted_twice(app, provider, idp_signer):
@@ -245,7 +246,7 @@ def test_sp_initiated_response_cannot_be_posted_twice(app, provider, idp_signer)
     resp = _response(idp_signer, in_response_to=request_id)
     assert _post(client, resp) == OK
     client.set_cookie(saml_sp.REQUEST_COOKIE, request_id, domain='ucm.example.test', path=ACS)
-    assert _post(client, resp) == REFUSED
+    assert _post(client, resp) == EXPIRED
 
 
 def test_idp_initiated_is_refused_by_default(app, provider, idp_signer, caplog):
@@ -578,7 +579,7 @@ def test_a_request_answers_one_login_only(app, provider, idp_signer, caplog):
     assert _post(client, _response(idp_signer, in_response_to=request_id)) == OK
     client.set_cookie(saml_sp.REQUEST_COOKIE, request_id, domain='ucm.example.test', path=ACS)
     _refused(caplog, client, _response(idp_signer, in_response_to=request_id),
-             'unknown, expired or already used AuthnRequest')
+             'unknown, expired or already used AuthnRequest', location=EXPIRED)
 
 
 def test_an_oversized_assertion_id_is_not_reported_as_a_replay(app, provider, idp_signer, caplog):

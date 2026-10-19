@@ -585,7 +585,8 @@
     "checkEmailDescBefore": "Якщо обліковий запис з",
     "checkEmailDescAfter": " існує, ви отримаєте посилання для скидання найближчим часом.",
     "accountDisabled": "Цей обліковий запис вимкнено",
-    "samlValidationFailed": "Помилка автентифікації SAML"
+    "samlValidationFailed": "Помилка автентифікації SAML",
+    "samlLoginExpired": "Цей вхід застарів або був розпочатий в іншій вкладці чи браузері. Почніть знову з цієї сторінки."
   },
   "dashboard": {
     "goodMorning": "Доброго ранку",

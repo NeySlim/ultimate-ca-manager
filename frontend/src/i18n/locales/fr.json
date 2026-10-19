@@ -709,7 +709,8 @@
     "checkEmailDescBefore": "Si un compte existe avec",
     "checkEmailDescAfter": ", vous recevrez un lien de réinitialisation sous peu.",
     "accountDisabled": "Ce compte a été désactivé",
-    "samlValidationFailed": "L'authentification SAML a échoué"
+    "samlValidationFailed": "L'authentification SAML a échoué",
+    "samlLoginExpired": "Cette connexion a expiré ou a été lancée dans un autre onglet ou navigateur. Recommencez depuis cette page."
   },
   "cas": {
     "chainRevoked": "Révoquée en amont",

@@ -583,7 +583,8 @@
     "checkEmailDescBefore": "Se esiste un account con",
     "checkEmailDescAfter": ", riceverai un link per reimpostare a breve.",
     "accountDisabled": "Questo account è stato disabilitato",
-    "samlValidationFailed": "Autenticazione SAML fallita"
+    "samlValidationFailed": "Autenticazione SAML fallita",
+    "samlLoginExpired": "Questo accesso è scaduto o è stato avviato in un'altra scheda o in un altro browser. Ricomincia da questa pagina."
   },
   "dashboard": {
     "goodMorning": "Buongiorno",
