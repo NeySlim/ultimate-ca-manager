@@ -693,26 +693,16 @@ const EXT_KEY_USAGE_FALLBACK = [
   'emailProtection', 'ipsecEndSystem', 'ipsecUser', 'OCSPSigning',
   'msSmartcardLogin'
 ]
-const SAN_TYPE_OPTIONS = ['dns', 'ip', 'email', 'uri', 'upn']
-// Reuse the Issue Certificate form's SAN type labels (already in every locale)
-const SAN_TYPE_LABEL_KEYS = {
-  dns: 'certificates.sanDns',
-  ip: 'certificates.sanIp',
-  email: 'certificates.sanEmail',
-  uri: 'certificates.sanUri',
-  upn: 'certificates.sanUpn',
-}
-
-// KU/EKU/SAN presets applied when the template type changes (mirrors system templates)
+// KU/EKU presets applied when the template type changes (mirrors system templates)
 const TYPE_EXTENSION_DEFAULTS = {
-  web_server:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['serverAuth'], san_types: ['dns', 'ip'] },
-  email:        { key_usage: ['digitalSignature', 'keyEncipherment', 'dataEncipherment'], extended_key_usage: ['emailProtection'], san_types: ['email'] },
-  vpn_server:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['serverAuth', 'ipsecEndSystem'], san_types: ['dns', 'ip'] },
-  vpn_client:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth', 'ipsecUser'], san_types: ['email'] },
-  code_signing: { key_usage: ['digitalSignature'], extended_key_usage: ['codeSigning'], san_types: [] },
-  client_auth:  { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth'], san_types: ['email'] },
-  ocsp_signing: { key_usage: ['digitalSignature'], extended_key_usage: ['OCSPSigning'], san_types: [] },
-  smartcard_logon: { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth', 'msSmartcardLogin'], san_types: ['upn'] },
+  web_server:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['serverAuth'] },
+  email:        { key_usage: ['digitalSignature', 'keyEncipherment', 'dataEncipherment'], extended_key_usage: ['emailProtection'] },
+  vpn_server:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['serverAuth', 'ipsecEndSystem'] },
+  vpn_client:   { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth', 'ipsecUser'] },
+  code_signing: { key_usage: ['digitalSignature'], extended_key_usage: ['codeSigning'] },
+  client_auth:  { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth'] },
+  ocsp_signing: { key_usage: ['digitalSignature'], extended_key_usage: ['OCSPSigning'] },
+  smartcard_logon: { key_usage: ['digitalSignature', 'keyEncipherment'], extended_key_usage: ['clientAuth', 'msSmartcardLogin'] },
 }
 
 function buildInitialState(template) {
@@ -724,7 +714,6 @@ function buildInitialState(template) {
       subject: { C: '', ST: '', L: '', O: '', OU: '', CN: '', emailAddress: '' },
       key_usage: ['digitalSignature', 'keyEncipherment'],
       extended_key_usage: ['serverAuth'],
-      san_types: ['dns', 'ip'],
       ad_derived_subject: false,
       autoenroll_enabled: false,
       allowed_ad_group: '',
@@ -748,7 +737,6 @@ function buildInitialState(template) {
     },
     key_usage: ext.key_usage || [],
     extended_key_usage: ext.extended_key_usage || [],
-    san_types: ext.san_types || [],
     ad_derived_subject: template.ad_derived_subject || false,
     autoenroll_enabled: template.autoenroll_enabled || false,
     allowed_ad_group: template.allowed_ad_group || '',
@@ -810,9 +798,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
         dn_template: { ...formData.subject },
         extensions_template: {
           key_usage: formData.key_usage,
-          extended_key_usage: formData.extended_key_usage,
-          basic_constraints: { ca: false },
-          san_types: formData.san_types
+          extended_key_usage: formData.extended_key_usage
         },
         ad_derived_subject: formData.ad_derived_subject,
         autoenroll_enabled: formData.autoenroll_enabled,
@@ -981,18 +967,6 @@ function TemplateForm({ template, onSubmit, onCancel }) {
           </div>
         </div>
 
-        {/* SAN Types */}
-        <div>
-          <label className="block text-xs font-medium text-text-secondary mb-2">{t('common.subjectAltNames')}</label>
-          <div className="flex flex-wrap gap-x-4 gap-y-2">
-            {SAN_TYPE_OPTIONS.map(st => (
-              <label key={st} className={checkboxCls}>
-                <input type="checkbox" checked={formData.san_types.includes(st)} onChange={() => toggleCheckbox('san_types', st)} className="accent-accent-primary" />
-                {t(SAN_TYPE_LABEL_KEYS[st], st.toUpperCase())}
-              </label>
-            ))}
-          </div>
-        </div>
       </div>
 
       <div className="flex justify-end gap-2 pt-4 border-t border-border">

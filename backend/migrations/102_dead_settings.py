@@ -2,7 +2,7 @@
 
 Each key below lost its reader or its screen in the same release; leaving the
 row would only keep a stale value (some of them secrets) in backups. Policy
-rules lose the keys no evaluation ever read.
+rules and template extensions lose the JSON keys nothing ever read.
 """
 import json
 import sqlite3
@@ -23,13 +23,26 @@ DEAD_RULE_KEYS = ('required_extensions', 'forbidden_extensions')
 DEAD_SAN_RULE_KEYS = ('require_approval_for_external',)
 
 
+DEAD_EXTENSION_KEYS = ('san_types', 'basic_constraints')
+
+
+def _load(text):
+    """A JSON object, tolerating the double encoding older imports wrote; None otherwise."""
+    value = text
+    for _ in range(2):
+        if not isinstance(value, str):
+            break
+        try:
+            value = json.loads(value or '{}')
+        except (TypeError, ValueError):
+            return None
+    return value if isinstance(value, dict) else None
+
+
 def _cleaned_rules(text):
     """The rules without the dead keys, or None when nothing changes."""
-    try:
-        rules = json.loads(text or '{}')
-    except (TypeError, ValueError):
-        return None
-    if not isinstance(rules, dict):
+    rules = _load(text)
+    if rules is None:
         return None
     cleaned = {k: v for k, v in rules.items() if k not in DEAD_RULE_KEYS}
     san = cleaned.get('san_restrictions')
@@ -38,15 +51,31 @@ def _cleaned_rules(text):
     return None if cleaned == rules else json.dumps(cleaned)
 
 
+def _cleaned_extensions(text):
+    ext = _load(text)
+    if ext is None or not any(k in ext for k in DEAD_EXTENSION_KEYS):
+        return None
+    return json.dumps({k: v for k, v in ext.items() if k not in DEAD_EXTENSION_KEYS})
+
+
+# (table, column, cleaner)
+JSON_COLUMNS = (
+    ('certificate_policies', 'rules', _cleaned_rules),
+    ('certificate_templates', 'extensions_template', _cleaned_extensions),
+)
+
+
 def _upgrade_sqlite(conn):
     tables = {r[0] for r in conn.execute("SELECT name FROM sqlite_master WHERE type='table'")}
     if 'system_config' in tables:
         conn.executemany("DELETE FROM system_config WHERE key = ?", [(k,) for k in DEAD_KEYS])
-    if 'certificate_policies' in tables:
-        for pid, rules in conn.execute("SELECT id, rules FROM certificate_policies").fetchall():
-            cleaned = _cleaned_rules(rules)
+    for table, column, clean in JSON_COLUMNS:
+        if table not in tables:
+            continue
+        for rid, value in conn.execute(f"SELECT id, {column} FROM {table}").fetchall():
+            cleaned = clean(value)
             if cleaned is not None:
-                conn.execute("UPDATE certificate_policies SET rules = ? WHERE id = ?", (cleaned, pid))
+                conn.execute(f"UPDATE {table} SET {column} = ? WHERE id = ?", (cleaned, rid))
     conn.commit()
 
 
@@ -57,12 +86,14 @@ def _upgrade_pg(conn):
     if 'system_config' in tables:
         conn.execute(text("DELETE FROM system_config WHERE key IN :keys").bindparams(
             bindparam('keys', expanding=True)), {'keys': list(DEAD_KEYS)})
-    if 'certificate_policies' in tables:
-        for pid, rules in conn.execute(text("SELECT id, rules FROM certificate_policies")).fetchall():
-            cleaned = _cleaned_rules(rules)
+    for table, column, clean in JSON_COLUMNS:
+        if table not in tables:
+            continue
+        for rid, value in conn.execute(text(f"SELECT id, {column} FROM {table}")).fetchall():
+            cleaned = clean(value)
             if cleaned is not None:
-                conn.execute(text("UPDATE certificate_policies SET rules = :r WHERE id = :i"),
-                             {'r': cleaned, 'i': pid})
+                conn.execute(text(f"UPDATE {table} SET {column} = :v WHERE id = :i"),
+                             {'v': cleaned, 'i': rid})
 
 
 def upgrade(conn):

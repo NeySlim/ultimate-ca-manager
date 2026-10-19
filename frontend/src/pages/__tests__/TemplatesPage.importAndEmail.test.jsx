@@ -202,4 +202,21 @@ describe('TemplatesPage Email field: not type="email" (built-in copies carry {em
     await waitFor(() => expect(svc.create).toHaveBeenCalledTimes(1))
     expect(svc.create.mock.calls[0][0]).not.toHaveProperty('max_validity_days')
   })
+
+  it('the form offers no SAN types and sends neither SAN types nor basic constraints', async () => {
+    svc.getAll.mockResolvedValue({ data: [] })
+    renderPage()
+
+    fireEvent.click(await screen.findByRole('button', { name: 'templates.new' }))
+    fireEvent.change(await screen.findByPlaceholderText('templates.namePlaceholder'), {
+      target: { value: 'No SAN Types' },
+    })
+    expect(screen.queryByText('certificates.sanUpn')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'common.create' }))
+
+    await waitFor(() => expect(svc.create).toHaveBeenCalledTimes(1))
+    const ext = svc.create.mock.calls[0][0].extensions_template
+    expect(ext).not.toHaveProperty('san_types')
+    expect(ext).not.toHaveProperty('basic_constraints')
+  })
 })

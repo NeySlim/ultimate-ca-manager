@@ -14,7 +14,7 @@ export default {
       {
         title: 'Recursos',
         items: [
-          { label: 'Tipo', text: 'Web Server, Email, VPN Server ou Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Define os padrões de Key Usage, EKU e SAN' },
+          { label: 'Tipo', text: 'Web Server, Email, VPN Server ou Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Define os padrões de Key Usage e EKU' },
           { label: 'Padrões de Sujeito', text: 'Pré-preencher Organização, OU, País, Estado, Cidade e Email. Em certificados E-mail e Servidor + Cliente (Combinado), o Email também se torna um SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, etc.' },
           { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
@@ -65,7 +65,7 @@ Autoridades certificadoras não são criadas a partir de modelos: crie-as na pá
 
 1. Clique em **Criar Modelo**
 2. Insira um **nome** e descrição opcional
-3. Selecione o **tipo** do modelo: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Ele define os padrões de Key Usage, Extended Key Usage e SAN, que você pode alterar em seguida
+3. Selecione o **tipo** do modelo: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Ele define os padrões de Key Usage e Extended Key Usage, que você pode alterar em seguida
 4. Configure **padrões de Sujeito** (O, OU, C, ST, L, CN, Email). Em certificados E-mail e Servidor + Cliente (Combinado), o Email também se torna um SAN de email
 5. Selecione flags de **Key Usage**
 6. Selecione valores de **Extended Key Usage**

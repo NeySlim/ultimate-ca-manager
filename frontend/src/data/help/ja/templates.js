@@ -14,7 +14,7 @@ export default {
       {
         title: '機能',
         items: [
-          { label: 'タイプ', text: 'Web Server、Email、VPN ServerまたはVPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon、Custom。Key Usage、EKU、SANのデフォルトを設定します' },
+          { label: 'タイプ', text: 'Web Server、Email、VPN ServerまたはVPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon、Custom。Key UsageとEKUのデフォルトを設定します' },
           { label: 'サブジェクトデフォルト', text: '組織、OU、国、都道府県、市区町村、Emailを事前入力。メール (S/MIME) およびサーバー + クライアント (複合) 証明書では、EmailはSANにもなります' },
           { label: 'Key Usage', text: 'Digital Signature、Key Enciphermentなど' },
           { label: 'Extended Key Usage', text: 'Server Auth、Client Auth、Code Signing、Email Protection' },
@@ -65,7 +65,7 @@ export default {
 
 1. **テンプレートを作成**をクリック
 2. **名前**とオプションの説明を入力
-3. テンプレート**タイプ**を選択：Web Server、Email、VPN Server、VPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon、Custom。Key Usage、Extended Key Usage、SANのデフォルトが設定され、その後変更できます
+3. テンプレート**タイプ**を選択：Web Server、Email、VPN Server、VPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon、Custom。Key UsageとExtended Key Usageのデフォルトが設定され、その後変更できます
 4. **サブジェクトデフォルト**を設定（O、OU、C、ST、L、CN、Email）。メール (S/MIME) およびサーバー + クライアント (複合) 証明書では、Emailはメール用SANにもなります
 5. **Key Usage**フラグを選択
 6. **Extended Key Usage**値を選択

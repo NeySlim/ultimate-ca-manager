@@ -55,9 +55,7 @@ class TemplateService:
             }),
             "extensions_template": json.dumps({
                 "key_usage": ["digitalSignature", "keyEncipherment"],
-                "extended_key_usage": ["serverAuth"],
-                "basic_constraints": {"ca": False},
-                "san_types": ["dns", "ip"]
+                "extended_key_usage": ["serverAuth"]
             }),
             "is_system": True,
             "is_active": True
@@ -79,9 +77,7 @@ class TemplateService:
             }),
             "extensions_template": json.dumps({
                 "key_usage": ["digitalSignature", "keyEncipherment", "dataEncipherment"],
-                "extended_key_usage": ["emailProtection"],
-                "basic_constraints": {"ca": False},
-                "san_types": ["email"]
+                "extended_key_usage": ["emailProtection"]
             }),
             "is_system": True,
             "is_active": True
@@ -103,9 +99,7 @@ class TemplateService:
             }),
             "extensions_template": json.dumps({
                 "key_usage": ["digitalSignature", "keyEncipherment"],
-                "extended_key_usage": ["serverAuth", "ipsecEndSystem"],
-                "basic_constraints": {"ca": False},
-                "san_types": ["dns", "ip"]
+                "extended_key_usage": ["serverAuth", "ipsecEndSystem"]
             }),
             "is_system": True,
             "is_active": True
@@ -127,9 +121,7 @@ class TemplateService:
             }),
             "extensions_template": json.dumps({
                 "key_usage": ["digitalSignature", "keyEncipherment"],
-                "extended_key_usage": ["clientAuth", "ipsecUser"],
-                "basic_constraints": {"ca": False},
-                "san_types": ["email"]
+                "extended_key_usage": ["clientAuth", "ipsecUser"]
             }),
             "is_system": True,
             "is_active": True
@@ -151,9 +143,7 @@ class TemplateService:
             }),
             "extensions_template": json.dumps({
                 "key_usage": ["digitalSignature"],
-                "extended_key_usage": ["codeSigning"],
-                "basic_constraints": {"ca": False},
-                "san_types": []
+                "extended_key_usage": ["codeSigning"]
             }),
             "is_system": True,
             "is_active": True
@@ -175,9 +165,7 @@ class TemplateService:
             }),
             "extensions_template": json.dumps({
                 "key_usage": ["digitalSignature"],
-                "extended_key_usage": ["OCSPSigning"],
-                "basic_constraints": {"ca": False},
-                "san_types": []
+                "extended_key_usage": ["OCSPSigning"]
             }),
             "is_system": True,
             "is_active": True
@@ -199,9 +187,7 @@ class TemplateService:
             }),
             "extensions_template": json.dumps({
                 "key_usage": ["digitalSignature", "keyEncipherment"],
-                "extended_key_usage": ["clientAuth"],
-                "basic_constraints": {"ca": False},
-                "san_types": ["email"]
+                "extended_key_usage": ["clientAuth"]
             }),
             "is_system": True,
             "is_active": True
@@ -223,9 +209,7 @@ class TemplateService:
             }),
             "extensions_template": json.dumps({
                 "key_usage": ["digitalSignature", "keyEncipherment"],
-                "extended_key_usage": ["clientAuth", "msSmartcardLogin"],
-                "basic_constraints": {"ca": False},
-                "san_types": ["upn"]
+                "extended_key_usage": ["clientAuth", "msSmartcardLogin"]
             }),
             "is_system": True,
             "is_active": True
@@ -294,7 +278,7 @@ class TemplateService:
             validity_days=data.get('validity_days', 397),
             digest=data.get('digest', 'sha256'),
             dn_template=json.dumps(data.get('dn_template', {})),
-            extensions_template=json.dumps(data.get('extensions_template', {})),
+            extensions_template=json.dumps(without_dead_extension_keys(data.get('extensions_template', {}))),
             is_system=False,  # Custom templates are never system
             is_active=True,
             created_by=username,
@@ -354,7 +338,7 @@ class TemplateService:
         if 'dn_template' in data:
             template.dn_template = json.dumps(data['dn_template'])
         if 'extensions_template' in data:
-            template.extensions_template = json.dumps(data['extensions_template'])
+            template.extensions_template = json.dumps(without_dead_extension_keys(data['extensions_template']))
         if 'is_active' in data:
             template.is_active = data['is_active']
         
@@ -621,6 +605,17 @@ class TemplateService:
 # #258: "keep the link, flag it"). KU/EKU never appear here by design — a
 # template's extensions are imposed, not overridable (issue #226).
 _TEMPLATE_OVERRIDABLE_FIELDS = ('key_type', 'validity_days', 'digest')
+
+
+# Stored by older forms, never applied: SAN types filtered nothing and
+# basic_constraints was always {ca: false}. Dropped on save and by migration 102.
+DEAD_EXTENSION_KEYS = ('san_types', 'basic_constraints')
+
+
+def without_dead_extension_keys(extensions):
+    if not isinstance(extensions, dict):
+        return extensions
+    return {k: v for k, v in extensions.items() if k not in DEAD_EXTENSION_KEYS}
 
 
 def disabled_template_error(template_id):

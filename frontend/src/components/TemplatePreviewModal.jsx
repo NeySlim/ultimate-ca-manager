@@ -43,12 +43,6 @@ function SANPreview({ template }) {
     sans.push('DNS: server.example.com')
     sans.push('DNS: *.example.com')
   }
-  if (template?.san_types?.includes('email') || template?.san_types?.includes('rfc822Name')) {
-    sans.push('Email: admin@example.com')
-  }
-  if (template?.san_types?.includes('ip') || template?.san_types?.includes('iPAddress')) {
-    sans.push('IP: 192.168.1.100')
-  }
   return sans.length > 0 ? sans.join('\n') : 'None configured'
 }
 
