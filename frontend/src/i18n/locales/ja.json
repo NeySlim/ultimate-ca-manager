@@ -4348,6 +4348,10 @@
       "compliance_status": {
         "name": "コンプライアンス状況",
         "description": "コンプライアンススコアと違反の概要"
+      },
+      "revoked_certificates": {
+        "name": "失効した証明書",
+        "description": "期間内に失効した証明書（日付と理由付き）"
       }
     },
     "available": "の利用可能",

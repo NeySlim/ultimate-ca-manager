@@ -3187,7 +3187,7 @@ UCM provides 6 built-in report types, an executive PDF report, and a full report
 | Type Key | Description |
 |----------|-------------|
 | `expiring_certificates` | Certificates expiring within N days |
-| `revoked_certificates` | All revoked certificates with revocation reason |
+| `revoked_certificates` | Certificates revoked within the period, with revocation date and reason |
 | `ca_hierarchy` | CA tree with issued certificate counts |
 | `audit_summary` | Audit log activity grouped by action type |
 | `compliance_status` | Policy compliance across all certificates |
@@ -3255,7 +3255,9 @@ Content-Type: application/json
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
 | `report_type` | string | Yes | One of the 6 report type keys |
-| `params.days` | integer | No | Look-ahead days (for `expiring_certificates`, default: 30) |
+| `params.days` | integer | No | Look-ahead days for `expiring_certificates`, look-back period for `revoked_certificates` and `audit_summary` (default: 30) |
+| `params.reason` | string | No | `revoked_certificates` only: keep one RFC 5280 reason (e.g. `keyCompromise`) |
+| `params.format` | string | No | `json` (default) or `csv` |
 
 **Response:**
 ```json
@@ -3304,7 +3306,7 @@ GET /api/v2/reports/schedule
       "recipients": ["admin@example.com"],
       "format": "csv"
     },
-    "revoked_certificates": {
+    "pdf_compliance": {
       "enabled": false,
       "frequency": "monthly",
       "time": "09:00",
@@ -3323,31 +3325,31 @@ PUT /api/v2/reports/schedule
 Content-Type: application/json
 
 {
-  "report_type": "expiring_certificates",
-  "config": {
+  "expiring_certificates": {
     "enabled": true,
     "frequency": "weekly",
     "time": "08:00",
     "day_of_week": 1,
     "day_of_month": 1,
     "recipients": ["admin@example.com", "security@example.com"],
-    "format": "csv"
+    "format": "json"
   }
 }
 ```
+
+The body maps schedule keys to their configuration. Keys are the report type keys, plus `pdf_<template>` for the PDF templates (`pdf_executive`, `pdf_certificate_inventory`, `pdf_compliance`, `pdf_ca_overview`, `pdf_security_audit`). The report is emailed as an attachment in the schedule's format: CSV or JSON for data reports, PDF for templates.
 
 **Schedule Config Fields:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `report_type` | string | Yes | One of the 6 report type keys |
-| `config.enabled` | boolean | Yes | Enable or disable the schedule |
-| `config.frequency` | string | Yes | `daily`, `weekly`, or `monthly` |
-| `config.time` | string | Yes | Execution time in `HH:MM` (24-hour format) |
-| `config.day_of_week` | integer | No | For weekly: `0` (Mon) – `6` (Sun) |
-| `config.day_of_month` | integer | No | For monthly: `1` – `28` |
-| `config.recipients` | array | Yes | Email addresses (max 50) |
-| `config.format` | string | Yes | `csv`, `json`, or `pdf` |
+| `enabled` | boolean | Yes | Enable or disable the schedule |
+| `frequency` | string | Yes | `daily`, `weekly`, or `monthly` |
+| `time` | string | Yes | Execution time in `HH:MM` (24-hour format) |
+| `day_of_week` | integer | No | For weekly: `0` (Mon) – `6` (Sun) |
+| `day_of_month` | integer | No | For monthly: `1` – `28` |
+| `recipients` | array | Yes | Email addresses (max 50) |
+| `format` | string | No | `csv` (default) or `json`; always `pdf` for `pdf_<template>` keys |
 
 ### Send Test Report
 ```http
@@ -3360,14 +3362,15 @@ Content-Type: application/json
 }
 ```
 
-Generates the report immediately and sends it to the specified recipient. Use this to verify email delivery and report content before enabling a schedule.
+Generates the report immediately and sends it to the specified recipient, attached in the schedule's saved format. Use this to verify email delivery and report content before enabling a schedule. Answers 502 when the email could not be sent.
 
 **Parameters:**
 
 | Field | Type | Required | Description |
 |-------|------|----------|-------------|
-| `report_type` | string | Yes | One of the 6 report type keys |
+| `report_type` | string | Yes | A schedule key (report type or `pdf_<template>`) |
 | `recipient` | string | Yes | Email address to send the test report to |
+| `format` | string | No | `csv` or `json`, overrides the saved format |
 
 ---
 

@@ -2919,6 +2919,9 @@ Security events and user activity summary. Includes login attempts, certificate 
 ### Compliance Status
 Policy compliance and violation summary. Shows which certificates comply with your policies and which ones violate them. Required for regulatory compliance.
 
+### Revoked Certificates
+Certificates revoked during the chosen period (default: 30 days), with revocation date and reason. Review it to follow revocations and their causes.
+
 ## Executive PDF Report
 
 Click **Download PDF** in the top-right to generate a professional executive report suitable for management reviews, board presentations, and compliance audits.
@@ -2968,6 +2971,8 @@ Sends a policy compliance summary every week. Useful for ongoing compliance moni
 2. Enable the reports you want to schedule
 3. Add recipient email addresses (press Enter or click Add)
 4. Click Save
+
+Each scheduled report is attached to the email in its format: CSV or JSON for data reports, PDF for the PDF templates.
 
 ### Test Send
 Before enabling schedules, use the ✈️ button on any report row to send a test report to a specific email address. This verifies that SMTP is configured correctly and the report format meets your needs.

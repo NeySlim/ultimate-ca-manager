@@ -1553,6 +1553,7 @@ export const helpContent = {
           { label: 'CA Hierarchy', text: 'Certificate Authority structure and statistics' },
           { label: 'Audit Summary', text: 'Security events and user activity summary' },
           { label: 'Compliance Status', text: 'Policy compliance and violation summary' },
+          { label: 'Revoked Certificates', text: 'Certificates revoked during the period, with date and reason' },
         ]
       },
       {

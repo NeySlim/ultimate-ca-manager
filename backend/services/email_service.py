@@ -6,6 +6,7 @@ import smtplib
 import logging
 from email.mime.text import MIMEText
 from email.mime.multipart import MIMEMultipart
+from email.mime.application import MIMEApplication
 from typing import List, Optional, Dict
 from datetime import datetime
 from models import db
@@ -132,6 +133,7 @@ class EmailService:
         resource_type: Optional[str] = None,
         resource_id: Optional[str] = None,
         threshold_days: Optional[int] = None,
+        attachments: Optional[List[tuple]] = None,
     ) -> tuple[bool, str]:
         """
         Send email to recipients
@@ -144,6 +146,7 @@ class EmailService:
             notification_type: Type of notification for logging
             resource_type: Type of resource (certificate, ca, crl)
             resource_id: ID of resource
+            attachments: (filename, bytes, mimetype) tuples
             
         Returns:
             (success: bool, message: str)
@@ -193,6 +196,16 @@ class EmailService:
                 if body_text:
                     msg.attach(MIMEText(body_text, 'plain', 'utf-8'))
                 msg.attach(MIMEText(body_html, 'html', 'utf-8'))
+
+            if attachments:
+                body_part, msg = msg, MIMEMultipart('mixed')
+                msg.attach(body_part)
+                for filename, content, mimetype in attachments:
+                    part = MIMEApplication(content, _subtype=mimetype.split('/', 1)[1])
+                    part.replace_header('Content-Type', mimetype)
+                    part.add_header('Content-Disposition', 'attachment',
+                                    filename=_sanitize_header_value(filename))
+                    msg.attach(part)
             
             msg['Subject'] = subject
             from_name = _sanitize_header_value(config.smtp_from_name) if config.smtp_from_name else ''

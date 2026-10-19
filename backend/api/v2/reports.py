@@ -7,7 +7,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from utils.sanitize import sanitize_filename
-from services.report_service import ReportService
+from services.report_service import ReportService, schedulable_reports, send_report
 from models import db, SystemConfig
 import json
 import re
@@ -20,15 +20,6 @@ TIME_RE = re.compile(r'^([01]\d|2[0-3]):[0-5]\d$')
 
 bp = Blueprint('reports_pro', __name__)
 
-# All schedulable report types
-SCHEDULABLE_REPORTS = [
-    'certificate_inventory',
-    'expiring_certificates',
-    'ca_hierarchy',
-    'audit_summary',
-    'compliance_status',
-    'executive_pdf',
-]
 
 DEFAULT_SCHEDULE = {
     'enabled': False,
@@ -198,7 +189,7 @@ def generate_custom_pdf():
 def get_schedule_settings():
     """Get report schedule settings for all report types"""
     schedules = {}
-    for report_key in SCHEDULABLE_REPORTS:
+    for report_key in schedulable_reports():
         config_key = f'report_schedule_{report_key}'
         raw = _get_config(config_key, '')
         if raw:
@@ -225,7 +216,7 @@ def get_schedule_settings():
                         sched['recipients'] = json.loads(_get_config('report_compliance_recipients', '[]'))
                     except (json.JSONDecodeError, ValueError):
                         pass
-            elif report_key == 'executive_pdf':
+            elif _is_pdf(report_key):
                 sched['format'] = 'pdf'
                 sched['frequency'] = 'monthly'
             schedules[report_key] = sched
@@ -239,7 +230,7 @@ def update_schedule_settings():
     """Update report schedule settings"""
     data = request.get_json() or {}
     
-    for report_key in SCHEDULABLE_REPORTS:
+    for report_key in schedulable_reports():
         if report_key in data:
             sched = data[report_key]
             # Validate frequency
@@ -273,7 +264,7 @@ def update_schedule_settings():
             
             # Validate format
             fmt = sched.get('format', 'csv')
-            if report_key != 'executive_pdf' and fmt not in ('csv', 'json'):
+            if not _is_pdf(report_key) and fmt not in ReportService.ATTACHMENT_TYPES:
                 fmt = 'csv'
             
             config_val = {
@@ -283,7 +274,7 @@ def update_schedule_settings():
                 'day_of_week': dow,
                 'day_of_month': dom,
                 'recipients': recipients,
-                'format': 'pdf' if report_key == 'executive_pdf' else fmt,
+                'format': 'pdf' if _is_pdf(report_key) else fmt,
             }
             _set_config(f'report_schedule_{report_key}', json.dumps(config_val))
     
@@ -300,26 +291,34 @@ def send_test_report():
     data = request.get_json() or {}
     
     report_type = data.get('report_type', 'expiring_certificates')
-    if report_type not in SCHEDULABLE_REPORTS:
+    if report_type not in schedulable_reports():
         return error_response("Invalid report type", 400)
     
     recipient = (data.get('recipient') or '').strip()
     if not recipient or not EMAIL_RE.match(recipient):
         return error_response("A valid recipient email is required", 400)
-    
+
+    # The test sends what the schedule would: its saved format unless one is given.
+    fmt = data.get('format')
+    if fmt is None:
+        try:
+            fmt = json.loads(_get_config(f'report_schedule_{report_type}', '') or '{}').get('format')
+        except (json.JSONDecodeError, ValueError, AttributeError):
+            fmt = None
+    if not _is_pdf(report_type) and fmt not in ReportService.ATTACHMENT_TYPES:
+        fmt = 'csv'
+
     try:
-        if report_type == 'executive_pdf':
-            ReportService.send_scheduled_pdf_report([recipient])
-        else:
-            ReportService.send_scheduled_report(
-                report_type,
-                [recipient],
-                {'days': 30}
-            )
+        if not send_report(report_type, [recipient], fmt):
+            return error_response("Failed to send test report", 502)
         return success_response(message="Test report sent successfully")
     except Exception as e:
         logger.error(f'Failed to send test report: {e}')
         return error_response("Failed to send test report", 500)
+
+
+def _is_pdf(report_key: str) -> bool:
+    return report_key == 'executive_pdf' or report_key.startswith('pdf_')
 
 
 def _get_config(key: str, default: str = '') -> str:

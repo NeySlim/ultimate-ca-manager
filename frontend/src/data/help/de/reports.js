@@ -12,6 +12,7 @@ export default {
           { label: 'CA-Hierarchie', text: 'Struktur der Zertifizierungsstellen und Statistiken' },
           { label: 'Audit-Zusammenfassung', text: 'Sicherheitsereignisse und Benutzeraktivitätsübersicht' },
           { label: 'Compliance-Status', text: 'Richtlinien-Compliance und Verstöße' },
+          { label: 'Widerrufene Zertifikate', text: 'Im Zeitraum widerrufene Zertifikate mit Datum und Grund' },
         ]
       },
       {
@@ -59,6 +60,9 @@ Sicherheitsereignisse und Benutzeraktivitätsübersicht. Enthält Anmeldeversuch
 
 ### Compliance-Status
 Richtlinien-Compliance und Verstöße. Zeigt, welche Zertifikate Ihren Richtlinien entsprechen und welche dagegen verstoßen. Erforderlich für die regulatorische Compliance.
+
+### Widerrufene Zertifikate
+Im gewählten Zeitraum (Standard: 30 Tage) widerrufene Zertifikate mit Widerrufsdatum und Grund. Nutzen Sie ihn, um Widerrufe und ihre Ursachen zu verfolgen.
 
 ## PDF-Managementbericht
 
@@ -109,6 +113,8 @@ Sendet wöchentlich eine Richtlinien-Compliance-Zusammenfassung. Nützlich für 
 2. Aktivieren Sie die Berichte, die Sie planen möchten
 3. Fügen Sie Empfänger-E-Mail-Adressen hinzu (Eingabetaste drücken oder auf Hinzufügen klicken)
 4. Klicken Sie auf Speichern
+
+Jeder geplante Bericht wird der E-Mail in seinem Format angehängt: CSV oder JSON für Datenberichte, PDF für die PDF-Vorlagen.
 
 ### Testversand
 Bevor Sie Zeitpläne aktivieren, verwenden Sie den ✈️-Button in jeder Berichtszeile, um einen Testbericht an eine bestimmte E-Mail-Adresse zu senden. Dies überprüft, ob SMTP korrekt konfiguriert ist und das Berichtsformat Ihren Anforderungen entspricht.

@@ -4348,6 +4348,10 @@
       "compliance_status": {
         "name": "Estado de cumplimiento",
         "description": "Puntuaciones de cumplimiento y resumen de violaciones"
+      },
+      "revoked_certificates": {
+        "name": "Certificados revocados",
+        "description": "Certificados revocados durante el período, con fecha y motivo"
       }
     },
     "available": "disponibles",

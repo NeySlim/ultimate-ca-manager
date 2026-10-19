@@ -4348,6 +4348,10 @@
       "compliance_status": {
         "name": "合规状态",
         "description": "合规评分和违规摘要"
+      },
+      "revoked_certificates": {
+        "name": "已吊销证书",
+        "description": "期间内吊销的证书，含日期和原因"
       }
     },
     "available": "个可用",

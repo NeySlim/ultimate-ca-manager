@@ -4084,6 +4084,10 @@
       "compliance_status": {
         "name": "Compliance Status",
         "description": "Policy compliance scores and violation summary"
+      },
+      "revoked_certificates": {
+        "name": "Revoked Certificates",
+        "description": "Certificates revoked during the period, with date and reason"
       }
     },
     "available": "available",
