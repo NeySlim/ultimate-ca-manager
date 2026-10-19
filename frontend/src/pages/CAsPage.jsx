@@ -35,7 +35,7 @@ export default function CAsPage() {
   const { openWindow } = useWindowManager()
   const openEntity = useOpenEntity()
   const { showSuccess, showError, showConfirm } = useNotification()
-  const { canWrite, canDelete } = usePermission()
+  const { canWrite, canDelete, hasPermission } = usePermission()
   const { muteToasts } = useWebSocket()
   const [searchParams, setSearchParams] = useSearchParams()
   const { addToHistory } = useRecentHistory('cas')
@@ -426,6 +426,7 @@ export default function CAsPage() {
             ca={selectedCA}
             canWrite={canWrite}
             canDelete={canDelete}
+            hasPermission={hasPermission}
             onExport={(format, options) => handleExport(selectedCA, format, options)}
             onDelete={() => handleDelete(selectedCA.id)}
             onChanged={(updated) => setSelectedCA(prev => (prev && prev.id === updated.id ? { ...prev, ...updated } : prev))}

@@ -1641,7 +1641,7 @@ Four built-in roles that cannot be modified or deleted:
 
 ### Permission Matrix
 Permissions are organized by category:
-- **CAs**: Create, read, update, delete, import, export
+- **CAs**: Create, read, update, delete, import, export (certificate only: see Private Keys)
 - **Certificates**: Issue, read, revoke, renew, delete, export (certificate only: see Private Keys)
 - **Private Keys**: Direct private-key export (\`read:private_keys\`), admin-only: no built-in role except Admin holds it. Roles without it go through Key Recovery
 - **CSRs**: Create, read, sign, delete

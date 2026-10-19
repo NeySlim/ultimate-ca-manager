@@ -55,7 +55,7 @@ Quatre rôles intégrés qui ne peuvent pas être modifiés ou supprimés :
 
 ### Matrice de permissions
 Les permissions sont organisées par catégorie :
-- **CA** : Créer, lire, mettre à jour, supprimer, importer, exporter
+- **CA** : Créer, lire, mettre à jour, supprimer, importer, exporter (certificat seul : voir Clés privées)
 - **Certificats** : Émettre, lire, révoquer, renouveler, supprimer, exporter (certificat seul : voir Clés privées)
 - **Clés privées** : Export direct de clé privée (\`read:private_keys\`), réservé aux administrateurs : aucun rôle intégré hormis Admin ne la détient. Les rôles sans cette permission passent par la récupération de clés
 - **CSR** : Créer, lire, signer, supprimer

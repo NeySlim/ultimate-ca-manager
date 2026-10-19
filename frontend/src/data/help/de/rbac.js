@@ -55,7 +55,7 @@ Vier integrierte Rollen, die nicht geändert oder gelöscht werden können:
 
 ### Berechtigungsmatrix
 Berechtigungen sind nach Kategorie organisiert:
-- **CAs**: Erstellen, Lesen, Aktualisieren, Löschen, Importieren, Exportieren
+- **CAs**: Erstellen, Lesen, Aktualisieren, Löschen, Importieren, Exportieren (nur Zertifikat: siehe Private Schlüssel)
 - **Zertifikate**: Ausstellen, Lesen, Widerrufen, Erneuern, Löschen, Exportieren (nur Zertifikat: siehe Private Schlüssel)
 - **Private Schlüssel**: Direkter Export privater Schlüssel (\`read:private_keys\`), nur für Admins: keine eingebaute Rolle außer Admin besitzt sie. Rollen ohne diese Berechtigung gehen über die Schlüsselwiederherstellung
 - **CSRs**: Erstellen, Lesen, Signieren, Löschen

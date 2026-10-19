@@ -18,10 +18,15 @@ import { Button } from '../Button'
 import { Input } from '../Input'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts'
+import { usePermission } from '../../hooks/usePermission'
+import { canExportPrivateKey } from '../../lib/exportPermissions'
 
 export function TakeOfflineModal({ open, onClose, ca, onSuccess }) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
+  const { canWrite, hasPermission } = usePermission()
+  // file_exported hands the key over: offered only where the server allows it
+  const canExportKey = canExportPrivateKey('ca', { canWrite, hasPermission })
 
   const [step, setStep] = useState('confirm')        // 'confirm' | 'form'
   const [mode, setMode] = useState('password_protected')
@@ -136,21 +141,23 @@ export function TakeOfflineModal({ open, onClose, ca, onSuccess }) {
               </div>
             </button>
 
-            <button
-              type="button"
-              onClick={() => setMode('file_exported')}
-              className={`w-full text-left p-3 rounded-md border transition-all flex items-start gap-3 ${
-                mode === 'file_exported'
-                  ? 'border-accent-warning bg-status-warning-op10'
-                  : 'border-border hover:border-text-tertiary'
-              }`}
-            >
-              <DownloadSimple size={18} className="text-accent-warning shrink-0 mt-0.5" />
-              <div className="text-sm">
-                <div className="font-medium text-text-primary">{t('cas.offlineFileExported')}</div>
-                <div className="text-xs text-text-secondary mt-0.5">{t('cas.offlineModeDesc.fileExported')}</div>
-              </div>
-            </button>
+            {canExportKey && (
+              <button
+                type="button"
+                onClick={() => setMode('file_exported')}
+                className={`w-full text-left p-3 rounded-md border transition-all flex items-start gap-3 ${
+                  mode === 'file_exported'
+                    ? 'border-accent-warning bg-status-warning-op10'
+                    : 'border-border hover:border-text-tertiary'
+                }`}
+              >
+                <DownloadSimple size={18} className="text-accent-warning shrink-0 mt-0.5" />
+                <div className="text-sm">
+                  <div className="font-medium text-text-primary">{t('cas.offlineFileExported')}</div>
+                  <div className="text-xs text-text-secondary mt-0.5">{t('cas.offlineModeDesc.fileExported')}</div>
+                </div>
+              </button>
+            )}
           </div>
 
           {mode === 'file_exported' && (

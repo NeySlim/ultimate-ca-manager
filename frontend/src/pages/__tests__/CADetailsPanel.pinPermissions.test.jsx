@@ -6,7 +6,7 @@
  * opened a modal whose every toggle answered 403.
  */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen } from '@testing-library/react'
+import { fireEvent, render, screen } from '@testing-library/react'
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ permissions: ['*'], user: { id: 1, username: 'probe' } }),
@@ -30,13 +30,14 @@ const CA = {
   has_private_key: true, pending: false, revoked: false,
 }
 
-function renderPanel(granted) {
+function renderPanel(granted, scopes = []) {
   const canWrite = (resource) => granted.includes(resource)
   render(
     <CADetailsPanel
       ca={CA}
       canWrite={canWrite}
       canDelete={() => false}
+      hasPermission={(scope) => scopes.includes(scope)}
       onExport={vi.fn()}
       onDelete={vi.fn()}
       onChanged={vi.fn()}
@@ -59,5 +60,20 @@ describe('CADetailsPanel — template pins need both scopes', () => {
   it('offers it to a holder of both', () => {
     renderPanel(['cas', 'templates'])
     expect(screen.getByText('templates.managePins')).toBeInTheDocument()
+  })
+})
+
+// POST /api/v2/cas/<id>/export with the key asks for write:cas AND read:private_keys
+describe('CADetailsPanel — CA key export needs read:private_keys', () => {
+  it('hides key formats from a holder of write:cas alone', () => {
+    renderPanel(['cas'])
+    fireEvent.click(screen.getByText('export.title'))
+    expect(screen.queryByText('P12 / PKCS#12')).not.toBeInTheDocument()
+  })
+
+  it('offers them with read:private_keys', () => {
+    renderPanel(['cas'], ['read:private_keys'])
+    fireEvent.click(screen.getByText('export.title'))
+    expect(screen.getByText('P12 / PKCS#12')).toBeInTheDocument()
   })
 })

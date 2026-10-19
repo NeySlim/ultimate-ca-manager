@@ -55,7 +55,7 @@ Cuatro roles integrados que no se pueden modificar ni eliminar:
 
 ### Matriz de permisos
 Los permisos están organizados por categoría:
-- **CA**: Crear, leer, actualizar, eliminar, importar, exportar
+- **CA**: Crear, leer, actualizar, eliminar, importar, exportar (solo el certificado: véase Claves privadas)
 - **Certificados**: Emitir, leer, revocar, renovar, eliminar, exportar (solo el certificado: véase Claves privadas)
 - **Claves privadas**: Exportación directa de la clave privada (\`read:private_keys\`), solo administradores: ningún rol integrado salvo Admin la posee. Los roles sin ella pasan por la Recuperación de claves
 - **CSR**: Crear, leer, firmar, eliminar

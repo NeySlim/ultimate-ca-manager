@@ -160,10 +160,12 @@ def export_ca(ca_id):
                 400,
             )
 
-    # Private key export requires write permission (operator+)
+    # A CA key leaves UCM only with read:private_keys, as a certificate key does
     if include_key or export_format in ('pkcs12', 'pfx', 'key', 'jks'):
-        if not has_permission('write:cas', g.permissions):
-            return error_response('Private key export requires write:cas permission', 403)
+        if not (has_permission('write:cas', g.permissions)
+                and has_permission('read:private_keys', g.permissions)):
+            return error_response(
+                'Private key export requires the write:cas and read:private_keys permissions', 403)
         # HSM-backed CAs cannot export their private key — it never leaves the HSM
         if ca.uses_hsm:
             return error_response('Cannot export HSM-backed key', 409)

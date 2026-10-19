@@ -55,7 +55,7 @@ Quatro funções integradas que não podem ser modificadas ou excluídas:
 
 ### Matriz de Permissões
 As permissões são organizadas por categoria:
-- **CAs**: Criar, ler, atualizar, excluir, importar, exportar
+- **CAs**: Criar, ler, atualizar, excluir, importar, exportar (somente o certificado: ver Chaves Privadas)
 - **Certificados**: Emitir, ler, revogar, renovar, excluir, exportar (somente o certificado: ver Chaves Privadas)
 - **Chaves Privadas**: Exportação direta da chave privada (\`read:private_keys\`), somente admin: nenhuma função integrada além de Admin a possui. As funções sem ela passam pela Recuperação de chaves
 - **CSRs**: Criar, ler, assinar, excluir
