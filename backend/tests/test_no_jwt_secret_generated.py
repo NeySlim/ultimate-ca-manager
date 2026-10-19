@@ -14,20 +14,24 @@ import yaml
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 
 
-def _heredoc_keys(path, marker='ENVEOF'):
-    """Variables of the env file a packaging script writes (its here-document)."""
+def written_env(path, tmp_path):
+    """The env file a packaging script writes, produced by running its here-document
+    in a throwaway shell; returns ``{name: value}``, commented examples included."""
     text = (ROOT / path).read_text()
-    keys = set()
-    for body in re.findall(rf"<<\s*'?{marker}'?\n(.*?)\n{marker}", text, re.S):
-        keys |= {m.group(1) for m in re.finditer(r'^#?\s*([A-Z][A-Z0-9_]+)=', body, re.M)}
-    return keys
+    block = re.search(r'^[ \t]*cat > "\$UCM_CONFIG/ucm\.env" << ?\'?ENVEOF\'?\n.*?\nENVEOF$',
+                      text, re.S | re.M).group(0)
+    env = {'PATH': '/usr/bin:/bin', 'UCM_CONFIG': str(tmp_path), 'UCM_DATA': '/data',
+           'SECRET_KEY': 'generated-secret', 'ADMIN_PASS': 'generated-pass'}
+    subprocess.run(['bash', '-c', 'set -e\n' + block], env=env, check=True)
+    written = (tmp_path / 'ucm.env').read_text()
+    return dict(re.findall(r'^#?\s*([A-Z][A-Z0-9_]+)=(\S*)', written, re.M))
 
 
 @pytest.mark.parametrize('path', ['packaging/debian/postinst', 'packaging/rpm/ucm.spec'])
-def test_packages_write_no_jwt_variable(path):
-    keys = _heredoc_keys(path)
-    assert 'SECRET_KEY' in keys
-    assert not {k for k in keys if k.startswith('JWT_')}
+def test_packages_write_no_jwt_variable(path, tmp_path):
+    written = written_env(path, tmp_path)
+    assert written['SECRET_KEY'] == 'generated-secret'
+    assert not {k for k in written if k.startswith('JWT_')}
 
 
 def test_the_docker_entrypoint_exports_no_jwt_secret():

@@ -3,23 +3,19 @@
 It offered SESSION_TIMEOUT and RATE_LIMIT_PER_MINUTE/PER_HOUR, which nothing
 applied, and none of the RATE_LIMIT_*_RPM/_BURST the limiter reads.
 """
-import pathlib
-import re
-
 import pytest
 
 from security.rate_limiter import RateLimitConfig
 
-POSTINST = pathlib.Path(__file__).resolve().parents[2] / 'packaging' / 'debian' / 'postinst'
+
+@pytest.fixture
+def offered(tmp_path):
+    from tests.test_no_jwt_secret_generated import written_env
+    return written_env('packaging/debian/postinst', tmp_path)
 
 
-def _offered():
-    body = re.search(r"<<\s*'?ENVEOF'?\n(.*?)\nENVEOF", POSTINST.read_text(), re.S).group(1)
-    return dict(re.findall(r'^#?\s*([A-Z][A-Z0-9_]+)=(\S*)', body, re.M))
-
-
-def test_dead_variables_are_not_offered():
-    assert not {'SESSION_TIMEOUT', 'RATE_LIMIT_PER_MINUTE', 'RATE_LIMIT_PER_HOUR'} & set(_offered())
+def test_dead_variables_are_not_offered(offered):
+    assert not {'SESSION_TIMEOUT', 'RATE_LIMIT_PER_MINUTE', 'RATE_LIMIT_PER_HOUR'} & set(offered)
 
 
 @pytest.mark.parametrize('name, path, field', [
@@ -28,8 +24,7 @@ def test_dead_variables_are_not_offered():
     ('RATE_LIMIT_HEAVY_RPM', '/api/v2/cas', 'rpm'),
     ('RATE_LIMIT_HEAVY_BURST', '/api/v2/cas', 'burst'),
 ])
-def test_each_offered_limit_reaches_the_limiter(monkeypatch, name, path, field):
-    offered = _offered()
+def test_each_offered_limit_reaches_the_limiter(monkeypatch, offered, name, path, field):
     assert name in offered
     # The value shown is the default the limiter applies without it
     monkeypatch.setattr(RateLimitConfig, '_limits_loaded', False)
