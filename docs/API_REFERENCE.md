@@ -2554,7 +2554,6 @@ Content-Type: application/json
   "credentials": {
     "api_token": "..."
   },
-  "zones": ["example.com"],
   "is_default": true,
   "enabled": true
 }
@@ -2573,7 +2572,6 @@ Content-Type: application/json
 {
   "name": "Updated Name",
   "credentials": { "api_token": "new-token" },
-  "zones": ["example.com", "example.org"],
   "enabled": true,
   "is_default": false
 }
