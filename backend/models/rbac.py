@@ -6,6 +6,11 @@ from models import db
 from datetime import datetime
 from utils.datetime_utils import utc_now, utc_isoformat
 
+# System roles mirror the built-in roles, which users hold in ``User.role``.
+SYSTEM_ROLE_USERS = {'Administrator': 'admin', 'Operator': 'operator',
+                     'Auditor': 'auditor', 'Viewer': 'viewer'}
+
+
 class CustomRole(db.Model):
     """Custom role for fine-grained RBAC"""
     __tablename__ = 'pro_custom_roles'
@@ -30,7 +35,10 @@ class CustomRole(db.Model):
     def to_dict(self):
         from models import User
         try:
-            user_count = User.query.filter_by(custom_role_id=self.id).count()
+            builtin = SYSTEM_ROLE_USERS.get(self.name) if self.is_system else None
+            query = (User.query.filter_by(role=builtin) if builtin
+                     else User.query.filter_by(custom_role_id=self.id))
+            user_count = query.count()
         except Exception:
             user_count = 0
         return {

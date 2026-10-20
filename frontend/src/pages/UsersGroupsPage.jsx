@@ -945,7 +945,7 @@ export default function UsersGroupsPage() {
       </CompactSection>
 
       <CompactSection title={t('groups.permissions')} icon={ShieldCheck} iconClass="icon-bg-violet">
-        {(selectedGroup.permissions && selectedGroup.permissions.length > 0) ? (
+        {(Array.isArray(selectedGroup.permissions) && selectedGroup.permissions.length > 0) ? (
           <div className="flex flex-wrap gap-1">
             {selectedGroup.permissions.map(p => (
               <Badge key={p} size="xs">{p}</Badge>
@@ -1529,7 +1529,7 @@ function GroupForm({ group, onSubmit, onCancel }) {
       setFormData({
         name: group.name || '',
         description: group.description || '',
-        permissions: group.permissions || []
+        permissions: Array.isArray(group.permissions) ? group.permissions : []
       })
     } else {
       setFormData({

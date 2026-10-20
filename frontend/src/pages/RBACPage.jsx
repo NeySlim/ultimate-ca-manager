@@ -242,7 +242,8 @@ export default function RBACPage() {
   const stats = useMemo(() => {
     const systemRoles = roles.filter(r => r.is_system).length
     const customRoles = roles.filter(r => !r.is_system).length
-    const totalUsers = roles.reduce((acc, r) => acc + (r.user_count || 0), 0)
+    // Every user holds exactly one built-in role, so system roles count each user once.
+    const totalUsers = roles.filter(r => r.is_system).reduce((acc, r) => acc + (r.user_count || 0), 0)
     return [
       { label: t('common.total'), value: roles.length, icon: Shield, variant: 'primary' },
       { label: t('common.system'), value: systemRoles, icon: Lock, variant: 'warning' },
