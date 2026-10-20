@@ -20,7 +20,6 @@ from models import AcmeClientOrder, Certificate
 from services.acme.acme_client_service import AcmeClientService
 from services.acme.acme_proxy_service import (
     AcmeProxyService,
-    ProxyChallengeIdentifierError,
     ProxyDns01OnlyError,
     ProxyResourceNotFoundError,
 )
@@ -37,6 +36,8 @@ from utils.acme_csr import decode_csr_b64
 from utils.acme_public_url import get_acme_public_origin, get_acme_proxy_public_base
 
 logger = logging.getLogger(__name__)
+# Request-JWK thumbprints use the shared RFC 7638 helper (name kept for callers).
+_jwk_thumbprint = jwk_thumbprint_or_none
 
 acme_proxy_bp = Blueprint('acme_proxy', __name__, url_prefix='/acme/proxy')
 
@@ -166,33 +167,19 @@ def _kid_account_thumbprint(protected):
         return None
 
 
-def _jwk_thumbprint(jwk):
-    """RFC 7638 thumbprint of a request JWK, or None when not computable.
-
-    The one implementation lives in services/acme/jwk_thumbprint, so a value
-    derived from a request header stays comparable with the thumbprint the
-    service stored on the account, with nothing to drift from. None rather
-    than an exception because the ownership checks fail closed on it.
-    """
-    return jwk_thumbprint_or_none(jwk)
-
-
 def _requester_identity(jwk=None):
     """(account_id, thumbprint) of the verified requester, for ownership checks.
-
     Only meaningful after verify_proxy_jws() succeeded: the kid (or jwk) has
     been validated against the account's key, so deriving identity from it is
     sound. kid-signed requests (the RFC 8555 §6.2 norm for these endpoints)
     resolve through the account's stored thumbprint; a jwk-signed request
     hashes the header JWK directly. Returns (None, None) when nothing can be
-    derived — owner-bound resources then fail closed in the service layer.
-    """
+    derived — owner-bound resources then fail closed in the service layer."""
     protected = _request_protected_header()
     account_id = _kid_account_id(protected)
-    thumbprint = _jwk_thumbprint(jwk) or _kid_account_thumbprint(protected)
+    thumbprint = jwk_thumbprint_or_none(jwk) or _kid_account_thumbprint(protected)
     return account_id, thumbprint
-
-
+# Payload decoding helpers.
 def _decode_b64url(value):
     """Strictly decode an unpadded base64url value."""
     if not isinstance(value, str) or not value:
@@ -409,17 +396,11 @@ def new_order(slug=None):
     if not is_valid:
         return proxy_error("malformed", err)
 
-    if not isinstance(payload, dict):
-        return proxy_error("malformed", "Payload must be a JSON object")
-
-    # Payload shape first: these checks need no account lookup, and an auth
-    # error must not mask an unsupported identifier or challenge type that
-    # the client can actually fix.
+    # PLANB-C.8: à implémenter selon SPEC (charge JSON objet, invariant 1)
     identifiers = payload.get('identifiers')
     if not identifiers:
         return proxy_error("malformed", "Missing 'identifiers' in payload")
-    if not isinstance(identifiers, list):
-        return proxy_error("malformed", "'identifiers' must be an array")
+    # PLANB-C.8: à implémenter selon SPEC ('identifiers' doit être un tableau, invariant 1)
     if any(
         not isinstance(identifier, dict) or identifier.get('type') != 'dns'
         for identifier in identifiers
@@ -456,28 +437,16 @@ def new_order(slug=None):
             400,
         )
 
-    # SECURITY: new-order MUST be kid-signed (RFC 8555 §6.2), and requiring
-    # the kid unconditionally is what makes the checks below reachable.
-    # verify_jws validates a jwk-signed JWS against its own inline key
-    # without any account lookup, so tolerating one here would skip the
-    # account existence/status check *and* the EAB identifier restrictions
-    # whenever EAB is not mandatory, and would leave the resulting order
-    # unbound — which _verify_order_ownership then serves to every client.
     protected_header = _request_protected_header()
     requester_account_id = _kid_account_id(protected_header)
-    if not requester_account_id:
-        return proxy_error('malformed', 'Account kid required in protected header')
-
-    acme_svc = AcmeService()
-    account = acme_svc.get_account_by_kid(requester_account_id)
-    if not account:
-        return proxy_error('accountDoesNotExist', 'Account not found', 404)
-    # RFC 8555 §7.3.6: 'revoked' is as unusable as 'deactivated'.
-    if account.status in ('deactivated', 'revoked'):
-        return proxy_error('unauthorized', f'Account is {account.status}', 401)
-
+    # PLANB-C.8: à implémenter selon SPEC (kid exigé, invariant 2 ; statut du compte, invariant 3)
+    acme_service = AcmeService()
+    if requester_account_id:
+        account = acme_service.get_account_by_kid(requester_account_id)
+        if not account:
+            return proxy_error('accountDoesNotExist', 'Account not found', 404)
     # EAB domain scope, reported as a single rejectedIdentifier (no compound here).
-    eab_cred = acme_svc.get_bound_eab_credential(requester_account_id)
+    eab_cred = acme_service.get_bound_eab_credential(requester_account_id)
     if eab_cred is not None:
         refused = [i['value'] for i in identifiers if not eab_cred.allows_identifier(i)]
         if refused:
@@ -488,7 +457,7 @@ def new_order(slug=None):
                 400,
             )
 
-    try:
+    try:  # malformed dates and upstream failures are mapped below
         not_before = payload.get('notBefore')
         if not_before:
             not_before = datetime.fromisoformat(not_before.replace('Z', '+00:00'))
@@ -500,10 +469,7 @@ def new_order(slug=None):
             return proxy_error("malformed", "Invalid replacement certificate identifier")
 
         # Bind the order to its owner so finalize can reject cross-account use.
-        # RFC 8555 §6.2 makes 'jwk' and 'kid' mutually exclusive and new-order
-        # is kid-signed (enforced above), so there is no header JWK to prefer:
-        # the thumbprint resolves through the account the kid names.
-        _, client_thumbprint = _requester_identity()
+        client_thumbprint = _requester_identity()[1]
 
         svc = get_proxy_service(slug)
         order_data, order_id = svc.new_order(
@@ -547,14 +513,11 @@ def authz(authz_id, slug=None):
         return err_resp
 
     requester_account_id, requester_thumbprint = _requester_identity(jwk)
-
     try:
         svc = get_proxy_service(slug)
-        result = svc.get_authz(
-            authz_id,
-            requester_account_id=requester_account_id,
-            requester_thumbprint=requester_thumbprint,
-        )
+        result = svc.get_authz(authz_id,
+                               requester_account_id=requester_account_id,
+                               requester_thumbprint=requester_thumbprint)
         if not result:
             return proxy_error("malformed", "Authorization not found", 404)
 
@@ -586,14 +549,11 @@ def challenge(chall_id, slug=None):
         return proxy_error("malformed", err)
 
     requester_account_id, requester_thumbprint = _requester_identity(jwk)
-
     try:
         svc = get_proxy_service(slug)
-        data, link_header = svc.respond_challenge(
-            chall_id,
-            requester_account_id=requester_account_id,
-            requester_thumbprint=requester_thumbprint,
-        )
+        data, link_header = svc.respond_challenge(chall_id,
+                                                  requester_account_id=requester_account_id,
+                                                  requester_thumbprint=requester_thumbprint)
         resp = proxy_response(data)
         if link_header:
             resp.headers['Link'] = link_header
@@ -608,11 +568,7 @@ def challenge(chall_id, slug=None):
         return proxy_error("malformed", str(e), 400)
     except ProxyEndpointNotConfiguredError as e:
         return proxy_error("malformed", str(e), 404)
-    except ProxyChallengeIdentifierError as e:
-        # Fail closed, but with a problem document that states the cause
-        # instead of a bare "Internal server error".
-        logger.warning(f"ACME proxy challenge: {e}")
-        return proxy_error("serverInternal", str(e), 500)
+    # PLANB-C.5: à implémenter selon SPEC (réponse à l'erreur typée de l'identifiant indéterminé)
     except RuntimeError as e:
         logger.warning(f"ACME proxy challenge: {e}")
         return proxy_error("serverInternal", "Failed to respond to challenge", 500)
@@ -633,14 +589,11 @@ def get_order(order_id, slug=None):
         return err_resp
 
     requester_account_id, requester_thumbprint = _requester_identity(jwk)
-
     try:
         svc = get_proxy_service(slug)
-        data = svc.get_order(
-            order_id,
-            requester_account_id=requester_account_id,
-            requester_thumbprint=requester_thumbprint,
-        )
+        data = svc.get_order(order_id,
+                             requester_account_id=requester_account_id,
+                             requester_thumbprint=requester_thumbprint)
         order_url = f"{_proxy_base_url(slug)}/order/{order_id}"
         resp = proxy_response(data)
         resp.headers['Location'] = order_url
@@ -672,9 +625,7 @@ def finalize(order_id, slug=None):
     if not requester_account_id and not requester_thumbprint:
         logger.warning("ACME proxy finalize: no requester identity from verified JWS")
 
-    if not isinstance(payload, dict):
-        return proxy_error("malformed", "Payload must be a JSON object")
-
+    # PLANB-C.8: à implémenter selon SPEC (charge JSON objet)
     try:
         csr_b64 = payload.get('csr')
         if not csr_b64:
@@ -721,14 +672,11 @@ def cert(cert_id, slug=None):
         return err_resp
 
     requester_account_id, requester_thumbprint = _requester_identity(jwk)
-
     try:
         svc = get_proxy_service(slug)
-        content, content_type, link_header = svc.get_certificate(
-            cert_id,
-            requester_account_id=requester_account_id,
-            requester_thumbprint=requester_thumbprint,
-        )
+        content, content_type, link_header = svc.get_certificate(cert_id,
+                                                                 requester_account_id=requester_account_id,
+                                                                 requester_thumbprint=requester_thumbprint)
 
         resp = make_response(content, 200)
         resp.headers['Content-Type'] = content_type

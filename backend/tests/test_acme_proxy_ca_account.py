@@ -244,14 +244,8 @@ class TestProxyServiceBinding:
             assert svc.account.id == acct.id
             assert svc.upstream_directory_url == AcmeClientAccount.LE_PRODUCTION_URL
 
-    def test_bg_thread_posts_upstream_after_account_reattach(self, app, clean_proxy_state):
-        """Regression: a detached ORM account must re-bind before JWS signing, and the
-        background DNS thread must reach upstream exactly once.
-
-        The thread signs through _make_worker_service(), patched here to this
-        instance so the _post_with_account mock applies; an unpatched worker
-        would open a real upstream connection.
-        """
+    def test_bg_thread_refreshes_detached_account(self, app, clean_proxy_state):
+        """Regression: background DNS thread must re-bind ORM account before signing JWS."""
         from unittest.mock import MagicMock, patch
         from services.acme.acme_proxy_service import AcmeProxyService
 
@@ -278,7 +272,6 @@ class TestProxyServiceBinding:
             mock_resp.json.return_value = {'status': 'processing'}
 
             with patch.object(svc, '_post_with_account', return_value=mock_resp) as post_mock, \
-                 patch.object(svc, '_make_worker_service', return_value=svc) as worker_mock, \
                  patch('api.v2.acme_domains.find_provider_for_domain') as find_prov, \
                  patch('services.acme.dns_providers.create_provider') as create_prov, \
                  patch('services.acme.acme_proxy_service.wait_for_txt', return_value={'ok': True, 'missing': [], 'waited': 0}):
@@ -312,8 +305,6 @@ class TestProxyServiceBinding:
                 )
 
             post_mock.assert_called_once()
-            # Pins the injection point: upstream signing goes through the worker.
-            worker_mock.assert_called_once()
 
     def test_bg_thread_submits_upstream_when_dns_not_visible_locally(self, app, clean_proxy_state):
         """Soft-fail: if the local resolver can't see the TXT after timeout, still submit
@@ -346,7 +337,6 @@ class TestProxyServiceBinding:
             with patch('api.v2.acme_domains.find_provider_for_domain') as find_prov, \
                  patch('services.acme.dns_providers.create_provider') as create_prov, \
                  patch('services.acme.acme_proxy_service.wait_for_txt', return_value={'ok': False, 'missing': ['_single_'], 'waited': 5}), \
-                 patch.object(svc, '_make_worker_service', return_value=svc), \
                  patch.object(svc, '_post_with_account') as post_mock:
                 provider_model = MagicMock()
                 provider_model.id = 1
@@ -373,31 +363,6 @@ class TestProxyServiceBinding:
             db.session.refresh(order)
             entry = order.challenges_dict.get('https://acme-proxy-test.example/chall/2', {})
             assert entry.get('status') == 'submitted'
-
-    def test_worker_service_is_distinct_instance(self, app, clean_proxy_state):
-        """The background worker must be its own instance bound to the same account.
-
-        Reusing the request instance is what let _refresh_account_session()
-        rebind shared ORM state from another thread.
-        """
-        from services.acme.acme_proxy_service import AcmeProxyService
-
-        with app.app_context():
-            acct = _seed_account()
-            db.session.add(SystemConfig(
-                key=PROXY_ACCOUNT_ID_KEY,
-                value=str(acct.id),
-                description='test',
-            ))
-            db.session.commit()
-
-            svc = AcmeProxyService('https://ucm.example')
-            worker = svc._make_worker_service()
-
-            assert worker is not svc
-            assert worker.base_url == svc.base_url
-            assert worker.account.id == acct.id
-            assert worker.upstream_directory_url == svc.upstream_directory_url
 
 
 class TestProxyMultiPath:

@@ -366,7 +366,7 @@ class TestCertificateOwnership:
         with app.app_context():
             svc = _make_svc(app, monkeypatch)
             monkeypatch.setattr(
-                svc, '_find_order_for_certificate', lambda _url, **_kw: None,
+                svc, '_find_order_for_certificate', lambda *_args, **_kwargs: None,
             )
             with pytest.raises(ProxyResourceNotFoundError):
                 svc.get_certificate(
@@ -493,72 +493,6 @@ def proxy_upstream_stub(app, monkeypatch):
             directory_url=_STUB_DIRECTORY_URL
         ).delete()
         db.session.commit()
-
-
-class TestHalfPopulatedOwnerBinding:
-    """An order that recorded only one of the two owner fields still resolves.
-
-    It belongs to exactly one local ACME account, so the missing half is
-    reconciled through the AcmeAccount row instead of being refused. That
-    reconciliation must not degrade into the old "absence of a contradiction
-    means allowed" rule, hence the stranger case.
-    """
-
-    def _alice(self, app, client):
-        """Register a real account and return (account_id, jwk_thumbprint)."""
-        alice_key, alice_jwk = _generate_rsa_key_and_jwk()
-        kid = _register_account(client, alice_key, alice_jwk)
-        account_id = kid.rstrip('/').rsplit('/', 1)[-1]
-        with app.app_context():
-            alice = AcmeAccount.query.filter_by(account_id=account_id).first()
-            assert alice is not None
-            assert alice.jwk_thumbprint
-            return account_id, alice.jwk_thumbprint
-
-    def test_account_id_only_binding_matches_thumbprint_requester(
-        self, app, client, monkeypatch, proxy_upstream_stub,
-    ):
-        account_id, thumbprint = self._alice(app, client)
-        upstream = _FakeResp({'status': 'valid', 'finalize': f'{ORDER_URL}/finalize'})
-        with app.app_context():
-            _seed_order(account_id=account_id, client_jwk_thumbprint=None)
-            svc = _make_svc(app, monkeypatch, upstream_response=upstream)
-            data = svc.get_order(
-                _b64(ORDER_URL),
-                requester_account_id=None,
-                requester_thumbprint=thumbprint,
-            )
-            assert data['status'] == 'valid'
-
-    def test_thumbprint_only_binding_matches_account_requester(
-        self, app, client, monkeypatch, proxy_upstream_stub,
-    ):
-        account_id, thumbprint = self._alice(app, client)
-        upstream = _FakeResp({'status': 'valid', 'finalize': f'{ORDER_URL}/finalize'})
-        with app.app_context():
-            _seed_order(account_id=None, client_jwk_thumbprint=thumbprint)
-            svc = _make_svc(app, monkeypatch, upstream_response=upstream)
-            data = svc.get_order(
-                _b64(ORDER_URL),
-                requester_account_id=account_id,
-                requester_thumbprint=None,
-            )
-            assert data['status'] == 'valid'
-
-    def test_half_populated_binding_still_denies_stranger(
-        self, app, client, monkeypatch, proxy_upstream_stub,
-    ):
-        _account_id, thumbprint = self._alice(app, client)
-        with app.app_context():
-            _seed_order(account_id=None, client_jwk_thumbprint=thumbprint)
-            # _make_svc without a response asserts upstream is never reached.
-            svc = _make_svc(app, monkeypatch)
-            with pytest.raises(PermissionError):
-                svc.get_order(
-                    _b64(ORDER_URL),
-                    requester_account_id='acct-stranger',
-                    requester_thumbprint=None,
-                )
 
 
 class TestEndpointOwnership:

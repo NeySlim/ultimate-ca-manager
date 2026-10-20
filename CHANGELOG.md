@@ -705,18 +705,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [2.213] - 2026-08-19
 
-> ⚠️ **Upgrade note: in-flight ACME proxy orders placed with a bare JWK must be
-> re-created.** The proxy's `new-order` now requires a kid (RFC 8555 §6.2) and binds
-> every order to an RFC 7638 thumbprint. A **pending** proxy order created before this
-> release through a **jwk-signed** new-order carries only the legacy thumbprint of the
-> raw JWK dict, which no longer equals the value derived from the requesting key: and
-> the account-row reconciliation cannot resolve it either, because that legacy hash
-> never equals a stored account thumbprint. Those orders become inaccessible and must
-> be re-created. ACME automation self-heals (the client simply places a new order on
-> its next run), and already-issued certificates are unaffected, but a client that
-> polls a saved order URL forever will need a nudge.
-
-### Security
+### Security / Migration
+- **Upgrade note**: pending ACME proxy orders created before this release by a jwk-signed `new-order` can no longer be read or finalized, because their stored owner thumbprint predates the RFC 7638 format. Clients recover by placing a new order on their next run; issued certificates are unaffected.
 - **ACME proxy `new-order` requires a kid**: a jwk-signed JWS is verified against its own inline key with no account lookup, so accepting one skipped the account existence/status check *and* the per-EAB identifier restrictions whenever EAB was not mandatory, and left the resulting order with no owner recorded: which the ownership check then served to every other client of that proxy. Identifier and challenge-type validation still runs first, so a client with an unsupported identifier keeps getting `unsupportedIdentifier` rather than an authentication error (#260)
 - **Deactivated *and* revoked accounts are refused on `new-order`**: the status check only covered `deactivated`, so a revoked account could keep ordering certificates
 - **Proxy resources require a positive owner match**: authz, challenge, order and certificate access previously allowed any verified requester when an order's owner binding was half-populated (an account id without a stored thumbprint, or a thumbprint that resolved to no account): the absence of a contradiction was treated as authorization. A match is now required on one of the two fields, and a half-populated binding is reconciled through the owning `AcmeAccount` row rather than waved through (#260)
@@ -733,8 +723,6 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Discovery: large scheduled scans no longer exhaust memory and crash-loop the service: probes are submitted through a bounded window with connection-level failures discarded immediately, a scan is capped at 65,536 host×port probes (rejected with a clear error beyond), a profile's next-run timestamp advances when a scan starts (not when it completes), scans orphaned by a restart are marked failed at startup, and reverse-DNS lookups are now lazy (#293)
 - Bulk Actions: pagination, search and status/CA filters for certificates and CSRs now run server-side against the complete inventory: the page-size selector is respected, selections survive page changes, resource count chips show real totals, and the CSR list endpoint gained server-side search (#294)
 - **Background DNS-01 threads no longer share ORM state with the request that started them**: the worker rebound the request's account object to its own session, racing the request thread and the sibling threads a multi-domain order starts; each worker now signs through its own service instance
-
-### Changed
 - **Proxied ACME requests reuse the upstream directory, finalize URL and challenge mapping, and pool `Replay-Nonce` values**: every proxied call previously paid an extra `GET /directory` plus `HEAD /new-nonce` upstream. All caches are advisory: a miss falls back to the upstream round-trip, so a restart or a second worker costs performance, never correctness
 
 ## [2.212] - 2026-08-17

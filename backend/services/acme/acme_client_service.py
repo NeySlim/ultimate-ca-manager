@@ -422,8 +422,8 @@ class AcmeClientService:
     def _get_nonce(self) -> str:
         """Get a nonce for the ACME server, reusing a pooled one first.
 
-        Every upstream response carries a fresh Replay-Nonce (RFC 8555 §6.5),
-        so harvesting them removes a HEAD /new-nonce round-trip; a stale pooled
+        Pooled values are Replay-Nonce headers kept from earlier responses (RFC
+        8555 §6.5), which saves a HEAD /new-nonce round-trip; a stale pooled
         value is still covered by the badNonce retry in _post. The HEAD falls
         back to the shared backoff, on the operator's configured HTTP timeout
         rather than a hard-coded 30 that ignored it.
@@ -679,13 +679,7 @@ class AcmeClientService:
             timeout=self._http_timeout(),
             verify=self.verify_ssl,
         )
-        # Harvest the fresh nonce for the next request. HTTP 400 is skipped: a
-        # badNonce error's Replay-Nonce is consumed by the retry above, and
-        # pooling it too would hand the same nonce to two requests.
-        if resp.status_code != 400:
-            outbound.nonce_pool_push(
-                self.directory_url,
-                (getattr(resp, 'headers', None) or {}).get('Replay-Nonce'))
+        # PLANB-C.10: à implémenter selon SPEC (empiler le Replay-Nonce reçu, jamais celui d'une réponse 400)
         return resp
 
 

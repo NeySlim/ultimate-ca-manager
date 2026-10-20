@@ -113,23 +113,6 @@ def test_proxy_new_order_forwards_replaces_when_present(client, monkeypatch):
         '_kid_account_thumbprint',
         lambda protected: None,
     )
-    # new-order is kid-signed (RFC 8555 §6.2) and the proxy resolves the account
-    # the kid names, so the stubbed JWS must carry one.
-    monkeypatch.setattr(
-        acme_proxy_api,
-        '_request_protected_header',
-        lambda: {'kid': 'https://ucm.example/acme/proxy/acct/internal-acme-account'},
-    )
-    monkeypatch.setattr(
-        acme_proxy_api.AcmeService,
-        'get_account_by_kid',
-        lambda _self, _account_id: MagicMock(status='valid'),
-    )
-    monkeypatch.setattr(
-        acme_proxy_api.AcmeService,
-        'get_bound_eab_credential',
-        lambda _self, _account_id: None,
-    )
 
     response = client.post(
         '/acme/proxy/new-order',

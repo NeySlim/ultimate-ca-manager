@@ -38,8 +38,7 @@ NONCE_POOL_TTL_SEC = 60
 NONCE_FETCH_ATTEMPTS = 3
 
 _pool_lock = threading.Lock()
-_nonce_pool = {}   # upstream directory URL -> [(stored_at, nonce), ...]
-
+# PLANB-C.10: à implémenter selon SPEC (réserve de nonces par URL d'annuaire amont)
 
 def validate_outbound_acme_url(url: str) -> None:
     """Block loopback/cloud-metadata targets for ACME sub-URLs.
@@ -56,37 +55,20 @@ def validate_outbound_acme_url(url: str) -> None:
 
 
 def nonce_pool_pop(directory_url: str) -> Optional[str]:
-    """Take a single-use pooled nonce (popped under lock: never handed out twice).
-
-    Newest first, and anything older than NONCE_POOL_TTL_SEC is discarded
-    rather than spent.
-    """
-    now = time.monotonic()
-    with _pool_lock:
-        pool = _nonce_pool.get(directory_url)
-        while pool:
-            stored_at, nonce = pool.pop()
-            if now - stored_at <= NONCE_POOL_TTL_SEC:
-                return nonce
+    """Newest first, and anything older than NONCE_POOL_TTL_SEC is discarded
+    rather than spent."""
+    # PLANB-C.10: à implémenter selon SPEC (dépiler un nonce à usage unique)
     return None
 
 
 def nonce_pool_push(directory_url: str, nonce: Optional[str]) -> None:
-    """Harvest a Replay-Nonce from an upstream response (RFC 8555 §6.5)."""
-    if not nonce or not directory_url:
-        return
-    with _pool_lock:
-        pool = _nonce_pool.setdefault(directory_url, [])
-        if any(entry[1] == nonce for entry in pool):
-            return
-        pool.append((time.monotonic(), nonce))
-        del pool[:-NONCE_POOL_MAX]
+    # PLANB-C.10: à implémenter selon SPEC (empiler un nonce reçu, borné à NONCE_POOL_MAX)
+    return None
 
 
 def reset_nonce_pool() -> None:
     """Drop every pooled nonce (process-level cache, so also test-level)."""
-    with _pool_lock:
-        _nonce_pool.clear()
+    # PLANB-C.10: à implémenter selon SPEC (vider la réserve)
 
 
 def fetch_nonce(nonce_url: str, *, timeout: int, verify: bool,

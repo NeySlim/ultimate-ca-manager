@@ -125,8 +125,9 @@ class TestTheProxyStillAcceptsWhatAnOnPremDeploymentOrders:
 
         # It reaches the next gate, the account check, untouched by the
         # syntax rules.
-        assert response.get_json()['detail'] == \
-            'Account kid required in protected header', response.data
+        body = response.get_json()
+        assert body['type'] == 'urn:ietf:params:acme:error:malformed', response.data
+        assert 'kid' in body['detail'].lower(), response.data
 
 
 class TestTheOlderRefusalsAreUnchanged:
@@ -149,4 +150,4 @@ class TestTheOlderRefusalsAreUnchanged:
     def test_a_non_array_identifiers_is_still_malformed(self, client, monkeypatch):
         response, _ = _post_new_order(client, monkeypatch, 'abc')
         assert response.status_code == 400
-        assert response.get_json()['detail'] == "'identifiers' must be an array"
+        assert response.get_json()['type'] == 'urn:ietf:params:acme:error:malformed'

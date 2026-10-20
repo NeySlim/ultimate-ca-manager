@@ -2,7 +2,7 @@
 import pytest
 
 from models import db, AcmeClientAccount
-from services.acme.acme_proxy_service import AcmeProxyService, _nonce_pool_pop
+from services.acme.acme_proxy_service import AcmeProxyService
 
 
 @pytest.fixture
@@ -73,9 +73,6 @@ class TestAcmeProxyUpstreamSsrf:
 
         class _Resp:
             status_code = 200
-            # _sign_and_post harvests Replay-Nonce for the pool (RFC 8555
-            # §6.5), so the stub answers like a real upstream response.
-            headers = {'Replay-Nonce': 'nonce-2'}
 
         def fake_post(url, **kwargs):
             called['url'] = url
@@ -95,8 +92,6 @@ class TestAcmeProxyUpstreamSsrf:
         assert called['url'] == 'https://93.184.216.34/cert/1'
         assert called['kwargs']['json']['protected']
         assert called['kwargs'].get('verify') is proxy_svc.verify_ssl
-        # The fresh nonce is pooled for the next upstream request.
-        assert _nonce_pool_pop(proxy_svc.upstream_directory_url) == 'nonce-2'
 
     def test_ensure_directory_uses_pinned_safe_request_get(self, proxy_svc, monkeypatch):
         called = {}
