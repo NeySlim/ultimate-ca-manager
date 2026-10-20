@@ -66,16 +66,21 @@ describe('CreateCAModal policy algorithms (#397)', () => {
 
   it('offers every option when no policy restricts them', async () => {
     renderModal({ allowed_key_types: null, allowed_digests: null })
-    await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
-    expect(optionValues('common.keyAlgorithm')).toEqual(['RSA', 'ECDSA'])
-    expect(optionValues('common.signatureAlgorithm')).toEqual(['auto', 'sha256', 'sha384', 'sha512'])
+    await waitFor(() => {
+      expect(mocks.getEffective).toHaveBeenCalled()
+      expect(optionValues('common.keyAlgorithm')).toEqual(['RSA', 'ECDSA'])
+      expect(optionValues('common.signatureAlgorithm')).toEqual(['auto', 'sha256', 'sha384', 'sha512'])
+    })
   })
 
   it('switches to an allowed key and sends only allowed choices', async () => {
     renderModal({ allowed_key_types: ['EC-P384'], allowed_digests: ['sha384', 'sha512'] })
-    await waitFor(() => expect(optionValues('common.keyAlgorithm')).toEqual(['ECDSA']))
-    expect(optionValues('common.keySize')).toEqual(['secp384r1'])
-    expect(optionValues('common.signatureAlgorithm')).toEqual(['auto', 'sha384', 'sha512'])
+    // The three selects settle over separate renders: wait for all of them.
+    await waitFor(() => {
+      expect(optionValues('common.keyAlgorithm')).toEqual(['ECDSA'])
+      expect(optionValues('common.keySize')).toEqual(['secp384r1'])
+      expect(optionValues('common.signatureAlgorithm')).toEqual(['auto', 'sha384', 'sha512'])
+    })
     expect(screen.getByText('cas.create.digestAutoHint:SHA384')).toBeTruthy()
 
     fireEvent.change(screen.getByLabelText('common.commonName (CN)'), { target: { value: 'Root' } })
