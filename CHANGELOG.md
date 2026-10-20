@@ -104,6 +104,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - OCSP: on PostgreSQL, the response for a certificate revoked with a reason was never cached, its reason name going into an integer column, and a SQLite database holding such rows could not be migrated to PostgreSQL. The cache stores the CRLReason code, and existing rows are converted at upgrade.
 - CSRs: a Windows or Intune request (CA:FALSE with a path length) failed to upload with an error 500 and could not be signed or approved; it now goes through like any other, and so do an ACME order finalized with such a request, EST re-enrolment and server key generation, and the import of such a CSR.
 - ACME client: an order invalidated by a failed challenge said "Order became invalid: Unknown"; it now gives the error the CA reported for the challenge (#401, by @ziller-hqs).
+- WSTEP in FIPS mode: Windows CertEnroll signed its request with SHA-1, refused and reported as a proof-of-possession failure. XCEP now announces a SHA-2 request hash (schema 3, KSP) in FIPS mode, and the refusal is named (#404, by @clinde04).
 
 ### Security
 

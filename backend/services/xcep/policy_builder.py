@@ -69,13 +69,8 @@ _GROUP_POLICY = 9  # "Enrollment object identifier" (the template's own OID)
 _GROUP_EXTENSION = 6  # "Certificate extension or attribute identifier"
 _GROUP_HASH_ALGORITHM = 1  # "Hash algorithm identifier"
 
-# Template digest -> hash OID for attributes/hashAlgorithmOIDReference,
-# the hash a client signs its request with (PKCS#10 and the outer CMC
-# SignedData that WSTEP verifies as proof of possession). Left nil, a
-# Windows client signs with its own default, SHA-1 for a schema 2 /
-# legacy-CSP template -- which FIPS mode then refuses at
-# services/scep/message_parser.verify_cms_signature. SHA-1 is deliberately
-# absent: it is never advertised.
+# Hash a client signs its request with (hashAlgorithmOIDReference). Left nil,
+# CertEnroll falls back to SHA-1, which FIPS mode refuses. SHA-1 is never announced.
 _HASH_ALGORITHM_OIDS = {
     'sha256': ('2.16.840.1.101.3.4.2.1', 'sha256'),
     'sha384': ('2.16.840.1.101.3.4.2.2', 'sha384'),
@@ -120,10 +115,7 @@ _XCEP_KEY_FAMILIES = ('RSA', 'EC')
 _RSA_KEY_SPEC = '1'
 _RSA_CRYPTO_PROVIDERS = ('Microsoft Enhanced RSA and AES Cryptographic Provider',)
 _ECDSA_CRYPTO_PROVIDERS = ('Microsoft Software Key Storage Provider',)
-# In FIPS mode RSA templates are advertised as schema 3 with the CNG KSP:
-# Windows only honors hashAlgorithmOIDReference for schema 3 templates
-# whose keys live in a Key Storage Provider (the legacy-CSP schema 2 path
-# ignores it and signs with SHA-1).
+# FIPS mode: RSA goes to schema 3 + KSP, the only path where Windows honors the request hash.
 _RSA_KSP_CRYPTO_PROVIDERS = ('Microsoft Software Key Storage Provider',)
 
 # subjectNameFlags: client supplies Subject (0x1) + SubjectAltName (0x10000).
@@ -388,8 +380,7 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
     # CA's string refid).
     ca_ref_id = 1
 
-    # FIPS mode: announce schema 3 + a KSP + the request hash so no client
-    # falls back to signing its request with SHA-1.
+    # FIPS mode: announce schema 3 + a KSP + the request hash so no client signs with SHA-1.
     pin_request_hash = fips_mode.enabled()
 
     for template in resolved_templates:

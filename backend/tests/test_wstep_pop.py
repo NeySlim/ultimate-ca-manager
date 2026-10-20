@@ -128,6 +128,17 @@ class TestVerifyPkcs7Pop:
         err = wstep_service._verify_pkcs7_pop(csr, signed_data)
         assert err == 'PKCS#7 envelope has no signature'
 
+    def test_fips_refusal_is_named(self, monkeypatch):
+        from fips_mode import FipsRestricted
+        from services.scep import message_parser
+
+        def refuse(*_a, **_k):
+            raise FipsRestricted('SHA-1 CMS signatures not available in FIPS mode')
+        monkeypatch.setattr(message_parser, 'verify_cms_signature', refuse)
+        csr, signed_data = _real_csr_and_signed_data()
+        err = wstep_service._verify_pkcs7_pop(csr, signed_data)
+        assert 'FIPS' in err and 'proof of possession' not in err
+
 
 def test_issue_accepts_real_windows_request_end_to_end(app, create_ca):
     """Full pipeline: wstep_service.issue() with the real captured

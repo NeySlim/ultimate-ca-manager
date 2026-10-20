@@ -186,6 +186,7 @@ def _verify_pkcs7_pop(csr, outer_signed_data):
 
     Returns an error string, or None if the envelope proves possession.
     """
+    from fips_mode import FipsRestricted
     from services.scep.message_parser import verify_cms_signature
 
     try:
@@ -210,7 +211,11 @@ def _verify_pkcs7_pop(csr, outer_signed_data):
 
     try:
         verify_cms_signature(outer_signed_data, csr_pubkey)
-    except Exception:
+    except FipsRestricted as e:
+        logger.warning("WSTEP: request envelope refused in FIPS mode: %s", e)
+        return f'PKCS#7 envelope refused: {e}'
+    except Exception as e:
+        logger.warning("WSTEP: request envelope signature check failed: %s", e)
         return 'PKCS#7 envelope signature invalid (proof of possession failed)'
 
     return None
