@@ -5,8 +5,8 @@ import html
 import json
 import logging
 import threading
-import time
 from datetime import timedelta
+from time import monotonic
 
 logger = logging.getLogger(__name__)
 
@@ -14,6 +14,8 @@ VIOLATION = 'policy_violation'
 APPROVAL_PENDING = 'policy_approval_pending'
 # A client retrying the same refused request is told once per window
 DEDUP_WINDOW = timedelta(hours=1)
+# After an attempt that told nobody, the same key waits this long, not the window
+RETRY_BACKOFF = timedelta(minutes=5)
 MAX_RECIPIENTS = 50
 
 _recent = {}
@@ -145,7 +147,7 @@ def _ca_name(ca_id):
 
 
 def _claim(key) -> bool:
-    now = time.monotonic()
+    now = monotonic()
     with _recent_lock:
         for k in [k for k, t in _recent.items() if now - t > DEDUP_WINDOW.total_seconds()]:
             del _recent[k]
@@ -155,9 +157,10 @@ def _claim(key) -> bool:
         return True
 
 
-def _release(key):
+def _back_off(key):
+    """Hold the key for RETRY_BACKOFF from now instead of the whole window."""
     with _recent_lock:
-        _recent.pop(key, None)
+        _recent[key] = monotonic() - DEDUP_WINDOW.total_seconds() + RETRY_BACKOFF.total_seconds()
 
 
 def _dispatch(policy_id, kind, resource_id, details):
@@ -168,14 +171,14 @@ def _dispatch(policy_id, kind, resource_id, details):
     if app.config.get('TESTING'):
         # Inline on the caller's session (a single shared connection in tests)
         if not _send(policy_id, kind, resource_id, details, own_session=False):
-            _release((kind, resource_id))
+            _back_off((kind, resource_id))
         return
 
     def run():
         with app.app_context():
-            # A failed attempt leaves the next refusal free to try again
+            # A failed attempt lets a refusal try again after RETRY_BACKOFF
             if not _send(policy_id, kind, resource_id, details, own_session=True):
-                _release((kind, resource_id))
+                _back_off((kind, resource_id))
     # Its own thread and session: the caller's transaction is never committed here
     threading.Thread(target=run, name=f'policy-notify-{policy_id}', daemon=True).start()
 
@@ -224,6 +227,9 @@ def _send(policy_id, kind, resource_id, details, *, own_session) -> bool:
     from models.policy import CertificatePolicy
     from services.email_service import EmailService
     try:
+        config = EmailService.get_smtp_config()
+        if config is None or not config.enabled:
+            return False  # checked first: no recipient lookup, no log row
         if not own_session and _recently_logged(kind, resource_id):
             return True
         policy = db.session.get(CertificatePolicy, policy_id)

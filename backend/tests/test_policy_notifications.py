@@ -4,6 +4,7 @@ the window is reported once."""
 
 import json
 import uuid
+from datetime import timedelta
 
 import pytest
 
@@ -34,7 +35,20 @@ def _log(app, kind, resource_id, status='sent'):
 
 
 @pytest.fixture
-def sent(app, monkeypatch):
+def clock(monkeypatch):
+    """The notifier's monotonic clock, moved forward by hand."""
+    class Clock:
+        now = 1_000_000.0
+
+        def advance(self, delta):
+            self.now += delta.total_seconds()
+    c = Clock()
+    monkeypatch.setattr(policy_notifications, 'monotonic', lambda: c.now)
+    return c
+
+
+@pytest.fixture
+def sent(app, monkeypatch, smtp_on):
     """Every e-mail the notifier hands to the e-mail service."""
     class Calls(list):
         outcomes = None  # (ok, message) results to return first, then success
@@ -124,17 +138,35 @@ class TestViolation:
             NotificationLog.query.filter_by(resource_id=sent[0]['resource_id']).delete()
             db.session.commit()
 
-    def test_a_failed_mail_is_tried_again_at_the_next_refusal(self, app, create_ca, policies, sent):
+    def test_a_failed_mail_is_tried_again_once_the_backoff_is_over(
+            self, app, create_ca, policies, sent, clock):
         ca = create_ca(cn='notify retry CA')
         pid, _name = policies(ca['id'], emails=['pki@example.test'])
         sent.outcomes.append((False, 'Failed to send email: connection refused'))
         _violate(app, pid, 'retry.notify.test')
         assert len(sent) == 1
         _log(app, policy_notifications.VIOLATION, sent[0]['resource_id'], status='failed')
+        _violate(app, pid, 'retry.notify.test')  # right after the failure: no new attempt
+        assert len(sent) == 1
+        clock.advance(policy_notifications.RETRY_BACKOFF + timedelta(seconds=1))
         _violate(app, pid, 'retry.notify.test')
         assert len(sent) == 2
-        _violate(app, pid, 'retry.notify.test')  # delivered: told once
+        clock.advance(policy_notifications.RETRY_BACKOFF + timedelta(seconds=1))
+        _violate(app, pid, 'retry.notify.test')  # delivered: quiet for the whole window
         assert len(sent) == 2
+
+    def test_nobody_to_notify_is_not_looked_up_at_every_refusal(
+            self, app, create_ca, policies, sent, clock, monkeypatch):
+        lookups = []
+        monkeypatch.setattr(policy_notifications, 'recipients', lambda pol: lookups.append(pol.id) or [])
+        ca = create_ca(cn='notify nobody CA')
+        pid, _name = policies(ca['id'])
+        for _ in range(3):
+            _violate(app, pid, 'nobody.notify.test')
+        assert lookups == [pid] and sent == []
+        clock.advance(policy_notifications.RETRY_BACKOFF + timedelta(seconds=1))
+        _violate(app, pid, 'nobody.notify.test')
+        assert lookups == [pid, pid]
 
     def test_a_policy_reusing_a_deleted_id_is_reported(self, app, create_ca, policies, sent):
         ca = create_ca(cn='notify reuse CA')
@@ -342,8 +374,8 @@ class TestOwnSession:
             NotificationLog.query.filter_by(resource_id=resource_id).delete()
             db.session.commit()
 
-    def test_a_failed_exchange_is_tried_again_at_the_next_refusal(
-            self, app, create_ca, policies, smtp_on, threaded, monkeypatch):
+    def test_a_failed_exchange_is_tried_again_once_the_backoff_is_over(
+            self, app, create_ca, policies, smtp_on, threaded, clock, monkeypatch):
         exchanges = []
 
         class FakeSMTP:
@@ -363,11 +395,33 @@ class TestOwnSession:
         pid, _name = policies(ca['id'], emails=['pki@example.test'])
         for _ in range(3):
             _violate(app, pid, 'thread.retry.notify.test')
-        assert len(exchanges) == 2  # refused, then delivered and told once
+        assert len(exchanges) == 1  # refused, then held back
+        clock.advance(policy_notifications.RETRY_BACKOFF + timedelta(seconds=1))
+        for _ in range(3):
+            _violate(app, pid, 'thread.retry.notify.test')
+        assert len(exchanges) == 2  # delivered and told once
         with app.app_context():
             statuses = [log.status for log in NotificationLog.query.filter(
                 NotificationLog.resource_id.like(f'{pid}:%')).order_by(NotificationLog.id)]
         assert statuses == ['failed', 'sent']
+
+    def test_smtp_turned_off_looks_nobody_up_and_logs_nothing(
+            self, app, create_ca, policies, smtp_on, threaded, clock, monkeypatch):
+        from models.email_notification import SMTPConfig
+        lookups, exchanges = [], []
+        monkeypatch.setattr(policy_notifications, 'recipients', lambda pol: lookups.append(pol.id) or [])
+        monkeypatch.setattr('services.email_service._smtp_connect', lambda *a, **k: exchanges.append(a))
+        with app.app_context():
+            SMTPConfig.query.first().enabled = False
+            db.session.commit()
+        ca = create_ca(cn='notify smtp off CA')
+        pid, _name = policies(ca['id'], emails=['pki@example.test'])
+        for _ in range(3):
+            _violate(app, pid, 'smtp.off.notify.test')
+            clock.advance(policy_notifications.RETRY_BACKOFF + timedelta(seconds=1))
+        assert lookups == [] and exchanges == []
+        with app.app_context():
+            assert NotificationLog.query.filter_by(resource_type='policy').count() == 0
 
     def test_the_record_comes_first_and_only_one_claim_wins(self, app):
         with app.app_context():
