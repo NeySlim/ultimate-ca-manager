@@ -1,7 +1,20 @@
 """Tests for ACME proxy upstream linked to AcmeClientAccount rows."""
 import pytest
-from models import db, AcmeClientAccount, SystemConfig
+from models import db, AcmeClientAccount, AcmeClientOrder, SystemConfig
 from services.acme.acme_proxy_account import resolve_proxy_account, PROXY_ACCOUNT_ID_KEY
+
+
+@pytest.fixture(autouse=True)
+def _drop_orders_created_here(app):
+    """Orders a test creates leave with it: later suites check FK integrity."""
+    with app.app_context():
+        floor = db.session.query(db.func.max(AcmeClientOrder.id)).scalar() or 0
+    yield
+    with app.app_context():
+        db.session.rollback()
+        AcmeClientOrder.query.filter(AcmeClientOrder.id > floor).delete(
+            synchronize_session=False)
+        db.session.commit()
 
 
 @pytest.fixture

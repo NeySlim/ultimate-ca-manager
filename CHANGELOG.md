@@ -44,7 +44,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
-- Backups: deleting archives or purging by retention while another backup operation holds the lock answers 409 instead of 500.
+- Backups: deleting archives while another backup operation holds the lock answers 409 instead of 500.
 - ACME EAB: an allowed-domains entry of `*.` and a PATCH that sets the list to `null` are refused with a 400 instead of being read as "every domain" and "block everything".
 - mTLS: a client certificate presented on a PKI protocol or health endpoint no longer signs its holder in to the web interface; certificate login goes through the interface as before (#402).
 - Packaging: the DEB ucm.env offered `SESSION_TIMEOUT` and `RATE_LIMIT_PER_MINUTE`/`RATE_LIMIT_PER_HOUR`, which nothing applied; it now offers the `RATE_LIMIT_*_RPM` and `*_BURST` limits UCM reads. Session lifetime is set in Settings > Security.
@@ -707,7 +707,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [2.213] - 2026-08-19
 
-### Security / Migration
+### Security
 - **Upgrade note**: pending ACME proxy orders created before this release by a jwk-signed `new-order` can no longer be read or finalized, because their stored owner thumbprint predates the RFC 7638 format. Clients recover by placing a new order on their next run; issued certificates are unaffected.
 - **ACME proxy `new-order` requires a kid**: a jwk-signed JWS is verified against its own inline key with no account lookup, so accepting one skipped the account existence/status check *and* the per-EAB identifier restrictions whenever EAB was not mandatory, and left the resulting order with no owner recorded: which the ownership check then served to every other client of that proxy. Identifier and challenge-type validation still runs first, so a client with an unsupported identifier keeps getting `unsupportedIdentifier` rather than an authentication error (#260)
 - **Deactivated *and* revoked accounts are refused on `new-order`**: the status check only covered `deactivated`, so a revoked account could keep ordering certificates
@@ -725,6 +725,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Discovery: large scheduled scans no longer exhaust memory and crash-loop the service: probes are submitted through a bounded window with connection-level failures discarded immediately, a scan is capped at 65,536 host×port probes (rejected with a clear error beyond), a profile's next-run timestamp advances when a scan starts (not when it completes), scans orphaned by a restart are marked failed at startup, and reverse-DNS lookups are now lazy (#293)
 - Bulk Actions: pagination, search and status/CA filters for certificates and CSRs now run server-side against the complete inventory: the page-size selector is respected, selections survive page changes, resource count chips show real totals, and the CSR list endpoint gained server-side search (#294)
 - **Background DNS-01 threads no longer share ORM state with the request that started them**: the worker rebound the request's account object to its own session, racing the request thread and the sibling threads a multi-domain order starts; each worker now signs through its own service instance
+
+### Changed
 - **Proxied ACME requests reuse the upstream directory, finalize URL and challenge mapping, and pool `Replay-Nonce` values**: every proxied call previously paid an extra `GET /directory` plus `HEAD /new-nonce` upstream. All caches are advisory: a miss falls back to the upstream round-trip, so a restart or a second worker costs performance, never correctness
 
 ## [2.212] - 2026-08-17

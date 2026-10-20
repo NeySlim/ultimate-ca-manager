@@ -60,6 +60,19 @@ def _seed_order(**overrides):
 
 
 @pytest.fixture(autouse=True)
+def _drop_orders_created_here(app):
+    """Orders a test creates leave with it: later suites check FK integrity."""
+    with app.app_context():
+        floor = db.session.query(db.func.max(AcmeClientOrder.id)).scalar() or 0
+    yield
+    with app.app_context():
+        db.session.rollback()
+        AcmeClientOrder.query.filter(AcmeClientOrder.id > floor).delete(
+            synchronize_session=False)
+        db.session.commit()
+
+
+@pytest.fixture(autouse=True)
 def _clean_orders(app):
     with app.app_context():
         AcmeClientOrder.query.filter_by(

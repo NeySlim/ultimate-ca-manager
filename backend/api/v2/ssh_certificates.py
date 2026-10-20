@@ -475,7 +475,7 @@ def delete_ssh_certificate(cert_id):
         return no_content_response()
 
     except ValueError as e:
-        # Refus de la garde : 409 ; certificat disparu entre-temps : 404.
+        # Guard refusal: 409; certificate gone in the meantime: 404
         msg = str(e)
         return error_response(msg, 404 if 'not found' in msg else 409)
     except Exception as e:

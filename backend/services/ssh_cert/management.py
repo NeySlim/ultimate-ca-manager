@@ -38,7 +38,7 @@ class SSHCertificateManagementMixin:
         if not cert:
             raise ValueError(f"SSH certificate not found: {cert_id}")
 
-        # Un certificat valide (non révoqué, non expiré) ne se supprime pas.
+        # A valid (not revoked, not expired) certificate cannot be deleted
         if not cert.revoked and cert.valid_to > utc_now():
             raise ValueError(
                 "Cannot delete a valid, non-revoked SSH certificate. Revoke it first.")
