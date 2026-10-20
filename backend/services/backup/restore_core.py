@@ -800,6 +800,7 @@ class RestoreCoreMixin:
             used_at = _archived_datetime(where, 'used_at', eab.get('used_at'))
             revoked_at = _archived_datetime(where, 'revoked_at', eab.get('revoked_at'))
             existing = AcmeEabCredential.query.filter_by(kid=kid).first()
+            target = existing
             if existing:
                 existing.hmac_key_b64 = eab['hmac_key_b64']
                 existing.label = eab.get('label')
@@ -823,6 +824,14 @@ class RestoreCoreMixin:
                     status=eab.get('status', 'active'),
                 )
                 db.session.add(new_eab)
+                target = new_eab
+            # The archive holds the column's JSON text; NULL means every domain,
+            # so dropping it would lift the credential's limits.
+            if 'allowed_domains' in eab:
+                limits = eab['allowed_domains']
+                if limits is not None and not isinstance(limits, str):
+                    raise BackupSchemaError(f"{where}: allowed_domains is not JSON text")
+                target._allowed_domains = limits
             results['acme_eab_credentials'] += 1
 
     def _restore_settings(self, backup_data: Dict, results: Dict) -> None:
