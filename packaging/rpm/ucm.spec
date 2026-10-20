@@ -244,6 +244,8 @@ fi
 %systemd_postun_with_restart %{name}.service
 
 %files
+%license LICENSE
+%doc COMMERCIAL-LICENSE.md
 %{ucm_home}/
 %dir %attr(0750,%{name},%{name}) %{_sysconfdir}/%{name}/
 %config(noreplace) %{_sysconfdir}/logrotate.d/%{name}

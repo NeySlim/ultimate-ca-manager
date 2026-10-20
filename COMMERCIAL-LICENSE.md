@@ -9,7 +9,8 @@ The AGPL is not a restriction on using the software. If any of these describes y
 the AGPL already covers it and you owe nothing:
 
 - You run UCM inside your company, for your own certificates.
-- You modified it for your own needs and keep those changes to yourself.
+- You modified it for your own needs, keep those changes to yourself, and only your
+  own organisation uses it.
 - You deploy it for a client and hand over the source you deployed.
 - You resell hardware or a service with UCM on it, and your customers can get the
   source of the UCM you shipped them.
@@ -20,13 +21,17 @@ the licence.
 
 ## When you do need it
 
-The AGPL has one real requirement, and it lives in its section 13: **if you modify**
-UCM and offer it to others over a network, those users must be able to get the source
-of your version. The obligation comes from modifying, not from hosting and not from
-charging: run UCM as released and you owe nothing, whatever you invoice for it.
+The AGPL asks two things, and running UCM as released, for yourself or for paying
+customers, triggers neither:
 
-A commercial licence removes that requirement for the case where you do modify it.
-In practice:
+- **If you distribute UCM**, modified or not (an image, an appliance, a product),
+  the people you give it to receive the licence and can get the source of what you
+  gave them.
+- **If you modify UCM** and let others use it over a network, those users can get
+  the source of your version (section 13).
+
+A commercial licence removes these obligations for the cases where you cannot meet
+them. In practice:
 
 - You host a modified UCM as a service for your customers and cannot publish your
   modifications.

@@ -110,7 +110,8 @@ ARG TARGETARCH
 
 LABEL maintainer="NeySlim <https://github.com/NeySlim>" \
       description="Ultimate CA Manager - Certificate Authority Management System" \
-      org.opencontainers.image.source="https://github.com/NeySlim/ultimate-ca-manager"
+      org.opencontainers.image.source="https://github.com/NeySlim/ultimate-ca-manager" \
+      org.opencontainers.image.licenses="AGPL-3.0-only"
 
 # Install only runtime dependencies
 RUN apt-get update && apt-get install -y --no-install-recommends \
@@ -155,6 +156,7 @@ WORKDIR /opt/ucm
 
 # Copy application files with proper ownership (same layout as packages)
 COPY --chown=ucm:ucm VERSION /opt/ucm/VERSION
+COPY --chown=ucm:ucm LICENSE /opt/ucm/LICENSE
 COPY --chown=ucm:ucm backend/ /opt/ucm/backend/
 # Only the built interface: the server serves frontend/dist, while frontend/
 # as a whole carries the sources and node_modules, several hundred megabytes

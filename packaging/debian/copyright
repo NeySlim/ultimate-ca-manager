@@ -1,0 +1,12 @@
+Format: https://www.debian.org/doc/packaging-manuals/copyright-format/1.0/
+Upstream-Name: Ultimate CA Manager
+Source: https://github.com/NeySlim/ultimate-ca-manager
+
+Files: *
+Copyright: 2025-2026 Lionel Alarcon
+License: AGPL-3.0-only
+ This program is free software: you can redistribute it and/or modify it under
+ the terms of the GNU Affero General Public License, version 3, as published by
+ the Free Software Foundation.
+ .
+ The full text of the licence is in /usr/share/doc/ucm/LICENSE.

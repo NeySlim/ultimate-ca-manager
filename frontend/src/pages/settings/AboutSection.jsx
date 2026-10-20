@@ -169,9 +169,9 @@ export default function AboutSection() {
       {/* License */}
       <DetailSection title={t('settings.about.license')} icon={Shield} iconClass="icon-bg-emerald" className="mt-4">
         <div className="p-3 bg-tertiary-50 border border-border rounded-lg">
-          <p className="text-sm text-text-primary font-medium">MIT License</p>
+          <p className="text-sm text-text-primary font-medium">GNU AGPL v3.0 only</p>
           <p className="text-xs text-text-secondary mt-1">
-            © 2024-2026 Lionel Alarcon: {t('settings.about.licenseDesc')}
+            © 2025-2026 Lionel Alarcon: {t('settings.about.licenseDesc')}
           </p>
         </div>
       </DetailSection>

@@ -113,7 +113,7 @@ cp wsgi.py "$PKG_DIR/"
 # The spec installs this one as the package's version marker
 cp VERSION "$PKG_DIR/"
 cp README.md "$PKG_DIR/" 2>/dev/null || true
-cp LICENSE "$PKG_DIR/" 2>/dev/null || true
+cp LICENSE COMMERCIAL-LICENSE.md "$PKG_DIR/"
 
 # Clean up
 echo "   Cleaning up..."
