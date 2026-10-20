@@ -113,11 +113,11 @@ LABEL maintainer="NeySlim <https://github.com/NeySlim>" \
       org.opencontainers.image.source="https://github.com/NeySlim/ultimate-ca-manager"
 
 # Install only runtime dependencies
-# PLANB-E.2: à implémenter selon SPEC (client SSH pour les KRL)
 RUN apt-get update && apt-get install -y --no-install-recommends \
     curl \
     ca-certificates \
     openssl \
+    openssh-client \
     softhsm2 \
     libkrb5-3 \
     postgresql-client \

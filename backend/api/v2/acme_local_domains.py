@@ -189,5 +189,9 @@ def find_local_domain_ca(domain: str) -> int | None:
 
 
 def _is_valid_domain(domain: str) -> bool:
-    # PLANB-E.3: à implémenter selon SPEC (docstring à réécrire)
+    """Whether ``domain`` can be registered as a local ACME domain.
+
+    Same shape rule as the DNS-provider table, plus a bare private TLD such as
+    ``lan`` or ``*.lan``, which covers every name under it on this table.
+    """
     return domain_match.is_valid_entry(domain, allow_single_label=True)

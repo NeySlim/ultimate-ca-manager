@@ -147,10 +147,9 @@ export default function SSHCAsPage() {
 
   const handleDownloadPublicKey = async (ca) => {
     try {
-      // PLANB-E.2: à implémenter selon SPEC (clé publique en texte brut)
-      const res = await sshCasService.getPublicKey(ca.id)
-      const publicKey = res.data?.public_key || res.data
-      const blob = new Blob([typeof publicKey === 'string' ? publicKey : JSON.stringify(publicKey)], { type: 'text/plain' })
+      // getPublicKey already returns the raw key text
+      const publicKey = await sshCasService.getPublicKey(ca.id)
+      const blob = new Blob([publicKey], { type: 'text/plain' })
       downloadBlob(blob, `${ca.descr || 'ssh-ca'}_key.pub`)
     } catch (error) {
       showError(error.message || t('messages.errors.downloadFailed.publicKey'))
@@ -178,10 +177,8 @@ export default function SSHCAsPage() {
 
   const handleCopyPublicKey = async (ca) => {
     try {
-      // PLANB-E.2: à implémenter selon SPEC (clé publique en texte brut)
-      const res = await sshCasService.getPublicKey(ca.id)
-      const publicKey = res.data?.public_key || res.data
-      await clipboardCopy(typeof publicKey === 'string' ? publicKey : JSON.stringify(publicKey), 'publicKey')
+      const publicKey = await sshCasService.getPublicKey(ca.id)
+      await clipboardCopy(publicKey, 'publicKey')
       showSuccess(t('sshCas.publicKeyCopied'))
     } catch (error) {
       showError(error.message || t('messages.errors.copyFailed.publicKey'))

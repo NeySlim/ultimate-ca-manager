@@ -920,7 +920,15 @@ def new_authz():
         if not ok:
             return acme_error(err_type, err_detail)
 
-        # PLANB-E.1: à implémenter selon SPEC (restriction EAB, new-authz)
+        # Accounts registered through EAB inherit the credential's domain scope.
+        eab_cred = service.get_bound_eab_credential(account_id)
+        if eab_cred is not None and not eab_cred.allows_identifier(identifier):
+            return acme_error(
+                'rejectedIdentifier',
+                f"Identifier {identifier.get('value')} is not allowed by this account's "
+                "external account binding",
+            )
+
         auth = service.create_pre_authorization(account_id, identifier)
         
         authz_url = f"{service.base_url}/acme/authz/{auth.authorization_id}"
@@ -1048,7 +1056,36 @@ def new_order():
                 subproblems=subproblems,
             )
 
-        # PLANB-E.1: à implémenter selon SPEC (restriction EAB, new-order local)
+        # EAB domain scope: every refused identifier is reported in one response.
+        eab_cred = service.get_bound_eab_credential(account_id)
+        if eab_cred is not None:
+            refused = [i for i in identifiers if not eab_cred.allows_identifier(i)]
+            if refused:
+                values = [i.get('value') for i in refused]
+                _audit_acme(
+                    'acme.order.rejected_eab_domains',
+                    resource_type='acme_account',
+                    resource_id=account_id,
+                    details=f"EAB kid={eab_cred.kid} rejected identifiers: {', '.join(values)}",
+                    success=False,
+                )
+                subproblems = [
+                    _identifier_subproblem(
+                        i, 'rejectedIdentifier',
+                        f"Identifier {i.get('value')} is not allowed by this account's "
+                        "external account binding",
+                    )
+                    for i in refused
+                ]
+                if len(subproblems) == 1:
+                    return acme_error('rejectedIdentifier', subproblems[0]['detail'],
+                                      subproblems=subproblems)
+                return acme_error(
+                    'compound',
+                    'Identifiers are not allowed by this account\'s external account binding',
+                    subproblems=subproblems,
+                )
+
         replaces = payload.get('replaces')
         if replaces is not None:
             if not isinstance(replaces, str) or ari.parse_certid(replaces) is None:

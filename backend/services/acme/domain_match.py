@@ -11,9 +11,11 @@ order for that zone fell through to the default CA (#352).
 The two halves disagreed rather than one of them being wrong: the validator
 accepts ``*.local`` on purpose, so the lookup is what has to understand it.
 """
+import string
 from typing import List, Optional
 
 _WILDCARD = '*.'
+_LABEL_CHARS = frozenset(string.ascii_letters + string.digits + '-')
 
 
 def is_valid_entry(domain: Optional[str], *, allow_single_label: bool) -> bool:
@@ -27,8 +29,24 @@ def is_valid_entry(domain: Optional[str], *, allow_single_label: bool) -> bool:
     name under it (#290). The DNS-provider table has no such case -- a zone it
     can answer a challenge in is one a provider hosts -- so it refuses them.
     """
-    # PLANB-E.3: à implémenter selon SPEC
-    raise NotImplementedError('PLANB-E.3')
+    if not isinstance(domain, str) or not domain:
+        return False
+    body = domain[len(_WILDCARD):] if domain.startswith(_WILDCARD) else domain
+    labels = body.split('.')
+    if len(labels) < (1 if allow_single_label else 2):
+        return False
+    if not all(_is_label(label) for label in labels):
+        return False
+    # A numeric or one-letter last label is no TLD that can ever exist.
+    top = labels[-1]
+    return len(top) >= 2 and top.isalpha()
+
+
+def _is_label(label: str) -> bool:
+    """An LDH label: 1 to 63 ASCII letters, digits or hyphens, no hyphen at either end."""
+    return (0 < len(label) <= 63
+            and all(char in _LABEL_CHARS for char in label)
+            and label[0] != '-' and label[-1] != '-')
 
 
 def normalize(domain: Optional[str]) -> str:

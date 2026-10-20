@@ -100,7 +100,10 @@ class Config:
     # Application
     APP_NAME = os.getenv("APP_NAME", "Ultimate Certificate Manager")
 
-    # PLANB-E.3: à implémenter selon SPEC (DATA_DIR sur app.config)
+    # Published on app.config for consumers such as the session cleanup; the
+    # module value is the one every data path below is built from.
+    DATA_DIR = DATA_DIR
+
     # Version - single source of truth: VERSION file at repo/install root
     @staticmethod
     def _get_version():
