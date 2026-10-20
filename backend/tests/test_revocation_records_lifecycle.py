@@ -77,6 +77,13 @@ def _fail_commit_when(monkeypatch, cert_id, predicate):
     monkeypatch.setattr(db.session, 'commit', commit)
 
 
+def _file_paths(cert_id):
+    """The files of the certificate that exist on disk now."""
+    from utils.file_naming import cert_cert_path, cert_key_path
+    cert = db.session.get(Certificate, cert_id)
+    return [path for path in (cert_cert_path(cert), cert_key_path(cert)) if path.exists()]
+
+
 def _revoke_service(app, cert_id, reason='keyCompromise', **kwargs):
     from services.cert_service import CertificateService
     with app.app_context():
@@ -388,13 +395,18 @@ class TestDeletion:
         renewal = _request(app, 'renewal', {'certificate_id': cert['id']})
         serial = _row(app, cert['id'])['serial']
 
+        with app.app_context():
+            paths = _file_paths(cert['id'])
+        assert paths, 'the fixture wrote no file, nothing to prove'
+
         def refuse(_obj):
-            raise RuntimeError('delete refused')
+            raise RuntimeError('delete refused: DELETE FROM certificates WHERE id = 1')
         with app.app_context():
             monkeypatch.setattr(db.session, 'delete', refuse)
             assert CertificateService.delete_certificate(cert['id'], username='admin') is False
             monkeypatch.undo()
         assert _row(app, cert['id']) is not None
+        assert all(path.exists() for path in paths), 'files removed for a row still there'
         assert _approval(app, renewal)['status'] == 'pending'
         assert _records(app, serial)[0]['certificate_id'] == cert['id']
         with app.app_context():
@@ -402,6 +414,8 @@ class TestDeletion:
                 action='cert_deleted', resource_name='delete-fails.example.test',
             ).order_by(AuditLog.id.desc()).first()
             assert entry is not None and entry.success is False
+            assert entry.details == ('Failed to delete certificate delete-fails.example.test: '
+                                     'the database refused the deletion')
 
     def test_success_is_audited_after_the_commit_and_emitted_from_the_snapshot(
             self, app, create_ca, create_cert, monkeypatch):
@@ -415,7 +429,10 @@ class TestDeletion:
         _revoke_service(app, cert['id'])
         caref = _row(app, cert['id'])['caref']
         with app.app_context():
+            paths = _file_paths(cert['id'])
+            assert paths, 'the fixture wrote no file, nothing to prove'
             assert CertificateService.delete_certificate(cert['id'], username='robot') is True
+            assert not any(path.exists() for path in paths)
             entry = AuditLog.query.filter_by(
                 action='cert_deleted', resource_name='delete-events.example.test',
             ).order_by(AuditLog.id.desc()).first()
@@ -447,6 +464,7 @@ def _seed_references(cert_id):
     its delivery history, all on ``cert_id``; returns their ids."""
     from models import DeployTarget, DeployBinding, DeployDelivery
     from models.acme_models import AcmeAccount, AcmeOrder, AcmeClientOrder
+    from models.msca import MicrosoftCA, MSCARequest
     account = AcmeAccount(account_id=f'del-{secrets.token_hex(6)}', jwk='{}',
                           jwk_thumbprint=secrets.token_hex(16), status='valid')
     db.session.add(account)
@@ -464,15 +482,21 @@ def _seed_references(cert_id):
     db.session.flush()
     delivery = DeployDelivery(binding_id=binding.id, binding_type='certificate',
                               event_type='initial', status='delivered')
-    db.session.add(delivery)
+    msca = MicrosoftCA(name=f'del-msca-{secrets.token_hex(4)}', server='ca.test')
+    db.session.add_all([delivery, msca])
+    db.session.flush()
+    msca_request = MSCARequest(msca_id=msca.id, csr_id=cert_id, cert_id=cert_id, template='WebServer')
+    db.session.add(msca_request)
     db.session.commit()
     return {'account': account.account_id, 'order': order.id, 'client_order': client_order.id,
-            'target': target.id, 'binding': binding.id, 'delivery': delivery.id}
+            'target': target.id, 'binding': binding.id, 'delivery': delivery.id,
+            'msca': msca.id, 'msca_request': msca_request.id}
 
 
 def _assert_references_cleared(ids):
     from models import DeployTarget, DeployBinding, DeployDelivery
     from models.acme_models import AcmeAccount, AcmeOrder, AcmeClientOrder
+    from models.msca import MicrosoftCA, MSCARequest
     db.session.expire_all()
     order = db.session.get(AcmeOrder, ids['order'])
     client_order = db.session.get(AcmeClientOrder, ids['client_order'])
@@ -480,6 +504,11 @@ def _assert_references_cleared(ids):
     assert client_order.certificate_id is None and client_order.source_certificate_id is None
     assert db.session.get(DeployBinding, ids['binding']) is None
     assert db.session.get(DeployDelivery, ids['delivery']) is None
+    msca_request = db.session.get(MSCARequest, ids['msca_request'])
+    assert msca_request.cert_id is None and msca_request.csr_id is None
+    db.session.delete(msca_request)
+    db.session.flush()
+    db.session.delete(db.session.get(MicrosoftCA, ids['msca']))
     db.session.delete(order)
     db.session.delete(client_order)
     db.session.delete(db.session.get(DeployTarget, ids['target']))
@@ -490,7 +519,7 @@ def _assert_references_cleared(ids):
 
 class TestReferencesAreCleared:
 
-    def test_acme_orders_and_deploy_bindings_on_sqlite(self, app, create_ca, create_cert):
+    def test_acme_orders_msca_requests_and_deploy_bindings_on_sqlite(self, app, create_ca, create_cert):
         from services.cert_service import CertificateService
         ca = create_ca(cn='Delete References CA')
         cert = create_cert(cn='delete-references.example.test', ca_id=ca['id'])
@@ -507,10 +536,17 @@ _PG_URL = os.environ.get('UCM_TEST_PG_URL')
 
 @contextmanager
 def _postgres_session(app, monkeypatch):
-    """``db.session`` bound to a throwaway PostgreSQL schema built from the models."""
+    """``db.session`` bound to a schema of our own on the bench, built from the
+    models; the bench is held exclusively (other files reset it)."""
+    from tests.conftest import pg_bench_exclusive
+    schema = f'b4_delete_{secrets.token_hex(4)}'
+    with pg_bench_exclusive():
+        yield from _postgres_schema_session(app, monkeypatch, schema)
+
+
+def _postgres_schema_session(app, monkeypatch, schema):
     from sqlalchemy import create_engine, text
     from sqlalchemy.orm import scoped_session, sessionmaker
-    schema = f'b4_delete_{secrets.token_hex(4)}'
     admin = create_engine(_PG_URL)
     with admin.begin() as conn:
         conn.execute(text(f'CREATE SCHEMA {schema}'))
@@ -533,10 +569,11 @@ def _postgres_session(app, monkeypatch):
         admin.dispose()
 
 
+@pytest.mark.postgres
 @pytest.mark.skipif(not _PG_URL, reason='UCM_TEST_PG_URL not set')
 class TestReferencesAreClearedOnPostgres:
 
-    def test_acme_orders_and_deploy_bindings(self, app, monkeypatch):
+    def test_acme_orders_msca_requests_and_deploy_bindings(self, app, monkeypatch):
         from models import CA
         from services.cert_service import CertificateService
         with _postgres_session(app, monkeypatch):

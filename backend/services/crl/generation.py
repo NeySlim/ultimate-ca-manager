@@ -148,14 +148,18 @@ def _parse_revoked_serial(cert: Certificate, *, context: str) -> Optional[int]:
 def _run_housekeeping(ca_id: int) -> None:
     """Opt-in purges run before a full CRL is enumerated; a failure never
     blocks the generation."""
-    try:
-        if CRLQueryMixin.is_purge_stale_serials_enabled():
-            CRLQueryMixin.purge_stale_revoked_serials(ca_id)
-        if CRLQueryMixin.is_auto_delete_enabled():
-            CRLQueryMixin.purge_expired_revoked_certificates(ca_id)
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"CRL: housekeeping failed for CA {ca_id}: {e}", exc_info=True)
+    purges = (
+        (CRLQueryMixin.is_purge_stale_serials_enabled, 'purge_stale_revoked_serials'),
+        (CRLQueryMixin.is_auto_delete_enabled, 'purge_expired_revoked_certificates'),
+    )
+    # Each purge on its own: one failing never skips the other
+    for enabled, name in purges:
+        try:
+            if enabled():
+                getattr(CRLQueryMixin, name)(ca_id)
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"CRL: {name} failed for CA {ca_id}: {e}", exc_info=True)
 
 
 CRL_DIGESTS = {

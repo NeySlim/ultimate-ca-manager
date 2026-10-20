@@ -4,6 +4,7 @@ import uuid
 import json
 import logging
 from datetime import timedelta
+from types import SimpleNamespace
 from typing import Dict, List, Optional
 
 from cryptography import x509
@@ -492,6 +493,7 @@ class LifecycleMixin:
         """
         from models import RevokedSerial, DeployBinding, DeployDelivery
         from models.acme_models import AcmeOrder, AcmeClientOrder
+        from models.msca import MSCARequest
         from models.policy import ApprovalRequest
         from services.approval_gate import resolve_moot_requests, request_snapshots
         from services.audit_service import AuditService
@@ -553,14 +555,19 @@ class LifecycleMixin:
         except Exception as e:
             logger.error(f"Certificate {cert_id}: ACME order references not cleared: {e}")
 
+        # Same for the Microsoft CA requests that name it as CSR or certificate
         try:
-            cleanup_old_files(certificate=certificate)
-            for path in (cert_cert_path(certificate), cert_csr_path(certificate),
-                         cert_key_path(certificate)):
-                if path.exists():
-                    path.unlink()
+            MSCARequest.query.filter(MSCARequest.cert_id == cert_id).update(
+                {MSCARequest.cert_id: None}, synchronize_session='fetch')
+            MSCARequest.query.filter(MSCARequest.csr_id == cert_id).update(
+                {MSCARequest.csr_id: None}, synchronize_session='fetch')
         except Exception as e:
-            logger.error(f"Certificate {cert_id}: files not removed: {e}")
+            logger.error(f"Certificate {cert_id}: Microsoft CA request references not cleared: {e}")
+
+        # The disk is touched only once the row is gone: a failed commit keeps both
+        file_paths = (cert_cert_path(certificate), cert_csr_path(certificate),
+                      cert_key_path(certificate))
+        legacy_files = SimpleNamespace(refid=certificate.refid)
 
         responder_cas = OCSPService.responder_cas_for_certificate(cert_id)
         try:
@@ -572,12 +579,21 @@ class LifecycleMixin:
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to delete certificate {cert_id}: {e}", exc_info=True)
-            # The files are already gone: this entry is the only trace
+            # The exception (often SQL) stays in the log, never in the ledger
             AuditService.log_action(
                 action='cert_deleted', resource_type='certificate', resource_id=str(cert_id),
-                resource_name=name, details=f'Failed to delete certificate {name}: {e}'[:1000],
+                resource_name=name,
+                details=f'Failed to delete certificate {name}: the database refused the deletion',
                 success=False, username=_audit_actor(username))
             return False
+
+        try:
+            cleanup_old_files(certificate=legacy_files)
+            for path in file_paths:
+                if path.exists():
+                    path.unlink()
+        except Exception as e:
+            logger.error(f"Certificate {cert_id}: files not removed: {e}")
 
         AuditService.log_action(
             action='cert_deleted', resource_type='certificate', resource_id=str(cert_id),

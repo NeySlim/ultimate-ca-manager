@@ -591,6 +591,21 @@ class TestPurges:
                             staticmethod(_boom))
         assert set(_entries(_full_crl(ca))) == {SERIAL_A}
 
+    def test_a_failing_first_purge_does_not_skip_the_second(self, backend, monkeypatch):
+        ca, ca_key, ca_cert = _make_ca()
+        _store(ca, _issue(ca_key, ca_cert, SERIAL_A), revoked=True)
+        _setting('crl_auto_purge_stale_serials', 'true')
+        _setting('crl_auto_delete_expired_revoked', 'true')
+        calls = []
+
+        def _boom(_ca_id):
+            raise RuntimeError('stale purge exploded')
+        monkeypatch.setattr(CRLQueryMixin, 'purge_stale_revoked_serials', staticmethod(_boom))
+        monkeypatch.setattr(CRLQueryMixin, 'purge_expired_revoked_certificates',
+                            staticmethod(lambda ca_id: calls.append(ca_id) or 0))
+        assert set(_entries(_full_crl(ca))) == {SERIAL_A}
+        assert calls == [ca.id]
+
 
 class TestAutoDeleteEndToEnd:
 
