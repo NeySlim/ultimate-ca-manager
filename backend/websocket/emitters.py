@@ -18,19 +18,25 @@ def _extract_cn(subject: str) -> str:
     return m.group(1).strip() if m else subject.split(',')[0].strip()
 
 
+# Server-managed scope rooms; each socket joins those its permissions allow.
+ROOM_CERTIFICATES = 'scope:certificates'
+ROOM_CAS = 'scope:cas'
+ROOM_SYSTEM_ALERTS = 'scope:system-alerts'
+ROOM_AUDIT = 'scope:audit'
+
+
 def emit_ws_event(event_type, data: Dict[str, Any], room: Optional[str] = None):
-    """
-    Safely emit a WebSocket event.
-    Gracefully handles cases where WebSocket is not initialized.
-    """
-    # PLANB-A.1: à implémenter selon SPEC (room obligatoire, constantes ROOM_*, room de chaque on_*)
+    """Emit to one room; business callers never see an error from here."""
+    if not room:
+        logger.warning("WebSocket event %s dropped: no room given",
+                       getattr(event_type, 'value', event_type))
+        return
     try:
-        from websocket import emit_event, EventType
+        from .events import emit_event  # circular: events imports the room names above
         emit_event(event_type, data, room=room)
-    except ImportError:
-        logger.debug("WebSocket module not available")
-    except Exception as e:
-        logger.warning(f"Failed to emit WebSocket event: {e}")
+    except Exception as e:  # noqa: BLE001: emission is best effort for business code
+        logger.warning("Failed to emit WebSocket event %s: %s",
+                       getattr(event_type, 'value', event_type), e)
 
 
 # ==================== Certificate Events ====================
@@ -44,7 +50,7 @@ def on_certificate_issued(cert_id: int, cn: str, ca_id: int, issuer: str, valid_
         'ca_id': ca_id,
         'issuer': issuer,
         'valid_to': valid_to
-    })
+    }, ROOM_CERTIFICATES)
 
 
 def on_certificate_revoked(cert_id: int, cn: str, reason: str, revoked_by: str):
@@ -55,7 +61,7 @@ def on_certificate_revoked(cert_id: int, cn: str, reason: str, revoked_by: str):
         'cn': cn,
         'reason': reason,
         'revoked_by': revoked_by
-    })
+    }, ROOM_CERTIFICATES)
 
 
 def on_certificate_renewed(cert_id: int, old_cert_id: int, cn: str):
@@ -65,7 +71,7 @@ def on_certificate_renewed(cert_id: int, old_cert_id: int, cn: str):
         'id': cert_id,
         'old_id': old_cert_id,
         'cn': cn
-    })
+    }, ROOM_CERTIFICATES)
 
 
 def on_certificate_deleted(cert_id: int, cn: str, deleted_by: str):
@@ -75,7 +81,7 @@ def on_certificate_deleted(cert_id: int, cn: str, deleted_by: str):
         'id': cert_id,
         'cn': cn,
         'deleted_by': deleted_by
-    })
+    }, ROOM_CERTIFICATES)
 
 
 # ==================== CA Events ====================
@@ -88,7 +94,7 @@ def on_ca_created(ca_id: int, name: str, common_name: str, created_by: str):
         'name': name,
         'common_name': common_name,
         'created_by': created_by
-    })
+    }, ROOM_CAS)
 
 
 def on_ca_updated(ca_id: int, name: str, changes: Dict[str, Any]):
@@ -98,7 +104,7 @@ def on_ca_updated(ca_id: int, name: str, changes: Dict[str, Any]):
         'id': ca_id,
         'name': name,
         'changes': changes
-    })
+    }, ROOM_CAS)
 
 
 def on_ca_deleted(ca_id: int, name: str, deleted_by: str):
@@ -108,7 +114,7 @@ def on_ca_deleted(ca_id: int, name: str, deleted_by: str):
         'id': ca_id,
         'name': name,
         'deleted_by': deleted_by
-    })
+    }, ROOM_CAS)
 
 
 def on_ca_revoked(ca_id: int, name: str, reason: str, revoked_by: str):
@@ -119,7 +125,7 @@ def on_ca_revoked(ca_id: int, name: str, reason: str, revoked_by: str):
         'name': name,
         'reason': reason,
         'revoked_by': revoked_by
-    })
+    }, ROOM_CAS)
 
 
 # ==================== CRL Events ====================
@@ -132,7 +138,7 @@ def on_crl_regenerated(ca_id: int, ca_name: str, next_update: str, entries_count
         'ca_name': ca_name,
         'next_update': next_update,
         'entries_count': entries_count
-    })
+    }, ROOM_CAS)
 
 
 # ==================== User Events ====================
@@ -144,7 +150,7 @@ def on_user_login(username: str, ip_address: str, method: str = 'password'):
         'username': username,
         'ip': ip_address,
         'method': method
-    })
+    }, ROOM_AUDIT)
 
 
 def on_user_logout(username: str):
@@ -152,7 +158,7 @@ def on_user_logout(username: str):
     from websocket.event_types import EventType
     emit_ws_event(EventType.USER_LOGOUT, {
         'username': username
-    })
+    }, ROOM_AUDIT)
 
 
 def on_user_created(user_id: int, username: str, created_by: str):
@@ -162,7 +168,7 @@ def on_user_created(user_id: int, username: str, created_by: str):
         'id': user_id,
         'username': username,
         'created_by': created_by
-    })
+    }, ROOM_AUDIT)
 
 
 def on_user_deleted(user_id: int, username: str, deleted_by: str):
@@ -172,7 +178,7 @@ def on_user_deleted(user_id: int, username: str, deleted_by: str):
         'id': user_id,
         'username': username,
         'deleted_by': deleted_by
-    })
+    }, ROOM_AUDIT)
 
 
 # ==================== Group Events ====================
@@ -184,7 +190,7 @@ def on_group_created(group_id: int, name: str, created_by: str):
         'id': group_id,
         'name': name,
         'created_by': created_by
-    })
+    }, ROOM_AUDIT)
 
 
 def on_group_deleted(group_id: int, name: str, deleted_by: str):
@@ -194,7 +200,7 @@ def on_group_deleted(group_id: int, name: str, deleted_by: str):
         'id': group_id,
         'name': name,
         'deleted_by': deleted_by
-    })
+    }, ROOM_AUDIT)
 
 
 # ==================== System Events ====================
@@ -207,7 +213,7 @@ def on_system_alert(alert_type: str, message: str, severity: str = 'info', detai
         'message': message,
         'severity': severity,
         'details': details or {}
-    })
+    }, ROOM_SYSTEM_ALERTS)
 
 
 def on_audit_critical(action: str, user: str, resource: str, details: Optional[Dict] = None):
@@ -218,7 +224,7 @@ def on_audit_critical(action: str, user: str, resource: str, details: Optional[D
         'user': user,
         'resource': resource,
         'details': details or {}
-    })
+    }, ROOM_AUDIT)
 
 
 # ==================== Discovery Events ====================
@@ -230,7 +236,7 @@ def on_discovery_scan_started(scan_run_id: int, profile_name: str, total_targets
         'scan_run_id': scan_run_id,
         'profile_name': profile_name,
         'total_targets': total_targets,
-    })
+    }, ROOM_SYSTEM_ALERTS)
 
 
 def on_discovery_scan_progress(scan_run_id: int, scanned: int, total: int, found: int):
@@ -241,7 +247,7 @@ def on_discovery_scan_progress(scan_run_id: int, scanned: int, total: int, found
         'scanned': scanned,
         'total': total,
         'found': found,
-    })
+    }, ROOM_SYSTEM_ALERTS)
 
 
 def on_discovery_scan_complete(scan_run_id: int, summary: Dict):
@@ -250,7 +256,7 @@ def on_discovery_scan_complete(scan_run_id: int, summary: Dict):
     emit_ws_event(EventType.DISCOVERY_SCAN_COMPLETE, {
         'scan_run_id': scan_run_id,
         'summary': summary,
-    })
+    }, ROOM_SYSTEM_ALERTS)
 
 
 def on_discovery_new_cert(target: str, port: int, subject: str):
@@ -262,7 +268,7 @@ def on_discovery_new_cert(target: str, port: int, subject: str):
         'port': port,
         'cn': cn,
         'subject': subject,
-    })
+    }, ROOM_CERTIFICATES)
 
 
 def on_discovery_cert_changed(target: str, port: int, old_subject: str, new_subject: str):
@@ -273,7 +279,7 @@ def on_discovery_cert_changed(target: str, port: int, old_subject: str, new_subj
         'port': port,
         'old_cn': _extract_cn(old_subject),
         'new_cn': _extract_cn(new_subject),
-    })
+    }, ROOM_CERTIFICATES)
 
 
 # ==================== SSH Certificate Events ====================
@@ -283,7 +289,7 @@ def on_ssh_ca_created(ca_id: int, name: str, ca_type: str, created_by: str):
     from websocket.event_types import EventType
     emit_ws_event(EventType.SSH_CA_CREATED, {
         'id': ca_id, 'name': name, 'ca_type': ca_type, 'created_by': created_by,
-    })
+    }, ROOM_CAS)
 
 
 def on_ssh_ca_updated(ca_id: int, name: str, updated_by: str):
@@ -291,7 +297,7 @@ def on_ssh_ca_updated(ca_id: int, name: str, updated_by: str):
     from websocket.event_types import EventType
     emit_ws_event(EventType.SSH_CA_UPDATED, {
         'id': ca_id, 'name': name, 'updated_by': updated_by,
-    })
+    }, ROOM_CAS)
 
 
 def on_ssh_ca_deleted(ca_id: int, name: str, deleted_by: str):
@@ -299,7 +305,7 @@ def on_ssh_ca_deleted(ca_id: int, name: str, deleted_by: str):
     from websocket.event_types import EventType
     emit_ws_event(EventType.SSH_CA_DELETED, {
         'id': ca_id, 'name': name, 'deleted_by': deleted_by,
-    })
+    }, ROOM_CAS)
 
 
 def on_ssh_certificate_issued(cert_id: int, key_id: str, ca_id: int, cert_type: str):
@@ -307,7 +313,7 @@ def on_ssh_certificate_issued(cert_id: int, key_id: str, ca_id: int, cert_type: 
     from websocket.event_types import EventType
     emit_ws_event(EventType.SSH_CERTIFICATE_ISSUED, {
         'id': cert_id, 'key_id': key_id, 'ca_id': ca_id, 'cert_type': cert_type,
-    })
+    }, ROOM_CERTIFICATES)
 
 
 def on_ssh_certificate_revoked(cert_id: int, key_id: str, reason: str, revoked_by: str):
@@ -315,7 +321,7 @@ def on_ssh_certificate_revoked(cert_id: int, key_id: str, reason: str, revoked_b
     from websocket.event_types import EventType
     emit_ws_event(EventType.SSH_CERTIFICATE_REVOKED, {
         'id': cert_id, 'key_id': key_id, 'reason': reason, 'revoked_by': revoked_by,
-    })
+    }, ROOM_CERTIFICATES)
 
 
 def on_ssh_certificate_deleted(cert_id: int, key_id: str, deleted_by: str):
@@ -323,4 +329,4 @@ def on_ssh_certificate_deleted(cert_id: int, key_id: str, deleted_by: str):
     from websocket.event_types import EventType
     emit_ws_event(EventType.SSH_CERTIFICATE_DELETED, {
         'id': cert_id, 'key_id': key_id, 'deleted_by': deleted_by,
-    })
+    }, ROOM_CERTIFICATES)
