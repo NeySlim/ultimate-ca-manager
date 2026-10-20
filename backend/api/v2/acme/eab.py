@@ -170,9 +170,9 @@ def patch_eab_credential(cred_id):
 
     if 'notes' in data:
         cred.notes = (data['notes'] or '').strip() or None
+
     if allowed_domains is not None:
         cred.allowed_domains = allowed_domains
-
     ok, err = safe_commit(logger, "Failed to update EAB credential")
     if not ok:
         return err

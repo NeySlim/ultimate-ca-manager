@@ -70,10 +70,9 @@ _ADMIN_ONLY_SETTINGS = frozenset([
     'backup_password',
     'backup_kdf',
     'clear_backup_password',
-    'crl_auto_delete_expired_revoked',
     'ocsp_responder_auto_renew',
     'ocsp_responder_renew_days',
-    'crl_auto_purge_stale_serials',
+    # PLANB-BF: the two CRL purge flags are admin-only too
     # Shortening it has the daily task delete audit history.
     'audit_retention_days',
     # Who may reach the admin UI at all (#402)
@@ -137,16 +136,7 @@ def get_general_settings():
         # Delegated OCSP responder certificates: daily renewal before expiry
         'ocsp_responder_auto_renew': get_config('ocsp_responder_auto_renew', 'true') == 'true',
         'ocsp_responder_renew_days': int(get_config('ocsp_responder_renew_days', '30') or 30),
-        # CRL auto-delete: purge expired revoked Certificate rows during CRL
-        # generation so the database doesn't grow unbounded. Defaults to off
-        # — expired revoked certs are kept as historical records unless an
-        # admin explicitly enables this.
-        'crl_auto_delete_expired_revoked': effective('crl_auto_delete_expired_revoked'),
-        # CRL auto-purge: delete stale RevokedSerial entries (valid_to < now)
-        # during full CRL generation. Defaults to off — RevokedSerial entries
-        # are preserved as audit records (renewal chain history) unless an
-        # admin explicitly enables this.
-        'crl_auto_purge_stale_serials': effective('crl_auto_purge_stale_serials'),
+        # PLANB-BF: report the two CRL purge flags
         # Admin source-address allowlist (#402); the env var, when set, locks it.
         'admin_allowed_networks': admin_allowlist.configured_entries(),
         'admin_allowed_networks_env_locked': admin_allowlist.env_locked(),
@@ -201,10 +191,7 @@ def update_general_settings():
         'ocsp_response_validity_hours',
         'ocsp_responder_auto_renew',
         'ocsp_responder_renew_days',
-        # CRL auto-delete expired revoked certificates
-        'crl_auto_delete_expired_revoked',
-        # CRL auto-purge stale RevokedSerial entries
-        'crl_auto_purge_stale_serials',
+        # PLANB-BF: accept the two CRL purge flags
         # Audit log retention in days, 0 keeps every log
         'audit_retention_days',
     ]
