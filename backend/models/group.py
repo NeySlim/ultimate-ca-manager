@@ -9,6 +9,15 @@ from datetime import datetime
 from utils.datetime_utils import utc_now, utc_isoformat
 
 
+# Seeded when no group exists. A group never grants the admin role, so there is no Administrators group.
+DEFAULT_GROUPS = (
+    {'name': 'Certificate Operators', 'description': 'Can manage certificates and CSRs',
+     'permissions': ['read:certificates', 'write:certificates', 'read:csrs', 'write:csrs', 'read:cas']},
+    {'name': 'Auditors', 'description': 'Read-only access to audit logs, certificates and CAs',
+     'permissions': ['read:audit', 'read:certificates', 'read:cas']},
+)
+
+
 def permission_list(value):
     """Stored group permissions as a list; JSON text from an old backup is decoded."""
     if isinstance(value, str):
@@ -18,7 +27,7 @@ def permission_list(value):
             return []
         if isinstance(value, str):
             return permission_list(value)
-    return value if isinstance(value, list) else []
+    return [p for p in value if isinstance(p, str)] if isinstance(value, list) else []
 
 
 class Group(db.Model):

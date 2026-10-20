@@ -1573,26 +1573,14 @@ def init_database(app):
     
     # ===== INITIALIZE DEFAULT DATA =====
     try:
-        from models.group import Group
+        from models.group import DEFAULT_GROUPS, Group
         from models.rbac import CustomRole, RolePermission
         
         # Create default groups if none exist
         if Group.query.count() == 0:
             app.logger.info("Creating default Pro groups...")
             
-            # A group can never grant the admin role, so there is no Administrators group.
-            default_groups = [
-                Group(
-                    name="Certificate Operators",
-                    description="Can manage certificates and CSRs",
-                    permissions=["read:certificates", "write:certificates", "read:csrs", "write:csrs", "read:cas"]
-                ),
-                Group(
-                    name="Auditors",
-                    description="Read-only access to audit logs, certificates and CAs",
-                    permissions=["read:audit", "read:certificates", "read:cas"]
-                )
-            ]
+            default_groups = [Group(**{**g, 'permissions': list(g['permissions'])}) for g in DEFAULT_GROUPS]
             
             for group in default_groups:
                 db.session.add(group)

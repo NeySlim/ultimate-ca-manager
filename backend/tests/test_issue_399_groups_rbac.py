@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, text
 
 from auth.permissions import GROUP_GRANTABLE_PERMISSIONS, get_group_permissions
 from models import User, db
-from models.group import Group, GroupMember
+from models.group import DEFAULT_GROUPS, Group, GroupMember
 from models.rbac import CustomRole
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
@@ -18,6 +18,7 @@ SEEDED = [
     (2, json.dumps('["read:certificates", "write:certificates"]'), 'ops'),
     (3, '["read:cas"]', 'already a list'),
     (4, 'not json', 'unreadable'),
+    (5, json.dumps('["read:audit", "read:dashboard", "read:certificates", "read:cas"]'), 'auditors'),
 ]
 
 
@@ -29,6 +30,8 @@ def _check(rows):
     assert rows[1] == ([], _migration().ADMIN_GROUP_NOW)
     assert rows[2] == (['read:certificates', 'write:certificates'], 'ops')
     assert rows[3] == (['read:cas'], 'already a list')
+    # read:dashboard is not grantable: kept, it would make every save of the group fail.
+    assert rows[5] == (['read:audit', 'read:certificates', 'read:cas'], 'auditors')
 
 
 def test_sqlite_decodes_string_permissions():
@@ -56,7 +59,7 @@ def test_postgres_decodes_string_permissions():
         conn.execute(text(f"SET search_path TO {schema}"))
         conn.execute(text("CREATE TABLE groups (id INTEGER PRIMARY KEY, name VARCHAR(100), "
                           "description TEXT, permissions JSON)"))
-        for gid, perms, desc in SEEDED[:3]:
+        for gid, perms, desc in SEEDED[:3] + SEEDED[4:]:
             conn.execute(text("INSERT INTO groups (id, permissions, description) "
                               "VALUES (:i, CAST(:p AS json), :d)"), {'i': gid, 'p': perms, 'd': desc})
         m.upgrade(conn)
@@ -71,14 +74,12 @@ def test_postgres_decodes_string_permissions():
         engine.dispose()
 
 
-def test_seeded_groups_hold_grantable_lists(app):
-    with app.app_context():
-        groups = Group.query.filter(Group.name.in_(['Certificate Operators', 'Auditors'])).all()
-        assert groups
-        for group in groups:
-            perms = group.permissions
-            assert isinstance(perms, list) and perms
-            assert set(perms) <= set(GROUP_GRANTABLE_PERMISSIONS)
+def test_default_groups_hold_grantable_lists():
+    assert DEFAULT_GROUPS
+    for group in DEFAULT_GROUPS:
+        perms = group['permissions']
+        assert isinstance(perms, list) and perms
+        assert set(perms) <= set(GROUP_GRANTABLE_PERMISSIONS)
 
 
 @pytest.fixture
@@ -109,16 +110,22 @@ def test_string_permissions_read_as_list(app, operator_in_string_group):
 
 def test_system_roles_count_builtin_users(app):
     with app.app_context():
+        viewer = CustomRole.query.filter_by(name='Viewer').first()
+        created = viewer is None
+        if created:  # a database reset earlier in the run drops the seeded roles
+            viewer = CustomRole(name='Viewer', description='', permissions=[], is_system=True)
+            db.session.add(viewer)
         user = User(username='viewer399', email='viewer399@example.test', role='viewer')
         user.set_password('Str0ng-Passw0rd!')
         db.session.add(user)
         db.session.commit()
         try:
-            viewer = CustomRole.query.filter_by(name='Viewer', is_system=True).first()
-            assert viewer is not None
+            assert viewer.is_system
             expected = User.query.filter_by(role='viewer').count()
             assert expected >= 1
             assert viewer.to_dict()['user_count'] == expected
         finally:
             db.session.delete(user)
+            if created:
+                db.session.delete(viewer)
             db.session.commit()

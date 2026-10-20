@@ -2,7 +2,7 @@
 
 The default groups were seeded with their permissions as a JSON string, which
 the API returned as text and the Groups panel crashed on. Each row becomes a
-list, without the wildcard and admin scopes a group can never grant.
+list of the scopes a group may grant.
 """
 import json
 import sqlite3
@@ -13,7 +13,16 @@ ADMIN_GROUP_SEEDED = 'Full system administrators with all permissions'
 ADMIN_GROUP_NOW = 'Membership grants no rights: assign the Administrator role for full access'
 
 
-def _grantable_list(value):
+def _grantable():
+    """The scopes a group may grant, or None to fall back on the structural filter."""
+    try:
+        from auth.permissions import GROUP_GRANTABLE_PERMISSIONS
+        return set(GROUP_GRANTABLE_PERMISSIONS)
+    except Exception:
+        return None
+
+
+def _grantable_list(value, grantable=None):
     """*value* (list, JSON text, or JSON text of JSON text) as a list of the
     scopes a group may hold, or None when it is not a list."""
     for _ in range(3):
@@ -26,7 +35,8 @@ def _grantable_list(value):
     if not isinstance(value, list):
         return None
     return [p for p in value
-            if isinstance(p, str) and ':' in p and '*' not in p and not p.startswith('admin:')]
+            if isinstance(p, str) and ':' in p and '*' not in p and not p.startswith('admin:')
+            and (grantable is None or p in grantable)]
 
 
 def _stored_list(raw, sqlite):
@@ -42,9 +52,9 @@ def _stored_list(raw, sqlite):
 
 def _fixes(rows, sqlite):
     """(id, permissions JSON, description) for each row that needs rewriting."""
-    out = []
+    out, grantable = [], _grantable()
     for gid, raw, description in rows:
-        fixed = _grantable_list(raw)
+        fixed = _grantable_list(raw, grantable)
         if fixed is None or fixed == _stored_list(raw, sqlite):
             continue
         if description == ADMIN_GROUP_SEEDED and not fixed:
