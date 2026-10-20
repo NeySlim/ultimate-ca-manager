@@ -3,19 +3,10 @@ WebSocket module for UCM real-time events.
 Uses Flask-SocketIO for bidirectional communication.
 """
 
-from .events import (
-    socketio,
-    init_websocket,
-    emit_event,
-    emit_to_user,
-    emit_certificate_event,
-    emit_ca_event,
-    emit_system_alert,
-    emit_audit_critical,
-    broadcast_to_scope,
-    get_connected_clients_count,
-    get_connected_clients_info,
-)
+# PLANB-A.1: exporter aussi la diffusion sur une room de scope selon SPEC
+from .events import socketio, init_websocket, emit_event, emit_system_alert
+from .events import emit_to_user, emit_certificate_event, emit_ca_event, emit_audit_critical
+from .events import get_connected_clients_count, get_connected_clients_info
 from .event_types import EventType
 from .emitters import (
     on_certificate_issued,
@@ -41,12 +32,6 @@ __all__ = [
     'socketio',
     'init_websocket',
     'emit_event',
-    'emit_to_user',
-    'emit_certificate_event',
-    'emit_ca_event',
-    'emit_system_alert',
-    'emit_audit_critical',
-    'broadcast_to_scope',
     'EventType',
     # Emitter functions
     'on_certificate_issued',
@@ -69,4 +54,6 @@ __all__ = [
     # Management functions
     'get_connected_clients_count',
     'get_connected_clients_info',
+    'emit_system_alert',
+    'emit_to_user', 'emit_certificate_event', 'emit_ca_event', 'emit_audit_critical',
 ]
