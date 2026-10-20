@@ -36,17 +36,38 @@ def _int_config(key, default):
         return default
 
 
-# PLANB-D.6: à implémenter selon SPEC (ensemble complet des clés réservées à admin:settings)
+# Writable with admin:settings only; write:settings alone has them dropped.
 _ADMIN_ONLY_SETTINGS = frozenset([
+    # Sign-in and session policy
+    'enforce_2fa',
+    'session_timeout',
+    'session_max_lifetime',
+    'max_login_attempts',
+    'lockout_duration',
+    'metrics_token',
+    'key_recovery_dual_control',
+    'min_password_length',
+    'max_password_length',
+    'password_require_uppercase',
+    'password_require_lowercase',
+    'password_require_numbers',
+    'password_require_special',
     'hsts_enabled',
     'hsts_include_subdomains',
     'hsts_max_age',
+    # Public addresses the service advertises and redirects to
+    'base_url',
+    'protocol_base_url',
+    'acme_public_vhost',
+    'acme_public_port',
+    'acme_public_tls_cert_id',
     # The whole backup schedule is admin-only, not just its password: an
     # operator who can shorten retention can have the daily task delete the
     # archives, which the dedicated admin:system route never allowed.
     'auto_backup_enabled',
     'backup_frequency',
     'backup_retention_days',
+    'backup_password',
     'backup_kdf',
     'clear_backup_password',
     'crl_auto_delete_expired_revoked',
@@ -139,8 +160,22 @@ def get_general_settings():
 def update_general_settings():
     """Update general settings in database"""
     data = request.json or {}
+    if not isinstance(data, dict):
+        return error_response('Request body must be a JSON object', 400)
 
-    # PLANB-D.6: à implémenter selon SPEC (clés réservées : retrait ou refus)
+    # Reserved keys are dropped before any validation; a body holding nothing
+    # else is refused, so a mixed card still saves its other fields.
+    if not has_permission('admin:settings', getattr(g, 'permissions', None) or []):
+        reserved = sorted(_ADMIN_ONLY_SETTINGS.intersection(data))
+        if reserved and len(reserved) == len(data):
+            return error_response(
+                'These settings require the admin:settings permission: '
+                + ', '.join(reserved), 403)
+        if reserved:
+            logger.info('Ignored admin-only settings without admin:settings: %s',
+                        ', '.join(reserved))
+            data = {k: v for k, v in data.items() if k not in _ADMIN_ONLY_SETTINGS}
+
     # List of allowed settings
     allowed_keys = [
         'system_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',

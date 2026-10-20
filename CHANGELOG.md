@@ -44,6 +44,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- Backups: deleting archives or purging by retention while another backup operation holds the lock answers 409 instead of 500.
 - ACME EAB: an allowed-domains entry of `*.` and a PATCH that sets the list to `null` are refused with a 400 instead of being read as "every domain" and "block everything".
 - mTLS: a client certificate presented on a PKI protocol or health endpoint no longer signs its holder in to the web interface; certificate login goes through the interface as before (#402).
 - Packaging: the DEB ucm.env offered `SESSION_TIMEOUT` and `RATE_LIMIT_PER_MINUTE`/`RATE_LIMIT_PER_HOUR`, which nothing applied; it now offers the `RATE_LIMIT_*_RPM` and `*_BURST` limits UCM reads. Session lifetime is set in Settings > Security.
@@ -117,6 +118,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- Settings: a migration deletes the `ldap_*` keys left over from the legacy LDAP configuration, bind password included; SSO providers are untouched.
 - An Operator, or any account or API key holding `write:cas`, could export the private key of any CA (PKCS#12, PFX, JKS, key file, PEM with key) or take it as a file by taking the CA offline. Both now also require `read:private_keys`, as a certificate key export does: an account or API key that exports CA keys now needs that scope, held by administrators or granted by a custom role.
 - A custom role assigned to a user granted none of its permissions, while the effective-permissions view listed them. Assigned custom roles now add their permissions to the built-in role, inherited ones included, except those kept for administrators (full access, wildcards, `admin:*`, account management, SSO, deployments, AD connector and HSM provider changes, system events, audit deletion), which stay stored but ignored: review existing roles and their assignments before upgrading.
 - Testing the AD connector, a Microsoft CA admin channel or an Intune app registration with the secret left blank reused the saved secret with the server, port, TLS settings, tenant or client typed in the request, so it could be sent to a server of the caller's choosing. The saved secret now goes only to the saved target; any other target needs it typed in.

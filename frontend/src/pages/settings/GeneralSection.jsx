@@ -9,8 +9,9 @@ import { certificateLabel } from '../../lib/utils'
 import { fetchAllPages } from '../../lib/fetchAllPages'
 import ServiceStatusWidget from './ServiceStatusWidget'
 import PublicEndpointsPanel from './PublicEndpointsPanel'
+import AdminLockLabel from './AdminLockLabel'
 
-export default function GeneralSection({ settings, updateSetting, handleSave, saving, canWrite }) {
+export default function GeneralSection({ settings, updateSetting, handleSave, saving, canWrite, hasPermission }) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const [metricsToken, setMetricsToken] = useState('')
@@ -18,7 +19,9 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
   const [tlsCertOptions, setTlsCertOptions] = useState([])
   const [endpointsRefresh, setEndpointsRefresh] = useState(0)
 
-  // PLANB-D.6: à implémenter selon SPEC (verrouillage des champs réservés à admin:settings)
+  // The API drops these keys without admin:settings; the other fields still save.
+  const adminLocked = !(typeof hasPermission === 'function' && hasPermission('admin:settings'))
+  const lockedLabel = (key) => <AdminLockLabel text={t(key)} locked={adminLocked} />
   // Certificates with a private key, for the ACME public vhost TLS selector
   useEffect(() => {
     let cancelled = false
@@ -84,14 +87,16 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             helperText={t('settings.systemNameHelper')}
           />
           <Input
-            label={t('settings.baseUrl')}
+            label={lockedLabel('settings.baseUrl')}
+            disabled={adminLocked}
             value={settings.base_url || ''}
             onChange={(e) => updateSetting('base_url', e.target.value)}
             placeholder={t('settings.baseUrlPlaceholder')}
             helperText={t('settings.baseUrlHelper')}
           />
           <Input
-            label={t('settings.protocolBaseUrl')}
+            label={lockedLabel('settings.protocolBaseUrl')}
+            disabled={adminLocked}
             value={settings.protocol_base_url || ''}
             onChange={(e) => updateSetting('protocol_base_url', e.target.value)}
             placeholder="http://admin.ucm.example.com:8080"
@@ -111,14 +116,16 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             helperText={t('settings.httpProtocolPortHelper')}
           />
           <Input
-            label={t('settings.acmePublicVhost')}
+            label={lockedLabel('settings.acmePublicVhost')}
+            disabled={adminLocked}
             value={settings.acme_public_vhost || ''}
             onChange={(e) => updateSetting('acme_public_vhost', e.target.value)}
             placeholder="acme.ucm.example.com"
             helperText={t('settings.acmePublicVhostHelper')}
           />
           <Input
-            label={t('settings.acmePublicPort')}
+            label={lockedLabel('settings.acmePublicPort')}
+            disabled={adminLocked}
             type="number"
             min={1}
             max={65535}
@@ -130,7 +137,8 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             helperText={t('settings.acmePublicPortHelper')}
           />
           <Select
-            label={t('settings.acmePublicTlsCertId')}
+            label={lockedLabel('settings.acmePublicTlsCertId')}
+            disabled={adminLocked}
             value={settings.acme_public_tls_cert_id ? String(settings.acme_public_tls_cert_id) : ''}
             onChange={(val) => updateSetting('acme_public_tls_cert_id', val || '')}
             options={[
@@ -152,6 +160,9 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
                 <FloppyDisk size={16} />
                 {t('common.saveChanges')}
               </Button>
+              {adminLocked && (
+                <p className="text-xs text-text-tertiary mt-2">{t('settings.adminFieldsLocked')}</p>
+              )}
             </div>
           )}
         </div>
@@ -164,7 +175,8 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
       <DetailSection title={t('settings.sessionTimezone')} icon={Clock} iconClass="icon-bg-teal">
         <div className="space-y-4">
           <Input
-            label={t('settings.sessionTimeout')}
+            label={lockedLabel('settings.sessionTimeout')}
+            disabled={adminLocked}
             type="number"
             value={Math.round((settings.session_timeout || 28800) / 60)}
             onChange={(e) => updateSetting('session_timeout', parseInt(e.target.value) * 60)}
@@ -173,7 +185,8 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             helperText={t('settings.sessionTimeoutHelper')}
           />
           <Input
-            label={t('settings.maxLoginAttempts')}
+            label={lockedLabel('settings.maxLoginAttempts')}
+            disabled={adminLocked}
             type="number"
             value={settings.max_login_attempts || 5}
             onChange={(e) => updateSetting('max_login_attempts', parseInt(e.target.value))}
@@ -182,7 +195,8 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             helperText={t('settings.maxLoginAttemptsHelper')}
           />
           <Input
-            label={t('settings.lockoutDuration')}
+            label={lockedLabel('settings.lockoutDuration')}
+            disabled={adminLocked}
             type="number"
             value={Math.round((settings.lockout_duration || 900) / 60)}
             onChange={(e) => updateSetting('lockout_duration', parseInt(e.target.value) * 60)}

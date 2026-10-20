@@ -502,7 +502,9 @@ def revoke_user_certificate(cert_id):
     auth_cert = db.session.get(AuthCertificate, cert_id)
     if not auth_cert:
         return error_response('Certificate not found', 404)
-    # PLANB-D.3: à implémenter selon SPEC
+    # Ownership first: a 404 reveals nothing, and no policy is evaluated for strangers
+    if not _can_access_cert(user, auth_cert):
+        return error_response('Certificate not found', 404)
     cert = _get_certificate_for_auth_cert(auth_cert)
     if not cert:
         return error_response('Certificate data not found', 404)
@@ -569,7 +571,9 @@ def delete_user_certificate(cert_id):
     auth_cert = db.session.get(AuthCertificate, cert_id)
     if not auth_cert:
         return error_response('Certificate not found', 404)
-    # PLANB-D.3: à implémenter selon SPEC
+    # Ownership first: a 404 reveals nothing, and no policy is evaluated for strangers
+    if not _can_access_cert(user, auth_cert):
+        return error_response('Certificate not found', 404)
     cert_name = auth_cert.name or f'User Certificate #{cert_id}'
 
     # Refused while a policy requires approval to revoke its certificate,

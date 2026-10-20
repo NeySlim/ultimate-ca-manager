@@ -149,7 +149,13 @@ def export_ca(ca_id):
         include_chain = request.args.get('include_chain', 'false').lower() == 'true'
         password = request.args.get('password')
         legacy = False
-        # PLANB-D.1: à implémenter selon SPEC
+        # Passwords and key-bearing formats must not travel in the URL
+        if password or include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key'):
+            if password:
+                logger.warning("Rejected CA %s export with password in query string", ca_id)
+            return error_response(
+                'Password and private key exports must use POST with a JSON body, '
+                'not the query string', 400)
 
     # A CA key leaves UCM only with read:private_keys, as a certificate key does
     if include_key or export_format in ('pkcs12', 'pfx', 'key', 'jks'):

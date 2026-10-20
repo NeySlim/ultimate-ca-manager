@@ -3,6 +3,7 @@ import { ShieldCheck, Lock, LockKey, Warning, Timer, Globe, Clock, CheckCircle, 
 import { Button, Input, Select, Textarea, Badge, LoadingSpinner, ExperimentalBadge, DetailHeader, DetailSection, DetailGrid, DetailContent } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { formatDate } from '../../lib/utils'
+import AdminLockLabel from './AdminLockLabel'
 
 // The API sends a list; the textarea edits one entry per line.
 function networksText(value) {
@@ -15,8 +16,10 @@ function networksList(value) {
 
 export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, encryptionLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
   const { t } = useTranslation()
-  // PLANB-D.6: à implémenter selon SPEC (verrouillage des champs réservés à admin:settings)
+  // Fields the API writes for admin:settings only are shown, but disabled.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
+  const adminLocked = !canAdminSettings
+  const canWriteSettings = Boolean(hasPermission('write:settings'))
   return (
     <DetailContent>
       <DetailHeader
@@ -116,8 +119,9 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
             onChange={(val) => updateSetting('enforce_2fa', val)}
             label={t('settings.enforce2fa')}
             description={t('settings.enforce2faDesc')}
+            disabled={adminLocked}
           />
-          {hasPermission('admin:system') && (
+          {canAdminSettings && (
             <Button type="button" onClick={() => handleSave('security2fa')} disabled={saving}>
               <FloppyDisk size={16} />
               {t('common.saveChanges')}
@@ -178,7 +182,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
             onChange={(val) => updateSetting('hsts_enabled', val)}
             label={t('settings.hstsEnabled')}
             description={t('settings.hstsEnabledDesc')}
-            disabled={settings.hsts_env_locked?.includes('hsts_enabled')}
+            disabled={adminLocked || settings.hsts_env_locked?.includes('hsts_enabled')}
           />
           {settings.hsts_enabled !== false && (
             <>
@@ -187,16 +191,16 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                 onChange={(val) => updateSetting('hsts_include_subdomains', val)}
                 label={t('settings.hstsIncludeSubdomains')}
                 description={t('settings.hstsIncludeSubdomainsDesc')}
-                disabled={settings.hsts_env_locked?.includes('hsts_include_subdomains')}
+                disabled={adminLocked || settings.hsts_env_locked?.includes('hsts_include_subdomains')}
               />
               <Input
-                label={t('settings.hstsMaxAge')}
+                label={<AdminLockLabel text={t('settings.hstsMaxAge')} locked={adminLocked} />}
                 type="number"
                 value={settings.hsts_max_age ?? 31536000}
                 onChange={(e) => updateSetting('hsts_max_age', parseInt(e.target.value))}
                 min="0"
                 helperText={t('settings.hstsMaxAgeDesc')}
-                disabled={settings.hsts_env_locked?.includes('hsts_max_age')}
+                disabled={adminLocked || settings.hsts_env_locked?.includes('hsts_max_age')}
               />
             </>
           )}
@@ -246,14 +250,16 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
             onChange={(val) => updateSetting('crl_auto_delete_expired_revoked', val)}
             label={t('settings.crlAutoDeleteExpiredRevoked')}
             description={t('settings.crlAutoDeleteExpiredRevokedDesc')}
+            disabled={adminLocked}
           />
           <ToggleSwitch
             checked={settings.crl_auto_purge_stale_serials || false}
             onChange={(val) => updateSetting('crl_auto_purge_stale_serials', val)}
             label={t('settings.crlAutoPurgeStaleSerials')}
             description={t('settings.crlAutoPurgeStaleSerialsDesc')}
+            disabled={adminLocked}
           />
-          {hasPermission('admin:system') && (
+          {canWriteSettings && (
             <Button type="button" onClick={() => handleSave('securityHsts')} disabled={saving}>
               <FloppyDisk size={16} />
               {t('common.saveChanges')}
@@ -268,7 +274,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
             onChange={(val) => updateSetting('key_recovery_dual_control', val)}
             label={t('settings.keyRecoveryDualControl')}
             description={t('settings.keyRecoveryDualControlDesc')}
-            disabled={settings.key_recovery_dual_control_locked}
+            disabled={adminLocked || settings.key_recovery_dual_control_locked}
           />
           {settings.key_recovery_dual_control_locked && (
             <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
@@ -276,7 +282,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
               <span>{t('settings.keyRecoveryDualControlLocked')}</span>
             </div>
           )}
-          {hasPermission('admin:system') && !settings.key_recovery_dual_control_locked && (
+          {canAdminSettings && !settings.key_recovery_dual_control_locked && (
             <Button type="button" onClick={() => handleSave('securityKeyRecovery')} disabled={saving}>
               <FloppyDisk size={16} />
               {t('common.saveChanges')}
@@ -287,7 +293,8 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
       <DetailSection title={t('settings.passwordPolicy')} icon={Lock} iconClass="icon-bg-violet">
         <div className="space-y-4">
           <Input
-            label={t('settings.minPasswordLength')}
+            label={<AdminLockLabel text={t('settings.minPasswordLength')} locked={adminLocked} />}
+            disabled={adminLocked}
             type="number"
             value={settings.min_password_length || 8}
             onChange={(e) => updateSetting('min_password_length', parseInt(e.target.value))}
@@ -300,21 +307,24 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
               onChange={(val) => updateSetting('password_require_uppercase', val)}
               label={t('settings.requireUppercase')}
               size="sm"
+              disabled={adminLocked}
             />
             <ToggleSwitch
               checked={settings.password_require_numbers || false}
               onChange={(val) => updateSetting('password_require_numbers', val)}
               label={t('settings.requireNumbers')}
               size="sm"
+              disabled={adminLocked}
             />
             <ToggleSwitch
               checked={settings.password_require_special || false}
               onChange={(val) => updateSetting('password_require_special', val)}
               label={t('settings.requireSpecial')}
               size="sm"
+              disabled={adminLocked}
             />
           </div>
-          {hasPermission('admin:system') && (
+          {canAdminSettings && (
             <Button type="button" onClick={() => handleSave('securityPassword')} disabled={saving}>
               <FloppyDisk size={16} />
               {t('common.saveChanges')}
@@ -376,7 +386,8 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
         <DetailGrid>
           <div className="col-span-full md:col-span-1">
             <Input
-              label={t('settings.sessionDuration')}
+              label={<AdminLockLabel text={t('settings.sessionDuration')} locked={adminLocked} />}
+              disabled={adminLocked}
               type="number"
               value={Math.round((settings.session_max_lifetime || 86400) / 3600)}
               onChange={(e) => updateSetting('session_max_lifetime', parseInt(e.target.value) * 3600)}
@@ -386,7 +397,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
             />
           </div>
         </DetailGrid>
-        {hasPermission('admin:system') && (
+        {canWriteSettings && (
           <div className="pt-4">
             <Button type="button" onClick={() => handleSave('securitySession')} disabled={saving}>
               <FloppyDisk size={16} />

@@ -2,6 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Database, Download, Trash, UploadSimple, FloppyDisk, MagnifyingGlass, CaretLeft, CaretRight, Broom, HardDrives, WarningCircle } from '@phosphor-icons/react'
 import { Button, Input, Select, FileUpload, Badge, DetailHeader, DetailSection, DetailContent } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
+import AdminLockLabel from './AdminLockLabel'
 
 export default function BackupSection({
   settings, updateSetting, handleSave, saving, hasPermission,
@@ -13,8 +14,9 @@ export default function BackupSection({
 }) {
   const { t } = useTranslation()
   const isAdmin = hasPermission('admin:system')
-  // PLANB-D.6: à implémenter selon SPEC (verrouillage des champs réservés à admin:settings)
+  // The KDF and the password need admin:settings; the schedule is refused by the API.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
+  const canWriteSettings = Boolean(hasPermission('write:settings'))
   const allSelected = backups.length > 0 && selectedBackups.length === backups.length
   const diskHigh = typeof backupMeta.disk_used_pct === 'number' && backupMeta.disk_used_pct >= 85
 
@@ -70,7 +72,8 @@ export default function BackupSection({
                 disabled={canAdminSettings === false}
               />
               <Input
-                label={t('settings.autoBackupPassword')}
+                label={<AdminLockLabel text={t('settings.autoBackupPassword')} locked={!canAdminSettings} />}
+                disabled={!canAdminSettings}
                 type="password"
                 noAutofill
                 value={settings.backup_password || ''}
@@ -98,7 +101,7 @@ export default function BackupSection({
             </>
           )}
 
-          {isAdmin && (
+          {canWriteSettings && (
             <div className="flex gap-2">
               <Button type="button" onClick={() => handleSave('backup')} disabled={saving}>
                 <FloppyDisk size={16} />
@@ -125,16 +128,20 @@ export default function BackupSection({
             max="3650"
             helperText={t('settings.retentionHelper')}
           />
-          {isAdmin && (
+          {(canWriteSettings || isAdmin) && (
             <div className="flex gap-2">
-              <Button type="button" onClick={() => handleSave('backup')} disabled={saving}>
-                <FloppyDisk size={16} />
-                {t('settings.saveSettings')}
-              </Button>
-              <Button type="button" variant="secondary" onClick={handleRunRetention} disabled={backupBusy}>
-                <Broom size={16} />
-                {t('settings.backupCleanupNow')}
-              </Button>
+              {canWriteSettings && (
+                <Button type="button" onClick={() => handleSave('backup')} disabled={saving}>
+                  <FloppyDisk size={16} />
+                  {t('settings.saveSettings')}
+                </Button>
+              )}
+              {isAdmin && (
+                <Button type="button" variant="secondary" onClick={handleRunRetention} disabled={backupBusy}>
+                  <Broom size={16} />
+                  {t('settings.backupCleanupNow')}
+                </Button>
+              )}
             </div>
           )}
         </div>

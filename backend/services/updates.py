@@ -363,11 +363,18 @@ def download_update(download_url, package_name, expected_sha256=None):
 
     Returns path to downloaded file
     """
-    # PLANB-D.2: à implémenter selon SPEC (nom réduit au nom final, confinement sous updates/)
-    safe_name = package_name
+    # Only the final path component is trusted; the result must stay under updates/
+    safe_name = os.path.basename(str(package_name or ''))
+    if safe_name != package_name:
+        logger.warning("Auto-update: package name %r reduced to %r", package_name, safe_name)
+    if safe_name in ('', '.', '..') or '\x00' in safe_name:
+        raise Exception(f"Invalid package name: {package_name!r}")
     update_dir = os.path.join(str(DATA_DIR), 'updates')
     os.makedirs(update_dir, exist_ok=True)
-    file_path = os.path.join(update_dir, package_name)
+    file_path = os.path.join(update_dir, safe_name)
+    real_dir = os.path.realpath(update_dir)
+    if os.path.dirname(os.path.realpath(file_path)) != real_dir:
+        raise Exception(f"Invalid package name: {package_name!r}")
 
     try:
         logger.info(f"Auto-update: downloading {download_url} to {file_path}")

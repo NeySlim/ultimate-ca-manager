@@ -2482,7 +2482,7 @@
     "hstsMaxAgeDesc": "Cuánto tiempo deben recordar los navegadores esta política HSTS (predeterminado: 31536000 = 1 año).",
     "hstsNote": "Los cambios se aplican en la siguiente respuesta. Desactivar HSTS no borra las políticas ya almacenadas en caché del navegador; los clientes existentes deben esperar a que expire el max-age anterior.",
     "hstsEnvLocked": "Una o más configuraciones de HSTS están forzadas por variables de entorno (UCM_HSTS_*) en /etc/ucm/ucm.env y no se pueden cambiar aquí. Elimine las variables de entorno para gestionar HSTS desde esta interfaz.",
-    "adminFieldsLocked": "",
+    "adminFieldsLocked": "Algunos campos de esta tarjeta requieren el permiso de administración de ajustes y están bloqueados. Los cambios en los demás campos se siguen guardando.",
     "keyRecoveryTitle": "Recuperación de claves",
     "keyRecoveryDualControl": "Control dual (cuatro ojos)",
     "keyRecoveryDualControlDesc": "Requiere que un segundo administrador apruebe cada solicitud de recuperación de clave privada (el aprobador debe ser distinto del solicitante).",

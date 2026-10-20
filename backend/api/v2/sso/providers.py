@@ -57,7 +57,8 @@ def get_provider(provider_id):
     """Get SSO provider details"""
     provider = db.get_or_404(SSOProvider, provider_id)
     include_secrets = request.args.get('include_secrets') == 'true'
-    # PLANB-D.4: à implémenter selon SPEC
+    if include_secrets and not has_permission('admin:system', g.permissions):
+        return error_response('Secrets available to administrators only', 403)
     return success_response(data=provider.to_dict(include_secrets=include_secrets))
 
 

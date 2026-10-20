@@ -2482,7 +2482,7 @@
     "hstsMaxAgeDesc": "ブラウザがこのHSTSポリシーを記憶する期間（デフォルト：31536000 = 1年）。",
     "hstsNote": "変更は次のレスポンスから適用されます。HSTSを無効にしても、ブラウザにキャッシュされたポリシーは削除されません。既存のクライアントは以前のmax-ageの期限切れを待つ必要があります。",
     "hstsEnvLocked": "1つ以上のHSTS設定が環境変数（UCM_HSTS_*）により /etc/ucm/ucm.env で強制されており、ここでは変更できません。このUIからHSTSを管理するには環境変数を削除してください。",
-    "adminFieldsLocked": "",
+    "adminFieldsLocked": "このカードの一部のフィールドは、設定の管理権限が必要なためロックされています。その他のフィールドへの変更は引き続き保存されます。",
     "keyRecoveryTitle": "鍵リカバリー",
     "keyRecoveryDualControl": "デュアルコントロール（四つ目の原則）",
     "keyRecoveryDualControlDesc": "各秘密鍵リカバリー要求に対して、2人目の管理者による承認を必須にします（承認者は要求者と異なる必要があります）。",

@@ -514,6 +514,78 @@ class TestExportSingleCA:
         assert cert_count >= 2
 
 
+class TestCAExportQueryStringSecrets:
+    """Passwords and key-bearing formats are refused on GET, accepted on POST."""
+
+    @staticmethod
+    def _operator(app, create_user):
+        create_user(username='op_ca_qs_probe', role='operator')
+        c = app.test_client()
+        r = c.post('/api/v2/auth/login',
+                   data=json.dumps({'username': 'op_ca_qs_probe', 'password': 'TestPass123!'}),
+                   content_type=CONTENT_JSON)
+        assert r.status_code == 200
+        return c
+
+    def test_get_with_password_is_refused_and_logged_without_secret(
+            self, auth_client, create_ca, caplog):
+        ca = create_ca(cn='QS Password CA')
+        with caplog.at_level('WARNING'):
+            r = auth_client.get(
+                f'/api/v2/cas/{ca["id"]}/export?format=pkcs12&password=Sup3rSecretPw')
+        assert_error(r, 400)
+        assert b'PRIVATE KEY' not in r.data and b'PKCS' not in r.data
+        assert 'POST' in get_json(r).get('message', '')
+        records = [x for x in caplog.records if x.levelname == 'WARNING'
+                   and str(ca['id']) in x.getMessage()]
+        assert records
+        assert all('Sup3rSecretPw' not in x.getMessage() for x in caplog.records)
+
+    def test_get_password_on_pem_is_refused(self, auth_client, create_ca):
+        ca = create_ca(cn='QS Pem Password CA')
+        r = auth_client.get(f'/api/v2/cas/{ca["id"]}/export?format=pem&password=x')
+        assert_error(r, 400)
+
+    @pytest.mark.parametrize('query', [
+        'format=pkcs12', 'format=p12', 'format=pfx', 'format=jks', 'format=key',
+        'format=pem&include_key=true',
+    ])
+    def test_get_key_format_without_password_is_refused_unlogged(
+            self, auth_client, create_ca, caplog, query):
+        ca = create_ca(cn='QS Key Format CA')
+        with caplog.at_level('WARNING'):
+            r = auth_client.get(f'/api/v2/cas/{ca["id"]}/export?{query}')
+        assert_error(r, 400)
+        assert not [x for x in caplog.records if x.levelname == 'WARNING'
+                    and 'query string' in x.getMessage()]
+
+    def test_refusal_precedes_permission_check(self, app, create_user, create_ca):
+        op = self._operator(app, create_user)
+        ca = create_ca(cn='QS Operator CA')
+        r = op.get(f'/api/v2/cas/{ca["id"]}/export?format=pkcs12')
+        assert r.status_code == 400
+        # Same caller on POST still meets the permission check
+        r = op.post(f'/api/v2/cas/{ca["id"]}/export',
+                    data=json.dumps({'format': 'pkcs12', 'password': 'ExportPass123!'}),
+                    content_type=CONTENT_JSON)
+        assert r.status_code == 403
+
+    def test_post_pkcs12_with_json_password_is_accepted(self, auth_client, create_ca):
+        ca = create_ca(cn='QS Post CA')
+        r = post_json(auth_client, f'/api/v2/cas/{ca["id"]}/export',
+                      {'format': 'pkcs12', 'password': 'ExportPass123!'})
+        assert r.status_code == 200
+        from cryptography.hazmat.primitives.serialization import pkcs12
+        key, cert, _ = pkcs12.load_key_and_certificates(r.data, b'ExportPass123!')
+        assert key is not None and cert is not None
+
+    def test_get_pem_without_secrets_still_works(self, auth_client, create_ca):
+        ca = create_ca(cn='QS Plain CA')
+        r = auth_client.get(f'/api/v2/cas/{ca["id"]}/export?format=pem')
+        assert r.status_code == 200
+        assert b'BEGIN CERTIFICATE' in r.data
+
+
 # ============================================================
 # include_chain flag — must be honored across formats (PR #100)
 # ============================================================

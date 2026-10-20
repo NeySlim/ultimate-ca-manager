@@ -7,7 +7,6 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
   const { t } = useTranslation()
   // The backend accepts a retention from admins only: shortening it deletes history.
   const canAdminSettings = Boolean(hasPermission('admin:settings'))
-  // PLANB-D.6: à implémenter selon SPEC (verrouillage des champs réservés à admin:settings)
   return (
     <DetailContent>
       <DetailHeader
@@ -27,7 +26,7 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
             helperText={t('settings.logRetentionHelp')}
             disabled={canAdminSettings === false}
           />
-          {hasPermission('admin:system') && (
+          {hasPermission('write:settings') && (
             <div className="pt-4">
               <Button type="button" onClick={() => handleSave('audit')} disabled={saving}>
                 <FloppyDisk size={16} />
