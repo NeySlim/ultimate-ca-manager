@@ -33,6 +33,8 @@ Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `U
 | `HTTPS_CERT_PATH` | `UCM_HTTPS_CERT` | (auto) | Server certificate: a file path natively, the PEM itself in Docker |
 | `HTTPS_KEY_PATH` | `UCM_HTTPS_KEY` | (auto) | Server private key: a file path natively, the PEM itself in Docker |
 | `DATABASE_URL` | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use PostgreSQL. When unset, UCM uses SQLite at `DATA_DIR/ucm.db`. |
+| `UCM_ADMIN_ALLOWED_NETWORKS` | `UCM_ADMIN_ALLOWED_NETWORKS` | (unset) | Comma-separated IP addresses or CIDR networks allowed to reach the web interface and the management API. When set, it wins over the setting in Settings > Security, which becomes read-only. See [Admin access allowlist](#admin-access-allowlist) |
+| `UCM_ADMIN_ALLOWLIST_DISABLE` | `UCM_ADMIN_ALLOWLIST_DISABLE` | (unset) | `1` turns the admin access allowlist off (recovery after a lock-out); a warning is logged at startup |
 
 ### Systemd Service
 
@@ -142,6 +144,31 @@ This affects:
 
 - **Audit log IP**: `X-Forwarded-For` is honoured **only** when the request comes from a trusted CIDR; otherwise the direct `remote_addr` is used. Spoofed XFF from untrusted networks is ignored.
 - **mTLS / EST / SCEP**: proxy-injected `X-SSL-Client-*` headers are only accepted from trusted CIDRs. Direct deployments (UCM terminates TLS itself) are unaffected.
+
+#### Admin access allowlist
+
+**Settings > Security > Admin access allowlist** restricts the web interface and the management API to a list of IPv4/IPv6 addresses and CIDR networks (one per line, up to 100). An empty list restricts nothing.
+
+- **Blocked from other addresses**: the web interface and its assets, the login, every `/api/v2/...` call (API keys included), the API docs and the WebSocket channel. API calls get a `403` JSON error, the interface a plain `403` page.
+- **Never blocked**: the PKI protocol endpoints (ACME and the ACME proxy, SCEP including `/cgi-bin/pkiclient.exe`, EST, OCSP, CRL and AIA under `/cdp` and `/ca`, TSA, XCEP/WSTEP, the SSH setup script) and the health, metrics and forward-auth endpoints, so devices and probes outside the list keep working.
+- **No lock-out from the screen**: the section shows the address the server sees for you, and a list that does not include it is refused. Each change is written to the audit log; refused requests are logged as warnings, once per address every few minutes.
+- **Environment variable**: `UCM_ADMIN_ALLOWED_NETWORKS=10.20.0.0/24,2001:db8:20::/64` wins over the stored list and makes the field read-only. An entry that is not a valid address or network is ignored with a warning; a variable with no valid entry admits nobody.
+- **Recovery**: if you are locked out, set `UCM_ADMIN_ALLOWLIST_DISABLE=1` in `/etc/ucm/ucm.env` (or the container environment) and restart UCM, fix the list, then remove the variable and restart again.
+
+The check uses the address of the TCP peer, or the client address resolved from `X-Forwarded-For` when the request comes from a proxy listed in `UCM_TRUSTED_PROXIES` with `UCM_BEHIND_PROXY=1`. It never trusts the header from anyone else.
+
+Recommended patterns:
+
+| Setup | What to list |
+|-------|--------------|
+| Management VLAN | The management subnet, e.g. `10.20.0.0/24` |
+| Bastion / jump host | The bastion address only |
+| VPN | The VPN client pool, e.g. `10.8.0.0/24` |
+| Reverse proxy | The client networks, **and** set `UCM_BEHIND_PROXY=1` plus `UCM_TRUSTED_PROXIES` to the proxy address. Without them every request appears to come from the proxy, and listing the proxy address would admit everyone who can reach it |
+
+**Docker and Kubernetes**: with a port published in bridge mode and no proxy in front, UCM may see the address after Docker's NAT (often the bridge gateway, such as `172.17.0.1`) rather than the real client. Check the address shown in the section before saving; use host networking, or a reverse proxy declared in `UCM_TRUSTED_PROXIES`, to keep real client addresses. On Kubernetes, behind an ingress controller, set the chart's `proxy.behindProxy` and `proxy.trustedProxies` (the controller's pod network), and pass `UCM_ADMIN_ALLOWED_NETWORKS` through `extraEnv` if you want it fixed by the deployment. The health probes are exempt, so liveness and readiness checks keep working.
+
+This is an application-level filter: it does not replace a firewall in front of the HTTPS port.
 
 ### Authentication Methods
 

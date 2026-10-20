@@ -2665,15 +2665,23 @@ Limit failed login attempts per IP address within a time window. After exceeding
 ### Lockout Duration
 How long an IP is blocked after exceeding the login attempt limit.
 
-## IP Restrictions
+## Admin Access Allowlist
 
-### Allow List
-Only allow connections from specified IPs or CIDR ranges. All other IPs are blocked.
+Limit the web interface and the management API to a list of IP addresses and CIDR networks, IPv4 or IPv6, one per line (up to 100). An empty list restricts nothing.
 
-### Deny List
-Block specific IPs or CIDR ranges. All other IPs are allowed.
+- **Blocked from other addresses**: the web interface and its assets, the login, every \`/api/v2\` call (API keys included) and the WebSocket channel answer **403**
+- **Always reachable**: ACME and the ACME proxy, SCEP, EST, OCSP, CRL and AIA, TSA, XCEP/WSTEP, the SSH setup script, and the health and metrics endpoints, so devices and probes keep working
+- **Your address**: the section shows the address the server sees for you. A list that does not include it is refused, so a save cannot lock you out
+- **Audit**: each change of the list is written to the audit log
 
-> ⚠ Be extremely careful with IP restrictions. Misconfiguration can lock out all users, including admins. Always test with a single IP first.
+### Environment Variables
+- \`UCM_ADMIN_ALLOWED_NETWORKS\`: comma-separated list that wins over the setting and makes the field read-only
+- \`UCM_ADMIN_ALLOWLIST_DISABLE=1\`: turns the check off after a restart; use it to recover from a lock-out, then remove it
+
+### Reverse Proxy, Docker and Kubernetes
+Behind a reverse proxy, set \`UCM_BEHIND_PROXY=1\` and list the proxy in \`UCM_TRUSTED_PROXIES\`, otherwise every request appears to come from the proxy. With Docker in bridge mode and no proxy, the address seen may be the one after Docker's NAT: check the address shown before saving.
+
+> ⚠ This filter works at the application level. Keep a firewall in front of the HTTPS port as well.
 
 ## Two-Factor Authentication
 

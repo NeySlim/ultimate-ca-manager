@@ -28,8 +28,19 @@ export default {
         items: [
           { label: 'Tempo Limite de Sessão', text: 'Logout automático após período de inatividade' },
           { label: 'Limitação de Taxa', text: 'Limitar tentativas de login para prevenir ataques de força bruta' },
-          { label: 'Restrições de IP', text: 'Permitir ou negar acesso de faixas de IP específicas' },
+          { label: 'Lista de acesso administrativo', text: 'Limitar a interface web e a API de gestão aos endereços IP e redes listados' },
           { label: 'Aplicação de 2FA', text: 'Exigir autenticação de dois fatores para todos os usuários' },
+        ]
+      },
+      {
+        title: 'Lista de Acesso Administrativo',
+        items: [
+          { label: 'Redes', text: 'Um endereço IPv4 ou IPv6 ou rede CIDR por linha, até 100. Vazia significa sem restrição' },
+          { label: 'O que é bloqueado', text: 'A partir de outros endereços: a interface web, o login, a API /api/v2 (chaves de API incluídas) e o canal WebSocket respondem 403' },
+          { label: 'Sempre acessíveis', text: 'ACME, SCEP, EST, OCSP, CRL/AIA, TSA, XCEP/WSTEP, o script de configuração SSH e os endpoints de saúde' },
+          { label: 'Seu endereço', text: 'A seção mostra o endereço que o servidor vê para você; uma lista que não o inclua é recusada' },
+          { label: 'UCM_ADMIN_ALLOWED_NETWORKS', text: 'Variável de ambiente (separada por vírgulas) que prevalece sobre a configuração e a torna somente leitura' },
+          { label: 'UCM_ADMIN_ALLOWLIST_DISABLE', text: 'Defina como 1 e reinicie para desativar a verificação após um bloqueio de acesso' },
         ]
       },
       {
@@ -42,11 +53,11 @@ export default {
     ],
     tips: [
       'Ative a limitação de taxa para proteger contra ferramentas de ataque automatizadas',
-      'Use restrições de IP para limitar acesso administrativo a redes confiáveis',
+      'Use a lista de acesso administrativo para limitar a interface web à sua VLAN de gestão, bastion ou VPN',
     ],
     warnings: [
       'Restringir a política de senha excessivamente pode frustrar os usuários',
-      'Sempre garanta que pelo menos um administrador pode acessar o sistema antes de ativar restrições de IP',
+      'Atrás de um proxy reverso, defina UCM_BEHIND_PROXY e UCM_TRUSTED_PROXIES antes de usar a lista de acesso administrativo, caso contrário todas as requisições parecem vir do proxy',
       'Configurações sensíveis à segurança (sessão, bloqueio, HSTS, URL pública, política de senha) requerem admin:settings, os campos ficam bloqueados para operators',
     ],
   },
@@ -105,15 +116,23 @@ Limitar tentativas de login com falha por endereço IP dentro de uma janela de t
 ### Duração do Bloqueio
 Por quanto tempo um IP fica bloqueado após exceder o limite de tentativas de login.
 
-## Restrições de IP
+## Lista de Acesso Administrativo
 
-### Lista de Permissão
-Permitir conexões apenas de IPs ou faixas CIDR especificadas. Todos os outros IPs são bloqueados.
+Limite a interface web e a API de gestão a uma lista de endereços IP e redes CIDR, IPv4 ou IPv6, um por linha (até 100). Uma lista vazia não restringe nada.
 
-### Lista de Negação
-Bloquear IPs ou faixas CIDR específicas. Todos os outros IPs são permitidos.
+- **Bloqueado a partir de outros endereços**: a interface web e seus recursos, o login, toda chamada \`/api/v2\` (chaves de API incluídas) e o canal WebSocket respondem **403**
+- **Sempre acessíveis**: ACME e o proxy ACME, SCEP, EST, OCSP, CRL e AIA, TSA, XCEP/WSTEP, o script de configuração SSH e os endpoints de saúde e métricas, para que dispositivos e sondas continuem funcionando
+- **Seu endereço**: a seção mostra o endereço que o servidor vê para você. Uma lista que não o inclua é recusada, então um salvamento não pode bloqueá-lo
+- **Auditoria**: cada alteração da lista é registrada no log de auditoria
 
-> ⚠ Tenha extremo cuidado com restrições de IP. Configuração incorreta pode bloquear todos os usuários, incluindo administradores. Sempre teste com um único IP primeiro.
+### Variáveis de Ambiente
+- \`UCM_ADMIN_ALLOWED_NETWORKS\`: lista separada por vírgulas que prevalece sobre a configuração e torna o campo somente leitura
+- \`UCM_ADMIN_ALLOWLIST_DISABLE=1\`: desativa a verificação após uma reinicialização; use para se recuperar de um bloqueio de acesso e depois remova
+
+### Proxy Reverso, Docker e Kubernetes
+Atrás de um proxy reverso, defina \`UCM_BEHIND_PROXY=1\` e liste o proxy em \`UCM_TRUSTED_PROXIES\`, caso contrário todas as requisições parecem vir do proxy. Com Docker em modo bridge e sem proxy, o endereço visto pode ser o posterior ao NAT do Docker: verifique o endereço exibido antes de salvar.
+
+> ⚠ Este filtro atua no nível da aplicação. Mantenha também um firewall na frente da porta HTTPS.
 
 ## Autenticação de Dois Fatores
 

@@ -28,8 +28,19 @@ export default {
         items: [
           { label: 'Sitzungszeitlimit', text: 'Automatische Abmeldung nach Inaktivitätszeitraum' },
           { label: 'Ratenbegrenzung', text: 'Anmeldeversuche begrenzen, um Brute-Force-Angriffe zu verhindern' },
-          { label: 'IP-Einschränkungen', text: 'Zugriff von bestimmten IP-Bereichen erlauben oder verweigern' },
+          { label: 'Admin-Zugriffs-Allowlist', text: 'Die Weboberfläche und die Management-API auf aufgelistete IP-Adressen und Netzwerke beschränken' },
           { label: '2FA-Durchsetzung', text: 'Zwei-Faktor-Authentifizierung für alle Benutzer erfordern' },
+        ]
+      },
+      {
+        title: 'Admin-Zugriffs-Allowlist',
+        items: [
+          { label: 'Netzwerke', text: 'Eine IPv4- oder IPv6-Adresse bzw. ein CIDR-Netzwerk pro Zeile, höchstens 100. Leer bedeutet keine Einschränkung' },
+          { label: 'Was blockiert wird', text: 'Von anderen Adressen antworten die Weboberfläche, die Anmeldung, die /api/v2-API (einschließlich API-Schlüssel) und der WebSocket-Kanal mit 403' },
+          { label: 'Immer erreichbar', text: 'ACME, SCEP, EST, OCSP, CRL/AIA, TSA, XCEP/WSTEP, das SSH-Setup-Skript und die Health-Endpunkte' },
+          { label: 'Ihre Adresse', text: 'Der Bereich zeigt die Adresse, unter der der Server Sie sieht; eine Liste, die sie nicht enthält, wird abgelehnt' },
+          { label: 'UCM_ADMIN_ALLOWED_NETWORKS', text: 'Umgebungsvariable (kommagetrennt), die Vorrang vor der Einstellung hat und sie schreibgeschützt macht' },
+          { label: 'UCM_ADMIN_ALLOWLIST_DISABLE', text: 'Auf 1 setzen und neu starten, um die Prüfung nach einer Aussperrung zu deaktivieren' },
         ]
       },
       {
@@ -42,11 +53,11 @@ export default {
     ],
     tips: [
       'Aktivieren Sie die Ratenbegrenzung zum Schutz vor automatisierten Angriffswerkzeugen',
-      'Verwenden Sie IP-Einschränkungen, um den Admin-Zugriff auf vertrauenswürdige Netzwerke zu beschränken',
+      'Verwenden Sie die Admin-Zugriffs-Allowlist, um die Weboberfläche auf Ihr Management-VLAN, Ihren Bastion-Host oder Ihr VPN zu beschränken',
     ],
     warnings: [
       'Zu strenge Passwortrichtlinien können Benutzer frustrieren',
-      'Stellen Sie immer sicher, dass mindestens ein Admin auf das System zugreifen kann, bevor Sie IP-Einschränkungen aktivieren',
+      'Hinter einem Reverse-Proxy müssen Sie UCM_BEHIND_PROXY und UCM_TRUSTED_PROXIES setzen, bevor Sie die Admin-Zugriffs-Allowlist verwenden, sonst scheint jede Anfrage vom Proxy zu kommen',
       'Sicherheitskritische Einstellungen (Sitzung, Sperrung, HSTS, öffentliche URL, Passwortrichtlinie) erfordern admin:settings, die Felder sind für Operatoren gesperrt',
     ],
   },
@@ -105,15 +116,23 @@ Begrenzt fehlgeschlagene Anmeldeversuche pro IP-Adresse innerhalb eines Zeitfens
 ### Sperrdauer
 Wie lange eine IP nach Überschreitung des Anmeldeversuchslimits gesperrt wird.
 
-## IP-Einschränkungen
+## Admin-Zugriffs-Allowlist
 
-### Erlaubnisliste
-Nur Verbindungen von angegebenen IPs oder CIDR-Bereichen erlauben. Alle anderen IPs werden blockiert.
+Beschränkt die Weboberfläche und die Management-API auf eine Liste von IP-Adressen und CIDR-Netzwerken, IPv4 oder IPv6, eine pro Zeile (höchstens 100). Eine leere Liste schränkt nichts ein.
 
-### Sperrliste
-Bestimmte IPs oder CIDR-Bereiche blockieren. Alle anderen IPs sind erlaubt.
+- **Von anderen Adressen blockiert**: Die Weboberfläche samt Ressourcen, die Anmeldung, jeder \`/api/v2\`-Aufruf (einschließlich API-Schlüssel) und der WebSocket-Kanal antworten mit **403**
+- **Immer erreichbar**: ACME und der ACME-Proxy, SCEP, EST, OCSP, CRL und AIA, TSA, XCEP/WSTEP, das SSH-Setup-Skript sowie die Health- und Metrik-Endpunkte, damit Geräte und Überwachung weiter funktionieren
+- **Ihre Adresse**: Der Bereich zeigt die Adresse, unter der der Server Sie sieht. Eine Liste, die sie nicht enthält, wird abgelehnt, sodass Sie sich beim Speichern nicht aussperren können
+- **Audit**: Jede Änderung der Liste wird im Audit-Log protokolliert
 
-> ⚠ Seien Sie äußerst vorsichtig mit IP-Einschränkungen. Fehlkonfigurationen können alle Benutzer, einschließlich Administratoren, aussperren. Testen Sie immer zuerst mit einer einzelnen IP.
+### Umgebungsvariablen
+- \`UCM_ADMIN_ALLOWED_NETWORKS\`: kommagetrennte Liste, die Vorrang vor der Einstellung hat und das Feld schreibgeschützt macht
+- \`UCM_ADMIN_ALLOWLIST_DISABLE=1\`: deaktiviert die Prüfung nach einem Neustart; damit stellen Sie den Zugriff nach einer Aussperrung wieder her und entfernen die Variable danach
+
+### Reverse-Proxy, Docker und Kubernetes
+Hinter einem Reverse-Proxy setzen Sie \`UCM_BEHIND_PROXY=1\` und tragen den Proxy in \`UCM_TRUSTED_PROXIES\` ein, sonst scheint jede Anfrage vom Proxy zu kommen. Mit Docker im Bridge-Modus und ohne Proxy kann die gesehene Adresse die nach dem NAT von Docker sein: Prüfen Sie die angezeigte Adresse vor dem Speichern.
+
+> ⚠ Dieser Filter arbeitet auf Anwendungsebene. Halten Sie zusätzlich eine Firewall vor dem HTTPS-Port vor.
 
 ## Zwei-Faktor-Authentifizierung
 

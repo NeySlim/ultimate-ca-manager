@@ -318,6 +318,14 @@ def create_app(config_name=None):
     # Initialize WebSocket support
     init_websocket(app)
     app.logger.info("✓ WebSocket support enabled")
+
+    # Flask-SocketIO answers /socket.io/ before any before_request hook runs.
+    from utils.admin_allowlist import SocketIOAllowlistGate, disabled_by_env as _allowlist_off
+    app.wsgi_app = SocketIOAllowlistGate(app.wsgi_app, app, trusted_hops=_trusted_hops)
+    if _allowlist_off():
+        app.logger.warning(
+            "UCM_ADMIN_ALLOWLIST_DISABLE is set: the admin source-address "
+            "allowlist is not enforced")
     
     # CORS - dynamic origins (admin base URL + localhost + env extras)
     class _DynamicCorsOrigins:
@@ -1054,6 +1062,24 @@ def create_app(config_name=None):
             'safe_mode': True
         }), 503
     
+    # Admin source-address allowlist (#402). Registered first so no other hook
+    # (mTLS login, CSRF, redirects) acts for a refused peer; protocols are exempt.
+    def enforce_admin_allowlist():
+        from utils import admin_allowlist
+        if admin_allowlist.is_exempt_path(request.path):
+            return None
+        addr = request.remote_addr or ''
+        if admin_allowlist.is_allowed(addr):
+            return None
+        admin_allowlist.log_refusal(addr, request.path)
+        if request.path.startswith('/api/'):
+            from utils.response import error_response
+            return error_response(admin_allowlist.REFUSAL_MESSAGE, 403)
+        return (admin_allowlist.REFUSAL_MESSAGE, 403,
+                {'Content-Type': 'text/plain; charset=utf-8'})
+
+    app.before_request_funcs.setdefault(None, []).insert(0, enforce_admin_allowlist)
+
     # ── Global error handlers ─────────────────────────────────
     # Ensure ALL errors return JSON (not HTML) for API requests
     

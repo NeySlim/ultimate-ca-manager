@@ -28,8 +28,19 @@ export default {
         items: [
           { label: '会话超时', text: '不活动一段时间后自动登出' },
           { label: '频率限制', text: '限制登录尝试次数以防暴力攻击' },
-          { label: 'IP 限制', text: '允许或拒绝来自特定 IP 范围的访问' },
+          { label: '管理访问允许列表', text: '将 Web 界面和管理 API 限制为列表中的 IP 地址和网络' },
           { label: '2FA 强制', text: '要求所有用户使用双因素认证' },
+        ]
+      },
+      {
+        title: '管理访问允许列表',
+        items: [
+          { label: '网络', text: '每行一个 IPv4 或 IPv6 地址或 CIDR 网络，最多 100 个。留空表示不限制' },
+          { label: '被阻止的内容', text: '来自其他地址时：Web 界面、登录、/api/v2 API（包括 API 密钥）和 WebSocket 通道均返回 403' },
+          { label: '始终可访问', text: 'ACME、SCEP、EST、OCSP、CRL/AIA、TSA、XCEP/WSTEP、SSH 设置脚本和健康检查端点' },
+          { label: '您的地址', text: '该部分显示服务器看到的您的地址；不包含该地址的列表将被拒绝' },
+          { label: 'UCM_ADMIN_ALLOWED_NETWORKS', text: '环境变量（逗号分隔），优先于设置并使其只读' },
+          { label: 'UCM_ADMIN_ALLOWLIST_DISABLE', text: '设为 1 并重启，可在被锁定后关闭检查' },
         ]
       },
       {
@@ -42,11 +53,11 @@ export default {
     ],
     tips: [
       '启用频率限制以防止自动化攻击工具',
-      '使用 IP 限制将管理访问限制在受信任的网络',
+      '使用管理访问允许列表将 Web 界面限制在您的管理 VLAN、堡垒机或 VPN',
     ],
     warnings: [
       '密码策略设置过于严格可能会影响用户体验',
-      '启用 IP 限制前请确保至少有一个管理员能够访问系统',
+      '在反向代理之后，使用管理访问允许列表前请先设置 UCM_BEHIND_PROXY 和 UCM_TRUSTED_PROXIES，否则每个请求都会显示为来自代理',
       '安全敏感设置（会话、锁定、HSTS、公共 URL、密码策略）需要 admin:settings 权限,, 这些字段对操作员锁定',
     ],
   },
@@ -105,15 +116,23 @@ export default {
 ### 封锁时长
 超过登录尝试限制后 IP 被封锁的时间。
 
-## IP 限制
+## 管理访问允许列表
 
-### 允许列表
-仅允许来自指定 IP 或 CIDR 范围的连接。其他所有 IP 将被阻止。
+将 Web 界面和管理 API 限制为一组 IP 地址和 CIDR 网络（IPv4 或 IPv6），每行一个，最多 100 个。空列表不做任何限制。
 
-### 拒绝列表
-阻止特定 IP 或 CIDR 范围。其他所有 IP 被允许。
+- **来自其他地址时被阻止**: Web 界面及其资源、登录、每个 \`/api/v2\` 调用（包括 API 密钥）和 WebSocket 通道均返回 **403**
+- **始终可访问**: ACME 和 ACME 代理、SCEP、EST、OCSP、CRL 和 AIA、TSA、XCEP/WSTEP、SSH 设置脚本以及健康和指标端点，确保设备和探测继续工作
+- **您的地址**: 该部分显示服务器看到的您的地址。不包含该地址的列表将被拒绝，因此保存不会将您锁定
+- **审计**: 列表的每次更改都会写入审计日志
 
-> ⚠ 使用 IP 限制时要非常小心。配置错误可能会锁定所有用户，包括管理员。请先用单个 IP 测试。
+### 环境变量
+- \`UCM_ADMIN_ALLOWED_NETWORKS\`: 逗号分隔的列表，优先于设置并使该字段只读
+- \`UCM_ADMIN_ALLOWLIST_DISABLE=1\`: 重启后关闭检查；用于从锁定中恢复，之后请删除它
+
+### 反向代理、Docker 和 Kubernetes
+在反向代理之后，请设置 \`UCM_BEHIND_PROXY=1\` 并在 \`UCM_TRUSTED_PROXIES\` 中列出代理，否则每个请求都会显示为来自代理。在桥接模式下且没有代理的 Docker 中，看到的地址可能是 Docker NAT 之后的地址：保存前请核对显示的地址。
+
+> ⚠ 此过滤在应用层工作。请同时在 HTTPS 端口前保留防火墙。
 
 ## 双因素认证
 

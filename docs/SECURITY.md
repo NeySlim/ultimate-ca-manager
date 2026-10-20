@@ -379,6 +379,7 @@ FLASK_ENV=production
 ### 3. Network Security
 - Run behind reverse proxy (nginx, Caddy)
 - Enable firewall, restrict access to port 8443
+- Restrict the web interface and the management API to your admin networks with the admin access allowlist (Settings > Security, or `UCM_ADMIN_ALLOWED_NETWORKS`); PKI protocol endpoints stay reachable. See the [Admin Guide](ADMIN_GUIDE.md#admin-access-allowlist)
 - Use proper TLS certificate (not self-signed in production)
 
 ### 4. Backup Security

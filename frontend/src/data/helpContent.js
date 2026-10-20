@@ -1393,8 +1393,20 @@ export const helpContent = {
         items: [
           { label: 'Session Timeout', text: 'Auto-logout after inactivity period' },
           { label: 'Rate Limiting', text: 'Limit login attempts to prevent brute force attacks' },
-          { label: 'IP Restrictions', text: 'Allow or deny access from specific IP ranges' },
+          { label: 'Admin access allowlist', text: 'Limit the web interface and the management API to listed IP addresses and networks' },
           { label: '2FA Enforcement', text: 'Require two-factor authentication for all users' },
+        ]
+      },
+      {
+        title: 'Admin Access Allowlist',
+        icon: Globe,
+        items: [
+          { label: 'Networks', text: 'One IPv4 or IPv6 address or CIDR network per line, up to 100. Empty means no restriction' },
+          { label: 'What is blocked', text: 'From other addresses: the web interface, the login, the /api/v2 API (API keys included) and the WebSocket channel answer 403' },
+          { label: 'Always reachable', text: 'ACME, SCEP, EST, OCSP, CRL/AIA, TSA, XCEP/WSTEP, the SSH setup script and the health endpoints' },
+          { label: 'Your address', text: 'The section shows the address the server sees for you; a list that does not include it is refused' },
+          { label: 'UCM_ADMIN_ALLOWED_NETWORKS', text: 'Environment variable (comma-separated) that wins over the setting and makes it read-only' },
+          { label: 'UCM_ADMIN_ALLOWLIST_DISABLE', text: 'Set to 1 and restart to turn the check off after a lock-out' },
         ]
       },
       {
@@ -1408,11 +1420,11 @@ export const helpContent = {
     ],
     tips: [
       'Enable rate limiting to protect against automated attack tools',
-      'Use IP restrictions to limit admin access to trusted networks',
+      'Use the admin access allowlist to limit the web interface to your management VLAN, bastion or VPN',
     ],
     warnings: [
       'Locking the password policy too tightly may frustrate users',
-      'Always ensure at least one admin can access the system before enabling IP restrictions',
+      'Behind a reverse proxy, set UCM_BEHIND_PROXY and UCM_TRUSTED_PROXIES before using the admin access allowlist, otherwise every request appears to come from the proxy',
       'Security-sensitive settings (session, lockout, HSTS, public URL, password policy) require admin:settings, the fields are locked for operators',
     ],
     related: ['Account', 'Users & Groups', 'Settings']

@@ -28,8 +28,19 @@ export default {
         items: [
           { label: 'Tiempo de sesión', text: 'Cierre de sesión automático tras un período de inactividad' },
           { label: 'Limitación de velocidad', text: 'Limitar intentos de inicio de sesión para prevenir ataques de fuerza bruta' },
-          { label: 'Restricciones de IP', text: 'Permitir o denegar acceso desde rangos de IP específicos' },
+          { label: 'Lista de acceso de administración', text: 'Limitar la interfaz web y la API de gestión a las direcciones IP y redes indicadas' },
           { label: 'Aplicación de 2FA', text: 'Requerir autenticación de dos factores para todos los usuarios' },
+        ]
+      },
+      {
+        title: 'Lista de acceso de administración',
+        items: [
+          { label: 'Redes', text: 'Una dirección IPv4 o IPv6 o red CIDR por línea, hasta 100. Vacía significa sin restricción' },
+          { label: 'Qué se bloquea', text: 'Desde otras direcciones: la interfaz web, el inicio de sesión, la API /api/v2 (claves API incluidas) y el canal WebSocket responden 403' },
+          { label: 'Siempre accesibles', text: 'ACME, SCEP, EST, OCSP, CRL/AIA, TSA, XCEP/WSTEP, el script de configuración SSH y los endpoints de estado' },
+          { label: 'Su dirección', text: 'La sección muestra la dirección que el servidor ve para usted; una lista que no la incluya se rechaza' },
+          { label: 'UCM_ADMIN_ALLOWED_NETWORKS', text: 'Variable de entorno (separada por comas) que prevalece sobre el ajuste y lo deja en solo lectura' },
+          { label: 'UCM_ADMIN_ALLOWLIST_DISABLE', text: 'Establézcala en 1 y reinicie para desactivar la comprobación tras un bloqueo de acceso' },
         ]
       },
       {
@@ -42,11 +53,11 @@ export default {
     ],
     tips: [
       'Active la limitación de velocidad para protegerse contra herramientas de ataque automatizadas',
-      'Use restricciones de IP para limitar el acceso de administración a redes de confianza',
+      'Use la lista de acceso de administración para limitar la interfaz web a su VLAN de gestión, bastión o VPN',
     ],
     warnings: [
       'Restringir demasiado la política de contraseñas puede frustrar a los usuarios',
-      'Siempre asegúrese de que al menos un administrador pueda acceder al sistema antes de activar las restricciones de IP',
+      'Detrás de un proxy inverso, defina UCM_BEHIND_PROXY y UCM_TRUSTED_PROXIES antes de usar la lista de acceso de administración; de lo contrario, todas las solicitudes parecen provenir del proxy',
       'Las configuraciones sensibles de seguridad (sesión, bloqueo, HSTS, URL pública, política de contraseñas) requieren admin:settings, los campos están bloqueados para los operadores',
     ],
   },
@@ -105,15 +116,23 @@ Limitar los intentos de inicio de sesión fallidos por dirección IP dentro de u
 ### Duración del bloqueo
 Tiempo durante el cual una IP permanece bloqueada después de superar el límite de intentos de inicio de sesión.
 
-## Restricciones de IP
+## Lista de acceso de administración
 
-### Lista de permitidos
-Solo permitir conexiones desde IP o rangos CIDR especificados. Todas las demás IP se bloquean.
+Limite la interfaz web y la API de gestión a una lista de direcciones IP y redes CIDR, IPv4 o IPv6, una por línea (hasta 100). Una lista vacía no restringe nada.
 
-### Lista de denegados
-Bloquear IP o rangos CIDR específicos. Todas las demás IP se permiten.
+- **Bloqueado desde otras direcciones**: la interfaz web y sus recursos, el inicio de sesión, toda llamada a \`/api/v2\` (claves API incluidas) y el canal WebSocket responden **403**
+- **Siempre accesibles**: ACME y el proxy ACME, SCEP, EST, OCSP, CRL y AIA, TSA, XCEP/WSTEP, el script de configuración SSH y los endpoints de estado y métricas, para que los dispositivos y las sondas sigan funcionando
+- **Su dirección**: la sección muestra la dirección que el servidor ve para usted. Una lista que no la incluya se rechaza, así que guardar no puede dejarle sin acceso
+- **Auditoría**: cada cambio de la lista se registra en el registro de auditoría
 
-> ⚠ Tenga mucho cuidado con las restricciones de IP. Una mala configuración puede bloquear a todos los usuarios, incluidos los administradores. Siempre pruebe primero con una sola IP.
+### Variables de entorno
+- \`UCM_ADMIN_ALLOWED_NETWORKS\`: lista separada por comas que prevalece sobre el ajuste y deja el campo en solo lectura
+- \`UCM_ADMIN_ALLOWLIST_DISABLE=1\`: desactiva la comprobación tras un reinicio; úsela para recuperarse de un bloqueo de acceso y luego elimínela
+
+### Proxy inverso, Docker y Kubernetes
+Detrás de un proxy inverso, defina \`UCM_BEHIND_PROXY=1\` e incluya el proxy en \`UCM_TRUSTED_PROXIES\`; de lo contrario, todas las solicitudes parecen provenir del proxy. Con Docker en modo bridge y sin proxy, la dirección vista puede ser la posterior al NAT de Docker: compruebe la dirección mostrada antes de guardar.
+
+> ⚠ Este filtro actúa a nivel de aplicación. Mantenga también un cortafuegos delante del puerto HTTPS.
 
 ## Autenticación de dos factores
 

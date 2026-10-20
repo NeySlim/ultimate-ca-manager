@@ -28,8 +28,19 @@ export default {
         items: [
           { label: 'Délai d\'expiration de session', text: 'Déconnexion automatique après une période d\'inactivité' },
           { label: 'Limitation de débit', text: 'Limiter les tentatives de connexion pour prévenir les attaques par force brute' },
-          { label: 'Restrictions IP', text: 'Autoriser ou refuser l\'accès depuis des plages IP spécifiques' },
+          { label: 'Liste d\'accès administrateur', text: 'Limiter l\'interface web et l\'API de gestion aux adresses IP et réseaux listés' },
           { label: 'Application de la 2FA', text: 'Exiger l\'authentification à deux facteurs pour tous les utilisateurs' },
+        ]
+      },
+      {
+        title: 'Liste d\'accès administrateur',
+        items: [
+          { label: 'Réseaux', text: 'Une adresse IPv4 ou IPv6 ou un réseau CIDR par ligne, 100 au maximum. Vide signifie aucune restriction' },
+          { label: 'Ce qui est bloqué', text: 'Depuis les autres adresses : l\'interface web, la connexion, l\'API /api/v2 (clés API comprises) et le canal WebSocket répondent 403' },
+          { label: 'Toujours accessibles', text: 'ACME, SCEP, EST, OCSP, CRL/AIA, TSA, XCEP/WSTEP, le script d\'installation SSH et les points de contrôle de santé' },
+          { label: 'Votre adresse', text: 'La section affiche l\'adresse que le serveur voit pour vous ; une liste qui ne l\'inclut pas est refusée' },
+          { label: 'UCM_ADMIN_ALLOWED_NETWORKS', text: 'Variable d\'environnement (séparée par des virgules) qui l\'emporte sur le paramètre et le rend en lecture seule' },
+          { label: 'UCM_ADMIN_ALLOWLIST_DISABLE', text: 'Définie à 1 avec un redémarrage, désactive le contrôle après un verrouillage' },
         ]
       },
       {
@@ -42,11 +53,11 @@ export default {
     ],
     tips: [
       'Activez la limitation de débit pour vous protéger contre les outils d\'attaque automatisés',
-      'Utilisez les restrictions IP pour limiter l\'accès admin aux réseaux de confiance',
+      'Utilisez la liste d\'accès administrateur pour limiter l\'interface web à votre VLAN de gestion, bastion ou VPN',
     ],
     warnings: [
       'Une politique de mot de passe trop stricte peut frustrer les utilisateurs',
-      'Assurez-vous toujours qu\'au moins un admin peut accéder au système avant d\'activer les restrictions IP',
+      'Derrière un reverse proxy, définissez UCM_BEHIND_PROXY et UCM_TRUSTED_PROXIES avant d\'utiliser la liste d\'accès administrateur, sinon toutes les requêtes semblent provenir du proxy',
       'Les paramètres sensibles (session, verrouillage, HSTS, URL publique, politique de mot de passe) exigent admin:settings, les champs sont verrouillés pour les opérateurs',
     ],
   },
@@ -105,15 +116,23 @@ Limiter les tentatives de connexion échouées par adresse IP dans une fenêtre 
 ### Durée de verrouillage
 Durée pendant laquelle une IP est bloquée après dépassement de la limite de tentatives de connexion.
 
-## Restrictions IP
+## Liste d'accès administrateur
 
-### Liste autorisée
-Autoriser uniquement les connexions depuis des IP ou plages CIDR spécifiées. Toutes les autres IP sont bloquées.
+Limitez l'interface web et l'API de gestion à une liste d'adresses IP et de réseaux CIDR, IPv4 ou IPv6, un par ligne (100 au maximum). Une liste vide ne restreint rien.
 
-### Liste refusée
-Bloquer des IP ou plages CIDR spécifiques. Toutes les autres IP sont autorisées.
+- **Bloqué depuis les autres adresses** : l'interface web et ses ressources, la connexion, chaque appel \`/api/v2\` (clés API comprises) et le canal WebSocket répondent **403**
+- **Toujours accessibles** : ACME et le proxy ACME, SCEP, EST, OCSP, CRL et AIA, TSA, XCEP/WSTEP, le script d'installation SSH, et les points de contrôle de santé et de métriques, afin que les équipements et les sondes continuent de fonctionner
+- **Votre adresse** : la section affiche l'adresse que le serveur voit pour vous. Une liste qui ne l'inclut pas est refusée, un enregistrement ne peut donc pas vous verrouiller
+- **Audit** : chaque modification de la liste est écrite dans le journal d'audit
 
-> ⚠ Soyez extrêmement prudent avec les restrictions IP. Une mauvaise configuration peut verrouiller tous les utilisateurs, y compris les admins. Testez toujours d'abord avec une seule IP.
+### Variables d'environnement
+- \`UCM_ADMIN_ALLOWED_NETWORKS\` : liste séparée par des virgules qui l'emporte sur le paramètre et rend le champ en lecture seule
+- \`UCM_ADMIN_ALLOWLIST_DISABLE=1\` : désactive le contrôle après un redémarrage ; à utiliser pour sortir d'un verrouillage, puis à retirer
+
+### Reverse proxy, Docker et Kubernetes
+Derrière un reverse proxy, définissez \`UCM_BEHIND_PROXY=1\` et listez le proxy dans \`UCM_TRUSTED_PROXIES\`, sinon toutes les requêtes semblent provenir du proxy. Avec Docker en mode bridge et sans proxy, l'adresse vue peut être celle située après le NAT de Docker : vérifiez l'adresse affichée avant d'enregistrer.
+
+> ⚠ Ce filtre agit au niveau applicatif. Conservez aussi un pare-feu devant le port HTTPS.
 
 ## Authentification à deux facteurs
 

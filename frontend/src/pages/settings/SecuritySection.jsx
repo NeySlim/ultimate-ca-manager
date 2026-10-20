@@ -1,8 +1,17 @@
 import { useTranslation } from 'react-i18next'
-import { ShieldCheck, Lock, LockKey, Warning, Timer, Globe, Clock, CheckCircle, ArrowsClockwise, WarningCircle, FloppyDisk, User, Download, Key } from '@phosphor-icons/react'
-import { Button, Input, Select, Badge, LoadingSpinner, ExperimentalBadge, DetailHeader, DetailSection, DetailGrid, DetailContent } from '../../components'
+import { ShieldCheck, Lock, LockKey, Warning, Timer, Globe, Clock, CheckCircle, ArrowsClockwise, WarningCircle, FloppyDisk, User, Download, Key, Network } from '@phosphor-icons/react'
+import { Button, Input, Select, Textarea, Badge, LoadingSpinner, ExperimentalBadge, DetailHeader, DetailSection, DetailGrid, DetailContent } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { formatDate } from '../../lib/utils'
+
+// The API sends a list; the textarea edits one entry per line.
+function networksText(value) {
+  return Array.isArray(value) ? value.join('\n') : (value || '')
+}
+
+function networksList(value) {
+  return networksText(value).split(/[\s,;]+/).filter(Boolean)
+}
 
 export default function SecuritySection({ settings, updateSetting, handleSave, saving, hasPermission, encryptionStatus, setShowEnableEncryptionModal, setShowDisableEncryptionModal, handleDownloadExistingMasterKey, handleEncryptRemainingKeys, encryptionLoading, anomalies, anomaliesLoading, loadAnomalies, mtlsSettings, setMtlsSettings, mtlsLoading, mtlsSaving, handleMtlsSave, cas }) {
   const { t } = useTranslation()
@@ -111,6 +120,52 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
           />
           {canAdminSettings && (
             <Button type="button" onClick={() => handleSave('security2fa')} disabled={saving}>
+              <FloppyDisk size={16} />
+              {t('common.saveChanges')}
+            </Button>
+          )}
+        </div>
+      </DetailSection>
+      <DetailSection
+        title={t('settings.adminAllowlistTitle')}
+        icon={Network}
+        iconClass="icon-bg-indigo"
+        badge={settings.admin_allowlist_disabled
+          ? <Badge variant="warning">{t('settings.adminAllowlistDisabled')}</Badge>
+          : (networksList(settings.admin_allowed_networks).length > 0
+            ? <Badge variant="success">{t('settings.adminAllowlistActive')}</Badge>
+            : null)}
+      >
+        <div className="space-y-4">
+          <p className="text-xs text-text-secondary">{t('settings.adminAllowlistDesc')}</p>
+          <div className="flex items-center gap-2 text-sm">
+            <span className="text-text-secondary">{t('settings.adminAllowlistYourIp')}:</span>
+            <strong className="text-text-primary font-mono">{settings.admin_client_ip || '-'}</strong>
+          </div>
+          <Textarea
+            label={t('settings.adminAllowlistNetworks')}
+            value={networksText(settings.admin_allowed_networks)}
+            onChange={(e) => updateSetting('admin_allowed_networks', e.target.value)}
+            rows={4}
+            placeholder={'192.168.10.0/24\n2001:db8:10::/64'}
+            helperText={t('settings.adminAllowlistHelper')}
+            disabled={settings.admin_allowed_networks_env_locked || !canAdminSettings}
+            spellCheck={false}
+          />
+          {settings.admin_allowed_networks_env_locked && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
+              <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
+              <span>{t('settings.adminAllowlistEnvLocked')}</span>
+            </div>
+          )}
+          {settings.admin_allowlist_disabled && (
+            <div className="flex items-start gap-2 p-3 rounded-lg bg-status-warning-op10 text-xs text-status-warning">
+              <WarningCircle size={16} weight="fill" className="flex-shrink-0 mt-0.5" />
+              <span>{t('settings.adminAllowlistDisabledNote')}</span>
+            </div>
+          )}
+          {canAdminSettings && !settings.admin_allowed_networks_env_locked && (
+            <Button type="button" onClick={() => handleSave('securityAdminAllowlist')} disabled={saving}>
               <FloppyDisk size={16} />
               {t('common.saveChanges')}
             </Button>

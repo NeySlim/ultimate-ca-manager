@@ -22,6 +22,7 @@ from services.backup.settings_contract import (
     validate_retention_days,
 )
 from utils.hsts import hsts_env_locked
+from utils import admin_allowlist
 from utils.public_endpoints import validate_admin_base_url, validate_protocol_base_url
 
 logger = logging.getLogger(__name__)
@@ -73,6 +74,8 @@ _ADMIN_ONLY_SETTINGS = frozenset({
     'crl_auto_purge_stale_serials',
     # Shortening it has the daily task delete audit history.
     'audit_retention_days',
+    # Who may reach the admin UI at all (#402)
+    'admin_allowed_networks',
 })
 
 
@@ -150,6 +153,11 @@ def get_general_settings():
         # are preserved as audit records (renewal chain history) unless an
         # admin explicitly enables this.
         'crl_auto_purge_stale_serials': effective('crl_auto_purge_stale_serials'),
+        # Admin source-address allowlist (#402); the env var, when set, locks it.
+        'admin_allowed_networks': admin_allowlist.configured_entries(),
+        'admin_allowed_networks_env_locked': admin_allowlist.env_locked(),
+        'admin_allowlist_disabled': admin_allowlist.disabled_by_env(),
+        'admin_client_ip': request.remote_addr or '',
     })
 
 
@@ -387,6 +395,26 @@ def update_general_settings():
             return error_response(
                 'date_format must be one of: ' + ', '.join(DATE_FORMATS), 400)
 
+    # Saved only when it changed, and never to a list that would refuse the
+    # caller's own address. The screen sends it back with every save.
+    allowlist_change = None
+    if 'admin_allowed_networks' in data:
+        raw_networks = data.pop('admin_allowed_networks')
+        if not admin_allowlist.env_locked():
+            try:
+                entries = admin_allowlist.parse_entries(raw_networks)
+            except ValueError as e:
+                return error_response(str(e), 400)
+            current = admin_allowlist.split_entries(get_config(admin_allowlist.CONFIG_KEY, '') or '')
+            if entries != current:
+                client = request.remote_addr or ''
+                if entries and not admin_allowlist.address_allowed_by(client, entries):
+                    return error_response(
+                        f'The admin allowlist must include your own address ({client or "unknown"}), '
+                        'otherwise this session would be locked out', 400)
+                set_config(admin_allowlist.CONFIG_KEY, ','.join(entries))
+                allowlist_change = (current, entries)
+
     # The password is never sent back, so a blank one keeps the stored value;
     # clearing it takes this explicit flag.
     clear_backup_password = data.pop('clear_backup_password', False)
@@ -435,6 +463,18 @@ def update_general_settings():
         db.session.rollback()
         logger.error(f"Failed to update general settings: {e}")
         return error_response('Failed to update settings', 500)
+
+    if allowlist_change is not None:
+        admin_allowlist.invalidate_cache()
+        before, after = allowlist_change
+        AuditService.log_action(
+            action='admin_allowlist_update',
+            resource_type='settings',
+            resource_name='Admin allowlist',
+            details=f"Admin allowlist changed from [{', '.join(before) or 'none'}] "
+                    f"to [{', '.join(after) or 'none'}]",
+            success=True,
+        )
 
     AuditService.log_action(
         action='settings_update',
