@@ -256,11 +256,57 @@ def test_verify_is_refused_from_outside_without_a_proxy(app, client):
     assert _refused(_get(client, '/api/auth/verify', OUTSIDE))
 
 
-def test_verify_passes_for_a_trusted_proxy_subrequest(app, client, monkeypatch):
-    _store(app, '10.0.0.0/8')
-    monkeypatch.setenv('UCM_TRUSTED_PROXIES', '198.51.100.1')
-    assert not _refused(_get(client, '/api/v2/auth/verify', '198.51.100.1'))
-    assert _refused(_get(client, '/api/v2/auth/verify', '198.51.100.2'))
+PROXY = '127.0.0.1'
+
+
+@pytest.fixture
+def behind_proxy(app, monkeypatch):
+    """The app as deployed with UCM_BEHIND_PROXY=1 and the default (loopback) trust."""
+    from werkzeug.middleware.proxy_fix import ProxyFix
+    from utils.trusted_proxy import ForwardedHeadersGate
+    monkeypatch.delenv('UCM_TRUSTED_PROXIES', raising=False)
+    monkeypatch.setattr(app, 'wsgi_app', ForwardedHeadersGate(ProxyFix(app.wsgi_app, x_for=1)))
+    return app
+
+
+def _via_proxy(client, method, path, client_addr, **kwargs):
+    return getattr(client, method)(path, headers={'X-Forwarded-For': client_addr},
+                                   environ_base={'REMOTE_ADDR': PROXY}, **kwargs)
+
+
+def _proxied_login(client):
+    r = _via_proxy(client, 'post', '/api/v2/auth/login', INSIDE,
+                   data=json.dumps({'username': 'admin', 'password': 'changeme123'}),
+                   content_type='application/json')
+    assert r.status_code == 200, r.data
+
+
+def test_forward_auth_for_a_refused_client_reads_as_signed_out(behind_proxy, client):
+    _store(behind_proxy, '10.0.0.0/8')
+    _proxied_login(client)
+    with client.session_transaction() as sess:
+        before = sess.get('last_activity')
+    assert before
+
+    r = _via_proxy(client, 'get', '/api/v2/auth/verify', OUTSIDE)
+    assert r.status_code == 200
+    data = r.get_json()['data']
+    assert data == {'authenticated': False, 'cert_error': None}
+    with client.session_transaction() as sess:
+        assert sess.get('last_activity') == before
+
+
+def test_forward_auth_for_an_admitted_client_still_works(behind_proxy, client):
+    _store(behind_proxy, '10.0.0.0/8')
+    _proxied_login(client)
+    data = _via_proxy(client, 'get', '/api/v2/auth/verify', INSIDE).get_json()['data']
+    assert data['authenticated'] is True
+    assert data.get('csrf_token')
+
+
+def test_proxied_admin_request_from_a_refused_client_is_403(behind_proxy, client):
+    _store(behind_proxy, '10.0.0.0/8')
+    assert _refused(_via_proxy(client, 'get', '/api/v2/certificates', OUTSIDE))
 
 
 def test_double_slash_api_path_is_refused_as_json(app, client):
@@ -335,3 +381,18 @@ def test_restore_without_a_request_clears_the_list(app):
     blob = _backup_of_configuration(app)
     _restore(app, blob)
     assert _stored(app) == ''
+
+
+def test_restore_keeps_the_list_while_the_check_is_disabled(app, monkeypatch):
+    _store(app, '10.0.0.0/8')
+    blob = _backup_of_configuration(app)
+    monkeypatch.setenv(admin_allowlist.ENV_DISABLE, '1')
+    _restore(app, blob, OUTSIDE)
+    assert _stored(app) == '10.0.0.0/8'
+
+
+def test_restore_message_says_the_list_was_cleared():
+    from services.backup.restore_completion import restore_message
+    message = restore_message({'restart_requested': True, 'admin_allowlist_cleared': True})
+    assert 'admin access allowlist' in message
+    assert 'admin access allowlist' not in restore_message({'restart_requested': True})

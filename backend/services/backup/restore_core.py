@@ -836,14 +836,17 @@ class RestoreCoreMixin:
             config_data = configuration.get('settings', {})
         from utils import admin_allowlist
         for key, value in config_data.items():
-            if key == admin_allowlist.CONFIG_KEY:
-                guarded = admin_allowlist.guard_restored_value(value)
-                if guarded != (value.strip() if isinstance(value, str) else ''):
+            if key == admin_allowlist.CONFIG_KEY and admin_allowlist.restored_value_locks_out(value):
+                if admin_allowlist.disabled_by_env():
+                    logger.warning(
+                        "Restore: the archived admin allowlist (%s) would not admit "
+                        "this restore's client; kept because UCM_ADMIN_ALLOWLIST_DISABLE is set", value)
+                else:
                     logger.warning(
                         "Restore: the archived admin allowlist (%s) would not admit "
                         "this restore's client, so it was cleared", value)
                     results['admin_allowlist_cleared'] = True
-                value = guarded
+                    value = ''
             existing = SystemConfig.query.filter_by(key=key).first()
             if existing:
                 existing.value = value

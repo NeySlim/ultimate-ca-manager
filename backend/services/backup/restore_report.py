@@ -67,6 +67,11 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
             f'{len(mismatches)} {record} {carries} a private key that is not '
             f"their certificate's and cannot sign: {listing}")
 
+    if (results or {}).get('admin_allowlist_cleared'):
+        message += _clause('The admin access allowlist from the archive would '
+                           'have locked out this session and was cleared; set '
+                           'it again in Settings > Security')
+
     if not message:
         return message
     return message if message.endswith(('.', '?', '!')) else message + '.'

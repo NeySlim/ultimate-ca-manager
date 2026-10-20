@@ -1067,14 +1067,17 @@ def create_app(config_name=None):
     def enforce_admin_allowlist():
         from utils import admin_allowlist, trusted_proxy
         path = request.path
-        if admin_allowlist.is_exempt_path(
-                path, from_trusted_proxy=(path in admin_allowlist.FORWARD_AUTH_PATHS
-                                          and trusted_proxy.is_request_from_trusted_proxy())):
+        if admin_allowlist.is_exempt_path(path):
             return None
         addr = request.remote_addr or ''
         if admin_allowlist.is_allowed(addr):
             return None
         admin_allowlist.log_refusal(addr, path)
+        # A forward-auth subrequest for a refused client gets verify's own
+        # unauthenticated answer, without reading or refreshing the session.
+        if path in admin_allowlist.FORWARD_AUTH_PATHS and trusted_proxy.is_request_from_trusted_proxy():
+            from utils.response import success_response
+            return success_response(data={'authenticated': False, 'cert_error': None})
         if path.startswith('/api/'):
             from utils.response import error_response
             return error_response(admin_allowlist.REFUSAL_MESSAGE, 403)
