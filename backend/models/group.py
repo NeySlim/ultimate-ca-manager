@@ -2,9 +2,42 @@
 Group Model - User groups for permission management
 """
 
+import json
+
 from models import db
 from datetime import datetime
 from utils.datetime_utils import utc_now, utc_isoformat
+
+
+# Seeded when no group exists. A group never grants the admin role, so there is no Administrators group.
+DEFAULT_GROUPS = (
+    {'name': 'Certificate Operators', 'description': 'Can manage certificates and CSRs',
+     'permissions': ['read:certificates', 'write:certificates', 'read:csrs', 'write:csrs', 'read:cas']},
+    {'name': 'Auditors', 'description': 'Read-only access to audit logs, certificates and CAs',
+     'permissions': ['read:audit', 'read:certificates', 'read:cas']},
+)
+
+
+def seed_default_groups():
+    """Create DEFAULT_GROUPS when no group exists; returns how many were created."""
+    if Group.query.count():
+        return 0
+    for g in DEFAULT_GROUPS:
+        db.session.add(Group(**{**g, 'permissions': list(g['permissions'])}))
+    db.session.commit()
+    return len(DEFAULT_GROUPS)
+
+
+def permission_list(value):
+    """Stored group permissions as a list; JSON text from an old backup is decoded."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return []
+        if isinstance(value, str):
+            return permission_list(value)
+    return [p for p in value if isinstance(p, str)] if isinstance(value, list) else []
 
 
 class Group(db.Model):
@@ -26,7 +59,7 @@ class Group(db.Model):
             'id': self.id,
             'name': self.name,
             'description': self.description,
-            'permissions': self.permissions or [],
+            'permissions': permission_list(self.permissions),
             'member_count': self.members.count(),
             'created_at': utc_isoformat(self.created_at),
             'updated_at': utc_isoformat(self.updated_at)

@@ -37,7 +37,8 @@ fi
 
 # ── 2. Frontend unit tests ────────────────────────────────────
 echo -n "  Frontend tests... "
-FRONT_OUT=$(cd "$ROOT/frontend" && npx vitest run --no-coverage 2>&1)
+# `|| true`: under set -e a failing run would end the hook before the report.
+FRONT_OUT=$(cd "$ROOT/frontend" && npx vitest run --no-coverage 2>&1) || true
 FRONT_RESULT=$(echo "$FRONT_OUT" | grep "Tests" | tail -1)
 # Strict: "N failed | M passed" must fail, not sneak through on "passed".
 if echo "$FRONT_RESULT" | grep -q "passed" && ! echo "$FRONT_RESULT" | grep -qE "fail|error"; then
@@ -56,7 +57,7 @@ fi
 # fails the hook — "1 failed, N passed" used to be accepted.
 # UCM_PYTEST_WORKERS caps the workers when several commits run at once.
 echo -n "  Backend tests... "
-BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -rfE -n "${UCM_PYTEST_WORKERS:-auto}" --dist loadfile 2>&1)
+BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -rfE -n "${UCM_PYTEST_WORKERS:-auto}" --dist loadfile 2>&1) || true
 BACK_RESULT=$(echo "$BACK_OUT" | tail -1)
 if echo "$BACK_RESULT" | grep -q "passed" && ! echo "$BACK_RESULT" | grep -qE "failed|error"; then
     echo -e "${GREEN}✅${NC} $BACK_RESULT"
