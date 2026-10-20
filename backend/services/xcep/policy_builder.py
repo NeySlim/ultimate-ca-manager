@@ -114,9 +114,8 @@ _XCEP_KEY_FAMILIES = ('RSA', 'EC')
 # (a legacy-CryptoAPI-only concept with no CNG equivalent).
 _RSA_KEY_SPEC = '1'
 _RSA_CRYPTO_PROVIDERS = ('Microsoft Enhanced RSA and AES Cryptographic Provider',)
-_ECDSA_CRYPTO_PROVIDERS = ('Microsoft Software Key Storage Provider',)
-# FIPS mode: RSA goes to schema 3 + KSP, the only path where Windows honors the request hash.
-_RSA_KSP_CRYPTO_PROVIDERS = ('Microsoft Software Key Storage Provider',)
+# ECDSA, and RSA in FIPS mode: schema 3 + KSP is the only path where Windows honors the request hash.
+_KSP_CRYPTO_PROVIDERS = ('Microsoft Software Key Storage Provider',)
 
 # subjectNameFlags: client supplies Subject (0x1) + SubjectAltName (0x10000).
 # Matches how EST/SCEP already accept a client-supplied CSR subject/SAN
@@ -441,9 +440,9 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         # keyUsageProperty, permissions, algorithmOIDReference,
         # cryptoProviders. keyUsageProperty/permissions/algorithmOIDReference
         # are required-but-nillable (see _nil_element's docstring), so they
-        # must appear even when nil. keySpec and cryptoProviders are
-        # populated (not nil) per the real-ADCS trace referenced in the
-        # module docstring; algorithmOIDReference stays nil (same trace).
+        # must appear even when nil. Outside FIPS mode keySpec and cryptoProviders
+        # are populated per the real-ADCS trace referenced in the module
+        # docstring; algorithmOIDReference stays nil (same trace).
         is_ecdsa = algo_name.startswith('ECDSA')
         use_ksp = is_ecdsa or pin_request_hash
         pk_attrs = etree.SubElement(attributes, '{%s}privateKeyAttributes' % XCEP_NS)
@@ -456,12 +455,7 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         _nil_element(pk_attrs, 'permissions')
         _nil_element(pk_attrs, 'algorithmOIDReference')
         crypto_providers = etree.SubElement(pk_attrs, '{%s}cryptoProviders' % XCEP_NS)
-        if is_ecdsa:
-            provider_names = _ECDSA_CRYPTO_PROVIDERS
-        elif pin_request_hash:
-            provider_names = _RSA_KSP_CRYPTO_PROVIDERS
-        else:
-            provider_names = _RSA_CRYPTO_PROVIDERS
+        provider_names = _KSP_CRYPTO_PROVIDERS if use_ksp else _RSA_CRYPTO_PROVIDERS
         for provider_name in provider_names:
             etree.SubElement(crypto_providers, '{%s}provider' % XCEP_NS).text = provider_name
 
