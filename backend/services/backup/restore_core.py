@@ -804,6 +804,7 @@ class RestoreCoreMixin:
             if existing:
                 existing.hmac_key_b64 = eab['hmac_key_b64']
                 existing.label = eab.get('label')
+                existing.notes = eab.get('notes')
                 existing.status = eab.get('status', 'active')
                 existing.used_at = used_at
                 existing.used_by_account_id = eab.get('used_by_account_id')
@@ -815,6 +816,7 @@ class RestoreCoreMixin:
                     kid=kid,
                     hmac_key_b64=eab['hmac_key_b64'],
                     label=eab.get('label'),
+                    notes=eab.get('notes'),
                     created_by_user_id=eab.get('created_by_user_id'),
                     expires_at=expires_at,
                     used_at=used_at,

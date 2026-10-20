@@ -1,7 +1,7 @@
-"""A restored EAB credential keeps the domains it was limited to.
+"""A restored EAB credential keeps its domain limits and its notes.
 
-The restorer copied every column but `allowed_domains`, so a restricted
-credential came back as NULL, which reads as "every domain".
+The restorer skipped `allowed_domains` and `notes`: a restricted credential
+came back as NULL, which reads as "every domain".
 """
 import base64
 
@@ -28,6 +28,7 @@ def _credential(kid, allowed):
         kid=kid,
         hmac_key_b64=base64.b64encode(f'{kid}-secret'.encode()).decode(),
         label=kid,
+        notes=f'{kid} notes',
         status='active',
     )
     cred.allowed_domains = allowed
@@ -49,11 +50,12 @@ def _cleanup():
 
 
 def _limits():
-    return {c.kid: c.allowed_domains for c in
+    return {c.kid: (c.allowed_domains, c.notes) for c in
             AcmeEabCredential.query.filter(AcmeEabCredential.kid.in_(KIDS))}
 
 
-EXPECTED = {KIDS[0]: LIMITED, KIDS[1]: [], KIDS[2]: None}
+EXPECTED = {kid: (limits, f'{kid} notes') for kid, limits in
+            zip(KIDS, (LIMITED, [], None))}
 
 
 def test_a_restore_onto_an_empty_table_recreates_the_limits(app):
@@ -83,6 +85,7 @@ def test_a_restore_over_existing_rows_puts_the_limits_back(app):
             for cred in AcmeEabCredential.query.filter(
                     AcmeEabCredential.kid.in_(KIDS)):
                 cred.allowed_domains = ['changed.example.net']
+                cred.notes = 'changed'
             db.session.commit()
 
             _service().restore_backup(blob, PASSWORD)
