@@ -163,7 +163,9 @@ def _credentials_retarget_error(provider, credentials):
     secret = {n for n in names
               if any(f['name'] == n and f.get('type') == 'password' for f in schema)
               or any(h in n.lower() for h in _SECRET_HINTS)}
-    defaults = {f['name']: f['default'] for f in schema if 'default' in f}
+    # The form shows an unsaved checkbox without a default as unticked
+    defaults = {f['name']: f.get('default', False if f.get('type') == 'checkbox' else None)
+                for f in schema}
     current = {n: existing.get(n, defaults.get(n)) for n in names - secret}
     requested = {k: v for k, v in credentials.items() if _given(v)}
     keeping = any(existing.get(k) and not credentials.get(k) for k in secret)

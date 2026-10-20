@@ -243,6 +243,29 @@ class TestDnsProviderTlsFlag:
         assert self._creds(app, provider_id)['api_key'] == 'saved-key'
 
 
+class TestDnsProviderCheckboxWithoutDefault:
+    """A checkbox with no schema default counts as unticked when never saved."""
+
+    @pytest.fixture
+    def provider_id(self, app):
+        from models import DnsProvider
+        with app.app_context():
+            row = DnsProvider(name=f'inwx-sandbox-{_suffix()}', provider_type='inwx',
+                              credentials=json.dumps({'username': 'u', 'password': 'saved-pw'}))
+            db.session.add(row)
+            db.session.commit()
+            return row.id
+
+    def test_unticked_is_not_a_change(self, auth_client, provider_id):
+        r = _send(auth_client, 'patch', f'/api/v2/dns-providers/{provider_id}', {
+            'credentials': {'sandbox': False, 'password': ''}})
+        assert r.status_code == 200, r.data
+
+    def test_ticked_without_the_secret_is_refused(self, auth_client, provider_id):
+        _refused(_send(auth_client, 'patch', f'/api/v2/dns-providers/{provider_id}', {
+            'credentials': {'sandbox': True, 'password': ''}}))
+
+
 def _drop_sso(app, provider_id):
     from models.sso import SSOProvider
     with app.app_context():
