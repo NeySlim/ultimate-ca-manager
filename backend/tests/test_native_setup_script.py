@@ -558,7 +558,7 @@ esac; exit 0''')
         time.sleep(0.05)
     assert started.exists(), proc.communicate(timeout=5)
     os.killpg(proc.pid, sig)
-    _out, err = proc.communicate(timeout=20)
+    _out, err = _reap(proc)
     assert proc.returncode != 0, err
     assert (home / 'venv' / 'good').exists() and not (home / 'venv.prev').exists()
     assert not (home / 'venv' / 'bin' / 'late').exists()
@@ -576,6 +576,23 @@ def test_a_failed_first_fips_build_leaves_no_venv_that_looks_usable(tmp_path):
     result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, {'PATH': str(bin_dir)}))
     assert result.returncode == 1
     assert _run(['venv-ok', str(home)], _env(tmp_path)).returncode != 0
+
+
+def _reap(proc, timeout=20, pipes=True):
+    """communicate() (or wait() once the pipes are closed); on a timeout, fail with what
+    was still running in the script's session and what it printed, then kill it."""
+    try:
+        return proc.communicate(timeout=timeout) if pipes else (proc.wait(timeout=timeout), None)
+    except subprocess.TimeoutExpired:
+        tree = subprocess.run(['ps', '-ww', '-o', 'pid,ppid,pgid,stat,etime,args', '-s', str(proc.pid)],
+                              capture_output=True, text=True).stdout
+        os.killpg(proc.pid, signal.SIGKILL)
+        try:
+            out, err = proc.communicate(timeout=10) if pipes else ('', '')
+        except subprocess.TimeoutExpired:  # a child outside the session still holds the pipes
+            out, err = '(pipes still held open)', ''
+        pytest.fail(f'script still running after {timeout} s\n--- processes\n{tree}'
+                    f'--- stdout\n{out}\n--- stderr\n{err}')
 
 
 def _slow_pip(step, started):
@@ -626,7 +643,7 @@ def test_a_dead_terminal_does_not_cut_the_recovery_short(tmp_path, trigger):
         if trigger == 'SIGHUP':
             _wait_for(started, proc)
             os.killpg(proc.pid, signal.SIGHUP)
-        proc.communicate(timeout=20)
+        _reap(proc)
     assert proc.returncode != 0
     assert (home / 'venv' / 'good').exists() and not (home / 'venv.prev').exists()
     assert _systemctl_lines(record) == RESTARTED
@@ -657,7 +674,7 @@ def test_a_closed_session_does_not_cost_the_service(tmp_path, case):
     proc.stdout.close()
     proc.stderr.close()
     go.touch()
-    proc.wait(timeout=20)
+    _reap(proc, pipes=False)
     if fips:
         # The verified build is kept; the package script starts ucm at the end
         assert proc.returncode == 0
@@ -692,7 +709,7 @@ def test_a_signal_while_the_previous_venv_is_dropped_keeps_the_new_one(tmp_path)
     proc = _spawn(tmp_path, home, python, envfile, extra)
     _wait_for(removing, proc)
     os.killpg(proc.pid, signal.SIGINT)
-    proc.communicate(timeout=20)
+    _reap(proc)
     assert (home / 'venv' / 'bin' / 'gunicorn').exists() and not (home / 'venv' / 'good').exists()
     assert _systemctl_lines(record)[-1].startswith('SYSTEMCTL start ucm')
 
@@ -728,7 +745,7 @@ def test_a_second_signal_does_not_cut_the_recovery_short(tmp_path):
     os.killpg(proc.pid, signal.SIGINT)
     _wait_for(removing, proc)
     os.killpg(proc.pid, signal.SIGINT)
-    proc.communicate(timeout=20)
+    _reap(proc)
     assert proc.returncode != 0
     assert (home / 'venv' / 'good').exists() and not (home / 'venv.prev').exists()
     assert _systemctl_lines(record) == RESTARTED
@@ -749,7 +766,7 @@ def test_an_incomplete_first_venv_does_not_pass_venv_ok(tmp_path, trigger):
     if trigger == 'SIGTERM':
         _wait_for(started, proc)
         os.killpg(proc.pid, signal.SIGTERM)
-    proc.communicate(timeout=20)
+    _reap(proc)
     assert proc.returncode != 0
     assert _run(['venv-ok', str(home)], _env(tmp_path)).returncode != 0
 
@@ -776,7 +793,7 @@ def test_an_interrupted_fips_build_leaves_no_temporary_file(tmp_path):
     _wait_for(started, proc)
     assert list(tmpdir.iterdir())  # the requirements copy exists during the build
     os.killpg(proc.pid, signal.SIGTERM)
-    proc.communicate(timeout=20)
+    _reap(proc)
     assert list(tmpdir.iterdir()) == []
 
 
