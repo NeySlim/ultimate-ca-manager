@@ -117,19 +117,9 @@ class EabMixin:
             logger.error(f"EAB validation error: {e}")
             return False, str(e)
 
-    def get_bound_eab_credential(self, account_id: str) -> Optional[AcmeEabCredential]:
-        """Most recently consumed EAB credential bound to ``account_id``, or None."""
-        if not account_id:
-            return None
-        return (
-            AcmeEabCredential.query
-            .filter(AcmeEabCredential.used_by_account_id == account_id)
-            .order_by(
-                AcmeEabCredential.used_at.desc().nullslast(),
-                AcmeEabCredential.id.desc(),
-            )
-            .first()
-        )
+    # PLANB-E.1: à implémenter selon SPEC (credential lié au compte)
+    def get_bound_eab_credential(self, account_id: str):
+        raise NotImplementedError('PLANB-E.1')
 
     def mark_eab_used(self, kid: str, account_id: str) -> bool:
         """Consume and bind an EAB credential after account creation commits."""

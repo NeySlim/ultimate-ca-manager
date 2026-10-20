@@ -44,7 +44,6 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
-- ACME EAB: an allowed-domains entry of `*.` and a PATCH that sets the list to `null` are refused with a 400 instead of being read as "every domain" and "block everything".
 - mTLS: a client certificate presented on a PKI protocol or health endpoint no longer signs its holder in to the web interface; certificate login goes through the interface as before (#402).
 - Packaging: the DEB ucm.env offered `SESSION_TIMEOUT` and `RATE_LIMIT_PER_MINUTE`/`RATE_LIMIT_PER_HOUR`, which nothing applied; it now offers the `RATE_LIMIT_*_RPM` and `*_BURST` limits UCM reads. Session lifetime is set in Settings > Security.
 

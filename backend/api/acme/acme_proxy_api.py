@@ -476,18 +476,7 @@ def new_order(slug=None):
     if account.status in ('deactivated', 'revoked'):
         return proxy_error('unauthorized', f'Account is {account.status}', 401)
 
-    # EAB domain scope, reported as a single rejectedIdentifier (no compound here).
-    eab_cred = acme_svc.get_bound_eab_credential(requester_account_id)
-    if eab_cred is not None:
-        refused = [i['value'] for i in identifiers if not eab_cred.allows_identifier(i)]
-        if refused:
-            return proxy_error(
-                'rejectedIdentifier',
-                "Identifiers not allowed by this account's external account binding: "
-                + ', '.join(refused),
-                400,
-            )
-
+    # PLANB-E.1: à implémenter selon SPEC (restriction EAB, new-order proxy)
     try:
         not_before = payload.get('notBefore')
         if not_before:

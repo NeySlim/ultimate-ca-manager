@@ -2,48 +2,11 @@ import { useState, useEffect, useMemo } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Plus, Trash, LockKey, Copy, Clock, Warning, Pencil, Check, X } from '@phosphor-icons/react'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
-import { Button, Badge, Card, Input, Select, Modal, Textarea } from '../../components'
+import { Button, Badge, Card, Input, Select, Modal } from '../../components'
 import { acmeService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks'
 import { formatDate } from '../../lib/utils'
-
-// null (legacy, unrestricted) and any list holding '*' both mean all domains.
-const isUnrestricted = (domains) => domains == null || domains.includes('*')
-
-// Patterns are typed one per line or comma separated.
-const parsePatterns = (text) => text.split(/[\n,]/).map(p => p.trim()).filter(Boolean)
-
-// The form always sends an explicit list, never null.
-const buildAllowedDomains = (allDomains, text) => (allDomains ? ['*'] : parsePatterns(text))
-
-function AllowedDomainsField({ allDomains, onAllDomainsChange, text, onTextChange }) {
-  const { t } = useTranslation()
-  return (
-    <div className="space-y-2">
-      <label className="flex items-center gap-2 cursor-pointer">
-        <input
-          type="checkbox"
-          checked={allDomains}
-          onChange={(e) => onAllDomainsChange(e.target.checked)}
-          className="rounded border-border bg-bg-tertiary"
-        />
-        <span className="text-sm text-text-primary">{t('acme.eab.allDomainsLabel')}</span>
-      </label>
-      <Textarea
-        label={t('acme.eab.allowedDomains')}
-        aria-label={t('acme.eab.allowedDomains')}
-        value={text}
-        onChange={(e) => onTextChange(e.target.value)}
-        disabled={allDomains}
-        rows={4}
-        placeholder={'example.com\n*.example.com'}
-        helperText={t('acme.eab.allowedDomainsHelp')}
-        className="font-mono"
-      />
-    </div>
-  )
-}
 
 export default function EabTab({ eabRequired, onToggleEabRequired, showCreateModal, onCloseCreateModal, canWrite, canDelete }) {
   const { t } = useTranslation()
@@ -56,13 +19,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
   const [newEabSecret, setNewEabSecret] = useState(null)
   const [eabLabel, setEabLabel] = useState('')
   const [eabExpiresInDays, setEabExpiresInDays] = useState('')
-  const [eabAllDomains, setEabAllDomains] = useState(true)
-  const [eabDomainsText, setEabDomainsText] = useState('')
-
-  // Allowed-domains editing state
-  const [editingDomainsCred, setEditingDomainsCred] = useState(null)
-  const [editAllDomains, setEditAllDomains] = useState(true)
-  const [editDomainsText, setEditDomainsText] = useState('')
+  // PLANB-E.1: à implémenter selon SPEC (état des domaines autorisés)
 
   // Notes editing state
   const [editingNotesId, setEditingNotesId] = useState(null)
@@ -89,7 +46,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
       const days = parseInt(eabExpiresInDays, 10)
       if (!Number.isNaN(days) && days > 0) payload.expires_in_days = days
 
-      payload.allowed_domains = buildAllowedDomains(eabAllDomains, eabDomainsText)
+      // PLANB-E.1: à implémenter selon SPEC (allowed_domains envoyé à la création)
       const res = await acmeService.createEabCredential(payload)
       const created = res.data || res
       setNewEabSecret(created)
@@ -97,8 +54,6 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
       onCloseCreateModal()
       setEabLabel('')
       setEabExpiresInDays('')
-      setEabAllDomains(true)
-      setEabDomainsText('')
       const list = await acmeService.listEabCredentials()
       setEabCredentials(list.data || [])
     } catch (error) {
@@ -171,35 +126,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
     }
   }
 
-  // Allowed domains editing: the form opens on the stored state
-  const startEditingDomains = (cred) => {
-    const domains = cred.allowed_domains
-    setEditingDomainsCred(cred)
-    setEditAllDomains(isUnrestricted(domains))
-    setEditDomainsText((domains || []).filter(p => p !== '*').join('\n'))
-  }
-
-  const closeEditingDomains = () => {
-    setEditingDomainsCred(null)
-    setEditAllDomains(true)
-    setEditDomainsText('')
-  }
-
-  const saveDomains = async () => {
-    if (!editingDomainsCred) return
-    try {
-      await acmeService.patchEabCredential(editingDomainsCred.id, {
-        allowed_domains: buildAllowedDomains(editAllDomains, editDomainsText),
-      })
-      showSuccess(t('acme.eab.domainsSaved'))
-      closeEditingDomains()
-      const list = await acmeService.listEabCredentials()
-      setEabCredentials(list.data || [])
-    } catch (error) {
-      showError(error.message || t('acme.eab.domainsSaveFailed'))
-    }
-  }
-
+  // PLANB-E.1: à implémenter selon SPEC (enregistrement des domaines)
   const isCreateOpen = showCreateModal || showLocalCreate
 
   return (
@@ -288,26 +215,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
                         <Copy size={12} />
                       </button>
                     </div>
-                    <div className="mt-1 flex items-start gap-1.5 text-xs text-text-tertiary" data-testid={`eab-domains-${cred.id}`}>
-                      <span>{t('acme.eab.allowedDomains')}:</span>
-                      <span className="font-mono break-all">
-                        {isUnrestricted(cred.allowed_domains)
-                          ? t('acme.eab.allDomains')
-                          : cred.allowed_domains.length === 0
-                            ? t('acme.eab.noDomains')
-                            : cred.allowed_domains.join(', ')}
-                      </span>
-                      {canWrite && (
-                        <button
-                          type="button"
-                          className="shrink-0 text-text-tertiary hover:text-accent-primary mt-0.5"
-                          onClick={() => startEditingDomains(cred)}
-                          title={t('acme.eab.editDomainsTitle')}
-                        >
-                          <Pencil size={12} />
-                        </button>
-                      )}
-                    </div>
+                    {/* PLANB-E.1: à implémenter selon SPEC (affichage des domaines autorisés) */}
                     <div className="mt-1 text-xs text-text-tertiary">
                       {t('acme.eab.created')}: {formatDate(cred.created_at)}
                       {cred.used_at && (
@@ -442,12 +350,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
             min={1}
             helperText={t('acme.eab.expiresHelp')}
           />
-          <AllowedDomainsField
-            allDomains={eabAllDomains}
-            onAllDomainsChange={setEabAllDomains}
-            text={eabDomainsText}
-            onTextChange={setEabDomainsText}
-          />
+          {/* PLANB-E.1: à implémenter selon SPEC (domaines autorisés à la création) */}
           <div className="flex justify-end gap-2 pt-2 border-t border-border">
             <Button type="button" variant="secondary" onClick={() => { setShowLocalCreate(false); onCloseCreateModal() }}>
               {t('common.cancel')}
@@ -502,30 +405,7 @@ export default function EabTab({ eabRequired, onToggleEabRequired, showCreateMod
           </div>
         )}
       </Modal>
-
-      {/* Edit allowed domains Modal */}
-      <Modal
-        open={!!editingDomainsCred}
-        onClose={closeEditingDomains}
-        title={t('acme.eab.editDomainsTitle')}
-      >
-        <div className="p-4 space-y-4">
-          <AllowedDomainsField
-            allDomains={editAllDomains}
-            onAllDomainsChange={setEditAllDomains}
-            text={editDomainsText}
-            onTextChange={setEditDomainsText}
-          />
-          <div className="flex justify-end gap-2 pt-2 border-t border-border">
-            <Button type="button" variant="secondary" onClick={closeEditingDomains}>
-              {t('common.cancel')}
-            </Button>
-            <Button type="button" onClick={saveDomains}>
-              {t('common.save')}
-            </Button>
-          </div>
-        </div>
-      </Modal>
+      {/* PLANB-E.1: à implémenter selon SPEC (édition des domaines autorisés) */}
     </>
   )
 }

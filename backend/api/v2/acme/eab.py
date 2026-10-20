@@ -87,16 +87,6 @@ def create_eab_credential():
     label = (data.get('label') or '').strip()[:255] or None
     expires_in_days = data.get('expires_in_days')
 
-    # Absent or null keeps the pre-restriction behaviour: unrestricted.
-    raw_domains = data.get('allowed_domains')
-    if raw_domains is None:
-        allowed_domains = ['*']
-    else:
-        try:
-            allowed_domains = AcmeEabCredential.clean_allowed_domains(raw_domains)
-        except ValueError as e:
-            return error_response(str(e), 400)
-
     expires_at = None
     if expires_in_days is not None:
         try:
@@ -120,8 +110,8 @@ def create_eab_credential():
         label=label,
         created_by_user_id=user_id,
         expires_at=expires_at,
-        status='active',
-        allowed_domains=allowed_domains,
+        status='active'
+        # PLANB-E.1: à implémenter selon SPEC (allowed_domains validé et stocké à la création)
     )
     db.session.add(cred)
     ok, err = safe_commit(logger, "Failed to create EAB credential")
@@ -158,21 +148,10 @@ def patch_eab_credential(cred_id):
         return error_response('EAB credential not found', 404)
 
     data = request.get_json() or {}
-    # Validate before touching any field so a 400 leaves the row unchanged.
-    allowed_domains = None
-    if 'allowed_domains' in data:
-        if data['allowed_domains'] is None:
-            return error_response('allowed_domains cannot be null; use ["*"] or a list of patterns', 400)
-        try:
-            allowed_domains = AcmeEabCredential.clean_allowed_domains(data['allowed_domains'])
-        except ValueError as e:
-            return error_response(str(e), 400)
-
     if 'notes' in data:
         cred.notes = (data['notes'] or '').strip() or None
-    if allowed_domains is not None:
-        cred.allowed_domains = allowed_domains
 
+    # PLANB-E.1: à implémenter selon SPEC (allowed_domains validé et stocké au PATCH)
     ok, err = safe_commit(logger, "Failed to update EAB credential")
     if not ok:
         return err

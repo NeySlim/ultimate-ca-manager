@@ -824,13 +824,7 @@ function IssueCertificateForm({ cas, onSubmit, onCancel }) {
     }
   }, [cas])
 
-  // Keep the certificate type in line with the selected CA's ca_type
-  useEffect(() => {
-    if (!caId) return
-    const ca = cas.find(c => String(c.id) === String(caId))
-    if (ca?.ca_type && ca.ca_type !== certType) setCertType(ca.ca_type)
-  }, [caId, cas])
-
+  // PLANB-E.2: à implémenter selon SPEC (type de certificat suivant la CA)
   const toggleExtension = (ext) => {
     setExtensions(prev =>
       prev.includes(ext) ? prev.filter(e => e !== ext) : [...prev, ext]
