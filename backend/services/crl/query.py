@@ -1,10 +1,9 @@
 import logging
 from typing import List, Optional
 from sqlalchemy import or_
-from models import db, CA, Certificate, RevokedSerial
+from models import db, CA, Certificate
 from models.crl import CRLMetadata
 from services.cert.serial_resolution import resolve_record_serial, same_serial
-from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -23,232 +22,51 @@ def _not_expired(column, now):
     return or_(column.is_(None), column > now)
 
 
+def _revoked_child_cas(ca, now) -> list:
+    """Revoked child CAs of ``ca`` whose validity has not passed.
+    A revoked child CA is listed from its own row too: its record under
+    this CA can be missing (a backup restored without certificates),
+    and OCSP already answers revoked from the flag (review of #343)."""
+    return CA.query.filter(
+        CA.caref == ca.refid,
+        CA.revoked == True,
+        _not_expired(CA.valid_to, now)
+    ).all()
 class CRLQueryMixin:
-
-    @staticmethod
-    def get_revoked_certificates(ca_id: int) -> List:
-        """Return revoked certificates for CRL generation.
-
-        Merges two sources:
-        1. Certificate rows with revoked=True (live certs)
-        2. RevokedSerial rows whose certificate_id is no longer present
-           (deleted certs whose revocation must persist until expiry)
-
-        Deduplicates by serial — a live Certificate row always wins over a
-        RevokedSerial fallback so there's a single source of truth. Two rows
-        naming one certificate in different spellings of its serial count as
-        one (see ``_filter_orphan_serials``).
-
-        Per RFC 5280, expired certificates are excluded — clients reject
-        them on validity alone, so they don't need CRL entries. A row that
-        never recorded a ``valid_to`` is not expired, only silent about it,
-        and stays (see ``_not_expired``).
-        """
+    @staticmethod  # PLANB-B.6: à implémenter selon SPEC (invariants 21 à 23, 30, 31)
+    def get_revoked_certificates(ca_id: int) -> list:
+        """Revoked entries the full CRL of this CA carries; the revoked child
+        CAs come from ``_revoked_child_cas``."""
         ca = db.session.get(CA, ca_id)
         if not ca:
             raise ValueError(f"CA with id {ca_id} not found")
-
-        now = utc_now()
-
-        # Live revoked certs that haven't expired yet
-        live_certs = Certificate.query.filter(
-            Certificate.caref == ca.refid,
-            Certificate.revoked == True,
-            _not_expired(Certificate.valid_to, now)
-        ).all()
-
-        # A revoked child CA is listed from its own row too: its record under
-        # this CA can be missing (a backup restored without certificates),
-        # and OCSP already answers revoked from the flag (review of #343)
-        live_cas = CA.query.filter(
-            CA.caref == ca.refid,
-            CA.revoked == True,
-            _not_expired(CA.valid_to, now)
-        ).all()
-        live_certs = live_certs + live_cas
-
-        # Fallback: RevokedSerial entries for certs that were deleted
-        # (certificate_id is NULL or the row no longer exists).
-        # Only include entries that haven't expired yet.
-        revoked_serials = RevokedSerial.query.filter(
-            RevokedSerial.caref == ca.refid,
-            RevokedSerial.valid_to > now
-        ).all()
-
-        orphan_serials = CRLQueryMixin._filter_orphan_serials(
-            revoked_serials, live_certs
-        )
-
-        return live_certs + orphan_serials
-
-    @staticmethod
+        raise NotImplementedError('PLANB-B.6: get_revoked_certificates')
+    @staticmethod  # PLANB-B.6: à implémenter selon SPEC (invariants 21, 22, 52)
     def _filter_orphan_serials(revoked_serials: List, live_records: List) -> List:
-        """Reduce RevokedSerial rows to the entries a CRL must still carry.
-
-        Shared by the full CRL (``get_revoked_certificates``) and the delta
-        CRL (``CRLGenerationMixin.generate_delta_crl``) so both apply the
-        same rules:
-
-        - drop entries whose serial already comes from a live Certificate row
-        - drop entries whose certificate row still exists, is not revoked AND
-          still carries the same serial number. When the serials differ the
-          certificate was renewed in-place, so the superseded serial MUST
-          stay on the CRL.
-        - drop duplicates: two rows for the same serial (possible when a
-          revoke and a renewal race) would otherwise emit the same serial
-          twice in one CRL.
+        """Revocation records a CRL must still carry once the live records are listed.
 
         "Same serial" is the identical column *or* the same resolved integer:
         the column has three writers, so one certificate can be a decimal row
         here and a hex row there, and the entry is built from the integer.
         Matching on the column alone let both through and put the same serial
         on the CRL twice. Widening the test only ever drops more, never
-        resurrects an entry the column test dropped.
-        """
-        if not revoked_serials:
-            return []
+        resurrects an entry the column test dropped."""
+        raise NotImplementedError('PLANB-B.6: _filter_orphan_serials')
+    @staticmethod  # PLANB-B.6: à implémenter selon SPEC (invariant 26)
+    def purge_stale_revoked_serials(ca_id) -> int:
+        raise NotImplementedError('PLANB-B.6: purge_stale_revoked_serials')
 
-        cert_ids = {rs.certificate_id for rs in revoked_serials if rs.certificate_id}
-        certs_by_id = {}
-        if cert_ids:
-            certs_by_id = {
-                c.id: c
-                for c in Certificate.query.filter(Certificate.id.in_(cert_ids)).all()
-            }
+    @staticmethod  # PLANB-B.6: à implémenter selon SPEC (invariant 54)
+    def is_auto_delete_enabled():
+        raise NotImplementedError('PLANB-B.6: is_auto_delete_enabled')
 
-        live_columns = {r.serial_number for r in live_records}
-        live_ints = {resolve_record_serial(r) for r in live_records}
-        live_ints.discard(None)
+    @staticmethod  # PLANB-B.6: à implémenter selon SPEC (invariant 54)
+    def is_purge_stale_serials_enabled():
+        raise NotImplementedError('PLANB-B.6: is_purge_stale_serials_enabled')
 
-        orphan_serials = []
-        seen_columns = set()
-        seen_ints = set()
-        for rs in revoked_serials:
-            if rs.serial_number in live_columns or rs.serial_number in seen_columns:
-                continue
-            rs_int = resolve_record_serial(rs)
-            if rs_int is not None and (rs_int in live_ints or rs_int in seen_ints):
-                continue
-            if rs.certificate_id:
-                existing = certs_by_id.get(rs.certificate_id)
-                if existing and not existing.revoked and same_serial(existing, rs):
-                    continue
-            seen_columns.add(rs.serial_number)
-            if rs_int is not None:
-                seen_ints.add(rs_int)
-            orphan_serials.append(rs)
-
-        return orphan_serials
-
-    @staticmethod
-    def purge_stale_revoked_serials(ca_id: int) -> int:
-        """Delete RevokedSerial entries whose valid_to has passed.
-
-        Once the original certificate has expired, its serial no longer
-        needs to appear on the CRL — the cert is rejected on validity
-        alone. Returns the number of purged entries.
-        """
-        ca = db.session.get(CA, ca_id)
-        if not ca:
-            return 0
-
-        now = utc_now()
-        stale = RevokedSerial.query.filter(
-            RevokedSerial.caref == ca.refid,
-            RevokedSerial.valid_to < now
-        ).all()
-
-        count = len(stale)
-        for rs in stale:
-            db.session.delete(rs)
-
-        if count:
-            try:
-                db.session.commit()
-                logger.info(f"Purged {count} stale revoked_serials for CA {ca.descr}")
-            except Exception as e:
-                db.session.rollback()
-                logger.warning(f"Failed to purge stale revoked_serials: {e}")
-                return 0
-
-        return count
-
-    @staticmethod
-    def is_auto_delete_enabled() -> bool:
-        """Check if auto-delete of expired revoked certificates is enabled.
-
-        Reads the 'crl_auto_delete_expired_revoked' system config key.
-        Defaults to False (off) — expired revoked certs remain in the
-        database as historical records unless an admin enables this.
-        """
-        from models.system_config import SystemConfig
-        row = SystemConfig.query.filter_by(
-            key='crl_auto_delete_expired_revoked'
-        ).first()
-        if not row or not row.value:
-            return False
-        return row.value.lower() in ('true', '1', 'yes', 'on')
-
-    @staticmethod
-    def is_purge_stale_serials_enabled() -> bool:
-        """Check if auto-purge of stale RevokedSerial entries is enabled.
-
-        Reads the 'crl_auto_purge_stale_serials' system config key.
-        Defaults to False (off) — stale RevokedSerial entries are preserved
-        as audit records (renewal chain history) unless an admin enables this.
-        When enabled, entries with valid_to < now are deleted during full
-        CRL generation.
-        """
-        from models.system_config import SystemConfig
-        row = SystemConfig.query.filter_by(
-            key='crl_auto_purge_stale_serials'
-        ).first()
-        if not row or not row.value:
-            return False
-        return row.value.lower() in ('true', '1', 'yes', 'on')
-
-    @staticmethod
-    def purge_expired_revoked_certificates(ca_id: int) -> int:
-        """Delete expired+revoked Certificate rows for this CA.
-
-        Only deletes certificates that are BOTH revoked AND past valid_to.
-        The RevokedSerial table is the authoritative revocation record —
-        deleting the cert row here is safe because the revocation data
-        persists independently.
-
-        Uses CertificateService.delete_certificate to ensure cert/key/csr
-        files on disk are also cleaned up and audit logs are written.
-
-        Gated by the 'crl_auto_delete_expired_revoked' system setting.
-        Returns the number of deleted certificate rows.
-        """
-        ca = db.session.get(CA, ca_id)
-        if not ca:
-            return 0
-
-        now = utc_now()
-        expired_revoked = Certificate.query.filter(
-            Certificate.caref == ca.refid,
-            Certificate.revoked == True,
-            Certificate.valid_to < now
-        ).all()
-
-        count = 0
-        for cert in expired_revoked:
-            try:
-                from services.cert_service import CertificateService
-                if CertificateService.delete_certificate(cert_id=cert.id, username='system'):
-                    count += 1
-            except Exception as e:
-                logger.warning(f"Failed to auto-delete expired revoked cert {cert.id}: {e}")
-
-        if count:
-            logger.info(
-                f"Auto-deleted {count} expired revoked certificates for CA {ca.descr}"
-            )
-
-        return count
-
+    @staticmethod  # PLANB-B.6: à implémenter selon SPEC (invariant 27)
+    def purge_expired_revoked_certificates(ca_id) -> int:
+        raise NotImplementedError('PLANB-B.6: purge_expired_revoked_certificates')
     @staticmethod
     def get_latest_crl(ca_id: int) -> Optional[CRLMetadata]:
         return CRLMetadata.query.filter_by(

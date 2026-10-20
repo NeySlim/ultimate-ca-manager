@@ -189,23 +189,7 @@ class CRLGenerationMixin:
         from services.hsm.ca_key_loader import get_ca_signing_key
         ca_private_key = get_ca_signing_key(ca, allow_revoked=True)
 
-        # Purge stale revocation records (expired certs no longer need CRL entries).
-        # Gated by 'crl_auto_purge_stale_serials' setting — defaults to off so
-        # RevokedSerial entries are preserved as audit records (renewal chain
-        # history) unless an admin explicitly enables purging.
-        try:
-            if CRLQueryMixin.is_purge_stale_serials_enabled():
-                CRLQueryMixin.purge_stale_revoked_serials(ca_id)
-        except Exception as e:
-            logger.warning(f"Failed to purge stale revoked_serials for CA {ca_id}: {e}")
-
-        # Auto-delete expired+revoked certificate rows if the setting is enabled
-        try:
-            if CRLQueryMixin.is_auto_delete_enabled():
-                CRLQueryMixin.purge_expired_revoked_certificates(ca_id)
-        except Exception as e:
-            logger.warning(f"Failed to auto-delete expired revoked certs for CA {ca_id}: {e}")
-
+        # PLANB-B.6: purges conditionnelles avant l'énumération (SPEC, invariants 26 et 27)
         revoked_certs = CRLQueryMixin.get_revoked_certificates(ca_id)
 
         last_crl = CRLMetadata.query.filter_by(ca_id=ca_id).order_by(
@@ -341,15 +325,12 @@ class CRLGenerationMixin:
         from services.hsm.ca_key_loader import get_ca_signing_key
         ca_private_key = get_ca_signing_key(ca, allow_revoked=True)
 
-        from models import RevokedSerial
-
-        now = utc_now()
+        now = utc_now()  # one instant for the filters below and the CRL dates
         revoked_certs = Certificate.query.filter(
             Certificate.caref == ca.refid,
             Certificate.revoked == True,
-            Certificate.revoked_at > base_crl.this_update,
-            _not_expired(Certificate.valid_to, now)
-        ).all()
+            _not_expired(Certificate.valid_to, now),
+            Certificate.revoked_at > base_crl.this_update).all()
         # A revoked child CA, from its row, as the full CRL lists it
         revoked_certs = revoked_certs + CA.query.filter(
             CA.caref == ca.refid,
@@ -357,20 +338,7 @@ class CRLGenerationMixin:
             CA.revoked_at > base_crl.this_update,
             _not_expired(CA.valid_to, now),
         ).all()
-
-        # Also include orphaned RevokedSerial entries revoked after the base CRL.
-        # Uses the same filter as the full CRL so a serial superseded by an
-        # in-place renewal (cert row alive, not revoked, but carrying a new
-        # serial) is published on the delta instead of waiting for the next
-        # full CRL.
-        orphan_candidates = RevokedSerial.query.filter(
-            RevokedSerial.caref == ca.refid,
-            RevokedSerial.revoked_at > base_crl.this_update,
-            RevokedSerial.valid_to > now
-        ).all()
-        revoked_certs.extend(
-            CRLQueryMixin._filter_orphan_serials(orphan_candidates, list(revoked_certs))
-        )
+        # PLANB-B.6: candidats revoked_serials de la delta CRL (SPEC, invariant 52)
 
         last_crl = CRLMetadata.query.filter_by(ca_id=ca_id).order_by(
             CRLMetadata.crl_number.desc()

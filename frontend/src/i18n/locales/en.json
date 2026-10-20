@@ -2965,13 +2965,11 @@
     "ctEmbedSct": "Embed SCTs at issuance (pre-certificate flow)",
     "ctRequired": "Require SCTs (fail issuance if no log responds)",
     "ctRequiredWarning": "Applies to web, ACME and EST issuance: if the CT logs are unreachable, ALL issuance fails.",
-    "ocspResponseValidity": "OCSP response validity (hours)",
-    "ocspResponseValidityDesc": "How long signed OCSP responses stay valid (nextUpdate). 1-168 hours, default 24.",
     "ocspResponderAutoRenew": "Auto-renew OCSP responder certificates",
     "ocspResponderAutoRenewDesc": "A daily task re-issues each delegated responder certificate before it expires, same key pair, and rebinds the responder",
     "ocspResponderRenewDays": "Renew OCSP responder certificates (days before expiry)",
     "ocspResponderRenewDaysDesc": "1-365, default 30. Short-lived responders renew once a third of their lifetime remains at the latest",
-    "crlAutoDeleteExpiredRevoked": "Auto-delete expired revoked certificates",
+    "crlAutoDeleteExpiredRevoked": "",
     "crlAutoDeleteExpiredRevokedDesc": "Automatically purge revoked certificate records (expired ones only) during CRL generation. When disabled, expired revoked certs are retained as historical records.",
     "crlAutoPurgeStaleSerials": "Auto-purge stale revoked serials",
     "crlAutoPurgeStaleSerialsDesc": "Automatically delete revoked-serial records (expired ones only) during CRL generation. When disabled, stale records are kept as renewal history.",
@@ -3106,7 +3104,9 @@
     },
     "backupKdf": "Key derivation",
     "backupKdfAuto": "Automatic (Argon2id when available, PBKDF2 in FIPS mode)",
-    "backupKdfHelper": "Archives written with Argon2id cannot be restored on an instance in FIPS mode."
+    "backupKdfHelper": "Archives written with Argon2id cannot be restored on an instance in FIPS mode.",
+    "ocspResponseValidity": "OCSP response validity (hours)",
+    "ocspResponseValidityDesc": "How long signed OCSP responses stay valid (nextUpdate). 1-168 hours, default 24."
   },
   "account": {
     "profile": "Profile",

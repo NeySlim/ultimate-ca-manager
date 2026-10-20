@@ -299,7 +299,10 @@ class TestEveryIssuancePath:
 
         def _no_key(*args, **kwargs):
             raise AssertionError('a key was generated for a refused renewal')
-        monkeypatch.setattr(renewal, '_matching_key_generator', lambda public_key: _no_key)
+        # Every generator a renewal can reach: the registry and the EdDSA classes
+        monkeypatch.setattr(key_algorithms.KeyAlgorithm, 'generate', _no_key)
+        monkeypatch.setattr(ed25519.Ed25519PrivateKey, 'generate', _no_key)
+        monkeypatch.setattr(ed448.Ed448PrivateKey, 'generate', _no_key)
         try:
             with app.app_context():
                 with pytest.raises(renewal.RenewalError, match='(?i)ED25519.*FIPS mode'):

@@ -329,37 +329,6 @@ class TestGetCertificate:
 class TestDeleteCertificate:
     """Tests for DELETE /api/v2/certificates/<id>"""
 
-    def test_delete_valid_cert_blocked(self, auth_client, create_cert):
-        """Valid (non-revoked, non-expired) certs cannot be deleted."""
-        cert = create_cert(cn='valid-no-delete.example.com')
-        cert_id = cert.get('id')
-        r = auth_client.delete(f'{BASE}/{cert_id}')
-        assert r.status_code == 409
-
-    def test_delete_revoked_cert_allowed(self, auth_client, create_cert):
-        """Revoked certs can be deleted (already on CRL)."""
-        cert = create_cert(cn='revoke-then-delete.example.com')
-        cert_id = cert.get('id')
-        post_json(auth_client, f'{BASE}/{cert_id}/revoke', {'reason': 'unspecified'})
-        r = auth_client.delete(f'{BASE}/{cert_id}')
-        assert r.status_code in (200, 204)
-
-    def test_delete_expired_cert_allowed(self, auth_client, create_cert):
-        """Expired certs can be deleted (no longer valid)."""
-        cert = create_cert(cn='expired-delete.example.com', validity_days=1)
-        cert_id = cert.get('id')
-        # Manually expire the cert by backdating valid_to in the DB
-        from models import Certificate, db
-        with auth_client.application.app_context():
-            row = db.session.get(Certificate, cert_id)
-            assert row is not None
-            from utils.datetime_utils import utc_now
-            from datetime import timedelta
-            row.valid_to = utc_now() - timedelta(days=1)
-            db.session.commit()
-        r = auth_client.delete(f'{BASE}/{cert_id}')
-        assert r.status_code in (200, 204)
-
     def test_delete_nonexistent(self, auth_client):
         r = auth_client.delete(f'{BASE}/999999')
         assert r.status_code == 404
@@ -744,78 +713,6 @@ class TestRenewCertificate:
         r = post_json(auth_client, f'{BASE}/999999/renew', {})
         assert r.status_code in (404, 500)
 
-    def test_renew_preserves_row_id(self, auth_client, create_cert):
-        """Renewal should update the certificate row in-place, preserving id and refid."""
-        cert = create_cert(cn='renew-inplace.example.com')
-        old_id = cert.get('id')
-        old_refid = cert.get('refid')
-        r = post_json(auth_client, f'{BASE}/{old_id}/renew', {})
-        assert r.status_code == 200
-        data = get_json(r).get('data', get_json(r))
-        new_id = data.get('id')
-        new_refid = data.get('refid')
-        # Same row — id and refid must be preserved
-        assert new_id == old_id
-        assert new_refid == old_refid
-        # Cert should still be accessible at the same URL
-        r_old = auth_client.get(f'{BASE}/{old_id}')
-        assert r_old.status_code == 200
-
-    def test_renew_sets_renewed_at(self, auth_client, create_cert):
-        """Renewal should set renewed_at and increment renewed_times."""
-        cert = create_cert(cn='renew-timestamp.example.com')
-        cert_id = cert.get('id')
-        # Before renewal, renewed_at should be None and renewed_times should be 0
-        assert cert.get('renewed_at') is None
-        assert cert.get('renewed_times', 0) == 0
-        r = post_json(auth_client, f'{BASE}/{cert_id}/renew', {})
-        assert r.status_code == 200
-        data = get_json(r).get('data', get_json(r))
-        # After renewal, renewed_at should be set and renewed_times should be 1
-        assert data.get('renewed_at') is not None
-        assert data.get('renewed_times') == 1
-        # Renew again — renewed_times should be 2
-        r2 = post_json(auth_client, f'{BASE}/{cert_id}/renew', {})
-        assert r2.status_code == 200
-        data2 = get_json(r2).get('data', get_json(r2))
-        assert data2.get('renewed_times') == 2
-
-    def test_renew_preserves_created_at(self, auth_client, create_cert):
-        """Renewal should preserve created_at (original issuance date)."""
-        cert = create_cert(cn='renew-created-at.example.com')
-        cert_id = cert.get('id')
-        old_created_at = cert.get('created_at')
-        r = post_json(auth_client, f'{BASE}/{cert_id}/renew', {})
-        assert r.status_code == 200
-        data = get_json(r).get('data', get_json(r))
-        # created_at must be unchanged
-        assert data.get('created_at') == old_created_at
-
-    def test_renew_revokes_old_cert(self, auth_client, create_cert, app):
-        """Renewal should record the old serial in revoked_serials with certificate_id link."""
-        from models import RevokedSerial, db as _db
-        cert = create_cert(cn='renew-revoke-old.example.com')
-        old_id = cert.get('id')
-        old_serial = cert.get('serial_number')
-        r = post_json(auth_client, f'{BASE}/{old_id}/renew', {})
-        assert r.status_code == 200
-        # The old serial should have a RevokedSerial entry
-        with app.app_context():
-            rs = RevokedSerial.query.filter_by(
-                serial_number=old_serial
-            ).first()
-            assert rs is not None
-            assert rs.revoke_reason == 'superseded'
-            # certificate_id should point back to the cert row (preserved for auditability)
-            assert rs.certificate_id == old_id
-
-    def test_renew_revoked_cert_blocked(self, auth_client, create_cert):
-        """Renewing a revoked cert is refused with 409 — issue a new cert instead."""
-        cert = create_cert(cn='revoke-then-renew.example.com')
-        cert_id = cert.get('id')
-        post_json(auth_client, f'{BASE}/{cert_id}/revoke', {'reason': 'unspecified'})
-        r = post_json(auth_client, f'{BASE}/{cert_id}/renew', {})
-        assert r.status_code == 409
 
 
 # ============================================================================
@@ -947,44 +844,6 @@ class TestBulkDelete:
         r = post_json(auth_client, f'{BASE}/bulk/delete', {})
         assert r.status_code == 400
 
-    def test_bulk_delete_valid_certs_blocked(self, auth_client, create_cert):
-        """Valid certs in a bulk delete must be reported as failed."""
-        c1 = create_cert(cn='bulk-del-block1.example.com')
-        c2 = create_cert(cn='bulk-del-block2.example.com')
-        r = post_json(auth_client, f'{BASE}/bulk/delete', {
-            'ids': [c1['id'], c2['id']],
-        })
-        assert r.status_code == 200
-        data = get_json(r).get('data', get_json(r))
-        assert len(data['failed']) == 2
-        assert len(data['success']) == 0
-
-    def test_bulk_delete_revoked_allowed(self, auth_client, create_cert):
-        """Revoked certs can be bulk deleted."""
-        c1 = create_cert(cn='bulk-del-rev1.example.com')
-        c2 = create_cert(cn='bulk-del-rev2.example.com')
-        post_json(auth_client, f'{BASE}/{c1["id"]}/revoke', {'reason': 'unspecified'})
-        post_json(auth_client, f'{BASE}/{c2["id"]}/revoke', {'reason': 'unspecified'})
-        r = post_json(auth_client, f'{BASE}/bulk/delete', {
-            'ids': [c1['id'], c2['id']],
-        })
-        assert r.status_code == 200
-        data = get_json(r).get('data', get_json(r))
-        assert len(data['success']) == 2
-
-    def test_bulk_delete_mixed(self, auth_client, create_cert):
-        """Mix of valid (blocked) and revoked (allowed) certs."""
-        c_valid = create_cert(cn='bulk-del-mix-valid.example.com')
-        c_revoked = create_cert(cn='bulk-del-mix-revoked.example.com')
-        post_json(auth_client, f'{BASE}/{c_revoked["id"]}/revoke', {'reason': 'unspecified'})
-        r = post_json(auth_client, f'{BASE}/bulk/delete', {
-            'ids': [c_valid['id'], c_revoked['id']],
-        })
-        assert r.status_code == 200
-        data = get_json(r).get('data', get_json(r))
-        assert c_revoked['id'] in data['success']
-        assert any(f['id'] == c_valid['id'] for f in data['failed'])
-
     def test_bulk_delete_nonexistent_ids(self, auth_client):
         r = post_json(auth_client, f'{BASE}/bulk/delete', {
             'ids': [999990, 999991],
@@ -995,7 +854,8 @@ class TestBulkDelete:
 
     def test_bulk_delete_confirms_gone(self, auth_client, create_cert):
         c = create_cert(cn='bulk-del-confirm.example.com')
-        post_json(auth_client, f'{BASE}/{c["id"]}/revoke', {'reason': 'unspecified'})
+        revoked = post_json(auth_client, f'{BASE}/{c["id"]}/revoke', {'reason': 'unspecified'})
+        assert revoked.status_code == 200
         post_json(auth_client, f'{BASE}/bulk/delete', {'ids': [c['id']]})
         r = auth_client.get(f'{BASE}/{c["id"]}')
         assert r.status_code == 404
@@ -1027,85 +887,6 @@ class TestBulkExport:
             'ids': [999990, 999991],
         })
         assert r.status_code == 404
-
-
-# ============================================================================
-# RevokedSerial persistence
-# ============================================================================
-
-class TestRevokedSerialPersistence:
-    """Tests for the revoked_serials table — revocation info survives cert deletion."""
-
-    def test_revoke_creates_revoked_serial(self, auth_client, create_cert, app):
-        """Revoking a cert should insert a RevokedSerial record."""
-        from models import RevokedSerial
-        cert = create_cert(cn='revserial-create.example.com')
-        cert_id = cert.get('id')
-        old_serial = cert.get('serial_number')
-        r = post_json(auth_client, f'{BASE}/{cert_id}/revoke', {'reason': 'key_compromise'})
-        assert r.status_code == 200
-        with app.app_context():
-            rs = RevokedSerial.query.filter_by(
-                serial_number=old_serial
-            ).first()
-            assert rs is not None
-            # stored in the canonical RFC 5280 spelling since #334
-            assert rs.revoke_reason == 'keyCompromise'
-            assert rs.valid_to is not None
-
-    def test_revoked_serial_survives_deletion(self, auth_client, create_cert, app):
-        """After deleting a revoked cert, the RevokedSerial record must persist."""
-        from models import RevokedSerial
-        cert = create_cert(cn='revserial-survive.example.com')
-        cert_id = cert.get('id')
-        old_serial = cert.get('serial_number')
-        post_json(auth_client, f'{BASE}/{cert_id}/revoke', {'reason': 'unspecified'})
-        # Now delete the revoked cert (should be allowed since it's revoked)
-        r = auth_client.delete(f'{BASE}/{cert_id}')
-        assert r.status_code == 204
-        # RevokedSerial must still be there
-        with app.app_context():
-            rs = RevokedSerial.query.filter_by(
-                serial_number=old_serial
-            ).first()
-            assert rs is not None
-
-    def test_stale_revoked_serial_purged(self, auth_client, create_cert, app):
-        """RevokedSerial entries past valid_to should be purged during CRL generation."""
-        from models import RevokedSerial, CA, SystemConfig, db as _db
-        from utils.datetime_utils import utc_now
-        from datetime import timedelta
-        cert = create_cert(cn='revserial-stale.example.com')
-        cert_id = cert.get('id')
-        old_serial = cert.get('serial_number')
-        post_json(auth_client, f'{BASE}/{cert_id}/revoke', {'reason': 'unspecified'})
-        # Manually set valid_to in the past to simulate expiry
-        with app.app_context():
-            rs = RevokedSerial.query.filter_by(serial_number=old_serial).first()
-            assert rs is not None
-            rs.valid_to = utc_now() - timedelta(days=1)
-            _db.session.commit()
-            ca = CA.query.filter_by(refid=rs.caref).first()
-            ca_id = ca.id
-            # Enable auto-purge so CRL generation actually deletes stale entries
-            # (defaults to False — entries are preserved as audit records).
-            cfg = SystemConfig.query.filter_by(key='crl_auto_purge_stale_serials').first()
-            if cfg:
-                cfg.value = 'true'
-            else:
-                _db.session.add(SystemConfig(key='crl_auto_purge_stale_serials', value='true'))
-            _db.session.commit()
-        # Trigger CRL generation which should purge the stale entry
-        from services.crl_service import CRLService
-        with app.app_context():
-            try:
-                CRLService.generate_crl(ca_id, username='test')
-            except Exception:
-                pass  # CRL gen may fail if CA key isn't available in test
-            rs_after = RevokedSerial.query.filter_by(serial_number=old_serial).first()
-            assert rs_after is None  # purged because valid_to < now
-
-
 class TestStatusFilterBuckets:
     """The list filter buckets match the stats endpoint and the row status,
     so a page is never filled with rows the caller asked to exclude (#345 review)."""

@@ -3,7 +3,7 @@ CAs CRUD Operations
 """
 
 from . import bp
-from flask import request, g
+from flask import g, request
 import base64
 import ipaddress
 import re

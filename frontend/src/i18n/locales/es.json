@@ -2964,13 +2964,11 @@
     "ctEmbedSct": "Incrustar SCTs en la emisión (flujo de precertificado)",
     "ctRequired": "Exigir SCTs (falla la emisión si ningún log responde)",
     "ctRequiredWarning": "Se aplica a emisiones web, ACME y EST: si los logs CT no son accesibles, TODA emisión falla.",
-    "ocspResponseValidity": "Validez de respuestas OCSP (horas)",
-    "ocspResponseValidityDesc": "Tiempo de validez de las respuestas OCSP firmadas (nextUpdate). 1-168 horas, 24 por defecto.",
     "ocspResponderAutoRenew": "Renovar automáticamente los certificados del respondedor OCSP",
     "ocspResponderAutoRenewDesc": "Una tarea diaria reemite cada certificado de respondedor delegado antes de que caduque, con el mismo par de claves, y vuelve a vincular el respondedor",
     "ocspResponderRenewDays": "Renovar certificados del respondedor OCSP (días antes de caducar)",
     "ocspResponderRenewDaysDesc": "1-365, 30 por defecto. Un respondedor de corta duración se renueva como muy tarde cuando le queda un tercio de su vida",
-    "crlAutoDeleteExpiredRevoked": "Eliminar automáticamente certificados revocados expirados",
+    "crlAutoDeleteExpiredRevoked": "",
     "crlAutoDeleteExpiredRevokedDesc": "Purga automáticamente los registros de certificados revocados (solo los expirados) durante la generación de CRL. Cuando está desactivado, los certificados revocados expirados se conservan como registros históricos.",
     "crlAutoPurgeStaleSerials": "Purgar automáticamente números de serie revocados obsoletos",
     "crlAutoPurgeStaleSerialsDesc": "Elimina automáticamente los registros de números de serie revocados (solo los expirados) durante la generación de CRL. Cuando está desactivado, los registros obsoletos se conservan como historial de renovaciones.",
@@ -3105,7 +3103,9 @@
     },
     "backupKdf": "Derivación de clave",
     "backupKdfAuto": "Automática (Argon2id si está disponible, PBKDF2 en modo FIPS)",
-    "backupKdfHelper": "Los archivos escritos con Argon2id no se pueden restaurar en una instancia en modo FIPS."
+    "backupKdfHelper": "Los archivos escritos con Argon2id no se pueden restaurar en una instancia en modo FIPS.",
+    "ocspResponseValidity": "Validez de respuestas OCSP (horas)",
+    "ocspResponseValidityDesc": "Tiempo de validez de las respuestas OCSP firmadas (nextUpdate). 1-168 horas, 24 por defecto."
   },
   "account": {
     "profile": "Perfil",

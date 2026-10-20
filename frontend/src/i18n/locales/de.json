@@ -2964,13 +2964,11 @@
     "ctEmbedSct": "SCTs bei Ausstellung einbetten (Vorzertifikat-Ablauf)",
     "ctRequired": "SCTs verlangen (Ausstellung schlägt fehl, wenn kein Log antwortet)",
     "ctRequiredWarning": "Gilt für Web-, ACME- und EST-Ausstellung: Sind die CT-Logs nicht erreichbar, schlägt JEDE Ausstellung fehl.",
-    "ocspResponseValidity": "Gültigkeit der OCSP-Antworten (Stunden)",
-    "ocspResponseValidityDesc": "Wie lange signierte OCSP-Antworten gültig bleiben (nextUpdate). 1-168 Stunden, Standard 24.",
     "ocspResponderAutoRenew": "OCSP-Responder-Zertifikate automatisch erneuern",
     "ocspResponderAutoRenewDesc": "Eine tägliche Aufgabe stellt jedes delegierte Responder-Zertifikat vor Ablauf mit demselben Schlüsselpaar neu aus und bindet den Responder neu",
     "ocspResponderRenewDays": "OCSP-Responder-Zertifikate erneuern (Tage vor Ablauf)",
     "ocspResponderRenewDaysDesc": "1-365, Standard 30. Kurzlebige Responder werden spätestens erneuert, wenn noch ein Drittel ihrer Laufzeit bleibt",
-    "crlAutoDeleteExpiredRevoked": "Abgelaufene widerrufene Zertifikate automatisch löschen",
+    "crlAutoDeleteExpiredRevoked": "",
     "crlAutoDeleteExpiredRevokedDesc": "Widerrufene Zertifikatsdatensätze (nur abgelaufene) bei der CRL-Generierung automatisch bereinigen. Wenn deaktiviert, werden abgelaufene widerrufene Zertifikate als Verlaufsdatensätze aufbewahrt.",
     "crlAutoPurgeStaleSerials": "Veraltete widerrufene Seriennummern automatisch bereinigen",
     "crlAutoPurgeStaleSerialsDesc": "Datensätze widerrufener Seriennummern (nur abgelaufene) bei der CRL-Generierung automatisch löschen. Wenn deaktiviert, bleiben veraltete Datensätze als Erneuerungsverlauf erhalten.",
@@ -3105,7 +3103,9 @@
     },
     "backupKdf": "Schlüsselableitung",
     "backupKdfAuto": "Automatisch (Argon2id, sofern verfügbar, PBKDF2 im FIPS-Modus)",
-    "backupKdfHelper": "Mit Argon2id geschriebene Archive lassen sich auf einer Instanz im FIPS-Modus nicht wiederherstellen."
+    "backupKdfHelper": "Mit Argon2id geschriebene Archive lassen sich auf einer Instanz im FIPS-Modus nicht wiederherstellen.",
+    "ocspResponseValidity": "Gültigkeit der OCSP-Antworten (Stunden)",
+    "ocspResponseValidityDesc": "Wie lange signierte OCSP-Antworten gültig bleiben (nextUpdate). 1-168 Stunden, Standard 24."
   },
   "account": {
     "profile": "Profil",

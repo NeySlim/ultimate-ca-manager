@@ -251,21 +251,37 @@ class TestSitesInFipsMode:
         assert len(genpkey) == 1 and 'ec_paramgen_curve:P-256' in genpkey[0]['cmd']
 
     @pytest.mark.parametrize('make', [
-        lambda: rsa.generate_private_key(65537, 2560),
+        lambda: rsa.generate_private_key(65537, 3072),
         lambda: ec.generate_private_key(ec.SECP521R1()),
     ])
-    def test_renewal_regenerates_through_genpkey(self, fips_on, genpkey, make):
-        from services.cert.renewal import _matching_key_generator
-        original = make().public_key()
-        new_key = _matching_key_generator(original)()
-        _assert_single_genpkey(genpkey, new_key)
-        assert key_algorithms.key_algo_for_public_key(new_key.public_key()) == \
-            key_algorithms.key_algo_for_public_key(original)
+    def test_renewal_regenerates_through_genpkey(self, app, create_ca, monkeypatch, genpkey, make):
+        # Set up outside FIPS mode; only the renewal itself runs inside it
+        from tests.test_renewal_alignment import _craft_row, _drop, _renew
+        original = make()
+        ca = create_ca(cn='FIPS rekey CA')
+        row_id = _craft_row(app, ca['id'], original, f'fips-rekey-{original.key_size}.test')
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        genpkey.clear()
+        try:
+            _, renewed = _renew(app, row_id, rekey=True)
+            _assert_single_genpkey(genpkey, renewed.public_key())
+            assert key_algorithms.key_algo_for_public_key(renewed.public_key()) == \
+                key_algorithms.key_algo_for_public_key(original.public_key())
+        finally:
+            _drop(app, row_id)
 
-    def test_renewal_of_an_off_policy_curve_is_refused(self, fips_on, genpkey):
-        from services.cert.renewal import _matching_key_generator
-        with pytest.raises(FipsRestricted):
-            _matching_key_generator(ec.generate_private_key(ec.SECP256K1()).public_key())()
+    def test_renewal_of_an_off_policy_curve_is_refused(self, app, create_ca, monkeypatch, genpkey):
+        from tests.test_renewal_alignment import _craft_row, _drop, _renew
+        ca = create_ca(cn='FIPS off-policy curve CA')
+        row_id = _craft_row(app, ca['id'], ec.generate_private_key(ec.SECP256K1()), 'fips-secp256k1.test')
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        genpkey.clear()
+        try:
+            with pytest.raises(Exception, match='(?i)secp256k1'):
+                _renew(app, row_id, rekey=True)
+            assert genpkey == []
+        finally:
+            _drop(app, row_id)
 
     def test_tls_alpn_proof_certificate(self, fips_on, genpkey):
         from utils.acme_ip import build_tls_alpn01_certificate

@@ -12,7 +12,7 @@ from flask import request, g, Response
 from auth.unified import require_auth, has_permission
 from sqlalchemy import or_
 
-from models import Certificate, CA, db
+from models import db, Certificate
 from utils.cert_status import issued_certificates
 from services.cert_service import CertificateService
 from services.cert.renewal import RenewalError, check_renewable, renew_certificate_in_place
@@ -113,13 +113,8 @@ def bulk_renew_certificates():
         return error_response('Bulk renewal keeps each certificate\'s duration; '
                               'renew a single certificate to choose one', 400)
     results = {'success': [], 'failed': []}
-    # CAs whose CRL must be regenerated once the loop finishes — every
-    # renewal records the superseded serial in revoked_serials, and that
-    # entry only reaches relying parties through a fresh CRL.
-    renewed_ca_ids = set()
-
+    # PLANB-B.3: CRL publiée une fois par CA après la boucle (SPEC, invariant 39e)
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-    actor_user_id = g.current_user.id if hasattr(g, 'current_user') else None
 
     for cert_id in ids:
         try:
@@ -127,7 +122,6 @@ def bulk_renew_certificates():
             if not cert:
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
                 continue
-
             check_renewable(cert)  # RenewalError → reported per item below
             try:
                 from api.v2.certificates.cert_renew import _approval_for_renewal
@@ -140,40 +134,13 @@ def bulk_renew_certificates():
                 results.setdefault('pending_approval', []).append(
                     {'id': cert_id, 'approval_id': approval.id, 'policy_name': policy.name})
                 continue
-            # Identical semantics to POST /<id>/renew — same shared routine,
-            # so the superseded serial, renewed_at/renewed_times, on-disk
-            # files, OCSP cache, audit entry and webhook all behave the same.
-            outcome = renew_certificate_in_place(
-                cert,
-                username=username,
-                actor_user_id=actor_user_id,
-                rekey=True,
-                # CRLs are published once per CA after the loop instead of
-                # once per certificate.
-                regenerate_crl=False,
-                trigger='bulk',
-            )
-            renewed_ca_ids.add(outcome['ca_id'])
-            results['success'].append(cert_id)
-        except RenewalError as e:
-            db.session.rollback()
-            results['failed'].append({'id': cert_id, 'error': e.message})
+            # PLANB-B.3: à implémenter selon SPEC (renouvellement de l'élément, refus de la
+            # routine rapporté par élément avec son message ; invariants 8 et 40)
+            raise NotImplementedError('PLANB-B.3: bulk renew item')
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Bulk renew failed for cert {cert_id}: {e}", exc_info=True)
+            logger.error("Bulk renewal of certificate %s failed: %s", cert_id, e, exc_info=True)
             results['failed'].append({'id': cert_id, 'error': 'Renewal failed'})
-
-    # Publish the superseded serials once per CA instead of once per cert.
-    if renewed_ca_ids:
-        from services.crl_service import CRLService
-        for ca_id in renewed_ca_ids:
-            ca = db.session.get(CA, ca_id)
-            if not ca or not ca.cdp_enabled:
-                continue
-            try:
-                CRLService.generate_crl(ca_id, username=username)
-            except Exception as e:
-                logger.warning(f"Failed to auto-generate CRL for CA {ca_id} after bulk renewal: {e}")
 
     AuditService.log_action(
         action='certificates_bulk_renewed',
@@ -208,11 +175,9 @@ def bulk_delete_certificates():
             blocker = first_blocker(certificate_deletion_blockers(cert))
             if blocker:
                 results['failed'].append({'id': cert_id, 'error': blocker.brief})
-                continue
-
             # Delegate to the service so cert/key/csr files on disk are
             # unlinked along with the DB row instead of leaving them orphaned.
-            if CertificateService.delete_certificate(cert_id=cert_id, username=username):
+            elif CertificateService.delete_certificate(cert_id=cert_id, username=username):
                 results['success'].append(cert_id)
             else:
                 results['failed'].append({'id': cert_id, 'error': 'Deletion failed'})

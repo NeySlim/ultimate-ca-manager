@@ -134,9 +134,8 @@ class TestRegistry:
             assert alg.family == 'EC' and param.name in alg.curve_names
 
     @pytest.mark.parametrize('label', LABELS)
-    def test_legacy_key_algo_is_what_renewal_writes(self, label):
-        from services.cert.renewal import _key_algo_label
-        assert _key_algo_label(ka.generate(label).public_key()) == ka.get(label).legacy_key_algo
+    def test_legacy_key_algo_is_the_spelling_of_the_public_key(self, label):
+        assert ka.key_algo_for_public_key(ka.generate(label).public_key()) == ka.get(label).legacy_key_algo
 
     @pytest.mark.parametrize('label', LABELS)
     def test_needs_digest_matches_signing_hash_for(self, label):
@@ -231,10 +230,7 @@ class TestRoomForNewFamilies:
 ])
 def test_imported_and_renewed_certificates_store_one_spelling(make_key, expected):
     # Import wrote "EdDSA" where renewal wrote "Ed25519"/"Ed448"
-    from services.cert.renewal import _key_algo_label
-    public_key = make_key().public_key()
-    assert ka.key_algo_for_public_key(public_key) == expected
-    assert _key_algo_label(public_key) == expected
+    assert ka.key_algo_for_public_key(make_key().public_key()) == expected
 
 
 def test_an_imported_ed25519_certificate_stores_ed25519(app):

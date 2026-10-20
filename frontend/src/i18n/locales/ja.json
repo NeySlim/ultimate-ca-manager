@@ -2964,13 +2964,11 @@
     "ctEmbedSct": "発行時にSCTを埋め込む（プレ証明書フロー）",
     "ctRequired": "SCTを必須にする（ログが応答しない場合は発行失敗）",
     "ctRequiredWarning": "Web・ACME・EST発行に適用されます。CTログに到達できない場合、すべての発行が失敗します。",
-    "ocspResponseValidity": "OCSP応答の有効期間（時間）",
-    "ocspResponseValidityDesc": "署名済みOCSP応答の有効期間（nextUpdate）。1〜168時間、既定は24。",
     "ocspResponderAutoRenew": "OCSP レスポンダー証明書を自動更新",
     "ocspResponderAutoRenewDesc": "毎日のタスクが、委任レスポンダー証明書を期限切れ前に同じ鍵ペアで再発行し、レスポンダーを再設定します",
     "ocspResponderRenewDays": "OCSP レスポンダー証明書を更新 (期限切れの何日前)",
     "ocspResponderRenewDaysDesc": "1〜365、既定は 30。短命のレスポンダーは、残り有効期間が 3 分の 1 になるまでに更新されます",
-    "crlAutoDeleteExpiredRevoked": "期限切れの失効証明書を自動削除",
+    "crlAutoDeleteExpiredRevoked": "",
     "crlAutoDeleteExpiredRevokedDesc": "CRL生成時に失効証明書レコード（期限切れのもののみ）を自動的に削除します。無効にすると、期限切れの失効証明書は履歴レコードとして保持されます。",
     "crlAutoPurgeStaleSerials": "古い失効シリアル番号を自動削除",
     "crlAutoPurgeStaleSerialsDesc": "CRL生成時に失効シリアル番号レコード（期限切れのもののみ）を自動的に削除します。無効にすると、古いレコードは更新履歴として保持されます。",
@@ -3105,7 +3103,9 @@
     },
     "backupKdf": "鍵導出",
     "backupKdfAuto": "自動（利用可能なら Argon2id、FIPS モードでは PBKDF2）",
-    "backupKdfHelper": "Argon2id で書き込まれたアーカイブは、FIPS モードのインスタンスでは復元できません。"
+    "backupKdfHelper": "Argon2id で書き込まれたアーカイブは、FIPS モードのインスタンスでは復元できません。",
+    "ocspResponseValidity": "OCSP応答の有効期間（時間）",
+    "ocspResponseValidityDesc": "署名済みOCSP応答の有効期間（nextUpdate）。1〜168時間、既定は24。"
   },
   "account": {
     "profile": "プロフィール",

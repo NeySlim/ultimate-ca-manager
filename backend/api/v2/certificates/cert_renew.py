@@ -3,7 +3,7 @@ import logging
 from flask import request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from models import Certificate, db
+from models import db, Certificate
 from services.audit_service import AuditService
 from services.cert.renewal import RenewalError, renew_certificate_in_place, check_renewable
 from utils import notices as notices_mod
@@ -36,13 +36,7 @@ def _approval_for_renewal(user, cert, data, validity_days=None):
 @require_auth(['write:certificates'])
 def renew_certificate(cert_id):
     """
-    Renew certificate - In-place update with old serial revocation.
-
-    The certificate row (id, refid, created_at) is preserved. The old serial
-    is recorded in revoked_serials with reason 'superseded' and
-    certificate_id pointing back to this row, so the CRL query can
-    distinguish between the current serial (good) and previous serials
-    (revoked/superseded). renewed_at is set to utc_now().
+    Renew a certificate in place (PLANB-B.3).
     """
 
     # Get original certificate
@@ -72,8 +66,8 @@ def renew_certificate(cert_id):
     # bypass). Fail closed on any error.
     try:
         check_renewable(cert)
-    except RenewalError as e:
-        return error_response(e.message, e.status, problem_type=e.problem_type)
+    except RenewalError as refusal:
+        return error_response(refusal.message, refusal.status, problem_type=refusal.problem_type)
     try:
         policy, approval = _approval_for_renewal(g.current_user, cert, data, validity_days)
     except Exception as e:
@@ -85,35 +79,9 @@ def renew_certificate(cert_id):
                                 message='Certificate renewal submitted for approval')
 
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-    actor_user_id = g.current_user.id if hasattr(g, 'current_user') else None
-
-    try:
-        # Manual renewal re-keys: UCM holds this certificate's private key and
-        # serves the new one through the export endpoints.
-        outcome = renew_certificate_in_place(
-            cert,
-            username=username,
-            actor_user_id=actor_user_id,
-            rekey=True,
-            regenerate_crl=True,
-            trigger='manual',
-            validity_days=validity_days,
-        )
-    except RenewalError as e:
-        db.session.rollback()
-        logger.info(f"Renewal refused for certificate {cert_id}: {e.message}")
-        return error_response(e.message, e.status, problem_type=e.problem_type)
-    except Exception as e:
-        db.session.rollback()
-        logger.error(f"Failed to renew certificate {cert_id}: {e}", exc_info=True)
-        return error_response('Failed to renew certificate', 500)
-
-    # A shortened duration (policy, CA expiry) is reported, not silent
-    return success_response(
-        data=cert.to_dict(),
-        message='Certificate renewed successfully',
-        meta=notices_mod.meta_with_notices(outcome.get('notices')),
-    )
+    # PLANB-B.3: à implémenter selon SPEC (appel de la routine avec rekey et CRL,
+    # erreurs de la routine et autres, réponse avec meta.notices ; invariants 32 et 40)
+    raise NotImplementedError('PLANB-B.3: renew route')
 
 
 def _renew_msca_certificate(cert):

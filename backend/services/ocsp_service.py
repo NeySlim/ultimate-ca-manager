@@ -24,12 +24,12 @@ from sqlalchemy import or_
 
 import fips_mode
 from fips_mode import FipsRestricted
-from models import db, CA, Certificate, OCSPResponse, SystemConfig, RevokedSerial
+from models import db, CA, Certificate, SystemConfig, OCSPResponse
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
 from utils.key_codec import refuse_eddsa_key
 from utils.revocation_reasons import REASON_CODES, REASON_FLAGS
-from utils.serial_format import serial_to_hex, serial_variants
+from utils.serial_format import serial_to_hex
 
 logger = logging.getLogger(__name__)
 
@@ -548,13 +548,26 @@ class OCSPService:
             return _DEFAULT_RESPONSE_VALIDITY_HOURS
 
     @staticmethod
+    def _serial_spellings(cert_serial: int):
+        # PLANB-B.6: à implémenter selon SPEC (toutes les graphies stockées du numéro, invariant 53)
+        raise NotImplementedError('PLANB-B.6: _serial_spellings')
+
+    @staticmethod
+    def _certificates_with_serial(ca: CA, variants) -> list:
+        # PLANB-B.6: à implémenter selon SPEC (certificats de la CA qui portent une de ces graphies, invariant 53)
+        raise NotImplementedError('PLANB-B.6: _certificates_with_serial')
+
+    @staticmethod
+    def _persisted_revocation(ca: CA, variants):
+        # PLANB-B.6: à implémenter selon SPEC (ligne revoked_serials de la CA pour une de ces
+        # graphies : None, sinon (date de révocation, motif CRLReason) ; invariants 24 et 53)
+        raise NotImplementedError('PLANB-B.6: _persisted_revocation')
+
+    @staticmethod
     def _status_for_serial(ca: CA, cert_serial: int):
-        variants = serial_variants(cert_serial)
+        variants = OCSPService._serial_spellings(cert_serial)
         certificate = None
-        for row in Certificate.query.filter(
-            Certificate.caref == ca.refid,
-            Certificate.serial_number.in_(variants),
-        ).all():
+        for row in OCSPService._certificates_with_serial(ca, variants):
             if _record_holds_serial(row, cert_serial) is not False:
                 certificate = row
                 break
@@ -588,14 +601,10 @@ class OCSPService:
             # Persistent revocation table: deleted certificates, and a CA
             # deleted after its revocation and imported again (its row is
             # new, the parent's record is not)
-            rs = RevokedSerial.query.filter(
-                RevokedSerial.caref == ca.refid,
-                RevokedSerial.serial_number.in_(variants),
-            ).first()
-            if rs:
-                return certificate, 'revoked', rs.revoked_at or utc_now(), _REASON_MAP.get(
-                    rs.revoke_reason, x509.ReasonFlags.unspecified
-                )
+            persisted = OCSPService._persisted_revocation(ca, variants)
+            if persisted:
+                revoked_at, reason = persisted
+                return certificate, 'revoked', revoked_at, reason
         # Externally-signed CRL uploaded for a key-less/offline CA (#302):
         # revocations decided next to the offline key exist only on that CRL,
         # so it overrides a 'good'/absent local record for this issuer.

@@ -10,7 +10,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
-from models import db, CA, Certificate, CertificateTemplate, SystemConfig, RevokedSerial
+from models import db, CA, CertificateTemplate, Certificate, SystemConfig
 from utils.validity import DEFAULT_CERTIFICATE_VALIDITY_DAYS
 from utils.key_type import issue_key_type_from_template
 from services.file_regen_service import mirror_private_key
@@ -275,7 +275,7 @@ class LifecycleMixin:
             db.session.commit()
         except Exception as _commit_err:
             db.session.rollback()
-            logger.error(f"Commit failed in services/cert/mixins/lifecycle.py: {_commit_err}", exc_info=True)
+            logger.error(f"Certificate creation not committed: {_commit_err}", exc_info=True)
             raise
 
         # Audit log
@@ -324,33 +324,11 @@ class LifecycleMixin:
         return certificate
 
     @staticmethod
-    def _restore_revocation_state(certificate, previous: dict, cert_id: int) -> None:
-        """Undo an in-memory revocation after the RevokedSerial write failed.
-
-        Restores the exact prior values (including a pre-existing
-        invalidityDate) instead of blanking the columns — a certificate that
-        was never successfully revoked must look untouched.
-        """
-        certificate.revoked = previous['revoked']
-        certificate.revoked_at = previous['revoked_at']
-        certificate.revoke_reason = previous['revoke_reason']
-        certificate.invalidity_at = previous['invalidity_at']
-        try:
-            db.session.commit()
-        except Exception as _rollback_err:
-            db.session.rollback()
-            logger.error(
-                f"Failed to roll back revocation for cert {cert_id}: {_rollback_err}",
-                exc_info=True,
-            )
-
-    @staticmethod
     def revoke_certificate(
         cert_id: int,
         reason: str = 'unspecified',
         username: str = 'system',
         invalidity_at=None,
-        _suppress_events: bool = False,
     ) -> Certificate:
         """
         Revoke a certificate
@@ -360,330 +338,24 @@ class LifecycleMixin:
             reason: Revocation reason
             username: User revoking
             invalidity_at: Optional RFC 5280 §5.3.2 invalidityDate (datetime)
-            _suppress_events: Skip audit log, webhook, CRL generation, and
-                OCSP cache invalidation. Used by the renewal flow which emits
-                a single `cert_renewed` event instead of cert_revoked +
-                cert_deleted + cert_renewed.
 
         Returns:
             Updated certificate
         """
-        certificate = db.session.get(Certificate, cert_id)
-        if not certificate:
-            raise ValueError("Certificate not found")
-
-        if certificate.revoked:
-            raise ValueError("Certificate already revoked")
-
-        # Snapshot the pre-revocation state so a failed RevokedSerial write
-        # can be undone exactly (see _restore_revocation_state).
-        previous_state = {
-            'revoked': certificate.revoked,
-            'revoked_at': certificate.revoked_at,
-            'revoke_reason': certificate.revoke_reason,
-            'invalidity_at': certificate.invalidity_at,
-        }
-
-        certificate.revoked = True
-        certificate.revoked_at = utc_now()
-        certificate.revoke_reason = reason
-        if invalidity_at is not None:
-            certificate.invalidity_at = invalidity_at
-
-        # Flush so the in-memory changes are visible to the RevokedSerial
-        # query below, but do NOT commit yet — the certificate revocation and
-        # the RevokedSerial record must be persisted atomically so a worker
-        # can never observe a revoked cert without its persistent record.
-        try:
-            db.session.flush()
-        except Exception as _flush_err:
-            db.session.rollback()
-            logger.error(
-                f"Flush failed in revoke_certificate for cert {cert_id}: {_flush_err}",
-                exc_info=True,
-            )
-            raise
-
-        # Persist a revocation record that survives certificate deletion.
-        # CRL generation and OCSP both consult this table as a fallback when
-        # the certificate row is gone (e.g. after renewal replaces the old cert).
-        # Skip for certs without a local CA (e.g. MSCA-issued) — there is no
-        # local CRL to carry the entry, and RevokedSerial.caref is NOT NULL.
-        if not certificate.caref:
-            logger.info(
-                f"Skipping RevokedSerial insert for cert {cert_id} "
-                f"(no local CA / caref is NULL)"
-            )
-        else:
-            existing_rs = RevokedSerial.query.filter_by(
-                caref=certificate.caref,
-                serial_number=certificate.serial_number,
-            ).first()
-            if existing_rs:
-                # Update the existing row so the CRL carries the latest
-                # revoked_at/reason (e.g. hold → unhold → re-revoke with a
-                # different reason). Skipping would leave the original
-                # hold date/reason on the CRL forever.
-                existing_rs.revoked_at = certificate.revoked_at
-                existing_rs.revoke_reason = certificate.revoke_reason
-                existing_rs.invalidity_at = certificate.invalidity_at
-                existing_rs.valid_to = certificate.valid_to or (utc_now() + timedelta(days=365))
-                existing_rs.certificate_id = certificate.id
-            else:
-                revoked_record = RevokedSerial(
-                    caref=certificate.caref,
-                    serial_number=certificate.serial_number,
-                    revoked_at=certificate.revoked_at,
-                    revoke_reason=certificate.revoke_reason,
-                    invalidity_at=certificate.invalidity_at,
-                    valid_to=certificate.valid_to or (utc_now() + timedelta(days=365)),
-                    certificate_id=certificate.id,
-                )
-                db.session.add(revoked_record)
-
-        # A renewal still waiting for approval is closed: a revoked
-        # certificate is not renewed (same transaction as the revocation).
-        # A hold is temporary: the request waits for the unhold (approving
-        # it meanwhile is refused, the certificate being revoked)
-        # A revocation waiting for approval is closed as approved by this one,
-        # unless it is a hold (the request then waits for the unhold)
-        closed_requests = []
-        if reason not in ('certificateHold', 'certificate_hold'):
-            from services.approval_gate import request_snapshots, resolve_moot_requests
-            closed_requests = request_snapshots(resolve_moot_requests(
-                'renewal', 'certificate_id', certificate.id, outcome='rejected',
-                username=username, reason='Certificate revoked', commit=False))
-            resolve_moot_requests(
-                'revocation', 'certificate_id', certificate.id, outcome='approved',
-                username=username, certificate_id=certificate.id,
-                reason='Revoked directly', commit=False)
-
-        # Single atomic commit — certificate revocation + RevokedSerial
-        # either both persist or both roll back.
-        try:
-            db.session.commit()
-        except Exception as _commit_err:
-            db.session.rollback()
-            LifecycleMixin._restore_revocation_state(
-                certificate, previous_state, cert_id)
-            logger.error(
-                f"Revocation failed for cert {cert_id}: unable to persist "
-                f"revocation record: {_commit_err}",
-                exc_info=True,
-            )
-            raise RuntimeError(
-                f"Revocation failed for cert {cert_id}: unable to persist "
-                f"revocation record: {_commit_err}"
-            ) from _commit_err
-
-        if certificate.caref:
-            logger.info(
-                f"RevokedSerial persisted for cert {cert_id} "
-                f"(serial={certificate.serial_number})."
-            )
-
-        if not _suppress_events:
-            # Audit log
-            from services.audit_service import AuditService
-            AuditService.log_certificate('cert_revoked', certificate, f'Revoked certificate: {certificate.descr} - Reason: {reason}')
-            from services.approval_gate import record_cancellations
-            record_cancellations()
-
-            # Auto-generate CRL if CA has CDP enabled
-            ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
-            if ca and ca.cdp_enabled:
-                from services.crl_service import CRLService
-                try:
-                    CRLService.generate_crl(ca.id, username=username)
-                except Exception as e:
-                    # Log error but don't fail revocation
-                    AuditService.log_ca('crl_auto_generation_failed', ca, f'Failed to auto-generate CRL after revocation: {str(e)}', success=False)
-
-            # RFC 6960 §2.2: revocation MUST take effect immediately for new
-            # responses, regardless of which CertID hash algorithm was requested.
-            if ca:
-                OCSPService.invalidate_cached_responses(
-                    certificate.serial_number, ca_id=ca.id)
-            # A revoked delegated responder stops signing at once, and the
-            # answers it signed so far stop being served (#347 review)
-            for responder_ca_id in OCSPService.responder_cas_for_certificate(cert_id):
-                OCSPService.invalidate_ca_cache(responder_ca_id)
-
-            from services.webhook_service import emit_cert_revoked
-            emit_cert_revoked(certificate.to_dict(), reason=reason, ca_refid=certificate.caref, actor=username)
-            from services.approval_gate import notify_rejected
-            notify_rejected(closed_requests, reason='Certificate revoked', actor=username)
-        else:
-            # Even in suppressed mode, invalidate OCSP cache so the old
-            # serial is immediately reported as revoked.
-            ca = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
-            if ca:
-                OCSPService.invalidate_cached_responses(
-                    certificate.serial_number, ca_id=ca.id)
-
-        return certificate
+        # PLANB-B.4: à implémenter selon SPEC (invariants 12 à 14, 45 à 47, contrats du §3.4)
+        raise NotImplementedError('PLANB-B.4: revoke_certificate')
 
     @staticmethod
-    def delete_certificate(cert_id: int, username: str = 'system', _suppress_events: bool = False) -> bool:
+    def delete_certificate(cert_id: int, username: str = 'system') -> bool:
         """
         Delete a certificate
 
         Args:
             cert_id: Certificate ID
             username: User deleting
-            _suppress_events: Skip audit log and webhook emit. Used by the
-                renewal flow which emits a single `cert_renewed` event.
 
         Returns:
             True if deleted
         """
-        certificate = db.session.get(Certificate, cert_id)
-        if not certificate:
-            return False
-
-        # Snapshot for the webhook payload before the row is gone
-        _cert_snapshot = certificate.to_dict()
-        _cert_caref = certificate.caref
-
-        # Clean up FK dependencies (ApprovalRequest.certificate_id has no cascade)
-        closed_sign_requests, closed_renewal_requests = [], []
-        try:
-            from models import ApprovalRequest
-            # Requests still waiting to sign or renew this record are closed
-            # (the target is gone), in the same transaction as the deletion
-            from services.approval_gate import request_snapshots, resolve_moot_requests
-            closed_sign_requests = request_snapshots(resolve_moot_requests(
-                'csr', 'csr_id', cert_id, outcome='rejected', username=username,
-                reason='Request deleted', commit=False))
-            closed_renewal_requests = request_snapshots(resolve_moot_requests(
-                'renewal', 'certificate_id', cert_id, outcome='rejected',
-                username=username, reason='Certificate deleted', commit=False))
-            closed_renewal_requests += request_snapshots(resolve_moot_requests(
-                'revocation', 'certificate_id', cert_id, outcome='rejected',
-                username=username, reason='Certificate deleted', commit=False))
-            ApprovalRequest.query.filter_by(certificate_id=cert_id).delete()
-        except Exception as e:
-            logger.error(f"Failed to clean approval requests for cert {cert_id}: {e}")
-            db.session.rollback()
-            return False
-
-        # Deploy bindings (#299): remove the cert's bindings and their delivery
-        # history — DeployBinding.certificate_id is a real FK with no cascade.
-        try:
-            from models import DeployBinding, DeployDelivery
-            binding_ids = [b.id for b in DeployBinding.query.filter_by(certificate_id=cert_id)]
-            if binding_ids:
-                DeployDelivery.query.filter(
-                    DeployDelivery.binding_type == DeployDelivery.BINDING_CERTIFICATE,
-                    DeployDelivery.binding_id.in_(binding_ids)).delete(synchronize_session=False)
-                DeployBinding.query.filter(
-                    DeployBinding.id.in_(binding_ids)).delete(synchronize_session=False)
-        except Exception as e:
-            logger.error(f"Failed to clean deploy bindings for cert {cert_id}: {e}")
-            db.session.rollback()
-            return False
-
-        # Null out the certificate_id FK on RevokedSerial rows so the CRL/OCSP
-        # query treats them as orphaned (the cert row is about to be deleted,
-        # but the revocation data must persist).
-        try:
-            RevokedSerial.query.filter_by(certificate_id=cert_id).update(
-                {RevokedSerial.certificate_id: None}
-            )
-        except Exception as e:
-            logger.warning(f"Failed to null out RevokedSerial.certificate_id for cert {cert_id}: {e}")
-
-        # Detach ACME order FKs (AcmeClientOrder.certificate_id,
-        # AcmeClientOrder.source_certificate_id, AcmeOrder.certificate_id)
-        # — these are real FKs to certificates.id with no cascade. Without
-        # detaching, PostgreSQL raises IntegrityError on delete; SQLite leaves
-        # dangling references.
-        try:
-            from models.acme_models import AcmeClientOrder, AcmeOrder
-            AcmeClientOrder.query.filter_by(certificate_id=cert_id).update(
-                {AcmeClientOrder.certificate_id: None}
-            )
-            AcmeClientOrder.query.filter_by(source_certificate_id=cert_id).update(
-                {AcmeClientOrder.source_certificate_id: None}
-            )
-            AcmeOrder.query.filter_by(certificate_id=cert_id).update(
-                {AcmeOrder.certificate_id: None}
-            )
-        except Exception as e:
-            logger.warning(f"Failed to detach ACME order FKs for cert {cert_id}: {e}")
-
-        # Delete files (cleanup old UUID names first, then new names)
-        cleanup_old_files(certificate=certificate)
-        cert_path = cert_cert_path(certificate)
-        csr_path = cert_csr_path(certificate)
-        key_path = cert_key_path(certificate)
-
-        for path in [cert_path, csr_path, key_path]:
-            if path.exists():
-                path.unlink()
-
-        # A responder binding must not outlive its certificate: the next
-        # certificate to reuse the id would become the responder unseen
-        # (self-review of #347)
-        from services.ocsp_service import OCSPService
-        for bound_ca_id in OCSPService.responder_cas_for_certificate(cert_id):
-            SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{bound_ca_id}').delete()
-            OCSPService.invalidate_ca_cache(bound_ca_id)
-
-        # Delete from database
-        try:
-            db.session.delete(certificate)
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to delete certificate {cert_id}: {e}")
-            # The row is still there and its files are not: the unlinks above
-            # are already done and the rollback cannot undo them. Recording
-            # the failure is the only thing left that says so. Safe to write
-            # here because the rollback has already emptied the session, so
-            # this commit carries nothing but the entry.
-            if not _suppress_events:
-                from services.audit_service import AuditService
-                AuditService.log_action(
-                    action='cert_deleted',
-                    resource_type='certificate',
-                    resource_id=_cert_snapshot.get('id'),
-                    resource_name=(_cert_snapshot.get('descr')
-                                   or _cert_snapshot.get('subject')
-                                   or f"Cert #{_cert_snapshot.get('id')}"),
-                    details=('Failed to delete certificate; its files on '
-                             'disk were already removed'),
-                    success=False)
-            return False
-
-        if not _suppress_events:
-            # After the commit: this call commits the session and rolls it
-            # back on failure, which used to re-attach the foreign keys after
-            # the files were gone. Read from the snapshot, not the object.
-            name = (_cert_snapshot.get('descr')
-                    or _cert_snapshot.get('subject')
-                    or f"Cert #{_cert_snapshot.get('id')}")
-            # No `username=` here, and not by omission. `log_certificate`
-            # never passed one either, so the entry was named after
-            # `g.current_user`. Two internal callers hand this function a
-            # fixed name -- `username='system'` from the expired-revoked
-            # purge, `username='acme_proxy'` from the proxy -- and the purge
-            # runs inside an operator's request, from `generate_crl`. Passing
-            # it through would put `system` in the ledger where the person who
-            # pressed the button used to be.
-            from services.audit_service import AuditService
-            AuditService.log_action(
-                action='cert_deleted',
-                resource_type='certificate',
-                resource_id=_cert_snapshot.get('id'),
-                resource_name=name,
-                details=f'Deleted certificate: {name}',
-                success=True)
-
-            from services.webhook_service import emit_cert_deleted
-            emit_cert_deleted(_cert_snapshot, ca_refid=_cert_caref, actor=username)
-            from services.approval_gate import notify_rejected
-            notify_rejected(closed_sign_requests, reason='Request deleted', actor=username)
-            notify_rejected(closed_renewal_requests, reason='Certificate deleted', actor=username)
-
-        return True
+        # PLANB-B.4: à implémenter selon SPEC (invariants 15 à 17, 48 à 51, contrats du §3.4)
+        raise NotImplementedError('PLANB-B.4: delete_certificate')

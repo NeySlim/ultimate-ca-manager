@@ -1,49 +1,23 @@
 """
 Certificate Auto-Renewal Service
 Automatically renews certificates before they expire.
-
-Renewal itself is delegated to ``services.cert.renewal.renew_certificate_in_place``
-— the exact routine behind ``POST /api/v2/certificates/<id>/renew`` and
-``POST /api/v2/certificates/bulk/renew``. Auto-renewed certificates therefore
-get the same treatment as manually renewed ones: the superseded serial is
-recorded in ``revoked_serials`` (reason ``superseded``) so it stays on the CRL
-and answers ``revoked`` over OCSP, the row is updated in place (``id``,
-``refid`` and ``created_at`` preserved, ``renewed_at`` / ``renewed_times``
-maintained), and the same audit entry and ``cert_renewed`` webhook fire.
-
 Only certificates whose private key the server holds are candidates: a
 certificate enrolled through SCEP, EST, WSTEP or ACME keeps its key on the
 device, which renews through its protocol, and a certificate re-signed here
 could never reach it. Auto-renewal does not re-key: the existing key pair is
 re-signed, so exports made from the previous certificate keep working.
 """
-import json
-from datetime import timedelta
+import datetime
 from models import db, Certificate, CA, SystemConfig, AuditLog
 from services.cert.renewal import RenewalError, SERIAL_UNSET, renew_certificate_in_place
+import json
 import logging
 from utils.datetime_utils import to_naive_utc, utc_now
 
 logger = logging.getLogger(__name__)
 
-# Actor recorded in the audit trail / webhooks for unattended renewals.
-AUTO_RENEWAL_ACTOR = 'auto-renewal'
-
-
-def _safe_json_loads(raw, default):
-    """Parse a JSON config string, returning *default* on malformed input.
-
-    SystemConfig values are admin-set free-text strings; a stray edit or
-    manual DB write can produce invalid JSON that would otherwise kill the
-    auto-renewal scheduler with an unhandled ``ValueError``.
-    """
-    try:
-        return json.loads(raw)
-    except (TypeError, ValueError, json.JSONDecodeError):
-        logger.warning("Malformed JSON config value %r, using default %r", raw, default)
-        return default
-
-
+# PLANB-B.5: nom d'acteur des renouvellements planifiés, à définir selon SPEC (invariant 41)
+AUTO_RENEWAL_ACTOR = None
 class AutoRenewalService:
     """Service for automatic certificate renewal"""
 
@@ -71,23 +45,9 @@ class AutoRenewalService:
 
         sources = SystemConfig.query.filter_by(key='auto_renewal_sources').first()
         if sources:
-            parsed = _safe_json_loads(sources.value, config['renewal_sources'])
-            if not isinstance(parsed, list):
-                logger.warning(
-                    "auto_renewal_sources is not a JSON list (%r), using default",
-                    sources.value,
-                )
-            else:
-                config['renewal_sources'] = parsed
-
-        notify_renewal = SystemConfig.query.filter_by(key='auto_renewal_notify_on_renewal').first()
-        if notify_renewal:
-            config['notify_on_renewal'] = notify_renewal.value == 'true'
-
-        notify_failure = SystemConfig.query.filter_by(key='auto_renewal_notify_on_failure').first()
-        if notify_failure:
-            config['notify_on_failure'] = notify_failure.value == 'true'
-
+            # PLANB-B.5: valeur invalide ou qui n'est pas une liste (SPEC, invariant 44)
+            config['renewal_sources'] = json.loads(sources.value)
+        # PLANB-B.5: lecture des deux drapeaux de notification (SPEC, invariant 44)
         return config
 
     @staticmethod
@@ -98,7 +58,8 @@ class AutoRenewalService:
                    'days_before_expiry': 'auto_renewal_days'}
         for key, value in config.items():
             db_key = db_keys.get(key, f'auto_renewal_{key}')
-            if key in ('enabled', 'notify_on_renewal', 'notify_on_failure'):
+            # PLANB-B.5: drapeaux de notification écrits comme 'enabled' (SPEC, invariant 44)
+            if key == 'enabled':
                 db_value = 'true' if value else 'false'
             elif key == 'renewal_sources':
                 db_value = json.dumps(value)
@@ -115,7 +76,7 @@ class AutoRenewalService:
             db.session.commit()
         except Exception as _commit_err:
             db.session.rollback()
-            logger.error(f"Commit failed in services/auto_renewal_service.py:109: {_commit_err}", exc_info=True)
+            logger.error(f"Auto-renewal settings not saved: {_commit_err}", exc_info=True)
             raise
 
     @staticmethod
@@ -125,7 +86,7 @@ class AutoRenewalService:
         if not config['enabled']:
             return []
 
-        threshold = utc_now() + timedelta(days=config['days_before_expiry'])
+        threshold = utc_now() + datetime.timedelta(days=config['days_before_expiry'])
 
         # NOTE: Certificate has no `status` column — `revoked` boolean + `archived` instead.
         # Expiry uses `valid_to`, not `not_after`.
@@ -157,7 +118,7 @@ class AutoRenewalService:
             (Certificate.archived.is_(False)) | (Certificate.archived.is_(None)),
             Certificate.crt.isnot(None),
             Certificate.valid_to.isnot(None),
-            Certificate.valid_to <= now + timedelta(days=config['days_before_expiry']),
+            Certificate.valid_to <= now + datetime.timedelta(days=config['days_before_expiry']),
             Certificate.valid_to >= now,
         ).all()
         waiting = {'not_yet_due': 0, 'no_private_key': 0, 'source_excluded': 0}
@@ -175,87 +136,22 @@ class AutoRenewalService:
         """Never before the last third of the lifetime, as ARI and the OCSP
         responder do: otherwise a certificate about as long as the window is
         re-signed on every pass from the day it is issued."""
-        window = timedelta(days=days_before_expiry)
+        window = datetime.timedelta(days=days_before_expiry)
         if cert.valid_from is not None:
             lifetime = to_naive_utc(cert.valid_to) - to_naive_utc(cert.valid_from)
-            if lifetime > timedelta(0):
+            if lifetime > datetime.timedelta(0):
                 window = min(window, lifetime / 3)
         return to_naive_utc(cert.valid_to) <= to_naive_utc(utc_now()) + window
 
-    @staticmethod
+    @staticmethod  # PLANB-B.5: à implémenter selon SPEC (invariant 41)
     def renew_certificate(cert: Certificate, regenerate_crl: bool = True, known_serial=SERIAL_UNSET) -> tuple:
-        """
-        Renew a single certificate in place.
+        """Renew one certificate in place for the scheduler."""
+        raise NotImplementedError('PLANB-B.5: renew_certificate')
 
-        Uses the same routine as manual and bulk renewal, so the superseded
-        serial lands in `revoked_serials` and the certificate keeps its id,
-        refid and created_at.
-
-        Args:
-            cert: the certificate to renew.
-            regenerate_crl: publish a fresh CRL immediately. `run_auto_renewal`
-                passes False and regenerates once per CA after the batch.
-            known_serial: the serial the batch listed the certificate with;
-                a certificate renewed by someone else meanwhile is refused.
-
-        Returns:
-            (success, cert_id or message): success is True, False for a
-            failure worth reporting, None when there was nothing to renew
-            (the row went away between the batch's read and the lock).
-        """
-        # Identity kept aside: after a refused renewal the session is rolled
-        # back and the instance expired; the row may be gone (deleted
-        # meanwhile), and reading it again would raise
-        cert_id, common_name = cert.id, cert.common_name
-        try:
-            renew_certificate_in_place(
-                cert,
-                username=AUTO_RENEWAL_ACTOR,
-                # The held key pair is re-signed, not replaced (module docstring)
-                rekey=False,
-                regenerate_crl=regenerate_crl,
-                trigger='auto',
-                known_serial=known_serial,
-            )
-            return True, cert_id
-
-        except RenewalError as e:
-            db.session.rollback()
-            if db.session.get(Certificate, cert_id, populate_existing=True) is None:
-                # Gone between the batch's read and the renewal's lock:
-                # nothing to renew, nothing to report as a failure (any
-                # other refusal, a missing issuing CA included, is one)
-                logger.info(f"Auto-renewal skipped cert {cert_id}: {e.message}")
-                return None, e.message
-            logger.warning(f"Auto-renewal refused for cert {cert_id}: {e.message}")
-            AutoRenewalService._log_failure(cert_id, common_name, e.message)
-            return False, e.message
-
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Auto-renewal failed for cert {cert_id}: {e}", exc_info=True)
-            AutoRenewalService._log_failure(cert_id, common_name, str(e))
-            return False, "Renewal failed"
-
-    @staticmethod
+    @staticmethod  # PLANB-B.5: à implémenter selon SPEC (invariant 42)
     def _log_failure(cert_id, common_name, reason: str):
-        """Surface a renewal failure in the audit trail.
-
-        A silently-swallowed failure means the certificate expires without
-        warning, so this is best-effort but never allowed to raise.
-        """
-        try:
-            from services.audit.staging import stage_audit_entry
-            stage_audit_entry(
-                action='certificate.auto_renewal_failed',
-                resource_type='certificate',
-                resource_id=cert_id,
-                resource_name=common_name,
-                details=f'Auto-renewal failed: {reason}',
-            )
-            db.session.commit()
-        except Exception:
-            db.session.rollback()
+        """Audit entry for a failed scheduled renewal."""
+        raise NotImplementedError('PLANB-B.5: _log_failure')
 
     @staticmethod
     def _declined(cert) -> bool:
@@ -318,9 +214,7 @@ class AutoRenewalService:
         # otherwise come back as not yet due
         stats = {'renewed': 0, 'failed': 0, 'skipped': 0, 'queued': 0, 'errors': [],
                  'waiting': AutoRenewalService.waiting_certificates(config)}
-        # CRLs are published once per CA after the batch — every renewal adds a
-        # superseded serial that only reaches relying parties through a CRL.
-        renewed_carefs = set()
+        renewed_carefs = set()  # PLANB-B.5: CA dont la CRL est publiée après le lot (invariant 43)
 
         # A renewal an operator queued for approval is a human decision the
         # scheduler does not pre-empt, as long as that decision (or the
@@ -339,7 +233,6 @@ class AutoRenewalService:
                 logger.info(f"Auto-renewal skipped cert {cert_id}: deleted meanwhile")
                 stats['skipped'] += 1
                 continue
-            # Skip already-archived (superseded by a pre-in-place-renewal run)
             if cert.archived:
                 stats['skipped'] += 1
                 continue
@@ -372,9 +265,7 @@ class AutoRenewalService:
                 stats['queued'] += 1
                 continue
 
-            success, result = AutoRenewalService.renew_certificate(
-                cert, regenerate_crl=False, known_serial=listed_serial
-            )
+            success, result = AutoRenewalService.renew_certificate(cert, regenerate_crl=False, known_serial=listed_serial)
 
             if success:
                 stats['renewed'] += 1
@@ -393,8 +284,7 @@ class AutoRenewalService:
                     'error': result
                 })
 
-        AutoRenewalService._publish_crls(renewed_carefs)
-
+        AutoRenewalService._publish_crls(carefs=renewed_carefs)
         logger.info(f"Auto-renewal complete: {stats['renewed']} renewed, {stats['failed']} failed")
 
         # Send notifications if configured
@@ -406,23 +296,9 @@ class AutoRenewalService:
 
         return stats
 
-    @staticmethod
-    def _publish_crls(carefs):
-        """Regenerate the CRL once per CDP-enabled CA touched by the batch."""
-        if not carefs:
-            return
-        from services.crl_service import CRLService
-        for caref in carefs:
-            ca = CA.query.filter_by(refid=caref).first()
-            if not ca or not ca.cdp_enabled:
-                continue
-            try:
-                CRLService.generate_crl(ca.id, username=AUTO_RENEWAL_ACTOR)
-            except Exception as e:
-                logger.warning(
-                    f"Failed to auto-generate CRL for CA {ca.id} after auto-renewal: {e}"
-                )
-
+    @staticmethod  # PLANB-B.5: à implémenter selon SPEC (invariant 43)
+    def _publish_crls(carefs) -> None:
+        raise NotImplementedError('PLANB-B.5: _publish_crls')
     @staticmethod
     def _send_renewal_notification(stats: dict):
         """Send notification about successful renewals"""
@@ -432,13 +308,8 @@ class AutoRenewalService:
         if not recipients:
             return
 
-        emails = _safe_json_loads(recipients.value, [])
-        if not isinstance(emails, list):
-            logger.warning(
-                "auto_renewal_notify_emails is not a JSON list (%r), skipping notifications",
-                recipients.value,
-            )
-            return
+        # PLANB-B.5: valeur invalide ou qui n'est pas une liste (SPEC, invariant 44)
+        emails = json.loads(recipients.value)
 
         for email in emails:
             try:
@@ -460,13 +331,8 @@ class AutoRenewalService:
         if not recipients:
             return
 
-        emails = _safe_json_loads(recipients.value, [])
-        if not isinstance(emails, list):
-            logger.warning(
-                "auto_renewal_notify_emails is not a JSON list (%r), skipping failure notifications",
-                recipients.value,
-            )
-            return
+        # PLANB-B.5: valeur invalide ou qui n'est pas une liste (SPEC, invariant 44)
+        emails = json.loads(recipients.value)
 
         error_list = '\n'.join([
             f"- {e['common_name']} (ID: {e['cert_id']}): {e['error']}"

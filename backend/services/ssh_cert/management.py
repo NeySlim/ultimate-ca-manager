@@ -38,12 +38,7 @@ class SSHCertificateManagementMixin:
         if not cert:
             raise ValueError(f"SSH certificate not found: {cert_id}")
 
-        if not cert.revoked and cert.valid_to > utc_now():
-            raise ValueError(
-                "Cannot delete a valid, non-revoked SSH certificate. "
-                "Revoke it first."
-            )
-
+        # PLANB-B.7: garde de suppression d'un certificat SSH valide (SPEC, invariant 15)
         cert_name = cert.key_id
         try:
             db.session.delete(cert)

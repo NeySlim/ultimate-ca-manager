@@ -761,35 +761,16 @@ class TestDeleteSSHCertificate:
         })
         cert = assert_success(r, status=201)
 
-        # Revoke first — a valid, non-revoked cert cannot be deleted.
-        r = post_json(auth_client, f'/api/v2/ssh/certificates/{cert["id"]}/revoke', {
-            'reason': 'unspecified',
-        })
-        assert_success(r)
-
+        # A valid certificate cannot be deleted: it is revoked first
+        revoked = post_json(auth_client, f'/api/v2/ssh/certificates/{cert["id"]}/revoke',
+                            {'reason': 'unspecified'})
+        assert_success(revoked)
         r = auth_client.delete(f'/api/v2/ssh/certificates/{cert["id"]}')
         assert r.status_code == 204
 
         # Verify gone
         r = auth_client.get(f'/api/v2/ssh/certificates/{cert["id"]}')
         assert_error(r, 404)
-
-    def test_delete_valid_certificate_blocked(self, auth_client):
-        """A valid, non-revoked certificate must not be deletable (409)."""
-        ca = _create_ssh_ca(auth_client, descr='Block Delete CA')
-        pub_key = _generate_test_ssh_key()
-        r = post_json(auth_client, '/api/v2/ssh/certificates', {
-            'ca_id': ca['id'], 'public_key': pub_key,
-            'cert_type': 'user', 'principals': ['blockdel'],
-        })
-        cert = assert_success(r, status=201)
-
-        r = auth_client.delete(f'/api/v2/ssh/certificates/{cert["id"]}')
-        assert_error(r, 409)
-
-        # Cert should still exist
-        r = auth_client.get(f'/api/v2/ssh/certificates/{cert["id"]}')
-        assert_success(r)
 
     def test_delete_certificate_not_found(self, auth_client):
         r = auth_client.delete('/api/v2/ssh/certificates/999999')
