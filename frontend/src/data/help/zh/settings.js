@@ -79,7 +79,7 @@ export default {
           { label: '通用', text: '实例名称、主机名和全系统默认值' },
           { label: '外观', text: '主题选择（亮色/暗色/系统）、强调色、桌面模式' },
           { label: '电子邮件 (SMTP)', text: 'SMTP 服务器、凭据、邮件模板编辑器和到期提醒通知。除传统密码认证外，还支持 Gmail、Outlook.com 和 Microsoft 365 的 OAuth2 (XOAUTH2)' },
-          { label: '安全', text: '密码策略、会话超时、频率限制、IP 限制' },
+          { label: '安全', text: '密码策略、会话超时、频率限制、管理访问允许列表' },
           { label: 'SSO', text: 'SAML 2.0、OAuth2/OIDC 和 LDAP 单点登录集成' },
           { label: '备份', text: '手动和计划的数据库备份' },
           { label: '审计', text: '日志保留、syslog 转发、完整性验证' },
@@ -224,8 +224,8 @@ export default {
 - 每 IP 的登录尝试限制
 - 超过限制后的封锁时长
 
-### IP 限制
-允许或拒绝来自特定 IP 地址或 CIDR 范围的访问。
+### 管理访问允许列表
+将 Web 界面和管理 API 限制为列出的 IP 地址和 CIDR 网络；PKI 协议仍可从任何地方访问。参见安全设置指南。
 
 ### 2FA 强制
 要求所有用户启用双因素认证。
@@ -235,7 +235,7 @@ export default {
 
 > 💡 安全敏感设置（会话、锁定、HSTS、公共 URL、密码策略）需要 **admin:settings** 权限,, 这些字段对操作员锁定。
 
-> ⚠ 应用 IP 限制前请仔细测试。不正确的规则可能会锁定所有用户。
+> ⚠ 不包含您自身地址的列表会被拒绝。如果仍然失去访问权限，请设置 \`UCM_ADMIN_ALLOWLIST_DISABLE=1\` 并重启 UCM。
 
 ## SSO（单点登录）
 

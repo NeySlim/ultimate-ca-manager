@@ -79,7 +79,7 @@ export default {
           { label: 'Allgemein', text: 'Instanzname, Hostname und systemweite Standardwerte' },
           { label: 'Darstellung', text: 'Theme-Auswahl (hell/dunkel/System), Akzentfarbe, Desktop-Modus' },
           { label: 'E-Mail (SMTP)', text: 'SMTP-Server, Anmeldedaten, E-Mail-Template-Editor und Ablauf-Warnbenachrichtigungen' },
-          { label: 'Sicherheit', text: 'Passwortrichtlinien, Sitzungszeitlimit, Ratenbegrenzung, IP-Einschränkungen' },
+          { label: 'Sicherheit', text: 'Passwortrichtlinien, Sitzungszeitlimit, Ratenbegrenzung, Admin-Zugriffs-Allowlist' },
           { label: 'SSO', text: 'SAML 2.0, OAuth2/OIDC und LDAP Single-Sign-On-Integration' },
           { label: 'Sicherung', text: 'Manuelle und geplante Datenbanksicherungen' },
           { label: 'Audit', text: 'Protokollaufbewahrung, Syslog-Weiterleitung, Integritätsüberprüfung' },
@@ -224,8 +224,8 @@ Wenn SMTP konfiguriert ist, aktivieren Sie automatische Zertifikatsablaufwarnung
 - Anmeldeversuchslimit pro IP
 - Sperrdauer nach Überschreitung des Limits
 
-### IP-Einschränkungen
-Zugriff von bestimmten IP-Adressen oder CIDR-Bereichen erlauben oder verweigern.
+### Admin-Zugriffs-Allowlist
+Beschränkt die Weboberfläche und die Management-API auf aufgelistete IP-Adressen und CIDR-Netzwerke; PKI-Protokolle bleiben von überall erreichbar. Siehe die Anleitung zu den Sicherheitseinstellungen.
 
 ### 2FA-Durchsetzung
 Alle Benutzer zur Aktivierung der Zwei-Faktor-Authentifizierung verpflichten.
@@ -235,7 +235,7 @@ Alle in der Datenbank gespeicherten privaten Schlüssel mit AES-256 verschlüsse
 
 > 💡 Sicherheitskritische Einstellungen (Sitzung, Sperrung, HSTS, öffentliche URL, Passwortrichtlinie) erfordern die Berechtigung **admin:settings**: die Felder sind für Operatoren gesperrt.
 
-> ⚠ Testen Sie IP-Einschränkungen sorgfältig vor der Anwendung. Falsche Regeln können alle Benutzer aussperren.
+> ⚠ Eine Liste, die Ihre eigene Adresse nicht enthält, wird abgelehnt. Wenn Sie trotzdem den Zugriff verlieren, setzen Sie \`UCM_ADMIN_ALLOWLIST_DISABLE=1\` und starten Sie UCM neu.
 
 ## SSO (Single Sign-On)
 

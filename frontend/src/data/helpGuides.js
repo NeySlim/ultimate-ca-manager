@@ -1889,8 +1889,8 @@ When SMTP is configured, enable automatic certificate expiry alerts:
 - Login attempt limit per IP
 - Lockout duration after exceeding the limit
 
-### IP Restrictions
-Allow or deny access from specific IP addresses or CIDR ranges.
+### Admin Access Allowlist
+Limit the web interface and the management API to listed IP addresses and CIDR networks; PKI protocols stay reachable from anywhere. See the Security Settings guide.
 
 ### 2FA Enforcement
 Require all users to enable two-factor authentication.
@@ -1900,7 +1900,7 @@ Encrypt all private keys stored in the database with AES-256, protected by a mas
 
 > 💡 Security-sensitive settings (session, lockout, HSTS, public URL, password policy) require the **admin:settings** permission, the fields are locked for operators.
 
-> ⚠ Test IP restrictions carefully before applying them. Incorrect rules can lock out all users.
+> ⚠ A list that does not include your own address is refused. If you lose access anyway, set \`UCM_ADMIN_ALLOWLIST_DISABLE=1\` and restart UCM.
 
 ## SSO (Single Sign-On)
 
@@ -2667,7 +2667,7 @@ How long an IP is blocked after exceeding the login attempt limit.
 
 ## Admin Access Allowlist
 
-Limit the web interface and the management API to a list of IP addresses and CIDR networks, IPv4 or IPv6, one per line (up to 100). An empty list restricts nothing.
+Limit the web interface and the management API to a list of IP addresses and CIDR networks, IPv4 or IPv6, one per line (up to 100). An empty list restricts nothing. IPv4 and IPv6 are listed separately: \`0.0.0.0/0\` does not admit an IPv6 client, and \`::/0\` does not admit an IPv4 client.
 
 - **Blocked from other addresses**: the web interface and its assets, the login, every \`/api/v2\` call (API keys included) and the WebSocket channel answer **403**
 - **Always reachable**: ACME and the ACME proxy, SCEP, EST, OCSP, CRL and AIA, TSA, XCEP/WSTEP, the SSH setup script, and the health and metrics endpoints, so devices and probes keep working

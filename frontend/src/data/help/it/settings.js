@@ -79,7 +79,7 @@ export default {
           { label: 'Generale', text: 'Nome dell\'istanza, hostname e impostazioni predefinite di sistema' },
           { label: 'Aspetto', text: 'Selezione tema (chiaro/scuro/sistema), colore principale, modalità desktop' },
           { label: 'Email (SMTP)', text: 'Server SMTP, credenziali, editor template email e notifiche avvisi scadenza' },
-          { label: 'Sicurezza', text: 'Politiche password, timeout sessione, limitazione frequenza, restrizioni IP' },
+          { label: 'Sicurezza', text: 'Politiche password, timeout sessione, limitazione frequenza, lista di accesso amministrativo' },
           { label: 'SSO', text: 'Integrazione single sign-on SAML 2.0, OAuth2/OIDC e LDAP' },
           { label: 'Backup', text: 'Backup del database manuali e pianificati' },
           { label: 'Audit', text: 'Conservazione log, inoltro syslog, verifica dell\'integrità' },
@@ -224,8 +224,8 @@ Quando SMTP è configurato, abilita gli avvisi automatici di scadenza certificat
 - Limite tentativi di accesso per IP
 - Durata del blocco dopo il superamento del limite
 
-### Restrizioni IP
-Consenti o nega l'accesso da indirizzi IP o intervalli CIDR specifici.
+### Lista di accesso amministrativo
+Limita l'interfaccia web e l'API di gestione agli indirizzi IP e alle reti CIDR elencati; i protocolli PKI restano raggiungibili da ovunque. Vedi la guida Impostazioni di sicurezza.
 
 ### Imposizione 2FA
 Richiedi a tutti gli utenti di abilitare l'autenticazione a due fattori.
@@ -235,7 +235,7 @@ Cifra tutte le chiavi private memorizzate nel database con AES-256, protette da 
 
 > 💡 Le impostazioni sensibili alla sicurezza (sessione, blocco, HSTS, URL pubblico, politica password) richiedono il permesso **admin:settings**: i campi sono bloccati per gli operatori.
 
-> ⚠ Testa attentamente le restrizioni IP prima di applicarle. Regole errate possono bloccare tutti gli utenti.
+> ⚠ Un elenco che non include il tuo indirizzo viene rifiutato. Se perdi comunque l'accesso, imposta \`UCM_ADMIN_ALLOWLIST_DISABLE=1\` e riavvia UCM.
 
 ## SSO (Single Sign-On)
 

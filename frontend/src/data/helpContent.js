@@ -985,7 +985,7 @@ export const helpContent = {
           { label: 'General', text: 'Instance name, hostname, and system-wide defaults' },
           { label: 'Appearance', text: 'Theme selection (light/dark/system), accent color, desktop mode' },
           { label: 'Email (SMTP)', text: 'SMTP server, credentials, email template editor, and expiry alert notifications. Supports OAuth2 (XOAUTH2) for Gmail, Outlook.com & Microsoft 365 in addition to legacy password auth' },
-          { label: 'Security', text: 'Password policies, session timeout, rate limiting, IP restrictions' },
+          { label: 'Security', text: 'Password policies, session timeout, rate limiting, admin access allowlist' },
           { label: 'SSO', text: 'SAML 2.0, OAuth2/OIDC, and LDAP single sign-on integration' },
           { label: 'Backup', text: 'Manual and scheduled database backups' },
           { label: 'Audit', text: 'Log retention, syslog forwarding, integrity verification' },
@@ -1401,7 +1401,7 @@ export const helpContent = {
         title: 'Admin Access Allowlist',
         icon: Globe,
         items: [
-          { label: 'Networks', text: 'One IPv4 or IPv6 address or CIDR network per line, up to 100. Empty means no restriction' },
+          { label: 'Networks', text: 'One IPv4 or IPv6 address or CIDR network per line, up to 100. Empty means no restriction. IPv4 and IPv6 are listed separately: 0.0.0.0/0 does not admit an IPv6 client, nor ::/0 an IPv4 client' },
           { label: 'What is blocked', text: 'From other addresses: the web interface, the login, the /api/v2 API (API keys included) and the WebSocket channel answer 403' },
           { label: 'Always reachable', text: 'ACME, SCEP, EST, OCSP, CRL/AIA, TSA, XCEP/WSTEP, the SSH setup script and the health endpoints' },
           { label: 'Your address', text: 'The section shows the address the server sees for you; a list that does not include it is refused' },

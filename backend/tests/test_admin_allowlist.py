@@ -105,7 +105,6 @@ PROTOCOL_PATHS = [
     '/api/v2/health',
     '/api/v2/health/ready',
     '/metrics',
-    '/api/v2/auth/verify',
 ]
 
 
@@ -249,3 +248,90 @@ def test_socket_gate_resolves_the_client_behind_a_trusted_proxy(app):
     # Forwarded headers from a peer outside UCM_TRUSTED_PROXIES are ignored.
     assert _socket_gate_call(app, 1, '198.51.100.7', INSIDE).status_code == 403
     assert _socket_gate_call(app, 0, '127.0.0.1', INSIDE).status_code == 403
+
+
+def test_verify_is_refused_from_outside_without_a_proxy(app, client):
+    _store(app, '10.0.0.0/8')
+    assert _refused(_get(client, '/api/v2/auth/verify', OUTSIDE))
+    assert _refused(_get(client, '/api/auth/verify', OUTSIDE))
+
+
+def test_verify_passes_for_a_trusted_proxy_subrequest(app, client, monkeypatch):
+    _store(app, '10.0.0.0/8')
+    monkeypatch.setenv('UCM_TRUSTED_PROXIES', '198.51.100.1')
+    assert not _refused(_get(client, '/api/v2/auth/verify', '198.51.100.1'))
+    assert _refused(_get(client, '/api/v2/auth/verify', '198.51.100.2'))
+
+
+def test_double_slash_api_path_is_refused_as_json(app, client):
+    # Werkzeug already folds the leading slashes of request.path.
+    _store(app, '10.0.0.0/8')
+    r = client.get('/', environ_overrides={'PATH_INFO': '//api/v2/certificates'},
+                   environ_base={'REMOTE_ADDR': OUTSIDE})
+    assert _refused(r)
+    assert r.get_json()['status'] == 403
+
+
+def test_disable_switch_also_lifts_the_lockout_guard(app, auth_client, monkeypatch):
+    monkeypatch.setenv(admin_allowlist.ENV_DISABLE, '1')
+    r = _patch(auth_client, ['192.0.2.0/24'], INSIDE)
+    assert r.status_code == 200, r.data
+    assert _stored(app) == '192.0.2.0/24'
+
+
+BACKUP_PASSWORD = 'Correct-Horse-Battery-9'
+
+
+def _backup_of_configuration(app):
+    from services.backup import manifest
+    from services.backup_service import BackupService
+    with app.app_context():
+        return BackupService().create_backup(
+            BACKUP_PASSWORD,
+            include={name: name == 'configuration' for name in manifest.SECTIONS})
+
+
+def _restore(app, blob, addr=None):
+    from services.backup_service import BackupService
+    if addr is None:
+        with app.app_context():
+            BackupService().restore_backup(blob, BACKUP_PASSWORD, mode='merge')
+        return
+    with app.test_request_context('/', environ_base={'REMOTE_ADDR': addr}):
+        BackupService().restore_backup(blob, BACKUP_PASSWORD, mode='merge')
+
+
+def test_restore_clears_a_list_that_would_lock_the_restorer_out(app, client):
+    _store(app, '10.0.0.0/8')
+    blob = _backup_of_configuration(app)
+    assert _refused(_get(client, '/', OUTSIDE))  # the list is cached now
+
+    _restore(app, blob, OUTSIDE)
+    assert _stored(app) == ''
+    assert not _refused(_get(client, '/', OUTSIDE))
+    with app.app_context():
+        entry = AuditLog.query.filter_by(action='admin_allowlist_update') \
+            .order_by(AuditLog.id.desc()).first()
+        assert entry is not None and 'restored backup' in entry.details
+
+
+def test_restore_keeps_a_list_that_admits_the_restorer(app):
+    _store(app, '10.0.0.0/8')
+    blob = _backup_of_configuration(app)
+    _store(app, '')
+    _restore(app, blob, INSIDE)
+    assert _stored(app) == '10.0.0.0/8'
+
+
+def test_restore_clears_a_list_with_no_valid_entry(app):
+    _store(app, 'nonsense')
+    blob = _backup_of_configuration(app)
+    _restore(app, blob, INSIDE)
+    assert _stored(app) == ''
+
+
+def test_restore_without_a_request_clears_the_list(app):
+    _store(app, '10.0.0.0/8')
+    blob = _backup_of_configuration(app)
+    _restore(app, blob)
+    assert _stored(app) == ''

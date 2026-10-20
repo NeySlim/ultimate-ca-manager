@@ -32,10 +32,12 @@ _EXEMPT_EXACT = frozenset({
     '/api/health/live', '/api/health/ready',
     '/health/live', '/health/ready',
     '/metrics', '/api/v2/metrics',
-    '/api/auth/verify', '/api/v2/auth/verify',
     # SCEP clients that hard-code the legacy path
     '/cgi-bin/pkiclient.exe',
 })
+# Forward-auth subrequests: exempt only when the reverse proxy itself asks,
+# otherwise a stolen session cookie could be kept alive from anywhere.
+FORWARD_AUTH_PATHS = frozenset({'/api/auth/verify', '/api/v2/auth/verify'})
 
 # The DB row is re-read at most this often, so a change written by another
 # process takes effect within seconds; a change written here is immediate.
@@ -48,10 +50,12 @@ _MAX_TRACKED_REFUSALS = 1024
 _refusals: dict[str, float] = {}
 
 
-def is_exempt_path(path: str) -> bool:
+def is_exempt_path(path: str, from_trusted_proxy: bool = False) -> bool:
     """True for paths a PKI client or a probe reaches: never filtered."""
     if path in _EXEMPT_EXACT:
         return True
+    if path in FORWARD_AUTH_PATHS:
+        return from_trusted_proxy
     from utils.public_endpoints import is_public_protocol_path
     return is_public_protocol_path(path)
 
@@ -193,6 +197,18 @@ def is_allowed(addr: str) -> bool:
         return True
     # A non-empty list whose entries are all invalid admits nobody.
     return address_in(addr, _compile(raw))
+
+
+def guard_restored_value(raw) -> str:
+    """The list a restore may write: '' when it would not admit the restoring
+    request, or when there is no request to check (CLI restore)."""
+    raw = (raw or '').strip() if isinstance(raw, str) else ''
+    if not raw:
+        return ''
+    from flask import has_request_context, request
+    if has_request_context() and address_in(request.remote_addr or '', _compile(raw)):
+        return raw
+    return ''
 
 
 def log_refusal(addr: str, path: str) -> None:

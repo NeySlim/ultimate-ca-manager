@@ -35,7 +35,7 @@ export default {
       {
         title: '管理访问允许列表',
         items: [
-          { label: '网络', text: '每行一个 IPv4 或 IPv6 地址或 CIDR 网络，最多 100 个。留空表示不限制' },
+          { label: '网络', text: '每行一个 IPv4 或 IPv6 地址或 CIDR 网络，最多 100 个。留空表示不限制。IPv4 和 IPv6 需分别列出：0.0.0.0/0 不包含 IPv6 客户端，::/0 也不包含 IPv4 客户端' },
           { label: '被阻止的内容', text: '来自其他地址时：Web 界面、登录、/api/v2 API（包括 API 密钥）和 WebSocket 通道均返回 403' },
           { label: '始终可访问', text: 'ACME、SCEP、EST、OCSP、CRL/AIA、TSA、XCEP/WSTEP、SSH 设置脚本和健康检查端点' },
           { label: '您的地址', text: '该部分显示服务器看到的您的地址；不包含该地址的列表将被拒绝' },
@@ -118,7 +118,7 @@ export default {
 
 ## 管理访问允许列表
 
-将 Web 界面和管理 API 限制为一组 IP 地址和 CIDR 网络（IPv4 或 IPv6），每行一个，最多 100 个。空列表不做任何限制。
+将 Web 界面和管理 API 限制为一组 IP 地址和 CIDR 网络（IPv4 或 IPv6），每行一个，最多 100 个。空列表不做任何限制。IPv4 和 IPv6 需分别列出：\`0.0.0.0/0\` 不包含 IPv6 客户端，\`::/0\` 也不包含 IPv4 客户端。
 
 - **来自其他地址时被阻止**: Web 界面及其资源、登录、每个 \`/api/v2\` 调用（包括 API 密钥）和 WebSocket 通道均返回 **403**
 - **始终可访问**: ACME 和 ACME 代理、SCEP、EST、OCSP、CRL 和 AIA、TSA、XCEP/WSTEP、SSH 设置脚本以及健康和指标端点，确保设备和探测继续工作

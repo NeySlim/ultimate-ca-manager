@@ -79,7 +79,7 @@ export default {
           { label: 'Général', text: 'Nom de l\'instance, nom d\'hôte et valeurs par défaut à l\'échelle du système' },
           { label: 'Apparence', text: 'Sélection du thème (clair/sombre/système), couleur d\'accentuation, mode bureau' },
           { label: 'E-mail (SMTP)', text: 'Serveur SMTP, identifiants, éditeur de modèle d\'e-mail et notifications d\'alerte d\'expiration' },
-          { label: 'Sécurité', text: 'Politiques de mot de passe, délai d\'expiration de session, limitation de débit, restrictions IP' },
+          { label: 'Sécurité', text: 'Politiques de mot de passe, délai d\'expiration de session, limitation de débit, liste d\'accès administrateur' },
           { label: 'SSO', text: 'Intégration d\'authentification unique SAML 2.0, OAuth2/OIDC et LDAP' },
           { label: 'Sauvegarde', text: 'Sauvegardes de base de données manuelles et programmées' },
           { label: 'Audit', text: 'Rétention des journaux, transfert syslog, vérification d\'intégrité' },
@@ -224,8 +224,8 @@ Lorsque SMTP est configuré, activez les alertes automatiques d'expiration de ce
 - Limite de tentatives de connexion par IP
 - Durée de verrouillage après dépassement de la limite
 
-### Restrictions IP
-Autoriser ou refuser l'accès depuis des adresses IP ou plages CIDR spécifiques.
+### Liste d'accès administrateur
+Limiter l'interface web et l'API de gestion aux adresses IP et réseaux CIDR listés ; les protocoles PKI restent accessibles de partout. Voir le guide des paramètres de sécurité.
 
 ### Application de la 2FA
 Exiger que tous les utilisateurs activent l'authentification à deux facteurs.
@@ -235,7 +235,7 @@ Chiffrez toutes les clés privées stockées en base de données avec AES-256, p
 
 > 💡 Les paramètres sensibles (session, verrouillage, HSTS, URL publique, politique de mot de passe) exigent la permission **admin:settings** : les champs sont verrouillés pour les opérateurs.
 
-> ⚠ Testez les restrictions IP soigneusement avant de les appliquer. Des règles incorrectes peuvent verrouiller tous les utilisateurs.
+> ⚠ Une liste qui n'inclut pas votre propre adresse est refusée. Si vous perdez tout de même l'accès, définissez \`UCM_ADMIN_ALLOWLIST_DISABLE=1\` et redémarrez UCM.
 
 ## SSO (Authentification unique)
 

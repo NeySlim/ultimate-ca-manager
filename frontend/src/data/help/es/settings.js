@@ -79,7 +79,7 @@ export default {
           { label: 'General', text: 'Nombre de instancia, nombre de host y valores predeterminados del sistema' },
           { label: 'Apariencia', text: 'Selección de tema (claro/oscuro/sistema), color de acento, modo escritorio' },
           { label: 'Correo electrónico (SMTP)', text: 'Servidor SMTP, credenciales, editor de plantillas de correo y notificaciones de alerta de expiración' },
-          { label: 'Seguridad', text: 'Políticas de contraseña, tiempo de espera de sesión, limitación de velocidad, restricciones de IP' },
+          { label: 'Seguridad', text: 'Políticas de contraseña, tiempo de espera de sesión, limitación de velocidad, lista de acceso de administración' },
           { label: 'SSO', text: 'Integración de inicio de sesión único con SAML 2.0, OAuth2/OIDC y LDAP' },
           { label: 'Respaldo', text: 'Copias de seguridad manuales y programadas de la base de datos' },
           { label: 'Auditoría', text: 'Retención de registros, reenvío a syslog, verificación de integridad' },
@@ -224,8 +224,8 @@ Cuando SMTP está configurado, active alertas automáticas de expiración de cer
 - Límite de intentos de inicio de sesión por IP
 - Duración del bloqueo después de exceder el límite
 
-### Restricciones de IP
-Permitir o denegar acceso desde direcciones IP o rangos CIDR específicos.
+### Lista de acceso de administración
+Limita la interfaz web y la API de gestión a las direcciones IP y redes CIDR indicadas; los protocolos PKI siguen siendo accesibles desde cualquier lugar. Consulte la guía de Configuración de seguridad.
 
 ### Aplicación de 2FA
 Requerir que todos los usuarios activen la autenticación de dos factores.
@@ -235,7 +235,7 @@ Cifre todas las claves privadas almacenadas en la base de datos con AES-256, pro
 
 > 💡 Las configuraciones sensibles de seguridad (sesión, bloqueo, HSTS, URL pública, política de contraseñas) requieren el permiso **admin:settings**: los campos están bloqueados para los operadores.
 
-> ⚠ Pruebe las restricciones de IP cuidadosamente antes de aplicarlas. Las reglas incorrectas pueden bloquear a todos los usuarios.
+> ⚠ Se rechaza una lista que no incluya su propia dirección. Si pierde el acceso de todos modos, defina \`UCM_ADMIN_ALLOWLIST_DISABLE=1\` y reinicie UCM.
 
 ## SSO (Single Sign-On)
 

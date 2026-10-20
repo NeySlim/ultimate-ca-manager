@@ -35,7 +35,7 @@ export default {
       {
         title: 'Admin-Zugriffs-Allowlist',
         items: [
-          { label: 'Netzwerke', text: 'Eine IPv4- oder IPv6-Adresse bzw. ein CIDR-Netzwerk pro Zeile, höchstens 100. Leer bedeutet keine Einschränkung' },
+          { label: 'Netzwerke', text: 'Eine IPv4- oder IPv6-Adresse bzw. ein CIDR-Netzwerk pro Zeile, höchstens 100. Leer bedeutet keine Einschränkung. IPv4 und IPv6 werden getrennt aufgelistet: 0.0.0.0/0 lässt keinen IPv6-Client zu, ebenso wenig ::/0 einen IPv4-Client' },
           { label: 'Was blockiert wird', text: 'Von anderen Adressen antworten die Weboberfläche, die Anmeldung, die /api/v2-API (einschließlich API-Schlüssel) und der WebSocket-Kanal mit 403' },
           { label: 'Immer erreichbar', text: 'ACME, SCEP, EST, OCSP, CRL/AIA, TSA, XCEP/WSTEP, das SSH-Setup-Skript und die Health-Endpunkte' },
           { label: 'Ihre Adresse', text: 'Der Bereich zeigt die Adresse, unter der der Server Sie sieht; eine Liste, die sie nicht enthält, wird abgelehnt' },
@@ -118,7 +118,7 @@ Wie lange eine IP nach Überschreitung des Anmeldeversuchslimits gesperrt wird.
 
 ## Admin-Zugriffs-Allowlist
 
-Beschränkt die Weboberfläche und die Management-API auf eine Liste von IP-Adressen und CIDR-Netzwerken, IPv4 oder IPv6, eine pro Zeile (höchstens 100). Eine leere Liste schränkt nichts ein.
+Beschränkt die Weboberfläche und die Management-API auf eine Liste von IP-Adressen und CIDR-Netzwerken, IPv4 oder IPv6, eine pro Zeile (höchstens 100). Eine leere Liste schränkt nichts ein. IPv4 und IPv6 werden getrennt aufgelistet: \`0.0.0.0/0\` lässt keinen IPv6-Client zu, und \`::/0\` lässt keinen IPv4-Client zu.
 
 - **Von anderen Adressen blockiert**: Die Weboberfläche samt Ressourcen, die Anmeldung, jeder \`/api/v2\`-Aufruf (einschließlich API-Schlüssel) und der WebSocket-Kanal antworten mit **403**
 - **Immer erreichbar**: ACME und der ACME-Proxy, SCEP, EST, OCSP, CRL und AIA, TSA, XCEP/WSTEP, das SSH-Setup-Skript sowie die Health- und Metrik-Endpunkte, damit Geräte und Überwachung weiter funktionieren

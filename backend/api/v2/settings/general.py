@@ -396,7 +396,8 @@ def update_general_settings():
                 'date_format must be one of: ' + ', '.join(DATE_FORMATS), 400)
 
     # Saved only when it changed, and never to a list that would refuse the
-    # caller's own address. The screen sends it back with every save.
+    # caller's own address, unless the check is switched off for recovery.
+    # The screen sends it back with every save.
     allowlist_change = None
     if 'admin_allowed_networks' in data:
         raw_networks = data.pop('admin_allowed_networks')
@@ -408,7 +409,8 @@ def update_general_settings():
             current = admin_allowlist.split_entries(get_config(admin_allowlist.CONFIG_KEY, '') or '')
             if entries != current:
                 client = request.remote_addr or ''
-                if entries and not admin_allowlist.address_allowed_by(client, entries):
+                if (entries and not admin_allowlist.disabled_by_env()
+                        and not admin_allowlist.address_allowed_by(client, entries)):
                     return error_response(
                         f'The admin allowlist must include your own address ({client or "unknown"}), '
                         'otherwise this session would be locked out', 400)

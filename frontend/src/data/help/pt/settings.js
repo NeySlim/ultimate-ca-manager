@@ -79,7 +79,7 @@ export default {
           { label: 'Geral', text: 'Nome da instância, hostname e padrões do sistema' },
           { label: 'Aparência', text: 'Seleção de tema (claro/escuro/sistema), cor de destaque, modo desktop' },
           { label: 'E-mail (SMTP)', text: 'Servidor SMTP, credenciais, editor de modelo de e-mail e notificações de alerta de expiração' },
-          { label: 'Segurança', text: 'Políticas de senha, tempo limite de sessão, limitação de taxa, restrições de IP' },
+          { label: 'Segurança', text: 'Políticas de senha, tempo limite de sessão, limitação de taxa, lista de acesso administrativo' },
           { label: 'SSO', text: 'Integração de login único SAML 2.0, OAuth2/OIDC e LDAP' },
           { label: 'Backup', text: 'Backups manuais e agendados do banco de dados' },
           { label: 'Auditoria', text: 'Retenção de logs, encaminhamento syslog, verificação de integridade' },
@@ -224,8 +224,8 @@ Quando o SMTP está configurado, ative alertas automáticos de expiração de ce
 - Limite de tentativas de login por IP
 - Duração do bloqueio após exceder o limite
 
-### Restrições de IP
-Permitir ou negar acesso de endereços IP específicos ou faixas CIDR.
+### Lista de Acesso Administrativo
+Limite a interface web e a API de gestão aos endereços IP e redes CIDR listados; os protocolos PKI continuam acessíveis de qualquer lugar. Veja o guia de Configurações de Segurança.
 
 ### Aplicação de 2FA
 Exigir que todos os usuários ativem autenticação de dois fatores.
@@ -235,7 +235,7 @@ Criptografe todas as chaves privadas armazenadas no banco de dados com AES-256, 
 
 > 💡 Configurações sensíveis à segurança (sessão, bloqueio, HSTS, URL pública, política de senha) requerem a permissão **admin:settings**: os campos ficam bloqueados para operators.
 
-> ⚠ Teste restrições de IP cuidadosamente antes de aplicá-las. Regras incorretas podem bloquear todos os usuários.
+> ⚠ Uma lista que não inclui o seu próprio endereço é recusada. Se mesmo assim perder o acesso, defina \`UCM_ADMIN_ALLOWLIST_DISABLE=1\` e reinicie o UCM.
 
 ## SSO (Login Único)
 

@@ -1065,14 +1065,17 @@ def create_app(config_name=None):
     # Admin source-address allowlist (#402). Registered first so no other hook
     # (mTLS login, CSRF, redirects) acts for a refused peer; protocols are exempt.
     def enforce_admin_allowlist():
-        from utils import admin_allowlist
-        if admin_allowlist.is_exempt_path(request.path):
+        from utils import admin_allowlist, trusted_proxy
+        path = request.path
+        if admin_allowlist.is_exempt_path(
+                path, from_trusted_proxy=(path in admin_allowlist.FORWARD_AUTH_PATHS
+                                          and trusted_proxy.is_request_from_trusted_proxy())):
             return None
         addr = request.remote_addr or ''
         if admin_allowlist.is_allowed(addr):
             return None
-        admin_allowlist.log_refusal(addr, request.path)
-        if request.path.startswith('/api/'):
+        admin_allowlist.log_refusal(addr, path)
+        if path.startswith('/api/'):
             from utils.response import error_response
             return error_response(admin_allowlist.REFUSAL_MESSAGE, 403)
         return (admin_allowlist.REFUSAL_MESSAGE, 403,

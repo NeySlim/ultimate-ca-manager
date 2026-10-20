@@ -35,7 +35,7 @@ export default {
       {
         title: 'Lista de Acesso Administrativo',
         items: [
-          { label: 'Redes', text: 'Um endereço IPv4 ou IPv6 ou rede CIDR por linha, até 100. Vazia significa sem restrição' },
+          { label: 'Redes', text: 'Um endereço IPv4 ou IPv6 ou rede CIDR por linha, até 100. Vazia significa sem restrição. IPv4 e IPv6 são listados separadamente: 0.0.0.0/0 não admite um cliente IPv6, nem ::/0 um cliente IPv4' },
           { label: 'O que é bloqueado', text: 'A partir de outros endereços: a interface web, o login, a API /api/v2 (chaves de API incluídas) e o canal WebSocket respondem 403' },
           { label: 'Sempre acessíveis', text: 'ACME, SCEP, EST, OCSP, CRL/AIA, TSA, XCEP/WSTEP, o script de configuração SSH e os endpoints de saúde' },
           { label: 'Seu endereço', text: 'A seção mostra o endereço que o servidor vê para você; uma lista que não o inclua é recusada' },
@@ -118,7 +118,7 @@ Por quanto tempo um IP fica bloqueado após exceder o limite de tentativas de lo
 
 ## Lista de Acesso Administrativo
 
-Limite a interface web e a API de gestão a uma lista de endereços IP e redes CIDR, IPv4 ou IPv6, um por linha (até 100). Uma lista vazia não restringe nada.
+Limite a interface web e a API de gestão a uma lista de endereços IP e redes CIDR, IPv4 ou IPv6, um por linha (até 100). Uma lista vazia não restringe nada. IPv4 e IPv6 são listados separadamente: \`0.0.0.0/0\` não admite um cliente IPv6, e \`::/0\` não admite um cliente IPv4.
 
 - **Bloqueado a partir de outros endereços**: a interface web e seus recursos, o login, toda chamada \`/api/v2\` (chaves de API incluídas) e o canal WebSocket respondem **403**
 - **Sempre acessíveis**: ACME e o proxy ACME, SCEP, EST, OCSP, CRL e AIA, TSA, XCEP/WSTEP, o script de configuração SSH e os endpoints de saúde e métricas, para que dispositivos e sondas continuem funcionando

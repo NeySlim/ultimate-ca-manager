@@ -147,13 +147,14 @@ This affects:
 
 #### Admin access allowlist
 
-**Settings > Security > Admin access allowlist** restricts the web interface and the management API to a list of IPv4/IPv6 addresses and CIDR networks (one per line, up to 100). An empty list restricts nothing.
+**Settings > Security > Admin access allowlist** restricts the web interface and the management API to a list of IPv4/IPv6 addresses and CIDR networks (one per line, up to 100). An empty list restricts nothing. IPv4 and IPv6 are listed separately: `0.0.0.0/0` does not admit an IPv6 client, and `::/0` does not admit an IPv4 client.
 
 - **Blocked from other addresses**: the web interface and its assets, the login, every `/api/v2/...` call (API keys included), the API docs and the WebSocket channel. API calls get a `403` JSON error, the interface a plain `403` page.
-- **Never blocked**: the PKI protocol endpoints (ACME and the ACME proxy, SCEP including `/cgi-bin/pkiclient.exe`, EST, OCSP, CRL and AIA under `/cdp` and `/ca`, TSA, XCEP/WSTEP, the SSH setup script) and the health, metrics and forward-auth endpoints, so devices and probes outside the list keep working.
+- **Never blocked**: the PKI protocol endpoints (ACME and the ACME proxy, SCEP including `/cgi-bin/pkiclient.exe`, EST, OCSP, CRL and AIA under `/cdp` and `/ca`, TSA, XCEP/WSTEP, the SSH setup script) and the health and metrics endpoints, so devices and probes outside the list keep working. The forward-auth endpoint (`/api/v2/auth/verify`) is exempt only for a proxy listed in `UCM_TRUSTED_PROXIES`.
 - **No lock-out from the screen**: the section shows the address the server sees for you, and a list that does not include it is refused. Each change is written to the audit log; refused requests are logged as warnings, once per address every few minutes.
 - **Environment variable**: `UCM_ADMIN_ALLOWED_NETWORKS=10.20.0.0/24,2001:db8:20::/64` wins over the stored list and makes the field read-only. An entry that is not a valid address or network is ignored with a warning; a variable with no valid entry admits nobody.
-- **Recovery**: if you are locked out, set `UCM_ADMIN_ALLOWLIST_DISABLE=1` in `/etc/ucm/ucm.env` (or the container environment) and restart UCM, fix the list, then remove the variable and restart again.
+- **Recovery**: if you are locked out, set `UCM_ADMIN_ALLOWLIST_DISABLE=1` in `/etc/ucm/ucm.env` (or the container environment) and restart UCM, fix the list, then remove the variable and restart again. While the variable is set, the list is saved even if it does not include your own address.
+- **Restore**: a backup whose list would not admit the client restoring it (or holds no valid entry) comes back with an empty list, with a warning in the log and an audit entry. A restore run without a web request (command line) always empties a non-empty list.
 
 The check uses the address of the TCP peer, or the client address resolved from `X-Forwarded-For` when the request comes from a proxy listed in `UCM_TRUSTED_PROXIES` with `UCM_BEHIND_PROXY=1`. It never trusts the header from anyone else.
 

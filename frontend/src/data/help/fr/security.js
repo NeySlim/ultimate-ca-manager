@@ -35,7 +35,7 @@ export default {
       {
         title: 'Liste d\'accès administrateur',
         items: [
-          { label: 'Réseaux', text: 'Une adresse IPv4 ou IPv6 ou un réseau CIDR par ligne, 100 au maximum. Vide signifie aucune restriction' },
+          { label: 'Réseaux', text: 'Une adresse IPv4 ou IPv6 ou un réseau CIDR par ligne, 100 au maximum. Vide signifie aucune restriction. IPv4 et IPv6 sont listés séparément : 0.0.0.0/0 n\'admet pas un client IPv6, ni ::/0 un client IPv4' },
           { label: 'Ce qui est bloqué', text: 'Depuis les autres adresses : l\'interface web, la connexion, l\'API /api/v2 (clés API comprises) et le canal WebSocket répondent 403' },
           { label: 'Toujours accessibles', text: 'ACME, SCEP, EST, OCSP, CRL/AIA, TSA, XCEP/WSTEP, le script d\'installation SSH et les points de contrôle de santé' },
           { label: 'Votre adresse', text: 'La section affiche l\'adresse que le serveur voit pour vous ; une liste qui ne l\'inclut pas est refusée' },
@@ -118,7 +118,7 @@ Durée pendant laquelle une IP est bloquée après dépassement de la limite de 
 
 ## Liste d'accès administrateur
 
-Limitez l'interface web et l'API de gestion à une liste d'adresses IP et de réseaux CIDR, IPv4 ou IPv6, un par ligne (100 au maximum). Une liste vide ne restreint rien.
+Limitez l'interface web et l'API de gestion à une liste d'adresses IP et de réseaux CIDR, IPv4 ou IPv6, un par ligne (100 au maximum). Une liste vide ne restreint rien. IPv4 et IPv6 sont listés séparément : \`0.0.0.0/0\` n'admet pas un client IPv6, et \`::/0\` n'admet pas un client IPv4.
 
 - **Bloqué depuis les autres adresses** : l'interface web et ses ressources, la connexion, chaque appel \`/api/v2\` (clés API comprises) et le canal WebSocket répondent **403**
 - **Toujours accessibles** : ACME et le proxy ACME, SCEP, EST, OCSP, CRL et AIA, TSA, XCEP/WSTEP, le script d'installation SSH, et les points de contrôle de santé et de métriques, afin que les équipements et les sondes continuent de fonctionner

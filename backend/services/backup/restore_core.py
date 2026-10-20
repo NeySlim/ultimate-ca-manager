@@ -338,6 +338,19 @@ class RestoreCoreMixin:
         finally:
             staged.discard()
 
+        from utils import admin_allowlist
+        admin_allowlist.invalidate_cache()
+        if results.get('admin_allowlist_cleared'):
+            from services.audit_service import AuditService
+            AuditService.log_action(
+                action='admin_allowlist_update',
+                resource_type='settings',
+                resource_name='Admin allowlist',
+                details='Admin allowlist from the restored backup cleared: it '
+                        'would not admit the client that restored it',
+                success=True,
+            )
+
         # What the restore leaves behind — sessions opened before it, caches
         # holding the PKI it replaced — is the caller's to clear: this service
         # restores data, and an API route is where revoking every session and
@@ -821,7 +834,16 @@ class RestoreCoreMixin:
             config_data = {}
         else:
             config_data = configuration.get('settings', {})
+        from utils import admin_allowlist
         for key, value in config_data.items():
+            if key == admin_allowlist.CONFIG_KEY:
+                guarded = admin_allowlist.guard_restored_value(value)
+                if guarded != (value.strip() if isinstance(value, str) else ''):
+                    logger.warning(
+                        "Restore: the archived admin allowlist (%s) would not admit "
+                        "this restore's client, so it was cleared", value)
+                    results['admin_allowlist_cleared'] = True
+                value = guarded
             existing = SystemConfig.query.filter_by(key=key).first()
             if existing:
                 existing.value = value
