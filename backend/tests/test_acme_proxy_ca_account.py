@@ -244,8 +244,9 @@ class TestProxyServiceBinding:
             assert svc.account.id == acct.id
             assert svc.upstream_directory_url == AcmeClientAccount.LE_PRODUCTION_URL
 
-    def test_bg_thread_refreshes_detached_account(self, app, clean_proxy_state):
-        """Regression: background DNS thread must re-bind ORM account before signing JWS."""
+    def test_bg_thread_takes_only_the_id_of_a_detached_account(self, app, clean_proxy_state):
+        """The dns-01 thread reads the CA account id without loading the row the
+        request thread left detached, and signs through the service it builds."""
         from unittest.mock import MagicMock, patch
         from services.acme.acme_proxy_service import AcmeProxyService
 
@@ -261,17 +262,14 @@ class TestProxyServiceBinding:
             svc = AcmeProxyService('https://ucm.example')
             db.session.expunge(svc.account)
 
-            svc._refresh_account_session()
-            assert svc.account.id == acct.id
-            # Must not raise DetachedInstanceError when building JWS helpers
-            assert svc._detect_key_algorithm() in ('ES256', 'RS256')
-
             mock_resp = MagicMock()
             mock_resp.status_code = 200
             mock_resp.text = '{}'
             mock_resp.json.return_value = {'status': 'processing'}
 
+            # The thread builds its own service; hand it this instance instead.
             with patch.object(svc, '_post_with_account', return_value=mock_resp) as post_mock, \
+                 patch.object(svc, '_make_thread_service', return_value=svc) as factory, \
                  patch('api.v2.acme_domains.find_provider_for_domain') as find_prov, \
                  patch('services.acme.dns_providers.create_provider') as create_prov, \
                  patch('services.acme.acme_proxy_service.wait_for_txt', return_value={'ok': True, 'missing': [], 'waited': 0}):
@@ -304,6 +302,7 @@ class TestProxyServiceBinding:
                     order.id,
                 )
 
+            factory.assert_called_once_with(acct.id)
             post_mock.assert_called_once()
 
     def test_bg_thread_submits_upstream_when_dns_not_visible_locally(self, app, clean_proxy_state):
@@ -337,7 +336,8 @@ class TestProxyServiceBinding:
             with patch('api.v2.acme_domains.find_provider_for_domain') as find_prov, \
                  patch('services.acme.dns_providers.create_provider') as create_prov, \
                  patch('services.acme.acme_proxy_service.wait_for_txt', return_value={'ok': False, 'missing': ['_single_'], 'waited': 5}), \
-                 patch.object(svc, '_post_with_account') as post_mock:
+                 patch.object(svc, '_post_with_account') as post_mock, \
+                 patch.object(svc, '_make_thread_service', return_value=svc) as factory:
                 provider_model = MagicMock()
                 provider_model.id = 1
                 provider_model.provider_type = 'gandi'
@@ -358,6 +358,7 @@ class TestProxyServiceBinding:
                 )
 
             # Upstream validation IS triggered despite the local DNS miss.
+            factory.assert_called_once_with(acct.id)
             post_mock.assert_called_once()
             assert post_mock.call_args[0][0] == 'https://acme-proxy-test.example/chall/2'
             db.session.refresh(order)

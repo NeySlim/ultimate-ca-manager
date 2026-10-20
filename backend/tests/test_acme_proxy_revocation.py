@@ -113,6 +113,16 @@ def test_proxy_new_order_forwards_replaces_when_present(client, monkeypatch):
         '_kid_account_thumbprint',
         lambda protected: None,
     )
+    # new-order requires a kid-signed JWS from an active account.
+    monkeypatch.setattr(
+        acme_proxy_api,
+        '_request_protected_header',
+        lambda: {'kid': 'http://localhost/acme/proxy/acct/replaces-acct'},
+    )
+    active_account = MagicMock()
+    active_account.status = 'valid'
+    monkeypatch.setattr(acme_proxy_api.AcmeService, 'get_account_by_kid',
+                        lambda *_args: active_account)
 
     response = client.post(
         '/acme/proxy/new-order',

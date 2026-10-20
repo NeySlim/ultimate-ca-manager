@@ -679,7 +679,11 @@ class AcmeClientService:
             timeout=self._http_timeout(),
             verify=self.verify_ssl,
         )
-        # PLANB-C.10: à implémenter selon SPEC (empiler le Replay-Nonce reçu, jamais celui d'une réponse 400)
+        # A 400 may be badNonce, whose nonce the retry spends: pooling it would serve it twice.
+        if getattr(resp, 'status_code', None) != 400:
+            headers = getattr(resp, 'headers', None)
+            replay_nonce = headers.get('Replay-Nonce') if hasattr(headers, 'get') else None
+            outbound.nonce_pool_push(self.directory_url, replay_nonce)
         return resp
 
 

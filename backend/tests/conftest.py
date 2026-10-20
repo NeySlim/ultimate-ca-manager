@@ -180,8 +180,16 @@ def _deterministic_dns(monkeypatch):
     monkeypatch.setattr(_ssrf, 'socket', _GuardResolverProxy(_socket))
 
 
-# PLANB-C.1: à implémenter selon SPEC (fixture autouse qui purge les caches du proxy
-# avant et après chaque test, invariant 17)
+@pytest.fixture(autouse=True)
+def _reset_acme_proxy_caches():
+    """The ACME proxy caches are process-wide: no test may see another's."""
+    from services.acme.acme_proxy_service import reset_proxy_caches
+
+    reset_proxy_caches()
+    yield
+    reset_proxy_caches()
+
+
 def _drop_unreadable_key_material(app):
     """Forget key material that was written under a now-discarded key.
 

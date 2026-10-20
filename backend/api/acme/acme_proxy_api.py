@@ -20,6 +20,7 @@ from models import AcmeClientOrder, Certificate
 from services.acme.acme_client_service import AcmeClientService
 from services.acme.acme_proxy_service import (
     AcmeProxyService,
+    ProxyChallengeIdentifierError,
     ProxyDns01OnlyError,
     ProxyResourceNotFoundError,
 )
@@ -36,6 +37,11 @@ from utils.acme_csr import decode_csr_b64
 from utils.acme_public_url import get_acme_public_origin, get_acme_proxy_public_base
 
 logger = logging.getLogger(__name__)
+
+# RFC 8555 §7.3.6: these accounts are refused, never served.
+_CLOSED_ACCOUNT_STATUSES = frozenset({'deactivated', 'revoked'})
+_NOT_AN_OBJECT = "The request payload is not a JSON object"
+
 # Request-JWK thumbprints use the shared RFC 7638 helper (name kept for callers).
 _jwk_thumbprint = jwk_thumbprint_or_none
 
@@ -174,11 +180,13 @@ def _requester_identity(jwk=None):
     sound. kid-signed requests (the RFC 8555 §6.2 norm for these endpoints)
     resolve through the account's stored thumbprint; a jwk-signed request
     hashes the header JWK directly. Returns (None, None) when nothing can be
-    derived — owner-bound resources then fail closed in the service layer."""
+    derived: owner-bound resources then fail closed in the service layer."""
     protected = _request_protected_header()
     account_id = _kid_account_id(protected)
     thumbprint = jwk_thumbprint_or_none(jwk) or _kid_account_thumbprint(protected)
     return account_id, thumbprint
+
+
 # Payload decoding helpers.
 def _decode_b64url(value):
     """Strictly decode an unpadded base64url value."""
@@ -396,11 +404,14 @@ def new_order(slug=None):
     if not is_valid:
         return proxy_error("malformed", err)
 
-    # PLANB-C.8: à implémenter selon SPEC (charge JSON objet, invariant 1)
+    if not isinstance(payload, dict):
+        return proxy_error("malformed", _NOT_AN_OBJECT)
     identifiers = payload.get('identifiers')
     if not identifiers:
         return proxy_error("malformed", "Missing 'identifiers' in payload")
-    # PLANB-C.8: à implémenter selon SPEC ('identifiers' doit être un tableau, invariant 1)
+    if not isinstance(identifiers, list):
+        return proxy_error(
+            "malformed", "The identifiers field has to be a list of identifier objects")
     if any(
         not isinstance(identifier, dict) or identifier.get('type') != 'dns'
         for identifier in identifiers
@@ -439,12 +450,24 @@ def new_order(slug=None):
 
     protected_header = _request_protected_header()
     requester_account_id = _kid_account_id(protected_header)
-    # PLANB-C.8: à implémenter selon SPEC (kid exigé, invariant 2 ; statut du compte, invariant 3)
+    # RFC 8555 §6.2: a jwk-signed JWS proves a key, not an account.
+    if not requester_account_id or protected_header.get('jwk'):
+        return proxy_error(
+            'malformed',
+            "new-order must be signed with the account 'kid' (RFC 8555 §6.2)",
+            400,
+        )
     acme_service = AcmeService()
-    if requester_account_id:
-        account = acme_service.get_account_by_kid(requester_account_id)
-        if not account:
-            return proxy_error('accountDoesNotExist', 'Account not found', 404)
+    # Defense in depth: verify_jws already refuses a kid whose account is missing or not valid.
+    account = acme_service.get_account_by_kid(requester_account_id)
+    if not account:
+        return proxy_error('accountDoesNotExist', 'Account not found', 404)
+    if account.status in _CLOSED_ACCOUNT_STATUSES:
+        return proxy_error(
+            'unauthorized',
+            f'This ACME account can no longer place orders (status: {account.status})',
+            401,
+        )
     # EAB domain scope, reported as a single rejectedIdentifier (no compound here).
     eab_cred = acme_service.get_bound_eab_credential(requester_account_id)
     if eab_cred is not None:
@@ -568,7 +591,9 @@ def challenge(chall_id, slug=None):
         return proxy_error("malformed", str(e), 400)
     except ProxyEndpointNotConfiguredError as e:
         return proxy_error("malformed", str(e), 404)
-    # PLANB-C.5: à implémenter selon SPEC (réponse à l'erreur typée de l'identifiant indéterminé)
+    except ProxyChallengeIdentifierError as e:
+        logger.error(f"ACME proxy challenge: {e}")
+        return proxy_error("serverInternal", str(e), 500)
     except RuntimeError as e:
         logger.warning(f"ACME proxy challenge: {e}")
         return proxy_error("serverInternal", "Failed to respond to challenge", 500)
@@ -625,7 +650,8 @@ def finalize(order_id, slug=None):
     if not requester_account_id and not requester_thumbprint:
         logger.warning("ACME proxy finalize: no requester identity from verified JWS")
 
-    # PLANB-C.8: à implémenter selon SPEC (charge JSON objet)
+    if not isinstance(payload, dict):
+        return proxy_error("malformed", _NOT_AN_OBJECT)
     try:
         csr_b64 = payload.get('csr')
         if not csr_b64:

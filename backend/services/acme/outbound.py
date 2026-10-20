@@ -18,7 +18,7 @@ The pieces live here so both callers get all of them.
 import logging
 import threading
 import time
-from typing import Optional
+from typing import Dict, List, Optional, Tuple
 
 from services.acme.dns_selfcheck import acme_allow_loopback_upstream
 from utils import ssrf_protection
@@ -38,7 +38,14 @@ NONCE_POOL_TTL_SEC = 60
 NONCE_FETCH_ATTEMPTS = 3
 
 _pool_lock = threading.Lock()
-# PLANB-C.10: à implémenter selon SPEC (réserve de nonces par URL d'annuaire amont)
+# directory URL -> [(nonce, monotonic deposit time)], oldest first; guarded by _pool_lock.
+_nonce_pool: Dict[str, List[Tuple[str, float]]] = {}
+
+
+def _now() -> float:
+    """Monotonic clock for nonce age (patched by tests)."""
+    return time.monotonic()
+
 
 def validate_outbound_acme_url(url: str) -> None:
     """Block loopback/cloud-metadata targets for ACME sub-URLs.
@@ -57,18 +64,38 @@ def validate_outbound_acme_url(url: str) -> None:
 def nonce_pool_pop(directory_url: str) -> Optional[str]:
     """Newest first, and anything older than NONCE_POOL_TTL_SEC is discarded
     rather than spent."""
-    # PLANB-C.10: à implémenter selon SPEC (dépiler un nonce à usage unique)
-    return None
+    now = _now()
+    with _pool_lock:
+        entries = _nonce_pool.get(directory_url)
+        nonce = None
+        while entries:
+            candidate, deposited = entries.pop()
+            if now - deposited <= NONCE_POOL_TTL_SEC:
+                nonce = candidate
+                break
+        if not entries:
+            _nonce_pool.pop(directory_url, None)
+        return nonce
 
 
 def nonce_pool_push(directory_url: str, nonce: Optional[str]) -> None:
-    # PLANB-C.10: à implémenter selon SPEC (empiler un nonce reçu, borné à NONCE_POOL_MAX)
-    return None
+    """Keep a received nonce for *directory_url*; the oldest go beyond NONCE_POOL_MAX."""
+    if not directory_url or not nonce:
+        return
+    now = _now()
+    with _pool_lock:
+        entries = _nonce_pool.setdefault(directory_url, [])
+        if any(existing == nonce for existing, _ in entries):
+            return
+        entries.append((nonce, now))
+        if len(entries) > NONCE_POOL_MAX:
+            del entries[:len(entries) - NONCE_POOL_MAX]
 
 
 def reset_nonce_pool() -> None:
     """Drop every pooled nonce (process-level cache, so also test-level)."""
-    # PLANB-C.10: à implémenter selon SPEC (vider la réserve)
+    with _pool_lock:
+        _nonce_pool.clear()
 
 
 def fetch_nonce(nonce_url: str, *, timeout: int, verify: bool,
