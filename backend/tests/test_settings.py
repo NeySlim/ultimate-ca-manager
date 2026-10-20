@@ -341,6 +341,23 @@ class TestBackupSettings:
 # Email Settings
 # ============================================================
 
+@pytest.fixture
+def smtp_restored(app):
+    """The SMTP settings as they were before the test, enabled flag included."""
+    from models import db
+    from models.email_notification import SMTPConfig
+    table = SMTPConfig.__table__
+    with app.app_context():
+        saved = [dict(row._mapping) for row in db.session.execute(table.select())]
+    yield
+    with app.app_context():
+        db.session.execute(table.delete())
+        if saved:
+            db.session.execute(table.insert(), saved)
+        db.session.commit()
+
+
+@pytest.mark.usefixtures('smtp_restored')
 class TestEmailSettings:
     """Email SMTP settings, template CRUD, test, preview."""
 
@@ -586,6 +603,7 @@ class TestLegacyLDAPSettingsRemoved:
         assert r.status_code in (404, 405), r.data
 
 
+@pytest.mark.usefixtures('smtp_restored')
 class TestEmailAuthMethodNone:
     """#322: authentication off is reported as 'none', not the stored default."""
 
