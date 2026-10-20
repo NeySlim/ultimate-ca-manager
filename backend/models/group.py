@@ -2,9 +2,23 @@
 Group Model - User groups for permission management
 """
 
+import json
+
 from models import db
 from datetime import datetime
 from utils.datetime_utils import utc_now, utc_isoformat
+
+
+def permission_list(value):
+    """Stored group permissions as a list; JSON text from an old backup is decoded."""
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return []
+        if isinstance(value, str):
+            return permission_list(value)
+    return value if isinstance(value, list) else []
 
 
 class Group(db.Model):
@@ -26,7 +40,7 @@ class Group(db.Model):
             'id': self.id,
             'name': self.name,
             'description': self.description,
-            'permissions': self.permissions or [],
+            'permissions': permission_list(self.permissions),
             'member_count': self.members.count(),
             'created_at': utc_isoformat(self.created_at),
             'updated_at': utc_isoformat(self.updated_at)

@@ -1580,21 +1580,17 @@ def init_database(app):
         if Group.query.count() == 0:
             app.logger.info("Creating default Pro groups...")
             
+            # A group can never grant the admin role, so there is no Administrators group.
             default_groups = [
-                Group(
-                    name="Administrators",
-                    description="Full system administrators with all permissions",
-                    permissions='["*"]'
-                ),
                 Group(
                     name="Certificate Operators",
                     description="Can manage certificates and CSRs",
-                    permissions='["read:certificates", "write:certificates", "read:csrs", "write:csrs", "read:cas"]'
+                    permissions=["read:certificates", "write:certificates", "read:csrs", "write:csrs", "read:cas"]
                 ),
                 Group(
                     name="Auditors",
-                    description="Read-only access to audit logs and system status",
-                    permissions='["read:audit", "read:dashboard", "read:certificates", "read:cas"]'
+                    description="Read-only access to audit logs, certificates and CAs",
+                    permissions=["read:audit", "read:certificates", "read:cas"]
                 )
             ]
             

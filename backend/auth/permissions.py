@@ -246,7 +246,7 @@ def get_group_permissions(user) -> list:
     if user is None or getattr(user, 'id', None) is None:
         return []
     try:
-        from models.group import Group, GroupMember
+        from models.group import Group, GroupMember, permission_list
 
         rows = (Group.query
                 .join(GroupMember, GroupMember.group_id == Group.id)
@@ -260,7 +260,7 @@ def get_group_permissions(user) -> list:
     grantable = set(GROUP_GRANTABLE_PERMISSIONS)
     granted = []
     for (perms,) in rows:
-        for perm in (perms or []):
+        for perm in permission_list(perms):
             if perm in grantable and perm not in granted:
                 granted.append(perm)
     return granted

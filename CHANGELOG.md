@@ -24,6 +24,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Passwords: the `admin_bypass_password_policy` setting is deleted and administrators follow the password policy (see Removed).
 - Templates: allowed SAN types are enforced only once "Enforce the allowed SAN types" is on; existing templates keep it off, new ones have it on (see Fixed).
 - Custom roles: assigned roles now grant their permissions, the administrator-only ones excepted; review roles and assignments before upgrading (see Security).
+- Groups: the default Certificate Operators and Auditors groups now grant their permissions to their members; review their members before upgrading (see Fixed).
 - Audit log: back up `audit-chain.keys` with `master.key`, beside which it is written (see Security and docs/SECURITY.md).
 - Docker Compose: `/etc/ucm` is now the named volume `ucm-config`; copy `master.key` out before switching (see Fixed and UPGRADE.md).
 
@@ -104,6 +105,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - OCSP: on PostgreSQL, the response for a certificate revoked with a reason was never cached, its reason name going into an integer column, and a SQLite database holding such rows could not be migrated to PostgreSQL. The cache stores the CRLReason code, and existing rows are converted at upgrade.
 - CSRs: a Windows or Intune request (CA:FALSE with a path length) failed to upload with an error 500 and could not be signed or approved; it now goes through like any other, and so do an ACME order finalized with such a request, EST re-enrolment and server key generation, and the import of such a CSR.
 - ACME client: an order invalidated by a failed challenge said "Order became invalid: Unknown"; it now gives the error the CA reported for the challenge (#401, by @ziller-hqs).
+- Users: opening a default group crashed the page and those groups granted nothing, their permissions having been stored as text; they are now lists, and the Administrators group, which a group cannot be, is no longer created (#399).
+- RBAC: the built-in roles showed 0 users; they now count the users holding them (#399).
 
 ### Security
 

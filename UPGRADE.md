@@ -165,7 +165,7 @@ Database migrations run automatically at startup.
 Several fixes change what an existing installation does once upgraded. The CHANGELOG lists them under **Upgrade notes**; before upgrading:
 
 - Back up `audit-chain.keys` with `master.key` from now on (same directory), and on Docker Compose follow the `ucm-config` volume steps below.
-- Review custom roles and their assignments: they now grant their permissions.
+- Review custom roles and their assignments, and the members of the default Certificate Operators and Auditors groups: they now grant their permissions.
 - SAML: set the admin Base URL and check that the IdP matches `/api/v2/sso/saml/metadata` and that its clock is within five minutes.
 - Check policies (notification e-mails, 50-name maximum now applied to ACME and the other protocols), ACME "Allow wildcard" per domain, discovery profile notifications and Reports > Schedule.
 - Integrations whose server or account changes ask for their secret again; SMTP OAuth needs a new consent after such a change.
