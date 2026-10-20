@@ -35,6 +35,7 @@ import uuid
 from asn1crypto import x509 as asn1_x509
 from lxml import etree
 
+import fips_mode
 from services.wstep.soap_envelope import build_envelope
 from utils import key_algorithms
 
@@ -66,6 +67,21 @@ AUTH_CLIENT_CERTIFICATE = 8
 # always nil (real-ADCS trace), so there's no reference to mint.
 _GROUP_POLICY = 9  # "Enrollment object identifier" (the template's own OID)
 _GROUP_EXTENSION = 6  # "Certificate extension or attribute identifier"
+_GROUP_HASH_ALGORITHM = 1  # "Hash algorithm identifier"
+
+# Template digest -> hash OID for attributes/hashAlgorithmOIDReference,
+# the hash a client signs its request with (PKCS#10 and the outer CMC
+# SignedData that WSTEP verifies as proof of possession). Left nil, a
+# Windows client signs with its own default, SHA-1 for a schema 2 /
+# legacy-CSP template -- which FIPS mode then refuses at
+# services/scep/message_parser.verify_cms_signature. SHA-1 is deliberately
+# absent: it is never advertised.
+_HASH_ALGORITHM_OIDS = {
+    'sha256': ('2.16.840.1.101.3.4.2.1', 'sha256'),
+    'sha384': ('2.16.840.1.101.3.4.2.2', 'sha384'),
+    'sha512': ('2.16.840.1.101.3.4.2.3', 'sha512'),
+}
+_DEFAULT_HASH = 'sha256'
 
 # id-ce-extKeyUsage / id-ce-keyUsage (RFC 5280) -- the extension OIDs
 # referenced by attributes/extensions/extension/oIDReference. Distinct from
@@ -104,6 +120,11 @@ _XCEP_KEY_FAMILIES = ('RSA', 'EC')
 _RSA_KEY_SPEC = '1'
 _RSA_CRYPTO_PROVIDERS = ('Microsoft Enhanced RSA and AES Cryptographic Provider',)
 _ECDSA_CRYPTO_PROVIDERS = ('Microsoft Software Key Storage Provider',)
+# In FIPS mode RSA templates are advertised as schema 3 with the CNG KSP:
+# Windows only honors hashAlgorithmOIDReference for schema 3 templates
+# whose keys live in a Key Storage Provider (the legacy-CSP schema 2 path
+# ignores it and signs with SHA-1).
+_RSA_KSP_CRYPTO_PROVIDERS = ('Microsoft Software Key Storage Provider',)
 
 # subjectNameFlags: client supplies Subject (0x1) + SubjectAltName (0x10000).
 # Matches how EST/SCEP already accept a client-supplied CSR subject/SAN
@@ -223,6 +244,18 @@ def _key_type_info(key_type):
     if alg is None or alg.family not in _XCEP_KEY_FAMILIES:
         return None
     return ('RSA' if alg.family == 'RSA' else f'ECDSA_{alg.param}'), alg.key_size
+
+
+def _request_hash(template):
+    """The digest a client must sign its request with: the template's own
+    digest when it is one XCEP can announce, else SHA-256. Never SHA-1."""
+    digest = (getattr(template, 'digest', None) or _DEFAULT_HASH).strip().lower().replace('-', '')
+    if digest not in _HASH_ALGORITHM_OIDS:
+        if digest == 'sha1':
+            logger.warning("XCEP: template %r digest SHA-1 not announced, using %s",
+                           getattr(template, 'name', '?'), _DEFAULT_HASH)
+        digest = _DEFAULT_HASH
+    return _HASH_ALGORITHM_OIDS[digest]
 
 
 def _policy_oid_for_template(ca, template):
@@ -355,6 +388,10 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
     # CA's string refid).
     ca_ref_id = 1
 
+    # FIPS mode: announce schema 3 + a KSP + the request hash so no client
+    # falls back to signing its request with SHA-1.
+    pin_request_hash = fips_mode.enabled()
+
     for template in resolved_templates:
         key_info = _key_type_info(template.key_type)
         if key_info is None:
@@ -382,7 +419,9 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
 
         attributes = etree.SubElement(policy, '{%s}attributes' % XCEP_NS)
         etree.SubElement(attributes, '{%s}commonName' % XCEP_NS).text = template.name
-        etree.SubElement(attributes, '{%s}policySchema' % XCEP_NS).text = '2'
+        etree.SubElement(attributes, '{%s}policySchema' % XCEP_NS).text = (
+            '3' if pin_request_hash else '2'
+        )
 
         validity = etree.SubElement(attributes, '{%s}certificateValidity' % XCEP_NS)
         validity_seconds = int(template.validity_days or 397) * 86400
@@ -415,9 +454,10 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         # populated (not nil) per the real-ADCS trace referenced in the
         # module docstring; algorithmOIDReference stays nil (same trace).
         is_ecdsa = algo_name.startswith('ECDSA')
+        use_ksp = is_ecdsa or pin_request_hash
         pk_attrs = etree.SubElement(attributes, '{%s}privateKeyAttributes' % XCEP_NS)
         etree.SubElement(pk_attrs, '{%s}minimalKeyLength' % XCEP_NS).text = str(min_key_length)
-        if is_ecdsa:
+        if use_ksp:
             _nil_element(pk_attrs, 'keySpec')
         else:
             etree.SubElement(pk_attrs, '{%s}keySpec' % XCEP_NS).text = _RSA_KEY_SPEC
@@ -425,7 +465,12 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         _nil_element(pk_attrs, 'permissions')
         _nil_element(pk_attrs, 'algorithmOIDReference')
         crypto_providers = etree.SubElement(pk_attrs, '{%s}cryptoProviders' % XCEP_NS)
-        provider_names = _ECDSA_CRYPTO_PROVIDERS if is_ecdsa else _RSA_CRYPTO_PROVIDERS
+        if is_ecdsa:
+            provider_names = _ECDSA_CRYPTO_PROVIDERS
+        elif pin_request_hash:
+            provider_names = _RSA_KSP_CRYPTO_PROVIDERS
+        else:
+            provider_names = _RSA_CRYPTO_PROVIDERS
         for provider_name in provider_names:
             etree.SubElement(crypto_providers, '{%s}provider' % XCEP_NS).text = provider_name
 
@@ -454,7 +499,12 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
             etree.SubElement(attributes, '{%s}generalFlags' % XCEP_NS).text = str(_GENERAL_MACHINE_TYPE)
         else:
             _nil_element(attributes, 'generalFlags')
-        _nil_element(attributes, 'hashAlgorithmOIDReference')
+        if pin_request_hash:
+            hash_oid, hash_name = _request_hash(template)
+            hash_ref = oids.ref(hash_oid, group=_GROUP_HASH_ALGORITHM, default_name=hash_name)
+            etree.SubElement(attributes, '{%s}hashAlgorithmOIDReference' % XCEP_NS).text = str(hash_ref)
+        else:
+            _nil_element(attributes, 'hashAlgorithmOIDReference')
         _nil_element(attributes, 'rARequirements')
         _nil_element(attributes, 'keyArchivalAttributes')
 
