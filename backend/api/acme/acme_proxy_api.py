@@ -430,7 +430,6 @@ def new_order(slug=None):
             'IP identifiers are not supported.',
             400,
         )
-
     # Same syntax rules the ACME server applies to its own new-order. Without
     # them a value carrying a port, userinfo, a scheme or whitespace went
     # unexamined into the order, into the DNS provider API as a record name,
@@ -444,11 +443,9 @@ def new_order(slug=None):
 
     wildcard_denied = domain_match.wildcard_refused(identifiers)
     if wildcard_denied:
-        return proxy_error(
-            'rejectedIdentifier',
-            'Wildcard certificates are not allowed for: ' + ', '.join(wildcard_denied),
-            400,
-        )
+        return proxy_error('rejectedIdentifier',
+                           'Wildcard certificates are not allowed for: ' + ', '.join(wildcard_denied),
+                           400)
 
     requested_challenge = payload.get('challenge_type') or payload.get('challengeType')
     if requested_challenge and requested_challenge != 'dns-01':
@@ -466,7 +463,8 @@ def new_order(slug=None):
     # account existence/status check *and* the EAB identifier restrictions
     # whenever EAB is not mandatory, and would leave the resulting order
     # unbound — which _verify_order_ownership then serves to every client.
-    requester_account_id = _kid_account_id(_request_protected_header())
+    protected_header = _request_protected_header()
+    requester_account_id = _kid_account_id(protected_header)
     if not requester_account_id:
         return proxy_error('malformed', 'Account kid required in protected header')
 
@@ -478,20 +476,15 @@ def new_order(slug=None):
     if account.status in ('deactivated', 'revoked'):
         return proxy_error('unauthorized', f'Account is {account.status}', 401)
 
-    # Per-EAB domain restrictions (mirrors local ACME new-order)
+    # EAB domain scope, reported as a single rejectedIdentifier (no compound here).
     eab_cred = acme_svc.get_bound_eab_credential(requester_account_id)
     if eab_cred is not None:
-        denied = [
-            str(identifier.get('value'))
-            for identifier in identifiers
-            if not eab_cred.allows_identifier(identifier)
-        ]
-        if denied:
+        refused = [i['value'] for i in identifiers if not eab_cred.allows_identifier(i)]
+        if refused:
             return proxy_error(
                 'rejectedIdentifier',
-                'Identifier(s) not permitted by the External Account '
-                'Binding credential bound to this account: '
-                + ', '.join(denied),
+                "Identifiers not allowed by this account's external account binding: "
+                + ', '.join(refused),
                 400,
             )
 

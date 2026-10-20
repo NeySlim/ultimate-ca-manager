@@ -11,22 +11,11 @@ order for that zone fell through to the default CA (#352).
 The two halves disagreed rather than one of them being wrong: the validator
 accepts ``*.local`` on purpose, so the lookup is what has to understand it.
 """
-import re
+import string
 from typing import List, Optional
 
 _WILDCARD = '*.'
-
-# A label: letter/digit at both ends, hyphens allowed inside, 63 characters max.
-_LABEL = r'[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?'
-# The last label is alphabetic and at least two characters, which is what keeps
-# `example.123` and a bare `a` out.
-_TLD = r'[a-zA-Z]{2,}'
-# `\Z` rather than `$`: in Python `$` also matches just before a trailing
-# newline, so `$` accepted "example.com\n" as a well-formed entry.
-_ENTRY_RE = {
-    False: re.compile(rf'\A(\*\.)?({_LABEL}\.)+{_TLD}\Z'),
-    True: re.compile(rf'\A(\*\.)?(({_LABEL}\.)+)?{_TLD}\Z'),
-}
+_LABEL_CHARS = frozenset(string.ascii_letters + string.digits + '-')
 
 
 def is_valid_entry(domain: Optional[str], *, allow_single_label: bool) -> bool:
@@ -40,9 +29,24 @@ def is_valid_entry(domain: Optional[str], *, allow_single_label: bool) -> bool:
     name under it (#290). The DNS-provider table has no such case -- a zone it
     can answer a challenge in is one a provider hosts -- so it refuses them.
     """
-    if not domain:
+    if not isinstance(domain, str) or not domain:
         return False
-    return bool(_ENTRY_RE[bool(allow_single_label)].match(domain))
+    body = domain[len(_WILDCARD):] if domain.startswith(_WILDCARD) else domain
+    labels = body.split('.')
+    if len(labels) < (1 if allow_single_label else 2):
+        return False
+    if not all(_is_label(label) for label in labels):
+        return False
+    # A numeric or one-letter last label is no TLD that can ever exist.
+    top = labels[-1]
+    return len(top) >= 2 and top.isalpha()
+
+
+def _is_label(label: str) -> bool:
+    """An LDH label: 1 to 63 ASCII letters, digits or hyphens, no hyphen at either end."""
+    return (0 < len(label) <= 63
+            and all(char in _LABEL_CHARS for char in label)
+            and label[0] != '-' and label[-1] != '-')
 
 
 def normalize(domain: Optional[str]) -> str:

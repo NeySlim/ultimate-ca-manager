@@ -4,6 +4,8 @@ Automatic Certificate Management Environment
 """
 from datetime import datetime, timedelta
 from . import db
+import ipaddress
+import re
 import secrets
 import json
 from utils.datetime_utils import utc_now, utc_isoformat
@@ -614,12 +616,8 @@ class AcmeEabCredential(db.Model):
     revoked_by_user_id = db.Column(db.Integer)
     status = db.Column(db.String(20), default='active', nullable=False, index=True)
     notes = db.Column(db.Text, nullable=True)
-    # JSON array of domain patterns this credential may order certificates
-    # for. Semantics: None = unrestricted (legacy rows), [] = deny all,
-    # '*' entry = allow everything, '*.example.com' = any subdomain
-    # (any depth, not the apex), otherwise exact match. IP identifiers
-    # match only '*' or an exact IP entry.
-    allowed_domains = db.Column(db.Text, nullable=True)
+    # JSON list of domain patterns; NULL = unrestricted, [] = nothing allowed.
+    _allowed_domains = db.Column('allowed_domains', db.Text, nullable=True)
 
     # --- Encrypted property accessor ---
 
@@ -651,64 +649,6 @@ class AcmeEabCredential(db.Model):
             return False
         return True
 
-    # --- Allowed-domain restrictions ---
-
-    @property
-    def allowed_domains_list(self):
-        """Parsed pattern list. None = unrestricted; [] = deny all."""
-        if self.allowed_domains is None:
-            return None
-        try:
-            parsed = json.loads(self.allowed_domains)
-        except Exception:
-            return []  # fail closed on corrupt data
-        if not isinstance(parsed, list):
-            return []
-        return [str(p) for p in parsed]
-
-    def set_allowed_domains_list(self, patterns):
-        self.allowed_domains = (
-            json.dumps(patterns) if patterns is not None else None
-        )
-
-    @staticmethod
-    def _domain_matches_pattern(pattern, value):
-        pattern = (pattern or '').strip().rstrip('.').lower()
-        value = (value or '').strip().rstrip('.').lower()
-        if not pattern or not value:
-            return False
-        if pattern == '*':
-            return True
-        if pattern.startswith('*.'):
-            suffix = pattern[2:]
-            if not suffix:
-                return False
-            if value.startswith('*.'):
-                # Requested wildcard: allowed only if the pattern covers
-                # every name the wildcard could match.
-                base = value[2:]
-                return base == suffix or base.endswith('.' + suffix)
-            return value != suffix and value.endswith('.' + suffix)
-        return value == pattern
-
-    def allows_identifier(self, identifier):
-        """Check an ACME identifier dict against the allowed patterns."""
-        patterns = self.allowed_domains_list
-        if patterns is None:
-            return True
-        if not patterns:
-            return False
-        identifier = identifier if isinstance(identifier, dict) else {}
-        id_type = (identifier.get('type') or '').lower()
-        value = str(identifier.get('value') or '')
-        if id_type == 'ip':
-            norm = value.strip().lower()
-            return any(
-                (p or '').strip().rstrip('.').lower() in ('*', norm)
-                for p in patterns
-            )
-        return any(self._domain_matches_pattern(p, value) for p in patterns)
-
     def to_dict(self, *, include_secret=False):
         data = {
             'id': self.id,
@@ -721,7 +661,7 @@ class AcmeEabCredential(db.Model):
             'used_at': utc_isoformat(self.used_at) if self.used_at else None,
             'used_by_account_id': self.used_by_account_id,
             'revoked_at': utc_isoformat(self.revoked_at) if self.revoked_at else None,
-            'allowed_domains': self.allowed_domains_list,
+            'allowed_domains': self.allowed_domains,
         }
         if include_secret:
             data['hmac_key'] = self.hmac_key_b64
@@ -729,3 +669,134 @@ class AcmeEabCredential(db.Model):
 
     def __repr__(self):
         return f'<AcmeEabCredential kid={self.kid} status={self.status}>'
+
+    # --- Domain restrictions ---
+
+    MAX_ALLOWED_DOMAINS = 100
+
+    @property
+    def allowed_domains(self):
+        """Stored patterns, normalized; None when unrestricted (NULL).
+
+        Unparsable or non-list content reads as [] so it blocks everything.
+        """
+        raw = self._allowed_domains
+        if raw is None:
+            return None
+        try:
+            parsed = json.loads(raw)
+        except (TypeError, ValueError):
+            return []
+        if not isinstance(parsed, list):
+            return []
+        patterns = []
+        for entry in parsed:
+            if not isinstance(entry, str):
+                continue
+            norm = _normalize_domain(entry)
+            # A stored '*.' never widens into '*'.
+            if norm == '*' and entry.strip() != '*':
+                continue
+            if norm and norm not in patterns:
+                patterns.append(norm)
+        return patterns
+
+    @allowed_domains.setter
+    def allowed_domains(self, value):
+        if value is None:
+            self._allowed_domains = None
+        elif isinstance(value, (list, tuple)):
+            self._allowed_domains = json.dumps(list(value))
+        else:
+            raise TypeError('allowed_domains must be a list or None')
+
+    @classmethod
+    def clean_allowed_domains(cls, raw):
+        """Validate and normalize admin input; raises ValueError with a message."""
+        if not isinstance(raw, list):
+            raise ValueError('allowed_domains must be an array of strings')
+        if len(raw) > cls.MAX_ALLOWED_DOMAINS:
+            raise ValueError(
+                f'allowed_domains accepts at most {cls.MAX_ALLOWED_DOMAINS} patterns')
+        patterns = []
+        for entry in raw:
+            if not isinstance(entry, str):
+                raise ValueError('allowed_domains entries must be strings')
+            stripped = entry.strip().lower()
+            pattern = _normalize_domain(entry)
+            if not pattern:
+                continue
+            # '*.' must not collapse into '*', nor 'x..' into 'x.'.
+            if pattern.endswith('.') or (pattern == '*' and stripped != '*'):
+                raise ValueError(f'Invalid domain pattern: {entry.strip()}')
+            if pattern != '*':
+                _check_domain_pattern(pattern, entry.strip())
+            if pattern not in patterns:
+                patterns.append(pattern)
+        return patterns
+
+    def allows_identifier(self, identifier: dict) -> bool:
+        """Whether this credential may request ``identifier`` ({type, value})."""
+        patterns = self.allowed_domains
+        if patterns is None:
+            return True
+        if '*' in patterns:
+            return True
+        if not isinstance(identifier, dict) or not isinstance(identifier.get('value'), str):
+            return False
+        value = _normalize_domain(identifier['value'])
+        if not value:
+            return False
+        if identifier.get('type') == 'ip':
+            return any(p == value for p in patterns if not p.startswith('*.'))
+        for pattern in patterns:
+            if pattern.startswith('*.'):
+                if _wildcard_covers(pattern[2:], value):
+                    return True
+            elif pattern == value:
+                return True
+        return False
+
+
+_LABEL_RE = re.compile(r'^(?!-)[a-z0-9_-]{1,63}(?<!-)$')
+_LAST_LABEL_RE = re.compile(r'^(?!-)[a-z0-9-]{1,63}(?<!-)$')
+
+
+def _normalize_domain(value: str) -> str:
+    """Strip, lowercase and drop a single trailing dot (no IDN decoding)."""
+    value = value.strip().lower()
+    return value[:-1] if value.endswith('.') else value
+
+
+def _is_ip(value: str) -> bool:
+    try:
+        ipaddress.ip_address(value)
+        return True
+    except ValueError:
+        return False
+
+
+def _check_domain_pattern(pattern: str, shown: str) -> None:
+    """Raise ValueError unless ``pattern`` is an IP, a hostname or ``*.hostname``."""
+    wildcard = pattern.startswith('*.')
+    host = pattern[2:] if wildcard else pattern
+    if _is_ip(host):
+        if wildcard:
+            raise ValueError(f'Wildcard patterns cannot apply to IP addresses: {shown}')
+        return
+    labels = host.split('.')
+    valid = (
+        len(pattern) <= 255 and len(host) <= 253
+        and all(_LABEL_RE.match(label) for label in labels[:-1])
+        and _LAST_LABEL_RE.match(labels[-1]) is not None
+    )
+    if not valid:
+        raise ValueError(f'Invalid domain pattern: {shown}')
+
+
+def _wildcard_covers(suffix: str, value: str) -> bool:
+    """``*.suffix`` covers names below suffix but not the apex; a requested
+    ``*.base`` is covered when base is suffix or lies below it."""
+    if not suffix:
+        return False
+    return value.endswith('.' + suffix)

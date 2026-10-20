@@ -920,12 +920,13 @@ def new_authz():
         if not ok:
             return acme_error(err_type, err_detail)
 
+        # Accounts registered through EAB inherit the credential's domain scope.
         eab_cred = service.get_bound_eab_credential(account_id)
         if eab_cred is not None and not eab_cred.allows_identifier(identifier):
             return acme_error(
                 'rejectedIdentifier',
-                'Identifier not permitted by the External Account Binding '
-                'credential bound to this account',
+                f"Identifier {identifier.get('value')} is not allowed by this account's "
+                "external account binding",
             )
 
         auth = service.create_pre_authorization(account_id, identifier)
@@ -1055,43 +1056,34 @@ def new_order():
                 subproblems=subproblems,
             )
 
-        # Per-EAB domain restrictions: if this account was registered via an
-        # EAB credential, every identifier must match the credential's
-        # allowed domain patterns. An empty list denies all issuance.
-        eab_cred = service.get_bound_eab_credential(account.account_id)
+        # EAB domain scope: every refused identifier is reported in one response.
+        eab_cred = service.get_bound_eab_credential(account_id)
         if eab_cred is not None:
-            eab_rejected = [
-                _identifier_subproblem(
-                    identifier,
-                    'rejectedIdentifier',
-                    'Identifier not permitted by the External Account '
-                    'Binding credential bound to this account',
-                )
-                for identifier in identifiers
-                if not eab_cred.allows_identifier(identifier)
-            ]
-            if eab_rejected:
-                denied_values = ', '.join(
-                    str((sp.get('identifier') or {}).get('value'))
-                    for sp in eab_rejected
-                )
+            refused = [i for i in identifiers if not eab_cred.allows_identifier(i)]
+            if refused:
+                values = [i.get('value') for i in refused]
                 _audit_acme(
                     'acme.order.rejected_eab_domains',
                     resource_type='acme_account',
-                    resource_id=account.account_id,
-                    details=(
-                        f'EAB kid={eab_cred.kid} rejected identifiers: '
-                        f'{denied_values}'
-                    ),
+                    resource_id=account_id,
+                    details=f"EAB kid={eab_cred.kid} rejected identifiers: {', '.join(values)}",
                     success=False,
                 )
+                subproblems = [
+                    _identifier_subproblem(
+                        i, 'rejectedIdentifier',
+                        f"Identifier {i.get('value')} is not allowed by this account's "
+                        "external account binding",
+                    )
+                    for i in refused
+                ]
+                if len(subproblems) == 1:
+                    return acme_error('rejectedIdentifier', subproblems[0]['detail'],
+                                      subproblems=subproblems)
                 return acme_error(
-                    'rejectedIdentifier' if len(eab_rejected) == 1
-                    else 'compound',
-                    eab_rejected[0]['detail'] if len(eab_rejected) == 1
-                    else 'Multiple identifiers are not permitted by the '
-                         'External Account Binding domain restrictions',
-                    subproblems=eab_rejected,
+                    'compound',
+                    'Identifiers are not allowed by this account\'s external account binding',
+                    subproblems=subproblems,
                 )
 
         replaces = payload.get('replaces')
@@ -1841,12 +1833,10 @@ def revoke_cert():
                 resource_type='certificate',
                 resource_id=cert.id,
                 details=f"held serial={serial_hex_lower}: approval required by policy {held_by.name}",
-                success=False,
-            )
-            return acme_error(
-                'unauthorized',
-                f'Revoking this certificate requires approval per policy "{held_by.name}"; '
-                'ask the certificate authority operators to revoke it', 403)
+                success=False)
+            return acme_error('unauthorized',
+                              f'Revoking this certificate requires approval per policy "{held_by.name}"; '
+                              'ask the certificate authority operators to revoke it', 403)
 
         # Revoke certificate
         try:

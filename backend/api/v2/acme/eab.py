@@ -6,9 +6,6 @@ the local ACME server. Single-use by design — once an account binds
 to a credential it transitions to ``used``.
 """
 import base64
-import json
-import re
-import ipaddress
 
 from flask import request, g
 from models import db, AcmeEabCredential, SystemConfig
@@ -19,52 +16,6 @@ from utils.db_transaction import safe_commit
 from utils.randomness import csp_bytes
 
 from . import bp, logger
-
-
-_HOSTNAME_RE = re.compile(
-    r'^(?=.{1,253}$)'
-    r'([a-z0-9_]([a-z0-9_-]{0,61}[a-z0-9_])?\.)*'
-    r'[a-z0-9]([a-z0-9-]{0,61}[a-z0-9])?$'
-)
-
-
-def _parse_allowed_domains(raw):
-    """Validate/normalize allowed_domains input.
-
-    Returns (patterns, error). raw=None -> (None, None) meaning
-    "not provided". Empty list is valid and means deny-all.
-    """
-    if raw is None:
-        return None, None
-    if not isinstance(raw, list):
-        return None, 'allowed_domains must be an array of domain patterns'
-    if len(raw) > 100:
-        return None, 'Too many allowed domain patterns (max 100)'
-
-    cleaned, seen = [], set()
-    for entry in raw:
-        if not isinstance(entry, str):
-            return None, 'allowed_domains entries must be strings'
-        pattern = entry.strip().rstrip('.').lower()
-        if not pattern:
-            continue
-        if pattern != '*':
-            is_wildcard = pattern.startswith('*.')
-            host = pattern[2:] if is_wildcard else pattern
-            is_ip = False
-            try:
-                ipaddress.ip_address(host)
-                is_ip = True
-            except ValueError:
-                pass
-            if is_ip and is_wildcard:
-                return None, f'Wildcard IP patterns are not supported: {entry}'
-            if not is_ip and (len(pattern) > 255 or not _HOSTNAME_RE.match(host)):
-                return None, f'Invalid domain pattern: {entry}'
-        if pattern not in seen:
-            seen.add(pattern)
-            cleaned.append(pattern)
-    return cleaned, None
 
 
 def _eab_required_value():
@@ -136,6 +87,16 @@ def create_eab_credential():
     label = (data.get('label') or '').strip()[:255] or None
     expires_in_days = data.get('expires_in_days')
 
+    # Absent or null keeps the pre-restriction behaviour: unrestricted.
+    raw_domains = data.get('allowed_domains')
+    if raw_domains is None:
+        allowed_domains = ['*']
+    else:
+        try:
+            allowed_domains = AcmeEabCredential.clean_allowed_domains(raw_domains)
+        except ValueError as e:
+            return error_response(str(e), 400)
+
     expires_at = None
     if expires_in_days is not None:
         try:
@@ -144,16 +105,6 @@ def create_eab_credential():
                 expires_at = datetime.utcnow() + timedelta(days=days)
         except (TypeError, ValueError):
             return error_response('expires_in_days must be a positive integer', 400)
-
-    allowed_domains, domains_error = _parse_allowed_domains(
-        data.get('allowed_domains')
-    )
-    if domains_error:
-        return error_response(domains_error, 400)
-    if allowed_domains is None:
-        # Not provided (API compatibility): unrestricted, like pre-existing
-        # credentials. The UI always sends an explicit list.
-        allowed_domains = ['*']
 
     # 16-byte kid (URL-safe), 32-byte HMAC secret (256-bit), URL-safe base64 encoded
     # without padding — RFC 8555 §7.3.4 only specifies HMAC, doesn't mandate length.
@@ -170,7 +121,7 @@ def create_eab_credential():
         created_by_user_id=user_id,
         expires_at=expires_at,
         status='active',
-        allowed_domains=json.dumps(allowed_domains),
+        allowed_domains=allowed_domains,
     )
     db.session.add(cred)
     ok, err = safe_commit(logger, "Failed to create EAB credential")
@@ -201,24 +152,26 @@ def get_eab_credential(cred_id):
 @bp.route('/api/v2/acme/eab-credentials/<int:cred_id>', methods=['PATCH'])
 @require_auth(['write:acme'])
 def patch_eab_credential(cred_id):
-    """Patch mutable EAB credential fields (notes, allowed domains)."""
+    """Patch mutable EAB credential fields."""
     cred = db.session.get(AcmeEabCredential, cred_id)
     if not cred:
         return error_response('EAB credential not found', 404)
 
     data = request.get_json() or {}
+    # Validate before touching any field so a 400 leaves the row unchanged.
+    allowed_domains = None
+    if 'allowed_domains' in data:
+        if data['allowed_domains'] is None:
+            return error_response('allowed_domains cannot be null; use ["*"] or a list of patterns', 400)
+        try:
+            allowed_domains = AcmeEabCredential.clean_allowed_domains(data['allowed_domains'])
+        except ValueError as e:
+            return error_response(str(e), 400)
+
     if 'notes' in data:
         cred.notes = (data['notes'] or '').strip() or None
-
-    if 'allowed_domains' in data:
-        allowed_domains, domains_error = _parse_allowed_domains(
-            data.get('allowed_domains')
-        )
-        if domains_error:
-            return error_response(domains_error, 400)
-        cred.set_allowed_domains_list(
-            allowed_domains if allowed_domains is not None else []
-        )
+    if allowed_domains is not None:
+        cred.allowed_domains = allowed_domains
 
     ok, err = safe_commit(logger, "Failed to update EAB credential")
     if not ok:

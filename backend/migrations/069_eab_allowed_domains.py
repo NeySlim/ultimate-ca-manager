@@ -1,78 +1,61 @@
-"""Migration 069: per-EAB allowed domain patterns.
- 
-Adds acme_eab_credentials.allowed_domains (JSON array, TEXT).
-Existing credentials are backfilled with ["*"] (unrestricted) so
-upgrades do not break accounts already bound to a credential.
- 
+"""Migration 069: domain restrictions on ACME EAB credentials.
+
+Adds ``acme_eab_credentials.allowed_domains`` (TEXT, JSON list of patterns,
+NULL = unrestricted). Rows that exist when the column is added get
+``["*"]`` so their behaviour does not change.
+
 Dual-backend (SQLite + PostgreSQL).
 """
- 
 import logging
 import sqlite3
- 
+
 logger = logging.getLogger(__name__)
 pg_compatible = True
- 
-_BACKFILL = '["*"]'
- 
- 
+
+_TABLE = 'acme_eab_credentials'
+_COLUMN = 'allowed_domains'
+_UNRESTRICTED = '["*"]'
+
+
 def _upgrade_sqlite(conn):
     tables = {
         row[0] for row in conn.execute(
-            "SELECT name FROM sqlite_master WHERE type='table'"
-        ).fetchall()
+            "SELECT name FROM sqlite_master WHERE type='table'").fetchall()
     }
-    if 'acme_eab_credentials' not in tables:
-        logger.info('[069] acme_eab_credentials absent, skipping (SQLite)')
+    if _TABLE not in tables:
+        logger.info("069: no %s table, nothing to do (SQLite)", _TABLE)
         return
- 
-    columns = {
-        row[1] for row in conn.execute(
-            'PRAGMA table_info(acme_eab_credentials)'
-        ).fetchall()
-    }
-    if 'allowed_domains' not in columns:
-        conn.execute(
-            'ALTER TABLE acme_eab_credentials ADD COLUMN allowed_domains TEXT'
-        )
-        conn.execute(
-            'UPDATE acme_eab_credentials SET allowed_domains = ? '
-            'WHERE allowed_domains IS NULL',
-            (_BACKFILL,),
-        )
+    cols = {row[1] for row in conn.execute(f"PRAGMA table_info({_TABLE})")}
+    if _COLUMN in cols:
+        return
+    conn.execute(f"ALTER TABLE {_TABLE} ADD COLUMN {_COLUMN} TEXT")
+    # Backfill only on the run that adds the column: later NULLs are deliberate.
+    conn.execute(f"UPDATE {_TABLE} SET {_COLUMN} = ?", (_UNRESTRICTED,))
     conn.commit()
-    logger.info('[069] added EAB allowed_domains (SQLite)')
- 
- 
+    logger.info("069: added %s.%s (SQLite)", _TABLE, _COLUMN)
+
+
 def _upgrade_pg(conn):
     from sqlalchemy import inspect, text
- 
+
     inspector = inspect(conn)
-    if 'acme_eab_credentials' not in set(inspector.get_table_names()):
-        logger.info('[069] acme_eab_credentials absent, skipping (PostgreSQL)')
+    if _TABLE not in inspector.get_table_names():
+        logger.info("069: no %s table, nothing to do (PostgreSQL)", _TABLE)
         return
- 
-    columns = {
-        column['name'] for column in inspector.get_columns('acme_eab_credentials')
-    }
-    if 'allowed_domains' not in columns:
-        conn.execute(text(
-            'ALTER TABLE acme_eab_credentials ADD COLUMN allowed_domains TEXT'
-        ))
-        conn.execute(text(
-            "UPDATE acme_eab_credentials SET allowed_domains = :backfill "
-            "WHERE allowed_domains IS NULL"
-        ), {'backfill': _BACKFILL})
-    logger.info('[069] added EAB allowed_domains (PostgreSQL)')
- 
- 
+    if _COLUMN in {c['name'] for c in inspector.get_columns(_TABLE)}:
+        return
+    conn.execute(text(f"ALTER TABLE {_TABLE} ADD COLUMN {_COLUMN} TEXT"))
+    conn.execute(text(f"UPDATE {_TABLE} SET {_COLUMN} = :v"), {'v': _UNRESTRICTED})
+    logger.info("069: added %s.%s (PostgreSQL)", _TABLE, _COLUMN)
+
+
 def upgrade(conn):
     if isinstance(conn, sqlite3.Connection):
         _upgrade_sqlite(conn)
     else:
         _upgrade_pg(conn)
- 
- 
+
+
 def downgrade(conn):
-    """Keep the column when rolling application code back."""
+    # Added column is harmless if left behind, matching nearby migrations.
     pass

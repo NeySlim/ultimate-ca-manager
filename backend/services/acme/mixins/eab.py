@@ -7,7 +7,7 @@ from typing import Dict, Any, Optional, Tuple
 
 from sqlalchemy import or_
 
-from models import db
+from models import db, AcmeEabCredential
 
 logger = logging.getLogger(__name__)
 
@@ -58,8 +58,6 @@ class EabMixin:
             if not kid:
                 return False, "EAB missing kid (external account ID)"
             
-            from models import AcmeEabCredential
-
             credential = AcmeEabCredential.query.filter_by(kid=kid).first()
             if credential is None:
                 return False, "Unknown external account"
@@ -119,10 +117,23 @@ class EabMixin:
             logger.error(f"EAB validation error: {e}")
             return False, str(e)
 
+    def get_bound_eab_credential(self, account_id: str) -> Optional[AcmeEabCredential]:
+        """Most recently consumed EAB credential bound to ``account_id``, or None."""
+        if not account_id:
+            return None
+        return (
+            AcmeEabCredential.query
+            .filter(AcmeEabCredential.used_by_account_id == account_id)
+            .order_by(
+                AcmeEabCredential.used_at.desc().nullslast(),
+                AcmeEabCredential.id.desc(),
+            )
+            .first()
+        )
+
     def mark_eab_used(self, kid: str, account_id: str) -> bool:
         """Consume and bind an EAB credential after account creation commits."""
         try:
-            from models import AcmeEabCredential
             from utils.datetime_utils import utc_now
 
             now = utc_now()
@@ -153,20 +164,3 @@ class EabMixin:
             db.session.rollback()
             logger.warning(f"Failed to consume EAB credential {kid}: {e}")
             return False
-
-    def get_bound_eab_credential(self, account_id):
-        """Return the EAB credential consumed by this account, if any.
-
-        Used to enforce per-credential domain restrictions on new-order /
-        new-authz. Accounts registered without EAB return None
-        (unrestricted).
-        """
-        if not account_id:
-            return None
-        from models import AcmeEabCredential
-        return (
-            AcmeEabCredential.query
-            .filter_by(used_by_account_id=account_id)
-            .order_by(AcmeEabCredential.used_at.desc())
-            .first()
-        )

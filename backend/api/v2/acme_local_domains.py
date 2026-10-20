@@ -189,13 +189,9 @@ def find_local_domain_ca(domain: str) -> int | None:
 
 
 def _is_valid_domain(domain: str) -> bool:
-    """Validate domain format.
+    """Whether ``domain`` can be registered as a local ACME domain.
 
-    Accepts standard domains, subdomains and wildcards, plus bare TLDs
-    (e.g. "local", "internal") so admins can register a whole private TLD
-    and let find_local_domain_ca's parent-walking cover every subdomain.
-
-    Accepted: local, *.local, example.com, *.example.com, foo.example.com
-    Rejected: *, ..com, com., single-char or numeric-only TLDs
+    Same shape rule as the DNS-provider table, plus a bare private TLD such as
+    ``lan`` or ``*.lan``, which covers every name under it on this table.
     """
     return domain_match.is_valid_entry(domain, allow_single_label=True)
