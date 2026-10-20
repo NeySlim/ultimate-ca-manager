@@ -1,5 +1,5 @@
 import { useTranslation } from 'react-i18next'
-import { Database, Download, Trash, UploadSimple, FloppyDisk, MagnifyingGlass, CaretLeft, CaretRight, Broom, HardDrives, WarningCircle, Lock } from '@phosphor-icons/react'
+import { Database, Download, Trash, UploadSimple, FloppyDisk, MagnifyingGlass, CaretLeft, CaretRight, Broom, HardDrives, WarningCircle } from '@phosphor-icons/react'
 import { Button, Input, Select, FileUpload, Badge, DetailHeader, DetailSection, DetailContent } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 
@@ -13,8 +13,8 @@ export default function BackupSection({
 }) {
   const { t } = useTranslation()
   const isAdmin = hasPermission('admin:system')
-  const canAdminSettings = hasPermission('admin:settings')
-  const canWriteSettings = hasPermission('write:settings')
+  // PLANB-D.6: à implémenter selon SPEC (verrouillage des champs réservés à admin:settings)
+  const canAdminSettings = Boolean(hasPermission('admin:settings'))
   const allSelected = backups.length > 0 && selectedBackups.length === backups.length
   const diskHigh = typeof backupMeta.disk_used_pct === 'number' && backupMeta.disk_used_pct >= 85
 
@@ -67,15 +67,10 @@ export default function BackupSection({
                 value={settings.backup_kdf || 'auto'}
                 onChange={(val) => updateSetting('backup_kdf', val)}
                 helperText={t('settings.backupKdfHelper')}
-                disabled={!canAdminSettings}
+                disabled={canAdminSettings === false}
               />
               <Input
-                label={
-                  <span className="flex items-center gap-1">
-                    {t('settings.autoBackupPassword')}
-                    {!canAdminSettings && <Lock size={12} className="text-text-tertiary" />}
-                  </span>
-                }
+                label={t('settings.autoBackupPassword')}
                 type="password"
                 noAutofill
                 value={settings.backup_password || ''}
@@ -85,7 +80,6 @@ export default function BackupSection({
                   ? t('settings.backupPasswordKeepHelper')
                   : t('settings.autoBackupPasswordHelper')}
                 showStrength
-                disabled={!canAdminSettings}
               />
               {/* Status only: the stored password is never sent to the browser */}
               <div className="flex items-center gap-2">
@@ -104,7 +98,7 @@ export default function BackupSection({
             </>
           )}
 
-          {canWriteSettings && (
+          {isAdmin && (
             <div className="flex gap-2">
               <Button type="button" onClick={() => handleSave('backup')} disabled={saving}>
                 <FloppyDisk size={16} />
@@ -131,18 +125,16 @@ export default function BackupSection({
             max="3650"
             helperText={t('settings.retentionHelper')}
           />
-          {canWriteSettings && (
+          {isAdmin && (
             <div className="flex gap-2">
               <Button type="button" onClick={() => handleSave('backup')} disabled={saving}>
                 <FloppyDisk size={16} />
                 {t('settings.saveSettings')}
               </Button>
-              {isAdmin && (
-                <Button type="button" variant="secondary" onClick={handleRunRetention} disabled={backupBusy}>
-                  <Broom size={16} />
-                  {t('settings.backupCleanupNow')}
-                </Button>
-              )}
+              <Button type="button" variant="secondary" onClick={handleRunRetention} disabled={backupBusy}>
+                <Broom size={16} />
+                {t('settings.backupCleanupNow')}
+              </Button>
             </div>
           )}
         </div>

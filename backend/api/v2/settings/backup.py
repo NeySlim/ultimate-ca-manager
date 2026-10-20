@@ -303,7 +303,7 @@ def download_backup(filename):
     except PermissionError:
         return error_response('Access denied', 403)
 
-    if not backup_file.is_file() or backup_file.is_symlink():
+    if backup_file.is_symlink() or not backup_file.is_file():
         return error_response('Backup file not found', 404)
 
     return send_file(
@@ -342,7 +342,7 @@ def delete_backup(filename):
         logger.info("Delete refused: %s", busy)
         return error_response(str(busy), 409)
     except OSError:
-        logger.exception("Failed to delete backup: %s", safe_filename)
+        logger.exception('Failed to delete backup: %s', safe_filename)
         return error_response('Failed to delete backup', 500)
 
     AuditService.log_action(

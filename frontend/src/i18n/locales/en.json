@@ -2483,7 +2483,7 @@
     "hstsMaxAgeDesc": "How long browsers should remember this HSTS policy (default: 31536000 = 1 year).",
     "hstsNote": "Changes apply on the next response. Disabling HSTS does not clear already-cached browser policies; existing clients must wait for the previous max-age to expire.",
     "hstsEnvLocked": "One or more HSTS settings are forced by environment variables (UCM_HSTS_*) in /etc/ucm/ucm.env and cannot be changed here. Remove the env vars to manage HSTS from this UI.",
-    "adminFieldsLocked": "Some fields on this card require admin settings permission and are locked. Your changes to the remaining fields will be saved.",
+    "adminFieldsLocked": "",
     "keyRecoveryTitle": "Key Recovery",
     "keyRecoveryDualControl": "Dual control (four-eyes)",
     "keyRecoveryDualControlDesc": "Require a second administrator to approve each private-key recovery request (the approver must differ from the requester).",

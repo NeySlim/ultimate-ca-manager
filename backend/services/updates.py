@@ -363,23 +363,12 @@ def download_update(download_url, package_name, expected_sha256=None):
 
     Returns path to downloaded file
     """
-    # SECURITY: Sanitize package_name to prevent path traversal.
-    safe_name = os.path.basename(package_name)
-    if not safe_name or safe_name != package_name:
-        logger.warning(
-            f"Path traversal attempt in package_name blocked: {package_name!r}, "
-            f"using sanitized name: {safe_name!r}"
-        )
-    if not safe_name:
-        raise Exception("Invalid package name after sanitization")
-    
+    # PLANB-D.2: à implémenter selon SPEC (nom réduit au nom final, confinement sous updates/)
+    safe_name = package_name
     update_dir = os.path.join(str(DATA_DIR), 'updates')
     os.makedirs(update_dir, exist_ok=True)
-    file_path = os.path.join(update_dir, safe_name)
-    
-    if not os.path.abspath(file_path).startswith(os.path.abspath(update_dir)):
-        raise Exception("Resolved file path escapes update directory")
-    
+    file_path = os.path.join(update_dir, package_name)
+
     try:
         logger.info(f"Auto-update: downloading {download_url} to {file_path}")
         response = requests.get(download_url, stream=True, timeout=300, allow_redirects=True, verify=_ca_bundle or True)

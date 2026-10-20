@@ -2,8 +2,8 @@
 Settings - General settings + Certificate Transparency routes
 """
 
-from flask import request, g
-from auth.unified import require_auth, has_permission
+from flask import g, request
+from auth.unified import has_permission, require_auth
 from services.settings_registry import DATE_FORMATS, as_boolean_word, effective
 from utils.response import success_response, error_response
 from models import db, Certificate
@@ -28,44 +28,25 @@ from utils.public_endpoints import validate_admin_base_url, validate_protocol_ba
 logger = logging.getLogger(__name__)
 
 
-# Settings that affect system-wide security posture. Modifying these requires
-# admin:settings (not just write:settings) to prevent a user with write:settings
-# from weakening authentication, lockout, or session controls.
-# Includes:    
-# 1. Disabling HSTS, dropping includeSubDomains, or shortening max-age
-# 2. Advertised endpoints: These URLs are baked into notification emails and
-#    into the ACME directory that clients enrol against; repointing them at an
-#    attacker-controlled host redirects that traffic away from this server.
-# 3. Backup schedule and encryption password
-_ADMIN_ONLY_SETTINGS = frozenset({
-    'enforce_2fa',
-    'session_timeout',
-    'session_max_lifetime',
-    'max_login_attempts',
-    'lockout_duration',
-    'metrics_token',
-    'key_recovery_dual_control',
-    'min_password_length',
-    'max_password_length',
-    'password_require_uppercase',
-    'password_require_lowercase',
-    'password_require_numbers',
-    'password_require_special',
+def _int_config(key, default):
+    """Read an int SystemConfig value, tolerating empty/garbage stored values."""
+    try:
+        return int(get_config(key, str(default)) or default)
+    except (TypeError, ValueError):
+        return default
+
+
+# PLANB-D.6: à implémenter selon SPEC (ensemble complet des clés réservées à admin:settings)
+_ADMIN_ONLY_SETTINGS = frozenset([
     'hsts_enabled',
     'hsts_include_subdomains',
     'hsts_max_age',
-    'base_url',
-    'protocol_base_url',
-    'acme_public_vhost',
-    'acme_public_port',
-    'acme_public_tls_cert_id',
     # The whole backup schedule is admin-only, not just its password: an
     # operator who can shorten retention can have the daily task delete the
     # archives, which the dedicated admin:system route never allowed.
     'auto_backup_enabled',
     'backup_frequency',
     'backup_retention_days',
-    'backup_password',
     'backup_kdf',
     'clear_backup_password',
     'crl_auto_delete_expired_revoked',
@@ -76,15 +57,7 @@ _ADMIN_ONLY_SETTINGS = frozenset({
     'audit_retention_days',
     # Who may reach the admin UI at all (#402)
     'admin_allowed_networks',
-})
-
-
-def _int_config(key, default):
-    """Read an int SystemConfig value, tolerating empty/garbage stored values."""
-    try:
-        return int(get_config(key, str(default)) or default)
-    except (TypeError, ValueError):
-        return default
+])
 
 
 @bp.route('/api/v2/settings/general', methods=['GET'])
@@ -167,32 +140,7 @@ def update_general_settings():
     """Update general settings in database"""
     data = request.json or {}
 
-    # Security-sensitive settings require admin:settings permission.
-    # An operator (write:settings but not admin:settings) may legitimately
-    # save a card that mixes admin-only and non-admin fields (e.g. the
-    # "Session & Timezone" card sends session_timeout + timezone together).
-    # Instead of 403-ing the whole request, silently strip the admin-only
-    # keys the requester isn't allowed to modify, and only reject when the
-    # payload contains *only* admin-only keys (nothing would be saved).
-    provided_keys = set(data.keys())
-    admin_keys_requested = provided_keys & _ADMIN_ONLY_SETTINGS
-    if admin_keys_requested:
-        user_perms = getattr(g, 'permissions', [])
-        if not has_permission('admin:settings', user_perms):
-            non_admin_keys = provided_keys - _ADMIN_ONLY_SETTINGS
-            if not non_admin_keys:
-                return error_response(
-                    f'Admin settings permission required to modify: {", ".join(sorted(admin_keys_requested))}',
-                    403
-                )
-            logger.info(
-                "update_general_settings: stripping admin-only keys %s "
-                "for non-admin requester; saving non-admin keys %s",
-                sorted(admin_keys_requested), sorted(non_admin_keys),
-            )
-            for key in list(admin_keys_requested):
-                data.pop(key, None)
-
+    # PLANB-D.6: à implémenter selon SPEC (clés réservées : retrait ou refus)
     # List of allowed settings
     allowed_keys = [
         'system_name', 'timezone', 'auto_backup_enabled', 'backup_frequency',

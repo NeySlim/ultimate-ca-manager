@@ -1,6 +1,6 @@
 import { useEffect, useState } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Gear, Clock, FloppyDisk, ChartBar, ArrowsClockwise, Lock } from '@phosphor-icons/react'
+import { Gear, Clock, FloppyDisk, ChartBar, ArrowsClockwise } from '@phosphor-icons/react'
 import { Button, Input, Select, Badge, DetailHeader, DetailSection, DetailGrid, DetailContent } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { useNotification } from '../../contexts'
@@ -10,7 +10,7 @@ import { fetchAllPages } from '../../lib/fetchAllPages'
 import ServiceStatusWidget from './ServiceStatusWidget'
 import PublicEndpointsPanel from './PublicEndpointsPanel'
 
-export default function GeneralSection({ settings, updateSetting, handleSave, saving, canWrite, hasPermission }) {
+export default function GeneralSection({ settings, updateSetting, handleSave, saving, canWrite }) {
   const { t } = useTranslation()
   const { showSuccess, showError } = useNotification()
   const [metricsToken, setMetricsToken] = useState('')
@@ -18,8 +18,7 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
   const [tlsCertOptions, setTlsCertOptions] = useState([])
   const [endpointsRefresh, setEndpointsRefresh] = useState(0)
 
-  const canAdminSettings = hasPermission ? hasPermission('admin:settings') : false
-
+  // PLANB-D.6: à implémenter selon SPEC (verrouillage des champs réservés à admin:settings)
   // Certificates with a private key, for the ACME public vhost TLS selector
   useEffect(() => {
     let cancelled = false
@@ -85,30 +84,18 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             helperText={t('settings.systemNameHelper')}
           />
           <Input
-            label={
-              <span className="flex items-center gap-1">
-                {t('settings.baseUrl')}
-                {!canAdminSettings && <Lock size={12} className="text-text-tertiary" />}
-              </span>
-            }
+            label={t('settings.baseUrl')}
             value={settings.base_url || ''}
             onChange={(e) => updateSetting('base_url', e.target.value)}
             placeholder={t('settings.baseUrlPlaceholder')}
             helperText={t('settings.baseUrlHelper')}
-            disabled={!canAdminSettings}
           />
           <Input
-            label={
-              <span className="flex items-center gap-1">
-                {t('settings.protocolBaseUrl')}
-                {!canAdminSettings && <Lock size={12} className="text-text-tertiary" />}
-              </span>
-            }
+            label={t('settings.protocolBaseUrl')}
             value={settings.protocol_base_url || ''}
             onChange={(e) => updateSetting('protocol_base_url', e.target.value)}
             placeholder="http://admin.ucm.example.com:8080"
             helperText={t('settings.protocolBaseUrlHelper')}
-            disabled={!canAdminSettings}
           />
           <Input
             label={t('settings.httpProtocolPort')}
@@ -124,25 +111,14 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
             helperText={t('settings.httpProtocolPortHelper')}
           />
           <Input
-            label={
-              <span className="flex items-center gap-1">
-                {t('settings.acmePublicVhost')}
-                {!canAdminSettings && <Lock size={12} className="text-text-tertiary" />}
-              </span>
-            }
+            label={t('settings.acmePublicVhost')}
             value={settings.acme_public_vhost || ''}
             onChange={(e) => updateSetting('acme_public_vhost', e.target.value)}
             placeholder="acme.ucm.example.com"
             helperText={t('settings.acmePublicVhostHelper')}
-            disabled={!canAdminSettings}
           />
           <Input
-            label={
-              <span className="flex items-center gap-1">
-                {t('settings.acmePublicPort')}
-                {!canAdminSettings && <Lock size={12} className="text-text-tertiary" />}
-              </span>
-            }
+            label={t('settings.acmePublicPort')}
             type="number"
             min={1}
             max={65535}
@@ -152,15 +128,9 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
               updateSetting('acme_public_port', Math.min(65535, Math.max(1, val)))
             }}
             helperText={t('settings.acmePublicPortHelper')}
-            disabled={!canAdminSettings}
           />
           <Select
-            label={
-              <span className="flex items-center gap-1">
-                {t('settings.acmePublicTlsCertId')}
-                {!canAdminSettings && <Lock size={12} className="text-text-tertiary" />}
-              </span>
-            }
+            label={t('settings.acmePublicTlsCertId')}
             value={settings.acme_public_tls_cert_id ? String(settings.acme_public_tls_cert_id) : ''}
             onChange={(val) => updateSetting('acme_public_tls_cert_id', val || '')}
             options={[
@@ -168,7 +138,6 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
               ...tlsCertOptions,
             ]}
             helperText={t('settings.acmePublicTlsCertIdHelper')}
-            disabled={!canAdminSettings}
           />
           {canWrite('settings') && (
             <div className="pt-2">
@@ -183,11 +152,6 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
                 <FloppyDisk size={16} />
                 {t('common.saveChanges')}
               </Button>
-              {!canAdminSettings && (
-                <p className="text-xs text-text-tertiary mt-1">
-                  {t('settings.adminFieldsLocked')}
-                </p>
-              )}
             </div>
           )}
         </div>
@@ -200,49 +164,31 @@ export default function GeneralSection({ settings, updateSetting, handleSave, sa
       <DetailSection title={t('settings.sessionTimezone')} icon={Clock} iconClass="icon-bg-teal">
         <div className="space-y-4">
           <Input
-            label={
-              <span className="flex items-center gap-1">
-                {t('settings.sessionTimeout')}
-                {!canAdminSettings && <Lock size={12} className="text-text-tertiary" />}
-              </span>
-            }
+            label={t('settings.sessionTimeout')}
             type="number"
             value={Math.round((settings.session_timeout || 28800) / 60)}
             onChange={(e) => updateSetting('session_timeout', parseInt(e.target.value) * 60)}
             min="5"
             max="1440"
             helperText={t('settings.sessionTimeoutHelper')}
-            disabled={!canAdminSettings}
           />
           <Input
-            label={
-              <span className="flex items-center gap-1">
-                {t('settings.maxLoginAttempts')}
-                {!canAdminSettings && <Lock size={12} className="text-text-tertiary" />}
-              </span>
-            }
+            label={t('settings.maxLoginAttempts')}
             type="number"
             value={settings.max_login_attempts || 5}
             onChange={(e) => updateSetting('max_login_attempts', parseInt(e.target.value))}
             min="3"
             max="20"
             helperText={t('settings.maxLoginAttemptsHelper')}
-            disabled={!canAdminSettings}
           />
           <Input
-            label={
-              <span className="flex items-center gap-1">
-                {t('settings.lockoutDuration')}
-                {!canAdminSettings && <Lock size={12} className="text-text-tertiary" />}
-              </span>
-            }
+            label={t('settings.lockoutDuration')}
             type="number"
             value={Math.round((settings.lockout_duration || 900) / 60)}
             onChange={(e) => updateSetting('lockout_duration', parseInt(e.target.value) * 60)}
             min="1"
             max="60"
             helperText={t('settings.lockoutDurationHelper')}
-            disabled={!canAdminSettings}
           />
           <Select
             label={t('settings.timezone')}

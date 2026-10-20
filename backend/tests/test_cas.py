@@ -486,24 +486,6 @@ class TestExportSingleCA:
         r = auth_client.get(f'/api/v2/cas/{ca["id"]}/export?format=pkcs12')
         assert_error(r, 400)
 
-    def test_export_pkcs12_with_password(self, auth_client, create_ca):
-        ca = create_ca(cn='ExportPKCS12 CA')
-        r = auth_client.post(
-            f'/api/v2/cas/{ca["id"]}/export',
-            data=json.dumps({'format': 'pkcs12', 'password': 'testpass123'}),
-            content_type='application/json'
-        )
-        assert r.status_code == 200
-        assert len(r.data) > 0
-
-    def test_export_pkcs12_password_in_query_rejected(self, auth_client, create_ca):
-        """GET with password in query string must be rejected (sensitive data in logs)."""
-        ca = create_ca(cn='ExportPKCS12 Query CA')
-        r = auth_client.get(
-            f'/api/v2/cas/{ca["id"]}/export?format=pkcs12&password=testpass123'
-        )
-        assert r.status_code == 400
-
     def test_export_not_found(self, auth_client):
         r = auth_client.get('/api/v2/cas/999999/export?format=pem')
         assert_error(r, 404)

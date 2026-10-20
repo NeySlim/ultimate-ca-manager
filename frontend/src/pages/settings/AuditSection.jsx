@@ -5,9 +5,9 @@ import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 
 export default function AuditSection({ settings, updateSetting, handleSave, saving, hasPermission, syslogConfig, updateSyslogConfig, syslogSaving, syslogTesting, handleSaveSyslog, handleTestSyslog }) {
   const { t } = useTranslation()
-  const canWriteSettings = hasPermission('write:settings')
   // The backend accepts a retention from admins only: shortening it deletes history.
-  const canAdminSettings = hasPermission('admin:settings')
+  const canAdminSettings = Boolean(hasPermission('admin:settings'))
+  // PLANB-D.6: à implémenter selon SPEC (verrouillage des champs réservés à admin:settings)
   return (
     <DetailContent>
       <DetailHeader
@@ -25,9 +25,9 @@ export default function AuditSection({ settings, updateSetting, handleSave, savi
             min="0"
             max="1825"
             helperText={t('settings.logRetentionHelp')}
-            disabled={!canAdminSettings}
+            disabled={canAdminSettings === false}
           />
-          {canWriteSettings && (
+          {hasPermission('admin:system') && (
             <div className="pt-4">
               <Button type="button" onClick={() => handleSave('audit')} disabled={saving}>
                 <FloppyDisk size={16} />
