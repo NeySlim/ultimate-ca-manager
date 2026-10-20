@@ -9,6 +9,7 @@ from services.certificate_parser import CertificateParser
 from services.mtls_auth_service import MTLSAuthService
 import logging
 from utils.datetime_utils import utc_now
+from utils.admin_allowlist import is_exempt_path
 
 logger = logging.getLogger(__name__)
 
@@ -59,7 +60,6 @@ def process_client_certificate():
     """
     # Protocol and probe paths read client certificates themselves; touching the
     # session there would keep a cookie's inactivity clock running from anywhere.
-    from utils.admin_allowlist import is_exempt_path
     if is_exempt_path(request.path):
         return
     # Already authenticated via certificate — skip
