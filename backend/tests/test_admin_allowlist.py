@@ -6,6 +6,7 @@ import pytest
 from models import db, SystemConfig, AuditLog
 from utils import admin_allowlist
 from utils.admin_allowlist import REFUSAL_MESSAGE, SocketIOAllowlistGate
+from tests.test_est_rfc7030 import est_config  # noqa: F401  (fixture)
 
 INSIDE = '10.1.2.3'
 OUTSIDE = '203.0.113.9'
@@ -396,3 +397,77 @@ def test_restore_message_says_the_list_was_cleared():
     message = restore_message({'restart_requested': True, 'admin_allowlist_cleared': True})
     assert 'admin access allowlist' in message
     assert 'admin access allowlist' not in restore_message({'restart_requested': True})
+
+
+def test_forward_auth_answer_is_not_logged_as_a_refusal(behind_proxy, client, monkeypatch):
+    _store(behind_proxy, '10.0.0.0/8')
+    logged = []
+    monkeypatch.setattr(admin_allowlist, 'log_refusal', lambda addr, path: logged.append(path))
+    _via_proxy(client, 'get', '/api/v2/auth/verify', OUTSIDE)
+    assert logged == []
+    _via_proxy(client, 'get', '/api/v2/certificates', OUTSIDE)
+    assert logged == ['/api/v2/certificates']
+
+
+EXEMPT_SESSION_PATHS = [
+    '/api/v2/health', '/health', '/api/v2/health/live', '/metrics',
+    '/acme/directory', '/ocsp', '/cdp/missing.crl', '/.well-known/est/cacerts',
+    '/scep/pkiclient.exe?operation=GetCACaps',
+]
+
+
+@pytest.mark.parametrize('path', EXEMPT_SESSION_PATHS)
+def test_exempt_paths_do_not_advance_a_session_from_outside(app, client, path):
+    _store(app, '10.0.0.0/8')
+    r = client.post('/api/v2/auth/login', environ_base={'REMOTE_ADDR': INSIDE},
+                    data=json.dumps({'username': 'admin', 'password': 'changeme123'}),
+                    content_type='application/json')
+    assert r.status_code == 200, r.data
+    from datetime import datetime, timedelta, timezone
+    stale = (datetime.now(timezone.utc) - timedelta(seconds=60)).isoformat()
+    with client.session_transaction() as sess:
+        sess['last_activity'] = stale
+
+    _get(client, path, OUTSIDE)
+    with client.session_transaction() as sess:
+        assert sess.get('last_activity') == stale
+
+
+def test_est_reenroll_with_a_client_certificate_still_works_from_outside(app, client, est_config):
+    """Non-regression: EST mTLS does not depend on the session hook it now skips."""
+    import base64
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes, serialization
+    from cryptography.hazmat.primitives.serialization import pkcs7
+    from tests.test_est_rfc7030 import EST_BASE, _basic_auth, _make_csr
+
+    _store(app, '10.0.0.0/8')
+    client.post('/api/v2/auth/login', environ_base={'REMOTE_ADDR': INSIDE},
+                data=json.dumps({'username': 'admin', 'password': 'changeme123'}),
+                content_type='application/json')
+
+    def post(path, csr, **kwargs):
+        return client.post(f'{EST_BASE}/{path}',
+                           data=base64.b64encode(csr.public_bytes(serialization.Encoding.DER)),
+                           content_type='application/pkcs10', **kwargs)
+
+    first_csr, key = _make_csr()
+    enrolled = post('simpleenroll', first_csr, headers=_basic_auth(),
+                    environ_base={'REMOTE_ADDR': OUTSIDE})
+    assert enrolled.status_code == 200, enrolled.data
+    leaf = [c for c in pkcs7.load_der_pkcs7_certificates(base64.b64decode(enrolled.data))
+            if not c.extensions.get_extension_for_oid(
+                x509.ExtensionOID.BASIC_CONSTRAINTS).value.ca][0]
+    csr = x509.CertificateSigningRequestBuilder().subject_name(leaf.subject) \
+        .sign(key, hashes.SHA256())
+    renewed = post('simplereenroll', csr, environ_base={'REMOTE_ADDR': OUTSIDE},
+                   environ_overrides={'peercert': leaf.public_bytes(serialization.Encoding.PEM).decode()})
+    assert renewed.status_code == 200, renewed.data
+
+
+def test_restore_keeps_the_archived_list_while_the_env_sets_it(app, monkeypatch):
+    _store(app, '10.0.0.0/8')
+    blob = _backup_of_configuration(app)
+    monkeypatch.setenv(admin_allowlist.ENV_NETWORKS, '203.0.113.0/24')
+    _restore(app, blob, OUTSIDE)
+    assert _stored(app) == '10.0.0.0/8'

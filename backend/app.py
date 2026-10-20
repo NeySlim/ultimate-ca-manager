@@ -1072,12 +1072,12 @@ def create_app(config_name=None):
         addr = request.remote_addr or ''
         if admin_allowlist.is_allowed(addr):
             return None
-        admin_allowlist.log_refusal(addr, path)
         # A forward-auth subrequest for a refused client gets verify's own
-        # unauthenticated answer, without reading or refreshing the session.
+        # unauthenticated answer; the session's inactivity clock is not advanced.
         if path in admin_allowlist.FORWARD_AUTH_PATHS and trusted_proxy.is_request_from_trusted_proxy():
             from utils.response import success_response
             return success_response(data={'authenticated': False, 'cert_error': None})
+        admin_allowlist.log_refusal(addr, path)
         if path.startswith('/api/'):
             from utils.response import error_response
             return error_response(admin_allowlist.REFUSAL_MESSAGE, 403)

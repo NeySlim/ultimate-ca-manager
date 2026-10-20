@@ -35,9 +35,9 @@ _EXEMPT_EXACT = frozenset({
     # SCEP clients that hard-code the legacy path
     '/cgi-bin/pkiclient.exe',
 })
-# Forward-auth subrequests: a refused client is answered "not authenticated"
-# when a trusted proxy asks, 403 otherwise (see app.enforce_admin_allowlist).
-FORWARD_AUTH_PATHS = frozenset({'/api/auth/verify', '/api/v2/auth/verify'})
+# Session check: a refused client is answered "not authenticated" when a
+# trusted proxy asks, 403 otherwise; its inactivity clock is not advanced.
+FORWARD_AUTH_PATHS = frozenset({'/api/v2/auth/verify'})
 
 # The DB row is re-read at most this often, so a change written by another
 # process takes effect within seconds; a change written here is immediate.
@@ -201,7 +201,8 @@ def restored_value_locks_out(raw) -> bool:
     """True when a restored non-empty list would not admit the restoring HTTP
     request, or when the restore runs outside an HTTP request."""
     raw = raw.strip() if isinstance(raw, str) else ''
-    if not raw:
+    if not raw or env_locked():
+        # Under UCM_ADMIN_ALLOWED_NETWORKS the archived list is not the one in force.
         return False
     from flask import has_request_context, request
     return not (has_request_context() and address_in(request.remote_addr or '', _compile(raw)))

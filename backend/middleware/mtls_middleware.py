@@ -57,6 +57,11 @@ def process_client_certificate():
     
     Sources: native TLS peercert, Nginx headers, Apache headers.
     """
+    # Protocol and probe paths read client certificates themselves; touching the
+    # session there would keep a cookie's inactivity clock running from anywhere.
+    from utils.admin_allowlist import is_exempt_path
+    if is_exempt_path(request.path):
+        return
     # Already authenticated via certificate — skip
     if session.get('user_id') and session.get('auth_method') == 'certificate':
         return
