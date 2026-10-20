@@ -72,7 +72,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- Policy notifications: a mail that failed to send blocked the next attempt for an hour; a refusal now tries again after five minutes, while a sent or in-flight mail still holds back repeats for the hour. Nothing is attempted while SMTP is off.
+- Policy notifications: a mail that failed to send blocked the next attempt for an hour; a refusal now tries again after five minutes, while a sent or in-flight mail still holds back repeats for the hour, and nothing is attempted while SMTP is off.
 - Policy notifications: on SQLite, a new approval request or policy that reused the id of one deleted within the hour was not reported; the notification key now also carries its creation time.
 - `POST /api/v2/audit/cleanup` deleted every entry older than the retention, even one behind a newer entry, which broke the chain; it now purges the oldest entries as the scheduled retention does.
 - Scheduled reports were emailed without the report attached and always announced as CSV; the file is now attached in the schedule's format (CSV, JSON or PDF), and a test send that fails says so.

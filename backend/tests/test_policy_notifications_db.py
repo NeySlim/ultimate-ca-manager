@@ -2,6 +2,7 @@
 sent or in-flight mail holds back a repeat, and creation times keep their
 microseconds (they tell a reused id apart)."""
 import os
+import uuid
 from contextlib import contextmanager
 from datetime import datetime
 
@@ -23,7 +24,9 @@ def _database(backend, tmp_path):
     if backend == 'sqlite':
         yield f"sqlite:///{tmp_path / 'notify.db'}"
     else:
-        with _a_schema_of_our_own('policy_notify_dedup') as url:
+        # One schema per worker and run, so two sessions on the bench never share one.
+        schema = f"policy_notify_dedup_{os.getenv('PYTEST_XDIST_WORKER', 'main')}_{uuid.uuid4().hex[:6]}"
+        with _a_schema_of_our_own(schema) as url:
             yield url
 
 
