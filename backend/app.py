@@ -1573,20 +1573,12 @@ def init_database(app):
     
     # ===== INITIALIZE DEFAULT DATA =====
     try:
-        from models.group import DEFAULT_GROUPS, Group
+        from models.group import seed_default_groups
         from models.rbac import CustomRole, RolePermission
         
-        # Create default groups if none exist
-        if Group.query.count() == 0:
-            app.logger.info("Creating default Pro groups...")
-            
-            default_groups = [Group(**{**g, 'permissions': list(g['permissions'])}) for g in DEFAULT_GROUPS]
-            
-            for group in default_groups:
-                db.session.add(group)
-            
-            db.session.commit()
-            app.logger.info(f"✓ Created {len(default_groups)} default Pro groups")
+        created = seed_default_groups()
+        if created:
+            app.logger.info(f"✓ Created {created} default Pro groups")
         
         # Create default custom roles if none exist
         if CustomRole.query.count() == 0:

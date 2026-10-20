@@ -9,7 +9,7 @@ from sqlalchemy import create_engine, text
 
 from auth.permissions import GROUP_GRANTABLE_PERMISSIONS, get_group_permissions
 from models import User, db
-from models.group import DEFAULT_GROUPS, Group, GroupMember
+from models.group import DEFAULT_GROUPS, Group, GroupMember, seed_default_groups
 from models.rbac import CustomRole
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
@@ -80,6 +80,24 @@ def test_default_groups_hold_grantable_lists():
         perms = group['permissions']
         assert isinstance(perms, list) and perms
         assert set(perms) <= set(GROUP_GRANTABLE_PERMISSIONS)
+
+
+def test_seed_on_empty_table_stores_lists(app):
+    with app.app_context():
+        saved = [(g.name, g.description, g.permissions) for g in Group.query.all()]
+        GroupMember.query.delete()
+        Group.query.delete()
+        db.session.commit()
+        try:
+            assert seed_default_groups() == len(DEFAULT_GROUPS)
+            assert seed_default_groups() == 0
+            # Read back as stored, not through to_dict which would decode text.
+            stored = {g.name: g.permissions for g in Group.query.all()}
+            assert stored == {g['name']: g['permissions'] for g in DEFAULT_GROUPS}
+        finally:
+            Group.query.delete()
+            db.session.add_all([Group(name=n, description=d, permissions=p) for n, d, p in saved])
+            db.session.commit()
 
 
 @pytest.fixture

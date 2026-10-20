@@ -5,7 +5,10 @@ the API returned as text and the Groups panel crashed on. Each row becomes a
 list of the scopes a group may grant.
 """
 import json
+import logging
 import sqlite3
+
+logger = logging.getLogger(__name__)
 
 pg_compatible = True
 
@@ -18,7 +21,8 @@ def _grantable():
     try:
         from auth.permissions import GROUP_GRANTABLE_PERMISSIONS
         return set(GROUP_GRANTABLE_PERMISSIONS)
-    except Exception:
+    except ImportError as e:
+        logger.warning("Migration 104: %s; keeping only scoped, non-admin permissions", e)
         return None
 
 

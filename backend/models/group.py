@@ -18,6 +18,16 @@ DEFAULT_GROUPS = (
 )
 
 
+def seed_default_groups():
+    """Create DEFAULT_GROUPS when no group exists; returns how many were created."""
+    if Group.query.count():
+        return 0
+    for g in DEFAULT_GROUPS:
+        db.session.add(Group(**{**g, 'permissions': list(g['permissions'])}))
+    db.session.commit()
+    return len(DEFAULT_GROUPS)
+
+
 def permission_list(value):
     """Stored group permissions as a list; JSON text from an old backup is decoded."""
     if isinstance(value, str):
