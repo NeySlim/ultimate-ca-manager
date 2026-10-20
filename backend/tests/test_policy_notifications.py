@@ -18,18 +18,36 @@ def _json(client, method, url, payload=None):
     return getattr(client, method)(url, data=json.dumps(payload or {}), content_type='application/json')
 
 
+def _forget_policy_logs(app):
+    """Other files leave policy mails behind, under ids this file may reuse."""
+    policy_notifications._recent.clear()
+    with app.app_context():
+        NotificationLog.query.filter_by(resource_type='policy').delete()
+        db.session.commit()
+
+
+def _log(app, kind, resource_id, status='sent'):
+    with app.app_context():
+        db.session.add(NotificationLog(type=kind, recipient='pki@example.test', status=status,
+                                       resource_type='policy', resource_id=resource_id))
+        db.session.commit()
+
+
 @pytest.fixture
-def sent(monkeypatch):
+def sent(app, monkeypatch):
     """Every e-mail the notifier hands to the e-mail service."""
-    calls = []
+    class Calls(list):
+        outcomes = None  # (ok, message) results to return first, then success
+    calls = Calls()
+    calls.outcomes = []
 
     def fake_send(recipients, subject, body_html, **kw):
         calls.append({'to': list(recipients), 'subject': subject, 'body': body_html, **kw})
-        return True, 'ok'
+        return calls.outcomes.pop(0) if calls.outcomes else (True, 'ok')
     monkeypatch.setattr('services.email_service.EmailService.send_email', staticmethod(fake_send))
-    policy_notifications._recent.clear()
+    _forget_policy_logs(app)
     yield calls
-    policy_notifications._recent.clear()
+    _forget_policy_logs(app)
 
 
 @pytest.fixture
@@ -106,6 +124,48 @@ class TestViolation:
             NotificationLog.query.filter_by(resource_id=sent[0]['resource_id']).delete()
             db.session.commit()
 
+    def test_a_failed_mail_is_tried_again_at_the_next_refusal(self, app, create_ca, policies, sent):
+        ca = create_ca(cn='notify retry CA')
+        pid, _name = policies(ca['id'], emails=['pki@example.test'])
+        sent.outcomes.append((False, 'Failed to send email: connection refused'))
+        _violate(app, pid, 'retry.notify.test')
+        assert len(sent) == 1
+        _log(app, policy_notifications.VIOLATION, sent[0]['resource_id'], status='failed')
+        _violate(app, pid, 'retry.notify.test')
+        assert len(sent) == 2
+        _violate(app, pid, 'retry.notify.test')  # delivered: told once
+        assert len(sent) == 2
+
+    def test_a_policy_reusing_a_deleted_id_is_reported(self, app, create_ca, policies, sent):
+        ca = create_ca(cn='notify reuse CA')
+        pid, _name = policies(ca['id'], emails=['pki@example.test'])
+        _violate(app, pid, 'reuse.notify.test')
+        assert len(sent) == 1
+        _log(app, policy_notifications.VIOLATION, sent[0]['resource_id'])
+        with app.app_context():
+            old = db.session.get(CertificatePolicy, pid)
+            db.session.delete(old)
+            db.session.commit()
+            # SQLite hands a deleted id out again when it was the highest
+            pol = CertificatePolicy(id=pid, name=f'notify-reused-{uuid.uuid4().hex[:8]}',
+                                    ca_id=ca['id'], is_active=True, priority=100,
+                                    notify_on_violation=True,
+                                    notification_emails=json.dumps(['pki@example.test']))
+            pol.set_rules({})
+            pol.set_operations(['issuance'])
+            db.session.add(pol)
+            db.session.commit()
+        policy_notifications._recent.clear()  # as seen from another process
+        _violate(app, pid, 'reuse.notify.test')
+        assert len(sent) == 2
+
+
+def _violate(app, pid, subject):
+    with app.app_context():
+        pol = db.session.get(CertificatePolicy, pid)
+        policy_notifications.violation([pol], {id(pol): ['Key type RSA-2048 is not allowed']},
+                                       {'operation': 'issuance', 'subject': subject})
+
 
 class TestApprovalQueued:
 
@@ -153,6 +213,31 @@ class TestApprovalQueued:
                 pol, {'cn': '<script>x</script>', 'ca_id': ca['id']}, None)
         assert len(sent) == 1
         assert '<script>' not in sent[0]['body'] and '&lt;script&gt;' in sent[0]['body']
+
+    def test_a_request_reusing_a_deleted_id_is_announced(self, app, create_ca, policies, sent):
+        ca = create_ca(cn='notify approval reuse CA')
+        pid, _name = policies(ca['id'], approval=True, emails=['pki@example.test'])
+        data = {'cn': 'reused.notify.test', 'ca_id': ca['id']}
+
+        def queue(approval_id=None):
+            with app.app_context():
+                approval = ApprovalRequest(id=approval_id, request_type='certificate', policy_id=pid,
+                                           request_data=json.dumps(data))
+                db.session.add(approval)
+                db.session.commit()
+                policy_notifications.approval_queued(db.session.get(CertificatePolicy, pid), approval, data)
+                return approval.id
+        first = queue()
+        assert len(sent) == 1
+        _log(app, policy_notifications.APPROVAL_PENDING, sent[0]['resource_id'])
+        with app.app_context():
+            ApprovalRequest.query.filter_by(id=first).delete()
+            db.session.commit()
+        policy_notifications._recent.clear()  # as seen from another process
+        # SQLite hands a deleted id out again when it was the highest
+        assert queue(first) == first
+        assert len(sent) == 2
+        assert f'/approvals?id={first}' in sent[1]['body']
 
 
 class TestPolicyEmailsField:
@@ -219,15 +304,9 @@ class TestOwnSession:
                 self.target()
         monkeypatch.setitem(app.config, 'TESTING', False)
         monkeypatch.setattr(policy_notifications.threading, 'Thread', SyncThread)
-        policy_notifications._recent.clear()
+        _forget_policy_logs(app)
         yield
-        policy_notifications._recent.clear()
-
-    def _violate(self, app, pid, subject):
-        with app.app_context():
-            pol = db.session.get(CertificatePolicy, pid)
-            policy_notifications.violation([pol], {id(pol): ['Key type RSA-2048 is not allowed']},
-                                           {'operation': 'issuance', 'subject': subject})
+        _forget_policy_logs(app)
 
     def test_no_connection_is_held_during_smtp_and_one_log_remains(
             self, app, create_ca, policies, smtp_on, threaded, monkeypatch):
@@ -246,7 +325,7 @@ class TestOwnSession:
         monkeypatch.setattr('services.email_service._smtp_connect', connect)
         ca = create_ca(cn='notify thread CA')
         pid, _name = policies(ca['id'], emails=['pki@example.test'])
-        self._violate(app, pid, 'thread.notify.test')
+        _violate(app, pid, 'thread.notify.test')
         assert exchanges == [False]  # a mail went out, with no session open
         with app.app_context():
             logs = NotificationLog.query.filter(
@@ -257,11 +336,38 @@ class TestOwnSession:
             resource_id = logs[0].resource_id
         # Another worker (empty memory) sees the record and stays silent
         policy_notifications._recent.clear()
-        self._violate(app, pid, 'thread.notify.test')
+        _violate(app, pid, 'thread.notify.test')
         assert exchanges == [False]
         with app.app_context():
             NotificationLog.query.filter_by(resource_id=resource_id).delete()
             db.session.commit()
+
+    def test_a_failed_exchange_is_tried_again_at_the_next_refusal(
+            self, app, create_ca, policies, smtp_on, threaded, monkeypatch):
+        exchanges = []
+
+        class FakeSMTP:
+            def sendmail(self, *_a):
+                pass
+
+            def quit(self):
+                pass
+
+        def connect(_config, timeout):
+            exchanges.append(timeout)
+            if len(exchanges) == 1:
+                raise ConnectionRefusedError('connection refused')
+            return FakeSMTP()
+        monkeypatch.setattr('services.email_service._smtp_connect', connect)
+        ca = create_ca(cn='notify thread retry CA')
+        pid, _name = policies(ca['id'], emails=['pki@example.test'])
+        for _ in range(3):
+            _violate(app, pid, 'thread.retry.notify.test')
+        assert len(exchanges) == 2  # refused, then delivered and told once
+        with app.app_context():
+            statuses = [log.status for log in NotificationLog.query.filter(
+                NotificationLog.resource_id.like(f'{pid}:%')).order_by(NotificationLog.id)]
+        assert statuses == ['failed', 'sent']
 
     def test_the_record_comes_first_and_only_one_claim_wins(self, app):
         with app.app_context():

@@ -98,9 +98,10 @@ def violation(policies, reasons_by_policy: dict, context: dict = None):
             continue
         if getattr(policy, 'id', None) is None:
             continue  # system policies (FIPS) have nobody to tell
+        # created_at tells a policy apart from a deleted one whose id SQLite reused
         key = hashlib.sha256(json.dumps(
-            [policy.id, context.get('operation'), context.get('subject'), sorted(reasons)],
-            default=str).encode()).hexdigest()[:32]
+            [policy.id, context.get('operation'), context.get('subject'), sorted(reasons),
+             getattr(policy, 'created_at', None)], default=str).encode()).hexdigest()[:32]
         _dispatch(policy.id, VIOLATION, f'{policy.id}:{key}', {
             'operation': context.get('operation') or 'issuance',
             'subject': context.get('subject'),
@@ -119,7 +120,9 @@ def approval_queued(policy, approval, request_data: dict):
     if data.get('serial_number'):
         subject = f"{subject or ''} (serial {data['serial_number']})".strip()
     requester = data.get('requested_by') or (approval.requester.username if approval.requester else None)
-    _dispatch(policy.id, APPROVAL_PENDING, f'approval:{approval.id}', {
+    # The id alone may be one SQLite reused from a deleted request
+    born = approval.created_at.strftime('%Y%m%d%H%M%S%f') if approval.created_at else ''
+    _dispatch(policy.id, APPROVAL_PENDING, f'approval:{approval.id}:{born}', {
         'operation': approval.request_type,
         'subject': subject,
         'ca': _ca_name(data.get('ca_id')),
@@ -152,6 +155,11 @@ def _claim(key) -> bool:
         return True
 
 
+def _release(key):
+    with _recent_lock:
+        _recent.pop(key, None)
+
+
 def _dispatch(policy_id, kind, resource_id, details):
     if not _claim((kind, resource_id)):
         return
@@ -159,12 +167,15 @@ def _dispatch(policy_id, kind, resource_id, details):
     app = current_app._get_current_object()
     if app.config.get('TESTING'):
         # Inline on the caller's session (a single shared connection in tests)
-        _send(policy_id, kind, resource_id, details, own_session=False)
+        if not _send(policy_id, kind, resource_id, details, own_session=False):
+            _release((kind, resource_id))
         return
 
     def run():
         with app.app_context():
-            _send(policy_id, kind, resource_id, details, own_session=True)
+            # A failed attempt leaves the next refusal free to try again
+            if not _send(policy_id, kind, resource_id, details, own_session=True):
+                _release((kind, resource_id))
     # Its own thread and session: the caller's transaction is never committed here
     threading.Thread(target=run, name=f'policy-notify-{policy_id}', daemon=True).start()
 
@@ -172,9 +183,11 @@ def _dispatch(policy_id, kind, resource_id, details):
 def _recently_logged(kind, resource_id, exclude_id=None):
     from models.email_notification import NotificationLog
     from utils.datetime_utils import utc_now
+    # Sent, or being sent by another worker: a failed attempt does not count
     query = NotificationLog.query.filter(
         NotificationLog.type == kind, NotificationLog.resource_type == 'policy',
         NotificationLog.resource_id == resource_id,
+        NotificationLog.status.in_(('sent', 'pending')),
         NotificationLog.sent_at >= utc_now() - DEDUP_WINDOW)
     if exclude_id is not None:
         query = query.filter(NotificationLog.id != exclude_id)
@@ -204,36 +217,39 @@ def _claim_in_db(kind, resource_id, recipients_label):
     return claim.id
 
 
-def _send(policy_id, kind, resource_id, details, *, own_session):
+def _send(policy_id, kind, resource_id, details, *, own_session) -> bool:
+    """True once the recipients are told, by this call or another worker."""
     from models import db
     from models.email_notification import NotificationLog
     from models.policy import CertificatePolicy
     from services.email_service import EmailService
     try:
         if not own_session and _recently_logged(kind, resource_id):
-            return
+            return True
         policy = db.session.get(CertificatePolicy, policy_id)
         if policy is None:
-            return
+            return False
         to = recipients(policy)
         if not to:
             logger.info("Policy %s: nobody to notify (%s)", policy.name, kind)
-            return
+            return False
         subject, body = _render(policy, kind, details)
         claim_id = _claim_in_db(kind, resource_id, ', '.join(to)) if own_session else None
         if own_session and claim_id is None:
-            return  # another worker told them already
-        EmailService.send_email(recipients=to, subject=subject, body_html=body,
-                                notification_type=kind, resource_type='policy',
-                                resource_id=resource_id, release_session=own_session)
+            return True  # another worker told them already
+        ok, _msg = EmailService.send_email(recipients=to, subject=subject, body_html=body,
+                                           notification_type=kind, resource_type='policy',
+                                           resource_id=resource_id, release_session=own_session)
         if claim_id is not None:
             # The service logged the outcome per recipient; the claim has served
             NotificationLog.query.filter_by(id=claim_id).delete()
             db.session.commit()
+        return ok
     except Exception as e:  # a notification never fails the operation
         if own_session:
             db.session.rollback()
         logger.warning("Policy notification failed: %s", e)
+        return False
 
 
 def _render(policy, kind, details):
