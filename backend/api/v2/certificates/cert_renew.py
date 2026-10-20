@@ -35,10 +35,7 @@ def _approval_for_renewal(user, cert, data, validity_days=None):
 @bp.route('/api/v2/certificates/<int:cert_id>/renew', methods=['POST'])
 @require_auth(['write:certificates'])
 def renew_certificate(cert_id):
-    """
-    Renew a certificate in place (PLANB-B.3).
-    """
-
+    """Renew a certificate in place."""
     # Get original certificate
     cert = db.session.get(Certificate, cert_id)
     if not cert:
@@ -78,10 +75,30 @@ def renew_certificate(cert_id):
         return success_response(data=approval_payload(policy, approval),
                                 message='Certificate renewal submitted for approval')
 
-    username = g.current_user.username if hasattr(g, 'current_user') else 'system'
-    # PLANB-B.3: à implémenter selon SPEC (appel de la routine avec rekey et CRL,
-    # erreurs de la routine et autres, réponse avec meta.notices ; invariants 32 et 40)
-    raise NotImplementedError('PLANB-B.3: renew route')
+    username, actor_user_id = _actor()
+    try:
+        outcome = renew_certificate_in_place(
+            cert, username=username, actor_user_id=actor_user_id, rekey=True,
+            regenerate_crl=True, trigger='manual', validity_days=validity_days)
+    except RenewalError as refusal:
+        db.session.rollback()
+        return error_response(refusal.message, refusal.status, problem_type=refusal.problem_type)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Failed to renew certificate {cert_id}: {e}", exc_info=True)
+        return error_response('Failed to renew certificate', 500)
+
+    renewed = db.session.get(Certificate, outcome['cert_id'])
+    return success_response(data=renewed.to_dict(), message='Certificate renewed successfully',
+                            meta=notices_mod.meta_with_notices(outcome.get('notices')))
+
+
+def _actor():
+    """``(username, user id)`` of the caller: ``('system', None)`` without a user."""
+    user = getattr(g, 'current_user', None)
+    if user is None:
+        return 'system', None
+    return getattr(user, 'username', None) or 'system', getattr(user, 'id', None)
 
 
 def _renew_msca_certificate(cert):

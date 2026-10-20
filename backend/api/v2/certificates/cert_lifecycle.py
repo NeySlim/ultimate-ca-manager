@@ -197,6 +197,11 @@ def unhold_certificate(cert_id):
         if cert.caref:
             ca = CA.query.filter_by(refid=cert.caref).first()
 
+        # The hold as it stands, before the removeFromCRL staging below
+        held = {field: getattr(cert, field)
+                for field in ('revoked', 'revoked_at', 'revoke_reason', 'invalidity_at')}
+        serial, caref = cert.serial_number, cert.caref
+
         # RFC 5280 §5.3.1 — when delta CRLs are enabled, emit removeFromCRL on
         # a delta before clearing the hold so relying parties drop the entry.
         if ca and ca.delta_crl_enabled and ca.cdp_enabled:
@@ -217,15 +222,24 @@ def unhold_certificate(cert_id):
                 logger.warning(f"Failed to emit removeFromCRL delta before unhold: {e}")
                 cert = db.session.get(Certificate, cert_id)
 
-        # PLANB-B.4: instantané de l'état avant unhold (SPEC, invariant 20)
         cert.revoked = False
         cert.revoked_at = None
         cert.revoke_reason = None
         cert.invalidity_at = None
 
-        # PLANB-B.4: à implémenter selon SPEC (suppression de la ligne revoked_serials
-        # dans la même transaction, commit, restauration sur échec ; invariants 19 et 20)
-        raise NotImplementedError('PLANB-B.4: unhold')
+        # The lifted hold and its revocation record go together or not at all
+        try:
+            if caref and serial:
+                from models import RevokedSerial
+                RevokedSerial.query.filter_by(caref=caref, serial_number=serial).delete(
+                    synchronize_session='fetch')
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"Failed to remove hold on certificate {cert_id}: {e}", exc_info=True)
+            _restore_hold(cert_id, held)
+            return error_response('Failed to remove certificate hold', 500)
+
         # Audit log
         AuditService.log_action(
             action='certificate_unheld',
@@ -294,3 +308,18 @@ def unhold_certificate(cert_id):
     except Exception as e:
         logger.error(f"Failed to unhold certificate: {e}")
         return error_response('Failed to remove certificate hold', 500)
+
+
+def _restore_hold(cert_id, held):
+    """Put the hold back as it was before a failed unhold (the delta staging
+    may have committed removeFromCRL)."""
+    try:
+        cert = db.session.get(Certificate, cert_id)
+        if cert is None:
+            return
+        for field, value in held.items():
+            setattr(cert, field, value)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"Certificate {cert_id}: hold not restored after a failed unhold: {e}")

@@ -61,7 +61,10 @@ class Certificate(db.Model):
     created_at = db.Column(db.DateTime, default=utc_now)
     created_by = db.Column(db.String(80))
     
-    # PLANB-B.1: colonnes renewed_at et renewed_times (SPEC, §3.2)
+    # Last in-place renewal (naive UTC) and how many there were
+    renewed_at = db.Column(db.DateTime, nullable=True)
+    renewed_times = db.Column(db.Integer, nullable=False, default=0, server_default='0')
+
     # Source tracking (issuance origin). Known values:
     # 'manual', 'import', 'acme', 'letsencrypt', 'scep', 'est', 'msca'.
     # NULL is treated as 'manual'. Kept in sync with the certificate list
@@ -441,7 +444,8 @@ class Certificate(db.Model):
             "archived": self.archived or False,
             "imported_from": self.imported_from,
             "created_at": utc_isoformat(self.created_at),
-            # PLANB-B.1: renewed_at et renewed_times exposés (SPEC, §3.2)
+            "renewed_at": utc_isoformat(self.renewed_at),
+            "renewed_times": self.renewed_times or 0,
             "created_by": self.created_by,
             "source": self.source or 'manual',
             "has_private_key": self.has_private_key,

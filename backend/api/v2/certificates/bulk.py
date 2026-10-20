@@ -113,8 +113,10 @@ def bulk_renew_certificates():
         return error_response('Bulk renewal keeps each certificate\'s duration; '
                               'renew a single certificate to choose one', 400)
     results = {'success': [], 'failed': []}
-    # PLANB-B.3: CRL publiée une fois par CA après la boucle (SPEC, invariant 39e)
-    username = g.current_user.username if hasattr(g, 'current_user') else 'system'
+    from api.v2.certificates.cert_renew import _actor, _approval_for_renewal
+    username, actor_user_id = _actor()
+    # CAs that renewed at least one certificate: one CRL each, after the loop
+    renewed_ca_ids = []
 
     for cert_id in ids:
         try:
@@ -124,9 +126,9 @@ def bulk_renew_certificates():
                 continue
             check_renewable(cert)  # RenewalError → reported per item below
             try:
-                from api.v2.certificates.cert_renew import _approval_for_renewal
                 policy, approval = _approval_for_renewal(g.current_user, cert, data)
             except Exception as e:
+                db.session.rollback()
                 logger.error(f"Policy evaluation failed for renewal of {cert_id}: {e}", exc_info=True)
                 results['failed'].append({'id': cert_id, 'error': 'Policy evaluation failed'})
                 continue
@@ -134,13 +136,22 @@ def bulk_renew_certificates():
                 results.setdefault('pending_approval', []).append(
                     {'id': cert_id, 'approval_id': approval.id, 'policy_name': policy.name})
                 continue
-            # PLANB-B.3: à implémenter selon SPEC (renouvellement de l'élément, refus de la
-            # routine rapporté par élément avec son message ; invariants 8 et 40)
-            raise NotImplementedError('PLANB-B.3: bulk renew item')
+            outcome = renew_certificate_in_place(
+                cert, username=username, actor_user_id=actor_user_id, rekey=True,
+                regenerate_crl=False, trigger='bulk')
+            results['success'].append(cert_id)
+            if outcome.get('ca_id') is not None and outcome['ca_id'] not in renewed_ca_ids:
+                renewed_ca_ids.append(outcome['ca_id'])
+        except RenewalError as refusal:
+            db.session.rollback()
+            logger.info("Bulk renewal of certificate %s refused: %s", cert_id, refusal.message)
+            results['failed'].append({'id': cert_id, 'error': refusal.message})
         except Exception as e:
             db.session.rollback()
             logger.error("Bulk renewal of certificate %s failed: %s", cert_id, e, exc_info=True)
             results['failed'].append({'id': cert_id, 'error': 'Renewal failed'})
+
+    _publish_crls(renewed_ca_ids, username)
 
     AuditService.log_action(
         action='certificates_bulk_renewed',
@@ -152,6 +163,21 @@ def bulk_renew_certificates():
     )
 
     return success_response(data=results, message=f'{len(results["success"])} certificates renewed')
+
+
+def _publish_crls(ca_ids, username):
+    """Regenerate once the CRL of each CA whose CDP is enabled; a failure is
+    logged and leaves the bulk answer unchanged."""
+    from models import CA
+    from services.crl import CRLService
+    for ca_id in ca_ids:
+        try:
+            ca = db.session.get(CA, ca_id)
+            if ca is not None and ca.cdp_enabled:
+                CRLService.generate_crl(ca_id, username=username)
+        except Exception as e:
+            db.session.rollback()
+            logger.error("CRL of CA %s not regenerated after bulk renewal: %s", ca_id, e, exc_info=True)
 
 
 @bp.route('/api/v2/certificates/bulk/delete', methods=['POST'])

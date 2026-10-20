@@ -475,8 +475,9 @@ def delete_ssh_certificate(cert_id):
         return no_content_response()
 
     except ValueError as e:
-        # PLANB-B.7: refus de la garde en 409 avec son message (SPEC, §3.1)
-        return error_response(str(e), 404)
+        # Refus de la garde : 409 ; certificat disparu entre-temps : 404.
+        msg = str(e)
+        return error_response(msg, 404 if 'not found' in msg else 409)
     except Exception as e:
         logger.error(f"Failed to delete SSH certificate {cert_id}: {e}")
         return error_response('Failed to delete certificate', 500)

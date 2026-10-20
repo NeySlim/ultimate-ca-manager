@@ -14,7 +14,7 @@ from utils.datetime_utils import utc_now
 from services.cert.serial_resolution import resolve_record_serial
 from utils.x509_aki import authority_key_identifier_from_issuer
 from ._constants import REASON_MAP
-from .query import CRLQueryMixin, _not_expired
+from .query import CRLQueryMixin, _dedupe_live_records, _not_expired
 
 logger = logging.getLogger(__name__)
 
@@ -145,6 +145,19 @@ def _parse_revoked_serial(cert: Certificate, *, context: str) -> Optional[int]:
     return serial_int
 
 
+def _run_housekeeping(ca_id: int) -> None:
+    """Opt-in purges run before a full CRL is enumerated; a failure never
+    blocks the generation."""
+    try:
+        if CRLQueryMixin.is_purge_stale_serials_enabled():
+            CRLQueryMixin.purge_stale_revoked_serials(ca_id)
+        if CRLQueryMixin.is_auto_delete_enabled():
+            CRLQueryMixin.purge_expired_revoked_certificates(ca_id)
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f"CRL: housekeeping failed for CA {ca_id}: {e}", exc_info=True)
+
+
 CRL_DIGESTS = {
     'sha256': hashes.SHA256,
     'sha384': hashes.SHA384,
@@ -189,7 +202,7 @@ class CRLGenerationMixin:
         from services.hsm.ca_key_loader import get_ca_signing_key
         ca_private_key = get_ca_signing_key(ca, allow_revoked=True)
 
-        # PLANB-B.6: purges conditionnelles avant l'énumération (SPEC, invariants 26 et 27)
+        _run_housekeeping(ca_id)
         revoked_certs = CRLQueryMixin.get_revoked_certificates(ca_id)
 
         last_crl = CRLMetadata.query.filter_by(ca_id=ca_id).order_by(
@@ -338,7 +351,17 @@ class CRLGenerationMixin:
             CA.revoked_at > base_crl.this_update,
             _not_expired(CA.valid_to, now),
         ).all()
-        # PLANB-B.6: candidats revoked_serials de la delta CRL (SPEC, invariant 52)
+        # Persistent records revoked since the base: deleted or renewed serials
+        from models.revoked_serial import RevokedSerial
+        persisted = RevokedSerial.query.filter(
+            RevokedSerial.caref == ca.refid,
+            RevokedSerial.revoked_at > base_crl.this_update,
+            RevokedSerial.valid_to > now,
+        ).order_by(RevokedSerial.revoked_at, RevokedSerial.id).all()
+        revoked_certs = _dedupe_live_records(
+            sorted(revoked_certs, key=lambda r: (isinstance(r, CA), r.id)))
+        revoked_certs = revoked_certs + CRLQueryMixin._filter_orphan_serials(
+            persisted, revoked_certs)
 
         last_crl = CRLMetadata.query.filter_by(ca_id=ca_id).order_by(
             CRLMetadata.crl_number.desc()

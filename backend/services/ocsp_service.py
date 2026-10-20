@@ -20,7 +20,7 @@ from cryptography.hazmat.primitives.asymmetric import (
     dsa, ec, ed25519, ed448, padding, rsa, utils,
 )
 from cryptography.hazmat.backends import default_backend
-from sqlalchemy import or_
+from sqlalchemy import case, or_
 
 import fips_mode
 from fips_mode import FipsRestricted
@@ -29,7 +29,7 @@ from utils import key_algorithms
 from utils.datetime_utils import utc_now
 from utils.key_codec import refuse_eddsa_key
 from utils.revocation_reasons import REASON_CODES, REASON_FLAGS
-from utils.serial_format import serial_to_hex
+from utils.serial_format import serial_to_hex, serial_variants
 
 logger = logging.getLogger(__name__)
 
@@ -549,19 +549,36 @@ class OCSPService:
 
     @staticmethod
     def _serial_spellings(cert_serial: int):
-        # PLANB-B.6: à implémenter selon SPEC (toutes les graphies stockées du numéro, invariant 53)
-        raise NotImplementedError('PLANB-B.6: _serial_spellings')
+        """Every way the serial column may store *cert_serial*: decimal,
+        lower and upper hex, unpadded."""
+        return serial_variants(cert_serial)
 
     @staticmethod
     def _certificates_with_serial(ca: CA, variants) -> list:
-        # PLANB-B.6: à implémenter selon SPEC (certificats de la CA qui portent une de ces graphies, invariant 53)
-        raise NotImplementedError('PLANB-B.6: _certificates_with_serial')
+        """Certificates of *ca* whose column is one of *variants*, revoked
+        rows first so a duplicate never hides a revocation the CRL lists."""
+        return Certificate.query.filter(
+            Certificate.caref == ca.refid,
+            Certificate.serial_number.in_(list(variants)),
+        ).order_by(
+            case((Certificate.revoked == True, 0), else_=1),  # noqa: E712
+            Certificate.id,
+        ).all()
 
     @staticmethod
     def _persisted_revocation(ca: CA, variants):
-        # PLANB-B.6: à implémenter selon SPEC (ligne revoked_serials de la CA pour une de ces
-        # graphies : None, sinon (date de révocation, motif CRLReason) ; invariants 24 et 53)
-        raise NotImplementedError('PLANB-B.6: _persisted_revocation')
+        """``(revoked_at, reason)`` from the earliest persistent revocation
+        record of *ca* for one of *variants*, else None; ``valid_to`` is not
+        consulted."""
+        from models.revoked_serial import RevokedSerial
+        row = RevokedSerial.query.filter(
+            RevokedSerial.caref == ca.refid,
+            RevokedSerial.serial_number.in_(list(variants)),
+        ).order_by(RevokedSerial.revoked_at, RevokedSerial.id).first()
+        if row is None:
+            return None
+        reason = _REASON_MAP.get(row.revoke_reason, x509.ReasonFlags.unspecified)
+        return row.revoked_at or utc_now(), reason
 
     @staticmethod
     def _status_for_serial(ca: CA, cert_serial: int):
