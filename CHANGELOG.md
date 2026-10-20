@@ -44,6 +44,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- Licence: UCM is now released under AGPL-3.0-only, with a commercial licence for those who modify it and cannot publish their changes (see COMMERCIAL-LICENSE.md). Versions up to 2.242 remain under BSD 3-Clause with the Commons Clause.
 - Backups: deleting archives while another backup operation holds the lock answers 409 instead of 500.
 - ACME EAB: an allowed-domains entry of `*.` and a PATCH that sets the list to `null` are refused with a 400 instead of being read as "every domain" and "block everything".
 - mTLS: a client certificate presented on a PKI protocol or health endpoint no longer signs its holder in to the web interface; certificate login goes through the interface as before (#402).

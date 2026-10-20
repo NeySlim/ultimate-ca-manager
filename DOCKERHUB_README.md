@@ -197,4 +197,6 @@ docker run --rm -v ucm-data:/data -v ucm-config:/config -v $(pwd):/backup \
 
 ## License
 
-BSD 3-Clause License with Commons Clause.
+UCM is free software under the GNU AGPL v3.0 only. Running it, at any scale and commercially, costs nothing; a commercial licence is available for those who modify it and cannot publish their changes: https://github.com/NeySlim/ultimate-ca-manager/blob/main/COMMERCIAL-LICENSE.md
+
+Versions before 2.243 remain under their original licence, BSD 3-Clause with the Commons Clause.

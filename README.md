@@ -1,7 +1,7 @@
 # Ultimate Certificate Manager
 
 ![Version](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager?label=version&color=brightgreen)
-![License](https://img.shields.io/badge/license-BSD--3--Clause%20%2B%20Commons%20Clause-green.svg)
+![License](https://img.shields.io/badge/license-AGPL--3.0--only-blue.svg)
 ![Docker Hub](https://img.shields.io/docker/v/neyslim/ultimate-ca-manager?label=docker%20hub&color=blue)
 ![GHCR](https://img.shields.io/badge/ghcr.io-available-blue)
 ![Tests](https://img.shields.io/badge/tests-7938%20passing-brightgreen)
@@ -244,7 +244,9 @@ tests, translations and migrations.
 
 ## License
 
-BSD 3-Clause License with Commons Clause -- see [LICENSE](LICENSE).
+UCM is free software under the [GNU AGPL v3.0 only](LICENSE). Running it, at any scale and commercially, costs nothing; a [commercial licence](COMMERCIAL-LICENSE.md) is available for those who modify it and cannot publish their changes.
+
+Versions before 2.243 remain under their original licence, BSD 3-Clause with the Commons Clause.
 
 ---
 

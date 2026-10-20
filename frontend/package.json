@@ -19,7 +19,7 @@
   },
   "keywords": [],
   "author": "",
-  "license": "SEE LICENSE IN LICENSE",
+  "license": "AGPL-3.0-only",
   "description": "",
   "dependencies": {
     "@icons-pack/react-simple-icons": "^13.11.1",

@@ -3,7 +3,7 @@ Version:        0.0.0
 Release:        1%{?dist}
 Summary:        Ultimate Certificate Manager - Complete PKI Management Platform
 
-License:        BSD-3-Clause AND LicenseRef-Commons-Clause
+License:        AGPL-3.0-only
 URL:            https://github.com/NeySlim/ultimate-ca-manager
 Source0:        %{name}-%{version}.tar.gz
 
