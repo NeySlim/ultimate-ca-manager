@@ -2968,7 +2968,7 @@
     "ocspResponderAutoRenewDesc": "Uma tarefa diária reemite cada certificado de respondedor delegado antes de expirar, com o mesmo par de chaves, e religa o respondedor",
     "ocspResponderRenewDays": "Renovar certificados do respondedor OCSP (dias antes de expirar)",
     "ocspResponderRenewDaysDesc": "1-365, padrão 30. Um respondedor de curta duração é renovado o mais tardar quando resta um terço da sua vida",
-    "crlAutoDeleteExpiredRevoked": "",
+    "crlAutoDeleteExpiredRevoked": "Excluir automaticamente certificados revogados expirados",
     "crlAutoDeleteExpiredRevokedDesc": "Remove automaticamente os registros de certificados revogados (apenas os expirados) durante a geração da CRL. Quando desativado, os certificados revogados expirados são mantidos como registros históricos.",
     "crlAutoPurgeStaleSerials": "Remover automaticamente números de série revogados obsoletos",
     "crlAutoPurgeStaleSerialsDesc": "Exclui automaticamente os registros de números de série revogados (apenas os expirados) durante a geração da CRL. Quando desativado, os registros obsoletos são mantidos como histórico de renovações.",

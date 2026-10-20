@@ -2968,7 +2968,7 @@
     "ocspResponderAutoRenewDesc": "每日任务会在委派响应者证书到期前使用相同密钥对重新签发，并重新绑定响应者",
     "ocspResponderRenewDays": "续期 OCSP 响应者证书（到期前天数）",
     "ocspResponderRenewDaysDesc": "1-365，默认 30。短期响应者最迟在剩余三分之一有效期时续期",
-    "crlAutoDeleteExpiredRevoked": "",
+    "crlAutoDeleteExpiredRevoked": "自动删除已过期的已吊销证书",
     "crlAutoDeleteExpiredRevokedDesc": "在 CRL 生成期间自动清除吊销证书记录（仅限已过期的）。禁用时，已过期的吊销证书将作为历史记录保留。",
     "crlAutoPurgeStaleSerials": "自动清理过期的已吊销序列号",
     "crlAutoPurgeStaleSerialsDesc": "在 CRL 生成期间自动删除已吊销序列号记录（仅限已过期的）。禁用时，过期记录将作为续期历史保留。",

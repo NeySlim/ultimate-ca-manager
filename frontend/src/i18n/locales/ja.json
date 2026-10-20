@@ -2968,7 +2968,7 @@
     "ocspResponderAutoRenewDesc": "毎日のタスクが、委任レスポンダー証明書を期限切れ前に同じ鍵ペアで再発行し、レスポンダーを再設定します",
     "ocspResponderRenewDays": "OCSP レスポンダー証明書を更新 (期限切れの何日前)",
     "ocspResponderRenewDaysDesc": "1〜365、既定は 30。短命のレスポンダーは、残り有効期間が 3 分の 1 になるまでに更新されます",
-    "crlAutoDeleteExpiredRevoked": "",
+    "crlAutoDeleteExpiredRevoked": "期限切れの失効済み証明書を自動削除",
     "crlAutoDeleteExpiredRevokedDesc": "CRL生成時に失効証明書レコード（期限切れのもののみ）を自動的に削除します。無効にすると、期限切れの失効証明書は履歴レコードとして保持されます。",
     "crlAutoPurgeStaleSerials": "古い失効シリアル番号を自動削除",
     "crlAutoPurgeStaleSerialsDesc": "CRL生成時に失効シリアル番号レコード（期限切れのもののみ）を自動的に削除します。無効にすると、古いレコードは更新履歴として保持されます。",

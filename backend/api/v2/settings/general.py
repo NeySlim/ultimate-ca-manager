@@ -72,7 +72,9 @@ _ADMIN_ONLY_SETTINGS = frozenset([
     'clear_backup_password',
     'ocsp_responder_auto_renew',
     'ocsp_responder_renew_days',
-    # PLANB-BF: the two CRL purge flags are admin-only too
+    # CRL housekeeping deletes certificates and revoked serials
+    'crl_auto_delete_expired_revoked',
+    'crl_auto_purge_stale_serials',
     # Shortening it has the daily task delete audit history.
     'audit_retention_days',
     # Who may reach the admin UI at all (#402)
@@ -136,7 +138,9 @@ def get_general_settings():
         # Delegated OCSP responder certificates: daily renewal before expiry
         'ocsp_responder_auto_renew': get_config('ocsp_responder_auto_renew', 'true') == 'true',
         'ocsp_responder_renew_days': int(get_config('ocsp_responder_renew_days', '30') or 30),
-        # PLANB-BF: report the two CRL purge flags
+        # CRL housekeeping, read exactly as CRL generation reads it
+        'crl_auto_delete_expired_revoked': effective('crl_auto_delete_expired_revoked'),
+        'crl_auto_purge_stale_serials': effective('crl_auto_purge_stale_serials'),
         # Admin source-address allowlist (#402); the env var, when set, locks it.
         'admin_allowed_networks': admin_allowlist.configured_entries(),
         'admin_allowed_networks_env_locked': admin_allowlist.env_locked(),
@@ -191,7 +195,9 @@ def update_general_settings():
         'ocsp_response_validity_hours',
         'ocsp_responder_auto_renew',
         'ocsp_responder_renew_days',
-        # PLANB-BF: accept the two CRL purge flags
+        # CRL housekeeping flags, stored 'true' or 'false'
+        'crl_auto_delete_expired_revoked',
+        'crl_auto_purge_stale_serials',
         # Audit log retention in days, 0 keeps every log
         'audit_retention_days',
     ]

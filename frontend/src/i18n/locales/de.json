@@ -2968,7 +2968,7 @@
     "ocspResponderAutoRenewDesc": "Eine tägliche Aufgabe stellt jedes delegierte Responder-Zertifikat vor Ablauf mit demselben Schlüsselpaar neu aus und bindet den Responder neu",
     "ocspResponderRenewDays": "OCSP-Responder-Zertifikate erneuern (Tage vor Ablauf)",
     "ocspResponderRenewDaysDesc": "1-365, Standard 30. Kurzlebige Responder werden spätestens erneuert, wenn noch ein Drittel ihrer Laufzeit bleibt",
-    "crlAutoDeleteExpiredRevoked": "",
+    "crlAutoDeleteExpiredRevoked": "Abgelaufene widerrufene Zertifikate automatisch löschen",
     "crlAutoDeleteExpiredRevokedDesc": "Widerrufene Zertifikatsdatensätze (nur abgelaufene) bei der CRL-Generierung automatisch bereinigen. Wenn deaktiviert, werden abgelaufene widerrufene Zertifikate als Verlaufsdatensätze aufbewahrt.",
     "crlAutoPurgeStaleSerials": "Veraltete widerrufene Seriennummern automatisch bereinigen",
     "crlAutoPurgeStaleSerialsDesc": "Datensätze widerrufener Seriennummern (nur abgelaufene) bei der CRL-Generierung automatisch löschen. Wenn deaktiviert, bleiben veraltete Datensätze als Erneuerungsverlauf erhalten.",

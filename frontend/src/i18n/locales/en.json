@@ -2969,7 +2969,7 @@
     "ocspResponderAutoRenewDesc": "A daily task re-issues each delegated responder certificate before it expires, same key pair, and rebinds the responder",
     "ocspResponderRenewDays": "Renew OCSP responder certificates (days before expiry)",
     "ocspResponderRenewDaysDesc": "1-365, default 30. Short-lived responders renew once a third of their lifetime remains at the latest",
-    "crlAutoDeleteExpiredRevoked": "",
+    "crlAutoDeleteExpiredRevoked": "Auto-delete expired revoked certificates",
     "crlAutoDeleteExpiredRevokedDesc": "Automatically purge revoked certificate records (expired ones only) during CRL generation. When disabled, expired revoked certs are retained as historical records.",
     "crlAutoPurgeStaleSerials": "Auto-purge stale revoked serials",
     "crlAutoPurgeStaleSerialsDesc": "Automatically delete revoked-serial records (expired ones only) during CRL generation. When disabled, stale records are kept as renewal history.",

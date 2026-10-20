@@ -3103,7 +3103,7 @@
     "ocspResponderAutoRenewDesc": "Une tâche quotidienne réémet chaque certificat de répondeur délégué avant son expiration, même paire de clés, et relie le répondeur",
     "ocspResponderRenewDays": "Renouveler les certificats de répondeur OCSP (jours avant expiration)",
     "ocspResponderRenewDaysDesc": "1-365, 30 par défaut. Un répondeur à courte durée de vie est renouvelé au plus tard quand il lui reste un tiers de sa durée",
-    "crlAutoDeleteExpiredRevoked": "",
+    "crlAutoDeleteExpiredRevoked": "Supprimer automatiquement les certificats révoqués expirés",
     "crlAutoDeleteExpiredRevokedDesc": "Purge automatiquement les enregistrements de certificats révoqués (uniquement ceux expirés) lors de la génération de la CRL. Lorsque désactivé, les certificats révoqués expirés sont conservés comme enregistrements historiques.",
     "crlAutoPurgeStaleSerials": "Purger automatiquement les numéros de série révoqués obsolètes",
     "crlAutoPurgeStaleSerialsDesc": "Supprime automatiquement les enregistrements de numéros de série révoqués (uniquement ceux expirés) lors de la génération de la CRL. Lorsque désactivé, les enregistrements obsolètes sont conservés comme historique des renouvellements.",
