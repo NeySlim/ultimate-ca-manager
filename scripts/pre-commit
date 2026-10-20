@@ -56,11 +56,14 @@ fi
 # fails the hook — "1 failed, N passed" used to be accepted.
 # UCM_PYTEST_WORKERS caps the workers when several commits run at once.
 echo -n "  Backend tests... "
-BACK_RESULT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -n "${UCM_PYTEST_WORKERS:-auto}" --dist loadfile 2>&1 | tail -1)
+BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -rfE -n "${UCM_PYTEST_WORKERS:-auto}" --dist loadfile 2>&1)
+BACK_RESULT=$(echo "$BACK_OUT" | tail -1)
 if echo "$BACK_RESULT" | grep -q "passed" && ! echo "$BACK_RESULT" | grep -qE "failed|error"; then
     echo -e "${GREEN}✅${NC} $BACK_RESULT"
 else
     echo -e "${RED}❌${NC} $BACK_RESULT"
+    # Name the failing tests: intermittent ones rarely fail twice in a row.
+    echo "$BACK_OUT" | grep -E "^(FAILED|ERROR) " | head -20 | sed 's/^/    /'
     echo -e "${YELLOW}    Run 'cd backend && $PYTEST_PY -m pytest tests/ -v' for details${NC}"
     FAILED=1
 fi
