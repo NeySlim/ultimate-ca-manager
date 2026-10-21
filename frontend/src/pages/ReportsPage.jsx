@@ -398,7 +398,7 @@ export default function ReportsPage() {
     { icon: FileText, label: t('reports.dataReports'), value: reportEntries.length, variant: 'info' },
     { icon: CalendarBlank, label: t('reports.scheduledReports'), value: enabledSchedules, variant: 'success' },
     { icon: Download, label: t('reports.exportFormats'), value: 3, variant: 'default' },
-    { icon: Clock, label: t('reports.expiryReport'), value: schedule?.expiry_report?.enabled ? t('common.enabled') : t('common.disabled'), variant: 'warning' },
+    { icon: Clock, label: t('reports.expiryReport'), value: schedule?.expiring_certificates?.enabled ? t('common.enabled') : t('common.disabled'), variant: 'warning' },
   ], [reportEntries.length, enabledSchedules, schedule, t])
 
   if (loading) {
