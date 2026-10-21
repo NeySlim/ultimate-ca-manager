@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- Docker: the image ships `COMMERCIAL-LICENSE.md` beside `LICENSE` and `NOTICE`, which refers to it.
+- Docker and RPM: `COMMERCIAL-LICENSE.md`, which `NOTICE` refers to, now ships in the image and is installed with the RPM licence files, so a system installed without documentation keeps it.
 
 ## [2.243] - 2026-10-21
 
