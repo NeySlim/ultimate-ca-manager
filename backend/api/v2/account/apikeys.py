@@ -15,6 +15,14 @@ from . import bp
 logger = logging.getLogger(__name__)
 
 
+def _caller_can_grant(perm, owner_perms):
+    """A scope is grantable only if both the owner and the requesting credential hold it."""
+    caller_perms = g.permissions or []
+    if perm == '*':
+        return '*' in owner_perms and '*' in caller_perms
+    return has_permission(perm, owner_perms) and has_permission(perm, caller_perms)
+
+
 @bp.route('/api/v2/account/apikeys', methods=['GET'])
 @require_auth()
 def list_api_keys():
@@ -68,7 +76,7 @@ def create_api_key():
 
     for perm in data['permissions']:
         if perm == '*':
-            if '*' not in user_perms:
+            if not _caller_can_grant('*', user_perms):
                 return error_response('Only admins can create wildcard API keys', 403)
             continue
 
@@ -81,7 +89,7 @@ def create_api_key():
         else:
             return error_response(f'Invalid permission format: {perm}', 400)
 
-        if not has_permission(perm, user_perms):
+        if not _caller_can_grant(perm, user_perms):
             return error_response(
                 f'Cannot grant permission you do not have: {perm}',
                 403,
@@ -278,6 +286,11 @@ def regenerate_api_key(key_id):
     if not old_key:
         return error_response('API key not found', 404)
 
+    old_perms = json.loads(old_key.permissions)
+    owner_perms = get_effective_permissions(g.current_user)
+    if not all(_caller_can_grant(p, owner_perms) for p in old_perms):
+        return error_response('Cannot regenerate a key wider than the requesting credential', 403)
+
     # Create new key with same settings
     auth_manager = AuthManager()
 
@@ -285,7 +298,7 @@ def regenerate_api_key(key_id):
         new_key_info = auth_manager.create_api_key(
             user_id=g.user_id,
             name=old_key.name + ' (regenerated)',
-            permissions=json.loads(old_key.permissions),
+            permissions=old_perms,
             expires_days=365
         )
 

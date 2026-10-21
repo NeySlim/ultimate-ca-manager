@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Security
+
+- API keys: a key can no longer create or regenerate a key with scopes it does not hold itself; a narrow key belonging to an administrator could mint a `*` key.
+
 ### Fixed
 
 - Docker and RPM: `COMMERCIAL-LICENSE.md`, which `NOTICE` refers to, now ships in the image and is installed with the RPM licence files, so a system installed without documentation keeps it.
