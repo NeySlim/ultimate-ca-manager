@@ -19,6 +19,8 @@ import { signingCas } from '../../lib/caSelection'
 import { CA_KEY_CHOICES, POLICY_DIGESTS, caKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 
 const HSM_KEY_ALGORITHMS = ['RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521']
+// HSM provider types whose keys sign RSA-PSS (Azure and Google KMS do not here)
+const PSS_HSM_TYPES = ['pkcs11', 'aws-cloudhsm', 'openbao']
 
 const VALIDITY_YEAR_PRESETS = [1, 2, 3, 5, 10, 15, 20]
 const CUSTOM_VALIDITY = 'custom'
@@ -114,6 +116,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const [createFormNCPermitted, setCreateFormNCPermitted] = useState([])
   const [createFormNCExcluded, setCreateFormNCExcluded] = useState([])
   const [createFormDigest, setCreateFormDigest] = useState('auto')
+  const [createFormSignatureScheme, setCreateFormSignatureScheme] = useState('pkcs1v15')
   const [createFormKeyUsage, setCreateFormKeyUsage] = useState(ROOT_KEY_USAGE)
   const [createFormEkuServerAuth, setCreateFormEkuServerAuth] = useState(false)
   const [showCertProfile, setShowCertProfile] = useState(false)
@@ -181,6 +184,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     setCreateFormKeyAlgo('RSA')
     setCreateFormKeySize(DEFAULT_KEY_SIZE.RSA)
     setCreateFormDigest('auto')
+    setCreateFormSignatureScheme('pkcs1v15')
     setCreateFormKeyUsage(ROOT_KEY_USAGE)
     setCreateFormEkuServerAuth(false)
     setShowCertProfile(false)
@@ -229,6 +233,13 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     : createFormHsmKeyMode === 'generate' && createFormHsmKeyAlgorithm === 'RSA-2048'
   const rsa2048PastHorizon = createFormType !== 'external' && usesRsa2048
     && Number.isFinite(validityDaysValue) && Date.now() + validityDaysValue * 86400000 >= RSA_2048_HORIZON
+  const hsmProviderType = hsmProviders.find(p => String(p.id) === createFormHsmProviderId)?.provider_type
+  const keyIsRsa = createFormKeyStorage === 'local'
+    ? createFormKeyAlgo === 'RSA'
+    : createFormHsmKeyMode === 'generate'
+      ? createFormHsmKeyAlgorithm.startsWith('RSA')
+      : Boolean(hsmKeys.find(k => String(k.id) === createFormHsmKeyId)?.algorithm?.startsWith('RSA'))
+  const pssAvailable = keyIsRsa && (createFormKeyStorage === 'local' || PSS_HSM_TYPES.includes(hsmProviderType))
   const policyBlocksCreate = noDigestAllowed || (createFormKeyStorage === 'local'
     ? noKeyAllowed
     : createFormHsmKeyMode === 'generate' && hsmAlgorithmOptions.length === 0)
@@ -246,6 +257,9 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
       setCreateFormDigest('auto')
     }
   }, [allowedDigestChoices, createFormDigest])
+  useEffect(() => {
+    if (!pssAvailable && createFormSignatureScheme !== 'pkcs1v15') setCreateFormSignatureScheme('pkcs1v15')
+  }, [pssAvailable, createFormSignatureScheme])
   useEffect(() => {
     if (hsmAlgorithmOptions.length && !hsmAlgorithmOptions.includes(createFormHsmKeyAlgorithm)) {
       setCreateFormHsmKeyAlgorithm(hsmAlgorithmOptions[0])
@@ -288,6 +302,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         ...(createFormPathLength !== '' && { pathLength: parseInt(createFormPathLength) }),
         namedUrls: createFormNamedUrls,
         hashAlgorithm: createFormDigest,
+        ...(pssAvailable && { signatureScheme: createFormSignatureScheme }),
         keyUsage: createFormKeyUsage,
         ...(createFormType === 'intermediate' && {
           extendedKeyUsage: createFormEkuServerAuth ? ['serverAuth'] : [],
@@ -573,6 +588,19 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
             </>
           )}
         </div>
+        )}
+
+        {keyIsRsa && (
+          <Select
+            label={t('cas.signatureScheme')}
+            options={[
+              { value: 'pkcs1v15', label: t('cas.signatureSchemePkcs1v15') },
+              ...(pssAvailable ? [{ value: 'pss', label: t('cas.signatureSchemePss') }] : []),
+            ]}
+            value={createFormSignatureScheme}
+            onChange={(value) => setCreateFormSignatureScheme(value)}
+            helperText={pssAvailable ? t('cas.signatureSchemeHelp') : t('cas.signatureSchemeHsmUnsupported')}
+          />
         )}
 
         {createFormType !== 'external' && (

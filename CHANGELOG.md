@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- CAs: an RSA CA can sign with RSA-PSS (salt as long as the hash) instead of PKCS#1 v1.5, chosen at creation or switched later from its details; certificates, CRLs, OCSP responses, timestamps and SCEP replies follow it, on a local key or a PKCS#11 or OpenBao HSM key.
+
 ### Upgrade notes
 
 - Signature hashes: SHA-224 is no longer accepted, and an unknown hash name is refused where it used to be signed in SHA-256 without a word; UCM signs with SHA-256, SHA-384 or SHA-512.

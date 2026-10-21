@@ -389,6 +389,7 @@ export function FloatingDetailWindow({ windowInfo }) {
               onExport={handleExport}
               onDelete={handleDelete}
               onImportKey={isCA && canWrite('cas') && needsKeyImport(data) ? () => setImportKeyOpen(true) : null}
+              onCaChanged={(updated) => setData(updated)}
             />
           </div>
         </>
@@ -464,7 +465,7 @@ export function FloatingDetailWindow({ windowInfo }) {
 /**
  * DetailContent — Renders the appropriate detail view based on entity type
  */
-function DetailContent({ type, data, canWrite, canDelete, onExport, onDelete, onImportKey }) {
+function DetailContent({ type, data, canWrite, canDelete, onExport, onDelete, onImportKey, onCaChanged }) {
   if (type === 'certificate' || type === 'user_certificate') {
     return (
       <CertificateDetails
@@ -485,10 +486,12 @@ function DetailContent({ type, data, canWrite, canDelete, onExport, onDelete, on
         showPem={true}
         embedded={true}
         canWrite={canWrite('cas') && canWrite('templates')}
+        canWriteCas={canWrite('cas')}
         canDelete={canDelete('cas')}
         onExport={onExport}
         onDelete={onDelete}
         onImportKey={onImportKey}
+        onCaChanged={onCaChanged}
       />
     )
   }

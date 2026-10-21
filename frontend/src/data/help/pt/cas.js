@@ -25,6 +25,7 @@ export default {
           { label: 'Importar chave privada', text: 'Anexar a chave privada de uma CA que possui apenas o seu certificado (assinado a partir de um pedido externo), para que possa assinar' },
           { label: 'Chave e validade', text: 'RSA-3072 por padrão, local ou HSM. Validade de 1, 2, 3, 5, 10, 15 ou 20 anos, ou Personalizada (dias) até 50 anos. Uma CA RSA-2048 que sobreviveria a 2030 é sinalizada: a ANSSI aceita RSA-2048 até o fim de 2030, a ETSI TS 119 312 até o fim de 2026' },
           { label: 'Restrições de nomes', text: 'Restrições avançadas (RFC 5280): subárvores permitidas e excluídas (DNS, faixa de IP, e-mail) limitam os nomes que a CA pode certificar. Para uma CA assinada externamente, elas são definidas pela CA assinante' },
+          { label: 'Esquema de assinatura RSA', text: 'PKCS#1 v1.5 por padrão, ou RSA-PSS (sal tão longo quanto o hash) para uma CA RSA com chave local, PKCS#11 ou OpenBao. Aplica-se aos certificados, CRLs e respostas OCSP que a CA assina, e aos carimbos de data/hora e respostas SCEP dos signatários que ela emitiu. "Assinar com RSA-PSS" nos detalhes da CA altera uma CA existente em ambos os sentidos: os certificados já emitidos mantêm a sua assinatura' },
         ]
       },
       {

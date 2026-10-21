@@ -25,6 +25,7 @@ export default {
           { label: 'Privaten Schlüssel importieren', text: 'Den privaten Schlüssel einer CA anhängen, die nur ihr Zertifikat besitzt (aus einer externen Anfrage signiert), damit sie signieren kann' },
           { label: 'Schlüssel und Gültigkeit', text: 'Standardmäßig RSA-3072, lokal oder HSM. Gültigkeit von 1, 2, 3, 5, 10, 15 oder 20 Jahren oder Benutzerdefiniert (Tage) bis zu 50 Jahren. Eine RSA-2048-CA, die 2030 überdauern würde, wird markiert: Die ANSSI akzeptiert RSA-2048 bis Ende 2030, ETSI TS 119 312 bis Ende 2026' },
           { label: 'Name Constraints', text: 'Erweiterte Einschränkungen (RFC 5280): erlaubte und ausgeschlossene Teilbäume (DNS, IP-Bereich, E-Mail) begrenzen die Namen, die die CA zertifizieren darf. Bei einer extern signierten CA legt die signierende CA sie fest' },
+          { label: 'RSA-Signaturverfahren', text: 'Standardmäßig PKCS#1 v1.5, oder RSA-PSS (Salt so lang wie der Hash) für eine RSA-CA mit lokalem, PKCS#11- oder OpenBao-Schlüssel. Es gilt für die Zertifikate, CRLs und OCSP-Antworten, die die CA signiert, sowie für die Zeitstempel und SCEP-Antworten der von ihr ausgestellten Signierer. „Mit RSA-PSS signieren" in den CA-Details stellt eine bestehende CA in beide Richtungen um: Bereits ausgestellte Zertifikate behalten ihre Signatur' },
         ]
       },
       {
