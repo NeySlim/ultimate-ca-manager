@@ -10,7 +10,8 @@ from services.audit_service import AuditService
 from services.ski_aki_backfill import get_last_run_stats as get_backfill_stats
 from services.scheduler_service import get_scheduler
 from services.updates import get_current_version
-from services import fips_preflight
+from services import compliance_preflight, fips_preflight
+import compliance_profiles
 from models import db
 from config.settings import is_docker
 import os
@@ -176,6 +177,27 @@ def get_fips_preflight():
     except Exception as e:
         logger.error(f"FIPS preflight failed: {e}")
         return error_response("FIPS preflight failed", 500)
+    finally:
+        db.session.rollback()
+
+
+@bp.route('/api/v2/system/compliance-preflight', methods=['GET'])
+@require_auth(['admin:system'])
+def get_compliance_preflight():
+    """What a compliance profile would refuse on this instance (or on one CA); reads only."""
+    name, error = compliance_profiles.normalize(request.args.get('profile'))
+    if error or name is None:
+        return error_response(error or 'profile is required', 400)
+    ca_id = request.args.get('ca', type=int)
+    if request.args.get('ca') not in (None, '') and ca_id is None:
+        return error_response('ca must be a CA id', 400)
+    try:
+        return success_response(data=compliance_preflight.run(name, ca_id))
+    except LookupError:
+        return error_response('CA not found', 404)
+    except Exception as e:
+        logger.error(f"Compliance preflight failed: {e}")
+        return error_response("Compliance preflight failed", 500)
     finally:
         db.session.rollback()
 

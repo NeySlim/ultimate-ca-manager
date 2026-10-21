@@ -12,8 +12,7 @@ import logging
 import os
 import re
 import warnings
-from dataclasses import dataclass
-from typing import Callable, Iterable, List, Optional, Tuple
+from typing import Iterable, List, Optional, Tuple
 
 from cryptography import x509
 from cryptography.utils import CryptographyDeprecationWarning
@@ -22,13 +21,16 @@ from flask import current_app
 import fips_mode
 from models import (CA, Certificate, CertificatePolicy, CertificateTemplate, DeployTarget,
                     DnsProvider, AcmeClientOrder, HsmKey, HsmProvider, MicrosoftCA,
-                    SSHCertificate, SSHCertificateAuthority, SystemConfig, User, db)
+                    SSHCertificate, SSHCertificateAuthority, SystemConfig, User)
 from security import encryption
 from security.encryption import decrypt_text
 from services.backup import container
 from services.backup.backup_service import _ARGON2_AVAILABLE
 from services.backup.schedule import _existing_archives
 from services.backup.settings_contract import scheduled_kdf
+from services.preflight_core import (BLOCKER, INFO, MAX_EXAMPLES, SEVERITIES, WARNING,  # noqa: F401
+                                     Detector, registry_detector,
+                                     run_detectors)
 from services.tsa_service import tsa_is_enabled
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
@@ -37,30 +39,10 @@ from utils.key_codec import eddsa_key_name
 
 logger = logging.getLogger(__name__)
 
-BLOCKER, WARNING, INFO = 'blocker', 'warning', 'info'
-SEVERITIES = (BLOCKER, WARNING, INFO)
-MAX_EXAMPLES = 5
-
 _EDDSA_OIDS = {'1.3.101.112': 'Ed25519', '1.3.101.113': 'Ed448'}
 
-
-@dataclass(frozen=True)
-class Detector:
-    id: str
-    severity: str
-    title: str
-    remedy: str
-    find: Callable[[], List[str]]  # one name per affected object
-
-
 DETECTORS: List[Detector] = []
-
-
-def detector(id: str, severity: str, title: str, remedy: str):
-    def register(find):
-        DETECTORS.append(Detector(id, severity, title, remedy, find))
-        return find
-    return register
+detector = registry_detector(DETECTORS)
 
 
 # --- key helpers ------------------------------------------------------------
@@ -371,16 +353,17 @@ def _acme_client():
     return found
 
 
+def provider_is_softhsm(provider) -> bool:
+    path = str(provider.get_config().get('module_path') or '')
+    return 'softhsm' in path.lower() or 'softhsm' in (provider.name or '').lower()
+
+
 @detector('hsm.softhsm', WARNING,
           'SoftHSM providers: SoftHSM is not a validated module, keys on it are not FIPS protected',
           'Move the keys to a validated HSM, or accept SoftHSM as a test setup only.')
 def _softhsm():
-    found = []
-    for provider in HsmProvider.query.filter_by(type='pkcs11').order_by(HsmProvider.id).all():
-        path = str(provider.get_config().get('module_path') or '')
-        if 'softhsm' in path.lower() or 'softhsm' in (provider.name or '').lower():
-            found.append(_named(provider.name, provider.id))
-    return found
+    rows = HsmProvider.query.filter_by(type='pkcs11').order_by(HsmProvider.id).all()
+    return [_named(p.name, p.id) for p in rows if provider_is_softhsm(p)]
 
 
 @detector('hsm.gcp_grpc', WARNING,
@@ -517,21 +500,8 @@ def _https():
 
 def run(detectors: Optional[Iterable[Detector]] = None) -> dict:
     """Every detector's findings, blockers first; a detector that fails is listed in errors."""
-    findings, errors, checked = [], [], []
-    for item in detectors if detectors is not None else DETECTORS:
-        checked.append(item.id)
-        try:
-            names = item.find()
-        except Exception as exc:
-            logger.warning('FIPS preflight check %s failed: %s', item.id, exc)
-            db.session.rollback()
-            errors.append({'id': item.id, 'error': f'{type(exc).__name__}: {exc}'[:300]})
-            continue
-        if names:
-            findings.append({'id': item.id, 'severity': item.severity, 'title': item.title,
-                             'count': len(names), 'examples': names[:MAX_EXAMPLES],
-                             'remedy': item.remedy})
-    findings.sort(key=lambda f: SEVERITIES.index(f['severity']))
-    summary = {s: sum(1 for f in findings if f['severity'] == s) for s in SEVERITIES}
-    return {'fips_active': fips_mode.enabled(), 'ready': not summary[BLOCKER] and not errors,
-            'summary': summary, 'findings': findings, 'errors': errors, 'checked': checked}
+    result = run_detectors(DETECTORS if detectors is None else detectors, label='FIPS preflight')
+    return {'fips_active': fips_mode.enabled(),
+            'ready': not result['summary'][BLOCKER] and not result['errors'],
+            'summary': result['summary'], 'findings': result['findings'],
+            'errors': result['errors'], 'checked': result['checked']}

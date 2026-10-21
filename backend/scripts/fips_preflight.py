@@ -9,35 +9,17 @@ import json
 import os
 import sys
 
-from flask import Flask
-from sqlalchemy import event
-
 import fips_mode
-from config.settings import get_config
 from models import db
-from services import fips_preflight
+from services import fips_preflight, preflight_core
 
 
-def read_only_app(config=None) -> Flask:
+def read_only_app(config=None):
     """The database the service uses, opened read-only; no migration, no scheduler."""
     if fips_mode.requested():
         # As enforce_at_startup does; an explicit value stays, for the report to name it
         os.environ.setdefault('PGGSSENCMODE', 'disable')
-    app = Flask('ucm-fips-preflight')
-    app.config.from_object(config or get_config())
-    uri = app.config['SQLALCHEMY_DATABASE_URI']
-    if uri.startswith('sqlite:///') and ':memory:' not in uri:
-        app.config['SQLALCHEMY_DATABASE_URI'] = (
-            f"sqlite:///file:{uri[len('sqlite:///'):]}?mode=ro&uri=true")
-    db.init_app(app)
-    with app.app_context():
-        if db.engine.dialect.name == 'postgresql':
-            @event.listens_for(db.engine, 'connect')
-            def _read_only(dbapi_connection, _record):
-                with dbapi_connection.cursor() as cursor:
-                    cursor.execute('SET SESSION CHARACTERISTICS AS TRANSACTION READ ONLY')
-                dbapi_connection.commit()  # a rolled-back SET would be undone
-    return app
+    return preflight_core.read_only_app('ucm-fips-preflight', config)
 
 
 def render_text(report: dict) -> str:
