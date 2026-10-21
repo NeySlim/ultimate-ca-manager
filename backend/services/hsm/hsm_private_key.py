@@ -19,8 +19,8 @@ when signing X.509 / CRL structures:
 
   * ``public_key()``
   * ``key_size`` (RSA) / ``curve`` (EC)
-  * ``sign(data, padding, algorithm)``     (RSA — PKCS1v15/SHA-256)
-  * ``sign(data, signature_algorithm)``    (EC  — ECDSA(SHA-256))
+  * ``sign(data, padding, algorithm)``     (RSA — PKCS1v15 with SHA-256/384/512)
+  * ``sign(data, signature_algorithm)``    (EC  — ECDSA with SHA-256/384/512)
 
 For the underlying HSM call we pass the raw ``data`` (the to-be-signed
 bytes that ``cryptography`` already prepared) along with the *key
@@ -35,6 +35,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
@@ -68,6 +69,15 @@ def _hash_name(algorithm) -> Optional[str]:
     return _HASH_NAME.get(name)
 
 
+def _required_hash_name(algorithm) -> str:
+    """The provider hash for *algorithm*: any other digest would be named but not used."""
+    name = _hash_name(algorithm)
+    if name is None:
+        raise UnsupportedAlgorithm(
+            f"HSM signing does not support digest {getattr(algorithm, 'name', algorithm)}")
+    return name
+
+
 class HsmRSAPrivateKey:
     """Wraps an HSM-resident RSA private key.
 
@@ -94,24 +104,20 @@ class HsmRSAPrivateKey:
         """Sign ``data`` via HSM.
 
         ``cryptography`` calls this with the (already prepared) TBS bytes,
-        a padding instance and a hash algorithm.  We only support
-        PKCS1v15+SHA-256 in MVP; other combinations log a warning but are
-        still forwarded — the HSM provider decides based on the key type.
+        a padding instance and a hash algorithm. The providers sign PKCS#1
+        v1.5 with SHA-2 only: anything else is refused rather than signed v1.5.
         """
         from services.hsm import HsmService
 
         if not isinstance(padding_alg, padding.PKCS1v15):
-            logger.warning(
-                "HSM RSA sign requested with %s padding, only PKCS1v15 is "
-                "fully tested; falling back to provider default.",
-                type(padding_alg).__name__,
-            )
+            raise UnsupportedAlgorithm(
+                f"HSM RSA signing supports PKCS#1 v1.5 only, not {type(padding_alg).__name__}")
 
         # The digest cryptography asked for is what the AlgorithmIdentifier
         # will name: the provider must hash with it, not with a digest of its
         # own choosing (self-review of #347)
         return HsmService.sign(self._hsm_key_id, data, self._key_algorithm,
-                               hash_algorithm=_hash_name(algorithm) or 'sha256')
+                               hash_algorithm=_required_hash_name(algorithm))
 
     def signing_hash(self, requested):
         """The digest the provider will sign with when *requested* is asked for."""
@@ -166,16 +172,11 @@ class HsmECPrivateKey:
         """
         from services.hsm import HsmService
 
-        hash_name = 'sha256'
         if not isinstance(signature_algorithm, ec.ECDSA):
-            logger.warning(
-                "HSM EC sign called with %s: expected ec.ECDSA",
-                type(signature_algorithm).__name__,
-            )
-        else:
-            hash_name = _hash_name(signature_algorithm.algorithm) or 'sha256'
+            raise UnsupportedAlgorithm(
+                f"HSM EC signing supports ECDSA only, not {type(signature_algorithm).__name__}")
         return HsmService.sign(self._hsm_key_id, data, self._key_algorithm,
-                               hash_algorithm=hash_name)
+                               hash_algorithm=_required_hash_name(signature_algorithm.algorithm))
 
     def signing_hash(self, requested):
         """The digest the provider will sign with when *requested* is asked for."""
