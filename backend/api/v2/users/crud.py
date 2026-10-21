@@ -6,7 +6,7 @@ from . import bp, validate_password_strength
 from flask import request, g
 import logging
 
-from auth.unified import require_auth
+from auth.unified import refuse_api_key_on_own_account, require_auth
 from utils.response import success_response, error_response, created_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
@@ -287,6 +287,9 @@ def update_user(user_id):
         "active": true
     }
     """
+    refused = refuse_api_key_on_own_account(user_id)
+    if refused:
+        return refused
     # SECURITY: Non-admins can only update themselves (limited fields)
     if g.current_user.role != 'admin' and g.current_user.id != user_id:
         return error_response('Access denied', 403)

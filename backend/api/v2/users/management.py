@@ -8,7 +8,7 @@ import csv
 import io
 import logging
 
-from auth.unified import require_auth
+from auth.unified import refuse_api_key_on_own_account, require_auth
 from utils.response import success_response, error_response
 from auth.permissions import BUILTIN_ROLES
 from utils.db_transaction import safe_commit
@@ -41,6 +41,9 @@ def reset_user_password(user_id):
         "new_password": "NewSecurePass123!"
     }
     """
+    refused = refuse_api_key_on_own_account(user_id)
+    if refused:
+        return refused
     # SECURITY: Only admins can reset other users' passwords
     if g.current_user.role != 'admin' and g.current_user.id != user_id:
         return error_response('Access denied', 403)
@@ -111,6 +114,9 @@ def reset_user_2fa(user_id):
     enforcement, a user left without a key re-enrols on next login; ``totp_exempt``
     lets them in without 2FA.
     """
+    refused = refuse_api_key_on_own_account(user_id)
+    if refused:
+        return refused
     # SECURITY: only admins may reset another user's 2FA
     if g.current_user.role != 'admin':
         return error_response('Access denied', 403)
@@ -204,6 +210,9 @@ def link_user_sso(user_id):
     POST /api/v2/users/{user_id}/link-sso
     Body: {"provider_id": int}
     """
+    refused = refuse_api_key_on_own_account(user_id)
+    if refused:
+        return refused
     if g.current_user.role != 'admin':
         return error_response('Insufficient permissions', 403)
 
@@ -250,6 +259,9 @@ def unlink_user_sso(user_id):
 
     POST /api/v2/users/{user_id}/unlink-sso
     """
+    refused = refuse_api_key_on_own_account(user_id)
+    if refused:
+        return refused
     if g.current_user.role != 'admin':
         return error_response('Insufficient permissions', 403)
 
@@ -538,6 +550,9 @@ def delete_user_security_key(user_id, credential_id):
 
     DELETE /api/v2/users/{user_id}/webauthn/{credential_id}[?confirm=last_factor]
     """
+    refused = refuse_api_key_on_own_account(user_id)
+    if refused:
+        return refused
     user, credential, err = _users_key(user_id, credential_id)
     if err:
         return err
@@ -561,6 +576,9 @@ def toggle_user_security_key(user_id, credential_id):
     PATCH /api/v2/users/{user_id}/webauthn/{credential_id}[?confirm=last_factor]
     Body: {"enabled": false}
     """
+    refused = refuse_api_key_on_own_account(user_id)
+    if refused:
+        return refused
     data = request.get_json(silent=True)
     enabled = data.get('enabled') if isinstance(data, dict) else None
     if not isinstance(enabled, bool):

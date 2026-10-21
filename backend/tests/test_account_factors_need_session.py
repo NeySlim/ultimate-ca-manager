@@ -85,3 +85,42 @@ def test_enable_does_not_replace_a_confirmed_secret(app, auth_client):
     assert r.status_code == 409, r.data
     with app.app_context():
         assert User.query.filter_by(username='totp_rekey').first().totp_secret == 'JBSWY3DPEHPK3PXP'
+
+
+def _admin_id(auth_client):
+    return json.loads(auth_client.get('/api/v2/account/profile').data)['data']['id']
+
+
+SELF_ADMIN_ROUTES = [
+    ('put', '/api/v2/users/{id}', {'email': 'attacker@example.com'}),
+    ('post', '/api/v2/users/{id}/reset-password', {}),
+    ('post', '/api/v2/users/{id}/reset-2fa', {}),
+    ('post', '/api/v2/users/{id}/link-sso', {'provider_id': 1, 'external_id': 'attacker'}),
+    ('post', '/api/v2/users/{id}/unlink-sso', {}),
+    ('delete', '/api/v2/users/{id}/webauthn/999999', None),
+    ('patch', '/api/v2/users/{id}/webauthn/999999', {'enabled': False}),
+]
+
+
+@pytest.mark.parametrize('method, path, body', SELF_ADMIN_ROUTES)
+def test_api_key_cannot_reach_its_owner_through_the_admin_routes(app, auth_client, wildcard_key, method, path, body):
+    """The admin routes on one's own id would undo the session-only rule."""
+    kwargs = {'headers': {'X-API-Key': wildcard_key}}
+    if body is not None:
+        kwargs.update(data=json.dumps(body), content_type='application/json')
+    r = getattr(app.test_client(), method)(path.format(id=_admin_id(auth_client)), **kwargs)
+    assert r.status_code == 403, (path, r.status_code, r.data)
+
+
+def test_api_key_still_administers_other_users(app, auth_client, wildcard_key):
+    r = auth_client.post('/api/v2/users', data=json.dumps({
+        'username': 'key_admin_target', 'password': 'KeyTarget123!xx', 'email': 'kt@test.local',
+        'role': 'viewer'}), content_type='application/json')
+    target = json.loads(r.data)['data']['id'] if r.status_code in (200, 201) else None
+    if target is None:
+        from models import User
+        with app.app_context():
+            target = User.query.filter_by(username='key_admin_target').first().id
+    r = app.test_client().put(f'/api/v2/users/{target}', headers={'X-API-Key': wildcard_key},
+                              data=json.dumps({'email': 'kt2@test.local'}), content_type='application/json')
+    assert r.status_code == 200, r.data

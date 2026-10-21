@@ -323,6 +323,17 @@ class AuthManager:
     
 
 
+def refuse_api_key_on_own_account(user_id):
+    """403 when an API key reaches its owner's own account through an admin
+    route, which would undo ``session_only`` on the account routes; else None."""
+    if getattr(g, 'auth_method', None) == 'api_key' and g.current_user.id == user_id:
+        return jsonify({
+            'error': 'Forbidden',
+            'message': 'This operation requires an interactive session'
+        }), 403
+    return None
+
+
 def require_auth(permissions=None, session_only=False):
     """
     Decorator to protect routes with authentication

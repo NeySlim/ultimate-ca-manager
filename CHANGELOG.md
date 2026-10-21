@@ -12,15 +12,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Upgrade notes
 
 - Signature hashes: SHA-224 and any unknown hash name are refused where they used to be signed in SHA-256 without a word; UCM signs with SHA-256, SHA-384 or SHA-512.
-- API keys: the password, e-mail, 2FA, passkey, mTLS certificate and session routes of the account now refuse API keys, even `*` ones; scripts that used them must sign in with a session (see Security).
+- API keys: the password, e-mail, 2FA, passkey, mTLS certificate and session routes of the account now refuse API keys, even `*` ones, and so do the user administration routes when they target the key's own owner; scripts that used them must sign in with a session (see Security).
 
 ### Changed
 
-- CAs: a new CA is RSA-3072 by default, and the Create CA dialog warns when an RSA-2048 CA would outlive 2030; the default signature hash of a CA follows the curve size for Brainpool keys as it does for NIST curves.
+- CAs: the Create CA dialog defaults to RSA-3072 and warns when an RSA-2048 CA would outlive 2030; the default signature hash of a CA follows the curve size for Brainpool keys as it does for NIST curves.
 
 ### Security
 
-- Accounts: an API key, whatever its scopes, can no longer change its owner's password or e-mail, enable 2FA, register a passkey or enrol an mTLS certificate, which let a read-only key take over the account; enabling 2FA no longer replaces a confirmed secret.
+- Accounts: an API key, whatever its scopes, can no longer change its owner's password or e-mail, enable or reset 2FA, link an SSO identity, register a passkey or enrol an mTLS certificate, through the account or the user administration routes, which let a key take over the account it belongs to; enabling 2FA no longer replaces a confirmed secret.
 - API keys: a key can no longer create or regenerate a key with scopes it does not hold itself; a narrow key belonging to an administrator could mint a `*` key.
 
 ### Fixed
