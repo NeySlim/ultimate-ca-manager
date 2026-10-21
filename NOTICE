@@ -1,0 +1,28 @@
+Ultimate Certificate Manager (UCM)
+Copyright (C) 2025-2026 Lionel Alarcon
+
+This program is free software: you can redistribute it and/or modify it under the
+terms of the GNU Affero General Public License, version 3, as published by the
+Free Software Foundation.
+
+This program is distributed in the hope that it will be useful, but WITHOUT ANY
+WARRANTY; without even the implied warranty of MERCHANTABILITY or FITNESS FOR A
+PARTICULAR PURPOSE. See the GNU Affero General Public License for more details.
+
+The full text of the licence is in the LICENSE file. If it is missing, see
+<https://www.gnu.org/licenses/>.
+
+SPDX-License-Identifier: AGPL-3.0-only
+
+---
+
+COMMERCIAL LICENCE (see COMMERCIAL-LICENSE.md)
+
+Organisations that cannot meet the terms of the AGPL, typically because they
+distribute a modified version without publishing the source, or embed UCM in a
+closed product, can obtain a separate commercial licence.
+
+Contact: licensing@ucm.tools
+
+Versions released before 2.243 remain available under their original licence,
+BSD 3-Clause with the Commons Clause. This change is not retroactive.
