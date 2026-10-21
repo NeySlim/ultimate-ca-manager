@@ -65,7 +65,8 @@ jobs:
       
       - name: Run Bandit security scan
         run: |
-          bandit -r backend/ -f json -o bandit-report.json || true
+          # Outside the checkout: Trivy scans it next and flags the test fixtures it quotes
+          bandit -r backend/ -f json -o "$RUNNER_TEMP/bandit-report.json" || true
           bandit -r backend/ -ll
         continue-on-error: true
       
