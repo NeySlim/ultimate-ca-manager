@@ -7,7 +7,15 @@ holds rules in the same syntax that produce notices, never refusals.
 """
 import logging
 
+import fips_mode
+
 logger = logging.getLogger(__name__)
+
+PROBLEM_TYPE = 'urn:ucm:problem:compliance-profile-restricted'
+
+
+class ProfileRestricted(fips_mode.FipsRestricted):
+    """An operation the compliance profile of a CA refuses; the message names it."""
 
 DEFAULT_SETTING = 'compliance_profile_default'
 
@@ -119,3 +127,16 @@ def profile_of_ca(ca_id):
     ca = db.session.get(CA, ca_id)
     name = getattr(ca, 'compliance_profile', None)
     return name if is_valid(name) else None
+
+
+def refuse_legacy_pkcs12(ca_id=None, caref=None):
+    """Raise ProfileRestricted when the CA (*ca_id*, or the issuer *caref*) holds
+    a profile: PKCS#12 3DES/SHA-1 is below every profile, as it is in FIPS mode."""
+    if ca_id is None and caref:
+        from models import CA
+        ca = CA.query.filter_by(refid=caref).first()
+        ca_id = ca.id if ca else None
+    name = profile_of_ca(ca_id)
+    if name:
+        raise ProfileRestricted(
+            f'PKCS#12 legacy encryption (3DES/SHA-1) not available under compliance profile {name}')

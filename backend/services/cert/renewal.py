@@ -381,6 +381,14 @@ def _signature_hash_name(certificate):
         return None
 
 
+def _has_time_stamping(certificate):
+    try:
+        eku = certificate.extensions.get_extension_for_class(x509.ExtendedKeyUsage).value
+    except x509.ExtensionNotFound:
+        return False
+    return x509.ExtendedKeyUsageOID.TIME_STAMPING in eku
+
+
 def _apply_policies(cert, ca, ca_key, original, days):
     """``(signing hash, granted days, notices)``; every violation in one 400."""
     from services.policy_service import (
@@ -390,18 +398,23 @@ def _apply_policies(cert, ca, ca_key, original, days):
     policies = PolicyEvaluationService.applicable_policies(
         ca.id, getattr(cert, 'template_id', None), cn, dns, operation=RENEWAL_OPERATIONS)
     context = {'operation': 'renewal', 'ca_id': ca.id, 'subject': cn or cert.descr}
+    key_label = key_label_for_public_key(original.public_key())
+    advisories = []
+    tsa_signer = _has_time_stamping(original)
     sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
         policies, ca_key, _signature_hash_name(original), explicit=False,
-        key_type=key_label_for_public_key(original.public_key()), context=context)
+        key_type=key_label, context=context, tsa_signer=tsa_signer, notices=advisories)
     rule_violations, granted, capped_by = PolicyEvaluationService.enforce_rules(
-        policies, dns_name_count=len(dns), validity_days=days, context=context)
-    violations = list(violations) + list(rule_violations)
+        policies, key_type=key_label, dns_name_count=len(dns), validity_days=days,
+        context=context, tsa_signer=tsa_signer, notices=advisories)
+    violations = list(dict.fromkeys(list(violations) + list(rule_violations)))
     if violations:
         raise RenewalError('Policy violation: ' + '; '.join(violations), 400)
     notices = []
     if capped_by and granted < days:
         notices.append(notices_mod.validity_shortened(
             days, granted, notices_mod.policy_validity_reason(capped_by, granted)))
+    notices += advisories
     return sign_hash, granted, notices
 
 

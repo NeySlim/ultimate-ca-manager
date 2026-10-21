@@ -261,7 +261,7 @@ def export_ca(ca_id):
                 key=private_key,
                 cert=cert,
                 cas=ca_certs if ca_certs else None,
-                encryption_algorithm=pkcs12_encryption(password, legacy)
+                encryption_algorithm=pkcs12_encryption(password, legacy, ca_id=ca.id)
             )
 
             _audit_key_export(ca, export_format, password)
@@ -322,7 +322,7 @@ def export_ca(ca_id):
                 key=private_key,
                 cert=cert,
                 cas=ca_certs if ca_certs else None,
-                encryption_algorithm=pkcs12_encryption(password, legacy)
+                encryption_algorithm=pkcs12_encryption(password, legacy, ca_id=ca.id)
             )
 
             _audit_key_export(ca, export_format, password)

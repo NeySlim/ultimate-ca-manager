@@ -1132,8 +1132,11 @@ def create_app(config_name=None):
     def handle_exception(e):
         from fips_mode import FipsRestricted, PROBLEM_TYPE as FIPS_PROBLEM
         if isinstance(e, FipsRestricted):
+            from compliance_profiles import ProfileRestricted, PROBLEM_TYPE as PROFILE_PROBLEM
             from utils.response import build_problem, PROBLEM_CONTENT_TYPE
-            response = flask_jsonify(build_problem(str(e), 400, problem_type=FIPS_PROBLEM))
+            response = flask_jsonify(build_problem(
+                str(e), 400, problem_type=PROFILE_PROBLEM if isinstance(e, ProfileRestricted)
+                else FIPS_PROBLEM))
             response.mimetype = PROBLEM_CONTENT_TYPE
             return response, 400
         if isinstance(e, (OverflowError, ValueError)):

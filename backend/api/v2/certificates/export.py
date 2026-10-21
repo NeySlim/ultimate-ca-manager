@@ -442,7 +442,7 @@ def export_certificate(cert_id):
                 key=private_key,
                 cert=cert,
                 cas=_named_cas(ca_certs),
-                encryption_algorithm=pkcs12_encryption(password, legacy),
+                encryption_algorithm=pkcs12_encryption(password, legacy, caref=certificate.caref),
             )
 
             audit_key_export('certificate', certificate.id, certificate.descr or certificate.refid,
@@ -504,7 +504,7 @@ def export_certificate(cert_id):
                 key=private_key,
                 cert=cert,
                 cas=_named_cas(ca_certs),
-                encryption_algorithm=pkcs12_encryption(password, legacy),
+                encryption_algorithm=pkcs12_encryption(password, legacy, caref=certificate.caref),
             )
 
             audit_key_export('certificate', certificate.id, certificate.descr or certificate.refid,

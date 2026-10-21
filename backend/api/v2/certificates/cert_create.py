@@ -251,16 +251,17 @@ def create_certificate():
             ca.id, data.get('template_id'), data.get('cn'), requested_dns)
         requested_validity = validity_days
         rule_context = {'operation': 'issuance', 'subject': data.get('cn'), 'ca_id': ca.id}
+        advisories = []
         violations, validity_days, capped_by = PolicyEvaluationService.enforce_rules(
             policies, key_type=normalized_key,
             dns_name_count=len(set(requested_dns) | set(implicit_dns)),
-            validity_days=validity_days, context=rule_context,
+            validity_days=validity_days, context=rule_context, notices=advisories,
         )
         # The template's digest is a choice, checked; without one the default yields
         template_digest = template.digest if template and template.digest else None
         sign_hash, digest_violations = PolicyEvaluationService.checked_signing_hash(
             policies, ca_key, template_digest, explicit=template_digest is not None,
-            context=rule_context)
+            context=rule_context, notices=advisories)
         violations += digest_violations
         if violations:
             return error_response('Policy violation: ' + '; '.join(violations), 400)
@@ -269,6 +270,7 @@ def create_certificate():
             notices.append(notices_mod.validity_shortened(
                 requested_validity, validity_days,
                 notices_mod.policy_validity_reason(capped_by, validity_days)))
+        notices += advisories
 
         # Record which inherited values the request explicitly diverged from
         # (#258): the template link is kept and the divergence flagged. The
@@ -360,6 +362,11 @@ def create_certificate():
         if extra_err:
             return error_response(f'Invalid extra_ekus: {extra_err}', 400)
         eku_oids = merge_eku_lists(base_ekus, to_object_identifiers(extra_oid_strs))
+        if x509.ExtendedKeyUsageOID.TIME_STAMPING in eku_oids:
+            tsa_violations = PolicyEvaluationService.tsa_signer_violations(
+                ca.id, new_key.public_key())
+            if tsa_violations:
+                return error_response('Policy violation: ' + '; '.join(tsa_violations), 400)
         # The profile / template KU is written for RSA; bits the generated
         # key cannot honour (keyEncipherment on EC) are cleared (#327). Added
         # after the EKU is known because an S/MIME EC leaf keeps keyAgreement.

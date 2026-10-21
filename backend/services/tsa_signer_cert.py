@@ -195,6 +195,7 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
         PolicyEvaluationService.applicable_policies(ca.id, None, cn),
         ca_key, sign_hash.name, explicit=False,
         key_type=key_label_for_public_key(new_key.public_key()),
+        not_after=not_after.date(), tsa_signer=True,
         context={'operation': 'issuance', 'subject': cn, 'ca_id': ca.id})
     if violations:
         raise TsaSignerIssueError('Policy violation: ' + '; '.join(violations), 400)

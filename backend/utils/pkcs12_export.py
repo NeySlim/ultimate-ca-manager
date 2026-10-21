@@ -22,6 +22,7 @@ per-export opt-in, never a stored default.
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 
+import compliance_profiles
 import fips_mode
 
 _TRUE_STRINGS = frozenset({'1', 'true', 'yes', 'on'})
@@ -36,12 +37,15 @@ def legacy_flag(value) -> bool:
     return str(value).strip().lower() in _TRUE_STRINGS
 
 
-def pkcs12_encryption(password, legacy: bool = False):
-    """The ``encryption_algorithm`` for ``pkcs12.serialize_key_and_certificates``."""
+def pkcs12_encryption(password, legacy: bool = False, *, ca_id=None, caref=None):
+    """The ``encryption_algorithm`` for ``pkcs12.serialize_key_and_certificates``.
+    The legacy profile is refused in FIPS mode and for a CA (*ca_id*, or the
+    issuer *caref* of a certificate) that holds a compliance profile."""
     secret = password.encode() if isinstance(password, str) else bytes(password)
     if not legacy:
         return serialization.BestAvailableEncryption(secret)
     fips_mode.refuse('PKCS#12 legacy encryption (3DES/SHA-1)')
+    compliance_profiles.refuse_legacy_pkcs12(ca_id=ca_id, caref=caref)
     return (
         serialization.PrivateFormat.PKCS12.encryption_builder()
         .key_cert_algorithm(pkcs12.PBES.PBESv1SHA1And3KeyTripleDESCBC)

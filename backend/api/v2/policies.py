@@ -502,15 +502,16 @@ def _issue_approved_certificate(approval):
         data['ca_id'], data.get('template_id'), data.get('cn'), _requested_dns)
     _rule_context = {'operation': 'issuance', 'subject': data.get('cn'), 'ca_id': data['ca_id'],
                      'requester': _requester_name(approval, data)}
+    _advisories = []
     _violations, validity_days, _capped_by = PolicyEvaluationService.enforce_rules(
         _policies, key_type=normalized_key,
         dns_name_count=len(set(_requested_dns) | set(_implicit_dns)),
-        validity_days=validity_days, context=_rule_context,
+        validity_days=validity_days, context=_rule_context, notices=_advisories,
     )
     _template_digest = template.digest if template and template.digest else None
     _sign_hash, _digest_violations = PolicyEvaluationService.checked_signing_hash(
         _policies, ca_key, _template_digest, explicit=_template_digest is not None,
-        context=_rule_context)
+        context=_rule_context, notices=_advisories)
     _violations += _digest_violations
     if _violations:
         raise PolicyViolation('; '.join(_violations))
@@ -522,6 +523,7 @@ def _issue_approved_certificate(approval):
         _notices.append(notices_mod.validity_shortened(
             requested_validity, validity_days,
             notices_mod.policy_validity_reason(_capper, validity_days)))
+    _notices += _advisories
     new_key = key_algorithms.generate(normalized_key)
     
     # Build subject
@@ -788,33 +790,108 @@ def _issue_approved_certificate(approval):
 
 # ============ Policy Management ============
 
-def _validated_rules(rules):
-    """``(rules, error)``: key-type and digest lists normalised, unknown values refused."""
-    from services.policy_service import normalize_digest, strip_dead_rules
+_ADVISORY_RULE_KEYS = ('allowed_key_types', 'allowed_digests', 'allowed_signature_schemes',
+                       'key_type_horizons', 'key_type_issue_until', 'tsa_signer_key_types')
+
+
+def _validated_key_labels(rules, key):
+    """Normalise the list *key* of *rules* in place; an error message or None."""
     from services.template_service import _normalize_key_type_label
-    if not isinstance(rules, dict):
-        return None, 'rules must be an object'
-    rules = strip_dead_rules(rules)
-    key_types = rules.get('allowed_key_types')
-    if key_types is not None:
-        if not isinstance(key_types, list):
-            return None, 'allowed_key_types must be a list'
-        labels = [_normalize_key_type_label(k) if isinstance(k, (str, int)) else None
-                  for k in key_types]
-        if None in labels:
-            return None, f'Unknown key type in allowed_key_types: {key_types[labels.index(None)]}'
-        refused = [label for label in labels if not key_algorithms.fips_approved(label)]
+    values = rules.get(key)
+    if values is None:
+        return None
+    if not isinstance(values, list):
+        return f'{key} must be a list'
+    labels = [_normalize_key_type_label(k) if isinstance(k, (str, int)) else None for k in values]
+    if None in labels:
+        return f'Unknown key type in {key}: {values[labels.index(None)]}'
+    rules[key] = list(dict.fromkeys(labels))
+    return None
+
+
+def _validated_dates(rules, key):
+    """Normalise the ``{label: YYYY-MM-DD}`` rule *key* in place; an error message or None."""
+    from services.policy_service import parse_rule_date
+    from services.template_service import _normalize_key_type_label
+    mapping = rules.get(key)
+    if mapping is None:
+        return None
+    if not isinstance(mapping, dict):
+        return f'{key} must be an object of key type to YYYY-MM-DD date'
+    out = {}
+    for label, when in mapping.items():
+        norm = _normalize_key_type_label(label) if isinstance(label, str) else None
+        if norm is None:
+            return f'Unknown key type in {key}: {label}'
+        if parse_rule_date(when) is None:
+            return f'{key} date for {label} must be YYYY-MM-DD'
+        out[norm] = when
+    rules[key] = out
+    return None
+
+
+def _validated_algorithm_rules(rules, *, fips_check=True):
+    """Check and normalise the key, hash, scheme and date rules of *rules* in
+    place; an error message or None."""
+    from services.policy_service import SIGNATURE_SCHEMES, normalize_digest
+    for key in ('allowed_key_types', 'tsa_signer_key_types'):
+        error = _validated_key_labels(rules, key)
+        if error:
+            return error
+    if fips_check:
+        refused = [label for label in rules.get('allowed_key_types') or []
+                   if not key_algorithms.fips_approved(label)]
         if refused:
             fips_mode.refuse(f'{refused[0]} keys')
-        rules['allowed_key_types'] = list(dict.fromkeys(labels))
     digests = rules.get('allowed_digests')
     if digests is not None:
         if not isinstance(digests, list):
-            return None, 'allowed_digests must be a list'
+            return 'allowed_digests must be a list'
         names = [normalize_digest(d) if isinstance(d, str) else None for d in digests]
         if None in names:
-            return None, f'Unknown digest in allowed_digests: {digests[names.index(None)]}'
+            return f'Unknown digest in allowed_digests: {digests[names.index(None)]}'
         rules['allowed_digests'] = list(dict.fromkeys(names))
+    schemes = rules.get('allowed_signature_schemes')
+    if schemes is not None:
+        if not isinstance(schemes, list):
+            return 'allowed_signature_schemes must be a list'
+        bad = [x for x in schemes if not isinstance(x, str) or x not in SIGNATURE_SCHEMES]
+        if bad:
+            return (f'Unknown signature scheme in allowed_signature_schemes: {bad[0]} '
+                    f'(one of: {", ".join(SIGNATURE_SCHEMES)})')
+        rules['allowed_signature_schemes'] = list(dict.fromkeys(schemes))
+    for key in ('key_type_horizons', 'key_type_issue_until'):
+        error = _validated_dates(rules, key)
+        if error:
+            return error
+    return None
+
+
+def _validated_rules(rules):
+    """``(rules, error)``: key-type, digest, scheme and date rules normalised,
+    unknown values refused."""
+    from services.policy_service import strip_dead_rules
+    if not isinstance(rules, dict):
+        return None, 'rules must be an object'
+    rules = strip_dead_rules(rules)
+    error = _validated_algorithm_rules(rules)
+    for key in ('require_hsm_ca_key', 'pq_standalone'):
+        if error is None and key in rules and not isinstance(rules[key], bool):
+            error = f'{key} must be true or false'
+    advisories = rules.get('advisories')
+    if error is None and advisories is not None:
+        if not isinstance(advisories, dict):
+            error = 'advisories must be an object'
+        else:
+            extra = [k for k in advisories if k not in _ADVISORY_RULE_KEYS]
+            if extra:
+                error = f'advisories cannot hold {extra[0]} (one of: {", ".join(_ADVISORY_RULE_KEYS)})'
+            else:
+                advisories = dict(advisories)
+                error = _validated_algorithm_rules(advisories, fips_check=False)
+                rules['advisories'] = advisories
+    if error:
+        return None, error
     return rules, None
 
 
@@ -837,13 +914,15 @@ def _validated_operations(data):
 @bp.route('/api/v2/policies/effective', methods=['GET'])
 @require_auth()
 def effective_policy_algorithms():
-    """Key types and digests the active policies leave for a CA and template,
-    so a form offers only what issuance will accept (null = unrestricted)."""
+    """Key types, digests, signature schemes and date horizons the active policies
+    leave for a CA and template, so a form offers only what issuance will accept
+    (null = unrestricted)."""
     from services.policy_service import PolicyEvaluationService
     ca_id = request.args.get('ca_id', type=int)
     template_id = request.args.get('template_id', type=int)
     key_types, digests = PolicyEvaluationService.effective_algorithms(ca_id, template_id)
-    data = {'allowed_key_types': key_types, 'allowed_digests': digests}
+    data = {'allowed_key_types': key_types, 'allowed_digests': digests,
+            **PolicyEvaluationService.effective_signature_rules(ca_id, template_id)}
     if fips_mode.enabled():
         data['fips'] = True  # the FIPS system policy is part of the result
     return success_response(data=data)

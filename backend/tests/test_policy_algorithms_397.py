@@ -156,10 +156,11 @@ class TestPolicyApi:
             r = auth_client.get(f"/api/v2/policies/effective?ca_id={ca['id']}")
             assert r.status_code == 200
             data = get_json(r)['data']
-            assert data == {'allowed_key_types': ['EC-P384'], 'allowed_digests': ['sha384', 'sha512']}
+            assert (data['allowed_key_types'], data['allowed_digests']) == (
+                ['EC-P384'], ['sha384', 'sha512'])
             other = create_ca(cn='Algo unrestricted CA')
             data = get_json(auth_client.get(f"/api/v2/policies/effective?ca_id={other['id']}"))['data']
-            assert data == {'allowed_key_types': None, 'allowed_digests': None}
+            assert (data['allowed_key_types'], data['allowed_digests']) == (None, None)
         finally:
             _drop(app, CertificatePolicy, a, b, c)
 
@@ -465,12 +466,16 @@ class TestReviewFollowups:
         exc = PolicyViolation('Key type RSA-2048 is not allowed by policy "HSM only"')
         assert IssuanceMixin._is_request_failure(exc) is True
 
-    def test_legacy_unknown_key_labels_do_not_empty_the_form(self, app, create_ca):
+    def test_legacy_unknown_key_labels_allow_nothing(self, app, create_ca):
         ca = create_ca(cn='Algo legacy labels CA')
         pid = _policy(app, 'algo-legacy', ca['id'], {'allowed_key_types': ['RSA', 'ECDSA']})
         try:
             with app.app_context():
-                assert PolicyEvaluationService.effective_algorithms(ca['id']) == (None, None)
+                assert PolicyEvaluationService.effective_algorithms(ca['id']) == ([], None)
+                policies = PolicyEvaluationService.applicable_policies(ca['id'])
+                v, _, _ = PolicyEvaluationService.enforce_rules(
+                    policies, key_type='RSA-2048', notify=False)
+                assert len(v) == 1 and 'no known key type' in v[0] and 'algo-legacy' in v[0]
         finally:
             _drop(app, CertificatePolicy, pid)
 

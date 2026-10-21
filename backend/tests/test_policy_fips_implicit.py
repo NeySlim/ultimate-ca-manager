@@ -154,8 +154,8 @@ class TestPolicyApi:
         ca = create_ca(cn='FIPS effective CA')
         fips()
         data = get_json(auth_client.get(f"/api/v2/policies/effective?ca_id={ca['id']}"))['data']
-        assert data == {'allowed_key_types': FIPS_LABELS,
-                        'allowed_digests': list(POLICY_DIGESTS), 'fips': True}
+        assert (data['allowed_key_types'], data['allowed_digests'], data['fips']) == (
+            FIPS_LABELS, list(POLICY_DIGESTS), True)
 
     def test_effective_intersects_with_the_operator_policies(self, app, auth_client, fips, create_ca):
         ca = create_ca(cn='FIPS effective intersect CA')
@@ -165,8 +165,8 @@ class TestPolicyApi:
         fips()
         try:
             data = get_json(auth_client.get(f"/api/v2/policies/effective?ca_id={ca['id']}"))['data']
-            assert data == {'allowed_key_types': ['EC-P384'], 'allowed_digests': ['sha384'],
-                            'fips': True}
+            assert (data['allowed_key_types'], data['allowed_digests'], data['fips']) == (
+                ['EC-P384'], ['sha384'], True)
         finally:
             _drop(app, CertificatePolicy, pid)
 

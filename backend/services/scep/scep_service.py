@@ -1214,10 +1214,16 @@ class SCEPService:
         return [refusal] if refusal else []
 
     def _policy_validity(self, csr, validity_days):
-        """*validity_days* under the policies' ``max_validity_days``."""
-        from services.policy_service import PolicyEvaluationService
+        """*validity_days* under the policies' ``max_validity_days``; a validity
+        that ends past a key-type horizon of the policies is refused."""
+        from services.policy_service import (
+            PolicyEvaluationService, PolicyViolation, key_label_for_public_key)
         policies, _ = self._policies_for(csr)
-        _, capped, _ = PolicyEvaluationService.enforce_rules(policies, validity_days=validity_days)
+        violations, capped, _ = PolicyEvaluationService.enforce_rules(
+            policies, key_type=key_label_for_public_key(csr.public_key()),
+            validity_days=validity_days)
+        if violations:
+            raise PolicyViolation('; '.join(violations))
         return capped
 
     def _auto_approve_request(

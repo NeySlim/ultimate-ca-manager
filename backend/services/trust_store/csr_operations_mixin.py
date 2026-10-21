@@ -741,12 +741,13 @@ class CSROperationsMixin:
             explicit=bool((policy_scope or {}).get('digest_explicit', policy_scope is None)),
             key_type=key_label_for_public_key(csr.public_key()), context=policy_context)
         if policy_scope is not None:
-            # Name count and validity ceiling, for the protocols as for the form
+            # Name count, validity ceiling and key horizons, for the protocols as for the form
             dns_count = sum(isinstance(n, x509.DNSName) for n in (effective_sans or []))
             limit_violations, capped, capped_by = PolicyEvaluationService.enforce_rules(
-                policies, dns_name_count=dns_count, validity_days=validity_days,
+                policies, key_type=key_label_for_public_key(csr.public_key()),
+                dns_name_count=dns_count, validity_days=validity_days,
                 context=policy_context)
-            violations = list(violations) + limit_violations
+            violations = list(dict.fromkeys(list(violations) + limit_violations))
             if capped_by:
                 logger.info(f"Validity capped to {capped} days by policy '{capped_by}'")
                 validity_days = capped
@@ -1151,6 +1152,15 @@ class CSROperationsMixin:
                 _ad_security_extension(requester_sid),
                 critical=False,
             )
+
+        if policy_scope is not None and any(
+                isinstance(e.value, x509.ExtendedKeyUsage)
+                and x509.ExtendedKeyUsageOID.TIME_STAMPING in e.value
+                for e in builder._extensions):
+            tsa_violations = PolicyEvaluationService.tsa_signer_violations(
+                policy_scope.get('ca_id'), csr.public_key())
+            if tsa_violations:
+                raise PolicyViolation('; '.join(tsa_violations))
 
         # Sign
         certificate = builder.sign(

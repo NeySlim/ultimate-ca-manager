@@ -32,9 +32,13 @@ def issuer_expiry_reason(not_after) -> str:
             f'{not_after.strftime("%Y-%m-%d")} and no certificate may outlive it')
 
 
-def collect(*notices: Optional[str]) -> List[str]:
-    """The notices that are actually there, in order, without blanks."""
-    return [n for n in notices if n]
+def collect(*notices) -> List[str]:
+    """The notices that are actually there, in order, without blanks; a list
+    among them (policy advisories) is spread."""
+    out = []
+    for n in notices:
+        out += [x for x in n if x] if isinstance(n, (list, tuple)) else [n] if n else []
+    return out
 
 
 def meta_with_notices(notices, meta: Optional[dict] = None) -> Optional[dict]:

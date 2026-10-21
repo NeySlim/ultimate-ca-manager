@@ -436,7 +436,7 @@ def download_mtls_certificate(cert_id):
             key=private_key,
             cert=x509_cert,
             cas=ca_certs if ca_certs else None,
-            encryption_algorithm=pkcs12_encryption(password, legacy),
+            encryption_algorithm=pkcs12_encryption(password, legacy, caref=cert.caref),
         )
 
         AuditService.log_action(

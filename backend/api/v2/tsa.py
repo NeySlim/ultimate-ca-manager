@@ -88,6 +88,23 @@ def _signer_candidate_view(cert):
     }
 
 
+def _tsa_policy_refusal(ca, public_key):
+    """The TSA signer rules of the policies of *ca* refusing *public_key*, or None."""
+    from services.policy_service import PolicyEvaluationService
+    violations = PolicyEvaluationService.tsa_signer_violations(
+        ca.id if ca is not None else None, public_key)
+    return 'Policy violation: ' + '; '.join(violations) if violations else None
+
+
+def _ca_signer_refusal(ca):
+    from services.ca.signature_scheme import ca_public_key
+    try:
+        public = ca_public_key(ca)
+    except Exception:
+        return None
+    return _tsa_policy_refusal(ca, public) if public is not None else None
+
+
 def _validate_signer_refid(refid):
     """Return (error_message, None) or (None, cert). Empty refid is invalid here."""
     cert = Certificate.query.filter_by(refid=refid).first()
@@ -114,7 +131,14 @@ def _validate_signer_refid(refid):
                              backend=default_backend())
     except Exception:
         return 'The selected certificate private key cannot be decrypted by UCM', None
-    return None, cert
+    try:
+        import base64
+        from cryptography import x509
+        public_key = x509.load_pem_x509_certificate(base64.b64decode(cert.crt)).public_key()
+    except Exception:
+        return 'The selected certificate cannot be read', None
+    refusal = _tsa_policy_refusal(CA.query.filter_by(refid=cert.caref).first(), public_key)
+    return (refusal, None) if refusal else (None, cert)
 
 
 def normalize_policy_oid(value):
@@ -220,6 +244,11 @@ def update_tsa_config():
             new_refid = ca.refid if ca else ''
         if new_refid and new_refid != get_config('tsa_ca_refid', ''):
             problem = signing_ca_problem(ca)
+            dedicated = data['signer_cert_refid'] if 'signer_cert_refid' in data \
+                else get_config('tsa_signer_cert_refid', '')
+            if not problem and ca is not None and not dedicated:
+                # Without a dedicated signer, the CA certificate signs the tokens
+                problem = _ca_signer_refusal(ca)
             if problem:
                 return error_response(problem, 400)
         set_config('tsa_ca_refid', new_refid)

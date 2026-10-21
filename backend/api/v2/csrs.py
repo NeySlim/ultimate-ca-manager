@@ -146,18 +146,19 @@ def _policy_rule_refusal(ca, cert, template_id, validity_days, extra_dns=()):
     ``(refusal_message_or_None, validity_days)`` with the validity capped by
     the applicable policies. Shared by the unit and bulk Sign CSR routes.
 
-    Returns ``(refusal, validity_days, notice)``: the notice names the policy
-    that shortened the validity, so a signature honoured on other terms than
-    the ones asked for says so."""
+    Returns ``(refusal, validity_days, notices)``: the notices name the policy
+    that shortened the validity and the advisories that apply, so a signature
+    honoured on other terms than the ones asked for says so."""
     try:
         from services.policy_service import PolicyEvaluationService
         csr_cn, csr_dns, key_label = _csr_identity(cert)
         csr_dns = csr_dns + [d for d in extra_dns if d not in csr_dns]
         requested = validity_days
         policies = PolicyEvaluationService.applicable_policies(ca.id, template_id, csr_cn, csr_dns)
+        advisories = []
         violations, validity_days, capped_by = PolicyEvaluationService.enforce_rules(
             policies, key_type=key_label, dns_name_count=len(set(csr_dns)),
-            validity_days=validity_days,
+            validity_days=validity_days, signer=ca, notices=advisories,
             context={'operation': 'csr', 'subject': csr_cn, 'ca_id': ca.id})
     except (ValueError, TypeError) as e:
         return f'Invalid CSR: {e}', validity_days, None
@@ -168,7 +169,7 @@ def _policy_rule_refusal(ca, cert, template_id, validity_days, extra_dns=()):
         notice = notices_mod.validity_shortened(
             requested, validity_days,
             notices_mod.policy_validity_reason(capped_by, validity_days))
-    return None, validity_days, notice
+    return None, validity_days, notices_mod.collect(notice, advisories)
 
 
 def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus, validity_notice=None,
@@ -189,7 +190,7 @@ def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus
             # Names added to the request's own (#389), signed as approved
             'extra_san': extra_san,
             # The duration was already capped by policy: the approver is told
-            'validity_notice': validity_notice,
+            'validity_notice': validity_notice or None,
         },
         comment=data.get('approval_comment'),
     )
@@ -1157,7 +1158,7 @@ def bulk_sign_csrs():
             if approval is not None:
                 results.setdefault('pending_approval', []).append(
                     {'id': csr_id, 'approval_id': approval.id, 'policy_name': policy.name,
-                     'notice': _item_notice})
+                     'notice': ' '.join(_item_notice) or None})
                 continue
 
             signed_cert = CertificateService.sign_csr(

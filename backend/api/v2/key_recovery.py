@@ -225,7 +225,7 @@ def recover_key(rid):
         p12 = pkcs12.serialize_key_and_certificates(
             name=(cert.subject_cn or cert.refid or 'recovered').encode(),
             key=private_key, cert=cert_obj, cas=chain or None,
-            encryption_algorithm=pkcs12_encryption(password, legacy),
+            encryption_algorithm=pkcs12_encryption(password, legacy, caref=cert.caref),
         )
     except FipsRestricted:
         raise  # the app handler answers 400 with the FIPS problem type

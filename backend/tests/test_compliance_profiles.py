@@ -27,7 +27,7 @@ def _patch(auth_client, ca_id, **body):
 
 def _post_ca(auth_client, cn, **kwargs):
     data = {'type': 'root', 'commonName': cn, 'keyAlgo': 'RSA', 'keySize': 3072,
-            'validityYears': 5, 'hashAlgorithm': 'sha256', **kwargs}
+            'validityYears': 5, 'hashAlgorithm': 'sha256', 'signatureScheme': 'pss', **kwargs}
     return auth_client.post('/api/v2/cas', data=json.dumps(data), content_type=JSON)
 
 
@@ -141,7 +141,7 @@ def test_fips_and_a_profile_intersect(app, auth_client, create_ca, monkeypatch):
 
 
 def test_a_rsa_2048_leaf_is_refused_under_bsi_and_passes_without(app, auth_client, create_ca):
-    ca = create_ca(cn='Profile leaf CA')
+    ca = create_ca(cn='Profile leaf CA', signatureScheme='pss')
     assert _leaf(auth_client, ca['id'], 'before.profile.example.test').status_code == 201
     assert _patch(auth_client, ca['id'], complianceProfile='bsi').status_code == 200
     r = _leaf(auth_client, ca['id'], 'under.bsi.example.test')
@@ -167,7 +167,8 @@ def test_create_refuses_what_the_profile_forbids(app, auth_client):
     assert r.status_code == 400 and 'RSA-2048' in r.get_json()['message']
     with app.app_context():
         assert CA.query.filter_by(descr='Profile RSA2048 bsi').first() is None
-    r = _post_ca(auth_client, 'Profile RSA2048 anssi', keySize=2048, complianceProfile='anssi')
+    r = _post_ca(auth_client, 'Profile RSA2048 anssi', keySize=2048, validityYears=4,
+                  complianceProfile='anssi')
     assert r.status_code == 201
 
 
@@ -184,8 +185,8 @@ def test_the_global_default_seeds_new_cas_only(app, auth_client, create_ca, set_
     assert _profile_names(app, existing['id']) == []
     seeded = _post_ca(auth_client, 'Profile default seeded')
     assert seeded.get_json()['data']['compliance_profile'] == 'anssi'
-    explicit = _post_ca(auth_client, 'Profile default overridden', complianceProfile='eu-acm')
-    assert explicit.get_json()['data']['compliance_profile'] == 'eu-acm'
+    explicit = _post_ca(auth_client, 'Profile default overridden', complianceProfile='bsi')
+    assert explicit.get_json()['data']['compliance_profile'] == 'bsi'
     none = _post_ca(auth_client, 'Profile default none', complianceProfile=None)
     assert none.get_json()['data']['compliance_profile'] is None
     set_default('nonsense')
