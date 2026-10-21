@@ -307,6 +307,7 @@ class Certificate(db.Model):
         try:
             from cryptography import x509
             from cryptography.hazmat.backends import default_backend
+            from cryptography.x509.oid import SignatureAlgorithmOID
             import base64
             
             if not self.crt:
@@ -317,6 +318,9 @@ class Certificate(db.Model):
             
             # Get signature algorithm
             sig_oid = cert.signature_algorithm_oid
+            if sig_oid == SignatureAlgorithmOID.RSASSA_PSS:
+                from utils.signature_label import signature_algorithm_label
+                return signature_algorithm_label(cert)
             # Map common OIDs to friendly names
             sig_map = {
                 '1.2.840.113549.1.1.11': 'SHA256-RSA',

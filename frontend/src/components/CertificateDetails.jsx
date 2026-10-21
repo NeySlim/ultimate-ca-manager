@@ -54,6 +54,7 @@ import { CertificateExtensions, SubjectAltNames } from './CertificateExtensions'
 import { CertDeploySection } from './deploy/CertDeploySection'
 import { cn } from '../lib/utils'
 import { useClipboard } from '../hooks/useClipboard'
+import { signatureShortName } from '../lib/signatureName'
 
 // Maps a template_override field name to the i18n key of its label (#258).
 const OVERRIDE_FIELD_LABEL_KEYS = {
@@ -241,7 +242,7 @@ export function CertificateDetails({
         </div>
         <div className="bg-tertiary-op50 rounded-lg p-2 sm:p-2.5 text-center">
           <ShieldCheck size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
-          <div className="text-2xs sm:text-xs font-medium text-text-primary truncate">{cert.signature_algorithm?.split('-')[0] || '—'}</div>
+          <div className="text-2xs sm:text-xs font-medium text-text-primary truncate">{signatureShortName(cert.signature_algorithm)}</div>
           <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block" title={t('common.issuerSignatureAlgorithmHint')}>{t('common.issuerSignatureShort')}</div>
         </div>
       </div>

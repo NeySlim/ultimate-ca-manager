@@ -400,10 +400,14 @@ class CA(db.Model):
         try:
             from cryptography import x509
             from cryptography.hazmat.backends import default_backend
+            from cryptography.x509.oid import SignatureAlgorithmOID
             import base64
             
             cert_pem = base64.b64decode(self.crt).decode('utf-8')
             cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
+            if cert.signature_algorithm_oid == SignatureAlgorithmOID.RSASSA_PSS:
+                from utils.signature_label import signature_algorithm_label
+                return signature_algorithm_label(cert)
             return cert.signature_algorithm_oid._name.upper().replace('SHA', 'SHA-')
         except Exception:
             return "N/A"

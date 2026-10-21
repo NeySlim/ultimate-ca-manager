@@ -68,13 +68,14 @@ def test_size_only_ec_keys_keep_their_points():
     assert _score_key_strength({'key_algorithm': 'EC', 'key_size': 384})['score'] == 30
 
 
-@pytest.mark.parametrize('key_type, key_size', [
-    ('EC secp256k1', 0), ('EC secp256k1', 256), ('EC brainpoolP512r1', 512),
-    ('EC brainpoolP384r1', 384),
+@pytest.mark.parametrize('key_type, key_size, score', [
+    ('EC secp256k1', 0, 15), ('EC secp256k1', 256, 15),
+    # Brainpool scores like the NIST curve of its size, under its own name
+    ('EC brainpoolP512r1', 512, 30), ('EC brainpoolP384r1', 384, 30),
 ])
-def test_unregistered_curves_are_not_labelled_as_nist(key_type, key_size):
+def test_unregistered_curves_are_not_labelled_as_nist(key_type, key_size, score):
     result = _score_key_strength(_certificate_dict(key_type, key_size))
     curve = key_type.split()[1]
     assert result['reason'] == f'ECDSA {curve}'
     assert 'P-' not in result['reason']
-    assert result['score'] == 15
+    assert result['score'] == score

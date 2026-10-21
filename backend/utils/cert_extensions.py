@@ -11,6 +11,7 @@ from cryptography.x509.oid import ExtensionOID
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519, ed448, dsa
+from utils.signature_label import signature_algorithm_label
 
 logger = logging.getLogger(__name__)
 
@@ -252,11 +253,7 @@ def parse_certificate_info(pem_data):
         info['key_algorithm'] = type(pub_key).__name__
 
     # Signature algorithm
-    sig_oid = cert.signature_algorithm_oid
-    sig_name = sig_oid._name
-    if sig_name == 'Unknown OID':
-        sig_name = sig_oid.dotted_string
-    info['signature_algorithm'] = sig_name
+    info['signature_algorithm'] = signature_algorithm_label(cert)
 
     # Fingerprints
     der_data = cert.public_bytes(serialization.Encoding.DER)

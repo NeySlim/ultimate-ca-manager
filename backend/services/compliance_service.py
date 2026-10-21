@@ -103,6 +103,8 @@ def _score_key_strength(cert_dict):
 _EC_POINTS = {'EC-P256': (25, 'ECDSA P-256'), 'EC-P384': (30, 'ECDSA P-384'),
               'EC-P521': (30, 'ECDSA P-521')}
 _EC_LABEL_BY_SIZE = {256: 'EC-P256', 384: 'EC-P384', 521: 'EC-P521'}
+# Same strength as the NIST curve of the same size (BSI TR-02102-1)
+_BRAINPOOL_POINTS = {'brainpoolp256r1': 25, 'brainpoolp384r1': 30, 'brainpoolp512r1': 30}
 
 
 def _score_ec_key(cert_dict, key_size):
@@ -120,6 +122,8 @@ def _score_ec_key(cert_dict, key_size):
         if unregistered is None and len(curves) == 1:
             unregistered = curves[0]
     if unregistered:
+        if unregistered.lower() in _BRAINPOOL_POINTS:
+            return _BRAINPOOL_POINTS[unregistered.lower()], f'ECDSA {unregistered}'
         return 15, f'ECDSA {unregistered}'
     label = _EC_LABEL_BY_SIZE.get(key_size)
     if label:

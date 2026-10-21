@@ -8,6 +8,7 @@ from cryptography.hazmat.backends import default_backend
 from typing import Dict
 
 from utils.datetime_utils import utc_isoformat
+from utils.signature_label import signature_algorithm_label
 
 
 class ParsingMixin:
@@ -38,7 +39,7 @@ class ParsingMixin:
         details = {
             'version': cert.version.name,
             'serial_number': format(cert.serial_number, 'x').upper(),
-            'signature_algorithm': cert.signature_algorithm_oid._name,
+            'signature_algorithm': signature_algorithm_label(cert),
             'subject': {},
             'issuer': {},
             'validity': {

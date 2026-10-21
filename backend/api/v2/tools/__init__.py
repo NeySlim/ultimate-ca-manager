@@ -18,6 +18,7 @@ from cryptography.x509.oid import NameOID, ExtensionOID
 import logging
 
 from utils.datetime_utils import utc_isoformat
+from utils.signature_label import signature_algorithm_label
 
 logger = logging.getLogger(__name__)
 
@@ -52,7 +53,7 @@ def cert_to_dict(cert):
         'version': cert.version.name,
         'not_valid_before': utc_isoformat(cert.not_valid_before_utc),
         'not_valid_after': utc_isoformat(cert.not_valid_after_utc),
-        'signature_algorithm': cert.signature_algorithm_oid._name,
+        'signature_algorithm': signature_algorithm_label(cert),
     }
 
     # Validity status
@@ -145,7 +146,7 @@ def csr_to_dict(csr):
     """Convert CSR to detailed dict"""
     result = {
         'subject': format_name(csr.subject),
-        'signature_algorithm': csr.signature_algorithm_oid._name,
+        'signature_algorithm': signature_algorithm_label(csr),
         'is_signature_valid': csr.is_signature_valid
     }
 

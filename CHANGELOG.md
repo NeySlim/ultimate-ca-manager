@@ -25,6 +25,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Certificates: an RSA-PSS signature is shown with its hash and salt length ("RSASSA-PSS SHA-256 (salt 32)") and scored by its hash, and a Brainpool key is scored like the NIST curve of the same size, where both counted as unrated.
 - Signing: an unknown signature hash is refused instead of being replaced by SHA-256, and a TSA whose signer key is EdDSA says so instead of failing on the signature.
 - Imports and SCEP: chains signed in RSA-PSS are rebuilt by the smart import, which checked them as PKCS#1 v1.5, and SCEP accepts RSA-PSS signed requests.
 - HSM: a signature the provider cannot produce (RSA-PSS, a digest other than SHA-256/384/512) is refused instead of yielding a certificate or CRL whose signature does not verify.
