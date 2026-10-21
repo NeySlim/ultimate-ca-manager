@@ -28,7 +28,7 @@ logger = logging.getLogger(__name__)
 _MS_CERTIFICATE_TEMPLATE_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.21.7')
 
 
-from utils.signing_hash import signing_hash_for
+from utils.signing_hash import signing_hash_for, rsa_padding_for
 
 
 def _certificate_template_extension(template_oid, major=100, minor=0):
@@ -564,7 +564,9 @@ class CSROperationsMixin:
         )
 
         hash_algo = hash_algorithm(digest)
-        csr = builder.sign(private_key, signing_hash_for(private_key, hash_algo), default_backend())
+        sign_hash = signing_hash_for(private_key, hash_algo)
+        csr = builder.sign(private_key, sign_hash, default_backend(),
+                           rsa_padding=rsa_padding_for(private_key, sign_hash))
         return csr.public_bytes(serialization.Encoding.PEM)
 
     @staticmethod
@@ -1154,7 +1156,8 @@ class CSROperationsMixin:
         certificate = builder.sign(
             private_key=ca_private_key,
             algorithm=sign_hash,
-            backend=default_backend()
+            backend=default_backend(),
+            rsa_padding=rsa_padding_for(ca_private_key, sign_hash),
         )
 
         # Apply the Certificate Transparency policy (embed SCTs, enforce

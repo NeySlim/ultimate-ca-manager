@@ -10,6 +10,8 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
+from utils.signing_hash import rsa_padding_for
+
 logger = logging.getLogger(__name__)
 
 # Temporally-sharded logs accept only certificates whose notAfter falls in
@@ -246,7 +248,8 @@ def embed_scts_in_certificate(
     algorithm = certificate.signature_hash_algorithm
     precertificate = base_builder.add_extension(
         x509.PrecertPoison(), critical=True
-    ).sign(issuer_private_key, algorithm, backend=default_backend())
+    ).sign(issuer_private_key, algorithm, backend=default_backend(),
+           rsa_padding=rsa_padding_for(issuer_private_key, algorithm))
 
     precert_chain = [
         precertificate.public_bytes(serialization.Encoding.PEM).decode("ascii"),
@@ -260,7 +263,8 @@ def embed_scts_in_certificate(
     final_certificate = base_builder.add_extension(
         x509.UnrecognizedExtension(_SCT_LIST_OBJECT_ID, encoded_scts),
         critical=False,
-    ).sign(issuer_private_key, algorithm, backend=default_backend())
+    ).sign(issuer_private_key, algorithm, backend=default_backend(),
+           rsa_padding=rsa_padding_for(issuer_private_key, algorithm))
     return final_certificate, valid_scts
 
 

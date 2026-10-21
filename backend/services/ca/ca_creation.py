@@ -194,6 +194,7 @@ class CACreationMixin:
         extended_key_usage: Optional[List[str]] = None,
         named_urls: bool = False,
         digest_explicit: bool = True,
+        signature_scheme: str = 'pkcs1v15',
     ) -> CA:
         """
         Create an internal Certificate Authority.
@@ -213,11 +214,13 @@ class CACreationMixin:
             hsm_key_algorithm: Algorithm for the new HSM key
             digest_explicit: False when *digest* was not chosen ('auto'): it
                 then yields to the digests the issuance policies allow
+            signature_scheme: 'pkcs1v15' or 'pss' for what this CA signs; a
+                root's own certificate already follows it
 
         Returns:
             CA model instance
         """
-        from services.hsm.ca_key_loader import get_ca_signing_key
+        from services.hsm.ca_key_loader import bind_signature_scheme, get_ca_signing_key
         from services.policy_service import (
             PolicyEvaluationService, PolicyViolation, key_label_for_public_key)
 
@@ -299,6 +302,8 @@ class CACreationMixin:
             key_type, hsm_provider_id, hsm_key_id, hsm_key_label, hsm_key_algorithm
         )
         use_hsm = hsm_key is not None
+        if not caref:
+            private_key = bind_signature_scheme(private_key, signature_scheme)
         subject = TrustStoreService.build_subject(dn)
         if caref:
             parent_ca.serial = (parent_ca.serial or 0) + 1
@@ -380,6 +385,7 @@ class CACreationMixin:
             policy_constraints_inhibit=policy_constraints_inhibit,
             inhibit_any_policy=inhibit_any_policy,
             hsm_key_id=hsm_key.id if hsm_key else None,
+            signature_scheme=signature_scheme,
         )
 
         # Store JSON-serialized constraints
@@ -532,6 +538,7 @@ class CACreationMixin:
         hsm_key_label: Optional[str] = None,
         hsm_key_algorithm: Optional[str] = None,
         named_urls: bool = False,
+        signature_scheme: str = 'pkcs1v15',
     ) -> CA:
         """Create a pending CA: key pair + CA CSR, no certificate yet.
 
@@ -553,9 +560,10 @@ class CACreationMixin:
             policies, key_type=key_label_for_public_key(private_key.public_key()),
             context=rule_context)[0])
 
+        from services.hsm.ca_key_loader import bind_signature_scheme
         subject = TrustStoreService.build_subject(dn)
         csr_pem = TrustStoreService.generate_ca_csr(
-            subject, private_key, digest=digest,
+            subject, bind_signature_scheme(private_key, signature_scheme), digest=digest,
             path_length=path_length, key_usage=key_usage,
         )
 
@@ -573,6 +581,7 @@ class CACreationMixin:
             created_by=username,
             path_length=path_length,
             hsm_key_id=hsm_key.id if hsm_key else None,
+            signature_scheme=signature_scheme,
         )
 
         db.session.add(ca)

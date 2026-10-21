@@ -26,6 +26,9 @@ class BaseHsmProvider(ABC):
     Abstract base class for HSM providers.
     Implementations: PKCS11Provider, AzureKeyVaultProvider, GcpKmsProvider
     """
+
+    # True when sign() honours padding='pss' (RSASSA-PSS, salt = digest length)
+    SIGNS_PSS = False
     
     def __init__(self, config: Dict[str, Any]):
         """
@@ -150,7 +153,8 @@ class BaseHsmProvider(ABC):
         key_identifier: str,
         data: bytes,
         algorithm: Optional[str] = None,
-        hash_algorithm: Optional[str] = None
+        hash_algorithm: Optional[str] = None,
+        padding: Optional[str] = None
     ) -> bytes:
         """
         Sign data using HSM key.
@@ -162,6 +166,8 @@ class BaseHsmProvider(ABC):
             hash_algorithm: Digest to sign with ('sha256', 'sha384', 'sha512');
                 it is what the signature's AlgorithmIdentifier will name, so
                 a provider that can hash with it must
+            padding: 'pss' for RSASSA-PSS with a salt as long as the digest
+                (only passed to providers with SIGNS_PSS), else PKCS#1 v1.5
             
         Returns:
             Signature bytes

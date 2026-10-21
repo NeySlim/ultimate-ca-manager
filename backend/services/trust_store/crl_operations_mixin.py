@@ -12,7 +12,7 @@ from utils.datetime_utils import utc_now
 from .constants import hash_algorithm
 
 
-from utils.signing_hash import signing_hash_for
+from utils.signing_hash import signing_hash_for, rsa_padding_for
 
 
 class CRLOperationsMixin:
@@ -42,11 +42,12 @@ class CRLOperationsMixin:
             builder = builder.add_revoked_certificate(revoked_cert.build(default_backend()))
 
         # Sign CRL
-        hash_algo = hash_algorithm(digest)
+        sign_hash = signing_hash_for(ca_private_key, hash_algorithm(digest))
         crl = builder.sign(
             private_key=ca_private_key,
-            algorithm=signing_hash_for(ca_private_key, hash_algo),
-            backend=default_backend()
+            algorithm=sign_hash,
+            backend=default_backend(),
+            rsa_padding=rsa_padding_for(ca_private_key, sign_hash),
         )
 
         return crl.public_bytes(serialization.Encoding.PEM)

@@ -22,6 +22,7 @@ from utils.db_transaction import safe_commit
 from fips_mode import FipsRestricted
 from services.ca_service import CAService
 from services.audit_service import AuditService
+from services.ca.signature_scheme import ca_pss_refusal, normalize_signature_scheme, pss_refusal
 from services.deletion_blockers import ca_deletion_blockers, first_blocker
 from services.notification_service import NotificationService
 from utils.ca_profile import (
@@ -31,7 +32,7 @@ from utils.ca_profile import (
     default_key_usage_for_ca,
 )
 from models import Certificate, CA, db
-from models.hsm import HsmKey
+from models.hsm import HsmKey, HsmProvider
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import dsa
@@ -541,6 +542,20 @@ def create_ca():
         if digest_err:
             return error_response(digest_err, 400)
 
+        signature_scheme, scheme_err = normalize_signature_scheme(data.get('signatureScheme'))
+        if scheme_err:
+            return error_response(scheme_err, 400)
+        if signature_scheme == 'pss':
+            hsm_type = None
+            if hsm_key_id:
+                hsm_type = hsm_key.provider.type if hsm_key and hsm_key.provider else 'unknown'
+            elif hsm_provider_id:
+                provider = db.session.get(HsmProvider, int(hsm_provider_id))
+                hsm_type = provider.type if provider else 'unknown'
+            refusal = pss_refusal(str(digest_key_type).isdigit(), hsm_type)
+            if refusal:
+                return error_response(refusal, 400)
+
         raw_ku = data.get('keyUsage')
         if raw_ku is None and data.get('key_usage') is not None:
             raw_ku = data.get('key_usage')
@@ -570,6 +585,7 @@ def create_ca():
                 hsm_key_label=hsm_key_label,
                 hsm_key_algorithm=hsm_key_algorithm,
                 named_urls=bool(data.get('namedUrls')),
+                signature_scheme=signature_scheme,
             )
             ca_dict = ca.to_dict()
             from services.webhook_service import emit_ca_created
@@ -613,6 +629,7 @@ def create_ca():
             named_urls=bool(data.get('namedUrls')),
             # 'auto' (or nothing) is no choice: it yields to the policies
             digest_explicit=str(raw_digest or 'auto').strip().lower() != 'auto',
+            signature_scheme=signature_scheme,
         )
 
         # Single lifecycle event — bus fans out to webhook + email + WebSocket.
@@ -735,6 +752,18 @@ def update_ca(ca_id):
             'Cannot enable CDP/OCSP on a CA awaiting its certificate', 400
         )
 
+    # Checked before any field changes: a refused scheme leaves the CA as it was
+    new_scheme = None
+    if 'signatureScheme' in data or 'signature_scheme' in data:
+        new_scheme, scheme_err = normalize_signature_scheme(
+            data.get('signatureScheme', data.get('signature_scheme')))
+        if scheme_err:
+            return error_response(scheme_err, 400)
+        if new_scheme == 'pss' and ca.signature_scheme != 'pss':
+            refusal = ca_pss_refusal(ca)
+            if refusal:
+                return error_response(refusal, 400)
+
     # Track which fields actually changed for the audit log
     changed = []
 
@@ -854,6 +883,11 @@ def update_ca(ca_id):
     # /restore endpoints (they enforce password complexity + real key
     # encryption / decryption). Silently ignore any attempt to set
     # offline/offline_reason/offline_mode through the generic update path.
+    # Only what the CA signs from now on: issued certificates keep their signature
+    old_scheme = ca.signature_scheme or 'pkcs1v15'
+    if new_scheme is not None and new_scheme != old_scheme:
+        ca.signature_scheme = new_scheme
+        changed.append(f'signature_scheme {old_scheme} -> {new_scheme}')
     for forbidden in ('offline', 'offline_reason', 'offline_mode'):
         if forbidden in data:
             logger.warning(
@@ -864,6 +898,10 @@ def update_ca(ca_id):
 
     try:
         db.session.commit()
+        if any(c.startswith('signature_scheme ') for c in changed):
+            # A cached OCSP answer would keep the previous scheme until it expires
+            from services.ocsp_service import OCSPService
+            OCSPService.invalidate_ca_cache(ca_id)
 
         # Audit log
         AuditService.log_action(

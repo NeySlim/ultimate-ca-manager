@@ -60,6 +60,14 @@ try:
         Mechanism.ECDSA_SHA384: 'sha384',
         Mechanism.ECDSA_SHA512: 'sha512',
     }
+
+    # RSASSA-PSS: (mechanism, hash, MGF1 hash, salt = digest length)
+    from pkcs11 import MGF
+    _PSS_MECHANISMS = {
+        'sha256': (Mechanism.SHA256_RSA_PKCS_PSS, Mechanism.SHA256, MGF.SHA256, 32),
+        'sha384': (Mechanism.SHA384_RSA_PKCS_PSS, Mechanism.SHA384, MGF.SHA384, 48),
+        'sha512': (Mechanism.SHA512_RSA_PKCS_PSS, Mechanism.SHA512, MGF.SHA512, 64),
+    }
 except ImportError:
     pkcs11 = None
 
@@ -74,6 +82,8 @@ class Pkcs11Provider(BaseHsmProvider):
         user_pin: User PIN for authentication
         slot_index: Slot index (optional, default: auto-detect)
     """
+
+    SIGNS_PSS = True
     
     def __init__(self, config: Dict[str, Any]):
         if not PKCS11_AVAILABLE:
@@ -485,7 +495,8 @@ class Pkcs11Provider(BaseHsmProvider):
         key_identifier: str,
         data: bytes,
         algorithm: Optional[str] = None,
-        hash_algorithm: Optional[str] = None
+        hash_algorithm: Optional[str] = None,
+        padding: Optional[str] = None
     ) -> bytes:
         """Sign data using HSM key"""
         if not self._session:
@@ -515,7 +526,13 @@ class Pkcs11Provider(BaseHsmProvider):
                 KeyType.EC: {'sha256': Mechanism.ECDSA_SHA256, 'sha384': Mechanism.ECDSA_SHA384,
                              'sha512': Mechanism.ECDSA_SHA512},
             }
-            if hash_algorithm and key_type in by_digest and hash_algorithm in by_digest[key_type]:
+            mechanism_param = None
+            if padding == 'pss':
+                if key_type != KeyType.RSA or hash_algorithm not in _PSS_MECHANISMS:
+                    raise HsmOperationError(f"RSA-PSS needs an RSA key and SHA-2, not {hash_algorithm}")
+                mechanism, hash_mech, mgf, salt = _PSS_MECHANISMS[hash_algorithm]
+                mechanism_param = (hash_mech, mgf, salt)
+            elif hash_algorithm and key_type in by_digest and hash_algorithm in by_digest[key_type]:
                 mechanism = by_digest[key_type][hash_algorithm]
             elif algorithm:
                 mechanism = SIGN_MECHANISMS.get(algorithm)
@@ -530,7 +547,7 @@ class Pkcs11Provider(BaseHsmProvider):
             
             # Sign
             try:
-                signature = priv_key.sign(data, mechanism=mechanism)
+                signature = priv_key.sign(data, mechanism=mechanism, mechanism_param=mechanism_param)
             except pkcs11.exceptions.MechanismInvalid:
                 # SoftHSM and some tokens offer only raw ECDSA: hash here and
                 # sign the digest, which is the same signature.

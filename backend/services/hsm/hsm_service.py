@@ -62,6 +62,12 @@ class HsmService:
         logger.info(f"Registered HSM provider: {provider_type}")
     
     @classmethod
+    def signs_pss(cls, provider_type: str) -> bool:
+        """Whether keys of this provider type can sign RSASSA-PSS."""
+        provider_class = cls._provider_registry.get(provider_type)
+        return bool(provider_class and provider_class.SIGNS_PSS)
+
+    @classmethod
     def get_available_providers(cls) -> List[str]:
         """Get list of available (registered) provider types"""
         return list(cls._provider_registry.keys())
@@ -511,7 +517,7 @@ class HsmService:
 
     @classmethod
     def sign(cls, key_id: int, data: bytes, algorithm: Optional[str] = None,
-             hash_algorithm: Optional[str] = None) -> bytes:
+             hash_algorithm: Optional[str] = None, padding: Optional[str] = None) -> bytes:
         """
         Sign data using HSM key.
         
@@ -521,6 +527,7 @@ class HsmService:
             algorithm: Key algorithm (optional, uses default for key type)
             hash_algorithm: Digest to sign with ('sha256', 'sha384', 'sha512'),
                 the one the signature's AlgorithmIdentifier names
+            padding: 'pss' for RSASSA-PSS, refused by a provider that cannot
             
         Returns:
             Signature bytes
@@ -535,9 +542,14 @@ class HsmService:
         provider = key.provider
         try:
             hsm = cls._get_provider_instance(provider)
+            extra = {}
+            if padding == 'pss':
+                if not getattr(hsm, 'SIGNS_PSS', False):
+                    raise HsmOperationError(f"HSM provider type '{provider.type}' does not sign RSA-PSS")
+                extra['padding'] = 'pss'
             with hsm:
                 signature = hsm.sign(key.key_identifier, data, algorithm,
-                                     hash_algorithm=hash_algorithm)
+                                     hash_algorithm=hash_algorithm, **extra)
 
             # PKCS#11 and Azure return ECDSA as raw r || s; X.509 needs DER (#366).
             signature = ecdsa_to_der(

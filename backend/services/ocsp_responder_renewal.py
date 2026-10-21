@@ -35,6 +35,7 @@ DEFAULT_RENEW_DAYS = 30
 
 from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.cert_issuer import authority_key_identifier_hex
+from utils.signing_hash import rsa_padding_for
 
 
 def _get_config(key, default=None):
@@ -117,7 +118,8 @@ def _renew_responder_cert(ca: CA, cert: Certificate):
         context={'operation': 'renewal', 'subject': cert.subject_cn, 'ca_id': ca.id})
     if violations:
         raise PolicyViolation('; '.join(violations))
-    new_cert = builder.sign(ca_key, sign_hash, default_backend())
+    new_cert = builder.sign(ca_key, sign_hash, default_backend(),
+                            rsa_padding=rsa_padding_for(ca_key, sign_hash))
 
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode()
 

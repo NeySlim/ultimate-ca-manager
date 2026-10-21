@@ -88,6 +88,10 @@ class CA(db.Model):
     crl_validity_days = db.Column(db.Integer)
     crl_publish_interval_hours = db.Column(db.Integer)
     crl_digest = db.Column(db.String(20))
+
+    # RSA signature scheme for everything this CA's key signs: 'pkcs1v15' or 'pss'
+    signature_scheme = db.Column(db.String(16), nullable=False, default='pkcs1v15',
+                                 server_default='pkcs1v15')
     
     # OCSP (Online Certificate Status Protocol)
     ocsp_enabled = db.Column(db.Boolean, default=False)
@@ -586,6 +590,7 @@ class CA(db.Model):
             "certs": self.certificates.count() if self.certificates else 0,  # Count of issued certificates
             "key_type": self.key_type,
             "hash_algorithm": self.hash_algorithm,
+            "signature_scheme": self.signature_scheme or 'pkcs1v15',
             # CRL/CDP configuration
             "cdp_enabled": self.cdp_enabled,
             "cdp_url": self.get_primary_cdp_url(),

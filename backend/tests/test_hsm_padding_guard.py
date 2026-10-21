@@ -1,8 +1,9 @@
 """An HSM key refuses a signature its provider cannot produce.
 
-The providers sign RSA in PKCS#1 v1.5 with SHA-2. Asked for PSS, the wrapper
-used to warn and sign v1.5 anyway: the certificate then named RSASSA-PSS over
-a v1.5 signature and failed to verify, with no error at issuance.
+The providers sign RSA in PKCS#1 v1.5, and PSS with a salt as long as the
+digest, with SHA-2. Asked for PSS, the wrapper used to warn and sign v1.5
+anyway: the certificate then named RSASSA-PSS over a v1.5 signature and failed
+to verify, with no error at issuance.
 """
 from datetime import datetime, timedelta, timezone
 from unittest.mock import patch
@@ -29,9 +30,9 @@ def rsa_key():
     return rsa.generate_private_key(65537, 2048)
 
 
-def test_pss_request_is_refused_before_reaching_the_hsm(rsa_key):
+def test_pss_with_another_salt_is_refused_before_reaching_the_hsm(rsa_key):
     wrapper = HsmRSAPrivateKey(1, rsa_key.public_key(), 'RSA-2048')
-    pss = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.DIGEST_LENGTH)
+    pss = padding.PSS(mgf=padding.MGF1(hashes.SHA256()), salt_length=padding.PSS.MAX_LENGTH)
     with patch('services.hsm.HsmService.sign') as hsm_sign:
         with pytest.raises(UnsupportedAlgorithm):
             _builder(rsa_key.public_key()).sign(wrapper, hashes.SHA256(), rsa_padding=pss)

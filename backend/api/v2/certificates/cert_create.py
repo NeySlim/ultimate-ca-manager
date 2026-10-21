@@ -16,6 +16,7 @@ from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, me
 from utils.eku_validation import add_ocsp_nocheck_if_responder
 from utils.cert_profiles import profile_for
 from utils.leaf_key_usage import key_usage_for_key
+from utils.signing_hash import rsa_padding_for
 from models import Certificate, CertificateTemplate, CA, db
 from services.trust_store.constraints_mixin import validate_name_constraints
 from services.template_service import compute_template_overrides
@@ -522,7 +523,8 @@ def create_certificate():
             )
 
         # Sign with the digest resolved against the policies above
-        new_cert = builder.sign(ca_key, sign_hash, default_backend())
+        new_cert = builder.sign(ca_key, sign_hash, default_backend(),
+                                rsa_padding=rsa_padding_for(ca_key, sign_hash))
         # The CT policy (embed SCTs, ct_required) applies to this builder as
         # it does to the CSR trunk and the lifecycle service
         from utils.ct_client import apply_ct_policy

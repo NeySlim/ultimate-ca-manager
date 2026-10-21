@@ -37,6 +37,7 @@ from utils.validity import MAX_VALIDITY_DAYS as _MAX_VALIDITY_DAYS
 
 
 from utils.x509_aki import authority_key_identifier_from_issuer
+from utils.signing_hash import rsa_padding_for
 
 
 def _user_can_act_on_approval(user, approval):
@@ -692,7 +693,8 @@ def _issue_approved_certificate(approval):
         ]), critical=False)
     
     # Sign with the digest resolved against the policies above
-    new_cert = builder.sign(ca_key, _sign_hash, default_backend())
+    new_cert = builder.sign(ca_key, _sign_hash, default_backend(),
+                            rsa_padding=rsa_padding_for(ca_key, _sign_hash))
     # Same CT policy as the direct issue form (raises ValueError when
     # ct_required cannot be met: the approval stays pending with the reason)
     from utils.ct_client import apply_ct_policy

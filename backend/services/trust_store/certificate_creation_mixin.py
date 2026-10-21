@@ -20,7 +20,7 @@ from .key_operations_mixin import KeyOperationsMixin
 from utils.key_codec import private_key_to_pem
 
 
-from utils.signing_hash import signing_hash_for
+from utils.signing_hash import signing_hash_for, rsa_padding_for
 
 
 class CertificateCreationMixin:
@@ -225,11 +225,12 @@ class CertificateCreationMixin:
         ConstraintsMixin._validate_name_constraints(ca_cert, subject, san_names or None)
 
         # Sign
-        hash_algo = hash_algorithm(digest)
+        sign_hash = signing_hash_for(ca_private_key, hash_algorithm(digest))
         certificate = builder.sign(
             private_key=ca_private_key,
-            algorithm=signing_hash_for(ca_private_key, hash_algo),
-            backend=default_backend()
+            algorithm=sign_hash,
+            backend=default_backend(),
+            rsa_padding=rsa_padding_for(ca_private_key, sign_hash),
         )
 
         # Serialize

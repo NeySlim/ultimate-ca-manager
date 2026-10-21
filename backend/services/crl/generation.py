@@ -19,7 +19,7 @@ from .query import CRLQueryMixin, _dedupe_live_records, _not_expired
 logger = logging.getLogger(__name__)
 
 
-from utils.signing_hash import signing_hash_for
+from utils.signing_hash import signing_hash_for, rsa_padding_for
 
 
 def _refuse_offline_ca(ca) -> None:
@@ -247,7 +247,9 @@ class CRLGenerationMixin:
         # UCM issues unpartitioned CRLs — omit IDP on both full and delta.
         builder = _add_freshest_crl(builder, ca)
 
-        crl = builder.sign(ca_private_key, signing_hash_for(ca_private_key, _crl_signature_hash(ca)), default_backend())
+        crl_hash = signing_hash_for(ca_private_key, _crl_signature_hash(ca))
+        crl = builder.sign(ca_private_key, crl_hash, default_backend(),
+                           rsa_padding=rsa_padding_for(ca_private_key, crl_hash))
 
         crl_pem = crl.public_bytes(serialization.Encoding.PEM).decode('utf-8')
         crl_der = crl.public_bytes(serialization.Encoding.DER)
@@ -405,7 +407,9 @@ class CRLGenerationMixin:
             _authority_key_identifier_for_crl(ca_cert), critical=False
         )
 
-        crl = builder.sign(ca_private_key, signing_hash_for(ca_private_key, _crl_signature_hash(ca)), default_backend())
+        crl_hash = signing_hash_for(ca_private_key, _crl_signature_hash(ca))
+        crl = builder.sign(ca_private_key, crl_hash, default_backend(),
+                           rsa_padding=rsa_padding_for(ca_private_key, crl_hash))
 
         crl_pem = crl.public_bytes(serialization.Encoding.PEM).decode('utf-8')
         crl_der = crl.public_bytes(serialization.Encoding.DER)

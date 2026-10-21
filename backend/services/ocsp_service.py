@@ -47,7 +47,7 @@ _HASH_ALGORITHMS = {
 }
 
 
-from utils.signing_hash import signing_hash_for
+from utils.signing_hash import pss_algorithm_identifier, pss_padding, signing_hash_for, signs_pss
 
 
 @dataclass(frozen=True)
@@ -149,6 +149,27 @@ def _child_ca_for_serial(issuer: CA, cert_serial: int, variants) -> Optional[CA]
         except Exception:
             continue
     return None
+
+
+class _PlaceholderRSAKey:
+    """Lets pyca encode a response whose signature is then replaced: its
+    OCSP builder cannot sign RSA-PSS."""
+
+    def __init__(self, public_key):
+        self._public_key = public_key
+
+    def public_key(self):
+        return self._public_key
+
+    @property
+    def key_size(self):
+        return self._public_key.key_size
+
+    def sign(self, data, padding_alg, algorithm):
+        return bytes(self._public_key.key_size // 8)
+
+
+rsa.RSAPrivateKey.register(_PlaceholderRSAKey)
 
 
 def _build_unknown_certificate(serial: int, issuer: x509.Certificate) -> x509.Certificate:
@@ -464,7 +485,10 @@ class OCSPService:
                 self._refusal_reason = reason
                 return None, None
             resp_cert = self._load_cert(responder_record)
-            resp_key = self._load_responder_key(responder_record)
+            # A delegated responder signs with the scheme of the CA it answers for
+            from services.hsm.ca_key_loader import bind_signature_scheme
+            resp_key = bind_signature_scheme(self._load_responder_key(responder_record),
+                                             ca.signature_scheme)
             logger.debug(f"Using delegated OCSP responder for CA {ca.descr}")
             return resp_cert, resp_key
 
@@ -666,22 +690,42 @@ class OCSPService:
         public_key = signing_key.public_key()
         if isinstance(public_key, rsa.RSAPublicKey):
             digest = signing_hash_for(signing_key)
+            if signs_pss(signing_key):
+                signature = signing_key.sign(response_data_der, pss_padding(digest), digest)
+                return signature, pss_algorithm_identifier(digest)
             signature = signing_key.sign(response_data_der, padding.PKCS1v15(), digest)
-            return signature, f'{digest.name}_rsa'
+            return signature, {'algorithm': f'{digest.name}_rsa'}
         if isinstance(public_key, ec.EllipticCurvePublicKey):
             digest = signing_hash_for(signing_key)
             signature = signing_key.sign(response_data_der, ec.ECDSA(digest))
-            return signature, f'{digest.name}_ecdsa'
+            return signature, {'algorithm': f'{digest.name}_ecdsa'}
         if isinstance(public_key, ed25519.Ed25519PublicKey):
-            return signing_key.sign(response_data_der), 'ed25519'
+            return signing_key.sign(response_data_der), {'algorithm': 'ed25519'}
         if isinstance(public_key, ed448.Ed448PublicKey):
-            return signing_key.sign(response_data_der), 'ed448'
+            return signing_key.sign(response_data_der), {'algorithm': 'ed448'}
         if isinstance(public_key, dsa.DSAPublicKey):
             # Accepted as a responder like any other key type, so it has to
             # sign the multi-CertID answer too (#347 review)
             signature = signing_key.sign(response_data_der, hashes.SHA256())
-            return signature, 'sha256_dsa'
+            return signature, {'algorithm': 'sha256_dsa'}
         raise ValueError('Unsupported OCSP response signing key type')
+
+    @staticmethod
+    def _pss_signed(builder, signing_key) -> bytes:
+        """The response *builder* describes, signed RSA-PSS over the ResponseData pyca encoded."""
+        draft = builder.sign(_PlaceholderRSAKey(signing_key.public_key()), signing_hash_for(signing_key))
+        outer = asn1_ocsp.OCSPResponse.load(draft.public_bytes(serialization.Encoding.DER))
+        basic = outer['response_bytes']['response'].parsed
+        signature, algorithm = OCSPService._sign_response_data(signing_key, basic['tbs_response_data'].dump())
+        fields = {'tbs_response_data': basic['tbs_response_data'],
+                  'signature_algorithm': algorithm, 'signature': signature}
+        if basic['certs'].native:
+            fields['certs'] = basic['certs']
+        return asn1_ocsp.OCSPResponse({
+            'response_status': 'successful',
+            'response_bytes': {'response_type': 'basic_ocsp_response',
+                               'response': asn1_ocsp.BasicOCSPResponse(fields)},
+        }).dump()
 
     def generate_multi_response(
         self,
@@ -747,7 +791,7 @@ class OCSPService:
             )
             basic_response_fields = {
                 'tbs_response_data': response_data,
-                'signature_algorithm': {'algorithm': signature_algorithm},
+                'signature_algorithm': signature_algorithm,
                 'signature': signature,
             }
             if use_delegated:
@@ -947,8 +991,11 @@ class OCSPService:
             # Ed25519/Ed448 take no digest choice; the multi-response path
             # already knew that, this one handed them SHA-256 and every answer
             # from such a responder came back as an error (#347 review)
-            response = builder.sign(signing_key, signing_hash_for(signing_key))
-            response_der = response.public_bytes(serialization.Encoding.DER)
+            if signs_pss(signing_key):
+                response_der = self._pss_signed(builder, signing_key)
+            else:
+                response = builder.sign(signing_key, signing_hash_for(signing_key))
+                response_der = response.public_bytes(serialization.Encoding.DER)
             
             # Cache response — key includes the hash algorithm because a SHA-1
             # and a SHA-256 response for the same serial are different DER blobs.

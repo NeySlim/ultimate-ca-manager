@@ -18,6 +18,7 @@ from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 import fips_mode
 from utils.randomness import csp_bytes
+from utils.signing_hash import pss_algorithm_identifier, pss_padding, signs_pss
 
 
 AES128_CBC = "aes128_cbc"
@@ -158,16 +159,18 @@ def create_signed_pkcs7(
     if isinstance(signer_key, ed25519.Ed25519PrivateKey):
         digest_name = 'sha512'
         digest_algorithm = hashes.SHA512()
-        signature_algorithm = 'ed25519'
+        signature_algorithm = {'algorithm': 'ed25519'}
     else:
         digest_name = 'sha256'
         digest_algorithm = hashes.SHA256()
-        if isinstance(signer_key, rsa.RSAPrivateKey):
-            signature_algorithm = 'rsassa_pkcs1v15'
+        if signs_pss(signer_key):
+            signature_algorithm = pss_algorithm_identifier(digest_algorithm)
+        elif isinstance(signer_key, rsa.RSAPrivateKey):
+            signature_algorithm = {'algorithm': 'rsassa_pkcs1v15'}
         elif isinstance(signer_key, ec.EllipticCurvePrivateKey):
-            signature_algorithm = 'sha256_ecdsa'
+            signature_algorithm = {'algorithm': 'sha256_ecdsa'}
         elif isinstance(signer_key, dsa.DSAPrivateKey):
-            signature_algorithm = 'sha256_dsa'
+            signature_algorithm = {'algorithm': 'sha256_dsa'}
         else:
             raise ValueError("Unsupported CMS signer key type")
 
@@ -193,7 +196,10 @@ def create_signed_pkcs7(
     else:
         attributes_for_signing = attributes_der
 
-    if isinstance(signer_key, rsa.RSAPrivateKey):
+    if signs_pss(signer_key):
+        signature = signer_key.sign(attributes_for_signing, pss_padding(digest_algorithm),
+                                    digest_algorithm)
+    elif isinstance(signer_key, rsa.RSAPrivateKey):
         signature = signer_key.sign(
             attributes_for_signing,
             asym_padding.PKCS1v15(),
@@ -222,7 +228,7 @@ def create_signed_pkcs7(
         },
         'digest_algorithm': {'algorithm': digest_name},
         'signed_attrs': attributes,
-        'signature_algorithm': {'algorithm': signature_algorithm},
+        'signature_algorithm': signature_algorithm,
         'signature': asn1crypto.core.OctetString(signature),
     })
 

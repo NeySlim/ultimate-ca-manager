@@ -89,5 +89,5 @@ class TestOcspNamesTheDigestUsed:
         with patch('services.hsm.HsmService.signing_hash', return_value='sha512'), \
              patch('services.hsm.HsmService.sign', side_effect=fake_sign):
             signature, algorithm = OCSPService._sign_response_data(wrapped, b'response-data')
-        assert algorithm == 'sha512_rsa'
+        assert algorithm == {'algorithm': 'sha512_rsa'}
         real.public_key().verify(signature, b'response-data', padding.PKCS1v15(), hashes.SHA512())

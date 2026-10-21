@@ -142,9 +142,10 @@ def timestamp_request():
             except ImportError:
                 prv_decrypted = ca.prv
 
-            signer_key = load_pem_private_key(
+            from services.hsm.ca_key_loader import bind_signature_scheme
+            signer_key = bind_signature_scheme(load_pem_private_key(
                 base64.b64decode(prv_decrypted), password=None, backend=default_backend()
-            )
+            ), ca.signature_scheme)
 
         # Process timestamp request
         try:

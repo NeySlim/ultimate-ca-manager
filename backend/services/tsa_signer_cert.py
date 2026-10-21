@@ -78,6 +78,7 @@ def _key_algo_label(public_key) -> str:
 
 
 from utils.ca_pointer_extensions import add_ca_pointer_extensions as _copy_ca_pointer_extensions
+from utils.signing_hash import rsa_padding_for
 
 
 def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
@@ -197,7 +198,8 @@ def issue_tsa_signer_certificate(*, ca, cn=None, validity_days=None,
         context={'operation': 'issuance', 'subject': cn, 'ca_id': ca.id})
     if violations:
         raise TsaSignerIssueError('Policy violation: ' + '; '.join(violations), 400)
-    new_cert = builder.sign(ca_key, sign_hash, default_backend())
+    new_cert = builder.sign(ca_key, sign_hash, default_backend(),
+                            rsa_padding=rsa_padding_for(ca_key, sign_hash))
 
     cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
     key_pem = private_key_to_pem(new_key).decode('utf-8')

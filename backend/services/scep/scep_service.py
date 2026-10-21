@@ -64,6 +64,7 @@ logger = logging.getLogger(__name__)
 
 from utils.x509_aki import authority_key_identifier_from_issuer
 from services.cert.issued_lookup import find_issued_row, san_identity_matches
+from utils.signing_hash import rsa_padding_for
 
 
 def _scep_allow_no_challenge() -> bool:
@@ -171,9 +172,10 @@ class SCEPService:
         )
         ca_key_pem = load_pem_bytes(self.ca.prv, context=f"SCEP CA {self.ca.id}")
         refuse_eddsa_key(ca_key_pem, f"CA '{self.ca.descr}'")
-        self.ca_key = serialization.load_pem_private_key(
+        from services.hsm.ca_key_loader import bind_signature_scheme
+        self.ca_key = bind_signature_scheme(serialization.load_pem_private_key(
             ca_key_pem, password=None, backend=default_backend(),
-        )
+        ), self.ca.signature_scheme)
 
     # ------------------------------------------------------------------
     # Public protocol methods
@@ -1563,7 +1565,8 @@ class SCEPService:
                 critical=False,
             )
 
-        cert = builder.sign(self.ca_key, sign_hash, default_backend())
+        cert = builder.sign(self.ca_key, sign_hash, default_backend(),
+                            rsa_padding=rsa_padding_for(self.ca_key, sign_hash))
         # Same CT policy as every other leaf path (a ValueError here is a
         # refusal the SCEP layer reports as a failure)
         from utils.ct_client import apply_ct_policy

@@ -41,6 +41,7 @@ from utils.db_transaction import commit_or_rollback
 from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
 from utils import notices as notices_mod
+from utils.signing_hash import rsa_padding_for
 
 logger = logging.getLogger(__name__)
 
@@ -263,7 +264,8 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days) -> 
         public_key = new_key.public_key()
 
     builder = _builder(original, ca, ca_cert, public_key, not_after)
-    renewed = builder.sign(private_key=ca_key, algorithm=sign_hash)
+    renewed = builder.sign(private_key=ca_key, algorithm=sign_hash,
+                           rsa_padding=rsa_padding_for(ca_key, sign_hash))
     renewed, scts = _apply_ct(renewed, ca_cert, ca_key)
 
     old_serial, old_valid_to = cert.serial_number, cert.valid_to

@@ -27,7 +27,10 @@ from services.hsm.hsm_private_key import (
     load_hsm_private_key,
     is_hsm_private_key,
 )
+from cryptography.hazmat.primitives.asymmetric import rsa
+
 from utils.key_codec import load_pem_bytes, refuse_eddsa_key
+from utils.signing_hash import PssBoundRSAKey
 
 logger = logging.getLogger(__name__)
 
@@ -53,8 +56,9 @@ def get_ca_signing_key(ca, *, allow_revoked: bool = False):
             f"CA '{getattr(ca, 'descr', ca)}' is revoked and can no longer sign"
         )
 
+    scheme = getattr(ca, 'signature_scheme', None)
     if getattr(ca, 'hsm_key_id', None):
-        return load_hsm_private_key(ca.hsm_key_id)
+        return bind_signature_scheme(load_hsm_private_key(ca.hsm_key_id), scheme)
 
     if not ca.prv:
         raise ValueError(
@@ -64,12 +68,27 @@ def get_ca_signing_key(ca, *, allow_revoked: bool = False):
 
     pem = load_pem_bytes(ca.prv, context=f"CA {getattr(ca, 'refid', ca.id)}")
     refuse_eddsa_key(pem, f"CA '{getattr(ca, 'descr', None) or getattr(ca, 'refid', ca.id)}'")
-    return serialization.load_pem_private_key(
+    return bind_signature_scheme(serialization.load_pem_private_key(
         pem, password=None, backend=default_backend()
-    )
+    ), scheme)
+
+
+def bind_signature_scheme(key, scheme):
+    """*key*, bound to RSA-PSS when *scheme* is 'pss' and the key is RSA.
+
+    Every signature it then makes must be PSS: the builders read the scheme
+    through ``rsa_padding_for``, and a v1.5 request is refused.
+    """
+    if scheme != 'pss' or not isinstance(key, rsa.RSAPrivateKey) or isinstance(key, PssBoundRSAKey):
+        return key
+    if is_hsm_private_key(key):
+        key.signature_scheme = 'pss'
+        return key
+    return PssBoundRSAKey(key)
 
 
 __all__ = [
+    'bind_signature_scheme',
     'get_ca_signing_key',
     'is_hsm_private_key',
     'load_hsm_private_key',

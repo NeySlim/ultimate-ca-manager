@@ -86,6 +86,8 @@ class OpenBaoProvider(BaseHsmProvider):
         tls_skip_verify: Skip TLS certificate verification (default: False)
     """
 
+    SIGNS_PSS = True
+
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
         self._url = config.get('url', '').rstrip('/')
@@ -358,7 +360,8 @@ class OpenBaoProvider(BaseHsmProvider):
         key_identifier: str,
         data: bytes,
         algorithm: Optional[str] = None,
-        hash_algorithm: Optional[str] = None
+        hash_algorithm: Optional[str] = None,
+        padding: Optional[str] = None
     ) -> bytes:
         # Determine hash algorithm from key type if not specified
         hash_alg = None
@@ -391,6 +394,10 @@ class OpenBaoProvider(BaseHsmProvider):
         }
         if hash_alg:
             payload['hash_algorithm'] = hash_alg
+        if padding == 'pss':
+            # Transit's default salt is the largest that fits, not the digest length
+            sig_alg = 'pss'
+            payload['salt_length'] = 'hash'
         if sig_alg:
             payload['signature_algorithm'] = sig_alg
 

@@ -35,7 +35,7 @@ from __future__ import annotations
 import logging
 from typing import Optional
 
-from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
@@ -85,6 +85,9 @@ class HsmRSAPrivateKey:
     well enough that ``CertificateBuilder.sign(self, hashes.SHA256())`` works.
     """
 
+    # 'pss' once bound to a CA that signs RSA-PSS (ca_key_loader.bind_signature_scheme)
+    signature_scheme = 'pkcs1v15'
+
     def __init__(self, hsm_key_id: int, public_key: rsa.RSAPublicKey,
                  key_algorithm: str = 'RSA-2048'):
         self._hsm_key_id = hsm_key_id
@@ -104,20 +107,42 @@ class HsmRSAPrivateKey:
         """Sign ``data`` via HSM.
 
         ``cryptography`` calls this with the (already prepared) TBS bytes,
-        a padding instance and a hash algorithm. The providers sign PKCS#1
-        v1.5 with SHA-2 only: anything else is refused rather than signed v1.5.
+        a padding instance and a hash algorithm. PKCS#1 v1.5, or PSS where the
+        provider signs it: anything else is refused rather than signed v1.5.
         """
         from services.hsm import HsmService
 
+        if self.signature_scheme == 'pss' and not isinstance(padding_alg, padding.PSS):
+            raise ValueError('This CA signs with RSA-PSS: refusing a PKCS#1 v1.5 signature')
+        if isinstance(padding_alg, padding.PSS):
+            return self._sign_pss(data, padding_alg, algorithm)
         if not isinstance(padding_alg, padding.PKCS1v15):
             raise UnsupportedAlgorithm(
-                f"HSM RSA signing supports PKCS#1 v1.5 only, not {type(padding_alg).__name__}")
+                f"HSM RSA signing supports PKCS#1 v1.5 and PSS only, not {type(padding_alg).__name__}")
 
         # The digest cryptography asked for is what the AlgorithmIdentifier
         # will name: the provider must hash with it, not with a digest of its
         # own choosing (self-review of #347)
         return HsmService.sign(self._hsm_key_id, data, self._key_algorithm,
                                hash_algorithm=_required_hash_name(algorithm))
+
+    def _sign_pss(self, data: bytes, padding_alg, algorithm) -> bytes:
+        """PSS through the provider, checked here: a provider that picked
+        another salt or digest would yield a signature nobody can verify."""
+        from services.hsm import HsmService
+
+        salt = getattr(padding_alg, '_salt_length', None)
+        if salt not in (padding.PSS.DIGEST_LENGTH, getattr(algorithm, 'digest_size', None)):
+            raise UnsupportedAlgorithm('HSM RSA-PSS signs with a salt as long as the digest only')
+        signature = HsmService.sign(self._hsm_key_id, data, self._key_algorithm,
+                                    hash_algorithm=_required_hash_name(algorithm), padding='pss')
+        try:
+            self._public_key.verify(signature, data, padding.PSS(
+                mgf=padding.MGF1(algorithm), salt_length=algorithm.digest_size), algorithm)
+        except InvalidSignature:
+            raise ValueError('The HSM returned an RSA-PSS signature that does not verify '
+                             '(digest or salt length differs)') from None
+        return signature
 
     def signing_hash(self, requested):
         """The digest the provider will sign with when *requested* is asked for."""
