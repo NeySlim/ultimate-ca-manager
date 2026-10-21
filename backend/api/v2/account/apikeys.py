@@ -14,6 +14,8 @@ from . import bp
 
 logger = logging.getLogger(__name__)
 
+_NARROW_CALLER = 'An API key can only grant the permissions it holds itself'
+
 
 def _caller_can_grant(perm, owner_perms):
     """A scope is grantable only if both the owner and the requesting credential hold it."""
@@ -76,8 +78,10 @@ def create_api_key():
 
     for perm in data['permissions']:
         if perm == '*':
-            if not _caller_can_grant('*', user_perms):
+            if '*' not in user_perms:
                 return error_response('Only admins can create wildcard API keys', 403)
+            if not _caller_can_grant('*', user_perms):
+                return error_response(_NARROW_CALLER, 403)
             continue
 
         if ':' in perm:
@@ -89,11 +93,13 @@ def create_api_key():
         else:
             return error_response(f'Invalid permission format: {perm}', 400)
 
-        if not _caller_can_grant(perm, user_perms):
+        if not has_permission(perm, user_perms):
             return error_response(
                 f'Cannot grant permission you do not have: {perm}',
                 403,
             )
+        if not _caller_can_grant(perm, user_perms):
+            return error_response(_NARROW_CALLER, 403)
 
     # Check limit (max 10 keys per user by default). Expired keys don't
     # count - is_active alone doesn't capture that, expiry is derived live
@@ -286,10 +292,15 @@ def regenerate_api_key(key_id):
     if not old_key:
         return error_response('API key not found', 404)
 
-    old_perms = json.loads(old_key.permissions)
+    try:
+        old_perms = json.loads(old_key.permissions)
+    except (TypeError, ValueError):
+        return error_response('Failed to regenerate API key', 500)
     owner_perms = get_effective_permissions(g.current_user)
+    if not all(has_permission(p, owner_perms) for p in old_perms):
+        return error_response('This key holds permissions you no longer have; delete it and create a new one', 403)
     if not all(_caller_can_grant(p, owner_perms) for p in old_perms):
-        return error_response('Cannot regenerate a key wider than the requesting credential', 403)
+        return error_response(_NARROW_CALLER, 403)
 
     # Create new key with same settings
     auth_manager = AuthManager()

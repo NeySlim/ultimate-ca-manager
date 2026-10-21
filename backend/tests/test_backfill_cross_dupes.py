@@ -79,19 +79,18 @@ def test_identical_duplicates_are_still_merged(app):
         assert stats['deduplicated'] >= 1
 
 
-def test_pending_record_merges_into_its_certificate(app):
-    """A pending CA (crt='') and the imported certificate for its key are one CA."""
+def test_record_without_certificate_is_not_merged(app):
+    """The keeper is chosen by parent link and key: merging a record without a
+    certificate could keep it and delete the one holding the certificate."""
     key_a, key_b = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
     with app.app_context():
         root_a = db.session.get(CA, _row(_cert(key_a, 'Pending Parent'), key_a))
         signed = _cert(key_b, 'Pending Sub', key_a, 'Pending Parent')
-        pending = _row(signed, key_b, crt='')
+        pending = _row(signed, key_b, caref=root_a.refid, crt='')
         imported = _row(signed, caref=root_a.refid)
 
         backfill_ski_aki()
 
         db.session.expire_all()
-        remaining = [db.session.get(CA, i) for i in (pending, imported)]
-        remaining = [r for r in remaining if r is not None]
-        assert len(remaining) == 1
-        assert remaining[0].prv and remaining[0].caref == root_a.refid
+        assert db.session.get(CA, imported).crt
+        assert db.session.get(CA, pending) is not None

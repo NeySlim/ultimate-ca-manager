@@ -225,8 +225,9 @@ def backfill_ski_aki():
             pass
 
     # --- Phase 4: Deduplicate CAs with same SKI ---
-    # Only records holding the same certificate (or none yet) are one CA: a
-    # cross-certificate shares the SKI of the root it cross-signs.
+    # Only records holding the same certificate are one CA: a cross-certificate
+    # shares the SKI of the root it cross-signs, and a record without one has
+    # nothing the keeper could take over.
     from sqlalchemy import func
     dupes = db.session.query(CA.ski).filter(CA.ski.isnot(None)).group_by(CA.ski).having(func.count(CA.id) > 1).all()
     for (dupe_ski,) in dupes:
@@ -240,11 +241,9 @@ def backfill_ski_aki():
             stats['same_key_distinct_certs'] += 1
             logger.warning(f"SKI/AKI backfill: CAs {[c.id for c in cas_with_ski]} share SKI {dupe_ski} "
                            f"with distinct certificates (cross-certificate?), not merged")
-            groups = [group for group in by_cert.values() if len(group) > 1]
-        else:
-            groups = [cas_with_ski]
-        for group in groups:
-            _merge_ca_group(db, group, stats)
+        for group in by_cert.values():
+            if len(group) > 1:
+                _merge_ca_group(db, group, stats)
 
     if stats['rechained_cas'] or stats['rechained_certs'] or stats['deduplicated']:
         try:
