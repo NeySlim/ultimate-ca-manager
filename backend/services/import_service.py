@@ -6,6 +6,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 import re
 import base64
+from utils.cert_issuer import is_self_signed
 from utils.key_codec import private_key_to_pem, refuse_eddsa_key
 from utils.pkcs12_import import refuse_pkcs12_import
 
@@ -187,6 +188,11 @@ def extract_cert_info(cert):
 class AmbiguousImportTarget(ValueError):
     """Several records share the certificate's names and none can be told
     to be the one it belongs to."""
+
+
+class CrossCertificateImport(AmbiguousImportTarget):
+    """The certificate cross-certifies a self-signed CA already stored: applying
+    it would replace the root's own certificate and parent it under another CA."""
 
 
 def _spki(public_key):
@@ -394,6 +400,12 @@ def _select_existing(candidates, cert, kind):
             f"certificate's key and were issued under the same issuer name, which "
             f"does not tell them apart; the record to update cannot be determined")
     if len(same_key) == 1:
+        stored_cert, _ = _record_identity(same_key[0])
+        if stored_cert is not None and is_self_signed(stored_cert) and not is_self_signed(cert):
+            raise CrossCertificateImport(
+                f"This certificate is a cross-certificate of the self-signed {kind} "
+                f"'{getattr(same_key[0], 'descr', '')}' (same subject and key, another issuer); "
+                f"importing it would replace that {kind}'s own certificate, so it is refused")
         return same_key[0]
     if same_key:
         raise AmbiguousImportTarget(

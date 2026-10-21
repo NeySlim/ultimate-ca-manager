@@ -17,6 +17,7 @@ from models import CA, db
 from models.hsm import HsmKey
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
+from utils.cert_issuer import is_self_signed
 from utils.datetime_utils import to_naive_utc, utc_isoformat, utc_now
 from utils.serial_format import serial_to_int
 from .helpers import save_ca_files, save_ca_key_file
@@ -638,6 +639,13 @@ class CACreationMixin:
             raise ValueError("CA private key is not available")
         if not certificate_matches_private_key(cert, private_key):
             raise ValueError("Certificate public key does not match this CA's private key")
+        # A self-signed root re-certified by another CA is a cross-certificate:
+        # installing it would replace the root's own certificate (#400)
+        if not was_pending and ca.crt and not is_self_signed(cert):
+            stored = x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend())
+            if is_self_signed(stored):
+                raise ValueError("This certificate is a cross-certificate of this self-signed CA; "
+                                 "installing it would replace the CA's own certificate, so it is refused")
 
         # 2. CA constraints (same rules as CA import)
         ca_warning = validate_ca_certificate(cert)

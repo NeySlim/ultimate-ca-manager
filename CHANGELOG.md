@@ -25,7 +25,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - HSM: a signature the provider cannot produce (RSA-PSS, a digest other than SHA-256/384/512) is refused instead of yielding a certificate or CRL whose signature does not verify.
-- CAs: the hourly chain repair no longer deletes a self-signed root when a cross-certificate of the same key is stored as a separate CA; only records holding the same certificate are merged (#400).
+- CAs: a cross-certificate of a self-signed root no longer replaces the root's own certificate, through an import or a certificate installed after a renewal CSR: it is refused until cross-certificates can be attached; the hourly chain repair no longer deletes a self-signed root stored next to its cross-certificate, and merges only records holding the same certificate (#400).
 - Docker and RPM: `COMMERCIAL-LICENSE.md`, which `NOTICE` refers to, now ships in the image and is installed with the RPM licence files, so a system installed without documentation keeps it.
 
 ## [2.243] - 2026-10-21
