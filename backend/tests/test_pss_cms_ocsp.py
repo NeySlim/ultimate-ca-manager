@@ -1,4 +1,4 @@
-"""OCSP responses, timestamps and SCEP replies of a PSS CA are signed RSA-PSS.
+"""OCSP responses and SCEP replies of a PSS CA are signed RSA-PSS; timestamps stay v1.5.
 
 These structures are assembled by hand (pyca's OCSP builder cannot sign PSS),
 so each one is checked by OpenSSL, with the PSS AlgorithmIdentifier pyca
@@ -129,26 +129,51 @@ def test_delegated_responder_follows_the_ca(app, auth_client, create_cert, pss_c
         db.session.commit()
 
 
-def test_timestamp_from_a_dedicated_signer(app, pss_ca, ca_row, tmp_path):
-    from services import tsa_signer_cert
-    from services.tsa_service import TSAService, _load_signer_certificate
-    issued = tsa_signer_cert.issue_tsa_signer_certificate(ca=ca_row, cn='pss-tsa-signer.example.test')
-    _, cert, key, chain = _load_signer_certificate(issued.refid)
-    data = b'timestamp me'
-    request = tsp.TimeStampReq({
+def _tsq(data):
+    return tsp.TimeStampReq({
         'version': 1, 'cert_req': True,
         'message_imprint': {'hash_algorithm': {'algorithm': 'sha256'},
                             'hashed_message': hashlib.sha256(data).digest()},
     }).dump()
-    der, http = TSAService(cert, key, chain_certs=chain).process_request(request)
-    signed = tsp.TimeStampResp.load(der)['time_stamp_token']['content']
-    assert signed['signer_infos'][0]['signature_algorithm'].dump() == PSS_SHA256
-    # The token is checked as CMS: `openssl ts -verify` goes through OpenSSL's
-    # PKCS7 code, which verifies every RSA SignerInfo as PKCS#1 v1.5
-    token = tsp.TimeStampResp.load(der)['time_stamp_token'].dump()
-    _openssl(tmp_path, 'cms', '-verify', '-inform', 'DER', '-in', 'token.der', '-CAfile', 'ca.pem',
-             '-certfile', 'signer.pem', '-purpose', 'any', '-out', '/dev/null',
-             **{'token.der': token, 'ca.pem': _pem(_cert(ca_row)), 'signer.pem': _pem(cert)})
+
+
+def _assert_v15_token(der, signer_public_key):
+    signer_info = tsp.TimeStampResp.load(der)['time_stamp_token']['content']['signer_infos'][0]
+    assert signer_info['signature_algorithm']['algorithm'].native == 'sha256_rsa'
+    signer_public_key.verify(signer_info['signature'].native, signer_info['signed_attrs'].untag().dump(),
+                             padding.PKCS1v15(), hashes.SHA256())
+
+
+def test_timestamps_stay_v15_under_a_pss_ca(app, pss_ca, ca_row, tmp_path):
+    """The signer certificate is PSS, the token v1.5: `openssl ts -verify` checks it."""
+    from services import tsa_signer_cert
+    from services.tsa_service import TSAService, _load_signer_certificate
+    issued = tsa_signer_cert.issue_tsa_signer_certificate(ca=ca_row, cn='pss-tsa-signer.example.test')
+    _, cert, key, chain = _load_signer_certificate(issued.refid)
+    assert cert.signature_algorithm_oid == x509.oid.SignatureAlgorithmOID.RSASSA_PSS
+    data = b'timestamp me'
+    der, http = TSAService(cert, key, chain_certs=chain).process_request(_tsq(data))
+    assert http == 200
+    _assert_v15_token(der, cert.public_key())
+    _openssl(tmp_path, 'ts', '-verify', '-in', 'r.tsr', '-data', 'data.bin', '-CAfile', 'ca.pem',
+             '-untrusted', 'signer.pem',
+             **{'r.tsr': der, 'data.bin': data, 'ca.pem': _pem(_cert(ca_row)), 'signer.pem': _pem(cert)})
+
+
+def test_a_pss_ca_signing_timestamps_itself_signs_v15(app, client, pss_ca, ca_row):
+    for key, value in (('tsa_enabled', 'true'), ('tsa_ca_refid', ca_row.refid)):
+        row = SystemConfig.query.filter_by(key=key).first() or SystemConfig(key=key)
+        row.value = value
+        db.session.add(row)
+    db.session.commit()
+    try:
+        r = client.post('/tsa', data=_tsq(b'ca signer'), content_type='application/timestamp-query')
+        assert r.status_code == 200
+        assert tsp.TimeStampResp.load(r.data)['status']['status'].native == 'granted'
+        _assert_v15_token(r.data, _cert(ca_row).public_key())
+    finally:
+        SystemConfig.query.filter(SystemConfig.key.in_(['tsa_enabled', 'tsa_ca_refid'])).delete()
+        db.session.commit()
 
 
 def test_scep_reply(app, pss_ca, ca_row, tmp_path):

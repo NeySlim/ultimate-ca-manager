@@ -75,7 +75,7 @@ export const helpContent = {
           { label: 'Import private key', text: 'Attach the private key of a CA that holds only its certificate (signed from an external request), so it can sign' },
           { label: 'Key and validity', text: 'RSA-3072 by default, local or HSM. Validity of 1, 2, 3, 5, 10, 15 or 20 years, or Custom (days) up to 50 years. An RSA-2048 CA that would outlive 2030 is flagged: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026' },
           { label: 'Name constraints', text: 'Advanced Constraints (RFC 5280): permitted and excluded subtrees (DNS, IP range, email) limit the names the CA may certify. For an externally-signed CA they are set by the signing CA' },
-          { label: 'RSA signature scheme', text: 'PKCS#1 v1.5 by default, or RSA-PSS (salt as long as the hash) for an RSA CA with a local, PKCS#11 or OpenBao key. It applies to the certificates, CRLs and OCSP responses the CA signs, and to the timestamps and SCEP replies of the signers it issued. "Sign with RSA-PSS" in the CA details switches an existing CA either way: certificates already issued keep their signature' },
+          { label: 'RSA signature scheme', text: 'PKCS#1 v1.5 by default, or RSA-PSS (salt as long as the hash) for an RSA CA with a local, PKCS#11 or OpenBao key. It applies to the certificates, CRLs, OCSP responses and SCEP replies the CA signs; timestamps stay PKCS#1 v1.5, the scheme `openssl ts -verify` checks. "Sign with RSA-PSS" in the CA details switches an existing CA either way: certificates already issued keep their signature' },
         ]
       },
       {

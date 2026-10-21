@@ -45,7 +45,7 @@ HASH_CLASSES = {
 }
 
 
-from utils.signing_hash import pss_algorithm_identifier, pss_padding, signing_hash_for, signs_pss
+from utils.signing_hash import signing_hash_for
 
 
 class TSAConfigurationError(ValueError):
@@ -315,16 +315,15 @@ class TSAService:
         # Sign the DER-encoded signed attributes (with SET OF tag 0x31)
         signed_attrs_der = signed_attrs.dump()
         # Per CMS, signature is over the DER with EXPLICIT SET tag (0x31)
+        # PKCS#1 v1.5 even under an RSA-PSS CA: `openssl ts -verify` goes
+        # through OpenSSL's PKCS7 code, which verifies v1.5 only
         tsa_key = self.tsa_key
         if isinstance(tsa_key.public_key(), ec.EllipticCurvePublicKey):
             raw_sig = tsa_key.sign(signed_attrs_der, ec.ECDSA(signature_hash))
-            sig_alg = {'algorithm': f'{signature_hash_name}_ecdsa'}
-        elif signs_pss(tsa_key):
-            raw_sig = tsa_key.sign(signed_attrs_der, pss_padding(signature_hash), signature_hash)
-            sig_alg = pss_algorithm_identifier(signature_hash)
+            sig_alg = f'{signature_hash_name}_ecdsa'
         else:
             raw_sig = tsa_key.sign(signed_attrs_der, padding.PKCS1v15(), signature_hash)
-            sig_alg = {'algorithm': f'{signature_hash_name}_rsa'}
+            sig_alg = f'{signature_hash_name}_rsa'
 
         # Build SignerInfo
         issuer_and_serial = cms.IssuerAndSerialNumber({
@@ -337,7 +336,7 @@ class TSAService:
             'sid': cms.SignerIdentifier({'issuer_and_serial_number': issuer_and_serial}),
             'digest_algorithm': {'algorithm': signature_hash_name},
             'signed_attrs': signed_attrs,
-            'signature_algorithm': sig_alg,
+            'signature_algorithm': {'algorithm': sig_alg},
             'signature': raw_sig,
         })
 
@@ -567,9 +566,6 @@ def _load_signer_certificate(refid: str):
     # here; validate_certificate only waves through CA certificates.
     TSAService.validate_certificate(cert)
 
-    # The signer signs with the scheme of the CA that issued it
-    from services.hsm.ca_key_loader import bind_signature_scheme
-    key = bind_signature_scheme(key, issuing_ca.signature_scheme if issuing_ca else None)
     return record, cert, key, _load_issuer_chain(record.caref)
 
 

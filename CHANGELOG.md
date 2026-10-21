@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
-- CAs: an RSA CA can sign with RSA-PSS (salt as long as the hash) instead of PKCS#1 v1.5, chosen at creation or switched later from its details; certificates, CRLs, OCSP responses, timestamps and SCEP replies follow it, on a local key or a PKCS#11 or OpenBao HSM key.
+- CAs: an RSA CA can sign with RSA-PSS (salt as long as the hash) instead of PKCS#1 v1.5, chosen at creation or switched later from its details; certificates, CRLs, OCSP responses and SCEP replies follow it, on a local key or a PKCS#11 or OpenBao HSM key; timestamp tokens stay PKCS#1 v1.5 so that `openssl ts -verify` still checks them.
 
 ### Upgrade notes
 
