@@ -209,3 +209,28 @@ def test_postgres_migration_defaults_existing_cas_to_v15():
         conn.commit()
         conn.close()
         engine.dispose()
+
+
+@pytest.mark.parametrize('blank', [None, ''])
+def test_a_blank_scheme_does_not_switch_back(app, auth_client, pss_ca, blank):
+    r = auth_client.patch(f"/api/v2/cas/{pss_ca['id']}", content_type='application/json',
+                          data=json.dumps({'signatureScheme': blank}))
+    assert r.status_code == 400
+    with app.app_context():
+        assert db.session.get(CA, pss_ca['id']).signature_scheme == 'pss'
+
+
+def test_switching_drops_the_cached_ocsp_answers(app, auth_client, create_ca, create_cert):
+    from models import OCSPResponse
+    from services.ocsp_service import OCSPService
+    ca = create_ca(cn='Scheme switch OCSP cache')
+    leaf = create_cert(cn='ocsp-cache-switch.example.test', ca_id=ca['id'])
+    with app.app_context():
+        serial = int(db.session.get(Certificate, leaf['id']).serial_number, 16)
+        OCSPService().generate_response(db.session.get(CA, ca['id']), serial)
+        assert OCSPResponse.query.filter_by(ca_id=ca['id']).count() == 1
+    r = auth_client.patch(f"/api/v2/cas/{ca['id']}", content_type='application/json',
+                          data=json.dumps({'signatureScheme': 'pss'}))
+    assert r.status_code == 200
+    with app.app_context():
+        assert OCSPResponse.query.filter_by(ca_id=ca['id']).count() == 0

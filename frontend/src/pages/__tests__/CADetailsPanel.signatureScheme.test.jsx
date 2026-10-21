@@ -3,11 +3,15 @@
  * confirmation; an EC CA has no scheme to show.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { fireEvent, render, screen, waitFor } from '@testing-library/react'
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({ update: vi.fn(), showConfirm: vi.fn(), onChanged: vi.fn() }))
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key) => key }) }))
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key) => key, i18n: { language: 'en' } }),
+  Trans: ({ children }) => children,
+  initReactI18next: { type: '3rdParty', init: () => {} },
+}))
 
 vi.mock('../../contexts/AuthContext', () => ({
   useAuth: () => ({ permissions: ['*'], user: { id: 1, username: 'probe' } }),
@@ -23,6 +27,8 @@ vi.mock('../../services', () => ({
   casService: { getCrlInfo: vi.fn().mockResolvedValue({ data: {} }), update: mocks.update },
   templatesService: { getForCA: vi.fn().mockResolvedValue({ data: [] }) },
 }))
+
+vi.mock('../../components/cas/CACrlSection', () => ({ CACrlSection: () => null }))
 
 import { CADetailsPanel } from '../cas/CADetailsPanel'
 
@@ -66,6 +72,17 @@ describe('CADetailsPanel signature scheme', () => {
     fireEvent.click(screen.getByText('cas.signatureSchemeUseV15'))
     await waitFor(() => expect(mocks.showConfirm).toHaveBeenCalled())
     expect(mocks.update).not.toHaveBeenCalled()
+  })
+
+  it('offers no PSS on an Azure HSM key or without a key', () => {
+    renderPanel({ ...RSA_CA, uses_hsm: true, hsm_provider_type: 'azure-keyvault' })
+    expect(screen.queryByText('cas.signatureSchemeUsePss')).not.toBeInTheDocument()
+    cleanup()
+    renderPanel({ ...RSA_CA, has_private_key: false })
+    expect(screen.queryByText('cas.signatureSchemeUsePss')).not.toBeInTheDocument()
+    cleanup()
+    renderPanel({ ...RSA_CA, uses_hsm: true, hsm_provider_type: 'openbao' })
+    expect(screen.getByText('cas.signatureSchemeUsePss')).toBeInTheDocument()
   })
 
   it('offers no switch without write:cas', () => {

@@ -4,3 +4,6 @@ export function signatureShortName(signatureAlgorithm) {
   if (signatureAlgorithm.startsWith('RSASSA-PSS')) return 'RSASSA-PSS'
   return signatureAlgorithm.split('-')[0]
 }
+
+// HSM provider types whose keys sign RSA-PSS (Azure and Google KMS do not here)
+export const PSS_HSM_TYPES = ['pkcs11', 'aws-cloudhsm', 'openbao']

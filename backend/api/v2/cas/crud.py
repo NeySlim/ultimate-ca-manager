@@ -755,8 +755,9 @@ def update_ca(ca_id):
     # Checked before any field changes: a refused scheme leaves the CA as it was
     new_scheme = None
     if 'signatureScheme' in data or 'signature_scheme' in data:
-        new_scheme, scheme_err = normalize_signature_scheme(
-            data.get('signatureScheme', data.get('signature_scheme')))
+        raw_scheme = data.get('signatureScheme', data.get('signature_scheme'))
+        # A blank value names no scheme: it must not switch a PSS CA back to v1.5
+        new_scheme, scheme_err = normalize_signature_scheme(raw_scheme or '?')
         if scheme_err:
             return error_response(scheme_err, 400)
         if new_scheme == 'pss' and ca.signature_scheme != 'pss':

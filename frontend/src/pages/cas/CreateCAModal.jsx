@@ -17,10 +17,9 @@ import { useWebSocket } from '../../hooks'
 import { extractData, cn, downloadBlob } from '../../lib/utils'
 import { signingCas } from '../../lib/caSelection'
 import { CA_KEY_CHOICES, POLICY_DIGESTS, caKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
+import { PSS_HSM_TYPES } from '../../lib/signatureName'
 
 const HSM_KEY_ALGORITHMS = ['RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521']
-// HSM provider types whose keys sign RSA-PSS (Azure and Google KMS do not here)
-const PSS_HSM_TYPES = ['pkcs11', 'aws-cloudhsm', 'openbao']
 
 const VALIDITY_YEAR_PRESETS = [1, 2, 3, 5, 10, 15, 20]
 const CUSTOM_VALIDITY = 'custom'

@@ -7,7 +7,11 @@ import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({ update: vi.fn(), showConfirm: vi.fn(), onChanged: vi.fn() }))
 
-vi.mock('react-i18next', () => ({ useTranslation: () => ({ t: (key) => key, i18n: { language: 'en' } }) }))
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key) => key, i18n: { language: 'en' } }),
+  Trans: ({ children }) => children,
+  initReactI18next: { type: '3rdParty', init: () => {} },
+}))
 vi.mock('../../contexts/NotificationContext', () => ({
   useNotification: () => ({ showSuccess: vi.fn(), showError: vi.fn(), showConfirm: mocks.showConfirm }),
 }))

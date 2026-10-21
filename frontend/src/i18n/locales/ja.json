@@ -887,7 +887,7 @@
     "signatureScheme": "RSA署名方式",
     "signatureSchemePkcs1v15": "PKCS#1 v1.5",
     "signatureSchemePss": "RSA-PSS",
-    "signatureSchemeHelp": "この CA が署名するすべてのもの（証明書、CRL、OCSP 応答、およびこの CA が発行した署名者のタイムスタンプと SCEP 応答）に適用されます。PKCS#1 v1.5 はすべてのクライアントに適していますします。RSA-PSS は BSI TR-02102 と ANSSI が推奨する方式です。",
+    "signatureSchemeHelp": "この CA が署名するすべてのもの（証明書、CRL、OCSP 応答、およびこの CA が発行した署名者のタイムスタンプと SCEP 応答）に適用されます。PKCS#1 v1.5 はすべてのクライアントに適しています。RSA-PSS は BSI TR-02102 と ANSSI が推奨する方式です。",
     "signatureSchemeHsmUnsupported": "RSA-PSS にはローカル鍵、または PKCS#11 もしくは OpenBao HSM プロバイダー上の鍵が必要です。",
     "signatureSchemeToPssConfirm": "今後、この CA は証明書、CRL、OCSP 応答、タイムスタンプ、SCEP 応答に RSA-PSS で署名します。発行済みの証明書の署名は変わりません。PKCS#1 v1.5 のみに対応するクライアントは、今後署名されるものを拒否します。",
     "signatureSchemeToV15Confirm": "今後、この CA は PKCS#1 v1.5 で署名します。発行済みの証明書は RSA-PSS の署名のまま維持されます。",

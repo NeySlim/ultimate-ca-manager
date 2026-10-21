@@ -628,6 +628,7 @@ class CA(db.Model):
             "hsm_key_id": self.hsm_key_id,
             "hsm_provider_id": self.hsm_key.provider_id if self.hsm_key else None,
             "hsm_provider_name": (self.hsm_key.provider.name if (self.hsm_key and self.hsm_key.provider) else None),
+            "hsm_provider_type": (self.hsm_key.provider.type if (self.hsm_key and self.hsm_key.provider) else None),
             "hsm_key_label": self.hsm_key.label if self.hsm_key else None,
             # Offline state
             "offline": self.offline,
