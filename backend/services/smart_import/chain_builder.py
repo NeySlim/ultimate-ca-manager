@@ -13,7 +13,7 @@ from dataclasses import dataclass
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import padding, ec
+from utils.cert_issuer import verify_certificate_signature
 
 from .parser import ParsedObject, ObjectType
 
@@ -221,30 +221,9 @@ class ChainBuilder:
                 )
     
     def _verify_signature(self, cert: x509.Certificate, issuer_public_key) -> bool:
-        """Verify certificate signature"""
-        from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519, ed448
-        
-        try:
-            if isinstance(issuer_public_key, rsa.RSAPublicKey):
-                issuer_public_key.verify(
-                    cert.signature,
-                    cert.tbs_certificate_bytes,
-                    padding.PKCS1v15(),
-                    cert.signature_hash_algorithm
-                )
-            elif isinstance(issuer_public_key, ec.EllipticCurvePublicKey):
-                issuer_public_key.verify(
-                    cert.signature,
-                    cert.tbs_certificate_bytes,
-                    ec.ECDSA(cert.signature_hash_algorithm)
-                )
-            elif isinstance(issuer_public_key, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)):
-                issuer_public_key.verify(cert.signature, cert.tbs_certificate_bytes)
-            else:
-                raise ValueError(f"Unsupported key type: {type(issuer_public_key)}")
-            return True
-        except Exception:
-            raise
+        """Verify certificate signature (raises on failure)"""
+        verify_certificate_signature(cert, issuer_public_key)
+        return True
     
     def find_issuer_in_db(self, cert: ParsedObject) -> Optional[str]:
         """

@@ -18,37 +18,43 @@ class UnsupportedIssuerKey(Exception):
     """The candidate issuer's key type cannot be verified here."""
 
 
+def verify_certificate_signature(cert: x509.Certificate, public_key) -> None:
+    """Verify *cert*'s signature with *public_key*, RSA-PSS included.
+
+    Raises InvalidSignature on a bad signature and UnsupportedIssuerKey when
+    the key type is not one this can check."""
+    if isinstance(public_key, rsa.RSAPublicKey):
+        params = getattr(cert, 'signature_algorithm_parameters', None)
+        public_key.verify(
+            cert.signature, cert.tbs_certificate_bytes,
+            params if isinstance(params, padding.PSS) else padding.PKCS1v15(),
+            cert.signature_hash_algorithm,
+        )
+    elif isinstance(public_key, ec.EllipticCurvePublicKey):
+        public_key.verify(
+            cert.signature, cert.tbs_certificate_bytes,
+            ec.ECDSA(cert.signature_hash_algorithm),
+        )
+    elif isinstance(public_key, dsa.DSAPublicKey):
+        public_key.verify(
+            cert.signature, cert.tbs_certificate_bytes,
+            cert.signature_hash_algorithm,
+        )
+    elif isinstance(public_key, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)):
+        public_key.verify(cert.signature, cert.tbs_certificate_bytes)
+    else:
+        raise UnsupportedIssuerKey(f"unsupported issuer key type {type(public_key).__name__}")
+
+
 def certificate_signed_by(cert: x509.Certificate, issuer: x509.Certificate) -> bool:
     """Whether *cert*'s signature verifies with *issuer*'s public key.
 
     Raises UnsupportedIssuerKey when the key type is not one this can check,
-    so a caller never reads "unverifiable" as "not the issuer"."""
-    public_key = issuer.public_key()
+    so a caller never reads "unverifiable" as "not the issuer" (an unknown key
+    type would otherwise drop the CA out of its chain and its revocation,
+    #343 review)."""
     try:
-        if isinstance(public_key, rsa.RSAPublicKey):
-            params = getattr(cert, 'signature_algorithm_parameters', None)
-            public_key.verify(
-                cert.signature, cert.tbs_certificate_bytes,
-                params if isinstance(params, padding.PSS) else padding.PKCS1v15(),
-                cert.signature_hash_algorithm,
-            )
-        elif isinstance(public_key, ec.EllipticCurvePublicKey):
-            public_key.verify(
-                cert.signature, cert.tbs_certificate_bytes,
-                ec.ECDSA(cert.signature_hash_algorithm),
-            )
-        elif isinstance(public_key, dsa.DSAPublicKey):
-            public_key.verify(
-                cert.signature, cert.tbs_certificate_bytes,
-                cert.signature_hash_algorithm,
-            )
-        elif isinstance(public_key, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)):
-            public_key.verify(cert.signature, cert.tbs_certificate_bytes)
-        else:
-            # An unknown key type cannot be cleared: saying "not signed by this
-            # issuer" would drop the CA out of its chain and out of its
-            # revocation with it (#343 review)
-            raise UnsupportedIssuerKey(f"unsupported issuer key type {type(public_key).__name__}")
+        verify_certificate_signature(cert, issuer.public_key())
     except UnsupportedIssuerKey:
         raise
     except Exception:

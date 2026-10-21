@@ -151,6 +151,24 @@ def extract_signer_certificate(signed_data) -> Optional[x509.Certificate]:
     return None
 
 
+def _pss_padding(params, digest_name: str) -> padding.PSS:
+    """PSS padding from RSASSA-PSS-params (RFC 4055), whose hashes must be
+    the SignerInfo digest (RFC 4056 §3)."""
+    if params is None or params.native is None:
+        raise ValueError("RSASSA-PSS signature without parameters")
+    hash_name = params["hash_algorithm"]["algorithm"].native
+    mgf = params["mask_gen_algorithm"]
+    if mgf["algorithm"].native != "mgf1":
+        raise ValueError("Unsupported RSASSA-PSS mask generation function")
+    mgf_hash = mgf["parameters"]["algorithm"].native
+    if hash_name != digest_name or mgf_hash != digest_name:
+        raise ValueError("RSASSA-PSS hashes differ from the SignerInfo digest")
+    if params["trailer_field"].native not in (None, "trailer_field_bc"):
+        raise ValueError("Unsupported RSASSA-PSS trailer field")
+    hash_cls = _DIGEST_MAP[digest_name]
+    return padding.PSS(mgf=padding.MGF1(hash_cls()), salt_length=params["salt_length"].native)
+
+
 def verify_cms_signature(signed_data, signer_cert) -> None:
     """Verify the CMS SignerInfo signature against signer_cert's public key.
 
@@ -206,7 +224,13 @@ def verify_cms_signature(signed_data, signer_cert) -> None:
         if isinstance(signer_cert, x509.Certificate)
         else signer_cert
     )
-    if isinstance(public_key, rsa.RSAPublicKey):
+    if isinstance(public_key, rsa.RSAPublicKey) and sig_alg == "rsassa_pss":
+        public_key.verify(
+            bytes(signature), signed_bytes,
+            _pss_padding(signer_info["signature_algorithm"]["parameters"], digest_name),
+            hash_cls(),
+        )
+    elif isinstance(public_key, rsa.RSAPublicKey):
         if sig_alg not in (
             "rsassa_pkcs1v15", "rsa", "sha1_rsa", "sha256_rsa",
             "sha384_rsa", "sha512_rsa",

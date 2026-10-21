@@ -24,6 +24,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Imports and SCEP: chains signed in RSA-PSS are rebuilt by the smart import, which checked them as PKCS#1 v1.5, and SCEP accepts RSA-PSS signed requests.
 - HSM: a signature the provider cannot produce (RSA-PSS, a digest other than SHA-256/384/512) is refused instead of yielding a certificate or CRL whose signature does not verify.
 - CAs: a cross-certificate of a self-signed root no longer replaces the root's own certificate, through an import or a certificate installed after a renewal CSR: it is refused until cross-certificates can be attached; the hourly chain repair no longer deletes a self-signed root stored next to its cross-certificate, and merges only records holding the same certificate (#400).
 - Docker and RPM: `COMMERCIAL-LICENSE.md`, which `NOTICE` refers to, now ships in the image and is installed with the RPM licence files, so a system installed without documentation keeps it.
