@@ -881,6 +881,7 @@
       "hsmNoUnusedKeys": "Aucune clé de signature inutilisée sur ce fournisseur",
       "digestAuto": "Auto (aligné sur la clé)",
       "digestAutoHint": "Utilisera {{digest}} pour la clé sélectionnée",
+      "rsa2048Horizon": "RSA-2048 est accepté par l'ANSSI jusqu'à fin 2030 et par ETSI TS 119 312 jusqu'à fin 2026, et cette CA leur survivrait à tous deux. Choisissez RSA-3072 ou plus.",
       "certificateProfile": "Profil certificat (RFC 5280)",
       "certificateProfileHelp": "Les CA racines utilisent keyCertSign + cRLSign par défaut. Les CA émettrices ajoutent digitalSignature et peuvent inclure l'authentification de serveur web TLS (serverAuth).",
       "ekuServerAuth": "Utilisation étendue de la clé : authentification de serveur web TLS (serverAuth)",

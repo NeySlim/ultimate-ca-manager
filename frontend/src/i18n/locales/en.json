@@ -973,6 +973,7 @@
       "hsmNoUnusedKeys": "No unused signing keys on this provider",
       "digestAuto": "Auto (match key size)",
       "digestAutoHint": "Will use {{digest}} for the selected key",
+      "rsa2048Horizon": "RSA-2048 is accepted by ANSSI until the end of 2030 and by ETSI TS 119 312 until the end of 2026, and this CA would outlive both. Choose RSA-3072 or larger.",
       "certificateProfile": "Certificate Profile (RFC 5280)",
       "certificateProfileHelp": "Root CAs default to keyCertSign + cRLSign. Issuing CAs add digitalSignature and may include TLS Web Server Authentication (serverAuth).",
       "ekuServerAuth": "Extended Key Usage: TLS Web Server Authentication (serverAuth)",

@@ -42,16 +42,18 @@ DEFAULT_INTERMEDIATE_EKU = []
 ALLOWED_DIGESTS = frozenset({'sha256', 'sha384', 'sha512'})
 
 
+_CURVE_DIGESTS = {
+    'secp384r1': 'sha384', 'brainpoolp384r1': 'sha384',
+    'secp521r1': 'sha512', 'brainpoolp512r1': 'sha512',
+}
+
+
 def default_digest_for_key_type(key_type: str) -> str:
     """
-    Map key type to a matching signature hash (NIST SP 800-57 alignment for EC).
-    RSA defaults to SHA-256 unless the caller overrides.
+    Map key type to a hash of matching strength by curve size (NIST SP 800-57,
+    BSI TR-02102-1). RSA defaults to SHA-256 unless the caller overrides.
     """
-    if key_type == 'secp384r1':
-        return 'sha384'
-    if key_type == 'secp521r1':
-        return 'sha512'
-    return 'sha256'
+    return _CURVE_DIGESTS.get(str(key_type).lower(), 'sha256')
 
 
 def resolve_digest(digest: Optional[str], key_type: str) -> Tuple[str, Optional[str]]:

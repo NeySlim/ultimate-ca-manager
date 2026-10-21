@@ -22,6 +22,9 @@ const HSM_KEY_ALGORITHMS = ['RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P
 
 const VALIDITY_YEAR_PRESETS = [1, 2, 3, 5, 10, 15, 20]
 const CUSTOM_VALIDITY = 'custom'
+const DEFAULT_KEY_SIZE = { RSA: '3072', ECDSA: 'prime256v1' }
+// ANSSI PG-083 accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026
+const RSA_2048_HORIZON = Date.UTC(2031, 0, 1)
 // The API ceiling: 50 years
 const MAX_CA_VALIDITY_DAYS = 18250
 
@@ -102,7 +105,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const [createFormType, setCreateFormType] = useState('root')
   const [createFormParentCAId, setCreateFormParentCAId] = useState(null)
   const [createFormKeyAlgo, setCreateFormKeyAlgo] = useState('RSA')
-  const [createFormKeySize, setCreateFormKeySize] = useState('2048')
+  const [createFormKeySize, setCreateFormKeySize] = useState(DEFAULT_KEY_SIZE.RSA)
   const [createFormValidity, setCreateFormValidity] = useState('10')
   const [createFormValidityDays, setCreateFormValidityDays] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -125,7 +128,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const [createFormHsmProviderId, setCreateFormHsmProviderId] = useState('')
   const [createFormHsmKeyMode, setCreateFormHsmKeyMode] = useState('generate') // 'generate' | 'existing'
   const [createFormHsmKeyLabel, setCreateFormHsmKeyLabel] = useState('')
-  const [createFormHsmKeyAlgorithm, setCreateFormHsmKeyAlgorithm] = useState('RSA-2048')
+  const [createFormHsmKeyAlgorithm, setCreateFormHsmKeyAlgorithm] = useState('RSA-3072')
   const [createFormHsmKeyId, setCreateFormHsmKeyId] = useState('')
   const [hsmProviders, setHsmProviders] = useState([])
   const [hsmKeys, setHsmKeys] = useState([])
@@ -176,7 +179,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     if (open) return
     setCreateFormType('root')
     setCreateFormKeyAlgo('RSA')
-    setCreateFormKeySize('2048')
+    setCreateFormKeySize(DEFAULT_KEY_SIZE.RSA)
     setCreateFormDigest('auto')
     setCreateFormKeyUsage(ROOT_KEY_USAGE)
     setCreateFormEkuServerAuth(false)
@@ -197,7 +200,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     setCreateFormHsmProviderId('')
     setCreateFormHsmKeyMode('generate')
     setCreateFormHsmKeyLabel('')
-    setCreateFormHsmKeyAlgorithm('RSA-2048')
+    setCreateFormHsmKeyAlgorithm('RSA-3072')
     setCreateFormHsmKeyId('')
   }, [open])
 
@@ -219,6 +222,13 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const autoDigest = allowedDigestChoices.includes(suggested) ? suggested : allowedDigestChoices[0]
   const hsmAlgorithmOptions = useMemo(
     () => HSM_KEY_ALGORITHMS.filter(a => isAllowed(allowedKeyTypes, a)), [allowedKeyTypes])
+  const validityDaysValue = createFormValidity === CUSTOM_VALIDITY
+    ? parseInt(createFormValidityDays) : parseInt(createFormValidity) * 365
+  const usesRsa2048 = createFormKeyStorage === 'local'
+    ? createFormKeyAlgo === 'RSA' && createFormKeySize === '2048'
+    : createFormHsmKeyMode === 'generate' && createFormHsmKeyAlgorithm === 'RSA-2048'
+  const rsa2048PastHorizon = createFormType !== 'external' && usesRsa2048
+    && Number.isFinite(validityDaysValue) && Date.now() + validityDaysValue * 86400000 >= RSA_2048_HORIZON
   const policyBlocksCreate = noDigestAllowed || (createFormKeyStorage === 'local'
     ? noKeyAllowed
     : createFormHsmKeyMode === 'generate' && hsmAlgorithmOptions.length === 0)
@@ -413,8 +423,9 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
               value={createFormKeyAlgo}
               onChange={(value) => {
                 setCreateFormKeyAlgo(value)
-                setCreateFormKeySize(allowedLocalKeys.find(([a]) => a === value)?.[1]
-                  || (value === 'ECDSA' ? 'prime256v1' : '2048'))
+                const sizes = allowedLocalKeys.filter(([a]) => a === value).map(([, sz]) => sz)
+                setCreateFormKeySize(sizes.includes(DEFAULT_KEY_SIZE[value])
+                  ? DEFAULT_KEY_SIZE[value] : sizes[0] || DEFAULT_KEY_SIZE[value])
               }}
             />
             <Select
@@ -453,6 +464,11 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         )}
         {noDigestAllowed && (
           <p className="text-xs text-status-danger" role="alert">{t('cas.create.noDigestAllowedByPolicy')}</p>
+        )}
+        {rsa2048PastHorizon && (
+          <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
+            {t('cas.create.rsa2048Horizon')}
+          </div>
         )}
 
         {createFormKeyStorage === 'hsm' && (

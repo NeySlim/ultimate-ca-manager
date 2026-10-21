@@ -973,6 +973,7 @@
       "hsmNoUnusedKeys": "このプロバイダーに未使用の署名鍵はありません",
       "digestAuto": "自動（鍵サイズに合わせる）",
       "digestAutoHint": "選択した鍵に {{digest}} を使用します",
+      "rsa2048Horizon": "RSA-2048 は ANSSI では 2030 年末まで、ETSI TS 119 312 では 2026 年末まで認められていますが、この CA はどちらの期限よりも長く存続します。RSA-3072 以上を選択してください。",
       "certificateProfile": "証明書プロファイル (RFC 5280)",
       "certificateProfileHelp": "ルート CA: keyCertSign + cRLSign。発行 CA: digitalSignature と任意で serverAuth。",
       "ekuServerAuth": "拡張キー使用法: TLS Webサーバー認証 (serverAuth)",

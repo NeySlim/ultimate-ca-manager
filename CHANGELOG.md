@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Changed
+
+- CAs: a new CA is RSA-3072 by default, and the Create CA dialog warns when an RSA-2048 CA would outlive 2030; the default signature hash of a CA follows the curve size for Brainpool keys as it does for NIST curves.
+
 ### Security
 
 - API keys: a key can no longer create or regenerate a key with scopes it does not hold itself; a narrow key belonging to an administrator could mint a `*` key.

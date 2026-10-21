@@ -973,6 +973,7 @@
       "hsmNoUnusedKeys": "此提供商上没有未使用的签名密钥",
       "digestAuto": "自动（匹配密钥大小）",
       "digestAutoHint": "将为所选密钥使用 {{digest}}",
+      "rsa2048Horizon": "ANSSI 接受 RSA-2048 至 2030 年底,ETSI TS 119 312 接受至 2026 年底,而此 CA 的有效期将超过两者。请选择 RSA-3072 或更大的密钥。",
       "certificateProfile": "证书配置文件 (RFC 5280)",
       "certificateProfileHelp": "根 CA：keyCertSign + cRLSign。签发 CA：digitalSignature，可选 serverAuth。",
       "ekuServerAuth": "扩展密钥用途：TLS Web服务器身份验证 (serverAuth)",

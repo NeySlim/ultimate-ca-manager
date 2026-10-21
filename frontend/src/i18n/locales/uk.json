@@ -985,6 +985,7 @@
       "hsmNoUnusedKeys": "Немає невикористаних ключів підписання на цьому постачальнику",
       "digestAuto": "Авто (відповідно до ключа)",
       "digestAutoHint": "Буде використано {{digest}} для обраного ключа",
+      "rsa2048Horizon": "RSA-2048 прийнятний для ANSSI до кінця 2030 року і для ETSI TS 119 312 до кінця 2026 року, а цей ЦС проіснує довше за обидві дати. Оберіть RSA-3072 або більший.",
       "certificateProfile": "Профіль сертифіката (RFC 5280)",
       "certificateProfileHelp": "Кореневі CA: keyCertSign + cRLSign. Видаючі CA: digitalSignature та опційно serverAuth.",
       "ekuServerAuth": "Розширене використання ключа: автентифікація вебсервера TLS (serverAuth)",

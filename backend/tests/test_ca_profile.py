@@ -20,6 +20,13 @@ class TestDefaultDigest:
     def test_p256_maps_sha256(self):
         assert default_digest_for_key_type('prime256v1') == 'sha256'
 
+    @pytest.mark.parametrize('curve, digest', [
+        ('brainpoolP256r1', 'sha256'), ('brainpoolP384r1', 'sha384'), ('brainpoolP512r1', 'sha512'),
+        ('secp521r1', 'sha512'), ('3072', 'sha256'),
+    ])
+    def test_digest_follows_the_curve_size(self, curve, digest):
+        assert default_digest_for_key_type(curve) == digest
+
     def test_resolve_auto(self):
         digest, err = resolve_digest('auto', 'secp384r1')
         assert err is None

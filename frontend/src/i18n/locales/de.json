@@ -973,6 +973,7 @@
       "hsmNoUnusedKeys": "Keine ungenutzten Signaturschlüssel auf diesem Anbieter",
       "digestAuto": "Auto (Schlüsselgröße)",
       "digestAutoHint": "Verwendet {{digest}} für den gewählten Schlüssel",
+      "rsa2048Horizon": "RSA-2048 wird von der ANSSI bis Ende 2030 und von ETSI TS 119 312 bis Ende 2026 akzeptiert, und diese CA würde beide überdauern. Wählen Sie RSA-3072 oder größer.",
       "certificateProfile": "Zertifikatsprofil (RFC 5280)",
       "certificateProfileHelp": "Root-CAs: keyCertSign + cRLSign. Ausstellende CAs: digitalSignature und optional serverAuth.",
       "ekuServerAuth": "Erweiterte Schlüsselverwendung: TLS-Webserver-Authentifizierung (serverAuth)",
