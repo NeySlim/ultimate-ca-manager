@@ -99,6 +99,8 @@ SELF_ADMIN_ROUTES = [
     ('post', '/api/v2/users/{id}/unlink-sso', {}),
     ('delete', '/api/v2/users/{id}/webauthn/999999', None),
     ('patch', '/api/v2/users/{id}/webauthn/999999', {'enabled': False}),
+    ('post', '/api/v2/users/{id}/mtls/certificates', {}),
+    ('delete', '/api/v2/users/{id}/mtls/certificates/999999', None),
 ]
 
 

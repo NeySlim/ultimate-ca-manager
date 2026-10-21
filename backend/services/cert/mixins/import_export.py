@@ -17,7 +17,6 @@ logger = logging.getLogger(__name__)
 
 from security.encryption import decrypt_private_key, encrypt_private_key
 from utils.key_codec import load_pem_bytes, store_pem_bytes
-from utils.signature_label import signature_algorithm_label
 
 class ImportExportMixin:
 
@@ -53,9 +52,6 @@ class ImportExportMixin:
         # Extract key algorithm info
         from utils.key_algorithms import key_algo_for_public_key
         key_algo = key_algo_for_public_key(cert.public_key())
-
-        # Extract signature algorithm
-        sig_algo = signature_algorithm_label(cert)
 
         # Extract SANs from certificate. The shared reader also decodes the
         # otherName UPN: the four-branch cascade this used to inline dropped

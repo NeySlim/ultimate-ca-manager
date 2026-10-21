@@ -13,7 +13,7 @@ from cryptography import x509 as cx509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 
-from auth.unified import require_auth
+from auth.unified import refuse_api_key_on_own_account, require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.db_transaction import safe_commit
 from models import db, User, Certificate, CA
@@ -43,6 +43,9 @@ def list_user_mtls_certificates(user_id):
 @require_auth(['admin:users'])
 def create_user_mtls_certificate(user_id):
     """Generate or import an mTLS certificate for a user (admin only)."""
+    refused = refuse_api_key_on_own_account(user_id)
+    if refused:
+        return refused
     from models import Certificate, CA, SystemConfig
     from models.auth_certificate import AuthCertificate
     from services.cert_service import CertificateService
@@ -234,6 +237,9 @@ def create_user_mtls_certificate(user_id):
 @require_auth(['admin:users'])
 def delete_user_mtls_certificate(user_id, cert_id):
     """Delete an mTLS certificate for a user (admin only)."""
+    refused = refuse_api_key_on_own_account(user_id)
+    if refused:
+        return refused
     from models.auth_certificate import AuthCertificate
 
     target_user = db.session.get(User, user_id)

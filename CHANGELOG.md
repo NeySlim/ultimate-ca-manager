@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
-- Signature hashes: SHA-224 and any unknown hash name are refused where they used to be signed in SHA-256 without a word; UCM signs with SHA-256, SHA-384 or SHA-512.
+- Signature hashes: SHA-224 is no longer accepted, and an unknown hash name is refused where it used to be signed in SHA-256 without a word; UCM signs with SHA-256, SHA-384 or SHA-512.
 - API keys: the password, e-mail, 2FA, passkey, mTLS certificate and session routes of the account now refuse API keys, even `*` ones, and so do the user administration routes when they target the key's own owner; scripts that used them must sign in with a session (see Security).
 
 ### Changed
@@ -26,7 +26,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - Certificates: an RSA-PSS signature is shown with its hash and salt length ("RSASSA-PSS SHA-256 (salt 32)") and scored by its hash, and a Brainpool key is scored like the NIST curve of the same size, where both counted as unrated.
-- Signing: an unknown signature hash is refused instead of being replaced by SHA-256, and a TSA whose signer key is EdDSA says so instead of failing on the signature.
+- Signing: an unknown signature hash is refused instead of being replaced by SHA-256, and an EdDSA certificate is no longer offered or accepted as the TSA signer, which failed every timestamp request.
 - Imports and SCEP: chains signed in RSA-PSS are rebuilt by the smart import, which checked them as PKCS#1 v1.5, and SCEP accepts RSA-PSS signed requests.
 - HSM: a signature the provider cannot produce (RSA-PSS, a digest other than SHA-256/384/512) is refused instead of yielding a certificate or CRL whose signature does not verify.
 - CAs: a cross-certificate of a self-signed root no longer replaces the root's own certificate, through an import or a certificate installed after a renewal CSR: it is refused until cross-certificates can be attached; the hourly chain repair no longer deletes a self-signed root stored next to its cross-certificate, and merges only records holding the same certificate (#400).

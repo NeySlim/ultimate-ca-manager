@@ -61,3 +61,30 @@ def test_tsa_refuses_an_eddsa_signer_instead_of_signing_v15():
     tsa = TSAService(cert, key)
     with pytest.raises(ValueError, match='RSA or ECDSA'):
         tsa._build_signed_response(b'\x30\x00', False, 'sha256')
+
+
+def test_tsa_does_not_offer_an_eddsa_signer(app):
+    """Refused when chosen, not at every timestamp request afterwards."""
+    import base64, uuid
+    from datetime import datetime, timedelta, timezone
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ed25519
+    from api.v2.tsa import _validate_signer_refid
+    from models import db, Certificate
+    from utils.key_codec import store_pem_bytes
+    key = ed25519.Ed25519PrivateKey.generate()
+    now = datetime.now(timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(SUBJECT).issuer_name(SUBJECT)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
+            .add_extension(x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.TIME_STAMPING]), critical=True)
+            .sign(key, None))
+    with app.app_context():
+        row = Certificate(refid=str(uuid.uuid4()), descr='Ed TSA', subject=SUBJECT.rfc4514_string(),
+                          crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode(),
+                          prv=store_pem_bytes(key.private_bytes(serialization.Encoding.PEM,
+                                                                serialization.PrivateFormat.PKCS8,
+                                                                serialization.NoEncryption())))
+        db.session.add(row); db.session.commit()
+        error, _ = _validate_signer_refid(row.refid)
+    assert error and 'RSA or ECDSA' in error

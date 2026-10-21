@@ -60,6 +60,10 @@ def _signer_candidate_view(cert):
         eku_oids = {oid.dotted_string for oid in eku.value}
         if _TIME_STAMPING_OID not in eku_oids:
             return None
+        # The timestamp CMS is signed in RSA PKCS#1 v1.5 or ECDSA only
+        from cryptography.hazmat.primitives.asymmetric import ec, rsa
+        if not isinstance(parsed.public_key(), (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)):
+            return None
 
         now = utc_now()
         if cert.valid_to and cert.valid_to <= now:
@@ -93,8 +97,8 @@ def _validate_signer_refid(refid):
     if view is None:
         return (
             'The selected certificate cannot be a TSA signer: it must be a '
-            'non-revoked, unexpired certificate whose private key UCM holds '
-            'and that carries the timeStamping EKU', None
+            'non-revoked, unexpired certificate with an RSA or ECDSA key that UCM '
+            'holds and that carries the timeStamping EKU', None
         )
     # "Can decrypt" is the operative requirement — actually try it.
     try:
