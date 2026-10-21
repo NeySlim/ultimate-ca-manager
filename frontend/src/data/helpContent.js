@@ -136,7 +136,7 @@ export const helpContent = {
       'Deleting a CA will NOT revoke certificates it has issued: revoke them first',
       'Private keys are stored encrypted; losing the database means losing the keys',
       'Offline-mode passwords are NOT recoverable: store them in your password manager / vault before confirming',
-      'A cross-certificate of a self-signed root (same subject and key, another issuer) is refused (409), at import and when uploaded after Renew via CSR: it would replace the root\'s own certificate',
+      'A cross-certificate of a self-signed root (same subject and key, another issuer) is refused, at import and when uploaded after Renew via CSR: it would replace the root\'s own certificate',
     ],
     related: ['Certificates', 'Templates', 'CRL/OCSP']
   },
@@ -1469,7 +1469,7 @@ export const helpContent = {
           { label: 'Max Validity', text: 'Maximum certificate lifetime in days' },
           { label: 'Allowed Key Types', text: 'Restrict which key algorithms and sizes can be used' },
           { label: 'SAN Restrictions', text: 'Limit the number of SANs and enforce DNS name patterns' },
-          { label: 'Allowed Signature Hashes', text: 'SHA-256, SHA-384 or SHA-512; none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form and Create CA offer only the key types and hashes the policies allow' },
+          { label: 'Allowed Signature Hashes', text: 'SHA-256, SHA-384 or SHA-512; none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes' },
         ]
       },
       {

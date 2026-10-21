@@ -35,7 +35,7 @@ export default {
           { label: 'In attesa del certificato', text: 'La CA in attesa non può firmare, essere esportata, fare da padre o andare offline finché il suo certificato non è installato' },
           { label: 'Carica certificato', text: 'Incolla o carica il certificato firmato esternamente (PEM/DER). La sua chiave pubblica deve corrispondere alla chiave privata memorizzata; i vincoli CA vengono applicati' },
           { label: 'Catena', text: 'Collegata automaticamente quando l\'emittente è noto a UCM, importa la root esterna (solo certificato) per una catena completa' },
-          { label: 'Rinnova via CSR', text: 'Riemette una CSR dalla stessa chiave (SKI stabile); firmala esternamente e carica il nuovo certificato' },
+          { label: 'Rinnova tramite CSR', text: 'Riemette una CSR dalla stessa chiave (SKI stabile); firmala esternamente e carica il nuovo certificato' },
           { label: 'Dopo il rinnovo', text: 'Il certificato sostituito resta valido fino al suo notAfter, UCM ne mostra il numero di serie dopo il caricamento; revocalo presso la root esterna se non deve più essere considerato attendibile' },
         ]
       },
@@ -82,7 +82,7 @@ export default {
       'L\'eliminazione di una CA NON revoca i certificati che ha emesso: revocali prima',
       'Le chiavi private sono memorizzate crittografate; la perdita del database significa la perdita delle chiavi',
       'Le password della modalità offline NON sono recuperabili: conservale nel tuo password manager / vault prima di confermare',
-      'Un certificato incrociato di una root autofirmata (stesso soggetto e stessa chiave, altro emittente) viene rifiutato (409), all\'importazione e quando viene caricato dopo Rinnova via CSR: sostituirebbe il certificato della root stessa',
+      'Un certificato incrociato di una root autofirmata (stesso soggetto e stessa chiave, altro emittente) viene rifiutato, all\'importazione e quando viene caricato dopo Rinnova tramite CSR: sostituirebbe il certificato della root stessa',
     ],
   },
   helpGuides: {
@@ -145,7 +145,7 @@ Per il pattern della root offline: la chiave della CA emittente risiede in UCM, 
 
 UCM attiva la CA solo se la chiave pubblica del certificato corrisponde alla chiave privata memorizzata e i vincoli CA sono rispettati. La catena si collega automaticamente quando l'emittente è noto a UCM: importa la root esterna (solo certificato) per una catena completa. Fino all'attivazione, la CA in attesa non può firmare, essere esportata, fare da CA padre o andare offline.
 
-Per rinnovare, usa **Rinnova via CSR**: una nuova CSR viene emessa **dalla stessa chiave** (lo SKI resta stabile), firmata esternamente e caricata tramite lo stesso flusso.
+Per rinnovare, usa **Rinnova tramite CSR**: una nuova CSR viene emessa **dalla stessa chiave** (lo SKI resta stabile), firmata esternamente e caricata tramite lo stesso flusso.
 
 ## Importazione di una CA
 
@@ -156,7 +156,7 @@ Importa certificati CA esistenti tramite:
 
 Quando si importa senza chiave privata, la CA può verificare i certificati ma non può firmarne di nuovi.
 
-Un certificato incrociato di una root autofirmata già presente in UCM (stesso soggetto e stessa chiave, altro emittente) viene rifiutato (409), all'importazione e quando viene caricato dopo **Rinnova via CSR**: installarlo sostituirebbe il certificato della root stessa.
+Un certificato incrociato di una root autofirmata già presente in UCM (stesso soggetto e stessa chiave, altro emittente) viene rifiutato, all'importazione e quando viene caricato dopo **Rinnova tramite CSR**: installarlo sostituirebbe il certificato della root stessa.
 
 ## Esportazione di una CA
 

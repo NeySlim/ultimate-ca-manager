@@ -35,7 +35,7 @@ export default {
           { label: 'En espera de certificado', text: 'La CA pendiente no puede firmar, exportarse, ser padre ni ponerse sin conexión hasta que se instale su certificado' },
           { label: 'Subir certificado', text: 'Pegue o suba el certificado firmado externamente (PEM/DER). Su clave pública debe coincidir con la clave privada almacenada; se verifican las restricciones de CA' },
           { label: 'Cadena', text: 'Se vincula automáticamente cuando el emisor es conocido por UCM, importe la raíz externa (solo el certificado) para una cadena completa' },
-          { label: 'Renovar vía CSR', text: 'Reemite un CSR desde la misma clave (SKI estable); fírmelo externamente y suba el nuevo certificado' },
+          { label: 'Renovar mediante CSR', text: 'Reemite un CSR desde la misma clave (SKI estable); fírmelo externamente y suba el nuevo certificado' },
           { label: 'Después de la renovación', text: 'El certificado sustituido sigue siendo válido hasta su notAfter, UCM muestra su número de serie tras la subida; revóquelo en la raíz externa si ya no debe ser de confianza' },
         ]
       },
@@ -82,7 +82,7 @@ export default {
       'Eliminar una CA NO revocará los certificados que haya emitido: revócalos primero',
       'Las claves privadas se almacenan cifradas; perder la base de datos significa perder las claves',
       'Las contraseñas del modo sin conexión NO son recuperables: guárdelas en su gestor de contraseñas / vault antes de confirmar',
-      'Se rechaza (409) un certificado cruzado de una raíz autofirmada (mismo sujeto y clave, otro emisor), al importar y al subirlo tras Renovar vía CSR: reemplazaría el certificado propio de la raíz',
+      'Se rechaza un certificado cruzado de una raíz autofirmada (mismo sujeto y clave, otro emisor), al importar y al subirlo tras Renovar mediante CSR: reemplazaría el certificado propio de la raíz',
     ],
   },
   helpGuides: {
@@ -145,7 +145,7 @@ Para el patrón de raíz sin conexión: la clave de la CA emisora vive en UCM, s
 
 UCM solo activa la CA si la clave pública del certificado coincide con la clave privada almacenada y se cumplen las restricciones de CA. La cadena se vincula automáticamente cuando el emisor es conocido por UCM: importa la raíz externa (solo el certificado) para una cadena completa. Hasta la activación, la CA pendiente no puede firmar, exportarse, ser CA padre ni ponerse sin conexión.
 
-Para renovar, usa **Renovar vía CSR**: se emite un nuevo CSR **desde la misma clave** (el SKI permanece estable), se firma externamente y se sube mediante el mismo flujo.
+Para renovar, usa **Renovar mediante CSR**: se emite un nuevo CSR **desde la misma clave** (el SKI permanece estable), se firma externamente y se sube mediante el mismo flujo.
 
 ## Importar una CA
 
@@ -156,7 +156,7 @@ Importa certificados CA existentes mediante:
 
 Al importar sin clave privada, la CA puede verificar certificados pero no puede firmar nuevos.
 
-Se rechaza (409) un certificado cruzado de una raíz autofirmada ya presente en UCM (mismo sujeto y clave, otro emisor), al importar y al subirlo tras **Renovar vía CSR**: instalarlo reemplazaría el certificado propio de la raíz.
+Se rechaza un certificado cruzado de una raíz autofirmada ya presente en UCM (mismo sujeto y clave, otro emisor), al importar y al subirlo tras **Renovar mediante CSR**: instalarlo reemplazaría el certificado propio de la raíz.
 
 ## Exportar una CA
 

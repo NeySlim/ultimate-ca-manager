@@ -23,7 +23,7 @@ export default {
           { label: 'EAB', text: 'Supporto External Account Binding per CA che richiedono la pre-registrazione (ZeroSSL, HARICA, ecc.)' },
           { label: 'Tipi di chiave', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384 per le chiavi dei certificati' },
           { label: 'Chiavi account', text: 'Algoritmi ES256 (P-256), ES384 (P-384) o RS256 per le chiavi dell\'account ACME' },
-          { label: 'Provider DNS', text: 'Configura i provider di sfida DNS-01 (Cloudflare, Route53, Tencent DNSPod, Plesk, ecc.). Plesk usa la sua API XML; Verifica certificato SSL può essere disattivato per un pannello autofirmato e si può aggiungere un ritardo di propagazione DNS' },
+          { label: 'Provider DNS', text: 'Configura i provider di sfida DNS-01 (Cloudflare, Route53, Tencent DNSPod, Plesk, ecc.). Plesk usa la sua API XML; Verify TLS Certificate può essere disattivato per un pannello autofirmato e si può aggiungere un ritardo di propagazione DNS' },
           { label: 'Comando personalizzato', text: 'Tipo di provider DNS che esegue comandi locali configurati dall\'amministratore per creare/eliminare record TXT, i dettagli del record sono passati tramite le variabili d\'ambiente DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Percorso binario assoluto obbligatorio, nessuna shell, timeout configurabile' },
           { label: 'Domini', text: 'Mappa i domini ai provider DNS per la validazione automatica' },
           { label: 'HTTP-01', text: 'UCM serve il file di sfida dei suoi ordini in sospeso su /.well-known/acme-challenge/ sulla porta del protocollo HTTP (8080 per impostazione predefinita): inoltra quel percorso dalla porta 80 del dominio a UCM. Verify controlla prima il file e gli ordini HTTP-01 si rinnovano automaticamente' },
@@ -223,7 +223,7 @@ Configura i provider di sfida DNS-01 per la validazione del dominio. I provider 
 - DigitalOcean
 - OVH
 - Tencent Cloud DNSPod
-- Plesk (API XML): **Verifica certificato SSL** può essere disattivato per un pannello autofirmato e si può aggiungere un ritardo di propagazione DNS
+- Plesk (API XML): **Verify TLS Certificate** può essere disattivato per un pannello autofirmato e si può aggiungere un ritardo di propagazione DNS
 - E altri
 
 Ogni provider richiede credenziali API specifiche per il servizio DNS.

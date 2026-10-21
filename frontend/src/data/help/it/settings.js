@@ -172,8 +172,8 @@ Configurazione a livello di sistema organizzata in schede. Le modifiche hanno ef
 ## Generale
 
 - **Nome host syslog**: Inviato come HOSTNAME nei messaggi syslog inoltrati; il nome host della macchina se vuoto
-- **URL base**: URL HTTPS canonico dell'interfaccia di amministrazione e dell'API; gli altri nomi host e IP reindirizzano a esso
-- **URL base protocollo**: URL base scritto negli indirizzi CDP e OCSP; usa http:// per evitare cicli di verifica TLS, oppure lascia vuoto per usare l'URL base
+- **URL Base**: URL HTTPS canonico dell'interfaccia di amministrazione e dell'API; gli altri nomi host e IP reindirizzano a esso
+- **URL base protocollo**: URL base scritto negli indirizzi CDP e OCSP; usa http:// per evitare cicli di verifica TLS, oppure lascia vuoto per usare l'URL Base
 - **Porta HTTP protocollo**: Porta HTTP in chiaro che serve CDP e OCSP; 0 la disattiva, una modifica richiede un riavvio
 - **Vhost ACME pubblico**: Hostname concreto negli URL del directory ACME (es. \`acme.ucm.example.com\`: non \`*.ucm.example.com\`). Un **SAN del certificato TLS** wildcard \`*.ucm.example.com\` copre sia \`admin.ucm.example.com\` sia \`acme.ucm.example.com\`. Configura DNS e TLS per il vhost ACME **prima** di salvare: i client che rileggono il directory cambiano subito gli URL.
 

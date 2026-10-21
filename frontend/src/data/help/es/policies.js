@@ -19,7 +19,7 @@ export default {
           { label: 'Validez máxima', text: 'Duración máxima del certificado en días' },
           { label: 'Tipos de clave permitidos', text: 'Restringir qué algoritmos y tamaños de clave se pueden utilizar' },
           { label: 'Restricciones de SAN', text: 'Limitar el número de SAN y aplicar patrones de nombres DNS' },
-          { label: 'Hashes de firma permitidos', text: 'SHA-256, SHA-384 o SHA-512; si no se selecciona ninguno, se permite cualquiera. Cuando nadie ha elegido el hash, se aplica el predeterminado si está permitido y, si no, el más débil de los permitidos. El formulario de emisión y Crear CA ofrecen solo los tipos de clave y hashes que las políticas permiten' },
+          { label: 'Hashes de firma permitidos', text: 'SHA-256, SHA-384 o SHA-512; si no se selecciona ninguno, se permite cualquiera. Cuando nadie ha elegido el hash, se aplica el predeterminado si está permitido y, si no, el más débil de los permitidos. El formulario de emisión ofrece solo los tipos de clave permitidos, y Crear CA solo los tipos de clave y hashes permitidos' },
         ]
       },
       {
@@ -77,7 +77,7 @@ Restringir qué algoritmos y tamaños de clave se pueden utilizar:
 - **EC-P384**: Curva elíptica de mayor seguridad
 - **EC-P521**: Máxima seguridad (raramente necesario)
 
-**Hashes de firma permitidos** restringe el hash de firma del mismo modo (SHA-256, SHA-384, SHA-512); si no se selecciona ninguno, se permite cualquiera. Cuando nadie ha elegido el hash, se aplica el predeterminado si está permitido y, si no, el más débil de los permitidos. El formulario de emisión y Crear CA ofrecen solo los tipos de clave y hashes que las políticas permiten.
+**Hashes de firma permitidos** restringe el hash de firma del mismo modo (SHA-256, SHA-384, SHA-512); si no se selecciona ninguno, se permite cualquiera. Cuando nadie ha elegido el hash, se aplica el predeterminado si está permitido y, si no, el más débil de los permitidos. El formulario de emisión ofrece solo los tipos de clave permitidos, y Crear CA solo los tipos de clave y hashes permitidos.
 
 ### Restricciones de SAN
 - **Máximo de nombres DNS**: Limitar el número de Subject Alternative Names

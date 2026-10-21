@@ -19,7 +19,7 @@ export default {
           { label: 'Validité maximale', text: 'Durée de vie maximale du certificat en jours' },
           { label: 'Types de clés autorisés', text: 'Restreindre les algorithmes et tailles de clés pouvant être utilisés' },
           { label: 'Restrictions SAN', text: 'Limiter le nombre de SAN et imposer des motifs de noms DNS' },
-          { label: 'Algorithmes de hachage de signature autorisés', text: 'SHA-256, SHA-384 ou SHA-512 ; aucun sélectionné autorise tout. Quand personne n\'a choisi le hachage, celui par défaut s\'applique s\'il est autorisé, sinon le plus faible autorisé. Le formulaire d\'émission et Créer une CA ne proposent que les types de clé et hachages que les politiques autorisent' },
+          { label: 'Algorithmes de hachage de signature autorisés', text: 'SHA-256, SHA-384 ou SHA-512 ; aucun sélectionné autorise tout. Quand personne n\'a choisi le hachage, celui par défaut s\'applique s\'il est autorisé, sinon le plus faible autorisé. Le formulaire d\'émission ne propose que les types de clé autorisés, Créer une CA que les types de clé et hachages autorisés' },
         ]
       },
       {
@@ -77,7 +77,7 @@ Restreindre les algorithmes et tailles de clés pouvant être utilisés :
 - **EC-P384** : Courbe elliptique à sécurité plus élevée
 - **EC-P521** : Sécurité maximale (rarement nécessaire)
 
-**Algorithmes de hachage de signature autorisés** restreint le hachage de signature de la même façon (SHA-256, SHA-384, SHA-512) ; aucun sélectionné autorise tout. Quand personne n'a choisi le hachage, celui par défaut s'applique s'il est autorisé, sinon le plus faible autorisé. Le formulaire d'émission et Créer une CA ne proposent que les types de clé et hachages que les politiques autorisent.
+**Algorithmes de hachage de signature autorisés** restreint le hachage de signature de la même façon (SHA-256, SHA-384, SHA-512) ; aucun sélectionné autorise tout. Quand personne n'a choisi le hachage, celui par défaut s'applique s'il est autorisé, sinon le plus faible autorisé. Le formulaire d'émission ne propose que les types de clé autorisés, Créer une CA que les types de clé et hachages autorisés.
 
 ### Restrictions SAN
 - **Noms DNS max** : Limiter le nombre de noms alternatifs du sujet

@@ -146,7 +146,7 @@ Import existing CA certificates via:
 
 When importing without a private key, the CA can verify certificates but cannot sign new ones.
 
-A cross-certificate of a self-signed root already in UCM (same subject and key, another issuer) is refused (409), at import and when uploaded after **Renew via CSR**: installing it would replace the root's own certificate.
+A cross-certificate of a self-signed root already in UCM (same subject and key, another issuer) is refused, at import and when uploaded after **Renew via CSR**: installing it would replace the root's own certificate.
 
 ## Exporting a CA
 
@@ -2771,7 +2771,7 @@ Restrict which key algorithms and sizes can be used:
 - **EC-P384**: Higher security elliptic curve
 - **EC-P521**: Maximum security (rarely needed)
 
-**Allowed Signature Hashes** restricts the signature hash the same way (SHA-256, SHA-384, SHA-512); none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form and Create CA offer only the key types and hashes the policies allow.
+**Allowed Signature Hashes** restricts the signature hash the same way (SHA-256, SHA-384, SHA-512); none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes.
 
 ### SAN Restrictions
 - **Max DNS Names**: Limit the number of Subject Alternative Names

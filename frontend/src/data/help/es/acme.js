@@ -23,7 +23,7 @@ export default {
           { label: 'EAB', text: 'Soporte de External Account Binding para CAs que requieren pre-registro (ZeroSSL, HARICA, etc.)' },
           { label: 'Tipos de clave', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384 para claves de certificado' },
           { label: 'Claves de cuenta', text: 'Algoritmos ES256 (P-256), ES384 (P-384) o RS256 para claves de cuenta ACME' },
-          { label: 'Proveedores DNS', text: 'Configura proveedores de desafío DNS-01 (Cloudflare, Route53, Tencent DNSPod, Plesk, etc.). Plesk usa su API XML; se puede desactivar Verificar certificado TLS para un panel autofirmado y añadir un retardo de propagación DNS' },
+          { label: 'Proveedores DNS', text: 'Configura proveedores de desafío DNS-01 (Cloudflare, Route53, Tencent DNSPod, Plesk, etc.). Plesk usa su API XML; se puede desactivar Verify TLS Certificate para un panel autofirmado y añadir un retardo de propagación DNS' },
           { label: 'Custom Command', text: 'Tipo de proveedor DNS que ejecuta comandos locales configurados por el administrador para crear/eliminar registros TXT, los detalles del registro se pasan mediante las variables de entorno DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Ruta absoluta al binario obligatoria, sin shell, tiempo límite configurable' },
           { label: 'Dominios', text: 'Mapea dominios a proveedores DNS para validación automática' },
           { label: 'HTTP-01', text: 'UCM sirve el archivo de desafío de sus pedidos pendientes en /.well-known/acme-challenge/ en el puerto del protocolo HTTP (8080 por defecto): redirija esa ruta desde el puerto 80 del dominio hacia UCM. Verificar comprueba primero el archivo, y los pedidos HTTP-01 se renuevan automáticamente' },
@@ -223,7 +223,7 @@ Configura proveedores de desafío DNS-01 para la validación de dominio. Los pro
 - DigitalOcean
 - OVH
 - Tencent Cloud DNSPod
-- Plesk (API XML): se puede desactivar **Verificar certificado TLS** para un panel autofirmado y añadir un retardo de propagación DNS
+- Plesk (API XML): se puede desactivar **Verify TLS Certificate** para un panel autofirmado y añadir un retardo de propagación DNS
 - Y más
 
 Cada proveedor requiere credenciales API específicas del servicio DNS.

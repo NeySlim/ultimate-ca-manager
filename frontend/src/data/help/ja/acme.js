@@ -23,7 +23,7 @@ export default {
           { label: 'EAB', text: '事前登録が必要なCA（ZeroSSL、HARICAなど）のための外部アカウントバインディングサポート' },
           { label: 'キータイプ', text: '証明書キー用のRSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384' },
           { label: 'アカウントキー', text: 'ACMEアカウントキー用のES256 (P-256)、ES384 (P-384)、またはRS256アルゴリズム' },
-          { label: 'DNSプロバイダー', text: 'DNS-01チャレンジプロバイダーの設定（Cloudflare、Route53、Tencent DNSPod、Pleskなど）。Plesk は XML API を使用します。自己署名のパネル向けに TLS 証明書の検証をオフにでき、DNS 伝播の待機時間を追加できます' },
+          { label: 'DNSプロバイダー', text: 'DNS-01チャレンジプロバイダーの設定（Cloudflare、Route53、Tencent DNSPod、Pleskなど）。Plesk は XML API を使用します。自己署名のパネル向けに Verify TLS Certificate をオフにでき、DNS 伝播の待機時間を追加できます' },
           { label: 'カスタムコマンド', text: '管理者が設定したローカルコマンドをTXTレコードの作成/削除に実行するDNSプロバイダータイプ, レコード情報はDOMAIN、RECORD_NAME、RECORD_VALUE、TTL、ACTION環境変数で渡されます。バイナリの絶対パスが必須、シェルなし、タイムアウト設定可能' },
           { label: 'ドメイン', text: '自動検証のためにドメインをDNSプロバイダーにマッピングします' },
           { label: 'HTTP-01', text: 'UCMは保留中の注文のチャレンジファイルを、HTTPプロトコルポート（デフォルトは8080）の /.well-known/acme-challenge/ で提供します。ドメインのポート80からそのパスをUCMに転送してください。検証ではまずファイルを確認し、HTTP-01の注文は自動的に更新されます' },
@@ -223,7 +223,7 @@ ECDSAキーは最新のデプロイに推奨されます: より小さく、よ�
 - DigitalOcean
 - OVH
 - Tencent Cloud DNSPod
-- Plesk（XML API）: 自己署名のパネル向けに **TLS証明書を検証** をオフにでき、DNS 伝播の待機時間を追加できます
+- Plesk（XML API）: 自己署名のパネル向けに **Verify TLS Certificate** をオフにでき、DNS 伝播の待機時間を追加できます
 - その他
 
 各プロバイダーにはDNSサービス固有のAPI資格情報が必要です。

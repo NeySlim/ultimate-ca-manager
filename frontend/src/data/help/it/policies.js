@@ -19,7 +19,7 @@ export default {
           { label: 'Validità massima', text: 'Durata massima del certificato in giorni' },
           { label: 'Tipi di chiave consentiti', text: 'Limita gli algoritmi e le dimensioni delle chiavi utilizzabili' },
           { label: 'Restrizioni SAN', text: 'Limita il numero di SAN e imponi pattern di nomi DNS' },
-          { label: 'Hash di firma consentiti', text: 'SHA-256, SHA-384 o SHA-512; se nessuno è selezionato, tutti sono consentiti. Quando nessuno ha scelto l\'hash, si applica quello predefinito se consentito, altrimenti il più debole tra quelli consentiti. Il modulo di emissione e Crea CA propongono solo i tipi di chiave e gli hash che le policy consentono' },
+          { label: 'Hash di firma consentiti', text: 'SHA-256, SHA-384 o SHA-512; se nessuno è selezionato, tutti sono consentiti. Quando nessuno ha scelto l\'hash, si applica quello predefinito se consentito, altrimenti il più debole tra quelli consentiti. Il modulo di emissione propone solo i tipi di chiave consentiti, Crea CA solo i tipi di chiave e gli hash consentiti' },
         ]
       },
       {
@@ -77,7 +77,7 @@ Limita gli algoritmi e le dimensioni delle chiavi utilizzabili:
 - **EC-P384**: Curva ellittica a sicurezza superiore
 - **EC-P521**: Sicurezza massima (raramente necessario)
 
-**Hash di firma consentiti** limita l'hash di firma allo stesso modo (SHA-256, SHA-384, SHA-512); se nessuno è selezionato, tutti sono consentiti. Quando nessuno ha scelto l'hash, si applica quello predefinito se consentito, altrimenti il più debole tra quelli consentiti. Il modulo di emissione e Crea CA propongono solo i tipi di chiave e gli hash che le policy consentono.
+**Hash di firma consentiti** limita l'hash di firma allo stesso modo (SHA-256, SHA-384, SHA-512); se nessuno è selezionato, tutti sono consentiti. Quando nessuno ha scelto l'hash, si applica quello predefinito se consentito, altrimenti il più debole tra quelli consentiti. Il modulo di emissione propone solo i tipi di chiave consentiti, Crea CA solo i tipi di chiave e gli hash consentiti.
 
 ### Restrizioni SAN
 - **Massimo nomi DNS**: Limita il numero di Subject Alternative Names

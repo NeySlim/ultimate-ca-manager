@@ -23,7 +23,7 @@ export default {
           { label: 'EAB', text: '支持外部账户绑定，用于需要预注册的 CA（ZeroSSL、HARICA 等）' },
           { label: '密钥类型', text: '证书密钥支持 RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384' },
           { label: '账户密钥', text: 'ACME 账户密钥支持 ES256 (P-256)、ES384 (P-384) 或 RS256 算法' },
-          { label: 'DNS 提供商', text: '配置 DNS-01 挑战提供商（Cloudflare、Route53、Tencent DNSPod、Plesk 等）。Plesk 通过其 XML API；对于自签名面板可关闭验证 TLS 证书，并可添加 DNS 传播延迟' },
+          { label: 'DNS 提供商', text: '配置 DNS-01 挑战提供商（Cloudflare、Route53、Tencent DNSPod、Plesk 等）。Plesk 通过其 XML API；对于自签名面板可关闭 Verify TLS Certificate，并可添加 DNS 传播延迟' },
           { label: '自定义命令', text: '运行管理员配置的本地命令来创建/删除 TXT 记录的 DNS 提供商类型,, 记录详情通过 DOMAIN、RECORD_NAME、RECORD_VALUE、TTL、ACTION 环境变量传递。要求二进制文件绝对路径，不经过 shell，超时可配置' },
           { label: '域名', text: '将域名映射到 DNS 提供商以进行自动验证' },
           { label: 'HTTP-01', text: 'UCM 在 HTTP 协议端口（默认 8080）的 /.well-known/acme-challenge/ 下提供其待处理订单的 challenge 文件：请将域名 80 端口上的该路径转发到 UCM。验证会先检查该文件，HTTP-01 订单会自动续期' },
@@ -223,7 +223,7 @@ ECDSA 密钥推荐用于现代部署:, 更小、更快且同样安全。
 - DigitalOcean
 - OVH
 - Tencent Cloud DNSPod
-- Plesk（XML API）：对于自签名面板可关闭**验证 TLS 证书**，并可添加 DNS 传播延迟
+- Plesk（XML API）：对于自签名面板可关闭 **Verify TLS Certificate**，并可添加 DNS 传播延迟
 - 等等
 
 每个提供商需要特定于该 DNS 服务的 API 凭据。

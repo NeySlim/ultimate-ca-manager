@@ -82,7 +82,7 @@ export default {
       'Supprimer une CA ne révoquera PAS les certificats qu\'elle a émis : révoquez-les d\'abord',
       'Les clés privées sont stockées chiffrées ; perdre la base de données signifie perdre les clés',
       'Les mots de passe du mode hors ligne ne sont PAS récupérables : stockez-les dans votre coffre-fort avant de confirmer',
-      'Un certificat croisé d\'une racine auto-signée (même sujet et même clé, autre émetteur) est refusé (409), à l\'importation et lors du téléversement après Renouveler via CSR : il remplacerait le certificat propre de la racine',
+      'Un certificat croisé d\'une racine auto-signée (même sujet et même clé, autre émetteur) est refusé, à l\'importation et lors du téléversement après Renouveler via CSR : il remplacerait le certificat propre de la racine',
     ],
   },
   helpGuides: {
@@ -157,7 +157,7 @@ Importez des certificats de CA existants via :
 
 Lors de l'importation sans clé privée, la CA peut vérifier les certificats mais ne peut pas en signer de nouveaux.
 
-Un certificat croisé d'une racine auto-signée déjà présente dans UCM (même sujet et même clé, autre émetteur) est refusé (409), à l'importation et lors du téléversement après **Renouveler via CSR** : l'installer remplacerait le certificat propre de la racine.
+Un certificat croisé d'une racine auto-signée déjà présente dans UCM (même sujet et même clé, autre émetteur) est refusé, à l'importation et lors du téléversement après **Renouveler via CSR** : l'installer remplacerait le certificat propre de la racine.
 
 ## Exporter une CA
 

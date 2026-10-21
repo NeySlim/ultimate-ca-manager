@@ -23,7 +23,7 @@ export default {
           { label: 'EAB', text: 'External Account Binding-Unterstützung für CAs, die eine Vorregistrierung erfordern (ZeroSSL, HARICA, usw.)' },
           { label: 'Schlüsseltypen', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384 für Zertifikatsschlüssel' },
           { label: 'Kontoschlüssel', text: 'ES256 (P-256), ES384 (P-384) oder RS256-Algorithmen für ACME-Kontoschlüssel' },
-          { label: 'DNS-Anbieter', text: 'DNS-01-Challenge-Anbieter konfigurieren (Cloudflare, Route53, Tencent DNSPod, Plesk, usw.). Plesk läuft über seine XML-API; SSL-Zertifikat überprüfen kann für ein selbstsigniertes Panel deaktiviert und eine DNS-Propagationsverzögerung hinzugefügt werden' },
+          { label: 'DNS-Anbieter', text: 'DNS-01-Challenge-Anbieter konfigurieren (Cloudflare, Route53, Tencent DNSPod, Plesk, usw.). Plesk läuft über seine XML-API; Verify TLS Certificate kann für ein selbstsigniertes Panel deaktiviert und eine DNS-Propagationsverzögerung hinzugefügt werden' },
           { label: 'Custom Command', text: 'DNS-Anbietertyp, der vom Admin konfigurierte lokale Befehle zum Erstellen/Löschen von TXT-Einträgen ausführt, Eintragsdetails werden über die Umgebungsvariablen DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION übergeben. Absoluter Binärpfad erforderlich, keine Shell, konfigurierbares Timeout' },
           { label: 'Domänen', text: 'Domänen DNS-Anbietern für automatische Validierung zuordnen' },
           { label: 'HTTP-01', text: 'UCM stellt die Challenge-Datei seiner offenen Orders unter /.well-known/acme-challenge/ auf dem HTTP-Protokollport bereit (standardmäßig 8080): leiten Sie diesen Pfad von Port 80 der Domäne an UCM weiter. Verifizieren prüft zuerst die Datei, und HTTP-01-Orders werden automatisch erneuert' },
@@ -223,7 +223,7 @@ Konfigurieren Sie DNS-01-Challenge-Anbieter für die Domänenvalidierung. Unters
 - DigitalOcean
 - OVH
 - Tencent Cloud DNSPod
-- Plesk (XML-API): **SSL-Zertifikat überprüfen** kann für ein selbstsigniertes Panel deaktiviert und eine DNS-Propagationsverzögerung hinzugefügt werden
+- Plesk (XML-API): **Verify TLS Certificate** kann für ein selbstsigniertes Panel deaktiviert und eine DNS-Propagationsverzögerung hinzugefügt werden
 - Und weitere
 
 Jeder Anbieter erfordert spezifische API-Anmeldeinformationen für den DNS-Dienst.

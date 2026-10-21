@@ -35,7 +35,7 @@ export default {
           { label: 'Warten auf Zertifikat', text: 'Die wartende CA kann nicht signieren, exportiert werden, übergeordnete CA sein oder offline gehen, bis ihr Zertifikat installiert ist' },
           { label: 'Zertifikat hochladen', text: 'Das extern signierte Zertifikat einfügen oder hochladen (PEM/DER). Sein öffentlicher Schlüssel muss zum gespeicherten privaten Schlüssel passen; CA-Constraints werden erzwungen' },
           { label: 'Kette', text: 'Automatische Verknüpfung, wenn der Aussteller UCM bekannt ist, importieren Sie die externe Root (nur Zertifikat) für eine vollständige Kette' },
-          { label: 'Erneuern via CSR', text: 'Stellt einen CSR aus demselben Schlüssel erneut aus (stabile SKI); extern signieren und das neue Zertifikat hochladen' },
+          { label: 'Über CSR erneuern', text: 'Stellt einen CSR aus demselben Schlüssel erneut aus (stabile SKI); extern signieren und das neue Zertifikat hochladen' },
           { label: 'Nach der Erneuerung', text: 'Das abgelöste Zertifikat bleibt bis zu seinem notAfter gültig, UCM zeigt seine Seriennummer nach dem Hochladen an; widerrufen Sie es bei der externen Root, wenn ihm nicht mehr vertraut werden soll' },
         ]
       },
@@ -82,7 +82,7 @@ export default {
       'Das Löschen einer CA widerruft NICHT die von ihr ausgestellten Zertifikate: widerrufen Sie diese zuerst',
       'Private Schlüssel werden verschlüsselt gespeichert; der Verlust der Datenbank bedeutet den Verlust der Schlüssel',
       'Offline-Modus-Passwörter sind NICHT wiederherstellbar: bewahren Sie sie vor der Bestätigung in Ihrem Passwortmanager / Vault auf',
-      'Ein Cross-Zertifikat einer selbstsignierten Root (gleiches Subject und gleicher Schlüssel, anderer Aussteller) wird abgelehnt (409), beim Import und beim Hochladen nach „Erneuern via CSR": Es würde das eigene Zertifikat der Root ersetzen',
+      'Ein Cross-Zertifikat einer selbstsignierten Root (gleiches Subject und gleicher Schlüssel, anderer Aussteller) wird abgelehnt, beim Import und beim Hochladen nach „Über CSR erneuern": Es würde das eigene Zertifikat der Root ersetzen',
     ],
   },
   helpGuides: {
@@ -145,7 +145,7 @@ Für das Offline-Root-Muster: der Schlüssel der ausstellenden CA liegt in UCM, 
 
 UCM aktiviert die CA nur, wenn der öffentliche Schlüssel des Zertifikats zum gespeicherten privaten Schlüssel passt und die CA-Constraints erfüllt sind. Die Kette wird automatisch verknüpft, wenn der Aussteller UCM bekannt ist: importieren Sie die externe Root (nur Zertifikat) für eine vollständige Kette. Bis zur Aktivierung kann die wartende CA nicht signieren, exportiert werden, übergeordnete CA sein oder offline gehen.
 
-Zum Erneuern verwenden Sie **Erneuern via CSR**: Ein neuer CSR wird **aus demselben Schlüssel** ausgestellt (die SKI bleibt stabil), extern signiert und über denselben Ablauf hochgeladen.
+Zum Erneuern verwenden Sie **Über CSR erneuern**: Ein neuer CSR wird **aus demselben Schlüssel** ausgestellt (die SKI bleibt stabil), extern signiert und über denselben Ablauf hochgeladen.
 
 ## Eine CA importieren
 
@@ -156,7 +156,7 @@ Importieren Sie vorhandene CA-Zertifikate über:
 
 Beim Import ohne privaten Schlüssel kann die CA Zertifikate verifizieren, aber keine neuen signieren.
 
-Ein Cross-Zertifikat einer bereits in UCM vorhandenen selbstsignierten Root (gleiches Subject und gleicher Schlüssel, anderer Aussteller) wird abgelehnt (409), beim Import und beim Hochladen nach **Erneuern via CSR**: Die Installation würde das eigene Zertifikat der Root ersetzen.
+Ein Cross-Zertifikat einer bereits in UCM vorhandenen selbstsignierten Root (gleiches Subject und gleicher Schlüssel, anderer Aussteller) wird abgelehnt, beim Import und beim Hochladen nach **Über CSR erneuern**: Die Installation würde das eigene Zertifikat der Root ersetzen.
 
 ## Eine CA exportieren
 
