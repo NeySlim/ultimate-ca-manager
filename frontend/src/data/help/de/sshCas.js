@@ -15,8 +15,8 @@ export default {
         title: 'Schlüsselalgorithmen',
         items: [
           { label: 'Ed25519', text: 'Modern, schnell, kleine Schlüssel (256 Bit). Empfohlen für neue Bereitstellungen.' },
-          { label: 'ECDSA P-256 / P-384', text: 'Elliptische-Kurven-Schlüssel, weit verbreitet. Gutes Gleichgewicht zwischen Sicherheit und Kompatibilität.' },
-          { label: 'RSA 2048 / 4096', text: 'Traditioneller Algorithmus. Verwenden Sie 4096 Bit für langlebige CAs. Breiteste Kompatibilität mit älteren Systemen.' },
+          { label: 'ECDSA P-256 / P-384 / P-521', text: 'Elliptische-Kurven-Schlüssel, weit verbreitet. Gutes Gleichgewicht zwischen Sicherheit und Kompatibilität.' },
+          { label: 'RSA 4096', text: 'Traditioneller Algorithmus, immer 4096 Bit. Breiteste Kompatibilität mit älteren Systemen.' },
         ]
       },
       {
@@ -91,8 +91,8 @@ Eine Host CA signiert Zertifikate, die **Server gegenüber Clients** authentifiz
 3. Wählen Sie den CA-Typ: **User** oder **Host**
 4. Wählen Sie den Schlüsselalgorithmus:
    - **Ed25519**: Empfohlen. Schnell, kleine Schlüssel, moderne Sicherheit.
-   - **ECDSA P-256/P-384**: Gute Kompatibilität und Sicherheit.
-   - **RSA 2048/4096**: Breiteste Kompatibilität, größere Schlüssel.
+   - **ECDSA P-256/P-384/P-521**: Gute Kompatibilität und Sicherheit.
+   - **RSA 4096**: Breiteste Kompatibilität, größere Schlüssel.
 5. Legen Sie optional die maximale Gültigkeit und Standarderweiterungen fest
 6. Klicken Sie auf **Erstellen**
 

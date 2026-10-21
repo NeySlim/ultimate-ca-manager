@@ -22,6 +22,7 @@ export default {
           { label: 'Ajouter un PEM', text: 'Coller directement du texte de certificat encodé en PEM' },
           { label: 'Synchroniser depuis le système', text: 'Importer les CA de confiance du système d\'exploitation dans UCM' },
           { label: 'Exporter', text: 'Télécharger les certificats de confiance individuellement' },
+          { label: 'Supprimer la sélection', text: 'Sélectionnez plusieurs certificats et supprimez-les ensemble, par exemple les CA système filtrées comme expirées ; seules les lignes affichées par les filtres actuels sont supprimées' },
         ]
       },
     ],
@@ -70,6 +71,7 @@ Importez toutes les CA de confiance du magasin de confiance du système d'exploi
 - **Rechercher** : Trouver des certificats par nom de sujet
 - **Exporter** : Télécharger des certificats individuels au format PEM
 - **Supprimer** : Retirer un certificat du magasin de confiance
+- **Supprimer la sélection** : Sélectionnez plusieurs certificats et supprimez-les ensemble, par exemple les CA système filtrées comme expirées ; seules les lignes affichées par les filtres actuels sont supprimées
 
 ## Cas d'utilisation
 

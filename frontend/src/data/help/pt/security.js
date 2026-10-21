@@ -12,6 +12,7 @@ export default {
           { label: 'Arquivos de chave no disco', text: 'Mostra quantas cópias de chaves em texto claro restam; use hooks de implantação quando outro serviço precisar de um arquivo de chave' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Variável de ambiente opcional: recusa iniciar sem uma chave de criptografia de banco de dados explícita' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: 'Variável de ambiente opcional: recusa iniciar a menos que a criptografia de chaves privadas esteja ativada' },
+          { label: 'Criptografar chaves restantes', text: 'Exibido enquanto a criptografia está ativada e algumas chaves ou segredos ainda estão armazenados sem criptografia: criptografa-os, deixando como estão os já criptografados' },
         ]
       },
       {
@@ -75,6 +76,7 @@ Criptografe todas as chaves privadas de CAs e certificados armazenadas no banco 
 - **Status e contadores**: A seção mostra se a criptografia está ativada e quantas chaves estão atualmente **criptografadas** vs **não criptografadas**
 - **Ativar Criptografia**: Gera o arquivo de chave mestra e criptografa todas as chaves privadas armazenadas. Faça backup do arquivo de chave imediatamente: sem ele, as chaves criptografadas são perdidas permanentemente
 - **Desativar Criptografia**: Descriptografa todas as chaves privadas de volta ao armazenamento em texto claro (confirmação necessária)
+- **Criptografar chaves restantes**: Exibido enquanto a criptografia está ativada e algumas chaves ou segredos ainda estão armazenados sem criptografia; criptografa-os, deixando como estão os já criptografados
 
 ### Aplicação na Inicialização
 

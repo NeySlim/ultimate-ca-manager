@@ -22,6 +22,7 @@ export default {
           { label: 'Agregar PEM', text: 'Pegue texto de certificado codificado en PEM directamente' },
           { label: 'Sincronizar desde el sistema', text: 'Importar las CAs de confianza del SO a UCM' },
           { label: 'Exportar', text: 'Descargar certificados de confianza individualmente' },
+          { label: 'Eliminar selección', text: 'Seleccione varios certificados y elimínelos a la vez, por ejemplo las CAs del sistema filtradas como caducadas; solo se eliminan las filas que muestran los filtros actuales' },
         ]
       },
     ],
@@ -70,6 +71,7 @@ Importe todas las CAs de confianza del almacén de confianza del sistema operati
 - **Buscar**: Encuentre certificados por nombre del sujeto
 - **Exportar**: Descargue certificados individuales en formato PEM
 - **Eliminar**: Elimine un certificado del almacén de confianza
+- **Eliminar selección**: Seleccione varios certificados y elimínelos a la vez, por ejemplo las CAs del sistema filtradas como caducadas; solo se eliminan las filas que muestran los filtros actuales
 
 ## Casos de uso
 

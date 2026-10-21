@@ -23,7 +23,7 @@ export default {
           { label: 'EAB', text: '支持外部账户绑定，用于需要预注册的 CA（ZeroSSL、HARICA 等）' },
           { label: '密钥类型', text: '证书密钥支持 RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384' },
           { label: '账户密钥', text: 'ACME 账户密钥支持 ES256 (P-256)、ES384 (P-384) 或 RS256 算法' },
-          { label: 'DNS 提供商', text: '配置 DNS-01 挑战提供商（Cloudflare、Route53、Tencent DNSPod 等）' },
+          { label: 'DNS 提供商', text: '配置 DNS-01 挑战提供商（Cloudflare、Route53、Tencent DNSPod、Plesk 等）。Plesk 通过其 XML API；对于自签名面板可关闭验证 TLS 证书，并可添加 DNS 传播延迟' },
           { label: '自定义命令', text: '运行管理员配置的本地命令来创建/删除 TXT 记录的 DNS 提供商类型,, 记录详情通过 DOMAIN、RECORD_NAME、RECORD_VALUE、TTL、ACTION 环境变量传递。要求二进制文件绝对路径，不经过 shell，超时可配置' },
           { label: '域名', text: '将域名映射到 DNS 提供商以进行自动验证' },
           { label: 'HTTP-01', text: 'UCM 在 HTTP 协议端口（默认 8080）的 /.well-known/acme-challenge/ 下提供其待处理订单的 challenge 文件：请将域名 80 端口上的该路径转发到 UCM。验证会先检查该文件，HTTP-01 订单会自动续期' },
@@ -45,11 +45,11 @@ export default {
       {
         title: 'ACME 代理',
         items: [
-          { label: '上游CA', text: '选择预设（Let\'s Encrypt 生产/测试）或输入任何 RFC 8555 CA 的自定义URL' },
+          { label: '上游 CA 账户', text: '选择其中一个外部 CA 账户：其目录 URL（Let\'s Encrypt、ZeroSSL、任何 RFC 8555 CA）和 EAB 凭据在该账户上设置' },
           { label: '账户状态', text: '显示UCM是否已在上游CA注册。账户在首次代理请求时自动注册' },
           { label: '测试连接', text: '验证与上游CA的连接性并检查是否需要EAB凭据' },
-          { label: '重置账户', text: '清除保存的上游账户凭据以强制重新注册（更改CA后使用）' },
-          { label: 'EAB凭据', text: '需要EAB的CA的External Account Binding凭据（如ZeroSSL、Google Trust）' },
+          { label: '重置账户', text: '清除所选 CA 账户的上游注册以强制重新注册' },
+          { label: 'EAB凭据', text: '需要EAB的CA的External Account Binding凭据（如ZeroSSL、Google Trust），在“外部 CA 账户”中的 CA 账户上输入' },
           { label: 'DNS挑战', text: 'UCM使用配置的DNS提供商代表客户端处理DNS-01挑战' },
           { label: '清理被替换的证书', text: '可选开关：当代理订单 finalize 时，删除之前由代理订单为完全相同域名集合导入的证书。已吊销证书始终保留；非代理证书绝不受影响。默认关闭' },
                   { label: '客户端预检 (v2.217)', text: '代理还会发布用每个客户端账户密钥计算的 dns-01 TXT 值：lego/Traefik/Caddy 的传播预检无需禁用即可通过；重试的 new-order 会返回该账户仍在等待的订单' },
@@ -128,7 +128,7 @@ export default {
       '使用本地域名为不同的内部域名分配不同的 CA',
       '任何拥有私钥的 CA 都可以被选为签发 CA',
       '通配符域名 (*.example.com) 需要 DNS-01 验证',
-      '切换上游 CA 会自动清除过时的账户凭据',
+      '每个 CA 账户保留自己的上游注册：将代理切换到另一个账户时使用该账户的注册',
       '在 certbot 中使用代理 URL：certbot certonly --server https://your-server:port/acme/proxy/directory',
     ],
     warnings: [
@@ -166,7 +166,7 @@ UCM 支持两种 ACME（自动化证书管理环境）模式：
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-在**设置** → **自定义 ACME 服务器**中设置 CA 的目录 URL。
+将 CA 的目录 URL 设置为其在**外部 CA 账户**中账户的 **ACME目录URL**。
 
 ### 外部 CA 账户
 管理 UCM 注册的所有外部 CA 账户：
@@ -181,7 +181,7 @@ UCM 支持两种 ACME（自动化证书管理环境）模式：
 某些 CA 需要 EAB 凭据将您的 ACME 账户与 CA 上的现有账户关联：
 
 1. 在 CA 的门户网站注册以获取 **EAB 密钥 ID** 和 **HMAC 密钥**
-2. 在**设置** → **自定义 ACME 服务器**中输入这两个值
+2. 在**外部 CA 账户**中的 CA 账户上输入这两个值（**EAB密钥ID**、**EAB HMAC密钥**）
 3. HMAC 密钥是 base64url 编码的（由 CA 提供）
 
 > 💡 ZeroSSL、HARICA、Google Trust Services 和大多数企业 CA 都需要 EAB。
@@ -223,6 +223,7 @@ ECDSA 密钥推荐用于现代部署:, 更小、更快且同样安全。
 - DigitalOcean
 - OVH
 - Tencent Cloud DNSPod
+- Plesk（XML API）：对于自签名面板可关闭**验证 TLS 证书**，并可添加 DNS 传播延迟
 - 等等
 
 每个提供商需要特定于该 DNS 服务的 API 凭据。
@@ -295,7 +296,7 @@ https://your-ucm-server:8443/acme/proxy/directory
 
 ### 账户管理
 - **账户状态标记** 显示UCM是否已在上游CA注册
-- 更换上游CA会自动清除过时凭据并强制重新注册
+- 每个 CA 账户保留自己的上游注册：切换上游账户时使用该账户的注册，必要时在首次代理请求时注册
 - 如需手动清除凭据，使用 **重置账户** 按钮
 - **测试连接** 检查上游目录是否可达以及是否需要EAB
 
@@ -331,7 +332,7 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 代理 EAB 凭据与客户端 EAB 不同:, 用于 UCM 向上游 CA 认证。
+> 💡 上游 CA 账户的 EAB 凭据与客户端 EAB 不同:, 用于 UCM 向上游 CA 认证，而不是客户端向 UCM 认证。请在**外部 CA 账户**中的该账户上设置它们。
 
 > ⚠ 前提：域名须在 ACME Domains 中配置 DNS 提供商。代理仅支持 dns-01。
 

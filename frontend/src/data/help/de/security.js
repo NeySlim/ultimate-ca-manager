@@ -12,6 +12,7 @@ export default {
           { label: 'Schlüsseldateien auf dem Datenträger', text: 'Zeigt die verbleibenden Klartext-Schlüsselkopien; verwenden Sie Deploy-Hooks, wenn ein anderer Dienst eine Schlüsseldatei benötigt' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Opt-in-Umgebungsvariable: Start ohne expliziten Datenbank-Verschlüsselungsschlüssel verweigern' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: 'Opt-in-Umgebungsvariable: Start verweigern, solange die Verschlüsselung privater Schlüssel nicht aktiviert ist' },
+          { label: 'Verbleibende Schlüssel verschlüsseln', text: 'Wird angezeigt, solange die Verschlüsselung aktiviert ist und einige Schlüssel oder Geheimnisse noch unverschlüsselt gespeichert sind: verschlüsselt sie und lässt bereits verschlüsselte unverändert' },
         ]
       },
       {
@@ -75,6 +76,7 @@ Alle in der Datenbank gespeicherten privaten Schlüssel von CAs und Zertifikaten
 - **Status und Zähler**: Der Bereich zeigt, ob die Verschlüsselung aktiviert ist und wie viele Schlüssel derzeit **verschlüsselt** bzw. **unverschlüsselt** sind
 - **Verschlüsselung aktivieren**: Erzeugt die Master-Key-Datei und verschlüsselt alle gespeicherten privaten Schlüssel. Sichern Sie die Schlüsseldatei sofort: Ohne sie sind verschlüsselte Schlüssel unwiederbringlich verloren
 - **Verschlüsselung deaktivieren**: Entschlüsselt alle privaten Schlüssel zurück in die Klartextspeicherung (Bestätigung erforderlich)
+- **Verbleibende Schlüssel verschlüsseln**: Wird angezeigt, solange die Verschlüsselung aktiviert ist und einige Schlüssel oder Geheimnisse noch unverschlüsselt gespeichert sind; verschlüsselt sie und lässt bereits verschlüsselte unverändert
 
 ### Durchsetzung beim Start
 

@@ -19,6 +19,7 @@ export default {
           { label: 'Validade Máxima', text: 'Tempo máximo de vida do certificado em dias' },
           { label: 'Tipos de Chave Permitidos', text: 'Restringir quais algoritmos e tamanhos de chave podem ser usados' },
           { label: 'Restrições de SAN', text: 'Limitar o número de SANs e aplicar padrões de nomes DNS' },
+          { label: 'Hashes de Assinatura Permitidos', text: 'SHA-256, SHA-384 ou SHA-512; nenhum selecionado permite qualquer um. Quando ninguém escolheu o hash, aplica-se o padrão se permitido, senão o mais fraco permitido. O formulário de emissão e Criar CA oferecem apenas os tipos de chave e hashes que as políticas permitem' },
         ]
       },
       {
@@ -70,10 +71,13 @@ Tempo máximo de vida do certificado em dias. Valores comuns:
 ### Tipos de Chave Permitidos
 Restringir quais algoritmos e tamanhos de chave podem ser usados:
 - **RSA-2048**: Mínimo para confiança pública
+- **RSA-3072**: O tamanho de chave padrão para novas CAs
 - **RSA-4096**: Segurança superior, certificados maiores
 - **EC-P256**: Moderno, rápido, recomendado
 - **EC-P384**: Curva elíptica de segurança superior
 - **EC-P521**: Segurança máxima (raramente necessário)
+
+**Hashes de Assinatura Permitidos** restringe o hash da assinatura da mesma forma (SHA-256, SHA-384, SHA-512); nenhum selecionado permite qualquer um. Quando ninguém escolheu o hash, aplica-se o padrão se permitido, senão o mais fraco permitido. O formulário de emissão e Criar CA oferecem apenas os tipos de chave e hashes que as políticas permitem.
 
 ### Restrições de SAN
 - **Máx. Nomes DNS**: Limitar o número de Nomes Alternativos do Sujeito

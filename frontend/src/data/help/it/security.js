@@ -12,6 +12,7 @@ export default {
           { label: 'File di chiavi su disco', text: 'Mostra quante copie di chiavi in chiaro restano; usa gli hook di distribuzione quando un altro servizio necessita di un file di chiave' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Variabile d\'ambiente opt-in: rifiuta l\'avvio senza una chiave di cifratura del database esplicita' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: 'Variabile d\'ambiente opt-in: rifiuta l\'avvio se la cifratura delle chiavi private non è abilitata' },
+          { label: 'Crittografa chiavi rimanenti', text: 'Mostrato mentre la cifratura è abilitata e alcune chiavi o segreti sono ancora memorizzati in chiaro: li cifra, lasciando com\'erano quelli già cifrati' },
         ]
       },
       {
@@ -75,6 +76,7 @@ Cifra tutte le chiavi private di CA e certificati memorizzate nel database con A
 - **Stato e contatori**: La sezione mostra se la cifratura è abilitata e quante chiavi sono attualmente **cifrate** rispetto a quelle **non cifrate**
 - **Abilita cifratura**: Genera il file della chiave master e cifra tutte le chiavi private memorizzate. Esegui subito il backup del file della chiave: senza di esso, le chiavi cifrate sono perse in modo permanente
 - **Disabilita cifratura**: Decifra tutte le chiavi private riportandole alla memorizzazione in chiaro (conferma richiesta)
+- **Crittografa chiavi rimanenti**: Mostrato mentre la cifratura è abilitata e alcune chiavi o segreti sono ancora memorizzati in chiaro; li cifra, lasciando com'erano quelli già cifrati
 
 ### Controllo all'avvio
 

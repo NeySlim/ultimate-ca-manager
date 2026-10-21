@@ -30,7 +30,7 @@ export default {
         items: [
           { label: 'Émettre', text: 'Créer un nouveau certificat signé par une de vos CA' },
           { label: 'Importer', text: 'Importer un certificat existant (PEM, DER ou PKCS#12)' },
-          { label: 'Renouveler', text: 'En place depuis la v2.214 : mêmes id/refid, nouveaux numéro de série et période de validité, le numéro de série remplacé reste dans la CRL jusqu\'à l\'ancienne expiration. Un certificat révoqué ne peut pas être renouvelé' },
+          { label: 'Renouveler', text: 'En place depuis la v2.214 : mêmes id/refid, nouveaux numéro de série et période de validité, le numéro de série remplacé reste dans la CRL jusqu\'à l\'ancienne expiration. Un certificat révoqué ne peut pas être renouvelé. Demande la validité du nouveau certificat en jours, préremplie avec la durée actuelle ; les politiques et l\'expiration de la CA la plafonnent toujours' },
           { label: 'Renommer', text: 'Définir un nom d\'affichage indépendant du CN (par défaut le CN, ou le premier nom DNS des SAN pour les certificats sans CN)' },
           { label: 'Révoquer', text: 'Marquer comme révoqué avec un motif, apparaîtra dans la CRL' },
           { label: 'Lever la suspension', text: 'Annuler la suspension d\'un certificat révoqué avec le motif « Suspension de certificat », restaure le statut valide' },
@@ -64,7 +64,7 @@ export default {
         title: 'Déploiement (v2.215)',
         content: "Poussez ce certificat vers des hôtes distants en SSH/SFTP, réservé aux admins, les cibles se gèrent dans Paramètres › Déploiement.",
         items: [
-          { label: 'Attacher une cible', text: "Depuis le panneau de détails du certificat : choisissez une cible de déploiement et définissez des chemins de destination absolus pour le certificat, la clé privée et/ou la chaîne complète (au moins un)" },
+          { label: 'Attacher une cible', text: "Depuis le panneau de détails du certificat : choisissez une cible de déploiement et définissez des chemins de destination absolus pour le certificat, la clé privée et/ou la chaîne complète (au moins un). La chaîne complète omet la CA racine sauf si Inclure l'AC racine est coché" },
           { label: 'Même hôte', text: "Pour déployer sur l’hôte UCM lui-même, utilisez une cible SFTP sur 127.0.0.1 avec un compte SSH dédié ; le service isolé ne peut pas écrire hors de son répertoire de données" },
           { label: 'Automatique', text: "À l'émission et au renouvellement, les fichiers liés sont transférés à nouveau et la commande de rechargement de ce déploiement de certificat s'exécute ; les livraisons sont mises en file avec réessais" },
           { label: 'Fichiers', text: "Écrits de façon atomique aux chemins exacts configurés (le répertoire parent doit exister) : clé 0600, certificat/chaîne 0644" },
@@ -78,10 +78,13 @@ export default {
       'Utilisez les filtres pour trouver rapidement les certificats par statut, CA ou texte de recherche : votre sélection est conservée au rechargement',
       'Le renouvellement conserve le même enregistrement (id, refid, date de création) : les certificats dont la clé est détenue par UCM reçoivent une nouvelle clé, ceux enrôlés par protocole (SCEP/EST/ACME) conservent leur clé côté client',
       'Besoin d\'un EKU non-standard (Microsoft RDP, smartcard logon, document signing) ? Ajoutez-le via « EKU supplémentaires » plutôt que d\'éditer les modèles',
+      'Quand une politique ou l\'expiration de la CA émettrice raccourcit la validité demandée, le résultat l\'indique : "Issued for N day(s) instead of the M requested", avec la raison',
+      'Une signature RSA-PSS s\'affiche avec son hachage et la longueur du sel, p. ex. RSASSA-PSS SHA-256 (salt 32)',
     ],
     warnings: [
       'La révocation est généralement permanente : sauf pour « Suspension de certificat » qui peut être levée',
-      'Un certificat valide non révoqué ne peut pas être supprimé (409) : révoquez-le d\'abord pour que la révocation atteigne la CRL/OCSP ; les révocations survivent à la suppression',
+      'Un certificat valide non révoqué ne peut pas être supprimé seul : Supprimer explique pourquoi et propose « Révoquer, puis supprimer », pour que la révocation atteigne la CRL/OCSP ; les révocations survivent à la suppression',
+      'UCM signe uniquement en SHA-256, SHA-384 ou SHA-512 : SHA-224 et les noms de hachage inconnus sont refusés au lieu d\'être remplacés par SHA-256',
     ],
   },
   helpGuides: {
@@ -131,8 +134,9 @@ Depuis la v2.214, le renouvellement met à jour le certificat **en place** :
 - Le **numéro de série remplacé reste publié dans la CRL** (motif \`superseded\`) et répond \`revoked\` via OCSP jusqu'à l'expiration originale de l'ancien certificat
 - \`renewed_at\` / \`renewed_times\` tracent l'historique des renouvellements
 - Un certificat révoqué ne peut pas être renouvelé (409) : émettez-en un nouveau à la place
+- **Renouveler** demande la validité du nouveau certificat en jours, préremplie avec la durée actuelle ; les politiques d'émission et l'expiration de la CA la plafonnent toujours
 
-**Suppression** : un certificat valide non révoqué ne peut pas être supprimé (409) : révoquez-le d'abord pour que les parties utilisatrices voient le changement. Les révocations sont persistées indépendamment de l'enregistrement du certificat et survivent à la suppression.
+**Suppression** : un certificat valide non révoqué ne peut pas être supprimé seul : **Supprimer** explique pourquoi et propose **Révoquer, puis supprimer**, pour que les parties utilisatrices voient le changement. Les révocations sont persistées indépendamment de l'enregistrement du certificat et survivent à la suppression.
 
 ## Révoquer un certificat
 
@@ -162,7 +166,7 @@ Combine la révocation avec une réémission immédiate. Le nouveau certificat h
 
 Formats d'exportation :
 - **PEM** : Certificat seul
-- **PEM + Chaîne** : Certificat avec chaîne d'émetteur complète
+- **PEM + Chaîne** : Certificat avec ses CA émettrices (**Inclure la chaîne CA**) ; la CA racine n'est ajoutée que si **Inclure l'AC racine** est coché
 - **DER** : Format binaire
 - **PKCS#12** : Certificat + clé + chaîne, protégé par mot de passe
 

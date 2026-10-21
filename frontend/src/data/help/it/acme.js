@@ -23,7 +23,7 @@ export default {
           { label: 'EAB', text: 'Supporto External Account Binding per CA che richiedono la pre-registrazione (ZeroSSL, HARICA, ecc.)' },
           { label: 'Tipi di chiave', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384 per le chiavi dei certificati' },
           { label: 'Chiavi account', text: 'Algoritmi ES256 (P-256), ES384 (P-384) o RS256 per le chiavi dell\'account ACME' },
-          { label: 'Provider DNS', text: 'Configura i provider di sfida DNS-01 (Cloudflare, Route53, Tencent DNSPod, ecc.)' },
+          { label: 'Provider DNS', text: 'Configura i provider di sfida DNS-01 (Cloudflare, Route53, Tencent DNSPod, Plesk, ecc.). Plesk usa la sua API XML; Verifica certificato SSL può essere disattivato per un pannello autofirmato e si può aggiungere un ritardo di propagazione DNS' },
           { label: 'Comando personalizzato', text: 'Tipo di provider DNS che esegue comandi locali configurati dall\'amministratore per creare/eliminare record TXT, i dettagli del record sono passati tramite le variabili d\'ambiente DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Percorso binario assoluto obbligatorio, nessuna shell, timeout configurabile' },
           { label: 'Domini', text: 'Mappa i domini ai provider DNS per la validazione automatica' },
           { label: 'HTTP-01', text: 'UCM serve il file di sfida dei suoi ordini in sospeso su /.well-known/acme-challenge/ sulla porta del protocollo HTTP (8080 per impostazione predefinita): inoltra quel percorso dalla porta 80 del dominio a UCM. Verify controlla prima il file e gli ordini HTTP-01 si rinnovano automaticamente' },
@@ -45,11 +45,11 @@ export default {
       {
         title: 'Proxy ACME',
         items: [
-          { label: 'CA upstream', text: 'Selezionare un preset (Let\'s Encrypt Produzione/Staging) o inserire un URL personalizzato per qualsiasi CA RFC 8555' },
+          { label: 'Account CA a monte', text: 'Seleziona uno degli Account CA esterni: il suo URL directory (Let\'s Encrypt, ZeroSSL, qualsiasi CA RFC 8555) e le credenziali EAB sono impostati su quell\'account' },
           { label: 'Stato account', text: 'Mostra se UCM è registrato presso la CA upstream. Gli account vengono registrati automaticamente alla prima richiesta proxy' },
           { label: 'Test connessione', text: 'Verificare la connettività con la CA upstream e controllare se sono richieste credenziali EAB' },
-          { label: 'Reimposta account', text: 'Cancellare le credenziali dell\'account upstream per forzare una nuova registrazione (usare dopo il cambio di CA)' },
-          { label: 'Credenziali EAB', text: 'Credenziali External Account Binding per CA che le richiedono (es: ZeroSSL, Google Trust)' },
+          { label: 'Reimposta account', text: 'Cancella la registrazione upstream dell\'account CA selezionato per forzare una nuova registrazione' },
+          { label: 'Credenziali EAB', text: 'Credenziali External Account Binding per CA che le richiedono (es: ZeroSSL, Google Trust), inserite sull\'account CA in Account CA esterni' },
           { label: 'Sfide DNS', text: 'UCM gestisce le sfide DNS-01 per conto dei client utilizzando i provider DNS configurati' },
           { label: 'Elimina certificati sostituiti', text: 'Interruttore opt-in: quando un ordine proxy viene finalizzato, i certificati importati in precedenza da ordini proxy per lo stesso identico insieme di domini vengono eliminati. I certificati revocati sono sempre conservati; i certificati non-proxy non vengono mai toccati. Disattivato per impostazione predefinita' },
                   { label: 'Pre-check dei client (v2.217)', text: 'Il proxy pubblica anche i valori TXT dns-01 calcolati con la chiave account di ogni client: i pre-check di propagazione di lego/Traefik/Caddy passano senza essere disattivati; un new-order ripetuto restituisce l\'ordine ancora pending dell\'account' },
@@ -128,7 +128,7 @@ export default {
       'Usa i Domini locali per assegnare CA diverse a domini interni differenti',
       'Qualsiasi CA con chiave privata può essere selezionata come CA emittente',
       'I domini con carattere jolly (*.example.com) richiedono la validazione DNS-01',
-      'Il cambio di CA upstream cancella automaticamente le credenziali account obsolete',
+      'Ogni account CA mantiene la propria registrazione upstream: passando il proxy a un altro account si usa quella di quell\'account',
       'Usa l\'URL del proxy con certbot: certbot certonly --server https://your-server:port/acme/proxy/directory',
     ],
     warnings: [
@@ -166,7 +166,7 @@ Usa qualsiasi CA conforme a RFC 8555, non solo Let's Encrypt:
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-Imposta l'URL directory della tua CA in **Impostazioni** → **Server ACME personalizzato**.
+Imposta l'URL directory della tua CA come **URL directory ACME** del suo account in **Account CA esterni**.
 
 ### Account CA esterni
 Gestisci tutti gli account esterni con cui UCM si registra:
@@ -181,7 +181,7 @@ Gestisci tutti gli account esterni con cui UCM si registra:
 Alcune CA richiedono credenziali EAB per collegare il tuo account ACME con un account esistente presso la CA:
 
 1. Registrati sul portale della tua CA per ottenere **EAB Key ID** e **chiave HMAC**
-2. Inserisci entrambi i valori in **Impostazioni** → **Server ACME personalizzato**
+2. Inserisci entrambi i valori (**ID chiave EAB**, **Chiave HMAC EAB**) sull'account CA in **Account CA esterni**
 3. La chiave HMAC è codificata in base64url (fornita dalla CA)
 
 > 💡 L'EAB è richiesto da ZeroSSL, HARICA, Google Trust Services e dalla maggior parte delle CA aziendali.
@@ -223,6 +223,7 @@ Configura i provider di sfida DNS-01 per la validazione del dominio. I provider 
 - DigitalOcean
 - OVH
 - Tencent Cloud DNSPod
+- Plesk (API XML): **Verifica certificato SSL** può essere disattivato per un pannello autofirmato e si può aggiungere un ritardo di propagazione DNS
 - E altri
 
 Ogni provider richiede credenziali API specifiche per il servizio DNS.
@@ -295,7 +296,7 @@ Slug riservati (vietati): \`directory\`, \`new-order\`, \`challenge\`, \`acct\`,
 
 ### Gestione account
 - Il **badge stato account** mostra se UCM è registrato presso la CA upstream
-- Il cambio di CA upstream cancella automaticamente le credenziali obsolete e forza una nuova registrazione
+- Ogni account CA mantiene la propria registrazione upstream: passando all'account upstream di un altro si usa quella di quell'account, registrata alla prima richiesta proxy se necessario
 - Usare il pulsante **Reimposta account** per cancellare manualmente le credenziali se necessario
 - **Test connessione** verifica se il directory upstream è raggiungibile e se è richiesto EAB
 
@@ -331,7 +332,7 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 Le credenziali EAB del proxy sono distinte da quelle del client: autenticano UCM presso la CA upstream, non i vostri client presso UCM.
+> 💡 Le credenziali EAB dell'account CA upstream sono distinte da quelle del client: autenticano UCM presso la CA upstream, non i vostri client presso UCM. Impostale su quell'account in **Account CA esterni**.
 
 > ⚠ Prerequisito: il dominio deve essere in ACME Domains con provider DNS. Il proxy supporta solo dns-01.
 

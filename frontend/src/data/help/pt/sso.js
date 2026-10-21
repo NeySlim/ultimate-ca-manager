@@ -14,6 +14,7 @@ export default {
           { label: 'URL ACS', text: 'URL de callback do Assertion Consumer Service' },
           { label: 'Mapeamento de Atributos', text: 'Mapear atributos do IDP para campos de usuário UCM' },
           { label: 'Login iniciado pelo IdP', text: 'Aceita logins iniciados no portal do IdP, verificados como qualquer outra resposta. Ativado para provedores criados antes da 2.243, desativado para os novos: ative apenas se os usuários partirem do portal do IdP.' },
+          { label: 'Formato NameID', text: 'Não especificado (padrão do IdP), Persistente, Endereço de e-mail ou Transitório: enviado em cada solicitação de login e publicado nos metadados do SP. Persistente dá um identificador estável; um NameID transitório nunca é usado para reconhecer a conta.' },
         ]
       },
       {
@@ -79,7 +80,7 @@ Esta URL retorna um documento XML compatível com SAML 2.0 contendo:
 - **URL ACS**: Endpoint do Assertion Consumer Service (HTTP-POST)
 - **URL SLO**: Endpoint do serviço de Single Logout
 - **Certificado de Assinatura**: Certificado HTTPS do UCM para verificação de assinatura
-- **Formato NameID**: Formato de identificador de nome solicitado
+- **Formato NameID**: A definição **Formato do NameID** do provedor (Não especificado, Persistente, Endereço de e-mail ou Transitório), também enviada em cada solicitação de login. Persistente dá um identificador estável; um NameID transitório nunca é usado para reconhecer a conta
 
 Copie esta URL na configuração "Adicionar Service Provider" ou "Aplicação SAML" do seu IDP.
 

@@ -30,7 +30,7 @@ export default {
         items: [
           { label: 'Emetti', text: 'Crea un nuovo certificato firmato da una delle tue CA' },
           { label: 'Importa', text: 'Importa un certificato esistente (PEM, DER o PKCS#12)' },
-          { label: 'Rinnova', text: 'In loco dalla v2.214: stessi id/refid, nuovo numero di serie e nuova validità, il numero di serie sostituito resta nella CRL fino alla vecchia scadenza. Un certificato revocato non può essere rinnovato' },
+          { label: 'Rinnova', text: 'In loco dalla v2.214: stessi id/refid, nuovo numero di serie e nuova validità, il numero di serie sostituito resta nella CRL fino alla vecchia scadenza. Un certificato revocato non può essere rinnovato. Chiede la validità del nuovo certificato in giorni, precompilata con la durata attuale; le policy e la scadenza della CA la limitano comunque' },
           { label: 'Rinomina', text: 'Imposta un nome visualizzato indipendente dal CN (predefinito: il CN o il primo nome DNS SAN per i certificati senza CN)' },
           { label: 'Revoca', text: 'Segna come revocato con un motivo, apparirà nella CRL' },
           { label: 'Rimuovi sospensione', text: 'Riattiva un certificato revocato con motivo "Sospensione certificato", ripristina lo stato valido' },
@@ -64,7 +64,7 @@ export default {
         title: 'Distribuzione (v2.215)',
         content: 'Invia questo certificato a host remoti via SSH/SFTP, solo admin, le destinazioni si gestiscono in Impostazioni › Distribuzione.',
         items: [
-          { label: 'Associa destinazione', text: 'Dalla vista di dettaglio del certificato: scegli una destinazione di distribuzione e imposta i percorsi di destinazione assoluti per certificato, chiave privata e/o catena completa (almeno uno)' },
+          { label: 'Associa destinazione', text: 'Dalla vista di dettaglio del certificato: scegli una destinazione di distribuzione e imposta i percorsi di destinazione assoluti per certificato, chiave privata e/o catena completa (almeno uno). La catena completa omette la CA root a meno che Includi CA radice sia selezionato' },
           { label: 'Stesso host', text: 'Per distribuire sullo stesso host UCM, usa una destinazione SFTP su 127.0.0.1 con un account SSH dedicato; il servizio isolato non può scrivere fuori dalla directory dei dati' },
           { label: 'Automatico', text: 'All\'emissione e al rinnovo, i file associati vengono inviati di nuovo e viene eseguito il comando di ricarica opzionale di quella distribuzione; le consegne sono messe in coda con tentativi' },
           { label: 'File', text: 'Scritti in modo atomico esattamente nei percorsi configurati (la directory padre deve esistere): chiave 0600, certificato/catena 0644' },
@@ -78,10 +78,13 @@ export default {
       'Usa i filtri per trovare rapidamente i certificati per stato, CA o testo di ricerca: la selezione viene conservata al ricaricamento della pagina',
       'Il rinnovo conserva lo stesso record (id, refid, data di creazione): le chiavi detenute da UCM vengono rigenerate, i certificati registrati via protocollo (SCEP/EST/ACME) mantengono la loro chiave lato client',
       'Serve un EKU non standard (Microsoft RDP, smartcard logon, document signing)? Aggiungilo via "EKU extra" invece di modificare i template',
+      'Quando una policy o la scadenza della CA emittente accorcia la validità richiesta, il risultato lo indica: "Issued for N day(s) instead of the M requested", con il motivo',
+      'Una firma RSA-PSS viene mostrata con il suo hash e la lunghezza del salt, ad es. RSASSA-PSS SHA-256 (salt 32)',
     ],
     warnings: [
       'La revoca è generalmente permanente: tranne per "Sospensione certificato" che può essere rimossa',
-      'Un certificato valido e non revocato non può essere eliminato (409): revocalo prima affinché la revoca raggiunga CRL/OCSP; le revoche sopravvivono all\'eliminazione',
+      'Un certificato valido e non revocato non può essere eliminato direttamente: Elimina ne spiega il motivo e propone "Revoca, poi elimina", così la revoca raggiunge CRL/OCSP; le revoche sopravvivono all\'eliminazione',
+      'UCM firma solo con SHA-256, SHA-384 o SHA-512: SHA-224 e i nomi di hash sconosciuti vengono rifiutati invece di essere sostituiti da SHA-256',
     ],
   },
   helpGuides: {
@@ -131,8 +134,9 @@ Dalla v2.214, il rinnovo aggiorna il certificato **in loco**:
 - Il **numero di serie sostituito resta pubblicato nella CRL** (motivo \`superseded\`) e risponde \`revoked\` via OCSP fino alla scadenza originale del vecchio certificato
 - \`renewed_at\` / \`renewed_times\` tracciano la cronologia dei rinnovi
 - Un certificato revocato non può essere rinnovato (409): emettine invece uno nuovo
+- **Rinnova** chiede la validità del nuovo certificato in giorni, precompilata con la durata attuale; le policy di emissione e la scadenza della CA la limitano comunque
 
-**Eliminazione**: un certificato valido e non revocato non può essere eliminato (409): revocalo prima affinché le relying party vedano il cambiamento. Le revoche sono persistite indipendentemente dal record del certificato e sopravvivono all'eliminazione.
+**Eliminazione**: un certificato valido e non revocato non può essere eliminato direttamente: **Elimina** ne spiega il motivo e propone **Revoca, poi elimina**, così le relying party vedono il cambiamento. Le revoche sono persistite indipendentemente dal record del certificato e sopravvivono all'eliminazione.
 
 ## Revoca di un certificato
 
@@ -162,7 +166,7 @@ Combina la revoca con la riemissione immediata. Il nuovo certificato eredita lo 
 
 Formati di esportazione:
 - **PEM**: Solo certificato
-- **PEM + Catena**: Certificato con catena completa dell'emittente
+- **PEM + Catena**: Certificato con le sue CA emittenti (**Includi catena CA**); la CA root viene aggiunta solo se **Includi CA radice** è selezionato
 - **DER**: Formato binario
 - **PKCS#12**: Certificato + chiave + catena, protetto da password
 

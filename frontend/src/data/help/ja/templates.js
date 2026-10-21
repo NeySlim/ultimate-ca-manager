@@ -17,12 +17,13 @@ export default {
           { label: 'タイプ', text: 'Web Server、Email、VPN ServerまたはVPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon、Custom。Key Usage、EKU、SANのデフォルトを設定します' },
           { label: 'サブジェクトデフォルト', text: '組織、OU、国、都道府県、市区町村、Emailを事前入力。メール (S/MIME) およびサーバー + クライアント (複合) 証明書では、EmailはSANにもなります' },
           { label: 'Key Usage', text: 'Digital Signature、Key Enciphermentなど' },
-          { label: 'Extended Key Usage', text: 'Server Auth、Client Auth、Code Signing、Email Protection' },
+          { label: 'Extended Key Usage', text: 'サーバーが認識する任意の用途：Server Auth、Client Auth、Code Signing、Email Protection、Smartcard Logon、Time Stamping、OCSP Signing、IPsec、Microsoft RDP など' },
           { label: 'SAN の種類', text: 'このテンプレートで行う要求に含められる名前の種類 (DNS、IP、Email、URI、UPN) です。「許可された SAN の種類を適用する」がオンの場合、発行フォーム、CSR 署名、各登録プロトコル、更新、承認はそれ以外の種類を拒否し、CN から推定されるだけの名前は省かれます。新しいテンプレートではオン、以前のテンプレートと組み込みテンプレートではオフです。何も選択しない場合はすべての種類が許可されます' },
           { label: '有効期間', text: 'デフォルトの有効期間（日数）' },
           { label: '複製', text: '既存のテンプレートをクローンして修正' },
           { label: 'システムを表示', text: '組み込みテンプレートを非表示にして、自分のテンプレートだけを扱います。ブラウザごとに記憶されます' },
           { label: 'インポート/エクスポート', text: 'UCMインスタンス間でテンプレートをJSONファイルとして共有。テンプレート1件、または複数件をまとめた1つのファイル' },
+          { label: '鍵タイプ', text: 'RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384、EC-P521。ダイジェストは SHA-256、SHA-384、SHA-512' },
         ]
       },
       {
@@ -69,8 +70,8 @@ export default {
 3. テンプレート**タイプ**を選択：Web Server、Email、VPN Server、VPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon、Custom。Key Usage、Extended Key Usage、SANのデフォルトが設定され、その後変更できます
 4. **サブジェクトデフォルト**を設定（O、OU、C、ST、L、CN、Email）。メール (S/MIME) およびサーバー + クライアント (複合) 証明書では、Emailはメール用SANにもなります
 5. **Key Usage**フラグを選択
-6. **Extended Key Usage**値を選択
-7. **デフォルト有効期間**を日数で設定
+6. サーバーが認識する用途（Smartcard Logon、Time Stamping、Microsoft RDP など）から **Extended Key Usage** 値を選択
+7. **キータイプ**（RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384、EC-P521）、ダイジェスト、**デフォルト有効期間**を日数で設定
 8. **作成**をクリック
 
 ## テンプレートの使用

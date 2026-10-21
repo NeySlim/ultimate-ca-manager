@@ -26,8 +26,8 @@ export default {
       {
         title: 'Pianificazione',
         items: [
-          { label: 'Report scadenze', text: 'Email con i certificati in scadenza, con la frequenza scelta' },
-          { label: 'Report conformità', text: 'Email con lo stato di conformità delle politiche, con la frequenza scelta' },
+          { label: 'Scheda Pianificazione', text: 'Seleziona qualsiasi report di dati o modello PDF, poi imposta frequenza (giornaliera, settimanale o mensile), ora (UTC), formato e destinatari' },
+          { label: 'Allegato', text: 'Il report è allegato all\'email nel suo formato: CSV o JSON per i report di dati, PDF per i modelli PDF' },
         ]
       },
     ],
@@ -66,7 +66,7 @@ Certificati revocati nel periodo scelto (predefinito: 30 giorni), con data e mot
 
 ## Report esecutivo PDF
 
-Clicca **Scarica PDF** in alto a destra per generare un report esecutivo professionale adatto per revisioni della dirigenza, presentazioni al consiglio e audit di conformità.
+Apri la scheda **Report PDF** e clicca **Scarica PDF** sul modello **Riepilogo esecutivo** per generare un report esecutivo professionale adatto per revisioni della dirigenza, presentazioni al consiglio e audit di conformità.
 
 ### Contenuti
 Il report PDF include 9 sezioni:
@@ -102,17 +102,18 @@ Ogni riga del report ha pulsanti di download:
 
 ## Pianificazione dei report
 
-### Report scadenze (giornaliero)
-Invia automaticamente un report sulle scadenze dei certificati ogni giorno ai destinatari configurati. Abilitalo per individuare i certificati in scadenza prima che causino interruzioni.
+### Cosa si può pianificare
+Ogni report di dati e ogni modello PDF può essere pianificato, ciascuno con la propria frequenza, ora e destinatari. Pianifica **Certificati in scadenza** ogni giorno per individuare i certificati in scadenza prima che causino interruzioni.
 
-### Report conformità (settimanale)
-Invia un riepilogo della conformità alle politiche ogni settimana. Utile per il monitoraggio continuo della conformità senza sforzo manuale.
+### Frequenza
+**Giornaliera**, **Settimanale** (scegli il giorno della settimana) o **Mensile** (scegli il giorno del mese), a un'ora indicata in UTC.
 
 ### Configurazione
-1. Clicca **Pianifica report** in alto a destra
-2. Abilita i report che vuoi pianificare
-3. Aggiungi gli indirizzi email dei destinatari (premi Invio o clicca Aggiungi)
-4. Clicca Salva
+1. Apri la scheda **Pianificazione**
+2. Seleziona i report che vuoi pianificare
+3. Imposta la frequenza, l'ora e, per i report di dati, il formato (CSV o JSON)
+4. Aggiungi gli indirizzi email dei destinatari (premi Invio o clicca Aggiungi)
+5. Clicca Salva
 
 Ogni report programmato viene allegato all'e-mail nel suo formato: CSV o JSON per i report di dati, PDF per i modelli PDF.
 
@@ -127,7 +128,7 @@ Prima di abilitare le pianificazioni, usa il pulsante ✈️ su qualsiasi riga d
 - **read:audit + export:audit**: Scarica il report esecutivo PDF
 - **write:settings**: Configura le pianificazioni dei report
 
-> 💡 Pianifica prima il report scadenze: è il più operativamente prezioso e aiuta a prevenire le interruzioni legate ai certificati.
+> 💡 Pianifica prima il report Certificati in scadenza: è il più operativamente prezioso e aiuta a prevenire le interruzioni legate ai certificati.
 `
   }
 }

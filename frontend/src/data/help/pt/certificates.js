@@ -30,7 +30,7 @@ export default {
         items: [
           { label: 'Emitir', text: 'Criar um novo certificado assinado por uma das suas CAs' },
           { label: 'Importar', text: 'Importar um certificado existente (PEM, DER ou PKCS#12)' },
-          { label: 'Renovar', text: 'No lugar desde a v2.214: mesmos id/refid, novo número de série e nova validade, o número de série substituído permanece na CRL até a expiração antiga. Um certificado revogado não pode ser renovado' },
+          { label: 'Renovar', text: 'No lugar desde a v2.214: mesmos id/refid, novo número de série e nova validade, o número de série substituído permanece na CRL até a expiração antiga. Um certificado revogado não pode ser renovado. Pede a validade do novo certificado em dias, preenchida com a duração atual; as políticas e a expiração da CA ainda a limitam' },
           { label: 'Renomear', text: 'Definir um nome de exibição independente do CN (por padrão o CN, ou o primeiro nome DNS dos SANs para certificados sem CN)' },
           { label: 'Revogar', text: 'Marcar como revogado com um motivo, aparecerá na CRL' },
           { label: 'Remover Suspensão', text: 'Remover suspensão de um certificado revogado com motivo "Suspensão de Certificado", restaura para status válido' },
@@ -64,7 +64,7 @@ export default {
         title: 'Implantação (v2.215)',
         content: 'Envie este certificado para hosts remotos via SSH/SFTP, somente admin, os alvos são gerenciados em Configurações › Implantação.',
         items: [
-          { label: 'Anexar alvo', text: 'A partir da visão de detalhe do certificado: escolha um alvo de implantação e defina caminhos de destino absolutos para o certificado, a chave privada e/ou a cadeia completa (pelo menos um)' },
+          { label: 'Anexar alvo', text: 'A partir da visão de detalhe do certificado: escolha um alvo de implantação e defina caminhos de destino absolutos para o certificado, a chave privada e/ou a cadeia completa (pelo menos um). A cadeia completa omite a CA raiz, a menos que Incluir CA raiz esteja marcado' },
           { label: 'Mesmo host', text: 'Para implantar no próprio host UCM, use um alvo SFTP em 127.0.0.1 com uma conta SSH dedicada; o serviço isolado não pode gravar fora do diretório de dados' },
           { label: 'Automático', text: 'Na emissão e na renovação, os arquivos vinculados são reenviados e o comando de recarga opcional dessa implantação é executado; as entregas são enfileiradas com tentativas de repetição' },
           { label: 'Arquivos', text: 'Gravados de forma atômica exatamente nos caminhos configurados (o diretório pai deve existir): chave 0600, certificado/cadeia 0644' },
@@ -78,10 +78,13 @@ export default {
       'Use filtros para encontrar rapidamente certificados por status, CA ou texto de pesquisa: sua seleção é preservada ao recarregar',
       'A renovação mantém o mesmo registro (id, refid, data de criação): chaves mantidas pelo UCM são regeneradas, certificados inscritos via protocolo (SCEP/EST/ACME) mantêm sua chave do lado do cliente',
       'Precisa de um EKU não padrão (Microsoft RDP, smartcard logon, document signing)? Adicione via "EKU extras" em vez de editar templates',
+      'Quando uma política ou a expiração da CA emissora reduz a validade solicitada, o resultado informa: "Issued for N day(s) instead of the M requested", com o motivo',
+      'Uma assinatura RSA-PSS é exibida com seu hash e o comprimento do salt, p. ex. RSASSA-PSS SHA-256 (salt 32)',
     ],
     warnings: [
       'A revogação é geralmente permanente: exceto "Suspensão de Certificado" que pode ser removida',
-      'Um certificado válido e não revogado não pode ser excluído (409): revogue-o primeiro para que a revogação chegue à CRL/OCSP; as revogações sobrevivem à exclusão',
+      'Um certificado válido e não revogado não pode ser excluído isoladamente: Eliminar explica o motivo e oferece "Revogar e depois eliminar", para que a revogação chegue à CRL/OCSP; as revogações sobrevivem à exclusão',
+      'O UCM assina apenas com SHA-256, SHA-384 ou SHA-512: SHA-224 e nomes de hash desconhecidos são recusados em vez de substituídos por SHA-256',
     ],
   },
   helpGuides: {
@@ -131,8 +134,9 @@ Desde a v2.214, a renovação atualiza o certificado **no lugar**:
 - O **número de série substituído continua publicado na CRL** (motivo \`superseded\`) e responde \`revoked\` via OCSP até a expiração original do certificado antigo
 - \`renewed_at\` / \`renewed_times\` registram o histórico de renovações
 - Um certificado revogado não pode ser renovado (409): emita um novo em vez disso
+- **Renovar** pede a validade do novo certificado em dias, preenchida com a duração atual; as políticas de emissão e a expiração da CA ainda a limitam
 
-**Exclusão**: um certificado válido e não revogado não pode ser excluído (409): revogue-o primeiro para que as partes confiantes vejam a mudança. As revogações são persistidas independentemente do registro do certificado e sobrevivem à exclusão.
+**Exclusão**: um certificado válido e não revogado não pode ser excluído isoladamente: **Eliminar** explica o motivo e oferece **Revogar e depois eliminar**, para que as partes confiantes vejam a mudança. As revogações são persistidas independentemente do registro do certificado e sobrevivem à exclusão.
 
 ## Revogando um Certificado
 
@@ -162,7 +166,7 @@ Combina revogação com reemissão imediata. O novo certificado herda o mesmo Su
 
 Formatos de exportação:
 - **PEM**: Apenas o certificado
-- **PEM + Cadeia**: Certificado com cadeia completa do emissor
+- **PEM + Cadeia**: Certificado com suas CAs emissoras (**Incluir cadeia CA**); a CA raiz só é adicionada quando **Incluir CA raiz** está marcado
 - **DER**: Formato binário
 - **PKCS#12**: Certificado + chave + cadeia, protegido por senha
 

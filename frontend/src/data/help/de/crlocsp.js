@@ -24,7 +24,7 @@ export default {
           { label: 'Cache', text: 'Antwort-Cache mit automatischer täglicher Bereinigung abgelaufener Einträge' },
           { label: 'Gesamtabfragen', text: 'Anzahl der verarbeiteten OCSP-Anfragen' },
           { label: 'Delegierter Responder', text: 'Antworten mit einem dedizierten OCSPSigning-Zertifikat anstelle des CA-Schlüssels signieren, weisen Sie eines pro CA über das Detailpanel zu' },
-          { label: 'Responder-Auto-Erneuerung', text: 'Eine tägliche Aufgabe stellt das delegierte Responder-Zertifikat vor Ablauf neu aus (gleiches Schlüsselpaar, gleichwertig erneuert) und bindet es neu, standardmäßig aktiviert' },
+          { label: 'Responder-Auto-Erneuerung', text: 'Eine tägliche Aufgabe stellt das delegierte Responder-Zertifikat vor Ablauf neu aus (gleiches Schlüsselpaar, gleichwertig erneuert) und bindet es neu, standardmäßig aktiviert. Der Schalter und sein Fenster (Tage vor Ablauf, Standard 30) befinden sich unter Einstellungen › Sicherheit' },
         ]
       },
     ],

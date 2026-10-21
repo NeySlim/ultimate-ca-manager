@@ -26,8 +26,8 @@ export default {
       {
         title: 'Programación',
         items: [
-          { label: 'Informe de expiración', text: 'Correo electrónico con certificados que expiran pronto, con la frecuencia elegida' },
-          { label: 'Informe de cumplimiento', text: 'Correo electrónico con el estado de cumplimiento de políticas, con la frecuencia elegida' },
+          { label: 'Pestaña Programación', text: 'Marque cualquier informe de datos o plantilla PDF y defina su frecuencia (diaria, semanal o mensual), hora (UTC), formato y destinatarios' },
+          { label: 'Adjunto', text: 'El informe se adjunta al correo en su formato: CSV o JSON para los informes de datos, PDF para las plantillas PDF' },
         ]
       },
     ],
@@ -66,7 +66,7 @@ Certificados revocados durante el período elegido (por defecto: 30 días), con 
 
 ## Informe ejecutivo PDF
 
-Haga clic en **Descargar PDF** en la esquina superior derecha para generar un informe ejecutivo profesional adecuado para revisiones de la dirección, presentaciones ante la junta directiva y auditorías de cumplimiento.
+Abra la pestaña **Informes PDF** y haga clic en **Descargar PDF** en la plantilla **Resumen ejecutivo** para generar un informe ejecutivo profesional adecuado para revisiones de la dirección, presentaciones ante la junta directiva y auditorías de cumplimiento.
 
 ### Contenido
 El informe PDF incluye 9 secciones:
@@ -102,17 +102,18 @@ Cada fila de informe tiene botones de descarga:
 
 ## Programación de informes
 
-### Informe de expiración (Diario)
-Envía automáticamente un informe de expiración de certificados todos los días a los destinatarios configurados. Active esto para detectar certificados que expiran antes de que causen interrupciones.
+### Qué se puede programar
+Cada informe de datos y cada plantilla PDF se puede programar, cada uno con su propia frecuencia, hora y destinatarios. Programe **Certificados por expirar** a diario para detectar certificados que expiran antes de que causen interrupciones.
 
-### Informe de cumplimiento (Semanal)
-Envía un resumen de cumplimiento de políticas cada semana. Útil para el monitoreo continuo de cumplimiento sin esfuerzo manual.
+### Frecuencia
+**Diaria**, **Semanal** (elija el día de la semana) o **Mensual** (elija el día del mes), a una hora indicada en UTC.
 
 ### Configuración
-1. Haga clic en **Programar informes** en la esquina superior derecha
-2. Active los informes que desea programar
-3. Agregue direcciones de correo electrónico de los destinatarios (presione Enter o haga clic en Agregar)
-4. Haga clic en Guardar
+1. Abra la pestaña **Programación**
+2. Marque los informes que desea programar
+3. Defina la frecuencia, la hora y, para los informes de datos, el formato (CSV o JSON)
+4. Agregue direcciones de correo electrónico de los destinatarios (presione Enter o haga clic en Agregar)
+5. Haga clic en Guardar
 
 Cada informe programado se adjunta al correo en su formato: CSV o JSON para los informes de datos, PDF para las plantillas PDF.
 
@@ -127,7 +128,7 @@ Antes de activar los programas, use el botón ✈️ en cualquier fila de inform
 - **read:audit + export:audit**: Descargar informe ejecutivo PDF
 - **write:settings**: Configurar programas de informes
 
-> 💡 Programe el informe de expiración primero: es el más valioso operativamente y ayuda a prevenir interrupciones relacionadas con certificados.
+> 💡 Programe primero el informe Certificados por expirar: es el más valioso operativamente y ayuda a prevenir interrupciones relacionadas con certificados.
 `
   }
 }

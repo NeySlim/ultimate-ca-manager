@@ -23,6 +23,8 @@ export default {
           { label: 'Revogar', text: 'Revogar uma CA intermediária a partir da sua CA pai: publicada na CRL e no OCSP da CA pai, e a CA não pode mais assinar (permanente)' },
           { label: 'Reparo de Cadeia', text: 'Corrigir relações pai-filho quebradas automaticamente' },
           { label: 'Importar chave privada', text: 'Anexar a chave privada de uma CA que possui apenas o seu certificado (assinado a partir de um pedido externo), para que possa assinar' },
+          { label: 'Chave e validade', text: 'RSA-3072 por padrão, local ou HSM. Validade de 1, 2, 3, 5, 10, 15 ou 20 anos, ou Personalizada (dias) até 50 anos. Uma CA RSA-2048 que sobreviveria a 2030 é sinalizada: a ANSSI aceita RSA-2048 até o fim de 2030, a ETSI TS 119 312 até o fim de 2026' },
+          { label: 'Restrições de nomes', text: 'Restrições Avançadas (RFC 5280): subárvores permitidas e excluídas (DNS, faixa de IP, e-mail) limitam os nomes que a CA pode certificar. Para uma CA assinada externamente, elas são definidas pela CA assinante' },
         ]
       },
       {
@@ -80,6 +82,7 @@ export default {
       'Excluir uma CA NÃO revogará os certificados que ela emitiu: revogue-os primeiro',
       'As chaves privadas são armazenadas criptografadas; perder o banco de dados significa perder as chaves',
       'Senhas do modo offline NÃO são recuperáveis: armazene-as em seu gerenciador de senhas / vault antes de confirmar',
+      'Um certificado cruzado de uma raiz autoassinada (mesmo sujeito e chave, outro emissor) é recusado (409), na importação e ao ser enviado após Renovar via CSR: ele substituiria o próprio certificado da raiz',
     ],
   },
   helpGuides: {
@@ -116,8 +119,8 @@ Agrupa CAs pelo campo Organização (O). Útil para configurações multi-tenant
 ### Criar CA Raiz
 1. Clique em **Criar** → **CA Raiz**
 2. Preencha os campos do Sujeito (CN, O, OU, C, ST, L)
-3. Selecione o algoritmo de chave (RSA 2048/4096, ECDSA P-256/P-384)
-4. Defina o período de validade (tipicamente 10-20 anos para CAs Raiz)
+3. Selecione o algoritmo de chave (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521): RSA-3072 por padrão
+4. Defina o período de validade: 1, 2, 3, 5, 10, 15 ou 20 anos, ou **Personalizada (dias)** até 50 anos (tipicamente 10-20 anos para CAs Raiz)
 5. Opcionalmente selecione um modelo de certificado
 6. Clique em **Criar**
 
@@ -129,6 +132,8 @@ Agrupa CAs pelo campo Organização (O). Útil para configurações multi-tenant
 5. Clique em **Criar**
 
 > ⚠ A validade da CA Intermediária não pode exceder a validade da sua CA pai.
+
+O formulário sinaliza uma CA RSA-2048 que sobreviveria a 2030: a ANSSI aceita RSA-2048 até o fim de 2030, a ETSI TS 119 312 até o fim de 2026. Escolha RSA-3072 ou maior. Em **Restrições Avançadas (RFC 5280)**, subárvores permitidas e excluídas (DNS, faixa de IP, e-mail) limitam os nomes que a CA pode certificar.
 
 ### Criar uma CA assinada externamente (modo CSR, v2.214)
 Para o padrão de raiz offline: a chave da CA emissora vive no UCM, seu certificado é assinado em outro lugar:
@@ -150,6 +155,8 @@ Importe certificados de CA existentes via:
 - **PKCS#12**: Pacote de certificado + chave privada (requer senha)
 
 Ao importar sem chave privada, a CA pode verificar certificados mas não pode assinar novos.
+
+Um certificado cruzado de uma raiz autoassinada já presente no UCM (mesmo sujeito e chave, outro emissor) é recusado (409), na importação e ao ser enviado após **Renovar via CSR**: instalá-lo substituiria o próprio certificado da raiz.
 
 ## Exportando uma CA
 
@@ -221,7 +228,7 @@ O UCM pode armazenar a chave de assinatura de uma CA em um módulo de segurança
 3. Em **Armazenamento de chave**, mude de *Local* para **HSM**
 4. Escolha o provedor HSM
 5. Escolha um modo de chave:
-   - **Gerar nova chave**: forneça um rótulo (letras/dígitos/_/-) e escolha o algoritmo (RSA-2048/3072/4096 ou EC-P256/P384/P521)
+   - **Gerar nova chave**: forneça um rótulo (letras/dígitos/_/-) e escolha o algoritmo (RSA-2048/3072/4096 ou EC-P256/P384/P521, RSA-3072 por padrão)
    - **Usar chave existente**: escolha uma chave de assinatura não utilizada já presente no HSM
 6. Envie. O UCM cria o certificado CA e o vincula à chave HSM.
 

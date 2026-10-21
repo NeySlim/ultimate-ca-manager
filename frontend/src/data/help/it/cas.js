@@ -23,6 +23,8 @@ export default {
           { label: 'Revoca', text: 'Revoca una CA intermedia dalla sua CA padre: pubblicata nella CRL e nell\'OCSP del padre, e la CA non può più firmare (permanente)' },
           { label: 'Ripara catena', text: 'Correggi automaticamente le relazioni padre-figlio interrotte' },
           { label: 'Importa chiave privata', text: 'Collegare la chiave privata di una CA che possiede solo il proprio certificato (firmato da una richiesta esterna), perché possa firmare' },
+          { label: 'Chiave e validità', text: 'RSA-3072 per impostazione predefinita, locale o HSM. Validità di 1, 2, 3, 5, 10, 15 o 20 anni, oppure Personalizzata (giorni) fino a 50 anni. Una CA RSA-2048 che sopravvivrebbe al 2030 viene segnalata: l\'ANSSI accetta RSA-2048 fino alla fine del 2030, ETSI TS 119 312 fino alla fine del 2026' },
+          { label: 'Vincoli sui nomi', text: 'Vincoli avanzati (RFC 5280): i sottoalberi consentiti ed esclusi (DNS, intervallo IP, email) limitano i nomi che la CA può certificare. Per una CA firmata esternamente sono impostati dalla CA firmataria' },
         ]
       },
       {
@@ -80,6 +82,7 @@ export default {
       'L\'eliminazione di una CA NON revoca i certificati che ha emesso: revocali prima',
       'Le chiavi private sono memorizzate crittografate; la perdita del database significa la perdita delle chiavi',
       'Le password della modalità offline NON sono recuperabili: conservale nel tuo password manager / vault prima di confermare',
+      'Un certificato incrociato di una root autofirmata (stesso soggetto e stessa chiave, altro emittente) viene rifiutato (409), all\'importazione e quando viene caricato dopo Rinnova via CSR: sostituirebbe il certificato della root stessa',
     ],
   },
   helpGuides: {
@@ -116,8 +119,8 @@ Raggruppa le CA per il campo Organizzazione (O). Utile per configurazioni multi-
 ### Crea CA Root
 1. Clicca **Crea** → **CA Root**
 2. Compila i campi del Soggetto (CN, O, OU, C, ST, L)
-3. Seleziona l'algoritmo della chiave (RSA 2048/4096, ECDSA P-256/P-384)
-4. Imposta il periodo di validità (tipicamente 10-20 anni per le CA Root)
+3. Seleziona l'algoritmo della chiave (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521): RSA-3072 per impostazione predefinita
+4. Imposta il periodo di validità: 1, 2, 3, 5, 10, 15 o 20 anni, oppure **Personalizzata (giorni)** fino a 50 anni (tipicamente 10-20 anni per le CA Root)
 5. Facoltativamente seleziona un template di certificato
 6. Clicca **Crea**
 
@@ -129,6 +132,8 @@ Raggruppa le CA per il campo Organizzazione (O). Utile per configurazioni multi-
 5. Clicca **Crea**
 
 > ⚠ La validità della CA Intermedia non può superare quella della sua CA padre.
+
+Il modulo segnala una CA RSA-2048 che sopravvivrebbe al 2030: l'ANSSI accetta RSA-2048 fino alla fine del 2030, ETSI TS 119 312 fino alla fine del 2026. Scegli RSA-3072 o superiore. Sotto **Vincoli avanzati (RFC 5280)**, i sottoalberi consentiti ed esclusi (DNS, intervallo IP, email) limitano i nomi che la CA può certificare.
 
 ### Crea una CA firmata esternamente (modalità CSR, v2.214)
 Per il pattern della root offline: la chiave della CA emittente risiede in UCM, il suo certificato viene firmato altrove:
@@ -150,6 +155,8 @@ Importa certificati CA esistenti tramite:
 - **PKCS#12**: Bundle certificato + chiave privata (richiede password)
 
 Quando si importa senza chiave privata, la CA può verificare i certificati ma non può firmarne di nuovi.
+
+Un certificato incrociato di una root autofirmata già presente in UCM (stesso soggetto e stessa chiave, altro emittente) viene rifiutato (409), all'importazione e quando viene caricato dopo **Rinnova via CSR**: installarlo sostituirebbe il certificato della root stessa.
 
 ## Esportazione di una CA
 
@@ -221,7 +228,7 @@ UCM può memorizzare la chiave di firma di una CA su un modulo di sicurezza hard
 3. In **Archiviazione chiave**, passa da *Locale* a **HSM**
 4. Scegli il provider HSM
 5. Scegli una modalità chiave:
-   - **Genera nuova chiave**: fornisci un'etichetta (lettere/cifre/_/-) e scegli l'algoritmo (RSA-2048/3072/4096 o EC-P256/P384/P521)
+   - **Genera nuova chiave**: fornisci un'etichetta (lettere/cifre/_/-) e scegli l'algoritmo (RSA-2048/3072/4096 o EC-P256/P384/P521, RSA-3072 per impostazione predefinita)
    - **Usa chiave esistente**: scegli una chiave di firma inutilizzata già presente sull'HSM
 6. Invia. UCM crea il certificato CA e lo collega alla chiave HSM.
 

@@ -22,6 +22,7 @@ export default {
           { label: 'Aggiungi PEM', text: 'Incolla direttamente il testo del certificato codificato in PEM' },
           { label: 'Sincronizza dal sistema', text: 'Importa le CA fidate del sistema operativo in UCM' },
           { label: 'Esporta', text: 'Scarica i certificati fidati individualmente' },
+          { label: 'Elimina selezionati', text: 'Seleziona più certificati e rimuovili insieme, ad esempio le CA di sistema filtrate come scadute; vengono rimosse solo le righe mostrate dai filtri attuali' },
         ]
       },
     ],
@@ -70,6 +71,7 @@ Importa tutte le CA fidate dal trust store del sistema operativo. Questo popola 
 - **Cerca**: Trova certificati per nome soggetto
 - **Esporta**: Scarica singoli certificati in formato PEM
 - **Elimina**: Rimuovi un certificato dal trust store
+- **Elimina selezionati**: Seleziona più certificati e rimuovili insieme, ad esempio le CA di sistema filtrate come scadute; vengono rimosse solo le righe mostrate dai filtri attuali
 
 ## Casi d'uso
 

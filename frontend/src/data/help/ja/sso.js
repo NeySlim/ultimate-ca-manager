@@ -14,6 +14,7 @@ export default {
           { label: 'ACS URL', text: 'Assertion Consumer ServiceコールバックURL' },
           { label: '属性マッピング', text: 'IDP属性をUCMユーザーフィールドにマッピング' },
           { label: 'IdP 起点のログイン', text: 'IdP ポータルから開始されたログインを受け入れます。他の応答と同じように検証されます。2.243 より前に作成されたプロバイダーではオン、新しいプロバイダーではオフです。ユーザーが IdP ポータルから開始する場合にのみオンにしてください。' },
+          { label: 'NameID 形式', text: '指定なし (IdP の既定)、永続 (persistent)、メールアドレス、一時 (transient)：各ログイン要求で送信され、SP メタデータで公開されます。永続は安定した識別子を返します。一時の NameID はアカウントの識別には使われません。' },
         ]
       },
       {
@@ -79,7 +80,7 @@ https://your-ucm-host:8443/api/v2/sso/saml/metadata
 - **ACS URL**: Assertion Consumer Serviceエンドポイント（HTTP-POST）
 - **SLO URL**: Single Logout Serviceエンドポイント
 - **署名証明書**: 署名検証用のUCMのHTTPS証明書
-- **NameID形式**: 要求される名前識別子の形式
+- **NameID形式**: プロバイダーの **NameID 形式** 設定（指定なし、永続、メールアドレス、一時）で、各ログイン要求でも送信されます。永続は安定した識別子を返します。一時の NameID はアカウントの識別には使われません
 
 このURLをIDPの「サービスプロバイダーの追加」または「SAMLアプリケーション」設定にコピーしてください。
 

@@ -30,7 +30,7 @@ export default {
         items: [
           { label: 'Ausstellen', text: 'Ein neues Zertifikat erstellen, das von einer Ihrer CAs signiert wird' },
           { label: 'Importieren', text: 'Ein vorhandenes Zertifikat importieren (PEM, DER oder PKCS#12)' },
-          { label: 'Erneuern', text: 'In-place seit v2.214: gleiche id/refid, neue Seriennummer und Gültigkeit, die ersetzte Seriennummer bleibt bis zum alten Ablaufdatum auf der CRL. Ein widerrufenes Zertifikat kann nicht erneuert werden' },
+          { label: 'Erneuern', text: 'In-place seit v2.214: gleiche id/refid, neue Seriennummer und Gültigkeit, die ersetzte Seriennummer bleibt bis zum alten Ablaufdatum auf der CRL. Ein widerrufenes Zertifikat kann nicht erneuert werden. Fragt die Gültigkeit des neuen Zertifikats in Tagen ab, vorbelegt mit der aktuellen Dauer; Richtlinien und das Ablaufdatum der CA begrenzen sie weiterhin' },
           { label: 'Umbenennen', text: 'Einen vom CN unabhängigen Anzeigenamen festlegen (Standard: CN oder erster SAN-DNS-Name bei Zertifikaten ohne CN)' },
           { label: 'Widerrufen', text: 'Als widerrufen markieren mit einem Grund, erscheint in der CRL' },
           { label: 'Sperre aufheben', text: 'Ein mit dem Grund „Zertifikat gesperrt" widerrufenes Zertifikat entsperren, stellt den gültigen Status wieder her' },
@@ -64,7 +64,7 @@ export default {
         title: 'Bereitstellung (v2.215)',
         content: 'Dieses Zertifikat per SSH/SFTP auf entfernte Hosts übertragen, nur für Admins, Ziele werden unter Einstellungen › Bereitstellung verwaltet.',
         items: [
-          { label: 'Ziel verknüpfen', text: 'Aus der Zertifikat-Detailansicht: ein Deploy-Ziel wählen und absolute Zielpfade für Zertifikat, privaten Schlüssel und/oder vollständige Kette festlegen (mindestens einen)' },
+          { label: 'Ziel verknüpfen', text: 'Aus der Zertifikat-Detailansicht: ein Deploy-Ziel wählen und absolute Zielpfade für Zertifikat, privaten Schlüssel und/oder vollständige Kette festlegen (mindestens einen). Die vollständige Kette enthält die Root-CA nur, wenn Root-CA einschließen aktiviert ist' },
           { label: 'Derselbe Host', text: 'Für eine Bereitstellung auf dem UCM-Host selbst ein SFTP-Ziel unter 127.0.0.1 mit einem dedizierten SSH-Konto verwenden; der Sandbox-Dienst kann nicht außerhalb seines Datenverzeichnisses schreiben' },
           { label: 'Automatisch', text: 'Bei Ausstellung und Erneuerung werden die verknüpften Dateien erneut übertragen und der Reload-Befehl dieser Zertifikats-Bereitstellung ausgeführt, Zustellungen werden mit Wiederholungen in die Warteschlange gestellt' },
           { label: 'Dateien', text: 'Werden atomar an den exakt konfigurierten Pfaden geschrieben (übergeordnetes Verzeichnis muss existieren): Schlüssel 0600, Zertifikat/Kette 0644' },
@@ -78,10 +78,13 @@ export default {
       'Verwenden Sie Filter, um Zertifikate schnell nach Status, CA oder Suchtext zu finden. Ihre Auswahl wird über Reloads hinweg gespeichert',
       'Beim Erneuern bleibt derselbe Datensatz erhalten (id, refid, Erstellungsdatum): von UCM gehaltene Schlüssel werden neu generiert, per Protokoll ausgestellte Zertifikate (SCEP/EST/ACME) behalten ihren clientseitigen Schlüssel',
       'Brauchen Sie eine nicht-standardisierte EKU (Microsoft RDP, Smartcard-Anmeldung, Dokumentsignierung)? Fügen Sie sie über "Extra EKUs" hinzu, statt Templates zu bearbeiten',
+      'Verkürzt eine Richtlinie oder das Ablaufdatum der ausstellenden CA die angeforderte Gültigkeit, nennt das Ergebnis dies samt Grund: "Issued for N day(s) instead of the M requested"',
+      'Eine RSA-PSS-Signatur wird mit Hash und Salt-Länge angezeigt, z. B. RSASSA-PSS SHA-256 (salt 32)',
     ],
     warnings: [
       'Widerruf ist grundsätzlich dauerhaft: außer bei „Zertifikat gesperrt", das aufgehoben werden kann (Sperre aufheben)',
-      'Ein gültiges, nicht widerrufenes Zertifikat kann nicht gelöscht werden (409): widerrufen Sie es zuerst, damit der Widerruf CRL/OCSP erreicht; Widerrufe überleben das Löschen',
+      'Ein gültiges, nicht widerrufenes Zertifikat kann nicht allein gelöscht werden: Löschen erklärt den Grund und bietet „Widerrufen, dann löschen" an, damit der Widerruf CRL/OCSP erreicht; Widerrufe überleben das Löschen',
+      'UCM signiert nur mit SHA-256, SHA-384 oder SHA-512: SHA-224 und unbekannte Hash-Namen werden abgelehnt, statt durch SHA-256 ersetzt zu werden',
     ],
   },
   helpGuides: {
@@ -131,8 +134,9 @@ Seit v2.214 wird das Zertifikat bei der Erneuerung **in place** aktualisiert:
 - Die **ersetzte Seriennummer bleibt auf der CRL veröffentlicht** (Grund \`superseded\`) und antwortet über OCSP mit \`revoked\`, bis das ursprüngliche Ablaufdatum des alten Zertifikats erreicht ist
 - \`renewed_at\` / \`renewed_times\` protokollieren die Erneuerungshistorie
 - Ein widerrufenes Zertifikat kann nicht erneuert werden (409): stellen Sie stattdessen ein neues aus
+- **Erneuern** fragt die Gültigkeit des neuen Zertifikats in Tagen ab, vorbelegt mit der aktuellen Dauer; Ausstellungsrichtlinien und das Ablaufdatum der CA begrenzen sie weiterhin
 
-**Löschen**: Ein gültiges, nicht widerrufenes Zertifikat kann nicht gelöscht werden (409): widerrufen Sie es zuerst, damit Relying Parties die Änderung sehen. Widerrufe werden unabhängig vom Zertifikatsdatensatz gespeichert und überleben das Löschen.
+**Löschen**: Ein gültiges, nicht widerrufenes Zertifikat kann nicht allein gelöscht werden: **Löschen** erklärt den Grund und bietet **Widerrufen, dann löschen** an, damit Relying Parties die Änderung sehen. Widerrufe werden unabhängig vom Zertifikatsdatensatz gespeichert und überleben das Löschen.
 
 ## Zertifikat widerrufen
 
@@ -162,7 +166,7 @@ Kombiniert Widerruf mit sofortiger Neuausstellung. Das neue Zertifikat übernimm
 
 Exportformate:
 - **PEM**: Nur Zertifikat
-- **PEM + Kette**: Zertifikat mit vollständiger Ausstellerkette
+- **PEM + Kette**: Zertifikat mit seinen ausstellenden CAs (**CA-Kette einschließen**); die Root-CA wird nur hinzugefügt, wenn **Root-CA einschließen** aktiviert ist
 - **DER**: Binärformat
 - **PKCS#12**: Zertifikat + Schlüssel + Kette, passwortgeschützt
 

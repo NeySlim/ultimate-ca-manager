@@ -17,12 +17,13 @@ export default {
           { label: 'Type', text: 'Web Server, Email, VPN Server ou Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Définit les valeurs par défaut d\'utilisation de la clé, d\'EKU et de SAN' },
           { label: 'Valeurs par défaut du sujet', text: 'Préremplir Organisation, OU, Pays, État, Ville et Email. Sur les certificats Email (S/MIME) et Serveur + Client (Combiné), l\'Email devient aussi un SAN' },
           { label: 'Utilisation de la clé', text: 'Signature numérique, chiffrement de clé, etc.' },
-          { label: 'Utilisation étendue de la clé', text: 'Authentification serveur, authentification client, signature de code, protection e-mail' },
+          { label: 'Utilisation étendue de la clé', text: 'Tout usage connu du serveur : authentification serveur, authentification client, signature de code, protection e-mail, Smartcard Logon, horodatage, signature OCSP, IPsec, Microsoft RDP et autres' },
           { label: 'Types de SAN', text: 'Les types de noms (DNS, IP, Email, URI, UPN) qu\'une demande faite avec le modèle peut porter. Avec « Appliquer les types de SAN autorisés » activé, le formulaire d\'émission, la signature de CSR, les protocoles d\'enrôlement, les renouvellements et les approbations refusent tout autre type, et un nom seulement déduit du CN est omis. Les nouveaux modèles l\'ont activé ; les anciens et les modèles intégrés l\'ont désactivé. Aucune case cochée : tous les types sont permis' },
           { label: 'Validité', text: 'Période de validité par défaut en jours' },
           { label: 'Dupliquer', text: 'Cloner un modèle existant et le modifier' },
           { label: 'Afficher système', text: 'Masquer les modèles intégrés pour ne travailler qu\'avec les vôtres. Mémorisé par navigateur' },
           { label: 'Importer/Exporter', text: 'Partager des modèles sous forme de fichiers JSON entre instances UCM, un modèle ou plusieurs dans un fichier' },
+          { label: 'Type de clé', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 ou EC-P521, avec un condensat SHA-256, SHA-384 ou SHA-512' },
         ]
       },
       {
@@ -69,8 +70,8 @@ Les autorités de certification ne se créent pas à partir de modèles : créez
 3. Sélectionnez le **type** de modèle : Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Il définit les valeurs par défaut d'utilisation de la clé, d'utilisation étendue de la clé et de SAN, que vous pouvez ensuite modifier
 4. Configurez les **valeurs par défaut du sujet** (O, OU, C, ST, L, CN, Email). Sur les certificats Email (S/MIME) et Serveur + Client (Combiné), l'Email devient aussi un SAN
 5. Sélectionnez les indicateurs d'**utilisation de la clé**
-6. Sélectionnez les valeurs d'**utilisation étendue de la clé**
-7. Définissez la **période de validité par défaut** en jours
+6. Sélectionnez les valeurs d'**utilisation étendue de la clé** parmi les usages connus du serveur (Smartcard Logon, Time Stamping, Microsoft RDP et autres)
+7. Définissez le **type de clé** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 ou EC-P521), le condensat et la **période de validité par défaut** en jours
 8. Cliquez sur **Créer**
 
 ## Utiliser les modèles

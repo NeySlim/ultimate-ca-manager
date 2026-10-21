@@ -49,6 +49,7 @@ export default {
           { label: "Cadence", text: "Quotidienne / hebdomadaire / mensuelle" },
           { label: "Rétention", text: "Conserver les N sauvegardes les plus récentes ; les plus anciennes sont purgées" },
           { label: "Chiffrement", text: "Les sauvegardes sont chiffrées avec le mot de passe de sauvegarde configuré" },
+          { label: "Dérivation de clé", text: "Automatique (Argon2id si disponible, PBKDF2 en mode FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Les archives écrites avec Argon2id ne peuvent pas être restaurées sur une instance en mode FIPS" },
         ]
       },
       {
@@ -76,7 +77,7 @@ export default {
       {
         title: 'Catégories',
         items: [
-          { label: 'Général', text: 'Nom de l\'instance, nom d\'hôte et valeurs par défaut à l\'échelle du système' },
+          { label: 'Général', text: 'Nom d\'hôte syslog (envoyé comme HOSTNAME dans les messages syslog transmis), URL de base et valeurs par défaut à l\'échelle du système' },
           { label: 'Apparence', text: 'Sélection du thème (clair/sombre/système), couleur d\'accentuation, mode bureau' },
           { label: 'E-mail (SMTP)', text: 'Serveur SMTP, identifiants, éditeur de modèle d\'e-mail et notifications d\'alerte d\'expiration' },
           { label: 'Sécurité', text: 'Politiques de mot de passe, délai d\'expiration de session, limitation de débit, liste d\'accès administrateur' },
@@ -90,6 +91,7 @@ export default {
           { label: 'Déploiement', text: "Cibles de déploiement : connexions SSH/SFTP réutilisables ; chaque déploiement de certificat ou de CRL définit ses propres chemins et sa commande de rechargement facultative (réservé aux admins, v2.215)" },
           { label: 'Active Directory', text: "Connexion AD/LDAP propre à UCM pour les recherches liées aux certificats (résolution de principal Kerberos, sujets dérivés d'AD)" },
           { label: 'Auto-inscription Windows', text: 'Inscription Windows native MS-XCEP/MS-WSTEP : découverte de stratégie, émission de certificats et liaison Kerberos/SPNEGO' },
+          { label: 'À propos', text: 'Informations système, Liens & Ressources et le lien Soutenir UCM mènent à Ko-fi (les administrateurs voient aussi une carte Ko-fi masquable une fois par version d\'UCM). Avec admin:system, Vérifier la préparation à FIPS liste ce que le mode FIPS refuserait sur cette instance, avec un remède pour chacun, et ne modifie rien' },
         ]
       },
       {
@@ -119,9 +121,10 @@ export default {
         content: 'Connexion LDAP propre à UCM à Active Directory, indépendante de tout fournisseur LDAP configuré sous SSO -- celui-ci sert à se connecter à UCM, celui-ci aux recherches AD liées aux certificats.',
         items: [
           { label: 'Objectif', text: "Résout un principal de machine ou d'utilisateur Kerberos vers son objet AD, afin qu'UCM puisse dériver un sujet/SAN de certificat, comme le ferait une vraie AC Windows" },
-          { label: 'Champs', text: 'Serveur, port, LDAPS avec vérification AC facultative, DN de base, DN de liaison/mot de passe' },
+          { label: 'Champs', text: 'Contrôleurs de domaine (un par ligne, chacun par son propre nom d\'hôte, essayés dans l\'ordre avec basculement), port, LDAPS avec vérification AC facultative, DN de base, DN de liaison et mot de passe (tous deux requis tant que le connecteur est activé)' },
           { label: 'Tester la connexion', text: "Vérifier la connectivité et les identifiants avant d'enregistrer" },
           { label: "URL d'inscription GPO", text: "URL de stratégie d'inscription de certificats Kerberos et Nom d'utilisateur/Mot de passe à enregistrer dans la stratégie de groupe" },
+          { label: 'Contrôle d\'état', text: 'Chaque contrôleur de domaine est sondé par une vraie liaison à l\'intervalle de contrôle d\'état ; un contrôleur injoignable est ignoré lors de l\'inscription jusqu\'à son rétablissement. Le verdict s\'affiche sur la ligne des paramètres et pour chaque DC' },
         ]
       },
       {
@@ -142,6 +145,7 @@ export default {
           { label: 'En attente d\'approbation', text: 'Un certificat dont le renouvellement est en file d\'approbation est laissé à cette décision, tant qu\'elle peut intervenir avant l\'expiration du certificat' },
           { label: 'Renouvelé entre-temps', text: 'Un certificat qu\'un opérateur a renouvelé pendant le lot n\'est pas renouvelé une seconde fois ; un certificat supprimé pendant le lot est ignoré' },
           { label: 'Certificats courts', text: 'Le renouvellement ne commence jamais avant le dernier tiers de la durée d\'un certificat : un certificat de 27 jours est renouvelé à 9 jours de l\'échéance, et non dès son émission' },
+          { label: 'Exécuter maintenant', text: 'Exécute immédiatement une passe de renouvellement et signale les certificats arrivant à expiration qu\'elle a laissés de côté, comptés par motif : pas encore dans le dernier tiers de leur durée de vie, clé privée non détenue par le serveur, source non sélectionnée' },
         ]
       },
 
@@ -167,10 +171,10 @@ Configuration à l'échelle du système organisée en onglets. Les modifications
 
 ## Général
 
-- **Nom de l'instance** : Affiché dans le titre du navigateur et les e-mails
-- **Nom d'hôte** : Le nom de domaine pleinement qualifié du serveur
-- **Validité par défaut** : Période de validité par défaut des certificats en jours
-- **Seuil d'alerte d'expiration** : Jours avant l'expiration pour déclencher des avertissements
+- **Nom d'hôte syslog** : Envoyé comme HOSTNAME dans les messages syslog transmis ; le nom d'hôte de la machine si vide
+- **URL de base** : URL HTTPS canonique de l'interface d'administration et de l'API ; les autres noms d'hôte et IP y sont redirigés
+- **URL de base protocole** : URL de base écrite dans les adresses CDP et OCSP ; utilisez http:// pour éviter les boucles de vérification TLS, ou laissez vide pour utiliser l'URL de base
+- **Port HTTP protocole** : Port HTTP simple qui sert CDP et OCSP ; 0 le désactive, un changement nécessite un redémarrage
 - **Vhost ACME public** : Nom d'hôte concret dans les URL du directory ACME (ex. \`acme.ucm.example.com\`, pas \`*.ucm.example.com\`). Un **SAN de certificat TLS** wildcard \`*.ucm.example.com\` couvre à la fois \`admin.ucm.example.com\` et \`acme.ucm.example.com\`. Configurez le DNS et le TLS du vhost ACME **avant** d'enregistrer : les clients qui relisent le directory basculent immédiatement d'URL.
 
 ## Apparence
@@ -207,6 +211,7 @@ Lorsque SMTP est configuré, activez les alertes automatiques d'expiration de ce
 - Basculez les alertes on/off
 - Sélectionnez les seuils d'avertissement (90j, 60j, 30j, 14j, 7j, 3j, 1j)
 - Lancez **Vérifier maintenant** pour déclencher une analyse immédiate
+- **Ignorer les certificats émis par ACME** : exclut les certificats émis par le serveur ACME d'UCM, que leurs clients renouvellent ; désactivé par défaut
 
 ## Sécurité
 
@@ -268,6 +273,7 @@ Cliquez sur **Créer une sauvegarde** pour générer un instantané de la base d
 Configurez des sauvegardes automatiques :
 - Fréquence (quotidienne, hebdomadaire, mensuelle)
 - Nombre de rétention (nombre de sauvegardes à conserver)
+- **Dérivation de clé** : Automatique (Argon2id si disponible, PBKDF2 en mode FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Les archives écrites avec Argon2id ne peuvent pas être restaurées sur une instance en mode FIPS
 
 ### Restauration
 Téléversez un fichier de sauvegarde pour restaurer UCM à un état précédent.
@@ -399,6 +405,7 @@ Les paramètres de renouvellement automatique pilotent le planificateur de renou
 - **En attente d'approbation** : un certificat dont le renouvellement est en file d'approbation est laissé à cette décision, tant qu'elle peut intervenir avant l'expiration du certificat
 - **Renouvelé entre-temps** : un certificat qu'un opérateur a renouvelé pendant le lot n'est pas renouvelé une seconde fois ; un certificat supprimé pendant le lot est ignoré
 - **Certificats courts** : le renouvellement ne commence jamais avant le dernier tiers de la durée d'un certificat : un certificat de 27 jours est renouvelé à 9 jours de l'échéance, et non dès son émission
+- **Exécuter maintenant** : exécute immédiatement une passe de renouvellement et signale les certificats arrivant à expiration qu'elle a laissés de côté, comptés par motif : pas encore dans le dernier tiers de leur durée de vie, clé privée non détenue par le serveur, source non sélectionnée
 
 ## Sauvegardes planifiées
 
@@ -414,10 +421,11 @@ Paramètres › Sauvegarde permet des sauvegardes automatiques.
 Connexion LDAP propre à UCM à Active Directory, indépendante de tout fournisseur LDAP configuré sous SSO. Celui-ci sert à se connecter à UCM ; celui-ci est utilisé pour les recherches AD liées aux certificats et fonctionne indépendamment du fait que le SSO soit configuré ou non.
 
 - **Objectif** : Résout un principal de machine ou d'utilisateur Kerberos vers son objet AD, afin qu'UCM puisse dériver un sujet/SAN de certificat comme le ferait une vraie AC Windows
-- **Serveur** : Nom d'hôte/IP et port d'un contrôleur de domaine
+- **Contrôleurs de domaine** : Un par ligne, chacun par son propre nom d'hôte, essayés dans l'ordre : les recherches basculent sur le suivant quand un DC est hors service. Un nom de domaine seul échoue à la vérification du certificat, car le certificat d'un contrôleur de domaine ne nomme que son propre hôte
 - **LDAPS** : Activer pour utiliser LDAP sur SSL/TLS ; **Vérifier le certificat SSL** valide le certificat du DC (éventuellement par rapport à un bundle d'AC personnalisé lorsqu'il n'est pas approuvé publiquement)
-- **DN de base** et **DN de liaison / Mot de passe** : Identifiants du compte de service utilisés pour les recherches
+- **DN de base** et **DN de liaison / Mot de passe** : Identifiants du compte de service utilisés pour les recherches ; le DN de liaison et le mot de passe sont tous deux requis tant que le connecteur est activé
 - **Tester la connexion** : Vérifier la connectivité et les identifiants avant d'enregistrer
+- **Intervalle de contrôle d'état** : Chaque contrôleur de domaine est sondé par une vraie liaison à cet intervalle ; un contrôleur injoignable est ignoré lors de l'inscription jusqu'à son rétablissement. Le verdict s'affiche sur la ligne des paramètres et pour chaque DC
 
 ### URL de stratégie d'inscription GPO
 
@@ -462,6 +470,11 @@ Lors d'une **émission authentifiée par Kerberos**, UCM intègre le SID AD du d
 ### Sujets dérivés d'AD
 
 Un modèle de certificat peut choisir **Construire le sujet depuis Active Directory** (Modèles → Inscription) : pour l'auto-inscription GPO sans surveillance, le sujet et le SAN sont dérivés de l'objet AD du demandeur via le connecteur AD au lieu d'exiger que le client en fournisse un -- correspond à la configuration d'un modèle ADCS réel pour l'auto-inscription. Indépendamment, **Autoriser l'auto-inscription** annonce le modèle comme \`autoEnroll=true\` dans la stratégie d'inscription de certificats, afin que les clients authentifiés par GPO/Kerberos le demandent automatiquement à la connexion.
+
+## À propos
+
+- **Informations système**, **Liens & Ressources** et le lien **Soutenir UCM** mènent à Ko-fi. Les administrateurs voient aussi une carte Ko-fi masquable une fois par version d'UCM
+- **Vérifier la préparation à FIPS** (admin:system) : liste ce que le mode FIPS refuserait sur cette instance (hachages de mots de passe scrypt, autorités Ed25519, sauvegardes Argon2id, PostgreSQL sans TLS...), avec un remède pour chacun. Rien n'est modifié
 `
   }
 }

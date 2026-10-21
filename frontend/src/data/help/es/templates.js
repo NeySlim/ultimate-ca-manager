@@ -17,12 +17,13 @@ export default {
           { label: 'Tipo', text: 'Web Server, Email, VPN Server o Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon o Custom. Define los valores predeterminados de uso de clave, EKU y SAN' },
           { label: 'Valores predeterminados del sujeto', text: 'Prellenar Organización, OU, País, Estado, Ciudad y Email. En los certificados de Correo electrónico y Servidor + Cliente (Combinado), el Email también se convierte en un SAN' },
           { label: 'Uso de clave', text: 'Firma digital, cifrado de clave, etc.' },
-          { label: 'Uso extendido de clave', text: 'Autenticación de servidor, autenticación de cliente, firma de código, protección de correo' },
+          { label: 'Uso extendido de clave', text: 'Cualquier propósito que el servidor conozca: Server Auth, Client Auth, Code Signing, Email Protection, Smartcard Logon, Time Stamping, OCSP Signing, IPsec, Microsoft RDP y otros' },
           { label: 'Tipos de SAN', text: 'Los tipos de nombre (DNS, IP, Email, URI, UPN) que puede llevar una solicitud hecha con la plantilla. Con «Aplicar los tipos de SAN permitidos» activado, el formulario de emisión, la firma de CSR, los protocolos de inscripción, las renovaciones y las aprobaciones rechazan cualquier otro tipo, y un nombre solo deducido del CN se omite. Las plantillas nuevas lo tienen activado; las anteriores y las integradas, desactivado. Ninguno marcado: se permiten todos los tipos' },
           { label: 'Validez', text: 'Período de validez predeterminado en días' },
           { label: 'Duplicar', text: 'Clonar una plantilla existente y modificarla' },
           { label: 'Mostrar sistema', text: 'Oculte las plantillas integradas para trabajar solo con las suyas. Se recuerda por navegador' },
           { label: 'Importar/Exportar', text: 'Compartir plantillas como archivos JSON entre instancias de UCM, una plantilla o varias en un solo archivo' },
+          { label: 'Tipo de clave', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 o EC-P521, con un resumen SHA-256, SHA-384 o SHA-512' },
         ]
       },
       {
@@ -69,8 +70,8 @@ Las autoridades de certificación no se crean a partir de plantillas: créelas e
 3. Seleccione el **tipo** de plantilla: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon o Custom. Define los valores predeterminados de uso de clave, uso extendido de clave y SAN, que luego puede cambiar
 4. Configure los **valores predeterminados del sujeto** (O, OU, C, ST, L, CN, Email). En los certificados de Correo electrónico y Servidor + Cliente (Combinado), el Email también se convierte en un SAN de email
 5. Seleccione las opciones de **uso de clave**
-6. Seleccione los valores de **uso extendido de clave**
-7. Establezca el **período de validez predeterminado** en días
+6. Seleccione los valores de **uso extendido de clave** entre los propósitos que el servidor conoce (Smartcard Logon, Time Stamping, Microsoft RDP y otros)
+7. Establezca el **Tipo de clave** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 o EC-P521), el resumen y el **período de validez predeterminado** en días
 8. Haga clic en **Crear**
 
 ## Usar plantillas

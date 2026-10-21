@@ -24,7 +24,7 @@ export default {
           { label: 'Cache', text: 'Cache de réponses avec nettoyage automatique quotidien des entrées expirées' },
           { label: 'Total des requêtes', text: 'Nombre de requêtes OCSP traitées' },
           { label: 'Répondeur délégué', text: 'Signer les réponses avec un certificat OCSPSigning dédié au lieu de la clé de la CA, assignez-en un par CA depuis le panneau de détails' },
-          { label: 'Renouvellement auto du répondeur', text: 'Une tâche quotidienne réémet le certificat du répondeur délégué avant expiration (même paire de clés, renouvelé à l\'identique) et le relie, activé par défaut' },
+          { label: 'Renouvellement auto du répondeur', text: 'Une tâche quotidienne réémet le certificat du répondeur délégué avant expiration (même paire de clés, renouvelé à l\'identique) et le relie, activé par défaut. Le commutateur et sa fenêtre (jours avant expiration, 30 par défaut) se trouvent dans Paramètres › Sécurité' },
         ]
       },
     ],

@@ -31,6 +31,7 @@ export default {
       'UCMで生成したCSRに対して証明書をインポートすると、そのCSRが完了します：レコードは秘密鍵を保持するため、証明書は鍵とともにエクスポートされます',
       'Windows PKIに接続している場合、Microsoft CAモードを使用してAD CS経由でCSRに署名できます',
       '署名時には「追加 EKU」を使って Microsoft RDP、スマートカードログオン、IPsec、または任意の OID を追加できます: CSR の既存 EKU はマージされたセットで再構築されます',
+      'ポリシーまたは発行CAの有効期限により要求された有効期間が短縮された場合、結果にその旨が表示されます："Issued for N day(s) instead of the M requested" と理由（サーバーが英語で返すメッセージです）',
     ],
   },
   helpGuides: {

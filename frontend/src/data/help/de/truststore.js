@@ -22,6 +22,7 @@ export default {
           { label: 'PEM hinzufügen', text: 'PEM-kodierten Zertifikatstext direkt einfügen' },
           { label: 'Vom System synchronisieren', text: 'Vertrauenswürdige CAs des Betriebssystems in UCM importieren' },
           { label: 'Exportieren', text: 'Vertrauenswürdige Zertifikate einzeln herunterladen' },
+          { label: 'Auswahl löschen', text: 'Mehrere Zertifikate auswählen und gemeinsam entfernen, zum Beispiel die als abgelaufen gefilterten System-CAs; nur die Zeilen, die die aktuellen Filter anzeigen, werden entfernt' },
         ]
       },
     ],
@@ -70,6 +71,7 @@ Alle vertrauenswürdigen CAs aus dem Vertrauensspeicher des Betriebssystems impo
 - **Suche**: Zertifikate nach Betreffsname suchen
 - **Exportieren**: Einzelne Zertifikate im PEM-Format herunterladen
 - **Löschen**: Ein Zertifikat aus dem Vertrauensspeicher entfernen
+- **Auswahl löschen**: Mehrere Zertifikate auswählen und gemeinsam entfernen, zum Beispiel die als abgelaufen gefilterten System-CAs; nur die Zeilen, die die aktuellen Filter anzeigen, werden entfernt
 
 ## Anwendungsfälle
 

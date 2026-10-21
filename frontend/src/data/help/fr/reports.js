@@ -26,8 +26,8 @@ export default {
       {
         title: 'Programmation',
         items: [
-          { label: 'Rapport d\'expiration', text: 'E-mail avec les certificats expirant bientôt, à la fréquence choisie' },
-          { label: 'Rapport de conformité', text: 'E-mail avec le statut de conformité aux politiques, à la fréquence choisie' },
+          { label: 'Onglet Planification', text: 'Cochez n\'importe quel rapport de données ou modèle PDF, puis réglez sa fréquence (quotidienne, hebdomadaire ou mensuelle), son heure (UTC), son format et ses destinataires' },
+          { label: 'Pièce jointe', text: 'Le rapport est joint à l\'e-mail dans son format : CSV ou JSON pour les rapports de données, PDF pour les modèles PDF' },
         ]
       },
     ],
@@ -66,7 +66,7 @@ Certificats révoqués sur la période choisie (30 jours par défaut), avec la d
 
 ## Rapport PDF exécutif
 
-Cliquez sur **Télécharger PDF** en haut à droite pour générer un rapport exécutif professionnel adapté aux revues de direction, présentations et audits de conformité.
+Ouvrez l'onglet **Rapports PDF** et cliquez sur **Télécharger PDF** sur le modèle **Résumé exécutif** pour générer un rapport exécutif professionnel adapté aux revues de direction, présentations et audits de conformité.
 
 ### Contenu
 Le rapport PDF comprend 9 sections :
@@ -102,17 +102,18 @@ Chaque ligne de rapport a des boutons de téléchargement :
 
 ## Programmer des rapports
 
-### Rapport d'expiration (quotidien)
-Envoie automatiquement un rapport d'expiration de certificats chaque jour aux destinataires configurés. Activez ceci pour détecter les certificats expirants avant qu'ils ne causent des pannes.
+### Ce qui peut être planifié
+Chaque rapport de données et chaque modèle PDF peut être planifié, avec sa propre fréquence, son heure et ses destinataires. Planifiez **Certificats expirants** chaque jour pour détecter les certificats expirants avant qu'ils ne causent des pannes.
 
-### Rapport de conformité (hebdomadaire)
-Envoie un résumé de conformité aux politiques chaque semaine. Utile pour un suivi continu de la conformité sans effort manuel.
+### Fréquence
+**Quotidienne**, **Hebdomadaire** (choisissez le jour de la semaine) ou **Mensuelle** (choisissez le jour du mois), à une heure donnée en UTC.
 
 ### Configuration
-1. Cliquez sur **Programmer les rapports** en haut à droite
-2. Activez les rapports que vous souhaitez programmer
-3. Ajoutez les adresses e-mail des destinataires (appuyez sur Entrée ou cliquez sur Ajouter)
-4. Cliquez sur Enregistrer
+1. Ouvrez l'onglet **Planification**
+2. Cochez les rapports que vous souhaitez planifier
+3. Réglez la fréquence, l'heure et, pour les rapports de données, le format (CSV ou JSON)
+4. Ajoutez les adresses e-mail des destinataires (appuyez sur Entrée ou cliquez sur Ajouter)
+5. Cliquez sur Enregistrer
 
 Chaque rapport programmé est joint à l'e-mail dans son format : CSV ou JSON pour les rapports de données, PDF pour les modèles PDF.
 
@@ -127,7 +128,7 @@ Avant d'activer les programmations, utilisez le bouton ✈️ sur n'importe quel
 - **read:audit + export:audit** : Télécharger le rapport PDF exécutif
 - **write:settings** : Configurer les programmations de rapports
 
-> 💡 Programmez le rapport d'expiration en premier : c'est le plus précieux opérationnellement et aide à prévenir les pannes liées aux certificats.
+> 💡 Programmez d'abord le rapport Certificats expirants : c'est le plus précieux opérationnellement et aide à prévenir les pannes liées aux certificats.
 `
   }
 }

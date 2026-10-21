@@ -26,8 +26,8 @@ export default {
       {
         title: 'Planung',
         items: [
-          { label: 'Ablaufbericht', text: 'E-Mail mit bald ablaufenden Zertifikaten, in der gewählten Häufigkeit' },
-          { label: 'Compliance-Bericht', text: 'E-Mail mit Richtlinien-Compliance-Status, in der gewählten Häufigkeit' },
+          { label: 'Tab Zeitplan', text: 'Haken Sie einen beliebigen Datenbericht oder eine PDF-Vorlage an und legen Sie dann Häufigkeit (täglich, wöchentlich oder monatlich), Uhrzeit (UTC), Format und Empfänger fest' },
+          { label: 'Anhang', text: 'Der Bericht wird der E-Mail in seinem Format angehängt: CSV oder JSON für Datenberichte, PDF für die PDF-Vorlagen' },
         ]
       },
     ],
@@ -66,7 +66,7 @@ Im gewählten Zeitraum (Standard: 30 Tage) widerrufene Zertifikate mit Widerrufs
 
 ## PDF-Managementbericht
 
-Klicken Sie oben rechts auf **PDF herunterladen**, um einen professionellen Managementbericht zu erstellen, der für Managementprüfungen, Vorstandspräsentationen und Compliance-Audits geeignet ist.
+Öffnen Sie den Tab **PDF-Berichte** und klicken Sie bei der Vorlage **Zusammenfassung** auf **PDF herunterladen**, um einen professionellen Managementbericht zu erstellen, der für Managementprüfungen, Vorstandspräsentationen und Compliance-Audits geeignet ist.
 
 ### Inhalt
 Der PDF-Bericht enthält 9 Abschnitte:
@@ -102,17 +102,18 @@ Jede Berichtszeile hat Download-Schaltflächen:
 
 ## Berichte planen
 
-### Ablaufbericht (täglich)
-Sendet automatisch täglich einen Zertifikatsablaufbericht an konfigurierte Empfänger. Aktivieren Sie dies, um ablaufende Zertifikate zu erkennen, bevor sie Ausfälle verursachen.
+### Was planbar ist
+Jeder Datenbericht und jede PDF-Vorlage kann geplant werden, jeweils mit eigener Häufigkeit, Uhrzeit und eigenen Empfängern. Planen Sie **Ablaufende Zertifikate** täglich, um ablaufende Zertifikate zu erkennen, bevor sie Ausfälle verursachen.
 
-### Compliance-Bericht (wöchentlich)
-Sendet wöchentlich eine Richtlinien-Compliance-Zusammenfassung. Nützlich für die laufende Compliance-Überwachung ohne manuellen Aufwand.
+### Häufigkeit
+**Täglich**, **Wöchentlich** (Wochentag wählen) oder **Monatlich** (Tag des Monats wählen), zu einer in UTC angegebenen Uhrzeit.
 
 ### Konfiguration
-1. Klicken Sie oben rechts auf **Berichte planen**
-2. Aktivieren Sie die Berichte, die Sie planen möchten
-3. Fügen Sie Empfänger-E-Mail-Adressen hinzu (Eingabetaste drücken oder auf Hinzufügen klicken)
-4. Klicken Sie auf Speichern
+1. Öffnen Sie den Tab **Zeitplan**
+2. Haken Sie die Berichte an, die Sie planen möchten
+3. Legen Sie Häufigkeit, Uhrzeit und, bei Datenberichten, das Format (CSV oder JSON) fest
+4. Fügen Sie Empfänger-E-Mail-Adressen hinzu (Eingabetaste drücken oder auf Hinzufügen klicken)
+5. Klicken Sie auf Speichern
 
 Jeder geplante Bericht wird der E-Mail in seinem Format angehängt: CSV oder JSON für Datenberichte, PDF für die PDF-Vorlagen.
 
@@ -127,7 +128,7 @@ Bevor Sie Zeitpläne aktivieren, verwenden Sie den ✈️-Button in jeder Berich
 - **read:audit + export:audit**: PDF-Managementbericht herunterladen
 - **write:settings**: Berichtzeitpläne konfigurieren
 
-> 💡 Planen Sie den Ablaufbericht zuerst: er ist betrieblich am wertvollsten und hilft, zertifikatsbezogene Ausfälle zu vermeiden.
+> 💡 Planen Sie zuerst den Bericht Ablaufende Zertifikate: er ist betrieblich am wertvollsten und hilft, zertifikatsbezogene Ausfälle zu vermeiden.
 `
   }
 }

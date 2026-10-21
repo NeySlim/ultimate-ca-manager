@@ -16,7 +16,7 @@ export default {
         title: 'Sicurezza',
         items: [
           { label: 'Password', text: 'Modifica la tua password attuale' },
-          { label: '2FA (TOTP)', text: 'Abilita le password monouso basate sul tempo tramite app di autenticazione' },
+          { label: '2FA (TOTP)', text: 'Abilita le password monouso basate sul tempo tramite app di autenticazione. Riabilitarlo mentre è attivo viene rifiutato: disabilitalo prima' },
           { label: 'Chiavi di sicurezza', text: 'Registra chiavi WebAuthn/FIDO2 (YubiKey, impronta digitale, ecc.)' },
           { label: 'mTLS', text: 'Gestisci i certificati client per l\'autenticazione TLS reciproca' },
         ]
@@ -25,9 +25,10 @@ export default {
         title: 'Chiavi API',
         items: [
           { label: 'Crea chiave', text: 'Genera una nuova chiave API con scadenza opzionale' },
-          { label: 'Permessi', text: 'Le chiavi API ereditano i permessi del tuo ruolo' },
+          { label: 'Permessi', text: 'Una chiave porta l\'ambito scelto alla creazione, mai più dei tuoi permessi. Una chiave può creare o rigenerare solo una chiave i cui permessi possiede essa stessa' },
           { label: 'Revoca', text: 'Invalida immediatamente una chiave API' },
           { label: 'Utenti disattivati', text: 'Le chiavi API appartenenti a un utente disattivato vengono rifiutate anche se la chiave stessa è ancora valida' },
+          { label: 'Solo sessione interattiva', text: 'Le chiavi API, anche quelle ad accesso completo, non possono modificare il tuo profilo, la password, il 2FA, le chiavi di sicurezza, i certificati mTLS o le sessioni, né raggiungere il tuo account tramite le azioni di amministrazione utenti: accedi in modo interattivo' },
         ]
       },
       {
@@ -77,6 +78,8 @@ Aggiungi una password monouso basata sul tempo utilizzando qualsiasi app di aute
 
 > ⚠ Se perdi l'accesso all'autenticatore e ai codici di recupero, un amministratore dovrà disabilitare il tuo 2FA.
 
+Per spostare il 2FA su un nuovo autenticatore, disabilitalo prima: riabilitarlo mentre è attivo viene rifiutato.
+
 ### Chiavi di sicurezza (WebAuthn/FIDO2)
 Registra chiavi di sicurezza hardware o autenticatori biometrici:
 - YubiKey
@@ -118,7 +121,9 @@ X-API-Key: <la-tua-chiave-api>
 Oppure inviala come token bearer: \`Authorization: Bearer <la-tua-chiave-api>\`.
 
 ### Permessi
-Le chiavi API ereditano i permessi del ruolo del tuo utente. Non possono avere più accesso del tuo account.
+Ogni chiave porta l'ambito scelto alla creazione (**Accesso completo**, **Solo lettura**, **Lettura e scrittura**, **Solo certificati**) e mai più accesso del tuo account. Una chiave può creare o rigenerare solo una chiave i cui permessi possiede essa stessa.
+
+Le chiavi API, anche quelle ad accesso completo, non possono modificare il tuo profilo, la password, il 2FA, le chiavi di sicurezza, i certificati mTLS o le sessioni, né raggiungere il tuo account tramite le azioni di amministrazione utenti: questi richiedono una sessione interattiva.
 
 ### Revoca delle chiavi
 Clicca **Elimina** per invalidare immediatamente una chiave API. Le sessioni attive che utilizzano la chiave verranno terminate.

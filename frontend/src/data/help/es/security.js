@@ -12,6 +12,7 @@ export default {
           { label: 'Archivos de clave en disco', text: 'Muestra cuántas copias de claves en texto plano quedan; use hooks de despliegue cuando otro servicio necesite un archivo de clave' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Variable de entorno opcional: rechaza arrancar sin una clave de cifrado de base de datos explícita' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: 'Variable de entorno opcional: rechaza arrancar si el cifrado de claves privadas no está activado' },
+          { label: 'Cifrar claves restantes', text: 'Se muestra mientras el cifrado está activado y algunas claves o secretos siguen almacenados sin cifrar: los cifra, dejando como están los ya cifrados' },
         ]
       },
       {
@@ -75,6 +76,7 @@ Cifre todas las claves privadas de CAs y certificados almacenadas en la base de 
 - **Estado y contadores**: La sección muestra si el cifrado está activado y cuántas claves están actualmente **cifradas** frente a **sin cifrar**
 - **Activar cifrado**: Genera el archivo de clave maestra y cifra todas las claves privadas almacenadas. Haga una copia de seguridad del archivo de clave de inmediato: sin él, las claves cifradas se pierden de forma permanente
 - **Desactivar cifrado**: Descifra todas las claves privadas y vuelve al almacenamiento en texto plano (requiere confirmación)
+- **Cifrar claves restantes**: Se muestra mientras el cifrado está activado y algunas claves o secretos siguen almacenados sin cifrar; los cifra, dejando como están los ya cifrados
 
 ### Aplicación en el arranque
 

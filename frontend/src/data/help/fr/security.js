@@ -12,6 +12,7 @@ export default {
           { label: 'Fichiers de clé sur disque', text: 'Indique combien de copies de clés en clair subsistent ; utilisez les hooks de déploiement lorsqu’un autre service a besoin d’un fichier de clé' },
           { label: 'UCM_REQUIRE_DB_ENCRYPTION_KEY', text: 'Variable d\'environnement opt-in : refuser de démarrer sans clé de chiffrement de base de données explicite' },
           { label: 'UCM_REQUIRE_KEY_ENCRYPTION', text: 'Variable d\'environnement opt-in : refuser de démarrer si le chiffrement des clés privées n\'est pas activé' },
+          { label: 'Chiffrer les clés restantes', text: 'Affiché tant que le chiffrement est activé et que certaines clés ou certains secrets restent stockés non chiffrés : les chiffre, en laissant tels quels ceux qui le sont déjà' },
         ]
       },
       {
@@ -75,6 +76,7 @@ Chiffrez toutes les clés privées de CA et de certificats stockées en base de 
 - **Statut et compteurs** : La section indique si le chiffrement est activé et combien de clés sont actuellement **chiffrées** vs **non chiffrées**
 - **Activer le chiffrement** : Génère le fichier de clé maîtresse et chiffre toutes les clés privées stockées. Sauvegardez le fichier de clé immédiatement : sans lui, les clés chiffrées sont définitivement perdues
 - **Désactiver le chiffrement** : Déchiffre toutes les clés privées vers le stockage en clair (confirmation requise)
+- **Chiffrer les clés restantes** : Affiché tant que le chiffrement est activé et que certaines clés ou certains secrets restent stockés non chiffrés ; les chiffre, en laissant tels quels ceux qui le sont déjà
 
 ### Application au démarrage
 

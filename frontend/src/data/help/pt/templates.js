@@ -17,12 +17,13 @@ export default {
           { label: 'Tipo', text: 'Web Server, Email, VPN Server ou Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Define os padrões de Key Usage, EKU e SAN' },
           { label: 'Padrões de Sujeito', text: 'Pré-preencher Organização, OU, País, Estado, Cidade e Email. Em certificados E-mail e Servidor + Cliente (Combinado), o Email também se torna um SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, etc.' },
-          { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
+          { label: 'Extended Key Usage', text: 'Qualquer finalidade que o servidor conheça: Server Auth, Client Auth, Code Signing, Email Protection, Smartcard Logon, Time Stamping, OCSP Signing, IPsec, Microsoft RDP e outras' },
           { label: 'Tipos de SAN', text: 'Os tipos de nome (DNS, IP, Email, URI, UPN) que um pedido feito com o modelo pode conter. Com «Aplicar os tipos de SAN permitidos» ativado, o formulário de emissão, a assinatura de CSR, os protocolos de inscrição, as renovações e as aprovações recusam qualquer outro tipo, e um nome apenas deduzido do CN é omitido. Os novos modelos têm-no ativado; os anteriores e os integrados, desativado. Nenhum marcado: todos os tipos são permitidos' },
           { label: 'Validade', text: 'Período de validade padrão em dias' },
           { label: 'Duplicar', text: 'Clonar um modelo existente e modificá-lo' },
           { label: 'Mostrar sistema', text: 'Oculte os modelos incluídos para trabalhar apenas com os seus. Lembrado por navegador' },
           { label: 'Importar/Exportar', text: 'Compartilhar modelos como arquivos JSON entre instâncias UCM, um modelo ou vários em um só arquivo' },
+          { label: 'Tipo de chave', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 ou EC-P521, com um resumo SHA-256, SHA-384 ou SHA-512' },
         ]
       },
       {
@@ -69,8 +70,8 @@ Autoridades certificadoras não são criadas a partir de modelos: crie-as na pá
 3. Selecione o **tipo** do modelo: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon ou Custom. Ele define os padrões de Key Usage, Extended Key Usage e SAN, que você pode alterar em seguida
 4. Configure **padrões de Sujeito** (O, OU, C, ST, L, CN, Email). Em certificados E-mail e Servidor + Cliente (Combinado), o Email também se torna um SAN de email
 5. Selecione flags de **Key Usage**
-6. Selecione valores de **Extended Key Usage**
-7. Defina o **período de validade** padrão em dias
+6. Selecione valores de **Extended Key Usage** entre as finalidades que o servidor conhece (Smartcard Logon, Time Stamping, Microsoft RDP e outras)
+7. Defina o **Tipo de chave** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 ou EC-P521), o resumo e o **período de validade** padrão em dias
 8. Clique em **Criar**
 
 ## Usando Modelos

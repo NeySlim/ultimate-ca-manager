@@ -19,6 +19,7 @@ export default {
           { label: 'Validité maximale', text: 'Durée de vie maximale du certificat en jours' },
           { label: 'Types de clés autorisés', text: 'Restreindre les algorithmes et tailles de clés pouvant être utilisés' },
           { label: 'Restrictions SAN', text: 'Limiter le nombre de SAN et imposer des motifs de noms DNS' },
+          { label: 'Algorithmes de hachage de signature autorisés', text: 'SHA-256, SHA-384 ou SHA-512 ; aucun sélectionné autorise tout. Quand personne n\'a choisi le hachage, celui par défaut s\'applique s\'il est autorisé, sinon le plus faible autorisé. Le formulaire d\'émission et Créer une CA ne proposent que les types de clé et hachages que les politiques autorisent' },
         ]
       },
       {
@@ -70,10 +71,13 @@ Durée de vie maximale du certificat en jours. Valeurs courantes :
 ### Types de clés autorisés
 Restreindre les algorithmes et tailles de clés pouvant être utilisés :
 - **RSA-2048** : Minimum pour la confiance publique
+- **RSA-3072** : La taille de clé par défaut des nouvelles CA
 - **RSA-4096** : Sécurité plus élevée, certificats plus volumineux
 - **EC-P256** : Moderne, rapide, recommandé
 - **EC-P384** : Courbe elliptique à sécurité plus élevée
 - **EC-P521** : Sécurité maximale (rarement nécessaire)
+
+**Algorithmes de hachage de signature autorisés** restreint le hachage de signature de la même façon (SHA-256, SHA-384, SHA-512) ; aucun sélectionné autorise tout. Quand personne n'a choisi le hachage, celui par défaut s'applique s'il est autorisé, sinon le plus faible autorisé. Le formulaire d'émission et Créer une CA ne proposent que les types de clé et hachages que les politiques autorisent.
 
 ### Restrictions SAN
 - **Noms DNS max** : Limiter le nombre de noms alternatifs du sujet

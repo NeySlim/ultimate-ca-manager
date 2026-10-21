@@ -23,7 +23,7 @@ export default {
           { label: 'EAB', text: 'External Account Binding-Unterstützung für CAs, die eine Vorregistrierung erfordern (ZeroSSL, HARICA, usw.)' },
           { label: 'Schlüsseltypen', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384 für Zertifikatsschlüssel' },
           { label: 'Kontoschlüssel', text: 'ES256 (P-256), ES384 (P-384) oder RS256-Algorithmen für ACME-Kontoschlüssel' },
-          { label: 'DNS-Anbieter', text: 'DNS-01-Challenge-Anbieter konfigurieren (Cloudflare, Route53, Tencent DNSPod, usw.)' },
+          { label: 'DNS-Anbieter', text: 'DNS-01-Challenge-Anbieter konfigurieren (Cloudflare, Route53, Tencent DNSPod, Plesk, usw.). Plesk läuft über seine XML-API; SSL-Zertifikat überprüfen kann für ein selbstsigniertes Panel deaktiviert und eine DNS-Propagationsverzögerung hinzugefügt werden' },
           { label: 'Custom Command', text: 'DNS-Anbietertyp, der vom Admin konfigurierte lokale Befehle zum Erstellen/Löschen von TXT-Einträgen ausführt, Eintragsdetails werden über die Umgebungsvariablen DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION übergeben. Absoluter Binärpfad erforderlich, keine Shell, konfigurierbares Timeout' },
           { label: 'Domänen', text: 'Domänen DNS-Anbietern für automatische Validierung zuordnen' },
           { label: 'HTTP-01', text: 'UCM stellt die Challenge-Datei seiner offenen Orders unter /.well-known/acme-challenge/ auf dem HTTP-Protokollport bereit (standardmäßig 8080): leiten Sie diesen Pfad von Port 80 der Domäne an UCM weiter. Verifizieren prüft zuerst die Datei, und HTTP-01-Orders werden automatisch erneuert' },
@@ -45,11 +45,11 @@ export default {
       {
         title: 'ACME-Proxy',
         items: [
-          { label: 'Upstream-CA', text: 'Wählen Sie eine Voreinstellung (Let\'s Encrypt Produktion/Staging) oder geben Sie eine benutzerdefinierte URL für jede RFC 8555 CA ein' },
+          { label: 'Upstream-CA-Konto', text: 'Wählen Sie eines der Externen CA-Konten: Seine Verzeichnis-URL (Let\'s Encrypt, ZeroSSL, jede RFC 8555 CA) und die EAB-Zugangsdaten werden an diesem Konto festgelegt' },
           { label: 'Kontostatus', text: 'Zeigt an, ob UCM bei der Upstream-CA registriert ist. Konten werden automatisch bei der ersten Proxy-Anfrage registriert' },
           { label: 'Verbindungstest', text: 'Überprüfen Sie die Konnektivität zur Upstream-CA und prüfen Sie, ob EAB-Zugangsdaten erforderlich sind' },
-          { label: 'Konto zurücksetzen', text: 'Löschen Sie gespeicherte Upstream-Zugangsdaten, um eine Neuregistrierung zu erzwingen (nach CA-Wechsel verwenden)' },
-          { label: 'EAB-Zugangsdaten', text: 'External Account Binding-Zugangsdaten für CAs, die sie erfordern (z.B. ZeroSSL, Google Trust)' },
+          { label: 'Konto zurücksetzen', text: 'Die Upstream-Registrierung des gewählten CA-Kontos löschen, um eine Neuregistrierung zu erzwingen' },
+          { label: 'EAB-Zugangsdaten', text: 'External Account Binding-Zugangsdaten für CAs, die sie erfordern (z.B. ZeroSSL, Google Trust), erfasst am CA-Konto unter Externe CA-Konten' },
           { label: 'DNS-Herausforderungen', text: 'UCM bearbeitet DNS-01-Herausforderungen im Auftrag der Clients mit konfigurierten DNS-Anbietern' },
           { label: 'Ersetzte Zertifikate bereinigen', text: 'Opt-in-Schalter: Beim Abschluss einer Proxy-Order werden Zertifikate gelöscht, die zuvor von Proxy-Orders für exakt denselben Domänensatz importiert wurden. Widerrufene Zertifikate bleiben immer erhalten; Nicht-Proxy-Zertifikate werden nie angetastet. Standardmäßig aus' },
                   { label: 'Client-Prechecks (v2.217)', text: 'Der Proxy veröffentlicht auch die mit dem Kontoschlüssel jedes Clients berechneten dns-01-TXT-Werte: die Propagation-Prechecks von lego/Traefik/Caddy bestehen, ohne deaktiviert zu werden; ein wiederholtes new-order liefert die noch ausstehende Order des Kontos zurück' },
@@ -128,7 +128,7 @@ export default {
       'Verwenden Sie lokale Domänen, um verschiedenen internen Domänen unterschiedliche CAs zuzuweisen',
       'Jede CA mit einem privaten Schlüssel kann als ausstellende CA ausgewählt werden',
       'Wildcard-Domänen (*.example.com) erfordern DNS-01-Validierung',
-      'Ein Wechsel der Upstream-CA löscht veraltete Kontozugangsdaten automatisch',
+      'Jedes CA-Konto behält seine eigene Upstream-Registrierung: Wechselt der Proxy zu einem anderen Konto, wird dessen Registrierung verwendet',
       'Proxy-URL mit certbot verwenden: certbot certonly --server https://ihr-server:port/acme/proxy/directory',
     ],
     warnings: [
@@ -166,7 +166,7 @@ Verwenden Sie jede RFC 8555-konforme CA, nicht nur Let's Encrypt:
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-Legen Sie die Directory-URL Ihrer CA unter **Einstellungen** → **Benutzerdefinierter ACME-Server** fest.
+Legen Sie die Directory-URL Ihrer CA als **ACME-Verzeichnis-URL** seines Kontos unter **Externe CA-Konten** fest.
 
 ### Externe CA-Konten
 Verwalten Sie alle externen Konten, mit denen sich UCM registriert:
@@ -181,7 +181,7 @@ Verwalten Sie alle externen Konten, mit denen sich UCM registriert:
 Einige CAs erfordern EAB-Anmeldeinformationen, um Ihr ACME-Konto mit einem bestehenden Konto bei der CA zu verknüpfen:
 
 1. Registrieren Sie sich im Portal Ihrer CA, um **EAB Key ID** und **HMAC Key** zu erhalten
-2. Geben Sie beide Werte unter **Einstellungen** → **Benutzerdefinierter ACME-Server** ein
+2. Geben Sie beide Werte (**EAB-Schlüssel-ID**, **EAB-HMAC-Schlüssel**) am CA-Konto unter **Externe CA-Konten** ein
 3. Der HMAC-Schlüssel ist base64url-kodiert (von der CA bereitgestellt)
 
 > 💡 EAB wird von ZeroSSL, HARICA, Google Trust Services und den meisten Enterprise-CAs benötigt.
@@ -223,6 +223,7 @@ Konfigurieren Sie DNS-01-Challenge-Anbieter für die Domänenvalidierung. Unters
 - DigitalOcean
 - OVH
 - Tencent Cloud DNSPod
+- Plesk (XML-API): **SSL-Zertifikat überprüfen** kann für ein selbstsigniertes Panel deaktiviert und eine DNS-Propagationsverzögerung hinzugefügt werden
 - Und weitere
 
 Jeder Anbieter erfordert spezifische API-Anmeldeinformationen für den DNS-Dienst.
@@ -295,7 +296,7 @@ Reservierte Slugs (nicht erlaubt): \`directory\`, \`new-order\`, \`challenge\`, 
 
 ### Kontoverwaltung
 - Das **Kontostatus-Badge** zeigt an, ob UCM bei der Upstream-CA registriert ist
-- Ein Wechsel der Upstream-CA löscht automatisch veraltete Zugangsdaten und erzwingt eine Neuregistrierung
+- Jedes CA-Konto behält seine eigene Upstream-Registrierung: Beim Wechsel des Upstream-Kontos wird dessen Registrierung verwendet, bei Bedarf bei der ersten Proxy-Anfrage registriert
 - Verwenden Sie die Schaltfläche **Konto zurücksetzen**, um Zugangsdaten bei Bedarf manuell zu löschen
 - **Verbindungstest** prüft, ob das Upstream-Verzeichnis erreichbar ist und ob EAB erforderlich ist
 
@@ -331,7 +332,7 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 Die Proxy-EAB-Zugangsdaten sind von den Client-EAB getrennt: sie authentifizieren UCM gegenüber der Upstream-CA, nicht Ihre Clients gegenüber UCM.
+> 💡 Die EAB-Zugangsdaten des Upstream-CA-Kontos sind von den Client-EAB getrennt: sie authentifizieren UCM gegenüber der Upstream-CA, nicht Ihre Clients gegenüber UCM. Legen Sie sie an diesem Konto unter **Externe CA-Konten** fest.
 
 > ⚠ Voraussetzung: Die Domain muss in ACME Domains mit DNS-Provider konfiguriert sein. Der Proxy unterstützt nur dns-01.
 

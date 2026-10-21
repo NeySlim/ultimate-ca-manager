@@ -16,7 +16,7 @@ export default {
         title: 'Sicherheit',
         items: [
           { label: 'Passwort', text: 'Ändern Sie Ihr aktuelles Passwort' },
-          { label: '2FA (TOTP)', text: 'Aktivieren Sie zeitbasierte Einmalpasswörter über eine Authenticator-App' },
+          { label: '2FA (TOTP)', text: 'Aktivieren Sie zeitbasierte Einmalpasswörter über eine Authenticator-App. Erneutes Aktivieren, solange sie aktiv ist, wird abgelehnt: deaktivieren Sie sie zuerst' },
           { label: 'Sicherheitsschlüssel', text: 'Registrieren Sie WebAuthn/FIDO2-Schlüssel (YubiKey, Fingerabdruck, usw.)' },
           { label: 'mTLS', text: 'Verwalten Sie Client-Zertifikate für die gegenseitige TLS-Authentifizierung' },
         ]
@@ -25,9 +25,10 @@ export default {
         title: 'API-Schlüssel',
         items: [
           { label: 'Schlüssel erstellen', text: 'Generieren Sie einen neuen API-Schlüssel mit optionalem Ablaufdatum' },
-          { label: 'Berechtigungen', text: 'API-Schlüssel erben die Berechtigungen Ihrer Rolle' },
+          { label: 'Berechtigungen', text: 'Ein Schlüssel trägt den bei der Erstellung gewählten Geltungsbereich, nie mehr als Ihre eigenen Berechtigungen. Ein Schlüssel kann nur einen Schlüssel erstellen oder neu erzeugen, dessen Berechtigungen er selbst besitzt' },
           { label: 'Widerrufen', text: 'Einen API-Schlüssel sofort ungültig machen' },
           { label: 'Deaktivierte Benutzer', text: 'API-Schlüssel eines deaktivierten Benutzers werden abgelehnt, selbst wenn der Schlüssel selbst noch gültig ist' },
+          { label: 'Nur interaktive Sitzung', text: 'API-Schlüssel, auch mit Vollzugriff, können weder Ihr Profil, Passwort, 2FA, Sicherheitsschlüssel, mTLS-Zertifikate oder Sitzungen ändern noch über die Benutzerverwaltungsaktionen auf Ihr eigenes Konto zugreifen: melden Sie sich interaktiv an' },
         ]
       },
       {
@@ -77,6 +78,8 @@ Fügen Sie ein zeitbasiertes Einmalpasswort mit einer beliebigen Authenticator-A
 
 > ⚠ Wenn Sie den Zugang zu Ihrem Authenticator und den Wiederherstellungscodes verlieren, muss ein Administrator Ihre 2FA deaktivieren.
 
+Um 2FA auf einen neuen Authenticator zu übertragen, deaktivieren Sie sie zuerst: Erneutes Aktivieren, solange sie aktiv ist, wird abgelehnt.
+
 ### Sicherheitsschlüssel (WebAuthn/FIDO2)
 Registrieren Sie Hardware-Sicherheitsschlüssel oder biometrische Authentifikatoren:
 - YubiKey
@@ -118,7 +121,9 @@ X-API-Key: <ihr-api-schlüssel>
 Oder senden Sie ihn als Bearer-Token: \`Authorization: Bearer <ihr-api-schlüssel>\`.
 
 ### Berechtigungen
-API-Schlüssel erben die Berechtigungen Ihrer Benutzerrolle. Sie können nicht mehr Zugriff haben als Ihr Konto.
+Jeder Schlüssel trägt den bei der Erstellung gewählten Geltungsbereich (**Vollzugriff**, **Nur Lesen**, **Lesen & Schreiben**, **Nur Zertifikate**) und nie mehr Zugriff als Ihr Konto. Ein Schlüssel kann nur einen Schlüssel erstellen oder neu erzeugen, dessen Berechtigungen er selbst besitzt.
+
+API-Schlüssel, auch mit Vollzugriff, können weder Ihr Profil, Passwort, 2FA, Sicherheitsschlüssel, mTLS-Zertifikate oder Sitzungen ändern noch über die Benutzerverwaltungsaktionen auf Ihr eigenes Konto zugreifen: dafür ist eine interaktive Sitzung nötig.
 
 ### Schlüssel widerrufen
 Klicken Sie auf **Löschen**, um einen API-Schlüssel sofort ungültig zu machen. Aktive Sitzungen, die den Schlüssel verwenden, werden beendet.

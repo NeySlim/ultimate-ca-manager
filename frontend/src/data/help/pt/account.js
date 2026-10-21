@@ -16,7 +16,7 @@ export default {
         title: 'Segurança',
         items: [
           { label: 'Senha', text: 'Alterar sua senha atual' },
-          { label: '2FA (TOTP)', text: 'Ativar senhas únicas baseadas em tempo via aplicativo autenticador' },
+          { label: '2FA (TOTP)', text: 'Ativar senhas únicas baseadas em tempo via aplicativo autenticador. Ativá-lo de novo enquanto já está ativo é recusado: desative-o primeiro' },
           { label: 'Chaves de Segurança', text: 'Registrar chaves WebAuthn/FIDO2 (YubiKey, impressão digital, etc.)' },
           { label: 'mTLS', text: 'Gerenciar certificados de cliente para autenticação TLS mútua' },
         ]
@@ -25,9 +25,10 @@ export default {
         title: 'Chaves de API',
         items: [
           { label: 'Criar Chave', text: 'Gerar uma nova chave de API com expiração opcional' },
-          { label: 'Permissões', text: 'As chaves de API herdam as permissões do seu perfil' },
+          { label: 'Permissões', text: 'Uma chave tem o escopo escolhido na criação, nunca mais do que as suas próprias permissões. Uma chave só pode criar ou regenerar uma chave cujas permissões ela própria possui' },
           { label: 'Revogar', text: 'Invalidar imediatamente uma chave de API' },
           { label: 'Usuários desativados', text: 'Chaves de API pertencentes a um usuário desativado são rejeitadas mesmo que a própria chave ainda seja válida' },
+          { label: 'Somente sessão interativa', text: 'As chaves de API, mesmo as de Acesso total, não podem alterar seu perfil, senha, 2FA, chaves de segurança, certificados mTLS ou sessões, nem alcançar sua própria conta pelas ações de administração de usuários: entre de forma interativa' },
         ]
       },
       {
@@ -77,6 +78,8 @@ Adicione uma senha única baseada em tempo usando qualquer aplicativo autenticad
 
 > ⚠ Se você perder acesso ao seu autenticador e códigos de recuperação, um administrador deverá desativar seu 2FA.
 
+Para mover o 2FA para um novo autenticador, desative-o primeiro: ativá-lo de novo enquanto já está ativo é recusado.
+
 ### Chaves de Segurança (WebAuthn/FIDO2)
 Registre chaves de segurança de hardware ou autenticadores biométricos:
 - YubiKey
@@ -118,7 +121,9 @@ X-API-Key: <sua-chave-de-api>
 Ou envie-a como token bearer: \`Authorization: Bearer <sua-chave-de-api>\`.
 
 ### Permissões
-As chaves de API herdam as permissões do perfil do seu usuário. Elas não podem ter mais acesso do que sua conta.
+Cada chave tem o escopo escolhido na criação (**Acesso total**, **Somente leitura**, **Leitura e escrita**, **Apenas certificados**) e nunca mais acesso do que sua conta. Uma chave só pode criar ou regenerar uma chave cujas permissões ela própria possui.
+
+As chaves de API, mesmo as de Acesso total, não podem alterar seu perfil, senha, 2FA, chaves de segurança, certificados mTLS ou sessões, nem alcançar sua própria conta pelas ações de administração de usuários: isso exige uma sessão interativa.
 
 ### Revogando Chaves
 Clique em **Excluir** para invalidar imediatamente uma chave de API. Sessões ativas usando a chave serão encerradas.

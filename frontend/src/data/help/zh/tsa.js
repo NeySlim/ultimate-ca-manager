@@ -18,7 +18,7 @@ export default {
           { label: '策略 OID', text: 'TSA 策略的对象标识符（例如 1.2.3.4.1）,, 包含在每个时间戳响应中' },
           { label: '启用/禁用', text: '在不丢失配置的情况下开关 TSA 端点' },
           { label: '要求专用证书', text: '可选启用：拒绝使用 CA 证书本身签署时间戳,, 需要一个带有关键 timeStamping EKU 的专用终端实体签名证书（RFC 3161）' },
-                  { label: '签名证书 (v2.217)', text: '使用从已签发证书中选择的专用终端实体证书（timeStamping EKU，私钥由 UCM 持有）签署令牌。续期会被自动跟随；过期或被吊销的签名者会使请求以 503 失败，绝不回退到 CA 证书' },
+                  { label: '签名证书 (v2.217)', text: '使用从已签发证书中选择的专用终端实体证书（timeStamping EKU，由 UCM 持有的 RSA 或 ECDSA 私钥；不提供 Ed25519 和 Ed448 证书）签署令牌。续期会被自动跟随；过期或被吊销的签名者会使请求以 503 失败，绝不回退到 CA 证书' },
                   { label: '生成签名证书 (v2.218)', text: '一键签发专用的 RFC 3161 签名证书：CA:FALSE、KeyUsage 仅含 digitalSignature，外加关键且独占的 timeStamping EKU,, 正是严格校验器（openssl ts -verify）所要求的形态。证书由已配置的 TSA CA 签发，并在没有可用签名者时被自动选用。该证书的来源为 "manual"：请将 "manual" 加入自动续期来源，或在到期前自行续期' },
         ]
       },

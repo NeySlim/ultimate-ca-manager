@@ -49,6 +49,7 @@ export default {
           { label: "Cadência", text: "Diária / semanal / mensal" },
           { label: "Retenção", text: "Manter os N backups mais recentes; os mais antigos são removidos" },
           { label: "Cifragem", text: "Os backups são cifrados com a palavra-passe de backup configurada" },
+          { label: "Derivação de chave", text: "Automática (Argon2id quando disponível, PBKDF2 no modo FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Os arquivos gravados com Argon2id não podem ser restaurados numa instância em modo FIPS" },
         ]
       },
       {
@@ -76,7 +77,7 @@ export default {
       {
         title: 'Categorias',
         items: [
-          { label: 'Geral', text: 'Nome da instância, hostname e padrões do sistema' },
+          { label: 'Geral', text: 'Nome de host do syslog (enviado como HOSTNAME nas mensagens syslog encaminhadas), URLs base e padrões do sistema' },
           { label: 'Aparência', text: 'Seleção de tema (claro/escuro/sistema), cor de destaque, modo desktop' },
           { label: 'E-mail (SMTP)', text: 'Servidor SMTP, credenciais, editor de modelo de e-mail e notificações de alerta de expiração' },
           { label: 'Segurança', text: 'Políticas de senha, tempo limite de sessão, limitação de taxa, lista de acesso administrativo' },
@@ -90,6 +91,7 @@ export default {
           { label: 'Implantação', text: 'Os alvos de implantação são conexões SSH/SFTP reutilizáveis; cada implantação de certificado ou de CRL define seus próprios caminhos e seu comando de recarga opcional (somente admin, v2.215)' },
           { label: 'Active Directory', text: 'Conexão própria do UCM com AD/LDAP para consultas relacionadas a certificados (resolução de entidade de segurança Kerberos, assuntos derivados do AD)' },
           { label: 'Autoinscrição do Windows', text: 'Inscrição nativa do Windows MS-XCEP/MS-WSTEP: descoberta de diretiva, emissão de certificados e vinculação Kerberos/SPNEGO' },
+          { label: 'Sobre', text: 'Informações do sistema, Links e recursos e Apoiar o UCM levam ao Ko-fi (os administradores também veem um cartão Ko-fi dispensável uma vez por versão do UCM). Com admin:system, Verificar preparação para FIPS lista o que o modo FIPS recusaria nesta instância, com um remédio para cada item, e não altera nada' },
         ]
       },
       {
@@ -119,9 +121,10 @@ export default {
         content: 'Conexão LDAP própria do UCM com o Active Directory, independente de qualquer provedor LDAP configurado em SSO -- aquele serve para fazer login no UCM, este para consultas de AD relacionadas a certificados.',
         items: [
           { label: 'Finalidade', text: 'Resolve uma entidade de segurança de máquina ou usuário Kerberos para seu objeto AD, para que o UCM possa derivar um assunto/SAN de certificado, da mesma forma que uma CA Windows real faria' },
-          { label: 'Campos', text: 'Servidor, porta, LDAPS com verificação de CA opcional, DN Base, DN de Ligação/senha' },
+          { label: 'Campos', text: 'Controladores de domínio (um por linha, cada um pelo seu próprio nome de host, tentados em ordem com failover), porta, LDAPS com verificação de CA opcional, DN Base, DN de Ligação e senha (ambos obrigatórios enquanto o conector estiver ativado)' },
           { label: 'Testar conexão', text: 'Verificar a conectividade e as credenciais antes de salvar' },
           { label: 'URLs de inscrição GPO', text: 'URLs de diretiva de inscrição de certificados Kerberos e Usuário/Senha para registrar na Diretiva de Grupo' },
+          { label: 'Verificação de integridade', text: 'Cada controlador de domínio é testado com uma conexão real no Intervalo da verificação de integridade; um inacessível é ignorado no momento da inscrição até se recuperar. O veredito aparece na linha das definições e em cada DC' },
         ]
       },
       {
@@ -142,6 +145,7 @@ export default {
           { label: 'Aguardando aprovação', text: 'Um certificado cuja renovação está na fila de aprovação é deixado a essa decisão, desde que ela possa ocorrer antes de o certificado expirar' },
           { label: 'Renovado entretanto', text: 'Um certificado que um operador renovou durante o lote não é renovado uma segunda vez; um excluído durante o lote é ignorado' },
           { label: 'Certificados de curta duração', text: 'A renovação nunca começa antes do último terço da validade de um certificado: um certificado de 27 dias é renovado quando faltam 9, e não desde a emissão' },
+          { label: 'Executar agora', text: 'Executa uma passagem de renovação imediatamente e informa os certificados prestes a expirar que deixou de lado, contados por motivo: ainda não no último terço da validade, chave privada não detida pelo servidor, fonte não selecionada' },
         ]
       },
 
@@ -167,10 +171,10 @@ Configuração de todo o sistema organizada em abas. As alterações entram em v
 
 ## Geral
 
-- **Nome da Instância**: Exibido no título do navegador e nos e-mails
-- **Hostname**: O nome de domínio totalmente qualificado do servidor
-- **Validade Padrão**: Período de validade padrão do certificado em dias
-- **Limite de Aviso de Expiração**: Dias antes da expiração para acionar avisos
+- **Nome de host do syslog**: Enviado como HOSTNAME nas mensagens syslog encaminhadas; vazio, usa o nome de host da máquina
+- **URL Base**: URL HTTPS canônica da interface de administração e da API; outros nomes de host e IPs são redirecionados para ela
+- **URL base do protocolo**: URL base escrita nos endereços CDP e OCSP; use http:// para evitar loops de verificação TLS, ou deixe vazio para usar a URL Base
+- **Porta HTTP protocolo**: Porta HTTP simples que serve CDP e OCSP; 0 a desativa, uma alteração exige reinício
 - **Vhost ACME público**: Hostname concreto nas URLs do diretório ACME (ex.: \`acme.ucm.example.com\`: não \`*.ucm.example.com\`). Um **SAN do certificado TLS** curinga \`*.ucm.example.com\` cobre tanto \`admin.ucm.example.com\` quanto \`acme.ucm.example.com\`. Configure o DNS e o TLS para o vhost ACME **antes** de salvar: os clientes que releem o diretório mudam de URL imediatamente.
 
 ## Aparência
@@ -207,6 +211,7 @@ Quando o SMTP está configurado, ative alertas automáticos de expiração de ce
 - Alternar alertas ativados/desativados
 - Selecionar limites de aviso (90d, 60d, 30d, 14d, 7d, 3d, 1d)
 - Executar **Verificar Agora** para acionar uma verificação imediata
+- **Ignorar certificados emitidos por ACME**: deixa de fora os certificados emitidos pelo servidor ACME do UCM, que seus clientes renovam; desativado por padrão
 
 ## Segurança
 
@@ -268,6 +273,7 @@ Clique em **Criar Backup** para gerar um snapshot do banco de dados. Os backups 
 Configure backups automáticos:
 - Frequência (diária, semanal, mensal)
 - Contagem de retenção (número de backups a manter)
+- **Derivação de chave**: Automática (Argon2id quando disponível, PBKDF2 no modo FIPS), PBKDF2-HMAC-SHA256 ou Argon2id. Os arquivos gravados com Argon2id não podem ser restaurados numa instância em modo FIPS
 
 ### Restauração
 Envie um arquivo de backup para restaurar o UCM a um estado anterior.
@@ -398,6 +404,7 @@ As definições de renovação automática comandam o agendador de renovação.
 - **Aguardando aprovação**: um certificado cuja renovação está na fila de aprovação é deixado a essa decisão, desde que ela possa ocorrer antes de o certificado expirar
 - **Renovado entretanto**: um certificado que um operador renovou durante o lote não é renovado uma segunda vez; um excluído durante o lote é ignorado
 - **Certificados de curta duração**: a renovação nunca começa antes do último terço da validade de um certificado: um certificado de 27 dias é renovado quando faltam 9, e não desde a emissão
+- **Executar agora**: executa uma passagem de renovação imediatamente e informa os certificados prestes a expirar que deixou de lado, contados por motivo: ainda não no último terço da validade, chave privada não detida pelo servidor, fonte não selecionada
 
 ## Backups agendados
 
@@ -413,10 +420,11 @@ Definições › Backup ativa backups automáticos.
 Conexão LDAP própria do UCM com o Active Directory, independente de qualquer provedor LDAP configurado em SSO. Aquele serve para fazer login no UCM; este é usado para consultas de AD relacionadas a certificados e funciona independentemente de o SSO estar configurado ou não.
 
 - **Finalidade**: Resolve uma entidade de segurança de máquina ou usuário Kerberos para seu objeto AD, para que o UCM possa derivar um assunto/SAN de certificado da mesma forma que uma CA Windows real faria
-- **Servidor**: Nome de host/IP e porta de um controlador de domínio
+- **Controladores de domínio**: Um por linha, cada um pelo seu próprio nome de host, tentados em ordem: as consultas passam para o seguinte quando um DC está inativo. Um nome de domínio simples falha na verificação do certificado, pois o certificado de um controlador de domínio nomeia apenas o seu próprio host
 - **LDAPS**: Ativar para usar LDAP sobre SSL/TLS; **Verificar certificado SSL** valida o certificado do DC (opcionalmente em relação a um pacote de CA personalizado quando não é publicamente confiável)
-- **DN Base** e **DN de Ligação / Senha**: Credenciais da conta de serviço usadas para as consultas
+- **DN Base** e **DN de Ligação / Senha**: Credenciais da conta de serviço usadas para as consultas; o DN de Ligação e a senha são ambos obrigatórios enquanto o conector estiver ativado
 - **Testar conexão**: Verificar a conectividade e as credenciais antes de salvar
+- **Intervalo da verificação de integridade**: Cada controlador de domínio é testado com uma conexão real neste intervalo; um inacessível é ignorado no momento da inscrição até se recuperar. O veredito aparece na linha das definições e em cada DC
 
 ### URLs de diretiva de inscrição GPO
 
@@ -461,6 +469,11 @@ Na **emissão autenticada por Kerberos**, o UCM incorpora o SID do AD do solicit
 ### Assuntos derivados do AD
 
 Um modelo de certificado pode optar por **Criar assunto a partir do Active Directory** (Modelos → Inscrição): para a autoinscrição GPO não assistida, o assunto e o SAN são derivados do objeto AD do solicitante via o conector AD em vez de exigir que o cliente forneça um -- corresponde à forma como um modelo ADCS real é configurado para autoinscrição. De forma independente, **Permitir autoinscrição** anuncia o modelo como \`autoEnroll=true\` na Diretiva de Inscrição de Certificados, para que clientes autenticados por GPO/Kerberos o solicitem automaticamente no logon.
+
+## Sobre
+
+- **Informações do sistema**, **Links e recursos** e **Apoiar o UCM** levam ao Ko-fi. Os administradores também veem um cartão Ko-fi dispensável uma vez por versão do UCM
+- **Verificar preparação para FIPS** (admin:system): lista o que o modo FIPS recusaria nesta instância (hashes de senha scrypt, autoridades Ed25519, backups Argon2id, PostgreSQL sem TLS...), com um remédio para cada item. Nada é alterado
 `
   }
 }

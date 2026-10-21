@@ -19,6 +19,7 @@ export default {
           { label: 'Maximale Gültigkeit', text: 'Maximale Zertifikatslaufzeit in Tagen' },
           { label: 'Erlaubte Schlüsseltypen', text: 'Einschränken, welche Schlüsselalgorithmen und -größen verwendet werden können' },
           { label: 'SAN-Einschränkungen', text: 'Anzahl der SANs begrenzen und DNS-Namensmuster durchsetzen' },
+          { label: 'Erlaubte Signatur-Hashes', text: 'SHA-256, SHA-384 oder SHA-512; keine Auswahl erlaubt jeden. Hat niemand den Hash gewählt, gilt der Standard, falls erlaubt, sonst der schwächste erlaubte. Ausstellungsformular und CA-Erstellung bieten nur die Schlüsseltypen und Hashes an, die die Richtlinien erlauben' },
         ]
       },
       {
@@ -70,10 +71,13 @@ Maximale Zertifikatslaufzeit in Tagen. Gängige Werte:
 ### Erlaubte Schlüsseltypen
 Einschränken, welche Schlüsselalgorithmen und -größen verwendet werden können:
 - **RSA-2048**: Minimum für öffentliches Vertrauen
+- **RSA-3072**: Die Standard-Schlüsselgröße für neue CAs
 - **RSA-4096**: Höhere Sicherheit, größere Zertifikate
 - **EC-P256**: Modern, schnell, empfohlen
 - **EC-P384**: Höhere Sicherheit mit elliptischer Kurve
 - **EC-P521**: Maximale Sicherheit (selten erforderlich)
+
+**Erlaubte Signatur-Hashes** schränkt den Signatur-Hash auf dieselbe Weise ein (SHA-256, SHA-384, SHA-512); keine Auswahl erlaubt jeden. Hat niemand den Hash gewählt, gilt der Standard, falls erlaubt, sonst der schwächste erlaubte. Ausstellungsformular und CA-Erstellung bieten nur die Schlüsseltypen und Hashes an, die die Richtlinien erlauben.
 
 ### SAN-Einschränkungen
 - **Max. DNS-Namen**: Anzahl der Subject Alternative Names begrenzen

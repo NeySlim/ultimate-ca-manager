@@ -17,12 +17,13 @@ export default {
           { label: 'Тип', text: 'Web Server, Email, VPN Server або VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon або Власний. Задає значення Key Usage, EKU та SAN за замовчуванням' },
           { label: 'Значення суб\'єкта за замовчуванням', text: 'Попереднє заповнення Організація, OU, Країна, Штат/Область, Населений пункт та Email. У сертифікатах «Електронна пошта (S/MIME)» та «Сервер + Клієнт (Комбінований)» Email також стає SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment тощо' },
-          { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
+          { label: 'Extended Key Usage', text: 'Будь-яке призначення, відоме серверу: Server Auth, Client Auth, Code Signing, Email Protection, Smartcard Logon, Time Stamping, OCSP Signing, IPsec, Microsoft RDP та інші' },
           { label: 'Типи SAN', text: 'Типи імен (DNS, IP, Email, URI, UPN), які може містити запит за цим шаблоном. Якщо «Застосовувати дозволені типи SAN» увімкнено, форма випуску, підписання CSR, протоколи реєстрації, поновлення та схвалення відхиляють будь-який інший тип, а ім\'я, лише виведене з CN, пропускається. У нових шаблонах увімкнено; у попередніх і вбудованих вимкнено. Нічого не позначено: дозволено всі типи' },
           { label: 'Дійсність', text: 'Період дійсності за замовчуванням у днях' },
           { label: 'Дублювати', text: 'Клонувати існуючий шаблон та змінити його' },
           { label: 'Показувати системні', text: 'Приховує вбудовані шаблони, щоб працювати лише з власними. Вибір запам\'ятовується для кожного браузера' },
           { label: 'Імпорт/Експорт', text: 'Обмін шаблонами у форматі JSON між екземплярами UCM, один шаблон або кілька в одному файлі' },
+          { label: 'Key Type', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 або EC-P521 з дайджестом SHA-256, SHA-384 або SHA-512' },
         ]
       },
       {
@@ -69,8 +70,8 @@ export default {
 3. Виберіть **тип** шаблону: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon або Власний. Він задає значення Key Usage, Extended Key Usage та SAN за замовчуванням, які потім можна змінити
 4. Налаштуйте **значення суб'єкта за замовчуванням** (O, OU, C, ST, L, CN, Email). У сертифікатах «Електронна пошта (S/MIME)» та «Сервер + Клієнт (Комбінований)» Email також стає SAN електронної пошти
 5. Виберіть прапорці **Key Usage**
-6. Виберіть значення **Extended Key Usage**
-7. Встановіть **період дійсності за замовчуванням** у днях
+6. Виберіть значення **Extended Key Usage** серед призначень, відомих серверу (Smartcard Logon, Time Stamping, Microsoft RDP та інші)
+7. Задайте **Key Type** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 або EC-P521), дайджест і **період дійсності за замовчуванням** у днях
 8. Натисніть **Створити**
 
 ## Використання шаблонів

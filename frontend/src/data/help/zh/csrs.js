@@ -31,6 +31,7 @@ export default {
       '为在 UCM 中生成的 CSR 导入证书会完成该 CSR：记录保留其私钥，因此证书可连同私钥一起导出',
       '使用 Microsoft CA 模式可在连接到 Windows PKI 时通过 AD CS 签署 CSR',
       '签署时使用"额外 EKU"添加 Microsoft RDP、智能卡登录、IPsec 或任何 OID: CSR 现有的 EKU 将以合并集重建',
+      '当策略或签发 CA 的到期日缩短了请求的有效期时，结果会说明原因：“Issued for N day(s) instead of the M requested”',
     ],
   },
   helpGuides: {

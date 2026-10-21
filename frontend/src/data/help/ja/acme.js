@@ -23,7 +23,7 @@ export default {
           { label: 'EAB', text: '事前登録が必要なCA（ZeroSSL、HARICAなど）のための外部アカウントバインディングサポート' },
           { label: 'キータイプ', text: '証明書キー用のRSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384' },
           { label: 'アカウントキー', text: 'ACMEアカウントキー用のES256 (P-256)、ES384 (P-384)、またはRS256アルゴリズム' },
-          { label: 'DNSプロバイダー', text: 'DNS-01チャレンジプロバイダーの設定（Cloudflare、Route53、Tencent DNSPodなど）' },
+          { label: 'DNSプロバイダー', text: 'DNS-01チャレンジプロバイダーの設定（Cloudflare、Route53、Tencent DNSPod、Pleskなど）。Plesk は XML API を使用します。自己署名のパネル向けに TLS 証明書の検証をオフにでき、DNS 伝播の待機時間を追加できます' },
           { label: 'カスタムコマンド', text: '管理者が設定したローカルコマンドをTXTレコードの作成/削除に実行するDNSプロバイダータイプ, レコード情報はDOMAIN、RECORD_NAME、RECORD_VALUE、TTL、ACTION環境変数で渡されます。バイナリの絶対パスが必須、シェルなし、タイムアウト設定可能' },
           { label: 'ドメイン', text: '自動検証のためにドメインをDNSプロバイダーにマッピングします' },
           { label: 'HTTP-01', text: 'UCMは保留中の注文のチャレンジファイルを、HTTPプロトコルポート（デフォルトは8080）の /.well-known/acme-challenge/ で提供します。ドメインのポート80からそのパスをUCMに転送してください。検証ではまずファイルを確認し、HTTP-01の注文は自動的に更新されます' },
@@ -45,11 +45,11 @@ export default {
       {
         title: 'ACMEプロキシ',
         items: [
-          { label: 'アップストリームCA', text: 'プリセット（Let\'s Encrypt本番/ステージング）を選択するか、任意のRFC 8555 CA用のカスタムURLを入力します' },
+          { label: 'アップストリームCAアカウント', text: '外部CAアカウントのいずれかを選択します。ディレクトリURL（Let\'s Encrypt、ZeroSSL、任意のRFC 8555 CA）とEAB認証情報はそのアカウントで設定します' },
           { label: 'アカウント状態', text: 'UCMがアップストリームCAに登録されているかを表示します。アカウントは最初のプロキシリクエスト時に自動登録されます' },
           { label: '接続テスト', text: 'アップストリームCAへの接続性を確認し、EAB認証情報が必要かチェックします' },
-          { label: 'アカウントリセット', text: '保存されたアップストリームアカウント認証情報をクリアして再登録を強制します（CA変更後に使用）' },
-          { label: 'EAB認証情報', text: 'EABが必要なCAのためのExternal Account Binding認証情報（例：ZeroSSL、Google Trust）' },
+          { label: 'アカウントリセット', text: '選択したCAアカウントのアップストリーム登録をクリアして、新たに登録させます' },
+          { label: 'EAB認証情報', text: 'EABが必要なCAのためのExternal Account Binding認証情報（例：ZeroSSL、Google Trust）。外部CAアカウントのCAアカウントに入力します' },
           { label: 'DNSチャレンジ', text: 'UCMは設定されたDNSプロバイダーを使用して、クライアントに代わってDNS-01チャレンジを処理します' },
           { label: '置き換えられた証明書の削除', text: 'オプトインのトグル：プロキシオーダーの確定時に、まったく同じドメインセットに対して以前プロキシオーダーでインポートされた証明書を削除します。失効した証明書は常に保持され、プロキシ以外の証明書には一切触れません。デフォルトは無効' },
                   { label: 'クライアント事前チェック (v2.217)', text: 'プロキシは各クライアントのアカウント鍵で計算した dns-01 TXT 値も公開します。lego/Traefik/Caddy の伝播事前チェックは無効化せずに通過し、再試行された new-order はアカウントの保留中の注文を返します' },
@@ -128,7 +128,7 @@ export default {
       'ローカルドメインを使用して、異なる内部ドメインに異なるCAを割り当てることができます',
       '秘密鍵を持つ任意のCAを発行CAとして選択できます',
       'ワイルドカードドメイン（*.example.com）にはDNS-01検証が必要です',
-      'アップストリームCAを切り替えると、古いアカウント認証情報は自動的にクリアされます',
+      '各CAアカウントは独自のアップストリーム登録を保持します：プロキシを別のアカウントに切り替えると、そのアカウントの登録が使用されます',
       'certbot でプロキシURLを使用: certbot certonly --server https://your-server:port/acme/proxy/directory',
     ],
     warnings: [
@@ -166,7 +166,7 @@ Let's Encryptだけでなく、任意のRFC 8555準拠CAを使用できます：
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-**設定** → **カスタムACMEサーバー**でCAのディレクトリURLを設定してください。
+CAのディレクトリURLを、**外部CAアカウント**のそのアカウントの **ACMEディレクトリURL** として設定してください。
 
 ### 外部 CA アカウント
 UCM が登録する外部 CA のすべてのアカウントを管理します:
@@ -181,7 +181,7 @@ UCM が登録する外部 CA のすべてのアカウントを管理します:
 一部のCAは、ACMEアカウントをCAの既存アカウントにリンクするためにEAB資格情報を要求します：
 
 1. CAのポータルで登録して**EABキーID**と**HMACキー**を取得
-2. **設定** → **カスタムACMEサーバー**に両方の値を入力
+2. 両方の値（**EABキーID**、**EAB HMACキー**）を **外部CAアカウント** のCAアカウントに入力
 3. HMACキーはbase64urlエンコードされています（CAから提供）
 
 > 💡 EABはZeroSSL、HARICA、Google Trust Services、およびほとんどのエンタープライズCAで必要です。
@@ -223,6 +223,7 @@ ECDSAキーは最新のデプロイに推奨されます: より小さく、よ�
 - DigitalOcean
 - OVH
 - Tencent Cloud DNSPod
+- Plesk（XML API）: 自己署名のパネル向けに **TLS証明書を検証** をオフにでき、DNS 伝播の待機時間を追加できます
 - その他
 
 各プロバイダーにはDNSサービス固有のAPI資格情報が必要です。
@@ -295,7 +296,7 @@ https://your-ucm-server:8443/acme/proxy/directory
 
 ### アカウント管理
 - **アカウント状態バッジ**はUCMがアップストリームCAに登録されているかを表示
-- アップストリームCAの変更は古い認証情報を自動的にクリアし、再登録を強制
+- 各CAアカウントは独自のアップストリーム登録を保持します：アップストリームアカウントを切り替えると、そのアカウントの登録が使用され、必要なら最初のプロキシリクエスト時に登録されます
 - 必要に応じて**アカウントリセット**ボタンで手動で認証情報をクリア
 - **接続テスト**はアップストリームディレクトリが到達可能か、EABが必要かを確認
 
@@ -331,7 +332,7 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 プロキシEAB認証情報はクライアントEABとは別です: UCMをアップストリームCAに対して認証します。
+> 💡 アップストリームCAアカウントのEAB認証情報はクライアントEABとは別です: UCMをアップストリームCAに対して認証します。**外部CAアカウント** のそのアカウントで設定してください。
 
 > ⚠ 前提: ドメインをACME DomainsでDNSプロバイダ付きで設定。プロキシはdns-01のみ。
 

@@ -49,6 +49,7 @@ export default {
           { label: "Frequenz", text: "Täglich / wöchentlich / monatlich" },
           { label: "Aufbewahrung", text: "Die N neuesten Backups behalten; ältere werden bereinigt" },
           { label: "Verschlüsselung", text: "Backups werden mit dem konfigurierten Backup-Passwort verschlüsselt" },
+          { label: "Schlüsselableitung", text: "Automatisch (Argon2id, sofern verfügbar, PBKDF2 im FIPS-Modus), PBKDF2-HMAC-SHA256 oder Argon2id. Mit Argon2id geschriebene Archive lassen sich auf einer Instanz im FIPS-Modus nicht wiederherstellen" },
         ]
       },
       {
@@ -76,7 +77,7 @@ export default {
       {
         title: 'Kategorien',
         items: [
-          { label: 'Allgemein', text: 'Instanzname, Hostname und systemweite Standardwerte' },
+          { label: 'Allgemein', text: 'Syslog-Hostname (als HOSTNAME in weitergeleiteten Syslog-Nachrichten gesendet), Basis-URLs und systemweite Standardwerte' },
           { label: 'Darstellung', text: 'Theme-Auswahl (hell/dunkel/System), Akzentfarbe, Desktop-Modus' },
           { label: 'E-Mail (SMTP)', text: 'SMTP-Server, Anmeldedaten, E-Mail-Template-Editor und Ablauf-Warnbenachrichtigungen' },
           { label: 'Sicherheit', text: 'Passwortrichtlinien, Sitzungszeitlimit, Ratenbegrenzung, Admin-Zugriffs-Allowlist' },
@@ -90,6 +91,7 @@ export default {
           { label: 'Bereitstellung', text: 'Deploy-Ziele stellen wiederverwendbare SSH-/SFTP-Verbindungen bereit; Zertifikats- und CRL-Bereitstellungen legen eigene Pfade und optionale Reload-Befehle fest (nur Admins, v2.215)' },
           { label: 'Active Directory', text: 'UCMs eigene AD/LDAP-Verbindung für zertifikatsbezogene Abfragen (Kerberos-Prinzipalauflösung, AD-abgeleitete Betreffe)' },
           { label: 'Windows-Autoregistrierung', text: 'MS-XCEP/MS-WSTEP native Windows-Registrierung: Richtlinienermittlung, Zertifikatsausstellung und Kerberos/SPNEGO-Bindung' },
+          { label: 'Info', text: 'Systeminformationen, Links & Ressourcen und UCM unterstützen verweisen auf Ko-fi (Administratoren sehen zudem einmal pro UCM-Version eine ausblendbare Ko-fi-Karte). Mit admin:system listet FIPS-Bereitschaft prüfen auf, was der FIPS-Modus auf dieser Instanz ablehnen würde, mit je einer Abhilfe, und ändert nichts' },
         ]
       },
       {
@@ -119,9 +121,10 @@ export default {
         content: 'UCMs eigene LDAP-Verbindung zu Active Directory, unabhängig von einem unter SSO konfigurierten LDAP-Anbieter -- dieser dient der Anmeldung bei UCM, dieser hier den zertifikatsbezogenen AD-Abfragen.',
         items: [
           { label: 'Zweck', text: 'Löst ein Kerberos-Maschinen- oder Benutzerprinzipal zu seinem AD-Objekt auf, damit UCM einen Zertifikatsbetreff/SAN ableiten kann, genau wie eine echte Windows-CA' },
-          { label: 'Felder', text: 'Server, Port, LDAPS mit optionaler CA-Verifizierung, Basis-DN, Bind-DN/Passwort' },
+          { label: 'Felder', text: 'Domänencontroller (einer pro Zeile, jeweils mit eigenem Hostnamen, der Reihe nach mit Failover versucht), Port, LDAPS mit optionaler CA-Verifizierung, Basis-DN, Bind-DN und Passwort (beide erforderlich, solange der Connector aktiviert ist)' },
           { label: 'Verbindung testen', text: 'Verbindung und Anmeldedaten vor dem Speichern überprüfen' },
           { label: 'GPO-Registrierungs-URLs', text: 'Kerberos- und Benutzername/Passwort-URLs für die Zertifikatregistrierungsrichtlinie zur Registrierung in der Gruppenrichtlinie' },
+          { label: 'Zustandsprüfung', text: 'Jeder Domänencontroller wird im Intervall der Zustandsprüfung mit einem echten Bind geprüft; ein nicht erreichbarer wird bei der Registrierung übersprungen, bis er sich erholt. Das Ergebnis erscheint in der Einstellungszeile und bei jedem DC' },
         ]
       },
       {
@@ -142,6 +145,7 @@ export default {
           { label: 'Genehmigung ausstehend', text: 'Ein Zertifikat, dessen Erneuerung zur Genehmigung eingereiht ist, bleibt dieser Entscheidung überlassen, solange sie vor dem Ablauf des Zertifikats fallen kann' },
           { label: 'Inzwischen erneuert', text: 'Ein Zertifikat, das ein Operator während des Durchlaufs erneuert hat, wird nicht ein zweites Mal erneuert; ein während des Durchlaufs gelöschtes wird übersprungen' },
           { label: 'Kurzlebige Zertifikate', text: 'Die Erneuerung beginnt nie vor dem letzten Drittel der Laufzeit eines Zertifikats: ein 27-Tage-Zertifikat wird 9 Tage vor Ablauf erneuert, nicht schon ab der Ausstellung' },
+          { label: 'Jetzt ausführen', text: 'Startet sofort einen Erneuerungsdurchlauf und meldet die ablaufenden Zertifikate, die er unberührt ließ, nach Grund gezählt: noch nicht im letzten Drittel der Laufzeit, privater Schlüssel nicht beim Server, Quelle nicht ausgewählt' },
         ]
       },
 
@@ -167,10 +171,10 @@ Systemweite Konfiguration in Tabs organisiert. Änderungen werden sofort wirksam
 
 ## Allgemein
 
-- **Instanzname**: Wird im Browser-Titel und in E-Mails angezeigt
-- **Hostname**: Der vollqualifizierte Domänenname des Servers
-- **Standardgültigkeit**: Standard-Zertifikatsgültigkeitsdauer in Tagen
-- **Ablaufwarnung-Schwellenwert**: Tage vor Ablauf zur Auslösung von Warnungen
+- **Syslog-Hostname**: Wird als HOSTNAME in weitergeleiteten Syslog-Nachrichten gesendet; leer gilt der Hostname der Maschine
+- **Basis-URL**: Kanonische HTTPS-URL der Admin-Oberfläche und der API; andere Hostnamen und IPs leiten dorthin um
+- **Protokoll-Basis-URL**: In CDP- und OCSP-Adressen geschriebene Basis-URL; http:// vermeidet TLS-Verifizierungsschleifen, leer gilt die Basis-URL
+- **HTTP-Protokoll-Port**: Einfacher HTTP-Port, der CDP und OCSP ausliefert; 0 deaktiviert ihn, eine Änderung erfordert einen Neustart
 - **Öffentlicher ACME-Vhost**: Konkreter Hostname in den ACME-Directory-URLs (z. B. \`acme.ucm.example.com\`: nicht \`*.ucm.example.com\`). Ein Wildcard-**TLS-Zertifikat-SAN** \`*.ucm.example.com\` deckt sowohl \`admin.ucm.example.com\` als auch \`acme.ucm.example.com\` ab. Konfigurieren Sie DNS und TLS für den ACME-Vhost **vor** dem Speichern: Clients, die das Directory neu lesen, wechseln die URLs sofort.
 
 ## Darstellung
@@ -207,6 +211,7 @@ Wenn SMTP konfiguriert ist, aktivieren Sie automatische Zertifikatsablaufwarnung
 - Warnungen ein-/ausschalten
 - Warnschwellenwerte auswählen (90T, 60T, 30T, 14T, 7T, 3T, 1T)
 - **Jetzt prüfen** ausführen, um einen sofortigen Scan auszulösen
+- **Über ACME ausgestellte Zertifikate auslassen**: lässt die vom ACME-Server von UCM ausgestellten Zertifikate aus, die ihre Clients erneuern; standardmäßig aus
 
 ## Sicherheit
 
@@ -268,6 +273,7 @@ Klicken Sie auf **Sicherung erstellen**, um einen Datenbank-Snapshot zu erstelle
 Automatische Sicherungen konfigurieren:
 - Häufigkeit (täglich, wöchentlich, monatlich)
 - Aufbewahrungsanzahl (Anzahl der zu behaltenden Sicherungen)
+- **Schlüsselableitung**: Automatisch (Argon2id, sofern verfügbar, PBKDF2 im FIPS-Modus), PBKDF2-HMAC-SHA256 oder Argon2id. Mit Argon2id geschriebene Archive lassen sich auf einer Instanz im FIPS-Modus nicht wiederherstellen
 
 ### Wiederherstellen
 Laden Sie eine Sicherungsdatei hoch, um UCM auf einen früheren Zustand zurückzusetzen.
@@ -398,6 +404,7 @@ Die Einstellungen zur Auto-Erneuerung steuern den Erneuerungsplaner.
 - **Genehmigung ausstehend**: ein Zertifikat, dessen Erneuerung zur Genehmigung eingereiht ist, bleibt dieser Entscheidung überlassen, solange sie vor dem Ablauf des Zertifikats fallen kann
 - **Inzwischen erneuert**: ein Zertifikat, das ein Operator während des Durchlaufs erneuert hat, wird nicht ein zweites Mal erneuert; ein während des Durchlaufs gelöschtes wird übersprungen
 - **Kurzlebige Zertifikate**: die Erneuerung beginnt nie vor dem letzten Drittel der Laufzeit eines Zertifikats: ein 27-Tage-Zertifikat wird 9 Tage vor Ablauf erneuert, nicht schon ab der Ausstellung
+- **Jetzt ausführen**: startet sofort einen Erneuerungsdurchlauf und meldet die ablaufenden Zertifikate, die er unberührt ließ, nach Grund gezählt: noch nicht im letzten Drittel der Laufzeit, privater Schlüssel nicht beim Server, Quelle nicht ausgewählt
 
 ## Geplante Backups
 
@@ -413,10 +420,11 @@ Einstellungen › Sicherung ermöglicht automatische Backups.
 UCMs eigene LDAP-Verbindung zu Active Directory, unabhängig von einem unter SSO konfigurierten LDAP-Anbieter. Jener dient der Anmeldung bei UCM; dieser hier wird für zertifikatsbezogene AD-Abfragen verwendet und funktioniert unabhängig davon, ob SSO überhaupt konfiguriert ist.
 
 - **Zweck**: Löst ein Kerberos-Maschinen- oder Benutzerprinzipal zu seinem AD-Objekt auf, damit UCM einen Zertifikatsbetreff/SAN ableiten kann, genau wie eine echte Windows-CA
-- **Server**: Hostname/IP und Port eines Domänencontrollers
+- **Domänencontroller**: Einer pro Zeile, jeweils mit eigenem Hostnamen, der Reihe nach versucht: Abfragen wechseln zum nächsten, wenn ein DC ausfällt. Ein reiner Domänenname scheitert an der Zertifikatsprüfung, da ein Domänencontroller-Zertifikat nur den eigenen Host nennt
 - **LDAPS**: Umschalten, um LDAP über SSL/TLS zu verwenden; **SSL-Zertifikat prüfen** validiert das Zertifikat des DC (optional gegen ein benutzerdefiniertes CA-Bundle, wenn es nicht öffentlich vertrauenswürdig ist)
-- **Basis-DN** und **Bind-DN / Passwort**: Für Abfragen verwendete Dienstkonto-Anmeldedaten
+- **Basis-DN** und **Bind-DN / Passwort**: Für Abfragen verwendete Dienstkonto-Anmeldedaten; Bind-DN und Passwort sind beide erforderlich, solange der Connector aktiviert ist
 - **Verbindung testen**: Konnektivität und Anmeldedaten vor dem Speichern überprüfen
+- **Intervall der Zustandsprüfung**: Jeder Domänencontroller wird in diesem Intervall mit einem echten Bind geprüft; ein nicht erreichbarer wird bei der Registrierung übersprungen, bis er sich erholt. Das Ergebnis erscheint in der Einstellungszeile und bei jedem DC
 
 ### GPO-Registrierungsrichtlinien-URLs
 
@@ -461,6 +469,11 @@ Bei **Kerberos-authentifizierter Ausstellung** bettet UCM die AD-SID des Anfrage
 ### AD-abgeleitete Betreffe
 
 Eine Zertifikatvorlage kann sich für **Betreff aus Active Directory erstellen** (Vorlagen → Registrierung) entscheiden: Für unbeaufsichtigte GPO-Autoregistrierung werden Betreff und SAN aus dem AD-Objekt des Anfragers über den AD-Connector abgeleitet, statt vom Client eine Angabe zu verlangen -- entspricht der Konfiguration einer echten ADCS-Vorlage für die Autoregistrierung. Unabhängig davon kündigt **Autoregistrierung zulassen** die Vorlage als \`autoEnroll=true\` in der Certificate Enrollment Policy an, sodass GPO-/Kerberos-authentifizierte Clients sie beim Anmelden automatisch anfordern.
+
+## Info
+
+- **Systeminformationen**, **Links & Ressourcen** und **UCM unterstützen** verweisen auf Ko-fi. Administratoren sehen zudem einmal pro UCM-Version eine ausblendbare Ko-fi-Karte
+- **FIPS-Bereitschaft prüfen** (admin:system): listet auf, was der FIPS-Modus auf dieser Instanz ablehnen würde (scrypt-Passwort-Hashes, Ed25519-Autoritäten, Argon2id-Backups, PostgreSQL ohne TLS ...), mit je einer Abhilfe. Es wird nichts geändert
 `
   }
 }

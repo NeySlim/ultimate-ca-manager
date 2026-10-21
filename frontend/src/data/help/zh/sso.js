@@ -14,6 +14,7 @@ export default {
           { label: 'ACS URL', text: '断言消费者服务回调 URL' },
           { label: '属性映射', text: '将 IDP 属性映射到 UCM 用户字段' },
           { label: '由 IdP 发起的登录', text: '接受从 IdP 门户发起的登录，与其他响应一样进行校验。2.243 之前创建的提供商默认开启，新提供商默认关闭：仅当用户从 IdP 门户开始登录时才开启。' },
+          { label: 'NameID 格式', text: '未指定（IdP 默认）、持久 (persistent)、电子邮件地址或临时 (transient)：随每个登录请求发送，并发布在 SP 元数据中。持久格式提供稳定的标识符；临时 NameID 绝不用于识别账户。' },
         ]
       },
       {
@@ -79,7 +80,7 @@ https://your-ucm-host:8443/api/v2/sso/saml/metadata
 - **ACS URL**: 断言消费者服务端点（HTTP-POST）
 - **SLO URL**: 单点登出服务端点
 - **签名证书**: UCM 的 HTTPS 证书用于签名验证
-- **NameID 格式**: 请求的名称标识符格式
+- **NameID 格式**: 提供商的 **NameID 格式**设置（未指定、持久、电子邮件地址或临时），同时随每个登录请求发送。持久格式提供稳定的标识符；临时 NameID 绝不用于识别账户
 
 将此 URL 复制到 IDP 的"添加服务提供商"或"SAML 应用"配置中。
 

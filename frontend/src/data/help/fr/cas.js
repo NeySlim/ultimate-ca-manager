@@ -23,6 +23,8 @@ export default {
           { label: 'Révoquer', text: 'Révoquer une CA intermédiaire auprès de sa CA parente : publiée dans la CRL et l\'OCSP du parent, et la CA ne peut plus signer (définitif)' },
           { label: 'Réparation de chaîne', text: 'Corriger automatiquement les relations parent-enfant rompues' },
           { label: 'Importer la clé privée', text: 'Rattacher la clé privée d\'une CA qui ne détient que son certificat (signé à partir d\'une demande externe), pour qu\'elle puisse signer' },
+          { label: 'Clé et validité', text: 'RSA-3072 par défaut, locale ou HSM. Validité de 1, 2, 3, 5, 10, 15 ou 20 ans, ou Personnalisée (jours) jusqu\'à 50 ans. Une CA RSA-2048 qui dépasserait 2030 est signalée : l\'ANSSI accepte RSA-2048 jusqu\'à fin 2030, l\'ETSI TS 119 312 jusqu\'à fin 2026' },
+          { label: 'Contraintes de noms', text: 'Contraintes avancées (RFC 5280) : les sous-arbres permis et exclus (DNS, plage IP, e-mail) limitent les noms que la CA peut certifier. Pour une CA signée en externe, ils sont fixés par la CA signataire' },
         ]
       },
       {
@@ -80,6 +82,7 @@ export default {
       'Supprimer une CA ne révoquera PAS les certificats qu\'elle a émis : révoquez-les d\'abord',
       'Les clés privées sont stockées chiffrées ; perdre la base de données signifie perdre les clés',
       'Les mots de passe du mode hors ligne ne sont PAS récupérables : stockez-les dans votre coffre-fort avant de confirmer',
+      'Un certificat croisé d\'une racine auto-signée (même sujet et même clé, autre émetteur) est refusé (409), à l\'importation et lors du téléversement après Renouveler via CSR : il remplacerait le certificat propre de la racine',
     ],
   },
   helpGuides: {
@@ -116,9 +119,9 @@ Regroupe les CA par leur champ Organisation (O). Utile pour les configurations m
 ### Créer une CA racine
 1. Cliquez sur **Créer** → **CA racine**
 2. Remplissez les champs du sujet (CN, O, OU, C, ST, L)
-3. Sélectionnez l'algorithme de clé (RSA 2048/4096, ECDSA P-256/P-384)
+3. Sélectionnez l'algorithme de clé (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521) : RSA-3072 par défaut
 4. Choisissez l'algorithme de signature (Auto, SHA-256/384/512. Auto aligne P-384 sur SHA-384)
-5. Définissez la période de validité (typiquement 10-20 ans pour les CA racines)
+5. Définissez la période de validité : 1, 2, 3, 5, 10, 15 ou 20 ans, ou **Personnalisée (jours)** jusqu'à 50 ans (typiquement 10-20 ans pour les CA racines)
 6. Optionnel : ouvrez **Profil certificat (RFC 5280)** pour ajuster Key Usage / EKU
 7. Cliquez sur **Créer**
 
@@ -130,6 +133,8 @@ Regroupe les CA par leur champ Organisation (O). Utile pour les configurations m
 5. Cliquez sur **Créer**
 
 > ⚠ La validité de la CA intermédiaire ne peut pas dépasser celle de sa CA parente.
+
+Le formulaire signale une CA RSA-2048 qui dépasserait 2030 : l'ANSSI accepte RSA-2048 jusqu'à fin 2030, l'ETSI TS 119 312 jusqu'à fin 2026. Choisissez RSA-3072 ou plus. Sous **Contraintes avancées (RFC 5280)**, les sous-arbres permis et exclus (DNS, plage IP, e-mail) limitent les noms que la CA peut certifier.
 
 ### Créer une CA signée en externe (mode CSR, v2.214)
 Pour le schéma de racine hors ligne : la clé de la CA émettrice vit dans UCM, son certificat est signé ailleurs :
@@ -151,6 +156,8 @@ Importez des certificats de CA existants via :
 - **PKCS#12** : Certificat + clé privée en bundle (nécessite un mot de passe)
 
 Lors de l'importation sans clé privée, la CA peut vérifier les certificats mais ne peut pas en signer de nouveaux.
+
+Un certificat croisé d'une racine auto-signée déjà présente dans UCM (même sujet et même clé, autre émetteur) est refusé (409), à l'importation et lors du téléversement après **Renouveler via CSR** : l'installer remplacerait le certificat propre de la racine.
 
 ## Exporter une CA
 
@@ -222,7 +229,7 @@ UCM peut stocker la clé de signature d'une CA sur un module matériel de sécur
 3. Dans **Stockage de la clé**, basculez de *Local* à **HSM**
 4. Choisissez le fournisseur HSM
 5. Choisissez un mode de clé :
-   - **Générer une nouvelle clé** : fournissez une étiquette (lettres/chiffres/_/-) et choisissez l'algorithme (RSA-2048/3072/4096 ou EC-P256/P384/P521)
+   - **Générer une nouvelle clé** : fournissez une étiquette (lettres/chiffres/_/-) et choisissez l'algorithme (RSA-2048/3072/4096 ou EC-P256/P384/P521, RSA-3072 par défaut)
    - **Utiliser une clé existante** : choisissez une clé de signature inutilisée déjà présente sur le HSM
 6. Validez. UCM crée le certificat de CA et le lie à la clé HSM.
 

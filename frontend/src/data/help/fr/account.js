@@ -16,7 +16,7 @@ export default {
         title: 'Sécurité',
         items: [
           { label: 'Mot de passe', text: 'Changer votre mot de passe actuel' },
-          { label: '2FA (TOTP)', text: 'Activer les mots de passe à usage unique basés sur le temps via une application d\'authentification' },
+          { label: '2FA (TOTP)', text: 'Activer les mots de passe à usage unique basés sur le temps via une application d\'authentification. La réactiver alors qu\'elle est déjà active est refusé : désactivez-la d\'abord' },
           { label: 'Clés de sécurité', text: 'Enregistrer des clés WebAuthn/FIDO2 (YubiKey, empreinte digitale, etc.)' },
           { label: 'mTLS', text: 'Gérer les certificats client pour l\'authentification TLS mutuel' },
         ]
@@ -25,9 +25,10 @@ export default {
         title: 'Clés API',
         items: [
           { label: 'Créer une clé', text: 'Générer une nouvelle clé API avec expiration optionnelle' },
-          { label: 'Permissions', text: 'Les clés API héritent des permissions de votre rôle' },
+          { label: 'Permissions', text: 'Une clé porte le périmètre choisi à sa création, jamais plus que vos propres permissions. Une clé ne peut créer ou régénérer qu\'une clé dont elle détient elle-même les permissions' },
           { label: 'Révoquer', text: 'Invalider immédiatement une clé API' },
           { label: 'Utilisateurs désactivés', text: 'Les clés API appartenant à un utilisateur désactivé sont rejetées même si la clé elle-même est encore valide' },
+          { label: 'Session interactive uniquement', text: 'Les clés API, même à accès complet, ne peuvent pas modifier votre profil, mot de passe, 2FA, clés de sécurité, certificats mTLS ou sessions, ni atteindre votre propre compte via les actions d\'administration des utilisateurs : connectez-vous de façon interactive' },
         ]
       },
       {
@@ -77,6 +78,8 @@ Ajoutez un mot de passe à usage unique basé sur le temps à l'aide de n'import
 
 > ⚠ Si vous perdez l'accès à votre application d'authentification et aux codes de récupération, un administrateur devra désactiver votre 2FA.
 
+Pour migrer la 2FA vers une nouvelle application d'authentification, désactivez-la d'abord : la réactiver alors qu'elle est déjà active est refusé.
+
 ### Clés de sécurité (WebAuthn/FIDO2)
 Enregistrez des clés de sécurité matérielles ou des authentificateurs biométriques :
 - YubiKey
@@ -118,7 +121,9 @@ X-API-Key: <votre-cle-api>
 Ou envoyez-la comme jeton bearer : \`Authorization: Bearer <votre-cle-api>\`.
 
 ### Permissions
-Les clés API héritent des permissions du rôle de votre utilisateur. Elles ne peuvent pas avoir plus d'accès que votre compte.
+Chaque clé porte le périmètre choisi à sa création (**Accès complet**, **Lecture seule**, **Lecture et écriture**, **Certificats uniquement**) et jamais plus d'accès que votre compte. Une clé ne peut créer ou régénérer qu'une clé dont elle détient elle-même les permissions.
+
+Les clés API, même à accès complet, ne peuvent pas modifier votre profil, mot de passe, 2FA, clés de sécurité, certificats mTLS ou sessions, ni atteindre votre propre compte via les actions d'administration des utilisateurs : celles-ci exigent une session interactive.
 
 ### Révoquer des clés
 Cliquez sur **Supprimer** pour invalider immédiatement une clé API. Les sessions actives utilisant la clé seront terminées.

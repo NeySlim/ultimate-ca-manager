@@ -31,6 +31,7 @@ export default {
       'Un certificat importé pour une CSR générée dans UCM complète cette CSR : l\'enregistrement conserve sa clé privée, le certificat s\'exporte donc avec elle',
       'Utilisez le mode Microsoft CA pour signer les CSR via AD CS lorsque vous êtes connecté à une PKI Windows',
       'À la signature, utilisez « EKU supplémentaires » pour ajouter Microsoft RDP, smartcard logon, IPsec ou tout OID : l\'EKU existante du CSR est reconstruite avec le jeu fusionné',
+      'Quand une politique ou l\'expiration de la CA émettrice raccourcit la validité demandée, le résultat l\'indique : "Issued for N day(s) instead of the M requested", avec la raison',
     ],
   },
   helpGuides: {

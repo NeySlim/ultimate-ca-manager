@@ -19,6 +19,7 @@ export default {
           { label: 'Validità massima', text: 'Durata massima del certificato in giorni' },
           { label: 'Tipi di chiave consentiti', text: 'Limita gli algoritmi e le dimensioni delle chiavi utilizzabili' },
           { label: 'Restrizioni SAN', text: 'Limita il numero di SAN e imponi pattern di nomi DNS' },
+          { label: 'Hash di firma consentiti', text: 'SHA-256, SHA-384 o SHA-512; se nessuno è selezionato, tutti sono consentiti. Quando nessuno ha scelto l\'hash, si applica quello predefinito se consentito, altrimenti il più debole tra quelli consentiti. Il modulo di emissione e Crea CA propongono solo i tipi di chiave e gli hash che le policy consentono' },
         ]
       },
       {
@@ -70,10 +71,13 @@ Durata massima del certificato in giorni. Valori comuni:
 ### Tipi di chiave consentiti
 Limita gli algoritmi e le dimensioni delle chiavi utilizzabili:
 - **RSA-2048**: Minimo per la fiducia pubblica
+- **RSA-3072**: La dimensione di chiave predefinita per le nuove CA
 - **RSA-4096**: Sicurezza superiore, certificati più grandi
 - **EC-P256**: Moderno, veloce, raccomandato
 - **EC-P384**: Curva ellittica a sicurezza superiore
 - **EC-P521**: Sicurezza massima (raramente necessario)
+
+**Hash di firma consentiti** limita l'hash di firma allo stesso modo (SHA-256, SHA-384, SHA-512); se nessuno è selezionato, tutti sono consentiti. Quando nessuno ha scelto l'hash, si applica quello predefinito se consentito, altrimenti il più debole tra quelli consentiti. Il modulo di emissione e Crea CA propongono solo i tipi di chiave e gli hash che le policy consentono.
 
 ### Restrizioni SAN
 - **Massimo nomi DNS**: Limita il numero di Subject Alternative Names

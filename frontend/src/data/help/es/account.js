@@ -16,7 +16,7 @@ export default {
         title: 'Seguridad',
         items: [
           { label: 'Contraseña', text: 'Cambia tu contraseña actual' },
-          { label: '2FA (TOTP)', text: 'Activa contraseñas de un solo uso basadas en tiempo mediante una app de autenticación' },
+          { label: '2FA (TOTP)', text: 'Activa contraseñas de un solo uso basadas en tiempo mediante una app de autenticación. Volver a activarla mientras está activa se rechaza: desactívala primero' },
           { label: 'Claves de seguridad', text: 'Registra claves WebAuthn/FIDO2 (YubiKey, huella dactilar, etc.)' },
           { label: 'mTLS', text: 'Gestiona certificados de cliente para autenticación TLS mutua' },
         ]
@@ -25,9 +25,10 @@ export default {
         title: 'Claves API',
         items: [
           { label: 'Crear clave', text: 'Genera una nueva clave API con expiración opcional' },
-          { label: 'Permisos', text: 'Las claves API heredan los permisos de tu rol' },
+          { label: 'Permisos', text: 'Una clave lleva el alcance elegido al crearla, nunca más que tus propios permisos. Una clave solo puede crear o regenerar una clave cuyos permisos ella misma posee' },
           { label: 'Revocar', text: 'Invalida inmediatamente una clave API' },
           { label: 'Usuarios desactivados', text: 'Las claves API de un usuario desactivado se rechazan aunque la clave en sí siga siendo válida' },
+          { label: 'Solo sesión interactiva', text: 'Las claves API, incluso las de acceso completo, no pueden cambiar tu perfil, contraseña, 2FA, claves de seguridad, certificados mTLS ni sesiones, ni alcanzar tu propia cuenta mediante las acciones de administración de usuarios: inicia sesión de forma interactiva' },
         ]
       },
       {
@@ -77,6 +78,8 @@ Añade una contraseña de un solo uso basada en tiempo usando cualquier app de a
 
 > ⚠ Si pierdes el acceso a tu autenticador y a los códigos de recuperación, un administrador deberá desactivar tu 2FA.
 
+Para pasar la 2FA a un nuevo autenticador, desactívala primero: volver a activarla mientras está activa se rechaza.
+
 ### Claves de seguridad (WebAuthn/FIDO2)
 Registra claves de seguridad de hardware o autenticadores biométricos:
 - YubiKey
@@ -118,7 +121,9 @@ X-API-Key: <tu-clave-api>
 O envíala como token bearer: \`Authorization: Bearer <tu-clave-api>\`.
 
 ### Permisos
-Las claves API heredan los permisos del rol de tu usuario. No pueden tener más acceso que tu cuenta.
+Cada clave lleva el alcance elegido al crearla (**Acceso completo**, **Solo lectura**, **Lectura y escritura**, **Solo certificados**) y nunca más acceso que tu cuenta. Una clave solo puede crear o regenerar una clave cuyos permisos ella misma posee.
+
+Las claves API, incluso las de acceso completo, no pueden cambiar tu perfil, contraseña, 2FA, claves de seguridad, certificados mTLS ni sesiones, ni alcanzar tu propia cuenta mediante las acciones de administración de usuarios: esto requiere una sesión interactiva.
 
 ### Revocar claves
 Haz clic en **Eliminar** para invalidar inmediatamente una clave API. Las sesiones activas que usen la clave serán terminadas.

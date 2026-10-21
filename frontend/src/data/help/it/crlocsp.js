@@ -24,7 +24,7 @@ export default {
           { label: 'Cache', text: 'Cache delle risposte con pulizia automatica giornaliera delle voci scadute' },
           { label: 'Query totali', text: 'Numero di richieste OCSP elaborate' },
           { label: 'Risponditore delegato', text: 'Firma le risposte con un certificato OCSPSigning dedicato invece della chiave della CA, assegnane uno per CA dal pannello di dettaglio' },
-          { label: 'Rinnovo automatico del risponditore', text: 'Un task giornaliero riemette il certificato del risponditore delegato prima della scadenza (stessa coppia di chiavi, rinnovato alla pari) e lo ricollega, abilitato per impostazione predefinita' },
+          { label: 'Rinnovo automatico del risponditore', text: 'Un task giornaliero riemette il certificato del risponditore delegato prima della scadenza (stessa coppia di chiavi, rinnovato alla pari) e lo ricollega, abilitato per impostazione predefinita. L\'interruttore e la sua finestra (giorni prima della scadenza, 30 per impostazione predefinita) si trovano in Impostazioni › Sicurezza' },
         ]
       },
     ],

@@ -23,6 +23,8 @@ export default {
           { label: 'Widerrufen', text: 'Eine Intermediate-CA bei ihrer übergeordneten CA widerrufen: Veröffentlichung in CRL und OCSP der übergeordneten CA, und die CA kann nicht mehr signieren (dauerhaft)' },
           { label: 'Kettenreparatur', text: 'Unterbrochene Eltern-Kind-Beziehungen automatisch reparieren' },
           { label: 'Privaten Schlüssel importieren', text: 'Den privaten Schlüssel einer CA anhängen, die nur ihr Zertifikat besitzt (aus einer externen Anfrage signiert), damit sie signieren kann' },
+          { label: 'Schlüssel und Gültigkeit', text: 'Standardmäßig RSA-3072, lokal oder HSM. Gültigkeit von 1, 2, 3, 5, 10, 15 oder 20 Jahren oder Benutzerdefiniert (Tage) bis zu 50 Jahren. Eine RSA-2048-CA, die 2030 überdauern würde, wird markiert: Die ANSSI akzeptiert RSA-2048 bis Ende 2030, ETSI TS 119 312 bis Ende 2026' },
+          { label: 'Name Constraints', text: 'Erweiterte Einschränkungen (RFC 5280): erlaubte und ausgeschlossene Teilbäume (DNS, IP-Bereich, E-Mail) begrenzen die Namen, die die CA zertifizieren darf. Bei einer extern signierten CA legt die signierende CA sie fest' },
         ]
       },
       {
@@ -80,6 +82,7 @@ export default {
       'Das Löschen einer CA widerruft NICHT die von ihr ausgestellten Zertifikate: widerrufen Sie diese zuerst',
       'Private Schlüssel werden verschlüsselt gespeichert; der Verlust der Datenbank bedeutet den Verlust der Schlüssel',
       'Offline-Modus-Passwörter sind NICHT wiederherstellbar: bewahren Sie sie vor der Bestätigung in Ihrem Passwortmanager / Vault auf',
+      'Ein Cross-Zertifikat einer selbstsignierten Root (gleiches Subject und gleicher Schlüssel, anderer Aussteller) wird abgelehnt (409), beim Import und beim Hochladen nach „Erneuern via CSR": Es würde das eigene Zertifikat der Root ersetzen',
     ],
   },
   helpGuides: {
@@ -116,8 +119,8 @@ Gruppiert CAs nach ihrem Organisation-Feld (O). Nützlich für Multi-Mandanten-S
 ### Root-CA erstellen
 1. Klicken Sie auf **Erstellen** → **Root-CA**
 2. Füllen Sie die Betreffsfelder aus (CN, O, OU, C, ST, L)
-3. Wählen Sie den Schlüsselalgorithmus (RSA 2048/4096, ECDSA P-256/P-384)
-4. Legen Sie die Gültigkeitsdauer fest (typischerweise 10-20 Jahre für Root-CAs)
+3. Wählen Sie den Schlüsselalgorithmus (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521): standardmäßig RSA-3072
+4. Legen Sie die Gültigkeitsdauer fest: 1, 2, 3, 5, 10, 15 oder 20 Jahre oder **Benutzerdefiniert (Tage)** bis zu 50 Jahren (typischerweise 10-20 Jahre für Root-CAs)
 5. Wählen Sie optional ein Zertifikatstemplate
 6. Klicken Sie auf **Erstellen**
 
@@ -129,6 +132,8 @@ Gruppiert CAs nach ihrem Organisation-Feld (O). Nützlich für Multi-Mandanten-S
 5. Klicken Sie auf **Erstellen**
 
 > ⚠ Die Gültigkeit der Intermediate-CA kann die Gültigkeit der übergeordneten CA nicht überschreiten.
+
+Das Formular markiert eine RSA-2048-CA, die 2030 überdauern würde: Die ANSSI akzeptiert RSA-2048 bis Ende 2030, ETSI TS 119 312 bis Ende 2026. Wählen Sie RSA-3072 oder größer. Unter **Erweiterte Einschränkungen (RFC 5280)** begrenzen erlaubte und ausgeschlossene Teilbäume (DNS, IP-Bereich, E-Mail) die Namen, die die CA zertifizieren darf.
 
 ### Eine extern signierte CA erstellen (CSR-Modus, v2.214)
 Für das Offline-Root-Muster: der Schlüssel der ausstellenden CA liegt in UCM, ihr Zertifikat wird extern signiert:
@@ -150,6 +155,8 @@ Importieren Sie vorhandene CA-Zertifikate über:
 - **PKCS#12**: Zertifikat + privater Schlüssel (erfordert Passwort)
 
 Beim Import ohne privaten Schlüssel kann die CA Zertifikate verifizieren, aber keine neuen signieren.
+
+Ein Cross-Zertifikat einer bereits in UCM vorhandenen selbstsignierten Root (gleiches Subject und gleicher Schlüssel, anderer Aussteller) wird abgelehnt (409), beim Import und beim Hochladen nach **Erneuern via CSR**: Die Installation würde das eigene Zertifikat der Root ersetzen.
 
 ## Eine CA exportieren
 
@@ -221,7 +228,7 @@ UCM kann den Signaturschlüssel einer CA auf einem externen Hardware-Sicherheits
 3. Wechseln Sie unter **Schlüsselspeicher** von *Lokal* zu **HSM**
 4. Wählen Sie den HSM-Anbieter
 5. Wählen Sie einen Schlüsselmodus:
-   - **Neuen Schlüssel generieren**: Bezeichnung angeben (Buchstaben/Ziffern/_/-) und Algorithmus wählen (RSA-2048/3072/4096 oder EC-P256/P384/P521)
+   - **Neuen Schlüssel generieren**: Bezeichnung angeben (Buchstaben/Ziffern/_/-) und Algorithmus wählen (RSA-2048/3072/4096 oder EC-P256/P384/P521, standardmäßig RSA-3072)
    - **Vorhandenen Schlüssel verwenden**: einen ungenutzten Signaturschlüssel auf dem HSM auswählen
 6. Absenden. UCM erstellt das CA-Zertifikat und bindet es an den HSM-Schlüssel.
 

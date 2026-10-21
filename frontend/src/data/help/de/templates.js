@@ -17,12 +17,13 @@ export default {
           { label: 'Typ', text: 'Web Server, Email, VPN Server oder Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon oder Custom. Legt die Standardwerte für Key Usage, EKU und SAN fest' },
           { label: 'Betreffsstandards', text: 'Organisation, OU, Land, Bundesland, Stadt und E-Mail vorausfüllen. Bei „E-Mail"- und „Server + Client (Kombiniert)"-Zertifikaten wird die E-Mail zusätzlich zum SAN' },
           { label: 'Key Usage', text: 'Digital Signature, Key Encipherment, usw.' },
-          { label: 'Extended Key Usage', text: 'Server Auth, Client Auth, Code Signing, Email Protection' },
+          { label: 'Extended Key Usage', text: 'Jeder dem Server bekannte Zweck: Server Auth, Client Auth, Code Signing, Email Protection, Smartcard Logon, Time Stamping, OCSP Signing, IPsec, Microsoft RDP und weitere' },
           { label: 'SAN-Typen', text: 'Die Namenstypen (DNS, IP, E-Mail, URI, UPN), die eine Anfrage mit dieser Vorlage enthalten darf. Ist „Erlaubte SAN-Typen durchsetzen“ aktiv, lehnen Ausstellungsformular, CSR-Signierung, Enrollment-Protokolle, Erneuerungen und Genehmigungen jeden anderen Typ ab, und ein nur aus dem CN abgeleiteter Name wird weggelassen. Neue Vorlagen haben es aktiv, ältere und die integrierten nicht. Nichts ausgewählt: alle Typen sind erlaubt' },
           { label: 'Gültigkeit', text: 'Standard-Gültigkeitsdauer in Tagen' },
           { label: 'Duplizieren', text: 'Ein vorhandenes Template klonen und modifizieren' },
           { label: 'System anzeigen', text: 'Die mitgelieferten Templates ausblenden, um nur mit Ihren eigenen zu arbeiten. Wird pro Browser gespeichert' },
           { label: 'Import/Export', text: 'Templates als JSON-Dateien zwischen UCM-Instanzen teilen, ein Template oder mehrere in einer Datei' },
+          { label: 'Schlüsseltyp', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 oder EC-P521, mit einem Digest SHA-256, SHA-384 oder SHA-512' },
         ]
       },
       {
@@ -69,8 +70,8 @@ Zertifizierungsstellen werden nicht aus Templates erstellt: legen Sie sie auf de
 3. Wählen Sie den Template-**Typ**: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon oder Custom. Er legt die Standardwerte für Key Usage, Extended Key Usage und SAN fest, die Sie anschließend ändern können
 4. Konfigurieren Sie **Betreffsstandards** (O, OU, C, ST, L, CN, E-Mail). Bei „E-Mail"- und „Server + Client (Kombiniert)"-Zertifikaten wird die E-Mail zusätzlich zu einem E-Mail-SAN
 5. Wählen Sie **Key Usage**-Flags
-6. Wählen Sie **Extended Key Usage**-Werte
-7. Legen Sie die **Standard-Gültigkeitsdauer** in Tagen fest
+6. Wählen Sie **Extended Key Usage**-Werte aus den dem Server bekannten Zwecken (Smartcard Logon, Time Stamping, Microsoft RDP und weitere)
+7. Legen Sie den **Schlüsseltyp** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 oder EC-P521), den Digest und die **Standard-Gültigkeitsdauer** in Tagen fest
 8. Klicken Sie auf **Erstellen**
 
 ## Templates verwenden

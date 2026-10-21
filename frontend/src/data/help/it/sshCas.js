@@ -15,8 +15,8 @@ export default {
         title: 'Algoritmi di chiave',
         items: [
           { label: 'Ed25519', text: 'Moderno, veloce, chiavi piccole (256 bit). Consigliato per le nuove installazioni.' },
-          { label: 'ECDSA P-256 / P-384', text: 'Chiavi a curva ellittica, ampiamente supportate. Buon equilibrio tra sicurezza e compatibilità.' },
-          { label: 'RSA 2048 / 4096', text: 'Algoritmo tradizionale. Usare 4096 bit per CA a lunga durata. Massima compatibilità con i sistemi più datati.' },
+          { label: 'ECDSA P-256 / P-384 / P-521', text: 'Chiavi a curva ellittica, ampiamente supportate. Buon equilibrio tra sicurezza e compatibilità.' },
+          { label: 'RSA 4096', text: 'Algoritmo tradizionale, sempre a 4096 bit. Massima compatibilità con i sistemi più datati.' },
         ]
       },
       {
@@ -91,8 +91,8 @@ Una Host CA firma certificati che autenticano i **server presso i client**. Quan
 3. Seleziona il tipo di CA: **User** o **Host**
 4. Scegli l'algoritmo di chiave:
    - **Ed25519**: Consigliato. Veloce, chiavi piccole, sicurezza moderna.
-   - **ECDSA P-256/P-384**: Buona compatibilità e sicurezza.
-   - **RSA 2048/4096**: Massima compatibilità, chiavi più grandi.
+   - **ECDSA P-256/P-384/P-521**: Buona compatibilità e sicurezza.
+   - **RSA 4096**: Massima compatibilità, chiavi più grandi.
 5. Imposta opzionalmente la validità massima e le estensioni predefinite
 6. Fai clic su **Crea**
 

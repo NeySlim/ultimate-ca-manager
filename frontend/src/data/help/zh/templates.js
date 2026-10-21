@@ -17,12 +17,13 @@ export default {
           { label: '类型', text: 'Web Server、Email、VPN Server 或 Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon 或自定义。决定密钥用途、扩展密钥用途和 SAN 的默认值' },
           { label: '主题默认值', text: '预填组织、OU、国家、省/州、城市和 Email。在电子邮件及服务器 + 客户端（组合）证书上，Email 也会成为 SAN' },
           { label: '密钥用途', text: '数字签名、密钥加密等' },
-          { label: '扩展密钥用途', text: '服务器认证、客户端认证、代码签名、邮件保护' },
+          { label: '扩展密钥用途', text: '服务器已知的任何用途：服务器认证、客户端认证、代码签名、邮件保护、智能卡登录、时间戳、OCSP 签名、IPsec、Microsoft RDP 等' },
           { label: 'SAN 类型', text: '使用此模板的请求可包含的名称类型（DNS、IP、Email、URI、UPN）。启用「强制执行允许的 SAN 类型」后，签发表单、CSR 签名、各注册协议、续期和审批会拒绝其他类型，仅由 CN 推导出的名称会被省略。新模板默认启用；之前的模板和内置模板默认关闭。未勾选任何项：允许所有类型' },
           { label: '有效期', text: '以天为单位的默认有效期' },
           { label: '复制', text: '克隆现有模板并进行修改' },
           { label: '显示系统模板', text: '隐藏内置模板，只处理您自己的模板。每个浏览器单独记住此选择' },
           { label: '导入/导出', text: '在 UCM 实例之间以 JSON 文件共享模板，单个模板或多个模板合并在一个文件中' },
+          { label: '密钥类型', text: 'RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384 或 EC-P521，搭配 SHA-256、SHA-384 或 SHA-512 摘要' },
         ]
       },
       {
@@ -69,8 +70,8 @@ export default {
 3. 选择模板**类型**：Web Server、Email、VPN Server、VPN Client、Code Signing、Client Auth、OCSP Signing、Smartcard Logon 或自定义。它决定密钥用途、扩展密钥用途和 SAN 的默认值，之后您可以再修改
 4. 配置**主题默认值**（O、OU、C、ST、L、CN、Email）。在电子邮件及服务器 + 客户端（组合）证书上，Email 也会成为 SAN
 5. 选择**密钥用途**（数字签名、密钥加密等）
-6. 选择**扩展密钥用途**（服务器认证、客户端认证等）
-7. 设置**有效期**（天数）
+6. 从服务器已知的用途中选择**扩展密钥用途**（智能卡登录、时间戳、Microsoft RDP 等）
+7. 设置**密钥类型**（RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384 或 EC-P521）、摘要和**默认有效期**（天数）
 8. 点击**创建**
 
 ## 使用模板

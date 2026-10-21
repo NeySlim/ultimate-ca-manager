@@ -22,6 +22,7 @@ export default {
           { label: 'Adicionar PEM', text: 'Colar texto de certificado codificado em PEM diretamente' },
           { label: 'Sincronizar do Sistema', text: 'Importar CAs confiáveis do SO para o UCM' },
           { label: 'Exportar', text: 'Baixar certificados confiáveis individualmente' },
+          { label: 'Eliminar seleção', text: 'Selecione vários certificados e remova-os em conjunto, por exemplo as CAs do sistema filtradas como expiradas; só são removidas as linhas que os filtros atuais mostram' },
         ]
       },
     ],
@@ -70,6 +71,7 @@ Importe todas as CAs confiáveis do armazenamento de confiança do sistema opera
 - **Pesquisar**: Encontrar certificados pelo nome do sujeito
 - **Exportar**: Baixar certificados individuais em formato PEM
 - **Excluir**: Remover um certificado do armazenamento de confiança
+- **Eliminar seleção**: Selecione vários certificados e remova-os em conjunto, por exemplo as CAs do sistema filtradas como expiradas; só são removidas as linhas que os filtros atuais mostram
 
 ## Casos de Uso
 

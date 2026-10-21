@@ -24,7 +24,7 @@ export default {
           { label: 'Caché', text: 'Caché de respuestas con limpieza diaria automática de las entradas expiradas' },
           { label: 'Total de consultas', text: 'Número de solicitudes OCSP procesadas' },
           { label: 'Respondedor delegado', text: 'Firma las respuestas con un certificado OCSPSigning dedicado en lugar de la clave de la CA, asigne uno por CA desde el panel de detalles' },
-          { label: 'Auto-renovación del respondedor', text: 'Una tarea diaria reemite el certificado del respondedor delegado antes de que expire (mismo par de claves, renovado a la par) y lo vuelve a vincular, activado por defecto' },
+          { label: 'Auto-renovación del respondedor', text: 'Una tarea diaria reemite el certificado del respondedor delegado antes de que expire (mismo par de claves, renovado a la par) y lo vuelve a vincular, activado por defecto. El interruptor y su ventana (días antes de la expiración, 30 por defecto) están en Ajustes › Seguridad' },
         ]
       },
     ],

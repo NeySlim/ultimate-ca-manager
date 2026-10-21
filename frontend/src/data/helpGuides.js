@@ -109,8 +109,8 @@ Groups CAs by their Organization (O) field. Useful for multi-tenant setups where
 ### Create Root CA
 1. Click **Create** → **Root CA**
 2. Fill in the Subject fields (CN, O, OU, C, ST, L)
-3. Select the key algorithm (RSA 2048/4096, ECDSA P-256/P-384)
-4. Set the validity period (typically 10-20 years for Root CAs)
+3. Select the key algorithm (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521): RSA-3072 by default
+4. Set the validity period: 1, 2, 3, 5, 10, 15 or 20 years, or **Custom (days)** up to 50 years (typically 10-20 years for Root CAs)
 5. Optionally select a certificate template
 6. Click **Create**
 
@@ -122,6 +122,8 @@ Groups CAs by their Organization (O) field. Useful for multi-tenant setups where
 5. Click **Create**
 
 > ⚠ The Intermediate CA validity cannot exceed its parent CA's validity.
+
+The form flags an RSA-2048 CA that would outlive 2030: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026. Choose RSA-3072 or larger. Under **Advanced Constraints (RFC 5280)**, permitted and excluded subtrees (DNS, IP range, email) limit the names the CA may certify.
 
 ### Create an externally-signed CA (CSR mode, v2.214)
 For the offline-root pattern: the issuing CA's key lives in UCM, its certificate is signed elsewhere:
@@ -143,6 +145,8 @@ Import existing CA certificates via:
 - **PKCS#12**: Certificate + private key bundle (requires password)
 
 When importing without a private key, the CA can verify certificates but cannot sign new ones.
+
+A cross-certificate of a self-signed root already in UCM (same subject and key, another issuer) is refused (409), at import and when uploaded after **Renew via CSR**: installing it would replace the root's own certificate.
 
 ## Exporting a CA
 
@@ -214,7 +218,7 @@ UCM can store a CA's signing key on an external Hardware Security Module instead
 3. In **Key Storage**, switch from *Local* to **HSM**
 4. Pick the HSM provider
 5. Choose a key mode:
-   - **Generate new key**: provide a label (letters/digits/_/-) and pick the algorithm (RSA-2048/3072/4096 or EC-P256/P384/P521)
+   - **Generate new key**: provide a label (letters/digits/_/-) and pick the algorithm (RSA-2048/3072/4096 or EC-P256/P384/P521, RSA-3072 by default)
    - **Use existing key**: pick an unused signing key already present on the HSM
 6. Submit. UCM creates the CA certificate and binds it to the HSM key.
 
@@ -316,8 +320,9 @@ Since v2.214, renewal updates the certificate **in place**:
 - The **superseded serial stays published on the CRL** (reason \`superseded\`) and answers \`revoked\` over OCSP until the old certificate's original expiry
 - \`renewed_at\` / \`renewed_times\` track the renewal history
 - A revoked certificate cannot be renewed (409): issue a new one instead
+- **Renew** asks for the validity of the new certificate in days, prefilled with the current duration; issuance policies and the CA's expiry still cap it
 
-**Deleting**: a valid, non-revoked certificate cannot be deleted (409): revoke it first so relying parties see the change. Revocations are persisted independently of the certificate record and survive deletion.
+**Deleting**: a valid, non-revoked certificate cannot be deleted on its own: **Delete** explains why and offers **Revoke, then delete**, so relying parties see the change. Revocations are persisted independently of the certificate record and survive deletion.
 
 ## Revoking a Certificate
 
@@ -347,7 +352,7 @@ Combines revocation with immediate re-issuance. The new certificate inherits the
 
 Export formats:
 - **PEM**: Certificate only
-- **PEM + Chain**: Certificate with full issuer chain
+- **PEM + Chain**: Certificate with its issuing CAs (**Include CA chain**); the root CA is added only when **Include Root CA** is ticked
 - **DER**: Binary format
 - **PKCS#12**: Certificate + key + chain, password-protected
 
@@ -599,8 +604,8 @@ Certificate authorities are not made from templates: create them on the **CAs** 
 3. Select the template **type**: Web Server, Email, VPN Server, VPN Client, Code Signing, Client Auth, OCSP Signing, Smartcard Logon or Custom. It sets the Key Usage, Extended Key Usage and SAN defaults, which you can then change
 4. Configure **Subject defaults** (O, OU, C, ST, L, CN, Email). On Email and combined certificates, the Email also becomes an email SAN
 5. Select **Key Usage** flags
-6. Select **Extended Key Usage** values
-7. Set the **default validity** period in days
+6. Select **Extended Key Usage** values from the purposes the server knows (Smartcard Logon, Time Stamping, Microsoft RDP and others)
+7. Set the **Key Type** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 or EC-P521), the digest and the **default validity** period in days
 8. Click **Create**
 
 ## Using Templates
@@ -898,7 +903,7 @@ Use any RFC 8555-compliant CA, not just Let's Encrypt:
 | **HARICA** | \`https://acme-v02.harica.gr/acme/<token>/directory\` |
 | **Google Trust** | \`https://dv.acme-v02.api.pki.goog/directory\` |
 
-Set your CA's directory URL in **Settings** → **Custom ACME Server**.
+Set your CA's directory URL as the **ACME Directory URL** of its account in **External CA Accounts**.
 
 ### External CA Accounts
 Manage every external CA account UCM registers with:
@@ -913,7 +918,7 @@ Manage every external CA account UCM registers with:
 Some CAs require EAB credentials to link your ACME account with an existing account at the CA:
 
 1. Register at your CA's portal to obtain **EAB Key ID** and **HMAC Key**
-2. Enter both values in **Settings** → **Custom ACME Server**
+2. Enter both values (**EAB Key ID**, **EAB HMAC Key**) on the CA account in **External CA Accounts**
 3. The HMAC key is base64url-encoded (provided by the CA)
 
 > 💡 EAB is required by ZeroSSL, HARICA, Google Trust Services, and most enterprise CAs.
@@ -955,6 +960,7 @@ Configure DNS-01 challenge providers for domain validation. Supported providers 
 - DigitalOcean
 - OVH
 - Tencent Cloud DNSPod
+- Plesk (XML API): **Verify TLS Certificate** can be turned off for a self-signed panel, and a DNS propagation delay added
 - And more
 
 Each provider requires API credentials specific to the DNS service.
@@ -1026,7 +1032,7 @@ Reserved slugs (cannot be used): \`directory\`, \`new-order\`, \`challenge\`, \`
 
 ### Account Management
 - The **account status badge** shows whether UCM is registered with the upstream CA
-- Switching upstream CA automatically clears stale credentials and forces re-registration
+- Each CA account keeps its own upstream registration: switching the upstream account uses that account's, registered on the first proxy request if needed
 - Use the **Reset Account** button to manually clear credentials if needed
 - **Test Connection** checks if the upstream directory is reachable and whether EAB is required
 
@@ -1062,7 +1068,7 @@ certbot certonly \\
   -d subdomain.example.com
 \`\`\`
 
-> 💡 Proxy EAB credentials are separate from client EAB: they authenticate UCM with the upstream CA, not your clients with UCM.
+> 💡 The EAB credentials of the upstream CA account are separate from client EAB: they authenticate UCM with the upstream CA, not your clients with UCM. Set them on that account in **External CA Accounts**.
 
 > ⚠ Prerequisite: the domain (or a parent domain covering subdomains) must be configured in ACME Domains with a DNS provider. The proxy supports dns-01 only.
 
@@ -1526,6 +1532,7 @@ Import all trusted CAs from the operating system's trust store. This populates U
 - **Search**: Find certificates by subject name
 - **Export**: Download individual certificates in PEM format
 - **Delete**: Remove a certificate from the trust store
+- **Delete selected**: Select several certificates and remove them together, for instance the system CAs filtered as expired; only the rows the current filters show are removed
 
 ## Use Cases
 
@@ -1832,10 +1839,10 @@ System-wide configuration organized into tabs. Changes take effect immediately u
 
 ## General
 
-- **Instance Name**: Displayed in the browser title and emails
-- **Hostname**: The server's fully qualified domain name
-- **Default Validity**: Default certificate validity period in days
-- **Expiry Warning Threshold**: Days before expiry to trigger warnings
+- **Syslog hostname**: Sent as HOSTNAME in forwarded syslog messages; the machine hostname when empty
+- **Base URL**: Canonical HTTPS URL of the admin interface and API; other hostnames and IPs redirect to it
+- **Protocol Base URL**: Base URL written into CDP and OCSP addresses; use http:// to avoid TLS verification loops, or leave empty to use the Base URL
+- **HTTP Protocol Port**: Plain HTTP port that serves CDP and OCSP; 0 disables it, a change needs a restart
 - **Public ACME vhost**: Concrete hostname in ACME directory URLs (e.g. \`acme.ucm.example.com\`: not \`*.ucm.example.com\`). A wildcard \`*.ucm.example.com\` **TLS certificate SAN** covers both \`admin.ucm.example.com\` and \`acme.ucm.example.com\`. Configure DNS and TLS for the ACME vhost **before** saving: clients that re-read the directory switch URLs immediately.
 
 ## Appearance
@@ -1872,6 +1879,7 @@ When SMTP is configured, enable automatic certificate expiry alerts:
 - Toggle alerts on/off
 - Select warning thresholds (90d, 60d, 30d, 14d, 7d, 3d, 1d)
 - Run **Check Now** to trigger an immediate scan
+- **Skip certificates issued over ACME**: leaves out the certificates issued by UCM's ACME server, which their clients renew; off by default
 
 ## Security
 
@@ -1933,6 +1941,7 @@ Click **Create Backup** to generate a database snapshot. Backups include all cer
 Configure automatic backups:
 - Frequency (daily, weekly, monthly)
 - Retention count (number of backups to keep)
+- **Key derivation**: Automatic (Argon2id when available, PBKDF2 in FIPS mode), PBKDF2-HMAC-SHA256 or Argon2id. Archives written with Argon2id cannot be restored on an instance in FIPS mode
 
 ### Restore
 Upload a backup file to restore UCM to a previous state.
@@ -2062,6 +2071,7 @@ The auto-renewal settings drive the renewal scheduler.
 - **Sources**: the scheduler renews certificates whose private key the server holds: by default those issued from the form or a signed request ("manual"), and SCEP, ACME and EST enrolments with a server-generated key. Devices holding their own key renew through their protocol
 - **Awaiting approval**: a certificate whose renewal is queued for approval is left to that decision, as long as it can come before the certificate expires
 - **Renewed meanwhile**: a certificate an operator renewed during the batch is not renewed a second time; one deleted during the batch is skipped
+- **Run now**: runs a renewal pass at once and reports the expiring certificates it left alone, counted by reason: not yet in the last third of their lifetime, private key not held by the server, source not selected
 
 ## Scheduled backups
 
@@ -2076,10 +2086,11 @@ Settings › Backup enables automatic backups.
 UCM's own LDAP connection to Active Directory, independent of any LDAP provider configured under SSO. That one is for logging into UCM; this one is used for certificate-related AD lookups and works whether or not SSO is configured at all.
 
 - **Purpose**: Resolves a Kerberos machine or user principal to its AD object, so UCM can derive a certificate subject/SAN the same way a real Windows CA would
-- **Server**: Hostname/IP and port of a domain controller
+- **Domain Controllers**: One per row, each by its own hostname, tried in order: lookups fail over to the next one when a DC is down. A bare domain name fails certificate verification, since a domain controller certificate names only its own host
 - **LDAPS**: Toggle to use LDAP over SSL/TLS; **Verify SSL Certificate** validates the DC's certificate (optionally against a custom CA bundle when it isn't publicly trusted)
-- **Base DN** and **Bind DN / Password**: Service account credentials used for lookups
+- **Base DN** and **Bind DN / Password**: Service account credentials used for lookups; Bind DN and password are both required while the connector is enabled
 - **Test Connection**: Verify connectivity and credentials before saving
+- **Health Check Interval**: Each domain controller is probed with a real bind at this interval; an unreachable one is skipped at enrollment time until it recovers. The verdict shows on the settings row and against each DC
 
 ### GPO Enrollment Policy URLs
 
@@ -2124,6 +2135,11 @@ On **Kerberos-authenticated issuance**, UCM embeds the requester's AD SID in the
 ### AD-Derived Subjects
 
 A certificate template can opt into **Build subject from Active Directory** (Templates → Enrollment): for unattended GPO autoenrollment, the subject and SAN are derived from the requester's AD object via the AD Connector instead of requiring the client to supply one, matching how a real ADCS template is configured for autoenrollment. Independently, **Allow autoenrollment** advertises the template as \`autoEnroll=true\` in Certificate Enrollment Policy so GPO/Kerberos-authenticated clients request it automatically at logon.
+
+## About
+
+- **System Information**, **Links & Resources** and the **Support UCM** link to Ko-fi. Administrators also see a dismissible Ko-fi card once per UCM version
+- **Check FIPS readiness** (admin:system): lists what FIPS mode would refuse on this instance (scrypt password hashes, Ed25519 authorities, Argon2id backups, PostgreSQL without TLS...), with a remedy for each. Nothing is changed
 `
   },
 
@@ -2155,6 +2171,8 @@ Add a time-based one-time password using any authenticator app:
 4. Save the **recovery codes**: they are shown only once
 
 > ⚠ If you lose access to your authenticator and recovery codes, an admin must disable your 2FA.
+
+To move 2FA to a new authenticator, disable it first: enabling it again while it is on is refused.
 
 ### Security Keys (WebAuthn/FIDO2)
 Register hardware security keys or biometric authenticators:
@@ -2197,7 +2215,9 @@ X-API-Key: <your-api-key>
 Or send it as a bearer token: \`Authorization: Bearer <your-api-key>\`.
 
 ### Permissions
-API keys inherit your user role's permissions. They cannot have more access than your account.
+Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. A key can create or regenerate only a key whose permissions it holds itself.
+
+API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: these need an interactive session.
 
 ### Revoking Keys
 Click **Delete** to immediately invalidate an API key. Active sessions using the key will be terminated.
@@ -2532,7 +2552,7 @@ This URL returns a SAML 2.0 compliant XML document containing:
 - **ACS URL**: Assertion Consumer Service endpoint (HTTP-POST)
 - **SLO URL**: Single Logout Service endpoint
 - **Signing Certificate**: UCM's HTTPS certificate for signing verification
-- **NameID Format**: Requested name identifier format
+- **NameID Format**: The provider's **NameID format** setting (Unspecified, Persistent, Email address or Transient), also sent in each login request. Persistent gives a stable identifier; a transient NameID is never used to recognise the account
 
 Copy this URL into your IDP's "Add Service Provider" or "SAML Application" configuration.
 
@@ -2624,6 +2644,7 @@ Encrypt all CA and certificate private keys stored in the database with AES-256,
 - **Status and counters**: The section shows whether encryption is enabled and how many keys are currently **encrypted** vs **unencrypted**
 - **Enable Encryption**: Generates the master key file and encrypts all stored private keys. Back up the key file immediately: without it, encrypted keys are permanently lost
 - **Disable Encryption**: Decrypts all private keys back to plaintext storage (confirmation required)
+- **Encrypt remaining keys**: Shown while encryption is enabled and some keys or secrets are still stored unencrypted; encrypts them, leaving those already encrypted as they are
 
 ### Startup Enforcement
 
@@ -2744,10 +2765,13 @@ Maximum certificate lifetime in days. Common values:
 ### Allowed Key Types
 Restrict which key algorithms and sizes can be used:
 - **RSA-2048**: Minimum for public trust
+- **RSA-3072**: The default key size for new CAs
 - **RSA-4096**: Higher security, larger certificates
 - **EC-P256**: Modern, fast, recommended
 - **EC-P384**: Higher security elliptic curve
 - **EC-P521**: Maximum security (rarely needed)
+
+**Allowed Signature Hashes** restricts the signature hash the same way (SHA-256, SHA-384, SHA-512); none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form and Create CA offer only the key types and hashes the policies allow.
 
 ### SAN Restrictions
 - **Max DNS Names**: Limit the number of Subject Alternative Names
@@ -2949,7 +2973,7 @@ Certificates revoked during the chosen period (default: 30 days), with revocatio
 
 ## Executive PDF Report
 
-Click **Download PDF** in the top-right to generate a professional executive report suitable for management reviews, board presentations, and compliance audits.
+Open the **PDF Reports** tab and click **Download PDF** on the **Executive Summary** template to generate a professional executive report suitable for management reviews, board presentations, and compliance audits.
 
 ### Contents
 The PDF report includes 9 sections:
@@ -2985,17 +3009,18 @@ Each report row has download buttons:
 
 ## Scheduling Reports
 
-### Expiry Report (Daily)
-Automatically sends a certificate expiry report every day to configured recipients. Enable this to catch expiring certificates before they cause outages.
+### What can be scheduled
+Every data report and every PDF template can be scheduled, each with its own frequency, time and recipients. Schedule **Expiring Certificates** daily to catch expiring certificates before they cause outages.
 
-### Compliance Report (Weekly)
-Sends a policy compliance summary every week. Useful for ongoing compliance monitoring without manual effort.
+### Frequency
+**Daily**, **Weekly** (choose the day of week) or **Monthly** (choose the day of month), at a time given in UTC.
 
 ### Configuration
-1. Click **Schedule Reports** in the top-right
-2. Enable the reports you want to schedule
-3. Add recipient email addresses (press Enter or click Add)
-4. Click Save
+1. Open the **Schedule** tab
+2. Tick the reports you want to schedule
+3. Set the frequency, the time and, for data reports, the format (CSV or JSON)
+4. Add recipient email addresses (press Enter or click Add)
+5. Click Save
 
 Each scheduled report is attached to the email in its format: CSV or JSON for data reports, PDF for the PDF templates.
 
@@ -3010,7 +3035,7 @@ Before enabling schedules, use the ✈️ button on any report row to send a tes
 - **read:audit + export:audit**: Download PDF executive report
 - **write:settings**: Configure report schedules
 
-> 💡 Schedule the expiry report first: it's the most operationally valuable and helps prevent certificate-related outages.
+> 💡 Schedule the Expiring Certificates report first: it's the most operationally valuable and helps prevent certificate-related outages.
 `
   },
 
@@ -3269,8 +3294,8 @@ A Host CA signs certificates that authenticate **servers to clients**. When a cl
 3. Select the CA type: **User** or **Host**
 4. Choose the key algorithm:
    - **Ed25519**: Recommended. Fast, small keys, modern security.
-   - **ECDSA P-256/P-384**: Good compatibility and security.
-   - **RSA 2048/4096**: Broadest compatibility, larger keys.
+   - **ECDSA P-256/P-384/P-521**: Good compatibility and security.
+   - **RSA 4096**: Broadest compatibility, larger keys.
 5. Optionally set max validity and default extensions
 6. Click **Create**
 

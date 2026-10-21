@@ -26,8 +26,8 @@ export default {
       {
         title: 'Agendamento',
         items: [
-          { label: 'Relatório de Expiração', text: 'E-mail com certificados expirando em breve, na frequência escolhida' },
-          { label: 'Relatório de Conformidade', text: 'E-mail com status de conformidade com políticas, na frequência escolhida' },
+          { label: 'Aba Agendamento', text: 'Marque qualquer relatório de dados ou modelo PDF e defina sua frequência (diária, semanal ou mensal), hora (UTC), formato e destinatários' },
+          { label: 'Anexo', text: 'O relatório é anexado ao e-mail no seu formato: CSV ou JSON para relatórios de dados, PDF para os modelos PDF' },
         ]
       },
     ],
@@ -66,7 +66,7 @@ Certificados revogados no período escolhido (padrão: 30 dias), com data e moti
 
 ## Relatório PDF Executivo
 
-Clique em **Baixar PDF** no canto superior direito para gerar um relatório executivo profissional adequado para revisões gerenciais, apresentações ao conselho e auditorias de conformidade.
+Abra a aba **Relatórios PDF** e clique em **Baixar PDF** no modelo **Resumo executivo** para gerar um relatório executivo profissional adequado para revisões gerenciais, apresentações ao conselho e auditorias de conformidade.
 
 ### Conteúdo
 O relatório PDF inclui 9 seções:
@@ -102,17 +102,18 @@ Cada linha de relatório tem botões de download:
 
 ## Agendando Relatórios
 
-### Relatório de Expiração (Diário)
-Envia automaticamente um relatório de expiração de certificados todos os dias para destinatários configurados. Ative para detectar certificados expirando antes que causem interrupções.
+### O que pode ser agendado
+Todo relatório de dados e todo modelo PDF pode ser agendado, cada um com sua própria frequência, hora e destinatários. Agende **Certificados expirando** diariamente para detectar certificados expirando antes que causem interrupções.
 
-### Relatório de Conformidade (Semanal)
-Envia um resumo de conformidade com políticas toda semana. Útil para monitoramento contínuo de conformidade sem esforço manual.
+### Frequência
+**Diária**, **Semanal** (escolha o dia da semana) ou **Mensal** (escolha o dia do mês), em um horário dado em UTC.
 
 ### Configuração
-1. Clique em **Agendar Relatórios** no canto superior direito
-2. Ative os relatórios que deseja agendar
-3. Adicione endereços de e-mail dos destinatários (pressione Enter ou clique em Adicionar)
-4. Clique em Salvar
+1. Abra a aba **Agendamento**
+2. Marque os relatórios que deseja agendar
+3. Defina a frequência, a hora e, para relatórios de dados, o formato (CSV ou JSON)
+4. Adicione endereços de e-mail dos destinatários (pressione Enter ou clique em Adicionar)
+5. Clique em Salvar
 
 Cada relatório agendado é anexado ao e-mail no seu formato: CSV ou JSON para relatórios de dados, PDF para os modelos PDF.
 
@@ -127,7 +128,7 @@ Antes de ativar agendamentos, use o botão ✈️ em qualquer linha de relatóri
 - **read:audit + export:audit**: Baixar relatório PDF executivo
 - **write:settings**: Configurar agendamentos de relatórios
 
-> 💡 Agende o relatório de expiração primeiro: é o mais valioso operacionalmente e ajuda a prevenir interrupções relacionadas a certificados.
+> 💡 Agende primeiro o relatório Certificados expirando: é o mais valioso operacionalmente e ajuda a prevenir interrupções relacionadas a certificados.
 `
   }
 }
