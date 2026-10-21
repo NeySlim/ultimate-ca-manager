@@ -10,6 +10,7 @@ from typing import Any, Dict, List
 
 from models import db, CA, Certificate
 from utils.datetime_utils import utc_now
+from compliance_profiles import is_valid as is_valid_profile
 from utils.signing_hash import SIGNATURE_SCHEMES
 from models.acme_models import AcmeAccount
 from config.settings import Config
@@ -548,6 +549,8 @@ class RestoreCoreMixin:
                 setattr(ca, column, ca_data.get(column))
         if ca_data.get('signature_scheme') in SIGNATURE_SCHEMES:
             ca.signature_scheme = ca_data['signature_scheme']
+        if is_valid_profile(ca_data.get('compliance_profile')):
+            ca.compliance_profile = ca_data['compliance_profile']
         for column, setter in (('cdp_urls', 'set_cdp_urls'), ('ocsp_urls', 'set_ocsp_urls'),
                                ('aia_ca_issuers_urls', 'set_aia_urls')):
             if column in ca_data and isinstance(ca_data.get(column), list):

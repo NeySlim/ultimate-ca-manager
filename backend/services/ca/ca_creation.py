@@ -12,6 +12,7 @@ from cryptography.x509.oid import ExtensionOID
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
+import compliance_profiles
 from fips_mode import FipsRestricted
 from models import CA, db
 from models.hsm import HsmKey
@@ -35,7 +36,8 @@ def _key_default_digest(private_key) -> str:
     return 'sha256'
 
 
-def _ca_policies(parent_refid, dn, key_type, hsm_key_id, hsm_key_algorithm):
+def _ca_policies(parent_refid, dn, key_type, hsm_key_id, hsm_key_algorithm,
+                 compliance_profile=None):
     """``(policies, key label)`` binding a new CA (#397): those of the parent
     for an intermediate, the global ones for a root. Read before any key exists."""
     from services.policy_service import PolicyEvaluationService
@@ -48,6 +50,10 @@ def _ca_policies(parent_refid, dn, key_type, hsm_key_id, hsm_key_algorithm):
         label = hsm_key_algorithm or key_type
     policies = PolicyEvaluationService.applicable_policies(
         parent.id if parent else None, None, (dn or {}).get('CN'))
+    if compliance_profile:
+        own = compliance_profiles.profile_policy(compliance_profile)
+        if not any(p.name == own.name for p in policies):
+            policies = policies + [own]
     return policies, _normalize_key_type_label(label) or label
 
 
@@ -195,6 +201,7 @@ class CACreationMixin:
         named_urls: bool = False,
         digest_explicit: bool = True,
         signature_scheme: str = 'pkcs1v15',
+        compliance_profile: Optional[str] = None,
     ) -> CA:
         """
         Create an internal Certificate Authority.
@@ -226,7 +233,8 @@ class CACreationMixin:
 
         # Issuance policies, checked before a key is generated (an HSM key is
         # created on the device), then again on the real key and signer below
-        policies, key_label = _ca_policies(caref, dn, key_type, hsm_key_id, hsm_key_algorithm)
+        policies, key_label = _ca_policies(caref, dn, key_type, hsm_key_id, hsm_key_algorithm,
+                                           compliance_profile)
         if not digest_explicit:
             digest = PolicyEvaluationService.choose_digest(policies, digest)
         rule_context = {'operation': 'ca_creation', 'subject': (dn or {}).get('CN')}
@@ -386,6 +394,7 @@ class CACreationMixin:
             inhibit_any_policy=inhibit_any_policy,
             hsm_key_id=hsm_key.id if hsm_key else None,
             signature_scheme=signature_scheme,
+            compliance_profile=compliance_profile,
         )
 
         # Store JSON-serialized constraints
@@ -539,6 +548,7 @@ class CACreationMixin:
         hsm_key_algorithm: Optional[str] = None,
         named_urls: bool = False,
         signature_scheme: str = 'pkcs1v15',
+        compliance_profile: Optional[str] = None,
     ) -> CA:
         """Create a pending CA: key pair + CA CSR, no certificate yet.
 
@@ -548,7 +558,8 @@ class CACreationMixin:
         policies bind its key type; the certificate's hash is the signer's.
         """
         from services.policy_service import PolicyEvaluationService, key_label_for_public_key
-        policies, key_label = _ca_policies(None, dn, key_type, hsm_key_id, hsm_key_algorithm)
+        policies, key_label = _ca_policies(None, dn, key_type, hsm_key_id, hsm_key_algorithm,
+                                           compliance_profile)
         rule_context = {'operation': 'ca_creation', 'subject': (dn or {}).get('CN')}
         _refuse_on_violations(PolicyEvaluationService.enforce_rules(
             policies, key_type=key_label, context=rule_context)[0])
@@ -582,6 +593,7 @@ class CACreationMixin:
             path_length=path_length,
             hsm_key_id=hsm_key.id if hsm_key else None,
             signature_scheme=signature_scheme,
+            compliance_profile=compliance_profile,
         )
 
         db.session.add(ca)

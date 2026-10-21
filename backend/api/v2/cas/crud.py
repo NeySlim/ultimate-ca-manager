@@ -22,6 +22,7 @@ from utils.db_transaction import safe_commit
 from fips_mode import FipsRestricted
 from services.ca_service import CAService
 from services.audit_service import AuditService
+import compliance_profiles
 from services.ca.signature_scheme import ca_pss_refusal, normalize_signature_scheme, pss_refusal
 from services.deletion_blockers import ca_deletion_blockers, first_blocker
 from services.notification_service import NotificationService
@@ -556,6 +557,15 @@ def create_ca():
             if refusal:
                 return error_response(refusal, 400)
 
+        # Absent means the instance default; an explicit null or '' means no profile
+        if 'complianceProfile' in data or 'compliance_profile' in data:
+            compliance_profile, profile_err = compliance_profiles.normalize(
+                data.get('complianceProfile', data.get('compliance_profile')))
+            if profile_err:
+                return error_response(profile_err, 400)
+        else:
+            compliance_profile = compliance_profiles.default_profile()
+
         raw_ku = data.get('keyUsage')
         if raw_ku is None and data.get('key_usage') is not None:
             raw_ku = data.get('key_usage')
@@ -586,6 +596,7 @@ def create_ca():
                 hsm_key_algorithm=hsm_key_algorithm,
                 named_urls=bool(data.get('namedUrls')),
                 signature_scheme=signature_scheme,
+                compliance_profile=compliance_profile,
             )
             ca_dict = ca.to_dict()
             from services.webhook_service import emit_ca_created
@@ -630,6 +641,7 @@ def create_ca():
             # 'auto' (or nothing) is no choice: it yields to the policies
             digest_explicit=str(raw_digest or 'auto').strip().lower() != 'auto',
             signature_scheme=signature_scheme,
+            compliance_profile=compliance_profile,
         )
 
         # Single lifecycle event — bus fans out to webhook + email + WebSocket.
@@ -767,6 +779,16 @@ def update_ca(ca_id):
             if refusal:
                 return error_response(refusal, 400)
 
+    # Same rule: validated before any mutation; null or '' removes the profile.
+    # It binds future issuance only, nothing already issued is re-checked.
+    new_profile, profile_changed = None, False
+    if 'complianceProfile' in data or 'compliance_profile' in data:
+        new_profile, profile_err = compliance_profiles.normalize(
+            data.get('complianceProfile', data.get('compliance_profile')))
+        if profile_err:
+            return error_response(profile_err, 400)
+        profile_changed = True
+
     # Track which fields actually changed for the audit log
     changed = []
 
@@ -891,6 +913,10 @@ def update_ca(ca_id):
     if new_scheme is not None and new_scheme != old_scheme:
         ca.signature_scheme = new_scheme
         changed.append(f'signature_scheme {old_scheme} -> {new_scheme}')
+    if profile_changed and new_profile != ca.compliance_profile:
+        changed.append(f'compliance_profile {ca.compliance_profile or "none"} -> '
+                       f'{new_profile or "none"}')
+        ca.compliance_profile = new_profile
     for forbidden in ('offline', 'offline_reason', 'offline_mode'):
         if forbidden in data:
             logger.warning(

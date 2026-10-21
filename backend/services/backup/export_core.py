@@ -126,6 +126,7 @@ class ExportCoreMixin:
                 'cps_uri': ca.cps_uri,
                 'cps_oid': ca.cps_oid,
                 'signature_scheme': ca.signature_scheme or 'pkcs1v15',
+                'compliance_profile': ca.compliance_profile,
                 'imported_from': ca.imported_from,
                 'serial_number': ca.serial_number,
                 'ski': ca.ski,

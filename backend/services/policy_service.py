@@ -11,6 +11,8 @@ from models.policy import CertificatePolicy, ApprovalRequest
 from datetime import timedelta
 from utils.datetime_utils import utc_now
 from utils import key_algorithms
+import copy
+import compliance_profiles
 import fips_mode
 
 logger = logging.getLogger(__name__)
@@ -61,12 +63,13 @@ class SystemPolicy:
     priority = 0
     requires_approval = False
 
-    def __init__(self, name, rules):
+    def __init__(self, name, rules, kind=None):
         self.name = name
         self._rules = rules
+        self.kind = kind  # 'profile' for a compliance profile
 
     def get_rules(self):
-        return {k: list(v) if isinstance(v, list) else v for k, v in self._rules.items()}
+        return copy.deepcopy(self._rules)
 
 
 def fips_policy():
@@ -79,13 +82,19 @@ def fips_policy():
     })
 
 
-def with_system_policies(policies):
-    """*policies* headed by the system policies they do not already hold."""
+def with_system_policies(policies, ca_id=None):
+    """*policies* headed by the system policies they do not already hold: FIPS
+    mode, then the compliance profile of CA *ca_id* (one id or several)."""
     policies = list(policies or [])
-    system = fips_policy()
-    if system is None or any(isinstance(p, SystemPolicy) for p in policies):
-        return policies
-    return [system] + policies
+    system = []
+    if not any(isinstance(p, SystemPolicy) and p.kind != 'profile' for p in policies):
+        system.append(fips_policy())
+    if not any(isinstance(p, SystemPolicy) and p.kind == 'profile' for p in policies):
+        ids = ca_id if isinstance(ca_id, (tuple, list)) else (ca_id,)
+        for name in dict.fromkeys(compliance_profiles.profile_of_ca(i) for i in ids):
+            if name:
+                system.append(compliance_profiles.profile_policy(name))
+    return [p for p in system if p is not None] + policies
 
 
 def key_label_for_public_key(public_key):
@@ -168,11 +177,12 @@ class PolicyEvaluationService:
         Ordered by priority (lower number first), the system policies first.
         """
         return with_system_policies(PolicyEvaluationService._in_scope(
-            operation, ca_id, template_id, cn, san_list, approval=False))
+            operation, ca_id, template_id, cn, san_list, approval=False), ca_id)
 
     @staticmethod
     def enforce_rules(policies: list, *, key_type=None, dns_name_count=None,
-                      validity_days=None, digest=None, context=None, notify=True):
+                      validity_days=None, digest=None, context=None, notify=True,
+                      ca_id=None):
         """Apply the Rules of *policies* to a request (#335).
 
         Returns ``(violations, validity_days, capped_by)``: the
@@ -181,7 +191,8 @@ class PolicyEvaluationService:
         exceeded), the validity capped by the lowest ``max_validity_days``
         among the policies, and the name of the policy that set that cap, or
         ``None`` when nothing was shortened. Parameters left ``None`` are not
-        checked. The system policies (FIPS mode) apply whatever the list.
+        checked. The system policies (FIPS mode, and the compliance profile of
+        *ca_id* when given) apply whatever the list.
         Key types compare in the template label form (RSA-2048,
         EC-P256), whatever spelling the request used; *digest* is the hash the
         signature is computed with (None for Ed25519/Ed448 signers).
@@ -197,7 +208,7 @@ class PolicyEvaluationService:
         effective_validity = validity_days
         capped_by = None
         by_policy = {}
-        checked = with_system_policies(policies)
+        checked = with_system_policies(policies, ca_id)
         for policy in checked:
             rules = policy.get_rules() or {}
             before = len(violations)
