@@ -25,7 +25,7 @@ export default {
           { label: '导入私钥', text: '为仅持有证书的 CA（由外部请求签发）附加私钥，使其能够签名' },
           { label: '密钥与有效期', text: '默认 RSA-3072，本地或 HSM。有效期为 1、2、3、5、10、15 或 20 年，或自定义（天），最长 50 年。将在 2030 年之后到期的 RSA-2048 CA 会被标记：ANSSI 接受 RSA-2048 至 2030 年底，ETSI TS 119 312 接受至 2026 年底' },
           { label: '名称约束', text: '高级约束 (RFC 5280)：允许和排除的子树（DNS、IP 范围、电子邮件）限制该 CA 可认证的名称。对于外部签名的 CA，由签发 CA 设置' },
-          { label: 'RSA 签名方案', text: '默认为 PKCS#1 v1.5；使用本地、PKCS#11 或 OpenBao 密钥的 RSA CA 也可使用 RSA-PSS（盐长度与哈希相同）。它适用于该 CA 签署的证书、CRL、OCSP 响应和 SCEP 应答；时间戳仍使用 PKCS#1 v1.5，这是 `openssl ts -verify` 检查的方案。在 CA 详情中点击“使用 RSA-PSS 签名”可在两种方案间切换现有 CA：已签发的证书保留其原有签名' },
+          { label: 'RSA 签名方案', text: '默认为 PKCS#1 v1.5；使用本地、PKCS#11 或 OpenBao 密钥的 RSA CA 也可使用 RSA-PSS（盐长度与哈希相同）。它适用于该 CA 签署的证书、CRL、OCSP 响应和 SCEP 应答；时间戳仍使用 PKCS#1 v1.5，这是 openssl ts -verify 检查的方案。在 CA 详情中点击“使用 RSA-PSS 签名”可在两种方案间切换现有 CA：已签发的证书保留其原有签名' },
         ]
       },
       {

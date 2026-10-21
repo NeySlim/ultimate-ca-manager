@@ -13,7 +13,7 @@ from utils.signing_hash import SIGNATURE_SCHEMES
 
 
 def normalize_signature_scheme(value) -> Tuple[Optional[str], Optional[str]]:
-    """(scheme, error) for a request value; None or '' is PKCS#1 v1.5."""
+    """(scheme, error) for a request value; None or '' is PKCS#1 v1.5 (at creation)."""
     if value is None or value == '':
         return 'pkcs1v15', None
     if not isinstance(value, str) or value.strip().lower() not in SIGNATURE_SCHEMES:

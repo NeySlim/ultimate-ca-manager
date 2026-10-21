@@ -757,7 +757,9 @@ def update_ca(ca_id):
     if 'signatureScheme' in data or 'signature_scheme' in data:
         raw_scheme = data.get('signatureScheme', data.get('signature_scheme'))
         # A blank value names no scheme: it must not switch a PSS CA back to v1.5
-        new_scheme, scheme_err = normalize_signature_scheme(raw_scheme or '?')
+        if raw_scheme in (None, ''):
+            return error_response('signatureScheme must be pkcs1v15 or pss', 400)
+        new_scheme, scheme_err = normalize_signature_scheme(raw_scheme)
         if scheme_err:
             return error_response(scheme_err, 400)
         if new_scheme == 'pss' and ca.signature_scheme != 'pss':
