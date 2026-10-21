@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+
+- Docker: the image ships `COMMERCIAL-LICENSE.md` beside `LICENSE` and `NOTICE`, which refers to it.
+
 ## [2.243] - 2026-10-21
 
 ### Upgrade notes

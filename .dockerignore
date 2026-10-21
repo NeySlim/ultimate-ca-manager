@@ -57,6 +57,7 @@ test*.py
 docs/
 *.md
 !README.md
+!COMMERCIAL-LICENSE.md
 
 # Node dependencies: the image serves frontend/dist, never the sources
 **/node_modules/
