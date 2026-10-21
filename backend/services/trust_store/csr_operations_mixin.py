@@ -11,14 +11,14 @@ from utils.csr_extensions import csr_extensions
 from utils.san_parse import cn_looks_like_hostname
 from utils.eku_validation import add_ocsp_nocheck_if_responder
 from cryptography.x509.oid import NameOID, ExtensionOID
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from utils.datetime_utils import utc_now, cert_not_before
 from utils.ca_signing_window import check_issuer_window, clamp_not_after
 from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.leaf_key_usage import constrain_builder_key_usage
-from .constants import HASH_ALGORITHMS
+from .constants import hash_algorithm
 from .key_operations_mixin import KeyOperationsMixin
 from .constraints_mixin import ConstraintsMixin
 from utils.key_codec import private_key_to_pem
@@ -519,7 +519,7 @@ class CSROperationsMixin:
             )
 
         # Sign CSR
-        hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
+        hash_algo = hash_algorithm(digest)
         csr = builder.sign(private_key, hash_algo, default_backend())
 
         # Serialize
@@ -563,7 +563,7 @@ class CSROperationsMixin:
             )
         )
 
-        hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
+        hash_algo = hash_algorithm(digest)
         csr = builder.sign(private_key, signing_hash_for(private_key, hash_algo), default_backend())
         return csr.public_bytes(serialization.Encoding.PEM)
 

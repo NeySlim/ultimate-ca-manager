@@ -11,7 +11,7 @@ from typing import Optional, Tuple
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, padding
+from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
 from cryptography.x509.oid import ExtendedKeyUsageOID, ExtensionOID
 
 from asn1crypto import tsp, cms, core, x509 as asn1_x509
@@ -263,6 +263,8 @@ class TSAService:
         message_imprint_hash: str,
     ) -> bytes:
         """Build TimeStampResp wrapping a CMS SignedData."""
+        if not isinstance(self.tsa_key.public_key(), (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)):
+            raise ValueError('The TSA signer key must be RSA or ECDSA')
         signature_hash_name = (
             message_imprint_hash if message_imprint_hash in HASH_CLASSES else 'sha256'
         )

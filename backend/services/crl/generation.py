@@ -172,6 +172,9 @@ CRL_DIGESTS = {
 def _crl_signature_hash(ca: CA) -> hashes.HashAlgorithm:
     """Signature digest for this CA's CRLs (#207) — sha256 unless configured."""
     name = (ca.crl_digest or 'sha256').lower().strip()
+    if name not in CRL_DIGESTS:
+        # The API only stores allowed digests: an older row must not stop CRL publication
+        logger.warning(f"CRL: CA {ca.id} has unsupported crl_digest {name!r}, signing with SHA-256")
     return CRL_DIGESTS.get(name, hashes.SHA256)()
 
 

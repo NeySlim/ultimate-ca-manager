@@ -14,7 +14,7 @@ from utils.datetime_utils import utc_now, cert_not_before
 from utils.eku_validation import add_ocsp_nocheck_if_responder
 from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.leaf_key_usage import key_usage_for_key
-from .constants import HASH_ALGORITHMS
+from .constants import hash_algorithm
 from .constraints_mixin import ConstraintsMixin
 from .key_operations_mixin import KeyOperationsMixin
 from utils.key_codec import private_key_to_pem
@@ -50,8 +50,6 @@ class CertificateCreationMixin:
         ocsp_must_staple: bool = False,
     ) -> Tuple[bytes, bytes]:
         """Create a certificate signed by a CA."""
-        from cryptography.hazmat.primitives import hashes
-
         # Same issuer-window rule as the CSR trunk (RFC 5280 §6.1), checked
         # before the key pair is generated
         from utils.ca_signing_window import check_issuer_window, clamp_not_after
@@ -227,7 +225,7 @@ class CertificateCreationMixin:
         ConstraintsMixin._validate_name_constraints(ca_cert, subject, san_names or None)
 
         # Sign
-        hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
+        hash_algo = hash_algorithm(digest)
         certificate = builder.sign(
             private_key=ca_private_key,
             algorithm=signing_hash_for(ca_private_key, hash_algo),

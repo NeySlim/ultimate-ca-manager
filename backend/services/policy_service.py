@@ -277,12 +277,16 @@ class PolicyEvaluationService:
         to the weakest one the policies allow; the hash the key really signs
         with (HSM-bound, None for Ed25519/Ed448) is then checked with *key_type*."""
         from cryptography.hazmat.primitives import hashes
-        from services.trust_store.constants import HASH_ALGORITHMS
+        from services.trust_store.constants import hash_algorithm
         from utils.signing_hash import signing_hash_for
         name = str(digest or 'sha256').strip().lower()
         if not explicit:
             name = PolicyEvaluationService.choose_digest(policies, name)
-        sign_hash = signing_hash_for(ca_key, HASH_ALGORITHMS.get(name, hashes.SHA256()))
+        try:
+            requested = hash_algorithm(name)
+        except ValueError as e:
+            return hashes.SHA256(), [str(e)]
+        sign_hash = signing_hash_for(ca_key, requested)
         violations, _, _ = PolicyEvaluationService.enforce_rules(
             policies, key_type=key_type,
             digest=sign_hash.name if sign_hash is not None else None, context=context)

@@ -11,6 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- Signature hashes: SHA-224 and any unknown hash name are refused where they used to be signed in SHA-256 without a word; UCM signs with SHA-256, SHA-384 or SHA-512.
 - API keys: the password, e-mail, 2FA, passkey, mTLS certificate and session routes of the account now refuse API keys, even `*` ones; scripts that used them must sign in with a session (see Security).
 
 ### Changed
@@ -24,6 +25,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- Signing: an unknown signature hash is refused instead of being replaced by SHA-256, and a TSA whose signer key is EdDSA says so instead of failing on the signature.
 - Imports and SCEP: chains signed in RSA-PSS are rebuilt by the smart import, which checked them as PKCS#1 v1.5, and SCEP accepts RSA-PSS signed requests.
 - HSM: a signature the provider cannot produce (RSA-PSS, a digest other than SHA-256/384/512) is refused instead of yielding a certificate or CRL whose signature does not verify.
 - CAs: a cross-certificate of a self-signed root no longer replaces the root's own certificate, through an import or a certificate installed after a renewal CSR: it is refused until cross-certificates can be attached; the hourly chain repair no longer deletes a self-signed root stored next to its cross-certificate, and merges only records holding the same certificate (#400).

@@ -16,10 +16,20 @@ KEY_TYPES = {
     'secp521r1': ('ec', ec.SECP521R1()),
 }
 
-# Supported hash algorithms
+# Supported signature hashes, the policy digests (services.policy_service.POLICY_DIGESTS)
 HASH_ALGORITHMS = {
-    'sha224': hashes.SHA224(),
     'sha256': hashes.SHA256(),
     'sha384': hashes.SHA384(),
     'sha512': hashes.SHA512(),
 }
+
+
+def hash_algorithm(digest):
+    """The signature hash named *digest*, SHA-256 when none is named; an unknown
+    name is refused rather than signed in SHA-256."""
+    if not digest:
+        return hashes.SHA256()
+    algo = HASH_ALGORITHMS.get(str(digest).strip().lower())
+    if algo is None:
+        raise ValueError(f'Unsupported signature hash: {digest}')
+    return algo

@@ -144,7 +144,8 @@ class TestSystemPolicy:
             key = ec.generate_private_key(ec.SECP256R1())
             sign_hash, v = PolicyEvaluationService.checked_signing_hash(
                 policies, key, 'sha224', key_type='EC-P256')
-            assert sign_hash.name == 'sha224' and len(v) == 1 and SYSTEM_POLICY in v[0]
+            # SHA-224 is no signature hash of UCM's any more: refused before any policy
+            assert len(v) == 1 and 'Unsupported signature hash: sha224' in v[0]
 
 
 class TestPolicyApi:

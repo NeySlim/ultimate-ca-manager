@@ -9,7 +9,7 @@ from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from utils.datetime_utils import utc_now
-from .constants import HASH_ALGORITHMS
+from .constants import hash_algorithm
 
 
 from utils.signing_hash import signing_hash_for
@@ -27,8 +27,6 @@ class CRLOperationsMixin:
         digest: str = 'sha256'
     ) -> bytes:
         """Generate a Certificate Revocation List."""
-        from cryptography.hazmat.primitives import hashes
-
         builder = x509.CertificateRevocationListBuilder()
         builder = builder.issuer_name(ca_cert.subject)
         builder = builder.last_update(utc_now())
@@ -44,7 +42,7 @@ class CRLOperationsMixin:
             builder = builder.add_revoked_certificate(revoked_cert.build(default_backend()))
 
         # Sign CRL
-        hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
+        hash_algo = hash_algorithm(digest)
         crl = builder.sign(
             private_key=ca_private_key,
             algorithm=signing_hash_for(ca_private_key, hash_algo),

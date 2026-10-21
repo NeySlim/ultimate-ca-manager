@@ -6,7 +6,7 @@ from datetime import datetime, timedelta
 from typing import List, Optional, Tuple
 
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.backends import default_backend
 
 from utils.datetime_utils import utc_now, to_naive_utc, cert_not_before
@@ -17,7 +17,7 @@ from utils.ca_profile import (
     default_eku_for_ca,
     default_key_usage_for_ca,
 )
-from .constants import HASH_ALGORITHMS
+from .constants import hash_algorithm
 from .constraints_mixin import ConstraintsMixin
 from utils.key_codec import private_key_to_pem
 
@@ -225,7 +225,7 @@ class CACertificateCreationMixin:
             )
 
         # Sign certificate
-        hash_algo = HASH_ALGORITHMS.get(digest, hashes.SHA256())
+        hash_algo = hash_algorithm(digest)
         certificate = builder.sign(
             private_key=issuer_private_key,
             algorithm=signing_hash_for(issuer_private_key, hash_algo),
