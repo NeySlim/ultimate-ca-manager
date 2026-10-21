@@ -4,7 +4,7 @@ SKI/AKI Backfill & Chain Repair Task
 Phase 1: Populate missing SKI/AKI from stored PEM certificates
 Phase 2: Re-chain orphan CAs via AKI→SKI matching
 Phase 3: Re-chain orphan certificates via AKI→SKI matching
-Phase 4: Deduplicate CAs with identical SKI (merge into best record)
+Phase 4: Deduplicate CAs with identical SKI and certificate (merge into best record)
 
 Runs at startup then hourly. Phases 2-4 handle late imports
 (e.g., CA imported after its child certificates).
@@ -13,9 +13,77 @@ import base64
 import logging
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import hashes
 from cryptography.x509.oid import ExtensionOID
 
 logger = logging.getLogger(__name__)
+
+
+def _certificate_fingerprint(crt):
+    """SHA-256 of the stored certificate, None when the record holds none yet."""
+    if not crt:
+        return None
+    try:
+        cert = x509.load_pem_x509_certificate(base64.b64decode(crt), default_backend())
+        return cert.fingerprint(hashes.SHA256()).hex()
+    except Exception:
+        return f'raw:{crt}'
+
+
+def _merge_ca_group(db, cas_with_ski, stats):
+    """Merge records of one CA into the best of them (parent link, then key)."""
+    keeper = None
+    for c in cas_with_ski:
+        if c.caref and c.prv:
+            keeper = c
+            break
+    if not keeper:
+        for c in cas_with_ski:
+            if c.caref:
+                keeper = c
+                break
+    if not keeper:
+        for c in cas_with_ski:
+            if c.prv:
+                keeper = c
+                break
+    if not keeper:
+        keeper = cas_with_ski[0]
+
+    latest = max(cas_with_ski, key=lambda c: c.id)
+    if latest.descr != keeper.descr:
+        logger.info(f"SKI/AKI backfill: renaming keeper '{keeper.descr}' -> '{latest.descr}'")
+        keeper.descr = latest.descr
+    if not keeper.caref:
+        for c in cas_with_ski:
+            if c.caref:
+                keeper.caref = c.caref
+                break
+    if not keeper.prv:
+        for c in cas_with_ski:
+            if c.prv:
+                keeper.prv = c.prv
+                break
+
+    for c in cas_with_ski:
+        if c.id == keeper.id:
+            continue
+        # Use raw SQL to avoid ORM cascade issues with incomplete schemas
+        db.session.execute(
+            db.text("UPDATE certificates SET caref = :new_ref WHERE caref = :old_ref"),
+            {'new_ref': keeper.refid, 'old_ref': c.refid}
+        )
+        db.session.execute(
+            db.text("UPDATE certificate_authorities SET caref = :new_ref WHERE caref = :old_ref"),
+            {'new_ref': keeper.refid, 'old_ref': c.refid}
+        )
+        db.session.execute(
+            db.text("DELETE FROM certificate_authorities WHERE id = :id"),
+            {'id': c.id}
+        )
+        db.session.expunge(c)
+        logger.info(f"SKI/AKI backfill: dedup CA '{c.descr}' (id={c.id}) -> merged into '{keeper.descr}' (id={keeper.id})")
+        stats['deduplicated'] += 1
 
 
 def backfill_ski_aki():
@@ -28,6 +96,7 @@ def backfill_ski_aki():
         'rechained_cas': 0,
         'rechained_certs': 0,
         'deduplicated': 0,
+        'same_key_distinct_certs': 0,
         'orphan_cas': 0,
         'orphan_certs': 0,
         'total_cas': 0,
@@ -156,62 +225,26 @@ def backfill_ski_aki():
             pass
 
     # --- Phase 4: Deduplicate CAs with same SKI ---
+    # Only records holding the same certificate (or none yet) are one CA: a
+    # cross-certificate shares the SKI of the root it cross-signs.
     from sqlalchemy import func
     dupes = db.session.query(CA.ski).filter(CA.ski.isnot(None)).group_by(CA.ski).having(func.count(CA.id) > 1).all()
     for (dupe_ski,) in dupes:
         cas_with_ski = CA.query.filter(CA.ski == dupe_ski).order_by(CA.id.asc()).all()
-        keeper = None
+        by_cert = {}
         for c in cas_with_ski:
-            if c.caref and c.prv:
-                keeper = c
-                break
-        if not keeper:
-            for c in cas_with_ski:
-                if c.caref:
-                    keeper = c
-                    break
-        if not keeper:
-            for c in cas_with_ski:
-                if c.prv:
-                    keeper = c
-                    break
-        if not keeper:
-            keeper = cas_with_ski[0]
-
-        latest = max(cas_with_ski, key=lambda c: c.id)
-        if latest.descr != keeper.descr:
-            logger.info(f"SKI/AKI backfill: renaming keeper '{keeper.descr}' -> '{latest.descr}'")
-            keeper.descr = latest.descr
-        if not keeper.caref:
-            for c in cas_with_ski:
-                if c.caref:
-                    keeper.caref = c.caref
-                    break
-        if not keeper.prv:
-            for c in cas_with_ski:
-                if c.prv:
-                    keeper.prv = c.prv
-                    break
-
-        for c in cas_with_ski:
-            if c.id == keeper.id:
-                continue
-            # Use raw SQL to avoid ORM cascade issues with incomplete schemas
-            db.session.execute(
-                db.text("UPDATE certificates SET caref = :new_ref WHERE caref = :old_ref"),
-                {'new_ref': keeper.refid, 'old_ref': c.refid}
-            )
-            db.session.execute(
-                db.text("UPDATE certificate_authorities SET caref = :new_ref WHERE caref = :old_ref"),
-                {'new_ref': keeper.refid, 'old_ref': c.refid}
-            )
-            db.session.execute(
-                db.text("DELETE FROM certificate_authorities WHERE id = :id"),
-                {'id': c.id}
-            )
-            db.session.expunge(c)
-            logger.info(f"SKI/AKI backfill: dedup CA '{c.descr}' (id={c.id}) -> merged into '{keeper.descr}' (id={keeper.id})")
-            stats['deduplicated'] += 1
+            fingerprint = _certificate_fingerprint(c.crt)
+            if fingerprint:
+                by_cert.setdefault(fingerprint, []).append(c)
+        if len(by_cert) > 1:
+            stats['same_key_distinct_certs'] += 1
+            logger.warning(f"SKI/AKI backfill: CAs {[c.id for c in cas_with_ski]} share SKI {dupe_ski} "
+                           f"with distinct certificates (cross-certificate?), not merged")
+            groups = [group for group in by_cert.values() if len(group) > 1]
+        else:
+            groups = [cas_with_ski]
+        for group in groups:
+            _merge_ca_group(db, group, stats)
 
     if stats['rechained_cas'] or stats['rechained_certs'] or stats['deduplicated']:
         try:
