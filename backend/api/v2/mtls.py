@@ -188,7 +188,7 @@ def list_mtls_certificates():
 
 
 @bp.route('/certificates', methods=['POST'])
-@require_auth(['write:user_certificates'])
+@require_auth(['write:user_certificates'], session_only=True)
 def create_mtls_certificate():
     """Issue a new mTLS client certificate and auto-enroll it
 
@@ -324,7 +324,7 @@ def create_mtls_certificate():
 
 
 @bp.route('/certificates/<int:cert_id>', methods=['DELETE'])
-@require_auth()
+@require_auth(session_only=True)
 def delete_mtls_certificate(cert_id):
     """Delete an enrolled mTLS certificate"""
     user = g.current_user
@@ -356,7 +356,7 @@ def delete_mtls_certificate(cert_id):
 
 
 @bp.route('/certificates/<int:cert_id>/download', methods=['GET', 'POST'])
-@require_auth()
+@require_auth(session_only=True)
 def download_mtls_certificate(cert_id):
     """Download mTLS certificate as PEM or PKCS12"""
 
@@ -472,7 +472,7 @@ def download_mtls_certificate(cert_id):
 
 
 @bp.route('/enroll', methods=['POST'])
-@require_auth()
+@require_auth(session_only=True)
 def enroll_presented_certificate():
     """Enroll a client certificate already presented via mTLS.
     Used when user has a valid cert signed by the trusted CA but not yet enrolled."""
@@ -563,7 +563,7 @@ def enroll_presented_certificate():
 
 
 @bp.route('/enroll-import', methods=['POST'])
-@require_auth()
+@require_auth(session_only=True)
 def enroll_import_certificate():
     """Import a PEM certificate: create Certificate record + AuthCertificate enrollment."""
 
@@ -763,7 +763,7 @@ def list_available_certificates():
 
 
 @bp.route('/assign', methods=['POST'])
-@require_auth()
+@require_auth(session_only=True)
 def assign_certificate():
     """Assign an existing certificate to the current user's mTLS account.
     Admin can assign to another user via user_id param."""

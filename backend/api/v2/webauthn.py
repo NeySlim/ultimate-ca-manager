@@ -48,7 +48,7 @@ def list_credentials():
 
 
 @bp.route('/credentials/<int:credential_id>', methods=['DELETE'])
-@require_auth()
+@require_auth(session_only=True)
 def delete_credential(credential_id):
     """Delete a WebAuthn credential"""
     user = g.current_user
@@ -72,7 +72,7 @@ def delete_credential(credential_id):
 
 
 @bp.route('/credentials/<int:credential_id>/toggle', methods=['POST'])
-@require_auth()
+@require_auth(session_only=True)
 def toggle_credential(credential_id):
     """Enable/disable a WebAuthn credential"""
     user = g.current_user
@@ -99,7 +99,7 @@ def toggle_credential(credential_id):
 
 
 @bp.route('/register/options', methods=['POST'])
-@require_auth()
+@require_auth(session_only=True)
 def registration_options():
     """Get WebAuthn registration options - uses WebAuthnService for proper crypto"""
     user = g.current_user
@@ -110,7 +110,7 @@ def registration_options():
 
 
 @bp.route('/register/verify', methods=['POST'])
-@require_auth()
+@require_auth(session_only=True)
 def verify_registration():
     """Verify WebAuthn registration and create credential"""
     user = g.current_user

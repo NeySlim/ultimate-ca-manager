@@ -41,7 +41,7 @@ def list_sessions():
 
 
 @bp.route('/api/v2/account/sessions/<int:session_id>', methods=['DELETE'])
-@require_auth()
+@require_auth(session_only=True)
 def revoke_session(session_id):
     """Revoke a specific session"""
     session = UserSession.query.filter_by(id=session_id, user_id=g.current_user.id).first()
@@ -66,7 +66,7 @@ def revoke_session(session_id):
 
 
 @bp.route('/api/v2/account/sessions/revoke-all', methods=['POST'])
-@require_auth()
+@require_auth(session_only=True)
 def revoke_all_sessions():
     """Revoke all sessions except current"""
     current_session_id = request.cookies.get('session_id')

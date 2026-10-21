@@ -90,7 +90,7 @@ def get_profile():
 
 
 @bp.route('/api/v2/account/profile', methods=['PATCH'])
-@require_auth()
+@require_auth(session_only=True)
 def update_profile():
     """
     Update current user profile

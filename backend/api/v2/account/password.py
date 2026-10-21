@@ -15,7 +15,7 @@ logger = logging.getLogger(__name__)
 
 
 @bp.route('/api/v2/account/password', methods=['POST'])
-@require_auth()
+@require_auth(session_only=True)
 def change_password():
     """Change password"""
     data = request.json

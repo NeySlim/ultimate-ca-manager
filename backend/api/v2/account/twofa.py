@@ -30,12 +30,14 @@ logger = logging.getLogger(__name__)
 # ============================================================================
 
 @bp.route('/api/v2/account/2fa/enable', methods=['POST'])
-@require_auth()
+@require_auth(session_only=True)
 def enable_2fa():
     """Enable 2FA (TOTP) - generates QR code and secret"""
     user = db.session.get(User, g.current_user.id)
     if not user:
         return error_response('User not found', 404)
+    if user.totp_confirmed:
+        return error_response('2FA is already enabled; disable it first', 409)
 
     # Generate new TOTP secret
     secret = pyotp.random_base32()
@@ -70,7 +72,7 @@ def enable_2fa():
 
 
 @bp.route('/api/v2/account/2fa/confirm', methods=['POST'])
-@require_auth()
+@require_auth(session_only=True)
 def confirm_2fa():
     """Confirm 2FA setup with verification code"""
     data = request.json
@@ -121,7 +123,7 @@ def confirm_2fa():
 
 
 @bp.route('/api/v2/account/2fa/disable', methods=['POST'])
-@require_auth()
+@require_auth(session_only=True)
 def disable_2fa():
     """Disable 2FA"""
     data = request.json
@@ -180,7 +182,7 @@ def disable_2fa():
 
 
 @bp.route('/api/v2/account/2fa/webauthn', methods=['PUT'])
-@require_auth()
+@require_auth(session_only=True)
 def set_webauthn_second_factor():
     """Turn a security key on or off as the second factor of password logins.
 
@@ -219,7 +221,7 @@ def set_webauthn_second_factor():
 
 
 @bp.route('/api/v2/account/2fa/recovery-codes', methods=['GET'])
-@require_auth()
+@require_auth(session_only=True)
 def get_recovery_codes():
     """Get current recovery codes (masked)"""
     user = db.session.get(User, g.current_user.id)
@@ -238,7 +240,7 @@ def get_recovery_codes():
 
 
 @bp.route('/api/v2/account/2fa/recovery-codes/regenerate', methods=['POST'])
-@require_auth()
+@require_auth(session_only=True)
 def regenerate_recovery_codes():
     """Regenerate recovery codes (invalidates old ones)"""
     data = request.json

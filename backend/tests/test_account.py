@@ -524,6 +524,8 @@ class TestConfirm2FA:
         assert 'backup_codes' in data
         assert isinstance(data['backup_codes'], list)
         assert len(data['backup_codes']) == 8
+        # Leave the shared admin as found: enabling again is refused while confirmed
+        assert_success(post_json(auth_client, '/api/v2/account/2fa/disable', {'code': totp.now()}))
 
 
 class TestDisable2FA:

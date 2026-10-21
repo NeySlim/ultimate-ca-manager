@@ -323,7 +323,7 @@ class AuthManager:
     
 
 
-def require_auth(permissions=None):
+def require_auth(permissions=None, session_only=False):
     """
     Decorator to protect routes with authentication
     Supports: Session, JWT, API Key (auto-detected)
@@ -331,6 +331,8 @@ def require_auth(permissions=None):
     Args:
         permissions: Optional list of required permissions
                     Examples: ['read:cas'], ['write:certificates', 'read:cas']
+        session_only: refuse API keys; for routes that change how the
+                    account signs in, whatever scopes the key holds
     
     Usage:
         @require_auth()  # Any authenticated user
@@ -353,6 +355,11 @@ def require_auth(permissions=None):
             if not auth_result:
                 from utils.response import error_response
                 return error_response('Authentication required', 401)
+            if session_only and auth_result['auth_method'] != 'session':
+                return jsonify({
+                    'error': 'Forbidden',
+                    'message': 'This operation requires an interactive session'
+                }), 403
 
             # Forced-2FA-enrolment gate (#141): a session flagged for mandatory
             # enrolment may only reach the enrolment endpoints (and logout) until
