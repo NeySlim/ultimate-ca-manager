@@ -62,7 +62,7 @@ override_dh_auto_install:
 	# Copy documentation
 	cp README.md debian/ucm/usr/share/doc/ucm/
 	cp DOCKER_QUICKSTART.md debian/ucm/usr/share/doc/ucm/ || true
-	cp LICENSE COMMERCIAL-LICENSE.md debian/ucm/usr/share/doc/ucm/
+	cp LICENSE NOTICE COMMERCIAL-LICENSE.md debian/ucm/usr/share/doc/ucm/
 	
 	# Install systemd service and auto-updater units
 	install -d debian/ucm/lib/systemd/system
@@ -90,4 +90,4 @@ override_dh_fixperms:
 	chmod 755 debian/ucm/var/log/ucm || true
 
 override_dh_compress:
-	dh_compress -XLICENSE -XCOMMERCIAL-LICENSE.md
+	dh_compress -XLICENSE -XNOTICE -XCOMMERCIAL-LICENSE.md

@@ -211,7 +211,7 @@ jobs:
           
           # Copy only what's needed (NO node_modules, only dist/)
           cp -r backend packaging /tmp/rpm-build/ucm-${TAR_VERSION}/
-          cp VERSION LICENSE COMMERCIAL-LICENSE.md /tmp/rpm-build/ucm-${TAR_VERSION}/
+          cp VERSION LICENSE NOTICE COMMERCIAL-LICENSE.md /tmp/rpm-build/ucm-${TAR_VERSION}/
           mkdir -p /tmp/rpm-build/ucm-${TAR_VERSION}/frontend
           cp -r frontend/dist /tmp/rpm-build/ucm-${TAR_VERSION}/frontend/
           
@@ -323,6 +323,8 @@ jobs:
           images: |
             ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
             neyslim/ultimate-ca-manager
+          labels: |
+            org.opencontainers.image.licenses=AGPL-3.0-only
           tags: |
             type=raw,value=${{ needs.build-deb.outputs.version }}
             type=raw,value=latest,enable=${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') && !contains(github.ref, 'dev') }}
@@ -408,6 +410,8 @@ jobs:
           images: |
             ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
             neyslim/ultimate-ca-manager
+          labels: |
+            org.opencontainers.image.licenses=AGPL-3.0-only
           tags: |
             type=raw,value=${{ needs.build-deb.outputs.version }}-fips
 
@@ -523,6 +527,8 @@ jobs:
           images: |
             ${{ env.REGISTRY }}/${{ steps.image.outputs.name }}
             neyslim/ultimate-ca-manager
+          labels: |
+            org.opencontainers.image.licenses=AGPL-3.0-only
           tags: |
             type=raw,value=${{ needs.build-deb.outputs.version }}-fips
             type=raw,value=latest-fips,enable=${{ !contains(github.ref, 'rc') && !contains(github.ref, 'beta') && !contains(github.ref, 'alpha') && !contains(github.ref, 'dev') }}

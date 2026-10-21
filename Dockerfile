@@ -156,7 +156,7 @@ WORKDIR /opt/ucm
 
 # Copy application files with proper ownership (same layout as packages)
 COPY --chown=ucm:ucm VERSION /opt/ucm/VERSION
-COPY --chown=ucm:ucm LICENSE /opt/ucm/LICENSE
+COPY --chown=ucm:ucm LICENSE NOTICE /opt/ucm/
 COPY --chown=ucm:ucm backend/ /opt/ucm/backend/
 # Only the built interface: the server serves frontend/dist, while frontend/
 # as a whole carries the sources and node_modules, several hundred megabytes
