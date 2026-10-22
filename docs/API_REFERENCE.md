@@ -2298,6 +2298,90 @@ Check ids: `users.password_scrypt`, `protocols.secret_scrypt`, `ca.eddsa_key`, `
 `hsm.unapproved_keys`, `backup.schedule_argon2id`, `backup.archives_argon2id` (warnings);
 `certificates.unapproved_key`, `ssh_certificates.eddsa_key` (information).
 
+
+### Compliance Profiles
+```http
+# The profiles and the rules they apply (any signed-in user): title, reference,
+# key types, digests, signature schemes, horizons, HSM requirement
+GET /api/v2/system/compliance-profiles
+
+# Instance default for new CAs (admin:settings); empty string clears it
+PATCH /api/v2/settings/general
+{"compliance_profile_default": "bsi"}
+
+# What a compliance profile (anssi, bsi or eu-acm) would refuse or advise against
+# on this instance, or on one CA; reads only (admin:system). Same report shape as
+# fips-preflight, plus the profile and the CA. 400 for an unknown profile or a
+# malformed ca, 404 for a CA that does not exist.
+# CLI: python -m scripts.compliance_preflight --profile bsi [--ca ID] [--json]
+# (exit code 0 nothing blocks, 1 blockers, 2 a check could not run or unknown profile/CA)
+GET /api/v2/system/compliance-preflight?profile=bsi
+GET /api/v2/system/compliance-preflight?profile=bsi&ca=3
+
+# Response
+{
+  "data": {
+    "profile": {"name": "bsi", "title": "BSI", "reference": "BSI-TR-02102-1 2026-01"},
+    "ca_id": null,
+    "ready": false,
+    "summary": {"blocker": 1, "warning": 0, "info": 0},
+    "findings": [{
+      "id": "ca.key_type",
+      "severity": "blocker",
+      "title": "Certificate authorities whose key type the profile does not allow",
+      "count": 1,
+      "examples": ["Root CA (#1): RSA-2048"],
+      "remedy": "Create an authority with an allowed key type and move issuance to it; ..."
+    }],
+    "errors": [],
+    "checked": ["ca.key_type", "ca.key_type.advisory", "..."]
+  }
+}
+```
+
+Check ids (each also exists with an `.advisory` suffix, at warning level, or information for
+`ca.eddsa_key` and `certificates.key_horizon`, for what the profile only advises against):
+`ca.key_type`, `ca.eddsa_key`, `ca.signature_scheme`, `ca.key_horizon`, `ca.key_protection`,
+`certificates.key_horizon`, `templates.key_type`, `templates.digest`, `policies.key_type`,
+`policies.digest`, `acme.digest`, `ocsp.responder_key`, `tsa.signer_key`; and the blocker
+`policies.unknown_key_types_only`.
+
+**CA profile.** `POST /api/v2/cas` accepts `complianceProfile` (`anssi`, `bsi`, `eu-acm`;
+`null` or `""` for none; omitted means the instance default, the `compliance_profile_default`
+system setting). The CA being created must meet the profile. `PATCH /api/v2/cas/{id}` with
+`complianceProfile` attaches, changes or (with `null` or `""`) removes it; it binds future
+issuance only, nothing issued is re-checked, and the change is audited. Run the preflight first.
+Every CA object returns `compliance_profile` (string or `null`). A refusal by a profile names
+the rule; a recommendation comes back in `meta.notices` of the issuance response.
+
+**Policy rule keys.** Policies (`rules`) also accept `allowed_signature_schemes`
+(`rsa_pkcs1v15`, `rsa_pss`, `ecdsa`, `eddsa`), `key_type_horizons` (`{"RSA-2048": "2030-12-31"}`:
+the certificate must not be valid beyond the date), `key_type_issue_until` (no issuance of that
+key type after the date), `require_hsm_ca_key` (boolean, software and SoftHSM CA keys refused),
+`tsa_signer_key_types`, `pq_standalone` (boolean) and `advisories` (an object using the same
+keys, producing notices instead of refusals). A policy whose `allowed_key_types` holds only
+unknown labels refuses issuance.
+
+```http
+# Key types, digests, signature schemes and horizons left by the active policies
+# (system policies included: FIPS mode, the compliance profile of the CA), null = unrestricted
+GET /api/v2/policies/effective?ca_id=3&template_id=1
+
+# Response
+{
+  "data": {
+    "allowed_key_types": ["EC-P256", "EC-P384", "RSA-3072"],
+    "allowed_digests": ["sha256", "sha384", "sha512"],
+    "allowed_signature_schemes": ["rsa_pss", "ecdsa"],
+    "key_type_horizons": {},
+    "key_type_issue_until": {},
+    "require_hsm_ca_key": false,
+    "tsa_signer_key_types": ["EC-P256", "EC-P384", "EC-P521"],
+    "fips": true                 # only present in FIPS mode
+  }
+}
+```
+
 ---
 
 ## Import/Export
