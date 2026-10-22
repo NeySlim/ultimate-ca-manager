@@ -23,6 +23,7 @@ from services.backup.settings_contract import (
 )
 from utils.hsts import hsts_env_locked
 from utils import admin_allowlist
+import compliance_profiles
 from utils.public_endpoints import validate_admin_base_url, validate_protocol_base_url
 
 logger = logging.getLogger(__name__)
@@ -79,6 +80,8 @@ _ADMIN_ONLY_SETTINGS = frozenset([
     'audit_retention_days',
     # Who may reach the admin UI at all (#402)
     'admin_allowed_networks',
+    # Profile new CAs receive when the request names none
+    'compliance_profile_default',
 ])
 
 
@@ -146,6 +149,7 @@ def get_general_settings():
         'admin_allowed_networks_env_locked': admin_allowlist.env_locked(),
         'admin_allowlist_disabled': admin_allowlist.disabled_by_env(),
         'admin_client_ip': request.remote_addr or '',
+        'compliance_profile_default': compliance_profiles.default_profile() or '',
     })
 
 
@@ -200,6 +204,7 @@ def update_general_settings():
         'crl_auto_purge_stale_serials',
         # Audit log retention in days, 0 keeps every log
         'audit_retention_days',
+        'compliance_profile_default',
     ]
 
     if 'ocsp_response_validity_hours' in data:
@@ -371,6 +376,16 @@ def update_general_settings():
             return error_response(
                 'date_format must be one of: ' + ', '.join(DATE_FORMATS), 400)
 
+    profile_change = None
+    if 'compliance_profile_default' in data:
+        profile, err = compliance_profiles.normalize(data['compliance_profile_default'])
+        if err:
+            return error_response(err.replace('complianceProfile', 'compliance_profile_default'), 400)
+        before = compliance_profiles.default_profile()
+        data['compliance_profile_default'] = profile or ''
+        if profile != before:
+            profile_change = (before, profile)
+
     # Saved only when it changed, and never to a list that would refuse the
     # caller's own address, unless the check is switched off for recovery.
     # The screen sends it back with every save.
@@ -451,6 +466,16 @@ def update_general_settings():
             resource_name='Admin allowlist',
             details=f"Admin allowlist changed from [{', '.join(before) or 'none'}] "
                     f"to [{', '.join(after) or 'none'}]",
+            success=True,
+        )
+
+    if profile_change is not None:
+        AuditService.log_action(
+            action='compliance_profile_default_update',
+            resource_type='settings',
+            resource_name='Default compliance profile',
+            details=f"Default compliance profile changed from {profile_change[0] or 'none'} "
+                    f"to {profile_change[1] or 'none'}",
             success=True,
         )
 

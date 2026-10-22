@@ -386,6 +386,7 @@ export function FloatingDetailWindow({ windowInfo }) {
               data={data}
               canWrite={canWrite}
               canDelete={canDelete}
+              hasPermission={hasPermission}
               onExport={handleExport}
               onDelete={handleDelete}
               onImportKey={isCA && canWrite('cas') && needsKeyImport(data) ? () => setImportKeyOpen(true) : null}
@@ -465,7 +466,7 @@ export function FloatingDetailWindow({ windowInfo }) {
 /**
  * DetailContent — Renders the appropriate detail view based on entity type
  */
-function DetailContent({ type, data, canWrite, canDelete, onExport, onDelete, onImportKey, onCaChanged }) {
+function DetailContent({ type, data, canWrite, canDelete, hasPermission, onExport, onDelete, onImportKey, onCaChanged }) {
   if (type === 'certificate' || type === 'user_certificate') {
     return (
       <CertificateDetails
@@ -487,6 +488,7 @@ function DetailContent({ type, data, canWrite, canDelete, onExport, onDelete, on
         embedded={true}
         canWrite={canWrite('cas') && canWrite('templates')}
         canWriteCas={canWrite('cas')}
+        canAttachProfile={canWrite('cas') && hasPermission('admin:system')}
         canDelete={canDelete('cas')}
         onExport={onExport}
         onDelete={onDelete}

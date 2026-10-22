@@ -108,6 +108,14 @@ export const systemService = {
     return apiClient.get('/system/fips-preflight')
   },
 
+  async getComplianceProfiles() {
+    return apiClient.get('/system/compliance-profiles')
+  },
+
+  async getCompliancePreflight(profile, caId) {
+    return apiClient.get(`/system/compliance-preflight${buildQueryString({ profile, ca: caId })}`)
+  },
+
   async restartService() {
     return apiClient.post('/system/service/restart')
   },

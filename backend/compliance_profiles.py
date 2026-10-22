@@ -140,3 +140,14 @@ def refuse_legacy_pkcs12(ca_id=None, caref=None):
     if name:
         raise ProfileRestricted(
             f'PKCS#12 legacy encryption (3DES/SHA-1) not available under compliance profile {name}')
+
+
+def describe(name):
+    """What profile *name* alone leaves a form to offer, in the shape of ``/policies/effective``."""
+    from services.policy_service import PolicyEvaluationService as service
+    policy = profile_policy(name)
+    key_types, digests = service.algorithms_of([policy])
+    profile = PROFILES[name]
+    return {'name': name, 'title': profile['title'], 'reference': profile['reference'],
+            'url': profile['url'], 'allowed_key_types': key_types, 'allowed_digests': digests,
+            **service.signature_rules_of([policy])}

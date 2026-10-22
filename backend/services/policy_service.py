@@ -452,7 +452,12 @@ class PolicyEvaluationService:
         meet, each None when unrestricted. Policies narrowed by a DNS pattern
         bind only some names: without a name they do not match, and are left to
         the issuance-time check. A list of unknown labels only allows nothing."""
-        policies = PolicyEvaluationService.applicable_policies(ca_id, template_id)
+        return PolicyEvaluationService.algorithms_of(
+            PolicyEvaluationService.applicable_policies(ca_id, template_id))
+
+    @staticmethod
+    def algorithms_of(policies):
+        """``effective_algorithms`` for an explicit list of policies."""
         key_types = None
         for policy in policies:
             allowed = (policy.get_rules() or {}).get('allowed_key_types')
@@ -469,7 +474,12 @@ class PolicyEvaluationService:
         ``allowed_signature_schemes`` (intersection, None when unrestricted),
         ``key_type_horizons`` and ``key_type_issue_until`` (earliest date per
         label, ISO strings), ``require_hsm_ca_key`` and ``tsa_signer_key_types``."""
-        policies = PolicyEvaluationService.applicable_policies(ca_id, template_id)
+        return PolicyEvaluationService.signature_rules_of(
+            PolicyEvaluationService.applicable_policies(ca_id, template_id))
+
+    @staticmethod
+    def signature_rules_of(policies):
+        """``effective_signature_rules`` for an explicit list of policies."""
         schemes = None
         horizons, issue_until, tsa = {}, {}, None
         hsm = False

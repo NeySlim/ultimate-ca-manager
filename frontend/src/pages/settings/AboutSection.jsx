@@ -11,6 +11,7 @@ import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
 import { downloadBlob } from '../../lib/utils'
 import FipsPreflightPanel from './FipsPreflightPanel'
+import CompliancePreflightPanel from './CompliancePreflightPanel'
 import { KOFI_URL } from '../../lib/support'
 
 export default function AboutSection() {
@@ -111,6 +112,7 @@ export default function AboutSection() {
       )}
 
       {hasPermission('admin:system') && <FipsPreflightPanel />}
+      {hasPermission('admin:system') && <CompliancePreflightPanel />}
 
       {/* Links */}
       <DetailSection title={t('settings.about.links')} icon={Globe} iconClass="icon-bg-teal" className="mt-4">

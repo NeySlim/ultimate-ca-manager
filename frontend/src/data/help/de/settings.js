@@ -92,6 +92,7 @@ export default {
           { label: 'Active Directory', text: 'UCMs eigene AD/LDAP-Verbindung für zertifikatsbezogene Abfragen (Kerberos-Prinzipalauflösung, AD-abgeleitete Betreffe)' },
           { label: 'Windows-Autoregistrierung', text: 'MS-XCEP/MS-WSTEP native Windows-Registrierung: Richtlinienermittlung, Zertifikatsausstellung und Kerberos/SPNEGO-Bindung' },
           { label: 'Info', text: 'Systeminformationen, Links & Ressourcen und UCM unterstützen verweisen auf Ko-fi (Administratoren sehen zudem einmal pro UCM-Version eine ausblendbare Ko-fi-Karte). Mit admin:system listet FIPS-Bereitschaft prüfen auf, was der FIPS-Modus auf dieser Instanz ablehnen würde, mit je einer Abhilfe, und ändert nichts' },
+          { label: 'Compliance-Profile', text: 'Unter Info, mit admin:system: Profil prüfen listet auf, was ANSSI, BSI oder EU ACM (Regeln, die sich an einem Referenztext orientieren) auf dieser Instanz ablehnen oder davon abraten würden, und ändert nichts. Mit admin:settings legt Standardprofil für neue CAs fest, welches Profil eine CA erhält, wenn keines gewählt wird; bestehende CAs bleiben unverändert' },
         ]
       },
       {

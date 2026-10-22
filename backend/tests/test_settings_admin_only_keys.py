@@ -50,6 +50,7 @@ RESERVED_VALUES = {
     'crl_auto_purge_stale_serials': True,
     'audit_retention_days': 7,
     'admin_allowed_networks': '10.0.0.0/8',
+    'compliance_profile_default': 'bsi',
 }
 
 
@@ -118,7 +119,7 @@ def api_key(auth_client):
 def test_the_reserved_set_is_the_contract():
     from api.v2.settings.general import _ADMIN_ONLY_SETTINGS
     assert set(_ADMIN_ONLY_SETTINGS) == set(RESERVED_VALUES)
-    assert len(RESERVED_VALUES) == 33
+    assert len(RESERVED_VALUES) == 34
 
 
 @pytest.mark.parametrize('key', sorted(RESERVED_VALUES))

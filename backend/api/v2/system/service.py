@@ -181,6 +181,13 @@ def get_fips_preflight():
         db.session.rollback()
 
 
+@bp.route('/api/v2/system/compliance-profiles', methods=['GET'])
+@require_auth()
+def list_compliance_profiles():
+    """The compliance profiles and what each leaves a form to offer."""
+    return success_response(data=[compliance_profiles.describe(n) for n in compliance_profiles.PROFILE_NAMES])
+
+
 @bp.route('/api/v2/system/compliance-preflight', methods=['GET'])
 @require_auth(['admin:system'])
 def get_compliance_preflight():

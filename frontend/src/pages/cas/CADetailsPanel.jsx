@@ -15,6 +15,7 @@ import { RevokeCertificateModal } from '../../components/RevokeCertificateModal'
 import { ManageTemplatePinsModal } from '../../components/cas/ManageTemplatePinsModal'
 import { CACrlSection } from '../../components/cas/CACrlSection'
 import { SignatureSchemeField } from '../../components/cas/SignatureSchemeField'
+import { ComplianceProfileField } from '../../components/cas/ComplianceProfileField'
 import { UploadCACertModal } from './UploadCACertModal'
 import { ImportCaKeyModal } from '../../components/cas/ImportCaKeyModal'
 import { casService } from '../../services'
@@ -290,6 +291,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
           <CompactField autoIcon="keySize" label={t('common.keySize')} value={keySpec || '—'} />
           <CompactField autoIcon="signature" label={t('common.signature')} value={ca.signature_algorithm} />
           <SignatureSchemeField ca={ca} canWrite={canWrite('cas')} onChanged={onChanged} />
+          <ComplianceProfileField ca={ca} canWrite={canWrite('cas')} canAttach={!!hasPermission?.('admin:system')} onChanged={onChanged} />
           {ca.uses_hsm && (
             <>
               <CompactField label={t('cas.create.hsmProvider')} value={ca.hsm_provider_name || '—'} />

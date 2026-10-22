@@ -36,6 +36,7 @@ import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { CertificateExtensions } from './CertificateExtensions'
 import { CACrlSection } from './cas/CACrlSection'
 import { SignatureSchemeField } from './cas/SignatureSchemeField'
+import { ComplianceProfileField } from './cas/ComplianceProfileField'
 import { cn } from '../lib/utils'
 import { useClipboard } from '../hooks/useClipboard'
 import { needsKeyImport } from '../lib/caSelection'
@@ -54,6 +55,7 @@ export function CADetails({
   onCaChanged,
   canWrite = false,
   canWriteCas = false,
+  canAttachProfile = false,
   canDelete = false,
   showActions = true,
   showPem = true,
@@ -263,6 +265,7 @@ export function CADetails({
           <CompactField autoIcon="keyType" label={t('common.keyType')} value={ca.key_type} />
           <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={ca.signature_algorithm || ca.hash_algorithm} />
           <SignatureSchemeField ca={ca} canWrite={canWriteCas} onChanged={onCaChanged} />
+          <ComplianceProfileField ca={ca} canWrite={canWriteCas} canAttach={canAttachProfile} onChanged={onCaChanged} />
           <CompactField autoIcon="subjectDN" label={t('details.subjectDN')} value={ca.subject} mono colSpan={2} />
         </CompactGrid>
       </CompactSection>

@@ -92,6 +92,7 @@ export default {
           { label: 'Active Directory', text: '証明書関連の参照 (Kerberos プリンシパルの解決、AD 由来のサブジェクト) のための UCM 独自の AD/LDAP 接続' },
           { label: 'Windows 自動登録', text: 'MS-XCEP/MS-WSTEP によるネイティブ Windows 登録: ポリシー検出、証明書発行、Kerberos/SPNEGO バインディング' },
           { label: '概要', text: 'システム情報、リンクとリソース、UCM を支援は Ko-fi にリンクします（管理者には、UCM のバージョンごとに 1 回、閉じられる Ko-fi カードも表示されます）。admin:system 権限があれば、FIPS 対応状況を確認 で、このインスタンスで FIPS モードが拒否する項目が対処方法とともに一覧表示されます。何も変更されません' },
+          { label: 'コンプライアンスプロファイル', text: '概要で、admin:system 権限があれば、プロファイルを確認 で、ANSSI、BSI、EU ACM（参照文書に沿ったルール）がこのインスタンスで拒否または非推奨とする項目が一覧表示されます。何も変更されません。admin:settings 権限があれば、新規 CA のデフォルトプロファイル で、プロファイルが選択されなかった CA に割り当てるプロファイルを設定できます。既存の CA は変更されません' },
         ]
       },
       {

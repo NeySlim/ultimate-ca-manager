@@ -92,6 +92,7 @@ export default {
           { label: 'Active Directory', text: 'UCM 自身的 AD/LDAP 连接，用于与证书相关的查询（Kerberos 主体解析、AD 派生主题）' },
           { label: 'Windows 自动注册', text: 'MS-XCEP/MS-WSTEP 原生 Windows 注册：策略发现、证书签发和 Kerberos/SPNEGO 绑定' },
           { label: '关于', text: '系统信息、链接与资源和支持 UCM 链接到 Ko-fi（管理员每个 UCM 版本还会看到一次可关闭的 Ko-fi 卡片）。拥有 admin:system 时，检查 FIPS 就绪情况会列出 FIPS 模式在此实例上会拒绝的内容及各自的补救办法，且不会更改任何内容' },
+          { label: '合规配置文件', text: '在“关于”中，拥有 admin:system 时：检查配置文件会列出 ANSSI、BSI 或 EU ACM（与参考文本对齐的规则）在此实例上会拒绝或不建议的内容，且不会更改任何内容。拥有 admin:settings 时，新 CA 的默认配置文件用于设定未选择时 CA 获得的配置文件；现有 CA 不会更改' },
         ]
       },
       {

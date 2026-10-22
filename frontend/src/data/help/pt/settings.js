@@ -92,6 +92,7 @@ export default {
           { label: 'Active Directory', text: 'Conexão própria do UCM com AD/LDAP para consultas relacionadas a certificados (resolução de entidade de segurança Kerberos, assuntos derivados do AD)' },
           { label: 'Autoinscrição do Windows', text: 'Inscrição nativa do Windows MS-XCEP/MS-WSTEP: descoberta de diretiva, emissão de certificados e vinculação Kerberos/SPNEGO' },
           { label: 'Sobre', text: 'Informações do sistema, Links e recursos e Apoiar o UCM levam ao Ko-fi (os administradores também veem um cartão Ko-fi dispensável uma vez por versão do UCM). Com admin:system, Verificar preparação para FIPS lista o que o modo FIPS recusaria nesta instância, com um remédio para cada item, e não altera nada' },
+          { label: 'Perfis de conformidade', text: 'Em Sobre, com admin:system: Verificar perfil lista o que ANSSI, BSI ou EU ACM (regras alinhadas com um texto de referência) recusariam ou desaconselhariam nesta instância, sem alterar nada. Com admin:settings, Perfil predefinido para novas CAs define o perfil que uma CA recebe quando nenhum é escolhido; as CAs existentes não são alteradas' },
         ]
       },
       {

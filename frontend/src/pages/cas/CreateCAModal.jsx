@@ -18,6 +18,7 @@ import { extractData, cn, downloadBlob } from '../../lib/utils'
 import { signingCas } from '../../lib/caSelection'
 import { CA_KEY_CHOICES, POLICY_DIGESTS, caKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 import { PSS_HSM_TYPES } from '../../lib/signatureName'
+import { COMPLIANCE_PROFILE_NAMES, limitsWithProfile, useComplianceDefault, useComplianceProfiles } from '../../lib/complianceProfiles'
 
 const HSM_KEY_ALGORITHMS = ['RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521']
 
@@ -116,6 +117,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const [createFormNCExcluded, setCreateFormNCExcluded] = useState([])
   const [createFormDigest, setCreateFormDigest] = useState('auto')
   const [createFormSignatureScheme, setCreateFormSignatureScheme] = useState('pkcs1v15')
+  // null = untouched (the proposal applies), '' = no profile
+  const [createFormProfile, setCreateFormProfile] = useState(null)
   const [createFormKeyUsage, setCreateFormKeyUsage] = useState(ROOT_KEY_USAGE)
   const [createFormEkuServerAuth, setCreateFormEkuServerAuth] = useState(false)
   const [showCertProfile, setShowCertProfile] = useState(false)
@@ -152,22 +155,6 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     return () => { cancelled = true }
   }, [open])
 
-  // Load HSM signing keys when provider selected and "use existing" mode active
-  useEffect(() => {
-    if (createFormKeyStorage !== 'hsm' || createFormHsmKeyMode !== 'existing' || !createFormHsmProviderId) {
-      setHsmKeys([])
-      return
-    }
-    let cancelled = false
-    hsmService.getSigningKeys({ providerId: parseInt(createFormHsmProviderId, 10), unused: true })
-      .then(res => {
-        if (cancelled) return
-        setHsmKeys(extractData(res) || [])
-      })
-      .catch(() => { if (!cancelled) setHsmKeys([]) })
-    return () => { cancelled = true }
-  }, [createFormKeyStorage, createFormHsmKeyMode, createFormHsmProviderId])
-
   // Apply RFC 5280 defaults when CA type changes. No EKU on any CA unless
   // asked for: a serverAuth-only issuing CA invalidates every clientAuth
   // leaf beneath it for OpenSSL-based validators (the v2.196 API default).
@@ -184,6 +171,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     setCreateFormKeySize(DEFAULT_KEY_SIZE.RSA)
     setCreateFormDigest('auto')
     setCreateFormSignatureScheme('pkcs1v15')
+    setCreateFormProfile(null)
     setCreateFormKeyUsage(ROOT_KEY_USAGE)
     setCreateFormEkuServerAuth(false)
     setShowCertProfile(false)
@@ -208,10 +196,24 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   }, [open])
 
   // Policies of the parent CA, or the global ones for a root/external CA (#397)
-  const { allowedKeyTypes, allowedDigests } = useEffectiveAlgorithms({
+  const policyLimits = useEffectiveAlgorithms({
     caId: createFormType === 'intermediate' ? createFormParentCAId : null,
     enabled: open,
   })
+
+  // Compliance profile: proposed from the parent CA, else the global default
+  const profiles = useComplianceProfiles({ enabled: open })
+  const defaultProfile = useComplianceDefault({ enabled: open })
+  const parentProfile = createFormType === 'intermediate'
+    ? (cas || []).find(c => String(c.id) === String(createFormParentCAId))?.compliance_profile
+    : null
+  const proposedProfile = COMPLIANCE_PROFILE_NAMES.includes(parentProfile) ? parentProfile : defaultProfile
+  const profileName = createFormProfile ?? proposedProfile
+  const profile = profiles[profileName]
+  const { allowedKeyTypes, allowedDigests, allowedSchemes, horizons, requireHsm } =
+    useMemo(() => limitsWithProfile(policyLimits, profile), [policyLimits, profile])
+  // eu-acm: the CA key lives on an HSM
+  const keyStorage = requireHsm ? 'hsm' : createFormKeyStorage
   const allowedLocalKeys = useMemo(
     () => CA_KEY_CHOICES.filter(([algo, size]) => isAllowed(allowedKeyTypes, caKeyLabel(algo, size))),
     [allowedKeyTypes],
@@ -227,19 +229,47 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     () => HSM_KEY_ALGORITHMS.filter(a => isAllowed(allowedKeyTypes, a)), [allowedKeyTypes])
   const validityDaysValue = createFormValidity === CUSTOM_VALIDITY
     ? parseInt(createFormValidityDays) : parseInt(createFormValidity) * 365
-  const usesRsa2048 = createFormKeyStorage === 'local'
+  // Load HSM signing keys when provider selected and "use existing" mode active
+  useEffect(() => {
+    if (keyStorage !== 'hsm' || createFormHsmKeyMode !== 'existing' || !createFormHsmProviderId) {
+      setHsmKeys([])
+      return
+    }
+    let cancelled = false
+    hsmService.getSigningKeys({ providerId: parseInt(createFormHsmProviderId, 10), unused: true })
+      .then(res => {
+        if (cancelled) return
+        setHsmKeys(extractData(res) || [])
+      })
+      .catch(() => { if (!cancelled) setHsmKeys([]) })
+    return () => { cancelled = true }
+  }, [keyStorage, createFormHsmKeyMode, createFormHsmProviderId])
+
+  const usesRsa2048 = keyStorage === 'local'
     ? createFormKeyAlgo === 'RSA' && createFormKeySize === '2048'
     : createFormHsmKeyMode === 'generate' && createFormHsmKeyAlgorithm === 'RSA-2048'
   const rsa2048PastHorizon = createFormType !== 'external' && usesRsa2048
     && Number.isFinite(validityDaysValue) && Date.now() + validityDaysValue * 86400000 >= RSA_2048_HORIZON
   const hsmProviderType = hsmProviders.find(p => String(p.id) === createFormHsmProviderId)?.provider_type
-  const keyIsRsa = createFormKeyStorage === 'local'
+  const keyIsRsa = keyStorage === 'local'
     ? createFormKeyAlgo === 'RSA'
     : createFormHsmKeyMode === 'generate'
       ? createFormHsmKeyAlgorithm.startsWith('RSA')
       : Boolean(hsmKeys.find(k => String(k.id) === createFormHsmKeyId)?.algorithm?.startsWith('RSA'))
-  const pssAvailable = keyIsRsa && (createFormKeyStorage === 'local' || PSS_HSM_TYPES.includes(hsmProviderType))
-  const policyBlocksCreate = noDigestAllowed || (createFormKeyStorage === 'local'
+  const pssAvailable = keyIsRsa && (keyStorage === 'local' || PSS_HSM_TYPES.includes(hsmProviderType))
+  // The schemes the profile leaves: PSS imposed under bsi
+  const schemeChoices = [
+    ...(isAllowed(allowedSchemes, 'rsa_pkcs1v15') ? ['pkcs1v15'] : []),
+    ...(pssAvailable && isAllowed(allowedSchemes, 'rsa_pss') ? ['pss'] : []),
+  ]
+  const noSchemeAllowed = keyIsRsa && schemeChoices.length === 0
+  const horizonLabel = keyStorage === 'local'
+    ? caKeyLabel(createFormKeyAlgo, createFormKeySize)
+    : createFormHsmKeyMode === 'generate' ? createFormHsmKeyAlgorithm : null
+  const profileHorizon = createFormType !== 'external' ? horizons[horizonLabel] : null
+  const pastProfileHorizon = Boolean(profileHorizon) && Number.isFinite(validityDaysValue)
+    && Date.now() + validityDaysValue * 86400000 > Date.parse(profileHorizon) + 86400000
+  const policyBlocksCreate = noDigestAllowed || noSchemeAllowed || (keyStorage === 'local'
     ? noKeyAllowed
     : createFormHsmKeyMode === 'generate' && hsmAlgorithmOptions.length === 0)
 
@@ -257,8 +287,10 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     }
   }, [allowedDigestChoices, createFormDigest])
   useEffect(() => {
-    if (!pssAvailable && createFormSignatureScheme !== 'pkcs1v15') setCreateFormSignatureScheme('pkcs1v15')
-  }, [pssAvailable, createFormSignatureScheme])
+    if (schemeChoices.length && !schemeChoices.includes(createFormSignatureScheme)) {
+      setCreateFormSignatureScheme(schemeChoices[0])
+    }
+  }, [schemeChoices.join(), createFormSignatureScheme]) // eslint-disable-line react-hooks/exhaustive-deps
   useEffect(() => {
     if (hsmAlgorithmOptions.length && !hsmAlgorithmOptions.includes(createFormHsmKeyAlgorithm)) {
       setCreateFormHsmKeyAlgorithm(hsmAlgorithmOptions[0])
@@ -302,6 +334,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         namedUrls: createFormNamedUrls,
         hashAlgorithm: createFormDigest,
         ...(pssAvailable && { signatureScheme: createFormSignatureScheme }),
+        ...(profileName ? { complianceProfile: profileName } : createFormProfile !== null && { complianceProfile: null }),
         keyUsage: createFormKeyUsage,
         ...(createFormType === 'intermediate' && {
           extendedKeyUsage: createFormEkuServerAuth ? ['serverAuth'] : [],
@@ -311,7 +344,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
       }
 
       // HSM key storage — replaces local key fields
-      if (createFormKeyStorage === 'hsm') {
+      if (keyStorage === 'hsm') {
         if (!createFormHsmProviderId) {
           showError(t('cas.create.hsmProviderRequired'))
           return
@@ -386,12 +419,35 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
           </div>
         </div>
 
+        <div className="space-y-2">
+          <Select
+            label={t('cas.complianceProfile')}
+            options={[
+              { value: '', label: t('cas.complianceProfileNone') },
+              ...COMPLIANCE_PROFILE_NAMES.map(n => ({
+                value: n,
+                label: profiles[n] ? `${profiles[n].title} (${profiles[n].reference})` : n,
+              })),
+            ]}
+            value={profileName}
+            onChange={(value) => setCreateFormProfile(value)}
+            helperText={
+              createFormProfile === null && profileName
+                ? t(COMPLIANCE_PROFILE_NAMES.includes(parentProfile) ? 'cas.complianceProfileFromParent' : 'cas.complianceProfileFromDefault')
+                : t('cas.complianceProfileHelp')
+            }
+          />
+          {requireHsm && (
+            <p className="text-xs text-text-secondary">{t('cas.create.profileRequiresHsm')}</p>
+          )}
+        </div>
+
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-text-primary">{t('cas.create.keyStorage')}</h3>
           <div className="flex gap-2">
             <label className={cn(
               'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-all',
-              createFormKeyStorage === 'local'
+              keyStorage === 'local'
                 ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
                 : 'border-border hover:border-border-hover text-text-secondary'
             )}>
@@ -400,14 +456,15 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
                 name="keyStorage"
                 value="local"
                 className="sr-only"
-                checked={createFormKeyStorage === 'local'}
+                checked={keyStorage === 'local'}
+                disabled={requireHsm}
                 onChange={() => setCreateFormKeyStorage('local')}
               />
               {t('cas.create.keyStorageLocal')}
             </label>
             <label className={cn(
               'flex-1 flex items-center justify-center gap-2 px-3 py-2 rounded-lg border text-sm cursor-pointer transition-all',
-              createFormKeyStorage === 'hsm'
+              keyStorage === 'hsm'
                 ? 'border-accent-primary bg-accent-primary-op10 text-accent-primary font-semibold'
                 : 'border-border hover:border-border-hover text-text-secondary'
             )}>
@@ -416,7 +473,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
                 name="keyStorage"
                 value="hsm"
                 className="sr-only"
-                checked={createFormKeyStorage === 'hsm'}
+                checked={keyStorage === 'hsm'}
                 onChange={() => setCreateFormKeyStorage('hsm')}
               />
               {t('cas.create.keyStorageHsm')}
@@ -424,7 +481,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
           </div>
         </div>
 
-        {createFormKeyStorage === 'local' && (
+        {keyStorage === 'local' && (
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-text-primary">{t('cas.keyConfiguration')}</h3>
           <div className="grid grid-cols-2 gap-4">
@@ -476,8 +533,16 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
           )}
         </div>
         )}
+        {noSchemeAllowed && (
+          <p className="text-xs text-status-danger" role="alert">{t('cas.create.noSchemeAllowedByProfile')}</p>
+        )}
         {noDigestAllowed && (
           <p className="text-xs text-status-danger" role="alert">{t('cas.create.noDigestAllowedByPolicy')}</p>
+        )}
+        {pastProfileHorizon && (
+          <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
+            {t('cas.create.profileHorizon', { key: horizonLabel, date: profileHorizon })}
+          </div>
         )}
         {rsa2048PastHorizon && (
           <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
@@ -485,7 +550,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
           </div>
         )}
 
-        {createFormKeyStorage === 'hsm' && (
+        {keyStorage === 'hsm' && (
         <div className="space-y-4">
           <h3 className="text-sm font-semibold text-text-primary">{t('cas.keyConfiguration')}</h3>
           {!hsmLoading && hsmProviders.length === 0 ? (
@@ -592,10 +657,9 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         {keyIsRsa && (
           <Select
             label={t('cas.signatureScheme')}
-            options={[
-              { value: 'pkcs1v15', label: t('cas.signatureSchemePkcs1v15') },
-              ...(pssAvailable ? [{ value: 'pss', label: t('cas.signatureSchemePss') }] : []),
-            ]}
+            options={schemeChoices.map(v => ({
+              value: v, label: t(v === 'pss' ? 'cas.signatureSchemePss' : 'cas.signatureSchemePkcs1v15'),
+            }))}
             value={createFormSignatureScheme}
             onChange={(value) => setCreateFormSignatureScheme(value)}
             helperText={pssAvailable ? t('cas.signatureSchemeHelp') : t('cas.signatureSchemeHsmUnsupported')}
@@ -773,7 +837,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
             type="submit"
             disabled={
               creating || policyBlocksCreate || (
-              createFormKeyStorage === 'hsm' && (
+              keyStorage === 'hsm' && (
                 hsmProviders.length === 0 ||
                 (createFormHsmKeyMode === 'existing' && !!createFormHsmProviderId && hsmKeys.length === 0)
               )
