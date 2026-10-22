@@ -13,11 +13,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - CAs: an RSA CA can sign with RSA-PSS (salt as long as the hash) instead of PKCS#1 v1.5, chosen at creation or switched later from its details; certificates, CRLs, OCSP responses and SCEP replies follow it, on a local key or a PKCS#11 or OpenBao HSM key; timestamp tokens stay PKCS#1 v1.5 so that `openssl ts -verify` still checks them.
 - Compliance profiles: a CA can follow a profile aligned with ANSSI (PG-083 3.00), BSI (TR-02102-1) or the EU agreed cryptographic mechanisms (ECCG ACM 2.0), which refuses what the text requires and advises against what it only recommends (keys, digests, RSA scheme, key horizons, HSM-held CA key, timestamping signer). A preflight in Settings, the API and the command line lists what a profile would refuse before it is attached to a CA, and an instance default applies to new CAs.
+- Keys: Brainpool P256r1, P384r1 and P512r1 (`EC-BP256`, `EC-BP384`, `EC-BP512`) can be used for CA and certificate keys outside FIPS mode, across issuance, enrollment protocols, CRL, OCSP, timestamping and PKCS#11 HSMs, with SHA-384 and SHA-512 by default for the larger curves; the key type lists group them with a TLS compatibility warning, and the compliance profiles accept them.
+- Certificates: a certificate using SM2, GOST or FRP256v1 can be imported and is shown by its algorithm name or OID, its chain marked as not verifiable, where it used to raise an error.
 
 ### Upgrade notes
 
 - Signature hashes: SHA-224 is no longer accepted, and an unknown hash name is refused where it used to be signed in SHA-256 without a word; UCM signs with SHA-256, SHA-384 or SHA-512.
 - API keys: the password, e-mail, 2FA, passkey, mTLS certificate and session routes of the account now refuse API keys, even `*` ones, and so do the user administration routes when they target the key's own owner; scripts that used them must sign in with a session (see Security).
+- Enrollment: a CSR with a Brainpool key, refused until now, is accepted outside FIPS mode by Sign CSR, ACME, EST, SCEP and WSTEP; restrict it with a policy's allowed key types if needed.
 - Policies: a policy whose allowed key types are all unknown to UCM (an old or imported row) used to check nothing; it now refuses issuance until its key types are fixed. The compliance preflight lists such policies.
 
 ### Changed
