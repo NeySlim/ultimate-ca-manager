@@ -536,12 +536,14 @@ def test_an_interrupted_build_restores_the_previous_venv_and_the_service(tmp_pat
     fips = step == '*no-binary*'
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
     started = tmp_path / 'pip-started'
-    # Like pip finishing a write, the fake takes a moment to die and writes into its venv meanwhile
+    # Like pip finishing a write, the fake takes a moment to die and writes into its venv meanwhile.
+    # `started` appears once the sleep exists and `wait` lets the trap run at once (a signal sent
+    # before the sleep's fork waited 30 s); the trap kills the sleep, which ignores SIGINT in background.
     sleep = shutil.which('sleep')
     python, record = _fake_python(tmp_path, f'''{GUNICORN}
 case "$*" in {step})
-  trap '{sleep} 0.3; : > "$(dirname "$0")/late"; exit 1' TERM INT HUP
-  touch {started}; {sleep} 30;;
+  trap 'kill $p 2>/dev/null; {sleep} 0.3; : > "$(dirname "$0")/late"; exit 1' TERM INT HUP
+  {sleep} 30 & p=$!; touch {started}; wait $p;;
 esac; exit 0''')
     home, envfile = _home(tmp_path)
     if not fips:
@@ -600,8 +602,8 @@ def _slow_pip(step, started):
     sleep = shutil.which('sleep')
     return f'''{GUNICORN}
 case "$*" in {step})
-  trap '{sleep} 0.3; : > "$(dirname "$0")/late"; exit 1' TERM INT HUP
-  touch {started}; {sleep} 30;;
+  trap 'kill $p 2>/dev/null; {sleep} 0.3; : > "$(dirname "$0")/late"; exit 1' TERM INT HUP
+  {sleep} 30 & p=$!; touch {started}; wait $p;;
 esac; exit 0'''
 
 
