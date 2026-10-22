@@ -74,8 +74,8 @@ def test_profile_policy_is_a_named_system_policy():
     assert policy.name == 'Compliance profile bsi (BSI-TR-02102-1 2026-01)'
     rules = policy.get_rules()
     assert 'RSA-2048' not in rules['allowed_key_types'] and 'ED25519' not in rules['allowed_key_types']
-    assert not any('BP' in label for p in compliance_profiles.PROFILES.values()
-                   for label in p['rules']['allowed_key_types'])
+    assert all({'EC-BP256', 'EC-BP384', 'EC-BP512'} <= set(p['rules']['allowed_key_types'])
+               for p in compliance_profiles.PROFILES.values())
     rules['allowed_key_types'].append('x')
     rules['advisories']['allowed_key_types'].append('x')
     assert 'x' not in policy.get_rules()['allowed_key_types']
@@ -92,6 +92,24 @@ def test_edwards_keys_follow_the_arbitrage():
     assert 'ED25519' not in labels['eu-acm']['allowed_key_types']
     assert labels['eu-acm']['require_hsm_ca_key'] is True
 
+
+
+@pytest.mark.parametrize('profile, brainpool_notice, nist_notice', [
+    ('anssi', True, False), ('bsi', False, True), ('eu-acm', False, False)])
+def test_brainpool_is_accepted_and_advised_as_each_text_says(profile, brainpool_notice, nist_notice):
+    policy = [compliance_profiles.profile_policy(profile)]
+    for label, expect_notice in (('EC-BP256', brainpool_notice), ('EC-BP512', brainpool_notice),
+                                 ('EC-P256', nist_notice)):
+        notices = []
+        v, _, _ = PolicyEvaluationService.enforce_rules(policy, key_type=label, notify=False, notices=notices)
+        assert v == [], (profile, label, v)
+        assert bool(notices) is expect_notice, (profile, label, notices)
+
+
+def test_a_brainpool_tsa_signer_is_an_ec_signer_under_bsi():
+    policy = [compliance_profiles.profile_policy('bsi')]
+    v, _, _ = PolicyEvaluationService.enforce_rules(policy, key_type='EC-BP384', tsa_signer=True, notify=False)
+    assert v == []
 
 # ---- injection ---------------------------------------------------------------
 

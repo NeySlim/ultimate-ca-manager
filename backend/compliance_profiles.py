@@ -20,6 +20,7 @@ DEFAULT_SETTING = 'compliance_profile_default'
 
 _DIGESTS = ['sha256', 'sha384', 'sha512']
 _NIST_EC = ['EC-P256', 'EC-P384', 'EC-P521']
+_BRAINPOOL = ['EC-BP256', 'EC-BP384', 'EC-BP512']
 _RSA_STRONG = ['RSA-3072', 'RSA-4096']
 _EDWARDS = ['ED25519', 'ED448']
 
@@ -29,7 +30,8 @@ PROFILES = {
         'reference': 'ANSSI-PG-083 3.00',
         'url': 'https://messervices.cyber.gouv.fr/documents-guides/anssi-guide-mecanismes-crypto-3.00.pdf',
         'rules': {
-            'allowed_key_types': ['RSA-2048'] + _RSA_STRONG + _NIST_EC + _EDWARDS,
+            # Brainpool: listed among the curves, absent from the signature clause (advised against)
+            'allowed_key_types': ['RSA-2048'] + _RSA_STRONG + _NIST_EC + _BRAINPOOL + _EDWARDS,
             'allowed_digests': _DIGESTS,
             'allowed_signature_schemes': ['rsa_pkcs1v15', 'rsa_pss', 'ecdsa', 'eddsa'],
             'key_type_horizons': {'RSA-2048': '2030-12-31'},
@@ -49,16 +51,16 @@ PROFILES = {
         'url': 'https://www.bsi.bund.de/SharedDocs/Downloads/EN/BSI/Publications/'
                'TechGuidelines/TG02102/BSI-TR-02102-1.pdf',
         'rules': {
-            'allowed_key_types': _RSA_STRONG + _NIST_EC,
+            'allowed_key_types': _RSA_STRONG + _BRAINPOOL + _NIST_EC,
             'allowed_digests': _DIGESTS,
             'allowed_signature_schemes': ['rsa_pss', 'ecdsa'],
             'key_type_horizons': {},
             'require_hsm_ca_key': False,
             'pq_standalone': True,
-            'tsa_signer_key_types': _NIST_EC,
+            'tsa_signer_key_types': _BRAINPOOL + _NIST_EC,
             'advisories': {
-                'allowed_key_types': _RSA_STRONG,
-                'key_type_horizons': {k: '2035-12-31' for k in _RSA_STRONG + _NIST_EC},
+                'allowed_key_types': _RSA_STRONG + _BRAINPOOL,
+                'key_type_horizons': {k: '2035-12-31' for k in _RSA_STRONG + _BRAINPOOL + _NIST_EC},
             },
         },
     },
@@ -67,7 +69,7 @@ PROFILES = {
         'reference': 'ECCG-ACM 2.0',
         'url': 'https://certification.enisa.europa.eu/publications/eucc-guidelines-cryptography_en',
         'rules': {
-            'allowed_key_types': ['RSA-2048'] + _RSA_STRONG + _NIST_EC,
+            'allowed_key_types': ['RSA-2048'] + _RSA_STRONG + _NIST_EC + _BRAINPOOL,
             'allowed_digests': _DIGESTS,
             'allowed_signature_schemes': ['rsa_pkcs1v15', 'rsa_pss', 'ecdsa'],
             'key_type_horizons': {'RSA-2048': '2028-12-31'},
@@ -76,9 +78,9 @@ PROFILES = {
             'pq_standalone': True,
             'tsa_signer_key_types': [],
             'advisories': {
-                'allowed_key_types': _RSA_STRONG + _NIST_EC,
+                'allowed_key_types': _RSA_STRONG + _NIST_EC + _BRAINPOOL,
                 'allowed_signature_schemes': ['rsa_pss', 'ecdsa'],
-                'tsa_signer_key_types': _NIST_EC,
+                'tsa_signer_key_types': _NIST_EC + _BRAINPOOL,
             },
         },
     },
