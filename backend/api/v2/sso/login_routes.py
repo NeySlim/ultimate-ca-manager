@@ -1,5 +1,6 @@
 from . import bp, VALID_ROLES
-from .helpers import _get_ssl_verify, _cleanup_ssl_verify, _parse_json_field
+from .helpers import (_get_ssl_verify, _cleanup_ssl_verify, _parse_json_field,
+                      _extract_saml_groups)
 from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
 from . import saml_sp
 from flask import request, redirect, session, Response, after_this_request
@@ -463,7 +464,9 @@ def sso_callback(provider_type):
             user, error_code = _get_or_create_sso_user(
                 provider, username, email, fullname,
                 {'name_id': name_id, 'name_id_format': name_id_format,
-                 'attributes': {k: v for k, v in attrs.items()}}
+                 'attributes': {k: v for k, v in attrs.items()},
+                 # Role mapping reads a top-level 'groups' key (as OIDC/LDAP supply).
+                 'groups': _extract_saml_groups(attrs, attr_mapping)}
             )
 
             if not user:

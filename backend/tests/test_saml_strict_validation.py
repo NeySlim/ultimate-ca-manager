@@ -4,6 +4,7 @@ Audience, Destination, validity window, InResponseTo against the AuthnRequest
 this browser started, IdP-initiated opt-in and the replay cache.
 """
 import base64
+import json
 import os
 import datetime
 import uuid
@@ -96,13 +97,20 @@ def _ts(delta_minutes=0):
 
 def _response(idp_signer, *, in_response_to=None, sp_base=SP_BASE, audience=None,
               destination=None, issued=0, expires=5, assertion_id=None, name_id=None,
-              scd_expiry=True):
+              scd_expiry=True, attributes=None):
     irt = f' InResponseTo="{in_response_to}"' if in_response_to else ''
     destination = destination or f'{sp_base}{ACS}'
     audience = audience or f'{sp_base}{saml_sp.ENTITY_PATH}'
     assertion_id = assertion_id or f'_a{uuid.uuid4().hex}'
     name_id = name_id or f'saml-{uuid.uuid4().hex[:12]}'
     scd_nooa = f' NotOnOrAfter="{_ts(expires)}"' if scd_expiry else ''
+    attribute_statement = ''
+    if attributes:
+        attribute_statement = '<saml:AttributeStatement>' + ''.join(
+            f'<saml:Attribute Name="{name}">'
+            + ''.join(f'<saml:AttributeValue>{v}</saml:AttributeValue>' for v in values)
+            + '</saml:Attribute>'
+            for name, values in attributes.items()) + '</saml:AttributeStatement>'
     xml = f'''<samlp:Response xmlns:samlp="urn:oasis:names:tc:SAML:2.0:protocol"
  xmlns:saml="urn:oasis:names:tc:SAML:2.0:assertion" ID="_r{uuid.uuid4().hex}" Version="2.0"
  IssueInstant="{_ts(issued)}" Destination="{destination}"{irt}>
@@ -122,6 +130,7 @@ def _response(idp_signer, *, in_response_to=None, sp_base=SP_BASE, audience=None
   <saml:AuthnStatement AuthnInstant="{_ts(issued)}" SessionIndex="_s1">
    <saml:AuthnContext><saml:AuthnContextClassRef>urn:oasis:names:tc:SAML:2.0:ac:classes:Password</saml:AuthnContextClassRef></saml:AuthnContext>
   </saml:AuthnStatement>
+  {attribute_statement}
  </saml:Assertion>
 </samlp:Response>'''
     signed = OneLogin_Saml2_Utils.add_sign(xml, idp_signer[0], idp_signer[1],
@@ -157,6 +166,65 @@ def test_sp_initiated_login_is_accepted(app, provider, idp_signer):
     client = app.test_client()
     request_id = _start_login(client)
     assert _post(client, _response(idp_signer, in_response_to=request_id)) == OK
+
+
+ENTRA_GROUPS = 'http://schemas.microsoft.com/ws/2008/06/identity/claims/groups'
+
+
+@pytest.fixture
+def mapped_provider(app, provider):
+    """The provider with a role mapping; restored afterwards (it is module-wide)."""
+    def configure(**fields):
+        with app.app_context():
+            row = db.session.get(SSOProvider, provider)
+            for key, val in fields.items():
+                setattr(row, key, val)
+            db.session.commit()
+    yield configure
+    configure(role_mapping=None, attribute_mapping=None, sync_role_on_login=False)
+
+
+def _login_role(app, idp_signer, **response_args):
+    client = app.test_client()
+    request_id = _start_login(client)
+    name_id = f'saml-{uuid.uuid4().hex[:12]}'
+    resp = _response(idp_signer, in_response_to=request_id, name_id=name_id, **response_args)
+    assert _post(client, resp) == OK
+    with app.app_context():
+        return User.query.filter_by(sso_external_id=name_id).one().role, name_id
+
+
+def test_role_mapping_applies_the_groups_of_the_assertion(app, mapped_provider, idp_signer):
+    mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}))
+    role, _ = _login_role(app, idp_signer, attributes={ENTRA_GROUPS: ['other', 'pki-admins']})
+    assert role == 'admin'
+
+
+def test_role_mapping_reads_the_attribute_mapped_to_groups(app, mapped_provider, idp_signer):
+    mapped_provider(role_mapping=json.dumps({'pki-operators': 'operator'}),
+                    attribute_mapping=json.dumps({'memberships': 'groups'}))
+    role, _ = _login_role(app, idp_signer,
+                          attributes={'memberships': ['pki-operators'], 'groups': ['pki-admins']})
+    assert role == 'operator'
+
+
+def test_unmatched_groups_get_the_default_role(app, mapped_provider, idp_signer):
+    mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}))
+    role, _ = _login_role(app, idp_signer, attributes={'groups': ['someone-else']})
+    assert role == 'viewer'
+
+
+def test_role_sync_follows_the_groups_on_the_next_login(app, mapped_provider, idp_signer):
+    mapped_provider(role_mapping=json.dumps({'pki-admins': 'admin'}), sync_role_on_login=True)
+    role, name_id = _login_role(app, idp_signer)
+    assert role == 'viewer'
+    client = app.test_client()
+    request_id = _start_login(client)
+    resp = _response(idp_signer, in_response_to=request_id, name_id=name_id,
+                     attributes={'groups': ['pki-admins']})
+    assert _post(client, resp) == OK
+    with app.app_context():
+        assert User.query.filter_by(sso_external_id=name_id).one().role == 'admin'
 
 
 def _cookie_headers(r):

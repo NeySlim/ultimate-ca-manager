@@ -224,6 +224,81 @@ def _clear_ldap_failed_attempts(username):
             logger.error(f"Failed to clear LDAP failed attempts for {username}: {e}")
 
 
+# SAML attributes read for group membership when the provider's attribute
+# mapping names none: the plain name, and the claim URIs Microsoft Entra ID
+# (groups, app roles) and AD FS send by default.
+_SAML_GROUP_ATTRIBUTES = (
+    'groups',
+    'http://schemas.microsoft.com/ws/2008/06/identity/claims/groups',
+    'http://schemas.microsoft.com/ws/2008/06/identity/claims/role',
+    'http://schemas.xmlsoap.org/claims/Group',
+)
+# Sent by Entra ID in place of the groups claim when the user has too many groups.
+_ENTRA_GROUPS_OVERAGE = 'http://schemas.microsoft.com/claims/groups.link'
+# UCM fields an attribute mapping row can target.
+_MAPPING_FIELDS = ('username', 'email', 'fullname', 'groups')
+
+
+def _saml_group_attribute_names(attr_mapping):
+    """SAML attributes the provider's attribute mapping assigns to ``groups``.
+
+    The mapping form stores ``{SSO attribute: UCM field}``, so every attribute
+    mapped to ``groups`` is returned. ``{"groups": "<attribute>"}`` is accepted
+    as well. Anything that is not a non-empty string is ignored, so a malformed
+    mapping cannot break the login. Empty when no group attribute is configured.
+    """
+    if not isinstance(attr_mapping, dict):
+        return ()
+    names = {}
+    for key, val in attr_mapping.items():
+        if (isinstance(key, str) and key.strip() and isinstance(val, str)
+                and val.strip() == 'groups'):
+            names[key.strip()] = None
+    reverse = attr_mapping.get('groups')
+    if isinstance(reverse, str) and reverse.strip() and reverse.strip() not in _MAPPING_FIELDS:
+        names[reverse.strip()] = None
+    return tuple(names)
+
+
+def _extract_saml_groups(attrs, attr_mapping=None):
+    """Group / role values from a validated SAML assertion, for role mapping.
+
+    ``attrs`` is the ``{name: [values]}`` dict from the SAML library. When the
+    attribute mapping assigns attributes to ``groups``, only those are read and
+    the defaults in ``_SAML_GROUP_ATTRIBUTES`` are not. Returns the non-empty
+    values, de-duplicated in assertion order, for the top-level ``groups`` key
+    that ``_resolve_role_from_mapping`` reads.
+    """
+    attrs = attrs if isinstance(attrs, dict) else {}
+    configured = _saml_group_attribute_names(attr_mapping)
+    groups = {}  # insertion-ordered set
+    sources = []
+    for name in configured or _SAML_GROUP_ATTRIBUTES:
+        values = attrs.get(name)
+        if values is None:
+            continue
+        if isinstance(values, str):
+            values = [values]
+        before = len(groups)
+        for value in values:
+            value = str(value).strip() if value is not None else ''
+            if value:
+                groups[value] = None
+        if len(groups) > before:
+            sources.append(name)
+
+    if sources:
+        logger.info(f"SAML groups read from {', '.join(sources)} ({len(groups)} value(s))")
+    elif configured:
+        logger.info(f"SAML group attribute {', '.join(configured)} not in the assertion")
+    if not groups and _ENTRA_GROUPS_OVERAGE in attrs:
+        logger.warning(
+            "SAML assertion has no groups: Entra ID sent groups.link because the user "
+            "has too many groups. Emit only the groups assigned to the application, "
+            "or app roles, so role mapping can match.")
+    return list(groups)
+
+
 # Highest privilege first — multi-match resolution picks the greatest (#221).
 _ROLE_PRIVILEGE = {'admin': 3, 'operator': 2, 'auditor': 1, 'viewer': 0}
 

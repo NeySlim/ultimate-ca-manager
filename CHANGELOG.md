@@ -20,6 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- SAML: role mappings now take effect, so review Role Mapping on SAML providers before upgrading, especially with "Sync role on every login" on (see Fixed).
 - Helm chart: `podSecurityContext` and `securityContext` now default to the non-root user 1000 with `fsGroup` 1000; values that set them keep theirs.
 - Signature hashes: SHA-224 is no longer accepted, and an unknown hash name is refused where it used to be signed in SHA-256 without a word; UCM signs with SHA-256, SHA-384 or SHA-512.
 - API keys: the password, e-mail, 2FA, passkey, mTLS certificate and session routes of the account now refuse API keys, even `*` ones, and so do the user administration routes when they target the key's own owner; scripts that used them must sign in with a session (see Security).
@@ -40,6 +41,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- SAML: logins now apply the provider's role mapping, which never received the assertion's groups, so every SAML user got the default role; groups are read from `groups` and the Entra ID / AD FS group and role claims, or from the attributes mapped to `groups` (#408, thanks @clinde04).
 - EST: `/csrattrs` no longer asks for a challengePassword, which UCM never checked; the FortiOS EST client took it as a request for proof-of-possession and hung on `/simpleenroll`.
 - EST: re-enrolment over native mTLS failed for every client with "Invalid client certificate": the TLS worker hands the client certificate over as DER and `/simplereenroll` read it as PEM; it is now converted, and `/serverkeygen` with a client certificate is fixed the same way.
 - EST: responses carried their base64 on one unbroken line, which RFC 2045 (the transfer encoding RFC 7030 uses) limits to 76 characters; clients decoding with OpenSSL's base64 BIO, the FortiOS EST client among them, failed on `/cacerts` with "Failed to decode base64 msg". Responses are now wrapped at 64 characters.
