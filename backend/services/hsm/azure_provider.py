@@ -241,7 +241,8 @@ class AzureKeyVaultProvider(BaseHsmProvider):
                 algorithm=algorithm,
                 key_type='asymmetric',  # Azure Key Vault mainly handles asymmetric
                 purpose=purpose,
-                is_extractable=not is_hsm
+                is_extractable=not is_hsm,
+                metadata={'protection_level': 'HSM' if is_hsm else 'SOFTWARE'}
             )
             
         except Exception as e:
@@ -304,7 +305,8 @@ class AzureKeyVaultProvider(BaseHsmProvider):
                 key_type='asymmetric',
                 purpose=purpose,
                 public_key_pem=public_key_pem,
-                is_extractable=extractable
+                is_extractable=extractable,
+                metadata={'protection_level': 'HSM'}  # hardware_protected=True above
             )
             
         except AzureError as e:

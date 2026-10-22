@@ -2358,7 +2358,8 @@ the rule; a recommendation comes back in `meta.notices` of the issuance response
 **Policy rule keys.** Policies (`rules`) also accept `allowed_signature_schemes`
 (`rsa_pkcs1v15`, `rsa_pss`, `ecdsa`, `eddsa`, `ml_dsa`, `slh_dsa`), `key_type_horizons` (`{"RSA-2048": "2030-12-31"}`:
 the certificate must not be valid beyond the date), `key_type_issue_until` (no issuance of that
-key type after the date), `require_hsm_ca_key` (boolean, software and SoftHSM CA keys refused),
+key type after the date), `require_hsm_ca_key` (boolean: software, SoftHSM and OpenBao CA keys refused, an Azure or Google
+key accepted only when its protection level is HSM),
 `tsa_signer_key_types`, `pq_standalone` (boolean) and `advisories` (an object using the same
 keys, producing notices instead of refusals). A policy whose `allowed_key_types` holds only
 unknown labels refuses issuance.

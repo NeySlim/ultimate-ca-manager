@@ -178,6 +178,29 @@ class TestHsmAndTsa:
         vendor = SimpleNamespace(type='pkcs11', name='HSM', get_config=lambda: {'module_path': '/opt/v/lib.so'})
         assert compliance_signer.storage_for_hsm_key(SimpleNamespace(provider=vendor)) == 'hsm'
 
+    @pytest.mark.parametrize('kind, protection, storage', [
+        ('pkcs11', None, 'hsm'), ('aws-cloudhsm', None, 'hsm'), ('openbao', 'HSM', 'software'),
+        ('azure-keyvault', 'HSM', 'hsm'), ('azure-keyvault', 'SOFTWARE', 'software'),
+        ('azure-keyvault', None, 'software'), ('google-kms', 'HSM', 'hsm'),
+        ('google-kms', 'SOFTWARE', 'software'), ('google-kms', None, 'software'),
+        ('future-kms', 'HSM', 'software'),
+    ])
+    def test_a_cloud_key_counts_as_hsm_only_when_its_provider_says_so(self, kind, protection, storage):
+        provider = SimpleNamespace(type=kind, name='vault', get_config=lambda: {'module_path': '/opt/v/lib.so'})
+        metadata = {'protection_level': protection} if protection else {}
+        key = SimpleNamespace(provider=provider, get_metadata=lambda: metadata)
+        assert compliance_signer.storage_for_hsm_key(key) == storage
+
+    def test_a_key_about_to_be_generated_takes_the_protection_it_will_get(self):
+        def provider(kind, config=None):
+            return SimpleNamespace(type=kind, name='vault', get_config=lambda: config or {})
+        assert compliance_signer.storage_for_new_key(provider('azure-keyvault')) == 'hsm'
+        assert compliance_signer.storage_for_new_key(provider('google-kms')) == 'hsm'
+        assert compliance_signer.storage_for_new_key(
+            provider('google-kms', {'protection_level': 'SOFTWARE'})) == 'software'
+        assert compliance_signer.storage_for_new_key(provider('openbao')) == 'software'
+        assert compliance_signer.storage_for_new_key(None) == 'software'
+
     def test_a_planned_ca_on_a_missing_hsm_row_is_not_an_hsm(self, app):
         from services.ca.ca_creation import _planned_signer
         with app.app_context():

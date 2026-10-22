@@ -220,7 +220,8 @@ def _ca_horizon(ctx):
 
 @graded('ca.key_protection',
         'Certificate authorities whose key is not in a hardware module, which the profile requires',
-        'Create an authority whose key lives in an HSM (SoftHSM does not count) and move issuance to it.',
+        'Create an authority whose key lives in an HSM (SoftHSM, OpenBao and software-protected cloud keys '
+        'do not count) and move issuance to it; for an Azure or Google key, sync the provider keys first.',
         'Certificate authorities whose key is not in a hardware module, which the profile recommends')
 def _ca_hsm(ctx):
     grade = ctx.flag_grade('require_hsm_ca_key')

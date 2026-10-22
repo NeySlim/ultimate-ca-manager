@@ -173,6 +173,23 @@ def test_hardware_key_is_required_under_eu_acm_only(session):
     assert _finding(_report('bsi'), 'ca.key_protection') is None
 
 
+def test_vault_and_software_cloud_keys_are_not_hardware_under_eu_acm(session):
+    for name, kind, metadata in (('bao', 'openbao', None), ('az-soft', 'azure-keyvault', 'SOFTWARE'),
+                                 ('az-unsynced', 'azure-keyvault', None), ('gcp-hsm', 'google-kms', 'HSM')):
+        provider = HsmProvider(name=name, type=kind, config='{}')
+        session.add(provider)
+        session.flush()
+        key = HsmKey(provider_id=provider.id, key_identifier=name, label=name, algorithm='EC-P384',
+                     key_type='asymmetric', purpose='signing',
+                     extra_data=json.dumps({'protection_level': metadata}) if metadata else None)
+        session.add(key)
+        session.flush()
+        _ca('p384', f'{name}-root', hsm_key_id=key.id)
+    finding = _assert(_report('eu-acm'), 'ca.key_protection', 'blocker',
+                      'bao-root', 'az-soft-root', 'az-unsynced-root', count=3)
+    assert not any('gcp-hsm-root' in e for e in finding['examples'])
+
+
 def test_an_authority_without_a_signing_key_is_left_alone(session):
     ca = _ca('rsa2048', 'trust-anchor', days=_years(10))
     ca.prv = None

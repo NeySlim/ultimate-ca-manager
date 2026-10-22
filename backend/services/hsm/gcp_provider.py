@@ -299,7 +299,8 @@ class GcpKmsProvider(BaseHsmProvider):
                 key_type='asymmetric',
                 purpose=purpose,
                 public_key_pem=public_key_pem,
-                is_extractable=False
+                is_extractable=False,
+                metadata={'protection_level': protection.name}
             )
             
         except gcp_exceptions.AlreadyExists:

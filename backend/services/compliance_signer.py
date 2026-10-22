@@ -30,13 +30,45 @@ def softhsm_provider(provider):
     return 'softhsm' in module.lower() or 'softhsm' in (provider.name or '').lower()
 
 
+# Providers whose keys are all in hardware; a cloud key says so key by key
+_HARDWARE_PROVIDERS = ('pkcs11', 'aws-cloudhsm')
+_CLOUD_PROVIDERS = ('azure-keyvault', 'google-kms')
+
+
+def storage_for_provider(provider, protection_level=None):
+    """``softhsm`` / ``hsm`` / ``software`` for a key on *provider*: a cloud key
+    is an HSM key only when its protection level is HSM, an OpenBao key never."""
+    if provider is None:
+        return 'software'
+    if provider.type in _HARDWARE_PROVIDERS:
+        return 'softhsm' if softhsm_provider(provider) else 'hsm'
+    if provider.type in _CLOUD_PROVIDERS and str(protection_level or '').upper() == 'HSM':
+        return 'hsm'
+    return 'software'
+
+
+def storage_for_new_key(provider):
+    """Storage of a key UCM is about to generate on *provider*: Azure always
+    asks for an HSM key, Google for the provider's protection level."""
+    level = None
+    if provider is not None and provider.type == 'azure-keyvault':
+        level = 'HSM'
+    elif provider is not None and provider.type == 'google-kms':
+        level = (provider.get_config() or {}).get('protection_level', 'HSM')
+    return storage_for_provider(provider, level)
+
+
 def storage_for_hsm_key(hsm_key):
-    """``softhsm`` / ``hsm`` for a stored HSM key row; ``software`` when the row
-    or its provider is missing or unreadable, so an HSM rule fails closed."""
-    if hsm_key is None or hsm_key.provider is None:
+    """Storage of a stored HSM key row; ``software`` when the row, its provider
+    or its protection level cannot be read, so an HSM rule fails closed."""
+    if hsm_key is None:
         return 'software'
     try:
-        return 'softhsm' if softhsm_provider(hsm_key.provider) else 'hsm'
+        provider = hsm_key.provider
+        level = None
+        if provider is not None and provider.type in _CLOUD_PROVIDERS:
+            level = (hsm_key.get_metadata() or {}).get('protection_level')
+        return storage_for_provider(provider, level)
     except Exception:
         return 'software'
 

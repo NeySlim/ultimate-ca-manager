@@ -618,6 +618,10 @@ class HsmService:
                     db.session.add(key)
                     added += 1
                 else:
+                    level = (key_info.metadata or {}).get('protection_level')
+                    if level:
+                        known = db_keys[key_info.key_identifier]
+                        known.set_metadata({**known.get_metadata(), 'protection_level': level})
                     unchanged += 1
             
             # A partial listing proves nothing missing; a referenced key is never dropped

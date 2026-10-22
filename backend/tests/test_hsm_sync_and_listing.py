@@ -167,6 +167,19 @@ class TestAzureCurveLabels:
         assert 'BEGIN PUBLIC KEY' in provider._export_public_key(key)
         assert provider._key_to_key_info(_azure_ec_key('P-521', ec.SECP521R1())).algorithm == 'EC-P521'
 
+    def test_the_protection_level_is_read_from_the_key_type(self):
+        provider = _azure_provider()
+        hsm = _azure_ec_key(azure_keys.KeyCurveName.p_384)
+        soft = SimpleNamespace(**{**vars(hsm), 'key_type': azure_keys.KeyType.ec})
+        assert provider._key_to_key_info(hsm).metadata == {'protection_level': 'HSM'}
+        assert provider._key_to_key_info(soft).metadata == {'protection_level': 'SOFTWARE'}
+
+    def test_a_generated_key_is_recorded_as_hsm_protected(self):
+        provider = _azure_provider()
+        provider._key_client = SimpleNamespace(
+            create_ec_key=lambda **kw: _azure_ec_key(azure_keys.KeyCurveName.p_384))
+        assert provider.generate_key('ca', 'EC-P384').metadata == {'protection_level': 'HSM'}
+
     def test_a_key_that_cannot_be_fetched_is_reported(self):
         provider = _azure_provider()
 
@@ -265,6 +278,16 @@ class TestSyncKeys:
             assert result['removed'] == 0
             assert result['listing_errors'] == 1 and result['missing_kept'] == 1
             assert _surviving(app, pid) == {'a', 'b'}
+
+    def test_a_listed_key_refreshes_its_protection_level(self, app):
+        from models import db
+        from models.hsm import HsmKey
+        with _provider_with_keys(app, 'protection', ['a']) as (pid, ids, _ca):
+            listed = _info('a')
+            listed.metadata = {'protection_level': 'HSM'}
+            _sync(app, pid, _ListingProvider([listed]))
+            with app.app_context():
+                assert db.session.get(HsmKey, ids['a']).get_metadata()['protection_level'] == 'HSM'
 
     def test_an_unreferenced_missing_key_is_still_removed(self, app):
         with _provider_with_keys(app, 'clean', ['a', 'gone']) as (pid, _ids, _ca):
@@ -373,3 +396,17 @@ def test_gcp_lists_its_keys_and_reports_an_unread_one():
     assert [k.label for k in keys] == ['ca-key']
     assert keys[0].purpose == 'signing'
     assert len(provider.list_errors) == 1 and 'broken' in provider.list_errors[0]
+
+
+@pytest.mark.parametrize('level', ['HSM', 'SOFTWARE'])
+def test_gcp_records_the_protection_level_of_a_generated_key(level):
+    pytest.importorskip('google.cloud.kms_v1')
+    from services.hsm.gcp_provider import GcpKmsProvider
+    provider = GcpKmsProvider.__new__(GcpKmsProvider)
+    provider._key_ring_path = 'projects/p/locations/l/keyRings/r'
+    provider.protection_level = level
+    provider._client = SimpleNamespace(create_crypto_key=lambda **kw: SimpleNamespace(
+        name=f"{kw['parent']}/cryptoKeys/{kw['crypto_key_id']}"))
+    with patch.object(GcpKmsProvider, '_get_primary_public_key', return_value=None):
+        info = provider.generate_key('ca-key', 'EC-P256')
+    assert info.metadata == {'protection_level': level}
