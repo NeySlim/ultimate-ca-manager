@@ -688,3 +688,30 @@ def test_an_oversized_assertion_id_is_not_reported_as_a_replay(app, provider, id
     resp = _response(idp_signer, in_response_to=request_id, assertion_id='_' + 'a' * 300)
     _refused(caplog, client, resp, 'assertion ID missing or longer than 256 characters')
     assert 'replay' not in caplog.text
+
+
+def test_attribute_mapping_is_read_in_the_form_direction(app, mapped_provider, idp_signer):
+    # The form stores {SSO attribute: UCM field} (#408).
+    mapped_provider(attribute_mapping=json.dumps({'upn': 'username', 'mail': 'email'}))
+    _, name_id = _login_role(app, idp_signer, attributes={'upn': ['jdoe@corp.example'],
+                                                          'mail': ['jdoe@corp.example']})
+    with app.app_context():
+        user = User.query.filter_by(sso_external_id=name_id).one()
+        assert (user.username, user.email) == ('jdoe@corp.example', 'jdoe@corp.example')
+
+
+def test_custom_role_follows_the_mapping_through_the_callback(app, mapped_provider, idp_signer):
+    from models.rbac import CustomRole
+    with app.app_context():
+        role = CustomRole.query.filter_by(name='saml-e2e-role').first()
+        if role is None:
+            role = CustomRole(name='saml-e2e-role', description='e2e', permissions='[]')
+            db.session.add(role)
+            db.session.commit()
+        role_id = role.id
+    mapped_provider(role_mapping=json.dumps(
+        {'pki-ops': {'role': 'operator', 'custom_role': 'saml-e2e-role'}}))
+    _, name_id = _login_role(app, idp_signer, attributes={'groups': ['pki-ops']})
+    with app.app_context():
+        user = User.query.filter_by(sso_external_id=name_id).one()
+        assert (user.role, user.custom_role_id, user.custom_role_source) == ('operator', role_id, 'sso')

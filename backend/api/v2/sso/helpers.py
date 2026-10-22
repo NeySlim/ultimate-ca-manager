@@ -239,25 +239,64 @@ _ENTRA_GROUPS_OVERAGE = 'http://schemas.microsoft.com/claims/groups.link'
 _MAPPING_FIELDS = ('username', 'email', 'fullname', 'groups')
 
 
-def _saml_group_attribute_names(attr_mapping):
-    """SAML attributes the provider's attribute mapping assigns to ``groups``.
+def mapped_attributes(attr_mapping, field):
+    """SSO attributes the mapping assigns to the UCM ``field``.
 
-    The mapping form stores ``{SSO attribute: UCM field}``, so every attribute
-    mapped to ``groups`` is returned. ``{"groups": "<attribute>"}`` is accepted
-    as well. Anything that is not a non-empty string is ignored, so a malformed
-    mapping cannot break the login. Empty when no group attribute is configured.
+    The form stores ``{SSO attribute: UCM field}``; the legacy shape
+    ``{UCM field: SSO attribute}`` is accepted when no row targets ``field``
+    and the value is not itself a UCM field name. Malformed entries are ignored.
     """
     if not isinstance(attr_mapping, dict):
         return ()
     names = {}
     for key, val in attr_mapping.items():
         if (isinstance(key, str) and key.strip() and isinstance(val, str)
-                and val.strip() == 'groups'):
+                and val.strip() == field):
             names[key.strip()] = None
-    reverse = attr_mapping.get('groups')
-    if isinstance(reverse, str) and reverse.strip() and reverse.strip() not in _MAPPING_FIELDS:
-        names[reverse.strip()] = None
-    return tuple(names)
+    if names:
+        return tuple(names)
+    legacy = attr_mapping.get(field)
+    if isinstance(legacy, str) and legacy.strip() and legacy.strip() not in _MAPPING_FIELDS:
+        return (legacy.strip(),)
+    return ()
+
+
+def mapped_attribute(attr_mapping, field, default):
+    """First SSO attribute mapped to ``field``, else ``default``."""
+    names = mapped_attributes(attr_mapping, field)
+    return names[0] if names else default
+
+
+def _saml_group_attribute_names(attr_mapping):
+    """SAML attributes mapped to ``groups``; empty when none is configured."""
+    return mapped_attributes(attr_mapping, 'groups')
+
+
+def oidc_identity(userinfo, attr_mapping):
+    """(username, email, fullname) from OIDC userinfo through the attribute mapping."""
+    userinfo = userinfo if isinstance(userinfo, dict) else {}
+
+    def get(field, default):
+        value = userinfo.get(mapped_attribute(attr_mapping, field, default))
+        return value if isinstance(value, str) else ''
+
+    email = get('email', 'email')
+    username = get('username', 'preferred_username') or (userinfo.get('email') or '').split('@')[0]
+    return username, email, get('fullname', 'name')
+
+
+def saml_identity(attrs, name_id, attr_mapping):
+    """(username, email, fullname) from SAML attributes through the attribute mapping."""
+    attrs = attrs if isinstance(attrs, dict) else {}
+
+    def get(field, default):
+        values = attrs.get(mapped_attribute(attr_mapping, field, default))
+        if isinstance(values, (list, tuple)):
+            values = values[0] if values else None
+        return values.strip() if isinstance(values, str) else ''
+
+    return get('username', 'username') or (name_id or '').strip(), \
+        get('email', 'email'), get('fullname', 'name')
 
 
 def _extract_saml_groups(attrs, attr_mapping=None):
@@ -303,44 +342,144 @@ def _extract_saml_groups(attrs, attr_mapping=None):
 _ROLE_PRIVILEGE = {'admin': 3, 'operator': 2, 'auditor': 1, 'viewer': 0}
 
 
-def _resolve_role_from_mapping(provider, external_data):
-    """Try to resolve a role from the configured role_mapping.
+def _find_custom_role(name):
+    """The custom role called ``name`` (names are unique, case-insensitively), or None."""
+    from models.rbac import CustomRole
+    if not isinstance(name, str) or not name.strip():
+        return None
+    return CustomRole.query.filter(
+        db.func.lower(CustomRole.name) == name.strip().lower()).first()
 
-    When several of the user's external groups match mapping entries, the
-    highest-privilege mapped role wins (admin > operator > auditor >
-    viewer, #221) — entry order in the mapping is irrelevant. Returns
-    ``None`` when no mapping is configured or no group matches — the
-    caller is then responsible for deciding whether to fall back to
-    ``default_role`` (creation only) or to keep the stored role
-    (existing user, see #81).
+
+def _split_mapping_value(value):
+    """``(base_role, custom_role_name)`` of a role_mapping value; either may be None.
+
+    A string is a base role; an object carries ``role`` and/or ``custom_role``.
+    """
+    if isinstance(value, dict):
+        return value.get('role') or None, value.get('custom_role') or None
+    return (value or None), None
+
+
+def mapped_custom_role_names(role_mapping):
+    """Custom role names a role_mapping refers to."""
+    return {name for name in (_split_mapping_value(v)[1] for v in (role_mapping or {}).values())
+            if isinstance(name, str)}
+
+
+def validate_role_mapping(value):
+    """Check a role_mapping at save time. Returns ``(normalized_dict, error)``.
+
+    Rows with no key and no value (blank editor rows) are dropped.
+    """
+    if isinstance(value, str):
+        try:
+            value = json.loads(value)
+        except ValueError:
+            return None, "role_mapping is not valid JSON"
+    if value is None:
+        return {}, None
+    if not isinstance(value, dict):
+        return None, "role_mapping must be an object mapping external groups to roles"
+    cleaned = {}
+    for group, entry in value.items():
+        blank = entry in (None, '', {}) or (isinstance(entry, dict) and not any(entry.values()))
+        if not isinstance(group, str) or not group.strip():
+            if blank:
+                continue
+            return None, "role_mapping has an entry without an external group name"
+        if isinstance(entry, dict):
+            if set(entry) - {'role', 'custom_role'}:
+                return None, f"role_mapping entry '{group}' has unknown keys (allowed: role, custom_role)"
+        elif not isinstance(entry, str):
+            return None, f"role_mapping entry '{group}' must be a role name or an object"
+        role, custom = _split_mapping_value(entry)
+        if role is not None and (not isinstance(role, str) or role not in VALID_ROLES):
+            return None, (f"role_mapping entry '{group}': invalid role '{role}'. "
+                          f"Must be one of: {', '.join(sorted(VALID_ROLES))}")
+        if custom is not None:
+            if not isinstance(custom, str) or _find_custom_role(custom) is None:
+                return None, f"role_mapping entry '{group}': custom role '{custom}' does not exist"
+        if role is None and custom is None:
+            return None, f"role_mapping entry '{group}' needs a role or a custom role"
+        cleaned[group] = entry
+    return cleaned, None
+
+
+def providers_using_custom_role(name):
+    """Names of the SSO providers whose role_mapping cites the custom role ``name``."""
+    from models.sso import SSOProvider
+    wanted = (name or '').strip().lower()
+    users = []
+    for provider in SSOProvider.query.all():
+        cited = mapped_custom_role_names(_parse_json_field(provider.role_mapping))
+        if any(c.strip().lower() == wanted for c in cited):
+            users.append(provider.name)
+    return users
+
+
+def _resolve_mapped_roles(provider, external_data):
+    """``(base_role, custom_role)`` the role_mapping gives, either may be None.
+
+    Base role: the highest-privilege one among matching entries (admin >
+    operator > auditor > viewer, #221). Custom role: the first matching entry,
+    in mapping order, that names one. An invalid base role counts as viewer
+    (as before) and an unknown custom role is ignored, both with a warning.
     """
     role_mapping = _parse_json_field(provider.role_mapping)
-    if not role_mapping:
-        return None
+    if not role_mapping or not isinstance(role_mapping, dict):
+        return None, None
     external_roles = external_data.get('roles', external_data.get('groups', []))
     if isinstance(external_roles, str):
         external_roles = [external_roles]
     logger.info(f"Role resolution: mapping={role_mapping}, external_groups={external_roles}")
-    matches = [
-        (ucm_role if ucm_role in VALID_ROLES else 'viewer', ext_role)
-        for ext_role, ucm_role in role_mapping.items()
-        if ext_role in external_roles
-    ]
-    if not matches:
-        return None
-    resolved, ext_role = max(matches, key=lambda m: _ROLE_PRIVILEGE[m[0]])
-    logger.info(f"Role resolved via mapping: {ext_role} -> {resolved} (highest privilege of {len(matches)} match(es))")
-    return resolved
+    bases, customs = [], []
+    for ext_role, value in role_mapping.items():
+        if ext_role not in external_roles:
+            continue
+        base, custom_name = _split_mapping_value(value)
+        if base is not None:
+            if isinstance(base, str) and base in VALID_ROLES:
+                bases.append((base, ext_role))
+            else:
+                logger.warning(f"Role mapping for '{ext_role}': invalid role {base!r}, using viewer")
+                bases.append(('viewer', ext_role))
+        if custom_name is not None:
+            custom = _find_custom_role(custom_name)
+            if custom is not None:
+                customs.append((custom, ext_role))
+            else:
+                logger.warning(f"Role mapping for '{ext_role}': ignoring unknown custom role {custom_name!r}")
+    resolved = custom = None
+    if bases:
+        resolved, ext_role = max(bases, key=lambda m: _ROLE_PRIVILEGE[m[0]])
+        logger.info(f"Role resolved via mapping: {ext_role} -> {resolved} (highest privilege of {len(bases)} match(es))")
+    if customs:
+        custom = customs[0][0]
+        if len({c.id for c, _ in customs}) > 1:
+            logger.warning(f"Role mapping: several custom roles match, using '{custom.name}' "
+                           f"(first in mapping order)")
+    return resolved, custom
 
 
-def _resolve_role(provider, external_data):
+def _resolve_role_from_mapping(provider, external_data):
+    """Base role from the role_mapping, or ``None`` when none applies.
+
+    ``None`` means the caller decides: ``default_role`` at creation, the stored
+    role for an existing user (#81).
+    """
+    return _resolve_mapped_roles(provider, external_data)[0]
+
+
+def _resolve_role(provider, external_data, mapped=None):
     """Resolve user role for **user creation** — uses role_mapping then
     falls back to ``default_role``. Do NOT use this on existing users:
     that behaviour caused #81 (UI role overwritten on every SSO login).
     For existing users, use :func:`_resolve_role_from_mapping` and check
-    ``provider.sync_role_on_login``.
+    ``provider.sync_role_on_login``. ``mapped`` is an already resolved base role.
     """
-    mapped = _resolve_role_from_mapping(provider, external_data)
+    if mapped is None:
+        mapped = _resolve_role_from_mapping(provider, external_data)
     if mapped is not None:
         return mapped
     fallback = provider.default_role if provider.default_role in VALID_ROLES else 'viewer'

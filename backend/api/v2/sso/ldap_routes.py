@@ -21,7 +21,7 @@ from ldap3 import Server, Connection, ALL, Tls
 from ldap3.utils.conv import escape_filter_chars
 import ssl
 from . import saml_sp
-from .helpers import _check_ldap_lockout, _clear_ldap_failed_attempts, _record_ldap_failed_attempt, _resolve_role_from_mapping, _resolve_role, _build_ldap_tls, _decrypt_ldap_password
+from .helpers import _check_ldap_lockout, _clear_ldap_failed_attempts, _record_ldap_failed_attempt, _resolve_mapped_roles, _resolve_role, _build_ldap_tls, _decrypt_ldap_password
 
 @bp.route('/api/v2/sso/ldap/login', methods=['POST'])
 @limiter.limit("5/minute")
@@ -343,8 +343,9 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         # then managed in the UCM UI. Re-sync on login is opt-in via
         # `sync_role_on_login` and only acts on an explicit role_mapping
         # match — never falls back to `default_role` for existing users.
+        custom_change = None
         if provider.sync_role_on_login:
-            mapped_role = _resolve_role_from_mapping(provider, external_data)
+            mapped_role, mapped_custom = _resolve_mapped_roles(provider, external_data)
             if mapped_role is not None and user.role != mapped_role:
                 logger.info(
                     f"SSO role sync: user {username} role changed "
@@ -352,6 +353,18 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
                 )
                 role_change = (user.role, mapped_role)
                 user.role = mapped_role
+            # A custom role set by hand (source NULL) is never removed.
+            current = user.custom_role.name if user.custom_role_id and user.custom_role else None
+            if mapped_custom is not None:
+                if user.custom_role_id != mapped_custom.id:
+                    custom_change = (current, mapped_custom.name)
+                    user.custom_role_id = mapped_custom.id
+                user.custom_role_source = 'sso'
+            elif user.custom_role_source == 'sso':
+                if user.custom_role_id is not None:
+                    custom_change = (current, None)
+                user.custom_role_id = None
+                user.custom_role_source = None
 
         user.last_login = utc_now()
         try:
@@ -359,7 +372,7 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to update SSO user {username}: {e}")
-            role_change = None
+            role_change = custom_change = None
 
         if role_change:
             # Recorded once the new role is committed, and from the values
@@ -379,6 +392,20 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
                 ),
                 success=True
             )
+        if custom_change:
+            from services.audit_service import AuditService
+            AuditService.log_action(
+                action='role_change',
+                resource_type='user',
+                resource_name=username,
+                username=username,
+                details=(
+                    f"SSO role sync: custom role changed from "
+                    f"{custom_change[0] or 'none'} to {custom_change[1] or 'none'} "
+                    f"(role_mapping match)"
+                ),
+                success=True
+            )
         return user, None
 
     # Create new user if auto_create is enabled
@@ -394,7 +421,8 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
     effective_email = email or f'{username}@sso.local'
 
     # Creation path keeps the historical fallback to default_role.
-    role = _resolve_role(provider, external_data)
+    mapped_role, mapped_custom = _resolve_mapped_roles(provider, external_data)
+    role = _resolve_role(provider, external_data, mapped=mapped_role)
 
     user = User(
         username=username,
@@ -407,6 +435,9 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
         sso_provider_id=provider.id,
         sso_external_id=external_id,
     )
+    if mapped_custom is not None:
+        user.custom_role_id = mapped_custom.id
+        user.custom_role_source = 'sso'
 
     # SSO users don't have a password — use sentinel that cannot match any hash
     user.password_hash = '!SSO_NO_PASSWORD!'

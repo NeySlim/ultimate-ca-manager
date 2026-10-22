@@ -7,7 +7,7 @@ from models import db
 from models.sso import SSOProvider, SSOSession
 from services.audit_service import AuditService
 import json
-from .helpers import _encrypt_ldap_password, _parse_json_field, _parse_group_list
+from .helpers import _encrypt_ldap_password, _parse_json_field, _parse_group_list, validate_role_mapping
 from .connection_tests import _test_ldap_connection, _test_oauth2_connection, _test_saml_connection
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from utils.secret_target import MASKS, keeps_saved_secret, retarget_error
@@ -191,9 +191,10 @@ def create_provider():
             val = json.loads(val)
         provider.attribute_mapping = json.dumps(val)
     if data.get('role_mapping'):
-        val = data['role_mapping']
-        if isinstance(val, str):
-            val = json.loads(val)
+        val, role_error = validate_role_mapping(data['role_mapping'])
+        if role_error:
+            db.session.rollback()
+            return error_response(role_error, 400)
         provider.role_mapping = json.dumps(val)
 
     signing_error = _sp_signing_error(provider)
@@ -365,9 +366,10 @@ def update_provider(provider_id=None, provider_type_name=None):
             val = json.loads(val)
         provider.attribute_mapping = json.dumps(val)
     if 'role_mapping' in data:
-        val = data['role_mapping']
-        if isinstance(val, str):
-            val = json.loads(val)
+        val, role_error = validate_role_mapping(data['role_mapping'])
+        if role_error:
+            db.session.rollback()
+            return error_response(role_error, 400)
         provider.role_mapping = json.dumps(val)
 
     if 'saml_sign_requests' in data or 'saml_sp_cert_source' in data:

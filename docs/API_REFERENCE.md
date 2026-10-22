@@ -1605,6 +1605,14 @@ GET /api/v2/rbac/roles/{role}
 GET /api/v2/rbac/permissions
 ```
 
+### Update or Delete a Custom Role
+```http
+PUT /api/v2/rbac/roles/{role_id}
+DELETE /api/v2/rbac/roles/{role_id}
+```
+
+Renaming or deleting a custom role that an SSO provider's `role_mapping` cites is refused with `409`; the message lists the providers. Update the mapping first. A user's `custom_role_source` is `"sso"` when the role came from the SSO role mapping and `null` when it was assigned by hand; writing `custom_role_id` through `PUT /api/v2/users/{user_id}` resets it to `null`.
+
 ---
 
 ## Dashboard
@@ -2945,6 +2953,26 @@ Content-Type: application/json
 ```
 
 Additional fields depend on `provider_type` (ldap, oauth2, saml).
+
+#### Role mapping
+
+`role_mapping` maps an external group to a UCM role. Each value is either a base role (`admin`, `operator`, `auditor`, `viewer`) or an object naming a base role, a custom role, or both:
+
+```json
+{
+  "role_mapping": {
+    "pki-admins": "admin",
+    "pki-auditors": { "role": "auditor", "custom_role": "Certificate Reviewer" },
+    "pki-helpdesk": { "custom_role": "Helpdesk" }
+  }
+}
+```
+
+Custom roles are referenced by name. Among the groups a user belongs to, the base role is the most privileged one given; the custom role is the first one, in mapping order, that names one. A custom role never grants the permissions reserved to administrators.
+
+The mapping is checked when the provider is created or updated: an unknown base role, an unknown custom role or a malformed entry returns `400` and nothing is saved. At login, a value that has become invalid is not trusted: an invalid base role counts as `viewer` and an unknown custom role is ignored.
+
+With `sync_role_on_login` on, each login also updates the custom role, and removes it when no matching group names one, but only if it came from the mapping (`custom_role_source` is `"sso"`). A custom role assigned by hand is never removed. Changes are recorded in the audit log as `role_change`.
 
 ### Update SSO Provider (admin)
 ```http

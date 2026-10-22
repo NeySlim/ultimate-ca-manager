@@ -53,6 +53,7 @@ class User(db.Model):
     full_name = db.Column(db.String(255))  # Full name for WebAuthn/certificates
     role = db.Column(db.String(20), nullable=False, default="viewer")  # see auth.permissions.BUILTIN_ROLES
     custom_role_id = db.Column(db.Integer, db.ForeignKey('pro_custom_roles.id', ondelete='SET NULL'), nullable=True)
+    custom_role_source = db.Column(db.String(16), nullable=True)  # 'sso' = from the SSO role mapping; NULL = by hand
     active = db.Column(db.Boolean, default=True)
     # Never set by anything: the 2FA state is totp_confirmed. Kept for older databases.
     mfa_enabled = db.Column(db.Boolean, default=False)
@@ -151,6 +152,7 @@ class User(db.Model):
             "full_name": self.full_name,
             "role": self.role,
             "custom_role_id": self.custom_role_id,
+            "custom_role_source": self.custom_role_source,
             "active": self.active,
             "totp_enabled": self.totp_confirmed,
             "two_factor_enabled": self.second_factor_required(),

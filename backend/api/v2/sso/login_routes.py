@@ -1,6 +1,6 @@
 from . import bp, VALID_ROLES
 from .helpers import (_get_ssl_verify, _cleanup_ssl_verify, _parse_json_field,
-                      _extract_saml_groups)
+                      _extract_saml_groups, oidc_identity, saml_identity)
 from .ldap_routes import _get_or_create_sso_user, _get_saml_auth
 from . import saml_sp
 from flask import request, redirect, session, Response, after_this_request
@@ -263,9 +263,7 @@ def sso_callback(provider_type):
 
             # Map attributes
             attr_mapping = _parse_json_field(provider.attribute_mapping)
-            username = userinfo.get(attr_mapping.get('username', 'preferred_username')) or userinfo.get('email', '').split('@')[0]
-            email = userinfo.get(attr_mapping.get('email', 'email'), '')
-            fullname = userinfo.get(attr_mapping.get('fullname', 'name'), '')
+            username, email, fullname = oidc_identity(userinfo, attr_mapping)
 
             if not username:
                 return redirect('/login?error=no_username')
@@ -448,14 +446,7 @@ def sso_callback(provider_type):
             # Map attributes
             attr_mapping = _parse_json_field(provider.attribute_mapping)
 
-            username_key = attr_mapping.get('username', 'username')
-            email_key = attr_mapping.get('email', 'email')
-            fullname_key = attr_mapping.get('fullname', 'name')
-
-            # SAML attributes are lists
-            username = (attrs.get(username_key, [None])[0] or name_id or '').strip()
-            email = (attrs.get(email_key, [None])[0] or '').strip()
-            fullname = (attrs.get(fullname_key, [None])[0] or '').strip()
+            username, email, fullname = saml_identity(attrs, name_id, attr_mapping)
 
             if not username:
                 return redirect('/login?error=no_username')

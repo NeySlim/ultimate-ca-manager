@@ -341,10 +341,12 @@ def update_user(user_id):
                 if not db.session.get(CustomRole, int(data['custom_role_id'])):
                     return error_response('Custom role not found', 404)
                 user.custom_role_id = int(data['custom_role_id'])
+                user.custom_role_source = None
             except (ValueError, ImportError):
                 return error_response('Invalid custom role ID', 400)
         else:
             user.custom_role_id = None
+            user.custom_role_source = None
 
     # SECURITY: Only admins can change active status
     if 'active' in data:

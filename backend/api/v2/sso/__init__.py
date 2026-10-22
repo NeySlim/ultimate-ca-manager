@@ -57,6 +57,7 @@ from .helpers import (
     _record_ldap_failed_attempt,
     _clear_ldap_failed_attempts,
     _resolve_role_from_mapping,
+    _resolve_mapped_roles,
     _resolve_role,
 )
 from .ldap_routes import _get_or_create_sso_user
@@ -76,6 +77,7 @@ __all__ = [
     '_record_ldap_failed_attempt',
     '_clear_ldap_failed_attempts',
     '_resolve_role_from_mapping',
+    '_resolve_mapped_roles',
     '_resolve_role',
     '_get_or_create_sso_user',
 ]

@@ -181,6 +181,14 @@ def update_custom_role(role_id):
         if clash:
             return error_response("Role name already exists", 409)
 
+    if 'name' in cleaned and cleaned['name'].strip().lower() != role.name.strip().lower():
+        from api.v2.sso.helpers import providers_using_custom_role
+        cited = providers_using_custom_role(role.name)
+        if cited:
+            return error_response(
+                f"Role is used by the role mapping of SSO provider(s): {', '.join(cited)}. "
+                "Update the mapping first.", 409, details={'providers': cited})
+
     if 'name' in cleaned:
         role.name = cleaned['name']
     if 'description' in cleaned:
@@ -224,6 +232,12 @@ def delete_custom_role(role_id):
         return error_response(f"Role is assigned to {user_count} user(s). Remove assignments first.", 409)
     if CustomRole.query.filter_by(inherits_from=role_id).count():
         return error_response("Other roles inherit from this role. Change them first.", 409)
+    from api.v2.sso.helpers import providers_using_custom_role
+    cited = providers_using_custom_role(role.name)
+    if cited:
+        return error_response(
+            f"Role is used by the role mapping of SSO provider(s): {', '.join(cited)}. "
+            "Update the mapping first.", 409, details={'providers': cited})
     
     role_name = role.name
     db.session.delete(role)
