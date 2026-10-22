@@ -15,7 +15,7 @@ from utils.acme_public_url import get_acme_public_base, get_acme_proxy_public_ba
 from models import db, SystemConfig
 from utils.acme_debug import clear_acme_debug_cache
 from services.audit_service import AuditService
-from services.acme.acme_client_service import ACCOUNT_KEY_TYPES, CERT_KEY_TYPES
+from services.acme.acme_client_service import ACCOUNT_KEY_TYPES, CERT_KEY_TYPES, fips_key_type_refusal
 from services.acme.dns_selfcheck import DNS_PROPAGATION_MAX_DELAY, dns_propagation_delay
 from security.encryption import encrypt_text
 from utils.dns_txt_lookup import (
@@ -375,6 +375,8 @@ def update_settings():
         valid_key_types = list(CERT_KEY_TYPES)
         if data['key_type'] not in valid_key_types:
             return error_response(f'Key type must be one of: {", ".join(valid_key_types)}', 400)
+        if fips_key_type_refusal(data['key_type']):
+            return error_response(fips_key_type_refusal(data['key_type']), 400)
         _set_config('acme.client.key_type', data['key_type'], 'Certificate key type')
         updates.append('key_type')
 

@@ -26,6 +26,12 @@ def _b64url_uint(value: int, length: int) -> str:
     return base64.urlsafe_b64encode(value.to_bytes(length, byteorder='big')).rstrip(b'=').decode()
 
 
+def _has_jwk(label) -> bool:
+    """Whether a key of *label* has a JWK form (RSA, or an EC curve RFC 7518 names)."""
+    alg = key_algorithms.get(label)
+    return alg is not None and (alg.family == 'RSA' or bool(set(alg.curve_names) & set(_JWK_CURVES)))
+
+
 def _public_jwk(private_key) -> dict:
     """RFC 7517 public JWK of an RSA or NIST EC key; ValueError for anything else."""
     public_key = private_key.public_key()
@@ -96,9 +102,9 @@ def create_acme_account():
     # this route did not know fell through to P-256 while the JWK went on to
     # say P-256, and every other label fell through to the RSA branch, where
     # the bit count came from the label itself with no ceiling.
-    if key_type not in CERT_KEY_TYPES:
-        return error_response(
-            f'Key type must be one of: {", ".join(CERT_KEY_TYPES)}', 400)
+    account_types = [k for k in CERT_KEY_TYPES if _has_jwk(k)]
+    if key_type not in account_types:
+        return error_response(f'Key type must be one of: {", ".join(account_types)}', 400)
 
     # Check for existing account with same email
     existing = AcmeAccount.query.filter(

@@ -513,6 +513,19 @@ class CA(db.Model):
     def set_name_constraints_excluded(self, constraints):
         self.name_constraints_excluded = json.dumps(constraints) if constraints else None
     
+    def effective_crl_digest(self):
+        """The CRL signature digest: the configured one, else the registry default of the CA key."""
+        if self.crl_digest:
+            return self.crl_digest
+        try:
+            import base64
+            from cryptography import x509
+            from utils.key_algorithms import default_digest_for_key
+            cert = x509.load_pem_x509_certificate(base64.b64decode(self.crt))
+            return default_digest_for_key(cert.public_key())
+        except Exception:
+            return 'sha256'
+
     def to_dict(self, include_private=False):
         """Convert to dictionary"""
         # Determine CA type (lowercase for frontend)
@@ -608,7 +621,7 @@ class CA(db.Model):
             "delta_crl_interval": self.delta_crl_interval or 4,
             "crl_validity_days": self.crl_validity_days or 7,
             "crl_publish_interval_hours": self.crl_publish_interval_hours,
-            "crl_digest": self.crl_digest or 'sha256',
+            "crl_digest": self.effective_crl_digest(),
             # OCSP configuration
             "ocsp_enabled": self.ocsp_enabled,
             "ocsp_url": self.get_primary_ocsp_url(),

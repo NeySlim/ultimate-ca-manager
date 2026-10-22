@@ -409,9 +409,12 @@ class PolicyEvaluationService:
         from cryptography.hazmat.primitives import hashes
         from services.trust_store.constants import hash_algorithm
         from utils.signing_hash import signing_hash_for
-        name = str(digest or 'sha256').strip().lower()
+        key_default = key_algorithms.default_digest_for_key(ca_key)
+        name = str(digest or key_default).strip().lower()
         if not explicit:
-            name = PolicyEvaluationService.choose_digest(policies, name)
+            # SHA-256 is the callers' placeholder default: the key's registry digest stands in
+            name = PolicyEvaluationService.choose_digest(
+                policies, key_default if name == 'sha256' else name)
         try:
             requested = hash_algorithm(name)
         except ValueError as e:

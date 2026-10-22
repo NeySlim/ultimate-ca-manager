@@ -102,6 +102,9 @@ _KEY_USAGE_BITS = {
 
 # Families XCEP can describe to a Windows client (keySpec, provider, length).
 _XCEP_KEY_FAMILIES = ('RSA', 'EC')
+# EC curves with an ECDSA_P<bits> CNG algorithm. Brainpool is left out: a real
+# Windows enrollment over XCEP in Brainpool has not been tested.
+_XCEP_EC_CURVES = ('P256', 'P384', 'P521')
 
 # privateKeyAttributes/keySpec + cryptoProviders, by algorithm family.
 # Confirmed against a real ADCS server's own WCF trace: every real
@@ -233,6 +236,8 @@ def _key_type_info(key_type):
     when the template's key type cannot be announced. Unset means the column default."""
     alg = key_algorithms.get(key_type or 'RSA-2048')
     if alg is None or alg.family not in _XCEP_KEY_FAMILIES:
+        return None
+    if alg.family == 'EC' and alg.param not in _XCEP_EC_CURVES:
         return None
     return ('RSA' if alg.family == 'RSA' else f'ECDSA_{alg.param}'), alg.key_size
 

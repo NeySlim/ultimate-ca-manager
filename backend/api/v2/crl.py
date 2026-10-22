@@ -275,7 +275,7 @@ def get_crl_config(ca_id):
     return success_response(data={
         'crl_validity_days': ca.crl_validity_days or 7,
         'crl_publish_interval_hours': ca.crl_publish_interval_hours,
-        'crl_digest': ca.crl_digest or 'sha256',
+        'crl_digest': ca.effective_crl_digest(),
         'next_publish': _next_publish(ca, latest),
     })
 
@@ -349,7 +349,7 @@ def configure_crl(ca_id):
             details=(
                 f"CRL schedule: validity={ca.crl_validity_days or 7}d, "
                 f"publish={ca.crl_publish_interval_hours}h, "
-                f"digest={ca.crl_digest or 'sha256'}"
+                f"digest={ca.effective_crl_digest()}"
             ),
             success=True
         )
@@ -361,7 +361,7 @@ def configure_crl(ca_id):
             data={
                 'crl_validity_days': ca.crl_validity_days or 7,
                 'crl_publish_interval_hours': ca.crl_publish_interval_hours,
-                'crl_digest': ca.crl_digest or 'sha256',
+                'crl_digest': ca.effective_crl_digest(),
                 'next_publish': _next_publish(ca, latest),
             },
             message='CRL schedule updated'

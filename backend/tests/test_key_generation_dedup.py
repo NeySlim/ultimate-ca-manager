@@ -162,8 +162,10 @@ def _old_jwk_of(key_type, private_key):
 
 
 def _cert_key_types():
+    """The certificate key types an ACME account key can also be (Brainpool has no JWK form)."""
+    from api.v2.acme.accounts import _has_jwk
     from services.acme.acme_client_service import CERT_KEY_TYPES
-    return sorted(CERT_KEY_TYPES)
+    return sorted(k for k in CERT_KEY_TYPES if _has_jwk(k))
 
 
 @pytest.mark.parametrize('key_type', _cert_key_types())

@@ -26,6 +26,7 @@ from services.acme.acme_client_service import (
     AUTHZ_INVALID_USER_MSG,
     CERT_KEY_TYPES,
     csr_identifiers_match_order,
+    fips_key_type_refusal,
 )
 from services.audit_service import AuditService
 from services.acme.http01 import wait_for_http01
@@ -224,6 +225,8 @@ def request_certificate():
     if key_type and key_type not in CERT_KEY_TYPES:
         return error_response(
             f'Invalid key type: must be one of {", ".join(CERT_KEY_TYPES)}', 400)
+    if key_type and fips_key_type_refusal(key_type):
+        return error_response(fips_key_type_refusal(key_type), 400)
 
     key_source = (data.get('key_source') or 'generate').lower()
     if key_source not in ('generate', 'reuse', 'csr'):

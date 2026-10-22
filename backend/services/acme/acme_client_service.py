@@ -35,6 +35,7 @@ from utils.acme_ip import (
     normalize_ip_for_identifier,
     TlsAlpn01Listener,
 )
+import fips_mode
 from utils import key_algorithms, ssrf_protection
 from utils.ca_profile import default_digest_for_key_type
 from utils.signing_hash import HASH_BY_NAME, signing_hash_for
@@ -61,7 +62,18 @@ CERT_KEY_TYPES = {
     'RSA-4096': lambda: key_algorithms.generate('RSA-4096'),
     'EC-P256': lambda: key_algorithms.generate('EC-P256'),
     'EC-P384': lambda: key_algorithms.generate('EC-P384'),
+    # Certificate keys only: an ACME account key has no Brainpool JWS algorithm
+    'EC-BP256': lambda: key_algorithms.generate('EC-BP256'),
+    'EC-BP384': lambda: key_algorithms.generate('EC-BP384'),
 }
+
+
+def fips_key_type_refusal(label):
+    """Why FIPS mode refuses the certificate key type *label*, or None."""
+    alg = key_algorithms.get(label)
+    if alg is not None and not alg.fips_approved and fips_mode.enabled():
+        return f'{alg.display} keys are not available in FIPS mode'
+    return None
 
 
 def csr_identifiers_match_order(
@@ -1642,6 +1654,9 @@ class AcmeClientService:
         generator = CERT_KEY_TYPES.get(key_type)
         if generator is None:
             return None, f'Unsupported certificate key type on order: {key_type}'
+        refusal = fips_key_type_refusal(key_type)
+        if refusal:
+            return None, refusal
         return generator(), None
 
     @staticmethod
