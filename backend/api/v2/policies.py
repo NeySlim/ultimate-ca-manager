@@ -834,6 +834,24 @@ def _validated_dates(rules, key):
     return None
 
 
+def _validated_certifications(rules, key):
+    """Check the ``{certification: YYYY-MM-DD or null}`` rule *key*; an error message or None."""
+    from models.hsm import HsmProvider
+    from services.policy_service import parse_rule_date
+    mapping = rules.get(key)
+    if mapping is None:
+        return None
+    if not isinstance(mapping, dict):
+        return f'{key} must be an object of HSM certification to YYYY-MM-DD date or null'
+    for code, when in mapping.items():
+        if code not in HsmProvider.CERTIFICATIONS:
+            return (f'Unknown certification in {key}: {code} '
+                    f'(one of: {", ".join(HsmProvider.CERTIFICATIONS)})')
+        if when is not None and parse_rule_date(when) is None:
+            return f'{key} date for {code} must be YYYY-MM-DD or null'
+    return None
+
+
 def _validated_algorithm_rules(rules, *, fips_check=True):
     """Check and normalise the key, hash, scheme and date rules of *rules* in
     place; an error message or None."""
@@ -868,7 +886,7 @@ def _validated_algorithm_rules(rules, *, fips_check=True):
         error = _validated_dates(rules, key)
         if error:
             return error
-    return None
+    return _validated_certifications(rules, 'hsm_certifications')
 
 
 def _validated_rules(rules):

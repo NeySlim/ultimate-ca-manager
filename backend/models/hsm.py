@@ -60,6 +60,9 @@ class HsmProvider(db.Model if db else object):
     status = db.Column(db.String(20), default='unknown')  # connected, disconnected, error, unknown
     last_tested_at = db.Column(db.DateTime, nullable=True)
     error_message = db.Column(db.Text, nullable=True)
+
+    # Certification the operator declares for the module (not verified by UCM)
+    certification = db.Column(db.String(32), nullable=True)
     
     # Audit fields
     created_at = db.Column(db.DateTime, default=utc_now)
@@ -73,6 +76,9 @@ class HsmProvider(db.Model if db else object):
     # Valid provider types
     VALID_TYPES = ['pkcs11', 'aws-cloudhsm', 'azure-keyvault', 'google-kms', 'openbao']
     
+    # Declarable certifications of the hardware
+    CERTIFICATIONS = ['cc-eal4+', 'eucc-high', 'fips-140-3-l3', 'fips-140-2-l3', 'other']
+
     # Valid statuses
     VALID_STATUSES = ['connected', 'disconnected', 'error', 'unknown']
     
@@ -90,6 +96,7 @@ class HsmProvider(db.Model if db else object):
             'enabled': self.status == 'connected',
             'last_tested_at': utc_isoformat(self.last_tested_at),
             'error_message': self.error_message,
+            'certification': self.certification,
             'created_at': utc_isoformat(self.created_at),
             'updated_at': utc_isoformat(self.updated_at),
             'key_count': self.keys.count() if self.keys else 0

@@ -103,3 +103,40 @@ def describe(signer):
     from models import db
     from models.hsm import HsmKey
     return scheme, storage_for_hsm_key(db.session.get(HsmKey, hsm_id))
+
+
+def normalize_certification(value):
+    """``(certification or None, error)``: blank means not declared, anything
+    else must be one of ``HsmProvider.CERTIFICATIONS``."""
+    from models.hsm import HsmProvider
+    if value is None or (isinstance(value, str) and not value.strip()):
+        return None, None
+    if not isinstance(value, str) or value.strip() not in HsmProvider.CERTIFICATIONS:
+        return None, f'certification must be one of: {", ".join(HsmProvider.CERTIFICATIONS)}'
+    return value.strip(), None
+
+
+def certification_for_provider(provider):
+    """The certification declared for an HSM provider row; None when not declared."""
+    return normalize_certification(getattr(provider, 'certification', None))[0] if provider is not None else None
+
+
+def certification_for_hsm_key(hsm_key):
+    """Certification declared for the provider of a stored HSM key row; None when unreadable."""
+    try:
+        return certification_for_provider(hsm_key.provider) if hsm_key is not None else None
+    except Exception:
+        return None
+
+
+def certification_of(signer):
+    """Certification declared for the HSM holding the key of *signer* (a CA row or
+    a loaded CA signing key); None for a software key or when not declared."""
+    if signer is None:
+        return None
+    from models import CA, db
+    from models.hsm import HsmKey
+    if isinstance(signer, CA):
+        return certification_for_hsm_key(signer.hsm_key) if signer.hsm_key_id else None
+    hsm_id = getattr(signer, '_hsm_key_id', None)
+    return certification_for_hsm_key(db.session.get(HsmKey, hsm_id)) if hsm_id is not None else None

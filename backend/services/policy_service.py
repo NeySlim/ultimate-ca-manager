@@ -102,6 +102,45 @@ def _tsa_messages(rules, name, requested, verb='is not allowed by'):
     return []
 
 
+def _certification_map(mapping):
+    """``{certification: last accepted date or None}`` of an ``hsm_certifications``
+    rule; an entry whose date cannot be read is dropped, so it accepts nothing."""
+    out = {}
+    if isinstance(mapping, dict):
+        for code, when in mapping.items():
+            if when is None:
+                out[code] = None
+            elif (day := parse_rule_date(when)) is not None:
+                out[code] = day
+    return out
+
+
+def _earlier(a, b):
+    """The earlier of two last-accepted dates, None meaning no end."""
+    return b if a is None else a if b is None else min(a, b)
+
+
+def _certification_messages(rules, name, req, verb):
+    """Why the certification declared for the HSM holding the CA key breaks the
+    ``hsm_certifications`` rule of one policy."""
+    mapping = rules.get('hsm_certifications')
+    if not isinstance(mapping, dict) or not mapping:
+        return []
+    accepted = _certification_map(mapping)
+    listed = ', '.join(sorted(accepted)) or 'none'
+    certification = req.get('signer_certification')
+    if not certification:
+        return [f'The HSM holding the CA key has no declared certification (accepted: {listed}): '
+                f'that {verb} policy "{name}"; declare the certification of the HSM provider']
+    if certification not in accepted:
+        return [f'HSM certification {certification} {verb} policy "{name}" (accepted: {listed})']
+    last = accepted[certification]
+    if last is not None and req['today'] > last:
+        return [f'HSM certification {certification} {verb} policy "{name}" '
+                f'after {last.isoformat()}']
+    return []
+
+
 def _rule_messages(rules, name, req, advisory=False):
     """Why the request *req* breaks the key, hash, scheme, date, HSM and TSA
     rules of one policy; with *advisory* the wording is a recommendation."""
@@ -157,6 +196,9 @@ def _rule_messages(rules, name, req, advisory=False):
     if rules.get('require_hsm_ca_key') is True and storage in ('software', 'softhsm'):
         out.append(f'Policy "{name}" requires the CA key to be held in an HSM; this one is '
                    f'{"on SoftHSM" if storage == "softhsm" else "a software key"}')
+
+    if storage == 'hsm':
+        out += _certification_messages(rules, name, req, verb)
 
     if req.get('tsa_signer'):
         out += _tsa_messages(rules, name, requested, verb)
@@ -291,14 +333,14 @@ class PolicyEvaluationService:
     def enforce_rules(policies: list, *, key_type=None, dns_name_count=None,
                       validity_days=None, digest=None, context=None, notify=True,
                       ca_id=None, signer=None, signer_scheme=None, signer_storage=None,
-                      not_after=None, tsa_signer=False, pq_hybrid=False, notices=None):
+                      signer_certification=None, not_after=None, tsa_signer=False, pq_hybrid=False, notices=None):
         """Apply the Rules of *policies* to a request (#335).
 
         Returns ``(violations, validity_days, capped_by)``: the
         human-readable reasons the request must be refused
         (``allowed_key_types``, ``allowed_digests``, ``allowed_signature_schemes``,
         ``key_type_horizons``, ``key_type_issue_until``, ``require_hsm_ca_key``,
-        ``tsa_signer_key_types``, ``pq_standalone``, ``san_restrictions.max_dns_names``),
+        ``hsm_certifications``, ``tsa_signer_key_types``, ``pq_standalone``, ``san_restrictions.max_dns_names``),
         the validity capped by the lowest ``max_validity_days``
         among the policies, and the name of the policy that set that cap, or
         ``None`` when nothing was shortened. Parameters left ``None`` are not
@@ -310,7 +352,8 @@ class PolicyEvaluationService:
 
         *signer* (a CA row or its loaded signing key) gives the signature scheme
         and key storage the rules read; *signer_scheme* and *signer_storage*
-        say them when no signer exists yet. The end of the certificate is
+        say them when no signer exists yet (*signer_certification*: the
+        certification declared for its HSM). The end of the certificate is
         *not_after* (a date), else today plus the capped validity. *tsa_signer*
         marks a TSA signing certificate. The ``advisories`` of each policy are
         appended to *notices* (a list) and never refuse anything.
@@ -326,6 +369,7 @@ class PolicyEvaluationService:
             scheme, storage = compliance_signer.describe(signer)
             signer_scheme = signer_scheme or scheme
             signer_storage = signer_storage or storage
+            signer_certification = signer_certification or compliance_signer.certification_of(signer)
         checked = with_system_policies(policies, ca_id)
         rules_of = [policy.get_rules() or {} for policy in checked]
 
@@ -344,7 +388,8 @@ class PolicyEvaluationService:
         if end is None and effective_validity is not None:
             end = (utc_now() + timedelta(days=effective_validity)).date()
         req = {'key_type': key_type, 'digest': digest, 'signer_scheme': signer_scheme,
-               'signer_storage': signer_storage, 'not_after': end, 'today': today,
+               'signer_storage': signer_storage, 'signer_certification': signer_certification,
+               'not_after': end, 'today': today,
                'tsa_signer': tsa_signer, 'pq_hybrid': pq_hybrid}
         violations = []
         by_policy = {}
@@ -486,6 +531,7 @@ class PolicyEvaluationService:
         schemes = None
         horizons, issue_until, tsa = {}, {}, None
         hsm = False
+        certifications = None
         for policy in policies:
             rules = policy.get_rules() or {}
             allowed = rules.get('allowed_signature_schemes')
@@ -497,6 +543,11 @@ class PolicyEvaluationService:
                     if label not in target or day < target[label]:
                         target[label] = day
             hsm = hsm or rules.get('require_hsm_ca_key') is True
+            if isinstance(rules.get('hsm_certifications'), dict) and rules['hsm_certifications']:
+                accepted = _certification_map(rules['hsm_certifications'])
+                certifications = accepted if certifications is None else {
+                    code: _earlier(certifications[code], accepted[code])
+                    for code in certifications.keys() & accepted.keys()}
             labels = _label_set(rules.get('tsa_signer_key_types'))
             if labels:
                 tsa = labels if tsa is None else tsa & labels
@@ -505,6 +556,8 @@ class PolicyEvaluationService:
             'key_type_horizons': {k: v.isoformat() for k, v in sorted(horizons.items())},
             'key_type_issue_until': {k: v.isoformat() for k, v in sorted(issue_until.items())},
             'require_hsm_ca_key': hsm,
+            'hsm_certifications': ({k: v.isoformat() if v else None for k, v in sorted(certifications.items())}
+                                   if certifications is not None else None),
             'tsa_signer_key_types': sorted(tsa) if tsa is not None else None,
         }
 

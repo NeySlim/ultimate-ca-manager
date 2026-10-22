@@ -75,6 +75,8 @@ PROFILES = {
             'key_type_horizons': {'RSA-2048': '2028-12-31'},
             'key_type_issue_until': {'RSA-2048': '2026-12-31'},
             'require_hsm_ca_key': True,
+            # Declared HSM certification -> last day it is accepted (None: no end)
+            'hsm_certifications': {'cc-eal4+': None, 'eucc-high': None, 'fips-140-3-l3': '2030-12-31'},
             'pq_standalone': True,
             'tsa_signer_key_types': [],
             'advisories': {

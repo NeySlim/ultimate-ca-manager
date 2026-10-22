@@ -13,6 +13,7 @@ from fips_mode import FipsRestricted
 from auth.unified import require_auth
 from utils.secret_target import MASKS, changed_targets, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
+from services import compliance_signer
 from services.hsm import HsmService
 from services.hsm.base_provider import HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
 from models import db, CA
@@ -65,6 +66,7 @@ def create_provider():
         name: Unique provider name
         type: Provider type (pkcs11, azure-keyvault, google-kms, aws-cloudhsm)
         config: Provider-specific configuration
+        certification: Certification the operator declares for the hardware (optional)
     """
     data = request.get_json()
     
@@ -74,6 +76,7 @@ def create_provider():
     name = data.get('name', '').strip()
     provider_type = data.get('type', '').strip()
     config = data.get('config', {})
+    certification, cert_error = compliance_signer.normalize_certification(data.get('certification'))
     
     # Validation
     if not name:
@@ -93,6 +96,9 @@ def create_provider():
     
     if not isinstance(config, dict):
         return error_response('Config must be an object', 400)
+
+    if cert_error:
+        return error_response(cert_error, 400)
     
     try:
         user_id, username = _audit_user()
@@ -101,7 +107,8 @@ def create_provider():
             name=name,
             provider_type=provider_type,
             config=config,
-            created_by=user_id
+            created_by=user_id,
+            certification=certification
         )
         
         AuditService.log_action(
@@ -192,6 +199,7 @@ def update_provider(provider_id):
     Body:
         name: New name (optional)
         config: New configuration (optional)
+        certification: Declared certification (optional; null keeps it, "" clears it)
     """
     provider = HsmService.get_provider(provider_id)
     if not provider:
@@ -203,6 +211,11 @@ def update_provider(provider_id):
     
     name = data.get('name')
     config = data.get('config')
+    # Absent or null keeps the declaration, a blank string clears it
+    certification = data.get('certification')
+    _, cert_error = compliance_signer.normalize_certification(certification)
+    if cert_error:
+        return error_response(cert_error, 400)
     
     if name is not None:
         name = name.strip()
@@ -224,7 +237,8 @@ def update_provider(provider_id):
         updated = HsmService.update_provider(
             provider_id=provider_id,
             name=name,
-            config=config
+            config=config,
+            certification=certification
         )
         
         user_id, username = _audit_user()

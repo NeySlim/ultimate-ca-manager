@@ -2341,7 +2341,7 @@ GET /api/v2/system/compliance-preflight?profile=bsi&ca=3
 
 Check ids (each also exists with an `.advisory` suffix, at warning level, or information for
 `ca.eddsa_key` and `certificates.key_horizon`, for what the profile only advises against):
-`ca.key_type`, `ca.eddsa_key`, `ca.signature_scheme`, `ca.key_horizon`, `ca.key_protection`,
+`ca.key_type`, `ca.eddsa_key`, `ca.signature_scheme`, `ca.key_horizon`, `ca.key_protection`, `ca.hsm_certification` (blocker only, no advisory twin),
 `certificates.key_horizon`, `templates.key_type`, `templates.digest`, `policies.key_type`,
 `policies.digest`, `acme.digest`, `ocsp.responder_key`, `tsa.signer_key`; and the blocker
 `policies.unknown_key_types_only`.
@@ -2360,6 +2360,10 @@ the rule; a recommendation comes back in `meta.notices` of the issuance response
 the certificate must not be valid beyond the date), `key_type_issue_until` (no issuance of that
 key type after the date), `require_hsm_ca_key` (boolean: software, SoftHSM and OpenBao CA keys refused, an Azure or Google
 key accepted only when its protection level is HSM),
+`hsm_certifications` (`{"eucc-high": null, "fips-140-3-l3": "2030-12-31"}`: when the CA key is in an
+HSM, the certification declared for its provider must be listed and not past its last accepted date,
+`null` meaning no end; the profile `eu-acm` carries `cc-eal4+`, `eucc-high` and `fips-140-3-l3` until
+2030-12-31, values from the HSM provider list below),
 `tsa_signer_key_types`, `pq_standalone` (boolean) and `advisories` (an object using the same
 keys, producing notices instead of refusals). A policy whose `allowed_key_types` holds only
 unknown labels refuses issuance.
@@ -2378,6 +2382,7 @@ GET /api/v2/policies/effective?ca_id=3&template_id=1
     "key_type_horizons": {},
     "key_type_issue_until": {},
     "require_hsm_ca_key": false,
+    "hsm_certifications": null,  # {"eucc-high": null, ...} when a policy sets the rule
     "tsa_signer_key_types": ["EC-P256", "EC-P384", "EC-P521"],
     "fips": true                 # only present in FIPS mode
   }
@@ -3003,9 +3008,16 @@ Content-Type: application/json
   "type": "yubihsm",
   "config": {
     "connector_url": "http://localhost:12345"
-  }
+  },
+  "certification": "eucc-high"
 }
 ```
+
+`certification` is optional: the certification the operator declares for the hardware
+(`cc-eal4+`, `eucc-high`, `fips-140-3-l3`, `fips-140-2-l3` or `other`; `null`, absent or `""` means
+not declared). UCM does not verify it. Any other value is a 400. Providers return it as
+`certification` (string or `null`). It is read by the `hsm_certifications` policy rule (see the
+profile `eu-acm`) and by the preflight check `ca.hsm_certification`; it travels in backups.
 
 ### Get HSM Provider
 ```http
@@ -3019,9 +3031,12 @@ Content-Type: application/json
 
 {
   "name": "Updated Name",
-  "config": { ... }
+  "config": { ... },
+  "certification": "fips-140-3-l3"
 }
 ```
+
+On update, an absent or `null` `certification` keeps the declared one and `""` clears it.
 
 ### Delete HSM Provider
 ```http

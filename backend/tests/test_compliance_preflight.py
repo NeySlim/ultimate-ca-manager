@@ -173,6 +173,48 @@ def test_hardware_key_is_required_under_eu_acm_only(session):
     assert _finding(_report('bsi'), 'ca.key_protection') is None
 
 
+def _hsm_ca(session, name, certification, module='/usr/lib/vendor/libhsm.so'):
+    provider = HsmProvider(name=name, type='pkcs11', config=json.dumps({'module_path': module}),
+                           certification=certification)
+    session.add(provider)
+    session.flush()
+    key = HsmKey(provider_id=provider.id, key_identifier=name, label=name, algorithm='EC-P384',
+                 key_type='asymmetric', purpose='signing')
+    session.add(key)
+    session.flush()
+    return _ca('p384', f'{name}-root', hsm_key_id=key.id)
+
+
+def test_an_hsm_authority_needs_an_accepted_declared_certification_under_eu_acm(session):
+    _hsm_ca(session, 'undeclared', None)
+    _hsm_ca(session, 'fips2', 'fips-140-2-l3')
+    _hsm_ca(session, 'other', 'other')
+    _hsm_ca(session, 'eucc', 'eucc-high')
+    _hsm_ca(session, 'fips3', 'fips-140-3-l3')
+    _hsm_ca(session, 'cc', 'cc-eal4+')
+    # a certification declared on a SoftHSM or software key is key_protection's business
+    _hsm_ca(session, 'softhsm', None, module='/usr/lib/softhsm/libsofthsm2.so')
+    _ca('p384', 'plain-software-root')
+    finding = _assert(_report('eu-acm'), 'ca.hsm_certification', 'blocker',
+                      'undeclared-root', 'fips2-root', 'other-root', count=3)
+    assert 'Declare the certification' in finding['remedy']
+    assert not any(n in e for n in ('eucc', 'fips3', 'cc-root', 'softhsm', 'plain') for e in finding['examples'])
+
+
+def test_an_expired_certification_is_a_blocker_under_eu_acm(session, monkeypatch):
+    _hsm_ca(session, 'fips3', 'fips-140-3-l3')
+    assert _finding(_report('eu-acm'), 'ca.hsm_certification') is None
+    monkeypatch.setitem(compliance_profiles.PROFILES['eu-acm']['rules'], 'hsm_certifications',
+                        {'cc-eal4+': None, 'fips-140-3-l3': '2020-01-01'})
+    _assert(_report('eu-acm'), 'ca.hsm_certification', 'blocker', 'fips3-root', '2020-01-01', count=1)
+
+
+def test_other_profiles_ask_nothing_of_the_hsm_certification(session):
+    _hsm_ca(session, 'undeclared', None)
+    for profile in ('anssi', 'bsi'):
+        assert _finding(_report(profile), 'ca.hsm_certification') is None
+
+
 def test_vault_and_software_cloud_keys_are_not_hardware_under_eu_acm(session):
     for name, kind, metadata in (('bao', 'openbao', None), ('az-soft', 'azure-keyvault', 'SOFTWARE'),
                                  ('az-unsynced', 'azure-keyvault', None), ('gcp-hsm', 'google-kms', 'HSM')):

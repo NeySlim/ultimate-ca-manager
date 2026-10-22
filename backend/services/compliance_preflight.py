@@ -21,7 +21,7 @@ from services.acme import profiles as acme_profiles
 from services.fips_preflight import (_EDDSA_OIDS, _active_certificate_filter, _configured_certificate,
                                      _named, load_stored_certificate)
 from services.ocsp_responder_renewal import RESPONDER_KEY_PREFIX
-from services.policy_service import key_label_for_public_key, normalize_digest
+from services.policy_service import key_label_for_public_key, normalize_digest, parse_rule_date
 from services.preflight_core import (BLOCKER, INFO, WARNING, Detector, run_detectors)
 from services.template_service import _normalize_key_type_label
 from services.tsa_service import tsa_is_enabled
@@ -233,6 +233,32 @@ def _ca_hsm(ctx):
         if storage != 'hsm':
             found.append((grade, _ca_name(ca, 'SoftHSM key' if storage == 'softhsm' else 'software key')))
     return found
+
+
+def _ca_hsm_certification(ctx):
+    accepted = ctx.rules.get('hsm_certifications')
+    if not isinstance(accepted, dict) or not accepted:
+        return []
+    found = []
+    for ca, _cert, _label in _signing_cas(ctx):
+        if compliance_signer.storage_of_ca(ca) != 'hsm':
+            continue  # ca.key_protection reports software and SoftHSM keys
+        declared = compliance_signer.certification_of(ca)
+        if declared is None:
+            found.append(_ca_name(ca, 'no declared certification'))
+        elif declared not in accepted:
+            found.append(_ca_name(ca, f'certification {declared} not accepted'))
+        elif (last := parse_rule_date(accepted[declared])) and ctx.today > last:
+            found.append(_ca_name(ca, f'certification {declared} accepted until {last.isoformat()}'))
+    return found
+
+
+DETECTORS.append(Detector(
+    'ca.hsm_certification', BLOCKER,
+    'Certificate authorities whose HSM has no accepted certification declared, which the profile requires',
+    'Declare the certification of the HSM provider (cc-eal4+, eucc-high or fips-140-3-l3) in its settings, '
+    'or move the authority to a certified HSM.',
+    _ca_hsm_certification))
 
 
 # --- certificates -------------------------------------------------------------

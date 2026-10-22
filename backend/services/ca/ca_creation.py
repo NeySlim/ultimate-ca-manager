@@ -77,6 +77,17 @@ def _planned_signer(key_label, signature_scheme, hsm_key_id, hsm_provider_id):
     return scheme, 'software'
 
 
+def _planned_certification(hsm_key_id, hsm_provider_id):
+    """Certification declared for the HSM a CA about to be created will sign with."""
+    from services import compliance_signer
+    from models.hsm import HsmProvider
+    if hsm_key_id:
+        return compliance_signer.certification_for_hsm_key(db.session.get(HsmKey, hsm_key_id))
+    if hsm_provider_id:
+        return compliance_signer.certification_for_provider(db.session.get(HsmProvider, hsm_provider_id))
+    return None
+
+
 def _discard_generated_hsm_key(key_id):
     from services.hsm import HsmService
     db.session.rollback()
@@ -261,17 +272,20 @@ class CACreationMixin:
         parent_row = CA.query.filter_by(refid=caref).first() if caref else None
         planned_scheme, planned_storage = _planned_signer(
             key_label, signature_scheme, hsm_key_id, hsm_provider_id)
+        planned_certification = _planned_certification(hsm_key_id, hsm_provider_id)
         # The signer is the parent for an intermediate, the new key for a root
         _refuse_on_violations(PolicyEvaluationService.enforce_rules(
             policies, key_type=key_label, digest=digest, context=rule_context,
             validity_days=validity_days, signer=parent_row,
             signer_scheme=None if parent_row else planned_scheme,
-            signer_storage=None if parent_row else planned_storage)[0])
+            signer_storage=None if parent_row else planned_storage,
+            signer_certification=None if parent_row else planned_certification)[0])
         if compliance_profile:
             _refuse_on_violations(PolicyEvaluationService.enforce_rules(
                 [compliance_profiles.profile_policy(compliance_profile)], key_type=key_label,
                 context=rule_context, validity_days=validity_days,
-                signer_scheme=planned_scheme, signer_storage=planned_storage)[0])
+                signer_scheme=planned_scheme, signer_storage=planned_storage,
+                signer_certification=planned_certification)[0])
 
         # Get parent CA if intermediate
         issuer = None
@@ -595,9 +609,11 @@ class CACreationMixin:
         rule_context = {'operation': 'ca_creation', 'subject': (dn or {}).get('CN')}
         planned_scheme, planned_storage = _planned_signer(
             key_label, signature_scheme, hsm_key_id, hsm_provider_id)
+        planned_certification = _planned_certification(hsm_key_id, hsm_provider_id)
         _refuse_on_violations(PolicyEvaluationService.enforce_rules(
             policies, key_type=key_label, context=rule_context,
-            signer_scheme=planned_scheme, signer_storage=planned_storage)[0])
+            signer_scheme=planned_scheme, signer_storage=planned_storage,
+            signer_certification=planned_certification)[0])
         private_key, key_pem, hsm_key = CACreationMixin._resolve_signing_key(
             key_type, hsm_provider_id, hsm_key_id, hsm_key_label, hsm_key_algorithm
         )

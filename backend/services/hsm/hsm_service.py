@@ -11,6 +11,7 @@ import logging
 import fips_mode
 from models import db
 from models.hsm import HsmProvider, HsmKey
+from services import compliance_signer
 from services.hsm.ecdsa_signature import coordinate_bytes, ecdsa_to_der
 from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo, brainpool_refusal,
@@ -132,7 +133,8 @@ class HsmService:
         name: str,
         provider_type: str,
         config: Dict[str, Any],
-        created_by: Optional[int] = None
+        created_by: Optional[int] = None,
+        certification: Optional[str] = None
     ) -> HsmProvider:
         """
         Create a new HSM provider.
@@ -142,6 +144,7 @@ class HsmService:
             provider_type: Provider type (pkcs11, azure-keyvault, etc.)
             config: Provider configuration dict
             created_by: User ID who created the provider
+            certification: Certification the operator declares (not verified)
             
         Returns:
             Created HsmProvider instance
@@ -153,6 +156,10 @@ class HsmService:
         if provider_type not in HsmProvider.VALID_TYPES:
             raise ValueError(f"Invalid provider type: {provider_type}")
         
+        certification, error = compliance_signer.normalize_certification(certification)
+        if error:
+            raise ValueError(error)
+
         # Check name uniqueness
         if HsmProvider.query.filter_by(name=name).first():
             raise ValueError(f"Provider with name '{name}' already exists")
@@ -163,6 +170,7 @@ class HsmService:
             type=provider_type,
             config='{}',
             status='unknown',
+            certification=certification,
             created_by=created_by
         )
         provider.set_config(config or {})
@@ -182,10 +190,11 @@ class HsmService:
     def update_provider(
         provider_id: int,
         name: Optional[str] = None,
-        config: Optional[Dict[str, Any]] = None
+        config: Optional[Dict[str, Any]] = None,
+        certification: Optional[str] = None
     ) -> HsmProvider:
         """
-        Update an existing provider.
+        Update an existing provider. *certification*: None keeps it, blank clears it.
         
         Args:
             provider_id: Provider ID
@@ -201,7 +210,13 @@ class HsmService:
         provider = db.session.get(HsmProvider, provider_id)
         if not provider:
             raise ValueError(f"Provider not found: {provider_id}")
-        
+
+        certification_given = certification is not None
+        if certification_given:
+            certification, error = compliance_signer.normalize_certification(certification)
+            if error:
+                raise ValueError(error)
+
         if name:
             # Check name uniqueness
             existing = HsmProvider.query.filter_by(name=name).first()
@@ -222,6 +237,9 @@ class HsmService:
             provider.status = 'unknown'
             provider.error_message = None
         
+        if certification_given:
+            provider.certification = certification
+
         provider.updated_at = utc_now()
         try:
             db.session.commit()
