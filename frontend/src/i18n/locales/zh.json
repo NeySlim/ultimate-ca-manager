@@ -1273,7 +1273,7 @@
         "eidas-legal": "法人（eIDAS）"
       },
       "ccLegislation": "QcCClegislation（国家代码）",
-      "ccLegislationHint": "ISO 3166 两位字母代码，以逗号分隔。不能与 QcCompliance 同时使用。",
+      "ccLegislationHint": "ISO 3166 两位字母代码，以逗号分隔，用于依据欧盟以外法律框架认定的合格证书。欧盟合格证书请留空。",
       "retentionPeriod": "QcRetentionPeriod（年）",
       "limitValue": "QcLimitValue",
       "limitCurrency": "货币（ISO 4217）",

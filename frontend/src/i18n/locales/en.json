@@ -1273,7 +1273,7 @@
         "eidas-legal": "Legal person (eIDAS)"
       },
       "ccLegislation": "QcCClegislation (country codes)",
-      "ccLegislationHint": "ISO 3166 two-letter codes, comma separated. Cannot be combined with QcCompliance.",
+      "ccLegislationHint": "ISO 3166 two-letter codes, comma separated, for a certificate qualified under a non-EU legal framework. Leave empty for an EU qualified certificate.",
       "retentionPeriod": "QcRetentionPeriod (years)",
       "limitValue": "QcLimitValue",
       "limitCurrency": "Currency (ISO 4217)",

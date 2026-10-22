@@ -180,7 +180,7 @@ function QcStatements({ qc }) {
       <div className="flex flex-wrap gap-1">
         {qc.compliance && <Badge variant="success" size="sm">{t('details.ext.qc.compliance')}</Badge>}
         {qc.sscd && <Badge variant="success" size="sm">{t('details.ext.qc.sscd')}</Badge>}
-        {qc.type && <Badge variant="teal" size="sm">{t('details.ext.qc.type')}: {qc.type}</Badge>}
+        {qc.type && <Badge variant="teal" size="sm">{t('details.ext.qc.type')}: {[].concat(qc.type).join(', ')}</Badge>}
         {qc.semantics && <Badge variant="secondary" size="sm">{t('details.ext.qc.semantics')}: {qc.semantics}</Badge>}
       </div>
       {qc.cc_legislation?.length > 0 && (

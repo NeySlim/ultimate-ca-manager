@@ -39,6 +39,15 @@ class TestValidation:
         assert qc.validate_qc_statements(None) == []
         assert qc.validate_qc_statements({}) == []
 
+    @pytest.mark.parametrize('payload', [
+        # Qualified under a non-EU framework: EN 319 412-5 wants both statements.
+        {'compliance': True, 'cc_legislation': ['CH'], 'pds': [{'url': 'https://x.test/p', 'language': 'de'}]},
+        # Not EU qualified: no English PDS needed.
+        {'pds': [{'url': 'https://x.test/p', 'language': 'fr'}]},
+    ])
+    def test_accepted(self, payload):
+        assert qc.validate_qc_statements(payload) == []
+
     @pytest.mark.parametrize('payload,needle', [
         ('x', 'must be an object'),
         ({'bogus': 1}, 'Unknown qc_statements key: bogus'),
@@ -49,11 +58,12 @@ class TestValidation:
         ({'cc_legislation': []}, 'cc_legislation'),
         ({'cc_legislation': ['fr']}, 'cc_legislation'),
         ({'cc_legislation': ['FR', 'FR']}, 'duplicate'),
-        ({'compliance': True, 'cc_legislation': ['FR']}, 'mutually exclusive'),
         ({'pds': []}, 'pds'),
         ({'pds': [{'url': 'http://x.test/p', 'language': 'en'}]}, 'https'),
         ({'pds': [{'url': 'https://x.test/p', 'language': 'EN'}]}, 'language'),
-        ({'pds': [{'url': 'https://x.test/p', 'language': 'fr'}]}, 'English'),
+        ({'compliance': True, 'pds': [{'url': 'https://x.test/p', 'language': 'fr'}]}, 'English'),
+        ({'pds': [{'url': 'https://x.test/a', 'language': 'en'},
+                  {'url': 'https://x.test/b', 'language': 'en'}]}, 'more than one entry'),
         ({'pds': [{'url': 'https://x.test/p', 'language': 'en', 'x': 1}]}, 'url, language'),
         ({'retention_period': 0}, 'retention_period'),
         ({'retention_period': True}, 'retention_period'),
@@ -90,6 +100,29 @@ class TestEncoding:
     def test_cc_legislation_roundtrip(self):
         d = qc.decode_qc_statements(qc.build_qc_statements_der({'cc_legislation': ['FR', 'DE']}))
         assert d == {'cc_legislation': ['FR', 'DE']}
+
+    def test_several_qc_types_are_all_shown(self):
+        der = qc._Statements([qc._statement(qc.OID_TYPE, qc._Oids(
+            [qc.QC_TYPES['esign'], qc.QC_TYPES['web']]))]).dump()
+        assert qc.decode_qc_statements(der) == {'type': ['esign', 'web']}
+
+    def test_renewal_carries_only_the_policies_the_template_lists(self):
+        from cryptography.hazmat.primitives import hashes
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.x509.oid import NameOID
+        import datetime
+        key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'p')])
+        now = datetime.datetime.now(datetime.timezone.utc)
+        cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+                .public_key(key.public_key()).serial_number(1)
+                .not_valid_before(now).not_valid_after(now + datetime.timedelta(days=1))
+                .add_extension(x509.CertificatePolicies([
+                    x509.PolicyInformation(x509.ObjectIdentifier(o), None)
+                    for o in ('1.2.3.1', '2.23.140.1.2.1', '0.4.0.194112.1.2')]), critical=False)
+                .sign(key, hashes.SHA256()))
+        assert qc.carried_policy_oids(cert, '1.2.3.1', ['0.4.0.194112.1.2']) == ['0.4.0.194112.1.2']
+        assert qc.carried_policy_oids(cert, '1.2.3.1', []) == []
 
     def test_unknown_statement_is_listed_and_garbage_refused(self):
         der = bytes.fromhex('3007300506032a0304')  # one statement, OID 1.2.3.4

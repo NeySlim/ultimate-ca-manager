@@ -1273,7 +1273,7 @@
         "eidas-legal": "法人 (eIDAS)"
       },
       "ccLegislation": "QcCClegislation (国コード)",
-      "ccLegislationHint": "ISO 3166 の2文字コードをカンマ区切りで指定します。QcCompliance とは併用できません。",
+      "ccLegislationHint": "ISO 3166 の2文字コードをカンマ区切りで指定します。EU 域外の法的枠組みで適格とされる証明書に使用します。EU の適格証明書では空欄のままにします。",
       "retentionPeriod": "QcRetentionPeriod (年)",
       "limitValue": "QcLimitValue",
       "limitCurrency": "通貨 (ISO 4217)",

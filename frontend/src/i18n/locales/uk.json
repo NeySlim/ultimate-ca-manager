@@ -1289,7 +1289,7 @@
         "eidas-legal": "Юридична особа (eIDAS)"
       },
       "ccLegislation": "QcCClegislation (коди країн)",
-      "ccLegislationHint": "Дволітерні коди ISO 3166, через кому. Не можна поєднувати з QcCompliance.",
+      "ccLegislationHint": "Дволітерні коди ISO 3166, через кому, для сертифіката, кваліфікованого за правовою системою поза ЄС. Для кваліфікованого сертифіката ЄС залиште порожнім.",
       "retentionPeriod": "QcRetentionPeriod (роки)",
       "limitValue": "QcLimitValue",
       "limitCurrency": "Валюта (ISO 4217)",

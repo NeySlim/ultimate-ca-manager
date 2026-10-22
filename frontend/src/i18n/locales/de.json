@@ -1273,7 +1273,7 @@
         "eidas-legal": "Juristische Person (eIDAS)"
       },
       "ccLegislation": "QcCClegislation (Ländercodes)",
-      "ccLegislationHint": "Zweistellige ISO-3166-Codes, durch Kommas getrennt. Nicht mit QcCompliance kombinierbar.",
+      "ccLegislationHint": "Zweistellige ISO-3166-Codes, durch Kommas getrennt, für ein nach einem Rechtsrahmen außerhalb der EU qualifiziertes Zertifikat. Für ein qualifiziertes EU-Zertifikat leer lassen.",
       "retentionPeriod": "QcRetentionPeriod (Jahre)",
       "limitValue": "QcLimitValue",
       "limitCurrency": "Währung (ISO 4217)",

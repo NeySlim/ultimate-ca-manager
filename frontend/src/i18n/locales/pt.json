@@ -1273,7 +1273,7 @@
         "eidas-legal": "Pessoa coletiva (eIDAS)"
       },
       "ccLegislation": "QcCClegislation (códigos de país)",
-      "ccLegislationHint": "Códigos ISO 3166 de duas letras, separados por vírgulas. Não pode ser combinado com QcCompliance.",
+      "ccLegislationHint": "Códigos ISO 3166 de duas letras, separados por vírgulas, para um certificado qualificado segundo um quadro jurídico fora da UE. Deixar vazio para um certificado qualificado da UE.",
       "retentionPeriod": "QcRetentionPeriod (anos)",
       "limitValue": "QcLimitValue",
       "limitCurrency": "Moeda (ISO 4217)",

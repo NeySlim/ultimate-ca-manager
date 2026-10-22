@@ -1086,7 +1086,6 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
             onChange={(e) => setQc('cc_legislation', e.target.value)}
             placeholder="FR, DE"
             helperText={t('templates.qc.ccLegislationHint')}
-            disabled={formData.qc.compliance}
           />
           <Input
             label={t('templates.qc.retentionPeriod')}

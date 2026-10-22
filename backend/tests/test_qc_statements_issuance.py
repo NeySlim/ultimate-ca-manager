@@ -221,6 +221,22 @@ class TestRenewal:
             renew_certificate_in_place(db.session.get(Certificate, cert_id), username='test')
         assert _policy_oids(_cert(app, cert_id)) == ['1.3.6.1.4.1.99999.2'] + POLICIES
 
+    def test_renewal_drops_a_policy_the_template_no_longer_lists(self, app, auth_client, cps_ca,
+                                                                 make_template):
+        from services.cert.renewal import renew_certificate_in_place
+        tpl_id = make_template()
+        r = auth_client.post('/api/v2/certificates', json={
+            'cn': 'qc-renew4.example.test', 'ca_id': cps_ca['id'], 'template_id': tpl_id})
+        cert_id = r.get_json()['data']['id']
+        with app.app_context():
+            tpl = db.session.get(CertificateTemplate, tpl_id)
+            ext = json.loads(tpl.extensions_template)
+            ext['certificate_policies'] = []
+            tpl.extensions_template = json.dumps(ext)
+            db.session.commit()
+            renew_certificate_in_place(db.session.get(Certificate, cert_id), username='test')
+        assert _policy_oids(_cert(app, cert_id)) == [CPS_OID]
+
     def test_plain_certificate_renews_without_extras(self, app, auth_client, cps_ca):
         from services.cert.renewal import renew_certificate_in_place
         r = auth_client.post('/api/v2/certificates', json={

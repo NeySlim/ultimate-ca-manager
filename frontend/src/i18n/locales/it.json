@@ -1273,7 +1273,7 @@
         "eidas-legal": "Persona giuridica (eIDAS)"
       },
       "ccLegislation": "QcCClegislation (codici paese)",
-      "ccLegislationHint": "Codici ISO 3166 di due lettere, separati da virgole. Non può essere combinato con QcCompliance.",
+      "ccLegislationHint": "Codici ISO 3166 di due lettere, separati da virgole, per un certificato qualificato secondo un quadro giuridico extra UE. Lasciare vuoto per un certificato qualificato UE.",
       "retentionPeriod": "QcRetentionPeriod (anni)",
       "limitValue": "QcLimitValue",
       "limitCurrency": "Valuta (ISO 4217)",

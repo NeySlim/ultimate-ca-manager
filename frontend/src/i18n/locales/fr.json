@@ -3642,7 +3642,7 @@
         "eidas-legal": "Personne morale (eIDAS)"
       },
       "ccLegislation": "QcCClegislation (codes pays)",
-      "ccLegislationHint": "Codes ISO 3166 à deux lettres, séparés par des virgules. Ne peut pas être combiné avec QcCompliance.",
+      "ccLegislationHint": "Codes ISO 3166 à deux lettres, séparés par des virgules, pour un certificat qualifié selon un cadre juridique hors UE. Laisser vide pour un certificat qualifié UE.",
       "retentionPeriod": "QcRetentionPeriod (années)",
       "limitValue": "QcLimitValue",
       "limitCurrency": "Devise (ISO 4217)",

@@ -1116,7 +1116,7 @@ Content-Type: application/json
 ```
 
 - `certificate_policies`: up to 20 dotted OIDs, added after the CA's CPS policy.
-- `qc_statements`: `compliance` (QcCompliance) and `cc_legislation` (ISO 3166 country codes, QcCClegislation) exclude each other; `type` is `esign`, `eseal` or `web`; `pds` entries need an `https` URL and a two-letter language, one of them in English; `semantics` is `natural`, `legal`, `eidas-natural` or `eidas-legal` (RFC 3739 semantics identifier). Unknown keys are refused.
+- `qc_statements`: `compliance` is QcCompliance and `cc_legislation` (ISO 3166 country codes, QcCClegislation) names the non-EU legal framework of a qualified certificate, left out for an EU one; `type` is `esign`, `eseal` or `web`; `pds` entries need an `https` URL and a two-letter language, at most one per language, and an EU qualified certificate (QcCompliance without QcCClegislation) needs one in English; `semantics` is `natural`, `legal`, `eidas-natural` or `eidas-legal` (RFC 3739 semantics identifier). Unknown keys are refused.
 - Certificates issued from the UI, Sign CSR (single and bulk), ACME, SCEP and approvals carry both; renewals keep them. EST, WSTEP and mTLS enrollment do not add them. `GET /api/v2/certificates/{id}` decodes the extension under `extensions.qc_statements`, and `GET /api/v2/certificates/{id}/lint?profile=etsi` runs the ETSI EN 319 412 checks.
 
 ### Get Template

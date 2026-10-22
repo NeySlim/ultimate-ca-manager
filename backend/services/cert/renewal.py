@@ -34,7 +34,7 @@ from utils.eku_validation import add_ocsp_nocheck_if_responder
 from utils.validity import DEFAULT_CERTIFICATE_VALIDITY_DAYS, MAX_VALIDITY_DAYS as MAX_RENEWAL_DAYS
 from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.ca_pointer_extensions import add_ca_pointer_extensions
-from utils.qc_statements import carried_policy_oids
+from utils.qc_statements import carried_policy_oids, template_policy_oids
 from utils.leaf_key_usage import constrain_builder_key_usage
 from utils.datetime_utils import cert_not_before, utc_isoformat, utc_now
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window, clamp_not_after
@@ -264,7 +264,8 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days) -> 
             raise RenewalError.from_fips(e) from e
         public_key = new_key.public_key()
 
-    builder = _builder(original, ca, ca_cert, public_key, not_after)
+    builder = _builder(original, ca, ca_cert, public_key, not_after,
+                       _template_policy_oids(getattr(cert, 'template_id', None)))
     renewed = builder.sign(private_key=ca_key, algorithm=sign_hash,
                            rsa_padding=rsa_padding_for(ca_key, sign_hash))
     renewed, scts = _apply_ct(renewed, ca_cert, ca_key)
@@ -438,7 +439,17 @@ def _generate_like(public_key):
     return registered_algorithms(family)[0].generate()
 
 
-def _builder(original, ca, ca_cert, public_key, not_after) -> x509.CertificateBuilder:
+def _template_policy_oids(template_id):
+    """Policy OIDs the certificate's template lists today ([] without a template)."""
+    if not template_id:
+        return []
+    from models.certificate_template import CertificateTemplate
+    from services.template_service import template_extensions
+    template = db.session.get(CertificateTemplate, template_id)
+    return template_policy_oids(template_extensions(template)) if template is not None else []
+
+
+def _builder(original, ca, ca_cert, public_key, not_after, template_oids=()) -> x509.CertificateBuilder:
     """The original's subject and extensions; the issuer's own rebuilt from the CA."""
     builder = (
         x509.CertificateBuilder()
@@ -462,7 +473,7 @@ def _builder(original, ca, ca_cert, public_key, not_after) -> x509.CertificateBu
                 f'Cannot carry extension {ext.oid.dotted_string} over to the renewed '
                 f'certificate: {e}', 400) from e
     builder = add_ca_pointer_extensions(
-        builder, ca, carried_policy_oids(original, ca.cps_oid if ca.cps_enabled else None))
+        builder, ca, carried_policy_oids(original, ca.cps_oid if ca.cps_enabled else None, template_oids))
     builder = builder.add_extension(
         x509.SubjectKeyIdentifier.from_public_key(public_key), critical=False)
     builder = builder.add_extension(authority_key_identifier_from_issuer(ca_cert), critical=False)

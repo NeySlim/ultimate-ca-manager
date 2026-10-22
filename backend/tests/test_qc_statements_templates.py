@@ -35,20 +35,20 @@ class TestCreate:
         assert r.status_code == 400
         assert 'qc_ident_method' in r.get_json()['message']
 
-    def test_compliance_with_cc_legislation_is_refused(self, auth_client):
+    def test_non_eu_qualified_template_is_accepted(self, auth_client):
         r = _create(auth_client, {'qc_statements': {'compliance': True, 'cc_legislation': ['CH']}})
-        assert r.status_code == 400
-        assert 'mutually exclusive' in r.get_json()['message']
+        assert r.status_code == 201, r.get_json()
 
     def test_bad_oid_is_refused(self, auth_client):
         r = _create(auth_client, {'certificate_policies': ['not-an-oid']})
         assert r.status_code == 400
         assert 'not-an-oid' in r.get_json()['message']
 
-    def test_pds_without_english_is_refused(self, auth_client):
+    def test_eu_qualified_pds_without_english_is_refused(self, auth_client):
         r = _create(auth_client, {'qc_statements': {
-            'pds': [{'url': 'https://x.test/p', 'language': 'fr'}]}})
+            'compliance': True, 'pds': [{'url': 'https://x.test/p', 'language': 'fr'}]}})
         assert r.status_code == 400
+        assert 'English' in r.get_json()['message']
 
     def test_json_string_extensions_are_validated_too(self, auth_client):
         r = _create(auth_client, json.dumps({'qc_statements': {'type': 'nope'}}))

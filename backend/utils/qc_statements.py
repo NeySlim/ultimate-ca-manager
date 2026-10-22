@@ -87,10 +87,11 @@ def _validate_pds(pds) -> List[str]:
             errors.append(f'qc_statements.pds url must be an https URL: {url!r}')
         if not isinstance(lang, str) or not _LANG_RE.match(lang):
             errors.append(f'qc_statements.pds language must be a lowercase ISO 639-1 code: {lang!r}')
+        elif lang in languages:
+            errors.append(f'qc_statements.pds has more than one entry in {lang!r} '
+                          '(EN 319 412-5, table 2)')
         else:
             languages.append(lang)
-    if not errors and 'en' not in languages:
-        errors.append('qc_statements.pds needs one entry in English (EN 319 412-5, 4.3.4)')
     return errors
 
 
@@ -113,15 +114,18 @@ def validate_qc_statements(qc) -> List[str]:
                           'uppercase ISO 3166 alpha-2 country codes')
         elif len(set(cc)) != len(cc):
             errors.append('qc_statements.cc_legislation contains a duplicate country')
-        if qc.get('compliance') is True:
-            errors.append('qc_statements.cc_legislation and compliance are mutually '
-                          'exclusive (EN 319 412-5, 4.2.4)')
     if 'type' in qc and qc['type'] not in QC_TYPES:
         errors.append('qc_statements.type must be one of: ' + ', '.join(QC_TYPES))
     if 'semantics' in qc and qc['semantics'] not in SEMANTICS:
         errors.append('qc_statements.semantics must be one of: ' + ', '.join(SEMANTICS))
     if 'pds' in qc:
-        errors.extend(_validate_pds(qc['pds']))
+        pds_errors = _validate_pds(qc['pds'])
+        errors.extend(pds_errors)
+        # An EU qualified certificate (QcCompliance without QcCClegislation) needs an English PDS.
+        if (not pds_errors and qc.get('compliance') is True and not qc.get('cc_legislation')
+                and not any(p['language'] == 'en' for p in qc['pds'])):
+            errors.append('qc_statements.pds needs one entry in English for an EU qualified '
+                          'certificate (EN 319 412-5, table 2)')
     if 'retention_period' in qc:
         rp = qc['retention_period']
         if not _is_int(rp) or not 0 < rp <= 1000:
@@ -257,15 +261,16 @@ def add_certificate_policies(builder, cps_uri, cps_oid, extra_oids=()):
     return builder if ext is None else builder.add_extension(ext, critical=False)
 
 
-def carried_policy_oids(certificate, cps_oid) -> List[str]:
-    """Qualifier-less policy OIDs of a certificate other than the CA's own (for renewal)."""
+def carried_policy_oids(certificate, cps_oid, template_oids) -> List[str]:
+    """Policy OIDs a renewal carries: those of the certificate its template still lists."""
     try:
         policies = certificate.extensions.get_extension_for_class(x509.CertificatePolicies).value
     except x509.ExtensionNotFound:
         return []
-    own = cps_oid or ANY_POLICY_OID
+    own, kept = cps_oid or ANY_POLICY_OID, set(template_oids or ())
     return [p.policy_identifier.dotted_string for p in policies
-            if not p.policy_qualifiers and p.policy_identifier.dotted_string != own]
+            if not p.policy_qualifiers and p.policy_identifier.dotted_string != own
+            and p.policy_identifier.dotted_string in kept]
 
 
 # ── decoding ────────────────────────────────────────────────────────────────
@@ -296,7 +301,7 @@ def decode_qc_statements(der: bytes) -> Optional[dict]:
             elif oid == OID_TYPE and full:
                 codes = {v: k for k, v in QC_TYPES.items()}
                 types = [codes.get(o.dotted, o.dotted) for o in _Oids.load(full)]
-                out['type'] = types[0] if types else None
+                out['type'] = types[0] if len(types) == 1 else (types or None)
             elif oid == OID_CC_LEGISLATION and full:
                 out['cc_legislation'] = [c.native for c in _Countries.load(full)]
             elif oid == OID_QCS_SYNTAX_V2 and full:

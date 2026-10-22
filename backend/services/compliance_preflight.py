@@ -239,15 +239,15 @@ def _ca_hsm_certification(ctx):
     accepted = ctx.rules.get('hsm_certifications')
     if not isinstance(accepted, dict) or not accepted:
         return []
-    found = []
+    found, listed = [], ', '.join(sorted(accepted))
     for ca, _cert, _label in _signing_cas(ctx):
         if compliance_signer.storage_of_ca(ca) != 'hsm':
             continue  # ca.key_protection reports software and SoftHSM keys
         declared = compliance_signer.certification_of(ca)
         if declared is None:
-            found.append(_ca_name(ca, 'no declared certification'))
+            found.append(_ca_name(ca, f'no declared certification, accepted: {listed}'))
         elif declared not in accepted:
-            found.append(_ca_name(ca, f'certification {declared} not accepted'))
+            found.append(_ca_name(ca, f'certification {declared} not accepted, accepted: {listed}'))
         elif (last := parse_rule_date(accepted[declared])) and ctx.today > last:
             found.append(_ca_name(ca, f'certification {declared} accepted until {last.isoformat()}'))
     return found
@@ -256,7 +256,7 @@ def _ca_hsm_certification(ctx):
 DETECTORS.append(Detector(
     'ca.hsm_certification', BLOCKER,
     'Certificate authorities whose HSM has no accepted certification declared, which the profile requires',
-    'Declare the certification of the HSM provider (cc-eal4+, eucc-high or fips-140-3-l3) in its settings, '
+    'Declare an accepted certification of the HSM provider in its settings, '
     'or move the authority to a certified HSM.',
     _ca_hsm_certification))
 

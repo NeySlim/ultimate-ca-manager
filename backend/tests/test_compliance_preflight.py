@@ -197,8 +197,11 @@ def test_an_hsm_authority_needs_an_accepted_declared_certification_under_eu_acm(
     _ca('p384', 'plain-software-root')
     finding = _assert(_report('eu-acm'), 'ca.hsm_certification', 'blocker',
                       'undeclared-root', 'fips2-root', 'other-root', count=3)
-    assert 'Declare the certification' in finding['remedy']
-    assert not any(n in e for n in ('eucc', 'fips3', 'cc-root', 'softhsm', 'plain') for e in finding['examples'])
+    assert 'Declare an accepted certification' in finding['remedy']
+    names = [e.split(' (')[0] for e in finding['examples']]
+    assert not any(n in e for n in ('eucc', 'fips3', 'cc-root', 'softhsm', 'plain') for e in names)
+    # the accepted list comes from the profile's rule, not from a fixed text
+    assert all('accepted: cc-eal4+, eucc-high, fips-140-3-l3' in e for e in finding['examples'])
 
 
 def test_an_expired_certification_is_a_blocker_under_eu_acm(session, monkeypatch):

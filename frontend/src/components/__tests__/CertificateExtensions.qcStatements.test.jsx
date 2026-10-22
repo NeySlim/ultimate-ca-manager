@@ -21,6 +21,11 @@ describe('CertificateExtensions, qcStatements', () => {
     expect(screen.getByText(/5000e0 EUR/)).toBeTruthy()
   })
 
+  it('lists every QcType of an imported certificate', () => {
+    render(<CertificateExtensions extensions={{ qc_statements: { type: ['esign', 'web'] } }} />)
+    expect(screen.getByText(/esign, web/)).toBeTruthy()
+  })
+
   it('renders nothing for it when the key is absent', () => {
     render(<CertificateExtensions extensions={{ key_usage: { usages: ['digitalSignature'] } }} />)
     expect(screen.queryByText('details.ext.qcStatements')).toBeNull()
