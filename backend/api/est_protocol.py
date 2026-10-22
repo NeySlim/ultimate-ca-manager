@@ -398,8 +398,14 @@ def _trusted_client_cert():
     """
     # Native TLS: gunicorn populates request.environ['peercert'] only after
     # validating the chain against the configured CA — safe to trust.
-    if request.environ.get('peercert'):
-        return request.environ['peercert']
+    # The worker stores it as DER (getpeercert(binary_form=True)) while every
+    # caller here parses PEM, so a DER value is converted.
+    peercert = request.environ.get('peercert')
+    if peercert:
+        if isinstance(peercert, (bytes, bytearray)) and not bytes(peercert).lstrip().startswith(b'-----'):
+            return x509.load_der_x509_certificate(bytes(peercert)).public_bytes(
+                _crypto_serialization.Encoding.PEM).decode('ascii')
+        return peercert
 
     from utils.trusted_proxy import immediate_peer_addr, is_request_from_trusted_proxy
     if not is_request_from_trusted_proxy():

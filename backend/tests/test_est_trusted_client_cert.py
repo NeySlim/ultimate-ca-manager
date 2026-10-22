@@ -146,3 +146,35 @@ def test_untrusted_peer_cert_headers_are_ignored_and_warned(bare_app, caplog):
     warnings = _warnings(caplog)
     assert len(warnings) == 1
     assert 'untrusted peer' in warnings[0].getMessage()
+
+
+def _der_of(pem):
+    from cryptography import x509
+    from cryptography.hazmat.primitives import serialization
+    return x509.load_pem_x509_certificate(pem.encode()).public_bytes(
+        serialization.Encoding.DER)
+
+
+def test_native_tls_der_peercert_is_returned_as_pem(bare_app):
+    """workers.MTLSWebSocketHandler stores the peer certificate as DER
+    (getpeercert(binary_form=True)); every EST caller parses the value with
+    load_pem_x509_certificate, so it must come back as PEM."""
+    from cryptography import x509
+    with bare_app.test_request_context(
+        '/.well-known/est/simplereenroll',
+        environ_overrides={'peercert': _der_of(CLIENT_PEM)},
+    ):
+        result = est_protocol._trusted_client_cert()
+
+    assert result is not None
+    cert = x509.load_pem_x509_certificate(
+        result.encode() if isinstance(result, str) else result)
+    assert cert == x509.load_pem_x509_certificate(CLIENT_PEM.encode())
+
+
+def test_native_tls_pem_peercert_is_returned_unchanged(bare_app):
+    with bare_app.test_request_context(
+        '/.well-known/est/simplereenroll',
+        environ_overrides={'peercert': CLIENT_PEM},
+    ):
+        assert est_protocol._trusted_client_cert() == CLIENT_PEM

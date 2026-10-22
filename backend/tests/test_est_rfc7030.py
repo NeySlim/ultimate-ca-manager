@@ -268,6 +268,31 @@ class TestSimpleReenroll:
         certs = pkcs7.load_der_pkcs7_certificates(base64.b64decode(response.data))
         assert len(certs) == 1
 
+    def test_reenroll_with_der_peercert_from_the_tls_worker(self, client, est_config):
+        """The gunicorn worker hands the client certificate over as DER, not
+        PEM: re-enrolment must accept it in that form."""
+        names = ('der-device.example.test',)
+        first_csr, key = _make_csr(common_name='der-device.example.test', san_names=names)
+        enrolled = _post_csr(client, 'simpleenroll', first_csr, headers=_basic_auth())
+        assert enrolled.status_code == 200, enrolled.data
+        issued = pkcs7.load_der_pkcs7_certificates(base64.b64decode(enrolled.data))
+        leaf = [c for c in issued if not c.extensions.get_extension_for_oid(
+            x509.ExtensionOID.BASIC_CONSTRAINTS).value.ca][0]
+        csr = x509.CertificateSigningRequestBuilder().subject_name(leaf.subject).add_extension(
+            x509.SubjectAlternativeName([x509.DNSName(name) for name in names]), critical=False,
+        ).sign(key, hashes.SHA256())
+        body = base64.b64encode(csr.public_bytes(serialization.Encoding.DER))
+        response = client.post(
+            f'{EST_BASE}/simplereenroll', data=body,
+            content_type='application/pkcs10',
+            environ_overrides={'peercert': leaf.public_bytes(serialization.Encoding.DER)},
+        )
+        assert response.status_code == 200, response.data
+        renewed = pkcs7.load_der_pkcs7_certificates(base64.b64decode(response.data))
+        assert len(renewed) == 1
+        assert renewed[0].subject == leaf.subject
+        assert renewed[0].serial_number != leaf.serial_number
+
 
 class TestCsrAttrs:
     @pytest.mark.parametrize('without_pyasn1', [False, True])
