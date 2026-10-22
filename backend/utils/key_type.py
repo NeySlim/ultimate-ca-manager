@@ -161,8 +161,8 @@ def parse_csr_key_type(key_algo_full: str) -> str:
 # ---------------------------------------------------------------------------
 # EST (RFC 7030 §3.7) and SCEP (RFC 8894) both defer key-strength policy to the
 # local CA. UCM enforces the same floor it applies to UI/API issuance: RSA >=
-# 2048 and NIST P-256/384/521 for EC. Legacy/edge curves and short RSA keys are
-# refused so a weak (e.g. 512-bit) or exotic key never gets a CA signature.
+# 2048, NIST P-256/384/521 and, outside FIPS mode, Brainpool for EC. Other
+# curves and short RSA keys are refused so a weak or exotic key is never signed.
 MIN_RSA_BITS = 2048
 # And a ceiling, which there was none of. Key size is attacker-chosen on every
 # enrollment path: signing and later verifying a 65536-bit RSA key costs orders

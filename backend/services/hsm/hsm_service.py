@@ -61,6 +61,7 @@ class HsmService:
             provider_class: Provider class implementing BaseHsmProvider
         """
         cls._provider_registry[provider_type] = provider_class
+        provider_class.PROVIDER_TYPE = provider_type
         logger.info(f"Registered HSM provider: {provider_type}")
     
     @classmethod

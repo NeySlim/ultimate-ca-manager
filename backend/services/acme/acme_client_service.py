@@ -72,7 +72,7 @@ def fips_key_type_refusal(label):
     """Why FIPS mode refuses the certificate key type *label*, or None."""
     alg = key_algorithms.get(label)
     if alg is not None and not alg.fips_approved and fips_mode.enabled():
-        return f'{alg.display} keys are not available in FIPS mode'
+        return f'{alg.display} keys not available in FIPS mode'
     return None
 
 

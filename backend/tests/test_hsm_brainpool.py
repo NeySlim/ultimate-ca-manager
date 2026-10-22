@@ -70,8 +70,11 @@ def test_other_providers_refuse_brainpool_and_say_why(type_name, label):
         provider = _provider_for(type_name)
     except (ImportError, AttributeError):
         pytest.skip('provider SDK not installed')
-    with pytest.raises(HsmOperationError, match='only PKCS#11'):
+    import services.hsm  # noqa: F401  registers the providers and their type names
+    with pytest.raises(HsmOperationError, match='only PKCS#11') as refused:
         provider.generate_key('bp', label)
+    # Same wording as the service refusal: the provider type, not its class
+    assert f"provider type '{type_name}'" in str(refused.value)
 
 
 def test_the_refusal_names_the_provider_and_curve():

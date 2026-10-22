@@ -14,11 +14,18 @@ from utils.cert_status import (
     revoked_condition, unknown_status_message, valid_condition,
 )
 from utils.response import error_response
-from services.compliance_service import calculate_compliance_score
+from services.compliance_service import calculate_compliance_score, key_algo_sort_points
 from utils.datetime_utils import utc_now
 from . import bp
 
 logger = logging.getLogger(__name__)
+
+
+def key_strength_order(column):
+    """SQL key strength points (0-30) of a ``key_algo`` *column*, the scale of
+    compliance_service._score_key_strength; another EC curve 15, the rest 10."""
+    return case(*[(column.ilike(spelling), points) for spelling, points in key_algo_sort_points()],
+                (column.ilike('EC %'), 15), else_=10)
 
 
 @bp.route('/api/v2/certificates', methods=['GET'])
@@ -167,22 +174,7 @@ def list_certificates():
 
         compliance_order = (
             # Key strength component (0-30)
-            # Same points as compliance_service._score_key_strength, on the
-            # key_algo spellings ("RSA 4096", "EC secp384r1", "Ed25519")
-            case(
-                (Certificate.key_algo.ilike('RSA 4096'), 30),
-                (Certificate.key_algo.ilike('RSA 8192'), 30),
-                (Certificate.key_algo.ilike('RSA 3072'), 25),
-                (Certificate.key_algo.ilike('RSA 2048'), 20),
-                (Certificate.key_algo.ilike('RSA 1024'), 5),
-                (Certificate.key_algo.ilike('EC secp521r1'), 30),
-                (Certificate.key_algo.ilike('EC secp384r1'), 30),
-                (Certificate.key_algo.ilike('EC secp256r1'), 25),
-                (Certificate.key_algo.ilike('Ed25519'), 30),
-                (Certificate.key_algo.ilike('Ed448'), 30),
-                (Certificate.key_algo.ilike('EC %'), 15),
-                else_=10
-            ) +
+            key_strength_order(Certificate.key_algo) +
             # Validity component (0-25)
             case(
                 (Certificate.revoked == True, 0),

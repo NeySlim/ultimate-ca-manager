@@ -114,3 +114,16 @@ def test_compliance_sort_scores_other_curves_like_the_service(app, auth_client):
             for cert_id in ids:
                 db.session.delete(db.session.get(Certificate, cert_id))
             db.session.commit()
+
+
+def test_the_sql_sort_scores_every_registered_key_like_the_service(app):
+    # One table for both: the SQL sort used to give Brainpool 15 where the grade gave 25/30
+    from sqlalchemy import literal, select
+    from api.v2.certificates.cert_list import key_strength_order
+    from services.compliance_service import _score_key_strength
+    from utils import key_algorithms
+    with app.app_context():
+        for alg in key_algorithms.ALGORITHMS:
+            sql = db.session.execute(select(key_strength_order(literal(alg.legacy_key_algo)))).scalar()
+            expected = _score_key_strength({'key_algo': alg.legacy_key_algo, 'key_size': alg.key_size})['score']
+            assert sql == expected, alg.label

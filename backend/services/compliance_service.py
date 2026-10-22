@@ -8,6 +8,7 @@ validity, SANs, and industry best practices.
 import logging
 from datetime import datetime, timezone
 
+from utils import key_algorithms
 from utils.key_algorithms import normalize_label
 
 logger = logging.getLogger(__name__)
@@ -100,16 +101,24 @@ def _score_key_strength(cert_dict):
     return {'score': score, 'max': max_points, 'reason': reason}
 
 
+# Brainpool scores like the NIST curve of the same size (BSI TR-02102-1)
 _EC_POINTS = {'EC-P256': (25, 'ECDSA P-256'), 'EC-P384': (30, 'ECDSA P-384'),
-              'EC-P521': (30, 'ECDSA P-521')}
+              'EC-P521': (30, 'ECDSA P-521'), 'EC-BP256': (25, 'ECDSA brainpoolP256r1'),
+              'EC-BP384': (30, 'ECDSA brainpoolP384r1'), 'EC-BP512': (30, 'ECDSA brainpoolP512r1')}
 _EC_LABEL_BY_SIZE = {256: 'EC-P256', 384: 'EC-P384', 521: 'EC-P521'}
-# Same strength as the NIST curve of the same size (BSI TR-02102-1)
-_BRAINPOOL_POINTS = {'brainpoolp256r1': 25, 'brainpoolp384r1': 30, 'brainpoolp512r1': 30}
+
+
+def key_algo_sort_points():
+    """``(key_algo spelling, points)`` of every registered key, plus RSA 8192
+    and 1024, scored by ``_score_key_strength`` itself for the SQL sort."""
+    spellings = [(a.legacy_key_algo, a.key_size) for a in key_algorithms.ALGORITHMS]
+    spellings += [('RSA 8192', 8192), ('RSA 1024', 1024)]
+    return [(s, _score_key_strength({'key_algo': s, 'key_size': n})['score']) for s, n in spellings]
 
 
 def _score_ec_key(cert_dict, key_size):
     """Points for an EC key from its actual curve; a curve outside the registry
-    (secp256k1, brainpool) is named as such and scored as an unrated EC key."""
+    (secp256k1) is named as such and scored as an unrated EC key."""
     unregistered = None
     for field in ('key_type', 'key_algo', 'key_algorithm'):
         spelling = str(cert_dict.get(field) or '').strip()
@@ -122,8 +131,6 @@ def _score_ec_key(cert_dict, key_size):
         if unregistered is None and len(curves) == 1:
             unregistered = curves[0]
     if unregistered:
-        if unregistered.lower() in _BRAINPOOL_POINTS:
-            return _BRAINPOOL_POINTS[unregistered.lower()], f'ECDSA {unregistered}'
         return 15, f'ECDSA {unregistered}'
     label = _EC_LABEL_BY_SIZE.get(key_size)
     if label:

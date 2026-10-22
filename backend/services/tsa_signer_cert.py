@@ -62,7 +62,8 @@ def _generate_key(key_type, key_size, curve):
     # With neither curve nor size, the RSA default size would be parsed as a curve.
     if str(key_type or '').strip().lower() in ('ec', 'ecdsa') and not key_size and not curve:
         raise TsaSignerIssueError(
-            'An EC key needs a curve: pass curve (P-256, P-384 or P-521)', 400)
+            'An EC key needs a curve: pass curve (P-256, P-384 or P-521, or outside FIPS mode '
+            'brainpoolP256r1, brainpoolP384r1 or brainpoolP512r1)', 400)
     try:
         normalized = parse_issue_key_type(key_type or DEFAULT_KEY_TYPE,
                                           key_size or DEFAULT_KEY_SIZE,

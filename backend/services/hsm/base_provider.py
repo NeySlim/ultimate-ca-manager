@@ -35,7 +35,8 @@ class BaseHsmProvider(ABC):
 
     def refuse_unsupported_curve(self, algorithm: str) -> None:
         """Raise HsmOperationError for a Brainpool label this provider cannot handle."""
-        message = brainpool_refusal(type(self).__name__, algorithm, self.SIGNS_BRAINPOOL)
+        name = getattr(type(self), 'PROVIDER_TYPE', None) or type(self).__name__
+        message = brainpool_refusal(f"provider type '{name}'", algorithm, self.SIGNS_BRAINPOOL)
         if message:
             raise HsmOperationError(message)
     
