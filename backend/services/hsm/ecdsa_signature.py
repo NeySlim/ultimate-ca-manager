@@ -12,7 +12,8 @@ from cryptography.hazmat.primitives.asymmetric.utils import (
     decode_dss_signature, encode_dss_signature,
 )
 
-_COORDINATE_BYTES = {'EC-P256': 32, 'EC-P384': 48, 'EC-P521': 66}
+_COORDINATE_BYTES = {'EC-P256': 32, 'EC-P384': 48, 'EC-P521': 66,
+                      'EC-BP256': 32, 'EC-BP384': 48, 'EC-BP512': 64}
 
 
 def coordinate_bytes(key_algorithm: Optional[str], public_key_pem: Optional[str] = None) -> Optional[int]:

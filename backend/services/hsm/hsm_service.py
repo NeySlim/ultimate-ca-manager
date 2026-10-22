@@ -8,13 +8,15 @@ from datetime import datetime
 import json
 import logging
 
+import fips_mode
 from models import db
 from models.hsm import HsmProvider, HsmKey
 from services.hsm.ecdsa_signature import coordinate_bytes, ecdsa_to_der
 from services.hsm.base_provider import (
-    BaseHsmProvider, HsmKeyInfo,
+    BaseHsmProvider, HsmKeyInfo, brainpool_refusal,
     HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
 )
+from utils import key_algorithms
 from utils.datetime_utils import utc_now
 from utils import hsm_check, pkcs11_config
 
@@ -66,6 +68,13 @@ class HsmService:
         """Whether keys of this provider type can sign RSASSA-PSS."""
         provider_class = cls._provider_registry.get(provider_type)
         return bool(provider_class and provider_class.SIGNS_PSS)
+
+    @classmethod
+    def brainpool_refusal(cls, provider_type: str, algorithm: Optional[str]) -> Optional[str]:
+        """Why this provider type cannot hold a Brainpool *algorithm* key, or None."""
+        provider_class = cls._provider_registry.get(provider_type)
+        supported = bool(provider_class and provider_class.SIGNS_BRAINPOOL)
+        return brainpool_refusal(f"provider type '{provider_type}'", algorithm, supported)
 
     @classmethod
     def get_available_providers(cls) -> List[str]:
@@ -358,6 +367,12 @@ class HsmService:
         # Validate algorithm
         if algorithm not in HsmKey.VALID_ALGORITHMS:
             raise ValueError(f"Invalid algorithm: {algorithm}")
+        refusal = cls.brainpool_refusal(provider.type, algorithm)
+        if refusal:
+            raise HsmOperationError(refusal)
+        registered = key_algorithms.get(algorithm)
+        if registered is not None and not registered.fips_approved:
+            fips_mode.refuse(f'{registered.display} keys')
         
         # Validate purpose
         if purpose not in HsmKey.VALID_PURPOSES:

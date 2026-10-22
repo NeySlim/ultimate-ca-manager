@@ -248,6 +248,7 @@ class GcpKmsProvider(BaseHsmProvider):
         extractable: bool = False
     ) -> HsmKeyInfo:
         """Generate a new key in GCP KMS"""
+        self.refuse_unsupported_curve(algorithm)
         if not self._client:
             raise HsmOperationError("Not connected")
         

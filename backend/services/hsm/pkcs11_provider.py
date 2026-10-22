@@ -20,6 +20,24 @@ from utils.request_helpers import safe_call
 
 logger = logging.getLogger(__name__)
 
+# DER OIDs of the Brainpool curves (RFC 5639); asn1crypto, hence python-pkcs11,
+# does not know their names.
+_BRAINPOOL_OID = {
+    'brainpoolP256r1': '1.3.36.3.3.2.8.1.1.7',
+    'brainpoolP384r1': '1.3.36.3.3.2.8.1.1.11',
+    'brainpoolP512r1': '1.3.36.3.3.2.8.1.1.13',
+}
+
+
+def _curve_parameters(curve_name: str) -> bytes:
+    """DER EC_PARAMS (named curve) for *curve_name*."""
+    oid = _BRAINPOOL_OID.get(curve_name)
+    if oid is None:
+        return encode_named_curve_parameters(curve_name)
+    from asn1crypto.core import ObjectIdentifier
+    return ObjectIdentifier(oid).dump()
+
+
 # Try to import pkcs11 - it's optional
 PKCS11_AVAILABLE = False
 ALGORITHM_TO_PKCS11 = {}
@@ -40,6 +58,9 @@ try:
         'EC-P256': (KeyType.EC, 'secp256r1'),
         'EC-P384': (KeyType.EC, 'secp384r1'),
         'EC-P521': (KeyType.EC, 'secp521r1'),
+        'EC-BP256': (KeyType.EC, 'brainpoolP256r1'),
+        'EC-BP384': (KeyType.EC, 'brainpoolP384r1'),
+        'EC-BP512': (KeyType.EC, 'brainpoolP512r1'),
         'AES-128': (KeyType.AES, 128),
         'AES-256': (KeyType.AES, 256),
     }
@@ -52,6 +73,9 @@ try:
         'EC-P256': Mechanism.ECDSA_SHA256,
         'EC-P384': Mechanism.ECDSA_SHA384,
         'EC-P521': Mechanism.ECDSA_SHA512,
+        'EC-BP256': Mechanism.ECDSA_SHA256,
+        'EC-BP384': Mechanism.ECDSA_SHA384,
+        'EC-BP512': Mechanism.ECDSA_SHA512,
     }
 
     # Digest to apply locally when a token lacks the hashed ECDSA mechanism
@@ -84,6 +108,7 @@ class Pkcs11Provider(BaseHsmProvider):
     """
 
     SIGNS_PSS = True
+    SIGNS_BRAINPOOL = True
     
     def __init__(self, config: Dict[str, Any]):
         if not PKCS11_AVAILABLE:
@@ -346,7 +371,7 @@ class Pkcs11Provider(BaseHsmProvider):
             elif key_type_enum == KeyType.EC:
                 ecparams = self._session.create_domain_parameters(
                     KeyType.EC,
-                    {Attribute.EC_PARAMS: encode_named_curve_parameters(param)},
+                    {Attribute.EC_PARAMS: _curve_parameters(param)},
                     local=True
                 )
                 

@@ -29,6 +29,15 @@ class BaseHsmProvider(ABC):
 
     # True when sign() honours padding='pss' (RSASSA-PSS, salt = digest length)
     SIGNS_PSS = False
+
+    # True when the provider generates and signs with Brainpool curves (RFC 5639)
+    SIGNS_BRAINPOOL = False
+
+    def refuse_unsupported_curve(self, algorithm: str) -> None:
+        """Raise HsmOperationError for a Brainpool label this provider cannot handle."""
+        message = brainpool_refusal(type(self).__name__, algorithm, self.SIGNS_BRAINPOOL)
+        if message:
+            raise HsmOperationError(message)
     
     def __init__(self, config: Dict[str, Any]):
         """
@@ -196,6 +205,17 @@ class HsmError(Exception):
 class HsmConnectionError(HsmError):
     """HSM connection failed"""
     pass
+
+
+BRAINPOOL_ALGORITHMS = ('EC-BP256', 'EC-BP384', 'EC-BP512')
+
+
+def brainpool_refusal(provider: str, algorithm: Optional[str], supported: bool = False) -> Optional[str]:
+    """Why *provider* cannot take the Brainpool *algorithm*, or None."""
+    if supported or algorithm not in BRAINPOOL_ALGORITHMS:
+        return None
+    return (f"Brainpool key {algorithm} is not supported by {provider}: "
+            f"only PKCS#11 HSMs generate and sign with Brainpool curves")
 
 
 class HsmOperationError(HsmError):

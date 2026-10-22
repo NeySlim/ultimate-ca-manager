@@ -259,6 +259,7 @@ class HsmKey(db.Model if db else object):
     VALID_ALGORITHMS = [
         'RSA-2048', 'RSA-3072', 'RSA-4096',
         'EC-P256', 'EC-P384', 'EC-P521',
+        'EC-BP256', 'EC-BP384', 'EC-BP512',
         'AES-128', 'AES-256'
     ]
     

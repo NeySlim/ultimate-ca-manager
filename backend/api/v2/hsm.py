@@ -9,6 +9,7 @@ Supports:
 """
 
 from flask import Blueprint, request, g
+from fips_mode import FipsRestricted
 from auth.unified import require_auth
 from utils.secret_target import MASKS, changed_targets, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
@@ -477,6 +478,10 @@ def generate_key(provider_id):
             400
         )
     
+    refusal = HsmService.brainpool_refusal(provider.type, algorithm)
+    if refusal:
+        return error_response(refusal, 400)
+
     try:
         key = HsmService.generate_key(
             provider_id=provider_id,
@@ -499,6 +504,8 @@ def generate_key(provider_id):
         
         return created_response(data=key.to_dict())
         
+    except FipsRestricted:
+        raise
     except ValueError as e:
         logger.warning(f"HSM key generation validation error: {e}")
         return error_response('Invalid key parameters', 400)

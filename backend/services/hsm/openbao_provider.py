@@ -283,6 +283,7 @@ class OpenBaoProvider(BaseHsmProvider):
         purpose: str = 'signing',
         extractable: bool = False
     ) -> HsmKeyInfo:
+        self.refuse_unsupported_curve(algorithm)
         if algorithm not in ALGORITHM_TO_TRANSIT:
             raise HsmOperationError(
                 f'Unsupported algorithm: {algorithm}. '

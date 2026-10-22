@@ -34,6 +34,7 @@ from utils.ca_profile import (
 )
 from models import Certificate, CA, db
 from models.hsm import HsmKey, HsmProvider
+from services.hsm import HsmService
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import dsa
@@ -540,6 +541,16 @@ def create_ca():
         else:
             hsm_key_algorithm_for_digest = hsm_key_algorithm
         digest_key_type = _HSM_ALGORITHM_KEY_TYPE.get(hsm_key_algorithm_for_digest, key_type)
+        if hsm_key_id or hsm_provider_id:
+            if hsm_key_id:
+                chosen_provider = hsm_key.provider if hsm_key else None
+            else:
+                chosen_provider = (db.session.get(HsmProvider, int(hsm_provider_id))
+                                   if str(hsm_provider_id).isdigit() else None)
+            brainpool_refusal = (HsmService.brainpool_refusal(chosen_provider.type, hsm_key_algorithm_for_digest)
+                                 if chosen_provider else None)
+            if brainpool_refusal:
+                return error_response(brainpool_refusal, 400)
         digest, digest_err = resolve_digest(raw_digest, digest_key_type)
         if digest_err:
             return error_response(digest_err, 400)
