@@ -33,7 +33,7 @@ class TestNormalizeEcCurve:
         with pytest.raises(ValueError, match='P-256'):
             normalize_ec_curve('secp256k1')
 
-    @pytest.mark.parametrize('bad', ['P-192', 'brainpoolP256r1', 'RSA', ''])
+    @pytest.mark.parametrize('bad', ['P-192', 'brainpoolP320r1', 'RSA', ''])
     def test_rejects_non_nist_and_empty(self, bad):
         with pytest.raises(ValueError):
             normalize_ec_curve(bad)

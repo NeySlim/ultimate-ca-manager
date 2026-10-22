@@ -146,6 +146,20 @@ def _ec(bits: int, curve: type, names: tuple[str, ...], trust_store_id: str) -> 
     )
 
 
+def _brainpool(bits: int, curve: type) -> KeyAlgorithm:
+    """RFC 5639 curve; generated with pyca outside FIPS mode, refused inside it."""
+    name = f'brainpoolP{bits}r1'
+    return KeyAlgorithm(
+        label=f'EC-BP{bits}', family='EC', param=f'BP{bits}',
+        private_class=ec.EllipticCurvePrivateKey, public_class=ec.EllipticCurvePublicKey,
+        generator=lambda: generate_ec(curve()),
+        needs_digest=True, default_digest={256: 'sha256', 384: 'sha384', 512: 'sha512'}[bits],
+        display=f'EC Brainpool P{bits}r1', legacy_key_algo=f'EC {name}', trust_store_id=name,
+        fips_approved=False, key_size=bits, curve_names=(name.lower(),),
+        aliases=(name, f'EC-{name}', f'BP-{bits}'),
+    )
+
+
 def _edwards(name: str, private_class: type, public_class: type, bits: int) -> KeyAlgorithm:
     return KeyAlgorithm(
         label=name.upper(), family=name.upper(), param=None,
@@ -164,6 +178,9 @@ ALGORITHMS: tuple[KeyAlgorithm, ...] = (
     _ec(256, ec.SECP256R1, ('secp256r1', 'prime256v1'), 'prime256v1'),
     _ec(384, ec.SECP384R1, ('secp384r1',), 'secp384r1'),
     _ec(521, ec.SECP521R1, ('secp521r1',), 'secp521r1'),
+    _brainpool(256, ec.BrainpoolP256R1),
+    _brainpool(384, ec.BrainpoolP384R1),
+    _brainpool(512, ec.BrainpoolP512R1),
     _edwards('Ed25519', ed25519.Ed25519PrivateKey, ed25519.Ed25519PublicKey, 256),
     _edwards('Ed448', ed448.Ed448PrivateKey, ed448.Ed448PublicKey, 448),
 )

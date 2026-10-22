@@ -37,6 +37,9 @@ def _old_issue_cascade(normalized_key):
         'prime256v1': ec.SECP256R1(),
         'secp384r1': ec.SECP384R1(),
         'secp521r1': ec.SECP521R1(),
+        'brainpoolP256r1': ec.BrainpoolP256R1(),
+        'brainpoolP384r1': ec.BrainpoolP384R1(),
+        'brainpoolP512r1': ec.BrainpoolP512R1(),
     }
     if normalized_key in EC_CURVES:
         return ec.generate_private_key(EC_CURVES[normalized_key])

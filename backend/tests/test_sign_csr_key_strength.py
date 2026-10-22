@@ -91,14 +91,15 @@ def test_weak_curve_secp192r1_is_rejected(ca):
         _sign(ca, csr)
 
 
-def test_brainpool_curve_is_rejected(ca):
-    """Non-NIST curve outside the allow-list."""
-    try:
-        key = ec.generate_private_key(ec.BrainpoolP256R1())
-    except Exception:
-        pytest.skip('BrainpoolP256R1 unavailable in this OpenSSL build')
+def test_brainpool_curve_is_accepted(ca):
+    """Brainpool is in the registry: signed outside FIPS mode."""
+    _sign(ca, _csr(ec.generate_private_key(ec.BrainpoolP256R1())))
+
+
+def test_secp256k1_curve_is_rejected(ca):
+    """Non-registry curve outside the allow-list."""
     with pytest.raises(ValueError, match='Unsupported EC curve'):
-        _sign(ca, _csr(key))
+        _sign(ca, _csr(ec.generate_private_key(ec.SECP256K1())))
 
 
 def test_weak_key_rejected_for_intermediate_ca_too(ca):

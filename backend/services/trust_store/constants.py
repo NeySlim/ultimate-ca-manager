@@ -14,6 +14,9 @@ KEY_TYPES = {
     'secp256r1': ('ec', ec.SECP256R1()),
     'secp384r1': ('ec', ec.SECP384R1()),
     'secp521r1': ('ec', ec.SECP521R1()),
+    'brainpoolP256r1': ('ec', ec.BrainpoolP256R1()),
+    'brainpoolP384r1': ('ec', ec.BrainpoolP384R1()),
+    'brainpoolP512r1': ('ec', ec.BrainpoolP512R1()),
 }
 
 # Supported signature hashes, the policy digests (services.policy_service.POLICY_DIGESTS)

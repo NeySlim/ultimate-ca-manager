@@ -64,6 +64,7 @@ _MAX_CA_VALIDITY_DAYS = 50 * 365
 _HSM_ALGORITHM_KEY_TYPE = {
     'RSA-2048': '2048', 'RSA-3072': '3072', 'RSA-4096': '4096',
     'EC-P256': 'prime256v1', 'EC-P384': 'secp384r1', 'EC-P521': 'secp521r1',
+    'EC-BP256': 'brainpoolP256r1', 'EC-BP384': 'brainpoolP384r1', 'EC-BP512': 'brainpoolP512r1',
 }
 _MAX_OID_LEN = 100
 _MAX_NAME_CONSTRAINTS = 32

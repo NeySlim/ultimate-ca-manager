@@ -27,6 +27,8 @@ TEMPLATES = os.path.join(_REPO, 'frontend', 'src', 'pages', 'TemplatesPage.jsx')
 # The labels a template stores; legacy spellings (`rsa:2048`, `ec:p256`) are
 # accepted on input and stored as these.
 CANONICAL = set(TEMPLATE_KEY_TYPES)
+# The editors list Brainpool once the frontend registry lands (phase 4.4).
+SCREEN_SET = {t for t in CANONICAL if not t.startswith('EC-BP')}
 
 
 def _js_array(path, name):
@@ -37,23 +39,24 @@ def _js_array(path, name):
 
 
 class TestTheScreensOfferWhatTheApiAccepts:
-    def test_the_canonical_set_is_the_six(self):
+    def test_the_canonical_set_is_the_six_plus_brainpool(self):
         assert CANONICAL == {'RSA-2048', 'RSA-3072', 'RSA-4096',
-                             'EC-P256', 'EC-P384', 'EC-P521'}
+                             'EC-P256', 'EC-P384', 'EC-P521',
+                             'EC-BP256', 'EC-BP384', 'EC-BP512'}
 
     def test_the_template_screen_offers_all_of_them(self):
         body = _js_array(TEMPLATES, 'KEY_TYPE_OPTIONS')
         offered = set(re.findall(r"'([A-Z][^']*)'", body))
-        assert offered == CANONICAL, (
+        assert offered == SCREEN_SET, (
             f'the template editor offers {sorted(offered)} where the API '
-            f'accepts {sorted(CANONICAL)}')
+            f'accepts {sorted(SCREEN_SET)}')
 
     def test_the_policy_screen_offers_all_of_them(self):
         body = _js_array(POLICIES, 'KEY_TYPE_OPTIONS')
         offered = set(re.findall(r"value: '([^']+)'", body))
-        assert offered == CANONICAL, (
+        assert offered == SCREEN_SET, (
             f'the policy editor offers {sorted(offered)} where the API '
-            f'accepts {sorted(CANONICAL)}; a key type a template can ask for '
+            f'accepts {sorted(SCREEN_SET)}; a key type a template can ask for '
             'and a policy cannot permit is refused with no way to allow it')
 
     def test_a_new_policy_permits_everything_the_api_accepts(self):
@@ -64,9 +67,9 @@ class TestTheScreensOfferWhatTheApiAccepts:
         if 'KEY_TYPE_OPTIONS' in line or line.strip().rstrip(',') == '[]':
             return      # seeded from the list itself, or empty: no restriction
         seeded = set(re.findall(r"'([^']+)'", line))
-        assert seeded == CANONICAL, (
+        assert seeded == SCREEN_SET, (
             f'a new policy is seeded permitting {sorted(seeded)}, so an '
-            f'{sorted(CANONICAL - seeded)} certificate is refused by the '
+            f'{sorted(SCREEN_SET - seeded)} certificate is refused by the '
             'default policy')
 
 

@@ -753,6 +753,9 @@ def _normalize_key_type_label(value):
     by_curve = key_algorithms.label_for_curve_name(v)
     if by_curve:
         return by_curve
+    alias = key_algorithms.get(v)
+    if alias is not None and alias.family == 'EC' and alias.param.startswith('BP'):
+        return alias.label
     uppered = v.upper()
     # Any RSA-/EC- spelling passes through so an unregistered size still compares.
     if uppered.startswith(('RSA-', 'EC-')) or uppered in key_algorithms.labels():

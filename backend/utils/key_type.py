@@ -3,6 +3,7 @@ from __future__ import annotations
 
 import re
 
+import fips_mode
 from utils import key_algorithms
 
 RSA_SIZES = frozenset(a.trust_store_id for a in key_algorithms.algorithms('RSA'))
@@ -16,7 +17,8 @@ _EC_ALIASES: dict[str, str] = {
 
 _EC_ERROR_HINT = (
     'EC curve must be P-256, P-384, or P-521 '
-    '(aliases: secp256r1/prime256v1, secp384r1, secp521r1)'
+    '(aliases: secp256r1/prime256v1, secp384r1, secp521r1) '
+    'or, outside FIPS mode, Brainpool EC-BP256, EC-BP384 or EC-BP512 (brainpoolP256r1/P384r1/P512r1)'
 )
 
 
@@ -31,8 +33,20 @@ _EC_COLLAPSED_ALIASES: dict[str, str] = {
 }
 
 
+def _fips_checked(trust_store_id: str) -> str:
+    """*trust_store_id*, or FipsRestricted when FIPS mode excludes its curve."""
+    alg = key_algorithms.get(trust_store_id)
+    if alg is not None and not alg.fips_approved:
+        fips_mode.refuse(f'{alg.display} keys')
+    return trust_store_id
+
+
 def normalize_ec_curve(value: str) -> str:
     """Map UI / OpenSSL curve names to TrustStore KEY_TYPES EC identifiers."""
+    return _fips_checked(_lookup_ec_curve(value))
+
+
+def _lookup_ec_curve(value: str) -> str:
     raw = (value or '').strip()
     if not raw:
         raise ValueError(_EC_ERROR_HINT)
@@ -135,6 +149,7 @@ def parse_csr_key_type(key_algo_full: str) -> str:
         or 'SECP' in upper
         or 'PRIME' in upper
         or re.search(r'P-\d{3}', upper)
+        or re.search(r'BRAINPOOL|\bBP-?\d{3}', upper)
     ):
         return normalize_ec_curve(raw)
 
@@ -156,6 +171,8 @@ MIN_RSA_BITS = 2048
 MAX_RSA_BITS = 8192
 _ALLOWED_EC_CURVES = frozenset(
     c for a in key_algorithms.algorithms('EC') for c in a.curve_names)
+_FIPS_EC_CURVES = frozenset(
+    c for a in key_algorithms.algorithms('EC') if a.fips_approved for c in a.curve_names)
 
 
 def validate_enrollment_public_key(public_key) -> str | None:
@@ -178,7 +195,10 @@ def validate_enrollment_public_key(public_key) -> str | None:
     if family == 'EC':
         curve = public_key.curve.name.lower()
         if curve not in _ALLOWED_EC_CURVES:
-            return f'Unsupported EC curve {public_key.curve.name!r} (allowed: P-256/384/521)'
+            return (f'Unsupported EC curve {public_key.curve.name!r} '
+                    f'(allowed: P-256/384/521, Brainpool P256r1/P384r1/P512r1)')
+        if fips_mode.enabled() and curve not in _FIPS_EC_CURVES:
+            return f'EC curve {public_key.curve.name!r} is not available in FIPS mode'
         return None
 
     if family in ('ED25519', 'ED448'):
