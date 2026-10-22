@@ -22,3 +22,4 @@ not counted as a signature.
 | mripkens-reuter | 2026-10-09 | I have read and agree to the UCM CLA v1.1 |
 | lengqing5977 | 2026-10-12 | I have read and agree to the UCM CLA v1.1 |
 | ziller-hqs | 2026-10-19 | I have read and agree to the UCM CLA v1.1 |
+| avargasn | 2026-10-21 | I have read and agree to the UCM CLA v1.1 |
