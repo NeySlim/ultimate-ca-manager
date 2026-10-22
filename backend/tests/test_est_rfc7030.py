@@ -306,6 +306,39 @@ class TestCaCerts:
         )
 
 
+def _assert_rfc2045_lines(body):
+    """RFC 7030 sends base64 as RFC 2045 Content-Transfer-Encoding, whose
+    lines are at most 76 characters (section 6.8). Decoders built on OpenSSL's
+    base64 BIO (FortiOS, libest) reject one unbroken line."""
+    text = body.decode('ascii') if isinstance(body, bytes) else body
+    lines = text.splitlines()
+    assert len(lines) > 1, 'base64 sent as a single line'
+    assert all(len(line) <= 76 for line in lines), max(len(line) for line in lines)
+    return base64.b64decode(''.join(lines), validate=True)
+
+
+class TestBase64LineLength:
+    def test_cacerts(self, client, est_config):
+        response = client.get(f'{EST_BASE}/cacerts')
+        assert response.status_code == 200
+        der = _assert_rfc2045_lines(response.data)
+        assert pkcs7.load_der_pkcs7_certificates(der)
+
+    def test_simpleenroll(self, client, est_config):
+        csr, _ = _make_csr(common_name='wrap.example.test')
+        response = _post_csr(client, 'simpleenroll', csr, headers=_basic_auth())
+        assert response.status_code == 200, response.data
+        der = _assert_rfc2045_lines(response.data)
+        assert len(pkcs7.load_der_pkcs7_certificates(der)) == 1
+
+    def test_serverkeygen_parts(self, client, est_config):
+        csr, _ = _make_csr(common_name='wrap-keygen.example.test')
+        response = _post_csr(client, 'serverkeygen', csr, headers=_basic_auth())
+        assert response.status_code == 200, response.data
+        for part in _multipart_parts(response):
+            _assert_rfc2045_lines(part.get_payload())
+
+
 class TestServerKeygen:
     def test_basic_returns_encrypted_pkcs8_and_single_certificate(self, client, est_config):
         csr, _ = _make_csr(san_names=('basic.example.test',))

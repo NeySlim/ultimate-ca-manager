@@ -29,6 +29,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- EST: responses carried their base64 on one unbroken line, which RFC 2045 (the transfer encoding RFC 7030 uses) limits to 76 characters; clients decoding with OpenSSL's base64 BIO, the FortiOS EST client among them, failed on `/cacerts` with "Failed to decode base64 msg". Responses are now wrapped at 64 characters.
 - Reports: the Expiry Report tile showed Disabled whatever the Expiring Certificates schedule; it now follows that schedule.
 - Certificates: an RSA-PSS signature is shown with its hash and salt length ("RSASSA-PSS SHA-256 (salt 32)") and scored by its hash, and a Brainpool key is scored like the NIST curve of the same size, where both counted as unrated.
 - Signing: an unknown signature hash is refused instead of being replaced by SHA-256, and an EdDSA certificate is no longer offered or accepted as the TSA signer, which failed every timestamp request.
