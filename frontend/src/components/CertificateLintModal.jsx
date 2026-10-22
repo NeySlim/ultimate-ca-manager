@@ -61,7 +61,7 @@ export function CertificateLintModal({ certId, certName, open, onClose }) {
 
         {/* Profile toggle */}
         <div className="flex items-center gap-1">
-          {['rfc5280', 'cabf'].map((p) => (
+          {['rfc5280', 'cabf', 'etsi'].map((p) => (
             <Button key={p} type="button" size="sm"
                     variant={profile === p ? 'primary' : 'secondary'}
                     onClick={() => setProfile(p)} disabled={loading}>
@@ -125,10 +125,10 @@ export function CertificateLintModal({ certId, certName, open, onClose }) {
               </div>
             )}
 
-            {profile === 'cabf' && findings.length > 0 && (
+            {(profile === 'cabf' || profile === 'etsi') && findings.length > 0 && (
               <p className="flex items-start gap-1.5 text-2xs text-text-tertiary">
                 <Warning size={13} className="mt-0.5 shrink-0" />
-                {t('lint.cabfNote')}
+                {profile === 'etsi' ? t('lint.etsiNote') : t('lint.cabfNote')}
               </p>
             )}
           </>

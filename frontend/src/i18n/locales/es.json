@@ -1251,7 +1251,42 @@
     "pinSuccess": "Plantilla fijada a la CA",
     "unpinSuccess": "Plantilla desfijada de la CA",
     "selectCA": "Seleccione una autoridad de certificación",
-    "pinnedCount": "{{count}} de {{total}} plantillas fijadas"
+    "pinnedCount": "{{count}} de {{total}} plantillas fijadas",
+    "qc": {
+      "title": "qcStatements (ETSI EN 319 412-5) y OID de política",
+      "hint": "Añade la extensión qcStatements y OID de política de certificado adicionales a cada certificado emitido con esta plantilla. Todos los campos son opcionales.",
+      "legalWarning": "QcCompliance es una declaración legal de que un certificado es un certificado cualificado según eIDAS. Solo un prestador cualificado de servicios de confianza puede hacerla. UCM añade lo que declare aquí y no comprueba su condición de cualificado.",
+      "compliance": "QcCompliance (certificado cualificado)",
+      "sscd": "QcSSCD (clave privada en un dispositivo cualificado de creación de firma)",
+      "type": "QcType",
+      "none": "Ninguno",
+      "types": {
+        "esign": "Firma electrónica",
+        "eseal": "Sello electrónico",
+        "web": "Autenticación de sitios web"
+      },
+      "semantics": "Identificador de semántica",
+      "semanticsValues": {
+        "natural": "Persona física (ETSI)",
+        "legal": "Persona jurídica (ETSI)",
+        "eidas-natural": "Persona física (eIDAS)",
+        "eidas-legal": "Persona jurídica (eIDAS)"
+      },
+      "ccLegislation": "QcCClegislation (códigos de país)",
+      "ccLegislationHint": "Códigos de dos letras ISO 3166, separados por comas. No se puede combinar con QcCompliance.",
+      "retentionPeriod": "QcRetentionPeriod (años)",
+      "limitValue": "QcLimitValue",
+      "limitCurrency": "Moneda (ISO 4217)",
+      "limitAmount": "Importe",
+      "limitExponent": "Exponente",
+      "pds": "QcPDS (declaraciones de divulgación de PKI)",
+      "pdsHint": "URL HTTPS y código de idioma de dos letras (ISO 639-1). EN 319 412-5 espera una entrada en inglés.",
+      "pdsUrl": "URL",
+      "pdsLanguage": "Idioma",
+      "addPds": "Añadir una declaración de divulgación",
+      "policyOids": "OID de política de certificado",
+      "policyOidsHint": "OID con puntos, uno por línea, añadidos después de la política propia de la CA. Los botones añaden las políticas ETSI QCP."
+    }
   },
   "users": {
     "securityKeys": {
@@ -3452,6 +3487,18 @@
       "mountPath": "Ruta de montaje Transit",
       "namespace": "Espacio de nombres",
       "tlsSkipVerify": "Omitir verificación TLS"
+    },
+    "certification": {
+      "label": "Certificación declarada",
+      "hint": "La certificación que el operador declara para este HSM. UCM no verifica el hardware. Los perfiles alineados con eIDAS la usan para comprobar la protección de la clave de la CA.",
+      "notDeclared": "No declarada",
+      "values": {
+        "cc-eal4+": "Common Criteria EAL 4+",
+        "eucc-high": "EUCC (garantía alta)",
+        "fips-140-3-l3": "FIPS 140-3 nivel 3",
+        "fips-140-2-l3": "FIPS 140-2 nivel 3",
+        "other": "Otra"
+      }
     }
   },
   "sso": {
@@ -3787,7 +3834,19 @@
       "aia": "Acceso a información de la autoridad",
       "policies": "Políticas del certificado",
       "nameConstraints": "Restricciones de nombre",
-      "sct": "Marcas de tiempo de certificados firmados (SCT)"
+      "sct": "Marcas de tiempo de certificados firmados (SCT)",
+      "qcStatements": "Declaraciones de certificado cualificado",
+      "qc": {
+        "compliance": "QcCompliance",
+        "ccLegislation": "QcCClegislation",
+        "type": "QcType",
+        "sscd": "QcSSCD",
+        "pds": "QcPDS",
+        "retention": "QcRetentionPeriod",
+        "retentionYears": "{{count}} años",
+        "limit": "QcLimitValue",
+        "semantics": "Identificador de semántica"
+      }
     },
     "subjectAltNames": "Nombres alternativos del sujeto"
   },
@@ -5449,7 +5508,9 @@
       "warning": "Advertencia",
       "notice": "Aviso",
       "info": "Info"
-    }
+    },
+    "profile_etsi": "ETSI (EN 319 412)",
+    "etsiNote": "Las reglas ETSI se aplican a certificados cualificados y relacionados con eIDAS; otros certificados pueden generar hallazgos que no corresponden."
   },
   "keyRecovery": {
     "title": "Recuperación de claves",

@@ -24,6 +24,8 @@ export default {
           { label: 'Afficher système', text: 'Masquer les modèles intégrés pour ne travailler qu\'avec les vôtres. Mémorisé par navigateur' },
           { label: 'Importer/Exporter', text: 'Partager des modèles sous forme de fichiers JSON entre instances UCM, un modèle ou plusieurs dans un fichier' },
           { label: 'Type de clé', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 ou EC-P521, avec un condensat SHA-256, SHA-384 ou SHA-512' },
+          { label: 'qcStatements', text: 'Déclarations ETSI EN 319 412-5 facultatives ajoutées à chaque certificat émis depuis le modèle : QcCompliance, QcType (signature, cachet ou site web), QcSSCD, QcPDS (URL HTTPS et langue à deux lettres), QcRetentionPeriod, QcLimitValue, QcCClegislation (ne peut pas être combiné avec QcCompliance) et l\'identifiant de sémantique. Non appliquées à l\'émission EST, WSTEP ou mTLS, et une extension qcStatements présente dans une CSR est ignorée. QcIdentMethod, QcQSCDlegislation et les déclarations PSD2 ne sont pas prises en charge' },
+          { label: 'OID de politique', text: 'OID de politique de certificat supplémentaires (par exemple les politiques ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd et QCP-w), ajoutés après la politique propre à la CA' },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 et EC-BP512 (RFC 5639, regroupés sous Brainpool dans les listes de types de clé, masqués en mode FIPS). OpenSSL et Windows lisent leurs chaînes et signatures, mais Chrome, Firefox, Go, rustls, GnuTLS et Java sans Bouncy Castle les refusent pour TLS, et Windows Schannel ne les active pas par défaut. Sur un HSM, seuls les fournisseurs PKCS#11 les conservent' },
         ]
       },

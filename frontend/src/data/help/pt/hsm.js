@@ -21,6 +21,7 @@ export default {
           { label: 'Testar Conexão', text: 'Verificar se o HSM está acessível e as credenciais são válidas' },
           { label: 'Gerar Chave', text: 'Criar um novo par de chaves diretamente no HSM' },
           { label: 'Status', text: 'Monitorar a saúde da conexão do provedor' },
+          { label: 'Certificação', text: 'Declarar a certificação do HSM: Common Criteria EAL 4+, EUCC high, FIPS 140-3 nível 3, FIPS 140-2 nível 3 ou outra. Se ficar vazia, não é declarada. O perfil de conformidade eu-acm aceita, para uma CA respaldada por HSM, apenas Common Criteria EAL 4+, EUCC high e FIPS 140-3 nível 3 (até 31 de dezembro de 2030)' },
         ]
       },
       {
@@ -43,6 +44,7 @@ export default {
       'Para CAs raiz de longa duração em produção, prefira o armazenamento de chave respaldado por HSM',
     ],
     warnings: [
+      'A certificação declarada é a afirmação do operador sobre o HSM: o UCM não verifica o hardware. Os perfis alinhados com o eIDAS leem-na para verificar a proteção da chave da CA',
       'Configuração incorreta do provedor HSM pode impedir a assinatura de certificados',
       'Perder acesso ao HSM significa perder acesso às chaves armazenadas nele',
     ],

@@ -8,7 +8,7 @@ export default {
         title: "Konformitätsprüfung",
         content: "Die Aktion „Prüfen“ in den Zertifikatdetails führt das Zertifikat durch Standard-Linter und zeigt die Befunde. Nur informativ, blockiert nie die Ausstellung.",
         items: [
-          { label: "Profile", text: "RFC 5280 (immer relevant) und CA/Browser Forum Baseline Requirements (TLS-Serverzertifikate)" },
+          { label: "Profile", text: "RFC 5280 (immer relevant) und CA/Browser Forum Baseline Requirements (TLS-Serverzertifikate) und ETSI EN 319 412 (qualifizierte und eIDAS-bezogene Zertifikate, einschließlich qcStatements)" },
           { label: "Schweregrade", text: "Befunde werden eingestuft: fatal, error, warning, notice, info" },
           { label: "Engine", text: "Angetrieben von pkilint (und zlint, falls dessen Binary vorhanden): optionale Serverabhängigkeit" },
           { label: "Interne PKI", text: "CA/Browser-Forum-Regeln gelten für öffentliche Zertifikate; bei interner PKI sind nicht zutreffende Befunde zu erwarten" },

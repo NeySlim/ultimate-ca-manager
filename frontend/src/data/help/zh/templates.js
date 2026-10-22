@@ -24,6 +24,8 @@ export default {
           { label: '显示系统模板', text: '隐藏内置模板，只处理您自己的模板。每个浏览器单独记住此选择' },
           { label: '导入/导出', text: '在 UCM 实例之间以 JSON 文件共享模板，单个模板或多个模板合并在一个文件中' },
           { label: '密钥类型', text: 'RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384 或 EC-P521，搭配 SHA-256、SHA-384 或 SHA-512 摘要' },
+          { label: 'qcStatements', text: '可选的 ETSI EN 319 412-5 声明，添加到使用该模板签发的每个证书：QcCompliance、QcType（签名、印章或网站）、QcSSCD、QcPDS（HTTPS URL 和两位语言代码）、QcRetentionPeriod、QcLimitValue、QcCClegislation（不能与 QcCompliance 同时使用）以及语义标识符。不适用于 EST、WSTEP 或 mTLS 签发，CSR 中的 qcStatements 扩展会被忽略。不支持 QcIdentMethod、QcQSCDlegislation 和 PSD2 声明' },
+          { label: '策略 OID', text: '额外的证书策略 OID（例如 ETSI QCP-n、QCP-l、QCP-n-qscd、QCP-l-qscd 和 QCP-w 策略），添加在 CA 自身策略之后' },
           { label: 'Brainpool', text: 'EC-BP256、EC-BP384 和 EC-BP512（RFC 5639，在密钥类型列表中归入 Brainpool 分组，FIPS 模式下隐藏）。OpenSSL 和 Windows 可以读取其证书链和签名，但 Chrome、Firefox、Go、rustls、GnuTLS 以及未使用 Bouncy Castle 的 Java 在 TLS 中会拒绝它们，Windows Schannel 默认也未启用。在 HSM 上，只有 PKCS#11 提供者可以存放这些密钥' },
         ]
       },

@@ -1251,7 +1251,42 @@
     "pinSuccess": "模板已置顶至 CA",
     "unpinSuccess": "模板已取消从 CA 置顶",
     "selectCA": "选择证书颁发机构",
-    "pinnedCount": "已置顶 {{count}} / {{total}} 个模板"
+    "pinnedCount": "已置顶 {{count}} / {{total}} 个模板",
+    "qc": {
+      "title": "qcStatements（ETSI EN 319 412-5）与策略 OID",
+      "hint": "为使用此模板签发的每个证书添加 qcStatements 扩展和额外的证书策略 OID。所有字段均为可选。",
+      "legalWarning": "QcCompliance 是声明证书为 eIDAS 下合格证书的法律声明，只有合格信任服务提供商才能作出。UCM 只会添加您在此声明的内容，不会核实您的合格资质。",
+      "compliance": "QcCompliance（合格证书）",
+      "sscd": "QcSSCD（私钥位于合格签名创建设备中）",
+      "type": "QcType",
+      "none": "无",
+      "types": {
+        "esign": "电子签名",
+        "eseal": "电子印章",
+        "web": "网站身份验证"
+      },
+      "semantics": "语义标识符",
+      "semanticsValues": {
+        "natural": "自然人（ETSI）",
+        "legal": "法人（ETSI）",
+        "eidas-natural": "自然人（eIDAS）",
+        "eidas-legal": "法人（eIDAS）"
+      },
+      "ccLegislation": "QcCClegislation（国家代码）",
+      "ccLegislationHint": "ISO 3166 两位字母代码，以逗号分隔。不能与 QcCompliance 同时使用。",
+      "retentionPeriod": "QcRetentionPeriod（年）",
+      "limitValue": "QcLimitValue",
+      "limitCurrency": "货币（ISO 4217）",
+      "limitAmount": "金额",
+      "limitExponent": "指数",
+      "pds": "QcPDS（PKI 披露声明）",
+      "pdsHint": "HTTPS URL 和两位语言代码（ISO 639-1）。EN 319 412-5 要求包含英文条目。",
+      "pdsUrl": "URL",
+      "pdsLanguage": "语言",
+      "addPds": "添加披露声明",
+      "policyOids": "证书策略 OID",
+      "policyOidsHint": "点分 OID，每行一个，添加在 CA 自身策略之后。按钮用于添加 ETSI QCP 策略。"
+    }
   },
   "users": {
     "securityKeys": {
@@ -3452,6 +3487,18 @@
       "mountPath": "Transit挂载路径",
       "namespace": "命名空间",
       "tlsSkipVerify": "跳过TLS验证"
+    },
+    "certification": {
+      "label": "声明的认证",
+      "hint": "运营方为此 HSM 声明的认证。UCM 不会核实硬件。与 eIDAS 对齐的配置会用它来检查 CA 密钥保护。",
+      "notDeclared": "未声明",
+      "values": {
+        "cc-eal4+": "Common Criteria EAL 4+",
+        "eucc-high": "EUCC（高保证级）",
+        "fips-140-3-l3": "FIPS 140-3 级别 3",
+        "fips-140-2-l3": "FIPS 140-2 级别 3",
+        "other": "其他"
+      }
     }
   },
   "sso": {
@@ -3787,7 +3834,19 @@
       "aia": "颁发机构信息访问",
       "policies": "证书策略",
       "nameConstraints": "名称约束",
-      "sct": "签名证书时间戳（SCT）"
+      "sct": "签名证书时间戳（SCT）",
+      "qcStatements": "合格证书声明",
+      "qc": {
+        "compliance": "QcCompliance",
+        "ccLegislation": "QcCClegislation",
+        "type": "QcType",
+        "sscd": "QcSSCD",
+        "pds": "QcPDS",
+        "retention": "QcRetentionPeriod",
+        "retentionYears": "{{count}} 年",
+        "limit": "QcLimitValue",
+        "semantics": "语义标识符"
+      }
     },
     "subjectAltNames": "主题备用名称"
   },
@@ -5449,7 +5508,9 @@
       "warning": "警告",
       "notice": "提示",
       "info": "信息"
-    }
+    },
+    "profile_etsi": "ETSI (EN 319 412)",
+    "etsiNote": "ETSI 规则适用于合格证书和与 eIDAS 相关的证书；其他证书可能出现不适用的结果。"
   },
   "keyRecovery": {
     "title": "密钥恢复",

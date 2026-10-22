@@ -8,7 +8,7 @@ export default {
         title: "適合性検査",
         content: "証明書詳細の「検査」操作は、標準リンターで証明書を検査し結果を表示します。参考情報のみ, 発行をブロックすることはありません。",
         items: [
-          { label: "プロファイル", text: "RFC 5280（常に該当）および CA/Browser Forum ベースライン要件（TLS サーバー証明書）" },
+          { label: "プロファイル", text: "RFC 5280（常に該当）および CA/Browser Forum ベースライン要件（TLS サーバー証明書）、ETSI EN 319 412（適格証明書および eIDAS 関連の証明書、qcStatements を含む）" },
           { label: "重大度", text: "結果は fatal、error、warning、notice、info に分類されます" },
           { label: "エンジン", text: "pkilint（および zlint バイナリがあれば使用）, 任意のサーバー依存関係" },
           { label: "内部 PKI", text: "CA/Browser Forum のルールは公開証明書向けです。内部 PKI では該当しない結果が出ることがあります" },

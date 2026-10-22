@@ -134,6 +134,9 @@ export function CertificateExtensions({ extensions, defaultOpen = true }) {
           </div>
         )}
 
+        {/* Qualified Certificate Statements (RFC 3739, ETSI EN 319 412-5) */}
+        {extensions.qc_statements && <QcStatements qc={extensions.qc_statements} />}
+
         {/* Name Constraints */}
         {extensions.name_constraints && (
           <div className="space-y-1">
@@ -162,6 +165,40 @@ export function CertificateExtensions({ extensions, defaultOpen = true }) {
         )}
       </div>
     </CompactSection>
+  )
+}
+
+function QcStatements({ qc }) {
+  const { t } = useTranslation()
+  const lim = qc.limit_value
+  return (
+    <div className="space-y-1" data-testid="qc-statements">
+      <div className="text-xs font-semibold text-text-primary flex items-center gap-1.5">
+        {t('details.ext.qcStatements')}
+        {qc.critical && <Badge variant="danger" size="sm">Critical</Badge>}
+      </div>
+      <div className="flex flex-wrap gap-1">
+        {qc.compliance && <Badge variant="success" size="sm">{t('details.ext.qc.compliance')}</Badge>}
+        {qc.sscd && <Badge variant="success" size="sm">{t('details.ext.qc.sscd')}</Badge>}
+        {qc.type && <Badge variant="teal" size="sm">{t('details.ext.qc.type')}: {qc.type}</Badge>}
+        {qc.semantics && <Badge variant="secondary" size="sm">{t('details.ext.qc.semantics')}: {qc.semantics}</Badge>}
+      </div>
+      {qc.cc_legislation?.length > 0 && (
+        <div className="text-2xs"><span className="font-medium">{t('details.ext.qc.ccLegislation')}:</span> {qc.cc_legislation.join(', ')}</div>
+      )}
+      {qc.retention_period != null && (
+        <div className="text-2xs"><span className="font-medium">{t('details.ext.qc.retention')}:</span> {t('details.ext.qc.retentionYears', { count: qc.retention_period })}</div>
+      )}
+      {lim && (
+        <div className="text-2xs font-mono"><span className="font-medium font-sans">{t('details.ext.qc.limit')}:</span> {lim.amount}e{lim.exponent} {lim.currency}</div>
+      )}
+      {qc.pds?.map((p, i) => (
+        <div key={i} className="flex items-start gap-2 text-2xs">
+          <Badge variant="secondary" size="sm" className="shrink-0">{t('details.ext.qc.pds')} {p.language}</Badge>
+          <span className="font-mono text-accent-primary break-all">{p.url}</span>
+        </div>
+      ))}
+    </div>
   )
 }
 

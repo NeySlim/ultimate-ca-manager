@@ -8,7 +8,7 @@ export default {
         title: "Linting de conformité",
         content: "Le bouton « Linter » sur le détail d'un certificat le passe dans des linters de standards et affiche les anomalies. Purement informatif, ne bloque jamais l'émission.",
         items: [
-          { label: "Profils", text: "RFC 5280 (toujours pertinent) et CA/Browser Forum Baseline Requirements (certificats TLS serveur)" },
+          { label: "Profils", text: "RFC 5280 (toujours pertinent), CA/Browser Forum Baseline Requirements (certificats TLS serveur) et ETSI EN 319 412 (certificats qualifiés et liés à eIDAS, y compris qcStatements)" },
           { label: "Sévérités", text: "Les résultats sont gradés : fatal, error, warning, notice, info" },
           { label: "Moteur", text: "Propulsé par pkilint (et zlint si son binaire est présent) : dépendance serveur optionnelle" },
           { label: "PKI interne", text: "Les règles CA/Browser Forum visent les certificats publics ; attendez-vous à des anomalies non applicables sur une PKI interne" },

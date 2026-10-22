@@ -23,6 +23,8 @@ export default {
           { label: '複製', text: '既存のテンプレートをクローンして修正' },
           { label: 'システムを表示', text: '組み込みテンプレートを非表示にして、自分のテンプレートだけを扱います。ブラウザごとに記憶されます' },
           { label: 'インポート/エクスポート', text: 'UCMインスタンス間でテンプレートをJSONファイルとして共有。テンプレート1件、または複数件をまとめた1つのファイル' },
+          { label: 'qcStatements', text: 'テンプレートから発行されるすべての証明書に付加される、ETSI EN 319 412-5 の任意のステートメントです。QcCompliance、QcType (署名、シール、ウェブサイト)、QcSSCD、QcPDS (HTTPS の URL と2文字の言語コード)、QcRetentionPeriod、QcLimitValue、QcCClegislation (QcCompliance とは併用不可)、セマンティクス識別子に対応します。EST、WSTEP、mTLS の発行には適用されず、CSR に含まれる qcStatements 拡張は無視されます。QcIdentMethod、QcQSCDlegislation、PSD2 ステートメントには対応していません' },
+          { label: 'ポリシー OID', text: '追加の証明書ポリシー OID (例: ETSI の QCP-n、QCP-l、QCP-n-qscd、QCP-l-qscd、QCP-w ポリシー)。CA 自身のポリシーの後に追加されます' },
           { label: '鍵タイプ', text: 'RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384、EC-P521。ダイジェストは SHA-256、SHA-384、SHA-512' },
           { label: 'Brainpool', text: 'EC-BP256、EC-BP384、EC-BP512 (RFC 5639)。鍵タイプの一覧では Brainpool の下に表示され、FIPS モードでは非表示になります。OpenSSL と Windows はそのチェーンと署名を読み取れますが、Chrome、Firefox、Go、rustls、GnuTLS、Bouncy Castle を使わない Java は TLS で拒否し、Windows Schannel もデフォルトでは有効にしていません。HSM では、PKCS#11 プロバイダーのみがこれらを保持できます' },
         ]

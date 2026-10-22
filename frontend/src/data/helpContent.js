@@ -153,7 +153,7 @@ export const helpContent = {
         title: "Conformance linting",
         content: "The Lint action on a certificate's detail runs it through standards linters and shows the findings. Informative only, it never blocks issuance.",
         items: [
-          { label: "Profiles", text: "RFC 5280 (always relevant) and CA/Browser Forum Baseline Requirements (TLS server certificates)" },
+          { label: "Profiles", text: "RFC 5280 (always relevant), CA/Browser Forum Baseline Requirements (TLS server certificates) and ETSI EN 319 412 (qualified and eIDAS-related certificates, including qcStatements)" },
           { label: "Severities", text: "Findings are graded fatal, error, warning, notice, info" },
           { label: "Engine", text: "Powered by pkilint (and zlint when its binary is present): an optional server dependency" },
           { label: "Internal PKI", text: "CA/Browser Forum rules target public certificates; expect non-applicable findings on an internal PKI" },
@@ -354,6 +354,8 @@ export const helpContent = {
           { label: 'Duplicate', text: 'Clone an existing template and modify it' },
           { label: 'Show system', text: 'Hide the built-in templates to work with your own only. Remembered per browser' },
           { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances, one template or several in one file' },
+          { label: 'qcStatements', text: 'Optional ETSI EN 319 412-5 statements added to every certificate issued from the template: QcCompliance, QcType (signature, seal or website), QcSSCD, QcPDS (HTTPS URL and two-letter language), QcRetentionPeriod, QcLimitValue, QcCClegislation (cannot be combined with QcCompliance) and the semantics identifier. Not applied to EST, WSTEP or mTLS issuance, and a qcStatements extension in a CSR is ignored. QcIdentMethod, QcQSCDlegislation and PSD2 statements are not supported' },
+          { label: 'Policy OIDs', text: 'Extra certificate policy OIDs (for example the ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd and QCP-w policies), added after the CA\'s own policy' },
           { label: 'Key Type', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 or EC-P521, with a SHA-256, SHA-384 or SHA-512 digest' },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 and EC-BP512 (RFC 5639, listed under Brainpool in key type lists, hidden in FIPS mode). OpenSSL and Windows read their chains and signatures, but Chrome, Firefox, Go, rustls, GnuTLS and Java without Bouncy Castle refuse them for TLS, and Windows Schannel does not enable them by default. On an HSM, only PKCS#11 providers hold them' },
         ]
@@ -1285,6 +1287,7 @@ export const helpContent = {
           { label: 'Test Connection', text: 'Verify the HSM is reachable and credentials are valid' },
           { label: 'Generate Key', text: 'Create a new key pair directly on the HSM' },
           { label: 'Status', text: 'Monitor provider connection health' },
+          { label: 'Certification', text: 'Declare the certification of the HSM: Common Criteria EAL 4+, EUCC high, FIPS 140-3 level 3, FIPS 140-2 level 3 or other. Left empty, it is not declared. The eu-acm compliance profile accepts only Common Criteria EAL 4+, EUCC high, and FIPS 140-3 level 3 (until 31 December 2030) for an HSM-backed CA' },
         ]
       },
       {
@@ -1307,6 +1310,7 @@ export const helpContent = {
       'For long-lived root CAs in production, prefer HSM-backed key storage',
     ],
     warnings: [
+      'The declared certification is the operator\'s statement about the HSM: UCM does not verify the hardware. Profiles aligned with eIDAS read it to check CA key protection',
       'HSM provider misconfiguration can prevent certificate signing',
       'Losing access to the HSM means losing access to the keys stored on it',
     ],

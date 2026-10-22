@@ -1251,7 +1251,42 @@
     "pinSuccess": "Modello fissato alla CA",
     "unpinSuccess": "Modello sganciato dalla CA",
     "selectCA": "Seleziona un'autorità di certificazione",
-    "pinnedCount": "{{count}} modelli su {{total}} fissati"
+    "pinnedCount": "{{count}} modelli su {{total}} fissati",
+    "qc": {
+      "title": "qcStatements (ETSI EN 319 412-5) e OID di policy",
+      "hint": "Aggiunge l'estensione qcStatements e OID di policy del certificato aggiuntivi a ogni certificato emesso da questo modello. Tutti i campi sono facoltativi.",
+      "legalWarning": "QcCompliance è una dichiarazione legale che un certificato è un certificato qualificato ai sensi di eIDAS. Solo un prestatore di servizi fiduciari qualificato può farla. UCM aggiunge quanto dichiarato qui e non verifica il tuo stato di qualificato.",
+      "compliance": "QcCompliance (certificato qualificato)",
+      "sscd": "QcSSCD (chiave privata in un dispositivo qualificato per la creazione di firme)",
+      "type": "QcType",
+      "none": "Nessuno",
+      "types": {
+        "esign": "Firma elettronica",
+        "eseal": "Sigillo elettronico",
+        "web": "Autenticazione di siti web"
+      },
+      "semantics": "Identificatore di semantica",
+      "semanticsValues": {
+        "natural": "Persona fisica (ETSI)",
+        "legal": "Persona giuridica (ETSI)",
+        "eidas-natural": "Persona fisica (eIDAS)",
+        "eidas-legal": "Persona giuridica (eIDAS)"
+      },
+      "ccLegislation": "QcCClegislation (codici paese)",
+      "ccLegislationHint": "Codici ISO 3166 di due lettere, separati da virgole. Non può essere combinato con QcCompliance.",
+      "retentionPeriod": "QcRetentionPeriod (anni)",
+      "limitValue": "QcLimitValue",
+      "limitCurrency": "Valuta (ISO 4217)",
+      "limitAmount": "Importo",
+      "limitExponent": "Esponente",
+      "pds": "QcPDS (PKI disclosure statements)",
+      "pdsHint": "URL HTTPS e codice lingua di due lettere (ISO 639-1). EN 319 412-5 prevede una voce in inglese.",
+      "pdsUrl": "URL",
+      "pdsLanguage": "Lingua",
+      "addPds": "Aggiungi una disclosure statement",
+      "policyOids": "OID di policy del certificato",
+      "policyOidsHint": "OID in notazione puntata, uno per riga, aggiunti dopo la policy della CA stessa. I pulsanti aggiungono le policy ETSI QCP."
+    }
   },
   "users": {
     "securityKeys": {
@@ -3452,6 +3487,18 @@
       "mountPath": "Percorso di montaggio Transit",
       "namespace": "Namespace",
       "tlsSkipVerify": "Ignora verifica TLS"
+    },
+    "certification": {
+      "label": "Certificazione dichiarata",
+      "hint": "La certificazione che l'operatore dichiara per questo HSM. UCM non verifica l'hardware. I profili allineati a eIDAS la usano per controllare la protezione della chiave della CA.",
+      "notDeclared": "Non dichiarata",
+      "values": {
+        "cc-eal4+": "Common Criteria EAL 4+",
+        "eucc-high": "EUCC (alta garanzia)",
+        "fips-140-3-l3": "FIPS 140-3 livello 3",
+        "fips-140-2-l3": "FIPS 140-2 livello 3",
+        "other": "Altra"
+      }
     }
   },
   "sso": {
@@ -3787,7 +3834,19 @@
       "aia": "Accesso informazioni autorità",
       "policies": "Politiche del certificato",
       "nameConstraints": "Vincoli di nome",
-      "sct": "Timestamp di certificati firmati (SCT)"
+      "sct": "Timestamp di certificati firmati (SCT)",
+      "qcStatements": "Qualified Certificate Statements",
+      "qc": {
+        "compliance": "QcCompliance",
+        "ccLegislation": "QcCClegislation",
+        "type": "QcType",
+        "sscd": "QcSSCD",
+        "pds": "QcPDS",
+        "retention": "QcRetentionPeriod",
+        "retentionYears": "{{count}} anni",
+        "limit": "QcLimitValue",
+        "semantics": "Identificatore di semantica"
+      }
     },
     "subjectAltNames": "Nomi alternativi del soggetto"
   },
@@ -5449,7 +5508,9 @@
       "warning": "Avviso",
       "notice": "Nota",
       "info": "Info"
-    }
+    },
+    "profile_etsi": "ETSI (EN 319 412)",
+    "etsiNote": "Le regole ETSI si applicano ai certificati qualificati e correlati a eIDAS; altri certificati possono produrre rilievi non pertinenti."
   },
   "keyRecovery": {
     "title": "Recupero chiavi",

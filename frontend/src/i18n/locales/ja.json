@@ -1251,7 +1251,42 @@
     "pinSuccess": "テンプレートをCAにピン留めしました",
     "unpinSuccess": "テンプレートのCAへのピン留めを解除しました",
     "selectCA": "認証局を選択",
-    "pinnedCount": "{{total}} 件中 {{count}} 件のテンプレートをピン留め済み"
+    "pinnedCount": "{{total}} 件中 {{count}} 件のテンプレートをピン留め済み",
+    "qc": {
+      "title": "qcStatements (ETSI EN 319 412-5) とポリシー OID",
+      "hint": "このテンプレートから発行されるすべての証明書に、qcStatements 拡張と追加の証明書ポリシー OID を付加します。すべての項目は任意です。",
+      "legalWarning": "QcCompliance は、その証明書が eIDAS に基づく適格証明書であることを示す法的な宣言です。宣言できるのは適格トラストサービスプロバイダーのみです。UCM はここで指定した内容を付加するだけで、適格性の確認は行いません。",
+      "compliance": "QcCompliance (適格証明書)",
+      "sscd": "QcSSCD (秘密鍵が適格署名作成デバイス内にある)",
+      "type": "QcType",
+      "none": "なし",
+      "types": {
+        "esign": "電子署名",
+        "eseal": "電子シール",
+        "web": "ウェブサイト認証"
+      },
+      "semantics": "セマンティクス識別子",
+      "semanticsValues": {
+        "natural": "自然人 (ETSI)",
+        "legal": "法人 (ETSI)",
+        "eidas-natural": "自然人 (eIDAS)",
+        "eidas-legal": "法人 (eIDAS)"
+      },
+      "ccLegislation": "QcCClegislation (国コード)",
+      "ccLegislationHint": "ISO 3166 の2文字コードをカンマ区切りで指定します。QcCompliance とは併用できません。",
+      "retentionPeriod": "QcRetentionPeriod (年)",
+      "limitValue": "QcLimitValue",
+      "limitCurrency": "通貨 (ISO 4217)",
+      "limitAmount": "金額",
+      "limitExponent": "指数",
+      "pds": "QcPDS (PKI 開示声明)",
+      "pdsHint": "HTTPS の URL と2文字の言語コード (ISO 639-1) を指定します。EN 319 412-5 では英語のエントリが必要です。",
+      "pdsUrl": "URL",
+      "pdsLanguage": "言語",
+      "addPds": "開示声明を追加",
+      "policyOids": "証明書ポリシー OID",
+      "policyOidsHint": "ドット表記の OID を1行に1つずつ指定します。CA 自身のポリシーの後に追加されます。ボタンで ETSI QCP ポリシーを追加できます。"
+    }
   },
   "users": {
     "securityKeys": {
@@ -3164,7 +3199,8 @@
     "backupKdfAuto": "自動（利用可能なら Argon2id、FIPS モードでは PBKDF2）",
     "backupKdfHelper": "Argon2id で書き込まれたアーカイブは、FIPS モードのインスタンスでは復元できません。",
     "ocspResponseValidity": "OCSP応答の有効期間（時間）",
-    "ocspResponseValidityDesc": "署名済みOCSP応答の有効期間（nextUpdate）。1〜168時間、既定は24。"
+    "ocspResponseValidityDesc": "署名済みOCSP応答の有効期間（nextUpdate）。1〜168時間、既定は24。",
+    "appearance": {}
   },
   "account": {
     "profile": "プロフィール",
@@ -3349,6 +3385,7 @@
       "singleSignOn": "シングルサインオン",
       "ssh": "SSH証明書"
     },
+    "stats": {},
     "subtitle_one": "{{count}} 件のロール",
     "subtitle_other": "{{count}} 件のロール",
     "subtitle": "{{count}} 件のカスタムロール",
@@ -3452,6 +3489,18 @@
       "mountPath": "Transitマウントパス",
       "namespace": "名前空間",
       "tlsSkipVerify": "TLS検証をスキップ"
+    },
+    "certification": {
+      "label": "申告された認証",
+      "hint": "オペレーターがこの HSM について申告する認証です。UCM はハードウェアを検証しません。eIDAS に準拠したプロファイルは、CA 鍵の保護を確認するためにこの値を使用します。",
+      "notDeclared": "未申告",
+      "values": {
+        "cc-eal4+": "Common Criteria EAL 4+",
+        "eucc-high": "EUCC (高保証)",
+        "fips-140-3-l3": "FIPS 140-3 レベル 3",
+        "fips-140-2-l3": "FIPS 140-2 レベル 3",
+        "other": "その他"
+      }
     }
   },
   "sso": {
@@ -3511,6 +3560,7 @@
     "updateSuccess": "プロバイダーを更新しました",
     "saveFailed": "プロバイダーの保存に失敗しました",
     "keepExisting": "••••••• （空白で維持）",
+    "roles": {},
     "configuredProviders": "設定済みプロバイダー",
     "acsUrl": "アサーションコンシューマーサービス（ACS）URL",
     "acsUrlDesc": "認証後にIdPがSAMLアサーションを送信する先",
@@ -3787,7 +3837,19 @@
       "aia": "認証局情報アクセス",
       "policies": "証明書ポリシー",
       "nameConstraints": "名前制約",
-      "sct": "署名済み証明書タイムスタンプ（SCT）"
+      "sct": "署名済み証明書タイムスタンプ（SCT）",
+      "qcStatements": "適格証明書ステートメント (qcStatements)",
+      "qc": {
+        "compliance": "QcCompliance",
+        "ccLegislation": "QcCClegislation",
+        "type": "QcType",
+        "sscd": "QcSSCD",
+        "pds": "QcPDS",
+        "retention": "QcRetentionPeriod",
+        "retentionYears": "{{count}} 年",
+        "limit": "QcLimitValue",
+        "semantics": "セマンティクス識別子"
+      }
     },
     "subjectAltNames": "サブジェクト代替名"
   },
@@ -5449,7 +5511,9 @@
       "warning": "警告",
       "notice": "通知",
       "info": "情報"
-    }
+    },
+    "profile_etsi": "ETSI (EN 319 412)",
+    "etsiNote": "ETSI のルールは適格証明書および eIDAS 関連の証明書に適用されます。それ以外の証明書では該当しない指摘が出る場合があります。"
   },
   "keyRecovery": {
     "title": "鍵リカバリ",

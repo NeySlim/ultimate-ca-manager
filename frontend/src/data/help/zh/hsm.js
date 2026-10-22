@@ -21,6 +21,7 @@ export default {
           { label: '测试连接', text: '验证 HSM 可达且凭据有效' },
           { label: '生成密钥', text: '直接在 HSM 上创建新的密钥对' },
           { label: '状态', text: '监控提供商连接健康状况' },
+          { label: '认证', text: '声明 HSM 的认证：Common Criteria EAL 4+、EUCC high、FIPS 140-3 级别 3、FIPS 140-2 级别 3 或其他。留空表示未声明。对于由 HSM 支持的 CA，eu-acm 合规配置仅接受 Common Criteria EAL 4+、EUCC high 以及 FIPS 140-3 级别 3（至 2030 年 12 月 31 日）' },
         ]
       },
       {
@@ -43,6 +44,7 @@ export default {
       '对于生产中长寿命的根 CA,首选 HSM 支持的密钥存储',
     ],
     warnings: [
+      '声明的认证是运营方对 HSM 的陈述：UCM 不会核实硬件。与 eIDAS 对齐的配置会读取它来检查 CA 密钥保护',
       'HSM 提供商配置错误可能会阻止证书签名',
       '失去对 HSM 的访问权限意味着失去存储在其上的密钥',
     ],

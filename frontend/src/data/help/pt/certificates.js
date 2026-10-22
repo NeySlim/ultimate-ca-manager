@@ -8,7 +8,7 @@ export default {
         title: "Análise de conformidade",
         content: "A ação « Analisar » no detalhe de um certificado passa-o por linters de padrões e mostra os resultados. Apenas informativo, nunca bloqueia a emissão.",
         items: [
-          { label: "Perfis", text: "RFC 5280 (sempre relevante) e CA/Browser Forum Baseline Requirements (certificados TLS de servidor)" },
+          { label: "Perfis", text: "RFC 5280 (sempre relevante), CA/Browser Forum Baseline Requirements (certificados TLS de servidor) e ETSI EN 319 412 (certificados qualificados e relacionados com o eIDAS, incluindo qcStatements)" },
           { label: "Severidades", text: "Os resultados são classificados: fatal, error, warning, notice, info" },
           { label: "Motor", text: "Alimentado por pkilint (e zlint quando o seu binário está presente): dependência opcional do servidor" },
           { label: "PKI interna", text: "As regras do CA/Browser Forum visam certificados públicos; espere resultados não aplicáveis numa PKI interna" },

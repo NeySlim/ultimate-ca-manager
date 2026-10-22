@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   FileText, Plus, Copy, Trash, Download, FileArrowUp, PencilSimple,
-  Certificate, ShieldCheck, Clock, Eye, Key, Globe
+  Certificate, ShieldCheck, Clock, Eye, Key, Globe, Warning
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select, Textarea,
@@ -25,6 +25,10 @@ import { listAlgorithms, groupedOptions } from '../lib/keyAlgorithms'
 import { useFipsMode } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { ekuService } from '../services/eku.service'
+import {
+  buildExtensionsTemplate, qcFormFromStored, emptyQcForm, parsePolicyOids,
+  QC_TYPES, QC_SEMANTICS, ETSI_POLICY_PRESETS
+} from '../lib/templateExtensions'
 const SHOW_SYSTEM_KEY = 'ucm-templates-show-system'
 
 export default function TemplatesPage() {
@@ -504,6 +508,23 @@ export default function TemplatesPage() {
           </div>
         </CompactSection>
       )}
+
+      {(selectedTemplate.extensions_template?.qc_statements || selectedTemplate.extensions_template?.certificate_policies?.length > 0) && (
+        <CompactSection title={t('templates.qc.title')} icon={ShieldCheck} collapsible defaultOpen={false}>
+          <div className="space-y-2">
+            {selectedTemplate.extensions_template.qc_statements && (
+              <div className="flex flex-wrap gap-1">
+                {Object.keys(selectedTemplate.extensions_template.qc_statements).map(k => (
+                  <Badge key={k} variant="teal" size="sm">{k}</Badge>
+                ))}
+              </div>
+            )}
+            {selectedTemplate.extensions_template.certificate_policies?.map(oid => (
+              <div key={oid} className="text-2xs font-mono text-text-secondary">{oid}</div>
+            ))}
+          </div>
+        </CompactSection>
+      )}
     </div>
   )
 
@@ -732,7 +753,9 @@ function buildInitialState(template) {
       ad_derived_subject: false,
       autoenroll_enabled: false,
       allowed_ad_group: '',
-      pinned_subject_fields: { O: '', OU: '', C: '', ST: '', L: '' }
+      pinned_subject_fields: { O: '', OU: '', C: '', ST: '', L: '' },
+      qc: emptyQcForm(),
+      policy_oids: ''
     }
   }
   const dn = template.dn_template || {}
@@ -761,11 +784,13 @@ function buildInitialState(template) {
     pinned_subject_fields: {
       O: pinned.O || '', OU: pinned.OU || '', C: pinned.C || '',
       ST: pinned.ST || '', L: pinned.L || ''
-    }
+    },
+    qc: qcFormFromStored(ext.qc_statements),
+    policy_oids: Array.isArray(ext.certificate_policies) ? ext.certificate_policies.join('\n') : ''
   }
 }
 
-function TemplateForm({ template, onSubmit, onCancel }) {
+export function TemplateForm({ template, onSubmit, onCancel }) {
   const { t } = useTranslation()
   const [formData, setFormData] = useState(() => buildInitialState(template))
   const [loading, setLoading] = useState(false)
@@ -799,6 +824,14 @@ function TemplateForm({ template, onSubmit, onCancel }) {
   const updatePinned = (field, value) =>
     setFormData(p => ({ ...p, pinned_subject_fields: { ...p.pinned_subject_fields, [field]: value } }))
 
+  const setQc = (field, value) => setFormData(p => ({ ...p, qc: { ...p.qc, [field]: value } }))
+  const updatePds = (i, field, value) => setFormData(p => ({
+    ...p, qc: { ...p.qc, pds: p.qc.pds.map((e, j) => (j === i ? { ...e, [field]: value } : e)) }
+  }))
+  const addPolicyPreset = (oid) => setFormData(p => ({
+    ...p, policy_oids: parsePolicyOids(p.policy_oids).includes(oid) ? p.policy_oids : [...parsePolicyOids(p.policy_oids), oid].join('\n')
+  }))
+
   const toggleCheckbox = (field, item) => {
     setFormData(p => {
       const arr = p[field]
@@ -819,12 +852,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
         digest: formData.digest,
         validity_days: formData.validity_days,
         dn_template: { ...formData.subject },
-        extensions_template: {
-          key_usage: formData.key_usage,
-          extended_key_usage: formData.extended_key_usage,
-          basic_constraints: { ca: false },
-          san_types: formData.san_types
-        },
+        extensions_template: buildExtensionsTemplate(template?.extensions_template, formData),
         enforce_san_types: formData.enforce_san_types,
         ad_derived_subject: formData.ad_derived_subject,
         autoenroll_enabled: formData.autoenroll_enabled,
@@ -1016,6 +1044,104 @@ function TemplateForm({ template, onSubmit, onCancel }) {
             {t('templates.enforceSanTypes')}
           </label>
           <p className="text-xs text-text-secondary mt-1">{t('templates.enforceSanTypesDescription')}</p>
+        </div>
+      </div>
+
+      {/* qcStatements + policy OIDs */}
+      <div className="border-t border-border pt-4 space-y-4">
+        <h4 className={sectionTitle}>{t('templates.qc.title')}</h4>
+        <p className="text-xs text-text-secondary">{t('templates.qc.hint')}</p>
+        <div className="p-3 rounded-lg border border-yellow-500/30 bg-yellow-500/10 flex items-start gap-2 text-xs text-text-secondary">
+          <Warning size={16} className="text-yellow-500 shrink-0 mt-0.5" weight="bold" />
+          <span>{t('templates.qc.legalWarning')}</span>
+        </div>
+
+        <div className="flex flex-wrap gap-x-6 gap-y-2">
+          <label className={checkboxCls}>
+            <input type="checkbox" checked={formData.qc.compliance} onChange={(e) => setQc('compliance', e.target.checked)} className="accent-accent-primary" />
+            {t('templates.qc.compliance')}
+          </label>
+          <label className={checkboxCls}>
+            <input type="checkbox" checked={formData.qc.sscd} onChange={(e) => setQc('sscd', e.target.checked)} className="accent-accent-primary" />
+            {t('templates.qc.sscd')}
+          </label>
+        </div>
+
+        <div className="grid grid-cols-2 gap-4">
+          <Select
+            label={t('templates.qc.type')}
+            value={formData.qc.type}
+            onChange={(val) => setQc('type', val)}
+            options={[{ value: '', label: t('templates.qc.none') }, ...QC_TYPES.map(v => ({ value: v, label: t(`templates.qc.types.${v}`) }))]}
+          />
+          <Select
+            label={t('templates.qc.semantics')}
+            value={formData.qc.semantics}
+            onChange={(val) => setQc('semantics', val)}
+            options={[{ value: '', label: t('templates.qc.none') }, ...QC_SEMANTICS.map(v => ({ value: v, label: t(`templates.qc.semanticsValues.${v}`) }))]}
+          />
+          <Input
+            label={t('templates.qc.ccLegislation')}
+            value={formData.qc.cc_legislation}
+            onChange={(e) => setQc('cc_legislation', e.target.value)}
+            placeholder="FR, DE"
+            helperText={t('templates.qc.ccLegislationHint')}
+            disabled={formData.qc.compliance}
+          />
+          <Input
+            label={t('templates.qc.retentionPeriod')}
+            type="number"
+            min="1"
+            value={formData.qc.retention_period}
+            onChange={(e) => setQc('retention_period', e.target.value)}
+          />
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-2">{t('templates.qc.limitValue')}</label>
+          <div className="grid grid-cols-3 gap-4">
+            <Input label={t('templates.qc.limitCurrency')} value={formData.qc.limit_currency} onChange={(e) => setQc('limit_currency', e.target.value)} placeholder="EUR" />
+            <Input label={t('templates.qc.limitAmount')} type="number" value={formData.qc.limit_amount} onChange={(e) => setQc('limit_amount', e.target.value)} />
+            <Input label={t('templates.qc.limitExponent')} type="number" value={formData.qc.limit_exponent} onChange={(e) => setQc('limit_exponent', e.target.value)} />
+          </div>
+        </div>
+
+        <div>
+          <label className="block text-xs font-medium text-text-secondary mb-2">{t('templates.qc.pds')}</label>
+          <p className="text-xs text-text-secondary mb-2">{t('templates.qc.pdsHint')}</p>
+          <div className="space-y-2">
+            {formData.qc.pds.map((entry, i) => (
+              <div key={i} className="grid grid-cols-[1fr_6rem_auto] gap-2 items-end">
+                <Input label={t('templates.qc.pdsUrl')} value={entry.url} onChange={(e) => updatePds(i, 'url', e.target.value)} placeholder="https://example.com/pds_en.pdf" />
+                <Input label={t('templates.qc.pdsLanguage')} value={entry.language} onChange={(e) => updatePds(i, 'language', e.target.value)} placeholder="en" maxLength={2} />
+                <Button type="button" size="sm" variant="secondary" onClick={() => setQc('pds', formData.qc.pds.filter((_, j) => j !== i))}>
+                  {t('common.remove')}
+                </Button>
+              </div>
+            ))}
+          </div>
+          <Button type="button" size="sm" variant="secondary" className="mt-2"
+            onClick={() => setQc('pds', [...formData.qc.pds, { url: '', language: 'en' }])}>
+            {t('templates.qc.addPds')}
+          </Button>
+        </div>
+
+        <div>
+          <Textarea
+            label={t('templates.qc.policyOids')}
+            value={formData.policy_oids}
+            onChange={(e) => set('policy_oids', e.target.value)}
+            placeholder="0.4.0.194112.1.2"
+            rows={2}
+            helperText={t('templates.qc.policyOidsHint')}
+          />
+          <div className="flex flex-wrap gap-2 mt-2">
+            {ETSI_POLICY_PRESETS.map(pr => (
+              <Button key={pr.oid} type="button" size="sm" variant="secondary" onClick={() => addPolicyPreset(pr.oid)} title={pr.oid}>
+                {pr.label}
+              </Button>
+            ))}
+          </div>
         </div>
       </div>
 

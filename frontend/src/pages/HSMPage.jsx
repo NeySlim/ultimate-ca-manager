@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   Key, Plus, Trash, PencilSimple, CheckCircle, XCircle, TestTube,
-  Cloud, HardDrive, ArrowsClockwise, Lock, Warning, Copy
+  Cloud, HardDrive, ArrowsClockwise, Lock, Warning, Copy, ShieldCheck
 } from '@phosphor-icons/react'
 import { 
   Badge, Button, FormModal, Input, Select, Textarea, ExperimentalBadge,
@@ -360,6 +360,13 @@ export default function HSMPage() {
           )}
         </div>
 
+        <CompactSection title={t('hsm.certification.label')} icon={ShieldCheck} collapsible={false}>
+          <CompactField
+            label={t('hsm.certification.label')}
+            value={provider.certification ? t(`hsm.certification.values.${provider.certification}`, provider.certification) : t('hsm.certification.notDeclared')}
+          />
+        </CompactSection>
+
         {provider.last_error && (
           <div className="p-3 rounded-lg bg-status-danger-op10 border border-status-danger-op30">
             <div className="flex items-center gap-2 text-status-danger text-xs">
@@ -628,6 +635,8 @@ const SECRET_TARGETS = {
     'openbao_tls_skip_verify']],
 }
 
+export const HSM_CERTIFICATIONS = ['cc-eal4+', 'eucc-high', 'fips-140-3-l3', 'fips-140-2-l3', 'other']
+
 export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
   const { t } = useTranslation()
   const [formData, setFormData] = useState({
@@ -654,6 +663,7 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
     openbao_mount_path: provider?.openbao_mount_path || 'transit',
     openbao_namespace: provider?.openbao_namespace || '',
     openbao_tls_skip_verify: provider?.openbao_tls_skip_verify ?? false,
+    certification: provider?.certification || '',
   })
 
   const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }))
@@ -699,7 +709,8 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
       if (formData.openbao_namespace) config.namespace = formData.openbao_namespace
       config.tls_skip_verify = formData.openbao_tls_skip_verify
     }
-    return { name: formData.name, type: formData.provider_type, config }
+    // '' clears the declaration on the server
+    return { name: formData.name, type: formData.provider_type, config, certification: formData.certification }
   }
 
   return (
@@ -813,6 +824,14 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
           />
         </div>
       )}
+
+      <Select
+        label={t('hsm.certification.label')}
+        value={formData.certification}
+        onChange={value => handleChange('certification', value)}
+        options={[{ value: '', label: t('hsm.certification.notDeclared') }, ...HSM_CERTIFICATIONS.map(v => ({ value: v, label: t(`hsm.certification.values.${v}`) }))]}
+        helperText={t('hsm.certification.hint')}
+      />
     </FormModal>
   )
 }

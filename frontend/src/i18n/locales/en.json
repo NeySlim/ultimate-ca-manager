@@ -1251,7 +1251,42 @@
     "pinSuccess": "Template pinned to CA",
     "unpinSuccess": "Template unpinned from CA",
     "selectCA": "Select a Certificate Authority",
-    "pinnedCount": "{{count}} of {{total}} templates pinned"
+    "pinnedCount": "{{count}} of {{total}} templates pinned",
+    "qc": {
+      "title": "qcStatements (ETSI EN 319 412-5) and policy OIDs",
+      "hint": "Adds the qcStatements extension and extra certificate policy OIDs to every certificate issued from this template. All fields are optional.",
+      "legalWarning": "QcCompliance is a legal statement that a certificate is a qualified certificate under eIDAS. Only a qualified trust service provider may make it. UCM adds what you declare here and does not check your qualified status.",
+      "compliance": "QcCompliance (qualified certificate)",
+      "sscd": "QcSSCD (private key in a qualified signature creation device)",
+      "type": "QcType",
+      "none": "None",
+      "types": {
+        "esign": "Electronic signature",
+        "eseal": "Electronic seal",
+        "web": "Website authentication"
+      },
+      "semantics": "Semantics identifier",
+      "semanticsValues": {
+        "natural": "Natural person (ETSI)",
+        "legal": "Legal person (ETSI)",
+        "eidas-natural": "Natural person (eIDAS)",
+        "eidas-legal": "Legal person (eIDAS)"
+      },
+      "ccLegislation": "QcCClegislation (country codes)",
+      "ccLegislationHint": "ISO 3166 two-letter codes, comma separated. Cannot be combined with QcCompliance.",
+      "retentionPeriod": "QcRetentionPeriod (years)",
+      "limitValue": "QcLimitValue",
+      "limitCurrency": "Currency (ISO 4217)",
+      "limitAmount": "Amount",
+      "limitExponent": "Exponent",
+      "pds": "QcPDS (PKI disclosure statements)",
+      "pdsHint": "HTTPS URL and two-letter language code (ISO 639-1). EN 319 412-5 expects an English entry.",
+      "pdsUrl": "URL",
+      "pdsLanguage": "Language",
+      "addPds": "Add a disclosure statement",
+      "policyOids": "Certificate policy OIDs",
+      "policyOidsHint": "Dotted OIDs, one per line, added after the CA's own policy. The buttons add the ETSI QCP policies."
+    }
   },
   "users": {
     "securityKeys": {
@@ -3454,6 +3489,18 @@
       "mountPath": "Transit Mount Path",
       "namespace": "Namespace",
       "tlsSkipVerify": "Skip TLS Verification"
+    },
+    "certification": {
+      "label": "Declared certification",
+      "hint": "The certification the operator declares for this HSM. UCM does not verify the hardware. Profiles aligned with eIDAS use it to check the CA key protection.",
+      "notDeclared": "Not declared",
+      "values": {
+        "cc-eal4+": "Common Criteria EAL 4+",
+        "eucc-high": "EUCC (high assurance)",
+        "fips-140-3-l3": "FIPS 140-3 level 3",
+        "fips-140-2-l3": "FIPS 140-2 level 3",
+        "other": "Other"
+      }
     }
   },
   "sso": {
@@ -3790,7 +3837,19 @@
       "aia": "Authority Information Access",
       "policies": "Certificate Policies",
       "nameConstraints": "Name Constraints",
-      "sct": "Signed Certificate Timestamps (SCT)"
+      "sct": "Signed Certificate Timestamps (SCT)",
+      "qcStatements": "Qualified Certificate Statements",
+      "qc": {
+        "compliance": "QcCompliance",
+        "ccLegislation": "QcCClegislation",
+        "type": "QcType",
+        "sscd": "QcSSCD",
+        "pds": "QcPDS",
+        "retention": "QcRetentionPeriod",
+        "retentionYears": "{{count}} years",
+        "limit": "QcLimitValue",
+        "semantics": "Semantics identifier"
+      }
     },
     "subjectAltNames": "Subject Alternative Names"
   },
@@ -5452,7 +5511,9 @@
       "warning": "Warning",
       "notice": "Notice",
       "info": "Info"
-    }
+    },
+    "profile_etsi": "ETSI (EN 319 412)",
+    "etsiNote": "ETSI rules apply to qualified and eIDAS-related certificates; other certificates may raise findings that do not apply."
   },
   "keyRecovery": {
     "title": "Key Recovery",

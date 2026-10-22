@@ -2001,7 +2001,19 @@
       "aia": "Accès aux informations de l'autorité",
       "policies": "Politiques du certificat",
       "nameConstraints": "Contraintes de noms",
-      "sct": "Horodatages de certificats signés (SCT)"
+      "sct": "Horodatages de certificats signés (SCT)",
+      "qcStatements": "Déclarations de certificat qualifié",
+      "qc": {
+        "compliance": "QcCompliance",
+        "ccLegislation": "QcCClegislation",
+        "type": "QcType",
+        "sscd": "QcSSCD",
+        "pds": "QcPDS",
+        "retention": "QcRetentionPeriod",
+        "retentionYears": "{{count}} ans",
+        "limit": "QcLimitValue",
+        "semantics": "Identifiant de sémantique"
+      }
     },
     "subjectAltNames": "Noms alternatifs du sujet"
   },
@@ -2126,6 +2138,18 @@
       "mountPath": "Chemin de montage Transit",
       "namespace": "Espace de noms",
       "tlsSkipVerify": "Ignorer la vérification TLS"
+    },
+    "certification": {
+      "label": "Certification déclarée",
+      "hint": "La certification que l'opérateur déclare pour ce HSM. UCM ne vérifie pas le matériel. Les profils alignés sur eIDAS l'utilisent pour contrôler la protection de la clé de la CA.",
+      "notDeclared": "Non déclarée",
+      "values": {
+        "cc-eal4+": "Common Criteria EAL 4+",
+        "eucc-high": "EUCC (assurance élevée)",
+        "fips-140-3-l3": "FIPS 140-3 niveau 3",
+        "fips-140-2-l3": "FIPS 140-2 niveau 3",
+        "other": "Autre"
+      }
     }
   },
   "import": {
@@ -3596,7 +3620,42 @@
     "pinSuccess": "Modèle épinglé à la CA",
     "unpinSuccess": "Modèle détaché de la CA",
     "selectCA": "Sélectionner une autorité de certification",
-    "pinnedCount": "{{count}} sur {{total}} modèles épinglés"
+    "pinnedCount": "{{count}} sur {{total}} modèles épinglés",
+    "qc": {
+      "title": "qcStatements (ETSI EN 319 412-5) et OID de politique",
+      "hint": "Ajoute l'extension qcStatements et des OID de politique de certificat supplémentaires à chaque certificat émis depuis ce modèle. Tous les champs sont facultatifs.",
+      "legalWarning": "QcCompliance est une déclaration juridique attestant qu'un certificat est un certificat qualifié au sens d'eIDAS. Seul un prestataire de services de confiance qualifié peut la faire. UCM ajoute ce que vous déclarez ici et ne vérifie pas votre statut qualifié.",
+      "compliance": "QcCompliance (certificat qualifié)",
+      "sscd": "QcSSCD (clé privée dans un dispositif qualifié de création de signature)",
+      "type": "QcType",
+      "none": "Aucun",
+      "types": {
+        "esign": "Signature électronique",
+        "eseal": "Cachet électronique",
+        "web": "Authentification de site web"
+      },
+      "semantics": "Identifiant de sémantique",
+      "semanticsValues": {
+        "natural": "Personne physique (ETSI)",
+        "legal": "Personne morale (ETSI)",
+        "eidas-natural": "Personne physique (eIDAS)",
+        "eidas-legal": "Personne morale (eIDAS)"
+      },
+      "ccLegislation": "QcCClegislation (codes pays)",
+      "ccLegislationHint": "Codes ISO 3166 à deux lettres, séparés par des virgules. Ne peut pas être combiné avec QcCompliance.",
+      "retentionPeriod": "QcRetentionPeriod (années)",
+      "limitValue": "QcLimitValue",
+      "limitCurrency": "Devise (ISO 4217)",
+      "limitAmount": "Montant",
+      "limitExponent": "Exposant",
+      "pds": "QcPDS (PKI disclosure statements)",
+      "pdsHint": "URL HTTPS et code de langue à deux lettres (ISO 639-1). EN 319 412-5 attend une entrée en anglais.",
+      "pdsUrl": "URL",
+      "pdsLanguage": "Langue",
+      "addPds": "Ajouter une déclaration de divulgation",
+      "policyOids": "OID de politique de certificat",
+      "policyOidsHint": "OID en notation pointée, un par ligne, ajoutés après la politique propre à la CA. Les boutons ajoutent les politiques ETSI QCP."
+    }
   },
   "time": {
     "today": "Aujourd'hui",
@@ -5440,12 +5499,14 @@
     "subtitle": "Vérifie ce certificat au regard des standards X.509 (informatif uniquement).",
     "profile_rfc5280": "RFC 5280",
     "profile_cabf": "CA/Browser Forum",
+    "profile_etsi": "ETSI (EN 319 412)",
     "loadFailed": "Échec de l'analyse",
     "unavailable": "Aucun linter de certificat n'est installé sur le serveur",
     "unavailableHint": "Installez pkilint sur le serveur pour activer l'analyse.",
     "clean": "Aucun problème détecté",
     "detectedType": "Type de certificat détecté",
     "cabfNote": "Les règles Baseline Requirements visent les certificats TLS publics ; certains résultats peuvent ne pas s'appliquer à une PKI interne.",
+    "etsiNote": "Les règles ETSI s'appliquent aux certificats qualifiés et liés à eIDAS ; les autres certificats peuvent produire des anomalies non applicables.",
     "severity": {
       "fatal": "Fatal",
       "error": "Erreur",

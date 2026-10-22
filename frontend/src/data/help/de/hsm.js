@@ -21,6 +21,7 @@ export default {
           { label: 'Verbindung testen', text: 'Überprüfen, ob das HSM erreichbar ist und die Anmeldedaten gültig sind' },
           { label: 'Schlüssel generieren', text: 'Ein neues Schlüsselpaar direkt auf dem HSM erstellen' },
           { label: 'Status', text: 'Verbindungszustand des Anbieters überwachen' },
+          { label: 'Zertifizierung', text: 'Die Zertifizierung des HSM angeben: Common Criteria EAL 4+, EUCC high, FIPS 140-3 Level 3, FIPS 140-2 Level 3 oder andere. Bleibt das Feld leer, ist sie nicht angegeben. Das Compliance-Profil eu-acm akzeptiert für eine HSM-gestützte CA nur Common Criteria EAL 4+, EUCC high und FIPS 140-3 Level 3 (bis 31. Dezember 2030)' },
         ]
       },
       {
@@ -43,6 +44,7 @@ export default {
       'Für langlebige Root-CAs in Produktion HSM-gestützte Schlüsselablage bevorzugen',
     ],
     warnings: [
+      'Die angegebene Zertifizierung ist die Aussage des Betreibers über das HSM: UCM prüft die Hardware nicht. An eIDAS ausgerichtete Profile lesen sie, um den Schutz des CA-Schlüssels zu prüfen',
       'Falsche HSM-Anbieter-Konfiguration kann die Zertifikatssignierung verhindern',
       'Der Verlust des Zugangs zum HSM bedeutet den Verlust der dort gespeicherten Schlüssel',
     ],

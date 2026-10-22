@@ -1251,7 +1251,42 @@
     "pinSuccess": "Vorlage an CA angeheftet",
     "unpinSuccess": "Vorlage von CA gelöst",
     "selectCA": "Zertifizierungsstelle auswählen",
-    "pinnedCount": "{{count}} von {{total}} Vorlagen angeheftet"
+    "pinnedCount": "{{count}} von {{total}} Vorlagen angeheftet",
+    "qc": {
+      "title": "qcStatements (ETSI EN 319 412-5) und Policy-OIDs",
+      "hint": "Fügt jedem aus diesem Template ausgestellten Zertifikat die Erweiterung qcStatements und zusätzliche Zertifikatsrichtlinien-OIDs hinzu. Alle Felder sind optional.",
+      "legalWarning": "QcCompliance ist eine rechtliche Erklärung, dass ein Zertifikat ein qualifiziertes Zertifikat nach eIDAS ist. Nur ein qualifizierter Vertrauensdiensteanbieter darf sie abgeben. UCM fügt hinzu, was Sie hier angeben, und prüft Ihren Qualifikationsstatus nicht.",
+      "compliance": "QcCompliance (qualifiziertes Zertifikat)",
+      "sscd": "QcSSCD (privater Schlüssel in einer qualifizierten Signaturerstellungseinheit)",
+      "type": "QcType",
+      "none": "Keine",
+      "types": {
+        "esign": "Elektronische Signatur",
+        "eseal": "Elektronisches Siegel",
+        "web": "Website-Authentifizierung"
+      },
+      "semantics": "Semantics Identifier",
+      "semanticsValues": {
+        "natural": "Natürliche Person (ETSI)",
+        "legal": "Juristische Person (ETSI)",
+        "eidas-natural": "Natürliche Person (eIDAS)",
+        "eidas-legal": "Juristische Person (eIDAS)"
+      },
+      "ccLegislation": "QcCClegislation (Ländercodes)",
+      "ccLegislationHint": "Zweistellige ISO-3166-Codes, durch Kommas getrennt. Nicht mit QcCompliance kombinierbar.",
+      "retentionPeriod": "QcRetentionPeriod (Jahre)",
+      "limitValue": "QcLimitValue",
+      "limitCurrency": "Währung (ISO 4217)",
+      "limitAmount": "Betrag",
+      "limitExponent": "Exponent",
+      "pds": "QcPDS (PKI Disclosure Statements)",
+      "pdsHint": "HTTPS-URL und zweistelliger Sprachcode (ISO 639-1). EN 319 412-5 erwartet einen englischen Eintrag.",
+      "pdsUrl": "URL",
+      "pdsLanguage": "Sprache",
+      "addPds": "Disclosure Statement hinzufügen",
+      "policyOids": "Zertifikatsrichtlinien-OIDs",
+      "policyOidsHint": "OIDs in Punktnotation, eine pro Zeile, nach der Richtlinie der CA selbst hinzugefügt. Die Schaltflächen fügen die ETSI-QCP-Richtlinien hinzu."
+    }
   },
   "users": {
     "securityKeys": {
@@ -3452,6 +3487,18 @@
       "mountPath": "Transit-Einhängepfad",
       "namespace": "Namespace",
       "tlsSkipVerify": "TLS-Überprüfung überspringen"
+    },
+    "certification": {
+      "label": "Angegebene Zertifizierung",
+      "hint": "Die Zertifizierung, die der Betreiber für dieses HSM angibt. UCM prüft die Hardware nicht. An eIDAS ausgerichtete Profile verwenden sie, um den Schutz des CA-Schlüssels zu prüfen.",
+      "notDeclared": "Nicht angegeben",
+      "values": {
+        "cc-eal4+": "Common Criteria EAL 4+",
+        "eucc-high": "EUCC (hohe Vertrauenswürdigkeit)",
+        "fips-140-3-l3": "FIPS 140-3 Level 3",
+        "fips-140-2-l3": "FIPS 140-2 Level 3",
+        "other": "Andere"
+      }
     }
   },
   "sso": {
@@ -3787,7 +3834,19 @@
       "aia": "Zugriff auf Zertifizierungsstelleninformationen",
       "policies": "Zertifikatsrichtlinien",
       "nameConstraints": "Namenseinschränkungen",
-      "sct": "Signierte Zertifikatstimestamps (SCT)"
+      "sct": "Signierte Zertifikatstimestamps (SCT)",
+      "qcStatements": "Qualified Certificate Statements",
+      "qc": {
+        "compliance": "QcCompliance",
+        "ccLegislation": "QcCClegislation",
+        "type": "QcType",
+        "sscd": "QcSSCD",
+        "pds": "QcPDS",
+        "retention": "QcRetentionPeriod",
+        "retentionYears": "{{count}} Jahre",
+        "limit": "QcLimitValue",
+        "semantics": "Semantics Identifier"
+      }
     },
     "subjectAltNames": "Alternative Antragstellernamen"
   },
@@ -5449,7 +5508,9 @@
       "warning": "Warnung",
       "notice": "Hinweis",
       "info": "Info"
-    }
+    },
+    "profile_etsi": "ETSI (EN 319 412)",
+    "etsiNote": "ETSI-Regeln gelten für qualifizierte und eIDAS-bezogene Zertifikate; andere Zertifikate können Befunde auslösen, die nicht zutreffen."
   },
   "keyRecovery": {
     "title": "Schlüsselwiederherstellung",

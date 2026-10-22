@@ -1267,7 +1267,42 @@
     "pinSuccess": "Шаблон закріплено за CA",
     "unpinSuccess": "Шаблон відкріплено від CA",
     "selectCA": "Виберіть центр сертифікації",
-    "pinnedCount": "Закріплено шаблонів: {{count}} з {{total}}"
+    "pinnedCount": "Закріплено шаблонів: {{count}} з {{total}}",
+    "qc": {
+      "title": "qcStatements (ETSI EN 319 412-5) та OID політик",
+      "hint": "Додає розширення qcStatements та додаткові OID політик сертифіката до кожного сертифіката, виданого за цим шаблоном. Усі поля необов'язкові.",
+      "legalWarning": "QcCompliance є юридичним твердженням, що сертифікат є кваліфікованим згідно з eIDAS. Робити його може лише кваліфікований постачальник довірчих послуг. UCM додає те, що ви вказали тут, і не перевіряє ваш кваліфікований статус.",
+      "compliance": "QcCompliance (кваліфікований сертифікат)",
+      "sscd": "QcSSCD (приватний ключ у кваліфікованому пристрої створення підпису)",
+      "type": "QcType",
+      "none": "Немає",
+      "types": {
+        "esign": "Електронний підпис",
+        "eseal": "Електронна печатка",
+        "web": "Автентифікація вебсайту"
+      },
+      "semantics": "Ідентифікатор семантики",
+      "semanticsValues": {
+        "natural": "Фізична особа (ETSI)",
+        "legal": "Юридична особа (ETSI)",
+        "eidas-natural": "Фізична особа (eIDAS)",
+        "eidas-legal": "Юридична особа (eIDAS)"
+      },
+      "ccLegislation": "QcCClegislation (коди країн)",
+      "ccLegislationHint": "Дволітерні коди ISO 3166, через кому. Не можна поєднувати з QcCompliance.",
+      "retentionPeriod": "QcRetentionPeriod (роки)",
+      "limitValue": "QcLimitValue",
+      "limitCurrency": "Валюта (ISO 4217)",
+      "limitAmount": "Сума",
+      "limitExponent": "Показник степеня",
+      "pds": "QcPDS (PKI disclosure statements)",
+      "pdsHint": "HTTPS URL і дволітерний код мови (ISO 639-1). EN 319 412-5 очікує запис англійською.",
+      "pdsUrl": "URL",
+      "pdsLanguage": "Мова",
+      "addPds": "Додати disclosure statement",
+      "policyOids": "OID політик сертифіката",
+      "policyOidsHint": "OID у точковій нотації, по одному в рядку, додаються після власної політики CA. Кнопки додають політики ETSI QCP."
+    }
   },
   "users": {
     "securityKeys": {
@@ -3494,6 +3529,18 @@
       "mountPath": "Шлях монтування Transit",
       "namespace": "Простір імен",
       "tlsSkipVerify": "Пропустити перевірку TLS"
+    },
+    "certification": {
+      "label": "Заявлена сертифікація",
+      "hint": "Сертифікація, яку оператор заявляє для цього HSM. UCM не перевіряє апаратне забезпечення. Профілі, узгоджені з eIDAS, використовують її для перевірки захисту ключа CA.",
+      "notDeclared": "Не заявлено",
+      "values": {
+        "cc-eal4+": "Common Criteria EAL 4+",
+        "eucc-high": "EUCC (високий рівень гарантії)",
+        "fips-140-3-l3": "FIPS 140-3 рівень 3",
+        "fips-140-2-l3": "FIPS 140-2 рівень 3",
+        "other": "Інше"
+      }
     }
   },
   "sso": {
@@ -3837,7 +3884,19 @@
       "aia": "Доступ до інформації центру сертифікації",
       "policies": "Політики сертифіката",
       "nameConstraints": "Обмеження імен",
-      "sct": "Підписані мітки часу сертифікатів (SCT)"
+      "sct": "Підписані мітки часу сертифікатів (SCT)",
+      "qcStatements": "Кваліфіковані твердження сертифіката",
+      "qc": {
+        "compliance": "QcCompliance",
+        "ccLegislation": "QcCClegislation",
+        "type": "QcType",
+        "sscd": "QcSSCD",
+        "pds": "QcPDS",
+        "retention": "QcRetentionPeriod",
+        "retentionYears": "{{count}} р.",
+        "limit": "QcLimitValue",
+        "semantics": "Ідентифікатор семантики"
+      }
     },
     "subjectAltNames": "Альтернативні імена суб'єкта"
   },
@@ -5505,7 +5564,9 @@
       "warning": "Попередження",
       "notice": "Зауваження",
       "info": "Інфо"
-    }
+    },
+    "profile_etsi": "ETSI (EN 319 412)",
+    "etsiNote": "Правила ETSI застосовуються до кваліфікованих сертифікатів і сертифікатів, пов'язаних з eIDAS; для інших сертифікатів можуть з'явитися зауваження, що не стосуються їх."
   },
   "keyRecovery": {
     "title": "Відновлення ключів",

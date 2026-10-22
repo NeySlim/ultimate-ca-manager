@@ -8,7 +8,7 @@ export default {
         title: "合规性检查",
         content: "证书详情中的「检查」操作会用标准检查器对其进行分析并显示结果。仅供参考,, 绝不阻止签发。",
         items: [
-          { label: "配置", text: "RFC 5280（始终适用）和 CA/Browser Forum 基线要求（TLS 服务器证书）" },
+          { label: "配置", text: "RFC 5280（始终适用）、CA/Browser Forum 基线要求（TLS 服务器证书）和 ETSI EN 319 412（合格证书及与 eIDAS 相关的证书，包括 qcStatements）" },
           { label: "严重级别", text: "结果分级：fatal、error、warning、notice、info" },
           { label: "引擎", text: "由 pkilint 驱动（如存在 zlint 二进制文件也会使用）,, 可选的服务器依赖" },
           { label: "内部 PKI", text: "CA/Browser Forum 规则面向公共证书；内部 PKI 上会出现不适用的结果" },
@@ -192,6 +192,7 @@ export default {
 
 - **RFC 5280**: IETF X.509 配置，始终适用
 - **CA/Browser Forum**: 面向公共 TLS 证书的基线要求（内部 PKI 上会有噪声）
+- **ETSI EN 319 412**: 合格证书及与 eIDAS 相关的证书（包括 qcStatements）
 - 严重级别：fatal / error / warning / notice / info
 - 引擎：pkilint（如存在则加 zlint）:: 可选服务器依赖，缺失时优雅降级
 
