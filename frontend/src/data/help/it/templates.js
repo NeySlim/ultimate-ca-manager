@@ -24,6 +24,7 @@ export default {
           { label: 'Mostra sistema', text: 'Nascondi i modelli integrati per lavorare solo con i tuoi. Memorizzato per browser' },
           { label: 'Importa/Esporta', text: 'Condividi modelli come file JSON tra istanze UCM, un modello o più in un file' },
           { label: 'Tipo di chiave', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 o EC-P521, con digest SHA-256, SHA-384 o SHA-512' },
+          { label: 'Brainpool', text: 'EC-BP256, EC-BP384 e EC-BP512 (RFC 5639, elencati sotto Brainpool negli elenchi dei tipi di chiave, nascosti in modalità FIPS). OpenSSL e Windows leggono le loro catene e firme, ma Chrome, Firefox, Go, rustls, GnuTLS e Java senza Bouncy Castle li rifiutano per TLS, e Windows Schannel non li abilita per impostazione predefinita. Su un HSM, solo i provider PKCS#11 li gestiscono' },
         ]
       },
       {

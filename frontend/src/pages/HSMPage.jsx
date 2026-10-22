@@ -20,6 +20,9 @@ import { usePermission, useClipboard, usePersistedState } from '../hooks'
 import { hsmService } from '../services'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { secretInputProps } from '../lib/secretTarget'
+import { groupedOptions, listAlgorithms } from '../lib/keyAlgorithms'
+import { useFipsMode } from '../lib/policyAlgorithms'
+import { BrainpoolNotice } from '../components/BrainpoolNotice'
 
 const PROVIDER_TYPES = [
   { value: 'pkcs11', label: 'PKCS#11 (Local HSM)', icon: HardDrive },
@@ -816,6 +819,7 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
 
 function KeyModal({ provider, onSave, onClose }) {
   const { t } = useTranslation()
+  const fips = useFipsMode()
   const [formData, setFormData] = useState({
     label: '',
     key_type: 'rsa',
@@ -826,13 +830,16 @@ function KeyModal({ provider, onSave, onClose }) {
 
   const algorithmOptions = {
     rsa: [{ value: '2048', label: 'RSA-2048' }, { value: '3072', label: 'RSA-3072' }, { value: '4096', label: 'RSA-4096' }],
-    ec: [{ value: '256', label: 'EC-P256' }, { value: '384', label: 'EC-P384' }, { value: '521', label: 'EC-P521' }],
+    // Brainpool only on a PKCS#11 provider; the value is the algorithm label itself
+    ec: groupedOptions(
+      listAlgorithms({ generate: true, provider: provider?.provider_type ?? '', fips }).filter(a => a.family === 'EC'),
+      t, a => a.label),
     aes: [{ value: '128', label: 'AES-128' }, { value: '256', label: 'AES-256' }],
   }
 
   const buildAlgorithm = () => {
-    const prefix = formData.key_type === 'rsa' ? 'RSA' : formData.key_type === 'ec' ? 'EC-P' : 'AES'
-    return `${prefix}${formData.key_type === 'ec' ? '' : '-'}${formData.key_size}`
+    if (formData.key_type === 'ec') return formData.key_size
+    return `${formData.key_type === 'rsa' ? 'RSA' : 'AES'}-${formData.key_size}`
   }
 
   const handleSubmit = () => {
@@ -855,7 +862,7 @@ function KeyModal({ provider, onSave, onClose }) {
     >
       <Input label={t('hsm.keyLabel')} value={formData.label} onChange={e => setFormData({...formData, label: e.target.value})} required placeholder={t('hsm.keyLabelPlaceholder')} />
       <div className="grid grid-cols-2 gap-4">
-        <Select label={t('common.keyType')} value={formData.key_type} onChange={value => setFormData({...formData, key_type: value, key_size: value === 'rsa' ? '2048' : value === 'ec' ? '256' : '128'})} options={[{ value: 'rsa', label: 'RSA' }, { value: 'ec', label: 'ECDSA' }, { value: 'aes', label: 'AES' }]} />
+        <Select label={t('common.keyType')} value={formData.key_type} onChange={value => setFormData({...formData, key_type: value, key_size: value === 'rsa' ? '2048' : value === 'ec' ? 'EC-P256' : '128'})} options={[{ value: 'rsa', label: 'RSA' }, { value: 'ec', label: 'ECDSA' }, { value: 'aes', label: 'AES' }]} />
         <Select
           label={t('common.keySize')}
           value={formData.key_size}
@@ -863,6 +870,7 @@ function KeyModal({ provider, onSave, onClose }) {
           options={algorithmOptions[formData.key_type] || algorithmOptions.rsa}
         />
       </div>
+      {formData.key_type === 'ec' && <BrainpoolNotice label={formData.key_size} />}
       <Select label={t('common.purpose')} value={formData.purpose} onChange={value => setFormData({...formData, purpose: value})} options={[{ value: 'signing', label: t('hsm.purposes.caSigning') }, { value: 'encryption', label: t('common.smtpEncryption') }, { value: 'wrapping', label: t('hsm.purposes.general') }, { value: 'all', label: t('common.all') }]} />
     </FormModal>
   )

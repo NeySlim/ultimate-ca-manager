@@ -93,3 +93,25 @@ describe('RequestCertificateForm key type', () => {
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ key_type: 'EC-P256' }))
   })
 })
+
+describe('RequestCertificateForm Brainpool', () => {
+  beforeEach(() => {
+    getClientSettings.mockReset()
+    getClientSettings.mockResolvedValue({ data: {} })
+  })
+
+  it('offers EC-BP256 and EC-BP384 only, with the compatibility notice once picked', () => {
+    renderForm()
+    const values = Array.from(screen.getByLabelText('acme.keyType').options).map((o) => o.value).filter(Boolean)
+    expect(values).toEqual(['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384'])
+    expect(screen.queryByRole('note')).toBeNull()
+    fireEvent.change(screen.getByLabelText('acme.keyType'), { target: { value: 'EC-BP384' } })
+    expect(screen.getByRole('note').textContent).toContain('common.keyGroups.brainpoolWarning')
+  })
+
+  it('accepts a configured Brainpool default', () => {
+    const onSubmit = renderForm({ defaultKeyType: 'EC-BP256' })
+    submit()
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ key_type: 'EC-BP256' }))
+  })
+})

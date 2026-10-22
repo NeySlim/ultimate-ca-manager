@@ -7,6 +7,8 @@ import { useNotification } from '../../contexts'
 import { signingCas } from '../../lib/caSelection'
 import { daysRemaining } from '../../lib/utils'
 import { ISSUE_KEY_CHOICES, issueKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
+import { KEY_ALGORITHMS, findAlgorithm, groupedOptions, isFipsApproved } from '../../lib/keyAlgorithms'
+import { BrainpoolNotice } from '../../components/BrainpoolNotice'
 
 // Issue Certificate Form — full-featured with template, cert type, structured SANs, date picker
 export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
@@ -125,12 +127,13 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   }, [initialData])
 
   // Key types the policies of this CA/template allow (#397); the server enforces them regardless
-  const { allowedKeyTypes } = useEffectiveAlgorithms({
+  const { allowedKeyTypes, fips } = useEffectiveAlgorithms({
     caId: formData.ca_id, templateId: selectedTemplate, enabled: !!formData.ca_id,
   })
   const allowedKeys = useMemo(
-    () => ISSUE_KEY_CHOICES.filter(([type, size]) => isAllowed(allowedKeyTypes, issueKeyLabel(type, size))),
-    [allowedKeyTypes],
+    () => ISSUE_KEY_CHOICES.filter(([type, size]) => isAllowed(allowedKeyTypes, issueKeyLabel(type, size))
+      && (!fips || isFipsApproved(issueKeyLabel(type, size)))),
+    [allowedKeyTypes, fips],
   )
   const noKeyAllowed = allowedKeys.length === 0
   const firstAllowedSize = (type) => allowedKeys.find(([k]) => k === type)?.[1]
@@ -170,14 +173,10 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
 
     // Map template key_type to form fields
     if (tpl.key_type) {
-      const [algo, size] = tpl.key_type.split('-')
-      if (algo === 'RSA') {
-        updates.key_type = 'rsa'
-        updates.key_size = size || '2048'
-      } else if (algo === 'EC') {
-        updates.key_type = 'ecdsa'
-        const curveMap = { 'P256': '256', 'P384': '384', 'P521': '521' }
-        updates.key_size = curveMap[size] || '256'
+      const pair = findAlgorithm(tpl.key_type)?.issue
+      if (pair) {
+        updates.key_type = pair[0]
+        updates.key_size = pair[1]
       }
     }
     if (tpl.validity_days) updates.validity_days = String(tpl.validity_days)
@@ -591,20 +590,13 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
           label={t('common.keySize')}
           value={formData.key_size}
           onChange={(val) => update('key_size', val)}
-          options={(formData.key_type === 'rsa'
-            ? [
-              { value: '2048', label: t('certificates.keySizeRsa2048') },
-              { value: '3072', label: t('certificates.keySizeRsa3072') },
-              { value: '4096', label: t('certificates.keySizeRsa4096') },
-            ]
-            : [
-              { value: '256', label: t('certificates.keyCurveNistP256') },
-              { value: '384', label: t('certificates.keyCurveNistP384') },
-              { value: '521', label: t('certificates.keyCurveNistP521') },
-            ]
+          options={groupedOptions(
+            KEY_ALGORITHMS.filter(k => k.issue && k.issue[0] === formData.key_type), t,
+            k => (k.sizeKey ? t(k.sizeKey) : k.display), k => k.issue[1],
           ).filter(o => noKeyAllowed || allowedKeys.some(([k, sz]) => k === formData.key_type && sz === o.value))}
         />
       </div>
+      <BrainpoolNotice label={issueKeyLabel(formData.key_type, formData.key_size)} />
       {noKeyAllowed && (
         <p className="text-xs text-status-danger" role="alert">{t('certificates.noKeyTypeAllowedByPolicy')}</p>
       )}

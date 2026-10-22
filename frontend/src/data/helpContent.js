@@ -355,6 +355,7 @@ export const helpContent = {
           { label: 'Show system', text: 'Hide the built-in templates to work with your own only. Remembered per browser' },
           { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances, one template or several in one file' },
           { label: 'Key Type', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 or EC-P521, with a SHA-256, SHA-384 or SHA-512 digest' },
+          { label: 'Brainpool', text: 'EC-BP256, EC-BP384 and EC-BP512 (RFC 5639, listed under Brainpool in key type lists, hidden in FIPS mode). OpenSSL and Windows read their chains and signatures, but Chrome, Firefox, Go, rustls, GnuTLS and Java without Bouncy Castle refuse them for TLS, and Windows Schannel does not enable them by default. On an HSM, only PKCS#11 providers hold them' },
         ]
       },
       {

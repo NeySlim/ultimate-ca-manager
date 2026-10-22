@@ -24,6 +24,7 @@ export default {
           { label: 'Mostrar sistema', text: 'Oculte las plantillas integradas para trabajar solo con las suyas. Se recuerda por navegador' },
           { label: 'Importar/Exportar', text: 'Compartir plantillas como archivos JSON entre instancias de UCM, una plantilla o varias en un solo archivo' },
           { label: 'Tipo de clave', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 o EC-P521, con un resumen SHA-256, SHA-384 o SHA-512' },
+          { label: 'Brainpool', text: 'EC-BP256, EC-BP384 y EC-BP512 (RFC 5639, listadas en Brainpool en las listas de tipos de clave, ocultas en modo FIPS). OpenSSL y Windows leen sus cadenas y firmas, pero Chrome, Firefox, Go, rustls, GnuTLS y Java sin Bouncy Castle las rechazan para TLS, y Windows Schannel no las habilita de forma predeterminada. En un HSM, solo los proveedores PKCS#11 las admiten' },
         ]
       },
       {

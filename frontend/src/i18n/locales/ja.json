@@ -384,6 +384,13 @@
     "help": "ヘルプ",
     "theme": "テーマ",
     "menu": "メニュー",
+    "keyGroups": {
+      "rsa": "RSA",
+      "nist": "NIST曲線",
+      "brainpool": "Brainpool (RFC 5639)",
+      "eddsa": "EdDSA",
+      "brainpoolWarning": "Brainpool のチェーンと署名は OpenSSL と Windows で読み取れます。TLS サーバー鍵としては、Chrome、Chromium、Firefox、Go、rustls、GnuTLS、Bouncy Castle を使わない Java では拒否され、Windows Schannel でもこれらの曲線はデフォルトで有効になっていません。"
+    },
     "keyTypes": {
       "rsa2048": "RSA 2048ビット",
       "rsa3072": "RSA 3072ビット",

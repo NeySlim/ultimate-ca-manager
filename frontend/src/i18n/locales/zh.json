@@ -384,6 +384,13 @@
     "help": "帮助",
     "theme": "主题",
     "menu": "菜单",
+    "keyGroups": {
+      "rsa": "RSA",
+      "nist": "NIST 曲线",
+      "brainpool": "Brainpool (RFC 5639)",
+      "eddsa": "EdDSA",
+      "brainpoolWarning": "OpenSSL 和 Windows 可以读取 Brainpool 证书链和签名。但作为 TLS 服务器密钥时，Chrome、Chromium、Firefox、Go、rustls、GnuTLS 以及未使用 Bouncy Castle 的 Java 都会拒绝，Windows Schannel 默认也未启用这些曲线。"
+    },
     "keyTypes": {
       "rsa2048": "RSA 2048位",
       "rsa3072": "RSA 3072位",

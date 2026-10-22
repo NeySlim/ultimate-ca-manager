@@ -24,6 +24,7 @@ export default {
           { label: 'システムを表示', text: '組み込みテンプレートを非表示にして、自分のテンプレートだけを扱います。ブラウザごとに記憶されます' },
           { label: 'インポート/エクスポート', text: 'UCMインスタンス間でテンプレートをJSONファイルとして共有。テンプレート1件、または複数件をまとめた1つのファイル' },
           { label: '鍵タイプ', text: 'RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384、EC-P521。ダイジェストは SHA-256、SHA-384、SHA-512' },
+          { label: 'Brainpool', text: 'EC-BP256、EC-BP384、EC-BP512 (RFC 5639)。鍵タイプの一覧では Brainpool の下に表示され、FIPS モードでは非表示になります。OpenSSL と Windows はそのチェーンと署名を読み取れますが、Chrome、Firefox、Go、rustls、GnuTLS、Bouncy Castle を使わない Java は TLS で拒否し、Windows Schannel もデフォルトでは有効にしていません。HSM では、PKCS#11 プロバイダーのみがこれらを保持できます' },
         ]
       },
       {

@@ -386,6 +386,13 @@
     "help": "Допомога",
     "theme": "Тема",
     "menu": "Меню",
+    "keyGroups": {
+      "rsa": "RSA",
+      "nist": "Криві NIST",
+      "brainpool": "Brainpool (RFC 5639)",
+      "eddsa": "EdDSA",
+      "brainpoolWarning": "Ланцюжки та підписи Brainpool читають OpenSSL і Windows. Як ключ TLS-сервера його відхиляють Chrome і Chromium, Firefox, Go, rustls, GnuTLS та Java без Bouncy Castle, а Windows Schannel за замовчуванням не вмикає ці криві."
+    },
     "keyTypes": {
       "rsa2048": "RSA 2048 біт",
       "rsa3072": "RSA 3072 біт",

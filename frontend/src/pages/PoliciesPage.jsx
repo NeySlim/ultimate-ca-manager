@@ -19,6 +19,8 @@ import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { pickerCas } from '../lib/caSelection'
 import { useFipsMode } from '../lib/policyAlgorithms'
+import { KEY_ALGORITHMS, KEY_GROUPS, isBrainpool } from '../lib/keyAlgorithms'
+import { BrainpoolNotice } from '../components/BrainpoolNotice'
 
 // Operations a policy governs: labels resolved via t() inside component
 const POLICY_TYPES = [
@@ -42,27 +44,7 @@ function OperationBadges({ operations, t }) {
   )
 }
 
-// Key type options — labels resolved via t() inside component.
-// RSA-3072 was missing here while `api/v2/templates._VALID_KEY_TYPES`
-// accepts it and `utils/key_type.RSA_SIZES` generates it, so a policy could
-// not be made to allow a key size the rest of the product offers: an
-// RSA-3072 template was refused at issuance with no way to permit it from
-// this screen.
-const KEY_TYPE_OPTIONS = [
-  { value: 'RSA-2048', labelKey: 'common.keyTypes.rsa2048' },
-  { value: 'RSA-3072', labelKey: 'common.keyTypes.rsa3072' },
-  { value: 'RSA-4096', labelKey: 'common.keyTypes.rsa4096' },
-  { value: 'EC-P256', labelKey: 'common.keyTypes.ecdsaP256' },
-  { value: 'EC-P384', labelKey: 'common.keyTypes.ecdsaP384' },
-  { value: 'EC-P521', labelKey: 'common.keyTypes.ecdsaP521' },
-]
-
-// EdDSA keys only arrive through CSRs and enrollment protocols (no template generates them)
-const EDDSA_KEY_TYPE_OPTIONS = [
-  { value: 'ED25519', labelKey: 'common.keyTypes.ed25519' },
-  { value: 'ED448', labelKey: 'common.keyTypes.ed448' },
-]
-const EDDSA_VALUES = new Set(EDDSA_KEY_TYPE_OPTIONS.map(o => o.value))
+// Key types a policy can allow come from the shared registry (lib/keyAlgorithms.js)
 
 // Signature hashes; none selected means any hash
 const DIGEST_OPTIONS = [
@@ -113,7 +95,12 @@ export default function PoliciesPage() {
   // FIPS mode puts a read-only system policy ahead of these, without EdDSA keys
   const fipsActive = useFipsMode()
   const keyTypeOptions = useMemo(
-    () => [...KEY_TYPE_OPTIONS, ...EDDSA_KEY_TYPE_OPTIONS].map(o => ({ value: o.value, label: t(o.labelKey) })),
+    () => KEY_ALGORITHMS.map(a => ({
+      value: a.label,
+      label: a.i18nKey ? t(a.i18nKey) : a.display,
+      group: t(KEY_GROUPS.find(g => g.id === a.group).labelKey),
+      fips: a.fips,
+    })),
     [t],
   )
 
@@ -145,6 +132,9 @@ export default function PoliciesPage() {
 
   // Modal state (page-specific)
   const [formData, setFormData] = useState({ ...DEFAULT_FORM })
+  // In FIPS mode a key the module does not approve shows only while ticked, so it can be removed
+  const shownKeyTypes = keyTypeOptions.filter(opt => !fipsActive || opt.fips
+    || formData.rules.allowed_key_types?.includes(opt.value))
   const [emailsText, setEmailsText] = useState('')
   const parsedEmails = parseEmails(emailsText)
   const [actionInProgress, setActionInProgress] = useState(false)
@@ -743,25 +733,29 @@ export default function PoliciesPage() {
               <label className="text-sm font-medium text-text-primary mb-2 block">
                 {t('policies.allowedKeyTypes')}
               </label>
-              <div className="flex flex-wrap gap-2">
-                {/* In FIPS mode an EdDSA key shows only while ticked, so it can be removed */}
-                {keyTypeOptions.filter(opt => !fipsActive || !EDDSA_VALUES.has(opt.value)
-                  || formData.rules.allowed_key_types?.includes(opt.value)).map(opt => (
-                  <button
-                    key={opt.value}
-                    type="button"
-                    onClick={() => toggleKeyType(opt.value)}
-                    className={cn(
-                      'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
-                      formData.rules.allowed_key_types?.includes(opt.value)
-                        ? 'bg-accent-primary-op10 border-accent-primary text-accent-primary'
-                        : 'bg-bg-secondary border-border text-text-muted hover:border-border-hover'
-                    )}
-                  >
-                    {opt.label}
-                  </button>
-                ))}
-              </div>
+              {[...new Set(shownKeyTypes.map(o => o.group))].map(group => (
+                <div key={group} className="mb-2">
+                  <div className="text-xs text-text-tertiary mb-1">{group}</div>
+                  <div className="flex flex-wrap gap-2">
+                    {shownKeyTypes.filter(opt => opt.group === group).map(opt => (
+                      <button
+                        key={opt.value}
+                        type="button"
+                        onClick={() => toggleKeyType(opt.value)}
+                        className={cn(
+                          'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
+                          formData.rules.allowed_key_types?.includes(opt.value)
+                            ? 'bg-accent-primary-op10 border-accent-primary text-accent-primary'
+                            : 'bg-bg-secondary border-border text-text-muted hover:border-border-hover'
+                        )}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              ))}
+              <BrainpoolNotice label={(formData.rules.allowed_key_types || []).find(isBrainpool)} />
               <p className="text-xs text-text-tertiary mt-1">{t('policies.allowedKeyTypesHelp')}</p>
             </div>
 

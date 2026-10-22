@@ -7,6 +7,9 @@ import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { HelpCard, Button, Badge, CompactSection, Select, Input } from '../../components'
 import { useClipboard } from '../../hooks'
 import { cn, publicBaseUrl } from '../../lib/utils'
+import { ACME_CLIENT_LABELS, groupedOptions, listAlgorithms } from '../../lib/keyAlgorithms'
+import { useFipsMode } from '../../lib/policyAlgorithms'
+import { BrainpoolNotice } from '../../components/BrainpoolNotice'
 
 export default function LetsEncryptTab({
   clientSettings,
@@ -41,6 +44,7 @@ export default function LetsEncryptTab({
 }) {
   const { t } = useTranslation()
   const { copy } = useClipboard()
+  const fips = useFipsMode()
 
   const proxyAccountId = clientSettings.proxy_acme_account_id ?? null
   const selectedProxyAccount = caAccounts.find(a => a.id === proxyAccountId)
@@ -222,14 +226,10 @@ export default function LetsEncryptTab({
             value={clientSettings.key_type || 'RSA-2048'}
             onChange={(val) => onUpdateClientSetting('key_type', val)}
             disabled={!canWrite}
-            options={[
-              { value: 'RSA-2048', label: 'RSA 2048' },
-              { value: 'RSA-4096', label: 'RSA 4096' },
-              { value: 'EC-P256', label: 'ECDSA P-256' },
-              { value: 'EC-P384', label: 'ECDSA P-384' },
-            ]}
+            options={groupedOptions(listAlgorithms({ labels: ACME_CLIENT_LABELS, fips }), t)}
             helperText={t('acme.keyTypeHelper')}
           />
+          <BrainpoolNotice label={clientSettings.key_type} />
 
           <Select
             label={t('acme.accountKeyType')}

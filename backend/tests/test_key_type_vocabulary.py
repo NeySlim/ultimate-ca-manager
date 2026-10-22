@@ -2,40 +2,54 @@
 
 `services/template_service.TEMPLATE_KEY_TYPES` accepts RSA-2048/3072/4096 and
 EC-P256/384/521; `utils/key_type.RSA_SIZES` generates all three RSA sizes.
-`frontend/src/pages/PoliciesPage.jsx` offered five of the six, with
-**RSA-3072 missing**, and seeded a new policy's `allowed_key_types` with four
-of them. So an RSA-3072 template could be created and then refused at
-issuance by a policy, with no option on the policy screen to permit it.
+`frontend/src/pages/PoliciesPage.jsx` once offered five of the six, with
+**RSA-3072 missing**, so an RSA-3072 template could be created and then refused
+at issuance by a policy, with no option on the policy screen to permit it.
 
-`TemplatesPage.jsx` offers the six and is checked here too, so the screen
-that chooses a key type and the screen that permits one cannot drift apart.
+The screens now read one registry, `frontend/src/lib/keyAlgorithms.js`, which
+is checked here against the backend registry and its parsers: the screen that
+chooses a key type and the screen that permits one cannot drift apart.
 
 The vocabularies for a CA (`prime256v1`) and for SSH (`ed25519`) are
 deliberately different and are not in scope here; see the class at the end.
 """
+import json
 import os
-import re
+import shutil
+import subprocess
 
 import pytest
 
 from services.template_service import TEMPLATE_KEY_TYPES
+from utils import key_algorithms
+from utils.ca_profile import default_digest_for_key_type
+from utils.key_type import parse_csr_key_type, parse_issue_key_type
 
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
-POLICIES = os.path.join(_REPO, 'frontend', 'src', 'pages', 'PoliciesPage.jsx')
-TEMPLATES = os.path.join(_REPO, 'frontend', 'src', 'pages', 'TemplatesPage.jsx')
+REGISTRY = os.path.join(_REPO, 'frontend', 'src', 'lib', 'keyAlgorithms.js')
 
 # The labels a template stores; legacy spellings (`rsa:2048`, `ec:p256`) are
 # accepted on input and stored as these.
 CANONICAL = set(TEMPLATE_KEY_TYPES)
-# The editors list Brainpool once the frontend registry lands (phase 4.4).
-SCREEN_SET = {t for t in CANONICAL if not t.startswith('EC-BP')}
+SCREEN_SET = CANONICAL
 
 
-def _js_array(path, name):
-    source = open(path, encoding='utf-8').read()
-    match = re.search(rf'const {name}\s*=\s*\[(.*?)\n\]', source, re.S)
-    assert match, f'no {name} array in {os.path.basename(path)}'
-    return match.group(1)
+@pytest.fixture(scope='module')
+def js_registry():
+    """The frontend registry, evaluated by node (it has no imports)."""
+    node = shutil.which('node')
+    if node is None:
+        pytest.skip('node is not installed')
+    out = subprocess.run(
+        [node, '--input-type=module', '-e',
+         f"import {{ KEY_ALGORITHMS }} from {json.dumps('file://' + REGISTRY)};"
+         'console.log(JSON.stringify(KEY_ALGORITHMS))'],
+        capture_output=True, text=True, timeout=60, check=True)
+    return json.loads(out.stdout)
+
+
+def _generated(rows):
+    return [r for r in rows if r['generate']]
 
 
 class TestTheScreensOfferWhatTheApiAccepts:
@@ -44,33 +58,33 @@ class TestTheScreensOfferWhatTheApiAccepts:
                              'EC-P256', 'EC-P384', 'EC-P521',
                              'EC-BP256', 'EC-BP384', 'EC-BP512'}
 
-    def test_the_template_screen_offers_all_of_them(self):
-        body = _js_array(TEMPLATES, 'KEY_TYPE_OPTIONS')
-        offered = set(re.findall(r"'([A-Z][^']*)'", body))
+    def test_the_registry_the_screens_read_offers_all_of_them(self, js_registry):
+        offered = {r['label'] for r in _generated(js_registry)}
         assert offered == SCREEN_SET, (
-            f'the template editor offers {sorted(offered)} where the API '
-            f'accepts {sorted(SCREEN_SET)}')
-
-    def test_the_policy_screen_offers_all_of_them(self):
-        body = _js_array(POLICIES, 'KEY_TYPE_OPTIONS')
-        offered = set(re.findall(r"value: '([^']+)'", body))
-        assert offered == SCREEN_SET, (
-            f'the policy editor offers {sorted(offered)} where the API '
+            f'the screens offer {sorted(offered)} where the API '
             f'accepts {sorted(SCREEN_SET)}; a key type a template can ask for '
             'and a policy cannot permit is refused with no way to allow it')
 
-    def test_a_new_policy_permits_everything_the_api_accepts(self):
-        source = open(POLICIES, encoding='utf-8').read()
-        match = re.search(r'allowed_key_types:\s*(.+)', source)
-        assert match, 'no allowed_key_types default in the policy screen'
-        line = match.group(1)
-        if 'KEY_TYPE_OPTIONS' in line or line.strip().rstrip(',') == '[]':
-            return      # seeded from the list itself, or empty: no restriction
-        seeded = set(re.findall(r"'([^']+)'", line))
-        assert seeded == SCREEN_SET, (
-            f'a new policy is seeded permitting {sorted(seeded)}, so an '
-            f'{sorted(SCREEN_SET - seeded)} certificate is refused by the '
-            'default policy')
+    def test_each_row_matches_the_backend_registry(self, js_registry):
+        for row in js_registry:
+            backend = key_algorithms.get(row['label'])
+            assert backend is not None, row['label']
+            if backend.needs_digest:
+                # the digest 'auto' resolves to when a CA is created
+                assert row['digest'] == default_digest_for_key_type(backend.trust_store_id), row['label']
+            else:
+                assert row['digest'] is None, row['label']
+            assert row['fips'] == backend.fips_approved, row['label']
+
+    def test_each_form_value_parses_to_the_same_key(self, js_registry):
+        for row in _generated(js_registry):
+            expected = key_algorithms.get(row['label']).trust_store_id
+            assert parse_issue_key_type(*row['issue']) == expected, row['label']
+            assert parse_csr_key_type(row['csr']) == expected, row['label']
+            if row['ca'][0] == 'ECDSA':
+                assert parse_issue_key_type('ecdsa', row['ca'][1]) == expected, row['label']
+            else:
+                assert row['ca'][1] == expected, row['label']
 
 
 class TestTheOtherVocabulariesAreLeftAlone:

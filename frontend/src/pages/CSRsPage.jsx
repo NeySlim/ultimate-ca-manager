@@ -28,6 +28,9 @@ import { daysSinceExpiry, expiryVariant, hasExpiry } from '../lib/expiry'
 import { VALIDITY } from '../constants/config'
 import { signingCas } from '../lib/caSelection'
 import { soleImported } from '../lib/importResult'
+import { CSR_LABELS, KEY_ALGORITHMS, groupedOptions, listAlgorithms } from '../lib/keyAlgorithms'
+import { useFipsMode } from '../lib/policyAlgorithms'
+import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 export default function CSRsPage() {
   const { t } = useTranslation()
@@ -101,6 +104,7 @@ export default function CSRsPage() {
   const [genState, setGenState] = useState('')
   const [genLocality, setGenLocality] = useState('')
   const [genKeyType, setGenKeyType] = useState('RSA 2048')
+  const fips = useFipsMode()
   const [genSans, setGenSans] = useState([{ type: 'DNS', value: '' }])
   const [generating, setGenerating] = useState(false)
   
@@ -1147,16 +1151,12 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
           {/* Key Type */}
           <Select
             label={t('common.keyType')}
-            options={[
-              { value: 'RSA 2048', label: t('csrs.keyRsa2048') },
-              { value: 'RSA 4096', label: t('csrs.keyRsa4096') },
-              { value: 'EC P-256', label: t('csrs.keyCurveNistP256') },
-              { value: 'EC P-384', label: t('csrs.keyCurveNistP384') },
-              { value: 'EC P-521', label: t('csrs.keyCurveNistP521') },
-            ]}
+            options={groupedOptions(listAlgorithms({ labels: CSR_LABELS, fips }), t,
+              k => (k.csrKey ? t(k.csrKey) : k.display), k => k.csr)}
             value={genKeyType}
             onChange={setGenKeyType}
           />
+          <BrainpoolNotice label={KEY_ALGORITHMS.find(k => k.csr === genKeyType)?.label} />
 
           {/* Subject Details */}
           <details className="group">

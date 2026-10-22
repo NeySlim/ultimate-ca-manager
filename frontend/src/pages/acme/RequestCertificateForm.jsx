@@ -4,8 +4,11 @@ import { Warning, CloudArrowUp, MagnifyingGlass } from '@phosphor-icons/react'
 import { Input, Select, Button } from '../../components'
 import { useNotification } from '../../contexts'
 import { acmeService } from '../../services'
+import { ACME_CLIENT_LABELS, groupedOptions, listAlgorithms } from '../../lib/keyAlgorithms'
+import { useFipsMode } from '../../lib/policyAlgorithms'
+import { BrainpoolNotice } from '../../components/BrainpoolNotice'
 
-const KEY_TYPES = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384']
+const KEY_TYPES = ACME_CLIENT_LABELS
 
 export default function RequestCertificateForm({
   onSubmit,
@@ -20,6 +23,7 @@ export default function RequestCertificateForm({
 }) {
   const { t } = useTranslation()
   const { showWarning } = useNotification()
+  const fips = useFipsMode()
   const defaultCaAccountId = caAccounts.find(a => a.is_default)?.id ?? null
   const [formData, setFormData] = useState({
     domains: '',
@@ -256,15 +260,11 @@ export default function RequestCertificateForm({
           label={t('acme.keyType')}
           value={formData.key_type || ''}
           onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
-          options={[
-            { value: 'RSA-2048', label: 'RSA 2048' },
-            { value: 'RSA-4096', label: 'RSA 4096' },
-            { value: 'EC-P256', label: 'ECDSA P-256' },
-            { value: 'EC-P384', label: 'ECDSA P-384' },
-          ]}
+          options={groupedOptions(listAlgorithms({ labels: ACME_CLIENT_LABELS, fips }), t)}
           helperText={t('acme.keyTypeHelper')}
         />
       )}
+      {formData.key_source !== 'csr' && <BrainpoolNotice label={formData.key_type} />}
 
       <div className="p-3 rounded-lg border border-border bg-bg-secondary/50 space-y-3">
         <p className="text-sm font-medium text-text-primary">{t('acme.preflightTitle')}</p>

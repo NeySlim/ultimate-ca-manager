@@ -23,6 +23,17 @@ const EMPTY_VALUE = '__empty__'
 const toInternal = (v) => (v === '' ? EMPTY_VALUE : v)
 const fromInternal = (v) => (v === EMPTY_VALUE ? '' : v)
 
+// Consecutive options sharing `group` (a heading string) render under that heading
+function groupOptions(options) {
+  const out = []
+  for (const option of options) {
+    const last = out[out.length - 1]
+    if (last && last.heading === option.group) last.items.push(option)
+    else out.push({ heading: option.group, items: [option] })
+  }
+  return out
+}
+
 const sizes = {
   sm: {
     trigger: 'h-7 px-2 text-xs gap-1',
@@ -134,26 +145,36 @@ export function Select({
             align="start"
           >
             <SelectPrimitive.Viewport className="p-1 max-h-60 overflow-auto">
-              {options.map(option => (
-                <SelectPrimitive.Item
-                  key={toInternal(option.value)}
-                  value={toInternal(option.value)}
-                  disabled={option.disabled}
-                  className={cn(
-                    "flex items-center gap-2 rounded-md cursor-pointer outline-none",
-                    "transition-colors duration-100",
-                    "text-text-primary",
-                    "hover:bg-tertiary-op80 data-[highlighted]:bg-tertiary-op80",
-                    "data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
-                    sizeConfig.item
-                  )}
-                >
-                  <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
-                  <SelectPrimitive.ItemIndicator className="ml-auto">
-                    <Check size={sizeConfig.icon} className="text-accent-primary" />
-                  </SelectPrimitive.ItemIndicator>
-                </SelectPrimitive.Item>
-              ))}
+              {groupOptions(options).map(({ heading, items }, i) => {
+                const rendered = items.map(option => (
+                  <SelectPrimitive.Item
+                    key={toInternal(option.value)}
+                    value={toInternal(option.value)}
+                    disabled={option.disabled}
+                    className={cn(
+                      "flex items-center gap-2 rounded-md cursor-pointer outline-none",
+                      "transition-colors duration-100",
+                      "text-text-primary",
+                      "hover:bg-tertiary-op80 data-[highlighted]:bg-tertiary-op80",
+                      "data-[disabled]:opacity-50 data-[disabled]:cursor-not-allowed",
+                      sizeConfig.item
+                    )}
+                  >
+                    <SelectPrimitive.ItemText>{option.label}</SelectPrimitive.ItemText>
+                    <SelectPrimitive.ItemIndicator className="ml-auto">
+                      <Check size={sizeConfig.icon} className="text-accent-primary" />
+                    </SelectPrimitive.ItemIndicator>
+                  </SelectPrimitive.Item>
+                ))
+                return heading ? (
+                  <SelectPrimitive.Group key={`g${i}`}>
+                    <SelectPrimitive.Label className="px-2.5 pt-1.5 pb-1 text-xs font-semibold text-text-tertiary">
+                      {heading}
+                    </SelectPrimitive.Label>
+                    {rendered}
+                  </SelectPrimitive.Group>
+                ) : rendered
+              })}
             </SelectPrimitive.Viewport>
           </SelectPrimitive.Content>
         </SelectPrimitive.Portal>

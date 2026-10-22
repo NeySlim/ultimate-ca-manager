@@ -18,10 +18,11 @@ import { extractData, cn, downloadBlob } from '../../lib/utils'
 import { signingCas } from '../../lib/caSelection'
 import { CA_KEY_CHOICES, POLICY_DIGESTS, caKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 import { PSS_HSM_TYPES } from '../../lib/signatureName'
+import { KEY_ALGORITHMS, defaultDigestFor, groupedOptions, listAlgorithms } from '../../lib/keyAlgorithms'
+import { BrainpoolNotice } from '../../components/BrainpoolNotice'
 import { COMPLIANCE_PROFILE_NAMES, limitsWithProfile, useComplianceDefault, useComplianceProfiles } from '../../lib/complianceProfiles'
 
-const HSM_KEY_ALGORITHMS = ['RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521']
-
+const EC_CA_ALGORITHMS = KEY_ALGORITHMS.filter(k => k.ca && k.ca[0] === 'ECDSA')
 const VALIDITY_YEAR_PRESETS = [1, 2, 3, 5, 10, 15, 20]
 const CUSTOM_VALIDITY = 'custom'
 const DEFAULT_KEY_SIZE = { RSA: '3072', ECDSA: 'prime256v1' }
@@ -89,14 +90,6 @@ function NameConstraintRows({ label, hint, addLabel, rows, onChange }) {
       {hint && <p className="text-xs text-text-tertiary">{hint}</p>}
     </fieldset>
   )
-}
-
-function suggestedDigest(keyAlgo, keySize) {
-  if (keyAlgo === 'ECDSA') {
-    if (keySize === 'secp384r1') return 'sha384'
-    if (keySize === 'secp521r1') return 'sha512'
-  }
-  return 'sha256'
 }
 
 export function CreateCAModal({ open, onClose, cas, onSuccess }) {
@@ -214,19 +207,19 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     useMemo(() => limitsWithProfile(policyLimits, profile), [policyLimits, profile])
   // eu-acm: the CA key lives on an HSM
   const keyStorage = requireHsm ? 'hsm' : createFormKeyStorage
+  const fips = policyLimits.fips
   const allowedLocalKeys = useMemo(
-    () => CA_KEY_CHOICES.filter(([algo, size]) => isAllowed(allowedKeyTypes, caKeyLabel(algo, size))),
-    [allowedKeyTypes],
+    () => CA_KEY_CHOICES.filter(([algo, size]) => isAllowed(allowedKeyTypes, caKeyLabel(algo, size))
+      && (!fips || listAlgorithms({ labels: [caKeyLabel(algo, size)], fips: true }).length > 0)),
+    [allowedKeyTypes, fips],
   )
   const allowedDigestChoices = useMemo(
     () => POLICY_DIGESTS.filter(d => isAllowed(allowedDigests, d)), [allowedDigests])
   const noKeyAllowed = allowedLocalKeys.length === 0
   const noDigestAllowed = allowedDigestChoices.length === 0
   // 'auto' resolves like the server: the key's own digest when allowed, else the weakest allowed
-  const suggested = suggestedDigest(createFormKeyAlgo, createFormKeySize)
+  const suggested = defaultDigestFor(createFormKeyAlgo, createFormKeySize)
   const autoDigest = allowedDigestChoices.includes(suggested) ? suggested : allowedDigestChoices[0]
-  const hsmAlgorithmOptions = useMemo(
-    () => HSM_KEY_ALGORITHMS.filter(a => isAllowed(allowedKeyTypes, a)), [allowedKeyTypes])
   const validityDaysValue = createFormValidity === CUSTOM_VALIDITY
     ? parseInt(createFormValidityDays) : parseInt(createFormValidity) * 365
   // Load HSM signing keys when provider selected and "use existing" mode active
@@ -251,6 +244,12 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const rsa2048PastHorizon = createFormType !== 'external' && usesRsa2048
     && Number.isFinite(validityDaysValue) && Date.now() + validityDaysValue * 86400000 >= RSA_2048_HORIZON
   const hsmProviderType = hsmProviders.find(p => String(p.id) === createFormHsmProviderId)?.provider_type
+  // Brainpool only on a PKCS#11 provider; none shown until a provider is chosen
+  const hsmAlgorithms = useMemo(
+    () => listAlgorithms({ generate: true, provider: hsmProviderType ?? '', fips })
+      .filter(a => isAllowed(allowedKeyTypes, a.label)),
+    [allowedKeyTypes, hsmProviderType, fips])
+  const hsmAlgorithmOptions = useMemo(() => hsmAlgorithms.map(a => a.label), [hsmAlgorithms])
   const keyIsRsa = keyStorage === 'local'
     ? createFormKeyAlgo === 'RSA'
     : createFormHsmKeyMode === 'generate'
@@ -501,15 +500,13 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
             />
             <Select
               label={t('common.keySize')}
-              options={(createFormKeyAlgo === 'ECDSA' ? [
-                { value: 'prime256v1', label: 'P-256 (256 bits)' },
-                { value: 'secp384r1', label: 'P-384 (384 bits)' },
-                { value: 'secp521r1', label: 'P-521 (521 bits)' }
-              ] : [
-                { value: '2048', label: '2048 bits' },
-                { value: '3072', label: '3072 bits' },
-                { value: '4096', label: '4096 bits' }
-              ]).filter(o => noKeyAllowed || allowedLocalKeys.some(([a, sz]) => a === createFormKeyAlgo && sz === o.value))}
+              options={(createFormKeyAlgo === 'ECDSA'
+                ? groupedOptions(EC_CA_ALGORITHMS, t, k => k.display, k => k.ca[1])
+                : [
+                  { value: '2048', label: '2048 bits' },
+                  { value: '3072', label: '3072 bits' },
+                  { value: '4096', label: '4096 bits' }
+                ]).filter(o => noKeyAllowed || allowedLocalKeys.some(([a, sz]) => a === createFormKeyAlgo && sz === o.value))}
               value={createFormKeySize}
               onChange={(value) => setCreateFormKeySize(value)}
             />
@@ -539,6 +536,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         {noDigestAllowed && (
           <p className="text-xs text-status-danger" role="alert">{t('cas.create.noDigestAllowedByPolicy')}</p>
         )}
+        {createFormType !== 'external' && <BrainpoolNotice label={horizonLabel} />}
         {pastProfileHorizon && (
           <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
             {t('cas.create.profileHorizon', { key: horizonLabel, date: profileHorizon })}
@@ -621,7 +619,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
                   />
                   <Select
                     label={t('cas.create.hsmKeyAlgorithm')}
-                    options={hsmAlgorithmOptions.map(a => ({ value: a, label: a }))}
+                    options={groupedOptions(hsmAlgorithms, t, a => a.label)}
                     value={createFormHsmKeyAlgorithm}
                     onChange={(v) => setCreateFormHsmKeyAlgorithm(v)}
                   />

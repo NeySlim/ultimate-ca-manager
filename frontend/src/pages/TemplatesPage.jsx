@@ -21,6 +21,9 @@ import { useNotification, useMobile } from '../contexts'
 import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { VALIDITY } from '../constants/config'
+import { listAlgorithms, groupedOptions } from '../lib/keyAlgorithms'
+import { useFipsMode } from '../lib/policyAlgorithms'
+import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { ekuService } from '../services/eku.service'
 const SHOW_SYSTEM_KEY = 'ucm-templates-show-system'
 
@@ -676,7 +679,6 @@ const TEMPLATE_TYPE_OPTIONS = [
   'web_server', 'email', 'vpn_server', 'vpn_client',
   'code_signing', 'client_auth', 'ocsp_signing', 'smartcard_logon', 'custom'
 ]
-const KEY_TYPE_OPTIONS = ['RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521']
 const DIGEST_OPTIONS = ['sha256', 'sha384', 'sha512']
 const KEY_USAGE_OPTIONS = [
   'digitalSignature', 'keyEncipherment', 'contentCommitment',
@@ -768,6 +770,11 @@ function TemplateForm({ template, onSubmit, onCancel }) {
   const [formData, setFormData] = useState(() => buildInitialState(template))
   const [loading, setLoading] = useState(false)
   const [ekuOptions, setEkuOptions] = useState(EXT_KEY_USAGE_FALLBACK)
+  const fips = useFipsMode()
+  // The key already on the template stays listed, so FIPS mode never blanks the field
+  const keyTypeOptions = useMemo(() => groupedOptions(
+    listAlgorithms({ generate: true }).filter(a => !fips || a.fips || a.label === formData.key_type),
+    t, a => a.label), [fips, t, formData.key_type])
 
   useEffect(() => {
     let cancelled = false
@@ -871,7 +878,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
             label={t('common.keyType')}
             value={formData.key_type}
             onChange={(val) => set('key_type', val)}
-            options={KEY_TYPE_OPTIONS.map(v => ({ value: v, label: v }))}
+            options={keyTypeOptions}
           />
           <Select
             label="Digest"
@@ -880,6 +887,7 @@ function TemplateForm({ template, onSubmit, onCancel }) {
             options={DIGEST_OPTIONS.map(v => ({ value: v, label: v.toUpperCase() }))}
           />
         </div>
+        <div className="mt-2"><BrainpoolNotice label={formData.key_type} /></div>
       </div>
 
       {/* Validity */}

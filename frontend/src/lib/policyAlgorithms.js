@@ -5,6 +5,7 @@
 import { useEffect, useState } from 'react'
 import { policiesService } from '../services'
 import { extractData } from './utils'
+import { KEY_ALGORITHMS } from './keyAlgorithms'
 
 export const POLICY_DIGESTS = ['sha256', 'sha384', 'sha512']
 
@@ -13,29 +14,17 @@ export function isAllowed(allowed, value) {
 }
 
 // Issue form fields ('rsa' + '2048', 'ecdsa' + '384') <-> policy labels
-const ISSUE_EC_SIZES = { '256': 'P256', '384': 'P384', '521': 'P521' }
-export const ISSUE_KEY_CHOICES = [
-  ['rsa', '2048'], ['rsa', '3072'], ['rsa', '4096'],
-  ['ecdsa', '256'], ['ecdsa', '384'], ['ecdsa', '521'],
-]
+export const ISSUE_KEY_CHOICES = KEY_ALGORITHMS.filter(a => a.issue).map(a => a.issue)
 
 export function issueKeyLabel(keyType, keySize) {
-  if (keyType === 'rsa') return `RSA-${keySize}`
-  if (keyType === 'ecdsa') return ISSUE_EC_SIZES[keySize] ? `EC-${ISSUE_EC_SIZES[keySize]}` : null
-  return null
+  return KEY_ALGORITHMS.find(a => a.issue && a.issue[0] === keyType && a.issue[1] === keySize)?.label ?? null
 }
 
 // CA form fields ('RSA' + '2048', 'ECDSA' + 'secp384r1') <-> policy labels
-const CA_EC_CURVES = { prime256v1: 'P256', secp384r1: 'P384', secp521r1: 'P521' }
-export const CA_KEY_CHOICES = [
-  ['RSA', '2048'], ['RSA', '3072'], ['RSA', '4096'],
-  ['ECDSA', 'prime256v1'], ['ECDSA', 'secp384r1'], ['ECDSA', 'secp521r1'],
-]
+export const CA_KEY_CHOICES = KEY_ALGORITHMS.filter(a => a.ca).map(a => a.ca)
 
 export function caKeyLabel(keyAlgo, keySize) {
-  if (keyAlgo === 'RSA') return `RSA-${keySize}`
-  if (keyAlgo === 'ECDSA') return CA_EC_CURVES[keySize] ? `EC-${CA_EC_CURVES[keySize]}` : null
-  return null
+  return KEY_ALGORITHMS.find(a => a.ca && a.ca[0] === keyAlgo && a.ca[1] === keySize)?.label ?? null
 }
 
 /**
@@ -43,7 +32,7 @@ export function caKeyLabel(keyAlgo, keySize) {
  * A failed lookup leaves the form unrestricted: the server enforces the rules anyway.
  */
 export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
-  const [state, setState] = useState({ allowedKeyTypes: null, allowedDigests: null })
+  const [state, setState] = useState({ allowedKeyTypes: null, allowedDigests: null, fips: false })
   useEffect(() => {
     if (!enabled) return undefined
     let cancelled = false
@@ -55,10 +44,11 @@ export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
         setState({
           allowedKeyTypes: Array.isArray(data.allowed_key_types) ? data.allowed_key_types : null,
           allowedDigests: Array.isArray(data.allowed_digests) ? data.allowed_digests : null,
+          fips: data.fips === true,
         })
       })
       .catch(() => {
-        if (!cancelled) setState({ allowedKeyTypes: null, allowedDigests: null })
+        if (!cancelled) setState({ allowedKeyTypes: null, allowedDigests: null, fips: false })
       })
     return () => { cancelled = true }
   }, [caId, templateId, enabled])

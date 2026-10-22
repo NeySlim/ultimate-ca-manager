@@ -20,6 +20,9 @@ import { usePermission, useClipboard } from '../hooks'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { pickerCas } from '../lib/caSelection'
 import { certificateLabel } from '../lib/utils'
+import { TSA_LABELS, groupedOptions, listAlgorithms, signerKeyParams } from '../lib/keyAlgorithms'
+import { useFipsMode } from '../lib/policyAlgorithms'
+import { BrainpoolNotice } from '../components/BrainpoolNotice'
 
 export default function TSAPage() {
   const { t } = useTranslation()
@@ -37,6 +40,7 @@ export default function TSAPage() {
   const [generateOpen, setGenerateOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genForm, setGenForm] = useState(null)
+  const fips = useFipsMode()
 
   useEffect(() => {
     loadData()
@@ -92,10 +96,7 @@ export default function TSAPage() {
     if (!genForm) return
     setGenerating(true)
     try {
-      const kt = genForm.key_type || 'RSA-3072'
-      const dash = kt.indexOf('-')
-      const algo = dash === -1 ? kt : kt.slice(0, dash)
-      const rest = dash === -1 ? '' : kt.slice(dash + 1)
+      const key = signerKeyParams(genForm.key_type || 'RSA-3072')
       const res = await tsaService.issueSignerCertificate({
         ca_refid: genForm.ca_refid || undefined,
         cn: genForm.cn || undefined,
@@ -106,9 +107,7 @@ export default function TSAPage() {
           String(genForm.validity_days ?? '').trim() === ''
             ? undefined
             : Number(genForm.validity_days),
-        key_type: algo,
-        key_size: algo === 'RSA' ? rest : undefined,
-        curve: algo === 'EC' ? rest : undefined,
+        ...key,
       })
       setGenerateOpen(false)
       showSuccess(
@@ -388,16 +387,11 @@ export default function TSAPage() {
               />
               <Select
                 label={t('tsa.signerGenerateKeyType')}
-                options={[
-                  { value: 'RSA-3072', label: 'RSA 3072' },
-                  { value: 'RSA-2048', label: 'RSA 2048' },
-                  { value: 'RSA-4096', label: 'RSA 4096' },
-                  { value: 'EC-P-256', label: 'EC P-256' },
-                  { value: 'EC-P-384', label: 'EC P-384' },
-                ]}
+                options={groupedOptions(listAlgorithms({ labels: TSA_LABELS, fips }), t, k => k.display)}
                 value={genForm.key_type}
                 onChange={(val) => setGenForm({ ...genForm, key_type: val })}
               />
+              <BrainpoolNotice label={genForm.key_type} />
               <p className="text-xs text-text-tertiary">{t('tsa.signerGenerateRenewalNote')}</p>
             </FormModal>
           )}

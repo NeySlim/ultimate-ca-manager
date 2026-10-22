@@ -384,6 +384,13 @@
     "help": "Aiuto",
     "theme": "Tema",
     "menu": "Menu",
+    "keyGroups": {
+      "rsa": "RSA",
+      "nist": "Curve NIST",
+      "brainpool": "Brainpool (RFC 5639)",
+      "eddsa": "EdDSA",
+      "brainpoolWarning": "Le catene e le firme Brainpool sono lette da OpenSSL e Windows. Come chiave di un server TLS è rifiutata da Chrome e Chromium, Firefox, Go, rustls, GnuTLS e Java senza Bouncy Castle, e Windows Schannel non abilita queste curve per impostazione predefinita."
+    },
     "keyTypes": {
       "rsa2048": "RSA 2048 bit",
       "rsa3072": "RSA 3072 bit",

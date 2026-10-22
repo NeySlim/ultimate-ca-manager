@@ -24,6 +24,7 @@ export default {
           { label: 'System anzeigen', text: 'Die mitgelieferten Templates ausblenden, um nur mit Ihren eigenen zu arbeiten. Wird pro Browser gespeichert' },
           { label: 'Import/Export', text: 'Templates als JSON-Dateien zwischen UCM-Instanzen teilen, ein Template oder mehrere in einer Datei' },
           { label: 'Schlüsseltyp', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 oder EC-P521, mit einem Digest SHA-256, SHA-384 oder SHA-512' },
+          { label: 'Brainpool', text: 'EC-BP256, EC-BP384 und EC-BP512 (RFC 5639, in Schlüsseltyp-Listen unter Brainpool aufgeführt, im FIPS-Modus ausgeblendet). OpenSSL und Windows lesen ihre Ketten und Signaturen, aber Chrome, Firefox, Go, rustls, GnuTLS und Java ohne Bouncy Castle lehnen sie für TLS ab, und Windows Schannel aktiviert sie standardmäßig nicht. Auf einem HSM halten nur PKCS#11-Provider sie vor' },
         ]
       },
       {
