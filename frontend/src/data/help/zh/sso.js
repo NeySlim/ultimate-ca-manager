@@ -13,6 +13,7 @@ export default {
           { label: 'Entity ID', text: 'UCM 服务提供商实体标识符' },
           { label: 'ACS URL', text: '断言消费者服务回调 URL' },
           { label: '属性映射', text: '左列：IdP 发送的属性名称。右列：对应填充的 UCM 字段（username、email、fullname 或 groups）。示例：user.userprincipalname → username。' },
+          { label: '用于角色映射的组', text: '从映射到 groups 的属性中读取；否则从 groups 以及 Microsoft Entra ID / AD FS 的组和角色声明中读取。当 Entra ID 发送 groups.link 而不是组（用户属于超过 150 个组）时，会记录一条警告并应用默认角色：请只发出分配给该应用程序的组，或应用角色。' },
           { label: '由 IdP 发起的登录', text: '接受从 IdP 门户发起的登录，与其他响应一样进行校验。2.243 之前创建的提供商默认开启，新提供商默认关闭：仅当用户从 IdP 门户开始登录时才开启。' },
           { label: 'NameID 格式', text: '未指定（IdP 默认）、持久 (persistent)、电子邮件地址或临时 (transient)：随每个登录请求发送，并发布在 SP 元数据中。持久格式提供稳定的标识符；临时 NameID 绝不用于识别账户。' },
         ]
@@ -31,7 +32,7 @@ export default {
         title: '角色配置 (#81)',
         items: [
           { label: '默认角色', text: '仅在用户首次 SSO 登录被自动创建时应用。之后在 UCM 中所做的角色更改会被保留。' },
-          { label: '角色映射', text: '将外部组（Azure AD、Okta、LDAP）映射到 UCM 角色（admin / operator / viewer）。在用户创建时使用；启用角色同步后，每次登录时也会使用。多个组匹配时，权限最高的角色胜出（admin > operator > auditor > viewer）,, 条目顺序无关紧要 (#221)。每个组还可以指定一个自定义角色（从现有自定义角色中选择）：它会添加到基础角色之上，或单独使用。如果多个匹配的组都指定了自定义角色，则以列表中第一个为准。启用角色同步后，若没有任何组指定自定义角色，则由 SSO 设置的自定义角色会被移除；在 UCM 中手动分配的自定义角色不会被改动。' },
+          { label: '角色映射', text: '将外部组（Azure AD、Okta、LDAP）映射到 UCM 角色（admin / operator / viewer）。在用户创建时使用；启用角色同步后，每次登录时也会使用。多个组匹配时，权限最高的角色胜出（admin > operator > auditor > viewer），条目顺序无关紧要 (#221)。每个组还可以指定一个自定义角色（从现有自定义角色中选择）：它会添加到基础角色之上，或单独使用。如果多个匹配的组都指定了自定义角色，则以列表中第一个为准。启用角色同步后，若没有任何组指定自定义角色，则由 SSO 设置的自定义角色会被移除；在 UCM 中手动分配的自定义角色不会被改动。系统角色不能用作自定义角色。' },
           { label: '每次登录时同步角色', text: '关闭（默认）：SSO 绝不覆盖由 UCM 管理的角色。开启：每次登录时从 role_mapping 重新同步角色；没有映射匹配的用户保留其已存储的角色（default_role 绝不会被重新应用）。' },
           { label: '自动更新用户', text: '每次登录时更新邮箱和全名。不会改动角色。' },
         ]
