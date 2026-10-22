@@ -123,6 +123,15 @@ def _require_pkcs10_content_type():
     return None
 
 
+def _b64_body(data):
+    """Base64 for an EST response body (RFC 7030 Content-Transfer-Encoding:
+    base64, RFC 2045): lines of 64 characters, under the 76-character limit
+    of RFC 2045 section 6.8. One unbroken line is refused by decoders built on
+    OpenSSL's base64 BIO, the FortiOS EST client among them."""
+    text = base64.b64encode(data).decode('ascii')
+    return ''.join(text[i:i + 64] + '\n' for i in range(0, len(text), 64))
+
+
 def _decode_est_csr(csr_data):
     """Decode a PKCS#10 request: base64 DER per RFC 7030, with a PEM
     fallback for legacy clients that post the CSR as-is."""
@@ -151,7 +160,7 @@ def _certs_only_base64(cert):
     der = pkcs7.serialize_certificates(
         [cert], encoding=_crypto_serialization.Encoding.DER
     )
-    return base64.b64encode(der).decode('ascii')
+    return _b64_body(der)
 
 
 def _certs_only_response(cert, ca=None):
@@ -186,7 +195,7 @@ def _certs_only_response(cert, ca=None):
         certs, encoding=_crypto_serialization.Encoding.DER
     )
     return Response(
-        base64.b64encode(der).decode('ascii'),
+        _b64_body(der),
         status=200,
         content_type=PKCS7_CERTS_ONLY,
         headers={'Content-Transfer-Encoding': 'base64'},
@@ -617,7 +626,7 @@ def get_ca_certs(label=None):
         
         # Serialize as PKCS#7 degenerate (certs-only)
         p7_der = pkcs7.serialize_certificates(certs, encoding=_crypto_serialization.Encoding.DER)
-        p7_b64 = base64.b64encode(p7_der).decode()
+        p7_b64 = _b64_body(p7_der)
         
         return Response(
             p7_b64,
@@ -849,7 +858,7 @@ def get_csr_attrs(label=None):
     # Request the descriptive certificate extensions as values of an
     # extensionRequest Attribute.
     der_bytes = _build_csrattrs_der()
-    b64_content = base64.b64encode(der_bytes).decode('ascii')
+    b64_content = _b64_body(der_bytes)
     return Response(
         b64_content,
         status=200,
@@ -1040,7 +1049,7 @@ def server_keygen(label=None):
             key_content_type = (
                 'application/pkcs7-mime; smime-type=server-generated-key'
             )
-        key_b64 = base64.b64encode(key_der).decode('ascii')
+        key_b64 = _b64_body(key_der)
         
         # Create multipart response
         boundary = 'est-boundary-' + str(serial)[:8]
