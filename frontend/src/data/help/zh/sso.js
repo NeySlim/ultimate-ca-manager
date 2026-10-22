@@ -12,7 +12,7 @@ export default {
           { label: 'SP 证书', text: '元数据中包含的 UCM HTTPS 证书,, 必须被 IDP 信任，否则元数据将被拒绝' },
           { label: 'Entity ID', text: 'UCM 服务提供商实体标识符' },
           { label: 'ACS URL', text: '断言消费者服务回调 URL' },
-          { label: '属性映射', text: '将 IDP 属性映射到 UCM 用户字段' },
+          { label: '属性映射', text: '左列：IdP 发送的属性名称。右列：对应填充的 UCM 字段（username、email、fullname 或 groups）。示例：user.userprincipalname → username。' },
           { label: '由 IdP 发起的登录', text: '接受从 IdP 门户发起的登录，与其他响应一样进行校验。2.243 之前创建的提供商默认开启，新提供商默认关闭：仅当用户从 IdP 门户开始登录时才开启。' },
           { label: 'NameID 格式', text: '未指定（IdP 默认）、持久 (persistent)、电子邮件地址或临时 (transient)：随每个登录请求发送，并发布在 SP 元数据中。持久格式提供稳定的标识符；临时 NameID 绝不用于识别账户。' },
         ]
@@ -31,7 +31,7 @@ export default {
         title: '角色配置 (#81)',
         items: [
           { label: '默认角色', text: '仅在用户首次 SSO 登录被自动创建时应用。之后在 UCM 中所做的角色更改会被保留。' },
-          { label: '角色映射', text: '将外部组（Azure AD、Okta、LDAP）映射到 UCM 角色（admin / operator / viewer）。在用户创建时使用；启用角色同步后，每次登录时也会使用。多个组匹配时，权限最高的角色胜出（admin > operator > auditor > viewer）,, 条目顺序无关紧要 (#221)。' },
+          { label: '角色映射', text: '将外部组（Azure AD、Okta、LDAP）映射到 UCM 角色（admin / operator / viewer）。在用户创建时使用；启用角色同步后，每次登录时也会使用。多个组匹配时，权限最高的角色胜出（admin > operator > auditor > viewer）,, 条目顺序无关紧要 (#221)。每个组还可以指定一个自定义角色（从现有自定义角色中选择）：它会添加到基础角色之上，或单独使用。如果多个匹配的组都指定了自定义角色，则以列表中第一个为准。启用角色同步后，若没有任何组指定自定义角色，则由 SSO 设置的自定义角色会被移除；在 UCM 中手动分配的自定义角色不会被改动。' },
           { label: '每次登录时同步角色', text: '关闭（默认）：SSO 绝不覆盖由 UCM 管理的角色。开启：每次登录时从 role_mapping 重新同步角色；没有映射匹配的用户保留其已存储的角色（default_role 绝不会被重新应用）。' },
           { label: '自动更新用户', text: '每次登录时更新邮箱和全名。不会改动角色。' },
         ]
@@ -43,7 +43,7 @@ export default {
           { label: '绑定 DN', text: '用于 LDAP 绑定认证的可分辨名称' },
           { label: '基础 DN', text: '用户查找的搜索基础' },
           { label: '用户筛选器', text: '匹配用户的 LDAP 筛选器（例如 (uid={username})）' },
-          { label: '属性映射', text: '将 LDAP 属性映射到用户名、邮箱、全名' },
+          { label: '属性映射', text: '将 LDAP 属性映射到 UCM 字段：用户名、邮箱、全名。' },
         ]
       },
     ],

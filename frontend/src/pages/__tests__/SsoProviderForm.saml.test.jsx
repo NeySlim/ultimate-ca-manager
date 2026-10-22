@@ -24,6 +24,7 @@ vi.mock('../../services', () => ({
     getSamlCertificates: vi.fn(() => Promise.resolve({ data: [] })),
     getSamlSpInfo: vi.fn(() => Promise.resolve({ data: mockSpInfo })),
   },
+  rolesService: { listRoles: vi.fn(() => Promise.resolve({ data: [] })) },
 }))
 
 import SsoProviderForm from '../settings/SsoProviderForm'

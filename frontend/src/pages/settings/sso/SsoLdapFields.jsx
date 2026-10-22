@@ -2,7 +2,7 @@ import { useTranslation } from 'react-i18next'
 import { Plugs, MagnifyingGlass, UsersThree, UserPlus, Play, ShieldWarning } from '@phosphor-icons/react'
 import { Button, Input, Select, Badge, LoadingSpinner, CompactSection } from '../../../components'
 import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
-import MappingEditor from '../MappingEditor'
+import RoleMappingEditor from '../RoleMappingEditor'
 
 export default function SsoLdapFields({
   formData,
@@ -17,6 +17,7 @@ export default function SsoLdapFields({
   handleTestConnection,
   handleTestMapping,
   roleOptions,
+  customRoles,
   setFormData,
   secretProps,
 }) {
@@ -209,13 +210,13 @@ export default function SsoLdapFields({
           <div className="pt-1">
             <p className="text-xs font-medium text-text-secondary mb-2">{t('sso.roleMapping')}</p>
             <p className="text-xs text-text-muted mb-2">{t('sso.roleMappingHelp')}</p>
-            <MappingEditor
+            <RoleMappingEditor
               value={formData.role_mapping}
               onChange={val => handleChange('role_mapping', val)}
               keyLabel={t('sso.externalGroup')}
-              valueLabel={t('sso.ucmRole')}
               keyPlaceholder="e.g., pki-admins"
-              valueOptions={roleOptions}
+              roleOptions={roleOptions}
+              customRoles={customRoles}
             />
           </div>
           {provider?.id && (

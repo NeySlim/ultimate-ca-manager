@@ -12,7 +12,7 @@ export default {
           { label: 'Certificato SP', text: 'Il certificato HTTPS UCM incluso nei metadati, deve essere fidato dall\'IDP o i metadati verranno rifiutati' },
           { label: 'Entity ID', text: 'Identificatore del service provider UCM' },
           { label: 'URL ACS', text: 'URL di callback Assertion Consumer Service' },
-          { label: 'Mappatura attributi', text: 'Mappa gli attributi IDP ai campi utente UCM' },
+          { label: 'Mappatura attributi', text: 'Colonna sinistra: il nome dell\'attributo inviato dall\'IdP. Colonna destra: il campo UCM che compila (username, email, fullname o groups). Esempio: user.userprincipalname → username.' },
           { label: 'Accesso avviato dall\'IdP', text: 'Accetta gli accessi avviati dal portale dell\'IdP, verificati come qualsiasi altra risposta. Attivo per i provider creati prima della 2.243, disattivato per i nuovi: attivalo solo se gli utenti partono dal portale dell\'IdP.' },
           { label: 'Formato NameID', text: 'Non specificato (predefinito dell\'IdP), Persistente, Indirizzo e-mail o Transitorio: inviato in ogni richiesta di accesso e pubblicato nei metadati SP. Persistente fornisce un identificatore stabile; un NameID transitorio non viene mai usato per riconoscere l\'account.' },
         ]
@@ -31,7 +31,7 @@ export default {
         title: 'Provisioning dei ruoli (#81)',
         items: [
           { label: 'Ruolo predefinito', text: 'Applicato SOLO quando un utente viene creato automaticamente al primo accesso SSO. Le modifiche di ruolo effettuate in seguito in UCM vengono preservate.' },
-          { label: 'Mappatura ruoli', text: 'Mappa i gruppi esterni (Azure AD, Okta, LDAP) → ruoli UCM (admin / operator / viewer). Usata alla creazione dell\'utente e a ogni accesso quando la sincronizzazione dei ruoli è abilitata. Se più gruppi corrispondono, vince il ruolo con più privilegi (admin > operator > auditor > viewer): l\'ordine delle voci non conta (#221).' },
+          { label: 'Mappatura ruoli', text: 'Mappa i gruppi esterni (Azure AD, Okta, LDAP) → ruoli UCM (admin / operator / viewer). Usata alla creazione dell\'utente e a ogni accesso quando la sincronizzazione dei ruoli è abilitata. Se più gruppi corrispondono, vince il ruolo con più privilegi (admin > operator > auditor > viewer): l\'ordine delle voci non conta (#221). Ogni gruppo può indicare anche un ruolo personalizzato (scelto tra quelli esistenti): viene aggiunto al ruolo di base, oppure usato da solo. Se più gruppi corrispondenti indicano un ruolo personalizzato, vince il primo dell\'elenco. Con la sincronizzazione dei ruoli attiva, un ruolo personalizzato impostato da SSO viene rimosso quando nessun gruppo ne indica uno; un ruolo personalizzato assegnato a mano in UCM non viene mai toccato.' },
           { label: 'Sincronizza ruolo a ogni accesso', text: 'OFF (predefinito): SSO non sovrascrive mai i ruoli gestiti in UCM. ON: il ruolo viene risincronizzato da role_mapping a ogni accesso; gli utenti senza corrispondenza nella mappatura mantengono il ruolo memorizzato (default_role non viene mai riapplicato).' },
           { label: 'Aggiornamento automatico utenti', text: 'Aggiorna email e nome completo a ogni accesso. NON tocca il ruolo.' },
         ]

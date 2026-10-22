@@ -4,6 +4,7 @@ import { Button, Input, Select, Textarea, LoadingSpinner, CompactSection } from 
 import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import CopyableUrl from '../CopyableUrl'
 import MappingEditor from '../MappingEditor'
+import RoleMappingEditor from '../RoleMappingEditor'
 
 export default function SsoOAuth2Fields({
   formData,
@@ -14,6 +15,7 @@ export default function SsoOAuth2Fields({
   oauth2Preset,
   applyOAuth2Preset,
   roleOptions,
+  customRoles,
   oauthCallbackUrl,
   handleTestConnection,
   secretProps,
@@ -131,13 +133,13 @@ export default function SsoOAuth2Fields({
           <div className="pt-2 border-t border-border">
             <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.roleMapping')}</p>
             <p className="text-xs text-text-muted mb-2">{t('sso.roleMappingHelp')}</p>
-            <MappingEditor
+            <RoleMappingEditor
               value={formData.role_mapping}
               onChange={val => handleChange('role_mapping', val)}
               keyLabel={t('sso.externalGroup')}
-              valueLabel={t('sso.ucmRole')}
               keyPlaceholder="e.g., pki-admins"
-              valueOptions={roleOptions}
+              roleOptions={roleOptions}
+              customRoles={customRoles}
             />
           </div>
         </div>

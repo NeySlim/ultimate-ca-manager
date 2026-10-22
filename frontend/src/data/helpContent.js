@@ -1332,7 +1332,7 @@ export const helpContent = {
           { label: 'SP Certificate', text: 'UCM HTTPS certificate included in metadata, must be trusted by the IDP or metadata will be rejected' },
           { label: 'Entity ID', text: 'UCM service provider entity identifier' },
           { label: 'ACS URL', text: 'Assertion Consumer Service callback URL' },
-          { label: 'Attribute Mapping', text: 'Map IDP attributes to UCM user fields' },
+          { label: 'Attribute Mapping', text: 'Left column: the attribute name sent by the IdP. Right column: the UCM field it fills (username, email, fullname or groups). Example: user.userprincipalname → username.' },
           { label: 'IdP-initiated login', text: 'Accepts logins started from the IdP portal, checked like any other response. On for providers created before 2.243, off for new ones: turn it on only if users start from the IdP portal.' },
           { label: 'NameID format', text: 'Unspecified (IdP default), Persistent, Email address or Transient: sent in each login request and published in the SP metadata. Persistent gives a stable identifier; a transient NameID is never used to recognise the account.' },
         ]
@@ -1353,7 +1353,7 @@ export const helpContent = {
         icon: UserPlus,
         items: [
           { label: 'Default Role', text: 'Applied ONLY when a user is auto-created on first SSO login. Role changes made later in UCM are preserved.' },
-          { label: 'Role Mapping', text: 'Map external groups (Azure AD, Okta, LDAP) → UCM roles (admin / operator / viewer). Used at user creation, and at every login when role sync is enabled. When several groups match, the highest-privilege role wins (admin > operator > auditor > viewer): entry order does not matter (#221).' },
+          { label: 'Role Mapping', text: 'Map external groups (Azure AD, Okta, LDAP) → UCM roles (admin / operator / viewer). Used at user creation, and at every login when role sync is enabled. When several groups match, the highest-privilege role wins (admin > operator > auditor > viewer): entry order does not matter (#221). Each group can also name a custom role (chosen from the existing custom roles): it is added to the base role, or used alone. If several matching groups give a custom role, the first one in the list wins. With role sync on, a custom role set by SSO is removed when no group gives one; a custom role assigned by hand in UCM is never touched.' },
           { label: 'Sync role on each login', text: 'OFF (default): SSO never overrides UCM-managed roles. ON: role is re-synced from role_mapping at every login; users without a mapping match keep their stored role (default_role is never re-applied).' },
           { label: 'Auto-update users', text: 'Updates email and full name on each login. Does NOT touch the role.' },
         ]

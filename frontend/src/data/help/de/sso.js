@@ -12,7 +12,7 @@ export default {
           { label: 'SP-Zertifikat', text: 'UCM-HTTPS-Zertifikat in Metadaten enthalten, muss vom IDP vertraut werden, sonst werden die Metadaten abgelehnt' },
           { label: 'Entity ID', text: 'UCM Service Provider Entity-Kennung' },
           { label: 'ACS-URL', text: 'Assertion Consumer Service Callback-URL' },
-          { label: 'Attributzuordnung', text: 'IDP-Attribute UCM-Benutzerfeldern zuordnen' },
+          { label: 'Attributzuordnung', text: 'Linke Spalte: der vom IdP gesendete Attributname. Rechte Spalte: das UCM-Feld, das damit befüllt wird (username, email, fullname oder groups). Beispiel: user.userprincipalname → username.' },
           { label: 'IdP-initiierte Anmeldung', text: 'Akzeptiert Anmeldungen aus dem IdP-Portal, geprüft wie jede andere Antwort. Aktiv für Provider, die vor 2.243 angelegt wurden, aus für neue: nur aktivieren, wenn Benutzer im IdP-Portal starten.' },
           { label: 'NameID-Format', text: 'Nicht angegeben (IdP-Standard), Persistent, E-Mail-Adresse oder Transient: wird in jeder Anmeldeanfrage gesendet und in den SP-Metadaten veröffentlicht. Persistent liefert eine stabile Kennung; eine transiente NameID dient nie zur Wiedererkennung des Kontos.' },
         ]
@@ -31,7 +31,7 @@ export default {
         title: 'Rollen-Provisionierung (#81)',
         items: [
           { label: 'Standardrolle', text: 'Wird NUR angewendet, wenn ein Benutzer beim ersten SSO-Login automatisch erstellt wird. Später in UCM vorgenommene Rollenänderungen bleiben erhalten.' },
-          { label: 'Rollenzuordnung', text: 'Externe Gruppen (Azure AD, Okta, LDAP) → UCM-Rollen (admin / operator / viewer) zuordnen. Wird bei der Benutzererstellung verwendet und bei jedem Login, wenn die Rollensynchronisierung aktiviert ist. Wenn mehrere Gruppen passen, gewinnt die Rolle mit den höchsten Rechten (admin > operator > auditor > viewer): die Reihenfolge der Einträge spielt keine Rolle (#221).' },
+          { label: 'Rollenzuordnung', text: 'Externe Gruppen (Azure AD, Okta, LDAP) → UCM-Rollen (admin / operator / viewer) zuordnen. Wird bei der Benutzererstellung verwendet und bei jedem Login, wenn die Rollensynchronisierung aktiviert ist. Wenn mehrere Gruppen passen, gewinnt die Rolle mit den höchsten Rechten (admin > operator > auditor > viewer): die Reihenfolge der Einträge spielt keine Rolle (#221). Jede Gruppe kann zusätzlich eine benutzerdefinierte Rolle nennen (aus den vorhandenen benutzerdefinierten Rollen gewählt): sie wird zur Basisrolle hinzugefügt oder allein verwendet. Liefern mehrere passende Gruppen eine benutzerdefinierte Rolle, gewinnt die erste in der Liste. Bei aktiver Rollensynchronisierung wird eine per SSO gesetzte benutzerdefinierte Rolle entfernt, wenn keine Gruppe eine liefert; eine in UCM manuell zugewiesene benutzerdefinierte Rolle bleibt unberührt.' },
           { label: 'Rolle bei jedem Login synchronisieren', text: 'AUS (Standard): SSO überschreibt nie von UCM verwaltete Rollen. EIN: Die Rolle wird bei jedem Login aus role_mapping neu synchronisiert; Benutzer ohne passende Zuordnung behalten ihre gespeicherte Rolle (default_role wird nie erneut angewendet).' },
           { label: 'Benutzer automatisch aktualisieren', text: 'Aktualisiert E-Mail und vollständigen Namen bei jedem Login. Verändert die Rolle NICHT.' },
         ]
@@ -43,7 +43,7 @@ export default {
           { label: 'Bind-DN', text: 'Distinguished Name für LDAP-Bind-Authentifizierung' },
           { label: 'Basis-DN', text: 'Suchbasis für Benutzersuchen' },
           { label: 'Benutzerfilter', text: 'LDAP-Filter zum Abgleich von Benutzern (z.B. (uid={username}))' },
-          { label: 'Attributzuordnung', text: 'LDAP-Attribute Benutzername, E-Mail, vollständigem Namen zuordnen' },
+          { label: 'Attributzuordnung', text: 'LDAP-Attribute dem Benutzernamen, der E-Mail und dem vollständigen Namen zuordnen' },
         ]
       },
     ],

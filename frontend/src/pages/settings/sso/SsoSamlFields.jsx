@@ -4,6 +4,7 @@ import { Button, Input, Select, Textarea, LoadingSpinner, HelpCard, CompactSecti
 import { ToggleSwitch } from '../../../components/ui/ToggleSwitch'
 import CopyableUrl from '../CopyableUrl'
 import MappingEditor from '../MappingEditor'
+import RoleMappingEditor from '../RoleMappingEditor'
 import { formatDate } from '../../../lib/utils'
 
 export const NAMEID_UNSPECIFIED = 'urn:oasis:names:tc:SAML:1.1:nameid-format:unspecified'
@@ -24,6 +25,7 @@ export default function SsoSamlFields({
   fetchIdpMetadata,
   availableCerts,
   roleOptions,
+  customRoles,
   spEntityId,
   spMetadataUrl,
   spOriginUnconfigured,
@@ -161,13 +163,13 @@ export default function SsoSamlFields({
           <div className="pt-2 border-t border-border">
             <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.roleMapping')}</p>
             <p className="text-xs text-text-muted mb-2">{t('sso.roleMappingHelp')}</p>
-            <MappingEditor
+            <RoleMappingEditor
               value={formData.role_mapping}
               onChange={val => handleChange('role_mapping', val)}
               keyLabel={t('sso.externalGroup')}
-              valueLabel={t('sso.ucmRole')}
               keyPlaceholder="e.g., pki-admins"
-              valueOptions={roleOptions}
+              roleOptions={roleOptions}
+              customRoles={customRoles}
             />
           </div>
         </div>

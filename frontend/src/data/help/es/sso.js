@@ -12,7 +12,7 @@ export default {
           { label: 'Certificado SP', text: 'El certificado HTTPS de UCM incluido en los metadatos, debe ser confiable para el IDP o los metadatos serán rechazados' },
           { label: 'Entity ID', text: 'Identificador de entidad del proveedor de servicios UCM' },
           { label: 'URL ACS', text: 'URL de devolución del Assertion Consumer Service' },
-          { label: 'Mapeo de atributos', text: 'Mapee atributos del IDP a campos de usuario de UCM' },
+          { label: 'Mapeo de atributos', text: 'Columna izquierda: el nombre del atributo enviado por el IdP. Columna derecha: el campo de UCM que rellena (username, email, fullname o groups). Ejemplo: user.userprincipalname → username.' },
           { label: 'Inicio de sesión iniciado por el IdP', text: 'Acepta inicios de sesión lanzados desde el portal del IdP, verificados como cualquier otra respuesta. Activado para los proveedores creados antes de la 2.243, desactivado para los nuevos: actívelo solo si los usuarios parten del portal del IdP.' },
           { label: 'Formato de NameID', text: 'No especificado (predeterminado del IdP), Persistente, Dirección de correo o Transitorio: se envía en cada solicitud de inicio de sesión y se publica en los metadatos del SP. Persistente da un identificador estable; un NameID transitorio nunca se usa para reconocer la cuenta.' },
         ]
@@ -31,7 +31,7 @@ export default {
         title: 'Aprovisionamiento de roles (#81)',
         items: [
           { label: 'Rol predeterminado', text: 'Se aplica SOLO cuando un usuario se crea automáticamente en su primer inicio de sesión SSO. Los cambios de rol realizados después en UCM se conservan.' },
-          { label: 'Mapeo de roles', text: 'Mapee grupos externos (Azure AD, Okta, LDAP) → roles UCM (admin / operator / viewer). Se usa al crear el usuario y en cada inicio de sesión cuando la sincronización de roles está activada. Si varios grupos coinciden, gana el rol de mayor privilegio (admin > operator > auditor > viewer): el orden de las entradas no importa (#221).' },
+          { label: 'Mapeo de roles', text: 'Mapee grupos externos (Azure AD, Okta, LDAP) → roles UCM (admin / operator / viewer). Se usa al crear el usuario y en cada inicio de sesión cuando la sincronización de roles está activada. Si varios grupos coinciden, gana el rol de mayor privilegio (admin > operator > auditor > viewer): el orden de las entradas no importa (#221). Cada grupo también puede indicar un rol personalizado (elegido entre los roles personalizados existentes): se añade al rol base o se usa solo. Si varios grupos coincidentes aportan un rol personalizado, gana el primero de la lista. Con la sincronización de roles activada, un rol personalizado asignado por SSO se retira cuando ningún grupo lo aporta; un rol personalizado asignado a mano en UCM nunca se toca.' },
           { label: 'Sincronizar rol en cada inicio de sesión', text: 'DESACTIVADO (predeterminado): SSO nunca sobrescribe los roles gestionados en UCM. ACTIVADO: el rol se resincroniza desde role_mapping en cada inicio de sesión; los usuarios sin coincidencia en el mapeo conservan su rol almacenado (default_role nunca se vuelve a aplicar).' },
           { label: 'Actualizar usuarios automáticamente', text: 'Actualiza el correo y el nombre completo en cada inicio de sesión. NO toca el rol.' },
         ]

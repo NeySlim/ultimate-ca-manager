@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next'
 import { CheckCircle, XCircle } from '@phosphor-icons/react'
 import { Button, Badge, Input } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
-import { ssoService } from '../../services'
+import { ssoService, rolesService } from '../../services'
 import { useNotification } from '../../contexts'
 import { secretInputProps, secretRequiredForTarget } from '../../lib/secretTarget'
 
@@ -100,6 +100,16 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
   const [testMappingUsername, setTestMappingUsername] = useState('')
   const [testMappingResult, setTestMappingResult] = useState(null)
   const [oauth2Preset, setOauth2Preset] = useState('custom')
+
+  // Custom role names offered in the role mapping; the list stays empty if the user cannot read roles
+  const [customRoles, setCustomRoles] = useState([])
+  useEffect(() => {
+    let cancelled = false
+    Promise.resolve(rolesService.listRoles())
+      .then(res => { if (!cancelled) setCustomRoles((res?.data || []).map(r => r.name).filter(Boolean)) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [])
 
   useEffect(() => {
     if (formData.provider_type === 'saml') {
@@ -265,7 +275,7 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
   const isOauth2 = formData.provider_type === 'oauth2'
   const isSaml = formData.provider_type === 'saml'
 
-  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, handleTestConnection,
+  const sharedProps = { formData, handleChange, provider, testingConnection, connectionBadge, roleOptions, customRoles, handleTestConnection,
     secretProps: secretTarget ? secretInputProps(t, secretTarget) : {} }
 
   return (

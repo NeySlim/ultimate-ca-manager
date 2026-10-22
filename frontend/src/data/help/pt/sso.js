@@ -12,7 +12,7 @@ export default {
           { label: 'Certificado SP', text: 'Certificado HTTPS do UCM incluído nos metadados, deve ser confiável pelo IDP ou os metadados serão rejeitados' },
           { label: 'Entity ID', text: 'Identificador de entidade do provedor de serviço UCM' },
           { label: 'URL ACS', text: 'URL de callback do Assertion Consumer Service' },
-          { label: 'Mapeamento de Atributos', text: 'Mapear atributos do IDP para campos de usuário UCM' },
+          { label: 'Mapeamento de Atributos', text: 'Coluna da esquerda: o nome do atributo enviado pelo IdP. Coluna da direita: o campo do UCM que ele preenche (username, email, fullname ou groups). Exemplo: user.userprincipalname → username.' },
           { label: 'Login iniciado pelo IdP', text: 'Aceita logins iniciados no portal do IdP, verificados como qualquer outra resposta. Ativado para provedores criados antes da 2.243, desativado para os novos: ative apenas se os usuários partirem do portal do IdP.' },
           { label: 'Formato NameID', text: 'Não especificado (padrão do IdP), Persistente, Endereço de e-mail ou Transitório: enviado em cada solicitação de login e publicado nos metadados do SP. Persistente dá um identificador estável; um NameID transitório nunca é usado para reconhecer a conta.' },
         ]
@@ -31,7 +31,7 @@ export default {
         title: 'Provisionamento de Funções (#81)',
         items: [
           { label: 'Função Padrão', text: 'Aplicada APENAS quando um usuário é criado automaticamente no primeiro login SSO. Alterações de função feitas depois no UCM são preservadas.' },
-          { label: 'Mapeamento de Funções', text: 'Mapear grupos externos (Azure AD, Okta, LDAP) → funções UCM (admin / operator / viewer). Usado na criação do usuário e a cada login quando a sincronização de funções está ativada. Quando vários grupos correspondem, a função de maior privilégio vence (admin > operator > auditor > viewer): a ordem das entradas não importa (#221).' },
+          { label: 'Mapeamento de Funções', text: 'Mapear grupos externos (Azure AD, Okta, LDAP) → funções UCM (admin / operator / viewer). Usado na criação do usuário e a cada login quando a sincronização de funções está ativada. Quando vários grupos correspondem, a função de maior privilégio vence (admin > operator > auditor > viewer): a ordem das entradas não importa (#221). Cada grupo também pode indicar uma função personalizada (escolhida entre as funções personalizadas existentes): ela é somada à função base ou usada sozinha. Se vários grupos correspondentes indicarem uma função personalizada, vale a primeira da lista. Com a sincronização de funções ativada, uma função personalizada definida pelo SSO é removida quando nenhum grupo indica uma; uma função personalizada atribuída manualmente no UCM nunca é alterada.' },
           { label: 'Sincronizar função a cada login', text: 'DESATIVADO (padrão): o SSO nunca sobrescreve funções gerenciadas no UCM. ATIVADO: a função é ressincronizada a partir de role_mapping a cada login; usuários sem correspondência no mapeamento mantêm sua função armazenada (default_role nunca é reaplicada).' },
           { label: 'Atualização Automática de Usuários', text: 'Atualiza e-mail e nome completo a cada login. NÃO altera a função.' },
         ]
