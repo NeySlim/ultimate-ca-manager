@@ -6,8 +6,6 @@ import { defineConfig, devices } from '@playwright/test'
  * Environment variables:
  *   UCM_BASE_URL - UCM application URL (default: https://localhost:8443)
  *   UCM_PRO - Enable Pro features tests (default: true)
- *   KEYCLOAK_URL - Keycloak SSO URL (default: http://pve:8180)
- *   LDAP_HOST - LDAP server host (default: pve)
  */
 
 export default defineConfig({
