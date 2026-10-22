@@ -16,7 +16,7 @@ on:
         required: true
         type: string
       image:
-        description: 'Docker image (default: neyslim/ultimate-ca-manager)'
+        description: 'Docker image without tag or registry port (default: neyslim/ultimate-ca-manager)'
         required: false
         default: 'neyslim/ultimate-ca-manager'
         type: string

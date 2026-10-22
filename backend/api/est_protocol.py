@@ -1050,7 +1050,9 @@ def server_keygen(label=None):
                 'application/pkcs7-mime; smime-type=server-generated-key'
             )
         key_b64 = _b64_body(key_der)
-        
+        # MIME parts are framed in CRLF (RFC 2046 4.1.1), their base64 lines too.
+        p7_b64, key_b64 = (b.rstrip('\n').replace('\n', '\r\n') for b in (p7_b64, key_b64))
+
         # Create multipart response
         boundary = 'est-boundary-' + str(serial)[:8]
         body = f"""--{boundary}\r

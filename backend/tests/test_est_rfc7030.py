@@ -361,6 +361,7 @@ class TestBase64LineLength:
         csr, _ = _make_csr(common_name='wrap-keygen.example.test')
         response = _post_csr(client, 'serverkeygen', csr, headers=_basic_auth())
         assert response.status_code == 200, response.data
+        assert b'\n' not in response.data.replace(b'\r\n', b'')  # CRLF throughout
         for part in _multipart_parts(response):
             _assert_rfc2045_lines(part.get_payload())
 

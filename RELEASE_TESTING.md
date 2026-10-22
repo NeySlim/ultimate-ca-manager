@@ -1,7 +1,7 @@
 # UCM Release Testing
 
 Cross-distro validation matrix for every release candidate (`-rcN`) and stable
-tag. **6/6 mandatory** — 3 distros × 2 backends.
+tag. **6/6 mandatory**: 3 distros × 2 backends.
 
 | Target            | Host:Port           | SQLite | PostgreSQL |
 |-------------------|---------------------|--------|------------|
@@ -70,7 +70,7 @@ ssh <docker-host> "docker rm -f ucm-rc-pg"
 ```
 
 Docker → PG: add `--add-host=host.docker.internal:host-gateway` and use
-`host.docker.internal:5444`. IPv6 docker-proxy can be unreliable — use the
+`host.docker.internal:5444`. IPv6 docker-proxy can be unreliable: use the
 FQDN or `127.0.0.1`, never `localhost`.
 
 ## Mandatory functional smoke tests
@@ -137,11 +137,11 @@ curl -k https://<docker-host>:8444/api/v2/system/security/encryption-status
 
 A release is **not** stable until **6/6** targets pass:
 
-- [ ] DEB / SQLite — smoke + UC + functional smoke tests
-- [ ] DEB / PostgreSQL — smoke + UC + 33-migration-from-scratch
-- [ ] RPM / SQLite — smoke + UC + functional smoke tests
-- [ ] RPM / PostgreSQL — smoke + UC
-- [ ] Docker / SQLite — smoke + UC + master-key persistence
-- [ ] Docker / PostgreSQL — smoke + UC
+- [ ] DEB / SQLite: smoke + UC + functional smoke tests
+- [ ] DEB / PostgreSQL: smoke + UC + 33-migration-from-scratch
+- [ ] RPM / SQLite: smoke + UC + functional smoke tests
+- [ ] RPM / PostgreSQL: smoke + UC
+- [ ] Docker / SQLite: smoke + UC + master-key persistence
+- [ ] Docker / PostgreSQL: smoke + UC
 
 Skipping a target is how distro-specific regressions ship.

@@ -88,7 +88,7 @@ jobs:
             VERSION=${GITHUB_REF#refs/tags/v}
           fi
           [[ "$VERSION" =~ ^[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]] || { echo "Invalid version: $VERSION"; exit 1; }
-          # Convert to DEB version (2.0.0-beta1 -> 2.0.0~beta1)
+          # Convert to DEB version (2.244-rc1 -> 2.244~rc1)
           DEB_VERSION=$(echo "$VERSION" | sed 's/-/~/g')
           echo "version=$VERSION" >> $GITHUB_OUTPUT
           echo "deb_version=$DEB_VERSION" >> $GITHUB_OUTPUT

@@ -139,7 +139,8 @@ serviceAccount:
   annotations: {}
 
 ## The image runs as the non-root user ucm (UID/GID 1000); fsGroup makes the
-## data and /etc/ucm volumes writable by it.
+## data and /etc/ucm volumes writable by it (set fsGroupChangePolicy to Always
+## if files inside a volume were written by another user).
 podSecurityContext:
   runAsNonRoot: true
   runAsUser: 1000
