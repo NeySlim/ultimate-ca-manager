@@ -1559,17 +1559,12 @@ class SCEPService:
             )
 
         # Certificate Policies / CPS
-        if self.ca.cps_enabled and self.ca.cps_uri:
-            policy_oid = x509.ObjectIdentifier(self.ca.cps_oid or '2.5.29.32.0')
-            builder = builder.add_extension(
-                x509.CertificatePolicies([
-                    x509.PolicyInformation(
-                        policy_identifier=policy_oid,
-                        policy_qualifiers=[self.ca.cps_uri],
-                    )
-                ]),
-                critical=False,
-            )
+        from utils.qc_statements import (
+            add_certificate_policies, add_qc_statements, template_policy_oids)
+        builder = add_certificate_policies(
+            builder, self.ca.cps_uri if self.ca.cps_enabled else None, self.ca.cps_oid,
+            template_policy_oids(tpl_ext))
+        builder = add_qc_statements(builder, tpl_ext)
 
         cert = builder.sign(self.ca_key, sign_hash, default_backend(),
                             rsa_padding=rsa_padding_for(self.ca_key, sign_hash))

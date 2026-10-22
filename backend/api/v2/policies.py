@@ -693,10 +693,10 @@ def _issue_approved_certificate(approval):
             aia_descs.append(x509.AccessDescription(x509.oid.AuthorityInformationAccessOID.CA_ISSUERS, x509.UniformResourceIdentifier(url.replace('{ca_refid}', ca.url_ref))))
     if aia_descs:
         builder = builder.add_extension(x509.AuthorityInformationAccess(aia_descs), critical=False)
-    if ca.cps_enabled and ca.cps_uri:
-        builder = builder.add_extension(x509.CertificatePolicies([
-            x509.PolicyInformation(policy_identifier=x509.ObjectIdentifier(ca.cps_oid or '2.5.29.32.0'), policy_qualifiers=[ca.cps_uri])
-        ]), critical=False)
+    from utils.qc_statements import add_certificate_policies, add_qc_statements, template_policy_oids
+    builder = add_certificate_policies(
+        builder, ca.cps_uri if ca.cps_enabled else None, ca.cps_oid, template_policy_oids(tpl_ext))
+    builder = add_qc_statements(builder, tpl_ext)
     
     # Sign with the digest resolved against the policies above
     new_cert = builder.sign(ca_key, _sign_hash, default_backend(),
@@ -795,7 +795,8 @@ def _issue_approved_certificate(approval):
 # ============ Policy Management ============
 
 _ADVISORY_RULE_KEYS = ('allowed_key_types', 'allowed_digests', 'allowed_signature_schemes',
-                       'key_type_horizons', 'key_type_issue_until', 'tsa_signer_key_types')
+                       'key_type_horizons', 'key_type_issue_until', 'tsa_signer_key_types',
+                       'hsm_certifications')
 
 
 def _validated_key_labels(rules, key):

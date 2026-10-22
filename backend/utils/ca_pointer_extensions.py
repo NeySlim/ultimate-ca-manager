@@ -6,8 +6,10 @@ trunk, the issue form, the timestamp signer, in-place renewal)."""
 from cryptography import x509
 
 
-def add_ca_pointer_extensions(builder: x509.CertificateBuilder, ca) -> x509.CertificateBuilder:
-    """Embed the CA's CDP / AIA / CPS URLs when it publishes them."""
+def add_ca_pointer_extensions(builder: x509.CertificateBuilder, ca,
+                              extra_policy_oids=()) -> x509.CertificateBuilder:
+    """Embed the CA's CDP / AIA / CPS URLs when it publishes them, and any
+    *extra_policy_oids* after the CPS policy."""
     if ca.cdp_enabled:
         cdp_urls = [u.replace('{ca_refid}', ca.url_ref) for u in ca.get_cdp_urls()]
         if cdp_urls:
@@ -34,14 +36,6 @@ def add_ca_pointer_extensions(builder: x509.CertificateBuilder, ca) -> x509.Cert
     if aia:
         builder = builder.add_extension(
             x509.AuthorityInformationAccess(aia), critical=False)
-    if ca.cps_enabled and ca.cps_uri:
-        builder = builder.add_extension(
-            x509.CertificatePolicies([
-                x509.PolicyInformation(
-                    policy_identifier=x509.ObjectIdentifier(ca.cps_oid or '2.5.29.32.0'),
-                    policy_qualifiers=[ca.cps_uri],
-                )
-            ]),
-            critical=False,
-        )
-    return builder
+    from utils.qc_statements import add_certificate_policies
+    return add_certificate_policies(
+        builder, ca.cps_uri if ca.cps_enabled else None, ca.cps_oid, extra_policy_oids)

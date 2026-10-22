@@ -34,6 +34,7 @@ from utils.eku_validation import add_ocsp_nocheck_if_responder
 from utils.validity import DEFAULT_CERTIFICATE_VALIDITY_DAYS, MAX_VALIDITY_DAYS as MAX_RENEWAL_DAYS
 from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.ca_pointer_extensions import add_ca_pointer_extensions
+from utils.qc_statements import carried_policy_oids
 from utils.leaf_key_usage import constrain_builder_key_usage
 from utils.datetime_utils import cert_not_before, utc_isoformat, utc_now
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window, clamp_not_after
@@ -460,7 +461,8 @@ def _builder(original, ca, ca_cert, public_key, not_after) -> x509.CertificateBu
             raise RenewalError(
                 f'Cannot carry extension {ext.oid.dotted_string} over to the renewed '
                 f'certificate: {e}', 400) from e
-    builder = add_ca_pointer_extensions(builder, ca)
+    builder = add_ca_pointer_extensions(
+        builder, ca, carried_policy_oids(original, ca.cps_oid if ca.cps_enabled else None))
     builder = builder.add_extension(
         x509.SubjectKeyIdentifier.from_public_key(public_key), critical=False)
     builder = builder.add_extension(authority_key_identifier_from_issuer(ca_cert), critical=False)

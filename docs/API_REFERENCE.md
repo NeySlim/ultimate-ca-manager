@@ -1098,6 +1098,27 @@ Content-Type: application/json
 }
 ```
 
+**qcStatements and policy OIDs (ETSI EN 319 412-5).** `extensions_template` accepts two optional keys, validated on create, update and import:
+
+```json
+"extensions_template": {
+  "certificate_policies": ["0.4.0.194112.1.2"],
+  "qc_statements": {
+    "compliance": true,
+    "type": "esign",
+    "sscd": true,
+    "pds": [{"url": "https://pki.example.com/pds-en.pdf", "language": "en"}],
+    "retention_period": 15,
+    "limit_value": {"currency": "EUR", "amount": 10000, "exponent": 0},
+    "semantics": "eidas-natural"
+  }
+}
+```
+
+- `certificate_policies`: up to 20 dotted OIDs, added after the CA's CPS policy.
+- `qc_statements`: `compliance` (QcCompliance) and `cc_legislation` (ISO 3166 country codes, QcCClegislation) exclude each other; `type` is `esign`, `eseal` or `web`; `pds` entries need an `https` URL and a two-letter language, one of them in English; `semantics` is `natural`, `legal`, `eidas-natural` or `eidas-legal` (RFC 3739 semantics identifier). Unknown keys are refused.
+- Certificates issued from the UI, Sign CSR (single and bulk), ACME, SCEP and approvals carry both; renewals keep them. EST, WSTEP and mTLS enrollment do not add them. `GET /api/v2/certificates/{id}` decodes the extension under `extensions.qc_statements`, and `GET /api/v2/certificates/{id}/lint?profile=etsi` runs the ETSI EN 319 412 checks.
+
 ### Get Template
 ```http
 GET /api/v2/templates/{template_id}

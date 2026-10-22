@@ -13,6 +13,7 @@ from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519, ed448, dsa
 from utils.foreign_algorithms import describe_public_key
 from utils.signature_label import signature_algorithm_label
+from utils.qc_statements import QC_STATEMENTS_OID, describe_qc_extension
 
 logger = logging.getLogger(__name__)
 
@@ -196,6 +197,13 @@ def parse_certificate_extensions(pem_data):
                 policy_data['qualifiers'] = qualifiers
             policies.append(policy_data)
         extensions['certificate_policies'] = {'policies': policies, 'critical': ext.critical}
+
+    # Qualified certificate statements (RFC 3739, ETSI EN 319 412-5)
+    ext = _get_ext(QC_STATEMENTS_OID)
+    if ext:
+        qc_data = describe_qc_extension(ext)
+        if qc_data is not None:
+            extensions['qc_statements'] = qc_data
 
     # Name Constraints
     ext = _get_ext(ExtensionOID.NAME_CONSTRAINTS)

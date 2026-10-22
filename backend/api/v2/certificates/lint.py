@@ -33,7 +33,7 @@ def lint_status():
 def lint_certificate(cert_id):
     """Lint a stored certificate against the requested profile.
 
-    Query param ``profile``: ``rfc5280`` (default) or ``cabf``.
+    Query param ``profile``: ``rfc5280`` (default), ``cabf`` or ``etsi``.
     """
     cert = db.session.get(Certificate, cert_id)
     if not cert or not cert.crt:

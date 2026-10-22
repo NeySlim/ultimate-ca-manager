@@ -290,6 +290,7 @@ class CSRMixin:
             allow_sensitive_ekus=allow_sensitive_ekus,
             template_ext=template_ext,
             san_template=san_template,
+            qualification_template=san_template,
             extra_san=extra_san,
             policy_scope={
                 'ca_id': ca.id,

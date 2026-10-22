@@ -29,6 +29,7 @@ _MS_CERTIFICATE_TEMPLATE_OID = x509.ObjectIdentifier('1.3.6.1.4.1.311.21.7')
 
 
 from utils.signing_hash import signing_hash_for, rsa_padding_for
+from utils.qc_statements import add_certificate_policies, add_qc_statements, template_policy_oids
 
 
 def _certificate_template_extension(template_oid, major=100, minor=0):
@@ -598,6 +599,7 @@ class CSROperationsMixin:
         extra_san: Optional[List[x509.GeneralName]] = None,
         policy_scope: Optional[dict] = None,
         san_template=None,
+        qualification_template=None,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
         signing renews — its names are graced by NameConstraints validation.
@@ -643,7 +645,9 @@ class CSROperationsMixin:
         issuance; the policies in that scope bind the key type and the digest
         (an implicit one yields to them). Every production caller passes it.
         ``san_template``: template whose SAN types bind the request's names;
-        names implied by the subject alone are dropped instead of refused."""
+        names implied by the subject alone are dropped instead of refused.
+        ``qualification_template``: template whose qcStatements and policy OIDs
+        land on a leaf (EST, WSTEP and mTLS pass none)."""
         from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 
         # Load CSR
@@ -1091,19 +1095,18 @@ class CSROperationsMixin:
                     critical=False
                 )
 
-        # Certificate Policies
-        if cps_uri:
+        # Certificate Policies: the CA's CPS policy, then the template's OIDs
+        # (leaves only); qcStatements come from the same template
+        qc_tpl_ext = {}
+        if not issuing_ca:
+            from services.template_service import template_extensions
+            qc_tpl_ext = template_extensions(qualification_template) \
+                if qualification_template is not None else {}
+        if cps_uri or template_policy_oids(qc_tpl_ext):
             if not _sub_ca_csr_supplied(ExtensionOID.CERTIFICATE_POLICIES):
-                policy_oid_obj = x509.ObjectIdentifier(cps_oid or '2.5.29.32.0')
-                builder = builder.add_extension(
-                    x509.CertificatePolicies([
-                        x509.PolicyInformation(
-                            policy_identifier=policy_oid_obj,
-                            policy_qualifiers=[cps_uri]
-                        )
-                    ]),
-                    critical=False
-                )
+                builder = add_certificate_policies(
+                    builder, cps_uri, cps_oid, template_policy_oids(qc_tpl_ext))
+        builder = add_qc_statements(builder, qc_tpl_ext)
 
         # SubjectKeyIdentifier — always from the CSR subject public key
         builder = builder.add_extension(

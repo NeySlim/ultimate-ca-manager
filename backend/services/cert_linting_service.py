@@ -8,6 +8,8 @@ are supported:
 - ``cabf``    — CA/Browser Forum Baseline Requirements for TLS server certs
                 (mostly meaningful for public-facing certificates; expect noise
                 on internal certs).
+- ``etsi``    — ETSI EN 319 412 (qualified and non-qualified certificate
+                profiles); the profile is detected from the certificate.
 
 ``pkilint`` (a pure-Python linter) is an optional dependency: if it is not
 installed the service degrades gracefully and reports the linter as
@@ -28,7 +30,8 @@ logger = logging.getLogger(__name__)
 
 PROFILE_RFC5280 = 'rfc5280'
 PROFILE_CABF = 'cabf'
-VALID_PROFILES = (PROFILE_RFC5280, PROFILE_CABF)
+PROFILE_ETSI = 'etsi'
+VALID_PROFILES = (PROFILE_RFC5280, PROFILE_CABF, PROFILE_ETSI)
 
 # Severity ordering, highest first — used for sorting and summaries.
 _SEVERITY_ORDER = ['fatal', 'error', 'warning', 'notice', 'info']
@@ -78,6 +81,15 @@ def _build_pkilint_validator(profile: str, cert_doc):
         )
         finding_filters = serverauth.create_serverauth_finding_filters(cert_type)
         return validator, finding_filters, cert_type.to_option_str
+
+    if profile == PROFILE_ETSI:
+        from pkilint import etsi
+        cert_type = etsi.determine_certificate_type(cert_doc)
+        validator = certificate.create_pkix_certificate_validator_container(
+            etsi.create_decoding_validators(cert_type),
+            etsi.create_validators(cert_type),
+        )
+        return validator, etsi.create_etsi_finding_filters(cert_type), cert_type.to_option_str
 
     validator = certificate.create_pkix_certificate_validator_container(
         certificate.create_decoding_validators(

@@ -6,6 +6,7 @@ Certificate Templates Management Routes v2.0
 from flask import Blueprint, request, g, Response
 import logging
 from auth.unified import require_auth
+from utils.qc_statements import validate_policy_oids, validate_qc_statements
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.validity import DEFAULT_TEMPLATE_VALIDITY_DAYS
 from utils.db_transaction import safe_commit
@@ -149,6 +150,13 @@ def _validate_template_payload(data, *, partial=False):
             if len(kept) != len(ku):
                 logger.warning("template payload: CA key usages dropped from key_usage")
                 data['extensions_template']['key_usage'] = kept
+        ext = data['extensions_template']
+        errors = (validate_qc_statements(ext.get('qc_statements'))
+                  + validate_policy_oids(ext.get('certificate_policies')))
+        if errors:
+            return False, '; '.join(errors)
+        if isinstance(ext.get('certificate_policies'), list):
+            ext['certificate_policies'] = [o.strip() for o in ext['certificate_policies']]
     return True, None
 
 

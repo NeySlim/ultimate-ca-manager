@@ -31,6 +31,7 @@ from utils.datetime_utils import utc_now, utc_isoformat, cert_not_before
 from security.encryption import encrypt_private_key
 from utils.db_transaction import safe_commit
 from . import bp
+from utils.qc_statements import add_certificate_policies, add_qc_statements, template_policy_oids
 from utils import key_algorithms
 from utils.key_codec import private_key_to_pem
 from utils.x509_aki import authority_key_identifier_from_issuer
@@ -510,17 +511,10 @@ def create_certificate():
             )
 
         # Certificate Policies / CPS
-        if ca.cps_enabled and ca.cps_uri:
-            policy_oid = x509.ObjectIdentifier(ca.cps_oid or '2.5.29.32.0')
-            builder = builder.add_extension(
-                x509.CertificatePolicies([
-                    x509.PolicyInformation(
-                        policy_identifier=policy_oid,
-                        policy_qualifiers=[ca.cps_uri]
-                    )
-                ]),
-                critical=False
-            )
+        builder = add_certificate_policies(
+            builder, ca.cps_uri if ca.cps_enabled else None, ca.cps_oid,
+            template_policy_oids(tpl_ext))
+        builder = add_qc_statements(builder, tpl_ext)
 
         # OCSP Must-Staple / TLS Feature (RFC 6066)
         if data.get('ocsp_must_staple'):

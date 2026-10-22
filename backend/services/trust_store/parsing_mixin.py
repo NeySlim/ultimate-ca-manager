@@ -10,6 +10,7 @@ from typing import Dict
 from utils.datetime_utils import utc_isoformat
 from utils.foreign_algorithms import describe_public_key
 from utils.signature_label import signature_algorithm_label
+from utils.qc_statements import QC_STATEMENTS_OID, describe_qc_extension
 
 
 class ParsingMixin:
@@ -179,7 +180,9 @@ class ParsingMixin:
                     oid = ext.oid.dotted_string
                     ext_data = ext.value.value
 
-                    if oid == '2.16.840.1.113730.1.13':  # Netscape Comment
+                    if ext.oid == QC_STATEMENTS_OID and describe_qc_extension(ext) is not None:
+                        details['extensions']['qcStatements'] = describe_qc_extension(ext)
+                    elif oid == '2.16.840.1.113730.1.13':  # Netscape Comment
                         if ext_data[0] == 0x16:
                             length = ext_data[1]
                             comment = ext_data[2:2+length].decode('ascii', errors='ignore')
