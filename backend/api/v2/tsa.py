@@ -210,6 +210,7 @@ def get_tsa_config():
 def update_tsa_config():
     """Update TSA configuration in database"""
     data = request.json or {}
+    stored_signer = get_config('tsa_signer_cert_refid', '')
 
     policy_oid = None
     if 'policy_oid' in data:
@@ -224,6 +225,12 @@ def update_tsa_config():
             err, _cert = _validate_signer_refid(refid)
             if err:
                 return error_response(err, 400)
+        elif stored_signer and 'ca_refid' not in data and 'ca_id' not in data:
+            # Dropping the dedicated signer hands the tokens to the configured CA
+            ca = CA.query.filter_by(refid=get_config('tsa_ca_refid', '')).first()
+            problem = _ca_signer_refusal(ca) if ca is not None else None
+            if problem:
+                return error_response(problem, 400)
         set_config('tsa_signer_cert_refid', refid)
 
     if 'enabled' in data:
@@ -242,10 +249,11 @@ def update_tsa_config():
         else:
             ca = db.session.get(CA, data['ca_id']) if data['ca_id'] else None
             new_refid = ca.refid if ca else ''
-        if new_refid and new_refid != get_config('tsa_ca_refid', ''):
-            problem = signing_ca_problem(ca)
-            dedicated = data['signer_cert_refid'] if 'signer_cert_refid' in data \
-                else get_config('tsa_signer_cert_refid', '')
+        dedicated = data['signer_cert_refid'] if 'signer_cert_refid' in data \
+            else get_config('tsa_signer_cert_refid', '')
+        signer_dropped = not dedicated and stored_signer
+        if new_refid and (new_refid != get_config('tsa_ca_refid', '') or signer_dropped):
+            problem = signing_ca_problem(ca) if new_refid != get_config('tsa_ca_refid', '') else None
             if not problem and ca is not None and not dedicated:
                 # Without a dedicated signer, the CA certificate signs the tokens
                 problem = _ca_signer_refusal(ca)

@@ -70,10 +70,12 @@ def _planned_signer(key_label, signature_scheme, hsm_key_id, hsm_provider_id):
         scheme = 'eddsa' if label.startswith('ED') else None
     if hsm_key_id:
         hsm_key = db.session.get(HsmKey, hsm_key_id)
-        return scheme, compliance_signer.storage_for_hsm_key(hsm_key) if hsm_key else 'hsm'
+        return scheme, compliance_signer.storage_for_hsm_key(hsm_key)
     if hsm_provider_id:
         from models.hsm import HsmProvider
         provider = db.session.get(HsmProvider, hsm_provider_id)
+        if provider is None:
+            return scheme, 'software'
         return scheme, 'softhsm' if compliance_signer.softhsm_provider(provider) else 'hsm'
     return scheme, 'software'
 

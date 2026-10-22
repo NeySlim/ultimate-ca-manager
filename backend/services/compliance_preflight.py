@@ -15,11 +15,11 @@ from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 from cryptography.hazmat.primitives.asymmetric import rsa
 
 import compliance_profiles
-from models import (CA, Certificate, CertificatePolicy, CertificateTemplate, HsmProvider, SystemConfig)
+from models import (CA, Certificate, CertificatePolicy, CertificateTemplate, SystemConfig)
+from services import compliance_signer
 from services.acme import profiles as acme_profiles
 from services.fips_preflight import (_EDDSA_OIDS, _active_certificate_filter, _configured_certificate,
-                                     _named, load_stored_certificate,
-                                     provider_is_softhsm)
+                                     _named, load_stored_certificate)
 from services.ocsp_responder_renewal import RESPONDER_KEY_PREFIX
 from services.policy_service import key_label_for_public_key, normalize_digest
 from services.preflight_core import (BLOCKER, INFO, WARNING, Detector, run_detectors)
@@ -228,17 +228,10 @@ def _ca_hsm(ctx):
         return []
     found = []
     for ca, _cert, _label in _signing_cas(ctx):
-        if not ca.hsm_key_id:
-            found.append((grade, _ca_name(ca, 'software key')))
-            continue
-        provider = db_provider(ca)
-        if provider is not None and provider_is_softhsm(provider):
-            found.append((grade, _ca_name(ca, 'SoftHSM key')))
+        storage = compliance_signer.storage_of_ca(ca)
+        if storage != 'hsm':
+            found.append((grade, _ca_name(ca, 'SoftHSM key' if storage == 'softhsm' else 'software key')))
     return found
-
-
-def db_provider(ca) -> Optional[HsmProvider]:
-    return ca.hsm_key.provider if ca.hsm_key else None
 
 
 # --- certificates -------------------------------------------------------------

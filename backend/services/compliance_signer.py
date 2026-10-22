@@ -2,8 +2,6 @@
 
 ``enforce_rules`` reads these two facts from a CA row or a loaded CA key.
 """
-import os
-
 from utils import key_algorithms
 
 SCHEMES = ('rsa_pkcs1v15', 'rsa_pss', 'ecdsa', 'eddsa', 'ml_dsa', 'slh_dsa')
@@ -24,19 +22,28 @@ def scheme_for(public_key, signature_scheme=None):
 
 
 def softhsm_provider(provider):
-    """Whether an HSM provider row is SoftHSM: a PKCS#11 module named softhsm."""
+    """Whether an HSM provider row is SoftHSM: a PKCS#11 provider whose module
+    path or name says softhsm."""
     if provider is None or provider.type != 'pkcs11':
         return False
-    module = (provider.get_config() or {}).get('module_path') or ''
-    return 'softhsm' in os.path.basename(str(module)).lower()
+    module = str((provider.get_config() or {}).get('module_path') or '')
+    return 'softhsm' in module.lower() or 'softhsm' in (provider.name or '').lower()
 
 
 def storage_for_hsm_key(hsm_key):
-    """``softhsm`` / ``hsm`` for a stored HSM key row (``hsm`` when it cannot be told)."""
+    """``softhsm`` / ``hsm`` for a stored HSM key row; ``software`` when the row
+    or its provider is missing or unreadable, so an HSM rule fails closed."""
+    if hsm_key is None or hsm_key.provider is None:
+        return 'software'
     try:
         return 'softhsm' if softhsm_provider(hsm_key.provider) else 'hsm'
     except Exception:
-        return 'hsm'
+        return 'software'
+
+
+def storage_of_ca(ca):
+    """``software`` / ``softhsm`` / ``hsm`` for a CA row's key."""
+    return storage_for_hsm_key(ca.hsm_key) if ca.hsm_key_id else 'software'
 
 
 def describe(signer):
@@ -52,8 +59,7 @@ def describe(signer):
         except Exception:
             public = None
         scheme = scheme_for(public, signer.signature_scheme) if public is not None else None
-        storage = storage_for_hsm_key(signer.hsm_key) if signer.hsm_key_id else 'software'
-        return scheme, storage
+        return scheme, storage_of_ca(signer)
     try:
         public = signer.public_key()
     except Exception:

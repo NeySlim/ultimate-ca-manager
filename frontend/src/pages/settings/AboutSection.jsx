@@ -112,7 +112,7 @@ export default function AboutSection() {
       )}
 
       {hasPermission('admin:system') && <FipsPreflightPanel />}
-      {hasPermission('admin:system') && <CompliancePreflightPanel />}
+      {(hasPermission('admin:system') || hasPermission('admin:settings')) && <CompliancePreflightPanel />}
 
       {/* Links */}
       <DetailSection title={t('settings.about.links')} icon={Globe} iconClass="icon-bg-teal" className="mt-4">

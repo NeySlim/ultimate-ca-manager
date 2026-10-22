@@ -98,6 +98,15 @@ describe('CompliancePreflightPanel', () => {
     expect(screen.getByLabelText('settings.compliancePreflight.defaultProfile').disabled).toBe(true)
   })
 
+  it('sets the default without admin:system, and offers no check', async () => {
+    mocks.permissions = ['admin:settings']
+    render(<CompliancePreflightPanel />)
+    const select = screen.getByLabelText('settings.compliancePreflight.defaultProfile')
+    await waitFor(() => expect(select.value).toBe('anssi'))
+    expect(select.disabled).toBe(false)
+    expect(screen.queryByText('settings.compliancePreflight.run')).toBeNull()
+  })
+
   it('keeps the previous default shown when saving fails', async () => {
     mocks.updateBulk.mockRejectedValue(new Error('nope'))
     render(<CompliancePreflightPanel />)

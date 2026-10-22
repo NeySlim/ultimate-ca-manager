@@ -2350,12 +2350,13 @@ Check ids (each also exists with an `.advisory` suffix, at warning level, or inf
 `null` or `""` for none; omitted means the instance default, the `compliance_profile_default`
 system setting). The CA being created must meet the profile. `PATCH /api/v2/cas/{id}` with
 `complianceProfile` attaches, changes or (with `null` or `""`) removes it; it binds future
-issuance only, nothing issued is re-checked, and the change is audited. Run the preflight first.
+issuance only, nothing issued is re-checked, and the change is audited. The API runs no preflight
+(the interface does, and asks for confirmation): run it first.
 Every CA object returns `compliance_profile` (string or `null`). A refusal by a profile names
 the rule; a recommendation comes back in `meta.notices` of the issuance response.
 
 **Policy rule keys.** Policies (`rules`) also accept `allowed_signature_schemes`
-(`rsa_pkcs1v15`, `rsa_pss`, `ecdsa`, `eddsa`), `key_type_horizons` (`{"RSA-2048": "2030-12-31"}`:
+(`rsa_pkcs1v15`, `rsa_pss`, `ecdsa`, `eddsa`, `ml_dsa`, `slh_dsa`), `key_type_horizons` (`{"RSA-2048": "2030-12-31"}`:
 the certificate must not be valid beyond the date), `key_type_issue_until` (no issuance of that
 key type after the date), `require_hsm_ca_key` (boolean, software and SoftHSM CA keys refused),
 `tsa_signer_key_types`, `pq_standalone` (boolean) and `advisories` (an object using the same

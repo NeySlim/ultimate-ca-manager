@@ -232,7 +232,8 @@ class ImportExportMixin:
 
             key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
             return TrustStoreService.export_pkcs12(
-                cert_pem, key_pem, password, certificate.descr, legacy=legacy
+                cert_pem, key_pem, password, certificate.descr, legacy=legacy,
+                caref=certificate.caref
             )
 
         elif export_format == 'der':

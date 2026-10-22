@@ -28,6 +28,7 @@ from services.backup import container
 from services.backup.backup_service import _ARGON2_AVAILABLE
 from services.backup.schedule import _existing_archives
 from services.backup.settings_contract import scheduled_kdf
+from services.compliance_signer import softhsm_provider
 from services.preflight_core import (BLOCKER, INFO, MAX_EXAMPLES, SEVERITIES, WARNING,  # noqa: F401
                                      Detector, registry_detector,
                                      run_detectors)
@@ -353,17 +354,12 @@ def _acme_client():
     return found
 
 
-def provider_is_softhsm(provider) -> bool:
-    path = str(provider.get_config().get('module_path') or '')
-    return 'softhsm' in path.lower() or 'softhsm' in (provider.name or '').lower()
-
-
 @detector('hsm.softhsm', WARNING,
           'SoftHSM providers: SoftHSM is not a validated module, keys on it are not FIPS protected',
           'Move the keys to a validated HSM, or accept SoftHSM as a test setup only.')
 def _softhsm():
     rows = HsmProvider.query.filter_by(type='pkcs11').order_by(HsmProvider.id).all()
-    return [_named(p.name, p.id) for p in rows if provider_is_softhsm(p)]
+    return [_named(p.name, p.id) for p in rows if softhsm_provider(p)]
 
 
 @detector('hsm.gcp_grpc', WARNING,

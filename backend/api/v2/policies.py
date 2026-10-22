@@ -612,6 +612,10 @@ def _issue_approved_certificate(approval):
     if extra_err:
         raise ValueError(f'Invalid extra_ekus: {extra_err}')
     base_ekus = merge_eku_lists(base_ekus, to_object_identifiers(extra_oid_strs))
+    if ExtendedKeyUsageOID.TIME_STAMPING in base_ekus:
+        _tsa_violations = PolicyEvaluationService.tsa_signer_violations(data['ca_id'], new_key.public_key())
+        if _tsa_violations:
+            raise PolicyViolation('; '.join(_tsa_violations))
 
     # Same key-type clamp as the direct issue path (#327): no keyEncipherment
     # on an EC key, keyAgreement instead for an S/MIME one.

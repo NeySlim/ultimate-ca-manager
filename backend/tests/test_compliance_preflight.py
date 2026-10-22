@@ -231,6 +231,8 @@ def test_rsa_2048_issuance_ends_after_its_date_under_eu_acm(session, monkeypatch
     session.add(CertificateTemplate(name='rsa2048-tpl', template_type='custom', key_type='RSA-2048',
                                     extensions_template='{}'))
     session.flush()
+    before = datetime(2026, 6, 1, tzinfo=timezone.utc)
+    monkeypatch.setattr(compliance_preflight, 'utc_now', lambda: before)
     assert _finding(_report('eu-acm'), 'templates.key_type') is None
     later = datetime(2027, 3, 1, tzinfo=timezone.utc)
     monkeypatch.setattr(compliance_preflight, 'utc_now', lambda: later)

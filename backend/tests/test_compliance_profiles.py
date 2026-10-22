@@ -167,7 +167,7 @@ def test_create_refuses_what_the_profile_forbids(app, auth_client):
     assert r.status_code == 400 and 'RSA-2048' in r.get_json()['message']
     with app.app_context():
         assert CA.query.filter_by(descr='Profile RSA2048 bsi').first() is None
-    r = _post_ca(auth_client, 'Profile RSA2048 anssi', keySize=2048, validityYears=4,
+    r = _post_ca(auth_client, 'Profile RSA2048 anssi', keySize=2048, validityDays=30,
                   complianceProfile='anssi')
     assert r.status_code == 201
 

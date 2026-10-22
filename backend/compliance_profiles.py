@@ -1,9 +1,8 @@
 """Compliance profiles: policies in code, aligned with a versioned reference text.
 
 A CA with a profile is bound by it as FIPS mode binds every CA (the two
-intersect). ``allowed_key_types`` and ``allowed_digests`` are enforced today;
-the other keys are read by the rule engine as it learns them. ``advisories``
-holds rules in the same syntax that produce notices, never refusals.
+intersect). ``advisories`` holds rules in the same syntax that produce
+notices, never refusals.
 """
 import logging
 

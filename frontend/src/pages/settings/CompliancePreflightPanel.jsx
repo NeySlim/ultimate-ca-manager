@@ -20,6 +20,7 @@ export default function CompliancePreflightPanel() {
   const { showSuccess, showError } = useNotification()
   const { hasPermission } = usePermission()
   const canSetDefault = hasPermission('admin:settings')
+  const canCheck = hasPermission('admin:system')
   const profiles = useComplianceProfiles()
   const options = COMPLIANCE_PROFILE_NAMES.map((n) => ({
     value: n, label: profiles[n] ? `${profiles[n].title} (${profiles[n].reference})` : n,
@@ -85,7 +86,7 @@ export default function CompliancePreflightPanel() {
           />
         </div>
 
-        <div className="flex items-end justify-between gap-3 p-3 bg-tertiary-50 border border-border rounded-lg">
+        {canCheck && <div className="flex items-end justify-between gap-3 p-3 bg-tertiary-50 border border-border rounded-lg">
           <div className="min-w-0 flex-1 space-y-1">
             <Select
               label={t('settings.compliancePreflight.profile')}
@@ -99,7 +100,7 @@ export default function CompliancePreflightPanel() {
             <ShieldCheck size={14} />
             {loading ? t('settings.compliancePreflight.running') : t('settings.compliancePreflight.run')}
           </Button>
-        </div>
+        </div>}
 
         {error && <p className="text-sm status-danger-text">{error}</p>}
 

@@ -93,7 +93,7 @@ class CAExportMixin:
             prv_decrypted = decrypt_private_key(ca.prv)
             key_pem = base64.b64decode(prv_decrypted)
             return TrustStoreService.export_pkcs12(
-                cert_pem, key_pem, password, ca.descr, legacy=legacy
+                cert_pem, key_pem, password, ca.descr, legacy=legacy, ca_id=ca.id
             )
 
         elif export_format == 'der':

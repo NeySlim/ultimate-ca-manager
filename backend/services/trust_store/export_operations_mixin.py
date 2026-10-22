@@ -21,11 +21,15 @@ class ExportOperationsMixin:
         password: str,
         friendly_name: str = "Certificate",
         legacy: bool = False,
+        *,
+        ca_id=None,
+        caref=None,
     ) -> bytes:
         """Export certificate and key as PKCS#12.
 
         ``legacy`` selects the 3DES/SHA-1 compatibility profile (see
-        utils.pkcs12_export) instead of the AES-256 default.
+        utils.pkcs12_export) instead of the AES-256 default; *ca_id* or
+        *caref* names the CA whose compliance profile may refuse it.
         """
         cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
         key = serialization.load_pem_private_key(
@@ -37,7 +41,7 @@ class ExportOperationsMixin:
             key,
             cert,
             None,
-            pkcs12_encryption(password, legacy),
+            pkcs12_encryption(password, legacy, ca_id=ca_id, caref=caref),
         )
 
         return p12

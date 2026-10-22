@@ -157,13 +157,32 @@ class TestHsmAndTsa:
         assert _enforce(rules, signer_storage='hsm')[0] == []
         assert _enforce({'require_hsm_ca_key': False}, signer_storage='software')[0] == []
 
-    def test_softhsm_is_told_by_the_pkcs11_module(self):
-        def provider(kind, module):
-            return SimpleNamespace(type=kind, get_config=lambda: {'module_path': module})
+    def test_softhsm_is_told_by_the_pkcs11_module_or_its_name(self):
+        def provider(kind, module, name='HSM'):
+            return SimpleNamespace(type=kind, name=name, get_config=lambda: {'module_path': module})
         assert compliance_signer.softhsm_provider(provider('pkcs11', '/usr/lib/softhsm/libsofthsm2.so'))
+        assert compliance_signer.softhsm_provider(provider('pkcs11', '/usr/lib/softhsm/libpkcs11.so'))
+        assert compliance_signer.softhsm_provider(provider('pkcs11', '/opt/lab/libtoken.so', 'SoftHSM lab'))
         assert not compliance_signer.softhsm_provider(provider('pkcs11', '/opt/vendor/libcs_pkcs11_R3.so'))
         assert not compliance_signer.softhsm_provider(provider('openbao', '/usr/lib/softhsm/libsofthsm2.so'))
         assert not compliance_signer.softhsm_provider(None)
+
+    def test_a_key_row_that_cannot_be_read_is_not_an_hsm(self):
+        assert compliance_signer.storage_for_hsm_key(None) == 'software'
+        assert compliance_signer.storage_for_hsm_key(SimpleNamespace(provider=None)) == 'software'
+
+        def broken():
+            raise ValueError('config unreadable')
+        unreadable = SimpleNamespace(type='pkcs11', name='HSM', get_config=broken)
+        assert compliance_signer.storage_for_hsm_key(SimpleNamespace(provider=unreadable)) == 'software'
+        vendor = SimpleNamespace(type='pkcs11', name='HSM', get_config=lambda: {'module_path': '/opt/v/lib.so'})
+        assert compliance_signer.storage_for_hsm_key(SimpleNamespace(provider=vendor)) == 'hsm'
+
+    def test_a_planned_ca_on_a_missing_hsm_row_is_not_an_hsm(self, app):
+        from services.ca.ca_creation import _planned_signer
+        with app.app_context():
+            assert _planned_signer('EC-P256', None, 987654, None) == ('ecdsa', 'software')
+            assert _planned_signer('EC-P256', None, None, 987654) == ('ecdsa', 'software')
 
     def test_a_tsa_signer_must_have_an_allowed_key_type(self):
         rules = {'tsa_signer_key_types': ['EC-P256', 'EC-P384']}
@@ -453,6 +472,36 @@ class TestCaCreation:
         assert r.status_code == 400 and 'RSA-PSS' in r.get_json()['message'], r.get_json()
 
 
+class TestApproval:
+
+    def _approved(self, ca_id, cn, **data):
+        from models import User
+        gate = CertificatePolicy(name=f'tsa-gate-{uuid.uuid4().hex[:8]}', policy_type='issuance',
+                                 requires_approval=True, min_approvers=1, is_active=False)
+        db.session.add(gate)
+        db.session.commit()
+        requester = User.query.filter_by(role='admin').first()
+        approval = PolicyEvaluationService.create_approval_request(
+            policy=gate, requester_id=requester.id, request_type='certificate',
+            request_data={'cn': cn, 'ca_id': ca_id, 'validity_days': 30, **data})
+        approval.status = 'approved'
+        db.session.commit()
+        return approval
+
+    def test_an_approved_rsa_tsa_signer_is_refused_under_bsi(self, app, create_ca):
+        from api.v2.policies import _issue_approved_certificate
+        ca = _new_ca(create_ca, app, 'Approval tsa CA', profile='bsi', keySize=3072, signatureScheme='pss')
+        body = {'cert_type': 'custom', 'extra_ekus': ['timeStamping']}
+        with app.app_context():
+            rsa_ap = self._approved(ca['id'], 'rsa.approved.tsa.test', key_type='rsa', key_size=3072, **body)
+            with pytest.raises(PolicyViolation, match='EC signer'):
+                _issue_approved_certificate(rsa_ap)
+            db.session.rollback()
+            ec_ap = self._approved(ca['id'], 'ec.approved.tsa.test', key_type='ec', curve='P-256', **body)
+            assert _issue_approved_certificate(ec_ap)['id']
+            db.session.commit()
+
+
 class TestTsaSigner:
 
     def _issue(self, auth_client, ca_id, **body):
@@ -487,6 +536,16 @@ class TestTsaSigner:
                 ca_refid = db.session.get(CA, ca['id']).refid
             r = auth_client.patch('/api/v2/tsa/config', content_type=JSON,
                                   data=json.dumps({'ca_refid': ca_refid}))
+            assert r.status_code == 400 and 'EC signer' in r.get_json()['message'], r.get_json()
+            # Dropping the dedicated signer hands the tokens to the configured CA
+            with app.app_context():
+                for key, value in (('tsa_ca_refid', ca_refid), ('tsa_signer_cert_refid', refid)):
+                    row = SystemConfig.query.filter_by(key=key).first() or SystemConfig(key=key)
+                    row.value = value
+                    db.session.add(row)
+                db.session.commit()
+            r = auth_client.patch('/api/v2/tsa/config', content_type=JSON,
+                                  data=json.dumps({'signer_cert_refid': ''}))
             assert r.status_code == 400 and 'EC signer' in r.get_json()['message'], r.get_json()
         finally:
             with app.app_context():
@@ -616,3 +675,19 @@ class TestLegacyPkcs12:
         r = auth_client.post(f"/api/v2/cas/{ca['id']}/export", content_type=JSON, data=json.dumps({
             'format': 'pkcs12', 'include_key': True, 'password': 'Sup3r-secret-pw!', 'legacy': True}))
         assert r.status_code == 400 and 'bsi' in r.get_json()['message'], r.data[:200]
+
+    def test_the_service_exports_refuse_legacy_under_a_profile(self, app, auth_client, create_ca):
+        from services.ca_service import CAService
+        from services.cert_service import CertificateService
+        ca = _new_ca(create_ca, app, 'P12 service CA', profile='anssi')
+        r = _leaf(auth_client, ca['id'], 'p12.service.test')
+        assert r.status_code == 201
+        cert_id = get_json(r)['data']['id']
+        with app.app_context():
+            with pytest.raises(compliance_profiles.ProfileRestricted, match='anssi'):
+                CertificateService.export_certificate_with_options(
+                    cert_id, 'pkcs12', password='Sup3r-secret-pw!', legacy=True)
+            with pytest.raises(compliance_profiles.ProfileRestricted, match='anssi'):
+                CAService.export_ca_with_options(ca['id'], 'pkcs12', password='Sup3r-secret-pw!', legacy=True)
+            assert CertificateService.export_certificate_with_options(
+                cert_id, 'pkcs12', password='Sup3r-secret-pw!')
