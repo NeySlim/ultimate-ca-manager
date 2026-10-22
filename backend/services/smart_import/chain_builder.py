@@ -13,7 +13,8 @@ from dataclasses import dataclass
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
-from utils.cert_issuer import verify_certificate_signature
+from cryptography.exceptions import UnsupportedAlgorithm
+from utils.cert_issuer import UnsupportedIssuerKey, verify_certificate_signature
 
 from .parser import ParsedObject, ObjectType
 
@@ -26,6 +27,7 @@ class ChainInfo:
     leaf: Optional[ParsedObject] = None
     is_complete: bool = False
     is_valid: bool = False
+    verifiable: bool = True  # False when a signature uses an algorithm UCM cannot check
     errors: List[str] = None
     trust_source: Optional[str] = None  # 'self_contained', 'managed_ca', 'trust_store', None
     trust_anchor: Optional[str] = None  # Name of the trust anchor (CA name)
@@ -43,6 +45,7 @@ class ChainInfo:
             "leaf": self.leaf.to_dict() if self.leaf else None,
             "is_complete": self.is_complete,
             "is_valid": self.is_valid,
+            "verifiable": self.verifiable,
             "errors": self.errors,
             "chain_length": len(self.get_ordered_chain()),
             "trust_source": self.trust_source,
@@ -213,7 +216,13 @@ class ChainBuilder:
                 
                 # Verify signature
                 self._verify_signature(child_cert, parent_cert.public_key())
-                
+
+            except (UnsupportedIssuerKey, UnsupportedAlgorithm) as e:
+                chain.is_valid = False
+                chain.verifiable = False
+                chain.errors.append(
+                    f"Signature not verifiable: {child.subject} signed by {parent.subject}: {e}"
+                )
             except Exception as e:
                 chain.is_valid = False
                 chain.errors.append(

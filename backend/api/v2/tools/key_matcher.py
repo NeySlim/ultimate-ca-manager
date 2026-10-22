@@ -11,7 +11,7 @@ from cryptography.x509.oid import NameOID
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 
-from . import tools_bp, get_public_key_bytes, logger
+from . import tools_bp, get_public_key_bytes, logger, _csr_signature_valid
 
 
 @tools_bp.route('/match-keys', methods=['POST'])
@@ -144,7 +144,7 @@ def match_keys():
                     'type': 'csr',
                     'cn': cn,
                     'valid': True,
-                    'signature_valid': csr.is_signature_valid
+                    'signature_valid': _csr_signature_valid(csr)
                 })
             except Exception as e:
                 logger.warning(f"Invalid CSR data during PEM validation: {e}")

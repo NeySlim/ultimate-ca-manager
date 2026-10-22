@@ -8,6 +8,7 @@ signature with the candidate's key, not the name (#343 review).
 import logging
 
 from cryptography import x509
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, padding, rsa
 
 
@@ -23,6 +24,10 @@ def verify_certificate_signature(cert: x509.Certificate, public_key) -> None:
 
     Raises InvalidSignature on a bad signature and UnsupportedIssuerKey when
     the key type is not one this can check."""
+    try:
+        cert.signature_hash_algorithm
+    except UnsupportedAlgorithm as e:
+        raise UnsupportedIssuerKey(f"signature algorithm cannot be checked: {e}") from e
     if isinstance(public_key, rsa.RSAPublicKey):
         params = getattr(cert, 'signature_algorithm_parameters', None)
         public_key.verify(
@@ -54,7 +59,11 @@ def certificate_signed_by(cert: x509.Certificate, issuer: x509.Certificate) -> b
     type would otherwise drop the CA out of its chain and its revocation,
     #343 review)."""
     try:
-        verify_certificate_signature(cert, issuer.public_key())
+        try:
+            issuer_key = issuer.public_key()
+        except UnsupportedAlgorithm as e:
+            raise UnsupportedIssuerKey(f"issuer key cannot be loaded: {e}") from e
+        verify_certificate_signature(cert, issuer_key)
     except UnsupportedIssuerKey:
         raise
     except Exception:

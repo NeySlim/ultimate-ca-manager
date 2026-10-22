@@ -11,6 +11,7 @@ from cryptography.x509.oid import ExtensionOID
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519, ed448, dsa
+from utils.foreign_algorithms import describe_public_key
 from utils.signature_label import signature_algorithm_label
 
 logger = logging.getLogger(__name__)
@@ -232,8 +233,13 @@ def parse_certificate_info(pem_data):
     info = {}
 
     # Key algorithm and size
-    pub_key = cert.public_key()
-    if isinstance(pub_key, rsa.RSAPublicKey):
+    foreign = describe_public_key(cert)
+    pub_key = None if foreign else cert.public_key()
+    if foreign:
+        info['key_algorithm'] = foreign['label']
+        info['key_size'] = foreign['key_size']
+        info['key_oid'] = foreign['oid']
+    elif isinstance(pub_key, rsa.RSAPublicKey):
         info['key_algorithm'] = 'RSA'
         info['key_size'] = pub_key.key_size
     elif isinstance(pub_key, ec.EllipticCurvePublicKey):

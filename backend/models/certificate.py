@@ -174,15 +174,18 @@ class Certificate(db.Model):
             if self.crt:
                 pem_data = base64.b64decode(self.crt).decode('utf-8')
                 obj = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
-                public_key = obj.public_key()
             # Then try parsing CSR
             elif self.csr:
                 pem_data = base64.b64decode(self.csr).decode('utf-8')
                 obj = x509.load_pem_x509_csr(pem_data.encode(), default_backend())
-                public_key = obj.public_key()
             else:
                 return "N/A"
-            
+
+            from utils.foreign_algorithms import key_type_label
+            foreign = key_type_label(obj)
+            if foreign:
+                return foreign
+            public_key = obj.public_key()
             from utils.key_algorithms import key_algo_for_public_key
             return key_algo_for_public_key(public_key)
         except Exception:
@@ -331,7 +334,8 @@ class Certificate(db.Model):
                 '1.2.840.10045.4.3.3': 'ECDSA-SHA384',
                 '1.2.840.10045.4.3.4': 'ECDSA-SHA512',
             }
-            return sig_map.get(sig_oid.dotted_string, sig_oid._name or str(sig_oid))
+            from utils.foreign_algorithms import signature_label
+            return sig_map.get(sig_oid.dotted_string) or signature_label(sig_oid)
         except Exception:
             return "N/A"
     
@@ -520,9 +524,13 @@ def key_algo_from_crt(crt):
     import base64
     from cryptography import x509
     from utils.key_algorithms import key_algo_for_public_key
+    from utils.foreign_algorithms import describe_public_key
     try:
-        return key_algo_for_public_key(
-            x509.load_pem_x509_certificate(base64.b64decode(crt)).public_key())
+        cert = x509.load_pem_x509_certificate(base64.b64decode(crt))
+        foreign = describe_public_key(cert)
+        if foreign:
+            return foreign['label'][:50]
+        return key_algo_for_public_key(cert.public_key())
     except Exception:
         return None
 

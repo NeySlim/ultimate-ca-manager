@@ -10,6 +10,7 @@ from utils.days_remaining import days_remaining as compute_days_remaining
 
 from flask import Blueprint
 from cryptography import x509
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.backends import default_backend
@@ -18,6 +19,7 @@ from cryptography.x509.oid import NameOID, ExtensionOID
 import logging
 
 from utils.datetime_utils import utc_isoformat
+from utils.foreign_algorithms import describe_public_key, spki_der
 from utils.signature_label import signature_algorithm_label
 
 logger = logging.getLogger(__name__)
@@ -70,8 +72,11 @@ def cert_to_dict(cert):
     result['days_until_expiry'] = days_left
 
     # Public key info
-    pub_key = cert.public_key()
-    if isinstance(pub_key, rsa.RSAPublicKey):
+    foreign = describe_public_key(cert)
+    pub_key = None if foreign else cert.public_key()
+    if foreign:
+        result['public_key'] = _foreign_key_dict(foreign)
+    elif isinstance(pub_key, rsa.RSAPublicKey):
         result['public_key'] = {
             'type': 'RSA',
             'size': pub_key.key_size,
@@ -142,17 +147,28 @@ def cert_to_dict(cert):
     return result
 
 
+def _csr_signature_valid(csr):
+    """None when the signature algorithm cannot be checked here."""
+    try:
+        return csr.is_signature_valid
+    except UnsupportedAlgorithm:
+        return None
+
+
 def csr_to_dict(csr):
     """Convert CSR to detailed dict"""
     result = {
         'subject': format_name(csr.subject),
         'signature_algorithm': signature_algorithm_label(csr),
-        'is_signature_valid': csr.is_signature_valid
+        'is_signature_valid': _csr_signature_valid(csr),
     }
 
     # Public key info
-    pub_key = csr.public_key()
-    if isinstance(pub_key, rsa.RSAPublicKey):
+    foreign = describe_public_key(csr)
+    pub_key = None if foreign else csr.public_key()
+    if foreign:
+        result['public_key'] = _foreign_key_dict(foreign)
+    elif isinstance(pub_key, rsa.RSAPublicKey):
         result['public_key'] = {
             'type': 'RSA',
             'size': pub_key.key_size,
@@ -182,9 +198,15 @@ def csr_to_dict(csr):
     return result
 
 
+def _foreign_key_dict(foreign):
+    return {'type': foreign['label'], 'oid': foreign['oid'], 'size': foreign['key_size']}
+
+
 def get_public_key_bytes(obj):
     """Get public key bytes for comparison"""
     if hasattr(obj, 'public_key'):
+        if describe_public_key(obj):
+            return spki_der(obj)
         pub_key = obj.public_key()
     else:
         pub_key = obj

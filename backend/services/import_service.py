@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives import serialization
 import re
 import base64
 from utils.cert_issuer import is_self_signed
+from utils.foreign_algorithms import describe_public_key, spki_der
 from utils.key_codec import private_key_to_pem, refuse_eddsa_key
 from utils.pkcs12_import import refuse_pkcs12_import
 
@@ -202,6 +203,13 @@ def _spki(public_key):
     )
 
 
+def _spki_of(cert_or_csr):
+    """SubjectPublicKeyInfo of a certificate or CSR, also when pyca cannot load its key."""
+    if describe_public_key(cert_or_csr):
+        return spki_der(cert_or_csr)
+    return _spki(cert_or_csr.public_key())
+
+
 def _record_identity(record):
     """The record's current certificate and public key: (x509 or None, SPKI or None).
 
@@ -214,7 +222,7 @@ def _record_identity(record):
     if record.crt:
         try:
             stored_cert = x509.load_pem_x509_certificate(base64.b64decode(record.crt), default_backend())
-            return stored_cert, _spki(stored_cert.public_key())
+            return stored_cert, _spki_of(stored_cert)
         except Exception:
             stored_cert = None
     if record.prv:
@@ -230,7 +238,7 @@ def _record_identity(record):
         try:
             csr_pem = csr_stored.encode('utf-8') if csr_stored.startswith('-----BEGIN') else base64.b64decode(csr_stored)
             csr = x509.load_pem_x509_csr(csr_pem, default_backend())
-            return stored_cert, _spki(csr.public_key())
+            return stored_cert, _spki_of(csr)
         except Exception:
             pass
     hsm_key = getattr(record, 'hsm_key', None)
@@ -324,7 +332,7 @@ def _issuer_identity(cert, parents_by_name):
     for parent_cert in parents_by_name[name]:
         try:
             if certificate_signed_by(cert, parent_cert):
-                return ('key', _spki(parent_cert.public_key()))
+                return ('key', _spki_of(parent_cert))
         except Exception:
             continue
     try:
@@ -373,7 +381,7 @@ def _select_existing(candidates, cert, kind):
     if not candidates:
         return None
     try:
-        wanted = _spki(cert.public_key())
+        wanted = _spki_of(cert)
     except Exception:
         raise ValueError('Unsupported public key algorithm in the certificate')
     parents_by_name = {}
@@ -485,10 +493,7 @@ def find_pending_csr_for_certificate(cert):
     it; the key pair is the one thing the two share.
     """
     from models import Certificate
-    wanted = cert.public_key().public_bytes(
-        encoding=serialization.Encoding.DER,
-        format=serialization.PublicFormat.SubjectPublicKeyInfo,
-    )
+    wanted = _spki_of(cert)
     from utils.cert_status import pending_requests
     pending = pending_requests().order_by(Certificate.id.desc()).all()
     for record in pending:
@@ -496,10 +501,7 @@ def find_pending_csr_for_certificate(cert):
             stored = record.csr
             csr_pem = stored.encode('utf-8') if stored.startswith('-----BEGIN') else base64.b64decode(stored)
             csr = x509.load_pem_x509_csr(csr_pem, default_backend())
-            spki = csr.public_key().public_bytes(
-                encoding=serialization.Encoding.DER,
-                format=serialization.PublicFormat.SubjectPublicKeyInfo,
-            )
+            spki = _spki_of(csr)
         except Exception:
             continue
         if spki == wanted and not _issued_for_request(record.csr, cert):

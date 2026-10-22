@@ -8,6 +8,7 @@ from cryptography.hazmat.backends import default_backend
 from typing import Dict
 
 from utils.datetime_utils import utc_isoformat
+from utils.foreign_algorithms import describe_public_key
 from utils.signature_label import signature_algorithm_label
 
 
@@ -59,8 +60,15 @@ class ParsingMixin:
             details['issuer'][attr.oid._name] = attr.value
 
         # Parse public key info
-        public_key = cert.public_key()
-        if isinstance(public_key, rsa.RSAPublicKey):
+        foreign = describe_public_key(cert)
+        public_key = None if foreign else cert.public_key()
+        if foreign:
+            details['public_key'] = {
+                'algorithm': foreign['label'],
+                'oid': foreign['oid'],
+                'key_size': foreign['key_size'],
+            }
+        elif isinstance(public_key, rsa.RSAPublicKey):
             details['public_key'] = {
                 'algorithm': 'RSA',
                 'key_size': public_key.key_size,

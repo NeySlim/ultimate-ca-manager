@@ -13,6 +13,7 @@ from services.audit_service import AuditService
 from security.encryption import encrypt_private_key
 from . import bp
 from utils.key_codec import private_key_to_pem
+from utils.foreign_algorithms import describe_public_key, spki_der
 
 logger = logging.getLogger(__name__)
 
@@ -75,18 +76,24 @@ def upload_private_key(cert_id):
             try:
                 cert_pem = base64.b64decode(cert.crt)
                 certificate = load_pem_x509_certificate(cert_pem, default_backend())
-                cert_public_key = certificate.public_key()
                 key_public_key = private_key.public_key()
 
                 # Compare public key bytes
-                cert_pub_bytes = cert_public_key.public_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PublicFormat.SubjectPublicKeyInfo
-                )
-                key_pub_bytes = key_public_key.public_bytes(
-                    encoding=serialization.Encoding.PEM,
-                    format=serialization.PublicFormat.SubjectPublicKeyInfo
-                )
+                if describe_public_key(certificate):
+                    cert_pub_bytes = spki_der(certificate)
+                    key_pub_bytes = key_public_key.public_bytes(
+                        encoding=serialization.Encoding.DER,
+                        format=serialization.PublicFormat.SubjectPublicKeyInfo
+                    )
+                else:
+                    cert_pub_bytes = certificate.public_key().public_bytes(
+                        encoding=serialization.Encoding.PEM,
+                        format=serialization.PublicFormat.SubjectPublicKeyInfo
+                    )
+                    key_pub_bytes = key_public_key.public_bytes(
+                        encoding=serialization.Encoding.PEM,
+                        format=serialization.PublicFormat.SubjectPublicKeyInfo
+                    )
 
                 if cert_pub_bytes != key_pub_bytes:
                     return error_response('Private key does not match certificate public key', 400)

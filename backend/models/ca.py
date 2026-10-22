@@ -385,14 +385,16 @@ class CA(db.Model):
 
             if self.crt:
                 cert_pem = base64.b64decode(self.crt).decode('utf-8')
-                cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
-                public_key = cert.public_key()
+                obj = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
             else:
                 csr_pem = base64.b64decode(self.csr).decode('utf-8')
-                public_key = x509.load_pem_x509_csr(
-                    csr_pem.encode(), default_backend()
-                ).public_key()
+                obj = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())
 
+            from utils.foreign_algorithms import key_type_label
+            foreign = key_type_label(obj)
+            if foreign:
+                return foreign
+            public_key = obj.public_key()
             from utils.key_algorithms import key_algo_for_public_key
             return key_algo_for_public_key(public_key)
         except Exception:
@@ -414,6 +416,10 @@ class CA(db.Model):
             if cert.signature_algorithm_oid == SignatureAlgorithmOID.RSASSA_PSS:
                 from utils.signature_label import signature_algorithm_label
                 return signature_algorithm_label(cert)
+            from utils.foreign_algorithms import signature_name
+            known = signature_name(cert.signature_algorithm_oid.dotted_string)
+            if known:
+                return known
             return cert.signature_algorithm_oid._name.upper().replace('SHA', 'SHA-')
         except Exception:
             return "N/A"

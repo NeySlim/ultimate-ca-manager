@@ -9,12 +9,14 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.x509.oid import SignatureAlgorithmOID
 
+from utils.foreign_algorithms import signature_label
+
 
 def signature_algorithm_label(obj) -> str:
     """'RSASSA-PSS SHA-256 (salt 32)' for PSS, the OID name (or dotted string) otherwise."""
     oid = obj.signature_algorithm_oid
     if oid != SignatureAlgorithmOID.RSASSA_PSS:
-        return oid._name if oid._name != 'Unknown OID' else oid.dotted_string
+        return signature_label(oid)
     hash_name = obj.signature_hash_algorithm.name
     der = obj.public_bytes(serialization.Encoding.DER)
     parsed = (asn1crypto.x509.Certificate if isinstance(obj, x509.Certificate)

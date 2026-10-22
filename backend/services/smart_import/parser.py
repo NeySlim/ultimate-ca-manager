@@ -378,8 +378,7 @@ class SmartParser:
                     )
                     
                     # Extract key info from CSR
-                    pub_key = csr.public_key()
-                    obj.key_algorithm, obj.key_size = self._get_key_info(pub_key)
+                    obj.key_algorithm, obj.key_size = self._public_key_info(csr)
                     
                     # Extract SANs if present
                     try:
@@ -473,7 +472,7 @@ class SmartParser:
             pass
         
         # Key info
-        obj.key_algorithm, obj.key_size = self._get_key_info(cert.public_key())
+        obj.key_algorithm, obj.key_size = self._public_key_info(cert)
         
         # Store PEM
         obj.raw_pem = cert.public_bytes(serialization.Encoding.PEM).decode()
@@ -547,6 +546,14 @@ class SmartParser:
         except Exception:
             return None
     
+    def _public_key_info(self, cert_or_csr) -> Tuple[str, int]:
+        """Algorithm and size of a certificate's or CSR's key; a key pyca cannot load keeps its name or OID."""
+        from utils.foreign_algorithms import describe_public_key
+        foreign = describe_public_key(cert_or_csr)
+        if foreign:
+            return foreign['label'], foreign['key_size']
+        return self._get_key_info(cert_or_csr.public_key())
+
     def _get_key_info(self, key) -> Tuple[str, int]:
         """Extract algorithm and size from any key type"""
         from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519, ed448
