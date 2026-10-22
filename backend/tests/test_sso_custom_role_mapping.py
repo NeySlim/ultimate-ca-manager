@@ -244,6 +244,17 @@ class TestCreationAndSync:
             user = _login(app, pid, name, ['other'])
             assert user.custom_role.name == manual and user.custom_role_source is None
 
+    def test_sync_never_replaces_a_role_assigned_by_hand(self, app, provider, role, ptype):
+        a, manual = role(), role()
+        with app.app_context():
+            pid = provider(ptype, {'ga': {'custom_role': a}}, sync=True)
+            name = f'u-{_uid()}'
+            user = _login(app, pid, name, ['other'])
+            user.custom_role_id = db.session.query(CustomRole.id).filter_by(name=manual).scalar()
+            db.session.commit()
+            user = _login(app, pid, name, ['ga'])
+            assert user.custom_role.name == manual and user.custom_role_source is None
+
 
 # ---- validation at save --------------------------------------------------------
 
@@ -272,6 +283,15 @@ class TestValidationOnSave:
         assert r.status_code == 400, r.data
         shown = get_json(auth_client.get(f"{PROVIDERS}/{created['id']}"))['data']
         assert shown['role_mapping'] == {'g': 'viewer'}
+
+    def test_a_system_role_is_not_a_custom_role(self, app, auth_client):
+        with app.app_context():
+            system = CustomRole.query.filter_by(is_system=True).first()
+            if system is None:
+                pytest.skip('no system role seeded')
+            name = system.name
+        r = _post(auth_client, role_mapping={'g': {'custom_role': name}})
+        assert r.status_code == 400
 
     def test_good_mappings_are_stored_as_sent(self, auth_client, role):
         name = role()

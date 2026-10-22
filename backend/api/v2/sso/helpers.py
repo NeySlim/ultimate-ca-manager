@@ -239,37 +239,47 @@ _ENTRA_GROUPS_OVERAGE = 'http://schemas.microsoft.com/claims/groups.link'
 _MAPPING_FIELDS = ('username', 'email', 'fullname', 'groups')
 
 
-def mapped_attributes(attr_mapping, field):
+def mapped_attributes(attr_mapping, field, available=None):
     """SSO attributes the mapping assigns to the UCM ``field``.
 
-    The form stores ``{SSO attribute: UCM field}``; the legacy shape
-    ``{UCM field: SSO attribute}`` is accepted when no row targets ``field``
-    and the value is not itself a UCM field name. Malformed entries are ignored.
+    The form stores ``{SSO attribute: UCM field}``; the legacy ``{UCM field: SSO
+    attribute}`` is still read. A row whose two sides are both UCM field names is
+    read the form's way when it involves ``groups``, or when its key is among the
+    ``available`` attributes and its value is not; else the legacy way, the only
+    one that ever logged anyone in.
     """
     if not isinstance(attr_mapping, dict):
         return ()
-    names = {}
+    available = set(available or ())
+    form, legacy = {}, {}
     for key, val in attr_mapping.items():
-        if (isinstance(key, str) and key.strip() and isinstance(val, str)
-                and val.strip() == field):
-            names[key.strip()] = None
-    if names:
-        return tuple(names)
-    legacy = attr_mapping.get(field)
-    if isinstance(legacy, str) and legacy.strip() and legacy.strip() not in _MAPPING_FIELDS:
-        return (legacy.strip(),)
-    return ()
+        if not (isinstance(key, str) and isinstance(val, str) and key.strip() and val.strip()):
+            continue
+        key, val = key.strip(), val.strip()
+        key_is_field, val_is_field = key in _MAPPING_FIELDS, val in _MAPPING_FIELDS
+        if key_is_field and val_is_field:
+            # `groups` has no legacy history: such a row is always the form's.
+            as_form = 'groups' in (key, val) or (key in available and val not in available)
+        elif val_is_field or key_is_field:
+            as_form = val_is_field
+        else:
+            continue
+        if as_form and val == field:
+            form[key] = None
+        elif not as_form and key == field:
+            legacy[val] = None
+    return tuple(form) or tuple(legacy)
 
 
-def mapped_attribute(attr_mapping, field, default):
+def mapped_attribute(attr_mapping, field, default, available=None):
     """First SSO attribute mapped to ``field``, else ``default``."""
-    names = mapped_attributes(attr_mapping, field)
+    names = mapped_attributes(attr_mapping, field, available)
     return names[0] if names else default
 
 
-def _saml_group_attribute_names(attr_mapping):
+def _saml_group_attribute_names(attr_mapping, available=None):
     """SAML attributes mapped to ``groups``; empty when none is configured."""
-    return mapped_attributes(attr_mapping, 'groups')
+    return mapped_attributes(attr_mapping, 'groups', available)
 
 
 def oidc_identity(userinfo, attr_mapping):
@@ -277,7 +287,7 @@ def oidc_identity(userinfo, attr_mapping):
     userinfo = userinfo if isinstance(userinfo, dict) else {}
 
     def get(field, default):
-        value = userinfo.get(mapped_attribute(attr_mapping, field, default))
+        value = userinfo.get(mapped_attribute(attr_mapping, field, default, userinfo))
         return value if isinstance(value, str) else ''
 
     email = get('email', 'email')
@@ -290,7 +300,7 @@ def saml_identity(attrs, name_id, attr_mapping):
     attrs = attrs if isinstance(attrs, dict) else {}
 
     def get(field, default):
-        values = attrs.get(mapped_attribute(attr_mapping, field, default))
+        values = attrs.get(mapped_attribute(attr_mapping, field, default, attrs))
         if isinstance(values, (list, tuple)):
             values = values[0] if values else None
         return values.strip() if isinstance(values, str) else ''
@@ -309,7 +319,7 @@ def _extract_saml_groups(attrs, attr_mapping=None):
     that ``_resolve_role_from_mapping`` reads.
     """
     attrs = attrs if isinstance(attrs, dict) else {}
-    configured = _saml_group_attribute_names(attr_mapping)
+    configured = _saml_group_attribute_names(attr_mapping, attrs)
     groups = {}  # insertion-ordered set
     sources = []
     for name in configured or _SAML_GROUP_ATTRIBUTES:
@@ -343,12 +353,13 @@ _ROLE_PRIVILEGE = {'admin': 3, 'operator': 2, 'auditor': 1, 'viewer': 0}
 
 
 def _find_custom_role(name):
-    """The custom role called ``name`` (names are unique, case-insensitively), or None."""
+    """The non-system custom role called ``name`` (names are unique, case-insensitively)."""
     from models.rbac import CustomRole
     if not isinstance(name, str) or not name.strip():
         return None
     return CustomRole.query.filter(
-        db.func.lower(CustomRole.name) == name.strip().lower()).first()
+        db.func.lower(CustomRole.name) == name.strip().lower(),
+        CustomRole.is_system.isnot(True)).first()
 
 
 def _split_mapping_value(value):

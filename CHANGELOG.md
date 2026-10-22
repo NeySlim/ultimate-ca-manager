@@ -43,7 +43,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- SSO: the Attribute Mapping of OAuth2 and SAML providers was read backwards, so a row such as `user.userprincipalname` → `username` was ignored; it is now read as the form shows it, and mappings saved the other way round keep working (#408).
+- SSO: the Attribute Mapping of OAuth2 and SAML providers was read backwards, so a row such as `user.userprincipalname` → `username` was ignored; it is now read as the form shows it, and mappings saved the other way round, such as `username` → `email`, keep working (#408).
 - SAML: logins now apply the provider's role mapping, which never received the assertion's groups, so every SAML user got the default role; groups are read from `groups` and the Entra ID / AD FS group and role claims, or from the attributes mapped to `groups` (#408, thanks @clinde04).
 - EST: `/csrattrs` no longer asks for a challengePassword, which UCM never checked; the FortiOS EST client took it as a request for proof-of-possession and hung on `/simpleenroll`.
 - EST: re-enrolment over native mTLS failed for every client with "Invalid client certificate": the TLS worker hands the client certificate over as DER and `/simplereenroll` read it as PEM; it is now converted, and `/serverkeygen` with a client certificate is fixed the same way.

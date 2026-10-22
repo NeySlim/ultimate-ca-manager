@@ -353,9 +353,10 @@ def _get_or_create_sso_user(provider, username, email, fullname, external_data):
                 )
                 role_change = (user.role, mapped_role)
                 user.role = mapped_role
-            # A custom role set by hand (source NULL) is never removed.
+            # A custom role set by hand (source NULL) is never replaced nor removed.
             current = user.custom_role.name if user.custom_role_id and user.custom_role else None
-            if mapped_custom is not None:
+            by_hand = user.custom_role_id is not None and user.custom_role_source != 'sso'
+            if mapped_custom is not None and not by_hand:
                 if user.custom_role_id != mapped_custom.id:
                     custom_change = (current, mapped_custom.name)
                     user.custom_role_id = mapped_custom.id

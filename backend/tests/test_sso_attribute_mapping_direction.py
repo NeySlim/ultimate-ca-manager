@@ -16,12 +16,21 @@ class TestMappedAttribute:
         assert mapped_attribute(LEGACY, 'email', 'x') == 'mail'
 
     def test_form_direction_wins_over_legacy(self):
-        mapping = {'username': 'email', 'login': 'username'}
-        assert mapped_attribute(mapping, 'username', 'x') == 'login'
+        mapping = {'upn': 'username', 'username': 'login'}
+        assert mapped_attribute(mapping, 'username', 'x') == 'upn'
 
-    def test_identity_row_is_not_a_legacy_value(self):
-        # {'email': 'username'} maps the attribute "email" to the UCM username.
-        assert mapped_attribute({'email': 'username'}, 'email', 'dflt') == 'dflt'
+    def test_field_to_field_row_reads_the_legacy_way_by_default(self):
+        # {'username': 'email'} was the only shape that ever worked: username <- email.
+        assert mapped_attribute({'username': 'email'}, 'username', 'dflt') == 'email'
+        assert mapped_attribute({'username': 'email'}, 'email', 'dflt') == 'dflt'
+
+    def test_field_to_field_row_follows_the_attributes_present(self):
+        # The form's {'email': 'username'}: the assertion has "email", not "username".
+        present = {'email': 'a@corp.example'}
+        assert mapped_attribute({'email': 'username'}, 'username', 'dflt', present) == 'email'
+        assert mapped_attribute({'email': 'username'}, 'email', 'dflt', present) == 'dflt'
+        # The legacy {'username': 'email'} with the same assertion stays legacy.
+        assert mapped_attribute({'username': 'email'}, 'username', 'dflt', present) == 'email'
 
     @pytest.mark.parametrize('bad', [None, [], 'text', 5, {}, {'upn': None},
                                      {'upn': 3}, {'': 'username'}, {'username': ''},
@@ -68,3 +77,25 @@ class TestSamlIdentity:
 
     def test_non_string_value_does_not_crash(self):
         assert saml_identity({'upn': [5], 'mail': [['x']]}, 'nid', FORM) == ('nid', '', '')
+
+
+class TestLegacyFieldToFieldRow:
+    """A stored {'username': 'email'} keeps deriving the same identity (review of #408)."""
+
+    def test_oidc(self):
+        info = {'sub': 's1', 'email': 'alice@corp.example', 'name': 'Alice'}
+        assert oidc_identity(info, {'username': 'email'}) == \
+            ('alice@corp.example', 'alice@corp.example', 'Alice')
+
+    def test_saml(self):
+        attrs = {'email': ['alice@corp.example']}
+        assert saml_identity(attrs, 'opaque-nameid', {'username': 'email'})[:2] == \
+            ('alice@corp.example', 'alice@corp.example')
+
+    def test_saml_form_row_with_field_names(self):
+        attrs = {'email': ['bob@corp.example']}
+        assert saml_identity(attrs, 'opaque-nameid', {'email': 'username'})[0] == 'bob@corp.example'
+
+    def test_oidc_form_row_with_field_names(self):
+        info = {'sub': 's2', 'email': 'bob@corp.example'}
+        assert oidc_identity(info, {'email': 'username'})[0] == 'bob@corp.example'

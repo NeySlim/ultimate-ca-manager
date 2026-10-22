@@ -106,7 +106,7 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
   useEffect(() => {
     let cancelled = false
     Promise.resolve(rolesService.listRoles())
-      .then(res => { if (!cancelled) setCustomRoles((res?.data || []).map(r => r.name).filter(Boolean)) })
+      .then(res => { if (!cancelled) setCustomRoles((res?.data || []).filter(r => !r.is_system).map(r => r.name).filter(Boolean)) })
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
