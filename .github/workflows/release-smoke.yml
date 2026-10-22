@@ -35,17 +35,25 @@ jobs:
 
       - name: Resolve version
         id: ver
+        # Inputs reach the shell through env and are validated, never interpolated.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_IMAGE: ${{ inputs.image }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-            echo "image=${{ inputs.image }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            VER="$INPUT_VERSION"
+            IMAGE="$INPUT_IMAGE"
           else
             # Pulled from the triggering workflow run's head_branch (the tag ref).
-            REF="${{ github.event.workflow_run.head_branch }}"
-            VER="${REF#v}"
-            echo "version=$VER" >> "$GITHUB_OUTPUT"
-            echo "image=neyslim/ultimate-ca-manager" >> "$GITHUB_OUTPUT"
+            VER="${HEAD_BRANCH#v}"
+            IMAGE="neyslim/ultimate-ca-manager"
           fi
+          [[ "$VER" =~ ^[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]] || { echo "Invalid version: $VER"; exit 1; }
+          [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image: $IMAGE"; exit 1; }
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Determine RC flag
         id: rc
@@ -115,16 +123,25 @@ jobs:
 
       - name: Resolve version
         id: ver
+        # Inputs reach the shell through env and are validated, never interpolated.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_IMAGE: ${{ inputs.image }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-            echo "image=${{ inputs.image }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            VER="$INPUT_VERSION"
+            IMAGE="$INPUT_IMAGE"
           else
-            REF="${{ github.event.workflow_run.head_branch }}"
-            VER="${REF#v}"
-            echo "version=$VER" >> "$GITHUB_OUTPUT"
-            echo "image=neyslim/ultimate-ca-manager" >> "$GITHUB_OUTPUT"
+            # Pulled from the triggering workflow run's head_branch (the tag ref).
+            VER="${HEAD_BRANCH#v}"
+            IMAGE="neyslim/ultimate-ca-manager"
           fi
+          [[ "$VER" =~ ^[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]] || { echo "Invalid version: $VER"; exit 1; }
+          [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image: $IMAGE"; exit 1; }
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Determine RC flag
         id: rc
@@ -183,16 +200,25 @@ jobs:
 
       - name: Resolve version
         id: ver
+        # Inputs reach the shell through env and are validated, never interpolated.
+        env:
+          EVENT_NAME: ${{ github.event_name }}
+          INPUT_VERSION: ${{ inputs.version }}
+          INPUT_IMAGE: ${{ inputs.image }}
+          HEAD_BRANCH: ${{ github.event.workflow_run.head_branch }}
         run: |
-          if [ "${{ github.event_name }}" = "workflow_dispatch" ]; then
-            echo "version=${{ inputs.version }}" >> "$GITHUB_OUTPUT"
-            echo "image=${{ inputs.image }}" >> "$GITHUB_OUTPUT"
+          if [ "$EVENT_NAME" = "workflow_dispatch" ]; then
+            VER="$INPUT_VERSION"
+            IMAGE="$INPUT_IMAGE"
           else
-            REF="${{ github.event.workflow_run.head_branch }}"
-            VER="${REF#v}"
-            echo "version=$VER" >> "$GITHUB_OUTPUT"
-            echo "image=neyslim/ultimate-ca-manager" >> "$GITHUB_OUTPUT"
+            # Pulled from the triggering workflow run's head_branch (the tag ref).
+            VER="${HEAD_BRANCH#v}"
+            IMAGE="neyslim/ultimate-ca-manager"
           fi
+          [[ "$VER" =~ ^[0-9]+\.[0-9]+(-rc[0-9]+)?$ ]] || { echo "Invalid version: $VER"; exit 1; }
+          [[ "$IMAGE" =~ ^[a-z0-9][a-z0-9./_-]*$ ]] || { echo "Invalid image: $IMAGE"; exit 1; }
+          echo "version=$VER" >> "$GITHUB_OUTPUT"
+          echo "image=$IMAGE" >> "$GITHUB_OUTPUT"
 
       - name: Determine RC flag
         id: rc

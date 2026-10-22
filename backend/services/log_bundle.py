@@ -256,7 +256,7 @@ def build_bundle() -> bytes:
 
 
 def bundle_filename() -> str:
-    """Suggested download filename, e.g. ``ucm-logs-netsuit-20260627T1123.zip``."""
+    """Suggested download filename, e.g. ``ucm-logs-myhost-20260627T1123.zip``."""
     host = os.uname().nodename
     ts = datetime.now(timezone.utc).strftime('%Y%m%dT%H%M%S')
     return f'ucm-logs-{host}-{ts}.zip'

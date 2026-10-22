@@ -20,6 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- Helm chart: `podSecurityContext` and `securityContext` now default to the non-root user 1000 with `fsGroup` 1000; values that set them keep theirs.
 - Signature hashes: SHA-224 is no longer accepted, and an unknown hash name is refused where it used to be signed in SHA-256 without a word; UCM signs with SHA-256, SHA-384 or SHA-512.
 - API keys: the password, e-mail, 2FA, passkey, mTLS certificate and session routes of the account now refuse API keys, even `*` ones, and so do the user administration routes when they target the key's own owner; scripts that used them must sign in with a session (see Security).
 - Enrollment: a CSR with a Brainpool key, refused until now, is accepted outside FIPS mode by Sign CSR, ACME, EST, SCEP and WSTEP; restrict it with a policy's allowed key types if needed.
@@ -27,10 +28,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- Dependencies: the minimum versions of Pillow (12.3), lxml (6.1), azure-identity (1.25) and SQLAlchemy (2.0.45) are raised past their known vulnerabilities; fresh installs already picked newer releases.
 - CAs: the Create CA dialog defaults to RSA-3072 and warns when an RSA-2048 CA would outlive 2030; the default signature hash of a CA follows the curve size for Brainpool keys as it does for NIST curves.
 
 ### Security
 
+- Release workflows: dispatch inputs and the triggering tag reach the shell through environment variables and are validated, instead of being interpolated into the script.
+- Helm chart: pods run as the image's non-root user (UID 1000) with seccomp `RuntimeDefault`, no privilege escalation and every capability dropped, where the chart left the security context empty.
 - Accounts: an API key, whatever its scopes, can no longer change its owner's password or e-mail, enable or reset 2FA, link an SSO identity, register a passkey or enrol an mTLS certificate, through the account or the user administration routes, which let a key take over the account it belongs to; enabling 2FA no longer replaces a confirmed secret.
 - API keys: a key can no longer create or regenerate a key with scopes it does not hold itself; a narrow key belonging to an administrator could mint a `*` key.
 

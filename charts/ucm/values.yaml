@@ -138,11 +138,20 @@ serviceAccount:
   name: ""
   annotations: {}
 
-## UCM writes to /etc/ucm and /opt/ucm/data and manages file permissions in its
-## entrypoint, so it runs as root by default. Override only if your image/setup
-## supports a non-root UID with writable volumes.
-podSecurityContext: {}
-securityContext: {}
+## The image runs as the non-root user ucm (UID/GID 1000); fsGroup makes the
+## data and /etc/ucm volumes writable by it.
+podSecurityContext:
+  runAsNonRoot: true
+  runAsUser: 1000
+  runAsGroup: 1000
+  fsGroup: 1000
+  fsGroupChangePolicy: OnRootMismatch
+  seccompProfile:
+    type: RuntimeDefault
+securityContext:
+  allowPrivilegeEscalation: false
+  capabilities:
+    drop: [ALL]
 
 nodeSelector: {}
 tolerations: []

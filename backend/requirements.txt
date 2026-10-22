@@ -6,7 +6,7 @@ Flask==3.1.3
 Flask-RESTX==1.3.2
 Flask-SQLAlchemy==3.1.1
 # 2.1 resolves postgresql:// to psycopg 3 and has not been validated yet
-SQLAlchemy>=2.0,<2.1
+SQLAlchemy>=2.0.45,<2.1
 Flask-Migrate==4.1.0
 Flask-CORS==6.0.2
 Flask-Limiter==4.1.1
@@ -26,7 +26,7 @@ cbor2==6.1.2
 # TOTP/2FA Support
 pyotp>=2.9.0
 qrcode>=7.4
-Pillow>=10.0.0
+Pillow>=12.3.0
 
 # SCEP Support (pycryptodome dropped — SCEP now uses pyca/cryptography's ciphers)
 pyasn1==0.6.4
@@ -67,7 +67,7 @@ python3-saml>=1.16.0
 # HSM Support (PKCS#11, Azure Key Vault, Google Cloud KMS)
 python-pkcs11>=0.7.0
 azure-keyvault-keys>=4.9.0
-azure-identity>=1.15.0
+azure-identity>=1.25
 google-cloud-kms>=2.21.0
 
 # PostgreSQL support (for HA / multi-node deployments)
@@ -121,7 +121,7 @@ defusedxml>=0.7.1
 # MS-XCEP / MS-WSTEP (Windows autoenrollment, GH #229): SOAP/XML envelope
 # parsing and construction. Mature manylinux + Windows wheels, no native
 # lib beyond libxml2 (already pulled in transitively by other deps).
-lxml>=5.0
+lxml>=6.1
 # WS-Security XML-DSig verification for WSTEP's Certificate-bound renewal
 # binding (a real Windows CES client signs the RST with its current
 # certificate's private key; UCM verifies that signature before treating
