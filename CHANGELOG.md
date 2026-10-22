@@ -36,6 +36,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- EST: `/csrattrs` no longer asks for a challengePassword, which UCM never checked; the FortiOS EST client took it as a request for proof-of-possession and hung on `/simpleenroll`.
 - Reports: the Expiry Report tile showed Disabled whatever the Expiring Certificates schedule; it now follows that schedule.
 - Certificates: an RSA-PSS signature is shown with its hash and salt length ("RSASSA-PSS SHA-256 (salt 32)") and scored by its hash, and a Brainpool key is scored like the NIST curve of the same size, where both counted as unrated.
 - Signing: an unknown signature hash is refused instead of being replaced by SHA-256, and an EdDSA certificate is no longer offered or accepted as the TSA signer, which failed every timestamp request.

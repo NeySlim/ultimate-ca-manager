@@ -290,9 +290,10 @@ class TestCsrAttrs:
         der = base64.b64decode(response.data)
         attrs, trailing = der_decoder.decode(der)
         assert trailing == b''
-        assert str(attrs[0]) == '1.2.840.113549.1.9.7'
-        assert str(attrs[1][0]) == '1.2.840.113549.1.9.14'
-        assert {str(oid) for oid in attrs[1][1]} == {
+        # challengePassword is not asked for: UCM does not verify one (#405)
+        assert len(attrs) == 1
+        assert str(attrs[0][0]) == '1.2.840.113549.1.9.14'
+        assert {str(oid) for oid in attrs[0][1]} == {
             '2.5.29.15', '2.5.29.17', '2.5.29.37'
         }
 

@@ -267,11 +267,9 @@ def _certificate_key_identifier(cert):
 
 def _fallback_csrattrs_der():
     """Return a valid DER CsrAttrs when pyasn1 is unavailable."""
-    # RFC 7030 §4.5 example shape: an OID plus an extensionRequest
-    # Attribute whose SET contains the requested certificate extension OIDs.
+    # An extensionRequest Attribute whose SET holds the requested extension OIDs.
     return bytes.fromhex(
-        '3029'
-        '06092a864886f70d010907'
+        '301e'
         '301c06092a864886f70d01090e310f'
         '0603551d0f0603551d110603551d25'
     )
@@ -284,10 +282,9 @@ def _build_csrattrs_der():
     except ImportError:
         return _fallback_csrattrs_der()
 
+    # No challengePassword: UCM never checks one, and clients such as FortiOS
+    # take the OID as a request for tls-unique proof-of-possession.
     attrs = univ.SequenceOf(componentType=univ.Any())
-    challenge_password = univ.ObjectIdentifier('1.2.840.113549.1.9.7')
-    attrs.append(univ.Any(der_encoder.encode(challenge_password)))
-
     extension_request = univ.Sequence()
     extension_request.setComponentByPosition(
         0, univ.ObjectIdentifier('1.2.840.113549.1.9.14')
@@ -843,8 +840,8 @@ def get_csr_attrs(label=None):
     # CsrAttrs ::= SEQUENCE SIZE (1..MAX) OF AttrOrOID
     # AttrOrOID ::= CHOICE { oid OBJECT IDENTIFIER, attribute Attribute }
     #
-    # Request challengePassword as an OID and descriptive certificate
-    # extensions as values of an extensionRequest Attribute.
+    # Request the descriptive certificate extensions as values of an
+    # extensionRequest Attribute.
     der_bytes = _build_csrattrs_der()
     b64_content = base64.b64encode(der_bytes).decode('ascii')
     return Response(
