@@ -438,6 +438,31 @@ class TestJwsProblemTypes:
         assert r.status_code == 400 and _type(r) == 'badNonce', r.get_json()
         assert r.headers.get('Replay-Nonce')
 
+    def test_a_stale_nonce_says_what_acme_sh_looks_for(self, client, base):
+        key, jwk = _key()
+        r = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True}, key, jwk=jwk,
+                  nonce='not-a-nonce-this-server-issued')
+        assert 'JWS has an invalid anti-replay nonce' in r.get_json()['detail']
+
+    def test_an_eab_with_an_unusable_key_is_malformed(self, app, client, base):
+        kid = 'eab-bad-key' + base.replace('/', '-')
+        with app.app_context():
+            AcmeEabCredential.query.filter_by(kid=kid).delete()
+            db.session.add(AcmeEabCredential(kid=kid, hmac_key_b64=_b64(b'eab-secret'),
+                                             status='active'))
+            db.session.commit()
+        try:
+            key, jwk = _key()
+            eab = _eab({'kty': 'oct', 'k': 'AAAA'}, kid, b'eab-secret',
+                       f'http://localhost{base}/new-account')
+            r = _post(client, f'{base}/new-account',
+                      {'termsOfServiceAgreed': True, 'externalAccountBinding': eab}, key, jwk=jwk)
+            assert r.status_code == 400 and _type(r) == 'malformed', r.get_json()
+        finally:
+            with app.app_context():
+                AcmeEabCredential.query.filter_by(kid=kid).delete()
+                db.session.commit()
+
     def test_an_unusable_key_is_bad_public_key(self, client, base):
         key, jwk = _key()
         r = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True}, key,

@@ -2,14 +2,18 @@
 from services.acme.account_requests import CLOSED_ACCOUNT
 
 UNKNOWN_ACCOUNT = "No account matches the JWS kid"
+# Boulder's wording: acme.sh retries on this text, not on the problem type
+BAD_NONCE = "JWS has an invalid anti-replay nonce"
+_EAB_ERROR = 'Invalid external account binding'
 _BAD_KEY_MARKERS = ('Invalid JWK:', 'Unsupported key type:', 'Key is not a dict')
 
 
 def jws_problem(error_type: str, detail: str, status: int):
     """(type, status) for a problem, refining the 'malformed' verify_jws reports."""
-    if error_type != 'malformed' or not detail:
+    # An EAB error describes the inner JWS, never the request's own nonce or key
+    if error_type != 'malformed' or not detail or detail.startswith(_EAB_ERROR):
         return error_type, status
-    if detail.endswith('Invalid or expired nonce'):
+    if detail.endswith(BAD_NONCE):
         return 'badNonce', status
     if any(marker in detail for marker in _BAD_KEY_MARKERS):
         return 'badPublicKey', status

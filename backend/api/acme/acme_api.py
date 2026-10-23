@@ -18,7 +18,7 @@ from services.acme.account_requests import (
     consume_eab,
     require_valid_account,
 )
-from services.acme.jws_problems import UNKNOWN_ACCOUNT, jws_problem
+from services.acme.jws_problems import BAD_NONCE, UNKNOWN_ACCOUNT, jws_problem
 from models.acme_models import (
     AcmeAccount,
     AcmeAuthorization,
@@ -388,7 +388,7 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
         
         service = get_acme_service()
         if not service.validate_nonce(nonce):
-            return False, None, None, "Invalid or expired nonce"
+            return False, None, None, BAD_NONCE
         
         # Get JWK or KID
         jwk = protected.get('jwk')

@@ -6,6 +6,7 @@ import pytest
 
 from models import db, SystemConfig, AcmeClientAccount, AcmeClientOrder
 from services.acme.acme_proxy_account import PROXY_ACCOUNT_ID_KEY
+from services.acme.jws_problems import UNKNOWN_ACCOUNT
 
 
 _STUB_DIRECTORY_URL = 'https://acme-stub.example/directory'
@@ -195,7 +196,7 @@ class TestAcmeProxyEabNewOrder:
         detail = (r_order.get_json() or {}).get('detail', '')
         assert 'Missing JWK' not in detail
         assert 'kid required' not in detail.lower()
-        assert 'Account not found' not in detail
+        assert 'Account not found' not in detail and UNKNOWN_ACCOUNT not in detail
         assert 'No DNS provider configured' in detail  # past the kid check
 
 
@@ -248,7 +249,7 @@ class TestAcmeProxyOnlyReturnExisting:
         r_order = _post_new_order(client, jwk, private_key, r.headers['Location'])
         detail = (r_order.get_json() or {}).get('detail', '')
         assert 'kid required' not in detail.lower()
-        assert 'Account not found' not in detail
+        assert 'Account not found' not in detail and UNKNOWN_ACCOUNT not in detail
         assert 'No DNS provider configured' in detail  # past the kid check
 
     @pytest.mark.parametrize('eab_required', [True, False])

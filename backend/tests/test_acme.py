@@ -14,6 +14,7 @@ import json
 import os
 import sys
 from tests.conftest import get_json, assert_success, assert_error
+from services.acme.jws_problems import UNKNOWN_ACCOUNT
 
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
@@ -1591,8 +1592,9 @@ class TestAcmeProxyProtocol:
         r_order = client.post('/acme/proxy/new-order',
                               data=json.dumps(jws_order),
                               content_type='application/jose+json')
-        # Should NOT return 400 "Account not found" — that was the bug
-        assert 'Account not found' not in (r_order.get_json() or {}).get('detail', '')
+        # Should NOT refuse the kid as unknown — that was the bug
+        detail = (r_order.get_json() or {}).get('detail', '')
+        assert 'Account not found' not in detail and UNKNOWN_ACCOUNT not in detail
         # May return 400 for "No DNS provider" which is correct business logic
         if r_order.status_code == 400:
             detail = r_order.get_json().get('detail', '')
