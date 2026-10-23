@@ -135,14 +135,14 @@ class TestEddsaKeyName:
 
 class TestSshCaDefaults:
     def test_fips_mode_creates_ecdsa_p256_by_default(self, auth_client, fips_on):
-        r = _post(auth_client, '/api/v2/ssh/cas', {'descr': f'FIPS default {uuid.uuid4().hex[:6]}'})
+        r = _post(auth_client, '/api/v2/ssh/cas', {'descr': f'FIPS default {uuid.uuid4().hex[:6]}', 'allow_any_principal': True})
         assert r.status_code == 201, r.get_json()
         data = r.get_json()['data']
         assert data['key_type'] == 'ecdsa-p256'
         assert data['public_key'].startswith('ecdsa-sha2-nistp256 ')
 
     def test_default_stays_ed25519_outside_fips_mode(self, auth_client, fips_off):
-        r = _post(auth_client, '/api/v2/ssh/cas', {'descr': f'Std default {uuid.uuid4().hex[:6]}'})
+        r = _post(auth_client, '/api/v2/ssh/cas', {'descr': f'Std default {uuid.uuid4().hex[:6]}', 'allow_any_principal': True})
         assert r.status_code == 201, r.get_json()
         assert r.get_json()['data']['key_type'] == 'ed25519'
 
@@ -156,7 +156,7 @@ class TestSshCaDefaults:
         assert r.get_json()['data']['key_type'] == 'ecdsa-p256'
 
     def test_generated_user_key_defaults_to_ecdsa_in_fips_mode(self, auth_client, fips_on):
-        ca = _post(auth_client, '/api/v2/ssh/cas', {'descr': f'Gen {uuid.uuid4().hex[:6]}'}).get_json()['data']
+        ca = _post(auth_client, '/api/v2/ssh/cas', {'descr': f'Gen {uuid.uuid4().hex[:6]}', 'allow_any_principal': True}).get_json()['data']
         r = _post(auth_client, '/api/v2/ssh/certificates/generate',
                   {'ca_id': ca['id'], 'cert_type': 'user', 'principals': ['alice']})
         assert r.status_code == 201, r.get_json()
@@ -164,7 +164,7 @@ class TestSshCaDefaults:
         assert isinstance(key, ec.EllipticCurvePrivateKey) and key.curve.name == 'secp256r1'
 
     def test_generated_user_key_stays_ed25519_outside_fips_mode(self, auth_client, fips_off):
-        ca = _post(auth_client, '/api/v2/ssh/cas', {'descr': f'Gen std {uuid.uuid4().hex[:6]}'}).get_json()['data']
+        ca = _post(auth_client, '/api/v2/ssh/cas', {'descr': f'Gen std {uuid.uuid4().hex[:6]}', 'allow_any_principal': True}).get_json()['data']
         r = _post(auth_client, '/api/v2/ssh/certificates/generate',
                   {'ca_id': ca['id'], 'cert_type': 'user', 'principals': ['alice']})
         assert r.status_code == 201, r.get_json()
@@ -182,7 +182,8 @@ def ed25519_ssh_ca(app, monkeypatch):
         with monkeypatch.context() as m:
             m.setattr(fips_mode, 'enabled', lambda: False)
             ca = SSHCAService.create_ca(descr=f'Legacy Ed SSH CA {uuid.uuid4().hex[:6]}',
-                                        ca_type='user', key_type='ed25519', username='t')
+                                        ca_type='user', key_type='ed25519', username='t',
+                                        allow_any_principal=True)
         return ca.id
 
 
@@ -208,7 +209,7 @@ class TestExistingSshObjects:
                 SSHCAService.get_private_key_object(ed25519_ssh_ca)
 
     def test_an_ed25519_subject_key_is_refused(self, app, auth_client, fips_on):
-        ca = _post(auth_client, '/api/v2/ssh/cas', {'descr': f'EC signer {uuid.uuid4().hex[:6]}'}).get_json()['data']
+        ca = _post(auth_client, '/api/v2/ssh/cas', {'descr': f'EC signer {uuid.uuid4().hex[:6]}', 'allow_any_principal': True}).get_json()['data']
         r = _post(auth_client, '/api/v2/ssh/certificates', {
             'ca_id': ca['id'], 'cert_type': 'user', 'principals': ['alice'],
             'public_key': _ssh_public(ed25519.Ed25519PrivateKey.generate())})

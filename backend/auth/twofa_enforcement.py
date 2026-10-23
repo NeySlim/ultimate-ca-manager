@@ -15,6 +15,9 @@ ENROLL_SESSION_KEY = 'must_enroll_2fa'
 
 # Exact request paths reachable while in the forced-enrolment state. Everything
 # else returns 403 until the user confirms TOTP (or logs out).
+# Read only, for both forced prompts: they render in the user's language and theme
+PROMPT_READABLE_PATHS = frozenset({'/api/v2/account/preferences'})
+
 ENROLL_ALLOWED_PATHS = frozenset({
     '/api/v2/account/2fa/enable',
     '/api/v2/account/2fa/confirm',

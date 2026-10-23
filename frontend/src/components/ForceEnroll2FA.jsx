@@ -75,7 +75,7 @@ export function ForceEnroll2FA({ onComplete }) {
   }
 
   return (
-    <Modal open={true} onClose={() => {}} title={t('account.enroll2faRequired')}>
+    <Modal open={true} onClose={() => {}} showClose={false} title={t('account.enroll2faRequired')}>
       <div className="p-4 space-y-4">
         <div className="flex items-start gap-3 p-3 rounded-lg bg-accent-warning-op10 border border-accent-warning-op30">
           <Warning size={20} className="text-accent-warning flex-shrink-0 mt-0.5" />

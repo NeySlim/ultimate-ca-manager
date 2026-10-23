@@ -54,24 +54,24 @@ def _submit_chain(
     endpoint: str,
     timeout: int,
 ) -> Optional[Dict[str, Any]]:
-    import ssl
-    import urllib.request
+    from utils.ssrf_protection import safe_request_post
 
     submit_url = log_url.rstrip("/") + endpoint
     try:
-        from utils.ssrf_protection import validate_url_not_cloud_metadata
-
-        validate_url_not_cloud_metadata(submit_url)
         payload = json.dumps({"chain": _pem_chain_to_base64(cert_chain_pem)}).encode("utf-8")
-        request = urllib.request.Request(
+        # Resolved, vetted and pinned; a CT log answers in place (RFC 6962), so
+        # a redirect is a failure, never followed.
+        with safe_request_post(
             submit_url,
             data=payload,
             headers={"Content-Type": "application/json"},
-            method="POST",
-        )
-        context = ssl.create_default_context()
-        with urllib.request.urlopen(request, context=context, timeout=timeout) as response:
-            raw = response.read(_MAX_CT_RESPONSE_BYTES + 1)
+            timeout=timeout,
+            stream=True,
+            allow_redirects=False,
+        ) as response:
+            if response.status_code != 200:
+                raise ValueError(f"CT log answered HTTP {response.status_code}")
+            raw = response.raw.read(_MAX_CT_RESPONSE_BYTES + 1, decode_content=True)
         if len(raw) > _MAX_CT_RESPONSE_BYTES:
             raise ValueError("CT log response exceeds size limit")
         result = json.loads(raw.decode("utf-8"))

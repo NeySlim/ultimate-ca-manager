@@ -63,6 +63,11 @@ def test_2fa_enforcement_end_to_end(app):
         assert r.status_code == 403
         assert get_json(r).get('must_enroll_2fa') is True
 
+        # The prompt reads the user's preferences; writing them waits
+        assert c.get('/api/v2/account/preferences').status_code == 200
+        assert c.put('/api/v2/account/preferences', data='{}',
+                     content_type='application/json').status_code == 403
+
         # verify() advertises the enrolment state for the frontend router.
         assert get_json(c.get('/api/v2/auth/verify'))['data'].get('must_enroll_2fa') is True
 

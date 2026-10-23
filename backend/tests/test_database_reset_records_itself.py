@@ -62,3 +62,17 @@ class TestTheResetIsRecorded:
             # Sealed like any other entry: a chain that restarts is still a
             # chain, and this is its genesis.
             assert rows[0].entry_hash, 'the entry was not sealed'
+
+
+@pytest.mark.parametrize('initial,forced', [('changeme123', True), ('Operator-Chosen-1!', False)])
+def test_the_recreated_admin_is_forced_only_with_the_public_default(
+        app, auth_client, monkeypatch, initial, forced):
+    monkeypatch.setitem(app.config, 'INITIAL_ADMIN_PASSWORD', initial)
+    answer = auth_client.post('/api/v2/system/database/reset')
+    assert answer.status_code == 200, answer.data
+    with app.app_context():
+        admin = User.query.filter_by(username=app.config['INITIAL_ADMIN_USERNAME']).one()
+        assert admin.force_password_change is forced
+        # Later files sign in as admin with the default password
+        admin.set_password('changeme123')
+        db.session.commit()

@@ -68,6 +68,8 @@ Gerencie seu perfil pessoal, configurações de segurança e chaves de API.
 ### Alteração de Senha
 Altere sua senha atual. Deve estar em conformidade com a política de senhas do sistema (comprimento mínimo, requisitos de complexidade).
 
+Quando o UCM pede uma nova senha no login (a conta \`admin\` do primeiro boot, por exemplo), a alteração vem antes de qualquer outra coisa: enquanto ela não for feita, o servidor recusa todas as outras requisições dessa sessão, API incluída.
+
 ### Autenticação de Dois Fatores (TOTP)
 Adicione uma senha única baseada em tempo usando qualquer aplicativo autenticador:
 

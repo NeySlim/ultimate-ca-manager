@@ -39,20 +39,22 @@ def init_database():
             # canonical bootstrap paths in app.py / database_health.py.
             # NOTE: the User column is `active` — `is_active=True` made this
             # constructor raise TypeError whenever the block was reached.
+            from auth.password_change_gate import DEFAULT_INITIAL_PASSWORD, initial_password_needs_change
+            initial_password = app.config.get("INITIAL_ADMIN_PASSWORD", DEFAULT_INITIAL_PASSWORD)
             admin = User(
                 username=admin_username,
                 email=app.config.get("INITIAL_ADMIN_EMAIL", "admin@localhost"),
                 role='admin',
                 active=True,
-                # The seeded password is public knowledge, so it must be
+                # The default password is public knowledge, so it must be
                 # rotated at first login rather than silently remaining valid.
-                force_password_change=True,
+                force_password_change=initial_password_needs_change(initial_password),
                 # Exempt the bootstrap admin from forced 2FA enrolment (#141)
                 # so enabling global enforcement can never lock out this
                 # account — same as the other bootstrap paths.
                 totp_exempt=True
             )
-            admin.set_password(app.config.get("INITIAL_ADMIN_PASSWORD", "changeme123"))
+            admin.set_password(initial_password)
             db.session.add(admin)
             db.session.commit()
             print(f"✓ Default admin user created (username: {admin_username}, "

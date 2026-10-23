@@ -376,12 +376,21 @@ def require_auth(permissions=None, session_only=False):
             # enrolment may only reach the enrolment endpoints (and logout) until
             # TOTP is confirmed. Checked before permissions so an un-enrolled
             # session is uniformly blocked regardless of its permissions.
-            from auth.twofa_enforcement import ENROLL_SESSION_KEY, ENROLL_ALLOWED_PATHS
-            if session.get(ENROLL_SESSION_KEY) and request.path not in ENROLL_ALLOWED_PATHS:
+            from auth.twofa_enforcement import ENROLL_SESSION_KEY, ENROLL_ALLOWED_PATHS, PROMPT_READABLE_PATHS
+            if session.get(ENROLL_SESSION_KEY) and request.path not in ENROLL_ALLOWED_PATHS \
+                    and not (request.method == 'GET' and request.path in PROMPT_READABLE_PATHS):
                 return jsonify({
                     'error': 'Forbidden',
                     'message': '2FA enrolment required',
                     'must_enroll_2fa': True
+                }), 403
+
+            from auth.password_change_gate import password_change_allows, password_change_pending
+            if password_change_pending(auth_result) and not password_change_allows(request.path, request.method):
+                return jsonify({
+                    'error': 'Forbidden',
+                    'message': 'Password change required',
+                    'must_change_password': True
                 }), 403
 
             # Check permissions if specified

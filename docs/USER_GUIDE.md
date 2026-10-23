@@ -10,7 +10,7 @@ Quick start guide for using Ultimate Certificate Manager.
 
 1. Navigate to `https://your-server:8443`
 2. Login with default credentials: `admin` / `changeme123`
-3. **Important:** Change your password immediately in Account settings
+3. Set a new password when asked: until then the server refuses every other request of that session, API included
 
 ### Navigation
 

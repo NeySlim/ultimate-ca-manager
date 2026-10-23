@@ -4,6 +4,7 @@ https://www.namecheap.com/support/api/methods.aspx
 """
 import requests
 import defusedxml.ElementTree as ET
+from defusedxml import DefusedXmlException
 from typing import Tuple, Dict, Any, Optional, List
 import logging
 
@@ -78,7 +79,7 @@ class NamecheapDnsProvider(BaseDnsProvider):
             
             return True, root
             
-        except ET.ParseError as e:
+        except (ET.ParseError, DefusedXmlException) as e:
             logger.error(f"Namecheap XML parse failed: {self._failure(e)}")
             return False, f"XML parse error: {e}"
         except requests.RequestException as e:

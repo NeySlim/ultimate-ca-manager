@@ -3898,8 +3898,7 @@
     "mustBeDifferent": "La nuova password deve essere diversa dalla attuale",
     "incorrect": "Password non corretta",
     "changeSuccess": "Password cambiata con successo",
-    "changeFailed": "Cambio password fallito",
-    "skipForNow": "Salta per ora"
+    "changeFailed": "Cambio password fallito"
   },
   "import": {
     "smartImport": "Importazione Intelligente",
@@ -5343,7 +5342,9 @@
       "ttlPlaceholder": "es. 24h, 7d, 365d",
       "principalsPlaceholder": "es. root,admin,deploy (separati da virgola)",
       "keySizeLabel": "Dimensione chiave (solo RSA)",
-      "principalsHelperText": "Elenco di principal consentiti separati da virgola"
+      "principalsHelperText": "Elenco di principal consentiti separati da virgola",
+      "allowAnyPrincipal": "Consenti qualsiasi principal",
+      "allowAnyPrincipalHelp": "Se non è elencato alcun principal, firma per qualsiasi nome, root compreso. Senza questa opzione, una CA con elenco vuoto non firma nulla."
     },
     "searchPlaceholder": "Cerca CA SSH...",
     "downloadSetupScript": "Scarica script di configurazione",
@@ -5359,7 +5360,9 @@
     "quickInstallWindowsDescription": "Incolla questo in qualsiasi PowerShell sul server Windows. Scarica lo script di setup e lo avvia come amministratore in una nuova finestra che rimane aperta. Funziona anche quando l'esecuzione locale di .ps1 è bloccata.",
     "powershellCopied": "Comando PowerShell copiato negli appunti",
     "downloadSetupScriptLinux": "Scarica .sh (Linux/macOS)",
-    "downloadSetupScriptWindows": "Scarica .ps1 (Windows)"
+    "downloadSetupScriptWindows": "Scarica .ps1 (Windows)",
+    "anyPrincipal": "Qualsiasi principal",
+    "noPrincipalSignsNothing": "Nessun principal elencato: questa CA non firma nulla"
   },
   "sshCertificates": {
     "title": "Certificati SSH",

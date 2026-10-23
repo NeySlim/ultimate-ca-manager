@@ -1814,6 +1814,15 @@ export const helpContent = {
           { label: 'Validation', text: 'Malformed values are rejected with an error naming the accepted formats' },
         ]
       },
+      {
+        title: 'Allowed Principals',
+        icon: Users,
+        items: [
+          { label: 'Allowed principals', text: 'Comma-separated patterns (e.g. deploy, team-*). Every principal in a request must match one of them.' },
+          { label: 'Allow any principal', text: 'A CA with an empty list signs for any name, root included, only when this option is ticked. Otherwise it signs nothing.' },
+          { label: 'Upgrade', text: 'CAs created before 2.245 without a list keep signing for any principal: the upgrade ticks the option for them.' },
+        ]
+      },
     ],
     tips: [
       'Use separate CAs for user and host certificates, never mix them.',

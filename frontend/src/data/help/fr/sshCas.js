@@ -44,6 +44,14 @@ export default {
           { label: 'Validation', text: 'Les valeurs mal formées sont rejetées avec une erreur indiquant les formats acceptés' },
         ]
       },
+      {
+        title: 'Principals autorisés',
+        items: [
+          { label: 'Principals autorisés', text: 'Motifs séparés par des virgules (par ex. deploy, team-*). Chaque principal d\'une demande doit correspondre à l\'un d\'eux.' },
+          { label: 'Autoriser tout principal', text: 'Une CA dont la liste est vide signe pour n\'importe quel nom, root compris, uniquement si cette option est cochée. Sinon elle ne signe rien.' },
+          { label: 'Mise à niveau', text: 'Les CA créées avant 2.245 sans liste continuent de signer pour tout principal : la mise à niveau coche l\'option pour elles.' },
+        ]
+      },
     ],
     tips: [
       'Utilisez des CA distinctes pour les certificats utilisateur et hôte : ne les mélangez jamais.',
@@ -94,7 +102,14 @@ Une Host CA signe des certificats qui authentifient les **serveurs auprès des c
    - **ECDSA P-256/P-384/P-521** : Bonne compatibilité et sécurité.
    - **RSA 4096** : Compatibilité la plus large, clés plus volumineuses.
 5. Définissez optionnellement la validité maximale et les extensions par défaut
-6. Cliquez sur **Créer**
+6. Listez les principals autorisés, ou cochez **Autoriser tout principal**
+7. Cliquez sur **Créer**
+
+### Principals autorisés
+
+Le champ **Principals autorisés** restreint les noms pour lesquels une CA signe, sous forme de motifs séparés par des virgules (\`deploy\`, \`team-*\`, \`web??.example.com\`). Chaque principal d'une demande doit correspondre à l'un d'eux.
+
+Une CA dont la liste est vide ne signe rien, sauf si **Autoriser tout principal** est coché : elle signe alors pour n'importe quel nom, \`root\` compris. Les CA créées avant 2.245 sans liste se comportaient ainsi implicitement ; la mise à niveau coche l'option pour elles, elles continuent donc de fonctionner.
 
 ### Formats de TTL
 

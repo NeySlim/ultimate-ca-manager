@@ -68,6 +68,8 @@ Gérez votre profil personnel, vos paramètres de sécurité et vos clés API.
 ### Changement de mot de passe
 Changez votre mot de passe actuel. Doit respecter la politique de mot de passe du système (longueur minimale, exigences de complexité).
 
+Lorsque UCM demande un nouveau mot de passe à la connexion (le compte \`admin\` du premier démarrage, par exemple), ce changement passe avant tout le reste : tant qu'il n'est pas fait, le serveur refuse toutes les autres requêtes de cette session, API comprise.
+
 ### Authentification à deux facteurs (TOTP)
 Ajoutez un mot de passe à usage unique basé sur le temps à l'aide de n'importe quelle application d'authentification :
 

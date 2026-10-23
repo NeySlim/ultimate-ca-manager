@@ -1,4 +1,4 @@
-import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom'
+import { BrowserRouter, Routes, Route, Navigate, useLocation } from 'react-router-dom'
 import { lazy, Suspense } from 'react'
 import { AuthProvider, ThemeProvider, NotificationProvider, MobileProvider, WindowManagerProvider, useAuth } from './contexts'
 import { WebSocketProvider } from './hooks/useWebSocket'
@@ -92,8 +92,10 @@ function PermissionRoute({ children, permission }) {
   return children
 }
 
-function AppRoutes() {
+export function AppRoutes() {
   const { isAuthenticated, loading, sessionChecked, forcePasswordChange, clearForcePasswordChange, mustEnroll2fa, checkSession, logout } = useAuth()
+  const { pathname } = useLocation()
+  const gated = isAuthenticated && (mustEnroll2fa || forcePasswordChange)
 
   return (
     <Suspense fallback={<PageLoader />}>
@@ -111,7 +113,10 @@ function AppRoutes() {
         <ForcePasswordChange onComplete={clearForcePasswordChange} />
       )}
 
-      <Routes>
+      {/* Pages mount once the gates lift: the server refuses their requests until then.
+          A login URL is left now, or a logout from the prompt would land back on it. */}
+      {gated && pathname.startsWith('/login') && <Navigate to="/" replace />}
+      {!gated && <Routes>
         <Route 
           path="/login" 
           element={
@@ -173,7 +178,7 @@ function AppRoutes() {
         </Route>
         
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      </Routes>}
     </Suspense>
   )
 }

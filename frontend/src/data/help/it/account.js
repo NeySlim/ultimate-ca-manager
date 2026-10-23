@@ -68,6 +68,8 @@ Gestisci il tuo profilo personale, le impostazioni di sicurezza e le chiavi API.
 ### Cambio password
 Modifica la tua password attuale. Deve rispettare la politica password del sistema (lunghezza minima, requisiti di complessità).
 
+Quando UCM richiede una nuova password all'accesso (ad esempio per l'account \`admin\` del primo avvio), la modifica ha la precedenza su tutto: finché non è stata effettuata, il server rifiuta ogni altra richiesta di quella sessione, API comprese.
+
 ### Autenticazione a due fattori (TOTP)
 Aggiungi una password monouso basata sul tempo utilizzando qualsiasi app di autenticazione:
 

@@ -1,12 +1,12 @@
 # Security Documentation
 
-Ultimate Certificate Manager implements comprehensive security features to protect your PKI infrastructure.
+This page describes the security features of Ultimate Certificate Manager. To report a vulnerability, see the [security policy](../SECURITY.md).
 
 ## Security Features
 
 ### 1. Private Key Encryption
 
-All private keys (CA and certificate) are encrypted at rest using **Fernet** encryption (AES-256-CBC with HMAC-SHA256).
+All private keys (CA and certificate) are encrypted at rest using **Fernet** encryption (AES-128-CBC with HMAC-SHA256).
 
 #### Configuration
 
@@ -55,9 +55,11 @@ timestamp:nonce:hmac_signature
 - Signed with SECRET_KEY
 
 #### Exempt Paths
-- `/api/v2/auth/login` (needs to get token)
-- `/acme/`, `/scep/`, `/ocsp`, `/cdp/` (protocol endpoints)
-- `/api/health` (monitoring)
+- Pre-session authentication: `/api/v2/auth/login`, `/api/v2/auth/forgot`, `/api/v2/auth/reset`, `/api/v2/auth/methods`
+- SSO flows: `/api/v2/sso/callback`, `/api/v2/sso/login`, `/api/v2/sso/ldap/login`, `/api/v2/sso/saml/metadata`, `/api/v2/sso/available`
+- Protocol endpoints: `/acme/`, `/scep/`, `/.well-known/` (EST), `/ocsp`, `/cdp/`, `/ca/`, `/tsa`, `/ssh/setup/`, and the XCEP/WSTEP paths
+- Health checks: `/api/health`, `/api/v2/health`
+- Requests authenticated with `X-API-Key`
 
 ---
 
@@ -68,7 +70,7 @@ Strong password enforcement for all user accounts.
 #### Requirements
 | Rule | Value |
 |------|-------|
-| Minimum length | 8 characters |
+| Minimum length | 8 characters (configurable) |
 | Maximum length | 128 characters |
 | Uppercase required | Yes |
 | Lowercase required | Yes |
@@ -101,21 +103,24 @@ Protection against brute force and DoS attacks.
 
 | Endpoint Pattern | Requests/min | Burst |
 |-----------------|--------------|-------|
-| `/api/v2/auth/login` | 10 | 3 |
-| `/api/v2/auth/register` | 5 | 2 |
-| `/api/v2/certificates/issue` | 30 | 5 |
-| `/api/v2/cas` | 30 | 5 |
-| `/api/v2/backup` | 5 | 2 |
-| `/api/v2/users` | 60 | 10 |
-| `/api/v2/certificates` | 120 | 20 |
-| `/acme/`, `/scep/` | 300 | 50 |
+| `/api/v2/auth/login`, SSO callback and LDAP login | 30 | 10 |
+| `/api/v2/auth/forgot-password`, `/api/v2/auth/reset-password` | 15 | 9 |
+| `/api/v2/certificates/issue`, `/api/v2/cas` | 60 | 15 |
+| `/api/v2/csrs/sign` | 30 | 15 |
+| `/api/v2/import`, `/api/v2/export` | 20 | 2 |
+| `/api/v2/backup` | 10 | 2 |
+| `/api/v2/users`, `/api/v2/audit` | 300 | 50 |
+| `/api/v2/certificates` | 600 | 100 |
+| `/acme/`, `/scep/`, `/.well-known/est/` | 250 | 50 |
 | `/ocsp`, `/cdp/` | 500 | 100 |
-| Default | 120 | 20 |
+| Default | 600 | 100 |
+
+The four base rates can be changed with `RATE_LIMIT_{AUTH,HEAVY,STANDARD,PROTOCOL}_{RPM,BURST}`. Requests from RFC 1918, loopback and link-local addresses are not rate limited.
 
 #### Response Headers
 ```
-X-RateLimit-Limit: 120
-X-RateLimit-Remaining: 115
+X-RateLimit-Limit: 600
+X-RateLimit-Remaining: 595
 X-RateLimit-Reset: 1706789123
 ```
 
@@ -170,7 +175,7 @@ POST /api/v2/system/audit/cleanup
 {"retention_days": 90}
 ```
 
-Default: 90 days, auto-cleanup daily at midnight.
+Default: logs are kept forever. Setting a retention enables the cleanup, which runs every 24 hours.
 
 #### Integrity
 Each entry is chained to the previous one. With a master key (`/etc/ucm/master.key` or
@@ -228,7 +233,7 @@ PUT /api/v2/system/alerts/expiry
 }
 
 # List expiring certificates
-GET /api/v2/system/alerts/expiring-certs?days=30
+GET /api/v2/dashboard/expiring-certs?limit=10
 
 # Manual check
 POST /api/v2/system/alerts/expiry/check
@@ -282,7 +287,7 @@ A consolidated audit landed in v2.142. All changes are operator-transparent exce
 | **CSV bulk import** (`/api/v2/users/import`) | Capped at 5 MB / 10 000 rows, returns `413` on overflow | Split larger imports |
 | **CRL on-demand** (`/cdp/<ca>.crl`) | Per-CA serialisation lock, returns `503` + `Retry-After: 5` under contention | None, clients honour `Retry-After`. Cached CRL endpoint unaffected. |
 | **Webhooks** | DNS revalidated at delivery time (closes DNS-rebinding window between config and delivery) | None. RFC1918/.lan/.local still allowed by design (on-prem) |
-| **2FA backup codes** | Hashed at rest (Argon2id), atomic single-use consumption (`UPDATE ... WHERE hash = ? AND used_at IS NULL`) | None: re-generate codes after upgrade for fresh hashes |
+| **2FA backup codes** | Hashed at rest (PBKDF2-HMAC-SHA256), atomic single-use consumption (`UPDATE ... WHERE hash = ? AND used_at IS NULL`) | None: re-generate codes after upgrade for fresh hashes |
 | **Approval quorum** | Per-request DB lock, recount-in-transaction, idempotent re-submit | None |
 | **ACME account keys** | Encrypted at rest with master key | None: migrated transparently on first read |
 | **Audit IP** | `client_ip()` honours `X-Forwarded-For` only behind trusted proxy | None: same as mTLS row |
@@ -350,11 +355,11 @@ Threat model:
 - **Stolen offline file**: useless without the password (PKCS#8 password-encrypted; standard cryptography library hardening).
 - **Forgotten password**: no recovery. The CA is unrecoverable. This is by design.
 
-Sign/issue/CRL paths gate on `ca.offline` (see `services/ca/ca_signing.py:31`, `csrs.py:689`, `services/cert/mixins/csr.py`, `crl.py:97`). The `update_ca` endpoint can no longer flip the `offline` flag, only the dedicated `take_offline` / `restore` endpoints do, both of which require the password.
+Every signing path (issuance, CSR signing, CRL, SCEP, TSA) refuses an offline CA. The `update_ca` endpoint can no longer flip the `offline` flag, only the dedicated `take_offline` / `restore` endpoints do, both of which require the password.
 
 Audit actions: `ca.offline.password_protected`, `ca.offline.file_exported`, `ca.restore.password_protected`, `ca.restore.file_exported`. The legacy free-text "offline reason" field is no longer collected, the mode IS the audit record.
 
-Password policy for the offline password is the same as the user password policy (12+ chars, mixed classes, no 4+ sequential).
+The offline password follows the user password policy (see section 3).
 
 ---
 
@@ -362,7 +367,7 @@ Password policy for the offline password is the same as the user password policy
 
 ### 1. Initial Setup
 ```bash
-# 1. Change default admin password immediately
+# 1. Sign in and set the admin password (the default one must be changed before anything else)
 # 2. Generate and set encryption key
 # 3. Configure HTTPS with proper certificate
 # 4. Set strong SECRET_KEY in /etc/ucm/ucm.env
@@ -401,7 +406,7 @@ Access security metrics at Settings > Audit Logs:
 ### Scheduled Tasks
 | Task | Interval | Description |
 |------|----------|-------------|
-| `audit_log_cleanup` | Daily | Remove old audit logs |
+| `audit_log_cleanup` | Daily | Remove audit logs past the retention, when one is set |
 | `cert_expiry_alerts` | Daily | Send expiry notifications |
 | `crl_auto_regen` | Hourly | Regenerate expiring CRLs |
 
@@ -409,23 +414,4 @@ Access security metrics at Settings > Audit Logs:
 
 ## Reporting Security Issues
 
-If you discover a security vulnerability, please report it responsibly:
-
-1. **Do NOT** create a public GitHub issue
-2. Open a [GitHub Security Advisory](https://github.com/NeySlim/ultimate-ca-manager/security/advisories)
-3. Include: description, steps to reproduce, impact assessment
-4. Allow 90 days for fix before public disclosure
-
----
-
-## Security Changelog
-
-| Version | Date | Changes |
-|---------|------|---------|
-| Unreleased | 2026-07-17 | CSR SKI/AKI never copied from enrollee CSR; EE/CA AKI from issuer SKI; CA AIA `caIssuers`; CRL `invalidityDate`; unhold → delta `removeFromCRL` |
-| 2.56 | 2026-07-17 | ACME/CSR certificates now include Extended Key Usage (serverAuth), empty subject populated from SAN |
-| 2.55 | 2026-07-17 | DN format fix (RFC 4514), auto-migration corrects existing records |
-| 2.52 | 2026-07-14 | SSRF protection, DNS rebinding prevention, WebAuthn brute-force protection, SSO audit logging, certificate discovery security |
-| 2.1.0 | 2026-02-19 | SSO (LDAP/OAuth2/SAML) with rate limiting, LDAP filter injection fix, CSRF on SSO endpoints, 4-role RBAC (admin/operator/auditor/viewer), 28 SSO security tests |
-| 2.0.2 | 2026-01-31 | Private key encryption, CSRF, password policy, rate limiting |
-| 2.0.0 | 2026-01-29 | Initial security framework, session auth, RBAC |
+See the [security policy](../SECURITY.md).

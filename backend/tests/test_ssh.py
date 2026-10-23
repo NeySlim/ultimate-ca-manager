@@ -35,12 +35,14 @@ VALID_USER_CA = {
     'descr': 'Test User CA',
     'ca_type': 'user',
     'key_type': 'ed25519',
+    'allow_any_principal': True,
 }
 
 VALID_HOST_CA = {
     'descr': 'Test Host CA',
     'ca_type': 'host',
     'key_type': 'ed25519',
+    'allow_any_principal': True,
 }
 
 def post_json(client, url, data):
@@ -57,6 +59,7 @@ def _create_ssh_ca(auth_client, ca_type='user', descr=None, key_type='ed25519'):
         'descr': descr or f'Test {ca_type.capitalize()} CA',
         'ca_type': ca_type,
         'key_type': key_type,
+        'allow_any_principal': True,
     }
     r = post_json(auth_client, '/api/v2/ssh/cas', payload)
     assert r.status_code == 201, f'Create SSH CA failed ({r.status_code}): {r.data}'

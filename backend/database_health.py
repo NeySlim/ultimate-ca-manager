@@ -105,8 +105,10 @@ def ensure_admin_user(app):
             role="admin",
             active=True
         )
-        admin.set_password(app.config.get("INITIAL_ADMIN_PASSWORD", "changeme123"))
-        admin.force_password_change = True
+        from auth.password_change_gate import DEFAULT_INITIAL_PASSWORD, initial_password_needs_change
+        initial_password = app.config.get("INITIAL_ADMIN_PASSWORD", DEFAULT_INITIAL_PASSWORD)
+        admin.set_password(initial_password)
+        admin.force_password_change = initial_password_needs_change(initial_password)
         # Exempt the bootstrap admin from forced 2FA enrolment (#141) so
         # enabling global enforcement can never lock out this account.
         admin.totp_exempt = True

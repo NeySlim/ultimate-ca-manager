@@ -25,6 +25,7 @@ from utils.hsts import hsts_env_locked
 from utils import admin_allowlist
 import compliance_profiles
 from utils.public_endpoints import validate_admin_base_url, validate_protocol_base_url
+from utils.ssrf_protection import validate_url_not_cloud_metadata
 
 logger = logging.getLogger(__name__)
 
@@ -513,6 +514,21 @@ def get_ct_settings():
 def update_ct_settings():
     """Update Certificate Transparency configuration."""
     data = request.get_json()
+    if not isinstance(data, dict):
+        return error_response('Expected a JSON object', 400)
+
+    # Refused before anything is written: a log URL is fetched with the CA's chains
+    if data.get('log_urls') is not None:
+        if not isinstance(data['log_urls'], list):
+            return error_response('log_urls must be a list or null', 400)
+        for url in data['log_urls']:
+            if not isinstance(url, str) or not url.startswith(('http://', 'https://')):
+                return error_response('Each log URL must start with http:// or https://', 400)
+            try:
+                validate_url_not_cloud_metadata(url)
+            except ValueError as e:
+                logger.warning(f"CT log URL refused: {e}")
+                return error_response('A log URL must resolve, and not to loopback or a cloud metadata address', 400)
 
     if 'enabled' in data:
         set_config('ct_enabled', 'true' if data['enabled'] else 'false')
@@ -520,8 +536,6 @@ def update_ct_settings():
         # null is what GET answers when no list is set: it keeps the built-in logs.
         if data['log_urls'] is None:
             set_config('ct_log_urls', None)
-        elif not isinstance(data['log_urls'], list):
-            return error_response('log_urls must be a list or null', 400)
         else:
             set_config('ct_log_urls', json.dumps(data['log_urls']))
     if 'auto_submit' in data:

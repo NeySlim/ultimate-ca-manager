@@ -10,7 +10,9 @@ import urllib3
 
 from models.acme_models import AcmeClientOrder
 from utils.acme_ip import format_ip_for_url
-from utils.ssrf_protection import pin_host, validate_host_not_private, validate_url_not_cloud_metadata
+from utils.ssrf_protection import (
+    pin_host, validate_host_not_private, validate_url_not_cloud_metadata, validated_addresses,
+)
 
 logger = logging.getLogger(__name__)
 
@@ -43,8 +45,8 @@ def _get(url: str, pin, timeout: int = 10):
 def fetch_following_redirects(url: str, pin, allow_private: bool, timeout: int = 10):
     """GET *url*, following redirects on http/https and ports 80/443 only.
 
-    Cloud metadata is always refused; without *allow_private* every hop is
-    resolved, checked and pinned. Raises ValueError on a policy violation.
+    Cloud metadata is always refused, private addresses unless *allow_private*;
+    every hop is pinned to what was checked. Raises ValueError on a policy violation.
     """
     current = url
     for _ in range(MAX_REDIRECTS + 1):
@@ -64,7 +66,9 @@ def fetch_following_redirects(url: str, pin, allow_private: bool, timeout: int =
         if parsed.port not in (None, 80, 443):
             raise ValueError('redirect to a non-standard port')
         validate_url_not_cloud_metadata(current, allow_loopback=allow_private)
-        pin = None if allow_private else (parsed.hostname, validate_host_not_private(parsed.hostname))
+        # Every hop is pinned to what was vetted, whichever the policy
+        pin = (parsed.hostname, validated_addresses(current, allow_loopback=True)[1]
+               if allow_private else validate_host_not_private(parsed.hostname))
     raise ValueError(f'more than {MAX_REDIRECTS} redirects during http-01 validation')
 
 
@@ -99,8 +103,9 @@ def challenge_reachable(identifier: str, challenge: dict) -> tuple:
     """
     url = challenge_url(identifier, challenge['token'])
     try:
-        validate_url_not_cloud_metadata(url, allow_loopback=True)
-        response = fetch_following_redirects(url, None, allow_private=True, timeout=SELFCHECK_TIMEOUT)
+        # The first hop is pinned to what the check vetted, like every redirect
+        pin = validated_addresses(url, allow_loopback=True)
+        response = fetch_following_redirects(url, pin, allow_private=True, timeout=SELFCHECK_TIMEOUT)
     except ValueError:
         return False, f'{url}: name not resolvable or address refused'
     except requests.Timeout:

@@ -488,16 +488,21 @@ export default function SSHCAsPage() {
           </div>
         )}
 
-        {selectedCA.allowed_principals && (
+        {!principalList(selectedCA).length && (
+          <div className="mt-3">
+            {selectedCA.allow_any_principal
+              ? <Badge variant="warning" size="sm">{t('sshCas.anyPrincipal')}</Badge>
+              : <p className="text-xs text-text-secondary">{t('sshCas.noPrincipalSignsNothing')}</p>}
+          </div>
+        )}
+
+        {principalList(selectedCA).length > 0 && (
           <div className="mt-3 space-y-1">
             <div className="text-xs font-semibold text-text-primary">
               {t('sshCas.allowedPrincipals')}
             </div>
             <div className="flex flex-wrap gap-1">
-              {(Array.isArray(selectedCA.allowed_principals)
-                ? selectedCA.allowed_principals
-                : selectedCA.allowed_principals.split(',').map(p => p.trim()).filter(Boolean)
-              ).map(principal => (
+              {principalList(selectedCA).map(principal => (
                 <Badge key={principal} variant="primary" size="sm">{principal}</Badge>
               ))}
             </div>
@@ -662,6 +667,12 @@ export default function SSHCAsPage() {
 
 // ============= SSH CA FORM MODAL =============
 
+function principalList(ca) {
+  const listed = ca?.allowed_principals
+  if (Array.isArray(listed)) return listed
+  return (listed || '').split(',').map(p => p.trim()).filter(Boolean)
+}
+
 function SSHCAModal({ ca, onSave, onClose }) {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
@@ -675,6 +686,7 @@ function SSHCAModal({ ca, onSave, onClose }) {
     allowed_principals: Array.isArray(ca?.allowed_principals)
       ? ca.allowed_principals.join(', ')
       : (ca?.allowed_principals || ''),
+    allow_any_principal: !!ca?.allow_any_principal,
   })
 
   const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }))
@@ -713,7 +725,9 @@ function SSHCAModal({ ca, onSave, onClose }) {
         default_ttl: formData.default_ttl || undefined,
         max_ttl: formData.max_ttl || undefined,
         default_extensions: formData.ca_type === 'user' ? formData.default_extensions : [],
-        allowed_principals: principals.length > 0 ? principals : undefined,
+        // An empty list is sent too: on edit, clearing the field must clear it
+        allowed_principals: principals,
+        allow_any_principal: formData.allow_any_principal,
       })
     } finally {
       setLoading(false)
@@ -805,6 +819,19 @@ function SSHCAModal({ ca, onSave, onClose }) {
         placeholder={t('sshCas.modal.principalsPlaceholder')}
         helperText={t('sshCas.modal.principalsHelperText')}
       />
+
+      <div>
+        <label className={checkboxCls}>
+          <input
+            type="checkbox"
+            checked={formData.allow_any_principal}
+            onChange={e => handleChange('allow_any_principal', e.target.checked)}
+            className="accent-accent-primary"
+          />
+          {t('sshCas.modal.allowAnyPrincipal')}
+        </label>
+        <p className="mt-1 text-xs text-text-secondary">{t('sshCas.modal.allowAnyPrincipalHelp')}</p>
+      </div>
     </FormModal>
   )
 }

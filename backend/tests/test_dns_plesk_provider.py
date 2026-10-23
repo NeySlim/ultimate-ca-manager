@@ -109,7 +109,7 @@ class TestTransport:
     def test_posts_xml_to_plesk_endpoint(self, provider, caplog):
         with caplog.at_level(logging.DEBUG, logger="services.acme.dns_providers.plesk"):
             with patch(
-                "services.acme.dns_providers.plesk.requests.post",
+                "services.acme.dns_providers.plesk.safe_request_post",
                 return_value=_response(_sites_response((1, "example.com"))),
             ) as post:
                 ok, message = provider.test_connection()
@@ -136,7 +136,7 @@ class TestTransport:
             "verify_ssl": "false",
         })
         with patch(
-            "services.acme.dns_providers.plesk.requests.post",
+            "services.acme.dns_providers.plesk.safe_request_post",
             return_value=_response(_sites_response()),
         ) as post:
             assert provider.test_connection()[0]
@@ -163,7 +163,7 @@ class TestTransport:
             _response("not xml"),
         ]
         with caplog.at_level(logging.DEBUG, logger="services.acme.dns_providers.plesk"):
-            with patch("services.acme.dns_providers.plesk.requests.post", side_effect=responses):
+            with patch("services.acme.dns_providers.plesk.safe_request_post", side_effect=responses):
                 http_ok, http_message = provider.test_connection()
                 xml_ok, xml_message = provider.test_connection()
                 parse_ok, parse_message = provider.test_connection()
@@ -183,7 +183,7 @@ class TestTransport:
           <errtext>Authentication failed</errtext></system></packet>
         """
         with caplog.at_level(logging.ERROR, logger="services.acme.dns_providers.plesk"):
-            with patch("services.acme.dns_providers.plesk.requests.post", return_value=_response(response)):
+            with patch("services.acme.dns_providers.plesk.safe_request_post", return_value=_response(response)):
                 ok, message = provider.test_connection()
 
         assert not ok
@@ -191,9 +191,19 @@ class TestTransport:
         assert "Authentication failed" in message
         assert message.removeprefix("Connection failed: ") in caplog.text
 
+    def test_an_entity_declaration_is_malformed_xml_not_a_transport_failure(self, provider, caplog):
+        response = '<!DOCTYPE p [<!ENTITY x "y">]><packet>&x;</packet>'
+        with caplog.at_level(logging.ERROR, logger="services.acme.dns_providers.plesk"):
+            with patch("services.acme.dns_providers.plesk.safe_request_post", return_value=_response(response)):
+                ok, message = provider.test_connection()
+
+        assert not ok
+        assert "Invalid XML response" in message
+        assert "malformed XML" in caplog.text and "transport failure" not in caplog.text
+
     def test_empty_site_list_returns_actionable_message(self, provider):
         with patch(
-            "services.acme.dns_providers.plesk.requests.post",
+            "services.acme.dns_providers.plesk.safe_request_post",
             return_value=_response(_sites_response()),
         ):
             ok, message = provider.create_txt_record(
@@ -212,7 +222,7 @@ class TestCreateTxtRecord:
             _response("<packet><dns><add_rec><result><status>ok</status><id>42</id>"
                       "</result></add_rec></dns></packet>"),
         ]
-        with patch("services.acme.dns_providers.plesk.requests.post", side_effect=responses) as post:
+        with patch("services.acme.dns_providers.plesk.safe_request_post", side_effect=responses) as post:
             ok, message = provider.create_txt_record(
                 "sub.example.com",
                 "_acme-challenge.sub.example.com.",
@@ -237,7 +247,7 @@ class TestCreateTxtRecord:
             _response("<packet><dns><add_rec><result><status>ok</status><id>42</id>"
                       "</result></add_rec></dns></packet>"),
         ]
-        with patch("services.acme.dns_providers.plesk.requests.post", side_effect=responses):
+        with patch("services.acme.dns_providers.plesk.safe_request_post", side_effect=responses):
             with patch("services.acme.dns_providers.plesk.time.sleep") as sleep:
                 ok, message = provider.create_txt_record(
                     "example.com", "_acme-challenge.example.com", "value"
@@ -249,7 +259,7 @@ class TestCreateTxtRecord:
     def test_reports_unknown_zone(self, provider, caplog):
         with caplog.at_level(logging.WARNING, logger="services.acme.dns_providers.plesk"):
             with patch(
-                "services.acme.dns_providers.plesk.requests.post",
+                "services.acme.dns_providers.plesk.safe_request_post",
                 return_value=_response(_sites_response((1, "example.com"))),
             ):
                 ok, message = provider.create_txt_record("unknown.test", "_acme-challenge.unknown.test", "value")
@@ -280,7 +290,7 @@ class TestDeleteTxtRecord:
         </dns></packet>
         """
         responses = [_response(_sites_response((1, "example.com"))), _response(records), _response(deleted)]
-        with patch("services.acme.dns_providers.plesk.requests.post", side_effect=responses) as post:
+        with patch("services.acme.dns_providers.plesk.safe_request_post", side_effect=responses) as post:
             ok, message = provider.delete_txt_record("example.com", "_acme-challenge.example.com")
 
         assert ok, message
@@ -292,7 +302,7 @@ class TestDeleteTxtRecord:
             _response(_sites_response((1, "example.com"))),
             _response("<packet><dns><get_rec/></dns></packet>"),
         ]
-        with patch("services.acme.dns_providers.plesk.requests.post", side_effect=responses) as post:
+        with patch("services.acme.dns_providers.plesk.safe_request_post", side_effect=responses) as post:
             ok, message = provider.delete_txt_record("example.com", "_acme-challenge.example.com")
 
         assert ok
@@ -309,7 +319,7 @@ class TestDeleteTxtRecord:
           <errtext>DNS record does not exist.</errtext><id>10</id></result></del_rec></dns></packet>
         """
         responses = [_response(_sites_response((1, "example.com"))), _response(records), _response(deleted)]
-        with patch("services.acme.dns_providers.plesk.requests.post", side_effect=responses):
+        with patch("services.acme.dns_providers.plesk.safe_request_post", side_effect=responses):
             ok, message = provider.delete_txt_record("example.com", "_acme-challenge.example.com")
 
         assert ok, message
@@ -317,7 +327,7 @@ class TestDeleteTxtRecord:
     def test_site_lookup_is_cached(self, provider):
         records = "<packet><dns><get_rec/></dns></packet>"
         responses = [_response(_sites_response((1, "example.com"))), _response(records), _response(records)]
-        with patch("services.acme.dns_providers.plesk.requests.post", side_effect=responses) as post:
+        with patch("services.acme.dns_providers.plesk.safe_request_post", side_effect=responses) as post:
             assert provider.delete_txt_record("example.com", "_acme-challenge.example.com")[0]
             assert provider.delete_txt_record("example.com", "_acme-challenge.example.com")[0]
 
@@ -343,3 +353,14 @@ class TestSavedFlags:
                 assert CREDS["server_url"] not in body
         finally:
             auth_client.delete(f"/api/v2/dns-providers/{provider_id}")
+
+
+def test_namecheap_reads_an_entity_declaration_as_bad_xml():
+    """The same defusedxml refusal as Plesk: an answer, not an exception out of the order flow."""
+    from services.acme.dns_providers.namecheap import NamecheapDnsProvider
+
+    provider = NamecheapDnsProvider({'api_user': 'u', 'api_key': 'k', 'username': 'u', 'client_ip': '203.0.113.5'})
+    with patch("services.acme.dns_providers.namecheap.requests.get",
+               return_value=_response('<!DOCTYPE p [<!ENTITY x "y">]><ApiResponse>&x;</ApiResponse>')):
+        ok, message = provider._make_request('namecheap.domains.getList')
+    assert not ok and 'XML parse error' in message

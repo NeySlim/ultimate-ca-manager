@@ -2162,6 +2162,8 @@ Manage your personal profile, security settings, and API keys.
 ### Password Change
 Change your current password. Must comply with the system password policy (minimum length, complexity requirements).
 
+When UCM asks for a new password at login (the first-boot \`admin\` account, for instance), the change comes before anything else: until it is made, the server refuses every other request of that session, API included.
+
 ### Two-Factor Authentication (TOTP)
 Add a time-based one-time password using any authenticator app:
 
@@ -3297,7 +3299,14 @@ A Host CA signs certificates that authenticate **servers to clients**. When a cl
    - **ECDSA P-256/P-384/P-521**: Good compatibility and security.
    - **RSA 4096**: Broadest compatibility, larger keys.
 5. Optionally set max validity and default extensions
-6. Click **Create**
+6. List the allowed principals, or tick **Allow any principal**
+7. Click **Create**
+
+### Allowed Principals
+
+The **Allowed Principals** field restricts the names a CA signs for, as comma-separated patterns (\`deploy\`, \`team-*\`, \`web??.example.com\`). Every principal in a request must match one of them.
+
+A CA with an empty list signs nothing unless **Allow any principal** is ticked: it then signs for any name, \`root\` included. CAs created before 2.245 without a list behaved that way implicitly; the upgrade ticks the option for them, so they keep working.
 
 ### TTL Formats
 

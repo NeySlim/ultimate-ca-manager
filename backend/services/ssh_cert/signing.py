@@ -44,6 +44,10 @@ class SSHCertificateSigningMixin:
             raise ValueError("At least one non-empty principal is required")
 
         allowed = ca.get_allowed_principals()
+        if not allowed and not ca.allow_any_principal:
+            raise ValueError(
+                "This SSH CA lists no allowed principals: add some, or allow any principal"
+            )
         if allowed:
             for principal in principals:
                 if not any(

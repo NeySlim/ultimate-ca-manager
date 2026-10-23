@@ -68,6 +68,8 @@ Verwalten Sie Ihr persönliches Profil, Sicherheitseinstellungen und API-Schlüs
 ### Passwortänderung
 Ändern Sie Ihr aktuelles Passwort. Es muss der Systempasswortrichtlinie entsprechen (Mindestlänge, Komplexitätsanforderungen).
 
+Verlangt UCM bei der Anmeldung ein neues Passwort (zum Beispiel beim Konto \`admin\` nach dem ersten Start), hat die Änderung Vorrang vor allem anderen: Solange sie nicht erfolgt ist, lehnt der Server jede andere Anfrage dieser Sitzung ab, auch über die API.
+
 ### Zwei-Faktor-Authentifizierung (TOTP)
 Fügen Sie ein zeitbasiertes Einmalpasswort mit einer beliebigen Authenticator-App hinzu:
 

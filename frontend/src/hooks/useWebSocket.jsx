@@ -196,7 +196,9 @@ export function getEventNotification(payload, t) {
  * Wrap your app (inside AuthProvider) with this.
  */
 export function WebSocketProvider({ children }) {
-  const { isAuthenticated } = useAuth();
+  const { isAuthenticated, forcePasswordChange, mustEnroll2fa } = useAuth();
+  // The server refuses the socket while a forced change or enrolment is pending
+  const ready = isAuthenticated && !forcePasswordChange && !mustEnroll2fa;
   const { t } = useTranslation();
   const { showSuccess, showError, showWarning, showInfo } = useNotification();
   const socketRef = useRef(null);
@@ -320,13 +322,13 @@ export function WebSocketProvider({ children }) {
   
   // Auto-connect/disconnect based on auth state
   useEffect(() => {
-    if (isAuthenticated) {
+    if (ready) {
       connect();
     } else {
       disconnect();
     }
     return () => disconnect();
-  }, [isAuthenticated, connect, disconnect]);
+  }, [ready, connect, disconnect]);
   
   const value = {
     connectionState,
