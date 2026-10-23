@@ -9,6 +9,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Security
+
+- Pillow 13.0.0 is now the minimum: 12.x carries 39 published advisories, mostly in image decoders.
+- GitHub Actions are pinned to commit SHAs, kept up to date by Dependabot, and a test refuses an unpinned one.
+
+### Changed
+
+- The packages and the Docker image no longer install pytest, black and flake8: development tools moved to `backend/requirements-dev.txt`.
+
 ## [2.244] - 2026-10-23
 
 ### Added

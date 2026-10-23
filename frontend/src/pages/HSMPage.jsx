@@ -795,7 +795,7 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
             rows={4}
             value={formData.gcp_credentials_json === '***' ? '' : formData.gcp_credentials_json}
             onChange={e => handleChange('gcp_credentials_json', e.target.value || (provider?.gcp_credentials_json === '***' ? '***' : ''))}
-            placeholder='{"type": "service_account", ...}'
+            placeholder='{"type":"service_account", ...}'
             disabled={provider?.gcp_credentials_json === '***' && !formData.gcp_credentials_json}
             helperText={provider?.gcp_credentials_json === '***' ? t('hsm.gcpConfig.credentialsJsonStored') : t('hsm.gcpConfig.credentialsJsonHelp')}
           />

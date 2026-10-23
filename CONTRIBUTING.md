@@ -55,6 +55,7 @@ release candidates, so pull requests target **`dev`**.
 Run the tests before you open the pull request:
 
 ```bash
+pip install -r backend/requirements-dev.txt     # once: runtime and test dependencies
 cd backend  && python3 -m pytest tests/ -q      # backend
 cd frontend && npm test                          # frontend
 ```

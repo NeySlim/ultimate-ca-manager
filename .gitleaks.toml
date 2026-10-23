@@ -1,0 +1,24 @@
+title = "UCM gitleaks configuration"
+
+# Default rules, minus test fixtures, documentation examples and UI placeholders.
+[extend]
+useDefault = true
+
+[allowlist]
+description = "Test fixtures, help examples and placeholders, none of them a real secret"
+paths = [
+  '''(^|/)backend/tests/''',
+  '''(^|/)__tests__/''',
+  '''(^|/)frontend/src/data/help/[a-z]+/est\.js$''',
+  '''(^|/)frontend/src/data/helpGuides\.js$''',
+]
+regexTarget = "match"
+regexes = [
+  # PEM placeholders cut with "..." in forms and API docs
+  '''-----BEGIN (?:ENCRYPTED )?PRIVATE KEY-----(?:\\n|\n)?[A-Za-z0-9+/]*\.\.\.''',
+  # PEM template filled at runtime by the key matcher
+  '''-----BEGIN PRIVATE KEY-----\\n\{data\}''',
+  # Session flag name and translated "PKCS12 password" labels
+  '''must_enroll_2fa''',
+  '''PKCS12-Passwort''',
+]

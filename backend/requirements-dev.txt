@@ -1,0 +1,7 @@
+# Development and test tools, kept out of the packages and the image
+-r requirements.txt
+pytest==9.0.3
+pytest-cov==7.0.0
+pytest-mock
+black==26.10.1
+flake8==7.3.0

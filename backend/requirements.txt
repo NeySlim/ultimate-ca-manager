@@ -26,7 +26,7 @@ cbor2==6.1.2
 # TOTP/2FA Support
 pyotp>=2.9.0
 qrcode>=7.4
-Pillow>=12.3.0
+Pillow>=13.0.0
 
 # SCEP Support (pycryptodome dropped — SCEP now uses pyca/cryptography's ciphers)
 pyasn1==0.6.4
@@ -76,12 +76,6 @@ psycopg2-binary>=2.9.9
 
 # Redis session store and Socket.IO message queue, used only when a Redis URL is set
 redis>=5.0.0
-
-# Development & Testing
-pytest==9.0.3
-pytest-cov==7.0.0
-black==26.3.1
-flake8==7.3.0
 
 # WebSocket Support
 flask-socketio==5.6.1

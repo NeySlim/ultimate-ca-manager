@@ -40,6 +40,7 @@ Configured for bug-catching rules only (E/F/B/S categories).
 
 ```bash
 cd backend
+pip install -r requirements-dev.txt   # runtime and test dependencies
 
 # Run all tests
 pytest

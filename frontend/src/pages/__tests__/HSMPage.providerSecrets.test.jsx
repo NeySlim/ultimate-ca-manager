@@ -38,7 +38,7 @@ describe('HSM provider form, stored secrets', () => {
     fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(1))
     expect(onSave.mock.calls[0][0].config).not.toHaveProperty('service_account_json')
-    fireEvent.change(screen.getByPlaceholderText('{"type": "service_account", ...}'), { target: { value: '{"type": "service_account"}' } })
+    fireEvent.change(screen.getByPlaceholderText('{"type":"service_account", ...}'), { target: { value: '{"type": "service_account"}' } })
     fireEvent.click(screen.getByRole('button', { name: 'common.save' }))
     await waitFor(() => expect(onSave).toHaveBeenCalledTimes(2))
     expect(onSave.mock.calls[1][0].config.service_account_json).toBe('{"type": "service_account"}')
