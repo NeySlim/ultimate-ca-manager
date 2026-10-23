@@ -48,16 +48,19 @@ describe('ForcePasswordChange', () => {
     expect(onComplete).not.toHaveBeenCalled()
   })
 
-  it('reloads the page once the password is changed', async () => {
+  it('lifts the gate in place, keeping the success toast on screen', async () => {
     const reload = vi.fn()
     vi.stubGlobal('location', { ...window.location, reload })
+    const onComplete = vi.fn()
     mocks.changePassword.mockResolvedValue({ data: {} })
-    render(<ForcePasswordChange onComplete={vi.fn()} />)
+    render(<ForcePasswordChange onComplete={onComplete} />)
     for (const input of document.querySelectorAll('input[type="password"]')) {
       fireEvent.change(input, { target: { value: 'Replaced-Pass-456!' } })
     }
     fireEvent.click(screen.getByText('common.changePassword'))
-    await waitFor(() => expect(reload).toHaveBeenCalledTimes(1))
+    await waitFor(() => expect(onComplete).toHaveBeenCalledTimes(1))
+    expect(mocks.showSuccess).toHaveBeenCalledWith('password.changeSuccess')
+    expect(reload).not.toHaveBeenCalled()
     vi.unstubAllGlobals()
   })
 })

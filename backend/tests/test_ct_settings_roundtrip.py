@@ -44,3 +44,16 @@ def test_null_returns_a_custom_list_to_the_built_in_logs(app, auth_client, no_ct
 
 def test_other_types_are_refused(auth_client, no_ct_config):
     assert auth_client.patch('/api/v2/settings/ct', json={'log_urls': 'x'}).status_code == 400
+
+
+@pytest.mark.parametrize('urls', [
+    ['http://169.254.169.254/'],
+    ['http://127.0.0.1:8080/'],
+    ['ftp://ct.example.test/'],
+    [42],
+])
+def test_a_log_url_the_submission_would_refuse_is_refused_at_save(app, auth_client, no_ct_config, urls):
+    r = auth_client.patch('/api/v2/settings/ct', json={'enabled': True, 'log_urls': urls})
+    assert r.status_code == 400, r.data
+    body = _get(auth_client)
+    assert body['log_urls'] is None and body['enabled'] is False, 'a refused body wrote part of itself'

@@ -111,7 +111,8 @@ function AppRoutes() {
         <ForcePasswordChange onComplete={clearForcePasswordChange} />
       )}
 
-      <Routes>
+      {/* Pages mount once the gates lift: the server refuses their requests until then */}
+      {!(isAuthenticated && (mustEnroll2fa || forcePasswordChange)) && <Routes>
         <Route 
           path="/login" 
           element={
@@ -173,7 +174,7 @@ function AppRoutes() {
         </Route>
         
         <Route path="*" element={<Navigate to="/" replace />} />
-      </Routes>
+      </Routes>}
     </Suspense>
   )
 }

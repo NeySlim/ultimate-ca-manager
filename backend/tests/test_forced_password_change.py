@@ -79,6 +79,13 @@ def test_what_the_change_prompt_needs_still_answers(app, flagged_admin, path):
     assert client.get(path).status_code == 200
 
 
+def test_the_prompt_reads_its_preferences_and_writes_none(app, flagged_admin):
+    _, username = flagged_admin
+    client, _ = _login(app, username)
+    assert client.get('/api/v2/account/preferences').status_code == 200
+    assert _refused(client.put('/api/v2/account/preferences', json={'theme': 'dark'}))
+
+
 def test_logout_still_answers(app, flagged_admin):
     _, username = flagged_admin
     client, _ = _login(app, username)

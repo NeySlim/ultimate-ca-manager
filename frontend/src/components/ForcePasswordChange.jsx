@@ -65,8 +65,6 @@ export function ForcePasswordChange({ onComplete }) {
       
       showSuccess(t('password.changeSuccess'))
       onComplete?.()
-      // The page and its socket loaded while the server refused them: start over
-      window.location.reload()
     } catch (error) {
       if (error.data?.details?.i18n_key) {
         showError(t(error.data.details.i18n_key, error.data.details.i18n_values || {}))
