@@ -18,6 +18,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - The packages and the Docker image no longer install pytest, black and flake8: development tools moved to `backend/requirements-dev.txt`.
 
+### Fixed
+
+- ACME proxy: a `newAccount` request with `onlyReturnExisting` was refused with `externalAccountRequired` when External Account Binding was on, so cert-manager could not get its account URL and `new-order` failed with "Account kid required in protected header". The lookup is now answered before the EAB check (200 with the account URL, or `accountDoesNotExist`) and never creates an account; a deactivated or revoked account gets `unauthorized`.
+
 ## [2.244] - 2026-10-23
 
 ### Added

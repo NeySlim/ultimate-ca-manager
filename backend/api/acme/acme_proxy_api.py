@@ -16,7 +16,7 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
-from models import AcmeClientOrder, Certificate
+from models import db, AcmeClientOrder, Certificate
 from services.acme.acme_client_service import AcmeClientService
 from services.acme.acme_proxy_service import (
     AcmeProxyService,
@@ -331,6 +331,29 @@ def new_nonce(slug=None):
     return resp
 
 
+def _inactive_account_error(account):
+    """RFC 8555 §7.3.6: an account that is not valid is refused, never served.
+    Same rule as verify_jws, which accepts a kid only for status 'valid'."""
+    return proxy_error(
+        'unauthorized',
+        f'This ACME account is not valid (status: {account.status})',
+        401,
+    )
+
+
+def _account_response(account, slug, status_code):
+    """Account object (RFC 8555 §7.1.2) with its URL in Location."""
+    acct_url = f"{_proxy_base_url(slug)}/acct/{account.account_id}"
+    resp = proxy_response({
+        "status": account.status,
+        "contact": account.contact_list,
+        "termsOfServiceAgreed": account.terms_of_service_agreed,
+        "orders": f"{acct_url}/orders"
+    }, status_code)
+    resp.headers['Location'] = acct_url
+    return resp
+
+
 @_dual_route('/new-account', methods=['POST'], endpoint='proxy_new_account')
 def new_account(slug=None):
     """New account (RFC 8555 §7.3)"""
@@ -342,6 +365,37 @@ def new_account(slug=None):
 
     if not jwk:
         return proxy_error("malformed", "Missing JWK in protected header")
+
+    # onlyReturnExisting (RFC 8555 §7.3.1): never creates an account and needs
+    # no EAB; clients such as cert-manager use it to fetch their kid. The field
+    # is a boolean, so only `true` counts.
+    # JSON null counts as absent.
+    only_existing = (
+        payload.get('onlyReturnExisting') if isinstance(payload, dict) else None
+    )
+    if only_existing is None:
+        only_existing = False
+    if not isinstance(only_existing, bool):
+        return proxy_error('malformed', 'onlyReturnExisting must be a boolean', 400)
+    if only_existing:
+        try:
+            from models import AcmeAccount
+            thumbprint = jwk_thumbprint_or_none(jwk)
+            existing = (
+                AcmeAccount.query.filter_by(jwk_thumbprint=thumbprint).first()
+                if thumbprint else None
+            )
+        except Exception as e:
+            logger.error(f"ACME proxy account lookup error: {e}")
+            # proxy_error issues a nonce in this session, which a failed
+            # statement leaves unusable until it is rolled back.
+            db.session.rollback()
+            return proxy_error("serverInternal", "Failed to look up account", 500)
+        if not existing:
+            return proxy_error('accountDoesNotExist', 'Account does not exist', 400)
+        if existing.status != 'valid':
+            return _inactive_account_error(existing)
+        return _account_response(existing, slug, 200)
 
     eab_data = payload.get('externalAccountBinding') if isinstance(payload, dict) else None
     eab_cfg = SystemConfig.query.filter_by(key='acme_eab_required').first()
@@ -381,19 +435,13 @@ def new_account(slug=None):
             except Exception as e:
                 logger.warning(f"Could not mark EAB credential used: {e}")
 
-        acct_url = f"{_proxy_base_url(slug)}/acct/{account.account_id}"
-
-        resp_data = {
-            "status": account.status,
-            "contact": account.contact_list,
-            "orders": f"{acct_url}/orders"
-        }
-
-        resp = proxy_response(resp_data, 201 if is_new else 200)
-        resp.headers['Location'] = acct_url
-        return resp
+        if not is_new and account.status != 'valid':
+            return _inactive_account_error(account)
+        return _account_response(account, slug, 201 if is_new else 200)
     except Exception as e:
         logger.error(f"ACME proxy new-account error: {e}")
+        # As in the lookup branch: roll back so proxy_error can issue a nonce.
+        db.session.rollback()
         return proxy_error("serverInternal", "Failed to create account", 500)
 
 
