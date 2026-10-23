@@ -29,8 +29,8 @@ def _key():
     return key, {'kty': 'RSA', 'n': as_b64(pub.n), 'e': as_b64(pub.e)}
 
 
-def _post(client, path, payload, key, jwk=None, kid=None, raw_payload=None):
-    nonce = client.get('/acme/new-nonce').headers.get('Replay-Nonce', 'n')
+def _post(client, path, payload, key, jwk=None, kid=None, raw_payload=None, nonce=None):
+    nonce = nonce or client.get('/acme/new-nonce').headers.get('Replay-Nonce', 'n')
     protected = {'alg': 'RS256', 'nonce': nonce, 'url': f'http://localhost{path}'}
     protected.update({'kid': kid} if kid else {'jwk': jwk})
     protected_b64 = _b64(json.dumps(protected).encode())
@@ -419,3 +419,27 @@ class TestClosedAccountRequests:
         path = f"{base}/{route.format(id=kid.rsplit('/', 1)[-1])}"
         r = _post(client, path, None, other_key, kid=kid)
         assert r.status_code == 400 and _type(r) == 'malformed', r.get_json()
+
+
+@pytest.mark.parametrize('base', ['/acme/proxy', '/acme'])
+class TestJwsProblemTypes:
+    """RFC 8555 §6.7: a JWS failure carries its registered problem type on both servers."""
+
+    @pytest.mark.parametrize('route', ['new-order', 'order/abc', 'revoke-cert'])
+    def test_an_unknown_kid_is_account_does_not_exist(self, client, base, route):
+        key, _ = _key()
+        r = _post(client, f'{base}/{route}', {}, key, kid=f'http://localhost{base}/acct/nope')
+        assert r.status_code == 400 and _type(r) == 'accountDoesNotExist', r.get_json()
+
+    def test_a_stale_nonce_is_bad_nonce(self, client, base):
+        key, jwk = _key()
+        r = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True}, key, jwk=jwk,
+                  nonce='not-a-nonce-this-server-issued')
+        assert r.status_code == 400 and _type(r) == 'badNonce', r.get_json()
+        assert r.headers.get('Replay-Nonce')
+
+    def test_an_unusable_key_is_bad_public_key(self, client, base):
+        key, jwk = _key()
+        r = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True}, key,
+                  jwk={'kty': 'oct', 'k': 'AAAA'})
+        assert r.status_code == 400 and _type(r) == 'badPublicKey', r.get_json()

@@ -31,7 +31,6 @@ from services.acme.acme_proxy_account import (
 )
 from services.acme import AcmeService, ari
 from services.acme.account_requests import (
-    CLOSED_ACCOUNT,
     NOT_AN_OBJECT,
     AccountRequestError,
     apply_account_update,
@@ -40,6 +39,7 @@ from services.acme.account_requests import (
     require_valid_account,
 )
 from services.acme import domain_match
+from services.acme.jws_problems import jws_problem
 from services.acme.identifiers import validate_acme_identifier
 from services.acme.jwk_thumbprint import jwk_thumbprint_or_none
 from utils.acme_csr import decode_csr_b64
@@ -101,9 +101,7 @@ def proxy_response(data, status=200, headers=None):
 
 def proxy_error(error_type, detail, status_code=400):
     """Build an RFC 7807 problem+json error response (RFC 8555 §6.7)."""
-    # verify_jws refuses a closed account's request: 401 (RFC 8555 §7.3.6)
-    if error_type == 'malformed' and detail and CLOSED_ACCOUNT in detail:
-        error_type, status_code = 'unauthorized', 401
+    error_type, status_code = jws_problem(error_type, detail, status_code)
     error_data = {
         "type": f"urn:ietf:params:acme:error:{error_type}",
         "detail": detail,

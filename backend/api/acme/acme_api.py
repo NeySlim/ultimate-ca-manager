@@ -11,7 +11,6 @@ from typing import Dict, Any, Tuple, Optional
 from models import db, CA, Certificate
 from services.acme import AcmeService, ari, domain_match
 from services.acme.account_requests import (
-    CLOSED_ACCOUNT,
     AccountRequestError,
     apply_account_update,
     parse_new_account,
@@ -19,6 +18,7 @@ from services.acme.account_requests import (
     consume_eab,
     require_valid_account,
 )
+from services.acme.jws_problems import UNKNOWN_ACCOUNT, jws_problem
 from models.acme_models import (
     AcmeAccount,
     AcmeAuthorization,
@@ -125,14 +125,7 @@ def acme_error(
 
     # Preserve the compact verify_jws return contract while emitting the
     # registered RFC 8555 problem types required for specific JWS failures.
-    if error_type == 'malformed' and detail.endswith('Invalid or expired nonce'):
-        error_type = 'badNonce'
-    elif error_type == 'malformed' and any(marker in detail for marker in (
-        'Invalid JWK:', 'Unsupported key type:', 'Key is not a dict',
-    )):
-        error_type = 'badPublicKey'
-    elif error_type == 'malformed' and CLOSED_ACCOUNT in detail:
-        error_type, status_code = 'unauthorized', 401
+    error_type, status_code = jws_problem(error_type, detail, status_code)
 
     error_data = {
         "type": f"urn:ietf:params:acme:error:{error_type}",
@@ -196,7 +189,6 @@ def _is_caa_failure(error: Any) -> bool:
 # and used to forward it unexamined. Re-exported here because this module is
 # where callers and tests have always imported it from.
 from services.acme.identifiers import (  # noqa: E402
-    is_valid_dns_identifier as _is_valid_dns_identifier,
     validate_acme_identifier,
 )
 
@@ -446,7 +438,7 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
                         acct_id = kid.rstrip('/').split('/')[-1]
                         account = AcmeAccount.query.filter_by(account_id=acct_id).first()
                         if not account:
-                            return False, None, None, "Account not found"
+                            return False, None, None, UNKNOWN_ACCOUNT
                         key_to_verify = json.loads(account.jwk) if isinstance(account.jwk, str) else account.jwk
                     except (ValueError, TypeError):
                         return False, None, None, "Invalid KID format"
@@ -1517,19 +1509,19 @@ def respond_to_challenge(challenge_id: str):
         # is no longer pending (expired / deactivated / revoked).
         authz = challenge.authorization
         if challenge.status in ('valid', 'invalid'):
-            success = (challenge.status == 'valid')
+            pass
         elif authz and authz.status != 'pending':
             return acme_error('malformed',
                               f'Authorization is {authz.status}, not pending', 403)
         # Trigger validation based on challenge type
         elif challenge.type == "http-01":
-            success = service.validate_http01_challenge(challenge, account)
+            service.validate_http01_challenge(challenge, account)
         elif challenge.type == "dns-01":
-            success = service.validate_dns01_challenge(challenge, account)
+            service.validate_dns01_challenge(challenge, account)
         elif challenge.type == "dns-persist-01":
-            success = service.validate_dns_persist01_challenge(challenge, account)
+            service.validate_dns_persist01_challenge(challenge, account)
         elif challenge.type == "tls-alpn-01":
-            success = service.validate_tls_alpn01_challenge(challenge, account)
+            service.validate_tls_alpn01_challenge(challenge, account)
         else:
             return acme_error('malformed', f'Challenge type {challenge.type} not supported')
 
@@ -1693,7 +1685,7 @@ def revoke_cert():
         
         from cryptography import x509
         from cryptography.hazmat.backends import default_backend
-        from cryptography.hazmat.primitives import serialization, hashes
+        from cryptography.hazmat.primitives import serialization
         try:
             cert_obj = x509.load_der_x509_certificate(cert_der, default_backend())
         except Exception:
