@@ -151,6 +151,7 @@ class SSHCAService:
             allowed_principals: List of allowed principal patterns
             comment: Optional notes
             owner_group_id: Optional group ownership
+            allow_any_principal: Sign for any principal when the list is empty
 
         Returns:
             SSHCertificateAuthority instance
@@ -230,6 +231,8 @@ class SSHCAService:
             max_ttl: Max TTL (0 = unlimited) — same formats
             comment: Optional notes
             owner_group_id: Optional group ownership
+            allowed_principals: List of allowed principal patterns
+            allow_any_principal: Sign for any principal when the list is empty
 
         Returns:
             SSHCertificateAuthority instance

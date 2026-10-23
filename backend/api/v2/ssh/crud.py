@@ -16,6 +16,16 @@ from .helpers import bp, logger
 from models import db
 
 
+def _allowed_principals(data):
+    """The allowed-principal patterns, a JSON list of non-empty strings, or None."""
+    value = data.get('allowed_principals')
+    if value is None:
+        return None
+    if not isinstance(value, list) or not all(isinstance(p, str) and p.strip() for p in value):
+        raise ValueError('allowed_principals must be a list of non-empty strings')
+    return [p.strip() for p in value]
+
+
 def _allow_any_principal(data):
     """The explicit opt-in to sign for any principal, a JSON boolean."""
     value = data.get('allow_any_principal', False)
@@ -100,7 +110,7 @@ def import_ssh_ca():
             default_ttl=data.get('default_ttl'),
             max_ttl=data.get('max_ttl', 0),
             comment=data.get('comment'),
-            allowed_principals=data.get('allowed_principals'),
+            allowed_principals=_allowed_principals(data),
             allow_any_principal=_allow_any_principal(data),
         )
 
@@ -172,7 +182,7 @@ def create_ssh_ca():
             default_ttl=data.get('default_ttl'),
             max_ttl=data.get('max_ttl', 0),
             default_extensions=data.get('default_extensions'),
-            allowed_principals=data.get('allowed_principals'),
+            allowed_principals=_allowed_principals(data),
             allow_any_principal=_allow_any_principal(data),
             comment=data.get('comment'),
         )
@@ -229,7 +239,7 @@ def update_ssh_ca(ca_id):
         if 'default_extensions' in data:
             kwargs['default_extensions'] = data['default_extensions']
         if 'allowed_principals' in data:
-            kwargs['allowed_principals'] = data['allowed_principals']
+            kwargs['allowed_principals'] = _allowed_principals(data)
         if 'allow_any_principal' in data:
             kwargs['allow_any_principal'] = _allow_any_principal(data)
 

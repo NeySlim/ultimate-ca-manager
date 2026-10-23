@@ -353,3 +353,14 @@ class TestSavedFlags:
                 assert CREDS["server_url"] not in body
         finally:
             auth_client.delete(f"/api/v2/dns-providers/{provider_id}")
+
+
+def test_namecheap_reads_an_entity_declaration_as_bad_xml():
+    """The same defusedxml refusal as Plesk: an answer, not an exception out of the order flow."""
+    from services.acme.dns_providers.namecheap import NamecheapDnsProvider
+
+    provider = NamecheapDnsProvider({'api_user': 'u', 'api_key': 'k', 'username': 'u', 'client_ip': '203.0.113.5'})
+    with patch("services.acme.dns_providers.namecheap.requests.get",
+               return_value=_response('<!DOCTYPE p [<!ENTITY x "y">]><ApiResponse>&x;</ApiResponse>')):
+        ok, message = provider._make_request('namecheap.domains.getList')
+    assert not ok and 'XML parse error' in message

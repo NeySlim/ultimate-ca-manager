@@ -53,7 +53,7 @@ class SSHCertificateAuthority(db.Model if db else object):
     # Default extensions for user certs (JSON list of extension names)
     default_extensions = db.Column(db.Text)
 
-    # Allowed principals pattern (JSON list of allowed principal patterns, empty = any)
+    # JSON list of allowed principal patterns (fnmatch)
     allowed_principals = db.Column(db.Text)
     # An empty list signs for nothing unless this says any principal will do
     allow_any_principal = db.Column(db.Boolean, default=False, nullable=False)

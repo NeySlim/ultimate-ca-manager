@@ -59,7 +59,9 @@ def _migration():
     return importlib.import_module('migrations.110_ssh_ca_allow_any_principal')
 
 
-_ROWS = [('none', None, 1), ('blank', '', 1), ('empty', '[]', 1), ('listed', '["deploy"]', 0)]
+# Every form get_allowed_principals reads as empty keeps signing after the upgrade
+_ROWS = [('none', None, 1), ('blank', '', 1), ('empty', '[]', 1), ('spaced', '[ ]', 1),
+         ('null', 'null', 1), ('false', 'false', 1), ('text', 'deploy', 1), ('listed', '["deploy"]', 0)]
 
 
 def test_sqlite_keeps_existing_cas_as_they_were_and_runs_twice():
@@ -72,7 +74,7 @@ def test_sqlite_keeps_existing_cas_as_they_were_and_runs_twice():
     connection.execute("UPDATE ssh_cas SET allow_any_principal = 0 WHERE descr = 'none'")
     _migration().upgrade(connection)
     got = dict(connection.execute("SELECT descr, allow_any_principal FROM ssh_cas"))
-    assert got == {'none': 0, 'blank': 1, 'empty': 1, 'listed': 0}
+    assert got == {d: (0 if d == 'none' else want) for d, _, want in _ROWS}
 
 
 @pytest.mark.postgres
@@ -92,6 +94,21 @@ def test_postgresql_keeps_existing_cas_as_they_were_and_runs_twice():
                 connection.execute(text("UPDATE ssh_cas SET allow_any_principal = FALSE WHERE descr = 'none'"))
                 _migration().upgrade(connection)
                 got = dict(connection.execute(text("SELECT descr, allow_any_principal FROM ssh_cas")).all())
-                assert got == {'none': False, 'blank': True, 'empty': True, 'listed': False}
+                assert got == {d: (False if d == 'none' else bool(want)) for d, _, want in _ROWS}
         finally:
             engine.dispose()
+
+
+@pytest.mark.parametrize('principals', ['deploy', True, 7, ['deploy', ''], [3]])
+def test_a_principal_list_that_is_not_one_is_refused(auth_client, principals):
+    r = post_json(auth_client, '/api/v2/ssh/cas', {'descr': 'Bad list CA', 'ca_type': 'user',
+                                                  'key_type': 'ed25519', 'allowed_principals': principals})
+    assert r.status_code == 400, r.data
+
+
+def test_the_migration_reads_a_list_as_the_model_does():
+    from models.ssh import SSHCertificateAuthority
+    for _, stored, want in _ROWS:
+        ca = SSHCertificateAuthority(allowed_principals=stored)
+        assert (not ca.get_allowed_principals()) is bool(want)
+        assert _migration()._lists_nothing(stored) is bool(want)

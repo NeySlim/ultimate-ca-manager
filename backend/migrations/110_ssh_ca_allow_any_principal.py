@@ -3,11 +3,20 @@
 An empty allowed-principals list used to mean "anything, root included".
 Existing CAs without a list keep that behaviour, now as an explicit setting.
 """
+import json
 import sqlite3
 
 pg_compatible = True
 
-_EMPTY = "allowed_principals IS NULL OR TRIM(allowed_principals) IN ('', '[]')"
+
+def _lists_nothing(stored):
+    """Read as SSHCertificateAuthority.get_allowed_principals does."""
+    if not stored:
+        return True
+    try:
+        return not json.loads(stored)
+    except (json.JSONDecodeError, TypeError):
+        return True
 
 
 def _upgrade_sqlite(conn):
@@ -18,7 +27,9 @@ def _upgrade_sqlite(conn):
     if 'allow_any_principal' not in columns:
         conn.execute("ALTER TABLE ssh_cas ADD COLUMN allow_any_principal "
                      "BOOLEAN NOT NULL DEFAULT 0")
-        conn.execute(f"UPDATE ssh_cas SET allow_any_principal = 1 WHERE {_EMPTY}")
+        empty = [(row[0],) for row in conn.execute("SELECT id, allowed_principals FROM ssh_cas")
+                 if _lists_nothing(row[1])]
+        conn.executemany("UPDATE ssh_cas SET allow_any_principal = 1 WHERE id = ?", empty)
     conn.commit()
 
 
@@ -32,7 +43,10 @@ def _upgrade_pg(conn):
         return
     conn.execute(text("ALTER TABLE ssh_cas ADD COLUMN allow_any_principal "
                       "BOOLEAN NOT NULL DEFAULT FALSE"))
-    conn.execute(text(f"UPDATE ssh_cas SET allow_any_principal = TRUE WHERE {_EMPTY}"))
+    for row in conn.execute(text("SELECT id, allowed_principals FROM ssh_cas")).all():
+        if _lists_nothing(row[1]):
+            conn.execute(text("UPDATE ssh_cas SET allow_any_principal = TRUE WHERE id = :id"),
+                         {'id': row[0]})
 
 
 def upgrade(conn):
