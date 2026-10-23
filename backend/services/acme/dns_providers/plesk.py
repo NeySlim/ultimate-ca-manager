@@ -8,6 +8,8 @@ from urllib.parse import urlparse
 import defusedxml.ElementTree as SafeXml
 import requests
 
+from utils.ssrf_protection import safe_request_post
+
 from .base import BaseDnsProvider
 
 logger = logging.getLogger(__name__)
@@ -85,8 +87,11 @@ class PleskDnsProvider(BaseDnsProvider):
         started = time.monotonic()
         logger.debug("Plesk XML API %s request to %s", context, self.endpoint)
         try:
-            response = requests.post(
+            # Pinned, and the API key never follows a redirect to another origin.
+            # A Plesk on the same host stays reachable.
+            response = safe_request_post(
                 self.endpoint,
+                allow_loopback=True,
                 headers=self._headers(),
                 data=payload,
                 timeout=30,
@@ -126,7 +131,7 @@ class PleskDnsProvider(BaseDnsProvider):
                 diagnostic = f"{diagnostic} ({self._failure(exc)})"
                 logger.error("Plesk XML API %s returned malformed XML: %s", context, diagnostic)
                 return False, diagnostic
-        except requests.RequestException as exc:
+        except (requests.RequestException, ValueError) as exc:
             diagnostic = self._failure(exc)
             elapsed_ms = (time.monotonic() - started) * 1000
             logger.error(

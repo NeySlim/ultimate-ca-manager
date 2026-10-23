@@ -7,6 +7,8 @@ import requests
 from typing import Tuple, Dict, Any, Optional
 import logging
 
+from utils.ssrf_protection import safe_request
+
 from .base import BaseDnsProvider
 
 logger = logging.getLogger(__name__)
@@ -29,7 +31,10 @@ class PowerDnsDnsProvider(BaseDnsProvider):
         url = f"{self.server_url}/api/v1/servers/localhost{path}"
         try:
             verify_ssl = self.credentials.get('verify_ssl', True)
-            resp = requests.request(method=method, url=url, headers=self._get_headers(), json=data, timeout=30, verify=verify_ssl)
+            # Pinned, and the API key never follows a redirect to another origin.
+            # A PowerDNS on the same host stays reachable.
+            resp = safe_request(method, url, allow_loopback=True, headers=self._get_headers(),
+                                json=data, timeout=30, verify=verify_ssl)
             if resp.status_code >= 400:
                 try:
                     error_msg = resp.json().get('error', resp.reason)
@@ -37,7 +42,7 @@ class PowerDnsDnsProvider(BaseDnsProvider):
                     error_msg = resp.reason
                 return False, error_msg
             return True, resp.json() if resp.text and resp.status_code != 204 else None
-        except requests.RequestException as e:
+        except (requests.RequestException, ValueError) as e:
             return False, self._failure(e)
     
     def _find_zone(self, domain: str) -> Optional[str]:
