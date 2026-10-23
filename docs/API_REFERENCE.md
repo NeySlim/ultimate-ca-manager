@@ -4,7 +4,6 @@
 > **Base URL**: `https://your-server:8443/api/v2`  
 > **Last Updated**: February 2026  
 > **Total Endpoints**: 347  
-> **Test Coverage**: 1364 tests (~95% route coverage)  
 > **Note**: All endpoints are served from `api/v2/` (34 registered blueprints). There is no separate `features/` module.
 
 ---

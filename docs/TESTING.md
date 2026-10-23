@@ -4,15 +4,13 @@
 
 UCM uses a comprehensive testing strategy with unit tests and E2E tests.
 
-| Test Type | Framework | Tests | Status |
-|-----------|-----------|-------|--------|
-| Unit Tests (Frontend) | Vitest + React Testing Library | 450 | Active |
-| Unit Tests (Backend) | pytest | 1364 | Active |
-| E2E Tests | Playwright |: | Active |
-| Linting (Frontend) | ESLint v9 |: | Active |
-| Linting (Backend) | Ruff |: | Active |
-
-**Total: 1814 tests** (450 frontend + 1364 backend)
+| Test Type | Framework | Status |
+|-----------|-----------|--------|
+| Unit Tests (Frontend) | Vitest + React Testing Library | Active |
+| Unit Tests (Backend) | pytest | Active |
+| E2E Tests | Playwright | Active |
+| Linting (Frontend) | ESLint v9 | Active |
+| Linting (Backend) | Ruff | Active |
 
 ## Linting
 
@@ -304,8 +302,6 @@ jobs:
 | Metric | Target | Current |
 |--------|--------|---------|
 | Backend Route Coverage | 80% | ~95% (347 routes) |
-| Frontend Unit Tests |: | 450 tests passing |
-| Backend Unit Tests |: | 1364 tests passing |
 | E2E Pass Rate | 95% | Active |
 | Critical Paths | 100% | Covered |
 
