@@ -82,7 +82,7 @@ the only way to know the fix does anything, and it keeps the bug from coming bac
 
 ## Security
 
-Please do not open a public issue for a vulnerability. See [SECURITY.md](docs/SECURITY.md)
+Please do not open a public issue for a vulnerability. See [SECURITY.md](SECURITY.md)
 for how to report one privately.
 
 ## Licence
