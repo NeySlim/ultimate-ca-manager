@@ -199,6 +199,13 @@ class TestAcmeProxyEabNewOrder:
         assert 'No DNS provider configured' in detail  # past the kid check
 
 
+def _fail_a_flush():
+    """A real failed statement: the session then refuses work until rolled back."""
+    from models import AcmeAccount
+    db.session.add(AcmeAccount(jwk=None, jwk_thumbprint=None))
+    db.session.flush()
+
+
 class TestAcmeProxyOnlyReturnExisting:
     """RFC 8555 §7.3.1: onlyReturnExisting never creates and needs no EAB."""
 
@@ -354,20 +361,11 @@ class TestAcmeProxyOnlyReturnExisting:
         self, app, client, proxy_protocol_upstream_stub, monkeypatch,
     ):
         from services.acme import AcmeService
-        from sqlalchemy.exc import OperationalError
 
         def _boom(self, *args, **kwargs):
-            raise OperationalError('INSERT', {}, Exception('db down'))
-
-        rollbacks = []
-        real_rollback = db.session.rollback
-
-        def _spy_rollback():
-            rollbacks.append(True)
-            return real_rollback()
+            _fail_a_flush()
 
         monkeypatch.setattr(AcmeService, 'create_account', _boom)
-        monkeypatch.setattr(db.session, 'rollback', _spy_rollback)
         _set_eab_required(app, False)
         private_key, jwk = _generate_rsa_key_and_jwk()
 
@@ -377,7 +375,6 @@ class TestAcmeProxyOnlyReturnExisting:
         assert r.headers['Content-Type'].startswith('application/problem+json')
         assert r.get_json()['type'].endswith('serverInternal')
         assert r.headers.get('Replay-Nonce')
-        assert rollbacks
         assert self._account_count(app, jwk) == 0
 
     def test_account_objects_carry_terms_of_service_agreed(
@@ -395,26 +392,17 @@ class TestAcmeProxyOnlyReturnExisting:
         assert r_lookup.get_json()['termsOfServiceAgreed'] is True
 
     def test_lookup_database_error_is_server_internal(
-        self, app, client, proxy_protocol_upstream_stub, monkeypatch,
+        self, app, client, proxy_protocol_upstream_stub,
     ):
         from models import AcmeAccount
-        from sqlalchemy.exc import OperationalError
 
         class _FailingQuery:
             def filter_by(self, *args, **kwargs):
                 return self
 
             def first(self):
-                raise OperationalError('SELECT 1', {}, Exception('db down'))
+                _fail_a_flush()
 
-        rollbacks = []
-        real_rollback = db.session.rollback
-
-        def _spy_rollback():
-            rollbacks.append(True)
-            return real_rollback()
-
-        monkeypatch.setattr(db.session, 'rollback', _spy_rollback)
         _set_eab_required(app, True)
         private_key, jwk = _generate_rsa_key_and_jwk()
 
@@ -429,7 +417,6 @@ class TestAcmeProxyOnlyReturnExisting:
         assert r.headers['Content-Type'].startswith('application/problem+json')
         assert r.get_json()['type'].endswith('serverInternal')
         assert r.headers.get('Replay-Nonce')
-        assert rollbacks
         assert self._account_count(app, jwk) == 0
 
 

@@ -134,14 +134,6 @@ class TestProxyAccountUrl:
                        key, jwk=jwk)
         assert lookup.status_code == 401 and _type(lookup) == 'unauthorized'
 
-    def test_a_status_other_than_deactivated_is_malformed(self, app, client):
-        key, jwk, kid = _proxy_account(client)
-        r = _post(client, _path(kid), {'status': 'revoked'}, key, kid=kid)
-        assert r.status_code == 400 and _type(r) == 'malformed'
-        with app.app_context():
-            assert AcmeAccount.query.filter_by(
-                jwk_thumbprint=jwk_thumbprint_or_none(jwk)).first().status == 'valid'
-
     def test_another_account_kid_is_refused(self, client):
         _, _, kid = _proxy_account(client)
         other_key, _, other_kid = _proxy_account(client)
@@ -172,6 +164,30 @@ class TestProxyAccountUrl:
         assert r.get_json()['orders'] == [
             f'http://localhost/acme/proxy/{_SLUG}/order/{AcmeProxyService._proxy_id(mine)}']
 
+    def test_orders_of_another_endpoint_are_not_listed(self, app, client, slug_endpoint):
+        key, jwk, kid = _proxy_account(client, slug=_SLUG)
+        account_id = kid.rsplit('/', 1)[-1]
+        with app.app_context():
+            other = AcmeClientAccount(directory_url='https://other.example/directory',
+                                      label='Other endpoint', email='other@example.com')
+            db.session.add(other)
+            db.session.flush()
+            db.session.add(AcmeClientOrder(
+                domains='["a.example"]', is_proxy_order=True,
+                upstream_order_url='https://other.example/order/1',
+                client_jwk_thumbprint=jwk_thumbprint_or_none(jwk),
+                acme_client_account_id=other.id))
+            db.session.commit()
+            other_id = other.id
+        try:
+            r = _post(client, f'/acme/proxy/{_SLUG}/acct/{account_id}/orders', None, key, kid=kid)
+            assert r.status_code == 200 and r.get_json()['orders'] == []
+        finally:
+            with app.app_context():
+                AcmeClientOrder.query.filter_by(acme_client_account_id=other_id).delete()
+                AcmeClientAccount.query.filter_by(id=other_id).delete()
+                db.session.commit()
+
     def test_orders_is_post_as_get(self, client, slug_endpoint):
         key, _, kid = _proxy_account(client, slug=_SLUG)
         account_id = kid.rsplit('/', 1)[-1]
@@ -199,6 +215,12 @@ class TestProxySlug:
                   {'termsOfServiceAgreed': True}, key, jwk=jwk)
         assert r.status_code == 404
         assert _accounts(app, jwk) == 0
+
+    def test_unknown_slug_account_url_is_refused(self, client):
+        key, _, kid = _proxy_account(client)
+        account_id = kid.rsplit('/', 1)[-1]
+        r = _post(client, f'/acme/proxy/no-such-endpoint/acct/{account_id}', None, key, kid=kid)
+        assert r.status_code == 404 and _type(r) == 'malformed'
 
     def test_known_slug_account_url_answers(self, client, slug_endpoint):
         key, _, kid = _proxy_account(client, slug=_SLUG)
@@ -264,3 +286,49 @@ class TestNativeClosedAccounts:
         r = _post(client, _path(kid), {'contact': 'mailto:a@example.com'}, key, kid=kid)
         assert r.status_code == 400 and _type(r) == 'invalidContact'
         assert _post(client, _path(kid), None, key, kid=kid).get_json()['contact'] == []
+
+
+@pytest.mark.parametrize('base', ['/acme/proxy', '/acme'])
+class TestAccountUrlBothServers:
+    """RFC 8555 §7.3.2 and §7.3.6 on the proxy and native account URLs."""
+
+    def _account(self, client, base):
+        key, jwk = _key()
+        r = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True}, key, jwk=jwk)
+        assert r.status_code == 201, r.get_json()
+        return key, r.headers['Location']
+
+    def test_an_echoed_account_object_is_accepted(self, client, base):
+        key, kid = self._account(client, base)
+        r = _post(client, _path(kid), {
+            'status': 'valid', 'contact': ['mailto:new@example.com'],
+            'termsOfServiceAgreed': True, 'orders': f'{kid}/orders'}, key, kid=kid)
+        assert r.status_code == 200, r.get_json()
+        assert r.get_json()['status'] == 'valid'
+        assert r.get_json()['contact'] == ['mailto:new@example.com']
+
+    def test_a_status_other_than_deactivated_is_ignored(self, client, base):
+        key, kid = self._account(client, base)
+        r = _post(client, _path(kid), {'status': 'revoked'}, key, kid=kid)
+        assert r.status_code == 200 and r.get_json()['status'] == 'valid'
+
+    def test_a_refused_update_changes_nothing(self, client, base):
+        key, kid = self._account(client, base)
+        r = _post(client, _path(kid), {'status': 'deactivated', 'contact': 'x'}, key, kid=kid)
+        assert r.status_code == 400 and _type(r) == 'invalidContact'
+        assert _post(client, _path(kid), None, key, kid=kid).get_json()['status'] == 'valid'
+
+    def test_a_deactivated_account_gets_unauthorized(self, client, base):
+        key, kid = self._account(client, base)
+        assert _post(client, _path(kid), {'status': 'deactivated'}, key, kid=kid).status_code == 200
+        r = _post(client, _path(kid), None, key, kid=kid)
+        assert r.status_code == 401 and _type(r) == 'unauthorized'
+
+
+def test_apply_account_update_validates_before_writing():
+    from types import SimpleNamespace
+    from services.acme.account_requests import AccountRequestError, apply_account_update
+    account = SimpleNamespace(status='valid', contact='[]')
+    with pytest.raises(AccountRequestError):
+        apply_account_update(account, {'status': 'deactivated', 'contact': 'x'})
+    assert (account.status, account.contact) == ('valid', '[]')

@@ -466,9 +466,16 @@ def new_account(slug=None):
 
 def _kid_signed_account(account_id):
     """(account, payload, None) for a JWS signed by this account's kid, else
-    (None, None, problem). verify_jws accepts only a valid account's kid."""
+    (None, None, problem)."""
     from models import AcmeAccount
 
+    account = AcmeAccount.query.filter_by(account_id=account_id).first()
+    # RFC 8555 §7.3.6: a closed account's own requests get 401, not a JWS error
+    if account is not None and _kid_account_id(_request_protected_header()) == account_id:
+        try:
+            require_valid_account(account)
+        except AccountRequestError as e:
+            return None, None, _problem(e)
     is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
         return None, None, proxy_error("malformed", err)
@@ -476,7 +483,6 @@ def _kid_signed_account(account_id):
         return None, None, proxy_error("malformed", "Account requests must be signed with the account kid")
     if _kid_account_id(_request_protected_header()) != account_id:
         return None, None, proxy_error("unauthorized", "JWS signed by different account than URL", 403)
-    account = AcmeAccount.query.filter_by(account_id=account_id).first()
     if account is None:
         return None, None, proxy_error("accountDoesNotExist", "Account not found", 404)
     return account, payload, None

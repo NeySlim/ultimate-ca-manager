@@ -94,13 +94,12 @@ def apply_account_update(account, payload: Any) -> bool:
         return False
     if not isinstance(payload, dict):
         raise AccountRequestError('malformed', NOT_AN_OBJECT)
-    changed = False
-    if 'status' in payload:
-        if payload['status'] != 'deactivated':
-            raise AccountRequestError('malformed', 'A client can only set the account status to deactivated')
+    # Validate everything before touching the account. Any status other than
+    # "deactivated" is ignored, like unknown fields (§7.3.2): clients echo "valid".
+    contact = _contact(payload) if 'contact' in payload else None
+    deactivate = payload.get('status') == 'deactivated'
+    if deactivate:
         account.status = 'deactivated'
-        changed = True
-    if 'contact' in payload:
-        account.contact = json.dumps(_contact(payload))
-        changed = True
-    return changed
+    if contact is not None:
+        account.contact = json.dumps(contact)
+    return deactivate or contact is not None

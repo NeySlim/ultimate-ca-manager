@@ -766,6 +766,13 @@ def account_info(account_id: str):
     if not jws_data:
         return acme_error('malformed', 'Request body must be JWS')
     
+    # RFC 8555 §7.3.6: a closed account's own requests get 401, not a JWS error
+    if _account_id_from_jws(jws_data) == account_id:
+        try:
+            require_valid_account(account)
+        except AccountRequestError as e:
+            return acme_error(e.error_type, e.detail, e.status)
+    
     expected_url = f"{service.base_url}/acme/acct/{account_id}"
     is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
     if not is_valid:
