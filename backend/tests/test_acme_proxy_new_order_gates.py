@@ -262,8 +262,8 @@ class TestAccountStatus:
                 nonce=_fresh_nonce(app))
             response = _post(client, body)
 
-            assert response.status_code == 400
-            assert response.get_json()['type'] == 'urn:ietf:params:acme:error:malformed'
+            assert response.status_code == 401
+            assert response.get_json()['type'] == 'urn:ietf:params:acme:error:unauthorized'
             service_factory.assert_not_called()
             with app.app_context():
                 assert AcmeClientOrder.query.count() == before

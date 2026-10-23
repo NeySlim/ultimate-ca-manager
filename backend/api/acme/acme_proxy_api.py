@@ -31,9 +31,11 @@ from services.acme.acme_proxy_account import (
 )
 from services.acme import AcmeService, ari
 from services.acme.account_requests import (
+    CLOSED_ACCOUNT,
     NOT_AN_OBJECT,
     AccountRequestError,
     apply_account_update,
+    consume_eab,
     parse_new_account,
     require_valid_account,
 )
@@ -99,6 +101,9 @@ def proxy_response(data, status=200, headers=None):
 
 def proxy_error(error_type, detail, status_code=400):
     """Build an RFC 7807 problem+json error response (RFC 8555 §6.7)."""
+    # verify_jws refuses a closed account's request: 401 (RFC 8555 §7.3.6)
+    if error_type == 'malformed' and detail and CLOSED_ACCOUNT in detail:
+        error_type, status_code = 'unauthorized', 401
     error_data = {
         "type": f"urn:ietf:params:acme:error:{error_type}",
         "detail": detail,
@@ -442,15 +447,7 @@ def new_account(slug=None):
         )
 
         if eab_data and is_new:
-            try:
-                eab_protected = json.loads(
-                    base64.urlsafe_b64decode(eab_data['protected'] + '==')
-                )
-                eab_kid = eab_protected.get('kid', '')
-                if eab_kid:
-                    acme_svc.mark_eab_used(eab_kid, account.account_id)
-            except Exception as e:
-                logger.warning(f"Could not mark EAB credential used: {e}")
+            consume_eab(acme_svc, eab_data, account)
 
         if not is_new:
             require_valid_account(account)
@@ -469,13 +466,6 @@ def _kid_signed_account(account_id):
     (None, None, problem)."""
     from models import AcmeAccount
 
-    account = AcmeAccount.query.filter_by(account_id=account_id).first()
-    # RFC 8555 §7.3.6: a closed account's own requests get 401, not a JWS error
-    if account is not None and _kid_account_id(_request_protected_header()) == account_id:
-        try:
-            require_valid_account(account)
-        except AccountRequestError as e:
-            return None, None, _problem(e)
     is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
         return None, None, proxy_error("malformed", err)
@@ -483,6 +473,7 @@ def _kid_signed_account(account_id):
         return None, None, proxy_error("malformed", "Account requests must be signed with the account kid")
     if _kid_account_id(_request_protected_header()) != account_id:
         return None, None, proxy_error("unauthorized", "JWS signed by different account than URL", 403)
+    account = AcmeAccount.query.filter_by(account_id=account_id).first()
     if account is None:
         return None, None, proxy_error("accountDoesNotExist", "Account not found", 404)
     return account, payload, None

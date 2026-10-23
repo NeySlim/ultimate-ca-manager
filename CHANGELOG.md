@@ -22,7 +22,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - ACME proxy: with External Account Binding on, an `onlyReturnExisting` lookup was refused with `externalAccountRequired`, so cert-manager got no account URL and its orders failed; the lookup is now answered before the EAB check and never creates an account (#409, by @WMP).
 - ACME proxy: the account URL it returns now answers reads, contact updates and deactivation, along with its orders list, and `new-account` refuses an unknown or disabled endpoint path instead of handing out an account URL under it (#410, #411, reported by @WMP).
-- ACME server and proxy: `new-account` refuses a payload that is not an object, a non-boolean `termsOfServiceAgreed` or `onlyReturnExisting`, and a malformed contact with `malformed` or `invalidContact` instead of a 500 or a stored value; a deactivated or revoked account gets `unauthorized` from `new-account` and from its account URL (#412, #413, reported by @WMP).
+- ACME server and proxy: `new-account` refuses a payload that is not an object, a non-boolean `termsOfServiceAgreed` or `onlyReturnExisting`, and a malformed contact with `malformed` or `invalidContact` instead of a 500 or a stored value; a deactivated or revoked account gets `unauthorized` instead of its URL (#412, #413, reported by @WMP).
+- ACME server and proxy: every request signed by a deactivated or revoked account now gets `unauthorized` (401) instead of `malformed`, and the proxy removes the new account when another registration consumed its EAB credential first, as the server already did.
 
 ## [2.244] - 2026-10-23
 

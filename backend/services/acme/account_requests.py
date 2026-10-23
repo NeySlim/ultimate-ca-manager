@@ -1,8 +1,15 @@
 """Account request rules shared by the ACME server and the ACME proxy (RFC 8555 §7.3)."""
+import base64
 import json
+import logging
 from typing import Any, Dict, Optional, Tuple
 
+from models import db
+
+logger = logging.getLogger(__name__)
+
 NOT_AN_OBJECT = "The request payload is not a JSON object"
+CLOSED_ACCOUNT = "This ACME account is not valid"
 
 
 class AccountRequestError(Exception):
@@ -82,8 +89,30 @@ def parse_new_account(payload: Any) -> Dict[str, Any]:
 def require_valid_account(account) -> None:
     """RFC 8555 §7.3.6: a deactivated or revoked account is refused, never served."""
     if account.status != 'valid':
-        raise AccountRequestError(
-            'unauthorized', f'This ACME account is not valid (status: {account.status})', 401)
+        raise AccountRequestError('unauthorized', closed_account_detail(account), 401)
+
+
+def closed_account_detail(account) -> str:
+    return f'{CLOSED_ACCOUNT} (status: {account.status})'
+
+
+def consume_eab(service, eab_data: Dict[str, Any], account) -> None:
+    """Consume the single-use EAB credential of a just-created account (RFC 8555 §7.3.4).
+
+    If another registration won the credential, the unbound account is removed."""
+    protected_b64 = eab_data['protected']
+    protected = json.loads(base64.urlsafe_b64decode(protected_b64 + '=' * (-len(protected_b64) % 4)))
+    eab_kid = protected.get('kid', '')
+    if eab_kid and service.mark_eab_used(eab_kid, account.account_id):
+        return
+    try:
+        db.session.delete(account)
+        db.session.commit()
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Failed to remove account after EAB race: {e}')
+        raise AccountRequestError('serverInternal', 'Internal server error', 500)
+    raise AccountRequestError('malformed', 'External account binding credential is no longer usable')
 
 
 def apply_account_update(account, payload: Any) -> bool:

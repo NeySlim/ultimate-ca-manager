@@ -11,9 +11,12 @@ from typing import Dict, Any, Tuple, Optional
 from models import db, CA, Certificate
 from services.acme import AcmeService, ari, domain_match
 from services.acme.account_requests import (
+    CLOSED_ACCOUNT,
     AccountRequestError,
     apply_account_update,
     parse_new_account,
+    closed_account_detail,
+    consume_eab,
     require_valid_account,
 )
 from models.acme_models import (
@@ -128,6 +131,8 @@ def acme_error(
         'Invalid JWK:', 'Unsupported key type:', 'Key is not a dict',
     )):
         error_type = 'badPublicKey'
+    elif error_type == 'malformed' and CLOSED_ACCOUNT in detail:
+        error_type, status_code = 'unauthorized', 401
 
     error_data = {
         "type": f"urn:ietf:params:acme:error:{error_type}",
@@ -426,6 +431,7 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
         # shared gate (algorithm allowlist, key type, signature).
         try:
             key_to_verify = None
+            account = None
             if jwk:
                 # New account - JWK in protected header
                 key_to_verify = jwk
@@ -439,10 +445,9 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
                         # Extract account ID from KID URL (account_id is a string token, not numeric)
                         acct_id = kid.rstrip('/').split('/')[-1]
                         account = AcmeAccount.query.filter_by(account_id=acct_id).first()
-                        if account and account.status == 'valid':
-                            key_to_verify = json.loads(account.jwk) if isinstance(account.jwk, str) else account.jwk
-                        else:
-                            return False, None, None, "Account not found or deactivated"
+                        if not account:
+                            return False, None, None, "Account not found"
+                        key_to_verify = json.loads(account.jwk) if isinstance(account.jwk, str) else account.jwk
                     except (ValueError, TypeError):
                         return False, None, None, "Invalid KID format"
 
@@ -456,6 +461,9 @@ def verify_jws(jws_data: Dict[str, Any], expected_url: str, account_key: Optiona
             )
             if error:
                 return False, None, None, error
+            # RFC 8555 §7.3.6: a closed account proves its key, then is refused
+            if account is not None and account.status != 'valid':
+                return False, None, None, closed_account_detail(account)
 
             # Signature valid!
             return True, payload, jwk, None
@@ -697,31 +705,12 @@ def new_account():
             except AccountRequestError as e:
                 return acme_error(e.error_type, e.detail, e.status)
 
-        # Consume the EAB only after account creation committed. If another
-        # registration won the single-use race, remove this unbound account.
+        # Consume the EAB only after account creation committed.
         if eab_data and is_new:
-            eab_protected = json.loads(base64.urlsafe_b64decode(
-                eab_data['protected'] + '=' * (-len(eab_data['protected']) % 4)
-            ))
-            eab_kid = eab_protected.get('kid', '')
-            if not eab_kid or not service.mark_eab_used(
-                eab_kid,
-                account.account_id,
-            ):
-                try:
-                    db.session.delete(account)
-                    db.session.commit()
-                except Exception as cleanup_error:
-                    db.session.rollback()
-                    logger.error(
-                        f'Failed to remove account after EAB race: {cleanup_error}'
-                    )
-                    return acme_error('serverInternal', 'Internal server error', 500)
-                return acme_error(
-                    'malformed',
-                    'External account binding credential is no longer usable',
-                    400,
-                )
+            try:
+                consume_eab(service, eab_data, account)
+            except AccountRequestError as e:
+                return acme_error(e.error_type, e.detail, e.status)
         
         # Build response
         account_url = f"{service.base_url}/acme/acct/{account.account_id}"
@@ -765,13 +754,6 @@ def account_info(account_id: str):
     jws_data = request.get_json(force=True, silent=True)
     if not jws_data:
         return acme_error('malformed', 'Request body must be JWS')
-    
-    # RFC 8555 §7.3.6: a closed account's own requests get 401, not a JWS error
-    if _account_id_from_jws(jws_data) == account_id:
-        try:
-            require_valid_account(account)
-        except AccountRequestError as e:
-            return acme_error(e.error_type, e.detail, e.status)
     
     expected_url = f"{service.base_url}/acme/acct/{account_id}"
     is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)

@@ -1,5 +1,7 @@
 """newAccount and account requests on the ACME server and proxy (#410-#413)."""
 import base64
+import hashlib
+import hmac
 import json
 
 import pytest
@@ -7,7 +9,8 @@ from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from models import db, AcmeClientAccount, AcmeClientOrder, SystemConfig
-from models.acme_models import AcmeAccount
+from models.acme_models import AcmeAccount, AcmeEabCredential
+from services.acme import AcmeService
 from services.acme.acme_proxy_service import AcmeProxyService
 from services.acme.jwk_thumbprint import jwk_thumbprint_or_none
 
@@ -332,3 +335,85 @@ def test_apply_account_update_validates_before_writing():
     with pytest.raises(AccountRequestError):
         apply_account_update(account, {'status': 'deactivated', 'contact': 'x'})
     assert (account.status, account.contact) == ('valid', '[]')
+
+
+def _eab(jwk, kid, secret, url):
+    protected = _b64(json.dumps({'alg': 'HS256', 'kid': kid, 'url': url}).encode())
+    payload = _b64(json.dumps(jwk).encode())
+    signature = _b64(hmac.new(secret, f'{protected}.{payload}'.encode(), hashlib.sha256).digest())
+    return {'protected': protected, 'payload': payload, 'signature': signature}
+
+
+@pytest.mark.parametrize('base', ['/acme/proxy', '/acme'])
+class TestEabSingleUse:
+    """An EAB credential binds one account, on the proxy as on the native server."""
+
+    @pytest.fixture
+    def credential(self, app, base):
+        kid = 'eab-single-use' + base.replace('/', '-')
+        with app.app_context():
+            AcmeEabCredential.query.filter_by(kid=kid).delete()
+            db.session.add(AcmeEabCredential(kid=kid, hmac_key_b64=_b64(b'eab-secret'),
+                                             status='active'))
+            db.session.commit()
+        yield kid
+        with app.app_context():
+            AcmeEabCredential.query.filter_by(kid=kid).delete()
+            db.session.commit()
+
+    def _register(self, client, base, kid):
+        key, jwk = _key()
+        eab = _eab(jwk, kid, b'eab-secret', f'http://localhost{base}/new-account')
+        r = _post(client, f'{base}/new-account',
+                  {'termsOfServiceAgreed': True, 'externalAccountBinding': eab}, key, jwk=jwk)
+        return jwk, r
+
+    def test_the_credential_is_bound_to_the_new_account(self, app, client, base, credential):
+        _, r = self._register(client, base, credential)
+        assert r.status_code == 201, r.get_json()
+        with app.app_context():
+            row = AcmeEabCredential.query.filter_by(kid=credential).first()
+            assert row.status == 'used'
+            assert row.used_by_account_id == r.headers['Location'].rsplit('/', 1)[-1]
+
+    def test_a_lost_race_leaves_no_account(self, app, client, monkeypatch, base, credential):
+        consume = AcmeService.mark_eab_used
+
+        def _another_registration_wins(service, eab_kid, account_id):
+            consume(service, eab_kid, 'another-account')
+            return consume(service, eab_kid, account_id)
+
+        monkeypatch.setattr(AcmeService, 'mark_eab_used', _another_registration_wins)
+        jwk, r = self._register(client, base, credential)
+        assert r.status_code == 400 and _type(r) == 'malformed'
+        assert 'Location' not in r.headers
+        assert _accounts(app, jwk) == 0
+
+
+@pytest.mark.parametrize('status', ['deactivated', 'revoked'])
+class TestClosedAccountRequests:
+    """RFC 8555 §7.3.6: every kid-signed request of a closed account gets 401."""
+
+    @pytest.mark.parametrize('base', ['/acme/proxy', '/acme'])
+    @pytest.mark.parametrize('route', ['new-order', 'acct/{id}', 'acct/{id}/orders'])
+    def test_a_closed_account_is_unauthorized(self, app, client, status, base, route):
+        key, jwk = _key()
+        kid = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True},
+                    key, jwk=jwk).headers['Location']
+        _set_status(app, jwk, status)
+        path = f"{base}/{route.format(id=kid.rsplit('/', 1)[-1])}"
+        payload = ({'identifiers': [{'type': 'dns', 'value': 'a.example.com'}]}
+                   if route == 'new-order' else None)
+        r = _post(client, path, payload, key, kid=kid)
+        assert r.status_code == 401 and _type(r) == 'unauthorized', r.get_json()
+
+    @pytest.mark.parametrize('base', ['/acme/proxy', '/acme'])
+    def test_a_bad_signature_is_malformed_not_unauthorized(self, app, client, status, base):
+        key, jwk = _key()
+        kid = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True},
+                    key, jwk=jwk).headers['Location']
+        _set_status(app, jwk, status)
+        other_key, _ = _key()
+        r = _post(client, f'{base}/new-order',
+                  {'identifiers': [{'type': 'dns', 'value': 'a.example.com'}]}, other_key, kid=kid)
+        assert r.status_code == 400 and _type(r) == 'malformed', r.get_json()
