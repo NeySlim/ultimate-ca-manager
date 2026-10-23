@@ -5342,7 +5342,9 @@
       "ttlPlaceholder": "ex. 24h, 7d, 365d",
       "principalsPlaceholder": "ex. root,admin,deploy (separados por vírgula)",
       "keySizeLabel": "Tamanho da chave (somente RSA)",
-      "principalsHelperText": "Lista de principals permitidos separados por vírgula"
+      "principalsHelperText": "Lista de principals permitidos separados por vírgula",
+      "allowAnyPrincipal": "Permitir qualquer principal",
+      "allowAnyPrincipalHelp": "Quando nenhum principal está listado, assinar para qualquer nome, incluindo root. Sem esta opção, uma CA com a lista vazia não assina nada."
     },
     "searchPlaceholder": "Pesquisar CAs SSH...",
     "downloadSetupScript": "Baixar script de configuração",
@@ -5358,7 +5360,9 @@
     "quickInstallWindowsDescription": "Cole isto em qualquer PowerShell no servidor Windows. Baixa o script de configuração e o inicia como administrador em uma nova janela que permanece aberta. Funciona mesmo quando a execução local de .ps1 está bloqueada.",
     "powershellCopied": "Comando PowerShell copiado para a área de transferência",
     "downloadSetupScriptLinux": "Baixar .sh (Linux/macOS)",
-    "downloadSetupScriptWindows": "Baixar .ps1 (Windows)"
+    "downloadSetupScriptWindows": "Baixar .ps1 (Windows)",
+    "anyPrincipal": "Qualquer principal",
+    "noPrincipalSignsNothing": "Nenhum principal listado: esta CA não assina nada"
   },
   "sshCertificates": {
     "title": "Certificados SSH",

@@ -3299,7 +3299,14 @@ A Host CA signs certificates that authenticate **servers to clients**. When a cl
    - **ECDSA P-256/P-384/P-521**: Good compatibility and security.
    - **RSA 4096**: Broadest compatibility, larger keys.
 5. Optionally set max validity and default extensions
-6. Click **Create**
+6. List the allowed principals, or tick **Allow any principal**
+7. Click **Create**
+
+### Allowed Principals
+
+The **Allowed Principals** field restricts the names a CA signs for, as comma-separated patterns (\`deploy\`, \`team-*\`, \`web??.example.com\`). Every principal in a request must match one of them.
+
+A CA with an empty list signs nothing unless **Allow any principal** is ticked: it then signs for any name, \`root\` included. CAs created before 2.245 without a list behaved that way implicitly; the upgrade ticks the option for them, so they keep working.
 
 ### TTL Formats
 

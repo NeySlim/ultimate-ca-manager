@@ -16,6 +16,14 @@ from .helpers import bp, logger
 from models import db
 
 
+def _allow_any_principal(data):
+    """The explicit opt-in to sign for any principal, a JSON boolean."""
+    value = data.get('allow_any_principal', False)
+    if not isinstance(value, bool):
+        raise ValueError('allow_any_principal must be a boolean')
+    return value
+
+
 @bp.route('/api/v2/ssh/cas', methods=['GET'])
 @require_auth(['read:ssh'])
 def list_ssh_cas():
@@ -92,6 +100,8 @@ def import_ssh_ca():
             default_ttl=data.get('default_ttl'),
             max_ttl=data.get('max_ttl', 0),
             comment=data.get('comment'),
+            allowed_principals=data.get('allowed_principals'),
+            allow_any_principal=_allow_any_principal(data),
         )
 
         AuditService.log_action(
@@ -163,6 +173,7 @@ def create_ssh_ca():
             max_ttl=data.get('max_ttl', 0),
             default_extensions=data.get('default_extensions'),
             allowed_principals=data.get('allowed_principals'),
+            allow_any_principal=_allow_any_principal(data),
             comment=data.get('comment'),
         )
 
@@ -219,6 +230,8 @@ def update_ssh_ca(ca_id):
             kwargs['default_extensions'] = data['default_extensions']
         if 'allowed_principals' in data:
             kwargs['allowed_principals'] = data['allowed_principals']
+        if 'allow_any_principal' in data:
+            kwargs['allow_any_principal'] = _allow_any_principal(data)
 
         ca = SSHCAService.update_ca(ca_id, **kwargs)
 

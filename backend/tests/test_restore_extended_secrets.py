@@ -772,6 +772,28 @@ class TestARowTheRestoreCreatesFindsWhatTheSameRestoreCreated:
                 'archive carried')
 
 
+class TestAnOlderArchiveKeepsItsSshPrincipalPolicy:
+    """Before allow_any_principal, an SSH CA without a list signed for anyone:
+    an archive from then restores that as the explicit setting."""
+
+    @pytest.mark.parametrize('principals,carried,expected', [
+        (None, None, True),
+        ('["deploy"]', None, False),
+        (None, False, False),
+    ])
+    def test_the_setting_follows_the_archive_s_age(
+            self, app, seeded, principals, carried, expected):
+        with app.app_context():
+            payload = {'ssh_cas': _archived('ssh_cas')}
+            row = payload['ssh_cas'][0]
+            row['allowed_principals'] = principals
+            row.pop('allow_any_principal', None)
+            if carried is not None:
+                row['allow_any_principal'] = carried
+            _restore(payload, 'ssh_cas')
+            assert _row('ssh_cas').allow_any_principal is expected
+
+
 # ---------------------------------------------------------------------------
 # The ACME client account keys, on an installation with other keys
 # ---------------------------------------------------------------------------

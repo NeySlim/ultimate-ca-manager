@@ -134,7 +134,8 @@ class SSHCAService:
     @staticmethod
     def create_ca(descr, ca_type, key_type=None, username=None,
                   default_ttl=None, max_ttl=0, default_extensions=None,
-                  allowed_principals=None, comment=None, owner_group_id=None):
+                  allowed_principals=None, comment=None, owner_group_id=None,
+                  allow_any_principal=False):
         """Create a new SSH Certificate Authority.
 
         Args:
@@ -201,6 +202,7 @@ class SSHCAService:
         )
         ca.set_default_extensions(default_extensions)
         ca.set_allowed_principals(allowed_principals)
+        ca.allow_any_principal = bool(allow_any_principal)
 
         try:
             db.session.add(ca)
@@ -215,7 +217,8 @@ class SSHCAService:
 
     @staticmethod
     def import_ca(descr, ca_type, private_key_pem, username=None,
-                  default_ttl=None, max_ttl=0, comment=None, owner_group_id=None):
+                  default_ttl=None, max_ttl=0, comment=None, owner_group_id=None,
+                  allowed_principals=None, allow_any_principal=False):
         """Import an existing SSH CA from a private key.
 
         Args:
@@ -283,6 +286,8 @@ class SSHCAService:
             owner_group_id=owner_group_id,
         )
         ca.set_default_extensions(default_extensions)
+        ca.set_allowed_principals(allowed_principals)
+        ca.allow_any_principal = bool(allow_any_principal)
 
         try:
             db.session.add(ca)
@@ -305,7 +310,7 @@ class SSHCAService:
         if not ca:
             raise ValueError(f"SSH CA not found: {ca_id}")
 
-        allowed_fields = {'descr', 'default_ttl', 'max_ttl', 'comment'}
+        allowed_fields = {'descr', 'default_ttl', 'max_ttl', 'comment', 'allow_any_principal'}
         for field, value in kwargs.items():
             if field in allowed_fields:
                 # Normalize TTL fields (seconds or duration strings like

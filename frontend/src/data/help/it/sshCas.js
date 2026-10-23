@@ -44,6 +44,14 @@ export default {
           { label: 'Validazione', text: 'I valori malformati vengono rifiutati con un errore che indica i formati accettati' },
         ]
       },
+      {
+        title: 'Principal consentiti',
+        items: [
+          { label: 'Principal consentiti', text: 'Pattern separati da virgola (es. deploy, team-*). Ogni principal di una richiesta deve corrispondere a uno di essi.' },
+          { label: 'Consenti qualsiasi principal', text: 'Una CA con elenco vuoto firma per qualsiasi nome, root compreso, solo se questa opzione è selezionata. Altrimenti non firma nulla.' },
+          { label: 'Aggiornamento', text: 'Le CA create prima della 2.245 senza elenco continuano a firmare per qualsiasi principal: l\'aggiornamento seleziona l\'opzione per loro.' },
+        ]
+      },
     ],
     tips: [
       'Usa CA separate per i certificati utente e host: non mescolarle mai.',
@@ -94,7 +102,14 @@ Una Host CA firma certificati che autenticano i **server presso i client**. Quan
    - **ECDSA P-256/P-384/P-521**: Buona compatibilità e sicurezza.
    - **RSA 4096**: Massima compatibilità, chiavi più grandi.
 5. Imposta opzionalmente la validità massima e le estensioni predefinite
-6. Fai clic su **Crea**
+6. Elenca i principal consentiti, oppure seleziona **Consenti qualsiasi principal**
+7. Fai clic su **Crea**
+
+### Principal consentiti
+
+Il campo **Principal consentiti** limita i nomi per cui la CA firma, come pattern separati da virgola (\`deploy\`, \`team-*\`, \`web??.example.com\`). Ogni principal di una richiesta deve corrispondere a uno di essi.
+
+Una CA con elenco vuoto non firma nulla, a meno che **Consenti qualsiasi principal** sia selezionato: in tal caso firma per qualsiasi nome, \`root\` compreso. Le CA create prima della 2.245 senza elenco si comportavano così in modo implicito; l'aggiornamento seleziona l'opzione per loro, quindi continuano a funzionare.
 
 ### Formati TTL
 

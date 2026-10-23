@@ -551,7 +551,8 @@ class TestSshExtensionAllowList:
         from services.ssh_ca_service import SSHCAService
 
         ca = SSHCAService.create_ca(
-            descr=descr, ca_type='user', key_type='ed25519', username='t'
+            descr=descr, ca_type='user', key_type='ed25519', username='t',
+            allow_any_principal=True,
         )
         if extensions is not None:
             from models import db

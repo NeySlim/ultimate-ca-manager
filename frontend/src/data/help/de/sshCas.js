@@ -44,6 +44,14 @@ export default {
           { label: 'Validierung', text: 'Fehlerhafte Werte werden mit einer Fehlermeldung abgelehnt, die die akzeptierten Formate nennt' },
         ]
       },
+      {
+        title: 'Erlaubte Principals',
+        items: [
+          { label: 'Erlaubte Principals', text: 'Kommagetrennte Muster (z. B. deploy, team-*). Jeder Principal einer Anfrage muss auf eines davon passen.' },
+          { label: 'Beliebigen Principal erlauben', text: 'Eine CA mit leerer Liste signiert für jeden Namen, auch root, nur wenn diese Option aktiviert ist. Andernfalls signiert sie nichts.' },
+          { label: 'Upgrade', text: 'Vor 2.245 erstellte CAs ohne Liste signieren weiterhin für jeden Principal: Das Upgrade aktiviert die Option für sie.' },
+        ]
+      },
     ],
     tips: [
       'Verwenden Sie getrennte CAs für Benutzer- und Host-Zertifikate: mischen Sie diese niemals.',
@@ -94,7 +102,14 @@ Eine Host CA signiert Zertifikate, die **Server gegenüber Clients** authentifiz
    - **ECDSA P-256/P-384/P-521**: Gute Kompatibilität und Sicherheit.
    - **RSA 4096**: Breiteste Kompatibilität, größere Schlüssel.
 5. Legen Sie optional die maximale Gültigkeit und Standarderweiterungen fest
-6. Klicken Sie auf **Erstellen**
+6. Tragen Sie die erlaubten Principals ein oder aktivieren Sie **Beliebigen Principal erlauben**
+7. Klicken Sie auf **Erstellen**
+
+### Erlaubte Principals
+
+Das Feld **Erlaubte Principals** beschränkt die Namen, für die eine CA signiert, als kommagetrennte Muster (\`deploy\`, \`team-*\`, \`web??.example.com\`). Jeder Principal einer Anfrage muss auf eines davon passen.
+
+Eine CA mit leerer Liste signiert nichts, es sei denn, **Beliebigen Principal erlauben** ist aktiviert: Dann signiert sie für jeden Namen, \`root\` eingeschlossen. Vor 2.245 erstellte CAs ohne Liste verhielten sich implizit so; das Upgrade aktiviert die Option für sie, damit sie weiter funktionieren.
 
 ### TTL-Formate
 

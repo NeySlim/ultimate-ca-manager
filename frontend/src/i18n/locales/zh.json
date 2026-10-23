@@ -5342,7 +5342,9 @@
       "ttlPlaceholder": "例如：24h, 7d, 365d",
       "principalsPlaceholder": "例如：root,admin,deploy（逗号分隔）",
       "keySizeLabel": "密钥大小（仅限 RSA）",
-      "principalsHelperText": "以逗号分隔的允许 Principal 列表"
+      "principalsHelperText": "以逗号分隔的允许 Principal 列表",
+      "allowAnyPrincipal": "允许任意主体",
+      "allowAnyPrincipalHelp": "未列出任何主体时，为任意名称签名，包括 root。未启用此选项时，列表为空的 CA 不会签署任何证书。"
     },
     "searchPlaceholder": "搜索 SSH CA...",
     "downloadSetupScript": "下载配置脚本",
@@ -5358,7 +5360,9 @@
     "quickInstallWindowsDescription": "将其粘贴到 Windows 服务器上的任意 PowerShell 中。它会下载安装脚本，然后以管理员身份在保持打开的新窗口中启动。即使本地 .ps1 执行被阻止也能正常工作。",
     "powershellCopied": "PowerShell 命令已复制到剪贴板",
     "downloadSetupScriptLinux": "下载 .sh (Linux/macOS)",
-    "downloadSetupScriptWindows": "下载 .ps1 (Windows)"
+    "downloadSetupScriptWindows": "下载 .ps1 (Windows)",
+    "anyPrincipal": "任意主体",
+    "noPrincipalSignsNothing": "未列出任何主体：此 CA 不会签署任何证书"
   },
   "sshCertificates": {
     "title": "SSH 证书",

@@ -44,6 +44,14 @@ export default {
           { label: 'Validación', text: 'Los valores mal formados se rechazan con un error que indica los formatos aceptados' },
         ]
       },
+      {
+        title: 'Principals permitidos',
+        items: [
+          { label: 'Principals permitidos', text: 'Patrones separados por comas (ej. deploy, team-*). Todos los principals de una solicitud deben coincidir con alguno de ellos.' },
+          { label: 'Permitir cualquier principal', text: 'Una CA con la lista vacía firma para cualquier nombre, incluido root, solo si esta opción está marcada. De lo contrario, no firma nada.' },
+          { label: 'Actualización', text: 'Las CA creadas antes de la 2.245 sin lista siguen firmando para cualquier principal: la actualización marca la opción por ellas.' },
+        ]
+      },
     ],
     tips: [
       'Use CAs separadas para certificados de usuario y de host: nunca las mezcle.',
@@ -94,7 +102,14 @@ Una Host CA firma certificados que autentican **servidores ante clientes**. Cuan
    - **ECDSA P-256/P-384/P-521**: Buena compatibilidad y seguridad.
    - **RSA 4096**: Mayor compatibilidad, claves más grandes.
 5. Opcionalmente, defina la validez máxima y las extensiones predeterminadas
-6. Haga clic en **Crear**
+6. Indique los principals permitidos o marque **Permitir cualquier principal**
+7. Haga clic en **Crear**
+
+### Principals permitidos
+
+El campo **Principals permitidos** restringe los nombres para los que firma una CA, mediante patrones separados por comas (\`deploy\`, \`team-*\`, \`web??.example.com\`). Todos los principals de una solicitud deben coincidir con alguno de ellos.
+
+Una CA con la lista vacía no firma nada a menos que se marque **Permitir cualquier principal**: entonces firma para cualquier nombre, incluido \`root\`. Las CA creadas antes de la 2.245 sin lista se comportaban así de forma implícita; la actualización marca la opción por ellas, de modo que siguen funcionando.
 
 ### Formatos de TTL
 

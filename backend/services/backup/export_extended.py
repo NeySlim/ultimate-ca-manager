@@ -53,6 +53,7 @@ class ExportExtendedMixin:
                 'max_ttl': getattr(ca, 'max_ttl', 0),
                 'default_extensions': getattr(ca, 'default_extensions', None),
                 'allowed_principals': getattr(ca, 'allowed_principals', None),
+                'allow_any_principal': bool(getattr(ca, 'allow_any_principal', False)),
                 'comment': getattr(ca, 'comment', None),
                 'created_at': ca.created_at.isoformat() if getattr(ca, 'created_at', None) else None,
                 'created_by': getattr(ca, 'created_by', None),

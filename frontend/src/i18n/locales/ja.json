@@ -5345,7 +5345,9 @@
       "ttlPlaceholder": "例: 24h, 7d, 365d",
       "principalsPlaceholder": "例: root,admin,deploy（カンマ区切り）",
       "keySizeLabel": "鍵サイズ（RSAのみ）",
-      "principalsHelperText": "許可されたPrincipalのカンマ区切りリスト"
+      "principalsHelperText": "許可されたPrincipalのカンマ区切りリスト",
+      "allowAnyPrincipal": "任意のプリンシパルを許可",
+      "allowAnyPrincipalHelp": "プリンシパルが一つも指定されていない場合、root を含む任意の名前に署名します。このオプションがなければ、リストが空の CA は何も署名しません。"
     },
     "searchPlaceholder": "SSH CAを検索...",
     "downloadSetupScript": "セットアップスクリプトをダウンロード",
@@ -5361,7 +5363,9 @@
     "quickInstallWindowsDescription": "Windows サーバー上の任意の PowerShell に貼り付けてください。セットアップスクリプトをダウンロードし、開いたままになる新しいウィンドウで管理者として起動します。ローカルの .ps1 実行がブロックされていても動作します。",
     "powershellCopied": "PowerShell コマンドをクリップボードにコピーしました",
     "downloadSetupScriptLinux": ".sh をダウンロード (Linux/macOS)",
-    "downloadSetupScriptWindows": ".ps1 をダウンロード (Windows)"
+    "downloadSetupScriptWindows": ".ps1 をダウンロード (Windows)",
+    "anyPrincipal": "任意のプリンシパル",
+    "noPrincipalSignsNothing": "プリンシパル未指定：この CA は何も署名しません"
   },
   "sshCertificates": {
     "title": "SSH証明書",

@@ -5347,7 +5347,9 @@
       "ttlPlaceholder": "e.g. 24h, 7d, 365d",
       "principalsPlaceholder": "e.g. root,admin,deploy (comma-separated)",
       "keySizeLabel": "Key Size (RSA only)",
-      "principalsHelperText": "Comma-separated list of allowed principals"
+      "principalsHelperText": "Comma-separated list of allowed principals",
+      "allowAnyPrincipal": "Allow any principal",
+      "allowAnyPrincipalHelp": "When no principal is listed, sign for any name, root included. Without it, a CA with an empty list signs nothing."
     },
     "searchPlaceholder": "Search SSH CAs...",
     "quickInstall": "Quick Install",
@@ -5361,7 +5363,9 @@
     "quickInstallWindowsDescription": "Paste this in any PowerShell on the Windows server. It downloads the setup script, then launches it as Administrator in a new window that stays open. Works even when local .ps1 execution is blocked.",
     "powershellCopied": "PowerShell command copied to clipboard",
     "downloadSetupScriptLinux": "Download .sh (Linux/macOS)",
-    "downloadSetupScriptWindows": "Download .ps1 (Windows)"
+    "downloadSetupScriptWindows": "Download .ps1 (Windows)",
+    "anyPrincipal": "Any principal",
+    "noPrincipalSignsNothing": "No principal listed: this CA signs nothing"
   },
   "sshCertificates": {
     "title": "SSH Certificates",

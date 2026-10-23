@@ -55,6 +55,8 @@ class SSHCertificateAuthority(db.Model if db else object):
 
     # Allowed principals pattern (JSON list of allowed principal patterns, empty = any)
     allowed_principals = db.Column(db.Text)
+    # An empty list signs for nothing unless this says any principal will do
+    allow_any_principal = db.Column(db.Boolean, default=False, nullable=False)
 
     # Comment / notes
     comment = db.Column(db.Text)
@@ -148,6 +150,7 @@ class SSHCertificateAuthority(db.Model if db else object):
             'max_ttl': self.max_ttl,
             'default_extensions': self.get_default_extensions(),
             'allowed_principals': self.get_allowed_principals(),
+            'allow_any_principal': bool(self.allow_any_principal),
             'comment': self.comment,
             'created_at': utc_isoformat(self.created_at),
             'created_by': self.created_by,

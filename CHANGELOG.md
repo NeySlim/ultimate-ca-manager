@@ -15,6 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Certificate Transparency submission now goes through the pinned SSRF guard: a log URL could be redirected, or its name rebound, to loopback or a cloud metadata address after it was checked (reported privately by @fredlubrano).
 - ACME HTTP-01 and TLS-ALPN-01 validation now pins its connection under the default policy too, where private addresses are allowed: a name could answer one address to the metadata check and the cloud metadata service to the fetch (reported privately by @heidrickla).
 - The PowerDNS and Plesk DNS providers now reach their server through the pinned SSRF guard: their API key, sent in a header of its own, followed a redirect to another host. A server on the same host stays reachable.
+- SSH: a CA with no allowed principals signed for any name, `root` included. It now signs nothing unless **Allow any principal** is ticked (reported privately by @heidrickla).
 - Pillow 13.0.0 is now the minimum: 12.x carries 39 published advisories, mostly in image decoders.
 - GitHub Actions are pinned to commit SHAs, kept up to date by Dependabot, and a test refuses an unpinned one.
 
@@ -31,6 +32,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME server and proxy: `new-account` refuses a payload that is not an object, a non-boolean `termsOfServiceAgreed` or `onlyReturnExisting`, and a malformed contact with `malformed` or `invalidContact` instead of a 500 or a stored value; a deactivated or revoked account gets `unauthorized` instead of its URL (#412, #413, reported by @WMP).
 - ACME server and proxy: every request signed by a deactivated or revoked account now gets `unauthorized` (401) instead of `malformed`, and the proxy removes the new account when another registration consumed its EAB credential first, as the server already did.
 - ACME proxy: a stale nonce or an unusable account key now gets `badNonce` or `badPublicKey` instead of `malformed`, so clients retry a stale nonce; on both servers a kid that names no account gets `accountDoesNotExist`.
+
+### Upgrade notes
+
+- SSH: existing CAs without allowed principals get **Allow any principal** ticked, so they keep signing; untick it once their principals are listed. A CA created through the API without a list now signs nothing unless `allow_any_principal` is `true`.
 
 ## [2.244] - 2026-10-23
 

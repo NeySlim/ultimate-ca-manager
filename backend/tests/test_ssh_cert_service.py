@@ -20,7 +20,8 @@ class TestSignCertificate:
     def test_sign_user_cert(self, app):
         with app.app_context():
             ca = SSHCAService.create_ca(descr='Sign CA', ca_type='user',
-                                        key_type='ed25519', username='t')
+                                        key_type='ed25519', username='t',
+                                        allow_any_principal=True)
             cert = SSHCertificateService.sign_certificate(
                 ca.id, _client_pubkey(), 'user', ['alice'], validity_seconds=3600)
             assert cert.id is not None
@@ -30,7 +31,8 @@ class TestSignCertificate:
     def test_rejects_invalid_cert_type(self, app):
         with app.app_context():
             ca = SSHCAService.create_ca(descr='Type CA', ca_type='user',
-                                        key_type='ed25519', username='t')
+                                        key_type='ed25519', username='t',
+                                        allow_any_principal=True)
             with pytest.raises(ValueError, match='certificate type'):
                 SSHCertificateService.sign_certificate(
                     ca.id, _client_pubkey(), 'banana', ['alice'])
@@ -38,7 +40,8 @@ class TestSignCertificate:
     def test_rejects_empty_principals(self, app):
         with app.app_context():
             ca = SSHCAService.create_ca(descr='Princ CA', ca_type='user',
-                                        key_type='ed25519', username='t')
+                                        key_type='ed25519', username='t',
+                                        allow_any_principal=True)
             with pytest.raises(ValueError):
                 SSHCertificateService.sign_certificate(
                     ca.id, _client_pubkey(), 'user', [])
@@ -80,7 +83,8 @@ class TestRevokeAndKrl:
     def test_revoke_marks_revoked(self, app):
         with app.app_context():
             ca = SSHCAService.create_ca(descr='Rev CA', ca_type='user',
-                                        key_type='ed25519', username='t')
+                                        key_type='ed25519', username='t',
+                                        allow_any_principal=True)
             cert = SSHCertificateService.sign_certificate(
                 ca.id, _client_pubkey(), 'user', ['bob'])
             SSHCertificateService.revoke_certificate(cert.id, reason='superseded', username='t')
@@ -93,7 +97,8 @@ class TestRevokeAndKrl:
         from services.ssh_krl_service import SSHKRLService
         with app.app_context():
             ca = SSHCAService.create_ca(descr='KRL CA', ca_type='user',
-                                        key_type='ed25519', username='t')
+                                        key_type='ed25519', username='t',
+                                        allow_any_principal=True)
             cert = SSHCertificateService.sign_certificate(
                 ca.id, _client_pubkey(), 'user', ['carol'])
             SSHCertificateService.revoke_certificate(cert.id, username='t')

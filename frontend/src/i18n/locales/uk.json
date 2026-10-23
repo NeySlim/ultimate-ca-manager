@@ -5396,7 +5396,9 @@
       "ttlPlaceholder": "напр. 24h, 7d, 365d",
       "principalsPlaceholder": "напр. root,admin,deploy (через кому)",
       "keySizeLabel": "Розмір ключа (лише RSA)",
-      "principalsHelperText": "Список дозволених Principal через кому"
+      "principalsHelperText": "Список дозволених Principal через кому",
+      "allowAnyPrincipal": "Дозволити будь-який principal",
+      "allowAnyPrincipalHelp": "Якщо жодного principal не вказано, підписувати для будь-якого імені, включно з root. Без цього параметра CA з порожнім списком нічого не підписує."
     },
     "searchPlaceholder": "Шукати SSH CA...",
     "downloadSetupScript": "Завантажити скрипт налаштування",
@@ -5412,7 +5414,9 @@
     "quickInstallWindowsDescription": "Вставте це в будь-який PowerShell на сервері Windows. Команда завантажить сценарій налаштування та запустить його як адміністратор у новому вікні, яке залишається відкритим. Працює навіть коли локальне виконання .ps1 заблоковане.",
     "powershellCopied": "Команду PowerShell скопійовано до буфера обміну",
     "downloadSetupScriptLinux": "Завантажити .sh (Linux/macOS)",
-    "downloadSetupScriptWindows": "Завантажити .ps1 (Windows)"
+    "downloadSetupScriptWindows": "Завантажити .ps1 (Windows)",
+    "anyPrincipal": "Будь-який principal",
+    "noPrincipalSignsNothing": "Жодного principal не вказано: цей CA нічого не підписує"
   },
   "sshCertificates": {
     "title": "SSH-сертифікати",

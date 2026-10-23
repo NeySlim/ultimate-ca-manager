@@ -262,6 +262,9 @@ class RestoreExtendedMixin:
                 db.session.add(sca)
 
             apply_columns(sca, 'ssh_cas', sca_data, plan)
+            if 'allow_any_principal' not in sca_data:
+                # An older archive: an empty list meant any principal then
+                sca.allow_any_principal = not sca.get_allowed_principals()
 
             encrypted = sca_data.get('private_key_pem_encrypted')
             prv = sca_data.get('_private_key_plaintext')
