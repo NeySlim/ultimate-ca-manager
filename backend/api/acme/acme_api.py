@@ -10,6 +10,12 @@ from typing import Dict, Any, Tuple, Optional
 
 from models import db, CA, Certificate
 from services.acme import AcmeService, ari, domain_match
+from services.acme.account_requests import (
+    AccountRequestError,
+    apply_account_update,
+    parse_new_account,
+    require_valid_account,
+)
 from models.acme_models import (
     AcmeAccount,
     AcmeAuthorization,
@@ -204,38 +210,6 @@ def _identifier_subproblem(
             'value': identifier_data.get('value'),
         },
     }
-
-
-def _validate_contact_uris(contact: Any) -> Tuple[bool, Optional[str], Optional[str]]:
-    """Validate RFC 8555 account contact URIs supported by this server."""
-    if not isinstance(contact, list):
-        return False, 'invalidContact', 'Contact must be an array of mailto URIs'
-
-    for contact_uri in contact:
-        if not isinstance(contact_uri, str):
-            return False, 'invalidContact', 'Contact URI must be a string'
-        scheme, separator, target = contact_uri.partition(':')
-        if not separator or scheme.lower() != 'mailto':
-            return False, 'unsupportedContact', 'Only mailto contact URIs are supported'
-
-        address = target.split('?', 1)[0]
-        if (
-            not address
-            or address.count('@') != 1
-            or any(character.isspace() for character in address)
-        ):
-            return False, 'invalidContact', 'Malformed mailto contact URI'
-        local_part, domain = address.rsplit('@', 1)
-        if (
-            not local_part
-            or not domain
-            or domain.startswith('.')
-            or domain.endswith('.')
-            or '..' in domain
-        ):
-            return False, 'invalidContact', 'Malformed mailto contact URI'
-
-    return True, None, None
 
 
 def _account_id_from_jws(jws_data: Dict[str, Any]) -> Optional[str]:
@@ -662,23 +636,23 @@ def new_account():
         if not jwk:
             return acme_error('malformed', 'JWK required in protected header for new-account')
         
-        # Extract account details
-        contact = payload.get('contact', [])
-        terms_agreed = payload.get('termsOfServiceAgreed', False)
-        only_return_existing = payload.get('onlyReturnExisting', False)
+        try:
+            fields = parse_new_account(payload)
+        except AccountRequestError as e:
+            return acme_error(e.error_type, e.detail, e.status)
+        contact = fields['contact']
+        terms_agreed = fields['terms_of_service_agreed']
 
-        contact_valid, contact_error, contact_detail = _validate_contact_uris(
-            contact
-        )
-        if not contact_valid:
-            return acme_error(contact_error, contact_detail)
-        
         # Handle onlyReturnExisting (RFC 8555 Section 7.3.1)
-        if only_return_existing:
+        if fields['only_return_existing']:
             thumbprint = service._compute_jwk_thumbprint(jwk)
             existing = AcmeAccount.query.filter_by(jwk_thumbprint=thumbprint).first()
             if not existing:
                 return acme_error('accountDoesNotExist', 'Account does not exist', 400)
+            try:
+                require_valid_account(existing)
+            except AccountRequestError as e:
+                return acme_error(e.error_type, e.detail, e.status)
             account_url = f"{service.base_url}/acme/acct/{existing.account_id}"
             response_data = {
                 "status": existing.status,
@@ -691,7 +665,7 @@ def new_account():
             return response
         
         # Validate EAB if required (RFC 8555 §7.3.4)
-        eab_data = payload.get('externalAccountBinding')
+        eab_data = fields['external_account_binding']
         from models import SystemConfig
         eab_config = SystemConfig.query.filter_by(key='acme_eab_required').first()
         eab_required = (eab_config.value if eab_config else 'false').lower() == 'true'
@@ -717,6 +691,11 @@ def new_account():
             contact=contact,
             terms_of_service_agreed=terms_agreed
         )
+        if not is_new:
+            try:
+                require_valid_account(account)
+            except AccountRequestError as e:
+                return acme_error(e.error_type, e.detail, e.status)
 
         # Consume the EAB only after account creation committed. If another
         # registration won the single-use race, remove this unbound account.
@@ -797,24 +776,18 @@ def account_info(account_id: str):
     if request_account_id != account_id:
         return acme_error('unauthorized', 'JWS signed by different account than URL', 403)
     
-    # Handle account deactivation (RFC 8555 Section 7.3.6)
-    if payload and payload.get('status') == 'deactivated':
-        account.status = 'deactivated'
+    # Contact update and deactivation (RFC 8555 §7.3.2, §7.3.6)
+    try:
+        changed = apply_account_update(account, payload)
+    except AccountRequestError as e:
+        db.session.rollback()
+        return acme_error(e.error_type, e.detail, e.status)
+    if changed:
         try:
             db.session.commit()
         except Exception as e:
             db.session.rollback()
-            logger.error(f"Failed to deactivate account: {e}")
-            return acme_error('serverInternal', 'Failed to update account', 500)
-    
-    # Handle contact update (RFC 8555 Section 7.3.2)
-    if payload and 'contact' in payload:
-        account.contact = json.dumps(payload['contact'])
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to update contact: {e}")
+            logger.error(f"Failed to update account: {e}")
             return acme_error('serverInternal', 'Failed to update account', 500)
     
     account_url = f"{service.base_url}/acme/acct/{account.account_id}"
@@ -822,6 +795,7 @@ def account_info(account_id: str):
     response_data = {
         "status": account.status,
         "contact": account.contact_list,
+        "termsOfServiceAgreed": account.terms_of_service_agreed,
         "orders": f"{account_url}/orders"
     }
     

@@ -30,6 +30,13 @@ from services.acme.acme_proxy_account import (
     resolve_proxy_by_slug,
 )
 from services.acme import AcmeService, ari
+from services.acme.account_requests import (
+    NOT_AN_OBJECT,
+    AccountRequestError,
+    apply_account_update,
+    parse_new_account,
+    require_valid_account,
+)
 from services.acme import domain_match
 from services.acme.identifiers import validate_acme_identifier
 from services.acme.jwk_thumbprint import jwk_thumbprint_or_none
@@ -40,7 +47,7 @@ logger = logging.getLogger(__name__)
 
 # RFC 8555 §7.3.6: these accounts are refused, never served.
 _CLOSED_ACCOUNT_STATUSES = frozenset({'deactivated', 'revoked'})
-_NOT_AN_OBJECT = "The request payload is not a JSON object"
+_NOT_AN_OBJECT = NOT_AN_OBJECT
 
 # Request-JWK thumbprints use the shared RFC 7638 helper (name kept for callers).
 _jwk_thumbprint = jwk_thumbprint_or_none
@@ -331,14 +338,22 @@ def new_nonce(slug=None):
     return resp
 
 
-def _inactive_account_error(account):
-    """RFC 8555 §7.3.6: an account that is not valid is refused, never served.
-    Same rule as verify_jws, which accepts a kid only for status 'valid'."""
-    return proxy_error(
-        'unauthorized',
-        f'This ACME account is not valid (status: {account.status})',
-        401,
-    )
+def _problem(error):
+    """problem+json response for an AccountRequestError."""
+    return proxy_error(error.error_type, error.detail, error.status)
+
+
+def _unknown_slug_error(slug):
+    """Same refusal as /directory for a slug that names no enabled endpoint."""
+    if not slug:
+        return None
+    try:
+        resolve_proxy_by_slug(slug)
+    except ValueError as e:
+        return proxy_error("malformed", str(e), 400)
+    except ProxyEndpointNotConfiguredError as e:
+        return proxy_error("malformed", str(e), 404)
+    return None
 
 
 def _account_response(account, slug, status_code):
@@ -359,6 +374,10 @@ def new_account(slug=None):
     """New account (RFC 8555 §7.3)"""
     from models import SystemConfig
 
+    slug_error = _unknown_slug_error(slug)
+    if slug_error:
+        return slug_error
+
     is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
@@ -366,18 +385,14 @@ def new_account(slug=None):
     if not jwk:
         return proxy_error("malformed", "Missing JWK in protected header")
 
+    try:
+        fields = parse_new_account(payload)
+    except AccountRequestError as e:
+        return _problem(e)
+
     # onlyReturnExisting (RFC 8555 §7.3.1): never creates an account and needs
-    # no EAB; clients such as cert-manager use it to fetch their kid. The field
-    # is a boolean, so only `true` counts.
-    # JSON null counts as absent.
-    only_existing = (
-        payload.get('onlyReturnExisting') if isinstance(payload, dict) else None
-    )
-    if only_existing is None:
-        only_existing = False
-    if not isinstance(only_existing, bool):
-        return proxy_error('malformed', 'onlyReturnExisting must be a boolean', 400)
-    if only_existing:
+    # no EAB; clients such as cert-manager use it to fetch their kid.
+    if fields['only_return_existing']:
         try:
             from models import AcmeAccount
             thumbprint = jwk_thumbprint_or_none(jwk)
@@ -393,11 +408,13 @@ def new_account(slug=None):
             return proxy_error("serverInternal", "Failed to look up account", 500)
         if not existing:
             return proxy_error('accountDoesNotExist', 'Account does not exist', 400)
-        if existing.status != 'valid':
-            return _inactive_account_error(existing)
+        try:
+            require_valid_account(existing)
+        except AccountRequestError as e:
+            return _problem(e)
         return _account_response(existing, slug, 200)
 
-    eab_data = payload.get('externalAccountBinding') if isinstance(payload, dict) else None
+    eab_data = fields['external_account_binding']
     eab_cfg = SystemConfig.query.filter_by(key='acme_eab_required').first()
     eab_required = (eab_cfg.value if eab_cfg else 'false').lower() == 'true'
 
@@ -420,8 +437,8 @@ def new_account(slug=None):
         acme_svc = AcmeService()
         account, is_new = acme_svc.create_account(
             jwk=jwk,
-            contact=payload.get("contact", []),
-            terms_of_service_agreed=payload.get("termsOfServiceAgreed", False)
+            contact=fields['contact'],
+            terms_of_service_agreed=fields['terms_of_service_agreed'],
         )
 
         if eab_data and is_new:
@@ -435,14 +452,92 @@ def new_account(slug=None):
             except Exception as e:
                 logger.warning(f"Could not mark EAB credential used: {e}")
 
-        if not is_new and account.status != 'valid':
-            return _inactive_account_error(account)
+        if not is_new:
+            require_valid_account(account)
         return _account_response(account, slug, 201 if is_new else 200)
+    except AccountRequestError as e:
+        return _problem(e)
     except Exception as e:
         logger.error(f"ACME proxy new-account error: {e}")
         # As in the lookup branch: roll back so proxy_error can issue a nonce.
         db.session.rollback()
         return proxy_error("serverInternal", "Failed to create account", 500)
+
+
+def _kid_signed_account(account_id):
+    """(account, payload, None) for a JWS signed by this account's kid, else
+    (None, None, problem). verify_jws accepts only a valid account's kid."""
+    from models import AcmeAccount
+
+    is_valid, payload, jwk, err = verify_proxy_jws()
+    if not is_valid:
+        return None, None, proxy_error("malformed", err)
+    if jwk:
+        return None, None, proxy_error("malformed", "Account requests must be signed with the account kid")
+    if _kid_account_id(_request_protected_header()) != account_id:
+        return None, None, proxy_error("unauthorized", "JWS signed by different account than URL", 403)
+    account = AcmeAccount.query.filter_by(account_id=account_id).first()
+    if account is None:
+        return None, None, proxy_error("accountDoesNotExist", "Account not found", 404)
+    return account, payload, None
+
+
+@_dual_route('/acct/<account_id>', methods=['POST'], endpoint='proxy_account')
+def account_info(account_id, slug=None):
+    """Account read, contact update and deactivation (RFC 8555 §7.3.2, §7.3.6)"""
+    slug_error = _unknown_slug_error(slug)
+    if slug_error:
+        return slug_error
+    account, payload, error = _kid_signed_account(account_id)
+    if error:
+        return error
+    try:
+        changed = apply_account_update(account, payload)
+    except AccountRequestError as e:
+        db.session.rollback()
+        return _problem(e)
+    if changed:
+        try:
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.error(f"ACME proxy account update error: {e}")
+            return proxy_error("serverInternal", "Failed to update account", 500)
+    return _account_response(account, slug, 200)
+
+
+@_dual_route('/acct/<account_id>/orders', methods=['POST'], endpoint='proxy_account_orders')
+def account_orders(account_id, slug=None):
+    """Orders of an account placed through this endpoint (RFC 8555 §7.1.2.1)"""
+    slug_error = _unknown_slug_error(slug)
+    if slug_error:
+        return slug_error
+    account, payload, error = _kid_signed_account(account_id)
+    if error:
+        return error
+    empty_error = _require_empty_payload(payload)
+    if empty_error:
+        return empty_error
+    try:
+        upstream_id = get_proxy_service(slug).account.id
+        orders = AcmeClientOrder.query.filter(
+            AcmeClientOrder.is_proxy_order.is_(True),
+            db.or_(AcmeClientOrder.account_id == account.account_id,
+                   AcmeClientOrder.client_jwk_thumbprint == account.jwk_thumbprint),
+            db.or_(AcmeClientOrder.acme_client_account_id.is_(None),
+                   AcmeClientOrder.acme_client_account_id == upstream_id),
+            AcmeClientOrder.status != 'invalid',
+            AcmeClientOrder.upstream_order_url.isnot(None),
+        ).order_by(AcmeClientOrder.id.desc()).all()
+    except Exception as e:
+        logger.error(f"ACME proxy account orders error: {e}")
+        db.session.rollback()
+        return proxy_error("serverInternal", "Failed to list orders", 500)
+    base = _proxy_base_url(slug)
+    return proxy_response({"orders": [
+        f"{base}/order/{AcmeProxyService._proxy_id(order.upstream_order_url)}"
+        for order in orders
+    ]})
 
 
 @_dual_route('/new-order', methods=['POST'], endpoint='proxy_new_order')
