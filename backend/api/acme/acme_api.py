@@ -803,9 +803,6 @@ def account_orders(account_id: str):
     if not account:
         return acme_error('accountDoesNotExist', 'Account not found', 404)
     
-    if account.status == 'deactivated':
-        return acme_error('unauthorized', 'Account is deactivated', 401)
-    
     # Verify JWS (POST-as-GET) — required, never optional
     jws_data = request.get_json(force=True, silent=True)
     if not jws_data:
@@ -873,9 +870,6 @@ def new_authz():
         account = service.get_account_by_kid(account_id)
         if not account:
             return acme_error('accountDoesNotExist', 'Account not found', 404)
-        
-        if account.status == 'deactivated':
-            return acme_error('unauthorized', 'Account is deactivated', 401)
         
         # Validate identifier (RFC 8555 DNS + RFC 8738 IP)
         identifier = payload.get('identifier')
@@ -967,10 +961,6 @@ def new_order():
         account = service.get_account_by_kid(account_id)
         if not account:
             return acme_error('accountDoesNotExist', 'Account not found', 404)
-        
-        # Reject deactivated accounts (RFC 8555 §7.3.6)
-        if account.status == 'deactivated':
-            return acme_error('unauthorized', 'Account is deactivated', 401)
         
         # Extract order details from payload
         identifiers = payload.get('identifiers', [])
@@ -1509,10 +1499,6 @@ def respond_to_challenge(challenge_id: str):
         account = service.get_account_by_kid(account_id)
         if not account:
             return acme_error('accountDoesNotExist', 'Account not found', 404)
-        
-        # Reject deactivated accounts (RFC 8555 §7.3.6)
-        if account.status == 'deactivated':
-            return acme_error('unauthorized', 'Account is deactivated', 401)
         
         # Verify account owns this challenge (via authorization → order)
         challenge_account = None

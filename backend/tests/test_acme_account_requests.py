@@ -408,12 +408,14 @@ class TestClosedAccountRequests:
         assert r.status_code == 401 and _type(r) == 'unauthorized', r.get_json()
 
     @pytest.mark.parametrize('base', ['/acme/proxy', '/acme'])
-    def test_a_bad_signature_is_malformed_not_unauthorized(self, app, client, status, base):
+    @pytest.mark.parametrize('route', ['new-order', 'acct/{id}', 'acct/{id}/orders'])
+    def test_a_bad_signature_is_malformed_not_unauthorized(self, app, client, status, base, route):
+        """The status is told only to the holder of the account key."""
         key, jwk = _key()
         kid = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True},
                     key, jwk=jwk).headers['Location']
         _set_status(app, jwk, status)
         other_key, _ = _key()
-        r = _post(client, f'{base}/new-order',
-                  {'identifiers': [{'type': 'dns', 'value': 'a.example.com'}]}, other_key, kid=kid)
+        path = f"{base}/{route.format(id=kid.rsplit('/', 1)[-1])}"
+        r = _post(client, path, None, other_key, kid=kid)
         assert r.status_code == 400 and _type(r) == 'malformed', r.get_json()
