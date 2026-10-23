@@ -720,3 +720,28 @@ def test_a_redirect_hop_is_pinned_under_the_default_policy(monkeypatch, dns_priv
     first = ('first.example.test', ['10.0.0.5'])
     http01.fetch_following_redirects('http://first.example.test/x', first, allow_private=True)
     assert pinned[1].get('next.example.test') == ['10.0.0.5']
+
+
+@pytest.fixture
+def dns_rebinding(monkeypatch):
+    """A name answering a LAN address to the first lookup, cloud metadata after."""
+    answers = iter(['10.0.0.5'])
+
+    def _rebind(host, *_a, **_kw):
+        return [(socket.AF_INET, socket.SOCK_STREAM, 6, '', (next(answers, '169.254.169.254'), 0))]
+
+    monkeypatch.setattr(ssrf_protection.socket, 'getaddrinfo', _rebind)
+
+
+@pytest.mark.parametrize('validator', ['validate_http01_challenge', 'validate_tls_alpn01_challenge'])
+def test_a_rebinding_caught_by_the_second_lookup_rejects_the_identifier(
+        outbound, dns_rebinding, validator):
+    result, challenge = _drive(validator, 'dns', 'lan.example.test', allow_private_ips=True)
+    _assert_rejected(result, challenge, outbound)
+
+
+def test_the_client_self_check_pins_its_first_hop(outbound, dns_private):
+    from services.acme import http01
+
+    http01.challenge_reachable('lan.example.test', {'token': 't', 'key_authorization': 'k'})
+    assert outbound['pinned'].get('lan.example.test') == ['10.0.0.5']

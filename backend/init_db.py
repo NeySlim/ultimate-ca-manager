@@ -39,8 +39,8 @@ def init_database():
             # canonical bootstrap paths in app.py / database_health.py.
             # NOTE: the User column is `active` — `is_active=True` made this
             # constructor raise TypeError whenever the block was reached.
-            from auth.password_change_gate import initial_password_needs_change
-            initial_password = app.config.get("INITIAL_ADMIN_PASSWORD", "changeme123")
+            from auth.password_change_gate import DEFAULT_INITIAL_PASSWORD, initial_password_needs_change
+            initial_password = app.config.get("INITIAL_ADMIN_PASSWORD", DEFAULT_INITIAL_PASSWORD)
             admin = User(
                 username=admin_username,
                 email=app.config.get("INITIAL_ADMIN_EMAIL", "admin@localhost"),

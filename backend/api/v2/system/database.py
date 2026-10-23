@@ -211,8 +211,8 @@ def reset_db():
         #   cannot recreate an admin that no one can log in as;
         # - set_password(), which pins the hash algorithm (models/user.py),
         #   instead of a bare generate_password_hash().
-        from auth.password_change_gate import initial_password_needs_change
-        initial_password = current_app.config.get('INITIAL_ADMIN_PASSWORD', 'changeme123')
+        from auth.password_change_gate import DEFAULT_INITIAL_PASSWORD, initial_password_needs_change
+        initial_password = current_app.config.get('INITIAL_ADMIN_PASSWORD', DEFAULT_INITIAL_PASSWORD)
         admin = User(
             username=current_app.config.get('INITIAL_ADMIN_USERNAME', 'admin'),
             email=current_app.config.get('INITIAL_ADMIN_EMAIL', 'admin@localhost'),

@@ -96,7 +96,14 @@ class ChallengeMixin:
                 # Private answers are legitimate here, but the metadata check
                 # above resolved the name once: pin to what it vetted.
                 from utils.ssrf_protection import validated_addresses
-                pinned_ips = validated_addresses(url, allow_loopback=True)[1]
+                try:
+                    pinned_ips = validated_addresses(url, allow_loopback=True)[1]
+                except ValueError as md_err:
+                    self._invalidate_challenge(
+                        challenge, 'rejectedIdentifier', 'Identifier targets a forbidden address')
+                    db.session.commit()
+                    logger.warning(f"HTTP-01 SSRF blocked for {identifier_value}: {md_err}")
+                    return False
 
             if pinned_ips is not None and identifier_type != "ip":
                 # Close the DNS-rebinding window: the guard resolved the name,
@@ -423,8 +430,15 @@ class ChallengeMixin:
             else:
                 # As for HTTP-01: connect to what the metadata check vetted.
                 from utils.ssrf_protection import validated_addresses
-                pinned_ips = validated_addresses(
-                    f"https://{format_ip_for_url(identifier_value)}/", allow_loopback=True)[1]
+                try:
+                    pinned_ips = validated_addresses(
+                        f"https://{format_ip_for_url(identifier_value)}/", allow_loopback=True)[1]
+                except ValueError as md_err:
+                    self._invalidate_challenge(
+                        challenge, 'rejectedIdentifier', 'Identifier targets a forbidden address')
+                    db.session.commit()
+                    logger.warning(f"TLS-ALPN-01 SSRF blocked for {identifier_value}: {md_err}")
+                    return False
 
             # RFC 8738: For IP identifiers, use reverse PTR mapping as SNI
             if identifier_type == "ip":

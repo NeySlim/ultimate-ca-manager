@@ -39,6 +39,11 @@ def wire(monkeypatch):
 
     for method in ('get', 'post', 'patch'):
         monkeypatch.setattr(requests, method, lambda url, **kw: _send(url, **kw))
+
+    def _unguarded(*_a, **_kw):
+        raise AssertionError('request sent outside the SSRF guard')
+
+    monkeypatch.setattr(requests, 'request', _unguarded)
     return hops
 
 
@@ -62,8 +67,8 @@ def test_plesk_key_does_not_follow_a_redirect(wire):
 
 def test_cloud_metadata_is_refused(wire):
     provider = PowerDnsDnsProvider({'server_url': 'http://169.254.169.254', 'api_key': 'pdns-key'})
-    ok, _ = provider._request('GET', '/zones')
-    assert ok is False and wire == []
+    ok, why = provider._request('GET', '/zones')
+    assert ok is False and wire == [] and 'cloud metadata' in why
 
 
 def test_a_server_on_the_same_host_stays_reachable(wire):

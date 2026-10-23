@@ -103,8 +103,9 @@ def challenge_reachable(identifier: str, challenge: dict) -> tuple:
     """
     url = challenge_url(identifier, challenge['token'])
     try:
-        validate_url_not_cloud_metadata(url, allow_loopback=True)
-        response = fetch_following_redirects(url, None, allow_private=True, timeout=SELFCHECK_TIMEOUT)
+        # The first hop is pinned to what the check vetted, like every redirect
+        pin = validated_addresses(url, allow_loopback=True)
+        response = fetch_following_redirects(url, pin, allow_private=True, timeout=SELFCHECK_TIMEOUT)
     except ValueError:
         return False, f'{url}: name not resolvable or address refused'
     except requests.Timeout:

@@ -11,7 +11,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
-- The forced password change now holds on the server: until the first-boot `admin`, or any account asked for a new password, sets one, its session gets `403` for everything but the change, logout and 2FA enrolment, API and WebSocket included. Before, only the web UI asked, so the documented default password gave full API access to a fresh install (reported privately by @EQSTLab).
+- The forced password change now holds on the server: until the first-boot `admin`, or any account asked for a new password, sets one, its session gets `403` for everything but the change, logout and a 2FA enrolment that is itself required, API and WebSocket included. Before, only the web UI asked, so the documented default password gave full API access to a fresh install (reported privately by @EQSTLab).
 - Certificate Transparency submission now goes through the pinned SSRF guard: a log URL could be redirected, or its name rebound, to loopback or a cloud metadata address after it was checked (reported privately by @fredlubrano).
 - ACME HTTP-01 and TLS-ALPN-01 validation now pins its connection under the default policy too, where private addresses are allowed: a name could answer one address to the metadata check and the cloud metadata service to the fetch (reported privately by @heidrickla).
 - The PowerDNS and Plesk DNS providers now reach their server through the pinned SSRF guard: their API key, sent in a header of its own, followed a redirect to another host. A server on the same host stays reachable.

@@ -191,6 +191,16 @@ class TestTransport:
         assert "Authentication failed" in message
         assert message.removeprefix("Connection failed: ") in caplog.text
 
+    def test_an_entity_declaration_is_malformed_xml_not_a_transport_failure(self, provider, caplog):
+        response = '<!DOCTYPE p [<!ENTITY x "y">]><packet>&x;</packet>'
+        with caplog.at_level(logging.ERROR, logger="services.acme.dns_providers.plesk"):
+            with patch("services.acme.dns_providers.plesk.safe_request_post", return_value=_response(response)):
+                ok, message = provider.test_connection()
+
+        assert not ok
+        assert "Invalid XML response" in message
+        assert "malformed XML" in caplog.text and "transport failure" not in caplog.text
+
     def test_empty_site_list_returns_actionable_message(self, provider):
         with patch(
             "services.acme.dns_providers.plesk.safe_request_post",

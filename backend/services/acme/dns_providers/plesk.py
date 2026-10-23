@@ -6,6 +6,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from urllib.parse import urlparse
 
 import defusedxml.ElementTree as SafeXml
+from defusedxml import DefusedXmlException
 import requests
 
 from utils.ssrf_protection import safe_request_post
@@ -126,7 +127,7 @@ class PleskDnsProvider(BaseDnsProvider):
                     len(response.text or ""),
                 )
                 return True, root
-            except SafeXml.ParseError as exc:
+            except (SafeXml.ParseError, DefusedXmlException) as exc:
                 diagnostic = self._error(response, "Invalid XML response: ")
                 diagnostic = f"{diagnostic} ({self._failure(exc)})"
                 logger.error("Plesk XML API %s returned malformed XML: %s", context, diagnostic)

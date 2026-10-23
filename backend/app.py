@@ -1386,7 +1386,7 @@ def init_database(app):
             
             db.session.commit()
             print(f"\n[SETUP] Initial admin user created: {admin.username}")
-            if app.config['INITIAL_ADMIN_PASSWORD'] == 'changeme123':
+            if initial_password_needs_change(app.config['INITIAL_ADMIN_PASSWORD']):
                 print(f"[SETUP] Using default password - CHANGE THIS IMMEDIATELY!")
             else:
                 print(f"[SETUP] Using custom password from INITIAL_ADMIN_PASSWORD")
