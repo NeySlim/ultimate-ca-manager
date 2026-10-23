@@ -57,3 +57,16 @@ def test_a_log_url_the_submission_would_refuse_is_refused_at_save(app, auth_clie
     assert r.status_code == 400, r.data
     body = _get(auth_client)
     assert body['log_urls'] is None and body['enabled'] is False, 'a refused body wrote part of itself'
+
+
+def test_a_name_that_does_not_resolve_is_named_as_such(auth_client, no_ct_config, monkeypatch):
+    import socket
+    from utils import ssrf_protection
+
+    def _nxdomain(*_a, **_kw):
+        raise socket.gaierror('Name or service not known')
+
+    monkeypatch.setattr(ssrf_protection.socket, 'getaddrinfo', _nxdomain)
+    r = auth_client.patch('/api/v2/settings/ct', json={'log_urls': ['https://log.example.invalid/']})
+    assert r.status_code == 400
+    assert 'must resolve' in r.get_json()['message']

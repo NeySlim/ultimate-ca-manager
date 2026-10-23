@@ -528,7 +528,7 @@ def update_ct_settings():
                 validate_url_not_cloud_metadata(url)
             except ValueError as e:
                 logger.warning(f"CT log URL refused: {e}")
-                return error_response('A log URL must not target cloud metadata services or loopback', 400)
+                return error_response('A log URL must resolve, and not to loopback or a cloud metadata address', 400)
 
     if 'enabled' in data:
         set_config('ct_enabled', 'true' if data['enabled'] else 'false')
