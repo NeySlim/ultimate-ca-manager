@@ -3950,8 +3950,7 @@
     "mustBeDifferent": "Новий пароль має відрізнятися від поточного",
     "incorrect": "Невірний пароль",
     "changeSuccess": "Пароль changed успішноfully",
-    "changeFailed": "Невдало to change password",
-    "skipForNow": "Пропустити поки що"
+    "changeFailed": "Невдало to change password"
   },
   "import": {
     "smartImport": "Smart Імпорт",

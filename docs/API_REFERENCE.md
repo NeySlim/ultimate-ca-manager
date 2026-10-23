@@ -95,11 +95,14 @@ Content-Type: application/json
     },
     "role": "admin",
     "permissions": ["*"],
-    "auth_method": "password"
+    "auth_method": "password",
+    "force_password_change": false
   },
   "message": "Login successful"
 }
 ```
+
+**Forced password change.** While `force_password_change` is `true` (the first-boot `admin` account, for instance), the session may only set a new password with `POST /api/v2/account/password` and `{"new_password": "..."}`, or log out. Every other call answers `403` with `"must_change_password": true`. API keys are not affected: creating one already needs a session past the change.
 
 ### Login with WebAuthn
 ```http

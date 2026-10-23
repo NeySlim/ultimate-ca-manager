@@ -34,7 +34,7 @@ docker run -d \
 ```
 
 **Access:** https://localhost:8443 or https://your-server-fqdn:8443
-**Credentials:** admin / changeme123
+**Credentials:** admin / changeme123: the first login must set a new password before anything else
 
 ---
 

@@ -3898,8 +3898,7 @@
     "mustBeDifferent": "La nuova password deve essere diversa dalla attuale",
     "incorrect": "Password non corretta",
     "changeSuccess": "Password cambiata con successo",
-    "changeFailed": "Cambio password fallito",
-    "skipForNow": "Salta per ora"
+    "changeFailed": "Cambio password fallito"
   },
   "import": {
     "smartImport": "Importazione Intelligente",

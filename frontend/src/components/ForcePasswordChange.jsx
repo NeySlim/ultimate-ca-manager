@@ -4,14 +4,14 @@
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Lock, Warning, SkipForward } from '@phosphor-icons/react'
+import { Lock, Warning, SignOut } from '@phosphor-icons/react'
 import { Modal, Button, Input } from '../components'
 import { useAuth, useNotification } from '../contexts'
 import { accountService, usersService } from '../services'
 
 export function ForcePasswordChange({ onComplete }) {
   const { t } = useTranslation()
-  const { user } = useAuth()
+  const { logout } = useAuth()
   const { showSuccess, showError } = useNotification()
   const [loading, setLoading] = useState(false)
   const [policy, setPolicy] = useState(null)
@@ -65,6 +65,8 @@ export function ForcePasswordChange({ onComplete }) {
       
       showSuccess(t('password.changeSuccess'))
       onComplete?.()
+      // The page and its socket loaded while the server refused them: start over
+      window.location.reload()
     } catch (error) {
       if (error.data?.details?.i18n_key) {
         showError(t(error.data.details.i18n_key, error.data.details.i18n_values || {}))
@@ -82,7 +84,8 @@ export function ForcePasswordChange({ onComplete }) {
   return (
     <Modal
       open={true}
-      onClose={() => {}} // Cannot be dismissed
+      onClose={() => {}} // The server refuses everything else until the change
+      showClose={false}
       title={t('password.changeRequired')}
     >
       <form onSubmit={handleSubmit} className="p-4 space-y-4">
@@ -118,9 +121,9 @@ export function ForcePasswordChange({ onComplete }) {
         />
 
         <div className="flex justify-between pt-2">
-          <Button variant="ghost" onClick={() => onComplete?.()} type="button">
-            <SkipForward size={16} />
-            {t('password.skipForNow')}
+          <Button variant="ghost" onClick={logout} type="button">
+            <SignOut size={16} />
+            {t('common.logout')}
           </Button>
           <Button type="submit" disabled={loading}>
             <Lock size={16} />

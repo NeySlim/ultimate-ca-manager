@@ -68,6 +68,8 @@ Gestiona tu perfil personal, configuración de seguridad y claves API.
 ### Cambio de contraseña
 Cambia tu contraseña actual. Debe cumplir con la política de contraseñas del sistema (longitud mínima, requisitos de complejidad).
 
+Cuando UCM solicita una nueva contraseña al iniciar sesión (la cuenta \`admin\` del primer arranque, por ejemplo), el cambio va antes que cualquier otra cosa: hasta que se realice, el servidor rechaza todas las demás solicitudes de esa sesión, incluida la API.
+
 ### Autenticación de dos factores (TOTP)
 Añade una contraseña de un solo uso basada en tiempo usando cualquier app de autenticación:
 

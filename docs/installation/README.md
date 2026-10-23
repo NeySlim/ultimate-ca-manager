@@ -186,7 +186,7 @@ After installation, access UCM at **https://localhost:8443** (or **https://your-
 - **Username:** admin
 - **Password:** `changeme123`
 
-**IMPORTANT:** Change the default password immediately after first login!
+The first login must set a new password: until then the server refuses every other request of that session, API included.
 
 ---
 

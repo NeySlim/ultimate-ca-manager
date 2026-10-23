@@ -2162,6 +2162,8 @@ Manage your personal profile, security settings, and API keys.
 ### Password Change
 Change your current password. Must comply with the system password policy (minimum length, complexity requirements).
 
+When UCM asks for a new password at login (the first-boot \`admin\` account, for instance), the change comes before anything else: until it is made, the server refuses every other request of that session, API included.
+
 ### Two-Factor Authentication (TOTP)
 Add a time-based one-time password using any authenticator app:
 

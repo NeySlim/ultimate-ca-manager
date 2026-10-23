@@ -190,6 +190,22 @@ def _reset_acme_proxy_caches():
     reset_proxy_caches()
 
 
+@pytest.fixture(autouse=True)
+def _admin_password_already_changed(request):
+    """The suite runs as an installation whose admin replaced the first-boot password.
+
+    The server refuses everything else to an account still flagged for a forced
+    change; the tests of that gate set the flag themselves."""
+    if 'app' in request.fixturenames:
+        app = request.getfixturevalue('app')
+        from models import db, User
+        with app.app_context():
+            User.query.filter_by(username='admin', force_password_change=True).update(
+                {'force_password_change': False})
+            db.session.commit()
+    yield
+
+
 def _drop_unreadable_key_material(app):
     """Forget key material that was written under a now-discarded key.
 

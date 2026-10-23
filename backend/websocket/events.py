@@ -20,6 +20,7 @@ import socketio as socketio_pkg
 from flask import current_app, has_request_context, request, session
 from flask_socketio import SocketIO, disconnect, emit, join_room, leave_room
 
+from auth.password_change_gate import password_change_pending
 from auth.twofa_enforcement import ENROLL_SESSION_KEY
 from auth.unified import AuthManager, has_permission
 from config.settings import redis_url as config_redis_url
@@ -205,7 +206,7 @@ def _session_identity():
         return None
     if not info:
         return None
-    if _enrollment_pending():
+    if _enrollment_pending() or password_change_pending(info):
         return None
     permissions = frozenset(p for p in (info.get('permissions') or []) if isinstance(p, str))
     if not has_permission(MIN_PERMISSION, permissions):

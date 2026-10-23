@@ -3898,8 +3898,7 @@
     "mustBeDifferent": "New password deve ser different de current",
     "incorrect": "Palavra-passe incorreta",
     "changeSuccess": "Palavra-passe changed successfully",
-    "changeFailed": "Falhado para change password",
-    "skipForNow": "Pular por agora"
+    "changeFailed": "Falhado para change password"
   },
   "import": {
     "smartImport": "Smart Importar",

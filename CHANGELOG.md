@@ -11,11 +11,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Security
 
+- The forced password change now holds on the server: until the first-boot `admin`, or any account asked for a new password, sets one, its session gets `403` for everything but the change, logout and 2FA enrolment, API and WebSocket included. Before, only the web UI asked, so the documented default password gave full API access to a fresh install (reported privately by @EQSTLab).
 - Pillow 13.0.0 is now the minimum: 12.x carries 39 published advisories, mostly in image decoders.
 - GitHub Actions are pinned to commit SHAs, kept up to date by Dependabot, and a test refuses an unpinned one.
 
 ### Changed
 
+- The forced password prompt no longer offers **Skip for now** or a close button: it offers a logout, and reloads the page once the password is changed.
 - The packages and the Docker image no longer install pytest, black and flake8: development tools moved to `backend/requirements-dev.txt`.
 
 ### Fixed

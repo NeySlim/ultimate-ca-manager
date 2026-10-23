@@ -3898,8 +3898,7 @@
     "mustBeDifferent": "新密码必须与当前密码不同",
     "incorrect": "密码错误",
     "changeSuccess": "密码更改成功",
-    "changeFailed": "更改密码失败",
-    "skipForNow": "暂时跳过"
+    "changeFailed": "更改密码失败"
   },
   "import": {
     "smartImport": "智能导入",

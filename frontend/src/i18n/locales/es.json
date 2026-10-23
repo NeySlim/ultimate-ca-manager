@@ -3898,8 +3898,7 @@
     "mustBeDifferent": "La nueva contraseña debe ser diferente de la actual",
     "incorrect": "Incorrect contraseña",
     "changeSuccess": "Contraseña changed éxitofully",
-    "changeFailed": "Error al cambiar la contraseña",
-    "skipForNow": "Omitir por ahora"
+    "changeFailed": "Error al cambiar la contraseña"
   },
   "import": {
     "smartImport": "Smart Importar",

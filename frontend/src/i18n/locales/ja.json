@@ -3901,8 +3901,7 @@
     "mustBeDifferent": "新しいパスワードは現在のパスワードと異なる必要があります",
     "incorrect": "パスワードが正しくありません",
     "changeSuccess": "パスワードが正常に変更されました",
-    "changeFailed": "パスワードの変更に失敗しました",
-    "skipForNow": "今はスキップ"
+    "changeFailed": "パスワードの変更に失敗しました"
   },
   "import": {
     "smartImport": "スマートインポート",
