@@ -681,3 +681,42 @@ def test_tls_alpn01_refuses_an_unresolvable_identifier_in_the_default_config(
         allow_private_ips=True,
     )
     _assert_rejected(result, challenge, outbound)
+
+
+# --------------------------------------------------------------------------
+# 6. The default policy (private addresses allowed) is pinned as well: the
+#    metadata check resolved the name, a second answer must not reach IMDS
+# --------------------------------------------------------------------------
+
+def test_http01_pins_under_the_default_policy(outbound, dns_private):
+    _drive('validate_http01_challenge', 'dns', 'lan.example.test', allow_private_ips=True)
+    assert outbound['fetched']
+    assert outbound['pinned'].get('lan.example.test') == ['10.0.0.5']
+
+
+def test_tls_alpn01_connects_to_the_vetted_address_under_the_default_policy(outbound, dns_private):
+    _drive('validate_tls_alpn01_challenge', 'dns', 'lan.example.test', allow_private_ips=True)
+    assert outbound['target'] == ('10.0.0.5', 443)
+
+
+def test_a_redirect_hop_is_pinned_under_the_default_policy(monkeypatch, dns_private):
+    import requests
+    from services.acme import http01
+
+    pinned = []
+
+    class _Answer:
+        def __init__(self, status, location=None):
+            self.status_code = status
+            self.headers = {'Location': location} if location else {}
+
+    def _get(url, **_kw):
+        pinned.append(dict(getattr(ssrf_protection._pinned_resolution, 'host_to_ip', None) or {}))
+        if len(pinned) == 1:
+            return _Answer(302, 'http://next.example.test/.well-known/acme-challenge/t')
+        return _Answer(200)
+
+    monkeypatch.setattr(requests, 'get', _get)
+    first = ('first.example.test', ['10.0.0.5'])
+    http01.fetch_following_redirects('http://first.example.test/x', first, allow_private=True)
+    assert pinned[1].get('next.example.test') == ['10.0.0.5']

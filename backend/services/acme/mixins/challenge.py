@@ -92,6 +92,11 @@ class ChallengeMixin:
                     db.session.commit()
                     logger.warning(f"HTTP-01 SSRF blocked for {identifier_value}: {ssrf_err}")
                     return False
+            else:
+                # Private answers are legitimate here, but the metadata check
+                # above resolved the name once: pin to what it vetted.
+                from utils.ssrf_protection import validated_addresses
+                pinned_ips = validated_addresses(url, allow_loopback=True)[1]
 
             if pinned_ips is not None and identifier_type != "ip":
                 # Close the DNS-rebinding window: the guard resolved the name,
@@ -101,10 +106,6 @@ class ChallengeMixin:
                 # (the guard vetted every one and would have refused the host
                 # otherwise, so keeping the whole set preserves multi-A/
                 # dual-stack failover at no security cost).
-                # Known limitation: only the hardened (allow_private_ips=false)
-                # configuration is pinned. Under the default, private addresses
-                # are a legitimate answer anyway, so pinning would buy only the
-                # metadata check above.
                 pin = (identifier_value, pinned_ips)
             else:
                 pin = None
@@ -419,6 +420,11 @@ class ChallengeMixin:
                     db.session.commit()
                     logger.warning(f"TLS-ALPN-01 SSRF blocked for {identifier_value}: {ssrf_err}")
                     return False
+            else:
+                # As for HTTP-01: connect to what the metadata check vetted.
+                from utils.ssrf_protection import validated_addresses
+                pinned_ips = validated_addresses(
+                    f"https://{format_ip_for_url(identifier_value)}/", allow_loopback=True)[1]
 
             # RFC 8738: For IP identifiers, use reverse PTR mapping as SNI
             if identifier_type == "ip":
