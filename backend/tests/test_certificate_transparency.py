@@ -67,8 +67,12 @@ def test_submit_precertificate_uses_add_pre_chain(monkeypatch):
     captured = {}
 
     class Response:
-        def read(self, *_args):
-            return json.dumps(_fake_sct()).encode()
+        status_code = 200
+
+        class raw:
+            @staticmethod
+            def read(*_args, **_kwargs):
+                return json.dumps(_fake_sct()).encode()
 
         def __enter__(self):
             return self
@@ -76,16 +80,13 @@ def test_submit_precertificate_uses_add_pre_chain(monkeypatch):
         def __exit__(self, *_args):
             return False
 
-    def fake_urlopen(request, **kwargs):
-        captured["url"] = request.full_url
-        captured["payload"] = json.loads(request.data)
+    def fake_post(url, **kwargs):
+        captured["url"] = url
+        captured["payload"] = json.loads(kwargs["data"])
         captured["timeout"] = kwargs["timeout"]
         return Response()
 
-    monkeypatch.setattr("urllib.request.urlopen", fake_urlopen)
-    monkeypatch.setattr(
-        "utils.ssrf_protection.validate_url_not_cloud_metadata", lambda _url: True
-    )
+    monkeypatch.setattr("utils.ssrf_protection.safe_request_post", fake_post)
 
     result = submit_precert_to_ct_log(
         "https://ct.example.test/", ["-----BEGIN CERTIFICATE-----\nYWJj\n-----END CERTIFICATE-----"]
