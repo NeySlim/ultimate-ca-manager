@@ -1,7 +1,7 @@
 """A forced password change holds on the server, not only in the UI prompt.
 
 The first-boot admin carries the documented default password: until it is
-replaced, that session reaches nothing but the change itself (GHSA-wgv8-q932-f5px).
+replaced, that session reaches nothing but the change itself.
 """
 from contextlib import contextmanager
 from uuid import uuid4
@@ -139,3 +139,58 @@ def test_a_forced_2fa_enrolment_comes_first(app, flagged_admin):
         sess[ENROLL_SESSION_KEY] = True
     r = client.post('/api/v2/account/2fa/enable')
     assert not _refused(r) and r.status_code < 400, (r.status_code, r.data)
+
+
+def test_2fa_enrolment_paths_stay_closed_without_a_forced_enrolment(app, flagged_admin):
+    _, username = flagged_admin
+    client, _ = _login(app, username)
+    assert _refused(client.post('/api/v2/account/2fa/enable'))
+
+
+@pytest.mark.parametrize('initial,forced', [('changeme123', True), ('Operator-Chosen-1!', False)])
+def test_only_the_public_default_password_is_forced_at_first_boot(monkeypatch, initial, forced):
+    """A password the operator set through INITIAL_ADMIN_PASSWORD is not public."""
+    import database_health
+
+    created = []
+
+    class _Query:
+        def filter_by(self, **_kw):
+            return self
+
+        def first(self):
+            return None
+
+        def count(self):
+            return 0
+
+    class _User:
+        query = _Query()
+
+        def __init__(self, **kw):
+            self.__dict__.update(kw)
+            created.append(self)
+
+        def set_password(self, password):
+            self.password = password
+
+    class _Session:
+        def add(self, _obj):
+            pass
+
+        def commit(self):
+            pass
+
+        def rollback(self):
+            pass
+
+    class _Db:
+        session = _Session()
+
+    class _App:
+        config = {'INITIAL_ADMIN_PASSWORD': initial}
+
+    monkeypatch.setattr(database_health, 'User', _User)
+    monkeypatch.setattr(database_health, 'db', _Db())
+    database_health.ensure_admin_user(_App())
+    assert created and created[0].force_password_change is forced

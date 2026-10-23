@@ -20,6 +20,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Changed
 
 - The forced password prompt no longer offers **Skip for now** or a close button: it offers a logout, and reloads the page once the password is changed.
+- A first-boot admin password set through `INITIAL_ADMIN_PASSWORD` (Docker `UCM_INITIAL_ADMIN_PASSWORD`, Helm `initialAdminPassword`) no longer has to be changed at first login: only the public default `changeme123` does, so automated deployments keep API access.
 - The packages and the Docker image no longer install pytest, black and flake8: development tools moved to `backend/requirements-dev.txt`.
 
 ### Fixed

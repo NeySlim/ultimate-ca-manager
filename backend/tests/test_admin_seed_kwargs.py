@@ -89,6 +89,7 @@ def _seed_facts(path):
     - the argument nodes of every ``<obj>.set_password(...)`` call,
     - the attribute names assigned True after construction
       (``admin.totp_exempt = True`` — the app.py/database_health.py style),
+      and those assigned ``initial_password_needs_change(...)``,
     - per config marker, the local names bound from an expression that
       references it (``admin_username = app.config.get(...)`` — the
       init_db.py style).
@@ -97,6 +98,7 @@ def _seed_facts(path):
     calls = []
     set_password_args = []
     true_attr_assigns = set()
+    gated_attr_assigns = set()
     config_bound = {marker: set() for marker in CONFIG_MARKERS}
     for node in ast.walk(tree):
         if isinstance(node, ast.Call):
@@ -109,6 +111,10 @@ def _seed_facts(path):
                 for tgt in node.targets:
                     if isinstance(tgt, ast.Attribute):
                         true_attr_assigns.add(tgt.attr)
+            elif _is_needs_change_call(node.value):
+                for tgt in node.targets:
+                    if isinstance(tgt, ast.Attribute):
+                        gated_attr_assigns.add(tgt.attr)
             else:
                 value_dump = ast.dump(node.value)
                 for marker in CONFIG_MARKERS:
@@ -116,7 +122,12 @@ def _seed_facts(path):
                         for tgt in node.targets:
                             if isinstance(tgt, ast.Name):
                                 config_bound[marker].add(tgt.id)
-    return calls, set_password_args, true_attr_assigns, config_bound
+    return calls, set_password_args, true_attr_assigns, gated_attr_assigns, config_bound
+
+
+def _is_needs_change_call(node):
+    return (isinstance(node, ast.Call) and isinstance(node.func, ast.Name)
+            and node.func.id == 'initial_password_needs_change')
 
 
 def _comes_from(marker, node, config_bound):
@@ -135,7 +146,7 @@ def test_seeding_sites_match_the_canonical_bootstrap_shape(path):
     identity source, the 2FA exemption, and the password-hashing helper —
     kwarg-name validity alone let all three regress unseen in the reset
     endpoint."""
-    calls, set_password_args, true_attr_assigns, config_bound = _seed_facts(path)
+    calls, set_password_args, true_attr_assigns, gated_attr_assigns, config_bound = _seed_facts(path)
     assert calls, f"expected at least one User(...) call in {path}"
 
     for kwargs in calls:
@@ -160,17 +171,19 @@ def test_seeding_sites_match_the_canonical_bootstrap_shape(path):
             f"pin, models/user.py), not a precomputed password_hash="
         )
 
-        # 3. Forced rotation and the 2FA-lockout exemption (#141), either as
+        # 3. The 2FA-lockout exemption (#141), and a forced rotation decided
+        #    by the one rule (only the public default password), either as
         #    constructor kwargs or assigned right after construction.
-        for prop in ('force_password_change', 'totp_exempt'):
-            as_kwarg = (
-                prop in kwargs
-                and isinstance(kwargs[prop], ast.Constant)
-                and kwargs[prop].value is True
-            )
-            assert as_kwarg or prop in true_attr_assigns, (
-                f"{path.name}: seeded admin must set {prop}=True "
+        exempt = kwargs.get('totp_exempt')
+        assert (isinstance(exempt, ast.Constant) and exempt.value is True) \
+            or 'totp_exempt' in true_attr_assigns, (
+                f"{path.name}: seeded admin must set totp_exempt=True "
                 f"(kwarg or attribute assignment)"
+            )
+        assert _is_needs_change_call(kwargs.get('force_password_change')) \
+            or 'force_password_change' in gated_attr_assigns, (
+                f"{path.name}: force_password_change must come from "
+                f"initial_password_needs_change(<INITIAL_ADMIN_PASSWORD>)"
             )
 
     assert any(

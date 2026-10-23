@@ -2,11 +2,23 @@
 
 The account created at first boot carries the documented default password, so
 the flag must hold on the server, not only in the UI prompt."""
-from auth.twofa_enforcement import ENROLL_ALLOWED_PATHS
+from flask import session
 
-# A forced 2FA enrolment comes first in the same session, so its paths (logout
-# among them) stay open.
-PASSWORD_CHANGE_ALLOWED_PATHS = frozenset({'/api/v2/account/password'}) | ENROLL_ALLOWED_PATHS
+from auth.twofa_enforcement import ENROLL_ALLOWED_PATHS, ENROLL_SESSION_KEY
+
+DEFAULT_INITIAL_PASSWORD = 'changeme123'
+_ALLOWED_PATHS = frozenset({'/api/v2/account/password', '/api/v2/auth/logout'})
+
+
+def initial_password_needs_change(password) -> bool:
+    """Only the public default must be replaced; a password the operator chose is theirs."""
+    return password == DEFAULT_INITIAL_PASSWORD
+
+
+def password_change_allows(path) -> bool:
+    """A forced 2FA enrolment comes first in the same session, so its paths stay open then."""
+    return path in _ALLOWED_PATHS or (bool(session.get(ENROLL_SESSION_KEY))
+                                      and path in ENROLL_ALLOWED_PATHS)
 
 
 def password_change_pending(auth_result) -> bool:

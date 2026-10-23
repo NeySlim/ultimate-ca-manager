@@ -384,8 +384,8 @@ def require_auth(permissions=None, session_only=False):
                     'must_enroll_2fa': True
                 }), 403
 
-            from auth.password_change_gate import PASSWORD_CHANGE_ALLOWED_PATHS, password_change_pending
-            if password_change_pending(auth_result) and request.path not in PASSWORD_CHANGE_ALLOWED_PATHS:
+            from auth.password_change_gate import password_change_allows, password_change_pending
+            if password_change_pending(auth_result) and not password_change_allows(request.path):
                 return jsonify({
                     'error': 'Forbidden',
                     'message': 'Password change required',

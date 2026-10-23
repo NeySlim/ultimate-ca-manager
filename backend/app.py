@@ -1368,7 +1368,8 @@ def init_database(app):
                 active=True
             )
             admin.set_password(app.config["INITIAL_ADMIN_PASSWORD"])
-            admin.force_password_change = True
+            from auth.password_change_gate import initial_password_needs_change
+            admin.force_password_change = initial_password_needs_change(app.config["INITIAL_ADMIN_PASSWORD"])
             # Exempt the bootstrap admin from forced 2FA enrolment (#141) so
             # enabling global enforcement can never lock out this account.
             admin.totp_exempt = True
