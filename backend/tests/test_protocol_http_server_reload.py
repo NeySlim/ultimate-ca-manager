@@ -79,7 +79,7 @@ def test_busy_port_is_bound_once_the_old_worker_lets_go(app, blocker, clean, fak
             blocker.close()
 
     fake_time['on_sleep'] = release
-    assert phs.start_http_protocol_server(app, port=port, retry_for=35) is None
+    assert phs.start_http_protocol_server(app, port=port, error_after=35) is None
     assert fake_time['spawned'] == 1
     assert phs._server is not None and phs._server.address[1] == port
     assert _port_is_held(port)
@@ -93,13 +93,33 @@ def test_without_retry_a_busy_port_fails_at_once(app, blocker, clean, fake_time)
     assert phs._server is None
 
 
-def test_retry_gives_up_at_the_deadline(app, blocker, clean, fake_time, caplog):
+def test_retry_outlives_the_deadline_and_reports_once(app, blocker, clean, fake_time, caplog):
+    """The old worker can take longer than graceful_timeout to exit."""
     port = blocker.getsockname()[1]
+
+    def release_late():
+        if fake_time['now'] >= 60:
+            blocker.close()
+
+    fake_time['on_sleep'] = release_late
     with caplog.at_level(logging.ERROR, logger='protocol_http_server'):
-        assert phs.start_http_protocol_server(app, port=port, retry_for=35) is None
+        phs.start_http_protocol_server(app, port=port, error_after=35)
+    assert phs._server is not None and phs._server.address[1] == port
+    assert max(fake_time['slept']) == phs.RETRY_MAX_DELAY
+    assert caplog.text.count('still busy after 35s') == 1
+
+
+def test_other_bind_error_during_the_retry_stops_it(app, clean, fake_time, monkeypatch, caplog):
+    errors = [OSError(errno.EADDRINUSE, 'busy'), PermissionError(errno.EACCES, 'denied')]
+
+    def bind(*_a):
+        raise errors.pop(0)
+
+    monkeypatch.setattr(phs, '_bind', bind)
+    with caplog.at_level(logging.ERROR, logger='protocol_http_server'):
+        assert phs.start_http_protocol_server(app, port=8080, error_after=35) is None
+    assert fake_time['slept'] == [0.25]
     assert phs._server is None
-    assert sum(fake_time['slept']) == pytest.approx(35)
-    assert max(fake_time['slept']) <= phs.RETRY_MAX_DELAY
     assert 'Cannot start HTTP protocol server' in caplog.text
 
 
@@ -108,7 +128,7 @@ def test_other_bind_errors_are_not_retried(app, clean, fake_time, monkeypatch):
         raise PermissionError(errno.EACCES, 'Permission denied')
 
     monkeypatch.setattr(phs, '_bind', denied)
-    assert phs.start_http_protocol_server(app, port=80, retry_for=35) is None
+    assert phs.start_http_protocol_server(app, port=80, error_after=35) is None
     assert fake_time['spawned'] == 0
 
 
@@ -135,9 +155,9 @@ def gunicorn_conf(app, monkeypatch):
 
 
 @pytest.mark.parametrize('graceful, expected', [(30, 35.0), (60, 65.0)])
-def test_post_worker_init_retries_for_the_graceful_timeout(gunicorn_conf, app, graceful, expected):
+def test_post_worker_init_reports_after_the_graceful_timeout(gunicorn_conf, app, graceful, expected):
     module, calls = gunicorn_conf
     worker = types.SimpleNamespace(cfg=types.SimpleNamespace(graceful_timeout=graceful),
                                    log=logging.getLogger('test.worker'))
     module.post_worker_init(worker)
-    assert calls[0] == (app, {'retry_for': expected})
+    assert calls[0] == (app, {'error_after': expected})
