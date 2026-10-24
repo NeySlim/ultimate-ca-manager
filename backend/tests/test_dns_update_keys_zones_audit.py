@@ -1,7 +1,10 @@
 """Key store, zone index and audit sink of the DNS UPDATE listener.
 
-Test names carry the invariant ID of the plan (K7, K8, K9, F1-F4, U3, N7,
-N11, N12, N13): ``test_<ID>_<what>_pos`` and ``_neg``.
+Test names start with an ID: the letter says what is tested (M message, E EDNS,
+T transport, S TSIG, U UPDATE, Q query and SOA discovery, R expected values,
+K keys, N server, logs and security, F regression of a fixed defect). The
+scenarios are in docs/testing/ACME-PROXY-DNS-UPDATE.md.
+Test names have the form ``test_<ID>_<what>_pos`` and ``_neg``.
 """
 import base64
 import json

@@ -1,7 +1,10 @@
 """REST API of the DNS UPDATE TSIG keys, listener port and cache hooks.
 
-Test names carry the invariant ID of the plan (K1, K3, K4, K5, N1, N2):
-``test_<ID>_<what>_pos`` and ``_neg``.
+Test names start with an ID: the letter says what is tested (M message, E EDNS,
+T transport, S TSIG, U UPDATE, Q query and SOA discovery, R expected values,
+K keys, N server, logs and security, F regression of a fixed defect). The
+scenarios are in docs/testing/ACME-PROXY-DNS-UPDATE.md.
+Test names have the form ``test_<ID>_<what>_pos`` and ``_neg``.
 """
 import base64
 import json
@@ -929,7 +932,7 @@ def test_D4d_effective_port_from_db_without_env_pos(auth_client, app, env, monke
         'dns_update_port_effective'] == 8053
 
 
-# ------------------------------------------------------------------- F3
+# ------------------------------------------------------------------- warm row cache
 
 def _warm_row(app, acct_id, tag):
     """A pending order and an expected value of the account, in the real cache."""
@@ -1000,7 +1003,7 @@ def test_F3_deleting_another_account_leaves_the_row_neg(auth_client, app, env):
             records.invalidate_cache()
 
 
-# ------------------------------------------------------------------- F4
+# ------------------------------------------------------------------- invalid port warning
 
 def test_F4_same_invalid_env_warns_once_pos(app, env, monkeypatch, caplog):
     from services.acme.dns_update.status import get_dns_update_port
@@ -1026,7 +1029,7 @@ def test_F4_other_invalid_value_warns_again_neg(app, env, monkeypatch, caplog):
     assert any('abc' in m for m in messages) and any('CAP_NET_BIND_SERVICE' in m for m in messages)
 
 
-# ------------------------------------------------------------------- F5
+# ------------------------------------------------------------------- stored port read
 
 def test_F5_settings_get_reads_stored_port_once_pos(auth_client, app, env, monkeypatch):
     from sqlalchemy import event

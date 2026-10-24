@@ -2,8 +2,13 @@
 
 Clients are built with dnspython; the server side is the module under test.
 The MAC of every signed response is also recomputed here with Python's hmac
-module over the RFC 8945 §4.3 digest components. Test names follow the
-invariant IDs of the design plan (section 4.2): test_<ID>_<what>_pos/_neg.
+module over the RFC 8945 §4.3 digest components.
+
+Test names start with an ID: the letter says what is tested (M message, E EDNS,
+T transport, S TSIG, U UPDATE, Q query and SOA discovery, R expected values,
+K keys, N server, logs and security, F regression of a fixed defect). The
+scenarios are in docs/testing/ACME-PROXY-DNS-UPDATE.md.
+Test names have the form test_<ID>_<what>_pos/_neg.
 """
 import base64
 import hashlib
@@ -277,7 +282,7 @@ def test_S5_unknown_key_and_bad_time_gives_badkey_neg():
 
 
 def test_S5_bad_mac_never_has_key_neg():
-    # F5: a BADSIG result never carries a key, so no signed response can follow.
+    # A BADSIG result never carries a key, so no signed response can follow.
     res, _ = run(flip_mac(client_update(t=NOW - 1000)), [material()])
     assert res.key is None
 
@@ -393,7 +398,7 @@ def test_S7_truncated_request_does_not_update_watermark_neg():
     assert not wm.is_older(1, 0)
 
 
-# --- S15 replay before time (plan step 6e before 6f) ------------------------------
+# --- S15: the replay check runs after the MAC and before the time check ------------
 
 def _run_replay(wire, key, now, wm, seen):
     calls = []
@@ -786,7 +791,7 @@ def test_unsigned_error_does_not_change_skeleton_pos():
     assert resp.rcode() == dns.rcode.NOERROR and resp.tsig is None
 
 
-# --- F11 repr ----------------------------------------------------------------------
+# --- repr hides secrets ----------------------------------------------------------------------
 
 def test_F11_key_repr_hides_secret_pos():
     key = material()

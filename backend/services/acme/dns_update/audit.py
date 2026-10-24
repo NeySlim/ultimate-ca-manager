@@ -1,4 +1,4 @@
-"""Bounded audit sink of the DNS UPDATE listener (F7, N6, N7, N12, N13).
+"""Bounded audit sink of the DNS UPDATE listener.
 
 An attacker on the network can send any number of bad packets. The sink
 writes at most one row per (peer IP, reason) per window and at most N rows per

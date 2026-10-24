@@ -290,7 +290,7 @@ def mark_confirmed(row_ids: Iterable[int], now: Optional[datetime] = None) -> No
 
 
 # ---------------------------------------------------------------------------
-# Active-row cache (plan 2.4)
+# Active-row cache
 # ---------------------------------------------------------------------------
 
 class ActiveRecord(NamedTuple):

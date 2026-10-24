@@ -492,7 +492,8 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'acme_orders': 'in-flight protocol state; a client retries against the restored server',
     'acme_authorizations': 'in-flight protocol state, tied to orders',
     'acme_challenges': 'in-flight protocol state, tied to authorizations',
-    'acme_proxy_dns_challenges': 'expected TXT values of in-flight proxy orders, valid for at most 24 hours; rebuilt when the client fetches the authorization',
+    'acme_proxy_dns_challenges': ('expected TXT values of in-flight proxy orders, valid for at most 24 hours; '
+                                  'rebuilt when the client fetches the authorization'),
     'crls': 'regenerated from the CAs and their revocation records',
     'crl_metadata': 'regenerated with the CRLs',
     'ocsp_responses': 'a response cache, rebuilt on demand',

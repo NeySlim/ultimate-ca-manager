@@ -26,7 +26,8 @@ MAX_FUDGE = 300
 # Fudge value, in seconds, that the server puts in its own responses.
 RESPONSE_FUDGE = 300
 
-# Limits for the message handler (plan 3, steps 2 and 6).
+# Limits for the message handler: size and header counts are checked before parsing
+# (step 2 of `_handle`). Anything above them gets no response.
 MAX_MESSAGE_SIZE = 4096
 MAX_QDCOUNT = 16
 MAX_ANCOUNT = 16

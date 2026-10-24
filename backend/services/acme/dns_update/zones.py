@@ -1,4 +1,4 @@
-"""Zones for which the DNS UPDATE listener is authoritative (plan 2.3, U3)."""
+"""Zones for which the DNS UPDATE listener is authoritative."""
 
 import logging
 import threading

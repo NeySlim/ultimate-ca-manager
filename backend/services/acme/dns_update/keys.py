@@ -1,6 +1,6 @@
 """TSIG key store of the DNS UPDATE listener, with a short-lived cache.
 
-One pass over the database loads every usable key (plan F1-F4, K7-K9). The
+One pass over the database loads every usable key. The
 verifier then calls ``lookup`` for each request without a SQL statement. All
 calls must run inside a Flask app context (the load needs one).
 
@@ -12,7 +12,7 @@ logs a secret, only key names.
 After ``invalidate()`` (key revoked, EAB deleted, account disabled, restore)
 the cache is dirty. A failed reload then empties the cache, so every key is
 unknown (BADKEY). After a normal expiry a failed reload keeps the previous
-cache (availability, F3). Failed loads are retried after ``_RETRY_S``, with one
+cache (availability). Failed loads are retried after ``_RETRY_S``, with one
 warning per attempt.
 """
 
@@ -39,7 +39,8 @@ _RETRY_S = 2.0
 
 @dataclass(frozen=True)
 class KeyScope:
-    """What a key may change (plan 2.3). Fail closed."""
+    """What a key may change: its proxy account and, when bound, its EAB account.
+    Fail closed."""
 
     acme_client_account_id: int
     eab_bound: bool

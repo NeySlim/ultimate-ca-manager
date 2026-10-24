@@ -35,7 +35,7 @@ class AcmeDnsUpdateKey(db.Model):
         nullable=True, index=True,
     )
     # Stays True when the credential reference is lost (restore, orphan):
-    # the key then matches nothing instead of the whole proxy account (F2).
+    # the key then matches nothing instead of the whole proxy account.
     eab_bound = db.Column(db.Boolean, nullable=False, default=False)
     # Absolute DNS name, lowercase, trailing dot (RFC 8945 §4.2).
     name = db.Column(db.String(255), unique=True, nullable=False)

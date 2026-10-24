@@ -2,7 +2,7 @@
 
 ``DnsUpdateHandler.handle`` is a pure function of the request bytes and of the
 state that is injected into it. It opens no socket and makes no outgoing call.
-The processing order is the one of the plan, section 3:
+The processing order of ``_handle`` is:
 
 1. short message or QR set: no response (M1, M2)
 2. size and header counts: no response (N9)
@@ -11,7 +11,8 @@ The processing order is the one of the plan, section 3:
 5. TSIG (RFC 8945 §5.2); errors are answered here (S2 to S9)
 6. replay cache for verified requests (S15)
 7. EDNS version above 0: BADVERS (E3)
-8. QUERY (plan 3.1) or UPDATE (plan 3.2)
+8. QUERY (only SOA discovery is answered, every other query is REFUSED) or UPDATE
+   (checked and answered; nothing is written to DNS)
 9. flags of the response (M6 to M8, E1, E4, E5)
 10. rendering and size limits (T1, T2, S12)
 11. side effects and audit, after the response is decided
@@ -192,7 +193,7 @@ class ReplayCache:
 
 @dataclass
 class _Event:
-    """What happens after the response is decided (plan step 11)."""
+    """What happens after the response is decided (step 11 of `_handle`)."""
 
     kind: str = "none"  # none | accepted | refused
     reason: str = ""
@@ -221,7 +222,8 @@ def _name_of(text: str) -> dns.name.Name:
 
 
 def _soa_rrset(zone: dns.name.Name) -> dns.rrset.RRset:
-    """The fixed SOA record of a zone (decision 13): no host name, no time."""
+    """The SOA record of a zone: MNAME = the zone, RNAME = hostmaster.<zone>, the fixed
+    ``SOA_TIMERS``, TTL 0. No UCM host name and no time in it."""
     mname = zone
     rname = dns.name.Name((b"hostmaster",) + zone.labels)
     serial, refresh, retry, expire, minimum = SOA_TIMERS
@@ -400,7 +402,7 @@ class DnsUpdateHandler:
         if len(wire) > MAX_MESSAGE_SIZE:
             self._log.note("oversize", logging.INFO, peer_ip)
             return None
-        # A QUERY has no answer RR (plan 2.4); an UPDATE keeps MAX_ANCOUNT (prerequisites).
+        # A QUERY has no answer RR; an UPDATE keeps MAX_ANCOUNT (its prerequisite section).
         if (flags >> 11) & 0xF == dns.opcode.QUERY and an != 0:
             self._log.note("counts", logging.INFO, peer_ip)
             return None
@@ -408,7 +410,8 @@ class DnsUpdateHandler:
             self._log.note("counts", logging.INFO, peer_ip)
             return None
 
-        # 3. Opcode: nothing but the header is looked at (decision 11).
+        # 3. Opcode: only QUERY and UPDATE are served. Any other opcode gets NOTIMP with
+        # the header only; the body is not parsed and no TSIG is added.
         opcode = (flags >> 11) & 0xF
         if opcode not in (dns.opcode.QUERY, dns.opcode.UPDATE):
             self._log.note("notimp", logging.INFO, peer_ip)
@@ -578,7 +581,7 @@ class DnsUpdateHandler:
             pass
         return out
 
-    # -- QUERY (plan 3.1) -----------------------------------------------------------------
+    # -- QUERY -----------------------------------------------------------------
 
     def _query(self, msg, resp, result, peer_ip) -> dns.message.Message:
         if len(msg.question) != 1:
@@ -634,7 +637,7 @@ class DnsUpdateHandler:
         resp.set_rcode(dns.rcode.REFUSED)
         return resp
 
-    # -- UPDATE (plan 3.2) ------------------------------------------------------------------
+    # -- UPDATE ------------------------------------------------------------------
 
     def _refuse(self, resp, rcode, reason, zone="", names=()):
         resp.set_rcode(rcode)

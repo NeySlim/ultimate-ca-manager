@@ -1,4 +1,4 @@
-"""Expected TXT values of the DNS UPDATE listener (plan 2.1-2.4, R1-R7).
+"""Expected TXT values of the DNS UPDATE listener (R1-R7).
 
 Integration tests run through ``AcmeProxyService.get_authz`` and
 ``get_certificate`` with the upstream stubbed, as the other proxy tests do.

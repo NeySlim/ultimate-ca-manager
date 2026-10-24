@@ -2,8 +2,12 @@
 
 The real gevent servers run on 127.0.0.1 port 0 in their own thread (own hub):
 the test process is not monkey-patched, so blocking client calls in the main
-thread would starve the hub otherwise. Most tests use a fake handler. Test
-names carry the invariant ID of the plan (section 4): test_<ID>_<what>_pos / _neg.
+thread would starve the hub otherwise. Most tests use a fake handler.
+Test names start with an ID: the letter says what is tested (M message, E EDNS,
+T transport, S TSIG, U UPDATE, Q query and SOA discovery, R expected values,
+K keys, N server, logs and security, F regression of a fixed defect). The
+scenarios are in docs/testing/ACME-PROXY-DNS-UPDATE.md.
+Test names have the form test_<ID>_<what>_pos / _neg.
 """
 import errno
 import importlib.util
@@ -329,7 +333,7 @@ def test_N3_free_port_listens_and_stop_clears_pos(app):
         socket.create_connection(('127.0.0.1', r.port), timeout=1)
 
 
-# -- N1 / F8 -----------------------------------------------------------------------
+# -- N1: start and bind host -----------------------------------------------------------------------
 
 def test_N1_port_zero_disables_the_listener_neg(app, monkeypatch):
     monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '0')

@@ -1,6 +1,6 @@
 """UDP and TCP server of the DNS UPDATE (RFC 2136) listener.
 
-gevent ``DatagramServer`` and ``StreamServer`` with bounded pools (plan 2.4).
+gevent ``DatagramServer`` and ``StreamServer`` with bounded pools.
 Every datagram and every TCP message passes a global and a per-IP token bucket
 before any parsing. Traffic over a limit is dropped without a response.
 

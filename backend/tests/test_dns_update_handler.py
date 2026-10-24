@@ -4,8 +4,12 @@ Requests are built with dnspython as an independent client; responses are
 parsed with dnspython, and the TSIG of every signed response is verified by
 dnspython as a client. The server side (key store, zone index, snapshot, audit)
 is replaced by fakes in the unit tests and is real in the integration tests.
-Test names carry the invariant ID of the plan (section 4): test_<ID>_<what>_pos
-and _neg. The negative test changes exactly one thing and checks that there
+Test names start with an ID: the letter says what is tested (M message, E EDNS,
+T transport, S TSIG, U UPDATE, Q query and SOA discovery, R expected values,
+K keys, N server, logs and security, F regression of a fixed defect). The
+scenarios are in docs/testing/ACME-PROXY-DNS-UPDATE.md.
+Test names have the form test_<ID>_<what>_pos and _neg. The negative test
+changes exactly one thing and checks that there
 is no side effect.
 """
 import base64
@@ -364,7 +368,7 @@ def test_M3_other_opcodes_get_notimp_header_only_neg(h, op):
     raw = h.send(wire)
     header_only_ok(raw, dns.rcode.NOTIMP, wire)
     assert h.quiet() and h.no_db()
-    # A signed request gets no TSIG either (decision 11).
+    # A signed request gets no TSIG either: the answer is the bare header.
     wire = set_opcode(sign(soa_query("x.example.org.")).wire, op)
     raw = h.send(wire)
     header_only_ok(raw, dns.rcode.NOTIMP, wire)
@@ -951,7 +955,7 @@ def test_U4_unsigned_update_is_refused_at_once_neg():
         resp = parse(raw)
         assert resp.rcode() == dns.rcode.REFUSED and resp.tsig is None
         assert len(raw) == 12 and counts(raw) == (0, 0, 0, 0)
-        # No DB access of any kind and no audit (F6, F1).
+        # No DB access of any kind and no audit: an unsigned UPDATE costs nothing.
         assert hh.snap.calls == 0 and hh.zones.calls == [] and hh.keys.calls == []
         assert hh.quiet() and hh.sampler.counts() == {"unsigned_update": 1}
         out.append(raw)
@@ -1258,7 +1262,7 @@ def test_U17_delete_all_rrsets_with_rdata_is_formerr_neg(h):
     assert h.quiet() and h.no_db()
 
 
-# --- client shapes (plan section 9) ---------------------------------------------
+# --- client shapes ---------------------------------------------
 
 def test_U_cert_manager_shape_pos():
     """Zone = example.com. (public apex), record below app; add TTL 60; delete class NONE."""

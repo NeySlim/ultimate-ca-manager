@@ -1,6 +1,6 @@
 # ACME proxy DNS UPDATE listener (RFC 2136) — Test plan
 
-Feature: the ACME proxy accepts TSIG-signed DNS UPDATE messages (RFC 2136, RFC 8945) for DNS-01 challenges (#416). The listener checks the TXT value against the pending proxy order and writes nothing to DNS. The design plan with the RFC invariants and the review decisions is in its own pull request (`docs/development/acme-proxy-dns-update/plan.md`).
+Feature: the ACME proxy accepts TSIG-signed DNS UPDATE messages (RFC 2136, RFC 8945) for DNS-01 challenges (#416). The listener checks the TXT value against the pending proxy order and writes nothing to DNS.
 
 ## Automated tests (regression)
 
@@ -23,7 +23,7 @@ UCM_TEST_PG_URL=postgresql://ucm@127.0.0.1:55432/ucmtest \
 # Reference: 6 passed (PostgreSQL 16)
 ```
 
-The test names start with the identifier of the invariant in the design plan (`M…` message, `E…` EDNS, `T…` transport, `S…` TSIG, `U…` UPDATE, `Q…` query, `R…` expected values, `K…` keys, `N…` server, logs and security) and end with `_pos` or `_neg`. Every invariant has a positive and a negative test.
+The test names start with the identifier of the scenario (`M…` message, `E…` EDNS, `T…` transport, `S…` TSIG, `U…` UPDATE, `Q…` query, `R…` expected values, `K…` keys, `N…` server, logs and security, `F…` regression test of a fixed defect) and end with `_pos` or `_neg`. Every scenario has a positive and a negative test.
 
 | File | Scenarios |
 |------|-----------|
