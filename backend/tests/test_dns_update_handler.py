@@ -1342,6 +1342,30 @@ def test_S15_other_transport_gets_own_response_without_new_side_effects_pos(h):
     assert h.send(req.wire, "udp") == first and len(h.marks) == 1
 
 
+def test_S15_resend_with_other_header_id_is_the_same_request_pos(h):
+    # The MAC covers the original ID in the TSIG, not the header ID (RFC 8945 §4.3.2):
+    # a captured request resent with another header ID is still the same request.
+    req = sign(good_update())
+    first = h.send(req.wire, "udp")
+    other_id = (struct.unpack("!H", req.wire[:2])[0] + 1) & 0xFFFF
+    resent = struct.pack("!H", other_id) + req.wire[2:]
+    second = h.send(resent, "udp")
+    assert second[:2] == resent[:2] and second[2:] == first[2:]
+    resp = verified(second, req)  # the response MAC still verifies (original ID in the TSIG)
+    assert resp.rcode() == dns.rcode.NOERROR
+    assert len(h.marks) == 1 and len(h.keys.touched) == 1 and len(h.audit.authenticated) == 1
+    assert h.snap.calls == 1
+
+
+def test_S15_new_request_with_new_mac_is_processed_neg(h):
+    first = sign(good_update())
+    h.send(first.wire, "udp")
+    again = sign(good_update())  # new ID and new MAC: a new request, not a replay
+    assert again.mac != first.mac
+    assert verified(h.send(again.wire, "udp"), again).rcode() == dns.rcode.NOERROR
+    assert len(h.marks) == 2 and len(h.audit.authenticated) == 2
+
+
 def test_S15_refused_request_is_replayed_without_new_audit_pos(h):
     req = sign(upd(adds=[(RECORD1, 60, VALUE2)]))
     first = h.send(req.wire)

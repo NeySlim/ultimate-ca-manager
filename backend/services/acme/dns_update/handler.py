@@ -24,7 +24,6 @@ The handler never logs packet bytes, MACs, TXT values or keys.
 import collections
 import copy
 import functools
-import hashlib
 import logging
 import struct
 import threading
@@ -120,8 +119,8 @@ def _safe_text(value) -> str:
 class ReplayCache:
     """Bounded LRU of final responses with a time to live. Thread safe.
 
-    The key is the digest of the request. Per digest it keeps one response per
-    transport, and the set of digests that are being processed right now."""
+    The key is (key name, request MAC) of a signed request. Per key it keeps one
+    response per transport, and the set of keys that are being processed right now."""
 
     def __init__(self, size: int = REPLAY_CACHE_SIZE, ttl_s: float = REPLAY_TTL_S,
                  clock=time.time):
@@ -265,6 +264,23 @@ def _update_rrs(wire: bytes) -> List[Tuple[dns.name.Name, int, int, int, int]]:
     return out
 
 
+def _replay_key(msg: dns.message.Message) -> Optional[Tuple[str, bytes]]:
+    """(key name, request MAC) of a signed message, or None (S15).
+
+    The MAC covers the whole message and the original ID, but not the header ID
+    (RFC 8945 §4.3.2), so a copy resent with another header ID is the same request.
+    Two different requests with the same MAC would need an HMAC collision."""
+    if msg.tsig is None or len(msg.tsig) == 0:
+        return None
+    return (msg.tsig.name.to_text().lower(), bytes(msg.tsig[0].mac))
+
+
+def _with_request_id(cached: bytes, wire: bytes) -> bytes:
+    """The stored response with the header ID of this request. The TSIG of the
+    response keeps the original ID, so the MAC still verifies (RFC 8945 §4.3.2)."""
+    return wire[:2] + cached[2:]
+
+
 def _txt_value(rdata) -> Optional[str]:
     """TXT value as ASCII text (strings joined, RFC 1035 §3.3.14), or None."""
     try:
@@ -392,10 +408,10 @@ class DnsUpdateHandler:
 
         # 5. TSIG.
         # The replay check runs inside, after the MAC and before the time (RFC 8945 §5.2).
-        digest = hashlib.sha256(wire).digest()
-        result = tsig.verify_request(wire, msg, self._key_store.lookup, now_int,
-                                     self._watermark,
-                                     is_replay=lambda: self._replay.seen(digest))
+        replay_key = _replay_key(msg)
+        result = tsig.verify_request(
+            wire, msg, self._key_store.lookup, now_int, self._watermark,
+            is_replay=lambda: replay_key is not None and self._replay.seen(replay_key))
         outcome = result.outcome
         if outcome == TsigOutcome.FORMERR:
             self._log.note("formerr", logging.INFO, peer_ip)
@@ -406,23 +422,22 @@ class DnsUpdateHandler:
             return self._tsig_error(wire, msg, skeleton, result, peer_ip, transport, now_int)
         signed = outcome == TsigOutcome.OK
 
-        # 6. Replay: the stored response, and no side effect. The digest alone is the key:
-        # a request replayed over the other transport gets its own rendering, but no
-        # second side effect. A copy that is in flight now gets no response.
-        replay_key = None
+        # 6. Replay: the stored response, and no side effect. The key is (key name,
+        # request MAC) for every transport: a request replayed over the other transport
+        # gets its own rendering, but no second side effect. A copy that is in flight
+        # now gets no response.
         suppress = False
         if signed:
-            replay_key = digest
             cached = self._replay.get(replay_key, transport)
             if cached is not None:
-                return cached
+                return _with_request_id(cached, wire)
             if not self._replay.begin(replay_key):
                 self._log.note("replay_in_flight", logging.DEBUG, peer_ip)
                 return None
             try:
                 cached = self._replay.get(replay_key, transport)
                 if cached is not None:
-                    return cached
+                    return _with_request_id(cached, wire)
                 suppress = result.replayed or self._replay.seen(replay_key)
                 return self._process(wire, msg, skeleton, result, opcode, peer_ip, transport,
                                      now, now_int, replay_key, suppress)

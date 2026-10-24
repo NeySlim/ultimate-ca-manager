@@ -260,7 +260,7 @@ Nazwa testu: `test_<ID>_<opis>_pos` / `test_<ID>_<opis>_neg`.
 | S12 | Ucięta odpowiedź podpisana: pytanie + TSIG, TC=1, NOERROR | 8945 §5.3 | SOA przez UDP z podpisem → TC=1 i poprawny TSIG | brak TSIG w uciętej odpowiedzi = błąd |
 | S13 | Nazwy kluczy i algorytmów porównywane bez wielkości liter | 8945 §9; 1034 §3.1 | `KEY.Example.` = `key.example.` | inna nazwa → BADKEY |
 | S14 | Okno czasu = min(Fudge żądania, 300 s); BADTIME podaje fudge klienta | 8945 §5.2.3, §10 | Fudge 300, różnica 300 → przyjęty | Fudge 65535, różnica 301 → BADTIME z Fudge 65535 w odpowiedzi |
-| S15 | Powtórka (ten sam skrót wiadomości przez 2 × 300 s, każdy transport) → odpowiedź bez skutków ubocznych; kopia w trakcie przetwarzania → brak odpowiedzi | 8945 §10 | retransmisja UDP → identyczna odpowiedź; UDP, potem TCP → odpowiedź TCP, skutki raz | powtórka nie zmienia `client_confirmed_at`, `last_used_at`, nie dodaje audytu |
+| S15 | Powtórka (ta sama para: nazwa klucza i MAC żądania, przez 2 × 300 s, każdy transport, także z innym ID nagłówka) → odpowiedź bez skutków ubocznych; kopia w trakcie przetwarzania → brak odpowiedzi | 8945 §10, §4.3.2 | retransmisja UDP → identyczna odpowiedź; UDP, potem TCP → odpowiedź TCP, skutki raz | powtórka nie zmienia `client_confirmed_at`, `last_used_at`, nie dodaje audytu |
 
 ### 4.3 UPDATE (U)
 
@@ -551,4 +551,6 @@ Runda 3 `/code-review` (15 ustaleń):
 | CR3-12, 15 | Podwójny odczyt portu; zmienna lokalna przesłaniała moduł `zones` | jeden odczyt; zmiana nazwy |
 
 Bez zmian: CR3-11 (trzy commity na przyjęte żądanie: `last_used_at` najwyżej raz na 60 s, osobny wpis audytu z założenia, N12), CR3-13 (jawne unieważnienia pamięci, jak w innych pamięciach UCM; brakujące miejsce poprawione w CR3-6), CR3-14 (trzy pamięci podręczne mają celowo różne zachowanie przy błędzie: klucze fail closed, strefy i wiersze poprzedni stan).
+
+Runda 1 `/security-review`: brak podatności z pewnością ≥ 0,7. Uwaga poniżej progu, poprawiona: pamięć powtórek używała skrótu całej wiadomości, a MAC nie obejmuje ID nagłówka, więc przechwycone żądanie z innym ID nagłówka powtarzało skutki (idempotentne). Klucz pamięci to teraz (nazwa klucza, MAC żądania); zapisana odpowiedź dostaje ID nagłówka bieżącego żądania (TSIG zachowuje oryginalne ID, RFC 8945 §4.3.2).
 
