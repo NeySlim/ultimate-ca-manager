@@ -1,6 +1,6 @@
 # Plan: nasłuch DNS UPDATE (RFC 2136) dla proxy ACME w UCM
 
-Status: wersja robocza 2 (z raportem o klientach). Przed security review.
+Status: wersja 3. Po security review planu (ustalenia F1–F15 w sekcji 11).
 
 ## 0. Źródła
 
@@ -69,11 +69,11 @@ Zasada: cała logika protokołu jest w `handler.py` i `tsig.py`. Te moduły nie 
 | Pole | Opis |
 |---|---|
 | `id` | PK |
-| `acme_client_account_id` | FK do `acme_client_accounts` (konto proxy, slug), `ON DELETE CASCADE` |
-| `eab_credential_id` | FK do `acme_eab_credentials`, NULL = brak powiązania |
+| `acme_client_account_id` | FK do `acme_client_accounts` (konto proxy, slug), `ON DELETE CASCADE`. SQLite w UCM nie wymusza FK, dlatego usunięcie konta usuwa też klucze i wiersze w kodzie (`_remove_account_row`) (F3) |
+| `eab_credential_id` | FK do `acme_eab_credentials`, `ON DELETE CASCADE`, NULL = brak powiązania. Usunięcie poświadczenia EAB usuwa powiązane klucze także w kodzie (handler DELETE EAB) (F2) |
 | `name` | Nazwa klucza jako nazwa DNS, absolutna, małe litery, unikalna (RFC 8945 §4.2) |
 | `algorithm` | `hmac-sha256` (domyślnie), `hmac-sha384`, `hmac-sha512` |
-| `secret` | Sekret szyfrowany kluczem master (wzorzec `AcmeClientAccount._eab_hmac_key`, kolumna dopisana do `MASTER_KEY_COLUMNS`) |
+| `secret` | Sekret szyfrowany jak HMAC EAB: `utils.encryption.encrypt_if_needed` (Fernet, zawsze włączone). Sekretu, którego nie da się odszyfrować, albo pustego, nie używa się nigdy: klucz = nieznany (BADKEY) (F4) |
 | `status` | `active` / `revoked` |
 | `created_at`, `created_by_user_id`, `last_used_at`, `revoked_at`, `notes` | |
 
@@ -98,39 +98,77 @@ Obie tabele trafiają też do: modeli SQLAlchemy (`db.create_all()` przy nowej i
 
 ### 2.2 Cykl życia oczekiwanej wartości
 
-1. Klient pobiera authz (`get_authz`). Dla każdego wyzwania `dns-01` w stanie `pending` UCM zapisuje wiersz dla zamówienia klienta **i dla zamówień rodzeństwa** (te same upstream authz, #307). Zapis jest idempotentny i nie zależy od tego, czy automatyka DNS już ruszyła.
-2. Wiersz jest „aktywny”, gdy: `status = pending`, `expires_at > teraz`, zamówienie ma `status = pending`.
-3. `get_certificate` zamyka wiersze zamówienia (`status = closed`).
-4. Wiersze starsze niż `expires_at + 7 dni` są usuwane przy kolejnym zapisie.
+1. Klient pobiera authz (`get_authz`). Dla każdego wyzwania `dns-01` w stanie `pending` UCM zapisuje wiersz dla zamówienia klienta **i dla zamówień rodzeństwa** (te same upstream authz, #307). Wiersz rodzeństwa ma **własny** `client_jwk_thumbprint` i `account_id` rodzeństwa. Zamówienie bez thumbprintu nie dostaje wiersza. Zapis jest idempotentny i nie zależy od tego, czy automatyka DNS już ruszyła (F13b).
+2. Zapis jest „best effort”: w savepoincie (`db.session.begin_nested()`), konflikt UNIQUE i każdy inny błąd jest logowany i **nigdy** nie przerywa `get_authz` ani nie cofa stanu `challenges_data` (F13a).
+3. `expires_at` = `expires` z upstream authz, ale nie później niż `created_at + 24 h` (F13d).
+4. Wiersz jest „aktywny”, gdy: `status = pending`, `expires_at > teraz`, zamówienie ma `status = pending`.
+5. Zamknięcie (`status = closed`): `get_certificate`; każdy odczyt upstream authz albo challenge w stanie innym niż `pending` (`get_authz`, `respond_challenge`) (F13d).
+6. Wiersze z `expires_at` starszym niż 7 dni są usuwane przy kolejnym zapisie.
 
 ### 2.3 Strefy „autorytatywne” i zakres klucza
 
 - **Domena D wiersza** = domena z „ACME → Domains”, którą wybiera istniejąca funkcja `find_provider_for_domain(identifier)` (najbardziej szczegółowe dopasowanie, bez `*.`). Tę samą domenę UCM używa dziś do wyboru dostawcy DNS. D jest apexem strefy, który UCM ogłasza w odpowiedziach SOA.
 - **Strefa jest nasza** (RFC 2136 §3.1.1), gdy ZNAME jest domeną z „ACME → Domains” albo jej przodkiem (bez korzenia i bez nazw jednoetykietowych). Przodek jest potrzebny, bo cert-manager bierze apex z publicznego DNS, a win-acme zaczyna od domeny rejestrowalnej (sekcja 9). Prawdziwa strefa, do której pisze dostawca DNS UCM, to D albo przodek D. Ta reguła nie zależy od aktywnych zamówień. Dzięki temu usunięcie rekordu po zakończeniu zamówienia dostaje NOERROR, jak chce maintainer.
-- **Zakres klucza** (RFC 3007 §3): wiersz pasuje do klucza, gdy `row.acme_client_account_id = key.acme_client_account_id`, a gdy klucz ma powiązane EAB, także `row.account_id = eab.used_by_account_id`.
+- **Klucz jest ważny** (inaczej BADKEY), gdy: `status = active`, sekret odszyfrowany i niepusty, konto proxy istnieje i ma `proxy_enabled = true` (F3, F4).
+- **Zakres klucza** (RFC 3007 §3), zasada „domyślnie brak”: wiersz pasuje do klucza, gdy `row.acme_client_account_id = key.acme_client_account_id`. Gdy `key.eab_credential_id` nie jest NULL, dodatkowo: poświadczenie EAB istnieje, ma `status = used`, ma niepuste `used_by_account_id`, a `row.account_id` jest niepuste i równe `used_by_account_id`. Każdy inny przypadek (EAB usunięte, nieużyte, NULL po którejkolwiek stronie) = brak dopasowania (F2).
+- **Dopasowanie wartości** zawsze dotyczy pary (`record_name`, `txt_value`), nigdy samej wartości (F13c).
+
+### 2.4 Zasoby, pamięć podręczna i odporność (F1, F8)
+
+Nasłuch działa w jedynym workerze gevent (`workers = 1`), który obsługuje też HTTPS, ACME, OCSP i CRL. Wywołania DB (psycopg2 bez psycogreen, sqlite3) blokują pętlę gevent. Dlatego:
+
+| Mechanizm | Wartość domyślna | Cel |
+|---|---|---|
+| `spawn=Pool(N)` dla `DatagramServer` i `StreamServer` | N = 16 (UDP), 32 połączenia (TCP) | ograniczona liczba greenletów |
+| Globalny token bucket pakietów, sprawdzany przed parsowaniem | 200 pakietów/s, zryw 400 | ochrona przed zalaniem także z podrobionych adresów |
+| Limit na IP, w ograniczonym LRU (np. 4096 wpisów) | 50 pakietów/s na IP dla ruchu bez poprawnego TSIG | ochrona przed jednym źródłem; LRU chroni pamięć |
+| Wstępna kontrola nagłówka przed `from_wire` | QDCOUNT ≤ 1, ANCOUNT = 0 dla QUERY, NSCOUNT ≤ 16, ARCOUNT ≤ 4, długość ≤ MAX_MSG = 4096 B | mały koszt odrzucenia |
+| Pamięć podręczna aktywnych wierszy (record_name, D, wartości, zakres) | odświeżanie po zapisie w `records.py` i co 5 s | SOA bez podpisu i BADKEY bez zapytań do DB |
+| Pamięć podręczna kluczy TSIG | unieważnienie przy każdej zmianie klucza (API w tym samym procesie), TTL 30 s | odwołanie działa od razu |
+| Pamięć podręczna domen ACME (strefy) | TTL 10 s | sprawdzanie strefy bez DB |
+| TCP: limit bezczynności, czas zapisu, maks. czas życia połączenia | 10 s, 10 s, 120 s | ochrona przed slow-read i wyczerpaniem połączeń |
+| Wyjątek w handlerze | odpowiedź SERVFAIL (gdy da się odczytać ID), inaczej brak odpowiedzi; serwer działa dalej | odporność |
+| Logi aplikacji dla ruchu bez podpisu i błędnego | próbkowanie: maks. 1 wiersz na (powód) na 10 s, plus liczniki | ochrona logów |
+| Adres nasłuchu | `UCM_DNS_UPDATE_HOST`, domyślnie `HOST` | możliwość nasłuchu tylko w sieci wewnętrznej (F8) |
+
+Osobny proces dla nasłuchu odrzucam: wzorzec serwera HTTP protokołów (wymaganie maintainera) i wspólne unieważnianie pamięci podręcznej w jednym procesie są prostsze. Powyższe limity ograniczają koszt ruchu bez podpisu do kilku operacji w pamięci.
 
 ## 3. Kolejność przetwarzania wiadomości
 
 Każdy krok ma numer niezmiennika z sekcji 4.
 
 ```
-1. Długość < 12 B → brak odpowiedzi (M2). QR=1 → brak odpowiedzi (M1).
-2. UDP: datagram > MAX_MSG → brak odpowiedzi (N4).
-3. Opcode ∉ {QUERY, UPDATE} → NOTIMP, sam nagłówek (M3).
-4. Parsowanie dnspython (keyring=False, bez weryfikacji) → błąd → FORMERR (M4, S1, E2).
-5. TSIG obecny → kolejność RFC 8945 §5.2:
-   a. pole Error ≠ 0 albo TSIG nie na końcu / więcej niż jeden → FORMERR (S1, S9)
-   b. klucz nieznany, odwołany, algorytm ≠ algorytm klucza lub spoza polityki → NOTAUTH/BADKEY, bez podpisu (S2, S3)
-   c. rozmiar MAC > długość skrótu albo < max(10, połowa) → FORMERR (S8)
-   d. MAC błędny → NOTAUTH/BADSIG, bez podpisu (S4)
-   e. czas poza ±fudge albo starszy niż ostatni przyjęty dla klucza → NOTAUTH/BADTIME, podpisany (S6, S7)
-   f. MAC skrócony (w dozwolonym zakresie) → NOTAUTH/BADTRUNC, podpisany (S8)
-6. EDNS: wersja > 0 → BADVERS z OPT wersji 0 (E3).
-7. QUERY → sekcja 3.1. UPDATE → sekcja 3.2.
-8. Odpowiedź: ID i opcode skopiowane, QR=1, RD skopiowany, RA=0, Z=0 (M6–M8).
-   Podpisana, gdy żądanie było podpisane i poprawne (S10). OPT, gdy żądanie miało OPT (E1).
-9. UDP, żądanie bez poprawnego TSIG: odpowiedź dłuższa niż żądanie → odpowiedź minimalna z TC=1 (T1).
-   UDP, żądanie z poprawnym TSIG: limit max(512, rozmiar EDNS); powyżej → TC=1 z TSIG (T2, S12).
+1. Globalny token bucket i limit na IP (ruch jeszcze niezweryfikowany) → brak odpowiedzi (N4, N8).
+2. Długość < 12 B → brak odpowiedzi (M2). QR=1 → brak odpowiedzi (M1).
+3. Długość > MAX_MSG albo liczniki nagłówka poza limitem → brak odpowiedzi (N9).
+4. Opcode ∉ {QUERY, UPDATE} → NOTIMP, sam nagłówek, bez TSIG (M3; decyzja 11).
+5. Parsowanie dnspython (keyring=False, bez weryfikacji, bez dopełnienia) → błąd → FORMERR, bez TSIG (M4, S1, E2).
+6. TSIG obecny → kolejność RFC 8945 §5.2:
+   a. pole Error ≠ 0 → FORMERR (S9)
+   b. klucz nieznany, nieważny (sekcja 2.3), algorytm ≠ algorytm klucza lub spoza polityki
+      → NOTAUTH/BADKEY, bez podpisu (S2, S3, K7–K9)
+   c. rozmiar MAC > długość skrótu albo < max(10, połowa skrótu) → FORMERR (S8)
+   d. MAC:
+      pełna długość → dns.tsig.validate(..., now=time_signed) (sprawdza nazwę, algorytm, HMAC);
+      skrócony → pełny MAC przez publiczne dns.tsig.sign na wiadomości bez TSIG,
+                 potem hmac.compare_digest(pełny[:len], mac) (F5).
+      Niezgodność → NOTAUTH/BADSIG, bez podpisu (S4, S8)
+   e. powtórka: ten sam MAC żądania już przyjęty w oknie → ta sama odpowiedź z pamięci,
+      bez skutków ubocznych (S15)
+   f. czas: |teraz − Time Signed| > min(Fudge, 300) albo Time Signed < ostatni przyjęty dla klucza
+      → NOTAUTH/BADTIME, podpisany, Time Signed = czas klienta, Other Data = czas serwera,
+      Fudge = fudge klienta (S6, S7, S14)
+   g. MAC skrócony (zgodny) → NOTAUTH/BADTRUNC, podpisany; w podpisie skrócony MAC żądania (S8)
+   h. ostatni przyjęty Time Signed dla klucza zmienia się dopiero tutaj (po b–g) (S7)
+7. EDNS: wersja > 0 → BADVERS z OPT wersji 0 (E3).
+8. QUERY → sekcja 3.1. UPDATE → sekcja 3.2.
+9. Odpowiedź: ID i opcode skopiowane, QR=1, RD skopiowany, RA=0, Z=0, bez dopełnienia
+   (make_response(pad=0)) (M6–M8, E5).
+   Podpisana, gdy żądanie było podpisane i przeszło 6b–6d (S10). OPT, gdy żądanie miało OPT (E1).
+10. UDP, żądanie bez poprawnego TSIG (także każda odpowiedź na błąd TSIG):
+    odpowiedź dłuższa niż żądanie → odpowiedź minimalna z TC=1 (T1).
+    UDP, żądanie z poprawnym TSIG: limit max(512, rozmiar EDNS); powyżej → TC=1 z TSIG (T2, S12).
+11. Audyt i log po decyzji, w osobnej transakcji (N6, N12, N13).
 ```
 
 ### 3.1 QUERY
@@ -147,24 +185,28 @@ QNAME jest potomkiem D i przodkiem lub równa record_name wiersza z W
 każde inne zapytanie → REFUSED (Q3)
 ```
 
+Rekord SOA(D) ma stałe wartości (F12): właściciel D, TTL 0, MNAME = D, RNAME = `hostmaster.D`, SERIAL = 1, REFRESH 3600, RETRY 600, EXPIRE 86400, MINIMUM 0. Nie zawiera nazwy hosta UCM, adresu e-mail ani znacznika czasu.
+
 Dlaczego tak (sekcja 9): certbot i lego idą od `_acme-challenge.<id>` w górę i potrzebują SOA w ANSWER na apexie. nsupdate pyta tylko o nazwę rekordu i przyjmuje SOA z AUTHORITY. Odpowiedź REFUSED na nazwę rekordu zatrzymałaby nsupdate.
+
+Uwaga do PR (F14): zakres klucza dla podpisanego SOA niczego nie ukrywa, bo ten sam klient może wysłać zapytanie bez podpisu i dostać odpowiedź dla wszystkich kont. To nie jest zabezpieczenie.
 
 ### 3.2 UPDATE (kolejność RFC 2136 §3)
 
 ```
+brak podpisu TSIG → REFUSED, od razu, przed sprawdzeniem strefy (U4; RFC 3007 §2, RFC 2136 §3.3.1) (F6)
 ZOCOUNT ≠ 1 albo ZTYPE ≠ SOA → FORMERR                (U1, §3.1.1)
 ZCLASS ≠ IN → NOTAUTH                                 (U2, §3.1.1)
 ZNAME nie jest naszą strefą → NOTAUTH                  (U3, §3.1.1)
-brak podpisu TSIG → REFUSED                            (U4, RFC 3007 §3, RFC 2136 §3.3)
 sekcja prerequisite niepusta → REFUSED                 (U5, polityka §3.3, wymaganie maintainera)
 dla każdego RR (sprawdzenie uprawnień, §3.3):
     typ ≠ TXT albo nazwa nie zaczyna się od "_acme-challenge." → REFUSED (U9)
-    dodanie: wartość ≠ aktywna wartość w zakresie klucza → REFUSED (U10)
+    dodanie: para (nazwa, wartość) ≠ aktywny wiersz w zakresie klucza → REFUSED (U10)
     usunięcie klasy ANY typu ANY → REFUSED (U11)
 prescan (§3.4.1): klasa ∉ {IN, ANY, NONE} → FORMERR; nazwa poza ZNAME → NOTZONE;
     reguły TTL/RDLENGTH/typów meta → FORMERR       (U6–U8)
 zastosowanie: bez zmiany DNS (UCM publikuje rekord sam, jak dziś); zapis client_confirmed_at,
-    last_used_at klucza, audyt                     (U12, U13, U15)
+    last_used_at klucza (U12, U13, U15)
 → NOERROR, liczniki sekcji = 0                     (U14, §3.8)
 ```
 
@@ -192,6 +234,7 @@ Nazwa testu: `test_<ID>_<opis>_pos` / `test_<ID>_<opis>_neg`.
 | E2 | Dwa OPT → FORMERR | 6891 §6.1.1 | jeden OPT → poprawnie | dwa OPT → FORMERR |
 | E3 | Wersja EDNS > 0 → BADVERS, OPT wersji 0 | 6891 §6.1.3; 8906 §3.2.2 | wersja 0 → poprawnie | wersja 1 → BADVERS |
 | E4 | Nieznane opcje i flagi EDNS są ignorowane i niekopiowane | 6891 §6.1.2, §6.1.4; 8906 §3.2.3–§3.2.4 | bez opcji → poprawnie | nieznana opcja i flaga → poprawnie, brak ich w odpowiedzi |
+| E5 | Odpowiedź bez dopełnienia EDNS (PADDING) | 6891 §7; maintainer (rozmiar) | zapytanie bez PADDING → odpowiedź bez PADDING | małe zapytanie z PADDING → odpowiedź nie dłuższa niż zapytanie |
 | T1 | UDP, żądanie bez poprawnego TSIG: odpowiedź nie dłuższa niż żądanie (maintainer). Dłuższa → TC=1, nagłówek, pytanie, OPT (gdy był) | 1035 §4.2.1; 6891 §7 | REFUSED mieści się → wysłany bez zmian | SOA bez podpisu przez UDP → TC=1, brak ANSWER i AUTHORITY, długość ≤ żądanie |
 | T2 | UDP, żądanie z poprawnym TSIG: odpowiedź ≤ max(512, rozmiar EDNS); dłuższa → TC=1 z TSIG | 1035 §4.2.1; 6891 §6.2.3; 8906 §3.2.5; 8945 §5.3 | SOA podpisane przez UDP (wzorzec nsupdate, bez EDNS) → pełna odpowiedź ≤ 512 | odpowiedź > 512 bez EDNS → TC=1, pytanie + TSIG |
 | T3 | TCP: ramka z 2 bajtami długości; kilka wiadomości w jednym połączeniu; dane w kilku segmentach | 1035 §4.2.2; 7766 §6.2.1, §8 | 2 zapytania w jednym połączeniu → 2 odpowiedzi; długość w osobnym segmencie → odpowiedź | długość 0 albo > MAX_MSG → zamknięcie bez odpowiedzi |
@@ -209,12 +252,14 @@ Nazwa testu: `test_<ID>_<opis>_pos` / `test_<ID>_<opis>_neg`.
 | S5 | Kolejność: klucz → MAC → czas → skrócenie | 8945 §5.2 | dobry MAC i zły czas → BADTIME | zły MAC i zły czas → BADSIG (nie BADTIME); nieznany klucz i zły czas → BADKEY |
 | S6 | Czas poza ±fudge → BADTIME, podpisany tym samym kluczem; Time Signed = czas klienta; Other Data = czas serwera (6 B); Fudge = fudge klienta; MAC żądania w podpisie | 8945 §5.2.3, §5.3.2 | różnica = fudge → przyjęty | różnica = fudge + 1 → BADTIME; klient weryfikuje odpowiedź |
 | S7 | Time Signed starszy niż ostatni przyjęty dla klucza → BADTIME | 8945 §5.2.3 (SHOULD) | ten sam i późniejszy czas → przyjęty | czas wcześniejszy → BADTIME |
-| S8 | Rozmiar MAC: > skrót → FORMERR; < max(10, skrót/2) → FORMERR; skrócony dozwolony → BADTRUNC (podpisany), bo polityka wymaga pełnego MAC | 8945 §5.2.2.1, §5.2.4, §7 | pełny MAC → przyjęty | 33 B dla sha256 → FORMERR; 9 B → FORMERR; 16 B → BADTRUNC |
+| S8 | Rozmiar MAC: > skrót → FORMERR; < max(10, skrót/2) → FORMERR; skrócony dozwolony → BADTRUNC (podpisany), bo polityka wymaga pełnego MAC | 8945 §5.2.2.1, §5.2.4, §7 | pełny MAC → przyjęty | 33 B dla sha256 → FORMERR; 9 B → FORMERR; 16 B zgodne → BADTRUNC (podpisany); 16 B z błędnymi bajtami → BADSIG bez podpisu (F5) |
 | S9 | Pole Error w żądaniu ≠ 0 → FORMERR | 8945 §4.2, §5.2 | Error=0 → przyjęty | Error=16 → FORMERR |
 | S10 | Podpisane żądanie → podpisana odpowiedź (klient ją weryfikuje); niepodpisane żądanie → odpowiedź bez TSIG | 8945 §5.3 | dnspython jako klient weryfikuje MAC odpowiedzi | żądanie bez TSIG → brak TSIG w odpowiedzi |
 | S11 | MAC odpowiedzi nie krótszy niż MAC żądania | 8945 §7 | pełny MAC w odpowiedzi | — (test właściwości dla wszystkich algorytmów) |
 | S12 | Ucięta odpowiedź podpisana: pytanie + TSIG, TC=1, NOERROR | 8945 §5.3 | SOA przez UDP z podpisem → TC=1 i poprawny TSIG | brak TSIG w uciętej odpowiedzi = błąd |
 | S13 | Nazwy kluczy i algorytmów porównywane bez wielkości liter | 8945 §9; 1034 §3.1 | `KEY.Example.` = `key.example.` | inna nazwa → BADKEY |
+| S14 | Okno czasu = min(Fudge żądania, 300 s); BADTIME podaje fudge klienta | 8945 §5.2.3, §10 | Fudge 300, różnica 300 → przyjęty | Fudge 65535, różnica 301 → BADTIME z Fudge 65535 w odpowiedzi |
+| S15 | Powtórka (ten sam MAC żądania w oknie) → ta sama odpowiedź, bez skutków ubocznych | 8945 §10 | retransmisja UDP → identyczna odpowiedź | powtórka nie zmienia `client_confirmed_at`, `last_used_at`, nie dodaje audytu |
 
 ### 4.3 UPDATE (U)
 
@@ -223,7 +268,7 @@ Nazwa testu: `test_<ID>_<opis>_pos` / `test_<ID>_<opis>_neg`.
 | U1 | ZOCOUNT ≠ 1 albo ZTYPE ≠ SOA → FORMERR | 2136 §3.1.1 | 1 × SOA → dalej | 0, 2 rekordy; ZTYPE=A → FORMERR |
 | U2 | ZCLASS ≠ IN → NOTAUTH | 2136 §3.1.1 | IN → dalej | CH, ANY → NOTAUTH |
 | U3 | ZNAME poza naszymi strefami → NOTAUTH | 2136 §3.1.1 | domena z ACME Domains; jej przodek (apex publiczny, wzorzec cert-manager i win-acme) → dalej | obca strefa; potomek domeny; korzeń; TLD → NOTAUTH |
-| U4 | UPDATE bez podpisu → REFUSED, tylko log aplikacji | 3007 §3; 2136 §3.3 | ten sam UPDATE podpisany → NOERROR | bez TSIG → REFUSED, brak audytu, brak zmian |
+| U4 | UPDATE bez podpisu → REFUSED od razu (przed U1–U3), tylko log aplikacji | 3007 §2, §3; 2136 §3.3.1 | ten sam UPDATE podpisany → NOERROR | bez TSIG → REFUSED, brak audytu, brak zmian; odpowiedź dla strefy z ACME Domains i dla obcej strefy identyczna bajt w bajt (poza ID); 0 zapytań do DB (F6) |
 | U5 | Niepusta sekcja prerequisite → REFUSED | 2136 §2.4, §3.3; maintainer | pusta → dalej | każda z 5 form (§2.4.1–§2.4.5) → REFUSED |
 | U6 | Klasa RR ∉ {IN, ANY, NONE} → FORMERR | 2136 §3.4.1 | IN, ANY, NONE → dalej | CH → FORMERR |
 | U7 | Nazwa RR poza ZNAME → NOTZONE | 2136 §3.4.1 | nazwa w strefie → dalej | dozwolona nazwa poza ZNAME → NOTZONE |
@@ -255,14 +300,19 @@ Nazwa testu: `test_<ID>_<opis>_pos` / `test_<ID>_<opis>_neg`.
 | R1 | Wartość = base64url(SHA-256(token "." thumbprint)), bez `=` | 8555 §8.1, §8.4; 4648 §5; 7638 §3 | wektor z RFC 7638 §3.1 i tokenem testowym, wynik liczony niezależnie przez `hashlib` | wynik nie zawiera `=`, `+`, `/` |
 | R2 | Nazwa rekordu = `_acme-challenge.` + identyfikator bez `*.` | 8555 §7.1.4, §8.4 | `*.example.com` → `_acme-challenge.example.com.` | nigdy `_acme-challenge.*.example.com` |
 | R3 | Zapis przy pobraniu authz dla zamówienia i rodzeństwa | 8555 §7.5; #307 | authz `pending` z dns-01 → wiersze dla wszystkich zamówień | authz `valid` (#325); obcy klient (403); brak dns-01 → brak wierszy |
-| R4 | Zamknięcie przy `get_certificate`; wygaśnięcie wg `expires_at` | 8555 §7.1.4 (`expires`) | po certyfikacie → `closed` | wiersz innego zamówienia bez zmian |
+| R4 | Zamknięcie przy `get_certificate` i gdy upstream authz/challenge nie jest `pending`; `expires_at` ≤ utworzenie + 24 h | 8555 §7.1.4 (`expires`), §7.1.6 | po certyfikacie → `closed`; authz `valid` → `closed` | wiersz innego zamówienia bez zmian; authz `expires` za 7 dni → `expires_at` = +24 h |
 | R5 | Zakres klucza: konto proxy, opcjonalnie konto ACME z EAB | 3007 §3, §3.1 | pasuje → dozwolone | inne konto proxy; inne konto ACME → niedozwolone |
+| R6 | Błąd zapisu wiersza (np. konflikt UNIQUE przy równoległym `get_authz`) nie przerywa `get_authz` i nie cofa `challenges_data` | spójność | dwa równoległe `get_authz` rodzeństwa → oba OK, wiersze bez duplikatów | wymuszony IntegrityError → `get_authz` zwraca authz, stan `initiated` zostaje |
+| R7 | Wiersz rodzeństwa ma thumbprint i `account_id` rodzeństwa; zamówienie bez thumbprintu nie ma wiersza | 8555 §8.1; #307 | 2 konta, wspólny authz → 2 wiersze z różnymi wartościami | zamówienie z `client_jwk_thumbprint` NULL → brak wiersza |
 | K1 | Sekret z CSPRNG, długość = wyjście skrótu (32/48/64 B) | 8945 §8 | długości dla 3 algorytmów | dwa klucze nigdy nie mają tego samego sekretu (1000 prób) |
 | K2 | Sekret zaszyfrowany w DB | maintainer | wartość w DB ≠ jawny tekst, odczyt przez model = jawny tekst | zły klucz master → brak odczytu |
 | K3 | Sekret zwracany tylko przy utworzeniu | maintainer | POST zwraca sekret | GET listy i GET klucza nie zwracają sekretu |
 | K4 | Algorytmy: tylko sha256/384/512, w trybie FIPS i poza nim | 8945 §6, §7; maintainer | 3 algorytmy → 201 | md5, sha1, sha224 → 400 |
 | K5 | Nazwa klucza: poprawna nazwa DNS ≤ 255 B, unikalna bez wielkości liter | 8945 §4.2; 1035 §2.3.4 | poprawna → 201 | duplikat innej wielkości liter; etykieta > 63 B → 400 |
 | K6 | Domyślnie brak uprawnień: nowy klucz bez wierszy nic nie zmienia | 3007 §3 | — | dodanie z nowym kluczem bez wierszy → REFUSED |
+| K7 | Sekret nieodszyfrowany albo pusty → klucz nieznany (BADKEY), nigdy pusty klucz HMAC | maintainer; 8945 §5.2.1 | poprawny sekret → przyjęty | zły klucz szyfrowania DB; pusty sekret; HMAC z pustym kluczem → BADKEY |
+| K8 | Klucz z EAB: brak dopasowania, gdy EAB usunięte, nieużyte, `used_by_account_id` NULL albo wiersz z `account_id` NULL | 3007 §3 (domyślnie brak) | EAB `used`, to samo konto → NOERROR | każdy z 4 przypadków → REFUSED; usunięcie EAB usuwa klucz (SQLite) |
+| K9 | Klucz konta proxy usuniętego albo z `proxy_enabled = false` → BADKEY | 3007 §3 | konto aktywne → przyjęty | konto usunięte (SQLite, bez FK); proxy wyłączone → BADKEY; nowe konto z tym samym ID nie dziedziczy klucza |
 
 ### 4.6 Serwer, logi, bezpieczeństwo (N)
 
@@ -271,24 +321,34 @@ Nazwa testu: `test_<ID>_<opis>_pos` / `test_<ID>_<opis>_neg`.
 | N1 | Port: najpierw env `UCM_DNS_UPDATE_PORT`, potem ustawienie; 0 = wyłączony; domyślnie 0 | maintainer | env 8053 → nasłuch | brak env i ustawienia → brak nasłuchu; wartość błędna → 0 i ostrzeżenie |
 | N2 | API: port 0 albo 1024–65535, inny niż HTTPS i port protokołów HTTP | maintainer (bez CAP_NET_BIND_SERVICE) | 8053 → 200 | 53, 70000, port HTTPS → 400 |
 | N3 | Błąd bind nie zatrzymuje aplikacji | wzorzec serwera HTTP | wolny port → nasłuch | zajęty port → log błędu, aplikacja działa |
-| N4 | Limity: UDP > MAX_MSG odrzucony; limit połączeń TCP (łącznie i na IP); limit wiadomości na IP | 7766 §6.2.2; bezpieczeństwo | ruch w limicie → odpowiedzi | ruch ponad limit → brak odpowiedzi, log |
+| N4 | Limity: globalny token bucket, limit na IP w LRU, Pool greenletów, limit połączeń TCP, czas zapisu i życia połączenia | 7766 §6.2.2, §6.2.3; bezpieczeństwo (F1) | ruch w limicie → odpowiedzi | ruch ponad limit → brak odpowiedzi; 10 000 adresów IP → rozmiar LRU ≤ limit; liczba greenletów ≤ Pool |
 | N5 | Brak rekursji i brak ruchu wychodzącego z handlera | maintainer; 8906 §3.1.3.1 | — | test z zablokowanym `socket.connect`: żadne wywołanie |
 | N6 | Audyt: przyjęte i odrzucone żądania z TSIG; log aplikacji: bez podpisu i błędne | maintainer | żądanie z TSIG → wpis audytu | bez TSIG; błędne → brak wpisu audytu |
 | N7 | Limit wpisów audytu na (IP, powód) | bezpieczeństwo (ochrona tabeli audytu) | pierwszy BADKEY → wpis | 100 BADKEY z tego samego IP w 60 s → 1 wpis + log |
+| N8 | Ruch bez podpisu (SOA, UPDATE) i BADKEY nie wykonuje zapytań do DB | bezpieczeństwo (F1) | — | 1000 zapytań SOA bez podpisu i 1000 BADKEY → 0 zapytań SQL (licznik zdarzeń SQLAlchemy) |
+| N9 | Liczniki nagłówka poza limitem albo długość > MAX_MSG → brak odpowiedzi, bez pełnego parsowania | bezpieczeństwo (F1) | liczniki w limicie → przetworzone | ARCOUNT=1000; QDCOUNT=2 dla QUERY (FORMERR po kontroli M5); 4097 B → brak odpowiedzi |
+| N10 | Wyjątek (np. DB) → SERVFAIL albo brak odpowiedzi; serwer działa dalej | 1035 §4.1.1 (SERVFAIL); 2136 §3.4.2.1 | — | wymuszony wyjątek DB → SERVFAIL; następne zapytanie → poprawna odpowiedź |
+| N11 | Sekret i MAC nigdy w logach i audycie | bezpieczeństwo (F11) | — | cały zestaw testów z caplog na DEBUG: brak sekretu (base64) i MAC (hex, base64) w logach |
+| N12 | Globalny limit wpisów audytu na powód (niezależnie od IP) + jeden wpis zbiorczy | bezpieczeństwo (F7) | pierwsze N wpisów → zapisane | 1000 BADKEY z 1000 losowych IP → ≤ N wpisów + 1 zbiorczy |
+| N13 | Audyt ma adres klienta i nazwę `dns-update:<nazwa klucza>` albo `dns-update:unauthenticated`; nazwy z pakietu są skracane i oczyszczane | bezpieczeństwo (F7) | przyjęty UPDATE → IP i nazwa klucza w audycie | nazwa 255 B ze znakami sterującymi → skrócona, bez znaków sterujących; nigdy `system` |
 
 ## 5. Miejsca, w których uzgadniam wymagania maintainera z RFC
 
 | # | Wymaganie maintainera | Problem | Decyzja i uzasadnienie |
 |---|---|---|---|
-| 1 | „answer unsigned SOA queries … refuse every other query” | nsupdate (acme.sh bez `NSUPDATE_ZONE`, Posh-ACME z `DDNSNameserver`) **podpisuje** zapytanie SOA, gdy ma klucz, a odpowiedź bez podpisu jest dla niego błędem krytycznym (sekcja 9). RFC 8945 §5.3 wymaga podpisanej odpowiedzi na podpisane żądanie | Odpowiadam na SOA bez podpisu i z podpisem. Zapytanie podpisane dostaje podpisaną odpowiedź i zakres klucza. Wyjaśnię to w PR |
-| 2 | „No response larger than the request” | Odpowiedź SOA jest zawsze dłuższa niż zapytanie. lego i cert-manager powtarzają przez TCP po TC=1, certbot pyta najpierw przez TCP, ale **nsupdate nie obsługuje TC** i pyta przez UDP (sekcja 9) | Reguła obowiązuje dla UDP bez poprawnego TSIG (T1): tylko taki ruch można sfałszować (podrobiony adres źródłowy). Żądanie z poprawnym TSIG (MAC zweryfikowany, czas w oknie, S7 blokuje starsze) dostaje zwykły limit RFC: max(512, EDNS) (T2). Współczynnik dla podpisanego SOA ≈ 1,25. TCP bez limitu (handshake) |
+| 1 | „answer unsigned SOA queries … refuse every other query” | nsupdate (acme.sh bez `NSUPDATE_ZONE`, Posh-ACME z `DDNSNameserver`) **podpisuje** zapytanie SOA, gdy ma klucz, a odpowiedź bez podpisu jest dla niego błędem krytycznym (sekcja 9). RFC 8945 §5.3 wymaga podpisanej odpowiedzi na podpisane żądanie | Odpowiadam na SOA bez podpisu i z podpisem. Zapytanie podpisane dostaje podpisaną odpowiedź i zakres klucza. **Wymaga zgody maintainera (F14), patrz sekcja 11** |
+| 2 | „No response larger than the request” | Odpowiedź SOA jest zawsze dłuższa niż zapytanie. lego i cert-manager powtarzają przez TCP po TC=1, certbot pyta najpierw przez TCP, ale **nsupdate nie obsługuje TC** i pyta przez UDP (sekcja 9) | Reguła obowiązuje dla UDP bez poprawnego TSIG (T1): tylko taki ruch można sfałszować (podrobiony adres źródłowy). Żądanie z poprawnym TSIG (MAC zweryfikowany, czas w oknie, S7 blokuje starsze, S15 obsługuje powtórki) dostaje zwykły limit RFC: max(512, EDNS) (T2). Współczynnik dla podpisanego SOA ≈ 1,25. TCP bez limitu (handshake). **Wymaga zgody maintainera (F14), patrz sekcja 11** |
 | 3 | „Always answer NOERROR, even when the order is gone” | RFC 2136 §3.1.1 sprawdza strefę przed usunięciem. Strefa zależna od aktywnych zamówień dałaby NOTAUTH | Strefa zależy od ACME Domains, nie od zamówień (sekcja 2.3) |
 | 4 | „A non-empty prerequisite section gets REFUSED” | RFC 2136 §3.2 ocenia prerequisite przed §3.3 | Nasza strefa nie ma stanu, względem którego można ocenić prerequisite. Odmowa jest polityką (§3.3.1 „implementation dependent”) |
 | 5 | Algorytmy „nothing weaker than SHA-256” | RFC 8945 §6: implementacja MUSI mieć hmac-sha1 | §7 pozwala lokalnej polityce odrzucić algorytm. sha1 → BADKEY |
 | 6 | Odpowiedzi BADTIME | dnspython podpisuje czasem serwera, a RFC 8945 §5.2.3 wymaga czasu klienta w Time Signed | Własna budowa TSIG dla BADTIME przez publiczne `dns.tsig.sign` |
 | 7 | „Use dnspython … do not hand-roll HMAC” | `dns.tsig.validate` sprawdza czas przed MAC; RFC 8945 §5.2 wymaga: klucz, MAC, czas | Wywołuję `dns.tsig.validate` z `now = time_signed` (czas zawsze OK), potem sprawdzam czas sam. HMAC liczy dnspython. Sprawdzone prototypem na dnspython 2.8.0 (`spike/tsig_spike.py` w tym katalogu) |
 | 8 | SOA „for names covered by a pending proxy order” | Który apex ogłaszać? Apex = nazwa rekordu psuje precheck lego (szuka NS dla fałszywej strefy). REFUSED dla nazwy rekordu zatrzymuje nsupdate | Apex = D (sekcja 2.3). SOA w ANSWER dla D, NODATA z SOA w AUTHORITY dla nazw od D do nazwy rekordu (Q1, Q7). Pasuje do certbot, lego i nsupdate (sekcja 9) |
-| 9 | RFC 8945 §5.2.3 (SHOULD): odrzucać Time Signed starszy niż ostatni dla klucza | cert-manager wysyła kilka UPDATE równolegle (kilka nazw w certyfikacie). Pakiety UDP mogą przyjść w innej kolejności, więc jeden dostanie BADTIME | Implementuję zalecenie dosłownie (S7). cert-manager ponawia wyzwanie po błędzie. Sprawdzę to w E2E. Gdy ponawianie nie wystarczy, wrócę z danymi |
+| 9 | RFC 8945 §5.2.3 (SHOULD): odrzucać Time Signed starszy niż ostatni dla klucza | cert-manager wysyła kilka UPDATE równolegle (kilka nazw w certyfikacie). Pakiety UDP mogą przyjść w innej kolejności, więc jeden dostanie BADTIME | Implementuję zalecenie dosłownie (S7). Znacznik zmienia się dopiero po pozytywnym sprawdzeniu MAC i czasu. Retransmisje obsługuje pamięć powtórek (S15). cert-manager ponawia wyzwanie po błędzie. Sprawdzę to w E2E |
+| 10 | UPDATE bez podpisu | RFC 2136 §3 sprawdza strefę (NOTAUTH) przed uprawnieniami (§3.3), co pozwala bez klucza sprawdzić, które domeny są w ACME Domains (F6) | REFUSED od razu po parsowaniu. RFC 3007 §2: „TSIG or SIG(0) records MUST be included in all secure dynamic update messages”; RFC 2136 §3.3.1: uprawnienia „in an implementation dependent fashion”. Żaden klient nie wysyła UPDATE bez podpisu |
+| 11 | NOTIMP i FORMERR dla wiadomości z TSIG | RFC 8945 §5.2: „the server is REQUIRED to return a TSIG RR in the response” | FORMERR: wiadomość, której nie da się zinterpretować (§5.2, „cannot be interpreted”). NOTIMP: nieznanego opcode nie parsujemy dalej niż nagłówek (RFC 8906 §7), więc nie ma czym podpisać. Świadome odstępstwo, bez wpływu na bezpieczeństwo (F15) |
+| 12 | Fudge | RFC 8945 §5.2.3 używa fudge z żądania (do 65535 s). §10: „A Fudge value that is too large may leave the server open to replay attacks” | Okno = min(fudge, 300 s). BADTIME podaje fudge klienta (§5.2.3). Wszyscy klienci używają 300 s (sekcja 9) (F9) |
+| 13 | Treść SOA | Nazwa hosta, e-mail albo znacznik czasu ujawniałyby więcej niż zgodził się maintainer (F12) | Stałe wartości (sekcja 3.1) |
 
 ## 6. Bezpieczeństwo (do security review)
 
@@ -296,24 +356,29 @@ Nazwa testu: `test_<ID>_<opis>_pos` / `test_<ID>_<opis>_neg`.
 |---|---|
 | Zapis dowolnego rekordu w DNS | Nasłuch nie zapisuje nic w DNS. Dodanie przechodzi tylko dla TXT `_acme-challenge` z wartością równą oczekiwanej |
 | Podszycie się pod innego klienta | Wartość zależy od thumbprintu klienta (RFC 8555 §8.1). Zakres klucza = konto proxy, opcjonalnie konto ACME z EAB |
-| Kradzież sekretu z DB | Szyfrowanie kluczem master, sekret pokazany raz |
-| Powtórzenie żądania (replay) | Okno ±fudge, ostatni Time Signed na klucz (S7). Operacje są idempotentne |
+| Kradzież sekretu z DB | Szyfrowanie Fernet jak HMAC EAB (zawsze włączone), sekret pokazany raz; sekret nieodszyfrowany = BADKEY (K7) |
+| Rozszerzenie zakresu klucza | Zasada „domyślnie brak” dla EAB i kont proxy, usuwanie kluczy w kodzie, bo SQLite nie wymusza FK (K8, K9) |
+| Wyrocznia podpisu (BADTRUNC) | MAC skrócony jest sprawdzany przed odpowiedzią podpisaną (krok 6d) |
+| Sekret w logach | Zakaz logowania `dns.tsig.Key`, keyring i `Message.to_text()`; tylko nazwa klucza, kod, adres (N11) |
+| Powtórzenie żądania (replay) | Okno ±min(fudge, 300 s) (S14), ostatni Time Signed na klucz (S7), pamięć powtórek wg MAC żądania (S15). Operacje są idempotentne |
 | Amplifikacja UDP | Bez poprawnego TSIG: odpowiedź ≤ żądanie, inaczej TC=1 (T1). Z poprawnym TSIG: limit RFC (T2); sfałszować się nie da bez sekretu, powtórkę ogranicza okno fudge i S7 |
-| Zalanie DB i audytu | Limity na IP (N4), limit wpisów audytu (N7), brak audytu dla żądań bez podpisu (N6) |
-| Wyciek nazw aktywnych wyzwań | SOA bez podpisu ujawnia nazwy z aktywnymi wyzwaniami (wymaganie maintainera). Dokumentacja: nasłuch tylko w sieci wewnętrznej |
-| Slow-read TCP | Limit bezczynności od pełnej wiadomości (T5), limit połączeń |
+| Zalanie procesu, DB i audytu | Sekcja 2.4: Pool, globalny token bucket, LRU na IP, kontrola nagłówka, pamięć podręczna (0 zapytań DB dla ruchu bez podpisu i BADKEY, N8), limity audytu na IP i globalne (N7, N12), audyt po decyzji w osobnej transakcji |
+| Rozpoznanie domen bez klucza | UPDATE bez podpisu → REFUSED przed sprawdzeniem strefy (U4, F6) |
+| Wyciek nazw aktywnych wyzwań | SOA bez podpisu ujawnia D i nazwy z aktywnymi wyzwaniami (wymaganie maintainera), nic więcej (stałe SOA, F12). Wiersze aktywne maks. 24 h (R4). Nasłuch na osobnym adresie (`UCM_DNS_UPDATE_HOST`), osobny Service w Helm (ClusterIP), dokumentacja: tylko sieć wewnętrzna (F8) |
+| Slow-read TCP | Limit bezczynności od pełnej wiadomości (T5), czas zapisu, maks. czas życia, limit połączeń (2.4) |
 | Porównanie MAC w czasie stałym | `hmac.compare_digest` (dnspython) |
 | Uprawnienia procesu | Port nieuprzywilejowany, bez CAP_NET_BIND_SERVICE |
 
 ## 7. Pozostałe części PR 2
 
-- **Uruchomienie:** w `post_worker_init` (gunicorn, `workers = 1`), obok serwera HTTP protokołów; w trybie dev w `app.py main()`. Serwery gevent `DatagramServer` i `StreamServer`. Zmiana portu wymaga restartu (jak port HTTP protokołów).
+- **Uruchomienie:** w `post_worker_init` (gunicorn, `workers = 1`), obok serwera HTTP protokołów; w trybie dev w `app.py main()`. Serwery gevent `DatagramServer` i `StreamServer` z `spawn=Pool(N)` (sekcja 2.4). Adres: `UCM_DNS_UPDATE_HOST` (domyślnie `HOST`). Zmiana portu wymaga restartu (jak port HTTP protokołów).
+- **Zmiany w istniejącym kodzie:** handler DELETE poświadczenia EAB usuwa powiązane klucze (K8); `_remove_account_row` usuwa klucze i wiersze konta (K9); `AuditService.log_action` dostaje opcjonalny parametr `ip_address` (N13); `get_authz`, `respond_challenge`, `get_certificate` zapisują i zamykają wiersze (R3, R4).
 - **API:**
   - `GET/POST /api/v2/acme/client/accounts/<id>/dns-update-keys` (`read:acme` / `write:acme`)
   - `DELETE /api/v2/acme/client/accounts/<id>/dns-update-keys/<key_id>` (`delete:acme`; aktywny → odwołanie, odwołany → usunięcie, jak EAB)
   - `dns_update_port` w `/api/v2/acme/client/settings` (GET/PATCH)
 - **UI:** sekcja „Klucze DNS UPDATE (RFC 2136)” w karcie konta proxy (`CaAccountsManager.jsx`). Okno „pokaż raz” z sekretem i gotowymi fragmentami: plik klucza BIND (nsupdate, acme.sh, Posh-ACME), Secret i ClusterIssuer dla cert-manager, plik ini certbot. Pole portu w sekcji proxy (`LetsEncryptTab.jsx`). Pomoc kontekstowa. Teksty w 9 językach (`npm run check:i18n`).
-- **Pakiety:** Dockerfile `EXPOSE 8053/udp 8053/tcp`; `docker/entrypoint.sh` sprawdza `UCM_DNS_UPDATE_PORT` (0 albo 1024–65535, inny niż inne porty). Helm: `dnsUpdate.enabled` (domyślnie false), `dnsUpdate.port` (8053), port usługi UDP i TCP (np. 53 → 8053), zmienna env. DEB i RPM: bez zmian w unitach.
+- **Pakiety:** Dockerfile `EXPOSE 8053/udp 8053/tcp`; `docker/entrypoint.sh` sprawdza `UCM_DNS_UPDATE_PORT` (0 albo 1024–65535, inny niż inne porty). Helm: `dnsUpdate.enabled` (domyślnie false), `dnsUpdate.port` (8053), **osobny Service** (`dnsUpdate.service.type`, domyślnie ClusterIP, port 53 → 8053, UDP i TCP), opcjonalna NetworkPolicy, zmienna env. Dokumentacja: SNAT kube-proxy może połączyć limity na IP w jeden. DEB i RPM: bez zmian w unitach.
 - **Dokumentacja:** `docs/ADMIN_GUIDE.md` (nowa sekcja, uwaga o sieci wewnętrznej, mapowanie portu 53), `examples/kubernetes/cert-manager/clusterissuer-ucm-proxy-rfc2136.yaml`, `docs/testing/ACME-PROXY-DNS-UPDATE.md` (testy ręczne i E2E), CHANGELOG.
 
 ## 8. Testy end-to-end z prawdziwymi klientami
@@ -393,3 +458,27 @@ Polecenia walidacji:
 - `cd backend && python -m pytest tests/ -q -n auto --dist loadfile`
 - `cd frontend && npx vitest run && npm run check:i18n`
 - testy PostgreSQL (`-m postgres`), gdy uda się uruchomić PostgreSQL lokalnie
+
+## 11. Security review planu (2026-10-24)
+
+Niezależny agent `reviewer` sprawdził plan w wersji 2. Wszystkie ustalenia przyjąłem. Dwa twierdzenia sprawdziłem sam w kodzie (`eab.py`: trwałe usunięcie używanego EAB; brak `PRAGMA foreign_keys=ON` w czasie działania).
+
+| ID | Waga | Problem | Zmiana w planie |
+|---|---|---|---|
+| F1 | wysoka | Ruch UDP bez podpisu (także z podrobionych adresów) blokuje jedyny worker gevent przez zapytania DB | sekcja 2.4; N4, N8–N10 |
+| F2 | wysoka | Klucz z EAB rozszerza zakres po usunięciu EAB (SQLite bez FK, `None == None`) | 2.1, 2.3; K8 |
+| F3 | średnia | Klucze zostają po usunięciu konta proxy (SQLite bez FK) | 2.1, 2.3, 7; K9 |
+| F4 | średnia | Sekret może trafić do DB jawnie; błąd odszyfrowania może dać pusty klucz HMAC | 2.1, 2.3; K7 |
+| F5 | średnia | BADTRUNC nieosiągalne przez `dns.tsig.validate`; naiwna poprawka = wyrocznia podpisu | krok 6d i 6g; S8 |
+| F6 | średnia | UPDATE bez podpisu ujawnia domeny z ACME Domains (NOTAUTH vs REFUSED) | 3.2; U4; decyzja 10 |
+| F7 | średnia | Zalanie audytu z losowych IP; audyt przypisany do `system`; commit audytu łamie atomowość | krok 11; N12, N13 |
+| F8 | średnia | Brak własnego adresu nasłuchu; wspólny Service w Helm | 2.4, 7 |
+| F9 | niska | Okno powtórki zależne od klienta (fudge do 65535 s) | krok 6e–6f; S14, S15; decyzja 12 |
+| F10 | niska | `make_response` dodaje dopełnienie EDNS | krok 9; E5 |
+| F11 | niska | `Key.__repr__` i `Message.to_text()` pokazują sekret i MAC | sekcja 6; N11 |
+| F12 | niska | Treść SOA nieokreślona | 3.1; decyzja 13 |
+| F13 | niska | Wyścig przy zapisie wiersza, pola rodzeństwa, para (nazwa, wartość), wiersze aktywne przez dni | 2.2, 2.3; R4, R6, R7 |
+| F14 | niska | Odstępstwa od dosłownych wymagań maintainera (decyzje 1, 2) bez jego zgody | komentarz do issue #416 (poniżej), przed scaleniem PR 2 |
+| F15 | info | NOTIMP bez TSIG; strefa przyjmuje sufiksy publiczne | decyzja 11; reguła strefy bez zmian (brak skutków) |
+
+**F14 – zgoda maintainera.** Decyzje 1 i 2 zmieniają dosłowne brzmienie wymagań. Nie mam dostępu do issue w upstream, więc przygotowuję komentarz do wysłania przez użytkownika ([`maintainer-comment-416.md`](maintainer-comment-416.md)). Praca nad PR 2 idzie dalej. Gdy maintainer się nie zgodzi, zmiana dotyczy tylko kroku 10 i sekcji 3.1 (Q2).
