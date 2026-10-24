@@ -1,9 +1,10 @@
 import { useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import {
-  Plus, Trash, PencilSimple, Key, CheckCircle, Star, Globe, LockKey, X, Power
+  Plus, Trash, PencilSimple, Key, CheckCircle, Star, Globe, LockKey, X, Power, ShieldCheck
 } from '@phosphor-icons/react'
 import { Button, Badge, Input, Select, Textarea, CompactSection } from '../../components'
+import DnsUpdateKeysPanel from './DnsUpdateKeysPanel'
 
 const EMPTY_FORM = {
   label: '',
@@ -30,6 +31,7 @@ const EMPTY_FORM = {
 export default function CaAccountsManager({
   accounts = [],
   proxyPublicBase = '',
+  dnsUpdatePort = 0,
   canWrite,
   canDelete,
   onCreate,
@@ -44,6 +46,7 @@ export default function CaAccountsManager({
   const [editingId, setEditingId] = useState(null)
   const [form, setForm] = useState(EMPTY_FORM)
   const [busy, setBusy] = useState(false)
+  const [keysAccountId, setKeysAccountId] = useState(null)
 
   const openCreate = () => {
     setEditingId(null)
@@ -194,6 +197,27 @@ export default function CaAccountsManager({
                       <Button type="button" variant="danger" size="sm" onClick={() => onDelete(acct.id)}>
                         <Trash size={12} /> {t('common.delete')}
                       </Button>
+                    )}
+                  </div>
+                )}
+                {acct.proxy_enabled && acct.proxy_slug && (
+                  <div className={canWrite ? 'mt-2' : 'mt-2 pt-2 border-t border-border-op30'}>
+                    <Button
+                      type="button"
+                      variant="secondary"
+                      size="sm"
+                      onClick={() => setKeysAccountId(keysAccountId === acct.id ? null : acct.id)}
+                    >
+                      <ShieldCheck size={12} /> {t('acme.dnsUpdate.manage')}
+                    </Button>
+                    {keysAccountId === acct.id && (
+                      <DnsUpdateKeysPanel
+                        account={acct}
+                        proxyPublicBase={proxyPublicBase}
+                        dnsUpdatePort={dnsUpdatePort}
+                        canWrite={canWrite}
+                        canDelete={canDelete}
+                      />
                     )}
                   </div>
                 )}

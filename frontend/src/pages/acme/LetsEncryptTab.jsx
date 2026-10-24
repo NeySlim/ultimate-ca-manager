@@ -10,6 +10,7 @@ import { cn, publicBaseUrl } from '../../lib/utils'
 import { ACME_CLIENT_LABELS, groupedOptions, listAlgorithms } from '../../lib/keyAlgorithms'
 import { useFipsMode } from '../../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../../components/BrainpoolNotice'
+import DnsUpdatePortField from './DnsUpdatePortField'
 
 export default function LetsEncryptTab({
   clientSettings,
@@ -32,6 +33,7 @@ export default function LetsEncryptTab({
   localDnsNameservers,
   onLocalDnsNameserversChange,
   onUpdateClientSetting,
+  onSaveDnsUpdatePort,
   onRegisterProxy,
   onUnregisterProxy,
   onProxyAccountChange,
@@ -296,6 +298,12 @@ export default function LetsEncryptTab({
               {selectedProxyAccount && (
                 <p className="text-xs text-text-tertiary">{t('acme.proxyManageCaAccountsHint')}</p>
               )}
+
+              <DnsUpdatePortField
+                clientSettings={clientSettings}
+                canWrite={canWrite}
+                onSave={onSaveDnsUpdatePort}
+              />
 
               {/* Account Registration Status */}
               {proxyAccountId && selectedProxyAccount?.is_registered ? (() => {

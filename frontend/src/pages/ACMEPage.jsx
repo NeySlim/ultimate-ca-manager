@@ -370,6 +370,18 @@ export default function ACMEPage() {
     }
   }
 
+  // The DNS UPDATE listener port is read at start: the response says if a restart is needed.
+  const handleSaveDnsUpdatePort = async (port) => {
+    try {
+      const res = await acmeService.updateClientSettings({ dns_update_port: port })
+      setClientSettings(prev => ({ ...prev, dns_update_port: port }))
+      return res
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.settings'))
+      return null
+    }
+  }
+
   const handleToggleRevokeOnRenewal = (enabled) => {
     if (enabled && revokeSuperseded && acmeSettings.superseded_count > 0) {
       setShowRevokeConfirm(true)
@@ -1174,6 +1186,7 @@ export default function ACMEPage() {
             localDnsNameservers={localDnsNameservers}
             onLocalDnsNameserversChange={setLocalDnsNameservers}
             onUpdateClientSetting={handleUpdateClientSetting}
+            onSaveDnsUpdatePort={handleSaveDnsUpdatePort}
             onRegisterProxy={handleRegisterProxy}
             onUnregisterProxy={handleUnregisterProxy}
             onProxyAccountChange={handleProxyAccountChange}
@@ -1188,6 +1201,7 @@ export default function ACMEPage() {
             <CaAccountsManager
               accounts={caAccounts}
               proxyPublicBase={publicBaseUrl(clientSettings.acme_proxy_public_base_url, '/acme/proxy')}
+              dnsUpdatePort={clientSettings.dns_update_port_env ?? clientSettings.dns_update_port ?? 0}
               canWrite={canWrite('acme')}
               canDelete={canDelete('acme')}
               onCreate={handleCreateCaAccount}
