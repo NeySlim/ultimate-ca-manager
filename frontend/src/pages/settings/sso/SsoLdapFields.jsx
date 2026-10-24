@@ -178,7 +178,7 @@ export default function SsoLdapFields({
               <ShieldWarning size={16} className="text-amber-500" />
               <p className="text-sm font-medium text-text-secondary">{t('sso.requiredGroups')}</p>
             </div>
-            <p className="text-xs text-text-muted mb-2">{t('sso.requiredGroupsHelp')}</p>
+            <p className="text-xs text-text-tertiary mb-2">{t('sso.requiredGroupsHelp')}</p>
             <Input
               value={formData.ldap_required_groups || ''}
               onChange={e => handleChange('ldap_required_groups', e.target.value)}
@@ -209,7 +209,7 @@ export default function SsoLdapFields({
           />
           <div className="pt-1">
             <p className="text-xs font-medium text-text-secondary mb-2">{t('sso.roleMapping')}</p>
-            <p className="text-xs text-text-muted mb-2">{t('sso.roleMappingHelp')}</p>
+            <p className="text-xs text-text-tertiary mb-2">{t('sso.roleMappingHelp')}</p>
             <RoleMappingEditor
               value={formData.role_mapping}
               onChange={val => handleChange('role_mapping', val)}
@@ -221,7 +221,7 @@ export default function SsoLdapFields({
           </div>
           {provider?.id && (
             <div className="pt-2 border-t border-border">
-              <p className="text-xs text-text-muted mb-2">{t('sso.testMappingDesc')}</p>
+              <p className="text-xs text-text-tertiary mb-2">{t('sso.testMappingDesc')}</p>
               <div className="flex gap-2">
                 <Input
                   value={testMappingUsername}
@@ -248,12 +248,12 @@ export default function SsoLdapFields({
                     <p className="text-status-error">{t('sso.testMappingNotFound')}</p>
                   ) : (
                     <>
-                      <p><span className="text-text-secondary font-medium">DN:</span> <span className="text-text-muted font-mono">{testMappingResult.user_dn}</span></p>
+                      <p><span className="text-text-secondary font-medium">DN:</span> <span className="text-text-tertiary font-mono">{testMappingResult.user_dn}</span></p>
                       <p>
                         <span className="text-text-secondary font-medium">{t('sso.testMappingGroups')}:</span>{' '}
                         {testMappingResult.groups?.length > 0
                           ? testMappingResult.groups.map(g => <Badge key={g} variant="secondary" size="sm" className="mr-1">{g}</Badge>)
-                          : <span className="text-text-muted italic">{t('sso.testMappingNoGroups')}</span>
+                          : <span className="text-text-tertiary italic">{t('sso.testMappingNoGroups')}</span>
                         }
                       </p>
                       <p>

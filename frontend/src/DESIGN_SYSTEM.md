@@ -1,8 +1,11 @@
 # UCM Design System
 
-> Source of truth: `src/index.css` (tokens, component classes) and
-> `src/contexts/ThemeContext.jsx` (per-theme color values). This document
-> describes what those files actually implement — keep it in sync when they change.
+> Source of truth: `src/index.css` (tokens, component classes),
+> `src/contexts/ThemeContext.jsx` (per-theme color values) and
+> `tailwind.config.js` (Tailwind aliases). This document describes what those
+> files actually implement. `src/lib/__tests__/designTokens.test.js` and
+> `opacityClasses.test.js` fail the suite when the source uses a token, class or
+> `var(--x)` that none of them declares.
 
 ## Theming model
 
@@ -18,6 +21,11 @@ Colors are **not** hardcoded. `ThemeContext.jsx` writes CSS custom properties on
 Mode resolves from `system` / `dark` / `light` (persisted in localStorage +
 server prefs). Every component must read tokens (`var(--…)` or the Tailwind
 aliases below) so it adapts to all 6 combinations. Never hardcode a hex.
+
+Two documented exceptions carry fixed colors in every theme: the Ko-fi tokens
+(`--kofi-coral`, `--kofi-coral-strong`, `--kofi-coral-hover`, used by
+`.kofi-card` / `.kofi-badge` / `.kofi-button` / `.kofi-icon`) because they are a
+third party's brand, and `icon-bg-rose` / `icon-bg-sky` (see below).
 
 ## Typography
 
@@ -48,14 +56,14 @@ and mode. Tailwind aliases (`tailwind.config.js`) map to the CSS vars.
 |----------------|---------|-------|
 | `bg-bg-primary` | `--bg-primary` | Main page background |
 | `bg-bg-secondary` | `--bg-secondary` | Cards, panels |
-| `bg-bg-tertiary` | `--bg-tertiary` | Inputs, nested elements |
+| `bg-bg-tertiary` / `bg-bg-hover` | `--bg-tertiary` | Inputs, nested elements, hover fill |
 
 ### Text
 | Tailwind alias | CSS var | Usage |
 |----------------|---------|-------|
 | `text-text-primary` | `--text-primary` | Headings, important text |
 | `text-text-secondary` | `--text-secondary` | Body text |
-| `text-text-tertiary` | `--text-tertiary` | Muted, placeholder |
+| `text-text-tertiary` | `--text-tertiary` | Muted, placeholder, help text |
 
 ### Accent & status
 | Tailwind alias | CSS var | Usage |
@@ -67,24 +75,62 @@ and mode. Tailwind aliases (`tailwind.config.js`) map to the CSS vars.
 | `status-danger` / `status-error` / `accent-danger` | `--accent-danger` | Expired, revoked, error |
 | `status-info` | `--accent-primary` | Info, neutral |
 | `border` | `--border` | Default borders |
+| `border-strong` | `--border-strong` | Emphasised borders (outline button hover, floating windows) |
+| `border-hover` | `--text-tertiary` | Border on hover |
 
-> **There is no `accent-secondary` token.** It is not defined in the Tailwind
-> theme, `ThemeContext`, or `index.css`. Use `accent-pro` for a secondary
-> highlight. (A few legacy usages of `text-accent-secondary` exist in the
-> codebase and render nothing — they should be migrated.)
+`--accent-purple` exists only as a CSS var (no Tailwind alias): it backs the
+`status-purple-*` tints and `Card accent="purple"`.
+
+> **These tokens do not exist**: `accent-secondary`, `accent` (bare),
+> `text-muted`, `border-primary`, `status-*-foreground`, `--status-danger`,
+> `--status-error`, `--status-warning`, `--accent-info`. A class or `var()`
+> naming them renders nothing, and `designTokens.test.js` fails on it. Use
+> `accent-pro`, `accent-primary`, `text-tertiary`, `border` and the
+> `--accent-*` vars instead.
 
 ### Opacity with CSS-var colors — use the helper classes
-Tailwind's `/opacity` syntax does **not** work on these var-backed colors. Use
-the predefined classes instead of `bg-bg-tertiary/40`:
-- `bg-tertiary-op30 / -op50 / -op60 / -op80`, `bg-secondary-op50`,
-  `border-op30 / -op40 / -op50` (see `index.css`).
-- Status tints: `status-success-bg` / `status-success-text` (+ `-bg-solid`),
-  and the same for `status-warning`, `status-danger`, `status-primary`.
+Tailwind's `/opacity` syntax does **not** work on these var-backed colors:
+`bg-bg-tertiary/40` is dropped from the build. `index.css` hand-writes
+`color-mix()` helpers named `<utility>-<token>-opNN`, with `hover:`,
+`focus:` and `enabled:hover:` variants where the UI needs them:
+
+- Surfaces: `bg-primary-op50/80/90`, `bg-secondary-op10…op95`, `bg-tertiary-op30/40/50/60/80`.
+- Accent: `bg-accent-primary-op5…op80`, `border-accent-primary-op20…op50`,
+  `ring-accent-primary-op30/40/50`, `text-accent-primary-op60`,
+  `from-accent-primary-op5`, `to-accent-primary-op70`.
+- Status: `bg-status-{success,warning,danger,info}-opNN` and
+  `border-status-…-opNN` at the steps the UI uses (5 to 40), and the same
+  families under the `accent-` spelling.
+- Border and text: `border-border-op30/40/50/60`, `divide-border-op30`,
+  `text-secondary-op60`, `text-tertiary-op50`, `placeholder-secondary-op60`.
+
+The exact list is the set of `-opNN` selectors in `index.css`;
+`opacityClasses.test.js` fails when the markup uses one that is not declared.
+Add the missing rule rather than rounding to a neighbour.
+
+### Status tints (theme-aware classes)
+For each of `success`, `warning`, `danger` and `primary` (info):
+`status-X-bg` (soft tint), `status-X-bg-solid`, `status-X-text`,
+`status-X-border`, `status-X-glow`, and the composite `status-X-badge`
+(tint + text + border). `status-purple-*` has only `bg`, `bg-solid`, `text`
+and `border`; `status-orange-*` and `status-yellow-*` are derived from
+`--accent-warning`. `status-badge-{success,warning,danger}` are the
+gradient variants used by `badge-enhanced`.
 
 ### Icon background classes (theme-aware, set by ThemeContext)
-`icon-bg-blue`, `icon-bg-orange`, `icon-bg-violet`, `icon-bg-green`,
-`icon-bg-teal` — colored tile backgrounds that avoid "ton sur ton" clashes per
-theme. Backing vars: `--icon-{blue,orange,violet,amber,emerald,teal}-{bg,text}`.
+Colored tile backgrounds that avoid "ton sur ton" clashes per theme:
+`icon-bg-blue`, `icon-bg-orange`, `icon-bg-amber`, `icon-bg-emerald` /
+`icon-bg-green`, `icon-bg-teal` / `icon-bg-cyan`, `icon-bg-violet` /
+`icon-bg-purple`, backed by `--icon-{blue,orange,amber,emerald,teal,violet}-{bg,text}`.
+Derived from status tokens: `icon-bg-red` (`--accent-danger`),
+`icon-bg-gray` (`--text-tertiary`). Fixed hues in every theme: `icon-bg-rose`
+(`#F472B6`) and `icon-bg-sky` (`#38BDF8`).
+
+### Detail panel tokens
+`ThemeContext` also writes `--gradient-bg` and the `--detail-*` set
+(`detail-header-bg/border/shadow`, `detail-icon-bg/shadow`,
+`detail-stats-border`, `detail-section-bg/border`, `detail-field-bg/border`),
+consumed by the detail panel classes in `index.css`.
 
 ## Spacing
 
@@ -108,21 +154,25 @@ Vertical rhythm: `space-y-4` between sections, `space-y-2` for compact lists.
 | `rounded-xl` | 8px | Large cards |
 | `rounded-full` | 50% | Circles, pills |
 
-Card classes (`card-soft`, `card-interactive`, `elevated`) use a literal
-`12px` radius. Buttons use `8px`.
+Card classes (`card-soft`, `card-interactive`) use a literal `12px` radius.
+Button classes (`btn-gradient`, `btn-soft`, `btn-danger-soft`,
+`btn-warning-soft`) use `8px`; the `ghost` and `outline` variants keep the
+`rounded-md` 4px of the base.
 
 ## Shadows & elevation
 
 `index.css` defines a layered shadow scale (not plain Tailwind shadows):
 
-| Var | `elevation-*` class | Usage |
-|-----|---------------------|-------|
-| `--shadow-xs` | `elevation-1` (`--shadow-sm`) | Resting cards/buttons |
-| `--shadow-sm` | — | Hover lift |
+| Var | Class | Usage |
+|-----|-------|-------|
+| — | `elevation-0` | No shadow |
+| `--shadow-xs` | — | Resting cards (`card-soft`) and `btn-soft` |
+| `--shadow-sm` | `elevation-1` | Resting buttons, hover lift |
 | `--shadow-md` | `elevation-2` | Elevated cards |
 | `--shadow-lg` | `elevation-3` | Dropdowns, popovers |
 | `--shadow-xl` | `elevation-4` | Modals, overlays |
 
+`elevation-glow-{primary,success,danger}` add `--shadow-glow-*` to `--shadow-md`.
 Extras: `--shadow-glow-{primary,success,danger,warning}` (focus/hover glow),
 `--shadow-inner-highlight`, `--shadow-inner-sm`, `--floating-window-shadow`.
 
@@ -135,7 +185,7 @@ Extras: `--shadow-glow-{primary,success,danger,warning}` (focus/hover glow),
 | `--gradient-surface` | Panel surfaces |
 | `--gradient-shine` | Highlight sheen |
 | `--gradient-accent` (per theme) | Brand gradient (from `--gradient-from`/`--gradient-to`) |
-| `--logo-gradient-{start,mid,end,accent}` | Orange logo gradient (`#fb923c → #f97316 → #ea580c`) |
+| `--logo-gradient-{start,mid,end,accent}` | Logo gradient: dark `#fb923c → #f97316 → #ea580c`, light `#ea580c → #c2410c → #9a3412` |
 
 ## Glassmorphism
 
@@ -160,12 +210,16 @@ Keyframe animations (Tailwind): `animate-fade-in`, `animate-slide-up`,
 ### Buttons (`components/Button.jsx`)
 ```jsx
 <Button variant="primary" size="sm">Action</Button>
+<Button type="submit" loading={saving} loadingText={t('common.saving')}>Save</Button>
 ```
 - **Variants**: `primary` (gradient — `btn-gradient`), `secondary` (`btn-soft`),
   `success`, `danger` (gradient), `danger-soft`, `warning-soft`, `ghost`,
   `outline`. Non-gradient variants get a `focus-ring`.
 - **Sizes**: `xs`, `sm` (default), `default`, `lg`.
-- `loading` prop shows a spinner + `loadingText`.
+- **`type` defaults to `button`**, not the HTML `submit`: a button inside a
+  form never submits it by accident. A submit button passes `type="submit"`.
+- `loading` disables the button and shows a spinner + `loadingText`; it wins
+  over an explicit `disabled={false}`.
 
 `primary` is a **gradient with a shine sweep on hover** (`--gradient-primary`),
 not a flat `bg-accent-primary`. Match this when rebuilding buttons elsewhere.
@@ -193,7 +247,8 @@ not a flat `bg-accent-primary`. Match this when rebuilding buttons elsewhere.
 - **Variants**: `default`/`soft` (`card-soft`), `elevated` (`elevation-2`),
   `bordered`. `interactive` makes it a clickable card with a lift effect
   (`card-interactive`: `translateY(-2px)` + accent-tinted border on hover).
-- **`accent`** left-border: `primary`, `success`, `warning`, `danger`, `info`.
+- **`accent`** left-border: `primary`, `success`, `warning`, `danger`, `info`,
+  `purple`.
 - `Card.Header` renders an `IconBadge` + `section-header-gradient`.
 
 ### Status indicators
@@ -220,6 +275,7 @@ not a flat `bg-accent-primary`. Match this when rebuilding buttons elsewhere.
 <span className="status-danger-text">                // semantic status
 <div className="p-4 space-y-4">                      // consistent spacing
 <div className="bg-tertiary-op40">                   // var-color opacity helper
+<div style={{ color: 'var(--accent-danger)' }}>      // a declared var when a class cannot do
 ```
 
 ### Don't
@@ -229,4 +285,6 @@ not a flat `bg-accent-primary`. Match this when rebuilding buttons elsewhere.
 <p className="text-[13px]">                            // BAD — arbitrary size
 <div className="bg-bg-tertiary/40">                    // BAD — /opacity on var color
 <span className="text-accent-secondary">              // BAD — token doesn't exist
+<p className="text-text-muted">                       // BAD — token doesn't exist (text-text-tertiary)
+<div style={{ color: 'var(--status-danger)' }}>       // BAD — var never set (--accent-danger)
 ```

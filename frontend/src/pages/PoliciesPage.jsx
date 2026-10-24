@@ -203,7 +203,7 @@ export default function PoliciesPage() {
           <div>
             <div className="font-medium text-text-primary">{val}</div>
             {row.description && (
-              <div className="text-xs text-text-muted truncate max-w-[200px]">{row.description}</div>
+              <div className="text-xs text-text-tertiary truncate max-w-[200px]">{row.description}</div>
             )}
           </div>
         </div>
@@ -219,7 +219,7 @@ export default function PoliciesPage() {
       key: 'ca_name',
       header: t('policies.scope'),
       priority: 3,
-      render: (val) => val || <span className="text-text-muted">{t('policies.allCAs')}</span>,
+      render: (val) => val || <span className="text-text-tertiary">{t('policies.allCAs')}</span>,
     },
     {
       key: 'priority',
@@ -242,7 +242,7 @@ export default function PoliciesPage() {
           </span>
         </div>
       ) : (
-        <span className="text-text-muted text-xs">{t('common.no')}</span>
+        <span className="text-text-tertiary text-xs">{t('common.no')}</span>
       ),
     },
     {
@@ -425,9 +425,9 @@ export default function PoliciesPage() {
       <div className="border-t border-border pt-3">
         <h4 className="text-sm font-semibold text-text-primary mb-2">{t('policies.scope')}</h4>
         <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="text-text-muted">{t('policies.targetCA')}</div>
+          <div className="text-text-tertiary">{t('policies.targetCA')}</div>
           <div className="text-text-primary">{selectedPolicy.ca_name || t('policies.allCAs')}</div>
-          <div className="text-text-muted">{t('policies.priority')}</div>
+          <div className="text-text-tertiary">{t('policies.priority')}</div>
           <div className="text-text-primary font-mono">{selectedPolicy.priority}</div>
         </div>
       </div>
@@ -439,13 +439,13 @@ export default function PoliciesPage() {
           <div className="space-y-2 text-sm">
             {selectedPolicy.rules.max_validity_days > 0 && (
               <div className="flex justify-between">
-                <span className="text-text-muted">{t('policies.maxValidity')}</span>
+                <span className="text-text-tertiary">{t('policies.maxValidity')}</span>
                 <span className="text-text-primary">{selectedPolicy.rules.max_validity_days} {t('common.days')}</span>
               </div>
             )}
             {selectedPolicy.rules.allowed_key_types?.length > 0 && (
               <div>
-                <span className="text-text-muted">{t('policies.allowedKeyTypes')}</span>
+                <span className="text-text-tertiary">{t('policies.allowedKeyTypes')}</span>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {selectedPolicy.rules.allowed_key_types.map(k => (
                     <Badge key={k} variant="default" size="sm">{k}</Badge>
@@ -455,7 +455,7 @@ export default function PoliciesPage() {
             )}
             {selectedPolicy.rules.allowed_digests?.length > 0 && (
               <div>
-                <span className="text-text-muted">{t('policies.allowedDigests')}</span>
+                <span className="text-text-tertiary">{t('policies.allowedDigests')}</span>
                 <div className="flex flex-wrap gap-1 mt-1">
                   {selectedPolicy.rules.allowed_digests.map(d => (
                     <Badge key={d} variant="default" size="sm">
@@ -467,7 +467,7 @@ export default function PoliciesPage() {
             )}
             {selectedPolicy.rules.san_restrictions?.max_dns_names != null && selectedPolicy.rules.san_restrictions.max_dns_names > 0 && (
               <div className="flex justify-between">
-                <span className="text-text-muted">{t('policies.maxSANs')}</span>
+                <span className="text-text-tertiary">{t('policies.maxSANs')}</span>
                 <span className="text-text-primary">{selectedPolicy.rules.san_restrictions.max_dns_names}</span>
               </div>
             )}
@@ -480,9 +480,9 @@ export default function PoliciesPage() {
         <div className="border-t border-border pt-3">
           <h4 className="text-sm font-semibold text-text-primary mb-2">{t('policies.approvalWorkflow')}</h4>
           <div className="grid grid-cols-2 gap-2 text-sm">
-            <div className="text-text-muted">{t('policies.approvalGroup')}</div>
+            <div className="text-text-tertiary">{t('policies.approvalGroup')}</div>
             <div className="text-text-primary">{selectedPolicy.approval_group_name || '—'}</div>
-            <div className="text-text-muted">{t('policies.minApprovers')}</div>
+            <div className="text-text-tertiary">{t('policies.minApprovers')}</div>
             <div className="text-text-primary">{selectedPolicy.min_approvers}</div>
           </div>
         </div>
@@ -491,11 +491,11 @@ export default function PoliciesPage() {
       {/* Metadata */}
       <div className="border-t border-border pt-3">
         <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="text-text-muted">{t('common.createdAt')}</div>
+          <div className="text-text-tertiary">{t('common.createdAt')}</div>
           <div className="text-text-primary">{formatDate(selectedPolicy.created_at)}</div>
           {selectedPolicy.created_by && (
             <>
-              <div className="text-text-muted">{t('common.createdBy')}</div>
+              <div className="text-text-tertiary">{t('common.createdBy')}</div>
               <div className="text-text-primary">{selectedPolicy.created_by}</div>
             </>
           )}
@@ -746,7 +746,7 @@ export default function PoliciesPage() {
                           'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
                           formData.rules.allowed_key_types?.includes(opt.value)
                             ? 'bg-accent-primary-op10 border-accent-primary text-accent-primary'
-                            : 'bg-bg-secondary border-border text-text-muted hover:border-border-hover'
+                            : 'bg-bg-secondary border-border text-text-tertiary hover:border-border-hover'
                         )}
                       >
                         {opt.label}
@@ -775,7 +775,7 @@ export default function PoliciesPage() {
                       'px-3 py-1.5 rounded-lg text-xs font-medium border transition-colors',
                       formData.rules.allowed_digests?.includes(opt.value)
                         ? 'bg-accent-primary-op10 border-accent-primary text-accent-primary'
-                        : 'bg-bg-secondary border-border text-text-muted hover:border-border-hover'
+                        : 'bg-bg-secondary border-border text-text-tertiary hover:border-border-hover'
                     )}
                   >
                     {opt.label}

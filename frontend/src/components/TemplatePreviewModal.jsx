@@ -80,7 +80,7 @@ export function TemplatePreviewModal({ open, onClose, template }) {
         <div className="flex items-center justify-between mb-4">
           <div className="flex items-center gap-2">
             <div className="w-8 h-8 rounded-lg icon-bg-purple flex items-center justify-center">
-              <Eye size={18} className="text-accent-secondary" />
+              <Eye size={18} />
             </div>
             <div>
               <h2 className="text-base font-semibold text-text-primary">{t('templates.preview')}</h2>

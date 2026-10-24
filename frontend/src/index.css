@@ -957,7 +957,7 @@ tr.row-selected td:first-child {
 }
 
 .border-border-primary-op50 {
-  border-color: color-mix(in srgb, var(--border-primary) 50%, transparent);
+  border-color: color-mix(in srgb, var(--border) 50%, transparent);
 }
 
 .enabled\:hover\:bg-accent-primary-op5:enabled:hover {
@@ -1075,6 +1075,10 @@ tr.row-selected td:first-child {
   background-color: color-mix(in srgb, var(--accent-danger) 10%, transparent);
 }
 
+.bg-status-danger-op15 {
+  background-color: color-mix(in srgb, var(--accent-danger) 15%, transparent);
+}
+
 .bg-status-danger-op20 {
   background-color: color-mix(in srgb, var(--accent-danger) 20%, transparent);
 }
@@ -1109,6 +1113,10 @@ tr.row-selected td:first-child {
 
 .bg-status-warning-op10 {
   background-color: color-mix(in srgb, var(--accent-warning) 10%, transparent);
+}
+
+.bg-status-warning-op15 {
+  background-color: color-mix(in srgb, var(--accent-warning) 15%, transparent);
 }
 
 .bg-status-warning-op20 {
@@ -1167,6 +1175,10 @@ tr.row-selected td:first-child {
   border-color: color-mix(in srgb, var(--accent-danger) 30%, transparent);
 }
 
+.border-status-danger-op40 {
+  border-color: color-mix(in srgb, var(--accent-danger) 40%, transparent);
+}
+
 .border-status-error-op20 {
   border-color: color-mix(in srgb, var(--accent-danger) 20%, transparent);
 }
@@ -1184,7 +1196,7 @@ tr.row-selected td:first-child {
 }
 
 .border-status-info-op30 {
-  border-color: color-mix(in srgb, var(--accent-info) 30%, transparent);
+  border-color: color-mix(in srgb, var(--accent-primary) 30%, transparent);
 }
 
 .divide-border-op30 > :not([hidden]) ~ :not([hidden]) {
@@ -1535,9 +1547,9 @@ input:focus, select:focus, textarea:focus {
 
 /* === DANGER SOFT BUTTON (less aggressive) === */
 .btn-danger-soft {
-  background: color-mix(in srgb, var(--status-error) 10%, var(--bg-secondary));
-  border: 1px solid color-mix(in srgb, var(--status-error) 30%, var(--border));
-  color: var(--status-error);
+  background: color-mix(in srgb, var(--accent-danger) 10%, var(--bg-secondary));
+  border: 1px solid color-mix(in srgb, var(--accent-danger) 30%, var(--border));
+  color: var(--accent-danger);
   border-radius: 8px;
   position: relative;
   box-shadow: var(--shadow-xs);
@@ -1545,23 +1557,23 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn-danger-soft:hover {
-  background: color-mix(in srgb, var(--status-error) 20%, var(--bg-secondary));
-  border-color: color-mix(in srgb, var(--status-error) 50%, var(--border));
+  background: color-mix(in srgb, var(--accent-danger) 20%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--accent-danger) 50%, var(--border));
   box-shadow: var(--shadow-sm);
   transform: translateY(-1px);
 }
 
 .btn-danger-soft:active {
   transform: translateY(0);
-  background: color-mix(in srgb, var(--status-error) 25%, var(--bg-secondary));
+  background: color-mix(in srgb, var(--accent-danger) 25%, var(--bg-secondary));
   box-shadow: var(--shadow-inner-sm);
 }
 
 /* === WARNING SOFT BUTTON === */
 .btn-warning-soft {
-  background: color-mix(in srgb, var(--status-warning) 10%, var(--bg-secondary));
-  border: 1px solid color-mix(in srgb, var(--status-warning) 30%, var(--border));
-  color: color-mix(in srgb, var(--status-warning) 80%, #000);
+  background: color-mix(in srgb, var(--accent-warning) 10%, var(--bg-secondary));
+  border: 1px solid color-mix(in srgb, var(--accent-warning) 30%, var(--border));
+  color: color-mix(in srgb, var(--accent-warning) 80%, #000);
   border-radius: 8px;
   position: relative;
   box-shadow: var(--shadow-xs);
@@ -1569,8 +1581,8 @@ input:focus, select:focus, textarea:focus {
 }
 
 .btn-warning-soft:hover {
-  background: color-mix(in srgb, var(--status-warning) 20%, var(--bg-secondary));
-  border-color: color-mix(in srgb, var(--status-warning) 50%, var(--border));
+  background: color-mix(in srgb, var(--accent-warning) 20%, var(--bg-secondary));
+  border-color: color-mix(in srgb, var(--accent-warning) 50%, var(--border));
   box-shadow: var(--shadow-sm);
   transform: translateY(-1px);
 }
@@ -2519,13 +2531,13 @@ input:focus, select:focus, textarea:focus {
 }
 
 .alert-bg-red {
-  background: color-mix(in srgb, var(--status-danger) 15%, transparent);
-  color: var(--status-danger);
+  background: color-mix(in srgb, var(--accent-danger) 15%, transparent);
+  color: var(--accent-danger);
 }
 
 .icon-bg-red {
-  background: color-mix(in srgb, var(--status-danger) 15%, transparent);
-  color: var(--status-danger);
+  background: color-mix(in srgb, var(--accent-danger) 15%, transparent);
+  color: var(--accent-danger);
 }
 
 .icon-bg-sky {

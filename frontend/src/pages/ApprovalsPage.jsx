@@ -141,7 +141,7 @@ export default function ApprovalsPage() {
       header: '#',
       priority: 2,
       sortable: true,
-      render: (val) => <span className="font-mono text-text-muted text-sm">#{val}</span>,
+      render: (val) => <span className="font-mono text-text-tertiary text-sm">#{val}</span>,
     },
     {
       key: 'request_type',
@@ -152,7 +152,7 @@ export default function ApprovalsPage() {
         <div>
           <RequestTypeBadge type={val} t={t} />
           {row.request_summary?.cn && (
-            <div className="text-xs text-text-muted mt-0.5 font-mono truncate max-w-48">{row.request_summary.cn}</div>
+            <div className="text-xs text-text-tertiary mt-0.5 font-mono truncate max-w-48">{row.request_summary.cn}</div>
           )}
         </div>
       ),
@@ -164,7 +164,7 @@ export default function ApprovalsPage() {
       sortable: true,
       render: (val) => (
         <div className="flex items-center gap-1.5">
-          <User size={14} className="text-text-muted" />
+          <User size={14} className="text-text-tertiary" />
           <span className="text-text-primary">{val || '—'}</span>
         </div>
       ),
@@ -175,10 +175,10 @@ export default function ApprovalsPage() {
       priority: 2,
       render: (val) => val ? (
         <div className="flex items-center gap-1.5">
-          <Gavel size={14} className="text-text-muted" />
+          <Gavel size={14} className="text-text-tertiary" />
           <span className="text-text-secondary text-sm">{val}</span>
         </div>
-      ) : <span className="text-text-muted">—</span>,
+      ) : <span className="text-text-tertiary">—</span>,
     },
     {
       key: 'status',
@@ -287,13 +287,13 @@ export default function ApprovalsPage() {
       <div className="border-t border-border pt-3">
         <h4 className="text-sm font-semibold text-text-primary mb-2">{t('approvals.requestDetails')}</h4>
         <div className="grid grid-cols-2 gap-2 text-sm">
-          <div className="text-text-muted">{t('approvals.requester')}</div>
+          <div className="text-text-tertiary">{t('approvals.requester')}</div>
           <div className="text-text-primary">{selectedRequest.requester_username || '—'}</div>
-          <div className="text-text-muted">{t('approvals.policy')}</div>
+          <div className="text-text-tertiary">{t('approvals.policy')}</div>
           <div className="text-text-primary">{selectedRequest.policy_name || '—'}</div>
           {selectedRequest.request_summary && (
             <>
-              <div className="text-text-muted">{t('approvals.summaryTarget')}</div>
+              <div className="text-text-tertiary">{t('approvals.summaryTarget')}</div>
               <div className="text-text-primary font-mono">
                 {selectedRequest.request_summary.csr_id
                   ? `CSR #${selectedRequest.request_summary.csr_id}`
@@ -307,13 +307,13 @@ export default function ApprovalsPage() {
               </div>
               {selectedRequest.request_summary.serial_number && (
                 <>
-                  <div className="text-text-muted">{t('approvals.summarySerial')}</div>
+                  <div className="text-text-tertiary">{t('approvals.summarySerial')}</div>
                   <div className="text-text-primary font-mono break-all">{selectedRequest.request_summary.serial_number}</div>
                 </>
               )}
               {selectedRequest.request_summary.reason && (
                 <>
-                  <div className="text-text-muted">{t('revocation.reasonLabel')}</div>
+                  <div className="text-text-tertiary">{t('revocation.reasonLabel')}</div>
                   <div className="text-text-primary">
                     {t(`revocation.reasons.${selectedRequest.request_summary.reason}`, selectedRequest.request_summary.reason)}
                   </div>
@@ -321,31 +321,31 @@ export default function ApprovalsPage() {
               )}
               {selectedRequest.request_summary.invalidity_at && (
                 <>
-                  <div className="text-text-muted">{t('approvals.summaryInvalidity')}</div>
+                  <div className="text-text-tertiary">{t('approvals.summaryInvalidity')}</div>
                   <div className="text-text-primary">{formatDate(selectedRequest.request_summary.invalidity_at)}</div>
                 </>
               )}
               {selectedRequest.request_summary.trigger === 'auto' && (
                 <>
-                  <div className="text-text-muted">{t('approvals.summaryTrigger')}</div>
+                  <div className="text-text-tertiary">{t('approvals.summaryTrigger')}</div>
                   <div className="text-text-primary">{t('approvals.triggerScheduler')}</div>
                 </>
               )}
               {selectedRequest.request_summary.validity_days && (
                 <>
-                  <div className="text-text-muted">{t('approvals.summaryValidity')}</div>
+                  <div className="text-text-tertiary">{t('approvals.summaryValidity')}</div>
                   <div className="text-text-primary">{selectedRequest.request_summary.validity_days}</div>
                 </>
               )}
               {selectedRequest.request_summary.extra_ekus?.length > 0 && (
                 <>
-                  <div className="text-text-muted">{t('approvals.summaryExtraEkus')}</div>
+                  <div className="text-text-tertiary">{t('approvals.summaryExtraEkus')}</div>
                   <div className="text-text-primary font-mono break-all">{selectedRequest.request_summary.extra_ekus.join(', ')}</div>
                 </>
               )}
               {selectedRequest.request_summary.extra_san?.length > 0 && (
                 <>
-                  <div className="text-text-muted">{t('approvals.summaryExtraSan')}</div>
+                  <div className="text-text-tertiary">{t('approvals.summaryExtraSan')}</div>
                   <div className="text-text-primary font-mono break-all">{selectedRequest.request_summary.extra_san.join(', ')}</div>
                 </>
               )}
@@ -353,21 +353,21 @@ export default function ApprovalsPage() {
           )}
           {selectedRequest.certificate_id && (
             <>
-              <div className="text-text-muted">{t('approvals.certificateId')}</div>
+              <div className="text-text-tertiary">{t('approvals.certificateId')}</div>
               <div className="text-text-primary font-mono">#{selectedRequest.certificate_id}</div>
             </>
           )}
-          <div className="text-text-muted">{t('common.createdAt')}</div>
+          <div className="text-text-tertiary">{t('common.createdAt')}</div>
           <div className="text-text-primary">{formatDate(selectedRequest.created_at)}</div>
           {selectedRequest.expires_at && (
             <>
-              <div className="text-text-muted">{t('approvals.expiresAt')}</div>
+              <div className="text-text-tertiary">{t('approvals.expiresAt')}</div>
               <div className="text-text-primary">{formatDate(selectedRequest.expires_at)}</div>
             </>
           )}
           {selectedRequest.resolved_at && (
             <>
-              <div className="text-text-muted">{t('approvals.resolvedAt')}</div>
+              <div className="text-text-tertiary">{t('approvals.resolvedAt')}</div>
               <div className="text-text-primary">{formatDate(selectedRequest.resolved_at)}</div>
             </>
           )}
@@ -398,7 +398,7 @@ export default function ApprovalsPage() {
                 <div className="flex-1 min-w-0">
                   <div className="flex items-center justify-between">
                     <span className="font-medium text-text-primary">{approval.username}</span>
-                    <span className="text-text-muted text-xs">{formatDate(approval.timestamp)}</span>
+                    <span className="text-text-tertiary text-xs">{formatDate(approval.timestamp)}</span>
                   </div>
                   {approval.comment && (
                     <p className="text-text-secondary mt-0.5">{approval.comment}</p>

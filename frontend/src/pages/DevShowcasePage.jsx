@@ -168,7 +168,7 @@ export default function DevShowcasePage() {
               'online', 'offline'].map(s => (
               <div key={s} className="flex items-center gap-2">
                 <StatusIndicator status={s} />
-                <span className="text-sm text-[var(--color-text-secondary)]">{s}</span>
+                <span className="text-sm text-[var(--text-secondary)]">{s}</span>
               </div>
             ))}
           </div>
@@ -200,7 +200,7 @@ export default function DevShowcasePage() {
               'amber', 'yellow', 'primary', 'success', 'warning', 'danger', 'slate', 'neutral', 'muted'].map(c => (
               <div key={c} className="flex flex-col items-center gap-1">
                 <IconBadge icon={Certificate} color={c} size="md" />
-                <span className="text-xs text-[var(--color-text-muted)]">{c}</span>
+                <span className="text-xs text-[var(--text-tertiary)]">{c}</span>
               </div>
             ))}
           </div>
@@ -210,7 +210,7 @@ export default function DevShowcasePage() {
             {['table', 'xs', 'sm', 'md', 'lg', 'xl'].map(s => (
               <div key={s} className="flex flex-col items-center gap-1">
                 <IconBadge icon={Lock} color="blue" size={s} />
-                <span className="text-xs text-[var(--color-text-muted)]">{s}</span>
+                <span className="text-xs text-[var(--text-tertiary)]">{s}</span>
               </div>
             ))}
           </div>
@@ -243,10 +243,10 @@ export default function DevShowcasePage() {
             {['default', 'elevated', 'bordered', 'soft'].map(v => (
               <Card key={v} variant={v}>
                 <Card.Header>
-                  <h3 className="font-semibold text-[var(--color-text-primary)]">Card: {v}</h3>
+                  <h3 className="font-semibold text-[var(--text-primary)]">Card: {v}</h3>
                 </Card.Header>
                 <Card.Body>
-                  <p className="text-sm text-[var(--color-text-secondary)]">
+                  <p className="text-sm text-[var(--text-secondary)]">
                     This is a {v} card variant with header, body, and footer.
                   </p>
                 </Card.Body>
@@ -262,7 +262,7 @@ export default function DevShowcasePage() {
             {['primary', 'success', 'warning', 'danger', 'info', 'purple'].map(a => (
               <Card key={a} accent={a}>
                 <Card.Body>
-                  <p className="text-sm font-medium text-[var(--color-text-primary)]">Accent: {a}</p>
+                  <p className="text-sm font-medium text-[var(--text-primary)]">Accent: {a}</p>
                 </Card.Body>
               </Card>
             ))}
@@ -405,7 +405,7 @@ export default function DevShowcasePage() {
 
           <Modal open={modalOpen} onClose={() => setModalOpen(false)} title="Basic Modal">
             <div className="p-4">
-              <p className="text-[var(--color-text-secondary)]">
+              <p className="text-[var(--text-secondary)]">
                 This is a basic modal with a title and close button.
                 You can put any content here.
               </p>
@@ -457,7 +457,7 @@ export default function DevShowcasePage() {
             <Tooltip content="Left tooltip" side="left">
               <Button variant="ghost">Hover (left)</Button>
             </Tooltip>
-            <span className="flex items-center gap-1 text-sm text-[var(--color-text-secondary)]">
+            <span className="flex items-center gap-1 text-sm text-[var(--text-secondary)]">
               With help icon <HelpTooltip content="This explains the feature in detail" />
             </span>
           </div>
@@ -468,7 +468,7 @@ export default function DevShowcasePage() {
       {activeSection === 'detail' && (
         <div className="space-y-6">
           <SectionTitle title="DetailHeader" />
-          <div className="border border-[var(--color-border)] rounded-lg overflow-hidden">
+          <div className="border border-[var(--border)] rounded-lg overflow-hidden">
             <DetailHeader
               icon={Certificate}
               title="example.com"
@@ -488,7 +488,7 @@ export default function DevShowcasePage() {
           </div>
 
           <SectionTitle title="DetailSection + DetailGrid + DetailField" />
-          <div className="border border-[var(--color-border)] rounded-lg p-4 space-y-4 bg-[var(--color-bg-primary)]">
+          <div className="border border-[var(--border)] rounded-lg p-4 space-y-4 bg-[var(--bg-primary)]">
             <DetailSection title="Subject Information" icon={User}>
               <DetailGrid columns={2}>
                 <DetailField label="Common Name" value="example.com" copyable />
@@ -507,7 +507,7 @@ export default function DevShowcasePage() {
 
             <DetailSection title="Extensions" icon={Gear}>
               <DetailContent>
-                <div className="text-sm text-[var(--color-text-secondary)] space-y-1">
+                <div className="text-sm text-[var(--text-secondary)] space-y-1">
                   <p>Key Usage: Digital Signature, Key Encipherment</p>
                   <p>Extended Key Usage: TLS Web Server Authentication</p>
                   <p>Subject Alternative Names: example.com, www.example.com</p>
@@ -517,7 +517,7 @@ export default function DevShowcasePage() {
           </div>
 
           <SectionTitle title="DetailTabs" />
-          <div className="border border-[var(--color-border)] rounded-lg p-4 bg-[var(--color-bg-primary)]">
+          <div className="border border-[var(--border)] rounded-lg p-4 bg-[var(--bg-primary)]">
             <DetailTabs
               tabs={[
                 { id: 'info', label: 'Information' },
@@ -535,7 +535,7 @@ export default function DevShowcasePage() {
       {activeSection === 'compact' && (
         <div className="space-y-6">
           <SectionTitle title="CompactHeader" />
-          <div className="border border-[var(--color-border)] rounded-lg overflow-hidden bg-[var(--color-bg-primary)]">
+          <div className="border border-[var(--border)] rounded-lg overflow-hidden bg-[var(--bg-primary)]">
             <CompactHeader
               icon={Lock}
               title="Internal Root CA"
@@ -546,7 +546,7 @@ export default function DevShowcasePage() {
           </div>
 
           <SectionTitle title="CompactStats" />
-          <div className="border border-[var(--color-border)] rounded-lg overflow-hidden bg-[var(--color-bg-primary)] p-3">
+          <div className="border border-[var(--border)] rounded-lg overflow-hidden bg-[var(--bg-primary)] p-3">
             <CompactStats stats={[
               { label: 'Certificates', value: '42', icon: Certificate },
               { label: 'Expiring', value: '3', icon: Warning, variant: 'warning' },
@@ -555,7 +555,7 @@ export default function DevShowcasePage() {
           </div>
 
           <SectionTitle title="CompactSection + CompactGrid + CompactField" />
-          <div className="border border-[var(--color-border)] rounded-lg overflow-hidden bg-[var(--color-bg-primary)] p-3 space-y-2">
+          <div className="border border-[var(--border)] rounded-lg overflow-hidden bg-[var(--bg-primary)] p-3 space-y-2">
             <CompactSection title="Certificate Details" icon={Certificate}>
               <CompactGrid cols={2}>
                 <CompactField label="Common Name" value="*.example.com" copyable />
@@ -574,7 +574,7 @@ export default function DevShowcasePage() {
           </div>
 
           <SectionTitle title="CompactActions" />
-          <div className="border border-[var(--color-border)] rounded-lg overflow-hidden bg-[var(--color-bg-primary)] p-3">
+          <div className="border border-[var(--border)] rounded-lg overflow-hidden bg-[var(--bg-primary)] p-3">
             <CompactActions>
               <Button variant="primary" size="xs"><Download size={14} /> Export</Button>
               <Button variant="ghost" size="xs"><PencilSimple size={14} /> Renew</Button>
@@ -591,24 +591,24 @@ export default function DevShowcasePage() {
           <div className="flex flex-wrap items-center gap-8">
             <div className="flex flex-col items-center gap-2">
               <LoadingSpinner size="sm" />
-              <span className="text-xs text-[var(--color-text-muted)]">sm</span>
+              <span className="text-xs text-[var(--text-tertiary)]">sm</span>
             </div>
             <div className="flex flex-col items-center gap-2">
               <LoadingSpinner size="md" />
-              <span className="text-xs text-[var(--color-text-muted)]">md</span>
+              <span className="text-xs text-[var(--text-tertiary)]">md</span>
             </div>
             <div className="flex flex-col items-center gap-2">
               <LoadingSpinner size="lg" />
-              <span className="text-xs text-[var(--color-text-muted)]">lg</span>
+              <span className="text-xs text-[var(--text-tertiary)]">lg</span>
             </div>
             <div className="flex flex-col items-center gap-2">
               <LoadingSpinner size="md" message="Loading certificates..." />
-              <span className="text-xs text-[var(--color-text-muted)]">with message</span>
+              <span className="text-xs text-[var(--text-tertiary)]">with message</span>
             </div>
           </div>
 
           <SectionTitle title="EmptyState" />
-          <div className="border border-[var(--color-border)] rounded-lg p-4 bg-[var(--color-bg-primary)]">
+          <div className="border border-[var(--border)] rounded-lg p-4 bg-[var(--bg-primary)]">
             <EmptyState
               icon={Certificate}
               title="No certificates found"
@@ -660,13 +660,13 @@ export default function DevShowcasePage() {
 
           <SectionTitle title="Tabs" />
           <Tabs tabs={[
-            { id: 'overview', label: 'Overview', content: <p className="p-4 text-sm text-[var(--color-text-secondary)]">Overview tab content</p> },
-            { id: 'details', label: 'Details', content: <p className="p-4 text-sm text-[var(--color-text-secondary)]">Details tab content</p> },
-            { id: 'history', label: 'History', content: <p className="p-4 text-sm text-[var(--color-text-secondary)]">History tab content</p> },
+            { id: 'overview', label: 'Overview', content: <p className="p-4 text-sm text-[var(--text-secondary)]">Overview tab content</p> },
+            { id: 'details', label: 'Details', content: <p className="p-4 text-sm text-[var(--text-secondary)]">Details tab content</p> },
+            { id: 'history', label: 'History', content: <p className="p-4 text-sm text-[var(--text-secondary)]">History tab content</p> },
           ]} />
 
           <SectionTitle title="TreeView" />
-          <div className="border border-[var(--color-border)] rounded-lg p-4 bg-[var(--color-bg-primary)] max-w-md">
+          <div className="border border-[var(--border)] rounded-lg p-4 bg-[var(--bg-primary)] max-w-md">
             <TreeView
               nodes={[
                 {
@@ -732,7 +732,7 @@ export default function DevShowcasePage() {
           </div>
 
           <SectionTitle title="ActionBar" />
-          <div className="border border-[var(--color-border)] rounded-lg p-3 bg-[var(--color-bg-primary)]">
+          <div className="border border-[var(--border)] rounded-lg p-3 bg-[var(--bg-primary)]">
             <ActionBar
               primary={<Button variant="primary" size="sm"><Plus size={14} /> New Certificate</Button>}
               secondary={[
@@ -743,7 +743,7 @@ export default function DevShowcasePage() {
           </div>
 
           <SectionTitle title="FilterChips" />
-          <div className="border border-[var(--color-border)] rounded-lg p-3 bg-[var(--color-bg-primary)]">
+          <div className="border border-[var(--border)] rounded-lg p-3 bg-[var(--bg-primary)]">
             <FilterChips
               filters={[
                 { key: 'status', label: 'Status', value: 'valid', options: [{ value: 'valid', label: 'Valid' }] },
@@ -755,7 +755,7 @@ export default function DevShowcasePage() {
           </div>
 
           <SectionTitle title="PermissionsDisplay" />
-          <div className="border border-[var(--color-border)] rounded-lg p-3 bg-[var(--color-bg-primary)] max-w-md">
+          <div className="border border-[var(--border)] rounded-lg p-3 bg-[var(--bg-primary)] max-w-md">
             <PermissionsDisplay
               role="admin"
               permissions={['certificates.read', 'certificates.write', 'cas.read', 'cas.write', 'users.manage', 'settings.manage']}
@@ -766,46 +766,44 @@ export default function DevShowcasePage() {
           <SectionTitle title="Color Palette (CSS Variables)" />
           <div className="grid grid-cols-2 md:grid-cols-4 gap-3">
             {[
-              { name: '--color-bg-primary', label: 'bg-primary' },
-              { name: '--color-bg-secondary', label: 'bg-secondary' },
-              { name: '--color-bg-tertiary', label: 'bg-tertiary' },
-              { name: '--color-bg-hover', label: 'bg-hover' },
-              { name: '--color-text-primary', label: 'text-primary' },
-              { name: '--color-text-secondary', label: 'text-secondary' },
-              { name: '--color-text-muted', label: 'text-muted' },
-              { name: '--color-border', label: 'border' },
-              { name: '--color-accent', label: 'accent' },
-              { name: '--color-accent-hover', label: 'accent-hover' },
-              { name: '--color-success', label: 'success' },
-              { name: '--color-warning', label: 'warning' },
-              { name: '--color-danger', label: 'danger' },
-              { name: '--color-info', label: 'info' },
-              { name: '--sidebar-bg', label: 'sidebar-bg' },
-              { name: '--sidebar-text', label: 'sidebar-text' },
+              { name: '--bg-primary', label: 'bg-primary' },
+              { name: '--bg-secondary', label: 'bg-secondary' },
+              { name: '--bg-tertiary', label: 'bg-tertiary' },
+              { name: '--text-primary', label: 'text-primary' },
+              { name: '--text-secondary', label: 'text-secondary' },
+              { name: '--text-tertiary', label: 'text-tertiary' },
+              { name: '--border', label: 'border' },
+              { name: '--border-strong', label: 'border-strong' },
+              { name: '--accent-primary', label: 'accent-primary' },
+              { name: '--accent-pro', label: 'accent-pro' },
+              { name: '--accent-success', label: 'accent-success' },
+              { name: '--accent-warning', label: 'accent-warning' },
+              { name: '--accent-danger', label: 'accent-danger' },
+              { name: '--accent-purple', label: 'accent-purple' },
             ].map(c => (
-              <div key={c.name} className="flex items-center gap-2 p-2 rounded border border-[var(--color-border)]">
+              <div key={c.name} className="flex items-center gap-2 p-2 rounded border border-[var(--border)]">
                 <div
                   className="w-8 h-8 rounded shadow-inner"
                   style={{
                     backgroundColor: `var(${c.name})`,
-                    border: '2px solid var(--color-border)',
+                    border: '2px solid var(--border)',
                     boxShadow: 'inset 0 0 0 1px rgba(0,0,0,0.1)',
                   }}
                 />
-                <span className="text-xs text-[var(--color-text-secondary)] font-mono">{c.label}</span>
+                <span className="text-xs text-[var(--text-secondary)] font-mono">{c.label}</span>
               </div>
             ))}
           </div>
 
           <SectionTitle title="Typography" />
-          <div className="space-y-2 bg-[var(--color-bg-primary)] border border-[var(--color-border)] rounded-lg p-4">
-            <h1 className="text-2xl font-bold text-[var(--color-text-primary)]">Heading 1: 2xl bold</h1>
-            <h2 className="text-xl font-semibold text-[var(--color-text-primary)]">Heading 2: xl semibold</h2>
-            <h3 className="text-lg font-medium text-[var(--color-text-primary)]">Heading 3: lg medium</h3>
-            <p className="text-base text-[var(--color-text-primary)]">Body text: base</p>
-            <p className="text-sm text-[var(--color-text-secondary)]">Secondary text: sm secondary</p>
-            <p className="text-xs text-[var(--color-text-muted)]">Muted text: xs muted</p>
-            <p className="text-sm font-mono text-[var(--color-text-primary)]">Monospace: for serial numbers, fingerprints</p>
+          <div className="space-y-2 bg-[var(--bg-primary)] border border-[var(--border)] rounded-lg p-4">
+            <h1 className="text-2xl font-bold text-[var(--text-primary)]">Heading 1: 2xl bold</h1>
+            <h2 className="text-xl font-semibold text-[var(--text-primary)]">Heading 2: xl semibold</h2>
+            <h3 className="text-lg font-medium text-[var(--text-primary)]">Heading 3: lg medium</h3>
+            <p className="text-base text-[var(--text-primary)]">Body text: base</p>
+            <p className="text-sm text-[var(--text-secondary)]">Secondary text: sm secondary</p>
+            <p className="text-xs text-[var(--text-tertiary)]">Muted text: xs muted</p>
+            <p className="text-sm font-mono text-[var(--text-primary)]">Monospace: for serial numbers, fingerprints</p>
           </div>
 
           <SectionTitle title="Spacing & Layout Reference" />
@@ -813,15 +811,15 @@ export default function DevShowcasePage() {
             {[1, 2, 3, 4, 6, 8, 12, 16].map(s => (
               <div key={s} className="flex flex-col items-center gap-1">
                 <div
-                  className="rounded border border-[var(--color-border)]"
+                  className="rounded border border-[var(--border)]"
                   style={{
                     width: `${s * 4}px`,
                     height: `${s * 4}px`,
-                    backgroundColor: 'var(--color-accent)',
+                    backgroundColor: 'var(--accent-primary)',
                     opacity: 0.7,
                   }}
                 />
-                <span className="text-[10px] text-[var(--color-text-muted)]">{s * 4}px</span>
+                <span className="text-[10px] text-[var(--text-tertiary)]">{s * 4}px</span>
               </div>
             ))}
           </div>
@@ -833,7 +831,7 @@ export default function DevShowcasePage() {
 
 function SectionTitle({ title }) {
   return (
-    <h3 className="text-sm font-semibold text-[var(--color-text-primary)] uppercase tracking-wider border-b border-[var(--color-border)] pb-2">
+    <h3 className="text-sm font-semibold text-[var(--text-primary)] uppercase tracking-wider border-b border-[var(--border)] pb-2">
       {title}
     </h3>
   )

@@ -153,7 +153,7 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
                 </span>
               </div>
               <div className="flex items-center gap-2">
-                <Certificate size={14} className="text-accent-secondary" />
+                <Certificate size={14} className="text-accent-pro" />
                 <span className="text-xs font-semibold text-text-primary truncate">
                   {cert2.common_name || t('compare.certificateB')}
                 </span>

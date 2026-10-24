@@ -128,7 +128,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
 
       {/* Awaiting-certificate banner (external-CSR mode, #298) */}
       {ca.pending && (
-        <div className="rounded-lg px-3 py-2 bg-status-warning/20 border border-status-warning/40">
+        <div className="rounded-lg px-3 py-2 bg-status-warning-op20 border border-status-warning-op40">
           <div className="flex items-center gap-2 text-status-warning">
             <Clock size={16} />
             <span className="text-xs font-medium">{t('cas.awaitingCertificate')}</span>
@@ -149,7 +149,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
 
       {/* Revoked banner (#343) */}
       {ca.revoked && (
-        <div className="rounded-lg px-3 py-2 bg-status-danger/20 border border-status-danger/40">
+        <div className="rounded-lg px-3 py-2 bg-status-danger-op20 border border-status-danger-op40">
           <div className="flex items-center gap-2 text-status-danger">
             <Prohibit size={16} />
             <span className="text-xs font-medium">{t('common.revoked')}</span>
@@ -165,7 +165,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
 
       {/* A CA above this one is revoked (#343) */}
       {ca.revoked_in_chain && !ca.revoked && (
-        <div className="rounded-lg px-3 py-2 bg-status-danger/15 border border-status-danger/40">
+        <div className="rounded-lg px-3 py-2 bg-status-danger-op15 border border-status-danger-op40">
           <div className="flex items-center gap-2 text-status-danger">
             <Prohibit size={16} />
             <span className="text-xs font-medium">{t('cas.chainRevoked')}</span>
@@ -176,7 +176,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
 
       {/* Certificate only: the key stayed where the request was made (#348) */}
       {needsKeyImport(ca) && (
-        <div className="rounded-lg px-3 py-2 bg-status-warning/15 border border-status-warning/40">
+        <div className="rounded-lg px-3 py-2 bg-status-warning-op15 border border-status-warning-op40">
           <div className="flex items-center gap-2 text-status-warning">
             <Key size={16} />
             <span className="text-xs font-medium">{t('cas.certificateOnly')}</span>
@@ -192,7 +192,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
 
       {/* Offline banner */}
       {ca.offline && (
-        <div className="rounded-lg px-3 py-2 bg-status-warning/20 border border-status-warning/40">
+        <div className="rounded-lg px-3 py-2 bg-status-warning-op20 border border-status-warning-op40">
           <div className="flex items-center gap-2 text-status-warning">
             <ShieldWarning size={16} />
             <span className="text-xs font-medium">{t('cas.offline')}</span>

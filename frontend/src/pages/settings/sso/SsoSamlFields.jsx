@@ -150,7 +150,7 @@ export default function SsoSamlFields({
         <div className="space-y-3">
           <div>
             <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.attributeMapping')}</p>
-            <p className="text-xs text-text-muted mb-2">{t('sso.attributeMappingHelp')}</p>
+            <p className="text-xs text-text-tertiary mb-2">{t('sso.attributeMappingHelp')}</p>
             <MappingEditor
               value={formData.attribute_mapping}
               onChange={val => handleChange('attribute_mapping', val)}
@@ -162,7 +162,7 @@ export default function SsoSamlFields({
           </div>
           <div className="pt-2 border-t border-border">
             <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.roleMapping')}</p>
-            <p className="text-xs text-text-muted mb-2">{t('sso.roleMappingHelp')}</p>
+            <p className="text-xs text-text-tertiary mb-2">{t('sso.roleMappingHelp')}</p>
             <RoleMappingEditor
               value={formData.role_mapping}
               onChange={val => handleChange('role_mapping', val)}

@@ -13,6 +13,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - The HTTP protocol server (CDP, OCSP, AIA, HTTP-01) stopped after `systemctl reload ucm` until the next restart, because the new worker could not take the port from the old one; it now waits for the port to be released.
 - ACME proxy: a challenge response now carries `Link: rel="up"` even when the upstream CA omits it (Pebble), which certbot and lego require (#420, reported by @WMP).
+- UI: the `danger-soft` and `warning-soft` buttons, the red icon tiles, the outline button hover and a few tinted panels (CA details, login, reports) referred to colour tokens that were never defined and rendered without their colour. A test now fails the suite when the source uses an undeclared token.
 
 ### Documentation
 

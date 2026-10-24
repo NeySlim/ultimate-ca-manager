@@ -201,7 +201,7 @@ export function CADetails({
 
       {/* Revoked by the parent CA (#343) */}
       {ca.revoked && (
-        <div className="rounded-lg px-3 py-2 bg-status-danger/20 border border-status-danger/40 text-xs text-text-secondary">
+        <div className="rounded-lg px-3 py-2 bg-status-danger-op20 border border-status-danger-op40 text-xs text-text-secondary">
           {t('cas.revokedBanner', {
             date: ca.revoked_at ? formatDate(ca.revoked_at) : '-',
             reason: t(`revocation.reasons.${ca.revoke_reason || 'unspecified'}`),
@@ -211,14 +211,14 @@ export function CADetails({
 
       {/* A CA above this one is revoked (#343) */}
       {ca.revoked_in_chain && !ca.revoked && (
-        <div className="rounded-lg px-3 py-2 bg-status-danger/15 border border-status-danger/40 text-xs text-text-secondary">
+        <div className="rounded-lg px-3 py-2 bg-status-danger-op15 border border-status-danger-op40 text-xs text-text-secondary">
           {t('cas.chainRevokedBanner')}
         </div>
       )}
 
       {/* Certificate only: the key stayed where the request was made (#348) */}
       {needsKeyImport(ca) && (
-        <div className="rounded-lg px-3 py-2 bg-status-warning/15 border border-status-warning/40 text-xs text-text-secondary flex items-start gap-2 flex-wrap">
+        <div className="rounded-lg px-3 py-2 bg-status-warning-op15 border border-status-warning-op40 text-xs text-text-secondary flex items-start gap-2 flex-wrap">
           <span className="flex-1 min-w-[12rem]">{t('cas.certificateOnlyBanner')}</span>
           {onImportKey && (
             <Button type="button" size="xs" variant="secondary" onClick={onImportKey}>
