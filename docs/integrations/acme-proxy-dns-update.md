@@ -2,7 +2,7 @@
 
 The ACME proxy of UCM has an optional DNS UPDATE listener. DNS-01 clients that speak RFC 2136 can use it instead of a DNS provider API. This page gives the settings for each client. For the listener itself (enabling, ports, keys, answers and error codes), read [ADMIN_GUIDE.md](../ADMIN_GUIDE.md#acme-proxy-dns-update-listener-rfc-2136).
 
-> **Internal network only.** Do not expose the listener to the internet.
+> **Internal network only.** Do not expose the listener to the internet. A peer that opens many TCP connections from enough addresses can hold the 128-connection pool, so the listener belongs on the internal network.
 
 ## How it works
 
@@ -12,6 +12,10 @@ The ACME proxy of UCM has an optional DNS UPDATE listener. DNS-01 clients that s
 4. The listener writes **nothing** to DNS. UCM publishes the challenge record through its DNS provider (ACME > Domains). The update tells UCM that the client holds the right value.
 
 The domain must be in **ACME > Domains**.
+
+The SOA query is answered while a challenge is pending, and for 24 hours after the expected value expires. This is also true after the validation failed or the certificate was downloaded. Clients can then find the zone again when they clean up. Adding a record still needs a pending order.
+
+The zone of an UPDATE can be an ACME Domains entry, a parent of one (not a top-level domain), or a name below one. Every record must be in that zone, otherwise UCM answers `NOTZONE`.
 
 ## Common settings
 
@@ -109,7 +113,7 @@ acme.sh --issue --dns dns_nsupdate -d www.example.com \
 
 Facts:
 
-- `NSUPDATE_SERVER`, `NSUPDATE_SERVER_PORT`, `NSUPDATE_KEY`, `NSUPDATE_ZONE` and `NSUPDATE_OPT` are the variables of the plugin. It adds the TXT with TTL 60 and removes it with `update delete <name> txt`, which is a delete of the whole TXT set. UCM answers `NOERROR` to that.
+- `NSUPDATE_SERVER`, `NSUPDATE_SERVER_PORT`, `NSUPDATE_KEY`, `NSUPDATE_ZONE` and `NSUPDATE_OPT` are the variables of the plugin. It adds the TXT with TTL 60 and removes it with `update delete <name> txt`, which is a delete of the whole TXT set. UCM answers `NOERROR` to that. `update delete <name>` without a type (delete all RRsets) is also accepted for `_acme-challenge` names. It changes nothing.
 - Without `NSUPDATE_ZONE`, `nsupdate` first asks for the SOA of the record name. It **signs** this query when it has a key, and it needs a **signed answer**. UCM signs it. You need no extra setting.
 - `nsupdate` sends over UDP and does not handle truncated (TC) answers. UCM keeps the signed SOA answer small for this reason.
 - acme.sh checks the TXT record in public DNS before it asks the CA. When the host cannot reach public DNS, or the record needs time, set `--dnssleep <seconds>` to wait instead of checking.
@@ -191,7 +195,7 @@ Facts (win-acme with ARSoft.Tools.Net 3.6.0):
 - The plugin options are `--serverhost`, `--serverport`, `--tsigkeyname`, `--tsigkeysecret` (base64) and `--tsigkeyalgorithm`. The algorithm names are the ARSoft names (`sha256`, `sha384`, `sha512`, ignoring case). An unknown name becomes `md5`. If you set none, it is `md5`.
 - **UCM must be reachable on port 53.** `--serverport` is passed to the DNS library as the query timeout (in milliseconds), not as a port. The library always uses port 53. Map port 53 to the listener (`-p 53:8053/udp -p 53:8053/tcp` in Docker, the Helm Service port 53, or a firewall redirect).
 - **Do not use `sha384`.** The library computes `hmac-sha384` with SHA-256, so every signature is wrong (`BADSIG`). Use `sha256`.
-- win-acme does not ask for the SOA. It sends test updates for the registrable domain and then for each longer name until the server answers `NOERROR`. UCM answers `NOTAUTH` for a zone that is not in ACME Domains (or a parent of one). Put the domain in ACME Domains.
+- win-acme does not ask for the SOA. It sends test updates for the registrable domain and then for each longer name until the server answers `NOERROR`. UCM answers `NOTAUTH` for a zone that is not in ACME Domains (or a parent of one, or below one). Put the domain in ACME Domains.
 - It sends over UDP first, then TCP, with TTL 60. It deletes one record (class NONE).
 - `--eab-key-identifier`, `--eab-key` and `--eab-algorithm` set External Account Binding.
 
@@ -238,7 +242,7 @@ EOF
 
 Messages of the clients that can mislead:
 
-- cert-manager and lego show `bad authentication` for every answer with the header code `NOTAUTH`: a TSIG error (wrong key name, secret, algorithm or clock) and also a zone that is not in ACME Domains. The audit log shows which one.
+- cert-manager and lego show `bad authentication` for every answer with the header code `NOTAUTH`: a TSIG error (wrong key name, secret, algorithm or clock) and also a zone that is not in ACME Domains (or a parent of one, or below one). The audit log shows which one.
 - `nsupdate` with a wrong secret can end with `REFUSED` or `could not reach any name server`, because it repeats the SOA query without a signature after `BADSIG`. With `zone` (or `NSUPDATE_ZONE`, `DDNSZone`) it shows `BADSIG`.
 - The audit log (actions `acme.dns_update.*`) gives the cause in the field `reason`, for example `value_mismatch` or `no_pending_order`.
 

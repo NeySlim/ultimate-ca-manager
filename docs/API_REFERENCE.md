@@ -2905,6 +2905,8 @@ DELETE /api/v2/acme/client/accounts/{account_id}/dns-update-keys/{key_id}
 ```
 Requires `delete:acme`. An active key is revoked at once (answer `200` with the key). A revoked key is deleted (answer `204`).
 
+Each account of `GET /api/v2/acme/client/accounts` has the integer field `dns_update_key_count`: the number of its DNS UPDATE keys of any status. It is `0` for an account without keys. The web interface uses it to show the keys of an account whose ACME proxy is off.
+
 ---
 
 ## ACME Domains

@@ -31,7 +31,7 @@ The test names start with the identifier of the invariant in the design plan (`M
 | `test_dns_update_handler.py` | RFC 2136 §3 order (zone, prerequisites, permission, prescan), add and delete forms, NOTAUTH/NOTZONE/REFUSED/FORMERR/NOTIMP, SOA answers (RFC 1034, RFC 2308), EDNS (RFC 6891), UDP size rules, replay cache, audit |
 | `test_dns_update_records.py` | Expected TXT values (RFC 8555 §8.4), rows per order, closing on failed states, cache |
 | `test_dns_update_keys_zones_audit.py` | Key scope (proxy account, EAB link), zone index, audit rate limits and the `reason` field |
-| `test_dns_update_api.py` | Key API (secret shown once, algorithms, EAB link, 409), port setting validation |
+| `test_dns_update_api.py` | Key API (secret shown once, algorithms, EAB link, 409), port setting validation, permissions with the auditor role and a custom role with `write:acme` only, `dns_update_key_count` of the account list |
 | `test_dns_update_server.py` | UDP and TCP server (RFC 7766 framing, pipelining, idle timeout), rate limits, start and stop |
 | `test_migration_111_acme_dns_update.py` | Tables and constraints on SQLite and PostgreSQL |
 | `test_entrypoint_dns_update_port.py` | Docker entrypoint check of `UCM_DNS_UPDATE_PORT` |
@@ -43,9 +43,35 @@ cd frontend
 npx vitest run src/pages/acme/__tests__/DnsUpdateKeysPanel.test.jsx \
   src/pages/acme/__tests__/DnsUpdatePortField.test.jsx \
   src/pages/acme/__tests__/dnsUpdateSnippets.test.js \
+  src/pages/acme/__tests__/CaAccountsManager.dnsUpdate.test.jsx \
   src/i18n/__tests__/dnsUpdateI18n.test.js
 npm run check:i18n
 ```
+
+### Scenarios of the review round
+
+| Scenario | Expected | Check |
+|----------|----------|-------|
+| Auditor permissions (`read:acme` only) | `GET` of keys and settings `200`. `POST` of a key, `DELETE` of a key and `PATCH` of `dns_update_port` give `403` and change nothing. A role with `write:acme` but not `delete:acme` gets `403` on `DELETE` | `test_dns_update_api.py`, `test_permissions_*` |
+| Bind retry after reload | After `systemctl reload`, the new worker retries the bind for up to `graceful_timeout` + 5 s (35 s by default) while the old worker holds the port. Then `dns_update_listening` is `true` | `test_dns_update_server.py`. Lab: `systemctl reload`, then read `dns_update_listening` |
+| SOA after the rows close | The SOA query is answered for 24 hours after the expected value expires, also after a failed validation or a downloaded certificate. An add still gets `REFUSED` without a pending order | `test_dns_update_handler.py`, `test_dns_update_records.py` |
+| Zone below an entry | An UPDATE for a zone below an ACME Domains entry is accepted. A record outside that zone gets `NOTZONE` | `test_dns_update_handler.py`, `test_dns_update_keys_zones_audit.py` |
+| Delete of type ANY | `update delete <name>` without a type for an `_acme-challenge` name gets `NOERROR` and changes nothing | `test_dns_update_handler.py`. Lab: `nsupdate` with `update delete _acme-challenge.<name>` |
+| Sibling order while processing | UCM stores the expected value when a client fetches the authorization while the challenge is pending or processing (#307) | `test_dns_update_records.py` |
+| `dns_update_key_count` | The account list gives the number of keys of any status for each account, `0` without keys, computed in one query | `test_dns_update_api.py`, `test_account_list_key_count_*` |
+| UI warning for an account whose proxy is off | The button **DNS UPDATE keys** shows for an account with keys. The warning shows, **New key** is disabled, revoke and delete work. No keys and no proxy: no button | `DnsUpdateKeysPanel.test.jsx`, `CaAccountsManager.dnsUpdate.test.jsx` |
+
+Lab results of the review round (Pebble upstream; the DNS provider publishes a wrong value for names that contain `fail`, so that the validation fails):
+
+| Client | Before the change | After the change |
+|--------|-------------------|------------------|
+| certbot + dns-rfc2136, failed validation | Cleanup fails: `Unable to determine base domain` (SOA `REFUSED` after the rows closed) | Cleanup works: the delete is `NOERROR` |
+| acme.sh `dns_nsupdate` without `NSUPDATE_ZONE`, failed validation | `Communication with 127.0.0.1#18054 failed: REFUSED`, `Error removing txt` | `Successfully removed` |
+| lego rfc2136, failed validation | Cleanup works: lego keeps the SOA for its Refresh value and does not ask again | Same |
+| cert-manager rfc2136 provider, failed validation | Cleanup works: cert-manager finds the zone through its recursive resolvers, not through UCM | Same |
+| gunicorn `HUP` (reload) | — | The new worker gets `EADDRINUSE`, retries, and the listener is up after 4 attempts (2 s) |
+| acme.sh, certbot, lego, cert-manager provider, valid order | — | Certificates, without the local patch |
+| `nsupdate` with `zone host.example.com` (entry `example.com`) | — | `update delete _acme-challenge.host.example.com` gives `NOERROR`; an add with a wrong value gives `REFUSED` (not `NOTAUTH`) |
 
 ## End-to-end lab
 
@@ -142,9 +168,9 @@ cert-manager: a Go program calls `rfc2136.NewDNSProviderCredentials` of cert-man
 | acme.sh + nsupdate | Issue `app.example.com`, key `e2e-a.` | Certificate from Pebble, audit `acme.dns_update.accepted` | Pass |
 | acme.sh + nsupdate | Key `e2e-b.` (other proxy account) | Signed SOA query `REFUSED`, no certificate | Pass |
 | acme.sh + nsupdate | Right key name, wrong secret | `BADSIG`, no certificate; `nsupdate` repeats unsigned and ends with `REFUSED` | Pass |
-| certbot + dns-rfc2136 | Issue `certbot.example.com` (SOA over TCP, UPDATE over TCP) | Certificate | Pass with the lab patch below |
-| lego rfc2136 | Issue `lego.example.com` (delete ANY + add in one message) | Certificate | Pass with the lab patch below |
-| cert-manager rfc2136 | Issue `cm.example.com` and `*.wild.example.com` | Certificates | Pass with the lab patch below |
+| certbot + dns-rfc2136 | Issue `certbot.example.com` (SOA over TCP, UPDATE over TCP) | Certificate | Pass with the lab patch (not needed since #420) |
+| lego rfc2136 | Issue `lego.example.com` (delete ANY + add in one message) | Certificate | Pass with the lab patch (not needed since #420) |
+| cert-manager rfc2136 | Issue `cm.example.com` and `*.wild.example.com` | Certificates | Pass with the lab patch (not needed since #420) |
 | cert-manager rfc2136 | `HMACMD5` (its default) | `BADKEY` (shown as `bad authentication`), no certificate | Pass |
 | cert-manager rfc2136 | Key `e2e-b.` (other proxy account) | `REFUSED`, no certificate | Pass |
 | cert-manager rfc2136 | Zone `example.net.` (not in ACME Domains) | `NOTAUTH` (shown as `bad authentication`), no certificate | Pass |
@@ -185,11 +211,13 @@ The issue [miekg/dns#1733](https://github.com/miekg/dns/issues/1733) (open on 20
 
 cert-manager v1.21.3 and lego v4.35.2 use `miekg/dns` v1.1.72. They send each UPDATE with `Client.Exchange`, which opens a new connection and closes it after the answer (`client.go`, `Exchange`). The issue does not apply to them.
 
-### Known issue in the lab: no `Link: rel="up"` from Pebble
+### Fixed: no `Link: rel="up"` from Pebble
+
+**Status: fixed on `dev` by #420.** The proxy now uses the authorization URL that it knows when the upstream header is missing. The lab no longer needs the local patch. The text below describes the old problem.
 
 certbot and lego need the `Link: <authz>;rel="up"` header in the answer to the challenge POST (`"up" Link header missing`, `authorization[get]: empty URL`). Pebble does not send it there. The ACME proxy of UCM only rewrites the header of the upstream CA, so the header is missing. This is not part of the listener: the same error occurs with `--manual` and no DNS UPDATE.
 
-For the lab, a small change in `AcmeProxyService._get_authz_link` uses the authorization URL that the proxy already knows when the upstream header is missing. With it, certbot, lego and cert-manager pass. The change is not in this branch. It is a candidate for a separate fix.
+Before #420, the lab used a small change in `AcmeProxyService._get_authz_link`. It used the authorization URL that the proxy already knows when the upstream header is missing. #420 contains this fix, so certbot, lego and cert-manager pass without a patch.
 
 ### Cleanup
 

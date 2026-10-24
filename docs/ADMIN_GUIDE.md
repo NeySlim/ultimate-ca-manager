@@ -579,9 +579,11 @@ curl -k -X PATCH -H "Authorization: Bearer $UCM_API_KEY" -H "Content-Type: appli
 
 **Purpose.** DNS-01 clients such as cert-manager, lego, certbot, acme.sh, win-acme and Posh-ACME can use the ACME proxy without a DNS API token of their own. They send a TSIG-signed DNS UPDATE (RFC 2136) to UCM. UCM checks the TXT value against the pending proxy order. Per-client settings are in [integrations/acme-proxy-dns-update.md](integrations/acme-proxy-dns-update.md).
 
-> **Internal network only.** The listener answers unsigned SOA queries for names of pending orders. Put it on an internal network or a private address. Never publish it to the internet. Use `UCM_DNS_UPDATE_HOST` and a firewall (or the Helm `dnsUpdate.networkPolicy`) to limit who can reach it.
+> **Internal network only.** The listener answers unsigned SOA queries for names of orders (see below). Put it on an internal network or a private address. Never publish it to the internet. Use `UCM_DNS_UPDATE_HOST` and a firewall (or the Helm `dnsUpdate.networkPolicy`) to limit who can reach it. A peer that opens many TCP connections from enough addresses can hold the whole pool of 128 TCP connections, so the listener belongs on the internal network.
 
 **Enable it.** The listener is **off by default**. A restart is needed after every change.
+
+**Reload and restart.** `systemctl reload` (HUP) starts a new worker while the old worker still holds the port. The new worker tries to bind the port again until it succeeds, for up to `graceful_timeout` + 5 seconds (35 seconds by default). If the port is still busy after that time, the listener is not running. The log shows the reason. `GET /api/v2/acme/client/settings` shows `dns_update_listening`.
 
 | Method | Value |
 |--------|-------|
@@ -614,16 +616,19 @@ Clients on the UCM host itself need the same rules in the `OUTPUT` chain. With n
 - The default algorithm is `hmac-sha256`. `hmac-sha384` and `hmac-sha512` are possible.
 - Revoke a key with `DELETE .../dns-update-keys/<key_id>`. A revoked key stops working at once (BADKEY). Another `DELETE` removes it. Deleting an ACME proxy account removes its keys.
 - Optional link to an EAB credential (`eab_credential_id`). The key then accepts only values for orders of the ACME account that registered with that credential, so the credential must be used already. A key without the link accepts values for all orders of its proxy account. Revoking the EAB credential revokes the keys linked to it, and deleting the credential deletes them. The audit log has an entry for each key.
+- The keys of an account whose ACME proxy is off stay in the database. They do not work (BADKEY). The **DNS UPDATE keys** button stays in the web interface for an account that has keys, with a warning. You can revoke and delete the keys there, but not create new ones. `GET /api/v2/acme/client/accounts` gives `dns_update_key_count` for each account (keys of any status).
 - `last_used_at` of a key shows when it last sent an accepted update.
 
 **What the listener accepts and answers.**
 
 - An UPDATE must be signed (TSIG). An unsigned UPDATE gets `REFUSED`.
-- An update adds only a TXT record at `_acme-challenge.<name>`, with the exact value that UCM expects for a pending proxy order of the key's scope. The name must be in a zone that matches an entry in ACME Domains, or in a parent of one.
-- Deletes (one record, or the whole TXT set of a name) always get `NOERROR`, also when the order is gone. A delete changes nothing.
+- An update adds only a TXT record at `_acme-challenge.<name>`, with the exact value that UCM expects for a pending proxy order of the key's scope. An add needs a pending order.
+- The zone section of an UPDATE must be an entry in ACME Domains, a parent of one (not a top-level domain), or a name below one. Every record of the update must be in that zone. A record outside the zone gets `NOTZONE`.
+- Deletes always get `NOERROR`, also when the order is gone. A delete can remove one record, the whole TXT set of a name, or all RRsets of a name. `update delete <name>` without a type means all RRsets (RFC 2136 §2.5.3). UCM accepts it for `_acme-challenge` names. It changes nothing, like the other deletes.
 - A message with prerequisites gets `REFUSED`.
+- UCM stores the expected value when a client fetches the authorization while the challenge is pending or processing. This covers sibling orders (#307).
 - **The listener writes nothing to DNS.** UCM still publishes the challenge record through its DNS provider, as for every proxy order. The update only proves that the client holds the right value.
-- It answers SOA queries for the zone of a pending order and for the names between that zone and the challenge name (the zone is the ACME Domains entry for the name). Unsigned and signed SOA queries are answered. A signed query gets a signed answer. The SOA record has fixed values and no host name.
+- It answers SOA queries for the zone of an order and for the names between that zone and the challenge name (the zone is the ACME Domains entry for the name). UCM answers the SOA query while a challenge is pending. It also answers for 24 hours after the expected value expires. This is also true after the validation failed or the certificate was downloaded. Clients can then find the zone again when they clean up. Adding a record still needs a pending order. Unsigned and signed SOA queries are answered. A signed query gets a signed answer. The SOA record has fixed values and no host name.
 - It refuses every other query (`REFUSED`). It does not recurse and does not serve any other data.
 - Over UDP, an answer to a request without a valid signature is never larger than the request. Larger answers are cut (TC) or dropped. A signed request gets a normal DNS answer size. TCP has no such limit.
 - Messages larger than 4096 bytes are ignored. The listener also limits the packet rate and the TCP connections, in total and per source (one IPv4 address, or one IPv6 /64 network). Behind NAT or kube-proxy SNAT, many clients can share one source address and one limit.
@@ -639,9 +644,9 @@ Clients on the UCM host itself need the same rules in the `OUTPUT` chain. With n
 | `BADKEY` | UCM does not know the key, or the key is not usable | Key name (with the trailing dot in some clients), key revoked, proxy account disabled, algorithm refused (`hmac-md5`, `hmac-sha1`: set `hmac-sha256`) |
 | `BADSIG` | The signature does not match | Wrong secret (copy it again from the creation dialog), secret not base64, a different algorithm than the key has. win-acme with `hmac-sha384` signs wrongly: use `hmac-sha256` |
 | `BADTIME` | The client clock is more than 300 s away from UCM, or the request was signed earlier than the last accepted request of the same key | Synchronize the time (NTP) on the client and on UCM. If the clocks are correct: several clients share one key, or parallel requests arrived out of order. Give each client its own key; the client normally retries |
-| `REFUSED` | The request is understood but not allowed | Unsigned UPDATE; value does not match the pending order (new order, new value); no pending order for that name (the client must fetch the authorization first); name is not `_acme-challenge.<name>`; record type is not TXT; the message has prerequisites; for a query, the name is not covered by a pending order |
-| `NOTAUTH` | The zone is not served | The domain (or a parent) is not in ACME Domains |
-| `NOTZONE` | A name in the update is outside the zone of the message | The client sent a zone and a record name that do not fit |
+| `REFUSED` | The request is understood but not allowed | Unsigned UPDATE; value does not match the pending order (new order, new value); no pending order for that name (the client must fetch the authorization first; an add needs a pending order, also when the SOA query was answered); name is not `_acme-challenge.<name>`; record type is not TXT; the message has prerequisites; for a query, the name is not covered by a pending order |
+| `NOTAUTH` | The zone is not served | The zone section is not an ACME Domains entry, a parent of one, or a name below one |
+| `NOTZONE` | A record of the update is outside the zone of the message | Every record must be in the zone. The client sent a zone and a record name that do not fit |
 
 If the client times out and gets no answer, check the port mapping, the firewall, `dns_update_listening`, and that the client uses UDP and TCP on the right port. UCM does not answer a packet that is shorter than a DNS header, larger than 4096 bytes, has too many records, or is itself a response.
 
