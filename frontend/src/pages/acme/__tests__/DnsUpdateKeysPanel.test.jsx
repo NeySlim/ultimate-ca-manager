@@ -211,6 +211,46 @@ describe('DnsUpdateKeysPanel', () => {
     expect(screen.queryByTitle('acme.dnsUpdate.delete')).not.toBeInTheDocument()
   })
 
+  describe('proxy of the account is off', () => {
+    it('warns, disables the create button and keeps revoke and delete', async () => {
+      mocks.list.mockResolvedValue({ data: [key(1), key(2, { status: 'revoked' })] })
+      renderPanel({ proxyActive: false })
+      await screen.findByTestId('dns-update-key-1')
+      expect(screen.getByTestId('dns-update-proxy-off')).toHaveTextContent('acme.dnsUpdate.proxyOff')
+      expect(screen.getByRole('button', { name: /acme.dnsUpdate.create/ })).toBeDisabled()
+      expect(screen.getByTitle('acme.dnsUpdate.revoke')).toBeEnabled()
+      expect(screen.getByTitle('acme.dnsUpdate.delete')).toBeEnabled()
+    })
+
+    it('still revokes a key', async () => {
+      const user = userEvent.setup()
+      mocks.list.mockResolvedValue({ data: [key(1)] })
+      renderPanel({ proxyActive: false })
+      await user.click(within(await screen.findByTestId('dns-update-key-1')).getByTitle('acme.dnsUpdate.revoke'))
+      await waitFor(() => expect(mocks.remove).toHaveBeenCalledWith(7, 1))
+    })
+
+    it('does not open the create dialog from the disabled button', async () => {
+      const user = userEvent.setup()
+      renderPanel({ proxyActive: false })
+      await user.click(await screen.findByRole('button', { name: /acme.dnsUpdate.create/ }))
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument()
+    })
+
+    it('shows no warning and enables create when the proxy is on', async () => {
+      renderPanel({ proxyActive: true })
+      await screen.findByText('acme.dnsUpdate.empty')
+      expect(screen.queryByTestId('dns-update-proxy-off')).not.toBeInTheDocument()
+      expect(screen.getByRole('button', { name: /acme.dnsUpdate.create/ })).toBeEnabled()
+    })
+
+    it('treats a missing prop as proxy on', async () => {
+      renderPanel()
+      await screen.findByText('acme.dnsUpdate.empty')
+      expect(screen.queryByTestId('dns-update-proxy-off')).not.toBeInTheDocument()
+    })
+  })
+
   describe('snippets in the dialog', () => {
     const openTab = async (user, name) => {
       await user.click(await screen.findByRole('tab', { name }))

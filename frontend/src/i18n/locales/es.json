@@ -1868,6 +1868,7 @@
       "title": "Claves DNS UPDATE (RFC 2136)",
       "manage": "Claves DNS UPDATE (RFC 2136)",
       "intro": "Los clientes con un solucionador rfc2136 estándar pueden usar estas claves TSIG para publicar el registro TXT de DNS-01 a través de UCM. Una clave solo funciona para esta cuenta proxy.",
+      "proxyOff": "El proxy ACME de esta cuenta está desactivado. Sus claves no funcionan. Aún puede revocarlas o eliminarlas.",
       "empty": "No hay claves DNS UPDATE para esta cuenta.",
       "create": "Nueva clave",
       "name": "Nombre de la clave",

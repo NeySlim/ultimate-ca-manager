@@ -23,6 +23,9 @@ const EMPTY_FORM = {
   preferred_chain: '',
 }
 
+// The proxy answers only when it is enabled and has a slug.
+const proxyIsOn = (acct) => !!(acct.proxy_enabled && acct.proxy_slug)
+
 /**
  * Multi-CA account manager for the ACME client. Lists every external ACME
  * authority (Let's Encrypt, ZeroSSL...) UCM can request certificates
@@ -200,7 +203,7 @@ export default function CaAccountsManager({
                     )}
                   </div>
                 )}
-                {acct.proxy_enabled && acct.proxy_slug && (
+                {(proxyIsOn(acct) || acct.dns_update_key_count > 0) && (
                   <div className={canWrite ? 'mt-2' : 'mt-2 pt-2 border-t border-border-op30'}>
                     <Button
                       type="button"
@@ -215,6 +218,7 @@ export default function CaAccountsManager({
                         account={acct}
                         proxyPublicBase={proxyPublicBase}
                         dnsUpdatePort={dnsUpdatePort}
+                        proxyActive={proxyIsOn(acct)}
                         canWrite={canWrite}
                         canDelete={canDelete}
                       />

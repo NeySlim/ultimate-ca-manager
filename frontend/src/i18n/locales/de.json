@@ -1868,6 +1868,7 @@
       "title": "DNS-UPDATE-Schlüssel (RFC 2136)",
       "manage": "DNS-UPDATE-Schlüssel (RFC 2136)",
       "intro": "Clients mit einem Standard-rfc2136-Solver können mit diesen TSIG-Schlüsseln den DNS-01-TXT-Eintrag über UCM setzen. Ein Schlüssel gilt nur für dieses Proxy-Konto.",
+      "proxyOff": "Der ACME-Proxy dieses Kontos ist aus. Seine Schlüssel funktionieren nicht. Sie können sie weiterhin widerrufen oder löschen.",
       "empty": "Keine DNS-UPDATE-Schlüssel für dieses Konto.",
       "create": "Neuer Schlüssel",
       "name": "Schlüsselname",

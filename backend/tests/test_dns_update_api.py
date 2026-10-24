@@ -244,6 +244,120 @@ def test_permissions_viewer_cannot_list_neg(viewer_client, auth_client, env):
     assert auth_client.get(_url(acct)).status_code == 200
 
 
+@pytest.fixture(scope='module')
+def auditor_client(app):
+    """Logged-in client of a user with the auditor role: read:acme, no write or delete.
+
+    Unlike viewer_client, it never falls back to the admin client.
+    """
+    from models import User
+    with app.app_context():  # the autouse fixture of conftest runs after this one
+        User.query.filter_by(username='admin').update({'force_password_change': False})
+        db.session.commit()
+    admin = app.test_client()
+    r = admin.post('/api/v2/auth/login',
+                   data=json.dumps({'username': 'admin', 'password': 'changeme123'}),
+                   content_type='application/json')
+    assert r.status_code == 200
+    r = admin.post('/api/v2/users',
+                   data=json.dumps({'username': 'auditor_dnsupd', 'password': 'AuditorPass123!',
+                                    'email': 'auditor-dnsupd@test.local', 'role': 'auditor'}),
+                   content_type='application/json')
+    assert r.status_code in (200, 201), r.get_data(as_text=True)
+    ac = app.test_client()
+    r = ac.post('/api/v2/auth/login',
+                data=json.dumps({'username': 'auditor_dnsupd', 'password': 'AuditorPass123!'}),
+                content_type='application/json')
+    assert r.status_code == 200, r.get_data(as_text=True)
+    me = ac.get('/api/v2/auth/verify')
+    assert me.status_code == 200 and 'auditor' in json.dumps(me.get_json())
+    return ac
+
+
+@pytest.fixture(scope='module')
+def acme_writer_client(app, auditor_client):
+    """A user with a custom role of read:acme and write:acme, but not delete:acme.
+
+    No built-in role has write without delete, so this is the one way to test
+    that DELETE needs delete:acme and not write:acme.
+    """
+    from models import User
+    admin = app.test_client()
+    r = admin.post('/api/v2/auth/login',
+                   data=json.dumps({'username': 'admin', 'password': 'changeme123'}),
+                   content_type='application/json')
+    assert r.status_code == 200
+    r = admin.post('/api/v2/rbac/roles',
+                   data=json.dumps({'name': 'dnsupd-acme-writer',
+                                    'permissions': ['read:acme', 'write:acme']}),
+                   content_type='application/json')
+    assert r.status_code == 200, r.get_data(as_text=True)
+    role_id = r.get_json()['data']['id']
+    r = admin.post('/api/v2/users',
+                   data=json.dumps({'username': 'writer_dnsupd', 'password': 'WriterPass123!',
+                                    'email': 'writer-dnsupd@test.local', 'role': 'viewer'}),
+                   content_type='application/json')
+    assert r.status_code in (200, 201), r.get_data(as_text=True)
+    with app.app_context():
+        user_id = User.query.filter_by(username='writer_dnsupd').first().id
+    r = admin.put(f'/api/v2/users/{user_id}', data=json.dumps({'custom_role_id': role_id}),
+                  content_type='application/json')
+    assert r.status_code == 200, r.get_data(as_text=True)
+    wc = app.test_client()
+    r = wc.post('/api/v2/auth/login',
+                data=json.dumps({'username': 'writer_dnsupd', 'password': 'WriterPass123!'}),
+                content_type='application/json')
+    assert r.status_code == 200, r.get_data(as_text=True)
+    return wc
+
+
+def test_permissions_write_acme_can_create_key_pos(acme_writer_client, env):
+    acct = env.make_account()
+    assert _post(acme_writer_client, acct).status_code == 201
+
+
+def test_permissions_write_acme_cannot_delete_key_neg(acme_writer_client, auth_client, env):
+    acct = env.make_account()
+    key_id = _data(_post(auth_client, acct))['id']
+    assert acme_writer_client.delete(_url(acct, key_id)).status_code == 403
+    with env.app.app_context():
+        assert db.session.get(AcmeDnsUpdateKey, key_id).status == 'active'
+
+
+def test_permissions_auditor_can_list_keys_pos(auditor_client, auth_client, env):
+    acct = env.make_account()
+    key_id = _data(_post(auth_client, acct))['id']
+    r = auditor_client.get(_url(acct))
+    assert r.status_code == 200
+    assert [k['id'] for k in _data(r)] == [key_id]
+
+
+def test_permissions_auditor_cannot_create_key_neg(auditor_client, env):
+    acct = env.make_account()
+    assert _post(auditor_client, acct).status_code == 403
+    with env.app.app_context():
+        assert AcmeDnsUpdateKey.query.count() == 0
+
+
+def test_permissions_auditor_cannot_delete_key_neg(auditor_client, auth_client, env):
+    acct = env.make_account()
+    key_id = _data(_post(auth_client, acct))['id']
+    assert auditor_client.delete(_url(acct, key_id)).status_code == 403
+    with env.app.app_context():
+        assert db.session.get(AcmeDnsUpdateKey, key_id).status == 'active'
+
+
+def test_permissions_auditor_can_read_settings_pos(auditor_client, env):
+    assert auditor_client.get('/api/v2/acme/client/settings').status_code == 200
+
+
+def test_permissions_auditor_cannot_patch_port_neg(auditor_client, env, monkeypatch):
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    assert _patch_settings(auditor_client, {'dns_update_port': 8053}).status_code == 403
+    with env.app.app_context():
+        assert SystemConfig.query.filter_by(key=PORT_KEY).first() is None
+
+
 def test_permissions_viewer_cannot_write_neg(viewer_client, auth_client, env):
     acct = env.make_account()
     key_id = _data(_post(auth_client, acct))['id']
@@ -251,6 +365,59 @@ def test_permissions_viewer_cannot_write_neg(viewer_client, auth_client, env):
     assert viewer_client.delete(_url(acct, key_id)).status_code == 403
     with env.app.app_context():
         assert db.session.get(AcmeDnsUpdateKey, key_id).status == 'active'
+
+
+# ------------------------------------------------------------------- account list
+
+def _list_accounts(client):
+    r = client.get('/api/v2/acme/client/accounts')
+    assert r.status_code == 200
+    return {a['id']: a for a in _data(r)}
+
+
+def test_account_list_key_count_pos(auth_client, env):
+    acct = env.make_account()
+    first = _data(_post(auth_client, acct))['id']
+    _post(auth_client, acct)
+    # Keys of any status count: a revoked key stays in the table.
+    assert auth_client.delete(_url(acct, first)).status_code == 200
+    assert _list_accounts(auth_client)[acct]['dns_update_key_count'] == 2
+
+
+def test_account_list_key_count_zero_and_per_account_neg(auth_client, env):
+    acct, other, empty = env.make_account(), env.make_account(), env.make_account()
+    _post(auth_client, acct)
+    _post(auth_client, other)
+    _post(auth_client, other)
+    accounts = _list_accounts(auth_client)
+    assert accounts[empty]['dns_update_key_count'] == 0
+    assert accounts[acct]['dns_update_key_count'] == 1
+    assert accounts[other]['dns_update_key_count'] == 2
+
+
+def test_account_list_key_count_proxy_off_pos(auth_client, env):
+    acct = env.make_account(enabled=False)
+    _post(auth_client, acct)
+    assert _list_accounts(auth_client)[acct]['dns_update_key_count'] == 1
+
+
+def test_account_list_key_count_uses_one_query_neg(auth_client, env):
+    from sqlalchemy import event
+    accts = [env.make_account() for _ in range(4)]
+    for a in accts:
+        _post(auth_client, a)
+    hits = []
+
+    def _count(conn, cursor, statement, *_a):
+        if 'acme_dns_update_keys' in statement:
+            hits.append(statement)
+
+    event.listen(db.engine, 'before_cursor_execute', _count)
+    try:
+        _list_accounts(auth_client)
+    finally:
+        event.remove(db.engine, 'before_cursor_execute', _count)
+    assert len(hits) == 1
 
 
 # ------------------------------------------------------------------- DELETE

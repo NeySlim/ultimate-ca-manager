@@ -6,8 +6,12 @@ import sqlite3
 import pytest
 from sqlalchemy import create_engine, text
 
+from models.acme_dns_update import AcmeDnsUpdateKey, AcmeProxyDnsChallenge
+
 PG_URL = os.getenv('UCM_TEST_PG_URL')
-TABLES = {'acme_dns_update_keys', 'acme_proxy_dns_challenges'}
+KEYS = AcmeDnsUpdateKey.__tablename__
+CHALLENGES = AcmeProxyDnsChallenge.__tablename__
+TABLES = {KEYS, CHALLENGES}
 INDEXES = {
     'ix_acme_dns_update_keys_acme_client_account_id',
     'ix_acme_dns_update_keys_eab_credential_id',
@@ -46,44 +50,44 @@ def test_sqlite_creates_tables_and_indexes():
     _migration().upgrade(conn)
     assert TABLES <= _names(conn, 'table')
     assert INDEXES <= _names(conn, 'index')
-    cols = {r[1] for r in conn.execute("PRAGMA table_info(acme_proxy_dns_challenges)")}
+    cols = {r[1] for r in conn.execute(f"PRAGMA table_info({CHALLENGES})")}
     assert 'zone_name' in cols
-    info = {r[1]: r for r in conn.execute("PRAGMA table_info(acme_dns_update_keys)")}
+    info = {r[1]: r for r in conn.execute(f"PRAGMA table_info({KEYS})")}
     assert 'eab_bound' in info
     assert info['eab_bound'][3] == 1  # NOT NULL
     conn.execute("INSERT INTO acme_client_accounts (id) VALUES (1)")
-    conn.execute("INSERT INTO acme_dns_update_keys (acme_client_account_id, name, secret) "
+    conn.execute(f"INSERT INTO {KEYS} (acme_client_account_id, name, secret) "
                  "VALUES (1, 'k.', 's')")
-    assert conn.execute("SELECT eab_bound FROM acme_dns_update_keys").fetchone()[0] == 0
+    assert conn.execute(f"SELECT eab_bound FROM {KEYS}").fetchone()[0] == 0
 
 
 def test_sqlite_unique_constraints():
     conn = _sqlite()
     _migration().upgrade(conn)
     conn.execute("INSERT INTO acme_client_orders (id) VALUES (1)")
-    ins = ("INSERT INTO acme_proxy_dns_challenges (order_id, client_jwk_thumbprint, "
+    ins = (f"INSERT INTO {CHALLENGES} (order_id, client_jwk_thumbprint, "
            "identifier, record_name, txt_value, zone_name, expires_at) "
            "VALUES (1, 't', 'x', 'n.', ?, 'z.', CURRENT_TIMESTAMP)")
     conn.execute(ins, ('a',))
     conn.execute(ins, ('b',))
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute(ins, ('a',))
-    k = ("INSERT INTO acme_dns_update_keys (acme_client_account_id, name, secret) "
+    k = (f"INSERT INTO {KEYS} (acme_client_account_id, name, secret) "
          "VALUES (1, ?, 's')")
     conn.execute(k, ('k.example.',))
     with pytest.raises(sqlite3.IntegrityError):
         conn.execute(k, ('k.example.',))
-    row = conn.execute("SELECT algorithm, status FROM acme_dns_update_keys").fetchone()
+    row = conn.execute(f"SELECT algorithm, status FROM {KEYS}").fetchone()
     assert row == ('hmac-sha256', 'active')
 
 
 def test_sqlite_second_run_is_idempotent():
     conn = _sqlite()
     _migration().upgrade(conn)
-    conn.execute("INSERT INTO acme_dns_update_keys (acme_client_account_id, name, secret) "
+    conn.execute(f"INSERT INTO {KEYS} (acme_client_account_id, name, secret) "
                  "VALUES (1, 'k.', 's')")
     _migration().upgrade(conn)
-    assert conn.execute("SELECT COUNT(*) FROM acme_dns_update_keys").fetchone()[0] == 1
+    assert conn.execute(f"SELECT COUNT(*) FROM {KEYS}").fetchone()[0] == 1
 
 
 def test_sqlite_downgrade_drops_tables():
@@ -113,7 +117,7 @@ def test_postgres_upgrade_twice_and_downgrade():
         assert TABLES <= tables
         col = conn.execute(text(
             "SELECT data_type, is_nullable, column_default FROM information_schema.columns "
-            "WHERE table_schema = :s AND table_name = 'acme_dns_update_keys' "
+            f"WHERE table_schema = :s AND table_name = '{KEYS}' "
             "AND column_name = 'eab_bound'"), {'s': schema}).fetchone()
         assert col is not None and col[0] == 'boolean' and col[1] == 'NO'
         assert 'false' in col[2].lower()

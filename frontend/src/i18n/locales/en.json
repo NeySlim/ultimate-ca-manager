@@ -1868,6 +1868,7 @@
       "title": "DNS UPDATE keys (RFC 2136)",
       "manage": "DNS UPDATE keys (RFC 2136)",
       "intro": "Clients with a standard rfc2136 solver can use these TSIG keys to publish the DNS-01 TXT record through UCM. A key works for this proxy account only.",
+      "proxyOff": "The ACME proxy of this account is off. Its keys do not work. You can still revoke or delete them.",
       "empty": "No DNS UPDATE keys for this account.",
       "create": "New key",
       "name": "Key name",

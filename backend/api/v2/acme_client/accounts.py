@@ -28,6 +28,7 @@ from utils.db_transaction import safe_commit
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from models import db
 from models.acme_client_account import AcmeClientAccount
+from models.acme_dns_update import AcmeDnsUpdateKey
 from models.acme_models import AcmeClientOrder
 from services.acme.acme_client_service import AcmeClientService, ACCOUNT_KEY_TYPES
 from services.acme.dns_update import records as dns_update_records
@@ -152,11 +153,22 @@ def _clear_other_defaults(except_id=None):
 @bp.route('/api/v2/acme/client/accounts', methods=['GET'])
 @require_auth(['read:acme'])
 def list_ca_accounts():
-    """List all configured external ACME CA accounts."""
+    """List all configured external ACME CA accounts.
+
+    Each account has ``dns_update_key_count``: its DNS UPDATE keys of any status.
+    The UI shows the keys of an account whose proxy is off, so they can be revoked.
+    """
     accounts = AcmeClientAccount.query.order_by(
         AcmeClientAccount.is_default.desc(), AcmeClientAccount.label.asc()
     ).all()
-    return success_response(data=[a.to_dict() for a in accounts])
+    # One grouped query for the whole list.
+    counts = dict(
+        db.session.query(AcmeDnsUpdateKey.acme_client_account_id, db.func.count(AcmeDnsUpdateKey.id))
+        .group_by(AcmeDnsUpdateKey.acme_client_account_id).all()
+    )
+    return success_response(data=[
+        {**a.to_dict(), 'dns_update_key_count': counts.get(a.id, 0)} for a in accounts
+    ])
 
 
 @bp.route('/api/v2/acme/client/accounts/<int:account_id>', methods=['GET'])

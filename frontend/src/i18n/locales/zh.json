@@ -1868,6 +1868,7 @@
       "title": "DNS UPDATE 密钥 (RFC 2136)",
       "manage": "DNS UPDATE 密钥 (RFC 2136)",
       "intro": "使用标准 rfc2136 求解器的客户端可以用这些 TSIG 密钥通过 UCM 发布 DNS-01 TXT 记录。密钥只对此代理账户有效。",
+      "proxyOff": "此账户的 ACME 代理已关闭。其密钥不起作用。您仍可以吊销或删除这些密钥。",
       "empty": "此账户没有 DNS UPDATE 密钥。",
       "create": "新建密钥",
       "name": "密钥名称",

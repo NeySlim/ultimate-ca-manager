@@ -36,12 +36,15 @@ function CopyField({ label, value, onCopy, testId }) {
 
 /**
  * DNS UPDATE (RFC 2136) TSIG keys of one ACME proxy account: list, create
- * (the secret is shown once), revoke and delete.
+ * (the secret is shown once), revoke and delete. ``proxyActive`` is true when
+ * the proxy of the account is enabled with a slug. When it is off, the keys do
+ * not work: a key cannot be created, but it can still be revoked or deleted.
  */
 export default function DnsUpdateKeysPanel({
   account,
   proxyPublicBase = '',
   dnsUpdatePort = 0,
+  proxyActive = true,
   canWrite,
   canDelete,
 }) {
@@ -209,12 +212,17 @@ export default function DnsUpdateKeysPanel({
           <ShieldCheck size={16} /> {t('acme.dnsUpdate.title')}
         </p>
         {canWrite && (
-          <Button type="button" size="sm" onClick={() => setShowCreate(true)}>
+          <Button type="button" size="sm" disabled={!proxyActive} onClick={() => setShowCreate(true)}>
             <Plus size={12} /> {t('acme.dnsUpdate.create')}
           </Button>
         )}
       </div>
       <p className="text-xs text-text-tertiary">{t('acme.dnsUpdate.intro')}</p>
+      {!proxyActive && (
+        <p className="text-sm status-warning-text flex items-start gap-2" data-testid="dns-update-proxy-off">
+          <Warning size={16} className="shrink-0 mt-0.5" /> {t('acme.dnsUpdate.proxyOff')}
+        </p>
+      )}
 
       {keys.length === 0 ? (
         <p className="text-xs text-text-tertiary py-2 text-center">{t('acme.dnsUpdate.empty')}</p>
