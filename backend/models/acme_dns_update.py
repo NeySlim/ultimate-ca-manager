@@ -5,9 +5,15 @@ account. ``AcmeProxyDnsChallenge`` holds the TXT values that a client may
 publish through the listener.
 """
 import base64
+import re
 
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
+
+
+# Key name labels: letters, digits, "_" and "-" (not first or last). DNS allows any
+# octet, but the name goes into shell, PowerShell and YAML snippets of the clients.
+_KEY_LABEL = re.compile(r'^[a-z0-9_](?:[a-z0-9_-]*[a-z0-9_])?$')
 
 
 class AcmeDnsUpdateKey(db.Model):
@@ -97,6 +103,10 @@ class AcmeDnsUpdateKey(db.Model):
             raise ValueError('Key name has a label longer than 63 bytes')
         if len(parsed.labels) < 2:
             raise ValueError('Key name must not be the root name')
+        for label in parsed.labels[:-1]:
+            if not _KEY_LABEL.match(label.decode('ascii', 'replace')):
+                raise ValueError('Key name labels may contain only letters, digits, '
+                                 '"_" and "-" (not as the first or last character)')
         return parsed.to_text().lower()
 
     def to_dict(self):

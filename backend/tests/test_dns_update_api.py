@@ -176,7 +176,8 @@ def test_K5_named_key_is_normalized_pos(auth_client, env):
     assert _data(r)['name'] == 'my-key.example.'
 
 
-@pytest.mark.parametrize('name', ['a' * 64 + '.example.', 'a..b', '.'])
+@pytest.mark.parametrize('name', ['a' * 64 + '.example.', 'a..b', '.', 'a`id`.example.',
+                                  "a'b.example.", 'a b.example.'])
 def test_K5_invalid_name_neg(auth_client, env, name):
     assert _post(auth_client, env.make_account(), {'name': name}).status_code == 400
 

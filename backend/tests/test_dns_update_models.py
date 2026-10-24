@@ -139,6 +139,11 @@ def test_K5_normalize_name_accepts_pos():
     assert AcmeDnsUpdateKey.normalize_name('Key1.Example.COM') == 'key1.example.com.'
     assert AcmeDnsUpdateKey.normalize_name(' key.example. ') == 'key.example.'
     assert AcmeDnsUpdateKey.normalize_name('a' * 63 + '.example.') == 'a' * 63 + '.example.'
+    # Generated names (<slug>-<hex>.) and underscore labels stay valid.
+    assert AcmeDnsUpdateKey.normalize_name('proxy-1-1a2b3c4d.') == 'proxy-1-1a2b3c4d.'
+    assert AcmeDnsUpdateKey.normalize_name('_tsig.example.') == '_tsig.example.'
+    # A non-ASCII name becomes IDNA (punycode): ASCII only, safe in the snippets.
+    assert AcmeDnsUpdateKey.normalize_name('k\u00e4y.example.').isascii()
 
 
 @pytest.mark.parametrize('bad', [
@@ -149,6 +154,15 @@ def test_K5_normalize_name_accepts_pos():
     '',
     '   ',
     '.example.com',
+    # Characters that would act in the shell/PowerShell snippets of the clients.
+    'a`id`.example.',
+    "a'b.example.",
+    'a|b.example.',
+    'a&b.example.',
+    'a b.example.',
+    'a$b.example.',
+    '-ab.example.',
+    'ab-.example.',
 ])
 def test_K5_normalize_name_rejects_neg(bad):
     with pytest.raises(ValueError):

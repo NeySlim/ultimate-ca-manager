@@ -554,3 +554,5 @@ Bez zmian: CR3-11 (trzy commity na przyjęte żądanie: `last_used_at` najwyżej
 
 Runda 1 `/security-review`: brak podatności z pewnością ≥ 0,7. Uwaga poniżej progu, poprawiona: pamięć powtórek używała skrótu całej wiadomości, a MAC nie obejmuje ID nagłówka, więc przechwycone żądanie z innym ID nagłówka powtarzało skutki (idempotentne). Klucz pamięci to teraz (nazwa klucza, MAC żądania); zapisana odpowiedź dostaje ID nagłówka bieżącego żądania (TSIG zachowuje oryginalne ID, RFC 8945 §4.3.2).
 
+Runda 2 `/security-review`: brak podatności z pewnością ≥ 0,7. Wzmocnienie poniżej progu, wprowadzone: etykiety nazwy klucza tylko z liter, cyfr, `_` i `-` (nie na początku i nie na końcu). Nazwa trafia do poleceń powłoki i PowerShell w gotowych fragmentach konfiguracji klientów; znaki takie jak `` ` ``, `'`, `|`, `$` mogłyby tam zadziałać. Nazwa spoza ASCII staje się punycode (ASCII). Uwagi bez zmian: różnica BADKEY/BADSIG pokazuje istnienie nazwy klucza (wymaga tego RFC 8945; nazwy generowane mają losowy przyrostek); klucz bez EAB potwierdza wartości wszystkich klientów swojego konta proxy (projekt, sekcja 2.3; `client_confirmed_at` nie wpływa na żadną decyzję).
+
