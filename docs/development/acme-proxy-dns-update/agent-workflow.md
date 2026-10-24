@@ -257,5 +257,7 @@ E2E znalazło błąd poza zakresem PR 2: proxy nie dodaje nagłówka `Link: rel=
 
 ## 7. Przegląd kodu po zakończeniu
 
-Po zakończeniu kodu: 3 rundy `/code-review` i 3 rundy `/security-review` na całej zmianie PR 2, z poprawkami między rundami. Każde ustalenie główna sesja sprawdza w kodzie i w RFC, zanim je poprawi. Wyniki rund są w opisie commitów z poprawkami.
+Po zakończeniu kodu: 3 rundy `/code-review` i 3 rundy `/security-review` na całej zmianie PR 2, z poprawkami między rundami. Każde ustalenie główna sesja sprawdza w kodzie i w RFC, zanim je poprawi. Poprawki przygotowują agenci `implementer` (osobne pliki dla każdego agenta, praca równoległa), a główna sesja czyta diff i uruchamia pełne testy przed commitem. Wszystkie ustalenia, decyzje (także „bez zmian” z uzasadnieniem) i commity są w sekcji 12 planu.
+
+Po rundach przeglądu główna sesja powtarza E2E na końcowym kodzie, na nowej bazie danych.
 
