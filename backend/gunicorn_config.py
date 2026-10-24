@@ -265,7 +265,9 @@ def post_worker_init(worker):
         from protocol_http_server import start_http_protocol_server
         from wsgi import app as flask_app
         with flask_app.app_context():
-            start_http_protocol_server(flask_app)
+            # After a reload the old worker may hold the port until graceful_timeout
+            retry_for = float(getattr(worker.cfg, 'graceful_timeout', 30)) + 5
+            start_http_protocol_server(flask_app, retry_for=retry_for)
     except Exception as e:
         import logging
         logging.getLogger('ucm.protocol').warning(
