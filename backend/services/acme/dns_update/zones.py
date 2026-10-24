@@ -83,14 +83,24 @@ class ZoneIndex:
             return self._zones
 
     def is_authoritative(self, zname: dns.name.Name) -> bool:
-        """A zone of ours, or a proper ancestor of one that is no TLD."""
+        """A zone of ours, a proper ancestor of one that is no TLD, or a name
+        below one of our zones."""
         # labels include the trailing empty root label: 'net.' has 2 labels.
         if not zname.is_absolute() or len(zname.labels) < 3:
             return False
         zname = zname.canonicalize()
         self._ensure()
         with self._lock:
-            return zname in self._zones or zname in self._ancestors
+            if zname in self._zones or zname in self._ancestors:
+                return True
+            # Below an ACME Domains entry. The handler checks that every
+            # record of the update is below the zone name.
+            parent = zname
+            while len(parent.labels) > 3:
+                parent = parent.parent()
+                if parent in self._zones:
+                    return True
+            return False
 
 
 zone_index = ZoneIndex()

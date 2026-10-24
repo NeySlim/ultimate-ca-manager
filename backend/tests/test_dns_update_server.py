@@ -674,7 +674,7 @@ def _tsig_handler():
     value = expected_value('tok', 'thumb')
     record = '_acme-challenge.app.example.com.'
     row = ActiveRecord(1, 1, record, value, 'example.com.', 1, 'acct-1')
-    snap = ActiveSnapshot({record: (row,)}, frozenset({'example.com.'}))
+    snap = ActiveSnapshot({record: (row,)}, frozenset({'example.com.'}), (row,))
     confirmed = []
 
     class Keys:

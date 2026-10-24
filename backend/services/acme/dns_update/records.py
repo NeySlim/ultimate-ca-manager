@@ -26,6 +26,10 @@ logger = logging.getLogger(__name__)
 
 # A row is never active longer than this, whatever the upstream authz says.
 ACTIVE_MAX_AGE = timedelta(hours=24)
+# SOA discovery still sees a row this long after its expires_at, whatever its
+# status: clients ask for the SOA again when they clean up, also after a
+# failed validation. Adds never use these rows.
+SOA_GRACE = timedelta(hours=24)
 # Rows whose expires_at is older than this are deleted on the next write.
 PURGE_AFTER = timedelta(days=7)
 # Maximum age of the active-row snapshot, in seconds.
@@ -300,12 +304,16 @@ class ActiveRecord(NamedTuple):
 
 
 class ActiveSnapshot(NamedTuple):
-    """Immutable view of the active rows."""
+    """Immutable view of the rows. ``by_name`` holds the active rows only (for
+    adds). ``soa_rows`` holds every row that SOA discovery may still see (up to
+    SOA_GRACE after expires_at, any status), and ``zones`` is the set of their
+    zone names."""
     by_name: Dict[str, Tuple[ActiveRecord, ...]]
     zones: FrozenSet[str]
+    soa_rows: Tuple[ActiveRecord, ...]
 
 
-_EMPTY_SNAPSHOT = ActiveSnapshot({}, frozenset())
+_EMPTY_SNAPSHOT = ActiveSnapshot({}, frozenset(), ())
 
 
 def _monotonic() -> float:
@@ -373,22 +381,28 @@ class ActiveRecordCache:
     def _load(now: datetime) -> ActiveSnapshot:
         from models import AcmeClientOrder, AcmeProxyDnsChallenge
 
-        rows = (db.session.query(AcmeProxyDnsChallenge)
+        # One query: the active rows are picked out in Python.
+        rows = (db.session.query(AcmeProxyDnsChallenge,
+                                 AcmeClientOrder.status)
                 .join(AcmeClientOrder,
                       AcmeClientOrder.id == AcmeProxyDnsChallenge.order_id)
-                .filter(AcmeProxyDnsChallenge.status == 'pending',
-                        AcmeProxyDnsChallenge.expires_at > now,
-                        AcmeClientOrder.status == 'pending')
+                .filter(AcmeProxyDnsChallenge.expires_at > now - SOA_GRACE)
                 .all())
         by_name: Dict[str, List[ActiveRecord]] = {}
+        soa_rows: List[ActiveRecord] = []
         zones = set()
-        for row in rows:
-            by_name.setdefault(row.record_name, []).append(ActiveRecord(
+        for row, order_status in rows:
+            record = ActiveRecord(
                 row.id, row.order_id, row.record_name, row.txt_value,
-                row.zone_name, row.acme_client_account_id, row.account_id))
+                row.zone_name, row.acme_client_account_id, row.account_id)
+            soa_rows.append(record)
             zones.add(row.zone_name)
+            if (row.status == 'pending' and row.expires_at > now
+                    and order_status == 'pending'):
+                by_name.setdefault(row.record_name, []).append(record)
         return ActiveSnapshot(
-            {k: tuple(v) for k, v in by_name.items()}, frozenset(zones))
+            {k: tuple(v) for k, v in by_name.items()}, frozenset(zones),
+            tuple(soa_rows))
 
 
 _cache = ActiveRecordCache()

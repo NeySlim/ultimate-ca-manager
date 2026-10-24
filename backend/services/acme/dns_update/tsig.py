@@ -166,10 +166,13 @@ def verify_request(wire: bytes, msg: dns.message.Message,
     Order: key, MAC size, MAC, replay, time, truncation policy. ``is_replay``
     is called only after the MAC verified. When it returns True the result is
     OK with ``replayed=True``: no time check, no truncation check, and the
-    watermark is not changed. Security: only a message whose MAC verified and
-    whose exact bytes were already answered within REPLAY_TTL_S can skip the
-    time check. It gets the stored answer (or the same answer rendered for the
-    other transport) and changes nothing.
+    watermark is not changed. The replay key is the key name and the request MAC;
+    the header ID is not part of it. Security: only a message whose MAC verified
+    and that was already answered within REPLAY_TTL_S can skip the time check.
+    On the same transport the caller sends the stored response with the header
+    ID of the new request. On the other transport the caller processes the
+    request again against the current snapshot, with the side effects
+    suppressed (no mark_confirmed, no touch of the key, no audit event).
     """
     if msg.tsig is None or len(msg.tsig) == 0:
         return TsigResult(TsigOutcome.UNSIGNED)
@@ -242,7 +245,9 @@ def verify_request(wire: bytes, msg: dns.message.Message,
     # The MAC is valid: the key is known to be the one that signed.
     result.key = key
 
-    # A retransmission of an answered request: stored answer, no time check.
+    # A request that was already answered (same key name and request MAC): no time
+    # check. The caller sends the stored response (same transport) or processes the
+    # request again without side effects (other transport).
     if is_replay is not None and is_replay():
         result.replayed = True
         result.outcome = TsigOutcome.OK

@@ -264,6 +264,53 @@ def test_R3_row_written_when_sibling_started_automation_pos(app, env, monkeypatc
         assert len(_rows()) == 2
 
 
+@pytest.mark.parametrize('chall_status', ['pending', 'processing'])
+def test_R9_sibling_gets_row_while_challenge_is_not_final_pos(app, env, monkeypatch,
+                                                              chall_status):
+    # RFC 8555 section 7.1.6: pending and processing are not final.
+    with app.app_context():
+        a, b = _two_orders(env)
+        a.set_challenges_dict({CHALL_URL: {'status': 'initiated'}})
+        db.session.commit()
+        svc = _svc(monkeypatch, _authz('pending', chall_status=chall_status))
+        _get_authz(svc, 'acct-b', 'thumb-b')
+        assert _Recorder.created == []  # the automation of the sibling runs already
+        rows = {r.order_id: r for r in _rows()}
+        assert set(rows) == {a.id, b.id}
+        assert rows[b.id].txt_value == _value('thumb-b')
+        assert rows[b.id].status == 'pending'
+
+
+def test_R9_processing_challenge_does_not_start_automation_neg(app, env, monkeypatch):
+    with app.app_context():
+        _two_orders(env)
+        _get_authz(_svc(monkeypatch, _authz('pending', chall_status='processing')))
+        assert _Recorder.created == []
+        assert len(_rows()) == 2
+
+
+@pytest.mark.parametrize('authz_status,chall_status', [
+    ('pending', 'valid'), ('valid', 'valid'), ('valid', 'processing'),
+    ('valid', 'pending'), ('invalid', 'processing'), ('invalid', 'pending')])
+def test_R9_final_authz_or_valid_challenge_writes_nothing_neg(
+        app, env, monkeypatch, authz_status, chall_status):
+    with app.app_context():
+        _two_orders(env)
+        _get_authz(_svc(monkeypatch, _authz(authz_status, chall_status=chall_status)))
+        assert _rows() == []
+
+
+def test_R9_invalid_challenge_closes_rows_and_writes_none_neg(app, env, monkeypatch):
+    with app.app_context():
+        a, b = _two_orders(env)
+        _get_authz(_svc(monkeypatch, _authz('pending', chall_status='invalid')))
+        assert _rows() == []  # nothing written for the orders without rows
+        _seed_rows(a, b)
+        _get_authz(_svc(monkeypatch, _authz('pending', chall_status='invalid')))
+        assert [r.status for r in _rows()] == ['closed', 'closed']
+        assert len(_rows()) == 2  # no new row next to the closed ones
+
+
 # --------------------------------------------------------------------- R4
 
 def _run_get_certificate(monkeypatch, acct='acct-a', thumb='thumb-a'):
@@ -638,6 +685,51 @@ def test_cache_excludes_inactive_rows_neg(app, env, monkeypatch):
         assert [r.txt_value for r in snap.by_name[RECORD]] == ['active']
 
 
+def test_R8_closed_valid_order_and_recent_expiry_are_soa_rows_only_pos(app, env, monkeypatch):
+    with app.app_context():
+        a, _b = _two_orders(env)
+        done = _seed_order(env, 'acct-c', 'thumb-c', status='valid')
+        _direct_row(a, 'closed', status='closed')
+        _direct_row(done, 'order-valid')
+        _direct_row(a, 'expired-23h', expires=utc_now() - timedelta(hours=23))
+        _direct_row(a, 'expired-1s', expires=utc_now() - timedelta(seconds=1))
+        records.invalidate_cache()
+        snap = records.get_active_snapshot()
+        assert records.SOA_GRACE == timedelta(hours=24)
+        assert sorted(r.txt_value for r in snap.soa_rows) == [
+            'closed', 'expired-1s', 'expired-23h', 'order-valid']
+        assert snap.zones == frozenset({'example.com.'})
+        assert snap.by_name == {}  # none of them is active: adds never use them
+
+
+def test_R8_active_row_is_in_both_views_pos(app, env, monkeypatch):
+    with app.app_context():
+        a, _b = _two_orders(env)
+        _direct_row(a, 'active')
+        _direct_row(a, 'closed', status='closed')
+        records.invalidate_cache()
+        snap = records.get_active_snapshot()
+        assert [r.txt_value for r in snap.by_name[RECORD]] == ['active']
+        assert sorted(r.txt_value for r in snap.soa_rows) == ['active', 'closed']
+
+
+def test_R8_row_past_the_grace_is_in_neither_view_neg(app, env, monkeypatch):
+    with app.app_context():
+        a, _b = _two_orders(env)
+        _direct_row(a, 'old-closed', status='closed',
+                    expires=utc_now() - timedelta(hours=25))
+        _direct_row(a, 'old-pending', expires=utc_now() - timedelta(hours=25))
+        records.invalidate_cache()
+        snap = records.get_active_snapshot()
+        assert snap.soa_rows == () and snap.zones == frozenset()
+        assert snap.by_name == {}
+
+
+def test_R8_empty_snapshot_has_no_soa_rows_neg():
+    snap = records._EMPTY_SNAPSHOT
+    assert snap.soa_rows == () and snap.zones == frozenset() and snap.by_name == {}
+
+
 def test_cache_warm_snapshot_runs_no_sql_pos(app, env, monkeypatch):
     with app.app_context():
         a, _b = _two_orders(env)
@@ -690,7 +782,7 @@ def _failing_cache(monkeypatch, fail=True):
         calls.append(1)
         if state['fail']:
             raise OperationalError('SELECT', {}, Exception('db gone'))
-        return records.ActiveSnapshot({}, frozenset())
+        return records.ActiveSnapshot({}, frozenset(), ())
 
     monkeypatch.setattr(cache, '_load', _load)
     return cache, clock, calls, state

@@ -73,12 +73,14 @@ ROW1 = ActiveRecord(1, 11, RECORD1, VALUE1, ZONE, 1, "acct-1")
 ROW2 = ActiveRecord(2, 12, RECORD2, VALUE2, ZONE, 2, "acct-2")
 
 
-def snapshot_of(*rows):
+def snapshot_of(*rows, closed=()):
+    """rows are active (by_name and soa_rows); closed rows are visible to SOA discovery only."""
     by_name = {}
     for r in rows:
         by_name.setdefault(r.record_name, []).append(r)
+    soa_rows = tuple(rows) + tuple(closed)
     return ActiveSnapshot({k: tuple(v) for k, v in by_name.items()},
-                          frozenset(r.zone_name for r in rows))
+                          frozenset(r.zone_name for r in soa_rows), soa_rows)
 
 
 # --- fakes --------------------------------------------------------------------
@@ -151,11 +153,12 @@ class Snap:
 
 
 class Harness:
-    def __init__(self, rows=(ROW1, ROW2), zones=(ZONE, "app.example.com."), clock=None, **kw):
+    def __init__(self, rows=(ROW1, ROW2), zones=(ZONE, "app.example.com."), clock=None,
+                 closed=(), **kw):
         self.keys = FakeKeys()
         self.zones = FakeZones(zones)
         self.audit = FakeAudit()
-        self.snap = Snap(snapshot_of(*rows))
+        self.snap = Snap(snapshot_of(*rows, closed=closed))
         self.marks = []
         self.sampler = LogSampler(clock=lambda: 0.0)
         self.handler = DnsUpdateHandler(
@@ -774,6 +777,44 @@ def test_Q7_name_without_active_row_is_refused_neg(h, name):
     assert resp.rcode() == dns.rcode.REFUSED and resp.authority == [] and resp.answer == []
 
 
+def test_Q8_soa_for_apex_and_inner_name_of_closed_row_is_answered_pos():
+    hh = Harness(rows=(), closed=(ROW1,))  # closed, expired or order done: not in by_name
+    apex = parse(hh.send(plain(soa_query(ZONE)).wire, "tcp"))  # Q1 form
+    assert apex.rcode() == dns.rcode.NOERROR and apex.flags & dns.flags.AA
+    assert len(apex.answer) == 1 and apex.authority == []
+    inner = parse(hh.send(plain(soa_query("app.example.com.")).wire, "tcp"))  # Q7 form
+    assert inner.rcode() == dns.rcode.NOERROR and inner.answer == []
+    assert len(inner.authority) == 1 and inner.authority[0].name == dns.name.from_text(ZONE)
+    assert hh.quiet()
+
+
+def test_Q8_signed_soa_sees_closed_rows_of_the_key_scope_only_neg():
+    hh = Harness(rows=(), closed=(ROW2,))  # the closed row is of account 2
+    req = sign(soa_query(ZONE), key=KEY)  # account 1
+    resp = verified(hh.send(req.wire, "tcp"), req)
+    assert resp.rcode() == dns.rcode.REFUSED and resp.answer == [] and resp.authority == []
+    req = sign(soa_query(RECORD2), key=KEY)
+    assert verified(hh.send(req.wire, "tcp"), req).rcode() == dns.rcode.REFUSED
+    req = sign(soa_query(ZONE), key=KEY2)  # pos: the owner of the row
+    assert len(verified(hh.send(req.wire, "tcp"), req).answer) == 1
+    assert hh.quiet()
+
+
+def test_Q8_update_add_with_value_of_closed_row_is_refused_neg():
+    hh = Harness(rows=(), closed=(ROW1,))
+    resp = send_signed(hh, good_update())
+    assert resp.rcode() == dns.rcode.REFUSED
+    assert hh.audit.records[-1]["reason"] == "no_pending_order"
+    assert not hh.marks and not hh.keys.touched and not hh.audit.authenticated
+
+
+def test_Q8_row_past_the_grace_is_refused_neg():
+    hh = Harness(rows=(), closed=())  # a snapshot holds no row older than SOA_GRACE
+    assert parse(hh.send(plain(soa_query(ZONE)).wire, "tcp")).rcode() == dns.rcode.REFUSED
+    assert parse(hh.send(plain(soa_query(RECORD1)).wire, "tcp")).rcode() == dns.rcode.REFUSED
+    assert hh.quiet()
+
+
 def test_F6_rows_of_unrelated_zone_are_not_looked_at_pos():
     other = ActiveRecord(3, 13, "_acme-challenge.x.example.org.", VALUE2, "example.org.", 1,
                          "acct-1")
@@ -1085,11 +1126,7 @@ def test_U11_delete_none_and_any_need_no_row_pos():
     assert len(hh.audit.authenticated) == 2
 
 
-def test_U11_delete_all_rrsets_and_delete_of_a_are_refused_neg(h):
-    u = dns.update.UpdateMessage(ZONE)
-    u.delete(RECORD1)  # class ANY, type ANY
-    resp = send_signed(h, u)
-    assert resp.rcode() == dns.rcode.REFUSED
+def test_U11_delete_of_a_is_refused_neg(h):
     u = dns.update.UpdateMessage(ZONE)
     u.delete(RECORD1, "A")
     assert send_signed(h, u).rcode() == dns.rcode.REFUSED
@@ -1167,6 +1204,58 @@ def test_U15_accepted_update_sets_fields_and_audit_pos(h):
 def test_U15_refused_update_changes_nothing_neg(h):
     send_signed(h, upd(adds=[(RECORD1, 60, VALUE2)]))
     assert not h.marks and not h.keys.touched and not h.audit.authenticated
+
+
+def _delete_all(name=RECORD1):
+    """Wire of an UPDATE with one "delete all RRsets" RR: class ANY, type ANY, TTL 0, RDLENGTH 0."""
+    u = dns.update.UpdateMessage(ZONE)
+    u.delete(name)
+    return u.to_wire()
+
+
+def _with_rr_class(wire, rclass):
+    """The class of the last RR (it has no RDATA: ... CLASS(2) TTL(4) RDLENGTH(2))."""
+    return wire[:-8] + struct.pack("!H", rclass) + wire[-6:]
+
+
+def test_U17_delete_all_rrsets_at_challenge_name_is_accepted_as_delete_pos():
+    hh = Harness(rows=())  # no row: a delete needs none
+    u = dns.update.UpdateMessage(ZONE)
+    u.delete("_acme-challenge.x.example.com.")  # class ANY, type ANY
+    parsed = dns.message.from_wire(u.to_wire(), keyring=False).update[0]
+    assert parsed.rdtype == dns.rdatatype.ANY and parsed.deleting == dns.rdataclass.ANY
+    assert send_signed(hh, u).rcode() == dns.rcode.NOERROR
+    assert not hh.marks and hh.snap.calls == 0 and not hh.audit.records
+    details = hh.audit.authenticated[0]["details"]
+    assert details["adds"] == 0 and details["deletes"] == 1
+
+
+@pytest.mark.parametrize("rclass", [dns.rdataclass.NONE, dns.rdataclass.IN])
+def test_U17_type_any_with_class_none_or_in_is_refused_neg(h, rclass):
+    req = sign_wire(_with_rr_class(_delete_all(), rclass))
+    resp = verified(h.send(req.wire), req)
+    assert resp.rcode() == dns.rcode.REFUSED
+    assert h.audit.records[-1]["reason"] == "type_not_allowed"
+    assert not h.marks and not h.keys.touched and not h.audit.authenticated
+
+
+def test_U17_delete_all_rrsets_at_other_name_is_refused_neg(h):
+    for name in ("www.example.com.", "example.com.", "x._acme-challenge.example.com."):
+        req = sign_wire(_delete_all(name))
+        resp = verified(h.send(req.wire), req)
+        assert resp.rcode() == dns.rcode.REFUSED
+        assert h.audit.records[-1]["reason"] == "type_not_allowed"
+    assert not h.marks and not h.keys.touched and not h.audit.authenticated
+
+
+def test_U17_delete_all_rrsets_with_rdata_is_formerr_neg(h):
+    # RDLENGTH = 1 and one byte of RDATA with class ANY. dnspython refuses this while it
+    # parses, so the answer is FORMERR without TSIG, before the prescan can run.
+    wire = _delete_all()
+    bad = wire[:-2] + struct.pack("!H", 1) + b"\x00"
+    req = sign_wire(bad)
+    header_only_ok(h.send(req.wire), dns.rcode.FORMERR, req.wire)
+    assert h.quiet() and h.no_db()
 
 
 # --- client shapes (plan section 9) ---------------------------------------------
@@ -1676,7 +1765,8 @@ def test_A3_name_cache_is_bounded_pos():
 
 def test_A3_zone_prefilter_uses_the_snapshot_zones_neg():
     hh = Harness(rows=(ROW1,), zones=(ZONE,))
-    hh.snap.snapshot = ActiveSnapshot(hh.snap.snapshot.by_name, frozenset())
+    hh.snap.snapshot = ActiveSnapshot(hh.snap.snapshot.by_name, frozenset(),
+                                      hh.snap.snapshot.soa_rows)
     assert parse(hh.send(plain(soa_query(ZONE)).wire, "tcp")).rcode() == dns.rcode.REFUSED
     hh.snap.snapshot = snapshot_of(ROW1)
     assert len(parse(hh.send(plain(soa_query(ZONE)).wire, "tcp")).answer) == 1
@@ -2057,6 +2147,80 @@ def test_integration_ancestor_zone_with_real_zone_index_pos_and_neg(real):
     assert send_signed(hh, upd(ZONE, adds=[GOOD_ADD])).rcode() == dns.rcode.NOERROR
     assert send_signed(hh, upd("other.org.", adds=[GOOD_ADD])).rcode() == dns.rcode.NOTAUTH
     assert send_signed(hh, upd("com.", adds=[GOOD_ADD])).rcode() == dns.rcode.NOTAUTH
+
+
+def _confirmed(real, row_id):
+    real.db.session.expire_all()
+    return real.AcmeProxyDnsChallenge.query.get(row_id).client_confirmed_at
+
+
+def test_U16_zone_below_acme_domains_entry_goes_on_pos(real):
+    hh = real_handler(real, FakeAudit())
+    # The entry is example.com; the zone section is app.example.com, the record is below it.
+    resp = send_signed(hh, upd("app.example.com.", adds=[GOOD_ADD]))
+    assert resp.rcode() == dns.rcode.NOERROR
+    assert _confirmed(real, real.row_id) is not None
+
+
+def test_U16_record_outside_the_zone_below_the_entry_is_notzone_neg(real):
+    audit = FakeAudit()
+    hh = real_handler(real, audit)
+    row = real.AcmeProxyDnsChallenge.query.get(real.row_id)
+    other = real.AcmeProxyDnsChallenge(
+        order_id=row.order_id, acme_client_account_id=row.acme_client_account_id,
+        account_id=row.account_id, client_jwk_thumbprint="thumb",
+        identifier="other.example.com", record_name=RECORD2, txt_value=VALUE2,
+        zone_name=ZONE, status="pending", expires_at=row.expires_at)
+    real.db.session.add(other)
+    real.db.session.commit()
+    other_id = other.id
+    # The key may write both names; the second one is not below the zone section.
+    resp = send_signed(hh, upd("app.example.com.", adds=[GOOD_ADD, (RECORD2, 60, VALUE2)]))
+    assert resp.rcode() == dns.rcode.NOTZONE
+    assert audit.records[-1]["reason"] == "not_in_zone" and not audit.authenticated
+    assert _confirmed(real, real.row_id) is None and _confirmed(real, other_id) is None
+    assert real.AcmeDnsUpdateKey.query.get(real.key_id).last_used_at is None
+
+
+@pytest.mark.parametrize("zone", ["app.other.org.", "www.example.org.", "x.com."])
+def test_U16_zone_below_another_domain_is_notauth_neg(real, zone):
+    audit = FakeAudit()
+    hh = real_handler(real, audit)
+    resp = send_signed(hh, upd(zone, adds=[GOOD_ADD]))
+    assert resp.rcode() == dns.rcode.NOTAUTH
+    assert audit.records[-1]["reason"] == "not_authoritative" and not audit.authenticated
+    assert _confirmed(real, real.row_id) is None
+    assert real.AcmeDnsUpdateKey.query.get(real.key_id).last_used_at is None
+
+
+def _age_row(real, row_id, status, age):
+    from utils.datetime_utils import utc_now
+
+    row = real.AcmeProxyDnsChallenge.query.get(row_id)
+    row.status = status
+    row.expires_at = utc_now() - age
+    real.db.session.commit()
+    real.cache.invalidate()
+
+
+def test_Q8_real_snapshot_closed_row_is_seen_inside_the_grace_pos(real):
+    hh = real_handler(real, FakeAudit())
+    _age_row(real, real.row_id, "closed", timedelta(hours=23))
+    assert len(parse(hh.send(plain(soa_query(ZONE)).wire, "tcp")).answer) == 1
+    assert len(parse(hh.send(plain(soa_query(RECORD1)).wire, "tcp")).authority) == 1
+    # An add is still refused: the row is not active.
+    resp = send_signed(hh, good_update())
+    assert resp.rcode() == dns.rcode.REFUSED
+    assert _confirmed(real, real.row_id) is None
+
+
+def test_Q8_real_snapshot_row_past_the_grace_is_refused_neg(real):
+    audit = FakeAudit()
+    hh = real_handler(real, audit)
+    _age_row(real, real.row_id, "closed", timedelta(hours=25))
+    for name in (ZONE, RECORD1):
+        assert parse(hh.send(plain(soa_query(name)).wire, "tcp")).rcode() == dns.rcode.REFUSED
+    assert not audit.authenticated and _confirmed(real, real.row_id) is None
 
 
 # =============================================================================

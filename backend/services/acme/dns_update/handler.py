@@ -329,13 +329,12 @@ class DnsUpdateHandler:
         self._by_zone: Dict[str, tuple] = {}
 
     def _rows_by_zone(self, snapshot) -> Dict[str, tuple]:
-        """Rows of the snapshot grouped by zone text, built once per snapshot object."""
+        """SOA rows of the snapshot grouped by zone text, built once per snapshot object."""
         with self._index_lock:
             if snapshot is not self._index_snapshot:
                 index: Dict[str, list] = {}
-                for group in snapshot.by_name.values():
-                    for row in group:
-                        index.setdefault(row.zone_name, []).append(row)
+                for row in snapshot.soa_rows:
+                    index.setdefault(row.zone_name, []).append(row)
                 self._by_zone = {k: tuple(v) for k, v in index.items()}
                 self._index_snapshot = snapshot
             return self._by_zone
@@ -444,10 +443,12 @@ class DnsUpdateHandler:
             return self._tsig_error(wire, msg, skeleton, result, peer_ip, transport, now_int)
         signed = outcome == TsigOutcome.OK
 
-        # 6. Replay: the stored response, and no side effect. The key is (key name,
-        # request MAC) for every transport: a request replayed over the other transport
-        # gets its own rendering, but no second side effect. A copy that is in flight
-        # now gets no response.
+        # 6. Replay. The key is (key name, request MAC); the header ID is not part of it.
+        # On the same transport the stored response is sent with the header ID of the new
+        # request. On the other transport the request is processed again against the
+        # current snapshot, with the side effects suppressed: no mark_confirmed, no
+        # touch of the key and no audit event (step 11). A copy that is in flight now
+        # gets no response.
         suppress = False
         if signed:
             cached = self._replay.get(replay_key, transport)
@@ -673,13 +674,15 @@ class DnsUpdateHandler:
 
         # 5. Prescan (RFC 2136 §3.4.1), in the order of the RRs.
         rrs = _update_rrs(wire)
-        for name, _rtype, rclass, ttl, _rdlen in rrs:
+        for name, _rtype, rclass, ttl, rdlen in rrs:
             if not name.is_subdomain(zrr.name):
                 return self._refuse(resp, dns.rcode.NOTZONE, "not_in_zone", zone_text, names)
             if rclass == _IN:
                 continue
             if rclass in (_ANY, _NONE):
-                if ttl != 0:
+                # §3.4.1.3: class ANY has TTL 0 and RDLENGTH 0 (dnspython already
+                # refuses RDLENGTH != 0 at parse time).
+                if ttl != 0 or (rclass == _ANY and rdlen != 0):
                     return self._refuse(resp, dns.rcode.FORMERR, "format", zone_text, names)
                 continue
             return self._refuse(resp, dns.rcode.FORMERR, "format", zone_text, names)
@@ -696,7 +699,11 @@ class DnsUpdateHandler:
         snapshot = None
         row_ids: List[int] = []
         for rrset in msg.update:
-            if (rrset.rdtype != dns.rdatatype.TXT or len(rrset.name.labels) < 2
+            # "Delete all RRsets from a name" (RFC 2136 §2.5.3: class ANY, type ANY) is a
+            # delete like the others. Type ANY with class NONE or IN is not.
+            delete_all = rrset.rdtype == dns.rdatatype.ANY and rrset.deleting == _ANY
+            if ((rrset.rdtype != dns.rdatatype.TXT and not delete_all)
+                    or len(rrset.name.labels) < 2
                     or rrset.name.labels[0].lower() != CHALLENGE_LABEL):
                 return "type_not_allowed", []
             if rrset.deleting is not None:

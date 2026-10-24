@@ -696,9 +696,22 @@ def test_U3_authoritative_pos(zone_env, name):
     assert zone_env.is_authoritative(_n(name))
 
 
-@pytest.mark.parametrize('name', ['foo.example.com.', 'other.org.', 'net.', 'com.', '.',
-                                  'a.corp.example.net.'])
+@pytest.mark.parametrize('name', ['other.org.', 'net.', 'com.', '.', 'foo.example.net.',
+                                  'a.other.org.', 'x.net.', 'org.'])
 def test_U3_not_authoritative_neg(zone_env, name):
+    assert not zone_env.is_authoritative(_n(name))
+
+
+@pytest.mark.parametrize('name', ['foo.example.com.', 'a.b.example.com.', 'FOO.Example.com.',
+                                  'a.corp.example.net.'])
+def test_U16_name_below_an_acme_domains_entry_is_authoritative_pos(zone_env, name):
+    assert zone_env.is_authoritative(_n(name))
+
+
+@pytest.mark.parametrize('name', ['foo.example.net.', 'a.b.example.net.', 'host.other.org.',
+                                  'example.org.', 'com.', 'net.'])
+def test_U16_name_below_a_name_that_is_no_entry_is_not_authoritative_neg(zone_env, name):
+    # example.net is an ancestor of an entry, not an entry; a TLD stays refused.
     assert not zone_env.is_authoritative(_n(name))
 
 

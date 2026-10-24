@@ -1195,7 +1195,13 @@ class AcmeProxyService:
 
             # Expected TXT values for the DNS UPDATE listener: one row per
             # order sharing this authz, whether or not automation started.
-            if chall.get('status') == 'pending' and not already_valid:
+            # Written while the authz is pending and the challenge is pending
+            # or processing (RFC 8555 section 7.1.6: not final yet), so a
+            # sibling order that fetches the authz after the automation
+            # started still gets its row.
+            if (authz.get('status') == 'pending'
+                    and chall.get('status') in ('pending', 'processing')
+                    and not already_valid):
                 _dns_rows_hook('persist_expected_values', candidates, domain,
                                chall.get('token'), chall_url,
                                authz.get('expires'), utc_now())
