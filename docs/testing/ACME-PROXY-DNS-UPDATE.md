@@ -162,6 +162,15 @@ cert-manager: a Go program calls `rfc2136.NewDNSProviderCredentials` of cert-man
 
 win-acme and Posh-ACME were not run (Windows). Their message forms (trial updates from the registrable domain, TTL 60, delete class NONE, `nsupdate` for Posh-ACME) are covered by the handler tests and by the `nsupdate` runs.
 
+### TSIG on one TCP connection (miekg/dns#1733)
+
+The issue [miekg/dns#1733](https://github.com/miekg/dns/issues/1733) (open on 2026-10-24) is about a client that sends several signed messages on one TCP connection. RFC 8945 §5.3.1 chains the prior MAC only for the messages of one multi-message response (for example a zone transfer). Each independent request is signed as a first message (§4.3.1: the request MAC is used only for the response). The listener verifies each request on its own and keeps no TSIG state per connection.
+
+- `test_T3_independent_signed_updates_on_one_connection_pos`: three signed UPDATEs on one TCP connection, each response verifies with the MAC of its own request.
+- `test_T3_request_signed_with_the_prior_response_mac_is_badsig_neg`: a request signed with the MAC of the previous response gets an unsigned `BADSIG` and no confirmation; the next independent request on the same connection gets `NOERROR`.
+
+cert-manager v1.21.3 and lego v4.35.2 use `miekg/dns` v1.1.72. They send each UPDATE with `Client.Exchange`, which opens a new connection and closes it after the answer (`client.go`, `Exchange`). The issue does not apply to them.
+
 ### Known issue in the lab: no `Link: rel="up"` from Pebble
 
 certbot and lego need the `Link: <authz>;rel="up"` header in the answer to the challenge POST (`"up" Link header missing`, `authorization[get]: empty URL`). Pebble does not send it there. The ACME proxy of UCM only rewrites the header of the upstream CA, so the header is missing. This is not part of the listener: the same error occurs with `--manual` and no DNS UPDATE.

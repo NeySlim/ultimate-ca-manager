@@ -591,6 +591,119 @@ def test_real_handler_refuses_unsigned_soa_over_udp_and_tcp_pos(app):
         r.stop()
 
 
+# -- TSIG on one TCP connection (RFC 8945 §4.3.1, §5.3.1; miekg/dns#1733) ----------------
+#
+# The prior MAC chain of §5.3.1 applies only to the messages of ONE multi-message
+# response. Independent requests on the same TCP connection are each signed and
+# verified as a first message: no state carries over from one request to the next.
+
+
+def _tsig_handler():
+    import dns.name
+    import dns.tsig
+    from services.acme.dns_update.handler import DnsUpdateHandler
+    from services.acme.dns_update.keys import KeyScope
+    from services.acme.dns_update.records import ActiveRecord, ActiveSnapshot, expected_value
+    from services.acme.dns_update.tsig import TsigKeyMaterial
+
+    key = dns.tsig.Key(dns.name.from_text('tcp-chain.example.'), bytes(range(7, 39)), dns.tsig.HMAC_SHA256)
+    value = expected_value('tok', 'thumb')
+    record = '_acme-challenge.app.example.com.'
+    row = ActiveRecord(1, 1, record, value, 'example.com.', 1, 'acct-1')
+    snap = ActiveSnapshot({record: (row,)}, frozenset({'example.com.'}))
+    confirmed = []
+
+    class Keys:
+        def lookup(self, name):
+            return TsigKeyMaterial(1, key.name, key.algorithm, key.secret) if name == key.name else None
+
+        def scope(self, key_id):
+            return KeyScope(1, False, None)
+
+        def touch(self, key_id, now):
+            pass
+
+    class Zones:
+        def is_authoritative(self, zname):
+            return zname == dns.name.from_text('example.com.')
+
+    class Audit:
+        def record(self, **kw):
+            return True
+
+        def record_authenticated(self, **kw):
+            return True
+
+    handler = DnsUpdateHandler(key_store=Keys(), zone_index=Zones(), audit=Audit(),
+                               snapshot_fn=lambda *a: snap,
+                               mark_confirmed_fn=lambda ids, now: confirmed.append(list(ids)))
+    return handler, key, record, value, confirmed
+
+
+def _update(key, record, value, request_mac=b''):
+    import dns.update
+    m = dns.update.UpdateMessage('example.com.')
+    m.add(record, 60, 'TXT', f'"{value}"')
+    m.use_tsig({key.name: key}, key.name, algorithm=key.algorithm)
+    # A request has no request MAC (RFC 8945 §4.3.1). A non-empty value here
+    # signs the request like a client that chains the previous response MAC.
+    m.request_mac = request_mac
+    wire = m.to_wire()
+    return m, wire
+
+
+def test_T3_independent_signed_updates_on_one_connection_pos(app):
+    handler, key, record, value, confirmed = _tsig_handler()
+    r = Running(app, handler, ServerLimits(**OPEN))
+    assert r.ok
+    try:
+        s = tcp(r, timeout=5)
+        for _ in range(3):
+            req, wire = _update(key, record, value)
+            s.sendall(frame(wire))
+            body = read_frame(s)
+            assert body is not None
+            # dnspython as the client verifies the response MAC with this request's MAC.
+            resp = dns.message.from_wire(body, keyring={key.name: key}, request_mac=req.mac)
+            assert resp.had_tsig
+            assert resp.rcode() == dns.rcode.NOERROR
+        s.close()
+        assert confirmed == [[1], [1], [1]]
+    finally:
+        r.stop()
+
+
+def test_T3_request_signed_with_the_prior_response_mac_is_badsig_neg(app):
+    handler, key, record, value, confirmed = _tsig_handler()
+    r = Running(app, handler, ServerLimits(**OPEN))
+    assert r.ok
+    try:
+        s = tcp(r, timeout=5)
+        req1, wire1 = _update(key, record, value)
+        s.sendall(frame(wire1))
+        resp1 = dns.message.from_wire(read_frame(s), keyring={key.name: key}, request_mac=req1.mac)
+        assert resp1.rcode() == dns.rcode.NOERROR
+
+        # Second request chained to the first response MAC: the server must not
+        # accept it (BADSIG, unsigned error, RFC 8945 §5.3.2) and must not confirm.
+        _req2, wire2 = _update(key, record, value, request_mac=resp1.mac)
+        s.sendall(frame(wire2))
+        resp2 = dns.message.from_wire(read_frame(s), keyring=False)
+        assert resp2.rcode() == dns.rcode.NOTAUTH
+        assert resp2.tsig[0].error == dns.rcode.BADSIG
+        assert resp2.tsig[0].mac == b''
+
+        # The connection keeps no TSIG state: the next independent request works.
+        req3, wire3 = _update(key, record, value)
+        s.sendall(frame(wire3))
+        resp3 = dns.message.from_wire(read_frame(s), keyring={key.name: key}, request_mac=req3.mac)
+        assert resp3.rcode() == dns.rcode.NOERROR
+        s.close()
+        assert confirmed == [[1], [1]]
+    finally:
+        r.stop()
+
+
 # -- startup wiring ----------------------------------------------------------------
 
 def _post_worker_init():
