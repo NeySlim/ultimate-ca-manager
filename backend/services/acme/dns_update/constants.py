@@ -25,3 +25,20 @@ MAX_FUDGE = 300
 
 # Fudge value, in seconds, that the server puts in its own responses.
 RESPONSE_FUDGE = 300
+
+# Limits for the message handler (plan 3, steps 2 and 6).
+MAX_MESSAGE_SIZE = 4096
+MAX_QDCOUNT = 16
+MAX_ANCOUNT = 16
+MAX_NSCOUNT = 16
+MAX_ARCOUNT = 4
+
+# Replay cache (RFC 8945 §10, S15): bounded size and time to live in seconds.
+REPLAY_CACHE_SIZE = 4096
+REPLAY_TTL_S = 300
+
+# SOA RDATA that the listener announces: serial, refresh, retry, expire, minimum.
+SOA_TIMERS = (1, 3600, 600, 86400, 0)
+
+# First label of every owner name that a client may change (RFC 8555 §8.4).
+CHALLENGE_LABEL = b'_acme-challenge'

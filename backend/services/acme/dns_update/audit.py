@@ -66,6 +66,21 @@ class AuditSink:
                 pass
             return False
 
+    def record_authenticated(self, *, action: str, peer_ip: str, keyname: Optional[str],
+                             success: bool, details: dict) -> bool:
+        """Write a row for a request with a verified TSIG, without a rate limit.
+
+        Replays are absorbed by the replay cache of the handler. Never raises."""
+        try:
+            self._write(action, keyname, success, details or {}, ip=sanitize_text(peer_ip, 45))
+            return True
+        except Exception as e:
+            try:
+                logger.warning("DNS UPDATE audit record failed: %s", type(e).__name__)
+            except Exception:
+                pass
+            return False
+
     def _record(self, action, reason, peer_ip, keyname, success, details) -> bool:
         reason_s = sanitize_text(reason)
         ip_s = sanitize_text(peer_ip, 45)

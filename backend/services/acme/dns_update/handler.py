@@ -1,0 +1,595 @@
+"""Protocol handler of the DNS UPDATE (RFC 2136) listener: bytes in, bytes out.
+
+``DnsUpdateHandler.handle`` is a pure function of the request bytes and of the
+state that is injected into it. It opens no socket and makes no outgoing call.
+The processing order is the one of the plan, section 3:
+
+1. short message or QR set: no response (M1, M2)
+2. size and header counts: no response (N9)
+3. opcode other than QUERY and UPDATE: NOTIMP, header only (M3)
+4. parse; any error: FORMERR, header only (M4, S1, E2)
+5. TSIG (RFC 8945 §5.2); errors are answered here (S2 to S9)
+6. replay cache for verified requests (S15)
+7. EDNS version above 0: BADVERS (E3)
+8. QUERY (plan 3.1) or UPDATE (plan 3.2)
+9. flags of the response (M6 to M8, E1, E4, E5)
+10. rendering and size limits (T1, T2, S12)
+11. side effects and audit, after the response is decided
+12. any unexpected exception: SERVFAIL header only (N10)
+
+The handler never logs packet bytes, MACs, TXT values or keys.
+"""
+
+import collections
+import copy
+import hashlib
+import logging
+import struct
+import threading
+import time
+from dataclasses import dataclass, field
+from datetime import datetime, timezone
+from typing import Dict, List, Optional, Tuple
+
+import dns.exception
+import dns.flags
+import dns.message
+import dns.name
+import dns.opcode
+import dns.rcode
+import dns.rdataclass
+import dns.rdatatype
+import dns.rdtypes.ANY.SOA
+import dns.rrset
+import dns.wire
+
+from . import audit as audit_module
+from . import keys, records, tsig, zones
+from .constants import (
+    CHALLENGE_LABEL,
+    MAX_ANCOUNT,
+    MAX_ARCOUNT,
+    MAX_MESSAGE_SIZE,
+    MAX_NSCOUNT,
+    MAX_QDCOUNT,
+    REPLAY_CACHE_SIZE,
+    REPLAY_TTL_S,
+    SOA_TIMERS,
+)
+from .tsig import TimeWatermark, TsigOutcome
+
+logger = logging.getLogger(__name__)
+
+_HEADER = struct.Struct("!HHHHHH")
+_QR = 0x8000
+_RD = 0x0100
+_MIN_UDP = 512
+_WIRE_LIMIT = 65535
+_PARSE_ERRORS = (dns.exception.DNSException, ValueError, TypeError, IndexError,
+                 struct.error, UnicodeError)
+_IN = dns.rdataclass.IN
+_ANY = dns.rdataclass.ANY
+_NONE = dns.rdataclass.NONE
+_MAX_AUDIT_NAMES = 8
+
+
+# --- sampled application log ---------------------------------------------------
+
+class LogSampler:
+    """At most one log line per reason per interval, plus counters."""
+
+    def __init__(self, interval_s: float = 10.0, clock=time.monotonic, log=logger):
+        self._interval = interval_s
+        self._clock = clock
+        self._log = log
+        self._lock = threading.Lock()
+        self._counts: Dict[str, int] = {}
+        self._last: Dict[str, float] = {}
+
+    def note(self, reason: str, level: int = logging.INFO, peer_ip: Optional[str] = None,
+             detail: Optional[str] = None) -> bool:
+        """Count the event; log it when the interval for the reason has passed."""
+        with self._lock:
+            self._counts[reason] = self._counts.get(reason, 0) + 1
+            now = self._clock()
+            last = self._last.get(reason)
+            if last is not None and now - last < self._interval:
+                return False
+            self._last[reason] = now
+            total = self._counts[reason]
+        try:
+            self._log.log(level, "DNS UPDATE listener: %s (peer=%s, total=%d)%s", reason,
+                          _safe_text(peer_ip), total, f" [{detail}]" if detail else "")
+        except Exception:
+            pass
+        return True
+
+    def counts(self) -> Dict[str, int]:
+        with self._lock:
+            return dict(self._counts)
+
+
+def _safe_text(value) -> str:
+    return audit_module.sanitize_text(value if value is not None else "-", 64)
+
+
+# --- replay cache (S15) ----------------------------------------------------------
+
+class ReplayCache:
+    """Bounded LRU of final responses with a time to live. Thread safe."""
+
+    def __init__(self, size: int = REPLAY_CACHE_SIZE, ttl_s: float = REPLAY_TTL_S,
+                 clock=time.time):
+        if size < 1:
+            raise ValueError("size must be positive")
+        self._size = size
+        self._ttl = ttl_s
+        self._clock = clock
+        self._lock = threading.Lock()
+        self._items: "collections.OrderedDict[tuple, Tuple[float, bytes]]" = (
+            collections.OrderedDict())
+
+    def get(self, key) -> Optional[bytes]:
+        with self._lock:
+            item = self._items.get(key)
+            if item is None:
+                return None
+            if self._clock() - item[0] >= self._ttl:
+                del self._items[key]
+                return None
+            self._items.move_to_end(key)
+            return item[1]
+
+    def put(self, key, value: bytes) -> None:
+        with self._lock:
+            self._items[key] = (self._clock(), value)
+            self._items.move_to_end(key)
+            while len(self._items) > self._size:
+                self._items.popitem(last=False)
+
+    def __len__(self) -> int:
+        with self._lock:
+            return len(self._items)
+
+
+# --- helpers ----------------------------------------------------------------------
+
+@dataclass
+class _Event:
+    """What happens after the response is decided (plan step 11)."""
+
+    kind: str = "none"  # none | accepted | refused
+    reason: str = ""
+    zone: str = ""
+    names: List[str] = field(default_factory=list)
+    adds: int = 0
+    deletes: int = 0
+    row_ids: List[int] = field(default_factory=list)
+
+
+_NO_EVENT = _Event()
+
+
+def _header_only(wire: bytes, rcode: int) -> bytes:
+    """ID, opcode and RD of the request; QR=1; all counts 0."""
+    ident, flags = struct.unpack_from("!HH", wire)
+    opcode = (flags >> 11) & 0xF
+    out = _QR | (opcode << 11) | (flags & _RD) | (rcode & 0xF)
+    return _HEADER.pack(ident, out, 0, 0, 0, 0)
+
+
+def _name_of(text: str) -> dns.name.Name:
+    return dns.name.from_text(text)
+
+
+def _soa_rrset(zone: dns.name.Name) -> dns.rrset.RRset:
+    """The fixed SOA record of a zone (decision 13): no host name, no time."""
+    mname = zone
+    rname = dns.name.Name((b"hostmaster",) + zone.labels)
+    serial, refresh, retry, expire, minimum = SOA_TIMERS
+    rdata = dns.rdtypes.ANY.SOA.SOA(_IN, dns.rdatatype.SOA, mname, rname, serial, refresh,
+                                    retry, expire, minimum)
+    return dns.rrset.from_rdata(zone, 0, rdata)
+
+
+def _truncated(resp: dns.message.Message) -> dns.message.Message:
+    """Question and OPT only, TC set, same RCODE (RFC 1035 §4.2.1)."""
+    out = copy.copy(resp)
+    out.sections = [list(s) for s in resp.sections]
+    out.answer = []
+    out.authority = []
+    out.additional = []
+    out.flags |= dns.flags.TC
+    return out
+
+
+def _update_rrs(wire: bytes) -> List[Tuple[dns.name.Name, int, int, int, int]]:
+    """(name, type, class, ttl, rdlength) of each RR of the update section.
+
+    dnspython keeps neither the TTL of a delete of class ANY nor the RDLENGTH, and
+    RFC 2136 §3.4.1 needs both for the prescan."""
+    p = dns.wire.Parser(wire)
+    _id, _flags, zocount, prcount, upcount, _ar = _HEADER.unpack(p.get_bytes(12))
+    for _ in range(zocount):
+        p.get_name()
+        p.get_bytes(4)
+    for _ in range(prcount):
+        p.get_name()
+        _t, _c, _ttl, rdlen = p.get_struct("!HHIH")
+        p.get_bytes(rdlen)
+    out = []
+    for _ in range(upcount):
+        name = p.get_name()
+        rtype, rclass, ttl, rdlen = p.get_struct("!HHIH")
+        p.get_bytes(rdlen)
+        out.append((name, rtype, rclass, ttl, rdlen))
+    return out
+
+
+def _txt_value(rdata) -> Optional[str]:
+    """TXT value as ASCII text (strings joined, RFC 1035 §3.3.14), or None."""
+    try:
+        return b"".join(rdata.strings).decode("ascii")
+    except UnicodeDecodeError:
+        return None
+
+
+def _utc_naive(t: float) -> datetime:
+    return datetime.fromtimestamp(t, tz=timezone.utc).replace(tzinfo=None)
+
+
+class DnsUpdateHandler:
+    def __init__(self, *, key_store=keys.key_store, zone_index=zones.zone_index,
+                 audit=audit_module.audit_sink, snapshot_fn=records.get_active_snapshot,
+                 mark_confirmed_fn=records.mark_confirmed, clock=time.time,
+                 watermark: Optional[TimeWatermark] = None, replay_cache=None,
+                 log_sampler=None):
+        self._key_store = key_store
+        self._zone_index = zone_index
+        self._audit = audit
+        self._snapshot_fn = snapshot_fn
+        self._mark_confirmed = mark_confirmed_fn
+        self._clock = clock
+        self._watermark = watermark if watermark is not None else TimeWatermark()
+        self._replay = replay_cache if replay_cache is not None else ReplayCache(clock=clock)
+        self._log = log_sampler if log_sampler is not None else LogSampler()
+
+    # -- entry point ---------------------------------------------------------------
+
+    def handle(self, wire: bytes, peer_ip: str, transport: str) -> Optional[bytes]:
+        """Response bytes for one request, or None for "no response". Never raises."""
+        try:
+            return self._handle(wire, peer_ip, transport)
+        except Exception as exc:
+            return self._servfail(wire, peer_ip, exc)
+
+    def _servfail(self, wire, peer_ip, exc) -> Optional[bytes]:
+        try:
+            self._log.note("servfail", logging.ERROR, peer_ip, type(exc).__name__)
+        except Exception:
+            pass
+        try:
+            from models import db
+            db.session.rollback()
+        except Exception:
+            pass
+        try:
+            if len(wire) >= 12:
+                return _header_only(wire, dns.rcode.SERVFAIL)
+        except Exception:
+            pass
+        return None
+
+    # -- steps 1 to 12 -----------------------------------------------------------------
+
+    def _handle(self, wire: bytes, peer_ip: str, transport: str) -> Optional[bytes]:
+        now = self._clock()
+        now_int = int(now)
+        tcp = transport == "tcp"
+
+        # 1. Short message, or a response (RFC 1035 §4.1.1).
+        if len(wire) < 12:
+            self._log.note("short", logging.DEBUG, peer_ip)
+            return None
+        _ident, flags, qd, an, ns, ar = _HEADER.unpack_from(wire)
+        if flags & _QR:
+            self._log.note("qr", logging.DEBUG, peer_ip)
+            return None
+
+        # 2. Size and counts, before the parser runs.
+        if len(wire) > MAX_MESSAGE_SIZE:
+            self._log.note("oversize", logging.INFO, peer_ip)
+            return None
+        if qd > MAX_QDCOUNT or an > MAX_ANCOUNT or ns > MAX_NSCOUNT or ar > MAX_ARCOUNT:
+            self._log.note("counts", logging.INFO, peer_ip)
+            return None
+
+        # 3. Opcode: nothing but the header is looked at (decision 11).
+        opcode = (flags >> 11) & 0xF
+        if opcode not in (dns.opcode.QUERY, dns.opcode.UPDATE):
+            self._log.note("notimp", logging.INFO, peer_ip)
+            return _header_only(wire, dns.rcode.NOTIMP)
+
+        # 4. Parse without any TSIG validation by dnspython.
+        try:
+            msg = dns.message.from_wire(wire, keyring=False)
+        except _PARSE_ERRORS:
+            self._log.note("formerr", logging.INFO, peer_ip)
+            return _header_only(wire, dns.rcode.FORMERR)
+
+        # 5. TSIG.
+        result = tsig.verify_request(wire, msg, self._key_store.lookup, now_int,
+                                     self._watermark)
+        outcome = result.outcome
+        if outcome == TsigOutcome.FORMERR:
+            self._log.note("formerr", logging.INFO, peer_ip)
+            return _header_only(wire, dns.rcode.FORMERR)
+        skeleton = self._skeleton(msg)
+        if outcome in (TsigOutcome.BADKEY, TsigOutcome.BADSIG, TsigOutcome.BADTIME,
+                       TsigOutcome.BADTRUNC):
+            return self._tsig_error(wire, msg, skeleton, result, peer_ip, transport, now_int)
+        signed = outcome == TsigOutcome.OK
+
+        # 6. Replay: the stored response, and no side effect.
+        replay_key = None
+        if signed:
+            replay_key = (transport, hashlib.sha256(wire).digest())
+            cached = self._replay.get(replay_key)
+            if cached is not None:
+                return cached
+
+        # 7. EDNS version.
+        event = _NO_EVENT
+        if msg.edns > 0:
+            resp = skeleton
+            resp.set_rcode(dns.rcode.BADVERS)
+            self._log.note("badvers", logging.DEBUG, peer_ip)
+        elif opcode == dns.opcode.QUERY:
+            resp = self._query(msg, skeleton, result, peer_ip)
+        else:
+            resp, event = self._update(wire, msg, skeleton, result, peer_ip)
+
+        # 9, 10. Flags are set by make_response; render and apply the size limit.
+        if signed:
+            limit = None if tcp else max(_MIN_UDP, msg.payload if msg.edns >= 0 else _MIN_UDP)
+            out = tsig.render_signed(resp, result, now_int, max_size=limit)
+        else:
+            out = self._render_unsigned(resp, self._unsigned_limit(wire, msg, tcp), peer_ip)
+        if signed and replay_key is not None:
+            self._replay.put(replay_key, out)
+
+        # 11. Side effects and audit.
+        self._after(event, result, peer_ip, transport, now)
+        return out
+
+    # -- responses ----------------------------------------------------------------------
+
+    @staticmethod
+    def _skeleton(msg: dns.message.Message) -> dns.message.Message:
+        """QR=1, ID, opcode and RD copied, RA=0, no padding. An UPDATE response has
+        no sections at all (RFC 2136 §3.8): the zone section is never echoed."""
+        # Advertise the size the listener accepts (RFC 6891 §6.2.5), not dnspython's 8192.
+        resp = dns.message.make_response(msg, pad=0, our_payload=MAX_MESSAGE_SIZE)
+        if msg.opcode() == dns.opcode.UPDATE:
+            resp.question = []
+        return resp
+
+    @staticmethod
+    def _unsigned_limit(wire: bytes, msg: dns.message.Message, tcp: bool) -> Optional[int]:
+        """T1: over UDP, no response is longer than the request (nor above the EDNS size)."""
+        if tcp:
+            return None
+        payload = msg.payload if msg.edns >= 0 else _MIN_UDP
+        return min(len(wire), max(_MIN_UDP, payload))
+
+    def _render_unsigned(self, resp: dns.message.Message, limit: Optional[int],
+                         peer_ip) -> Optional[bytes]:
+        out = resp.to_wire(max_size=_WIRE_LIMIT)
+        if limit is None or len(out) <= limit:
+            return out
+        out = _truncated(resp).to_wire(max_size=_WIRE_LIMIT)
+        if len(out) <= limit:
+            return out
+        self._log.note("udp_drop", logging.INFO, peer_ip)
+        return None
+
+    def _tsig_error(self, wire, msg, skeleton, result, peer_ip, transport, now_int):
+        outcome = result.outcome
+        reason = outcome.value
+        tcp = transport == "tcp"
+        if outcome == TsigOutcome.BADKEY:
+            def render(r):
+                return tsig.render_unsigned_tsig_error(r, result, dns.rcode.BADKEY)
+        elif outcome == TsigOutcome.BADSIG:
+            def render(r):
+                return tsig.render_unsigned_tsig_error(r, result, dns.rcode.BADSIG)
+        elif outcome == TsigOutcome.BADTIME:
+            def render(r):
+                return tsig.render_badtime(r, result, now_int)
+        else:
+            def render(r):
+                return tsig.render_badtrunc(r, result, now_int)
+        if tcp:
+            limit = None
+        elif outcome in (TsigOutcome.BADTIME, TsigOutcome.BADTRUNC):
+            limit = max(_MIN_UDP, msg.payload if msg.edns >= 0 else _MIN_UDP)
+        else:
+            limit = self._unsigned_limit(wire, msg, tcp)
+        out = render(skeleton)
+        if limit is not None and len(out) > limit:
+            out = render(_truncated(skeleton))
+            if len(out) > limit:
+                out = None
+                self._log.note("udp_drop", logging.INFO, peer_ip)
+        self._log.note(reason, logging.INFO, peer_ip)
+        try:
+            self._audit.record(
+                action="acme.dns_update.rejected", reason=reason, peer_ip=peer_ip,
+                keyname=result.keyname.to_text() if result.keyname is not None else None,
+                success=False, details={"transport": transport})
+        except Exception:
+            pass
+        return out
+
+    # -- QUERY (plan 3.1) -----------------------------------------------------------------
+
+    def _query(self, msg, resp, result, peer_ip) -> dns.message.Message:
+        if len(msg.question) != 1:
+            # RFC 9619: exactly one question. The response is header only.
+            resp.question = []
+            resp.set_rcode(dns.rcode.FORMERR)
+            self._log.note("formerr", logging.INFO, peer_ip)
+            return resp
+        self._log.note("query", logging.DEBUG, peer_ip)
+        question = msg.question[0]
+        if question.rdclass != _IN or question.rdtype != dns.rdatatype.SOA:
+            resp.set_rcode(dns.rcode.REFUSED)
+            return resp
+
+        rows = [row for group in self._snapshot_fn().by_name.values() for row in group]
+        if result.outcome == TsigOutcome.OK:
+            scope = self._key_store.scope(result.key.key_id)
+            rows = [] if scope is None else [
+                r for r in rows if scope.allows(r.acme_client_account_id, r.account_id)]
+        qname = question.name
+
+        # Q1: the apex of a row.
+        for row in rows:
+            zone = _name_of(row.zone_name)
+            if qname == zone:
+                resp.flags |= dns.flags.AA
+                resp.answer.append(_soa_rrset(zone))
+                return resp
+        # Q7: a name between the apex and the record name: NODATA (RFC 2308 §2.2).
+        for row in rows:
+            zone = _name_of(row.zone_name)
+            if (qname != zone and qname.is_subdomain(zone)
+                    and _name_of(row.record_name).is_subdomain(qname)):
+                resp.flags |= dns.flags.AA
+                resp.authority.append(_soa_rrset(zone))
+                return resp
+        resp.set_rcode(dns.rcode.REFUSED)
+        return resp
+
+    # -- UPDATE (plan 3.2) ------------------------------------------------------------------
+
+    def _refuse(self, resp, rcode, reason, zone="", names=()):
+        resp.set_rcode(rcode)
+        return resp, _Event("refused", reason, zone, list(names))
+
+    def _update(self, wire, msg, resp, result, peer_ip) -> Tuple[dns.message.Message, _Event]:
+        # 1. No TSIG: REFUSED at once, before any zone check and without a DB access (U4).
+        if result.outcome != TsigOutcome.OK:
+            resp.set_rcode(dns.rcode.REFUSED)
+            self._log.note("unsigned_update", logging.INFO, peer_ip)
+            return resp, _NO_EVENT
+
+        # 2. Zone section (RFC 2136 §3.1.1).
+        if len(msg.zone) != 1 or msg.zone[0].rdtype != dns.rdatatype.SOA:
+            return self._refuse(resp, dns.rcode.FORMERR, "format")
+        zrr = msg.zone[0]
+        zone_text = zrr.name.to_text()
+        if zrr.rdclass != _IN:
+            return self._refuse(resp, dns.rcode.NOTAUTH, "not_authoritative", zone_text)
+        if not self._zone_index.is_authoritative(zrr.name):
+            return self._refuse(resp, dns.rcode.NOTAUTH, "not_authoritative", zone_text)
+
+        # 3. Prerequisites: policy, nothing to evaluate them against.
+        if msg.prerequisite:
+            return self._refuse(resp, dns.rcode.REFUSED, "prerequisite", zone_text)
+
+        names: List[str] = []
+        for rrset in msg.update:
+            text = rrset.name.to_text()
+            if text not in names and len(names) < _MAX_AUDIT_NAMES:
+                names.append(text)
+
+        # 4. Permission of every RR, before anything is applied (RFC 2136 §3.3).
+        reason, row_ids = self._authorize(msg, result)
+        if reason is not None:
+            return self._refuse(resp, dns.rcode.REFUSED, reason, zone_text, names)
+
+        # 5. Prescan (RFC 2136 §3.4.1), in the order of the RRs.
+        rrs = _update_rrs(wire)
+        for name, _rtype, rclass, ttl, _rdlen in rrs:
+            if not name.is_subdomain(zrr.name):
+                return self._refuse(resp, dns.rcode.NOTZONE, "not_in_zone", zone_text, names)
+            if rclass == _IN:
+                continue
+            if rclass in (_ANY, _NONE):
+                if ttl != 0:
+                    return self._refuse(resp, dns.rcode.FORMERR, "format", zone_text, names)
+                continue
+            return self._refuse(resp, dns.rcode.FORMERR, "format", zone_text, names)
+
+        # 6, 7. Nothing is applied to DNS. NOERROR and no section (U14).
+        adds = sum(1 for rr in rrs if rr[2] == _IN)
+        return resp, _Event("accepted", "", zone_text, names, adds, len(rrs) - adds,
+                            sorted(set(row_ids)))
+
+    def _authorize(self, msg, result) -> Tuple[Optional[str], List[int]]:
+        """None and the matching row ids, or the reason code of the refusal."""
+        scope = None
+        scope_loaded = False
+        snapshot = None
+        row_ids: List[int] = []
+        for rrset in msg.update:
+            if (rrset.rdtype != dns.rdatatype.TXT or len(rrset.name.labels) < 2
+                    or rrset.name.labels[0].lower() != CHALLENGE_LABEL):
+                return "type_not_allowed", []
+            if rrset.deleting is not None:
+                # Deletes (class ANY or NONE) change nothing and are always allowed (U11).
+                continue
+            if not scope_loaded:
+                scope = self._key_store.scope(result.key.key_id)
+                snapshot = self._snapshot_fn()
+                scope_loaded = True
+            candidates = [
+                r for r in snapshot.by_name.get(rrset.name.to_text().lower(), ())
+                if scope is not None and scope.allows(r.acme_client_account_id, r.account_id)]
+            if not candidates:
+                return "no_pending_order", []
+            for rdata in rrset:
+                value = _txt_value(rdata)
+                matched = [r.row_id for r in candidates
+                           if value is not None and r.txt_value == value]
+                if not matched:
+                    return "value_mismatch", []
+                row_ids.extend(matched)
+        return None, row_ids
+
+    # -- step 11 ---------------------------------------------------------------------------
+
+    def _after(self, event: _Event, result, peer_ip, transport, now: float) -> None:
+        if event.kind == "none":
+            return
+        try:
+            keyname = result.key.name.to_text()
+            if event.kind == "accepted":
+                moment = _utc_naive(now)
+                if event.row_ids:
+                    self._mark_confirmed(event.row_ids, moment)
+                self._key_store.touch(result.key.key_id, moment)
+                self._audit.record_authenticated(
+                    action="acme.dns_update.accepted", peer_ip=peer_ip, keyname=keyname,
+                    success=True, details=self._details(event, transport))
+            else:
+                self._audit.record(
+                    action="acme.dns_update.refused", reason=event.reason, peer_ip=peer_ip,
+                    keyname=keyname, success=False, details=self._details(event, transport))
+        except Exception as exc:
+            # The response is decided. A failure here must not change it.
+            self._log.note("side_effect", logging.ERROR, peer_ip, type(exc).__name__)
+            try:
+                from models import db
+                db.session.rollback()
+            except Exception:
+                pass
+
+    @staticmethod
+    def _details(event: _Event, transport: str) -> dict:
+        details = {"zone": event.zone, "names": event.names, "transport": transport}
+        if event.kind == "accepted":
+            details["adds"] = event.adds
+            details["deletes"] = event.deletes
+        return details
