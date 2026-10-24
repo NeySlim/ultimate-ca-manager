@@ -318,6 +318,48 @@ def test_F2_invalidate_keys_helper_resets_singleton_pos(env):
     key_store.invalidate()
 
 
+def _restore_purge(name):
+    # Only the registered purge: invalidate_after_restore() would also revoke
+    # every session of the shared test database.
+    from services.backup.restore.invalidate import CACHE_PURGES
+    return dict(CACHE_PURGES).get(name)
+
+
+def test_F2_restore_drops_the_listener_caches_pos(env):
+    """A key or zone that a restore removed stops working at once (no 30 s wait)."""
+    from models.acme_dns_update import AcmeDnsUpdateKey
+    from models.acme_models import AcmeDomain
+    from services.acme.dns_update.keys import key_store
+    from services.acme.dns_update.zones import zone_index
+    k = env.make_key(env.make_account(), name='restored-away.example.')
+    env.make_domain('restored-away.example')
+    key_store.invalidate()
+    zone_index.invalidate()
+    assert key_store.lookup(_n(k.name)) is not None
+    assert zone_index.is_authoritative(_n('restored-away.example.'))
+    # What the restore does to the rows: replaced, here simply gone.
+    AcmeDnsUpdateKey.query.filter_by(name=k.name).delete()
+    AcmeDomain.query.filter_by(domain='restored-away.example').delete()
+    env.db.session.commit()
+    _restore_purge('acme_dns_update')()
+    assert key_store.lookup(_n(k.name)) is None
+    assert not zone_index.is_authoritative(_n('restored-away.example.'))
+
+
+def test_F2_without_the_restore_purge_the_key_cache_survives_neg(env):
+    """The purge is what drops the key: without it the warm cache still answers."""
+    from models.acme_dns_update import AcmeDnsUpdateKey
+    from services.acme.dns_update.keys import key_store
+    assert _restore_purge('acme_dns_update') is not None
+    k = env.make_key(env.make_account(), name='survives.example.')
+    key_store.invalidate()
+    assert key_store.lookup(_n(k.name)) is not None
+    AcmeDnsUpdateKey.query.filter_by(name=k.name).delete()
+    env.db.session.commit()
+    assert key_store.lookup(_n(k.name)) is not None  # stale until max age
+    key_store.invalidate()
+
+
 def test_F2_revocation_visible_after_max_age_pos(env):
     from services.acme.dns_update.keys import KeyStore
     clock = Clock()

@@ -142,6 +142,20 @@ def _purge_acme_proxy_caches() -> None:
     reset_proxy_caches()
 
 
+def _purge_acme_dns_update_caches() -> None:
+    """TSIG keys, zones and expected TXT values of the DNS UPDATE listener.
+
+    A key the restore removed or revoked must stop working at once, not
+    when the key cache expires (30 seconds).
+    """
+    from services.acme.dns_update.keys import invalidate_keys
+    from services.acme.dns_update.records import invalidate_cache
+    from services.acme.dns_update.zones import zone_index
+    invalidate_keys()
+    zone_index.invalidate()
+    invalidate_cache()
+
+
 def _purge_acme_renewal_info_cache() -> None:
     """Cached ARI windows, keyed by (client account id, certificate id).
 
@@ -231,6 +245,7 @@ def _purge_ca_request_caches() -> None:
 #: CRL) go first: they are the ones that would serve the replaced PKI.
 CACHE_PURGES: Tuple[Tuple[str, Callable[[], None]], ...] = (
     ('acme_proxy', _purge_acme_proxy_caches),
+    ('acme_dns_update', _purge_acme_dns_update_caches),
     ('acme_renewal_info', _purge_acme_renewal_info_cache),
     ('external_crl_entries', _purge_external_crl_cache),
     ('ocsp_responses', _purge_ocsp_responses),
