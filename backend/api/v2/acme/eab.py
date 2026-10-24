@@ -186,6 +186,13 @@ def patch_eab_credential(cred_id):
     return success_response(data=cred.to_dict(), message='EAB credential updated')
 
 
+def _delete_linked_dns_update_keys(cred_id):
+    """Fail-closed: SQLite does not enforce the FK cascade. Same transaction."""
+    from models.acme_dns_update import AcmeDnsUpdateKey
+    AcmeDnsUpdateKey.query.filter_by(eab_credential_id=cred_id).delete(
+        synchronize_session=False)
+
+
 @bp.route('/api/v2/acme/eab-credentials/<int:cred_id>', methods=['DELETE'])
 @require_auth(['delete:acme'])
 def revoke_eab_credential(cred_id):
@@ -204,6 +211,7 @@ def revoke_eab_credential(cred_id):
     if cred.status == 'revoked':
         # Permanent delete for already-revoked
         kid = cred.kid
+        _delete_linked_dns_update_keys(cred_id)
         db.session.delete(cred)
         ok, err = safe_commit(logger, "Failed to delete EAB credential")
         if not ok:
@@ -219,6 +227,7 @@ def revoke_eab_credential(cred_id):
     if cred.status == 'used':
         # Permanent delete for used credentials
         kid = cred.kid
+        _delete_linked_dns_update_keys(cred_id)
         db.session.delete(cred)
         ok, err = safe_commit(logger, "Failed to delete EAB credential")
         if not ok:
@@ -235,6 +244,7 @@ def revoke_eab_credential(cred_id):
     cred.status = 'revoked'
     cred.revoked_at = _utc_now()
     cred.revoked_by_user_id = user_id
+    _delete_linked_dns_update_keys(cred_id)
     ok, err = safe_commit(logger, "Failed to revoke EAB credential")
     if not ok:
         return err

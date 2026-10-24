@@ -19,6 +19,7 @@ from models.group import Group, GroupMember
 from models.email_notification import SMTPConfig, NotificationConfig, NotificationLog
 from models.acme_models import AcmeAccount, AcmeOrder, AcmeAuthorization, AcmeChallenge, AcmeNonce, DnsProvider, AcmeClientOrder, AcmeDomain, AcmeLocalDomain, AcmeEabCredential
 from models.acme_client_account import AcmeClientAccount
+from models.acme_dns_update import AcmeDnsUpdateKey, AcmeProxyDnsChallenge
 from models.api_key import APIKey
 from models.auth_certificate import AuthCertificate
 from models.crl import CRLMetadata
@@ -50,7 +51,7 @@ __all__ = [
     "CRLMetadata", "OCSPResponse", "CertificateTemplate",
     "AcmeAccount", "AcmeOrder", "AcmeAuthorization", "AcmeChallenge", "AcmeNonce",
     "DnsProvider", "AcmeClientOrder", "AcmeDomain", "AcmeLocalDomain", "AcmeEabCredential",
-    "AcmeClientAccount",
+    "AcmeClientAccount", "AcmeDnsUpdateKey", "AcmeProxyDnsChallenge",
     "HsmProvider", "HsmKey",
     "ScanProfile", "ScanRun", "DiscoveredCertificate",
     "SSHCertificateAuthority", "SSHCertificate",

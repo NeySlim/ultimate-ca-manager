@@ -341,6 +341,13 @@ def _remove_account_row(acct: AcmeClientAccount) -> None:
     AcmeClientOrder.query.filter_by(acme_client_account_id=acct.id).update(
         {AcmeClientOrder.acme_client_account_id: None}
     )
+    # SQLite does not enforce the FK cascade: remove keys and expected values
+    # in the same transaction so nothing outlives the account.
+    from models.acme_dns_update import AcmeDnsUpdateKey, AcmeProxyDnsChallenge
+    AcmeDnsUpdateKey.query.filter_by(acme_client_account_id=acct.id).delete(
+        synchronize_session=False)
+    AcmeProxyDnsChallenge.query.filter_by(acme_client_account_id=acct.id).delete(
+        synchronize_session=False)
     db.session.delete(acct)
     if was_default:
         replacement = AcmeClientAccount.query.filter(

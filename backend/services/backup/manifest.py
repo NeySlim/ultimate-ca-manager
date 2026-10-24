@@ -294,6 +294,16 @@ SECTIONS: Dict[str, Section] = {
                     'source_certificate_id': 'certificates'},
         optional=True,
     ),
+    'acme_dns_update_keys': Section(
+        model='models.acme_dns_update:AcmeDnsUpdateKey',
+        identity=('name',),
+        exclude={**_SURROGATE, 'last_used_at': 'usage statistic'},
+        # Property `secret`: the setter re-encrypts on restore.
+        secrets=('secret',),
+        references={'acme_client_account_id': 'acme_client_accounts',
+                    'eab_credential_id': 'acme_eab_credentials',
+                    'created_by_user_id': 'users'},
+    ),
     'ssh_cas': Section(
         model='models.ssh:SSHCertificateAuthority',
         identity=('refid',),
@@ -482,6 +492,7 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'acme_orders': 'in-flight protocol state; a client retries against the restored server',
     'acme_authorizations': 'in-flight protocol state, tied to orders',
     'acme_challenges': 'in-flight protocol state, tied to authorizations',
+    'acme_proxy_dns_challenges': 'expected TXT values of in-flight proxy orders, valid for at most 24 hours; rebuilt when the client fetches the authorization',
     'crls': 'regenerated from the CAs and their revocation records',
     'crl_metadata': 'regenerated with the CRLs',
     'ocsp_responses': 'a response cache, rebuilt on demand',
