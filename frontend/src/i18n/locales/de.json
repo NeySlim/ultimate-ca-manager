@@ -1912,7 +1912,7 @@
       "secretConfirm": "Ich habe das Geheimnis gespeichert",
       "snippets": "Client-Konfiguration",
       "snippetsHelp": "Ersetzen Sie die Beispiel-Domain und die E-Mail-Adresse. Jedes Beispiel setzt den Algorithmus, weil UCM die Standardwerte der Clients (md5, sha1) ablehnt.",
-      "notePort": "Die Beispiele verwenden Port {{port}}, den Port des UCM-Listeners.",
+      "notePort": "Die Beispiele verwenden Port {{port}}, den Port des UCM-Listeners. Wenn Port 53 darauf weitergeleitet ist (Docker, Kubernetes-Service, Firewall-Umleitung), verwenden Sie Port 53.",
       "notePortDisabled": "Der Listener ist deaktiviert, daher verwenden die Beispiele Port 53. Legen Sie zuerst einen Listener-Port fest und leiten Sie dann Port 53 darauf um (Docker, Kubernetes oder Firewall-Weiterleitung).",
       "tabBind": "BIND-Schlüsseldatei",
       "tabAcmesh": "acme.sh",

@@ -147,7 +147,7 @@ export function buildDnsUpdateSnippets({
       code: [
         '# Add your usual target options (for example the host name)',
         `wacs.exe --baseuri ${directoryUrl} --accepttos --emailaddress ${email} \``,
-        '  --validation rfc2136 `',
+        '  --validationmode dns-01 --validation rfc2136 `',
         `  --serverhost ${host} \``,
         `  --tsigkeyname ${keyName} \``,
         `  --tsigkeysecret ${secret} \``,

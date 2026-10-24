@@ -1912,7 +1912,7 @@
       "secretConfirm": "He guardado el secreto",
       "snippets": "Configuración del cliente",
       "snippetsHelp": "Sustituya el dominio y el correo de ejemplo. Cada fragmento define el algoritmo, porque UCM rechaza los valores por defecto de los clientes (md5, sha1).",
-      "notePort": "Los fragmentos usan el puerto {{port}}, el del listener de UCM.",
+      "notePort": "Los fragmentos usan el puerto {{port}}, el del listener de UCM. Si el puerto 53 se redirige a él (Docker, Service de Kubernetes, redirección del firewall), use el puerto 53.",
       "notePortDisabled": "El listener está desactivado, por lo que los fragmentos usan el puerto 53. Defina primero un puerto de listener y después redirija el puerto 53 a él (Docker, Kubernetes o redirección del cortafuegos).",
       "tabBind": "Archivo de clave BIND",
       "tabAcmesh": "acme.sh",

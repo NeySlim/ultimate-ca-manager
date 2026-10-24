@@ -1912,7 +1912,7 @@
       "secretConfirm": "I saved the secret",
       "snippets": "Client configuration",
       "snippetsHelp": "Replace the example domain and e-mail address. Every snippet sets the algorithm, because UCM refuses the client defaults (md5, sha1).",
-      "notePort": "The snippets use port {{port}}, the port of the UCM listener.",
+      "notePort": "The snippets use port {{port}}, the port of the UCM listener. When port 53 is mapped to it (Docker, Kubernetes Service, firewall redirect), use port 53.",
       "notePortDisabled": "The listener is disabled, so the snippets use port 53. Set a listener port first, then map port 53 to it (Docker, Kubernetes or a firewall redirect).",
       "tabBind": "BIND key file",
       "tabAcmesh": "acme.sh",

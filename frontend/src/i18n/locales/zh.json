@@ -1912,7 +1912,7 @@
       "secretConfirm": "我已保存密文",
       "snippets": "客户端配置",
       "snippetsHelp": "请替换示例域名和电子邮件地址。每个示例都设置了算法，因为 UCM 会拒绝客户端的默认算法 (md5、sha1)。",
-      "notePort": "示例使用端口 {{port}}，即 UCM 监听器的端口。",
+      "notePort": "示例使用端口 {{port}}，即 UCM 监听器的端口。如果端口 53 已映射到该端口（Docker、Kubernetes Service、防火墙重定向），请使用端口 53。",
       "notePortDisabled": "监听器已禁用，因此示例使用端口 53。请先设置监听器端口，再把端口 53 映射到该端口（Docker、Kubernetes 或防火墙重定向）。",
       "tabBind": "BIND 密钥文件",
       "tabAcmesh": "acme.sh",

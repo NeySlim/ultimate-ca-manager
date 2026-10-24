@@ -1912,7 +1912,7 @@
       "secretConfirm": "Ho salvato il segreto",
       "snippets": "Configurazione del client",
       "snippetsHelp": "Sostituisci il dominio e l'indirizzo e-mail di esempio. Ogni esempio imposta l'algoritmo, perché UCM rifiuta i valori predefiniti dei client (md5, sha1).",
-      "notePort": "Gli esempi usano la porta {{port}}, quella del listener UCM.",
+      "notePort": "Gli esempi usano la porta {{port}}, quella del listener UCM. Se la porta 53 è mappata su di essa (Docker, Service Kubernetes, redirect del firewall), usate la porta 53.",
       "notePortDisabled": "Il listener è disattivato, quindi gli esempi usano la porta 53. Imposta prima una porta del listener, poi reindirizza la porta 53 verso di essa (Docker, Kubernetes o reindirizzamento del firewall).",
       "tabBind": "File di chiave BIND",
       "tabAcmesh": "acme.sh",

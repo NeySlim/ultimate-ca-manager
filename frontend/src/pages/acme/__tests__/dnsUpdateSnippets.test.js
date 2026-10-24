@@ -57,6 +57,9 @@ describe('buildDnsUpdateSnippets', () => {
   it('gives win-acme the enum name of the algorithm and warns about port 53', () => {
     const win = byId(build(), 'winacme')
     expect(win.code).toContain('--tsigkeyalgorithm sha256')
+    expect(win.code).not.toContain('--tsigkeyalgorithm hmac-')
+    // Without --validationmode dns-01, win-acme looks for an http-01 plugin named rfc2136.
+    expect(win.code).toContain('--validationmode dns-01 --validation rfc2136')
     expect(win.code).not.toContain('--serverport')
     expect(win.noteKeys).toEqual(['noteWinAcmePort'])
     expect(byId(build({ algorithm: 'hmac-sha384' }), 'winacme').noteKeys).toContain('noteWinAcmeSha384')

@@ -1912,7 +1912,7 @@
       "secretConfirm": "シークレットを保存しました",
       "snippets": "クライアント設定",
       "snippetsHelp": "例のドメインとメールアドレスを置き換えてください。UCM はクライアントの既定値 (md5、sha1) を拒否するため、各スニペットでアルゴリズムを指定しています。",
-      "notePort": "スニペットは UCM リスナーのポート {{port}} を使います。",
+      "notePort": "スニペットは UCM リスナーのポート {{port}} を使います。 ポート 53 をこのポートへ転送している場合 (Docker、Kubernetes の Service、ファイアウォールのリダイレクト) は、ポート 53 を使います。",
       "notePortDisabled": "リスナーが無効のため、スニペットはポート 53 を使います。先にリスナーポートを設定し、ポート 53 をそのポートに転送してください (Docker、Kubernetes、またはファイアウォールのリダイレクト)。",
       "tabBind": "BIND キーファイル",
       "tabAcmesh": "acme.sh",

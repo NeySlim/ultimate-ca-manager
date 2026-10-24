@@ -661,7 +661,7 @@
       "secretConfirm": "J'ai enregistré le secret",
       "snippets": "Configuration du client",
       "snippetsHelp": "Remplacez le domaine et l'adresse e-mail d'exemple. Chaque extrait définit l'algorithme, car UCM refuse les valeurs par défaut des clients (md5, sha1).",
-      "notePort": "Les extraits utilisent le port {{port}}, celui du listener UCM.",
+      "notePort": "Les extraits utilisent le port {{port}}, celui du listener UCM. Si le port 53 est redirigé vers lui (Docker, Service Kubernetes, redirection du pare-feu), utilisez le port 53.",
       "notePortDisabled": "Le listener est désactivé, les extraits utilisent donc le port 53. Définissez d'abord un port de listener, puis redirigez le port 53 vers celui-ci (Docker, Kubernetes ou redirection du pare-feu).",
       "tabBind": "Fichier de clé BIND",
       "tabAcmesh": "acme.sh",
