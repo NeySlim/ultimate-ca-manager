@@ -103,7 +103,7 @@ Obie tabele trafiają też do: modeli SQLAlchemy (`db.create_all()` przy nowej i
 2. Zapis jest „best effort”: w savepoincie (`db.session.begin_nested()`), konflikt UNIQUE i każdy inny błąd jest logowany i **nigdy** nie przerywa `get_authz` ani nie cofa stanu `challenges_data` (F13a).
 3. `expires_at` = `expires` z upstream authz, ale nie później niż `created_at + 24 h` (F13d).
 4. Wiersz jest „aktywny”, gdy: `status = pending`, `expires_at > teraz`, zamówienie ma `status = pending`.
-5. Zamknięcie (`status = closed`): `get_certificate`; każdy odczyt upstream authz albo challenge w stanie innym niż `pending` (`get_authz`, `respond_challenge`) (F13d).
+5. Zamknięcie (`status = closed`): `get_certificate`; odczyt upstream authz albo challenge w końcowym stanie błędu (`invalid`, `expired`, `deactivated`, `revoked`, RFC 8555 §7.1.6) w `get_authz` i `respond_challenge` (F13d). Stany `processing` i `valid` **nie** zamykają wiersza: klient, który pobrał authz w stanie `pending`, może wysłać UPDATE już po tym, jak automatyka UCM zwalidowała wyzwanie, i nie może wtedy dostać REFUSED (wyścig). Sukces zamyka `get_certificate`.
 6. Wiersze z `expires_at` starszym niż 7 dni są usuwane przy kolejnym zapisie.
 
 ### 2.3 Strefy „autorytatywne” i zakres klucza
@@ -301,7 +301,7 @@ Nazwa testu: `test_<ID>_<opis>_pos` / `test_<ID>_<opis>_neg`.
 | R1 | Wartość = base64url(SHA-256(token "." thumbprint)), bez `=` | 8555 §8.1, §8.4; 4648 §5; 7638 §3 | wektor z RFC 7638 §3.1 i tokenem testowym, wynik liczony niezależnie przez `hashlib` | wynik nie zawiera `=`, `+`, `/` |
 | R2 | Nazwa rekordu = `_acme-challenge.` + identyfikator bez `*.` | 8555 §7.1.4, §8.4 | `*.example.com` → `_acme-challenge.example.com.` | nigdy `_acme-challenge.*.example.com` |
 | R3 | Zapis przy pobraniu authz dla zamówienia i rodzeństwa | 8555 §7.5; #307 | authz `pending` z dns-01 → wiersze dla wszystkich zamówień | authz `valid` (#325); obcy klient (403); brak dns-01 → brak wierszy |
-| R4 | Zamknięcie przy `get_certificate` i gdy upstream authz/challenge nie jest `pending`; `expires_at` ≤ utworzenie + 24 h | 8555 §7.1.4 (`expires`), §7.1.6 | po certyfikacie → `closed`; authz `valid` → `closed` | wiersz innego zamówienia bez zmian; authz `expires` za 7 dni → `expires_at` = +24 h |
+| R4 | Zamknięcie przy `get_certificate` i przy końcowym stanie błędu authz/challenge; `expires_at` ≤ utworzenie + 24 h | 8555 §7.1.4 (`expires`), §7.1.6 | po certyfikacie → `closed`; authz albo challenge `invalid` → `closed` | wiersz innego zamówienia bez zmian; `processing` i `valid` → wiersz zostaje `pending` (wyścig z automatyką UCM); authz `expires` za 7 dni → `expires_at` = +24 h |
 | R5 | Zakres klucza: konto proxy, opcjonalnie konto ACME z EAB | 3007 §3, §3.1 | pasuje → dozwolone | inne konto proxy; inne konto ACME → niedozwolone |
 | R6 | Błąd zapisu wiersza (np. konflikt UNIQUE przy równoległym `get_authz`) nie przerywa `get_authz` i nie cofa `challenges_data` | spójność | dwa równoległe `get_authz` rodzeństwa → oba OK, wiersze bez duplikatów | wymuszony IntegrityError → `get_authz` zwraca authz, stan `initiated` zostaje |
 | R7 | Wiersz rodzeństwa ma thumbprint i `account_id` rodzeństwa; zamówienie bez thumbprintu nie ma wiersza | 8555 §8.1; #307 | 2 konta, wspólny authz → 2 wiersze z różnymi wartościami | zamówienie z `client_jwk_thumbprint` NULL → brak wiersza |
