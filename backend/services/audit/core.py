@@ -21,7 +21,8 @@ class AuditCoreLoggingMixin:
         details: Optional[str] = None,
         success: bool = True,
         username: Optional[str] = None,
-        user_id: Optional[int] = None
+        user_id: Optional[int] = None,
+        ip_address: Optional[str] = None,
     ) -> AuditLog:
         try:
             in_request = has_request_context()
@@ -31,6 +32,9 @@ class AuditCoreLoggingMixin:
             if user_id is None and in_request and hasattr(g, 'user_id'):
                 user_id = g.user_id
 
+            # An explicit address (the DNS UPDATE listener has no request
+            # context) wins over the one derived from the request.
+            explicit_ip = ip_address
             ip_address = None
             user_agent = None
             if in_request:
@@ -40,6 +44,9 @@ class AuditCoreLoggingMixin:
                 # trail as if it were the real source.
                 ip_address = client_ip()
                 user_agent = request.headers.get('User-Agent', '')[:500]
+
+            if explicit_ip:
+                ip_address = str(explicit_ip)[:45]
 
             if not username:
                 username = 'system' if not in_request else 'anonymous'
