@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- ACME proxy: an optional DNS UPDATE (RFC 2136) listener, off by default, so that cert-manager, lego, certbot, acme.sh, win-acme and Posh-ACME can answer DNS-01 challenges through TSIG-signed updates. It has per-account keys and no effect on DNS: UCM still publishes the records. The Docker image exposes `8053/udp` and `8053/tcp`, the Helm chart has a separate `dnsUpdate` Service (chart 0.4.0), and the Admin Guide and `docs/integrations/acme-proxy-dns-update.md` describe it (#416).
+
 ## [2.245] - 2026-10-23
 
 ### Security

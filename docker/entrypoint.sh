@@ -42,6 +42,16 @@ validate_port() {
     fi
 }
 
+# Ports below 1024 need CAP_NET_BIND_SERVICE, which the image does not have.
+validate_unprivileged_port() {
+    local port=$1
+    if [[ "$port" =~ ^[0-9]+$ ]] && [ "$port" -ge 1024 ] && [ "$port" -le 65535 ]; then
+        return 0
+    else
+        return 1
+    fi
+}
+
 validate_fqdn() {
     local fqdn=$1
     if [[ "$fqdn" =~ ^[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?(\.[a-zA-Z0-9]([a-zA-Z0-9\-]{0,61}[a-zA-Z0-9])?)*$ ]]; then
@@ -202,6 +212,21 @@ fi
 if ! validate_port "$UCM_HTTP_PORT"; then
     echo -e "${RED}❌ Invalid HTTP port: $UCM_HTTP_PORT${NC}"
     exit 1
+fi
+
+# Validate the DNS UPDATE (RFC 2136) listener port. Unset or 0 = listener off.
+if [ -n "${UCM_DNS_UPDATE_PORT:-}" ] && [ "$UCM_DNS_UPDATE_PORT" != "0" ]; then
+    if ! validate_unprivileged_port "$UCM_DNS_UPDATE_PORT"; then
+        echo -e "${RED}❌ Invalid DNS UPDATE port: $UCM_DNS_UPDATE_PORT${NC}"
+        echo "   UCM_DNS_UPDATE_PORT must be 0 (off) or an integer from 1024 to 65535."
+        echo "   The container runs as an unprivileged user and cannot bind port 53."
+        echo "   To serve port 53, keep the default 8053 and map it: -p 53:8053/udp -p 53:8053/tcp"
+        exit 1
+    fi
+    if [ "$UCM_DNS_UPDATE_PORT" -eq "$UCM_HTTPS_PORT" ] || [ "$UCM_DNS_UPDATE_PORT" -eq "$UCM_HTTP_PORT" ]; then
+        echo -e "${RED}❌ DNS UPDATE port $UCM_DNS_UPDATE_PORT is the same as the HTTPS or HTTP port${NC}"
+        exit 1
+    fi
 fi
 
 echo -e "${GREEN}✅ Configuration validated${NC}"

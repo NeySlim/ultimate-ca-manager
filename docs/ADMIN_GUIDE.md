@@ -570,6 +570,76 @@ curl -k -X PATCH -H "Authorization: Bearer $UCM_API_KEY" -H "Content-Type: appli
   https://localhost:8443/api/v2/acme/client/accounts/<id>
 ```
 
+### ACME proxy: DNS UPDATE listener (RFC 2136)
+
+**Purpose.** DNS-01 clients such as cert-manager, lego, certbot, acme.sh, win-acme and Posh-ACME can use the ACME proxy without a DNS API token of their own. They send a TSIG-signed DNS UPDATE (RFC 2136) to UCM. UCM checks the TXT value against the pending proxy order. Per-client settings are in [integrations/acme-proxy-dns-update.md](integrations/acme-proxy-dns-update.md).
+
+> **Internal network only.** The listener answers unsigned SOA queries for names of pending orders. Put it on an internal network or a private address. Never publish it to the internet. Use `UCM_DNS_UPDATE_HOST` and a firewall (or the Helm `dnsUpdate.networkPolicy`) to limit who can reach it.
+
+**Enable it.** The listener is **off by default**. A restart is needed after every change.
+
+| Method | Value |
+|--------|-------|
+| Environment variable | `UCM_DNS_UPDATE_PORT=8053` (`/etc/ucm/ucm.env` natively, container environment in Docker). It wins over the setting |
+| Setting | `acme.proxy.dns_update_port`, API field `dns_update_port` of `PATCH /api/v2/acme/client/settings` |
+| Off | unset, or `0` |
+
+The port is 1024 to 65535. It cannot be the HTTPS or HTTP protocol port. UCM serves UDP and TCP on the same port. `GET /api/v2/acme/client/settings` shows `dns_update_listening`, which is `true` when the listener runs.
+
+**Bind address.** By default the listener uses the same address as the HTTP protocol port (`HOST`). Set `UCM_DNS_UPDATE_HOST` to bind it to one internal address only.
+
+**Port 53.** DNS clients use port 53 by default. UCM runs without the right to bind port 53, so keep a high port (8053 is the suggestion) and map port 53 to it. The DEB and RPM service units are not changed.
+
+| Deployment | How to map port 53 |
+|------------|--------------------|
+| Docker | `-p 53:8053/udp -p 53:8053/tcp` and `-e UCM_DNS_UPDATE_PORT=8053`. The image exposes `8053/udp` and `8053/tcp`. The entrypoint refuses a port below 1024 |
+| Kubernetes | Helm `dnsUpdate.enabled=true`. The chart creates the separate Service `<fullname>-dns-update` (port 53 to container port 8053; `ucm-dns-update` for the release `ucm`). See the [chart README](../charts/ucm/README.md) |
+| DEB, RPM | A firewall redirect on the UCM host, both protocols |
+
+```bash
+iptables -t nat -A PREROUTING -p udp --dport 53 -j REDIRECT --to-port 8053
+iptables -t nat -A PREROUTING -p tcp --dport 53 -j REDIRECT --to-port 8053
+```
+
+Clients on the UCM host itself need the same rules in the `OUTPUT` chain. With nftables or firewalld, use an equivalent redirect. Some clients can send only to port 53 (win-acme), so map the port for them.
+
+**Keys.** A TSIG key belongs to one ACME proxy account. There is no global key.
+
+- Create a key with `POST /api/v2/acme/client/accounts/<id>/dns-update-keys` (also in the web interface). UCM shows the secret **once**. It stores the secret encrypted and cannot show it again.
+- The default algorithm is `hmac-sha256`. `hmac-sha384` and `hmac-sha512` are possible.
+- Revoke a key with `DELETE .../dns-update-keys/<key_id>`. A revoked key stops working at once (BADKEY). Another `DELETE` removes it. Deleting an ACME proxy account removes its keys.
+- Optional link to an EAB credential (`eab_credential_id`). The key then accepts only values for orders of the ACME account that registered with that credential, so the credential must be used already. A key without the link accepts values for all orders of its proxy account. Deleting the EAB credential also deletes the keys linked to it.
+- `last_used_at` of a key shows when it last sent an accepted update.
+
+**What the listener accepts and answers.**
+
+- An UPDATE must be signed (TSIG). An unsigned UPDATE gets `REFUSED`.
+- An update adds only a TXT record at `_acme-challenge.<name>`, with the exact value that UCM expects for a pending proxy order of the key's scope. The name must be in a zone that matches an entry in ACME Domains, or in a parent of one.
+- Deletes (one record, or the whole TXT set of a name) always get `NOERROR`, also when the order is gone. A delete changes nothing.
+- A message with prerequisites gets `REFUSED`.
+- **The listener writes nothing to DNS.** UCM still publishes the challenge record through its DNS provider, as for every proxy order. The update only proves that the client holds the right value.
+- It answers SOA queries for the zone of a pending order and for the names between that zone and the challenge name (the zone is the ACME Domains entry for the name). Unsigned and signed SOA queries are answered. A signed query gets a signed answer. The SOA record has fixed values and no host name.
+- It refuses every other query (`REFUSED`). It does not recurse and does not serve any other data.
+- Over UDP, an answer to a request without a valid signature is never larger than the request. Larger answers are cut (TC) or dropped. A signed request gets a normal DNS answer size. TCP has no such limit.
+- Messages larger than 4096 bytes are ignored. The listener also limits the packet rate, in total and per source address. Behind NAT or kube-proxy SNAT, many clients can share one source address and one limit.
+
+**Algorithms and time.** UCM accepts only `hmac-sha256`, `hmac-sha384` and `hmac-sha512`. The default algorithm of many clients is `hmac-md5` or `hmac-sha1`. UCM refuses them with `BADKEY`, so always set the algorithm in the client. The clock of the client must be within 300 seconds of the UCM clock, or UCM answers `BADTIME`.
+
+**Audit log.** Accepted updates, and signed refusals (wrong key, wrong signature, wrong time, wrong value), are written to the audit log (actions `acme.dns_update.accepted`, `acme.dns_update.refused`, `acme.dns_update.rejected`). Unsigned and malformed packets are only written to the application log, sampled.
+
+**Troubleshooting.** The client output shows the DNS result code.
+
+| Code | Meaning | What to check |
+|------|---------|---------------|
+| `BADKEY` | UCM does not know the key, or the key is not usable | Key name (with the trailing dot in some clients), key revoked, proxy account disabled, algorithm refused (`hmac-md5`, `hmac-sha1`: set `hmac-sha256`) |
+| `BADSIG` | The signature does not match | Wrong secret (copy it again from the creation dialog), secret not base64, a different algorithm than the key has. win-acme with `hmac-sha384` signs wrongly: use `hmac-sha256` |
+| `BADTIME` | The client clock is more than 300 s away from UCM | Synchronize the time (NTP) on the client and on UCM |
+| `REFUSED` | The request is understood but not allowed | Unsigned UPDATE; value does not match the pending order (new order, new value); no pending order for that name (the client must fetch the authorization first); name is not `_acme-challenge.<name>`; record type is not TXT; the message has prerequisites; for a query, the name is not covered by a pending order |
+| `NOTAUTH` | The zone is not served | The domain (or a parent) is not in ACME Domains |
+| `NOTZONE` | A name in the update is outside the zone of the message | The client sent a zone and a record name that do not fit |
+
+If the client times out and gets no answer, check the port mapping, the firewall, `dns_update_listening`, and that the client uses UDP and TCP on the right port. UCM does not answer packets that it cannot parse.
+
 ### SCEP Administration
 
 View pending SCEP requests in the SCEP page, or via API:

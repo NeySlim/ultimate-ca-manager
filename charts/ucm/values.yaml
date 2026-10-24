@@ -93,6 +93,33 @@ service:
   httpPort: 8080    # CDP / OCSP / AIA protocol endpoints (plain HTTP)
   annotations: {}
 
+## DNS UPDATE (RFC 2136) listener of the ACME proxy. For INTERNAL networks only:
+## never expose it to the internet. Off by default.
+## The listener has its own Service, so that exposing the HTTPS UI (Service,
+## Ingress, LoadBalancer) never exposes the listener. The pod runs as a
+## non-root user and cannot bind port 53: the Service maps port 53 to `port`.
+## The per-account TSIG keys are created in the UCM web interface.
+dnsUpdate:
+  enabled: false
+  port: 8053            # container port, UDP and TCP, 1024..65535 (sets UCM_DNS_UPDATE_PORT)
+  host: ""              # bind address inside the pod (sets UCM_DNS_UPDATE_HOST), empty = default
+  service:
+    type: ClusterIP     # LoadBalancer needs mixed UDP/TCP support from your cloud
+    port: 53            # port that DNS clients use
+    annotations: {}
+    loadBalancerIP: ""
+  ## Additional NetworkPolicy: allows the listener ports only from these peers.
+  ## The HTTPS and HTTP ports stay open to all sources, as without a policy.
+  ## `from` is a list of NetworkPolicy peers (podSelector, namespaceSelector,
+  ## ipBlock). An empty list with enabled: true denies all ingress to the
+  ## listener ports. The policy needs a CNI that enforces NetworkPolicy.
+  networkPolicy:
+    enabled: false
+    from: []
+      # - namespaceSelector:
+      #     matchLabels:
+      #       kubernetes.io/metadata.name: cert-manager
+
 ## Ingress. UCM terminates TLS itself, so for the HTTPS UI you typically want
 ## passthrough OR a controller annotation telling it the backend speaks HTTPS
 ## (e.g. nginx: nginx.ingress.kubernetes.io/backend-protocol: "HTTPS").

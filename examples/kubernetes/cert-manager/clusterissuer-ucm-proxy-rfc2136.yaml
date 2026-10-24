@@ -1,0 +1,67 @@
+# ClusterIssuer for the UCM ACME proxy with DNS-01 through the DNS UPDATE
+# (RFC 2136) listener of UCM.
+#
+# The proxy forwards orders to the upstream CA (for example Let's Encrypt).
+# cert-manager proves control of the domain by sending a TSIG-signed DNS UPDATE
+# to UCM. UCM checks the TXT value and publishes the record through its own
+# DNS provider. This replaces the acme-dns stub approach: no extra DNS server
+# and no CNAME delegation are needed.
+#
+# Prerequisites:
+#   - UCM: the DNS UPDATE listener is on (Helm: dnsUpdate.enabled=true;
+#     Docker: UCM_DNS_UPDATE_PORT=8053; or the setting in ACME > Let's Encrypt).
+#   - UCM: the domain is in ACME > Domains, with a DNS provider.
+#   - UCM: a DNS UPDATE key exists for the proxy account. The secret is shown
+#     once. Use hmac-sha256 (HMACSHA256 here). cert-manager does not offer
+#     sha384, and UCM refuses the cert-manager default (HMACMD5).
+#   - cert-manager finds the zone apex through its recursive resolvers
+#     (--dns01-recursive-nameservers). They must see the public zone.
+#   - The listener is for INTERNAL networks only. Do not expose it.
+#
+# Replace the values marked REPLACE_ or example.com.
+#   <svc>      name of the UCM Service for the listener: <fullname>-dns-update.
+#              <fullname> is the Helm release name when it contains "ucm",
+#              otherwise <release>-ucm. Release "ucm" gives "ucm-dns-update".
+#   <ns>       namespace of that release
+#   <slug>     slug of the ACME proxy endpoint
+---
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ucm-proxy-tsig
+  namespace: cert-manager   # the namespace of cert-manager (ClusterIssuer secrets)
+type: Opaque
+stringData:
+  # Base64 secret exactly as UCM showed it when the key was created.
+  tsig-secret-key: REPLACE_WITH_TSIG_SECRET_FROM_UCM
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ucm-proxy-rfc2136
+spec:
+  acme:
+    server: https://ucm.example.com:8443/acme/proxy/<slug>/directory
+    email: pki-admin@example.com
+    privateKeySecretRef:
+      name: ucm-proxy-rfc2136-account-key
+    # Production: trust the UCM certificate instead (see README.md).
+    skipTLSVerify: true
+    # If External Account Binding is on for this proxy, add the
+    # externalAccountBinding block as in clusterissuer-ucm-dns01.yaml.
+    solvers:
+      - dns01:
+          rfc2136:
+            # Separate Service of the Helm chart: port 53 -> container port 8053.
+            nameserver: <svc>.<ns>.svc:53
+            # Name of the key in UCM, with the trailing dot.
+            tsigKeyName: REPLACE_WITH_KEY_NAME_FROM_UCM.
+            tsigAlgorithm: HMACSHA256
+            tsigSecretSecretRef:
+              name: ucm-proxy-tsig
+              key: tsig-secret-key
+            # UDP is the default. TCP also works.
+            # protocol: TCP
+        selector:
+          dnsZones:
+            - "example.com"

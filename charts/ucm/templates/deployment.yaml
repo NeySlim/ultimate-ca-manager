@@ -50,6 +50,14 @@ spec:
             - name: http
               containerPort: 8080
               protocol: TCP
+            {{- if .Values.dnsUpdate.enabled }}
+            - name: dns-udp
+              containerPort: {{ .Values.dnsUpdate.port }}
+              protocol: UDP
+            - name: dns-tcp
+              containerPort: {{ .Values.dnsUpdate.port }}
+              protocol: TCP
+            {{- end }}
           env:
             - name: UCM_FQDN
               value: {{ .Values.fqdn | quote }}
@@ -89,6 +97,14 @@ spec:
             {{- if .Values.fips.enabled }}
             - name: UCM_FIPS
               value: "1"
+            {{- end }}
+            {{- if .Values.dnsUpdate.enabled }}
+            - name: UCM_DNS_UPDATE_PORT
+              value: {{ .Values.dnsUpdate.port | quote }}
+            {{- with .Values.dnsUpdate.host }}
+            - name: UCM_DNS_UPDATE_HOST
+              value: {{ . | quote }}
+            {{- end }}
             {{- end }}
             {{- with .Values.extraEnv }}
             {{- toYaml . | nindent 12 }}

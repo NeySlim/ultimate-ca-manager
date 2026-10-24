@@ -10,6 +10,7 @@ for any Kubernetes workload using your private UCM-managed CA.
 |---|---|
 | `clusterissuer-ucm.yaml` | ClusterIssuer for HTTP-01 (no EAB) |
 | `clusterissuer-ucm-dns01.yaml` | ClusterIssuer for DNS-01 + EAB (wildcards, internal-only workloads) |
+| `clusterissuer-ucm-proxy-rfc2136.yaml` | Secret + ClusterIssuer for the UCM ACME proxy with DNS-01 through the UCM DNS UPDATE (RFC 2136) listener |
 | `eab-secret.yaml` | Holds the HMAC for External Account Binding |
 | `certificate-example.yaml` | Sample `Certificate` (single-host + wildcard) |
 
@@ -84,6 +85,16 @@ kubectl wait --for=condition=Ready clusterissuer/ucm-acme-dns01 --timeout=60s
 kubectl apply -f certificate-example.yaml
 kubectl wait --for=condition=Ready certificate/wildcard-example --timeout=300s
 ```
+
+## DNS-01 through the UCM ACME proxy (DNS UPDATE listener)
+
+`clusterissuer-ucm-proxy-rfc2136.yaml` points the `rfc2136` solver at the
+DNS UPDATE listener of UCM instead of a separate DNS server. Enable the
+listener (Helm: `dnsUpdate.enabled=true`), create a DNS UPDATE key for the
+proxy account in UCM (hmac-sha256), and put the secret in the Secret of the
+file. The listener is for internal networks only. See
+[`docs/integrations/acme-proxy-dns-update.md`](../../../docs/integrations/acme-proxy-dns-update.md)
+for the details and the limits of cert-manager here.
 
 ## Trusting UCM's TLS cert
 
