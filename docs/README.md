@@ -18,6 +18,7 @@ Technical documentation for Ultimate Certificate Manager.
 
 - **[integrations/intune-scep.md](./integrations/intune-scep.md)**: Microsoft Intune SCEP enrollment (live challenge validation via Entra app registration)
 - **[integrations/acme-proxy-clients.md](./integrations/acme-proxy-clients.md)**: ACME proxy for hosts without DNS API access (per-client setup, DNS resolver limits)
+- **[integrations/acme-proxy-dns-update.md](./integrations/acme-proxy-dns-update.md)**: ACME proxy DNS UPDATE (RFC 2136) listener: settings for cert-manager, acme.sh, certbot, lego, win-acme and Posh-ACME
 
 ## API
 
@@ -36,6 +37,7 @@ Technical documentation for Ultimate Certificate Manager.
 - **[testing/ACME-PUBLIC-VHOST.md](./testing/ACME-PUBLIC-VHOST.md)**: Public ACME vhost, wildcard TLS, test plan
 - **[testing/ACME-PROXY-MULTI-CA.md](./testing/ACME-PROXY-MULTI-CA.md)**: Multi-CA proxy endpoints
 - **[testing/ACME-DNS-PROPAGATION.md](./testing/ACME-DNS-PROPAGATION.md)**: DNS-01 propagation checks
+- **[testing/ACME-PROXY-DNS-UPDATE.md](./testing/ACME-PROXY-DNS-UPDATE.md)**: ACME proxy DNS UPDATE (RFC 2136) listener: tests and end-to-end lab with real clients
 
 ## Architecture
 

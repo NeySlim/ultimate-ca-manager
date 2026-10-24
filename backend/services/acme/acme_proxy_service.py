@@ -19,6 +19,7 @@ import requests
 from flask import current_app
 from sqlalchemy import and_, or_, inspect as sa_inspect
 from sqlalchemy.exc import NoInspectionAvailable
+from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
 
 from cryptography.hazmat.primitives import serialization, hashes
@@ -64,6 +65,25 @@ def _dns01_txt_value(key_authorization: str) -> str:
     import hashlib
     digest = hashlib.sha256(key_authorization.encode()).digest()
     return base64.urlsafe_b64encode(digest).rstrip(b'=').decode()
+
+
+def _dns_rows_hook(action, *args):
+    """Run a DNS UPDATE expected-value hook (``records.<action>``). The rows
+    are a side channel: a failure is logged and never changes the outcome of
+    the proxy request."""
+    try:
+        from services.acme.dns_update import records
+        return getattr(records, action)(*args)
+    except Exception as exc:
+        logger.warning("[ACME Proxy] DNS UPDATE hook %s failed: %s",
+                       action, type(exc).__name__)
+        return None
+
+
+def _dns_failed_state(status) -> bool:
+    """True for an RFC 8555 final state in which validation failed."""
+    from services.acme.dns_update.records import is_failed_state
+    return is_failed_state(status)
 
 
 class ProxyChallengeIdentifierError(RuntimeError):
@@ -1156,18 +1176,35 @@ class AcmeProxyService:
         # to reach the client directly, which cannot work through a proxy.
         already_valid = authz.get('status') == 'valid'
         proxy_challenges = []
+        closed_chall_urls = []
         for chall in authz.get('challenges', []):
             if chall.get('type') != 'dns-01' and not already_valid:
                 continue
             chall_url = chall.get('url')
             if not chall_url:
                 continue
+            if (_dns_failed_state(authz.get('status'))
+                    or _dns_failed_state(chall.get('status'))):
+                closed_chall_urls.append(chall_url)
             chall_id = self._proxy_id(chall_url)
             _challenge_order_cache.put(
                 self._challenge_cache_key(chall_url, requester_account_id,
                                           requester_thumbprint),
                 (order.id, domain, authz_url),
             )
+
+            # Expected TXT values for the DNS UPDATE listener: one row per
+            # order sharing this authz, whether or not automation started.
+            # Written while the authz is pending and the challenge is pending
+            # or processing (RFC 8555 section 7.1.6: not final yet), so a
+            # sibling order that fetches the authz after the automation
+            # started still gets its row.
+            if (authz.get('status') == 'pending'
+                    and chall.get('status') in ('pending', 'processing')
+                    and not already_valid):
+                _dns_rows_hook('persist_expected_values', candidates, domain,
+                               chall.get('token'), chall_url,
+                               authz.get('expires'), utc_now())
 
             # Check if we should trigger automation for this challenge
             # We trigger it as soon as the client fetches the authorization
@@ -1205,6 +1242,9 @@ class AcmeProxyService:
 
             chall['url'] = f"{self.base_url}/challenge/{chall_id}"
             proxy_challenges.append(chall)
+
+        if closed_chall_urls:
+            _dns_rows_hook('close_for_challenge_urls', closed_chall_urls)
 
         if not proxy_challenges and not already_valid:
             logger.error(
@@ -1280,6 +1320,8 @@ class AcmeProxyService:
             # the challenge type. A pre-validated authorization (#325) exposes
             # its already valid http-01/tls-alpn-01 challenge and a client may
             # poll it; nothing is triggered here.
+            if _dns_failed_state(status):
+                _dns_rows_hook('close_for_challenge_urls', [chall_url])
             challenge_data['url'] = f"{self.base_url}/challenge/{chall_id_b64}"
             return challenge_data, up_link
 
@@ -1885,6 +1927,8 @@ class AcmeProxyService:
                 except Exception as e:
                     db.session.rollback()
                     logger.error(f"Failed to update order status: {e}")
+                else:
+                    _dns_rows_hook('close_for_order', order.id)
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Failed during certificate cleanup: {e}")

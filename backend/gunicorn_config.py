@@ -245,6 +245,7 @@ def post_worker_init(worker):
     """Post-worker initialization:
     1. Suppress noisy SSL/connection tracebacks from gevent
     2. Start HTTP protocol server for CDP/OCSP (if configured)
+    3. Start the DNS UPDATE listener (if configured)
     """
     import ssl
     import gevent
@@ -270,4 +271,18 @@ def post_worker_init(worker):
         import logging
         logging.getLogger('ucm.protocol').warning(
             "Could not initialize HTTP protocol server: %s", e
+        )
+
+    # Start the DNS UPDATE (RFC 2136) listener (UDP and TCP, if a port is configured)
+    try:
+        from services.acme.dns_update.server import start_dns_update_server
+        from wsgi import app as flask_app
+        with flask_app.app_context():
+            # After a reload the old worker may hold the port until graceful_timeout
+            retry_for = float(getattr(worker.cfg, 'graceful_timeout', 30)) + 5
+            start_dns_update_server(flask_app, retry_for=retry_for)
+    except Exception as e:
+        import logging
+        logging.getLogger('ucm.protocol').warning(
+            "Could not initialize DNS UPDATE listener: %s", e
         )

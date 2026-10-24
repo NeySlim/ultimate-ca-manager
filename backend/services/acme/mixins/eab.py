@@ -159,6 +159,13 @@ class EabMixin:
                     and current.used_by_account_id == account_id
                 )
             db.session.commit()
+            try:
+                # A key bound to this credential caches "no account" until reload.
+                from services.acme.dns_update.keys import invalidate_keys
+                invalidate_keys()
+            except Exception as inv_err:
+                logger.warning("DNS UPDATE key cache invalidation failed: %s",
+                               type(inv_err).__name__)
             return True
         except Exception as e:
             db.session.rollback()

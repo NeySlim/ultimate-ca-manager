@@ -15,7 +15,9 @@ from utils.acme_public_url import get_acme_public_base, get_acme_proxy_public_ba
 from models import db, SystemConfig
 from utils.acme_debug import clear_acme_debug_cache
 from services.audit_service import AuditService
-from services.acme.acme_client_service import ACCOUNT_KEY_TYPES, CERT_KEY_TYPES, fips_key_type_refusal
+from services.acme.acme_client_service import (
+    ACCOUNT_KEY_TYPES, CERT_KEY_TYPES, fips_key_type_refusal, get_stored_tls_alpn_port,
+)
 from services.acme.dns_selfcheck import DNS_PROPAGATION_MAX_DELAY, dns_propagation_delay
 from security.encryption import encrypt_text
 from utils.dns_txt_lookup import (
@@ -25,6 +27,8 @@ from utils.dns_txt_lookup import (
     format_resolver_entries,
     parse_resolver_entries,
 )
+
+from services.acme.dns_update import status as dns_update_status
 
 logger = logging.getLogger(__name__)
 
@@ -100,17 +104,14 @@ def get_settings():
         proxy_eab_kid = None
         proxy_eab_hmac_set = False
     dns_timeout_cfg = SystemConfig.query.filter_by(key='acme.client.dns_propagation_timeout').first()
-    tls_alpn_port_cfg = SystemConfig.query.filter_by(key='acme.client.tls_alpn_port').first()
     debug_logging_cfg = SystemConfig.query.filter_by(key='acme.client.debug_logging').first()
     allow_loopback_cfg = SystemConfig.query.filter_by(key='acme.client.allow_loopback_upstream').first()
     try:
         dns_timeout = int(dns_timeout_cfg.value) if dns_timeout_cfg else 120
     except (ValueError, TypeError):
         dns_timeout = 120
-    try:
-        tls_alpn_port = int(tls_alpn_port_cfg.value) if tls_alpn_port_cfg else 443
-    except (ValueError, TypeError):
-        tls_alpn_port = 443
+    tls_alpn_port = get_stored_tls_alpn_port()
+    stored_dns_port = dns_update_status.get_stored_dns_update_port()
 
     return success_response(data={
         'email': email_cfg.value if email_cfg else None,
@@ -145,6 +146,10 @@ def get_settings():
         'account_key_type': acct_key_type_cfg.value if acct_key_type_cfg else 'ES256',
         'acme_public_base_url': get_acme_public_base(request),
         'acme_proxy_public_base_url': get_acme_proxy_public_base(request),
+        'dns_update_port': stored_dns_port,
+        'dns_update_port_effective': dns_update_status.get_dns_update_port(stored_dns_port),
+        'dns_update_port_env': dns_update_status.get_dns_update_port_env(),
+        'dns_update_listening': dns_update_status.is_listening(),
     })
 
 
@@ -254,12 +259,59 @@ def update_settings():
             return error_response(
                 'TLS-ALPN-01 listen port must be between 1 and 65535', 400
             )
+        effective_dns_port = dns_update_status.get_dns_update_port()
+        if 'dns_update_port' in data and dns_update_status.get_dns_update_port_env() is None:
+            try:
+                if not isinstance(data['dns_update_port'], bool):
+                    effective_dns_port = int(data['dns_update_port'])
+            except (TypeError, ValueError):
+                pass
+        if effective_dns_port != 0 and tls_alpn_port == effective_dns_port:
+            return error_response(
+                'TLS-ALPN-01 listen port cannot be the same as the DNS UPDATE port', 400)
         _set_config(
             'acme.client.tls_alpn_port',
             str(tls_alpn_port),
             'TCP port for the ACME client TLS-ALPN-01 proof listener',
         )
         updates.append('tls_alpn_port')
+
+    restart_needed = False
+    env_override = False
+    if 'dns_update_port' in data:
+        raw_port = data['dns_update_port']
+        try:
+            if isinstance(raw_port, bool):
+                raise TypeError
+            dns_update_port = int(raw_port)
+        except (TypeError, ValueError):
+            return error_response('DNS UPDATE port must be an integer', 400)
+        if dns_update_port != 0 and (dns_update_port < 1024 or dns_update_port > 65535):
+            return error_response(
+                'DNS UPDATE port must be 0 (disabled) or between 1024 and 65535', 400)
+        if dns_update_port != 0:
+            from config.settings import Config
+            from protocol_http_server import get_http_protocol_port
+            if dns_update_port == Config.HTTPS_PORT:
+                return error_response('DNS UPDATE port cannot be the same as HTTPS port', 400)
+            if dns_update_port == get_http_protocol_port():
+                return error_response(
+                    'DNS UPDATE port cannot be the same as HTTP protocol port', 400)
+            effective_tls_alpn = (tls_alpn_port if 'tls_alpn_port' in data
+                                  else get_stored_tls_alpn_port())
+            if dns_update_port == effective_tls_alpn:
+                return error_response(
+                    'DNS UPDATE port cannot be the same as the TLS-ALPN-01 port', 400)
+        env_override = dns_update_status.get_dns_update_port_env() is not None
+        _set_config(
+            dns_update_status.PORT_CONFIG_KEY,
+            str(dns_update_port),
+            'TCP/UDP port of the DNS UPDATE (RFC 2136) listener, 0 = disabled',
+        )
+        updates.append('dns_update_port')
+        # The environment variable wins over the setting: no restart helps then.
+        restart_needed = (dns_update_port != dns_update_status.listening_port()
+                          and not env_override)
 
     if 'debug_logging' in data:
         try:
@@ -487,6 +539,14 @@ def update_settings():
         success=True
     )
 
-    return success_response(
-        message=f'Settings updated: {", ".join(updates)}' if updates else 'No changes'
-    )
+    message = f'Settings updated: {", ".join(updates)}' if updates else 'No changes'
+    if restart_needed:
+        message += ' (restart UCM to apply the DNS UPDATE port)'
+    response_data = None
+    if 'dns_update_port' in data:
+        response_data = {'restart_required': restart_needed}
+        if env_override:
+            response_data['dns_update_port_env_override'] = True
+            message += (f' ({dns_update_status.PORT_ENV} is set and overrides the '
+                        'DNS UPDATE port setting)')
+    return success_response(data=response_data, message=message)

@@ -1,0 +1,40 @@
+{{- if and .Values.dnsUpdate.enabled .Values.dnsUpdate.networkPolicy.enabled }}
+## NetworkPolicies are additive allow-lists. Once a policy selects the pod,
+## every port that no rule allows is closed. This policy has two rules:
+## - from everywhere: the https and http ports and `extraPorts`;
+## - from the listed peers only: the DNS UPDATE ports.
+## Every other port of the pod is closed (for example the TLS-ALPN-01 proof
+## listener, or a port added with `extraEnv`). Add such ports to `extraPorts`.
+## With an empty `from` list, nothing reaches the DNS UPDATE ports.
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: {{ include "ucm.fullname" . }}-dns-update
+  labels:
+    {{- include "ucm.labels" . | nindent 4 }}
+spec:
+  podSelector:
+    matchLabels:
+      {{- include "ucm.selectorLabels" . | nindent 6 }}
+  policyTypes:
+    - Ingress
+  ingress:
+    - ports:
+        - port: https
+          protocol: TCP
+        - port: http
+          protocol: TCP
+        {{- range .Values.dnsUpdate.networkPolicy.extraPorts }}
+        - port: {{ .port }}
+          protocol: {{ .protocol | default "TCP" }}
+        {{- end }}
+    {{- with .Values.dnsUpdate.networkPolicy.from }}
+    - from:
+        {{- toYaml . | nindent 8 }}
+      ports:
+        - port: {{ $.Values.dnsUpdate.port }}
+          protocol: UDP
+        - port: {{ $.Values.dnsUpdate.port }}
+          protocol: TCP
+    {{- end }}
+{{- end }}

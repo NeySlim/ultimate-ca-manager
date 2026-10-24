@@ -1,0 +1,30 @@
+{{- if .Values.dnsUpdate.enabled }}
+## Separate Service for the DNS UPDATE (RFC 2136) listener. Exposing the main
+## Service (HTTPS UI) never exposes the listener.
+apiVersion: v1
+kind: Service
+metadata:
+  name: {{ include "ucm.fullname" . }}-dns-update
+  labels:
+    {{- include "ucm.labels" . | nindent 4 }}
+  {{- with .Values.dnsUpdate.service.annotations }}
+  annotations:
+    {{- toYaml . | nindent 4 }}
+  {{- end }}
+spec:
+  type: {{ .Values.dnsUpdate.service.type }}
+  {{- if and (eq .Values.dnsUpdate.service.type "LoadBalancer") .Values.dnsUpdate.service.loadBalancerIP }}
+  loadBalancerIP: {{ .Values.dnsUpdate.service.loadBalancerIP | quote }}
+  {{- end }}
+  ports:
+    - name: dns-udp
+      port: {{ .Values.dnsUpdate.service.port }}
+      targetPort: {{ .Values.dnsUpdate.port }}
+      protocol: UDP
+    - name: dns-tcp
+      port: {{ .Values.dnsUpdate.service.port }}
+      targetPort: {{ .Values.dnsUpdate.port }}
+      protocol: TCP
+  selector:
+    {{- include "ucm.selectorLabels" . | nindent 4 }}
+{{- end }}

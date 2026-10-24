@@ -23,6 +23,12 @@ bp = Blueprint('acme_domains', __name__)
 # Domain CRUD
 # =============================================================================
 
+def _invalidate_zone_index():
+    """The DNS UPDATE listener must see ACME Domains changes at once."""
+    from services.acme.dns_update.zones import zone_index
+    zone_index.invalidate()
+
+
 @bp.route('/api/v2/acme/domains', methods=['GET'])
 @require_auth(['read:acme'])
 def list_domains():
@@ -99,6 +105,7 @@ def create_domain():
     ok, _err = safe_commit(logger, "Failed to create ACME domain")
     if not ok:
         return _err
+    _invalidate_zone_index()
     
     AuditService.log_action(
         action='acme_domain_create',
@@ -155,6 +162,7 @@ def update_domain(domain_id):
     ok, _err = safe_commit(logger, "Failed to update ACME domain")
     if not ok:
         return _err
+    _invalidate_zone_index()
     
     AuditService.log_action(
         action='acme_domain_update',
@@ -183,6 +191,7 @@ def delete_domain(domain_id):
         ok, err = safe_commit(logger, 'Failed to delete domain')
         if not ok:
             return err
+        _invalidate_zone_index()
 
         AuditService.log_action(
             action='acme_domain_delete',

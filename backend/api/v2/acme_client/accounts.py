@@ -28,8 +28,11 @@ from utils.db_transaction import safe_commit
 from utils.ssrf_protection import validate_url_not_cloud_metadata
 from models import db
 from models.acme_client_account import AcmeClientAccount
+from models.acme_dns_update import AcmeDnsUpdateKey
 from models.acme_models import AcmeClientOrder
 from services.acme.acme_client_service import AcmeClientService, ACCOUNT_KEY_TYPES
+from services.acme.dns_update import records as dns_update_records
+from services.acme.dns_update.keys import invalidate_keys
 from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
@@ -150,11 +153,22 @@ def _clear_other_defaults(except_id=None):
 @bp.route('/api/v2/acme/client/accounts', methods=['GET'])
 @require_auth(['read:acme'])
 def list_ca_accounts():
-    """List all configured external ACME CA accounts."""
+    """List all configured external ACME CA accounts.
+
+    Each account has ``dns_update_key_count``: its DNS UPDATE keys of any status.
+    The UI shows the keys of an account whose proxy is off, so they can be revoked.
+    """
     accounts = AcmeClientAccount.query.order_by(
         AcmeClientAccount.is_default.desc(), AcmeClientAccount.label.asc()
     ).all()
-    return success_response(data=[a.to_dict() for a in accounts])
+    # One grouped query for the whole list.
+    counts = dict(
+        db.session.query(AcmeDnsUpdateKey.acme_client_account_id, db.func.count(AcmeDnsUpdateKey.id))
+        .group_by(AcmeDnsUpdateKey.acme_client_account_id).all()
+    )
+    return success_response(data=[
+        {**a.to_dict(), 'dns_update_key_count': counts.get(a.id, 0)} for a in accounts
+    ])
 
 
 @bp.route('/api/v2/acme/client/accounts/<int:account_id>', methods=['GET'])
@@ -256,6 +270,7 @@ def create_ca_account():
     ok, err = safe_commit(logger, 'Failed to create ACME CA account')
     if not ok:
         return err
+    invalidate_keys()  # proxy_enabled/slug/deletion change usable TSIG keys
 
     AuditService.log_action(
         action='acme_ca_account_create',
@@ -322,6 +337,7 @@ def update_ca_account(account_id):
     ok, err = safe_commit(logger, 'Failed to update ACME CA account')
     if not ok:
         return err
+    invalidate_keys()  # proxy_enabled/slug/deletion change usable TSIG keys
 
     AuditService.log_action(
         action='acme_ca_account_update',
@@ -341,6 +357,13 @@ def _remove_account_row(acct: AcmeClientAccount) -> None:
     AcmeClientOrder.query.filter_by(acme_client_account_id=acct.id).update(
         {AcmeClientOrder.acme_client_account_id: None}
     )
+    # SQLite does not enforce the FK cascade: remove keys and expected values
+    # in the same transaction so nothing outlives the account.
+    from models.acme_dns_update import AcmeDnsUpdateKey, AcmeProxyDnsChallenge
+    AcmeDnsUpdateKey.query.filter_by(acme_client_account_id=acct.id).delete(
+        synchronize_session=False)
+    AcmeProxyDnsChallenge.query.filter_by(acme_client_account_id=acct.id).delete(
+        synchronize_session=False)
     db.session.delete(acct)
     if was_default:
         replacement = AcmeClientAccount.query.filter(
@@ -365,6 +388,8 @@ def delete_ca_account(account_id):
     ok, err = safe_commit(logger, 'Failed to delete ACME CA account')
     if not ok:
         return err
+    invalidate_keys()  # proxy_enabled/slug/deletion change usable TSIG keys
+    dns_update_records.invalidate_cache()  # expected values of the account are gone
 
     AuditService.log_action(
         action='acme_ca_account_delete',
@@ -409,6 +434,8 @@ def deactivate_ca_account(account_id):
     ok, err = safe_commit(logger, 'Failed to remove deactivated ACME CA account')
     if not ok:
         return err
+    invalidate_keys()  # proxy_enabled/slug/deletion change usable TSIG keys
+    dns_update_records.invalidate_cache()  # expected values of the account are gone
 
     AuditService.log_action(
         action='acme_ca_account_deactivate',

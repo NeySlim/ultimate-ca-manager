@@ -31,6 +31,7 @@ import OrderDetailPanel from './acme/OrderDetailPanel'
 import CreateAccountForm from './acme/CreateAccountForm'
 import RequestCertificateForm from './acme/RequestCertificateForm'
 import CaAccountsManager from './acme/CaAccountsManager'
+import { effectiveDnsUpdatePort, settingsAfterPortSave } from './acme/dnsUpdatePort'
 import DnsProviderForm from './acme/DnsProviderForm'
 import DomainForm from './acme/DomainForm'
 import LocalDomainForm from './acme/LocalDomainForm'
@@ -367,6 +368,18 @@ export default function ACMEPage() {
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.settings'))
       localSetter(String(clientSettings[key] ?? fallback))
+    }
+  }
+
+  // The DNS UPDATE listener port is read at start: the response says if a restart is needed.
+  const handleSaveDnsUpdatePort = async (port) => {
+    try {
+      const res = await acmeService.updateClientSettings({ dns_update_port: port })
+      setClientSettings(prev => settingsAfterPortSave(prev, port))
+      return res
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.settings'))
+      return null
     }
   }
 
@@ -1174,6 +1187,7 @@ export default function ACMEPage() {
             localDnsNameservers={localDnsNameservers}
             onLocalDnsNameserversChange={setLocalDnsNameservers}
             onUpdateClientSetting={handleUpdateClientSetting}
+            onSaveDnsUpdatePort={handleSaveDnsUpdatePort}
             onRegisterProxy={handleRegisterProxy}
             onUnregisterProxy={handleUnregisterProxy}
             onProxyAccountChange={handleProxyAccountChange}
@@ -1188,6 +1202,7 @@ export default function ACMEPage() {
             <CaAccountsManager
               accounts={caAccounts}
               proxyPublicBase={publicBaseUrl(clientSettings.acme_proxy_public_base_url, '/acme/proxy')}
+              dnsUpdatePort={effectiveDnsUpdatePort(clientSettings)}
               canWrite={canWrite('acme')}
               canDelete={canDelete('acme')}
               onCreate={handleCreateCaAccount}

@@ -1,0 +1,144 @@
+import { beforeEach, describe, expect, it, vi } from 'vitest'
+import { render, screen, waitFor } from '@testing-library/react'
+import userEvent from '@testing-library/user-event'
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => ({ t: (key, opts) => (opts?.port !== undefined ? `${key}:${opts.port}` : key) }),
+  initReactI18next: { type: '3rdParty', init: vi.fn() },
+}))
+
+import DnsUpdatePortField from '../DnsUpdatePortField'
+import { parseDnsUpdatePort, effectiveDnsUpdatePort, settingsAfterPortSave } from '../dnsUpdatePort'
+
+const onSave = vi.fn()
+const renderField = (settings = {}, props = {}) => render(
+  <DnsUpdatePortField clientSettings={{ dns_update_port: 0, ...settings }} canWrite onSave={onSave} {...props} />,
+)
+const input = () => screen.getByRole('spinbutton', { name: 'acme.dnsUpdate.portLabel' })
+const typePort = async (user, value) => {
+  await user.clear(input())
+  await user.type(input(), value)
+}
+const save = (user) => user.click(screen.getByRole('button', { name: 'common.save' }))
+
+describe('parseDnsUpdatePort', () => {
+  it('accepts 0 and 1024 to 65535', () => {
+    expect(parseDnsUpdatePort('0')).toBe(0)
+    expect(parseDnsUpdatePort('1024')).toBe(1024)
+    expect(parseDnsUpdatePort('8053')).toBe(8053)
+    expect(parseDnsUpdatePort('65535')).toBe(65535)
+  })
+
+  it('rejects the rest', () => {
+    for (const bad of ['53', '1023', '65536', '70000', '-1', '', 'abc', '80.5']) {
+      expect(parseDnsUpdatePort(bad), bad).toBeNull()
+    }
+  })
+})
+
+describe('effectiveDnsUpdatePort', () => {
+  it('uses the server effective port, and 0 when the field is missing or invalid', () => {
+    expect(effectiveDnsUpdatePort({ dns_update_port: 8053, dns_update_port_env: '70000', dns_update_port_effective: 0 })).toBe(0)
+    expect(effectiveDnsUpdatePort({ dns_update_port: 0, dns_update_port_env: '8053', dns_update_port_effective: 8053 })).toBe(8053)
+    expect(effectiveDnsUpdatePort({ dns_update_port: 8053, dns_update_port_env: 5353 })).toBe(0)
+    expect(effectiveDnsUpdatePort(undefined)).toBe(0)
+  })
+})
+
+describe('DnsUpdatePortField', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    onSave.mockResolvedValue({ data: { restart_required: true } })
+  })
+
+  it('rejects ports 53 and 70000 without calling the server', async () => {
+    const user = userEvent.setup()
+    renderField()
+    for (const bad of ['53', '70000']) {
+      await typePort(user, bad)
+      await save(user)
+      expect(await screen.findByText('acme.dnsUpdate.portInvalid')).toBeInTheDocument()
+    }
+    expect(onSave).not.toHaveBeenCalled()
+  })
+
+  it('saves 8053 and asks for a restart', async () => {
+    const user = userEvent.setup()
+    renderField()
+    await typePort(user, '8053')
+    await save(user)
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(8053))
+    expect(await screen.findByText('acme.dnsUpdate.portRestartRequired')).toBeInTheDocument()
+    expect(screen.queryByText('acme.dnsUpdate.portInvalid')).not.toBeInTheDocument()
+  })
+
+  it('saves 0 to disable the listener', async () => {
+    const user = userEvent.setup()
+    renderField({ dns_update_port: 8053 })
+    await typePort(user, '0')
+    await save(user)
+    await waitFor(() => expect(onSave).toHaveBeenCalledWith(0))
+  })
+
+  it('shows no restart notice when the server does not ask for one', async () => {
+    const user = userEvent.setup()
+    onSave.mockResolvedValue({ data: null })
+    renderField()
+    await typePort(user, '8053')
+    await save(user)
+    await waitFor(() => expect(onSave).toHaveBeenCalled())
+    expect(screen.queryByText('acme.dnsUpdate.portRestartRequired')).not.toBeInTheDocument()
+  })
+
+  it('is read-only and shows the variable value when the environment overrides the port', () => {
+    renderField({ dns_update_port: 8053, dns_update_port_env: 5353 })
+    expect(input()).toHaveAttribute('readonly')
+    expect(input()).toHaveValue(5353)
+    expect(screen.getByText('acme.dnsUpdate.portEnvOverride:5353')).toBeInTheDocument()
+    expect(screen.queryByRole('button', { name: 'common.save' })).not.toBeInTheDocument()
+  })
+
+  it('shows the listening status', () => {
+    renderField({ dns_update_port: 8053, dns_update_listening: true })
+    expect(screen.getByText('acme.dnsUpdate.portListening')).toBeInTheDocument()
+  })
+
+  it('shows disabled, or "not listening" when a port waits for a restart', () => {
+    const { unmount } = renderField({ dns_update_port: 0 })
+    expect(screen.getByText('acme.dnsUpdate.portDisabled')).toBeInTheDocument()
+    unmount()
+    renderField({ dns_update_port: 8053, dns_update_listening: false })
+    expect(screen.getByText('acme.dnsUpdate.portNotListening')).toBeInTheDocument()
+  })
+
+  it('shows disabled, not "not listening", when the variable is set but the effective port is 0', () => {
+    renderField({ dns_update_port: 8053, dns_update_port_env: '70000', dns_update_port_effective: 0 })
+    expect(screen.getByText('acme.dnsUpdate.portDisabled')).toBeInTheDocument()
+    expect(screen.queryByText('acme.dnsUpdate.portNotListening')).not.toBeInTheDocument()
+    expect(input()).toHaveValue(70000)
+  })
+
+  it('has no save button without write permission', () => {
+    renderField({}, { canWrite: false })
+    expect(screen.queryByRole('button', { name: 'common.save' })).not.toBeInTheDocument()
+    expect(input()).toBeDisabled()
+  })
+})
+
+describe('settingsAfterPortSave', () => {
+  it('without an environment override the saved port becomes the effective port', () => {
+    const prev = { dns_update_port: 0, dns_update_port_env: null, dns_update_port_effective: 0 }
+    expect(settingsAfterPortSave(prev, 8053)).toMatchObject({ dns_update_port: 8053, dns_update_port_effective: 8053 })
+    expect(settingsAfterPortSave({ dns_update_port: 8053 }, 9053).dns_update_port_effective).toBe(9053)
+  })
+
+  it('an environment override keeps the effective port', () => {
+    const prev = { dns_update_port: 0, dns_update_port_env: '9000', dns_update_port_effective: 9000 }
+    expect(settingsAfterPortSave(prev, 8053)).toMatchObject({ dns_update_port: 8053, dns_update_port_effective: 9000 })
+  })
+
+  it('saving 0 turns the effective port off', () => {
+    const prev = { dns_update_port: 8053, dns_update_port_env: null, dns_update_port_effective: 8053 }
+    expect(settingsAfterPortSave(prev, 0)).toMatchObject({ dns_update_port: 0, dns_update_port_effective: 0 })
+  })
+})

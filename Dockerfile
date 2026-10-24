@@ -187,6 +187,11 @@ ENV PATH="/opt/ucm/venv/bin:$PATH" \
 # Expose HTTPS port (and optional HTTP protocol port for CDP/OCSP)
 EXPOSE 8443
 EXPOSE 8080
+# DNS UPDATE (RFC 2136) listener of the ACME proxy. It is OFF unless
+# UCM_DNS_UPDATE_PORT (or the acme.proxy.dns_update_port setting) is set.
+# The port must be 1024 or higher: the image runs as the user ucm.
+EXPOSE 8053/udp
+EXPOSE 8053/tcp
 
 # Declare persistent volumes.
 # /etc/ucm holds master.key — the symmetric key that decrypts every private
@@ -203,6 +208,7 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=40s --retries=3 \
 
 # Copy entrypoint before switching user
 COPY --chown=ucm:ucm docker/entrypoint.sh /entrypoint.sh
+COPY --chown=ucm:ucm docker/dns-update-port.sh /dns-update-port.sh
 RUN chmod +x /entrypoint.sh
 
 # Switch to non-root user

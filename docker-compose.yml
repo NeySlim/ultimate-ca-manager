@@ -9,6 +9,11 @@ services:
       # UCM listens inside the container on UCM_HTTPS_PORT
       - "${UCM_HTTPS_PORT:-8443}:${UCM_HTTPS_PORT:-8443}"
       - "${UCM_HTTP_PORT:-8080}:8080"
+      # Optional: DNS UPDATE (RFC 2136) listener of the ACME proxy. Internal
+      # network only. Also enable the commented UCM_DNS_UPDATE_PORT below.
+      # The container cannot bind port 53, so map the host port 53 to 8053.
+      # - "53:8053/udp"
+      # - "53:8053/tcp"
     
     volumes:
       # Persistent data volume (REQUIRED)
@@ -35,6 +40,9 @@ services:
       # Ports
       - UCM_HTTPS_PORT=${UCM_HTTPS_PORT:-8443}
       - UCM_HTTP_PORT=${UCM_HTTP_PORT:-8080}
+      # DNS UPDATE listener (off when unset or 0). 1024..65535 only.
+      # - UCM_DNS_UPDATE_PORT=8053
+      # - UCM_DNS_UPDATE_HOST=0.0.0.0   # address inside the container (default: HOST)
       
       # Debug & Logging
       - UCM_DEBUG=${UCM_DEBUG:-false}

@@ -2796,6 +2796,22 @@ Content-Type: application/json
 }
 ```
 
+Fields of the DNS UPDATE (RFC 2136) listener of the ACME proxy:
+
+| Field | Method | Description |
+|-------|--------|-------------|
+| `dns_update_port` | GET, PATCH | Port of the listener (UDP and TCP). `0` = disabled (default). Otherwise 1024 to 65535, and not the HTTPS port, the HTTP protocol port or the TLS-ALPN-01 port. A change needs a restart. The PATCH response has `restart_required` (`true` only when the new value differs from the port the listener uses now and `UCM_DNS_UPDATE_PORT` is not set) and, when that variable is set, `dns_update_port_env_override: true` |
+| `dns_update_port_env` | GET | Value of `UCM_DNS_UPDATE_PORT`, or `null` when it is not set or empty. When set, it wins over `dns_update_port` |
+| `dns_update_listening` | GET | `true` when the listener is running now |
+| `dns_update_port_effective` | GET | The port the listener uses at the next start: the environment variable when it is set, else `dns_update_port`; `0` when the value is invalid or the listener is off |
+
+```http
+PATCH /api/v2/acme/client/settings
+Content-Type: application/json
+
+{ "dns_update_port": 8053 }
+```
+
 ### List Orders
 ```http
 GET /api/v2/acme/client/orders
@@ -2861,6 +2877,35 @@ Content-Type: application/json
   "environment": "production"
 }
 ```
+
+### DNS UPDATE Keys (RFC 2136)
+
+TSIG keys of the DNS UPDATE listener of the ACME proxy. A key belongs to one proxy account. Optionally it is linked to an EAB credential: it then accepts only values for orders of the ACME account bound to that credential.
+
+```http
+GET /api/v2/acme/client/accounts/{account_id}/dns-update-keys
+```
+Requires `read:acme`. Lists the keys. The response never contains the secret.
+
+```http
+POST /api/v2/acme/client/accounts/{account_id}/dns-update-keys
+Content-Type: application/json
+
+{
+  "name": "proxy1-key.",
+  "algorithm": "hmac-sha256",
+  "eab_credential_id": 3,
+  "notes": "cert-manager, cluster A"
+}
+```
+Requires `write:acme`. All fields are optional: `name` is generated when omitted, `algorithm` is `hmac-sha256` (also `hmac-sha384`, `hmac-sha512`), `notes` has at most 1000 characters. Answers `201`. The response contains the base64 `secret` **once**; UCM stores it encrypted and cannot show it again. A name that exists already gives `409`.
+
+```http
+DELETE /api/v2/acme/client/accounts/{account_id}/dns-update-keys/{key_id}
+```
+Requires `delete:acme`. An active key is revoked at once (answer `200` with the key). A revoked key is deleted (answer `204`).
+
+Each account of `GET /api/v2/acme/client/accounts` has the integer field `dns_update_key_count`: the number of its DNS UPDATE keys of any status. It is `0` for an account without keys. The web interface uses it to show the keys of an account whose ACME proxy is off.
 
 ---
 

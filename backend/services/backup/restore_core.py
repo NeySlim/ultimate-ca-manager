@@ -75,6 +75,9 @@ GENERIC_SECTIONS = (
     'scep_profiles',
     'ca_template_pins',
     'acme_client_accounts',
+    # After its proxy account, EAB credential and creator (users and
+    # acme_eab_credentials have their own restorers, run before these).
+    'acme_dns_update_keys',
     'key_recovery_requests',
     # The history an archive carries only when it is asked for. They were
     # listed as restored and no code path ever wrote them: the export

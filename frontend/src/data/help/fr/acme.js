@@ -56,6 +56,18 @@ export default {
         ]
       },
       {
+        title: 'DNS UPDATE (RFC 2136) pour le proxy ACME',
+        items: [
+          { label: 'Fonction', text: 'Les clients utilisent leur solveur rfc2136 standard (certbot, lego, cert-manager, acme.sh, win-acme, Posh-ACME) et le dirigent vers UCM. UCM crée toujours l\'enregistrement TXT avec son propre fournisseur DNS' },
+          { label: 'Clés', text: 'Créez des clés pour chaque compte proxy dans Comptes CA externes. Une clé peut être liée à un identifiant EAB : elle ne fonctionne alors que pour les commandes du compte ACME enregistré avec cet identifiant. UCM affiche le secret une seule fois' },
+          { label: 'Modifications acceptées', text: 'UCM accepte uniquement un enregistrement TXT sous _acme-challenge avec la valeur qu\'il attend pour la commande. Il refuse les autres modifications. Il répond toujours NOERROR à une suppression' },
+          { label: 'Port et réseau', text: 'Définissez le port du listener dans la section Proxy ACME (0 le désactive, 1024 à 65535, redémarrage nécessaire). À utiliser uniquement sur le réseau interne. Pour utiliser le port 53, redirigez-le dans Docker ou Kubernetes, ou avec le pare-feu' },
+          { label: 'Algorithmes', text: 'hmac-sha256, hmac-sha384 et hmac-sha512. UCM refuse md5 et sha1, valeurs par défaut de nombreux clients : définissez l\'algorithme dans chaque client. cert-manager ne prend pas en charge sha384, et win-acme le calcule de façon incorrecte' },
+          { label: 'Découverte de la zone (SOA)', text: 'Les clients demandent l\'enregistrement SOA pour trouver la zone, et UCM y répond. win-acme envoie à la place des mises à jour de test, et utilise toujours le port 53' },
+          { label: 'Vérifications DNS des clients', text: 'Certains clients vérifient l\'enregistrement TXT dans le DNS public avant de continuer (lego, cert-manager, acme.sh). Ils ont besoin d\'un résolveur qui voit la zone publique, ou d\'un délai d\'attente : --dns.propagation-wait (lego), --dnssleep (acme.sh), --dns01-recursive-nameservers (cert-manager)' },
+        ]
+      },
+      {
         title: 'Identifiants EAB (côté serveur)',
         content: 'Lorsque UCM joue le rôle de serveur ACME, le External Account Binding (RFC 8555 §7.3.4) permet d\'exiger des identifiants pré-émis avant qu\'un client puisse créer un compte :',
         items: [
@@ -339,6 +351,42 @@ certbot certonly \\
 > ⚠ Évitez les demandes simultanées pour le même FQDN (Certbot + interface UCM) : le second enregistrement TXT peut écraser le premier.
 
 > ℹ️ En environnement lab / certificat auto-signé, ajoutez \`--no-verify-ssl\` à Certbot.
+
+### DNS UPDATE (RFC 2136)
+Les clients qui ne peuvent utiliser qu'un solveur rfc2136 standard peuvent aussi utiliser le proxy ACME. Ils envoient la mise à jour DNS à UCM, et UCM crée l'enregistrement TXT avec son propre fournisseur DNS.
+
+#### Configuration
+1. Activez **Exposer via le proxy ACME** sur le compte CA et définissez un chemin de proxy (voir ci-dessus)
+2. Dans la section **Proxy ACME**, définissez le **port du listener DNS UPDATE** (0 le désactive, 1024 à 65535). Redémarrez UCM pour l'appliquer
+3. Rendez le port accessible uniquement depuis le réseau interne. Pour le port 53, redirigez-le vers le listener dans Docker ou Kubernetes, ou avec le pare-feu
+4. Sur la carte du compte CA, cliquez sur **Clés DNS UPDATE (RFC 2136)**, puis sur **Nouvelle clé**
+5. Choisissez un algorithme (hmac-sha256 par défaut) et, si besoin, un identifiant EAB
+6. Copiez le secret et l'extrait de configuration pour votre client. UCM affiche le secret une seule fois
+
+#### Ce que UCM accepte
+- Uniquement les enregistrements TXT sous \`_acme-challenge\` avec la valeur que UCM attend pour la commande
+- UCM répond toujours NOERROR à une suppression
+- Une clé fonctionne pour le compte proxy auquel elle appartient. Avec un lien EAB, elle ne fonctionne que pour les commandes du compte ACME enregistré avec cet identifiant
+- Révoquez une clé pour l'arrêter immédiatement. Supprimez une clé révoquée pour la retirer
+
+#### Notes sur les clients
+- **Algorithme** : UCM refuse les valeurs par défaut de nombreux clients (HMAC-MD5, hmac-sha1). Définissez hmac-sha256 (ou sha512) dans chaque client
+- **certbot** : \`dns_rfc2136_server\` doit être une adresse IP. Définissez \`dns_rfc2136_algorithm = HMAC-SHA256\`
+- **lego** : définissez \`DNSUPDATE_TSIG_ALGORITHM\`. La valeur par défaut est hmac-sha1. Utilisez \`--dns.propagation-wait\` si lego ne voit pas la zone publique
+- **cert-manager** : ne prend en charge que HMACSHA256 et HMACSHA512, pas sha384. Il trouve la zone avec ses résolveurs récursifs : définissez \`--dns01-recursive-nameservers\` sur un résolveur qui voit la zone publique
+- **acme.sh** : utilisez \`dns_nsupdate\` avec \`NSUPDATE_KEY\` qui pointe vers le fichier de clé BIND. Utilisez \`--dnssleep\` si les vérifications du DNS public échouent
+- **win-acme** : envoie toujours la mise à jour au port 53 (\`--serverport\` sert de délai d'attente) : redirigez donc le port 53 vers le listener UCM. Il calcule hmac-sha384 de façon incorrecte : utilisez sha256
+- **Posh-ACME** : \`DDNSNameserver\` est obligatoire. Sans lui, nsupdate envoie la mise à jour au MNAME de la zone sur le port 53
+
+Exemple (acme.sh) :
+\`\`\`
+export NSUPDATE_SERVER="ucm.example.com"
+export NSUPDATE_SERVER_PORT="8053"
+export NSUPDATE_KEY="/etc/ucm-tsig.key"
+acme.sh --issue --dns dns_nsupdate --server https://ucm.example.com/acme/proxy/<slug>/directory -d www.example.com --dnssleep 30
+\`\`\`
+
+> ⚠ Utilisez le listener uniquement sur le réseau interne. Ne le publiez pas sur Internet.
 
 ## Serveur ACME local
 

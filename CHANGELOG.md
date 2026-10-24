@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- ACME proxy: optional DNS UPDATE (RFC 2136) listener, off by default, so standard rfc2136 solvers can answer DNS-01 through the proxy with per-account TSIG keys (#416).
+
 ### Fixed
 
 - ACME proxy: a challenge response now carries `Link: rel="up"` even when the upstream CA omits it (Pebble), which certbot and lego require (#420, reported by @WMP).
