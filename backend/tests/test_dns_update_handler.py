@@ -32,7 +32,8 @@ import dns.tsig
 import dns.update
 import pytest
 
-from services.acme.dns_update.constants import SOA_TIMERS
+from services.acme.dns_update import handler as handler_mod
+from services.acme.dns_update.constants import MAX_FUDGE, REPLAY_TTL_S, SOA_TIMERS
 from services.acme.dns_update.handler import DnsUpdateHandler, LogSampler, ReplayCache
 from services.acme.dns_update.keys import KeyScope
 from services.acme.dns_update.records import ActiveRecord, ActiveSnapshot
@@ -137,16 +138,20 @@ class Snap:
         self.snapshot = snapshot
         self.calls = 0
         self.error = None
+        self.hook = None  # runs once, inside the first call (a duplicate "in flight")
 
     def __call__(self, *a):
         self.calls += 1
+        if self.hook:
+            hook, self.hook = self.hook, None
+            hook()
         if self.error:
             raise self.error
         return self.snapshot
 
 
 class Harness:
-    def __init__(self, rows=(ROW1, ROW2), zones=(ZONE, "app.example.com."), **kw):
+    def __init__(self, rows=(ROW1, ROW2), zones=(ZONE, "app.example.com."), clock=None, **kw):
         self.keys = FakeKeys()
         self.zones = FakeZones(zones)
         self.audit = FakeAudit()
@@ -157,7 +162,7 @@ class Harness:
             key_store=self.keys, zone_index=self.zones, audit=self.audit,
             snapshot_fn=self.snap, mark_confirmed_fn=lambda ids, now: self.marks.append(
                 (list(ids), now)),
-            clock=lambda: float(NOW), log_sampler=self.sampler, **kw)
+            clock=clock or (lambda: float(NOW)), log_sampler=self.sampler, **kw)
 
     def send(self, wire, transport="udp", peer=PEER):
         raw = self.handler.handle(wire, peer, transport)
@@ -1246,14 +1251,16 @@ def test_S15_udp_retransmit_gets_identical_bytes_once_pos(h):
     assert h.snap.calls == 1  # the replay does no work at all
 
 
-def test_S15_other_transport_is_a_separate_entry_neg(h):
+def test_S15_other_transport_gets_own_response_without_new_side_effects_pos(h):
     req = sign(good_update())
     first = h.send(req.wire, "udp")
     tcp = h.send(req.wire, "tcp")
-    assert len(h.marks) == 2 and len(h.audit.authenticated) == 2
-    assert first == tcp  # same bytes here, but the work was done twice
-    h.send(req.wire, "tcp")
-    assert len(h.marks) == 2  # the tcp entry now exists
+    assert verified(tcp, req).rcode() == dns.rcode.NOERROR
+    assert len(h.marks) == 1 and len(h.audit.authenticated) == 1 and len(h.keys.touched) == 1
+    assert h.snap.calls == 2  # the tcp response was rendered, the update was not repeated
+    assert first == tcp  # same bytes here
+    assert h.send(req.wire, "tcp") == tcp and h.snap.calls == 2  # now a plain cache hit
+    assert h.send(req.wire, "udp") == first and len(h.marks) == 1
 
 
 def test_S15_refused_request_is_replayed_without_new_audit_pos(h):
@@ -1298,6 +1305,197 @@ def test_S15_replay_cache_is_thread_safe_pos():
     for t in threads:
         t.join()
     assert not errors and len(cache) <= 50
+
+
+def test_A1_default_ttl_covers_both_sides_of_the_fudge_pos_and_neg():
+    assert REPLAY_TTL_S == 2 * MAX_FUDGE
+    t = [0.0]
+    cache = ReplayCache(clock=lambda: t[0])
+    cache.put(b"d", b"v")
+    t[0] = 2 * MAX_FUDGE - 1
+    assert cache.get(b"d") == b"v"
+    t[0] = 2 * MAX_FUDGE + 1
+    assert cache.get(b"d") is None and not cache.seen(b"d")
+
+
+def test_A1_replay_450s_after_the_first_copy_is_a_cache_hit_pos():
+    clock = [float(NOW)]
+    hh = Harness(clock=lambda: clock[0])
+    req = sign(good_update(), t=NOW + 250)  # Time Signed is 250 s ahead of the server
+    first = hh.send(req.wire)
+    assert verified(first, req, t=NOW).rcode() == dns.rcode.NOERROR
+    clock[0] = NOW + 450.0  # 200 s after Time Signed: still inside the fudge
+    assert hh.send(req.wire) == first
+    assert len(hh.marks) == 1 and len(hh.audit.authenticated) == 1 and hh.snap.calls == 1
+    assert hh.sampler.counts().get("badtime") is None
+
+
+def test_A1_replay_outside_the_fudge_is_badtime_not_a_second_update_neg():
+    clock = [float(NOW)]
+    hh = Harness(clock=lambda: clock[0])
+    req = sign(good_update(), t=NOW + 250)
+    hh.send(req.wire)
+    clock[0] = NOW + 551.0  # 301 s after Time Signed
+    assert hh.send(req.wire) is not None
+    assert hh.sampler.counts()["badtime"] == 1
+    assert len(hh.marks) == 1 and len(hh.audit.authenticated) == 1 and hh.snap.calls == 1
+
+
+def test_A1_udp_request_replayed_over_tcp_has_side_effects_once_pos(h):
+    req = sign(good_update())
+    h.send(req.wire, "udp")
+    raw = h.send(req.wire, "tcp")
+    assert verified(raw, req).rcode() == dns.rcode.NOERROR
+    assert len(h.marks) == 1 and len(h.keys.touched) == 1 and len(h.audit.authenticated) == 1
+
+
+def test_A1_other_wire_over_tcp_runs_side_effects_neg(h):
+    first = sign(good_update(ident=1111))
+    other = sign(good_update(ident=2222))
+    h.send(first.wire, "udp")
+    assert verified(h.send(other.wire, "tcp"), other).rcode() == dns.rcode.NOERROR
+    assert len(h.marks) == 2 and len(h.keys.touched) == 2 and len(h.audit.authenticated) == 2
+
+
+def test_A1_tcp_first_then_udp_has_side_effects_once_pos(h):
+    req = sign(good_update())
+    h.send(req.wire, "tcp")
+    assert verified(h.send(req.wire, "udp"), req).rcode() == dns.rcode.NOERROR
+    assert len(h.marks) == 1 and len(h.audit.authenticated) == 1
+
+
+def test_A1_duplicate_in_flight_gets_no_response_and_no_side_effect_pos(h):
+    req = sign(good_update())
+    inner = []
+    h.snap.hook = lambda: inner.append(h.send(req.wire, "udp"))
+    outer = h.send(req.wire, "udp")
+    assert inner == [None]
+    assert verified(outer, req).rcode() == dns.rcode.NOERROR
+    assert len(h.marks) == 1 and len(h.keys.touched) == 1 and len(h.audit.authenticated) == 1
+    assert h.snap.calls == 1  # the duplicate did no work
+    # The retransmission after the first copy is done hits the cache.
+    assert h.send(req.wire, "udp") == outer and len(h.marks) == 1
+
+
+def test_A1_duplicate_in_flight_over_the_other_transport_is_dropped_pos(h):
+    req = sign(good_update())
+    inner = []
+    h.snap.hook = lambda: inner.append(h.send(req.wire, "tcp"))
+    h.send(req.wire, "udp")
+    assert inner == [None] and len(h.marks) == 1
+
+
+def test_A1_other_wire_in_flight_runs_normally_neg(h):
+    first = sign(good_update(ident=1111))
+    other = sign(good_update(ident=2222))
+    inner = []
+    h.snap.hook = lambda: inner.append(h.send(other.wire, "udp"))
+    outer = h.send(first.wire, "udp")
+    assert verified(inner[0], other).rcode() == dns.rcode.NOERROR
+    assert verified(outer, first).rcode() == dns.rcode.NOERROR
+    assert len(h.marks) == 2 and len(h.audit.authenticated) == 2
+
+
+def test_A1_in_flight_mark_is_removed_when_processing_fails_neg(h):
+    req = sign(good_update())
+    h.snap.error = ValueError("x")
+    assert verified(h.send(req.wire), req).rcode() == dns.rcode.SERVFAIL
+    h.snap.error = None
+    resp = verified(h.send(req.wire), req)  # not dropped as "in flight"
+    assert resp.rcode() == dns.rcode.NOERROR and len(h.marks) == 1
+    assert not h.handler._replay._in_flight
+
+
+def test_A1_in_flight_mark_is_removed_when_an_exception_escapes_neg(h):
+    req = sign(good_update())
+    with mock.patch.object(h.handler, "_process", side_effect=RuntimeError("x")):
+        raw = h.send(req.wire)
+    header_only_ok(raw, dns.rcode.SERVFAIL, req.wire)
+    assert not h.handler._replay._in_flight
+    assert verified(h.send(req.wire), req).rcode() == dns.rcode.NOERROR
+
+
+def test_A1_replay_cache_begin_end_pos_and_neg():
+    cache = ReplayCache()
+    assert cache.begin(b"a") and not cache.begin(b"a")
+    assert cache.begin(b"b")
+    cache.end(b"a")
+    assert cache.begin(b"a")
+    cache.end(b"zz")  # unknown digest: no error
+
+
+# --- A2: signed SERVFAIL (RFC 8945 §5.3) ------------------------------------------------
+
+def test_A2_signed_request_error_gets_signed_servfail_pos(h):
+    h.snap.error = RuntimeError("db is down")
+    req = sign(good_update())
+    raw = h.send(req.wire, "tcp")
+    resp = verified(raw, req)
+    assert resp.rcode() == dns.rcode.SERVFAIL
+    assert resp.question == [] and resp.answer == [] and resp.authority == []
+    assert h.sampler.counts()["servfail"] == 1 and h.quiet()
+    assert len(h.handler._replay) == 0  # a failure is not cached
+
+
+def test_A2_signed_query_error_gets_signed_servfail_over_udp_pos(h):
+    h.snap.error = RuntimeError("db is down")
+    req = sign(soa_query(ZONE))
+    assert verified(h.send(req.wire, "udp"), req).rcode() == dns.rcode.SERVFAIL
+
+
+def test_A2_unsigned_request_error_gets_header_only_servfail_neg(h):
+    h.snap.error = RuntimeError("db is down")
+    wire = plain(soa_query(ZONE)).wire
+    raw = h.send(wire, "tcp")
+    header_only_ok(raw, dns.rcode.SERVFAIL, wire)
+    assert parse(raw).tsig is None and h.quiet()
+
+
+def test_A2_failure_of_the_signed_rendering_falls_back_to_header_only_neg(h):
+    req = sign(good_update())
+    with mock.patch.object(handler_mod.tsig, "render_signed", side_effect=RuntimeError("x")):
+        raw = h.send(req.wire)
+    header_only_ok(raw, dns.rcode.SERVFAIL, req.wire)
+    assert parse(raw).tsig is None and h.quiet()
+    assert not h.handler._replay._in_flight
+    assert verified(h.send(req.wire), req).rcode() == dns.rcode.NOERROR
+
+
+# --- A3: SOA query cost ------------------------------------------------------------------
+
+def test_A3_name_outside_every_zone_parses_no_row_name_pos(h):
+    handler_mod._name_of.cache_clear()
+    for name in ("other.net.", "a.b.other.net.", "com.", "."):
+        resp = parse(h.send(plain(soa_query(name)).wire, "tcp"))
+        assert resp.rcode() == dns.rcode.REFUSED and resp.answer == [] and resp.authority == []
+    assert handler_mod._name_of.cache_info().misses == 0
+    req = sign(soa_query("other.net."))
+    assert verified(h.send(req.wire, "tcp"), req).rcode() == dns.rcode.REFUSED
+    assert handler_mod._name_of.cache_info().misses == 0
+
+
+def test_A3_name_inside_a_zone_is_answered_as_before_and_parsed_once_neg(h):
+    handler_mod._name_of.cache_clear()
+    assert len(parse(h.send(plain(soa_query(ZONE)).wire, "tcp")).answer) == 1
+    resp = parse(h.send(plain(soa_query("app.example.com.")).wire, "tcp"))
+    assert resp.rcode() == dns.rcode.NOERROR and len(resp.authority) == 1  # Q7
+    misses = handler_mod._name_of.cache_info().misses
+    assert misses > 0
+    h.send(plain(soa_query(ZONE)).wire, "tcp")
+    info = handler_mod._name_of.cache_info()
+    assert info.misses == misses and info.hits > 0  # the second query parses nothing
+
+
+def test_A3_name_cache_is_bounded_pos():
+    assert handler_mod._name_of.cache_info().maxsize == 4096
+
+
+def test_A3_zone_prefilter_uses_the_snapshot_zones_neg():
+    hh = Harness(rows=(ROW1,), zones=(ZONE,))
+    hh.snap.snapshot = ActiveSnapshot(hh.snap.snapshot.by_name, frozenset())
+    assert parse(hh.send(plain(soa_query(ZONE)).wire, "tcp")).rcode() == dns.rcode.REFUSED
+    hh.snap.snapshot = snapshot_of(ROW1)
+    assert len(parse(hh.send(plain(soa_query(ZONE)).wire, "tcp")).answer) == 1
 
 
 # =============================================================================
@@ -1415,11 +1613,11 @@ def test_N10_snapshot_error_gives_servfail_then_service_goes_on_neg(h):
     assert len(parse(h.send(wire, "tcp")).answer) == 1
 
 
-def test_N10_signed_request_error_gives_header_only_servfail_neg(h):
+def test_N10_signed_request_error_gives_signed_servfail_neg(h):
     h.snap.error = ValueError("x")
     req = sign(good_update())
     raw = h.send(req.wire)
-    header_only_ok(raw, dns.rcode.SERVFAIL, req.wire)
+    assert verified(raw, req).rcode() == dns.rcode.SERVFAIL
     # The failed request is not cached: the retransmit runs again and now works.
     h.snap.error = None
     resp = verified(h.send(req.wire), req)
@@ -1529,6 +1727,8 @@ def real(app):
         r.AcmeDnsUpdateKey, r.AcmeProxyDnsChallenge, r.AuditLog = (
             AcmeDnsUpdateKey, AcmeProxyDnsChallenge, AuditLog)
         r.key_store, r.zone_index = keys.KeyStore(), zones.ZoneIndex()
+        # Audit rows of this test only (rows are never deleted: hash chain).
+        r.audit_mark = db.session.query(db.func.max(AuditLog.id)).scalar() or 0
         r.cache = records.ActiveRecordCache()
         r.records, r.audit_mod = records, audit_mod
 
@@ -1555,7 +1755,7 @@ def real(app):
         AcmeDomain.query.filter_by(domain="example.com").delete()
         DnsProvider.query.filter_by(id=provider.id).delete()
         AcmeClientAccount.query.filter_by(id=account.id).delete()
-        AuditLog.query.filter(AuditLog.resource_type == "acme_dns_update").delete()
+        # Audit rows stay: the log is a hash chain that later tests verify.
         db.session.commit()
 
 
@@ -1612,7 +1812,8 @@ def test_end_to_end_signed_add_confirms_row_pos_and_neg(real):
     assert verified(hh.handle(bad.wire, PEER, "udp"), bad).rcode() == dns.rcode.REFUSED
     real.db.session.expire_all()
     assert real.AcmeProxyDnsChallenge.query.get(real.row_id).client_confirmed_at is None
-    refused = real.AuditLog.query.filter_by(action="acme.dns_update.refused").all()
+    refused = real.AuditLog.query.filter(real.AuditLog.id > real.audit_mark).filter_by(
+        action="acme.dns_update.refused").all()
     assert len(refused) == 1 and refused[0].ip_address == PEER
     assert refused[0].username == "dns-update:k1.example."
     # pos
@@ -1621,17 +1822,19 @@ def test_end_to_end_signed_add_confirms_row_pos_and_neg(real):
     real.db.session.expire_all()
     assert real.AcmeProxyDnsChallenge.query.get(real.row_id).client_confirmed_at is not None
     assert real.AcmeDnsUpdateKey.query.get(real.key_id).last_used_at is not None
-    accepted = real.AuditLog.query.filter_by(action="acme.dns_update.accepted").all()
+    accepted = real.AuditLog.query.filter(real.AuditLog.id > real.audit_mark).filter_by(
+        action="acme.dns_update.accepted").all()
     assert len(accepted) == 1 and accepted[0].ip_address == PEER
     assert VALUE1 not in (accepted[0].details or "")
 
 
-def test_audit_authenticated_has_no_rate_limit_pos_and_audit_limited_has_neg(real):
+def test_audit_authenticated_is_not_limited_per_ip_pos_and_audit_limited_is_neg(real):
     sink = real.audit_mod.AuditSink()
     kw = dict(peer_ip=PEER, keyname="k1.example.", success=True, details={"zone": ZONE})
     for _ in range(3):
         assert sink.audit_authenticated(action="acme.dns_update.accepted", **kw) is True
-    assert real.AuditLog.query.filter_by(action="acme.dns_update.accepted").count() == 3
+    assert real.AuditLog.query.filter(real.AuditLog.id > real.audit_mark).filter_by(
+        action="acme.dns_update.accepted").count() == 3
     results = [sink.audit_limited(action="acme.dns_update.refused", reason="x", **kw)
                for _ in range(3)]
     assert results == [True, False, False]  # the limited path still limits

@@ -471,9 +471,70 @@ def test_R6_flush_error_in_savepoint_keeps_get_authz_neg(app, env, monkeypatch, 
         authz, ident = _get_authz(svc)
         assert calls == [1]
         assert ident['value'] == IDENT and authz['challenges']
-        assert _rows() == []  # savepoint rolled back
+        # The savepoint of the failed row is rolled back; the sibling row is stored.
+        assert [r.order_id for r in _rows()] == [b.id]
         assert _initiated(a.id) == 'initiated'
         assert len(_Recorder.created) == 1
+
+
+def _conflict_on(monkeypatch, order_ids):
+    """Raise IntegrityError on a flush that holds a new row of one of the orders."""
+    real_flush = db.session.flush
+
+    def _flush(*args, **kwargs):
+        if any(isinstance(o, AcmeProxyDnsChallenge) and o.order_id in order_ids
+               for o in db.session.new):
+            raise IntegrityError('INSERT', {}, Exception('dup'))
+        return real_flush(*args, **kwargs)
+
+    monkeypatch.setattr(db.session, 'flush', _flush)
+
+
+def _persist(orders):
+    return records.persist_expected_values(
+        orders, IDENT, TOKEN, CHALL_URL, None, utc_now())
+
+
+def test_A4_conflict_on_one_row_keeps_the_other_rows_pos(app, env, monkeypatch):
+    with app.app_context():
+        a, b = _two_orders(env)
+        _conflict_on(monkeypatch, {a.id})
+        assert _persist([a, b]) == 1
+        assert [r.order_id for r in _rows()] == [b.id]
+
+
+def test_A4_single_conflicting_row_gives_zero_and_get_authz_goes_on_neg(
+        app, env, monkeypatch, caplog):
+    with app.app_context():
+        a = _seed_order(env, 'acct-a', 'thumb-a')
+        _conflict_on(monkeypatch, {a.id})
+        assert _persist([a]) == 0
+        assert _rows() == []
+        assert _value('thumb-a') not in caplog.text  # logged without values
+        authz, ident = _get_authz(_svc(monkeypatch, _authz()))
+        assert ident['value'] == IDENT and authz['challenges']
+        assert _initiated(a.id) == 'initiated'
+        assert _rows() == []
+
+
+def test_A4_cache_not_invalidated_when_nothing_inserted_pos(app, env, monkeypatch):
+    with app.app_context():
+        a, b = _two_orders(env)
+        assert _persist([a, b]) == 2
+        calls = []
+        monkeypatch.setattr(records, 'invalidate_cache', lambda: calls.append(1))
+        assert _persist([a, b]) == 0  # both rows exist already
+        assert calls == []
+        assert _persist([]) == 0 and calls == []
+
+
+def test_A4_cache_invalidated_once_when_rows_inserted_neg(app, env, monkeypatch):
+    with app.app_context():
+        a, b = _two_orders(env)
+        calls = []
+        monkeypatch.setattr(records, 'invalidate_cache', lambda: calls.append(1))
+        assert _persist([a, b]) == 2
+        assert calls == [1]
 
 
 def test_R6_hook_exception_is_swallowed_neg(app, env, monkeypatch):

@@ -15,13 +15,15 @@ The processing order is the one of the plan, section 3:
 9. flags of the response (M6 to M8, E1, E4, E5)
 10. rendering and size limits (T1, T2, S12)
 11. side effects and audit, after the response is decided
-12. any unexpected exception: SERVFAIL header only (N10)
+12. any unexpected exception: SERVFAIL (N10), signed when the TSIG was verified
+    (RFC 8945 §5.3), header only otherwise
 
 The handler never logs packet bytes, MACs, TXT values or keys.
 """
 
 import collections
 import copy
+import functools
 import hashlib
 import logging
 import struct
@@ -116,7 +118,10 @@ def _safe_text(value) -> str:
 # --- replay cache (S15) ----------------------------------------------------------
 
 class ReplayCache:
-    """Bounded LRU of final responses with a time to live. Thread safe."""
+    """Bounded LRU of final responses with a time to live. Thread safe.
+
+    The key is the digest of the request. Per digest it keeps one response per
+    transport, and the set of digests that are being processed right now."""
 
     def __init__(self, size: int = REPLAY_CACHE_SIZE, ttl_s: float = REPLAY_TTL_S,
                  clock=time.time):
@@ -126,26 +131,58 @@ class ReplayCache:
         self._ttl = ttl_s
         self._clock = clock
         self._lock = threading.Lock()
-        self._items: "collections.OrderedDict[tuple, Tuple[float, bytes]]" = (
+        self._items: "collections.OrderedDict[object, Tuple[float, Dict[str, bytes]]]" = (
             collections.OrderedDict())
+        self._in_flight = set()
 
-    def get(self, key) -> Optional[bytes]:
+    def _live(self, key):
+        """The entry of the key, or None. Drops an expired entry. Call under the lock."""
+        item = self._items.get(key)
+        if item is None:
+            return None
+        if self._clock() - item[0] >= self._ttl:
+            del self._items[key]
+            return None
+        return item
+
+    def get(self, key, transport: str = "") -> Optional[bytes]:
+        """The response stored for this key and transport, or None."""
         with self._lock:
-            item = self._items.get(key)
+            item = self._live(key)
             if item is None:
                 return None
-            if self._clock() - item[0] >= self._ttl:
-                del self._items[key]
-                return None
-            self._items.move_to_end(key)
-            return item[1]
+            value = item[1].get(transport)
+            if value is not None:
+                self._items.move_to_end(key)
+            return value
 
-    def put(self, key, value: bytes) -> None:
+    def seen(self, key) -> bool:
+        """True when a live entry exists for the key, for any transport."""
         with self._lock:
-            self._items[key] = (self._clock(), value)
+            return self._live(key) is not None
+
+    def put(self, key, value: bytes, transport: str = "") -> None:
+        with self._lock:
+            item = self._live(key)
+            if item is None:
+                item = (self._clock(), {})
+                self._items[key] = item
+            item[1][transport] = value
             self._items.move_to_end(key)
             while len(self._items) > self._size:
                 self._items.popitem(last=False)
+
+    def begin(self, key) -> bool:
+        """Mark the key as in flight. False when it already is."""
+        with self._lock:
+            if key in self._in_flight:
+                return False
+            self._in_flight.add(key)
+            return True
+
+    def end(self, key) -> None:
+        with self._lock:
+            self._in_flight.discard(key)
 
     def __len__(self) -> int:
         with self._lock:
@@ -178,7 +215,9 @@ def _header_only(wire: bytes, rcode: int) -> bytes:
     return _HEADER.pack(ident, out, 0, 0, 0, 0)
 
 
+@functools.lru_cache(maxsize=4096)
 def _name_of(text: str) -> dns.name.Name:
+    """Parsed name of a database row (never of a packet), cached."""
     return dns.name.from_text(text)
 
 
@@ -263,7 +302,9 @@ class DnsUpdateHandler:
         except Exception as exc:
             return self._servfail(wire, peer_ip, exc)
 
-    def _servfail(self, wire, peer_ip, exc) -> Optional[bytes]:
+    def _servfail(self, wire, peer_ip, exc, signed_ctx=None) -> Optional[bytes]:
+        """SERVFAIL for an unexpected exception. ``signed_ctx`` is (msg, result, now_int,
+        limit) of a request whose TSIG verified: the answer is then signed (RFC 8945 §5.3)."""
         try:
             self._log.note("servfail", logging.ERROR, peer_ip, type(exc).__name__)
         except Exception:
@@ -273,6 +314,20 @@ class DnsUpdateHandler:
             db.session.rollback()
         except Exception:
             pass
+        if signed_ctx is not None:
+            try:
+                msg, result, now_int, limit = signed_ctx
+                resp = self._skeleton(msg)
+                resp.question = []
+                resp.answer = []
+                resp.authority = []
+                resp.additional = []
+                resp.set_rcode(dns.rcode.SERVFAIL)
+                out = tsig.render_signed(resp, result, now_int, max_size=limit)
+                if out is not None:
+                    return out
+            except Exception:
+                pass
         try:
             if len(wire) >= 12:
                 return _header_only(wire, dns.rcode.SERVFAIL)
@@ -285,7 +340,6 @@ class DnsUpdateHandler:
     def _handle(self, wire: bytes, peer_ip: str, transport: str) -> Optional[bytes]:
         now = self._clock()
         now_int = int(now)
-        tcp = transport == "tcp"
 
         # 1. Short message, or a response (RFC 1035 §4.1.1).
         if len(wire) < 12:
@@ -330,36 +384,63 @@ class DnsUpdateHandler:
             return self._tsig_error(wire, msg, skeleton, result, peer_ip, transport, now_int)
         signed = outcome == TsigOutcome.OK
 
-        # 6. Replay: the stored response, and no side effect.
+        # 6. Replay: the stored response, and no side effect. The digest alone is the key:
+        # a request replayed over the other transport gets its own rendering, but no
+        # second side effect. A copy that is in flight now gets no response.
         replay_key = None
+        suppress = False
         if signed:
-            replay_key = (transport, hashlib.sha256(wire).digest())
-            cached = self._replay.get(replay_key)
+            replay_key = hashlib.sha256(wire).digest()
+            cached = self._replay.get(replay_key, transport)
             if cached is not None:
                 return cached
+            if not self._replay.begin(replay_key):
+                self._log.note("replay_in_flight", logging.DEBUG, peer_ip)
+                return None
+            try:
+                cached = self._replay.get(replay_key, transport)
+                if cached is not None:
+                    return cached
+                suppress = self._replay.seen(replay_key)
+                return self._process(wire, msg, skeleton, result, opcode, peer_ip, transport,
+                                     now, now_int, replay_key, suppress)
+            finally:
+                self._replay.end(replay_key)
+        return self._process(wire, msg, skeleton, result, opcode, peer_ip, transport,
+                             now, now_int, None, False)
 
-        # 7. EDNS version.
-        event = _NO_EVENT
-        if msg.edns > 0:
-            resp = skeleton
-            resp.set_rcode(dns.rcode.BADVERS)
-            self._log.note("badvers", logging.DEBUG, peer_ip)
-        elif opcode == dns.opcode.QUERY:
-            resp = self._query(msg, skeleton, result, peer_ip)
-        else:
-            resp, event = self._update(wire, msg, skeleton, result, peer_ip)
+    def _process(self, wire, msg, skeleton, result, opcode, peer_ip, transport, now, now_int,
+                 replay_key, suppress) -> Optional[bytes]:
+        signed = result.outcome == TsigOutcome.OK
+        tcp = transport == "tcp"
+        limit = None if tcp else max(_MIN_UDP, msg.payload if msg.edns >= 0 else _MIN_UDP)
+        try:
+            # 7. EDNS version.
+            event = _NO_EVENT
+            if msg.edns > 0:
+                resp = skeleton
+                resp.set_rcode(dns.rcode.BADVERS)
+                self._log.note("badvers", logging.DEBUG, peer_ip)
+            elif opcode == dns.opcode.QUERY:
+                resp = self._query(msg, skeleton, result, peer_ip)
+            else:
+                resp, event = self._update(wire, msg, skeleton, result, peer_ip)
 
-        # 9, 10. Flags are set by make_response; render and apply the size limit.
-        if signed:
-            limit = None if tcp else max(_MIN_UDP, msg.payload if msg.edns >= 0 else _MIN_UDP)
-            out = tsig.render_signed(resp, result, now_int, max_size=limit)
-        else:
-            out = self._render_unsigned(resp, self._unsigned_limit(wire, msg, tcp), peer_ip)
+            # 9, 10. Flags are set by make_response; render and apply the size limit.
+            if signed:
+                out = tsig.render_signed(resp, result, now_int, max_size=limit)
+            else:
+                out = self._render_unsigned(resp, self._unsigned_limit(wire, msg, tcp), peer_ip)
+        except Exception as exc:
+            if not signed:
+                raise
+            return self._servfail(wire, peer_ip, exc, (msg, result, now_int, limit))
         if signed and replay_key is not None:
-            self._replay.put(replay_key, out)
+            self._replay.put(replay_key, out, transport)
 
-        # 11. Side effects and audit.
-        self._after(event, result, peer_ip, transport, now)
+        # 11. Side effects and audit; not for a copy that was already processed.
+        if not suppress:
+            self._after(event, result, peer_ip, transport, now)
         return out
 
     # -- responses ----------------------------------------------------------------------
@@ -446,12 +527,22 @@ class DnsUpdateHandler:
             resp.set_rcode(dns.rcode.REFUSED)
             return resp
 
-        rows = [row for group in self._snapshot_fn().by_name.values() for row in group]
+        snapshot = self._snapshot_fn()
+        qname = question.name
+        # No zone at or above the name: REFUSED at once, without a loop over the rows.
+        zones = snapshot.zones
+        probe = qname
+        while len(probe.labels) > 1 and probe.to_text().lower() not in zones:
+            probe = probe.parent()
+        if len(probe.labels) <= 1:
+            resp.set_rcode(dns.rcode.REFUSED)
+            return resp
+
+        rows = [row for group in snapshot.by_name.values() for row in group]
         if result.outcome == TsigOutcome.OK:
             scope = self._key_store.scope(result.key.key_id)
             rows = [] if scope is None else [
                 r for r in rows if scope.allows(r.acme_client_account_id, r.account_id)]
-        qname = question.name
 
         # Q1: the apex of a row.
         for row in rows:

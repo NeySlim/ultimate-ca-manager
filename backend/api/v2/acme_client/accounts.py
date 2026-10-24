@@ -30,6 +30,7 @@ from models import db
 from models.acme_client_account import AcmeClientAccount
 from models.acme_models import AcmeClientOrder
 from services.acme.acme_client_service import AcmeClientService, ACCOUNT_KEY_TYPES
+from services.acme.dns_update.keys import invalidate_keys
 from services.audit_service import AuditService
 
 logger = logging.getLogger(__name__)
@@ -79,12 +80,6 @@ def _ensure_unique_proxy_slug(slug: str, except_id: int = None) -> str:
     if q.first():
         raise ValueError(f'proxy_slug {slug!r} is already in use')
     return slug
-
-
-def _invalidate_dns_update_keys() -> None:
-    """proxy_enabled/proxy_slug/deletion change which TSIG keys are usable."""
-    from services.acme.dns_update.keys import invalidate_keys
-    invalidate_keys()
 
 
 def _apply_proxy_endpoint_fields(acct: AcmeClientAccount, data: dict) -> None:
@@ -262,7 +257,7 @@ def create_ca_account():
     ok, err = safe_commit(logger, 'Failed to create ACME CA account')
     if not ok:
         return err
-    _invalidate_dns_update_keys()
+    invalidate_keys()  # proxy_enabled/slug/deletion change usable TSIG keys
 
     AuditService.log_action(
         action='acme_ca_account_create',
@@ -329,7 +324,7 @@ def update_ca_account(account_id):
     ok, err = safe_commit(logger, 'Failed to update ACME CA account')
     if not ok:
         return err
-    _invalidate_dns_update_keys()
+    invalidate_keys()  # proxy_enabled/slug/deletion change usable TSIG keys
 
     AuditService.log_action(
         action='acme_ca_account_update',
@@ -380,7 +375,7 @@ def delete_ca_account(account_id):
     ok, err = safe_commit(logger, 'Failed to delete ACME CA account')
     if not ok:
         return err
-    _invalidate_dns_update_keys()
+    invalidate_keys()  # proxy_enabled/slug/deletion change usable TSIG keys
 
     AuditService.log_action(
         action='acme_ca_account_delete',
@@ -425,7 +420,7 @@ def deactivate_ca_account(account_id):
     ok, err = safe_commit(logger, 'Failed to remove deactivated ACME CA account')
     if not ok:
         return err
-    _invalidate_dns_update_keys()
+    invalidate_keys()  # proxy_enabled/slug/deletion change usable TSIG keys
 
     AuditService.log_action(
         action='acme_ca_account_deactivate',

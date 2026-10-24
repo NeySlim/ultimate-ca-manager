@@ -15,6 +15,7 @@ from models import db, AcmeClientAccount, AcmeEabCredential, AcmeDomain, DnsProv
 from models.acme_dns_update import AcmeDnsUpdateKey
 
 PORT_KEY = 'acme.proxy.dns_update_port'
+TLS_KEY = 'acme.client.tls_alpn_port'
 
 
 @pytest.fixture
@@ -25,7 +26,8 @@ def env(app):
     with app.app_context():
         AcmeDnsUpdateKey.query.delete()
         AcmeDomain.query.delete()
-        SystemConfig.query.filter_by(key=PORT_KEY).delete()
+        SystemConfig.query.filter(SystemConfig.key.in_([PORT_KEY, TLS_KEY])).delete(
+            synchronize_session=False)
         db.session.commit()
         key_store.invalidate()
         zone_index.invalidate()
@@ -62,7 +64,8 @@ def env(app):
             synchronize_session=False)
         AcmeClientAccount.query.filter(AcmeClientAccount.id.in_(created['accounts'])).delete(
             synchronize_session=False)
-        SystemConfig.query.filter_by(key=PORT_KEY).delete()
+        SystemConfig.query.filter(SystemConfig.key.in_([PORT_KEY, TLS_KEY])).delete(
+            synchronize_session=False)
         db.session.commit()
         key_store.invalidate()
         zone_index.invalidate()
@@ -438,6 +441,197 @@ def test_N2_conflict_with_http_protocol_port_neg(auth_client, env, monkeypatch):
 
 def test_N2_viewer_cannot_patch_neg(viewer_client, env):
     assert _patch_settings(viewer_client, {'dns_update_port': 8053}).status_code == 403
+
+
+def _set_cfg(key, value):
+    cfg = SystemConfig.query.filter_by(key=key).first()
+    if cfg:
+        cfg.value = value
+    else:
+        db.session.add(SystemConfig(key=key, value=value))
+    db.session.commit()
+
+
+# ------------------------------------------------------------------- B3
+
+@pytest.mark.parametrize('raw', ['', '  '])
+def test_B3_blank_env_falls_back_to_db_pos(auth_client, app, env, monkeypatch, raw):
+    from services.acme.dns_update.status import get_dns_update_port, get_dns_update_port_env
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', raw)
+    with app.app_context():
+        _set_cfg(PORT_KEY, '8053')
+        assert get_dns_update_port_env() is None
+        assert get_dns_update_port() == 8053
+    g = _data(auth_client.get('/api/v2/acme/client/settings'))
+    assert g['dns_update_port_env'] is None and g['dns_update_port'] == 8053
+
+
+def test_B3_env_value_wins_over_db_neg(auth_client, app, env, monkeypatch):
+    from services.acme.dns_update.status import get_dns_update_port
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', ' 8054 ')
+    with app.app_context():
+        _set_cfg(PORT_KEY, '8053')
+        assert get_dns_update_port() == 8054
+    g = _data(auth_client.get('/api/v2/acme/client/settings'))
+    assert g['dns_update_port_env'] == '8054' and g['dns_update_port'] == 8053
+
+
+def test_B3_stored_port_invalid_is_zero_neg(app, env):
+    from services.acme.dns_update.status import get_stored_dns_update_port
+    with app.app_context():
+        assert get_stored_dns_update_port() == 0
+        _set_cfg(PORT_KEY, 'abc')
+        assert get_stored_dns_update_port() == 0
+        _set_cfg(PORT_KEY, '8053')
+        assert get_stored_dns_update_port() == 8053
+
+
+# ------------------------------------------------------------------- B4
+
+def test_B4_dns_port_equal_to_stored_tls_alpn_port_neg(auth_client, app, env, monkeypatch):
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    with app.app_context():
+        _set_cfg(TLS_KEY, '8443')
+    assert _patch_settings(auth_client, {'dns_update_port': 8443}).status_code == 400
+    with app.app_context():
+        assert SystemConfig.query.filter_by(key=PORT_KEY).first() is None
+
+
+def test_B4_dns_port_different_from_tls_alpn_port_pos(auth_client, app, env, monkeypatch):
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    with app.app_context():
+        _set_cfg(TLS_KEY, '8443')
+    assert _patch_settings(auth_client, {'dns_update_port': 8444}).status_code == 200
+
+
+def test_B4_dns_port_equal_to_tls_alpn_port_in_same_body_neg(auth_client, env, monkeypatch):
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    r = _patch_settings(auth_client, {'dns_update_port': 8443, 'tls_alpn_port': 8443})
+    assert r.status_code == 400
+
+
+def test_B4_tls_alpn_port_equal_to_stored_dns_port_neg(auth_client, app, env, monkeypatch):
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    with app.app_context():
+        _set_cfg(PORT_KEY, '8053')
+    assert _patch_settings(auth_client, {'tls_alpn_port': 8053}).status_code == 400
+    with app.app_context():
+        assert SystemConfig.query.filter_by(key=TLS_KEY).first() is None
+
+
+def test_B4_tls_alpn_port_different_from_dns_port_pos(auth_client, app, env, monkeypatch):
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    with app.app_context():
+        _set_cfg(PORT_KEY, '8053')
+    assert _patch_settings(auth_client, {'tls_alpn_port': 8054}).status_code == 200
+
+
+def test_B4_tls_alpn_port_with_disabled_dns_port_pos(auth_client, env, monkeypatch):
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    assert _patch_settings(auth_client, {'tls_alpn_port': 8053, 'dns_update_port': 0}
+                           ).status_code == 200
+
+
+def test_B4_restart_required_only_on_change_pos(auth_client, env, monkeypatch):
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    first = _patch_settings(auth_client, {'dns_update_port': 8053})
+    assert _data(first)['restart_required'] is True
+    second = _patch_settings(auth_client, {'dns_update_port': 8053})
+    assert second.status_code == 200
+    assert _data(second)['restart_required'] is False
+
+
+def test_B4_restart_not_required_when_env_is_set_neg(auth_client, app, env, monkeypatch):
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '9053')
+    r = _patch_settings(auth_client, {'dns_update_port': 8053})
+    assert r.status_code == 200
+    assert _data(r)['restart_required'] is False
+    assert _data(r)['dns_update_port_env_override'] is True
+    assert 'UCM_DNS_UPDATE_PORT' in r.get_json()['message']
+    with app.app_context():
+        assert SystemConfig.query.filter_by(key=PORT_KEY).first().value == '8053'
+
+
+def test_B4_no_env_override_flag_without_env_neg(auth_client, env, monkeypatch):
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    r = _patch_settings(auth_client, {'dns_update_port': 8053})
+    assert 'dns_update_port_env_override' not in _data(r)
+
+
+# ------------------------------------------------------------------- B5
+
+def _audit_mark(app):
+    """The newest audit row id now. Rows are never deleted: the log is a hash chain
+    that later tests verify."""
+    from models.audit_log import AuditLog
+    with app.app_context():
+        return db.session.query(db.func.max(AuditLog.id)).scalar() or 0
+
+
+def _key_audit(app, action, after):
+    from models.audit_log import AuditLog
+    with app.app_context():
+        db.session.expire_all()
+        return AuditLog.query.filter(
+            AuditLog.id > after, AuditLog.action == action,
+            AuditLog.resource_type == 'acme_dns_update_key').all()
+
+
+def test_B5_soft_revoke_revokes_linked_key_and_audits_pos(auth_client, app, env):
+    mark = _audit_mark(app)
+    acct = env.make_account()
+    cred = env.make_cred('active')
+    kid = _data(_post(auth_client, acct, {'name': 'b5a.example.', 'eab_credential_id': cred}))['id']
+    assert auth_client.delete(f'/api/v2/acme/eab-credentials/{cred}').status_code == 200
+    with app.app_context():
+        key = db.session.get(AcmeDnsUpdateKey, kid)
+        assert key is not None and key.status == 'revoked' and key.revoked_at is not None
+        kid_text = db.session.get(AcmeEabCredential, cred).kid
+    rows = _key_audit(app, 'acme.dns_update.key.revoke', mark)
+    assert len(rows) == 1
+    assert rows[0].resource_id == str(kid) and rows[0].resource_name == 'b5a.example.'
+    assert kid_text in rows[0].details
+    assert _lookup(app, 'b5a.example.') is None
+
+
+def test_B5_soft_revoke_leaves_other_credential_key_neg(auth_client, app, env):
+    mark = _audit_mark(app)
+    acct = env.make_account()
+    cred, other = env.make_cred('active'), env.make_cred('active')
+    _post(auth_client, acct, {'name': 'b5b.example.', 'eab_credential_id': cred})
+    other_id = _data(_post(auth_client, acct, {'name': 'b5c.example.',
+                                               'eab_credential_id': other}))['id']
+    free_id = _data(_post(auth_client, acct, {'name': 'b5d.example.'}))['id']
+    assert auth_client.delete(f'/api/v2/acme/eab-credentials/{cred}').status_code == 200
+    with app.app_context():
+        assert db.session.get(AcmeDnsUpdateKey, other_id).status == 'active'
+        assert db.session.get(AcmeDnsUpdateKey, free_id).status == 'active'
+    assert len(_key_audit(app, 'acme.dns_update.key.revoke', mark)) == 1
+
+
+def test_B5_permanent_delete_removes_linked_key_and_audits_pos(auth_client, app, env):
+    mark = _audit_mark(app)
+    acct = env.make_account()
+    cred = env.make_cred('used')
+    kid = _data(_post(auth_client, acct, {'name': 'b5e.example.', 'eab_credential_id': cred}))['id']
+    assert auth_client.delete(f'/api/v2/acme/eab-credentials/{cred}').status_code == 204
+    with app.app_context():
+        assert db.session.get(AcmeDnsUpdateKey, kid) is None
+    rows = _key_audit(app, 'acme.dns_update.key.delete', mark)
+    assert len(rows) == 1
+    assert rows[0].resource_id == str(kid) and rows[0].resource_name == 'b5e.example.'
+    assert 'kid-' in rows[0].details
+
+
+def test_B5_permanent_delete_leaves_unlinked_keys_neg(auth_client, app, env):
+    mark = _audit_mark(app)
+    acct = env.make_account()
+    cred = env.make_cred('used')
+    free_id = _data(_post(auth_client, acct, {'name': 'b5f.example.'}))['id']
+    assert auth_client.delete(f'/api/v2/acme/eab-credentials/{cred}').status_code == 204
+    with app.app_context():
+        assert db.session.get(AcmeDnsUpdateKey, free_id).status == 'active'
+    assert _key_audit(app, 'acme.dns_update.key.delete', mark) == []
 
 
 # ------------------------------------------------------------------- logs

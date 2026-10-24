@@ -120,15 +120,15 @@ Nasłuch działa w jedynym workerze gevent (`workers = 1`), który obsługuje te
 
 | Mechanizm | Wartość domyślna | Cel |
 |---|---|---|
-| `spawn=Pool(N)` dla `DatagramServer` i `StreamServer` | N = 16 (UDP), 32 połączenia (TCP) | ograniczona liczba greenletów |
+| `spawn=Pool(N)` dla `DatagramServer` i `StreamServer` | N = 16 (UDP), 128 połączeń (TCP), maks. 8 połączeń na źródło | ograniczona liczba greenletów; zajęcie wszystkich połączeń TCP wymaga co najmniej 16 źródeł (CR1-5) |
 | Globalny token bucket pakietów, sprawdzany przed parsowaniem | 200 pakietów/s, zryw 400 | ochrona przed zalaniem także z podrobionych adresów |
-| Limit na IP, w ograniczonym LRU (np. 4096 wpisów) | 50 pakietów/s na IP dla ruchu bez poprawnego TSIG | ochrona przed jednym źródłem; LRU chroni pamięć |
+| Limit na źródło, w ograniczonym LRU (np. 4096 wpisów) | 50 pakietów/s na źródło; źródło = adres IPv4 albo sieć IPv6 /64 | ochrona przed jednym źródłem; host z prefiksem /64 nie dostaje nowego limitu dla każdego adresu (CR1-6); LRU chroni pamięć |
 | Wstępna kontrola nagłówka przed `from_wire` | QDCOUNT ≤ 1, ANCOUNT = 0 dla QUERY, NSCOUNT ≤ 16, ARCOUNT ≤ 4, długość ≤ MAX_MSG = 4096 B | mały koszt odrzucenia |
 | Pamięć podręczna aktywnych wierszy (record_name, D, wartości, zakres) | odświeżanie po zapisie w `records.py` i co 5 s | SOA bez podpisu i BADKEY bez zapytań do DB |
-| Pamięć podręczna kluczy TSIG | unieważnienie przy każdej zmianie klucza (API w tym samym procesie), TTL 30 s | odwołanie działa od razu |
+| Pamięć podręczna kluczy TSIG | unieważnienie przy każdej zmianie klucza (API w tym samym procesie, przywrócenie kopii), TTL 30 s. Błąd odczytu po unieważnieniu → pusta pamięć (każdy klucz = BADKEY); błąd po zwykłym wygaśnięciu → stara pamięć; ponowna próba po 2 s | odwołanie działa od razu, także przy awarii DB (CR1-1) |
 | Pamięć podręczna domen ACME (strefy) | TTL 10 s | sprawdzanie strefy bez DB |
 | TCP: limit bezczynności, czas zapisu, maks. czas życia połączenia | 10 s, 10 s, 120 s | ochrona przed slow-read i wyczerpaniem połączeń |
-| Wyjątek w handlerze | odpowiedź SERVFAIL (gdy da się odczytać ID), inaczej brak odpowiedzi; serwer działa dalej | odporność |
+| Wyjątek w handlerze | odpowiedź SERVFAIL (gdy da się odczytać ID), podpisana, gdy TSIG żądania był poprawny (RFC 8945 §5.3); inaczej brak odpowiedzi; serwer działa dalej | odporność |
 | Logi aplikacji dla ruchu bez podpisu i błędnego | próbkowanie: maks. 1 wiersz na (powód) na 10 s, plus liczniki | ochrona logów |
 | Adres nasłuchu | `UCM_DNS_UPDATE_HOST`, domyślnie `HOST` | możliwość nasłuchu tylko w sieci wewnętrznej (F8) |
 
@@ -260,7 +260,7 @@ Nazwa testu: `test_<ID>_<opis>_pos` / `test_<ID>_<opis>_neg`.
 | S12 | Ucięta odpowiedź podpisana: pytanie + TSIG, TC=1, NOERROR | 8945 §5.3 | SOA przez UDP z podpisem → TC=1 i poprawny TSIG | brak TSIG w uciętej odpowiedzi = błąd |
 | S13 | Nazwy kluczy i algorytmów porównywane bez wielkości liter | 8945 §9; 1034 §3.1 | `KEY.Example.` = `key.example.` | inna nazwa → BADKEY |
 | S14 | Okno czasu = min(Fudge żądania, 300 s); BADTIME podaje fudge klienta | 8945 §5.2.3, §10 | Fudge 300, różnica 300 → przyjęty | Fudge 65535, różnica 301 → BADTIME z Fudge 65535 w odpowiedzi |
-| S15 | Powtórka (ten sam MAC żądania w oknie) → ta sama odpowiedź, bez skutków ubocznych | 8945 §10 | retransmisja UDP → identyczna odpowiedź | powtórka nie zmienia `client_confirmed_at`, `last_used_at`, nie dodaje audytu |
+| S15 | Powtórka (ten sam skrót wiadomości przez 2 × 300 s, każdy transport) → odpowiedź bez skutków ubocznych; kopia w trakcie przetwarzania → brak odpowiedzi | 8945 §10 | retransmisja UDP → identyczna odpowiedź; UDP, potem TCP → odpowiedź TCP, skutki raz | powtórka nie zmienia `client_confirmed_at`, `last_used_at`, nie dodaje audytu |
 
 ### 4.3 UPDATE (U)
 
@@ -312,7 +312,7 @@ Nazwa testu: `test_<ID>_<opis>_pos` / `test_<ID>_<opis>_neg`.
 | K5 | Nazwa klucza: poprawna nazwa DNS ≤ 255 B, unikalna bez wielkości liter | 8945 §4.2; 1035 §2.3.4 | poprawna → 201 | duplikat innej wielkości liter; etykieta > 63 B → 400 |
 | K6 | Domyślnie brak uprawnień: nowy klucz bez wierszy nic nie zmienia | 3007 §3 | — | dodanie z nowym kluczem bez wierszy → REFUSED |
 | K7 | Sekret nieodszyfrowany albo pusty → klucz nieznany (BADKEY), nigdy pusty klucz HMAC | maintainer; 8945 §5.2.1 | poprawny sekret → przyjęty | zły klucz szyfrowania DB; pusty sekret; HMAC z pustym kluczem → BADKEY |
-| K8 | Klucz z EAB: brak dopasowania, gdy EAB usunięte, nieużyte, `used_by_account_id` NULL albo wiersz z `account_id` NULL | 3007 §3 (domyślnie brak) | EAB `used`, to samo konto → NOERROR | każdy z 4 przypadków → REFUSED; usunięcie EAB usuwa klucz (SQLite) |
+| K8 | Klucz z EAB: brak dopasowania, gdy EAB usunięte, nieużyte, `used_by_account_id` NULL albo wiersz z `account_id` NULL | 3007 §3 (domyślnie brak) | EAB `used`, to samo konto → NOERROR | każdy z 4 przypadków → REFUSED; odwołanie EAB odwołuje klucz, usunięcie EAB usuwa klucz (SQLite); każda zmiana ma wpis audytu klucza |
 | K9 | Klucz konta proxy usuniętego albo z `proxy_enabled = false` → BADKEY | 3007 §3 | konto aktywne → przyjęty | konto usunięte (SQLite, bez FK); proxy wyłączone → BADKEY; nowe konto z tym samym ID nie dziedziczy klucza |
 
 ### 4.6 Serwer, logi, bezpieczeństwo (N)
@@ -324,11 +324,11 @@ Nazwa testu: `test_<ID>_<opis>_pos` / `test_<ID>_<opis>_neg`.
 | N3 | Błąd bind nie zatrzymuje aplikacji | wzorzec serwera HTTP | wolny port → nasłuch | zajęty port → log błędu, aplikacja działa |
 | N4 | Limity: globalny token bucket, limit na IP w LRU, Pool greenletów, limit połączeń TCP, czas zapisu i życia połączenia | 7766 §6.2.2, §6.2.3; bezpieczeństwo (F1) | ruch w limicie → odpowiedzi | ruch ponad limit → brak odpowiedzi; 10 000 adresów IP → rozmiar LRU ≤ limit; liczba greenletów ≤ Pool |
 | N5 | Brak rekursji i brak ruchu wychodzącego z handlera | maintainer; 8906 §3.1.3.1 | — | test z zablokowanym `socket.connect`: żadne wywołanie |
-| N6 | Audyt: przyjęte i odrzucone żądania z TSIG; log aplikacji: bez podpisu i błędne | maintainer | żądanie z TSIG → wpis audytu | bez TSIG; błędne → brak wpisu audytu |
+| N6 | Audyt: przyjęte i odrzucone żądania z TSIG; log aplikacji: bez podpisu i błędne. Przyjęte: maks. 120 wpisów na klucz na minutę, nadmiar w jednym wpisie podsumowania (CR1-2) | maintainer | żądanie z TSIG → wpis audytu | bez TSIG; błędne → brak wpisu audytu; 200 przyjętych w minucie → 120 wpisów + podsumowanie |
 | N7 | Limit wpisów audytu na (IP, powód) | bezpieczeństwo (ochrona tabeli audytu) | pierwszy BADKEY → wpis | 100 BADKEY z tego samego IP w 60 s → 1 wpis + log |
 | N8 | Ruch bez podpisu (SOA, UPDATE) i BADKEY nie wykonuje zapytań do DB | bezpieczeństwo (F1) | — | 1000 zapytań SOA bez podpisu i 1000 BADKEY → 0 zapytań SQL (licznik zdarzeń SQLAlchemy) |
 | N9 | Liczniki nagłówka poza limitem albo długość > MAX_MSG → brak odpowiedzi, bez pełnego parsowania | bezpieczeństwo (F1) | liczniki w limicie → przetworzone | ARCOUNT=1000; QDCOUNT=2 dla QUERY (FORMERR po kontroli M5); 4097 B → brak odpowiedzi |
-| N10 | Wyjątek (np. DB) → SERVFAIL albo brak odpowiedzi; serwer działa dalej | 1035 §4.1.1 (SERVFAIL); 2136 §3.4.2.1 | — | wymuszony wyjątek DB → SERVFAIL; następne zapytanie → poprawna odpowiedź |
+| N10 | Wyjątek (np. DB) → SERVFAIL albo brak odpowiedzi; serwer działa dalej. SERVFAIL na żądanie z poprawnym TSIG jest podpisany | 1035 §4.1.1 (SERVFAIL); 2136 §3.4.2.1; 8945 §5.3 | żądanie z TSIG → podpisany SERVFAIL | żądanie bez TSIG → SERVFAIL bez TSIG; następne zapytanie → poprawna odpowiedź |
 | N11 | Sekret i MAC nigdy w logach i audycie | bezpieczeństwo (F11) | — | cały zestaw testów z caplog na DEBUG: brak sekretu (base64) i MAC (hex, base64) w logach |
 | N12 | Globalny limit wpisów audytu na powód (niezależnie od IP) + jeden wpis zbiorczy | bezpieczeństwo (F7) | pierwsze N wpisów → zapisane | 1000 BADKEY z 1000 losowych IP → ≤ N wpisów + 1 zbiorczy |
 | N13 | Audyt ma adres klienta i nazwę `dns-update:<nazwa klucza>` albo `dns-update:unauthenticated`; nazwy z pakietu są skracane i oczyszczane | bezpieczeństwo (F7) | przyjęty UPDATE → IP i nazwa klucza w audycie | nazwa 255 B ze znakami sterującymi → skrócona, bez znaków sterujących; nigdy `system` |
@@ -489,3 +489,29 @@ Niezależny agent `reviewer` sprawdził plan w wersji 2. Wszystkie ustalenia prz
 | F15 | info | NOTIMP bez TSIG; strefa przyjmuje sufiksy publiczne | decyzja 11; reguła strefy bez zmian (brak skutków) |
 
 **F14 – zgoda maintainera.** Decyzje 1 i 2 zmieniają dosłowne brzmienie wymagań. Nie mam dostępu do issue w upstream, więc przygotowuję komentarz do wysłania przez użytkownika ([`maintainer-comment-416.md`](maintainer-comment-416.md)). Praca nad PR 2 idzie dalej. Gdy maintainer się nie zgodzi, zmiana dotyczy tylko kroku 10 i sekcji 3.1 (Q2).
+
+## 12. Przegląd kodu po zakończeniu (2026-10-24)
+
+Runda 1 `/code-review` (19 ustaleń). Każde ustalenie sprawdziłem w kodzie i w RFC. Zmiany względem planu:
+
+| ID | Problem | Zmiana |
+|---|---|---|
+| CR1-1 | Błąd odczytu kluczy po unieważnieniu zostawiał odwołany klucz w pamięci | pusta pamięć po unieważnieniu i błędzie (fail closed), ponowna próba po 2 s (2.4) |
+| CR1-2 | Posiadacz klucza mógł zalać audyt (usunięcia są zawsze przyjęte, nowe ID omija pamięć powtórek) | limit 120 wpisów na klucz na minutę z podsumowaniem (N6) |
+| CR1-3 | Pamięć powtórek: TTL krótszy niż okno czasu, klucz z transportem, brak ochrony kopii w trakcie przetwarzania | TTL 2 × 300 s, klucz = skrót wiadomości, kopia w trakcie → brak odpowiedzi (S15) |
+| CR1-4 | Pusta zmienna `UCM_DNS_UPDATE_PORT` wyłączała nasłuch i blokowała pole w UI | pusta wartość = brak zmiennej |
+| CR1-5 | 4 źródła mogły zająć wszystkie połączenia TCP | 128 połączeń (2.4) |
+| CR1-6 | Limity na adres IPv6 omijane przez adresy z jednego /64 | źródło IPv6 = sieć /64 (2.4) |
+| CR1-8 | Odwołanie EAB usuwało klucze bez wpisu audytu | odwołanie EAB odwołuje klucze, usunięcie usuwa; wpis audytu dla każdego klucza (K8) |
+| CR1-9 | Jeden konflikt UNIQUE kasował wiersze wszystkich zamówień z wywołania | osobny savepoint dla każdego wiersza (2.2) |
+| CR1-10 | Zapytanie SOA bez podpisu parsowało nazwy wszystkich wierszy | wstępny filtr przez zbiór stref migawki i pamięć parsowanych nazw |
+| CR1-11, 14 | Podsumowanie audytu pomijało odrzucenia limitu na IP; nieudany zapis audytu zwracał sukces | liczniki i wynik zapisu poprawione |
+| CR1-12, 13 | Zbędne unieważnienia pamięci wierszy, odczyt wszystkich poświadczeń EAB | unieważnienie tylko po zapisie, odczyt tylko powiązanych EAB |
+| CR1-15 | W trybie deweloperskim z reloaderem nasłuch mógł działać w procesie rodzica | start tylko w procesie obsługującym API |
+| CR1-16 | Port DNS UPDATE mógł być równy portowi TLS-ALPN-01; `restart_required` bez zmiany | kontrola obu portów; restart tylko po zmianie, gdy zmienna środowiskowa nie wygrywa |
+| — | SERVFAIL bez podpisu na żądanie z poprawnym TSIG (RFC 8945 §5.3) | podpisany SERVFAIL (N10) |
+
+Bez zmian: CR1-7 (znacznik czasu na klucz, decyzja 9: RFC 8945 §5.2.3 SHOULD, klient ponawia), `client_confirmed_at` (zapis potwierdzenia do diagnostyki), `tsig_start_offset` (publiczna funkcja z testami), CR1-19 (prompty w `docs/development/` są na życzenie użytkownika; dla upstream opcjonalne).
+
+Przy okazji test kopii zapasowej między instalacjami wykazał, że przywracanie pomijało tabelę kluczy. Poprawka: sekcja w `restore_core.GENERIC_SECTIONS`, a po przywróceniu czyszczenie pamięci kluczy, stref i wierszy.
+

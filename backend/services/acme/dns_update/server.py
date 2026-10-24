@@ -10,6 +10,7 @@ takes the rest). Memory and greenlet count stay bounded.
 
 Logs never contain packet bytes, keys or MACs.
 """
+import ipaddress
 import logging
 import socket
 import threading
@@ -34,7 +35,7 @@ _server = None  # module-level reference, keeps the servers alive
 @dataclass(frozen=True)
 class ServerLimits:
     udp_pool: int = 16
-    tcp_pool: int = 32
+    tcp_pool: int = 128
     tcp_per_ip: int = 8
     global_rate: float = 200.0      # packets per second, all sources
     global_burst: int = 400
@@ -44,6 +45,18 @@ class ServerLimits:
     tcp_idle_s: float = 10.0        # RFC 7766 §6.2.3, reset only on a FULL message
     tcp_write_s: float = 10.0
     tcp_lifetime_s: float = 120.0
+
+
+def _limit_key(ip: str) -> str:
+    """Key of the per-source limits: the address for IPv4, the /64 network for IPv6.
+    One host with a /64 must not get a fresh bucket for every address."""
+    try:
+        if ipaddress.ip_address(ip).version == 4:
+            return ip
+        net = ipaddress.IPv6Network(f"{ip}/64", strict=False)
+        return str(net.network_address) + "/64"
+    except ValueError:
+        return ip
 
 
 class _Bucket:
@@ -75,6 +88,7 @@ class RateLimiter:
     def allow(self, ip: str) -> bool:
         lim = self._limits
         now = self._clock()
+        ip = _limit_key(ip)
         bucket = self._per_ip.get(ip)
         if bucket is None:
             bucket = _Bucket(float(lim.per_ip_burst), now)
@@ -242,6 +256,7 @@ class DnsUpdateServer:
     # -- TCP -----------------------------------------------------------------------
 
     def _acquire_slot(self, ip: str) -> bool:
+        ip = _limit_key(ip)
         with self._tcp_lock:
             n = self._tcp_counts.get(ip, 0)
             if n >= self._limits.tcp_per_ip:
@@ -250,6 +265,7 @@ class DnsUpdateServer:
             return True
 
     def _release_slot(self, ip: str) -> None:
+        ip = _limit_key(ip)
         with self._tcp_lock:
             n = self._tcp_counts.get(ip, 0) - 1
             if n > 0:

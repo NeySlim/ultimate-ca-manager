@@ -1888,21 +1888,26 @@ def main():
 
     # Start the DNS UPDATE (RFC 2136) listener (dev mode). The gevent servers bind and
     # run in one daemon thread, which owns its own hub (the dev server is not patched).
+    # With DEBUG the Werkzeug reloader also runs main() in a parent process. Only the
+    # child (which serves the API and its cache invalidations) may bind the listener.
     try:
-        from services.acme.dns_update.status import get_dns_update_port
-        with app.app_context():
-            dns_update_port = get_dns_update_port()
-        if dns_update_port > 0:
-            import threading
+        if not config.DEBUG or os.environ.get('WERKZEUG_RUN_MAIN') == 'true':
+            from services.acme.dns_update.status import get_dns_update_port
+            with app.app_context():
+                dns_update_port = get_dns_update_port()
+            if dns_update_port > 0:
+                import threading
 
-            def _run_dns_update_listener():
-                from services.acme.dns_update.server import start_dns_update_server
-                srv = start_dns_update_server(app)
-                if srv is not None:
+                def _run_dns_update_listener():
+                    from services.acme.dns_update.server import start_dns_update_server
+                    srv = start_dns_update_server(app)
+                    if srv is None:
+                        print(f"  ⚠ DNS UPDATE listener failed to start on port {dns_update_port}")
+                        return
+                    print(f"  DNS UPDATE listener on port {dns_update_port} (UDP/TCP)")
                     srv.serve_forever()
 
-            threading.Thread(target=_run_dns_update_listener, daemon=True).start()
-            print(f"  DNS UPDATE listener on port {dns_update_port} (UDP/TCP)")
+                threading.Thread(target=_run_dns_update_listener, daemon=True).start()
     except Exception as e:
         print(f"  ⚠ DNS UPDATE listener failed: {e}")
 

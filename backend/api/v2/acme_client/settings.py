@@ -31,13 +31,12 @@ from services.acme.dns_update import status as dns_update_status
 logger = logging.getLogger(__name__)
 
 
-def _stored_dns_update_port() -> int:
-    cfg = SystemConfig.query.filter_by(key=dns_update_status.PORT_CONFIG_KEY).first()
+def _stored_tls_alpn_port() -> int:
+    cfg = SystemConfig.query.filter_by(key='acme.client.tls_alpn_port').first()
     try:
-        port = int(cfg.value) if cfg and cfg.value else 0
+        return int(cfg.value) if cfg and cfg.value else 443
     except (TypeError, ValueError):
-        return 0
-    return port if 0 <= port <= 65535 else 0
+        return 443
 
 
 @bp.route('/api/v2/acme/client/settings', methods=['GET'])
@@ -156,7 +155,7 @@ def get_settings():
         'account_key_type': acct_key_type_cfg.value if acct_key_type_cfg else 'ES256',
         'acme_public_base_url': get_acme_public_base(request),
         'acme_proxy_public_base_url': get_acme_proxy_public_base(request),
-        'dns_update_port': _stored_dns_update_port(),
+        'dns_update_port': dns_update_status.get_stored_dns_update_port(),
         'dns_update_port_env': dns_update_status.get_dns_update_port_env(),
         'dns_update_listening': dns_update_status.is_listening(),
     })
@@ -268,6 +267,16 @@ def update_settings():
             return error_response(
                 'TLS-ALPN-01 listen port must be between 1 and 65535', 400
             )
+        effective_dns_port = dns_update_status.get_dns_update_port()
+        if 'dns_update_port' in data:
+            try:
+                if not isinstance(data['dns_update_port'], bool):
+                    effective_dns_port = int(data['dns_update_port'])
+            except (TypeError, ValueError):
+                pass
+        if effective_dns_port != 0 and tls_alpn_port == effective_dns_port:
+            return error_response(
+                'TLS-ALPN-01 listen port cannot be the same as the DNS UPDATE port', 400)
         _set_config(
             'acme.client.tls_alpn_port',
             str(tls_alpn_port),
@@ -276,6 +285,7 @@ def update_settings():
         updates.append('tls_alpn_port')
 
     restart_needed = False
+    env_override = False
     if 'dns_update_port' in data:
         raw_port = data['dns_update_port']
         try:
@@ -295,13 +305,21 @@ def update_settings():
             if dns_update_port == get_http_protocol_port():
                 return error_response(
                     'DNS UPDATE port cannot be the same as HTTP protocol port', 400)
+            effective_tls_alpn = (tls_alpn_port if 'tls_alpn_port' in data
+                                  else _stored_tls_alpn_port())
+            if dns_update_port == effective_tls_alpn:
+                return error_response(
+                    'DNS UPDATE port cannot be the same as the TLS-ALPN-01 port', 400)
+        previous_dns_port = dns_update_status.get_stored_dns_update_port()
+        env_override = dns_update_status.get_dns_update_port_env() is not None
         _set_config(
             dns_update_status.PORT_CONFIG_KEY,
             str(dns_update_port),
             'TCP/UDP port of the DNS UPDATE (RFC 2136) listener, 0 = disabled',
         )
         updates.append('dns_update_port')
-        restart_needed = True
+        # The environment variable wins over the setting: no restart helps then.
+        restart_needed = dns_update_port != previous_dns_port and not env_override
 
     if 'debug_logging' in data:
         try:
@@ -532,7 +550,11 @@ def update_settings():
     message = f'Settings updated: {", ".join(updates)}' if updates else 'No changes'
     if restart_needed:
         message += ' (restart UCM to apply the DNS UPDATE port)'
-    return success_response(
-        data={'restart_required': True} if restart_needed else None,
-        message=message,
-    )
+    response_data = None
+    if 'dns_update_port' in data:
+        response_data = {'restart_required': restart_needed}
+        if env_override:
+            response_data['dns_update_port_env_override'] = True
+            message += (f' ({dns_update_status.PORT_ENV} is set and overrides the '
+                        'DNS UPDATE port setting)')
+    return success_response(data=response_data, message=message)

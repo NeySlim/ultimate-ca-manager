@@ -191,7 +191,7 @@ def test_K3_to_dict_has_no_secret_neg(app):
 
 # --- K8 ---
 
-@pytest.mark.parametrize('status', ['active', 'used', 'revoked'])
+@pytest.mark.parametrize('status', ['used', 'revoked'])
 def test_K8_eab_delete_removes_linked_key_pos(app, auth_client, status):
     with app.app_context():
         acct = _account()
@@ -202,6 +202,18 @@ def test_K8_eab_delete_removes_linked_key_pos(app, auth_client, status):
     assert resp.status_code in (200, 204)
     with app.app_context():
         assert db.session.get(AcmeDnsUpdateKey, key_id) is None
+
+
+def test_K8_eab_soft_revoke_revokes_linked_key_pos(app, auth_client):
+    # An active credential is only soft-revoked: its key stays, revoked (B5).
+    with app.app_context():
+        acct = _account()
+        cred = _eab('active')
+        key = _key(acct, eab=cred)
+        key_id, cred_id = key.id, cred.id
+    assert auth_client.delete(f'/api/v2/acme/eab-credentials/{cred_id}').status_code == 200
+    with app.app_context():
+        assert db.session.get(AcmeDnsUpdateKey, key_id).status == 'revoked'
 
 
 def test_K8_eab_delete_keeps_other_keys_neg(app, auth_client):

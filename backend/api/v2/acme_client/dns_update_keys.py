@@ -17,6 +17,7 @@ from api.v2.acme_client import bp, logger
 from auth.unified import require_auth
 from models import db, AcmeClientAccount, AcmeEabCredential
 from models.acme_dns_update import AcmeDnsUpdateKey
+from services.acme.dns_update.keys import invalidate_keys
 from services.audit_service import AuditService
 from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
@@ -24,11 +25,6 @@ from utils.response import success_response, error_response, no_content_response
 
 DEFAULT_ALGORITHM = 'hmac-sha256'
 MAX_NOTES_LENGTH = 1000
-
-
-def _invalidate_keys() -> None:
-    from services.acme.dns_update.keys import invalidate_keys
-    invalidate_keys()
 
 
 def _current_user_id():
@@ -115,7 +111,7 @@ def create_dns_update_key(account_id):
     ok, err = safe_commit(logger, 'Failed to create DNS UPDATE key')
     if not ok:
         return err
-    _invalidate_keys()
+    invalidate_keys()
 
     AuditService.log_action(
         action='acme.dns_update.key.create',
@@ -151,7 +147,7 @@ def delete_dns_update_key(account_id, key_id):
         ok, err = safe_commit(logger, 'Failed to delete DNS UPDATE key')
         if not ok:
             return err
-        _invalidate_keys()
+        invalidate_keys()
         AuditService.log_action(
             action='acme.dns_update.key.delete',
             resource_type='acme_dns_update_key',
@@ -167,7 +163,7 @@ def delete_dns_update_key(account_id, key_id):
     ok, err = safe_commit(logger, 'Failed to revoke DNS UPDATE key')
     if not ok:
         return err
-    _invalidate_keys()
+    invalidate_keys()
     AuditService.log_action(
         action='acme.dns_update.key.revoke',
         resource_type='acme_dns_update_key',

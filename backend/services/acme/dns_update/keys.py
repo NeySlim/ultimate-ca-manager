@@ -8,6 +8,12 @@ A key is usable when it is active, its proxy account exists and has
 ``proxy_enabled``, its algorithm is allowed, and its secret decrypts to
 non-empty base64. Anything else is skipped (fail closed). The module never
 logs a secret, only key names.
+
+After ``invalidate()`` (key revoked, EAB deleted, account disabled, restore)
+the cache is dirty. A failed reload then empties the cache, so every key is
+unknown (BADKEY). After a normal expiry a failed reload keeps the previous
+cache (availability, F3). Failed loads are retried after ``_RETRY_S``, with one
+warning per attempt.
 """
 
 import base64
@@ -28,6 +34,7 @@ from .tsig import TsigKeyMaterial
 logger = logging.getLogger(__name__)
 
 _TOUCH_INTERVAL_S = 60.0
+_RETRY_S = 2.0
 
 
 @dataclass(frozen=True)
@@ -62,30 +69,46 @@ class KeyStore:
         self._materials: Dict[str, TsigKeyMaterial] = {}
         self._scopes: Dict[int, KeyScope] = {}
         self._loaded_at: Optional[float] = None
+        self._dirty = False
+        self._retry_at: Optional[float] = None
         self._touched: Dict[int, float] = {}
 
     # -- cache -------------------------------------------------------------
     def invalidate(self) -> None:
         with self._lock:
+            self._dirty = True
             self._loaded_at = None
 
     def _ensure(self) -> None:
         with self._lock:
             now = self._clock()
-            if self._loaded_at is not None and (now - self._loaded_at) < self._max_age:
+            if (not self._dirty and self._loaded_at is not None
+                    and (now - self._loaded_at) < self._max_age):
+                return
+            if self._retry_at is not None and now < self._retry_at:
+                if self._dirty:
+                    self._materials = {}
+                    self._scopes = {}
                 return
             try:
                 materials, scopes = self._load()
             except Exception as e:
-                # Keep the previous cache. Retry after the next interval
-                # (not on every request, which would hammer a sick DB).
-                logger.warning("DNS UPDATE key reload failed, keeping previous cache: %s",
-                               type(e).__name__)
-                if self._loaded_at is not None or self._materials:
-                    self._loaded_at = now
+                self._retry_at = now + _RETRY_S
+                if self._dirty:
+                    # An explicit invalidation means the old cache may hold a
+                    # revoked key: fail closed.
+                    self._materials = {}
+                    self._scopes = {}
+                    logger.warning("DNS UPDATE key reload failed, cache emptied: %s",
+                                   type(e).__name__)
+                else:
+                    logger.warning("DNS UPDATE key reload failed, keeping previous cache: %s",
+                                   type(e).__name__)
                 return
             self._materials = materials
             self._scopes = scopes
+            self._dirty = False
+            self._retry_at = None
             self._loaded_at = now
 
     def lookup(self, name: dns.name.Name) -> Optional[TsigKeyMaterial]:
@@ -133,11 +156,15 @@ class KeyStore:
         try:
             enabled = {row[0] for row in db.session.query(AcmeClientAccount.id)
                        .filter(AcmeClientAccount.proxy_enabled.is_(True)).all()}
-            creds = {c.id: (c.status, c.used_by_account_id)
-                     for c in db.session.query(
-                         AcmeEabCredential.id, AcmeEabCredential.status,
-                         AcmeEabCredential.used_by_account_id).all()}
             keys = AcmeDnsUpdateKey.query.filter_by(status='active').all()
+            cred_ids = {k.eab_credential_id for k in keys if k.eab_credential_id is not None}
+            creds = {}
+            if cred_ids:
+                creds = {c.id: (c.status, c.used_by_account_id)
+                         for c in db.session.query(
+                             AcmeEabCredential.id, AcmeEabCredential.status,
+                             AcmeEabCredential.used_by_account_id)
+                         .filter(AcmeEabCredential.id.in_(cred_ids)).all()}
             for key in keys:
                 if key.acme_client_account_id not in enabled:
                     continue

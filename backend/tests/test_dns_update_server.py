@@ -475,6 +475,68 @@ def test_N4_limiter_allows_in_limit_traffic_pos():
     assert limiter.allow('a')
 
 
+def _limiter(burst=2):
+    now = [0.0]
+    return RateLimiter(ServerLimits(global_rate=100000.0, global_burst=100000,
+                                    per_ip_rate=0.001, per_ip_burst=burst),
+                       clock=lambda: now[0])
+
+
+def test_A5_limit_key_ipv6_is_the_64_network_pos():
+    assert srv_mod._limit_key('2001:db8:1:2:aaaa::1') == '2001:db8:1:2::/64'
+    assert srv_mod._limit_key('2001:db8:1:2:ffff:ffff:ffff:ffff') == '2001:db8:1:2::/64'
+    assert srv_mod._limit_key('2001:db8:1:3::1') == '2001:db8:1:3::/64'
+
+
+def test_A5_limit_key_ipv4_and_unparsable_are_unchanged_neg():
+    assert srv_mod._limit_key('192.0.2.7') == '192.0.2.7'
+    assert srv_mod._limit_key('') == ''
+    assert srv_mod._limit_key('not-an-ip') == 'not-an-ip'
+
+
+def test_A5_addresses_in_one_64_share_one_bucket_pos():
+    limiter = _limiter(burst=2)
+    assert limiter.allow('2001:db8:1:2::1') and limiter.allow('2001:db8:1:2::2')
+    assert not limiter.allow('2001:db8:1:2::3')  # the burst of the /64 is used up
+    assert limiter.table_size() == 1
+
+
+def test_A5_addresses_in_different_64s_have_separate_buckets_neg():
+    limiter = _limiter(burst=1)
+    assert limiter.allow('2001:db8:1:2::1')
+    assert not limiter.allow('2001:db8:1:2::1')
+    assert limiter.allow('2001:db8:1:3::1')  # another /64
+    assert limiter.allow('192.0.2.1') and limiter.allow('192.0.2.2')  # IPv4 per address
+    assert not limiter.allow('192.0.2.1')
+
+
+def test_A5_tcp_per_ip_cap_counts_one_64_together_pos():
+    s = DnsUpdateServer(None, '127.0.0.1', 0, FakeHandler(), ServerLimits(tcp_per_ip=2))
+    assert s._acquire_slot('2001:db8:1:2::1') and s._acquire_slot('2001:db8:1:2::2')
+    assert not s._acquire_slot('2001:db8:1:2::3')
+    s._release_slot('2001:db8:1:2::2')
+    assert s._acquire_slot('2001:db8:1:2::9')  # a slot of the /64 was freed
+    assert len(s._tcp_counts) == 1
+
+
+def test_A5_tcp_per_ip_cap_is_per_64_and_per_ipv4_address_neg():
+    s = DnsUpdateServer(None, '127.0.0.1', 0, FakeHandler(), ServerLimits(tcp_per_ip=1))
+    assert s._acquire_slot('2001:db8:1:2::1')
+    assert s._acquire_slot('2001:db8:1:3::1')  # another /64
+    assert s._acquire_slot('192.0.2.1') and s._acquire_slot('192.0.2.2')
+    assert not s._acquire_slot('192.0.2.1')
+    for ip in ('2001:db8:1:2::1', '2001:db8:1:3::1', '192.0.2.1', '192.0.2.2'):
+        s._release_slot(ip)
+    assert s._tcp_counts == {}
+
+
+def test_A5_default_tcp_pool_needs_16_sources_pos_and_neg():
+    lim = ServerLimits()
+    assert lim.tcp_pool == 128 and lim.tcp_per_ip == 8
+    assert lim.tcp_pool // lim.tcp_per_ip == 16
+    assert ServerLimits(tcp_pool=32).tcp_pool == 32  # an explicit value is kept
+
+
 def test_N4_tcp_per_ip_cap_closes_the_extra_connection_neg(run):
     r = run(tcp_per_ip=3, tcp_idle_s=5.0)
     held = [tcp(r) for _ in range(3)]

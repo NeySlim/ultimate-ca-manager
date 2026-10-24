@@ -397,6 +397,162 @@ def test_F3_db_error_on_first_load_finds_nothing_neg(env, monkeypatch):
     assert KeyStore().lookup(_n('any.example.')) is None
 
 
+def _failing_load(monkeypatch):
+    from services.acme.dns_update.keys import KeyStore
+    calls = []
+
+    def boom():
+        calls.append(1)
+        raise RuntimeError('db down')
+    monkeypatch.setattr(KeyStore, '_load', staticmethod(boom))
+    return calls
+
+
+def test_B1_failing_reload_after_invalidate_fails_closed_pos(env, monkeypatch):
+    from services.acme.dns_update.keys import KeyStore
+    clock = Clock()
+    k = env.make_key(env.make_account(), name='revoked-now.example.')
+    store = KeyStore(clock=clock)
+    assert store.lookup(_n(k.name)) is not None
+    _failing_load(monkeypatch)
+    store.invalidate()
+    assert store.lookup(_n(k.name)) is None
+    assert store.scope(k.id) is None
+
+
+def test_B1_failing_reload_after_expiry_keeps_cache_neg(env, monkeypatch):
+    from services.acme.dns_update.keys import KeyStore
+    clock = Clock()
+    k = env.make_key(env.make_account(), name='kept.example.')
+    store = KeyStore(max_age_s=30.0, clock=clock)
+    assert store.lookup(_n(k.name)) is not None
+    _failing_load(monkeypatch)
+    clock.t += 31  # expiry only, no invalidate()
+    assert store.lookup(_n(k.name)) is not None
+    assert store.scope(k.id) is not None
+
+
+def test_B1_dirty_cache_stays_closed_within_retry_window_pos(env, monkeypatch):
+    from services.acme.dns_update.keys import KeyStore
+    clock = Clock()
+    k = env.make_key(env.make_account(), name='dirty.example.')
+    store = KeyStore(clock=clock)
+    assert store.lookup(_n(k.name)) is not None
+    calls = _failing_load(monkeypatch)
+    store.invalidate()
+    assert store.lookup(_n(k.name)) is None
+    store.invalidate()  # a second invalidation inside the retry window
+    assert store.lookup(_n(k.name)) is None
+    assert len(calls) == 1
+
+
+def test_B1_dirty_cache_recovers_when_db_is_back_pos(env, monkeypatch):
+    from services.acme.dns_update import keys as keys_mod
+    clock = Clock()
+    k = env.make_key(env.make_account(), name='back.example.')
+    store = keys_mod.KeyStore(clock=clock)
+    assert store.lookup(_n(k.name)) is not None
+    with monkeypatch.context() as m:
+        m.setattr(keys_mod.KeyStore, '_load',
+                  staticmethod(lambda: (_ for _ in ()).throw(RuntimeError('x'))))
+        store.invalidate()
+        assert store.lookup(_n(k.name)) is None
+    clock.t += keys_mod._RETRY_S + 0.1
+    assert store.lookup(_n(k.name)) is not None
+
+
+def test_B1_retry_is_spaced_by_retry_interval_pos(env, monkeypatch):
+    from services.acme.dns_update.keys import KeyStore, _RETRY_S
+    clock = Clock()
+    store = KeyStore(clock=clock)
+    store.invalidate()
+    calls = _failing_load(monkeypatch)
+    store.lookup(_n('a.example.'))
+    clock.t += _RETRY_S / 2
+    store.lookup(_n('a.example.'))
+    assert len(calls) == 1
+    clock.t += _RETRY_S
+    store.lookup(_n('a.example.'))
+    assert len(calls) == 2
+
+
+def test_B1_retry_after_expiry_uses_retry_interval_not_max_age_pos(env, monkeypatch):
+    from services.acme.dns_update.keys import KeyStore, _RETRY_S
+    clock = Clock()
+    k = env.make_key(env.make_account(), name='exp.example.')
+    store = KeyStore(max_age_s=30.0, clock=clock)
+    assert store.lookup(_n(k.name)) is not None
+    calls = _failing_load(monkeypatch)
+    clock.t += 31
+    store.lookup(_n(k.name))
+    clock.t += _RETRY_S + 0.1
+    store.lookup(_n(k.name))
+    assert len(calls) == 2
+
+
+def test_B1_first_load_failure_does_not_hit_db_per_lookup_neg(env, monkeypatch):
+    from services.acme.dns_update.keys import KeyStore
+    store = KeyStore(clock=Clock())
+    calls = _failing_load(monkeypatch)
+    for i in range(50):
+        assert store.lookup(_n(f'x{i}.example.')) is None
+    assert len(calls) == 1
+
+
+def test_B1_one_warning_per_failed_attempt_pos(env, monkeypatch, caplog):
+    from services.acme.dns_update.keys import KeyStore, _RETRY_S
+    clock = Clock()
+    store = KeyStore(clock=clock)
+    _failing_load(monkeypatch)
+    with caplog.at_level(logging.WARNING):
+        for _ in range(20):
+            store.lookup(_n('w.example.'))
+        clock.t += _RETRY_S + 0.1
+        for _ in range(20):
+            store.lookup(_n('w.example.'))
+    warnings = [r for r in caplog.records if 'key reload failed' in r.getMessage()]
+    assert len(warnings) == 2
+
+
+def _eab_statements(env, fn):
+    statements = []
+
+    def hit(conn, cursor, statement, parameters, *a, **kw):
+        if 'FROM acme_eab_credentials' in statement:
+            statements.append((statement, parameters))
+    event.listen(env.db.engine, 'before_cursor_execute', hit)
+    try:
+        fn()
+    finally:
+        event.remove(env.db.engine, 'before_cursor_execute', hit)
+    return statements
+
+
+def test_B1_credential_query_selects_only_referenced_pos(env):
+    from services.acme.dns_update.keys import KeyStore
+    for _ in range(50):
+        env.make_cred('used', 'other')
+    cred_id = env.make_cred('used', 'acct-x')
+    k = env.make_key(env.make_account(), eab_credential_id=cred_id)
+    store = KeyStore()
+    stmts = _eab_statements(env, lambda: store.lookup(_n(k.name)))
+    assert len(stmts) == 1
+    assert 'IN' in stmts[0][0]
+    assert list(stmts[0][1]) == [cred_id]
+    assert store.scope(k.id).allows(k.acme_client_account_id, 'acct-x')
+    assert not store.scope(k.id).allows(k.acme_client_account_id, 'other')
+
+
+def test_B1_no_credential_query_without_bound_keys_neg(env):
+    from services.acme.dns_update.keys import KeyStore
+    env.make_cred('used', 'acct-x')
+    k = env.make_key(env.make_account())
+    store = KeyStore()
+    stmts = _eab_statements(env, lambda: store.lookup(_n(k.name)))
+    assert stmts == []
+    assert store.lookup(_n(k.name)) is not None
+
+
 def test_F4_touch_sets_last_used_and_throttles_pos(env):
     from models.acme_dns_update import AcmeDnsUpdateKey
     from services.acme.dns_update.keys import KeyStore
@@ -479,14 +635,16 @@ def test_U3_db_error_keeps_previous_pos(zone_env, monkeypatch):
 def audit_env(env):
     from models.audit_log import AuditLog
     env.AuditLog = AuditLog
-    AuditLog.query.filter(AuditLog.resource_type == 'acme_dns_update').delete()
-    env.db.session.commit()
+    # Never delete audit rows: the log is a hash chain that later tests verify.
+    # Only the rows written after this mark belong to the test.
+    env.audit_mark = env.db.session.query(env.db.func.max(AuditLog.id)).scalar() or 0
     yield env
 
 
 def _rows(env, action=None):
     env.db.session.expire_all()
-    q = env.AuditLog.query.filter(env.AuditLog.resource_type == 'acme_dns_update')
+    q = env.AuditLog.query.filter(env.AuditLog.resource_type == 'acme_dns_update',
+                                  env.AuditLog.id > env.audit_mark)
     if action:
         q = q.filter(env.AuditLog.action == action)
     return q.all()
@@ -616,6 +774,92 @@ def test_N13_log_action_without_ip_keeps_old_behaviour_pos(audit_env, app):
         row = AuditService.log_action(action='dnsupd.test', resource_type='acme_dns_update',
                                       username='u', ip_address='192.0.2.99')
         assert row.ip_address == '192.0.2.99'
+
+
+# ---------------------------------------------------------------- B2
+
+def _acc(sink, key='key1.example.', ip='192.0.2.1'):
+    return sink.audit_authenticated(action='acme.dns_update.accepted', peer_ip=ip,
+                                    keyname=key, success=True, details={'adds': 1})
+
+
+def test_B2_per_key_limit_and_summary_pos(audit_env):
+    from services.acme.dns_update.audit import AuditSink
+    clock = Clock()
+    sink = AuditSink(clock=clock)
+    results = [_acc(sink) for _ in range(200)]
+    assert results.count(True) == 120
+    assert len(_rows(audit_env, 'acme.dns_update.accepted')) == 120
+    assert len(_rows(audit_env, 'acme.dns_update.suppressed')) == 0
+    clock.t += 61
+    assert _acc(sink) is True
+    summary = _rows(audit_env, 'acme.dns_update.suppressed')
+    assert len(summary) == 1
+    assert json.loads(summary[0].details) == {'reason': 'accepted', 'keyname': 'key1.example.',
+                                             'dropped': 80}
+    assert len(_rows(audit_env, 'acme.dns_update.accepted')) == 121
+    # a window without drops writes no second summary
+    clock.t += 61
+    _acc(sink)
+    assert len(_rows(audit_env, 'acme.dns_update.suppressed')) == 1
+
+
+def test_B2_keys_have_separate_budgets_neg(audit_env):
+    from services.acme.dns_update.audit import AuditSink
+    sink = AuditSink(per_key_per_minute=3, clock=Clock())
+    assert [_acc(sink, 'a.example.') for _ in range(5)].count(True) == 3
+    assert [_acc(sink, 'b.example.') for _ in range(5)].count(True) == 3
+
+
+def test_B2_key_table_is_bounded_neg(audit_env):
+    from services.acme.dns_update.audit import AuditSink
+    sink = AuditSink(max_keys=10, clock=Clock())
+    for i in range(50):
+        _acc(sink, f'k{i}.example.')
+    assert len(sink._key_wins) <= 10
+
+
+def test_B2_per_ip_drops_are_counted_pos(audit_env):
+    from services.acme.dns_update.audit import AuditSink
+    clock = Clock()
+    sink = AuditSink(clock=clock)
+    results = [_rec(sink, '192.0.2.5', reason='badsig') for _ in range(10)]
+    assert results.count(True) == 1
+    assert len(_rows(audit_env, 'acme.dns_update.rejected')) == 1
+    clock.t += 61
+    _rec(sink, '192.0.2.6', reason='badsig')
+    summary = _rows(audit_env, 'acme.dns_update.suppressed')
+    assert len(summary) == 1
+    assert json.loads(summary[0].details) == {'reason': 'badsig', 'dropped': 9}
+
+
+def test_B2_other_reason_not_counted_in_summary_neg(audit_env):
+    from services.acme.dns_update.audit import AuditSink
+    clock = Clock()
+    sink = AuditSink(clock=clock)
+    for _ in range(10):
+        _rec(sink, '192.0.2.5', reason='badsig')
+    assert _rec(sink, '192.0.2.5', reason='badkey') is True  # own window and budget
+    clock.t += 61
+    _rec(sink, '192.0.2.6', reason='badsig')
+    d = json.loads(_rows(audit_env, 'acme.dns_update.suppressed')[0].details)
+    assert d == {'reason': 'badsig', 'dropped': 9}
+
+
+def test_B2_failed_write_returns_false_pos(audit_env, monkeypatch):
+    from services.acme.dns_update.audit import AuditSink
+    from services.audit import AuditService
+    monkeypatch.setattr(AuditService, 'log_action', staticmethod(lambda **kw: None))
+    assert _acc(AuditSink(clock=Clock())) is False
+    assert _rec(AuditSink(clock=Clock()), '192.0.2.8') is False
+
+
+def test_B2_successful_write_returns_true_neg(audit_env, monkeypatch):
+    from services.acme.dns_update.audit import AuditSink
+    from services.audit import AuditService
+    monkeypatch.setattr(AuditService, 'log_action', staticmethod(lambda **kw: object()))
+    assert _acc(AuditSink(clock=Clock())) is True
+    assert _rec(AuditSink(clock=Clock()), '192.0.2.8') is True
 
 
 # ---------------------------------------------------------------- N11

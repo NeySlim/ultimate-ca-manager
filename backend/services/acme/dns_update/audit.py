@@ -2,9 +2,12 @@
 
 An attacker on the network can send any number of bad packets. The sink
 writes at most one row per (peer IP, reason) per window and at most N rows per
-reason per window. Dropped events are counted and reported in ONE summary row
-when the next window opens. ``audit_limited`` and ``audit_authenticated``
-never raise.
+reason per window. Accepted updates (verified TSIG) are limited per key: at
+most ``per_key_per_minute`` rows per key per window. Dropped events are
+counted (per reason, or per key for accepted updates) and reported in ONE
+summary row when the next window opens. ``audit_limited`` and
+``audit_authenticated`` never raise. They return False when the row was
+dropped or the write failed.
 """
 
 import collections
@@ -45,16 +48,21 @@ def _sanitize_details(value):
 
 class AuditSink:
     def __init__(self, per_ip_per_minute: int = 1, global_per_reason_per_minute: int = 20,
-                 max_ips: int = 4096, clock=time.monotonic):
+                 max_ips: int = 4096, per_key_per_minute: int = 120, max_keys: int = 4096,
+                 clock=time.monotonic):
         self._per_ip = per_ip_per_minute
         self._global = global_per_reason_per_minute
         self._max_ips = max_ips
+        self._per_key = per_key_per_minute
+        self._max_keys = max_keys
         self._clock = clock
         self._lock = threading.Lock()
         # (ip, reason) -> list of write times, LRU ordered
         self._ip_hits: "collections.OrderedDict[tuple, list]" = collections.OrderedDict()
         # reason -> [window_start, written, dropped]
         self._windows: Dict[str, list] = {}
+        # sanitized keyname -> [window_start, written, dropped], LRU ordered
+        self._key_wins: "collections.OrderedDict[str, list]" = collections.OrderedDict()
 
     def audit_limited(self, *, action: str, reason: str, peer_ip: str, keyname: Optional[str],
                       success: bool, details: dict) -> bool:
@@ -69,12 +77,37 @@ class AuditSink:
 
     def audit_authenticated(self, *, action: str, peer_ip: str, keyname: Optional[str],
                             success: bool, details: dict) -> bool:
-        """Write a row for a request with a verified TSIG, without a rate limit.
+        """Write a row for a request with a verified TSIG.
 
-        Replays are absorbed by the replay cache of the handler. Never raises."""
+        At most ``per_key_per_minute`` rows per key per window. Drops are
+        counted and reported in one summary row when the key's next window
+        opens. Returns False when dropped or when the write failed. Never raises."""
         try:
-            self._write(action, keyname, success, details or {}, ip=sanitize_text(peer_ip, 45))
-            return True
+            key_s = sanitize_text(keyname) if keyname else ''
+            summary_dropped = 0
+            with self._lock:
+                now = self._clock()
+                win = self._key_wins.get(key_s)
+                if win is None or now - win[0] >= _WINDOW_S:
+                    summary_dropped = win[2] if win else 0
+                    win = [now, 0, 0]
+                    self._key_wins[key_s] = win
+                    while len(self._key_wins) > self._max_keys:
+                        self._key_wins.popitem(last=False)
+                self._key_wins.move_to_end(key_s)
+                allowed = win[1] < self._per_key
+                if allowed:
+                    win[1] += 1
+                else:
+                    win[2] += 1
+            if summary_dropped:
+                self._write(SUPPRESSED_ACTION, None, False,
+                            {'reason': 'accepted', 'keyname': key_s, 'dropped': summary_dropped},
+                            ip=None)
+            if not allowed:
+                return False
+            return self._write(action, keyname, success, details or {},
+                               ip=sanitize_text(peer_ip, 45))
         except Exception as e:
             try:
                 logger.warning("DNS UPDATE audit record failed: %s", type(e).__name__)
@@ -101,6 +134,7 @@ class AuditSink:
                 self._ip_hits.move_to_end(ip_key)
             allowed = True
             if hits is not None and len(hits) >= self._per_ip:
+                win[2] += 1
                 allowed = False
             if allowed and win[1] >= self._global:
                 win[2] += 1
@@ -121,14 +155,14 @@ class AuditSink:
         # The reason (badkey, value_mismatch, ...) is what an operator needs first.
         details = dict(details or {})
         details.setdefault('reason', reason_s)
-        self._write(action, keyname, success, details, ip=ip_s)
-        return True
+        return self._write(action, keyname, success, details, ip=ip_s)
 
     @staticmethod
-    def _write(action, keyname, success, details, ip) -> None:
+    def _write(action, keyname, success, details, ip) -> bool:
+        """True when the row was stored (log_action returns None on a failed commit)."""
         from services.audit import AuditService
         key_s = sanitize_text(keyname) if keyname else None
-        AuditService.log_action(
+        result = AuditService.log_action(
             action=sanitize_text(action),
             resource_type='acme_dns_update',
             resource_name=key_s or 'unauthenticated',
@@ -137,6 +171,7 @@ class AuditSink:
             username=f"dns-update:{key_s}" if key_s else "dns-update:unauthenticated",
             ip_address=ip,
         )
+        return result is not None
 
 
 audit_sink = AuditSink()

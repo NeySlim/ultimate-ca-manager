@@ -35,7 +35,8 @@ MAX_ARCOUNT = 4
 
 # Replay cache (RFC 8945 §10, S15): bounded size and time to live in seconds.
 REPLAY_CACHE_SIZE = 4096
-REPLAY_TTL_S = 300
+# A request passes the time check for 2 * fudge, so a replay may come that long after the first copy.
+REPLAY_TTL_S = 2 * MAX_FUDGE
 
 # SOA RDATA that the listener announces: serial, refresh, retry, expire, minimum.
 SOA_TIMERS = (1, 3600, 600, 86400, 0)

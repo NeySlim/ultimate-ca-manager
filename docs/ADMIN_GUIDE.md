@@ -580,11 +580,11 @@ curl -k -X PATCH -H "Authorization: Bearer $UCM_API_KEY" -H "Content-Type: appli
 
 | Method | Value |
 |--------|-------|
-| Environment variable | `UCM_DNS_UPDATE_PORT=8053` (`/etc/ucm/ucm.env` natively, container environment in Docker). It wins over the setting |
+| Environment variable | `UCM_DNS_UPDATE_PORT=8053` (`/etc/ucm/ucm.env` natively, container environment in Docker). It wins over the setting. An empty value counts as not set |
 | Setting | `acme.proxy.dns_update_port`, API field `dns_update_port` of `PATCH /api/v2/acme/client/settings` |
 | Off | unset, or `0` |
 
-The port is 1024 to 65535. It cannot be the HTTPS or HTTP protocol port. UCM serves UDP and TCP on the same port. `GET /api/v2/acme/client/settings` shows `dns_update_listening`, which is `true` when the listener runs.
+The port is 1024 to 65535. It cannot be the HTTPS port, the HTTP protocol port or the TLS-ALPN-01 port of the ACME client. UCM serves UDP and TCP on the same port. `GET /api/v2/acme/client/settings` shows `dns_update_listening`, which is `true` when the listener runs.
 
 **Bind address.** By default the listener uses the same address as the HTTP protocol port (`HOST`). Set `UCM_DNS_UPDATE_HOST` to bind it to one internal address only.
 
@@ -608,7 +608,7 @@ Clients on the UCM host itself need the same rules in the `OUTPUT` chain. With n
 - Create a key with `POST /api/v2/acme/client/accounts/<id>/dns-update-keys` (also in the web interface). UCM shows the secret **once**. It stores the secret encrypted and cannot show it again.
 - The default algorithm is `hmac-sha256`. `hmac-sha384` and `hmac-sha512` are possible.
 - Revoke a key with `DELETE .../dns-update-keys/<key_id>`. A revoked key stops working at once (BADKEY). Another `DELETE` removes it. Deleting an ACME proxy account removes its keys.
-- Optional link to an EAB credential (`eab_credential_id`). The key then accepts only values for orders of the ACME account that registered with that credential, so the credential must be used already. A key without the link accepts values for all orders of its proxy account. Deleting the EAB credential also deletes the keys linked to it.
+- Optional link to an EAB credential (`eab_credential_id`). The key then accepts only values for orders of the ACME account that registered with that credential, so the credential must be used already. A key without the link accepts values for all orders of its proxy account. Revoking the EAB credential revokes the keys linked to it, and deleting the credential deletes them. The audit log has an entry for each key.
 - `last_used_at` of a key shows when it last sent an accepted update.
 
 **What the listener accepts and answers.**
@@ -621,11 +621,11 @@ Clients on the UCM host itself need the same rules in the `OUTPUT` chain. With n
 - It answers SOA queries for the zone of a pending order and for the names between that zone and the challenge name (the zone is the ACME Domains entry for the name). Unsigned and signed SOA queries are answered. A signed query gets a signed answer. The SOA record has fixed values and no host name.
 - It refuses every other query (`REFUSED`). It does not recurse and does not serve any other data.
 - Over UDP, an answer to a request without a valid signature is never larger than the request. Larger answers are cut (TC) or dropped. A signed request gets a normal DNS answer size. TCP has no such limit.
-- Messages larger than 4096 bytes are ignored. The listener also limits the packet rate, in total and per source address. Behind NAT or kube-proxy SNAT, many clients can share one source address and one limit.
+- Messages larger than 4096 bytes are ignored. The listener also limits the packet rate and the TCP connections, in total and per source (one IPv4 address, or one IPv6 /64 network). Behind NAT or kube-proxy SNAT, many clients can share one source address and one limit.
 
 **Algorithms and time.** UCM accepts only `hmac-sha256`, `hmac-sha384` and `hmac-sha512`. The default algorithm of many clients is `hmac-md5` or `hmac-sha1`. UCM refuses them with `BADKEY`, so always set the algorithm in the client. The clock of the client must be within 300 seconds of the UCM clock, or UCM answers `BADTIME`.
 
-**Audit log.** Accepted updates, and signed refusals (wrong key, wrong signature, wrong time, wrong value), are written to the audit log (actions `acme.dns_update.accepted`, `acme.dns_update.refused`, `acme.dns_update.rejected`). Unsigned and malformed packets are only written to the application log, sampled.
+**Audit log.** Accepted updates, and signed refusals (wrong key, wrong signature, wrong time, wrong value), are written to the audit log (actions `acme.dns_update.accepted`, `acme.dns_update.refused`, `acme.dns_update.rejected`). Unsigned and malformed packets are only written to the application log, sampled. To keep the log usable during a flood, the listener writes at most 120 accepted entries per key per minute, and at most one refusal entry per source address and cause per minute (20 per cause in total). It counts the entries it leaves out and writes the count in one `acme.dns_update.suppressed` entry.
 
 **Troubleshooting.** The client output shows the DNS result code.
 

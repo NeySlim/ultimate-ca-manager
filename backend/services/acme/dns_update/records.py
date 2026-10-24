@@ -147,9 +147,18 @@ def persist_expected_values(orders, identifier, token, challenge_url,
                         AcmeProxyDnsChallenge.record_name == record_name,
                     ).all()
                 }
-                for order, thumbprint, value in wanted:
-                    if (order.id, value) in existing:
-                        continue
+        except Exception as exc:
+            logger.warning(
+                '[ACME DNS UPDATE] Could not store expected values: %s',
+                type(exc).__name__)
+            return 0
+        # One savepoint per row: a conflict (a concurrent request stored the
+        # row first) loses that row only, not the rows of the other orders.
+        for order, thumbprint, value in wanted:
+            if (order.id, value) in existing:
+                continue
+            try:
+                with db.session.begin_nested():
                     db.session.add(AcmeProxyDnsChallenge(
                         order_id=order.id,
                         acme_client_account_id=order.acme_client_account_id,
@@ -164,24 +173,30 @@ def persist_expected_values(orders, identifier, token, challenge_url,
                         created_at=now,
                         expires_at=expires_at,
                     ))
-                    inserted += 1
-                db.session.flush()
+                    db.session.flush()
+                inserted += 1
+            except IntegrityError:
+                logger.warning(
+                    '[ACME DNS UPDATE] Expected value already stored '
+                    '(UNIQUE conflict); skipped')
+            except Exception as exc:
+                logger.warning(
+                    '[ACME DNS UPDATE] Could not store expected value: %s',
+                    type(exc).__name__)
+        try:
+            with db.session.begin_nested():
                 AcmeProxyDnsChallenge.query.filter(
                     AcmeProxyDnsChallenge.expires_at < now - PURGE_AFTER,
                 ).delete(synchronize_session=False)
-        except IntegrityError:
-            logger.warning(
-                '[ACME DNS UPDATE] Expected value already stored '
-                '(UNIQUE conflict); skipped')
-            return 0
         except Exception as exc:
             logger.warning(
-                '[ACME DNS UPDATE] Could not store expected values: %s',
+                '[ACME DNS UPDATE] Could not purge old rows: %s',
                 type(exc).__name__)
-            return 0
         if not _commit():
             return 0
-        invalidate_cache()
+        # Purged rows are expired and never in the active snapshot.
+        if inserted:
+            invalidate_cache()
         return inserted
     except Exception as exc:
         logger.warning('[ACME DNS UPDATE] Expected values not stored: %s',
