@@ -186,6 +186,12 @@ def patch_eab_credential(cred_id):
     return success_response(data=cred.to_dict(), message='EAB credential updated')
 
 
+def invalidate_keys():
+    """Linked TSIG keys are gone: the listener must not serve them from cache."""
+    from services.acme.dns_update.keys import invalidate_keys as _invalidate
+    _invalidate()
+
+
 def _delete_linked_dns_update_keys(cred_id):
     """Fail-closed: SQLite does not enforce the FK cascade. Same transaction."""
     from models.acme_dns_update import AcmeDnsUpdateKey
@@ -216,6 +222,7 @@ def revoke_eab_credential(cred_id):
         ok, err = safe_commit(logger, "Failed to delete EAB credential")
         if not ok:
             return err
+        invalidate_keys()
         AuditService.log_action(
             action='acme.eab_credential.deleted',
             resource_type='acme_eab_credential',
@@ -232,6 +239,7 @@ def revoke_eab_credential(cred_id):
         ok, err = safe_commit(logger, "Failed to delete EAB credential")
         if not ok:
             return err
+        invalidate_keys()
         AuditService.log_action(
             action='acme.eab_credential.deleted',
             resource_type='acme_eab_credential',
@@ -248,6 +256,7 @@ def revoke_eab_credential(cred_id):
     ok, err = safe_commit(logger, "Failed to revoke EAB credential")
     if not ok:
         return err
+    invalidate_keys()
 
     AuditService.log_action(
         action='acme.eab_credential.revoke',

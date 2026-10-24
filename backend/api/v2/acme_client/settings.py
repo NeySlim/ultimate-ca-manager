@@ -26,7 +26,18 @@ from utils.dns_txt_lookup import (
     parse_resolver_entries,
 )
 
+from services.acme.dns_update import status as dns_update_status
+
 logger = logging.getLogger(__name__)
+
+
+def _stored_dns_update_port() -> int:
+    cfg = SystemConfig.query.filter_by(key=dns_update_status.PORT_CONFIG_KEY).first()
+    try:
+        port = int(cfg.value) if cfg and cfg.value else 0
+    except (TypeError, ValueError):
+        return 0
+    return port if 0 <= port <= 65535 else 0
 
 
 @bp.route('/api/v2/acme/client/settings', methods=['GET'])
@@ -145,6 +156,9 @@ def get_settings():
         'account_key_type': acct_key_type_cfg.value if acct_key_type_cfg else 'ES256',
         'acme_public_base_url': get_acme_public_base(request),
         'acme_proxy_public_base_url': get_acme_proxy_public_base(request),
+        'dns_update_port': _stored_dns_update_port(),
+        'dns_update_port_env': dns_update_status.get_dns_update_port_env(),
+        'dns_update_listening': dns_update_status.is_listening(),
     })
 
 
@@ -260,6 +274,34 @@ def update_settings():
             'TCP port for the ACME client TLS-ALPN-01 proof listener',
         )
         updates.append('tls_alpn_port')
+
+    restart_needed = False
+    if 'dns_update_port' in data:
+        raw_port = data['dns_update_port']
+        try:
+            if isinstance(raw_port, bool):
+                raise TypeError
+            dns_update_port = int(raw_port)
+        except (TypeError, ValueError):
+            return error_response('DNS UPDATE port must be an integer', 400)
+        if dns_update_port != 0 and (dns_update_port < 1024 or dns_update_port > 65535):
+            return error_response(
+                'DNS UPDATE port must be 0 (disabled) or between 1024 and 65535', 400)
+        if dns_update_port != 0:
+            from config.settings import Config
+            from protocol_http_server import get_http_protocol_port
+            if dns_update_port == Config.HTTPS_PORT:
+                return error_response('DNS UPDATE port cannot be the same as HTTPS port', 400)
+            if dns_update_port == get_http_protocol_port():
+                return error_response(
+                    'DNS UPDATE port cannot be the same as HTTP protocol port', 400)
+        _set_config(
+            dns_update_status.PORT_CONFIG_KEY,
+            str(dns_update_port),
+            'TCP/UDP port of the DNS UPDATE (RFC 2136) listener, 0 = disabled',
+        )
+        updates.append('dns_update_port')
+        restart_needed = True
 
     if 'debug_logging' in data:
         try:
@@ -487,6 +529,10 @@ def update_settings():
         success=True
     )
 
+    message = f'Settings updated: {", ".join(updates)}' if updates else 'No changes'
+    if restart_needed:
+        message += ' (restart UCM to apply the DNS UPDATE port)'
     return success_response(
-        message=f'Settings updated: {", ".join(updates)}' if updates else 'No changes'
+        data={'restart_required': True} if restart_needed else None,
+        message=message,
     )
