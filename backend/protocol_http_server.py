@@ -121,7 +121,8 @@ def _retry_bind(flask_app, host, port, error_after):
 
 
 def start_http_protocol_server(flask_app, port=None, error_after=0):
-    """Start the HTTP protocol server. Returns the server or None on failure.
+    """Start the HTTP protocol server. Returns the server, or None when it did
+    not start (yet).
 
     With ``error_after`` > 0, a busy port is retried in a greenlet until it is
     free (after a reload the old worker still holds it); an error is logged

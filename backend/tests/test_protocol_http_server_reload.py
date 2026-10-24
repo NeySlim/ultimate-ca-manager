@@ -97,7 +97,11 @@ def test_retry_outlives_the_deadline_and_reports_once(app, blocker, clean, fake_
     """The old worker can take longer than graceful_timeout to exit."""
     port = blocker.getsockname()[1]
 
+    reported_at = []
+
     def release_late():
+        if not reported_at and 'still busy' in caplog.text:
+            reported_at.append(fake_time['now'])
         if fake_time['now'] >= 60:
             blocker.close()
 
@@ -105,8 +109,9 @@ def test_retry_outlives_the_deadline_and_reports_once(app, blocker, clean, fake_
     with caplog.at_level(logging.ERROR, logger='protocol_http_server'):
         phs.start_http_protocol_server(app, port=port, error_after=35)
     assert phs._server is not None and phs._server.address[1] == port
-    assert max(fake_time['slept']) == phs.RETRY_MAX_DELAY
+    assert max(fake_time['slept']) == 1.0
     assert caplog.text.count('still busy after 35s') == 1
+    assert reported_at[0] >= 35
 
 
 def test_other_bind_error_during_the_retry_stops_it(app, clean, fake_time, monkeypatch, caplog):
