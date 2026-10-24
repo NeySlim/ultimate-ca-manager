@@ -638,7 +638,23 @@ Clients on the UCM host itself need the same rules in the `OUTPUT` chain. With n
 | `NOTAUTH` | The zone is not served | The domain (or a parent) is not in ACME Domains |
 | `NOTZONE` | A name in the update is outside the zone of the message | The client sent a zone and a record name that do not fit |
 
-If the client times out and gets no answer, check the port mapping, the firewall, `dns_update_listening`, and that the client uses UDP and TCP on the right port. UCM does not answer packets that it cannot parse.
+If the client times out and gets no answer, check the port mapping, the firewall, `dns_update_listening`, and that the client uses UDP and TCP on the right port. UCM does not answer a packet that is shorter than a DNS header, larger than 4096 bytes, has too many records, or is itself a response.
+
+The client message can differ from the name of the code:
+
+- A TSIG error (`BADKEY`, `BADSIG`, `BADTIME`) has the code `NOTAUTH` in the message header and the TSIG error in the TSIG record (RFC 8945). A zone that is not in ACME Domains also gives `NOTAUTH`. cert-manager and lego use the Go library `miekg/dns`, which shows all of these as `bad authentication`. Use the audit log to find the cause: a TSIG error is `acme.dns_update.rejected`, a zone error is `acme.dns_update.refused` with the reason `not_authoritative`.
+- `nsupdate` (acme.sh, Posh-ACME) first sends a signed SOA query. With a wrong secret, UCM answers `BADSIG`, and `nsupdate` then asks again without a signature. The final message can be `REFUSED` or `could not reach any name server`. Set the zone (`NSUPDATE_ZONE` in acme.sh, `DDNSZone` in Posh-ACME) to skip the SOA query and see `BADSIG` directly.
+
+The audit log entry gives the cause in the field `reason` of its details:
+
+| `reason` | Meaning |
+|----------|---------|
+| `badkey`, `badsig`, `badtime`, `badtrunc` | TSIG check failed (action `acme.dns_update.rejected`). A malformed TSIG record is only in the application log |
+| `no_pending_order` | No pending proxy order of the key's scope expects a value for this name |
+| `value_mismatch` | A pending order exists for the name, but the TXT value is different |
+| `type_not_allowed` | The record is not TXT, or the name does not start with `_acme-challenge` |
+| `not_authoritative` | The zone is not in ACME Domains (`NOTAUTH`) |
+| `prerequisite`, `not_in_zone`, `format` | The message has prerequisites, a name outside its zone, or a malformed update section |
 
 ### SCEP Administration
 

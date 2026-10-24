@@ -18,7 +18,7 @@ Ten dokument opisuje, jak powstaje zmiana „nasłuch DNS UPDATE (RFC 2136) dla 
 | Główna sesja | model główny | Zakres, architektura, decyzje RFC, przegląd każdego wyniku, testy, decyzja o końcu pracy | wszystkie |
 | Mapowanie kodu | `Explore` | Fakty o istniejącym kodzie UCM: pliki, wiersze, wzorce. Bez projektu | tylko odczyt |
 | Badanie klientów | `general-purpose` | Pobranie kodu klientów ACME i odpowiedź na pytania z cytatem z kodu | odczyt, git, pip, go |
-| Implementacja | `implementer` (Sonnet, wysiłek medium) | Kod, testy i dokumentacja według dokładnej specyfikacji. Bez commitów | edycja plików, testy |
+| Implementacja | `implementer` (mniejszy model, wysiłek medium) | Kod, testy i dokumentacja według dokładnej specyfikacji. Bez commitów | edycja plików, testy |
 | Przegląd | `reviewer` | Niezależny przegląd bezpieczeństwa planu i kodu | tylko odczyt |
 | Przegląd kodu | `/code-review`, `/security-review` | 3 rundy każdego po zakończeniu kodu, poprawki między rundami | — |
 
@@ -137,7 +137,7 @@ What to check (report anything else you find too):
 Output: a list of findings, each with: severity (critical/high/medium/low/info), the plan section or invariant ID, the concrete attack or failure scenario, evidence (file:line or RFC section quote), and a concrete fix to the plan. Then a short list of things you checked and found sound. Do not edit any files.
 ```
 
-### 5.4 PR 1: dokumentacja (`implementer`, Sonnet, medium)
+### 5.4 PR 1: dokumentacja (`implementer`)
 
 Prompt w skrócie (pełna treść ma ponad 100 wierszy): cel i kontekst issue #416, podstawa w RFC 8555 §8.4 i §7.5.1 (cytaty), lista produktów (nowy plik `docs/integrations/acme-proxy-clients.md`, przykład manifestu cert-manager z atrapą acme-dns, odnośniki w ADMIN_GUIDE i README przykładów, wpis w CHANGELOG), konfiguracja dla certbot, acme.sh, lego, cert-manager, win-acme i Posh-ACME. Najważniejszy wymóg:
 
@@ -151,7 +151,9 @@ Prompty dla części 2–9 planu powstają z sekcji 2–7 i 11 planu. Każdy pro
 
 Części 2 i 3 nie zależą od siebie, więc działają równolegle w tym samym worktree, na rozłącznych plikach.
 
-#### Część 3: moduł TSIG (`implementer`, Sonnet, medium)
+Pełne prompty wszystkich części PR 2 są w [`prompts-pr2.md`](prompts-pr2.md). Poniżej są najważniejsze elementy każdego promptu.
+
+#### Część 3: moduł TSIG (`implementer`)
 
 Najważniejsze elementy promptu:
 
@@ -177,7 +179,7 @@ Fragment o kolejności (dosłownie):
 7. `watermark.record(key.key_id, rdata.time_signed)`; return `OK`.
 ```
 
-#### Część 2: modele, migracja 111, sprzątanie kluczy (`implementer`, Sonnet, medium)
+#### Część 2: modele, migracja 111, sprzątanie kluczy (`implementer`)
 
 Najważniejsze elementy promptu:
 
@@ -186,3 +188,74 @@ Najważniejsze elementy promptu:
 - migracja dla SQLite i PostgreSQL według istniejących wzorców (027, 078, 110) i reguł `migration_runner.py`;
 - usuwanie kluczy w kodzie przy usunięciu EAB i konta proxy, bo SQLite w UCM nie wymusza kluczy obcych (F2, F3, K8, K9) — agent ma to sprawdzić, a nie przyjąć;
 - testy `_pos`/`_neg` dla K2, K3, K5, K8, K9 i ograniczenia UNIQUE, także przez API (usunięcie EAB i konta).
+
+#### Część 4: wartości oczekiwane i haki w proxy (`implementer`)
+
+- dokładne API modułu `records.py` (`record_name_for`, `expected_value`, `zone_for`, `persist_expected_values`, `close_*`, `mark_confirmed`, pamięć podręczna aktywnych wierszy);
+- wiersz dla każdego zamówienia rodzeństwa z **jego własnym** thumbprintem i kontem (F13b, #307), zapis w savepoincie, który nigdy nie zmienia wyniku `get_authz` (F13a, R6);
+- niezależne obliczenie wartości w teście (`hashlib` + `base64`) na przykładach z RFC 8555 §8.3 i RFC 7638 §3.1;
+- test „0 zapytań SQL” dla ciepłej pamięci podręcznej (licznik `before_cursor_execute`).
+
+Poprawka po przeglądzie w głównej sesji: specyfikacja zamykała wiersze także w stanach `processing` i `valid`. To dawało wyścig z UPDATE klienta. Wiersze zamykają się teraz tylko w stanach błędu (plan 2.2, punkt 5).
+
+#### Część 5a: magazyn kluczy, indeks stref, audyt (`implementer`)
+
+- `KeyScope.allows` „fail closed”: każde `None` daje odmowę (plan 2.3, K8);
+- klucz konta z wyłączonym proxy, klucz odwołany, sekret, którego nie da się odszyfrować, algorytm spoza listy: klucz nie istnieje dla nasłuchu (K7, K9);
+- audyt z limitem na parę (IP, przyczyna) i z limitem globalnym na przyczynę, z wierszem podsumowania (F7, N7, N12);
+- czyszczenie tekstu od atakującego przed zapisem do audytu (N13), brak sekretów w logach (N11).
+
+#### Część 5b: handler protokołu (`implementer`)
+
+- kolejność przetwarzania krok po kroku z planu (sekcja 3) z numerami sekcji RFC; każdy krok ma testy;
+- klient testów to niezależna biblioteka (dnspython jako klient), odpowiedzi podpisane są weryfikowane po stronie klienta;
+- kształty wiadomości każdego klienta z planu (sekcja 9): nsupdate, certbot, lego, cert-manager, win-acme, acme.sh;
+- brak skutków ubocznych w testach negatywnych (brak `mark_confirmed`, audytu, `touch`, TSIG w odpowiedzi);
+- test integracyjny z prawdziwą bazą: 1000 zapytań SOA bez podpisu i 1000 UPDATE z BADKEY bez zapytań SQL (N8).
+
+Poprawki po przeglądzie w głównej sesji: rozmiar EDNS w odpowiedzi (było 8192, jest `MAX_MESSAGE_SIZE`), przyczyna odmowy w polu `reason` wiersza audytu.
+
+#### Część 6: serwer UDP/TCP (`implementer`)
+
+- tabela limitów zasobów z planu 2.4 jako specyfikacja (`ServerLimits`);
+- RFC 7766: wiele wiadomości w jednym połączeniu, limit bezczynności liczony od ostatniej **pełnej** wiadomości, jeden zapis na odpowiedź;
+- błąd `bind` nie zatrzymuje UCM (N3), port 0 wyłącza nasłuch (N1);
+- start w `post_worker_init` (gunicorn, `workers = 1`) i w ścieżce deweloperskiej `app.py`.
+
+#### Część 7: API kluczy i ustawienie portu (`implementer`)
+
+- trasy, uprawnienia i odpowiedzi według wzoru API EAB (sekret pokazany raz);
+- tylko `hmac-sha256`, `hmac-sha384`, `hmac-sha512`, także w trybie FIPS (K4);
+- port 0 albo 1024–65535, bez konfliktu z portami HTTPS i HTTP (N2);
+- natychmiastowe unieważnienie pamięci podręcznej kluczy i stref po zmianach w API (test integracyjny).
+
+#### Część 8: interfejs, pomoc, tłumaczenia (`implementer`)
+
+- panel kluczy przy koncie proxy, okno z sekretem pokazanym raz, gotowe fragmenty konfiguracji dla 7 klientów;
+- każda nazwa opcji klienta zweryfikowana w kodzie źródłowym klienta;
+- 9 języków, `check:i18n`, testy vitest.
+
+Poprawki po przeglądzie w głównej sesji: `--validationmode dns-01` w fragmencie win-acme, informacja o porcie 53 przy przekierowaniu portu.
+
+#### Część 9: pakiety, Helm, dokumentacja (`implementer`)
+
+- `EXPOSE 8053/udp` i `8053/tcp`, kontrola portu w entrypoint (kontener działa bez prawa do portów < 1024);
+- osobny Service Helm dla nasłuchu (wystawienie UI nie wystawia nasłuchu), opcjonalna NetworkPolicy;
+- dokumentacja administratora i klientów z faktami z kodu źródłowego klientów.
+
+Poprawki po E2E w głównej sesji: sekcja rozwiązywania problemów (komunikaty `bad authentication` w `miekg/dns`, zachowanie `nsupdate` po BADSIG, pole `reason` w audycie).
+
+## 6. Testy end-to-end
+
+Testy E2E wykonuje główna sesja, bez agenta. Procedura i wyniki są w [`docs/testing/ACME-PROXY-DNS-UPDATE.md`](../../testing/ACME-PROXY-DNS-UPDATE.md).
+
+1. Najpierw harness: sam `DnsUpdateHandler` za prostym serwerem UDP/TCP, z kluczami i strefami w pamięci. Sprawdza format wiadomości z prawdziwymi bibliotekami klientów, bez przepływu ACME.
+2. Potem pełny przepływ: Pebble jako zewnętrzny CA, pebble-challtestsrv jako DNS, UCM z dostawcą `custom_command`, prawdziwi klienci.
+3. Każdy klient ma test pozytywny (certyfikat) i negatywny (klucz innego konta, zły sekret, zły algorytm, strefa spoza ACME Domains).
+
+E2E znalazło błąd poza zakresem PR 2: proxy nie dodaje nagłówka `Link: rel="up"`, gdy zewnętrzny CA go nie wysyła (Pebble). To kandydat na osobną poprawkę.
+
+## 7. Przegląd kodu po zakończeniu
+
+Po zakończeniu kodu: 3 rundy `/code-review` i 3 rundy `/security-review` na całej zmianie PR 2, z poprawkami między rundami. Każde ustalenie główna sesja sprawdza w kodzie i w RFC, zanim je poprawi. Wyniki rund są w opisie commitów z poprawkami.
+

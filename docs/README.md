@@ -36,6 +36,7 @@ Technical documentation for Ultimate Certificate Manager.
 - **[testing/ACME-PUBLIC-VHOST.md](./testing/ACME-PUBLIC-VHOST.md)**: Public ACME vhost, wildcard TLS, test plan
 - **[testing/ACME-PROXY-MULTI-CA.md](./testing/ACME-PROXY-MULTI-CA.md)**: Multi-CA proxy endpoints
 - **[testing/ACME-DNS-PROPAGATION.md](./testing/ACME-DNS-PROPAGATION.md)**: DNS-01 propagation checks
+- **[testing/ACME-PROXY-DNS-UPDATE.md](./testing/ACME-PROXY-DNS-UPDATE.md)**: ACME proxy DNS UPDATE (RFC 2136) listener: tests and end-to-end lab with real clients
 
 ## Architecture
 

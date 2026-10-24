@@ -1,6 +1,6 @@
 # Plan: nasłuch DNS UPDATE (RFC 2136) dla proxy ACME w UCM
 
-Status: wersja 3. Po security review planu (ustalenia F1–F15 w sekcji 11).
+Status: wersja 3. Po security review planu (ustalenia F1–F15 w sekcji 11). Kod PR 2 zrobiony (części 2–9), E2E zrobione (sekcja 8). Zmiany względem planu w trakcie pracy: sekcja 2.2 punkt 5 (zamykanie wierszy tylko w stanach błędu).
 
 ## 0. Źródła
 
@@ -406,6 +406,12 @@ Klienci i scenariusze (każdy z testem negatywnym):
 
 Ustawienia klientów w E2E: brak dostępu do publicznego DNS, dlatego: acme.sh `--dnssleep 1`, lego `--dns.propagation-wait 1s`, certbot `--dns-rfc2136-propagation-seconds 1`. Te same ustawienia trafią do dokumentacji (PR 1).
 
+**Wynik (2026-10-24).** Procedura i tabela wyników: [`docs/testing/ACME-PROXY-DNS-UPDATE.md`](../../testing/ACME-PROXY-DNS-UPDATE.md). Różnice względem tej sekcji:
+
+- acme.sh, certbot, lego i cert-manager wydały certyfikaty przez proxy. certbot, lego i cert-manager (przez bibliotekę ACME lego) potrzebowały w laboratorium łatki proxy dla nagłówka `Link: rel="up"`, którego Pebble nie wysyła. To błąd proxy poza nasłuchem (ten sam błąd jest bez DNS UPDATE). Łatka nie jest w PR 2.
+- Testy negatywne w pełnym przepływie: acme.sh (klucz innego konta → REFUSED, zły sekret → BADSIG), cert-manager (HMACMD5 → BADKEY, klucz innego konta → REFUSED, strefa spoza ACME Domains → NOTAUTH). Negatywne przypadki certbot i lego (zła wartość, domyślny algorytm, TC → TCP) są w harnessie samego handlera.
+- Posh-ACME i win-acme nie były uruchomione (brak Windows i pwsh). Ich kształty wiadomości pokrywają testy handlera i przebiegi `nsupdate`.
+
 ## 9. Zachowanie klientów (z kodu źródłowego)
 
 Źródła i wersje: nsupdate z BIND 9.18.39, acme.sh @37d064f7, certbot-dns-rfc2136 5.8.0, lego v4.35.2, cert-manager v1.21.3, Posh-ACME @392c2e76, win-acme @c213e6dc z ARSoft.Tools.Net 3.6.0. Kluczowe fakty sprawdziłem ponownie w źródłach (nsupdate `sendrequest`, certbot `_query_soa`).
@@ -453,7 +459,7 @@ Wnioski dla dokumentacji (PR 1 i PR 2):
 | 10 | E2E z klientami | 6, 7 | główna sesja |
 | 11 | 3 × `/code-review`, 3 × `/security-review`, poprawki | 1–10 | główna sesja |
 
-Implementer: agent Sonnet 5.5, wysiłek medium (preferencja użytkownika). Kod bezpieczeństwa (części 3, 5, 6) dostaje dokładną specyfikację z tego planu. Każdy wynik czytam w diffie i uruchamiam pełny zestaw testów.
+Implementer: agent na mniejszym modelu, wysiłek medium (preferencja użytkownika). Kod bezpieczeństwa (części 3, 5, 6) dostaje dokładną specyfikację z tego planu. Każdy wynik czytam w diffie i uruchamiam pełny zestaw testów.
 
 Polecenia walidacji:
 - `cd backend && python -m pytest tests/ -q -n auto --dist loadfile`

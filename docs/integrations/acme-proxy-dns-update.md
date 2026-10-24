@@ -236,6 +236,12 @@ EOF
 
 `zone` makes `nsupdate` skip the SOA query. `REFUSED` here is normal for a value that no pending order expects. `BADKEY`, `BADSIG` and `BADTIME` mean a key, secret or clock problem. See the table in the Admin Guide.
 
+Messages of the clients that can mislead:
+
+- cert-manager and lego show `bad authentication` for every answer with the header code `NOTAUTH`: a TSIG error (wrong key name, secret, algorithm or clock) and also a zone that is not in ACME Domains. The audit log shows which one.
+- `nsupdate` with a wrong secret can end with `REFUSED` or `could not reach any name server`, because it repeats the SOA query without a signature after `BADSIG`. With `zone` (or `NSUPDATE_ZONE`, `DDNSZone`) it shows `BADSIG`.
+- The audit log (actions `acme.dns_update.*`) gives the cause in the field `reason`, for example `value_mismatch` or `no_pending_order`.
+
 ## Source references
 
 Option names above come from these sources: BIND 9.18 `nsupdate`, acme.sh `dnsapi/dns_nsupdate.sh`, certbot-dns-rfc2136 5.8.0, lego v4.35.2 (`providers/dns/rfc2136`, `cmd/flags.go`), cert-manager v1.21.3 (`ACMEIssuerDNS01ProviderRFC2136`, `pkg/issuer/acme/dns/rfc2136`), Posh-ACME `Plugins/RFC2136.ps1`, win-acme `plugin.validation.dns.rfc2136` with ARSoft.Tools.Net 3.6.0.
