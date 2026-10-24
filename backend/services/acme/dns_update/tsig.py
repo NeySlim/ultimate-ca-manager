@@ -118,6 +118,15 @@ class TimeWatermark:
 
 def _last_rr(wire: bytes) -> Tuple[int, int]:
     """Return (offset, type) of the last RR of the message."""
+    last, last_type, _ttl = _last_rr_header(wire)
+    return last, last_type
+
+
+def _last_rr_header(wire: bytes) -> Tuple[int, int, int]:
+    """Return (offset, type, TTL) of the last RR of the message.
+
+    dnspython stores the TTL of a TSIG RR as 0 whatever the wire says, and the MAC
+    does not cover it, so the TTL check of RFC 8945 §4.2 reads the wire."""
     p = dns.wire.Parser(wire)
     _id, _flags, qd, an, ns, ar = _HEADER.unpack(p.get_bytes(12))
     for _ in range(qd):
@@ -125,14 +134,15 @@ def _last_rr(wire: bytes) -> Tuple[int, int]:
         p.get_bytes(4)
     last = -1
     last_type = -1
+    last_ttl = -1
     for _ in range(an + ns + ar):
         last = p.current
         p.get_name()
-        last_type, _cls, _ttl, rdlen = struct.unpack("!HHIH", p.get_bytes(10))
+        last_type, _cls, last_ttl, rdlen = struct.unpack("!HHIH", p.get_bytes(10))
         p.get_bytes(rdlen)
     if last < 0:
         raise dns.exception.FormError("message has no resource record")
-    return last, last_type
+    return last, last_type, last_ttl
 
 
 def tsig_start_offset(wire: bytes) -> int:
@@ -168,8 +178,14 @@ def verify_request(wire: bytes, msg: dns.message.Message,
     result = TsigResult(TsigOutcome.FORMERR, keyname=owner, rdata=rdata,
                         request_mac=bytes(rdata.mac))
 
-    # §4.2: the Error field of a request must be zero.
+    # §4.2: the Error field of a request must be zero, and the TTL of the TSIG RR
+    # must be 0 (the MAC does not cover the TTL; dnspython does not keep it).
     if rdata.error != 0:
+        return result
+    try:
+        if _last_rr_header(wire)[2] != 0:
+            return result
+    except (dns.exception.DNSException, struct.error, ValueError, IndexError):
         return result
 
     # §5.2.1: key and algorithm.

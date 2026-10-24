@@ -2070,3 +2070,50 @@ def test_N11_logs_of_the_whole_module_hold_no_secret_mac_or_value():
     assert MACS_SEEN  # the MACs were collected
     for item in SECRETS_SEEN | VALUES_SEEN | MACS_SEEN:
         assert item not in text, "sensitive item in a log line"
+
+
+# --- RFC 8945 §4.3.2: the message is read as it was signed -------------------------
+
+def _update_with_name_in_header(ident=0):
+    """UPDATE whose record name is "_acme-challenge" + a compression pointer to offset 0
+    (the header ID). RFC 1035 §4.1.4 allows pointers only to prior names."""
+    hdr = struct.pack("!HHHHHH", ident, 5 << 11, 1, 0, 1, 0)
+    zone = b"\x07example\x03com\x00" + struct.pack("!HH", 6, 1)
+    txt = b"\x2b" + b"A" * 43
+    rr = b"\x0f_acme-challenge\xc0\x00" + struct.pack("!HHIH", 16, 1, 60, len(txt)) + txt
+    return hdr + zone + rr
+
+
+def test_S1_header_id_changed_and_name_in_header_is_formerr_pos(h):
+    # Signed with header ID 0 (= original ID); a forwarder or attacker changes the header
+    # ID, which the MAC does not cover. The name pointing into the header now reads
+    # differently: refuse, before the TSIG check and without side effects.
+    req = sign_wire(_update_with_name_in_header(0))
+    changed = struct.pack("!H", 0x0261) + req.wire[2:]
+    # Header ID 0x0261 still parses, but the name becomes "_acme-challenge.a\(." instead of
+    # "_acme-challenge.", and the MAC still verifies.
+    assert [r.name.to_text() for r in parse(changed).update] != \
+        [r.name.to_text() for r in parse(req.wire).update]
+    raw = h.send(changed)
+    assert raw is not None and parse(raw).rcode() == dns.rcode.FORMERR
+    assert parse(raw).tsig is None
+    assert h.quiet()
+
+
+def test_S1_header_id_changed_on_a_normal_message_is_processed_neg(h):
+    # A normal signed message with another header ID (as a forwarder may send it) reads
+    # the same in its signed form and is processed.
+    req = sign(good_update())
+    other = (struct.unpack("!H", req.wire[:2])[0] + 7) & 0xFFFF
+    raw = h.send(struct.pack("!H", other) + req.wire[2:])
+    resp = verified(raw, req)
+    assert resp.rcode() == dns.rcode.NOERROR and resp.id == other
+    assert len(h.marks) == 1
+
+
+def test_S1_name_in_header_with_unchanged_id_is_not_formerr_neg(h):
+    # Same message without a header change: the signed form is the received form, so the
+    # check does not apply (the record name is then simply not an accepted one).
+    req = sign_wire(_update_with_name_in_header(0))
+    raw = h.send(req.wire)
+    assert parse(raw).rcode() != dns.rcode.FORMERR

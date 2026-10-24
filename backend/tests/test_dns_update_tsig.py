@@ -888,3 +888,29 @@ def test_tsig_not_last_rr_neg():
     res = verify_request(bad, msg, lookup_for(material()), NOW, TimeWatermark())
     assert res.outcome is TsigOutcome.FORMERR
     assert start == tsig_start_offset(wire)
+
+
+# --- §4.2: TTL of the TSIG RR ----------------------------------------------------
+
+def _with_tsig_ttl(wire, ttl):
+    """Set the TTL of the TSIG RR (the MAC does not cover it)."""
+    start = tsig_start_offset(wire)
+    p = dns.wire.Parser(wire, start)
+    p.get_name()
+    off = p.current + 4  # after TYPE and CLASS
+    return wire[:off] + struct.pack("!I", ttl) + wire[off + 4:]
+
+
+def test_S1_tsig_ttl_zero_is_accepted_pos():
+    result, _ = run(_with_tsig_ttl(client_update(), 0), [material()])
+    assert result.outcome == TsigOutcome.OK
+
+
+def test_S1_tsig_ttl_not_zero_is_formerr_neg():
+    # RFC 8945 §4.2: "TTL: This MUST be 0." The MAC still verifies, so only this check stops it.
+    wire = _with_tsig_ttl(client_update(), 60)
+    from services.acme.dns_update.tsig import _last_rr_header
+    assert _last_rr_header(wire)[2] == 60  # on the wire; dnspython keeps no TSIG TTL
+    result, _ = run(wire, [material()])
+    assert result.outcome == TsigOutcome.FORMERR
+    assert result.key is None

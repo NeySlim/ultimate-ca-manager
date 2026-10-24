@@ -264,6 +264,22 @@ def _update_rrs(wire: bytes) -> List[Tuple[dns.name.Name, int, int, int, int]]:
     return out
 
 
+def _same_in_signed_form(wire: bytes, msg: dns.message.Message) -> bool:
+    """True unless the message reads differently with the original ID of its TSIG.
+
+    Only a signed message whose header ID differs from that original ID is parsed
+    again (a forwarder may change the header ID, RFC 8945 §4.3.2)."""
+    if msg.tsig is None or len(msg.tsig) == 0 or msg.tsig[0].original_id == msg.id:
+        return True
+    signed_form = struct.pack("!H", msg.tsig[0].original_id) + wire[2:]
+    try:
+        again = dns.message.from_wire(signed_form, keyring=False)
+    except _PARSE_ERRORS:
+        return False
+    return (again.sections == msg.sections and again.tsig == msg.tsig
+            and again.edns == msg.edns and again.payload == msg.payload)
+
+
 def _replay_key(msg: dns.message.Message) -> Optional[Tuple[str, bytes]]:
     """(key name, request MAC) of a signed message, or None (S15).
 
@@ -403,6 +419,12 @@ class DnsUpdateHandler:
         try:
             msg = dns.message.from_wire(wire, keyring=False)
         except _PARSE_ERRORS:
+            self._log.note("formerr", logging.INFO, peer_ip)
+            return _header_only(wire, dns.rcode.FORMERR)
+        # The MAC covers the message with the original ID of the TSIG in place of the
+        # header ID (RFC 8945 §4.3.2). A name compressed into the header ID would read
+        # differently in the signed form: read that form too, and refuse a difference.
+        if not _same_in_signed_form(wire, msg):
             self._log.note("formerr", logging.INFO, peer_ip)
             return _header_only(wire, dns.rcode.FORMERR)
 

@@ -556,3 +556,8 @@ Runda 1 `/security-review`: brak podatności z pewnością ≥ 0,7. Uwaga poniż
 
 Runda 2 `/security-review`: brak podatności z pewnością ≥ 0,7. Wzmocnienie poniżej progu, wprowadzone: etykiety nazwy klucza tylko z liter, cyfr, `_` i `-` (nie na początku i nie na końcu). Nazwa trafia do poleceń powłoki i PowerShell w gotowych fragmentach konfiguracji klientów; znaki takie jak `` ` ``, `'`, `|`, `$` mogłyby tam zadziałać. Nazwa spoza ASCII staje się punycode (ASCII). Uwagi bez zmian: różnica BADKEY/BADSIG pokazuje istnienie nazwy klucza (wymaga tego RFC 8945; nazwy generowane mają losowy przyrostek); klucz bez EAB potwierdza wartości wszystkich klientów swojego konta proxy (projekt, sekcja 2.3; `client_confirmed_at` nie wpływa na żadną decyzję).
 
+Runda 3 `/security-review`: brak podatności z pewnością ≥ 0,7. Wzmocnienia poniżej progu, wprowadzone:
+- TTL rekordu TSIG różny od 0 → FORMERR (RFC 8945 §4.2: „TTL: This MUST be 0”). dnspython zapisuje TTL rekordu TSIG zawsze jako 0, a MAC go nie obejmuje, więc kontrola czyta bajty wiadomości (S1).
+- Wiadomość z TSIG, której ID nagłówka różni się od Original ID, jest czytana drugi raz w formie podpisanej (z Original ID, RFC 8945 §4.3.2). Gdy treść się różni (nazwa skompresowana wskaźnikiem do nagłówka, RFC 1035 §4.1.4 dopuszcza tylko wskaźnik do wcześniejszej nazwy) → FORMERR przed kontrolą TSIG (S1).
+Uwagi bez zmian: strefa przyjmuje sufiksy publiczne jako przodków (F15; decyduje zakres wierszy, skutek tylko NOTAUTH/REFUSED); wypchnięcie wpisu z pamięci powtórek przez posiadacza klucza (skutki idempotentne); zapytania SOA bez podpisu pokazują nazwy oczekujących wyzwań (F14, tylko sieć wewnętrzna).
+
