@@ -123,11 +123,11 @@ class FakeAudit:
         self.records = []
         self.authenticated = []
 
-    def record(self, **kw):
+    def audit_limited(self, **kw):
         self.records.append(kw)
         return True
 
-    def record_authenticated(self, **kw):
+    def audit_authenticated(self, **kw):
         self.authenticated.append(kw)
         return True
 
@@ -1427,7 +1427,7 @@ def test_N10_signed_request_error_gives_header_only_servfail_neg(h):
 
 
 def test_N10_side_effect_error_keeps_the_response_neg(h):
-    h.audit.record_authenticated = mock.Mock(side_effect=RuntimeError("audit"))
+    h.audit.audit_authenticated = mock.Mock(side_effect=RuntimeError("audit"))
     req = sign(good_update())
     resp = verified(h.send(req.wire), req)
     assert resp.rcode() == dns.rcode.NOERROR
@@ -1626,13 +1626,13 @@ def test_end_to_end_signed_add_confirms_row_pos_and_neg(real):
     assert VALUE1 not in (accepted[0].details or "")
 
 
-def test_record_authenticated_has_no_rate_limit_pos_and_record_has_neg(real):
+def test_audit_authenticated_has_no_rate_limit_pos_and_audit_limited_has_neg(real):
     sink = real.audit_mod.AuditSink()
     kw = dict(peer_ip=PEER, keyname="k1.example.", success=True, details={"zone": ZONE})
     for _ in range(3):
-        assert sink.record_authenticated(action="acme.dns_update.accepted", **kw) is True
+        assert sink.audit_authenticated(action="acme.dns_update.accepted", **kw) is True
     assert real.AuditLog.query.filter_by(action="acme.dns_update.accepted").count() == 3
-    results = [sink.record(action="acme.dns_update.refused", reason="x", **kw)
+    results = [sink.audit_limited(action="acme.dns_update.refused", reason="x", **kw)
                for _ in range(3)]
     assert results == [True, False, False]  # the limited path still limits
 

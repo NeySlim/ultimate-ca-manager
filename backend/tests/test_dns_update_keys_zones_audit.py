@@ -6,7 +6,6 @@ N11, N12, N13): ``test_<ID>_<what>_pos`` and ``_neg``.
 import base64
 import json
 import logging
-import os
 import uuid
 from datetime import datetime
 
@@ -23,8 +22,7 @@ def env(app):
     from models import db
     from models.acme_client_account import AcmeClientAccount
     from models.acme_dns_update import AcmeDnsUpdateKey
-    from models.acme_models import AcmeAccount, AcmeEabCredential, AcmeDomain, DnsProvider
-    from models.audit_log import AuditLog
+    from models.acme_models import AcmeEabCredential, AcmeDomain, DnsProvider
 
     with app.app_context():
         for model in (AcmeDnsUpdateKey, AcmeDomain):
@@ -453,7 +451,7 @@ def _rows(env, action=None):
 
 
 def _rec(sink, ip, reason='badkey', keyname=None, details=None, action='acme.dns_update.rejected'):
-    return sink.record(action=action, reason=reason, peer_ip=ip, keyname=keyname,
+    return sink.audit_limited(action=action, reason=reason, peer_ip=ip, keyname=keyname,
                        success=False, details=details or {'reason': reason})
 
 
@@ -537,7 +535,7 @@ def test_N13_reason_is_in_details_pos(audit_env):
 def test_N13_authenticated_row_has_no_rate_limit_reason_neg(audit_env):
     from services.acme.dns_update.audit import AuditSink
     sink = AuditSink(clock=Clock())
-    sink.record_authenticated(action='acme.dns_update.accepted', peer_ip='192.0.2.71',
+    sink.audit_authenticated(action='acme.dns_update.accepted', peer_ip='192.0.2.71',
                               keyname='key1.example.', success=True, details={'adds': 1})
     d = json.loads(_rows(audit_env)[0].details)
     assert 'reason' not in d and d['adds'] == 1

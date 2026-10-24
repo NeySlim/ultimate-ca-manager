@@ -628,10 +628,10 @@ def _tsig_handler():
             return zname == dns.name.from_text('example.com.')
 
     class Audit:
-        def record(self, **kw):
+        def audit_limited(self, **kw):
             return True
 
-        def record_authenticated(self, **kw):
+        def audit_authenticated(self, **kw):
             return True
 
     handler = DnsUpdateHandler(key_store=Keys(), zone_index=Zones(), audit=Audit(),

@@ -3,7 +3,8 @@
 An attacker on the network can send any number of bad packets. The sink
 writes at most one row per (peer IP, reason) per window and at most N rows per
 reason per window. Dropped events are counted and reported in ONE summary row
-when the next window opens. ``record`` never raises.
+when the next window opens. ``audit_limited`` and ``audit_authenticated``
+never raise.
 """
 
 import collections
@@ -55,10 +56,10 @@ class AuditSink:
         # reason -> [window_start, written, dropped]
         self._windows: Dict[str, list] = {}
 
-    def record(self, *, action: str, reason: str, peer_ip: str, keyname: Optional[str],
-               success: bool, details: dict) -> bool:
+    def audit_limited(self, *, action: str, reason: str, peer_ip: str, keyname: Optional[str],
+                      success: bool, details: dict) -> bool:
         try:
-            return self._record(action, reason, peer_ip, keyname, success, details)
+            return self._audit_limited(action, reason, peer_ip, keyname, success, details)
         except Exception as e:
             try:
                 logger.warning("DNS UPDATE audit record failed: %s", type(e).__name__)
@@ -66,8 +67,8 @@ class AuditSink:
                 pass
             return False
 
-    def record_authenticated(self, *, action: str, peer_ip: str, keyname: Optional[str],
-                             success: bool, details: dict) -> bool:
+    def audit_authenticated(self, *, action: str, peer_ip: str, keyname: Optional[str],
+                            success: bool, details: dict) -> bool:
         """Write a row for a request with a verified TSIG, without a rate limit.
 
         Replays are absorbed by the replay cache of the handler. Never raises."""
@@ -81,7 +82,7 @@ class AuditSink:
                 pass
             return False
 
-    def _record(self, action, reason, peer_ip, keyname, success, details) -> bool:
+    def _audit_limited(self, action, reason, peer_ip, keyname, success, details) -> bool:
         reason_s = sanitize_text(reason)
         ip_s = sanitize_text(peer_ip, 45)
         summary_dropped = 0

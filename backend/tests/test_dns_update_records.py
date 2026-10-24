@@ -7,7 +7,6 @@ import base64
 import hashlib
 import json
 import secrets
-import threading
 import uuid
 from datetime import timedelta
 from types import SimpleNamespace
@@ -497,7 +496,7 @@ def test_R6_hook_exception_is_swallowed_neg(app, env, monkeypatch):
 def test_R7_order_without_thumbprint_gets_no_row_pos(app, env, monkeypatch):
     with app.app_context():
         a = _seed_order(env, 'acct-a', 'thumb-a')
-        b = _seed_order(env, 'acct-b', None)
+        _seed_order(env, 'acct-b', None)  # sibling without a thumbprint
         _get_authz(_svc(monkeypatch, _authz()))
         assert [r.order_id for r in _rows()] == [a.id]
 

@@ -423,7 +423,7 @@ class DnsUpdateHandler:
                 self._log.note("udp_drop", logging.INFO, peer_ip)
         self._log.note(reason, logging.INFO, peer_ip)
         try:
-            self._audit.record(
+            self._audit.audit_limited(
                 action="acme.dns_update.rejected", reason=reason, peer_ip=peer_ip,
                 keyname=result.keyname.to_text() if result.keyname is not None else None,
                 success=False, details={"transport": transport})
@@ -570,11 +570,11 @@ class DnsUpdateHandler:
                 if event.row_ids:
                     self._mark_confirmed(event.row_ids, moment)
                 self._key_store.touch(result.key.key_id, moment)
-                self._audit.record_authenticated(
+                self._audit.audit_authenticated(
                     action="acme.dns_update.accepted", peer_ip=peer_ip, keyname=keyname,
                     success=True, details=self._details(event, transport))
             else:
-                self._audit.record(
+                self._audit.audit_limited(
                     action="acme.dns_update.refused", reason=event.reason, peer_ip=peer_ip,
                     keyname=keyname, success=False, details=self._details(event, transport))
         except Exception as exc:
