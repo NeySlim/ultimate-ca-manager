@@ -1886,6 +1886,26 @@ def main():
     except Exception as e:
         print(f"  ⚠ HTTP protocol server failed: {e}")
 
+    # Start the DNS UPDATE (RFC 2136) listener (dev mode). The gevent servers bind and
+    # run in one daemon thread, which owns its own hub (the dev server is not patched).
+    try:
+        from services.acme.dns_update.status import get_dns_update_port
+        with app.app_context():
+            dns_update_port = get_dns_update_port()
+        if dns_update_port > 0:
+            import threading
+
+            def _run_dns_update_listener():
+                from services.acme.dns_update.server import start_dns_update_server
+                srv = start_dns_update_server(app)
+                if srv is not None:
+                    srv.serve_forever()
+
+            threading.Thread(target=_run_dns_update_listener, daemon=True).start()
+            print(f"  DNS UPDATE listener on port {dns_update_port} (UDP/TCP)")
+    except Exception as e:
+        print(f"  ⚠ DNS UPDATE listener failed: {e}")
+
     # Run HTTPS server
     try:
         app.run(
