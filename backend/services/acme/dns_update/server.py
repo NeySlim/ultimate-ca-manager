@@ -10,6 +10,7 @@ takes the rest). Memory and greenlet count stay bounded.
 
 Logs never contain packet bytes, keys or MACs.
 """
+import errno
 import ipaddress
 import logging
 import socket
@@ -30,6 +31,19 @@ logger = logging.getLogger(__name__)
 # valid-looking message.
 
 _server = None  # module-level reference, keeps the servers alive
+_retry = None   # greenlet of a pending bind retry, if any
+
+# Bind retry after a reload: the old worker may still hold the port (seconds).
+RETRY_FIRST_DELAY = 0.25
+RETRY_MAX_DELAY = 4.0
+
+
+def _sleep(seconds: float) -> None:
+    import gevent
+    gevent.sleep(seconds)
+
+
+_clock = time.monotonic  # tests replace both _sleep and _clock
 
 
 @dataclass(frozen=True)
@@ -141,6 +155,7 @@ class DnsUpdateServer:
         self._tcp_lock = threading.Lock()
         self._hub = None
         self._stopped = None
+        self.bind_errno = None  # errno of the last bind OSError, None otherwise
 
     @property
     def port(self) -> int:
@@ -152,9 +167,10 @@ class DnsUpdateServer:
 
     # -- lifecycle -----------------------------------------------------------------
 
-    def start(self) -> bool:
+    def start(self, quiet: bool = False) -> bool:
         """Bind UDP and TCP on the same port. Call it in the thread that runs the
-        gevent hub. Returns False (never raises) when a bind fails."""
+        gevent hub. Returns False (never raises) when a bind fails. ``quiet`` logs
+        a bind error at debug level (for the bind retry)."""
         import gevent
         from gevent.event import Event
         from gevent.pool import Pool
@@ -163,6 +179,7 @@ class DnsUpdateServer:
         if self._handler is None:
             from services.acme.dns_update.handler import DnsUpdateHandler
             self._handler = DnsUpdateHandler()
+        self.bind_errno = None
         try:
             tcp = StreamServer((self._host, self._port), self._handle_tcp,
                                spawn=Pool(self._limits.tcp_pool))
@@ -174,8 +191,10 @@ class DnsUpdateServer:
             udp.start()
             self._udp = udp
         except OSError as exc:
-            logger.error("Cannot start DNS UPDATE listener on %s port %d: %s",
-                         self._host, self._port, exc)
+            self.bind_errno = exc.errno
+            logger.log(logging.DEBUG if quiet else logging.ERROR,
+                       "Cannot start DNS UPDATE listener on %s port %d: %s",
+                       self._host, self._port, exc)
             self._close_servers()
             return False
         except Exception as exc:
@@ -348,9 +367,42 @@ class DnsUpdateServer:
             last_full = self._clock()
 
 
-def start_dns_update_server(app) -> Optional[DnsUpdateServer]:
-    """Start the listener when a port is configured. Never raises."""
+def _retry_bind(server: DnsUpdateServer, retry_for: float) -> None:
+    """Greenlet body: call start() again with a growing delay until it works, fails
+    for another reason than a busy port, or the deadline passes. Never raises."""
     global _server
+    try:
+        deadline = _clock() + retry_for
+        delay = RETRY_FIRST_DELAY
+        attempts = 1  # the first start() was attempt 1
+        while True:
+            _sleep(delay)
+            delay = min(delay * 2, RETRY_MAX_DELAY)
+            attempts += 1
+            if server.start(quiet=True):
+                _server = server
+                logger.info("DNS UPDATE listener started after %d attempts", attempts)
+                return
+            if server.bind_errno != errno.EADDRINUSE:
+                logger.error("DNS UPDATE listener bind retry stopped: errno %s",
+                             server.bind_errno)
+                return
+            if _clock() >= deadline:
+                logger.error("DNS UPDATE port %d still in use after %.0f s, "
+                             "the listener is not running", server.port, retry_for)
+                return
+    except Exception as exc:
+        logger.error("DNS UPDATE listener bind retry failed: %s", type(exc).__name__)
+
+
+def start_dns_update_server(app, retry_for: float = 0.0) -> Optional[DnsUpdateServer]:
+    """Start the listener when a port is configured. Never raises.
+
+    When the port is busy and ``retry_for`` > 0, the bind is retried in a background
+    greenlet (a reload starts the new worker before the old one lets go of the port).
+    The call then returns None at once; the listener is in ``_server`` after a success.
+    """
+    global _server, _retry
     try:
         with app.app_context():
             port = status.get_dns_update_port()
@@ -361,7 +413,16 @@ def start_dns_update_server(app) -> Optional[DnsUpdateServer]:
         with app.app_context():
             handler = DnsUpdateHandler()
         server = DnsUpdateServer(app, host, port, handler)
-        if not server.start():
+        # With a retry, a busy port is expected after a reload: one warning, no error.
+        if not server.start(quiet=retry_for > 0):
+            if server.bind_errno == errno.EADDRINUSE and retry_for > 0:
+                import gevent
+                logger.warning("DNS UPDATE port %d is in use, a previous worker may still "
+                               "hold it; retrying for up to %.0f s", port, retry_for)
+                _retry = gevent.spawn(_retry_bind, server, retry_for)
+            elif retry_for > 0 and server.bind_errno is not None:
+                logger.error("Cannot start DNS UPDATE listener on %s port %d: errno %s",
+                             host, port, server.bind_errno)
             return None
         _server = server
         return server

@@ -1,29 +1,58 @@
 """The image entrypoint validates UCM_DNS_UPDATE_PORT (DNS UPDATE listener).
 
+The check is the shell function check_dns_update_port in docker/dns-update-port.sh.
+The tests source that file and call the function. entrypoint.sh sources the same file.
+
 The listener is off when the variable is unset or 0. Otherwise the port must be
 an integer from 1024 to 65535 (the image runs as the user ucm, without
 CAP_NET_BIND_SERVICE) and must differ from the HTTPS and HTTP ports.
 """
+import os
 import pathlib
-import re
 import subprocess
 
 import pytest
 
 ROOT = pathlib.Path(__file__).resolve().parents[2]
 ENTRYPOINT = ROOT / 'docker' / 'entrypoint.sh'
+HELPER = ROOT / 'docker' / 'dns-update-port.sh'
 
 
 def _run(env):
-    """Run the entrypoint's port function and its DNS UPDATE check with ``env``."""
-    body = ENTRYPOINT.read_text(encoding='utf-8')
-    func = re.search(r'^validate_unprivileged_port\(\) \{.*?^\}', body, re.M | re.S).group(0)
-    check = re.search(r'^# Validate the DNS UPDATE.*?(?=^echo -e "\$\{GREEN\}✅ Configuration validated)',
-                      body, re.M | re.S).group(0)
-    script = ('RED=; GREEN=; NC=\n: "${UCM_HTTPS_PORT:=8443}"\n: "${UCM_HTTP_PORT:=8080}"\n'
-              + func + '\n' + check + '\necho passed\n')
+    """Source the helper and call check_dns_update_port with ``env``."""
+    script = f'. {HELPER}; check_dns_update_port && echo passed'
     return subprocess.run(['bash', '-c', script], env={'PATH': '/usr/bin:/bin', **env},
                           capture_output=True, text=True)
+
+
+@pytest.mark.parametrize('script', [ENTRYPOINT, HELPER], ids=['entrypoint', 'helper'])
+def test_scripts_have_valid_bash_syntax_pos(script):
+    # One file per call: `bash -n a b` checks a only and passes b as $1.
+    result = subprocess.run(['bash', '-n', str(script)], capture_output=True, text=True)
+    assert result.returncode == 0, result.stderr
+
+
+def test_scripts_with_a_syntax_error_are_caught_neg(tmp_path):
+    bad = tmp_path / 'bad.sh'
+    bad.write_text('check() {\n')
+    result = subprocess.run(['bash', '-n', str(bad)], capture_output=True, text=True)
+    assert result.returncode != 0
+
+
+# The entrypoint itself stops on a bad port in its validation step, before it writes
+# anything. A good port goes on to set up /opt/ucm, so only the refusal is run here,
+# and not as root: there a regression could write to /opt/ucm.
+@pytest.mark.skipif(os.geteuid() == 0, reason='a regression could write to /opt/ucm as root')
+@pytest.mark.parametrize('env, message', [
+    ({'UCM_DNS_UPDATE_PORT': '53'}, 'Invalid DNS UPDATE port: 53'),
+    ({'UCM_DNS_UPDATE_PORT': '8443'}, 'is the same as the HTTPS or HTTP port'),
+])
+def test_entrypoint_stops_on_a_bad_port_neg(tmp_path, env, message):
+    result = subprocess.run(['timeout', '60', 'bash', str(ENTRYPOINT)], cwd=tmp_path,
+                            env={'PATH': '/usr/bin:/bin', 'HOME': str(tmp_path), **env},
+                            capture_output=True, text=True)
+    assert result.returncode == 1, result.stdout
+    assert message in result.stdout
 
 
 @pytest.mark.parametrize('env', [

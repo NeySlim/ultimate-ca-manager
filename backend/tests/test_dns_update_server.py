@@ -5,16 +5,20 @@ the test process is not monkey-patched, so blocking client calls in the main
 thread would starve the hub otherwise. Most tests use a fake handler. Test
 names carry the invariant ID of the plan (section 4): test_<ID>_<what>_pos / _neg.
 """
-import ast
+import errno
+import importlib.util
 import logging
 import pathlib
 import socket
+import sys
 import threading
 import time
+import types
 
 import dns.flags
 import dns.message
 import dns.rcode
+import gevent
 import pytest
 
 from services.acme.dns_update import server as srv_mod
@@ -768,30 +772,263 @@ def test_T3_request_signed_with_the_prior_response_mac_is_badsig_neg(app):
         r.stop()
 
 
+# -- bind retry --------------------------------------------------------------------
+
+class FakeServer:
+    """Stands in for DnsUpdateServer: start() answers from a list of errnos
+    (None = success)."""
+    results = []
+    attempts = 0
+
+    def __init__(self, app, host, port, handler=None, limits=None):
+        self.port = port
+        self.bind_errno = None
+
+    def start(self, quiet=False):
+        cls = type(self)
+        cls.attempts += 1
+        err = cls.results[min(cls.attempts, len(cls.results)) - 1]
+        self.bind_errno = err
+        return err is None
+
+
+@pytest.fixture
+def retry(app, monkeypatch):
+    """start_dns_update_server with a fake server, a fake clock and no real sleep."""
+    clock = {'now': 1000.0}
+    sleeps = []
+
+    def fake_sleep(seconds):
+        sleeps.append(seconds)
+        clock['now'] += seconds
+        gevent.sleep(0)
+
+    class Fake(FakeServer):
+        results = []
+        attempts = 0
+
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '5353')
+    monkeypatch.setattr(srv_mod, 'DnsUpdateServer', Fake)
+    monkeypatch.setattr(srv_mod, '_sleep', fake_sleep)
+    monkeypatch.setattr(srv_mod, '_clock', lambda: clock['now'])
+    monkeypatch.setattr(srv_mod, '_server', None)
+    monkeypatch.setattr(srv_mod, '_retry', None)
+
+    def go(results, retry_for):
+        Fake.results = results
+        result = srv_mod.start_dns_update_server(app, retry_for=retry_for)
+        if srv_mod._retry is not None:
+            gevent.joinall([srv_mod._retry], timeout=5)
+        return result
+
+    go.cls = Fake
+    go.sleeps = sleeps
+    return go
+
+
+def test_retry_busy_port_then_success_starts_the_listener_pos(retry, caplog):
+    caplog.set_level(logging.INFO, logger=srv_mod.logger.name)
+    busy = errno.EADDRINUSE
+    # The call returns at once with None: the greenlet does the retrying.
+    assert retry([busy, busy, None], retry_for=35) is None
+    assert retry.cls.attempts == 3
+    assert isinstance(srv_mod._server, retry.cls)
+    assert retry.sleeps == [0.25, 0.5]
+    warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
+    assert len(warnings) == 1 and 'in use' in warnings[0].getMessage()
+    assert any('after 3 attempts' in r.getMessage() for r in caplog.records)
+
+
+def test_retry_does_not_block_the_caller_pos(retry, app):
+    retry.cls.results = [errno.EADDRINUSE, None]
+    assert srv_mod.start_dns_update_server(app, retry_for=35) is None
+    assert retry.cls.attempts == 1 and srv_mod._server is None
+    assert srv_mod._retry is not None and not srv_mod._retry.dead
+    gevent.joinall([srv_mod._retry], timeout=5)
+    assert retry.cls.attempts == 2 and srv_mod._server is not None
+
+
+def test_retry_other_errno_stops_at_once_neg(retry, caplog):
+    assert retry([errno.EACCES], retry_for=35) is None
+    assert retry.cls.attempts == 1
+    assert retry.sleeps == []
+    assert srv_mod._retry is None and srv_mod._server is None
+    # The first start was quiet (a retry was possible): the error is logged here.
+    errors = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert len(errors) == 1 and str(errno.EACCES) in errors[0].getMessage()
+
+
+def test_retry_other_errno_after_a_busy_port_stops_neg(retry, caplog):
+    assert retry([errno.EADDRINUSE, errno.EACCES], retry_for=35) is None
+    assert retry.cls.attempts == 2
+    assert srv_mod._server is None
+    assert any(r.levelno == logging.ERROR for r in caplog.records)
+
+
+def test_retry_for_zero_tries_once_neg(retry):
+    assert retry([errno.EADDRINUSE], retry_for=0) is None
+    assert retry.cls.attempts == 1
+    assert retry.sleeps == [] and srv_mod._retry is None
+
+
+def test_retry_first_start_works_without_a_retry_pos(retry):
+    server = retry([None], retry_for=35)
+    assert server is not None and srv_mod._server is server
+    assert retry.cls.attempts == 1 and srv_mod._retry is None
+
+
+def test_retry_gives_up_at_the_deadline_neg(retry, caplog):
+    assert retry([errno.EADDRINUSE], retry_for=10) is None
+    assert srv_mod._server is None
+    # 0.25 + 0.5 + 1 + 2 + 4 = 7.75 s, then 4 s steps: the deadline falls after 3 more.
+    assert retry.sleeps == [0.25, 0.5, 1.0, 2.0, 4.0, 4.0]
+    assert retry.cls.attempts == 7
+    errors = [r for r in caplog.records if r.levelno == logging.ERROR]
+    assert len(errors) == 1 and 'still in use' in errors[0].getMessage()
+
+
+def test_retry_exception_in_start_is_caught_neg(retry, caplog):
+    class Boom(retry.cls):
+        def start(self, quiet=False):
+            if type(self).attempts:
+                raise RuntimeError('secret detail')
+            type(self).attempts += 1
+            self.bind_errno = errno.EADDRINUSE
+            return False
+
+    srv_mod.DnsUpdateServer = Boom  # restored by the retry fixture's monkeypatch
+    assert retry([], retry_for=35) is None
+    assert srv_mod._server is None
+    assert 'secret detail' not in caplog.text
+    assert 'RuntimeError' in caplog.text
+
+
+def test_bind_errno_is_kept_on_a_busy_port_pos(app):
+    blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    blocker.bind(('127.0.0.1', 0))
+    blocker.listen(1)
+    try:
+        r = Running(app, FakeHandler(), ServerLimits(), port=blocker.getsockname()[1])
+        assert r.ok is False
+        assert r.server.bind_errno == errno.EADDRINUSE
+    finally:
+        blocker.close()
+
+
+def test_bind_errno_is_none_after_a_success_neg(app):
+    r = Running(app, FakeHandler(), ServerLimits())
+    try:
+        assert r.ok is True
+        assert r.server.bind_errno is None
+    finally:
+        r.stop()
+
+
+def test_retry_real_sockets_listener_starts_after_the_port_is_freed_pos(app, monkeypatch, caplog):
+    caplog.set_level(logging.DEBUG, logger=srv_mod.logger.name)
+    blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
+    blocker.bind(('127.0.0.1', 0))
+    blocker.listen(1)
+    port = blocker.getsockname()[1]
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', str(port))
+    monkeypatch.setenv('UCM_DNS_UPDATE_HOST', '127.0.0.1')
+    monkeypatch.setattr(srv_mod, '_server', None)
+    monkeypatch.setattr(srv_mod, '_retry', None)
+    done = threading.Event()
+    result = {}
+
+    def go():
+        # Own thread, own hub: the retry greenlet runs while this thread waits.
+        result['first'] = srv_mod.start_dns_update_server(app, retry_for=8)
+        if srv_mod._retry is not None:
+            gevent.wait([srv_mod._retry])
+        result['server'] = srv_mod._server
+        done.set()
+        if result['server'] is not None:
+            result['server'].serve_forever()
+
+    threading.Thread(target=go, daemon=True).start()
+    threading.Timer(0.5, blocker.close).start()
+    try:
+        assert done.wait(10)
+        assert result['first'] is None
+        server = result['server']
+        assert server is not None and server.port == port
+        s = socket.create_connection(('127.0.0.1', port), timeout=2)
+        s.close()
+        # A busy port after a reload is expected: a warning, never an error.
+        assert not [r for r in caplog.records if r.levelno >= logging.ERROR]
+        assert [r for r in caplog.records if r.levelno == logging.WARNING]
+    finally:
+        blocker.close()
+        if result.get('server'):
+            result['server'].stop()
+
+
 # -- startup wiring ----------------------------------------------------------------
 
-def _post_worker_init():
-    tree = ast.parse((BACKEND / 'gunicorn_config.py').read_text(encoding='utf-8'))
-    for node in tree.body:
-        if isinstance(node, ast.FunctionDef) and node.name == 'post_worker_init':
-            return node
-    pytest.fail('post_worker_init not found')
+@pytest.fixture
+def gunicorn_conf(app, monkeypatch):
+    """gunicorn_config.py loaded without monkey patching this process. Returns
+    (module, calls): start_* calls of post_worker_init in order."""
+    import gevent.monkey
+    import protocol_http_server
+
+    monkeypatch.setattr(gevent.monkey, 'patch_all', lambda *a, **k: None)
+    spec = importlib.util.spec_from_file_location('_ucm_gunicorn_config_test',
+                                                  BACKEND / 'gunicorn_config.py')
+    module = importlib.util.module_from_spec(spec)
+    spec.loader.exec_module(module)
+    wsgi = types.ModuleType('wsgi')
+    wsgi.app = app
+    monkeypatch.setitem(sys.modules, 'wsgi', wsgi)
+    # post_worker_init replaces the handle_error of the hub: use a stand-in hub
+    monkeypatch.setattr(gevent, 'get_hub', lambda: types.SimpleNamespace(handle_error=None))
+    calls = []
+    monkeypatch.setattr(protocol_http_server, 'start_http_protocol_server',
+                        lambda a: calls.append(('http', a)))
+    monkeypatch.setattr(srv_mod, 'start_dns_update_server',
+                        lambda a, **kw: calls.append(('dns', a, kw)))
+    return module, calls
 
 
-def _imports_and_calls_in_try(fn, name):
-    for node in ast.walk(fn):
-        if isinstance(node, ast.Try):
-            body = ast.Module(body=node.body, type_ignores=[])
-            calls = any(isinstance(n, ast.Call) and getattr(n.func, 'id', None) == name
-                        for n in ast.walk(body))
-            if calls:
-                return True
-    return False
+def _worker(graceful_timeout=30):
+    cfg = types.SimpleNamespace(graceful_timeout=graceful_timeout)
+    return types.SimpleNamespace(cfg=cfg, log=logging.getLogger('test.worker'))
 
 
-def test_startup_gunicorn_starts_the_dns_update_listener_in_a_try_pos():
-    assert _imports_and_calls_in_try(_post_worker_init(), 'start_dns_update_server')
+def test_startup_gunicorn_starts_the_dns_update_listener_with_a_retry_pos(gunicorn_conf, app):
+    module, calls = gunicorn_conf
+    module.post_worker_init(_worker(30))
+    assert [c[0] for c in calls] == ['http', 'dns']
+    assert calls[1][1] is app
+    assert calls[1][2] == {'retry_for': 35.0}
 
 
-def test_startup_gunicorn_still_starts_the_http_protocol_server_neg():
-    assert _imports_and_calls_in_try(_post_worker_init(), 'start_http_protocol_server')
+def test_startup_gunicorn_retry_follows_graceful_timeout_pos(gunicorn_conf):
+    module, calls = gunicorn_conf
+    module.post_worker_init(_worker(60))
+    assert calls[1][2] == {'retry_for': 65.0}
+
+
+def test_startup_gunicorn_dns_update_starts_when_the_http_server_fails_neg(gunicorn_conf, monkeypatch):
+    import protocol_http_server
+    module, calls = gunicorn_conf
+
+    def boom(app):
+        raise RuntimeError('http down')
+
+    monkeypatch.setattr(protocol_http_server, 'start_http_protocol_server', boom)
+    module.post_worker_init(_worker())
+    assert [c[0] for c in calls] == ['dns']
+
+
+def test_startup_gunicorn_dns_update_failure_does_not_raise_neg(gunicorn_conf, monkeypatch):
+    module, calls = gunicorn_conf
+
+    def boom(app, **kw):
+        raise RuntimeError('dns down')
+
+    monkeypatch.setattr(srv_mod, 'start_dns_update_server', boom)
+    module.post_worker_init(_worker())
+    assert [c[0] for c in calls] == ['http']
