@@ -5,6 +5,7 @@ then from the ``acme.proxy.dns_update_port`` setting. 0 means disabled.
 """
 import logging
 import os
+from typing import Optional
 
 logger = logging.getLogger(__name__)
 
@@ -38,24 +39,41 @@ def get_stored_dns_update_port() -> int:
     return 0
 
 
-def get_dns_update_port() -> int:
-    """Resolve the listener port from env var or DB setting. 0 = disabled."""
+_warned = set()
+
+
+def _warn_once(kind: str, env_val: str, message: str, *args) -> None:
+    """Log a warning once per process for each (kind, env value)."""
+    mark = (kind, env_val)
+    if mark in _warned:
+        return
+    _warned.add(mark)
+    logger.warning(message, *args)
+
+
+def get_dns_update_port(stored: Optional[int] = None) -> int:
+    """Resolve the listener port from env var or DB setting. 0 = disabled.
+
+    ``stored`` is a port that the caller already read from the DB setting; it
+    replaces a new DB read."""
     env_val = get_dns_update_port_env()
     if env_val is not None:
         try:
             port = int(env_val)
         except (ValueError, TypeError):
-            logger.warning("Invalid %s env var: %s", PORT_ENV, env_val)
+            _warn_once("invalid", env_val, "Invalid %s env var: %s", PORT_ENV, env_val)
             return 0
         if not 0 <= port <= 65535:
-            logger.warning("%s=%s is out of range 0..65535, listener disabled", PORT_ENV, env_val)
+            _warn_once("range", env_val,
+                       "%s=%s is out of range 0..65535, listener disabled", PORT_ENV, env_val)
             return 0
         if 0 < port < 1024:
-            logger.warning(
+            _warn_once(
+                "privileged", env_val,
                 "%s=%d is a privileged port: the process needs CAP_NET_BIND_SERVICE "
                 "(the API and the Docker entrypoint refuse it)", PORT_ENV, port)
         return port
-    return get_stored_dns_update_port()
+    return stored if stored is not None else get_stored_dns_update_port()
 
 
 def get_dns_update_host() -> str:

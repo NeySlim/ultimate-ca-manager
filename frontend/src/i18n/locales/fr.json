@@ -645,6 +645,8 @@
       "nameHelp": "Si vous laissez ce champ vide, UCM génère un nom à partir du chemin du proxy.",
       "algorithmHelp": "Certains clients ne prennent pas en charge hmac-sha384 : cert-manager ne prend en charge que HMACSHA256 et HMACSHA512, et win-acme calcule sha384 de façon incorrecte. En cas de doute, utilisez hmac-sha256.",
       "eabNone": "Aucun (sans limite)",
+      "eabMissing": "Identifiant EAB manquant",
+      "eabMissingHelp": "Cette clé était liée à un identifiant EAB qui n'existe plus. Elle ne correspond à aucune commande. Créez une nouvelle clé.",
       "eabHelp": "Limite la clé aux commandes du compte ACME enregistré avec cet identifiant.",
       "notes": "Notes",
       "notesPlaceholder": "Facultatif, par exemple le client ou l'hôte qui utilise la clé",

@@ -601,6 +601,34 @@ def test_T2_signed_response_above_512_is_truncated_with_tsig_neg():
     assert not resp.flags & dns.flags.TC and len(resp.answer) == 1
 
 
+def test_F1_udp_drop_when_truncated_form_is_still_too_large_pos():
+    qname = ".".join(["a" * 60] * 4) + ".net."
+    long_key = _key(".".join(["k" * 60] * 4) + ".org.")
+    hh = Harness()
+    hh.keys.materials[long_key.name] = TsigKeyMaterial(1, long_key.name, SHA256, SECRET)
+    req = sign(soa_query(qname), key=long_key)
+    assert hh.send(req.wire, "udp") is None
+    assert hh.sampler.counts().get("udp_drop") == 1
+    assert len(hh.handler._replay) == 0  # None is not cached
+    # Over TCP the same request is answered (no size limit) and the answer is cached.
+    assert hh.send(req.wire, "tcp") is not None
+    assert len(hh.handler._replay) == 1
+
+
+def test_F1_signed_answer_above_512_with_small_truncated_form_is_cached_neg():
+    zone = _long("x")
+    long_key = _key(_long("j"))
+    row = ActiveRecord(1, 11, "_acme-challenge." + zone, VALUE1, zone, 1, "acct-1")
+    hh = Harness(rows=(row,), zones=(zone,))
+    hh.keys.materials[long_key.name] = TsigKeyMaterial(1, long_key.name, SHA256, SECRET)
+    req = sign(soa_query(zone), key=long_key)
+    raw = hh.send(req.wire, "udp")
+    assert raw is not None and len(raw) <= 512
+    assert verified(raw, req).flags & dns.flags.TC
+    assert "udp_drop" not in hh.sampler.counts()
+    assert len(hh.handler._replay) == 1
+
+
 def test_S12_truncated_response_keeps_tsig_pos_and_neg():
     zone = _long("y")
     long_key = _key(_long("m"))
@@ -744,6 +772,57 @@ def test_Q7_lego_pattern_truncated_then_tcp_pos(h):
 def test_Q7_name_without_active_row_is_refused_neg(h, name):
     resp = parse(h.send(plain(soa_query(name)).wire, "tcp"))
     assert resp.rcode() == dns.rcode.REFUSED and resp.authority == [] and resp.answer == []
+
+
+def test_F6_rows_of_unrelated_zone_are_not_looked_at_pos():
+    other = ActiveRecord(3, 13, "_acme-challenge.x.example.org.", VALUE2, "example.org.", 1,
+                         "acct-1")
+    hh = Harness(rows=(ROW1, other), zones=(ZONE, "example.org."))
+    scope = mock.Mock()
+    scope.allows.return_value = True
+    hh.keys.scopes[1] = scope
+    req = sign(soa_query(RECORD1))
+    resp = verified(hh.send(req.wire, "udp"), req)
+    assert len(resp.authority) == 1
+    seen = [c.args for c in scope.allows.call_args_list]
+    assert seen == [(ROW1.acme_client_account_id, ROW1.account_id)]
+
+
+def test_F6_nested_zones_deepest_wins_pos():
+    sub = "sub.example.com."
+    r_sub = ActiveRecord(3, 13, "_acme-challenge.host.sub.example.com.", VALUE2, sub, 1,
+                         "acct-1")
+    r_top = ActiveRecord(4, 14, "_acme-challenge.sub.example.com.", VALUE1, ZONE, 1, "acct-1")
+    hh = Harness(rows=(r_top, r_sub), zones=(ZONE, sub))
+    resp = parse(hh.send(plain(soa_query(sub)).wire, "tcp"))
+    assert len(resp.answer) == 1 and resp.answer[0].name == dns.name.from_text(sub)
+    # NODATA below sub.example.com.: both zones have a matching row, the deepest one wins.
+    r_top2 = ActiveRecord(5, 15, "_acme-challenge.host.sub.example.com.", VALUE1, ZONE, 1,
+                          "acct-1")
+    hh = Harness(rows=(r_top2, r_sub), zones=(ZONE, sub))
+    resp = parse(hh.send(plain(soa_query("host.sub.example.com.")).wire, "tcp"))
+    assert resp.answer == [] and len(resp.authority) == 1
+    assert resp.authority[0].name == dns.name.from_text(sub)
+
+
+def test_F6_index_is_rebuilt_only_for_a_new_snapshot_object_pos_and_neg(h):
+    builds = []
+    orig = h.handler._rows_by_zone.__func__
+
+    def counting(self, snapshot):
+        before = self._index_snapshot
+        out = orig(self, snapshot)
+        if snapshot is not before:
+            builds.append(snapshot)
+        return out
+
+    with mock.patch.object(DnsUpdateHandler, "_rows_by_zone", counting):
+        h.send(plain(soa_query(RECORD1)).wire, "tcp")
+        h.send(plain(soa_query(ZONE)).wire, "tcp")
+        assert len(builds) == 1  # neg: the same object does not rebuild
+        h.snap.snapshot = snapshot_of(ROW1, ROW2)
+        h.send(plain(soa_query(ZONE)).wire, "tcp")
+        assert len(builds) == 2  # pos: a new object rebuilds
 
 
 # =============================================================================

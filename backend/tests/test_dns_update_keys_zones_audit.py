@@ -1007,6 +1007,36 @@ def test_B2_other_reason_not_counted_in_summary_neg(audit_env):
     assert d == {'reason': 'badsig', 'dropped': 9}
 
 
+def test_F2_accepted_summary_row_belongs_to_the_key_and_succeeds_pos(audit_env):
+    from services.acme.dns_update.audit import AuditSink
+    clock = Clock()
+    sink = AuditSink(per_key_per_minute=2, clock=clock)
+    for _ in range(5):
+        _acc(sink)
+    clock.t += 61
+    _acc(sink)
+    summary = _rows(audit_env, 'acme.dns_update.suppressed')
+    assert len(summary) == 1
+    assert summary[0].username == 'dns-update:key1.example.'
+    assert summary[0].resource_name == 'key1.example.'
+    assert summary[0].success is True
+    assert json.loads(summary[0].details)['dropped'] == 3
+
+
+def test_F2_refusal_summary_row_stays_unauthenticated_and_failed_neg(audit_env):
+    from services.acme.dns_update.audit import AuditSink
+    clock = Clock()
+    sink = AuditSink(clock=clock)
+    for _ in range(3):
+        _rec(sink, '192.0.2.5', reason='badsig')
+    clock.t += 61
+    _rec(sink, '192.0.2.6', reason='badsig')
+    summary = _rows(audit_env, 'acme.dns_update.suppressed')
+    assert len(summary) == 1
+    assert summary[0].username == 'dns-update:unauthenticated'
+    assert summary[0].success is False
+
+
 def test_B2_failed_write_returns_false_pos(audit_env, monkeypatch):
     from services.acme.dns_update.audit import AuditSink
     from services.audit import AuditService

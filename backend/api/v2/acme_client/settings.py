@@ -111,6 +111,7 @@ def get_settings():
     except (ValueError, TypeError):
         dns_timeout = 120
     tls_alpn_port = get_stored_tls_alpn_port()
+    stored_dns_port = dns_update_status.get_stored_dns_update_port()
 
     return success_response(data={
         'email': email_cfg.value if email_cfg else None,
@@ -145,8 +146,8 @@ def get_settings():
         'account_key_type': acct_key_type_cfg.value if acct_key_type_cfg else 'ES256',
         'acme_public_base_url': get_acme_public_base(request),
         'acme_proxy_public_base_url': get_acme_proxy_public_base(request),
-        'dns_update_port': dns_update_status.get_stored_dns_update_port(),
-        'dns_update_port_effective': dns_update_status.get_dns_update_port(),
+        'dns_update_port': stored_dns_port,
+        'dns_update_port_effective': dns_update_status.get_dns_update_port(stored_dns_port),
         'dns_update_port_env': dns_update_status.get_dns_update_port_env(),
         'dns_update_listening': dns_update_status.is_listening(),
     })

@@ -30,6 +30,7 @@ from models import db
 from models.acme_client_account import AcmeClientAccount
 from models.acme_models import AcmeClientOrder
 from services.acme.acme_client_service import AcmeClientService, ACCOUNT_KEY_TYPES
+from services.acme.dns_update import records as dns_update_records
 from services.acme.dns_update.keys import invalidate_keys
 from services.audit_service import AuditService
 
@@ -376,6 +377,7 @@ def delete_ca_account(account_id):
     if not ok:
         return err
     invalidate_keys()  # proxy_enabled/slug/deletion change usable TSIG keys
+    dns_update_records.invalidate_cache()  # expected values of the account are gone
 
     AuditService.log_action(
         action='acme_ca_account_delete',
@@ -421,6 +423,7 @@ def deactivate_ca_account(account_id):
     if not ok:
         return err
     invalidate_keys()  # proxy_enabled/slug/deletion change usable TSIG keys
+    dns_update_records.invalidate_cache()  # expected values of the account are gone
 
     AuditService.log_action(
         action='acme_ca_account_deactivate',

@@ -80,4 +80,26 @@ describe('buildDnsUpdateSnippets', () => {
     expect(isIpAddress('10.0.0.5')).toBe(true)
     expect(isIpAddress('ucm.lan')).toBe(false)
   })
+
+  it('IPv6 host: bare address in plain forms, brackets in host:port forms', () => {
+    const host = hostFromBase('https://[fd00::10]:8443/acme/proxy')
+    expect(host).toBe('fd00::10')
+    const snippets = build({ host, port: 53 })
+    expect(byId(snippets, 'certbot').code).toContain('dns_rfc2136_server = fd00::10\n')
+    expect(byId(snippets, 'acmesh').code).toContain('NSUPDATE_SERVER="fd00::10"')
+    expect(byId(snippets, 'lego').code).toContain('DNSUPDATE_NAMESERVER="[fd00::10]:53"')
+    expect(byId(snippets, 'certmanager').code).toContain('nameserver: [fd00::10]:53')
+    expect(byId(snippets, 'winacme').code).toContain('--serverhost fd00::10 `')
+    expect(byId(snippets, 'poshacme').code).toContain("DDNSNameserver = 'fd00::10'")
+  })
+
+  it('host name and IPv4 host keep the plain forms', () => {
+    for (const host of ['ucm.lan', '10.0.0.5']) {
+      expect(hostFromBase(`https://${host}:8443/x`)).toBe(host)
+      const snippets = build({ host, port: 53 })
+      expect(byId(snippets, 'lego').code).toContain(`DNSUPDATE_NAMESERVER="${host}:53"`)
+      expect(byId(snippets, 'certmanager').code).toContain(`nameserver: ${host}:53`)
+      expect(byId(snippets, 'lego').code).not.toContain('[')
+    }
+  })
 })

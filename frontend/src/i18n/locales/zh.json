@@ -1896,6 +1896,8 @@
       "nameHelp": "如果此字段留空，UCM 会根据代理路径生成名称。",
       "algorithmHelp": "部分客户端不支持 hmac-sha384：cert-manager 只支持 HMACSHA256 和 HMACSHA512，win-acme 对 sha384 的计算有误。不确定时请使用 hmac-sha256。",
       "eabNone": "无（不限制）",
+      "eabMissing": "缺少 EAB 凭据",
+      "eabMissingHelp": "此密钥绑定的 EAB 凭据已不存在。它不匹配任何订单。请创建新密钥。",
       "eabHelp": "将密钥限制为使用此凭据注册的 ACME 账户的订单。",
       "notes": "备注",
       "notesPlaceholder": "可选，例如使用该密钥的客户端或主机",

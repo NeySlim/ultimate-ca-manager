@@ -1896,6 +1896,8 @@
       "nameHelp": "Si deja este campo vacío, UCM genera un nombre a partir de la ruta del proxy.",
       "algorithmHelp": "Algunos clientes no admiten hmac-sha384: cert-manager solo admite HMACSHA256 y HMACSHA512, y win-acme calcula sha384 de forma incorrecta. Si tiene dudas, use hmac-sha256.",
       "eabNone": "Ninguna (sin límite)",
+      "eabMissing": "Falta la credencial EAB",
+      "eabMissingHelp": "Esta clave estaba vinculada a una credencial EAB que ya no existe. No coincide con ningún pedido. Cree una clave nueva.",
       "eabHelp": "Limita la clave a los pedidos de la cuenta ACME registrada con esta credencial.",
       "notes": "Notas",
       "notesPlaceholder": "Opcional, por ejemplo el cliente o el host que usa la clave",

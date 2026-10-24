@@ -651,6 +651,28 @@ def test_S12_oversize_response_is_truncated_pos():
     assert hmac.compare_digest(mac, rd.mac)
 
 
+def test_F1_truncated_form_above_max_size_gives_none_pos():
+    long_name = dns.name.from_text(".".join(["a" * 60] * 4) + ".net.")
+    key = material(name=dns.name.from_text(".".join(["k" * 60] * 4) + ".org."))
+    k = dns.tsig.Key(key.name, key.secret, key.algorithm)
+    q = dns.message.make_query(long_name, "SOA")
+    q.use_tsig(k)
+    with at(NOW):
+        wire = q.to_wire()
+    res, msg = run(wire, [key])
+    assert res.outcome is TsigOutcome.OK
+    resp = skeleton(msg)
+    assert render_signed(resp, res, NOW, max_size=512) is None
+    assert len(render_signed(resp, res, NOW)) > 512  # no limit: bytes as before
+
+
+def test_F1_truncated_form_within_max_size_is_returned_neg():
+    key, wire, res, msg, resp = query_case()
+    out = render_signed(resp, res, NOW, max_size=512)
+    assert out is not None and len(out) <= 512
+    assert client_verify(out, res.request_mac, key).flags & dns.flags.TC
+
+
 def test_S12_large_max_size_gives_full_answer_neg():
     key, wire, res, msg, resp = query_case()
     out = render_signed(resp, res, NOW, max_size=65535)
@@ -669,7 +691,10 @@ def test_S12_truncation_keeps_skeleton_intact_neg():
 def test_S12_truncated_without_opt_pos():
     key, wire, res, msg = ok_case()
     resp = skeleton(msg)
-    out = render_signed(resp, res, NOW, max_size=20)
+    rrset = resp.find_rrset(resp.answer, dns.name.from_text("big.example."),
+                            dns.rdataclass.IN, dns.rdatatype.TXT, create=True)
+    rrset.add(dns.rdata.from_text(dns.rdataclass.IN, dns.rdatatype.TXT, '"%s"' % ("x" * 200)))
+    out = render_signed(resp, res, NOW, max_size=300)  # the full answer is above 300
     parsed = client_verify(out, res.request_mac, key)
     assert parsed.flags & dns.flags.TC and parsed.opt is None
     assert len(parsed.question) == 1

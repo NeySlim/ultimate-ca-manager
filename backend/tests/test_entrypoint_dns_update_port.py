@@ -33,6 +33,11 @@ def _run(env):
     {'UCM_DNS_UPDATE_PORT': '8053'},
     {'UCM_DNS_UPDATE_PORT': '1024'},
     {'UCM_DNS_UPDATE_PORT': '65535'},
+    {'UCM_DNS_UPDATE_PORT': '8053 '},
+    {'UCM_DNS_UPDATE_PORT': ' 8053'},
+    {'UCM_DNS_UPDATE_PORT': ' '},
+    {'UCM_DNS_UPDATE_PORT': '00'},
+    {'UCM_DNS_UPDATE_PORT': ' 0 '},
 ])
 def test_accepted(env):
     result = _run(env)
@@ -40,7 +45,8 @@ def test_accepted(env):
     assert result.stdout.strip().endswith('passed')
 
 
-@pytest.mark.parametrize('value', ['53', '1023', '65536', '-1', 'abc', '80.5', '8053/udp', '99999999999999999999'])
+@pytest.mark.parametrize('value', ['53', '1023', '65536', '-1', 'abc', '80.5', '8053/udp', '99999999999999999999',
+                                   '80 53', '8053x', '70000'])
 def test_rejected_value(value):
     result = _run({'UCM_DNS_UPDATE_PORT': value})
     assert result.returncode == 1
@@ -60,5 +66,11 @@ def test_privileged_port_error_names_the_port_mapping():
 ])
 def test_rejected_collision(env):
     result = _run(env)
+    assert result.returncode == 1
+    assert 'same as' in result.stdout
+
+
+def test_collision_is_numeric_after_strip():
+    result = _run({'UCM_DNS_UPDATE_PORT': ' 8443 '})
     assert result.returncode == 1
     assert 'same as' in result.stdout

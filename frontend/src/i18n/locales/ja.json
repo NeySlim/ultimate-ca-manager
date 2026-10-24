@@ -1896,6 +1896,8 @@
       "nameHelp": "この欄を空にすると、UCM がプロキシのパスから名前を生成します。",
       "algorithmHelp": "hmac-sha384 に対応しないクライアントがあります。cert-manager は HMACSHA256 と HMACSHA512 のみ対応し、win-acme は sha384 を誤って計算します。迷う場合は hmac-sha256 を使ってください。",
       "eabNone": "なし (制限なし)",
+      "eabMissing": "EAB 資格情報がありません",
+      "eabMissingHelp": "このキーは、すでに存在しない EAB 資格情報に紐づいていました。どのオーダーにも一致しません。新しいキーを作成してください。",
       "eabHelp": "このキーを、この資格情報で登録された ACME アカウントのオーダーに限定します。",
       "notes": "メモ",
       "notesPlaceholder": "任意。例: キーを使うクライアントやホスト",

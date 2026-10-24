@@ -31,7 +31,7 @@ import OrderDetailPanel from './acme/OrderDetailPanel'
 import CreateAccountForm from './acme/CreateAccountForm'
 import RequestCertificateForm from './acme/RequestCertificateForm'
 import CaAccountsManager from './acme/CaAccountsManager'
-import { effectiveDnsUpdatePort } from './acme/dnsUpdatePort'
+import { effectiveDnsUpdatePort, settingsAfterPortSave } from './acme/dnsUpdatePort'
 import DnsProviderForm from './acme/DnsProviderForm'
 import DomainForm from './acme/DomainForm'
 import LocalDomainForm from './acme/LocalDomainForm'
@@ -375,7 +375,7 @@ export default function ACMEPage() {
   const handleSaveDnsUpdatePort = async (port) => {
     try {
       const res = await acmeService.updateClientSettings({ dns_update_port: port })
-      setClientSettings(prev => ({ ...prev, dns_update_port: port }))
+      setClientSettings(prev => settingsAfterPortSave(prev, port))
       return res
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.settings'))

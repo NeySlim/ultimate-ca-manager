@@ -292,6 +292,21 @@ class DnsUpdateHandler:
         self._watermark = watermark if watermark is not None else TimeWatermark()
         self._replay = replay_cache if replay_cache is not None else ReplayCache(clock=clock)
         self._log = log_sampler if log_sampler is not None else LogSampler()
+        self._index_lock = threading.Lock()
+        self._index_snapshot = None
+        self._by_zone: Dict[str, tuple] = {}
+
+    def _rows_by_zone(self, snapshot) -> Dict[str, tuple]:
+        """Rows of the snapshot grouped by zone text, built once per snapshot object."""
+        with self._index_lock:
+            if snapshot is not self._index_snapshot:
+                index: Dict[str, list] = {}
+                for group in snapshot.by_name.values():
+                    for row in group:
+                        index.setdefault(row.zone_name, []).append(row)
+                self._by_zone = {k: tuple(v) for k, v in index.items()}
+                self._index_snapshot = snapshot
+            return self._by_zone
 
     # -- entry point ---------------------------------------------------------------
 
@@ -436,13 +451,19 @@ class DnsUpdateHandler:
             # 9, 10. Flags are set by make_response; render and apply the size limit.
             if signed:
                 out = tsig.render_signed(resp, result, now_int, max_size=limit)
+                if out is None:
+                    self._log.note("udp_drop", logging.INFO, peer_ip)
             else:
                 out = self._render_unsigned(resp, self._unsigned_limit(wire, msg, tcp), peer_ip)
         except Exception as exc:
             if not signed:
                 raise
             return self._servfail(wire, peer_ip, exc, (msg, result, now_int, limit))
-        if signed and replay_key is not None:
+        # Only real bytes are cached. After a udp_drop the side effects below still run
+        # (the request was valid). A retransmission finds nothing in the cache and is
+        # processed again; its side effects are idempotent (same confirmation, one more
+        # audit row). The client can repeat the request over TCP, which has no limit.
+        if signed and replay_key is not None and out is not None:
             self._replay.put(replay_key, out, transport)
 
         # 11. Side effects and audit; not for a copy that was already processed.
@@ -537,15 +558,21 @@ class DnsUpdateHandler:
         snapshot = self._snapshot_fn()
         qname = question.name
         # No zone at or above the name: REFUSED at once, without a loop over the rows.
-        zones = snapshot.zones
+        snap_zones = snapshot.zones
+        by_zone = self._rows_by_zone(snapshot)
+        rows = []
+        found = False
         probe = qname
-        while len(probe.labels) > 1 and probe.to_text().lower() not in zones:
+        while len(probe.labels) > 1:
+            text = probe.to_text().lower()
+            if text in snap_zones:
+                rows.extend(by_zone.get(text, ()))
+                found = True
             probe = probe.parent()
-        if len(probe.labels) <= 1:
+        if not found:
             resp.set_rcode(dns.rcode.REFUSED)
             return resp
 
-        rows = [row for group in snapshot.by_name.values() for row in group]
         if result.outcome == TsigOutcome.OK:
             scope = self._key_store.scope(result.key.key_id)
             rows = [] if scope is None else [

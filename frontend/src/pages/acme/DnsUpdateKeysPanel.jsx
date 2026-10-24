@@ -231,6 +231,11 @@ export default function DnsUpdateKeysPanel({
                     <Badge variant={key.status === 'active' ? 'success' : 'danger'} size="sm">
                       {key.status === 'active' ? t('acme.dnsUpdate.statusActive') : t('acme.dnsUpdate.statusRevoked')}
                     </Badge>
+                    {key.eab_bound && !key.eab_credential_id && (
+                      <Badge variant="warning" size="sm" title={t('acme.dnsUpdate.eabMissingHelp')} data-testid={`dns-update-eab-missing-${key.id}`}>
+                        <Warning size={10} /> {t('acme.dnsUpdate.eabMissing')}
+                      </Badge>
+                    )}
                     {key.eab_credential_id && (
                       <Badge variant="outline" size="sm">
                         <LockKey size={10} /> {cred ? eabLabel(cred) : `EAB #${key.eab_credential_id}`}

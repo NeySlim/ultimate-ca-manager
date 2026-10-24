@@ -1896,6 +1896,8 @@
       "nameHelp": "If you leave this field empty, UCM generates a name from the proxy path.",
       "algorithmHelp": "Some clients do not support hmac-sha384: cert-manager supports HMACSHA256 and HMACSHA512 only, and win-acme computes sha384 wrongly. Use hmac-sha256 if unsure.",
       "eabNone": "None (no limit)",
+      "eabMissing": "EAB credential missing",
+      "eabMissingHelp": "This key was bound to an EAB credential that no longer exists. It matches no order. Create a new key.",
       "eabHelp": "Limits the key to orders of the ACME account registered with this credential.",
       "notes": "Notes",
       "notesPlaceholder": "Optional, for example the client or host that uses the key",

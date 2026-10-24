@@ -18,3 +18,14 @@ export function effectiveDnsUpdatePort(clientSettings) {
   const port = Number(clientSettings?.dns_update_port_effective)
   return Number.isInteger(port) && port > 0 ? port : 0
 }
+
+/**
+ * Settings after a successful port save. Without an environment override the
+ * saved port is also the port of the next start (0 = off). With an override the
+ * effective port stays as the server computed it.
+ */
+export function settingsAfterPortSave(prev, port) {
+  const next = { ...prev, dns_update_port: port }
+  if (prev?.dns_update_port_env == null) next.dns_update_port_effective = port
+  return next
+}

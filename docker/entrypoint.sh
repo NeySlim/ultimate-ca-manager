@@ -214,17 +214,25 @@ if ! validate_port "$UCM_HTTP_PORT"; then
     exit 1
 fi
 
-# Validate the DNS UPDATE (RFC 2136) listener port. Unset or 0 = listener off.
-if [ -n "${UCM_DNS_UPDATE_PORT:-}" ] && [ "$UCM_DNS_UPDATE_PORT" != "0" ]; then
-    if ! validate_unprivileged_port "$UCM_DNS_UPDATE_PORT"; then
-        echo -e "${RED}❌ Invalid DNS UPDATE port: $UCM_DNS_UPDATE_PORT${NC}"
+# Validate the DNS UPDATE (RFC 2136) listener port. Unset, blank or 0 = listener off.
+# The application strips the value and reads a blank value as unset: do the same here.
+DNS_UPDATE_PORT_VALUE="${UCM_DNS_UPDATE_PORT:-}"
+DNS_UPDATE_PORT_VALUE="${DNS_UPDATE_PORT_VALUE#"${DNS_UPDATE_PORT_VALUE%%[![:space:]]*}"}"
+DNS_UPDATE_PORT_VALUE="${DNS_UPDATE_PORT_VALUE%"${DNS_UPDATE_PORT_VALUE##*[![:space:]]}"}"
+# An all-digit value of 0 (for example 00) is off. Compare in base 10 (no octal).
+if [[ "$DNS_UPDATE_PORT_VALUE" =~ ^[0-9]+$ ]] && [ "$((10#$DNS_UPDATE_PORT_VALUE))" -eq 0 ] 2>/dev/null; then
+    DNS_UPDATE_PORT_VALUE=""
+fi
+if [ -n "$DNS_UPDATE_PORT_VALUE" ]; then
+    if ! validate_unprivileged_port "$DNS_UPDATE_PORT_VALUE"; then
+        echo -e "${RED}❌ Invalid DNS UPDATE port: $DNS_UPDATE_PORT_VALUE${NC}"
         echo "   UCM_DNS_UPDATE_PORT must be 0 (off) or an integer from 1024 to 65535."
         echo "   The container runs as an unprivileged user and cannot bind port 53."
         echo "   To serve port 53, keep the default 8053 and map it: -p 53:8053/udp -p 53:8053/tcp"
         exit 1
     fi
-    if [ "$UCM_DNS_UPDATE_PORT" -eq "$UCM_HTTPS_PORT" ] || [ "$UCM_DNS_UPDATE_PORT" -eq "$UCM_HTTP_PORT" ]; then
-        echo -e "${RED}❌ DNS UPDATE port $UCM_DNS_UPDATE_PORT is the same as the HTTPS or HTTP port${NC}"
+    if [ "$((10#$DNS_UPDATE_PORT_VALUE))" -eq "$((10#$UCM_HTTPS_PORT))" ] || [ "$((10#$DNS_UPDATE_PORT_VALUE))" -eq "$((10#$UCM_HTTP_PORT))" ]; then
+        echo -e "${RED}❌ DNS UPDATE port $DNS_UPDATE_PORT_VALUE is the same as the HTTPS or HTTP port${NC}"
         exit 1
     fi
 fi

@@ -107,6 +107,28 @@ describe('DnsUpdateKeysPanel', () => {
     expect(mocks.list).toHaveBeenCalledWith(7)
   })
 
+  it('warns when an EAB-bound key lost its credential', async () => {
+    mocks.list.mockResolvedValue({ data: [key(1, { eab_bound: true, eab_credential_id: null })] })
+    renderPanel()
+    const badge = await screen.findByTestId('dns-update-eab-missing-1')
+    expect(within(badge).getByText('acme.dnsUpdate.eabMissing')).toBeInTheDocument()
+    expect(badge).toHaveAttribute('title', 'acme.dnsUpdate.eabMissingHelp')
+  })
+
+  it('shows no EAB warning for a key that was never bound', async () => {
+    mocks.list.mockResolvedValue({ data: [key(1, { eab_bound: false, eab_credential_id: null })] })
+    renderPanel()
+    await screen.findByTestId('dns-update-key-1')
+    expect(screen.queryByText('acme.dnsUpdate.eabMissing')).not.toBeInTheDocument()
+  })
+
+  it('shows the EAB badge, not the warning, for a key with its credential', async () => {
+    mocks.list.mockResolvedValue({ data: [key(1, { eab_bound: true, eab_credential_id: 3 })] })
+    renderPanel()
+    expect(await screen.findByText('ci-runner')).toBeInTheDocument()
+    expect(screen.queryByText('acme.dnsUpdate.eabMissing')).not.toBeInTheDocument()
+  })
+
   it('creates a key with the chosen algorithm and EAB credential and shows the secret once', async () => {
     const user = userEvent.setup()
     renderPanel()

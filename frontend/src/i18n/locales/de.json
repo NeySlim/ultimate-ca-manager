@@ -1896,6 +1896,8 @@
       "nameHelp": "Wenn Sie das Feld leer lassen, erzeugt UCM einen Namen aus dem Proxy-Pfad.",
       "algorithmHelp": "Manche Clients unterstützen hmac-sha384 nicht: cert-manager unterstützt nur HMACSHA256 und HMACSHA512, und win-acme berechnet sha384 falsch. Im Zweifel hmac-sha256 verwenden.",
       "eabNone": "Keine (ohne Einschränkung)",
+      "eabMissing": "EAB-Zugangsdaten fehlen",
+      "eabMissingHelp": "Dieser Schlüssel war an EAB-Zugangsdaten gebunden, die nicht mehr existieren. Er passt zu keiner Bestellung. Erstellen Sie einen neuen Schlüssel.",
       "eabHelp": "Beschränkt den Schlüssel auf Orders des ACME-Kontos, das mit diesen Zugangsdaten registriert wurde.",
       "notes": "Notizen",
       "notesPlaceholder": "Optional, z. B. der Client oder Host, der den Schlüssel verwendet",

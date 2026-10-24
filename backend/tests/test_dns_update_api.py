@@ -18,6 +18,15 @@ PORT_KEY = 'acme.proxy.dns_update_port'
 TLS_KEY = 'acme.client.tls_alpn_port'
 
 
+@pytest.fixture(autouse=True)
+def _fresh_port_warnings():
+    """The port warnings are logged once per value: each test starts clean."""
+    from services.acme.dns_update import status
+    status._warned.clear()
+    yield
+    status._warned.clear()
+
+
 @pytest.fixture
 def env(app):
     from services.acme.dns_update.keys import key_store
@@ -750,3 +759,137 @@ def test_D4d_effective_port_from_db_without_env_pos(auth_client, app, env, monke
         _set_cfg(PORT_KEY, '8053')
     assert _data(auth_client.get('/api/v2/acme/client/settings'))[
         'dns_update_port_effective'] == 8053
+
+
+# ------------------------------------------------------------------- F3
+
+def _warm_row(app, acct_id, tag):
+    """A pending order and an expected value of the account, in the real cache."""
+    from datetime import timedelta
+    from models import AcmeClientOrder
+    from models.acme_dns_update import AcmeProxyDnsChallenge
+    from utils.datetime_utils import utc_now
+    order = AcmeClientOrder(
+        domains=json.dumps([f'{tag}.example.com']), environment='staging',
+        challenge_type='dns-01', status='pending', is_proxy_order=True,
+        order_url=f'https://u.example/o/{tag}', account_id=f'acct-{tag}',
+        client_jwk_thumbprint=f'thumb-{tag}', acme_client_account_id=acct_id)
+    db.session.add(order)
+    db.session.commit()
+    row = AcmeProxyDnsChallenge(
+        order_id=order.id, client_jwk_thumbprint=f'thumb-{tag}',
+        identifier=f'{tag}.example.com', record_name=f'_acme-challenge.{tag}.example.com.',
+        txt_value=f'v-{tag}', zone_name='example.com.', acme_client_account_id=acct_id,
+        account_id=f'acct-{tag}', expires_at=utc_now() + timedelta(hours=1))
+    db.session.add(row)
+    db.session.commit()
+    return order.id, row.id
+
+
+def _cached_account_ids():
+    from services.acme.dns_update import records
+    snap = records.get_active_snapshot()
+    return {r.acme_client_account_id for group in snap.by_name.values() for r in group}
+
+
+def _drop_orders(order_ids):
+    from models import AcmeClientOrder
+    from models.acme_dns_update import AcmeProxyDnsChallenge
+    AcmeProxyDnsChallenge.query.filter(AcmeProxyDnsChallenge.order_id.in_(order_ids)).delete(
+        synchronize_session=False)
+    AcmeClientOrder.query.filter(AcmeClientOrder.id.in_(order_ids)).delete(
+        synchronize_session=False)
+    db.session.commit()
+
+
+def test_F3_account_delete_drops_its_rows_from_warm_cache_pos(auth_client, app, env):
+    from services.acme.dns_update import records
+    acct = env.make_account()
+    with app.app_context():
+        order_id, _row = _warm_row(app, acct, 'f3a')
+        try:
+            records.invalidate_cache()
+            assert acct in _cached_account_ids()  # the cache is warm with the row
+            assert auth_client.delete(f'/api/v2/acme/client/accounts/{acct}').status_code == 200
+            assert acct not in _cached_account_ids()  # no wait for the 5 s age
+        finally:
+            _drop_orders([order_id])
+            records.invalidate_cache()
+
+
+def test_F3_deleting_another_account_leaves_the_row_neg(auth_client, app, env):
+    from services.acme.dns_update import records
+    acct, other = env.make_account(), env.make_account()
+    with app.app_context():
+        order_id, _row = _warm_row(app, acct, 'f3b')
+        try:
+            records.invalidate_cache()
+            assert acct in _cached_account_ids()
+            assert auth_client.delete(f'/api/v2/acme/client/accounts/{other}').status_code == 200
+            assert acct in _cached_account_ids()
+        finally:
+            _drop_orders([order_id])
+            records.invalidate_cache()
+
+
+# ------------------------------------------------------------------- F4
+
+def test_F4_same_invalid_env_warns_once_pos(app, env, monkeypatch, caplog):
+    from services.acme.dns_update.status import get_dns_update_port
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '70000')
+    with app.app_context(), caplog.at_level(logging.WARNING):
+        assert get_dns_update_port() == 0
+        assert get_dns_update_port() == 0
+    assert len([r for r in caplog.records if 'UCM_DNS_UPDATE_PORT' in r.getMessage()]) == 1
+
+
+def test_F4_other_invalid_value_warns_again_neg(app, env, monkeypatch, caplog):
+    from services.acme.dns_update.status import get_dns_update_port
+    with app.app_context(), caplog.at_level(logging.WARNING):
+        monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '70000')
+        get_dns_update_port()
+        monkeypatch.setenv('UCM_DNS_UPDATE_PORT', 'abc')
+        assert get_dns_update_port() == 0
+        monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '53')
+        assert get_dns_update_port() == 53
+        get_dns_update_port()
+    messages = [r.getMessage() for r in caplog.records]
+    assert len(messages) == 3
+    assert any('abc' in m for m in messages) and any('CAP_NET_BIND_SERVICE' in m for m in messages)
+
+
+# ------------------------------------------------------------------- F5
+
+def test_F5_settings_get_reads_stored_port_once_pos(auth_client, app, env, monkeypatch):
+    from sqlalchemy import event
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    with app.app_context():
+        _set_cfg(PORT_KEY, '8053')
+    hits = []
+
+    def _count(conn, cursor, statement, parameters, *_a):
+        if 'system_config' in statement and PORT_KEY in repr(parameters):
+            hits.append(statement)
+
+    event.listen(db.engine, 'before_cursor_execute', _count)
+    try:
+        resp = auth_client.get('/api/v2/acme/client/settings')
+    finally:
+        event.remove(db.engine, 'before_cursor_execute', _count)
+    assert resp.status_code == 200
+    assert len(hits) == 1
+    data = _data(resp)
+    assert data['dns_update_port'] == 8053 and data['dns_update_port_effective'] == 8053
+
+
+def test_F5_explicit_stored_value_is_used_without_db_read_neg(app, env, monkeypatch):
+    from services.acme.dns_update.status import get_dns_update_port
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    with app.app_context():
+        _set_cfg(PORT_KEY, '8053')
+        assert get_dns_update_port() == 8053
+        assert get_dns_update_port(0) == 0  # the given value wins, no new read
+        assert get_dns_update_port(9000) == 9000
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '8054')
+    with app.app_context():
+        assert get_dns_update_port(9000) == 8054  # env still wins

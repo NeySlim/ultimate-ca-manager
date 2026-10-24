@@ -534,3 +534,21 @@ Runda 2 `/code-review` (17 ustaleń):
 
 Bez zmian: CR2-14 (druga funkcja wartości TXT: unika cyklu importów, test R1 pilnuje zgodności), CR2-16 (dwie funkcje obcięcia odpowiedzi: podpisana odpowiedź TC ma RCODE NOERROR wg RFC 8945 §5.3, niepodpisana zachowuje RCODE), CR2-17 (haki proxy na sesji żądania: obecne miejsca wywołania nie mają niezapisanych zmian, a CR2-13 usuwa zbędne commity).
 
+Runda 3 `/code-review` (15 ustaleń):
+
+| ID | Problem | Zmiana |
+|---|---|---|
+| CR3-1 | Po zapisie portu UI pokazywał w przykładach stary port do przeładowania strony | port efektywny aktualizowany po zapisie, gdy nie ma zmiennej środowiskowej |
+| CR3-2 | Entrypoint odrzucał wartości, które aplikacja przyjmuje (spacje, pusta wartość, `00`) | ta sama normalizacja w entrypoint i w aplikacji |
+| CR3-3 | Adres IPv6 w nawiasach w przykładach certbot, acme.sh, Posh-ACME, win-acme | adres bez nawiasów; nawiasy tylko w formie `host:port` |
+| CR3-4 | Podpisana odpowiedź TC (RFC 8945 §5.3), która nadal przekracza limit UDP, była wysyłana | brak odpowiedzi; nic w pamięci powtórek |
+| CR3-5 | Wpis podsumowania pominiętych przyjętych żądań był zapisany jako `unauthenticated` i błąd | nazwa klucza i sukces |
+| CR3-6 | Usunięcie konta proxy nie unieważniało pamięci wierszy | unieważnienie po commit |
+| CR3-7 | UI nie pokazywał klucza z EAB, który stracił poświadczenie | ostrzeżenie przy kluczu (9 języków) |
+| CR3-8 | Dokumentacja BADTIME pomijała znacznik czasu klucza (S7) | opis i zalecenie: osobny klucz dla każdego klienta |
+| CR3-9 | Ostrzeżenie o porcie ze zmiennej przy każdym odczycie ustawień | jedno ostrzeżenie dla wartości |
+| CR3-10 | Zapytanie SOA przeglądało wszystkie wiersze | indeks wierszy według strefy, raz na migawkę; najgłębsza strefa wygrywa |
+| CR3-12, 15 | Podwójny odczyt portu; zmienna lokalna przesłaniała moduł `zones` | jeden odczyt; zmiana nazwy |
+
+Bez zmian: CR3-11 (trzy commity na przyjęte żądanie: `last_used_at` najwyżej raz na 60 s, osobny wpis audytu z założenia, N12), CR3-13 (jawne unieważnienia pamięci, jak w innych pamięciach UCM; brakujące miejsce poprawione w CR3-6), CR3-14 (trzy pamięci podręczne mają celowo różne zachowanie przy błędzie: klucze fail closed, strefy i wiersze poprzedni stan).
+

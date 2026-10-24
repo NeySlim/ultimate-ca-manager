@@ -234,7 +234,7 @@ send
 EOF
 ```
 
-`zone` makes `nsupdate` skip the SOA query. `REFUSED` here is normal for a value that no pending order expects. `BADKEY`, `BADSIG` and `BADTIME` mean a key, secret or clock problem. See the table in the Admin Guide.
+`zone` makes `nsupdate` skip the SOA query. `REFUSED` here is normal for a value that no pending order expects. `BADKEY`, `BADSIG` and `BADTIME` mean a key, secret or clock problem. `BADTIME` with correct clocks means that several clients share one key: give each client its own key. See the table in the Admin Guide.
 
 Messages of the clients that can mislead:
 

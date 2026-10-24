@@ -8,7 +8,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 import DnsUpdatePortField from '../DnsUpdatePortField'
-import { parseDnsUpdatePort, effectiveDnsUpdatePort } from '../dnsUpdatePort'
+import { parseDnsUpdatePort, effectiveDnsUpdatePort, settingsAfterPortSave } from '../dnsUpdatePort'
 
 const onSave = vi.fn()
 const renderField = (settings = {}, props = {}) => render(
@@ -122,5 +122,23 @@ describe('DnsUpdatePortField', () => {
     renderField({}, { canWrite: false })
     expect(screen.queryByRole('button', { name: 'common.save' })).not.toBeInTheDocument()
     expect(input()).toBeDisabled()
+  })
+})
+
+describe('settingsAfterPortSave', () => {
+  it('without an environment override the saved port becomes the effective port', () => {
+    const prev = { dns_update_port: 0, dns_update_port_env: null, dns_update_port_effective: 0 }
+    expect(settingsAfterPortSave(prev, 8053)).toMatchObject({ dns_update_port: 8053, dns_update_port_effective: 8053 })
+    expect(settingsAfterPortSave({ dns_update_port: 8053 }, 9053).dns_update_port_effective).toBe(9053)
+  })
+
+  it('an environment override keeps the effective port', () => {
+    const prev = { dns_update_port: 0, dns_update_port_env: '9000', dns_update_port_effective: 9000 }
+    expect(settingsAfterPortSave(prev, 8053)).toMatchObject({ dns_update_port: 8053, dns_update_port_effective: 9000 })
+  })
+
+  it('saving 0 turns the effective port off', () => {
+    const prev = { dns_update_port: 8053, dns_update_port_env: null, dns_update_port_effective: 8053 }
+    expect(settingsAfterPortSave(prev, 0)).toMatchObject({ dns_update_port: 0, dns_update_port_effective: 0 })
   })
 })

@@ -101,7 +101,7 @@ class AuditSink:
                 else:
                     win[2] += 1
             if summary_dropped:
-                self._write(SUPPRESSED_ACTION, None, False,
+                self._write(SUPPRESSED_ACTION, key_s or None, True,
                             {'reason': 'accepted', 'keyname': key_s, 'dropped': summary_dropped},
                             ip=None)
             if not allowed:

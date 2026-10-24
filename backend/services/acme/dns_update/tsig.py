@@ -317,8 +317,11 @@ def _truncated_form(response: dns.message.Message) -> dns.message.Message:
 
 
 def render_signed(response: dns.message.Message, result: TsigResult, now: int,
-                  max_size: Optional[int] = None) -> bytes:
-    """Render a response and sign it with the key of the request."""
+                  max_size: Optional[int] = None) -> Optional[bytes]:
+    """Render a response and sign it with the key of the request.
+
+    An oversize response becomes the truncated form of RFC 8945 §5.3. When even
+    that form is larger than ``max_size``, the result is None (no response)."""
     key = _require_key(result)
     template = _tsig_rdata(key.algorithm, now, RESPONSE_FUDGE, b"", response.id, 0)
     # The size limit is the caller's max_size, not the EDNS payload that dnspython
@@ -332,6 +335,8 @@ def render_signed(response: dns.message.Message, result: TsigResult, now: int,
     if out is None or (max_size is not None and len(out) > max_size):
         out = _sign_and_append(_truncated_form(response).to_wire(max_size=_WIRE_LIMIT), key,
                                template, now, result.request_mac)
+        if max_size is not None and len(out) > max_size:
+            return None
     return out
 
 

@@ -30,9 +30,13 @@ export const certManagerAlgorithm = (algorithm) => {
 // win-acme parses the name of its TSigAlgorithm enum: Sha256, not hmac-sha256.
 const winAcmeAlgorithm = (algorithm) => algorithm.replace('hmac-', '')
 
+// host:port form (lego, cert-manager): an IPv6 address needs brackets.
+const hostPort = (host, port) => (host.includes(':') ? `[${host}]:${port}` : `${host}:${port}`)
+
 export function hostFromBase(base) {
   try {
-    const host = new URL(base).hostname
+    // URL keeps the brackets of an IPv6 literal. The clients need the bare address.
+    const host = new URL(base).hostname.replace(/^\[(.*)\]$/, '$1')
     return host || 'ucm.example.com'
   } catch {
     return 'ucm.example.com'
@@ -77,7 +81,7 @@ export function buildDnsUpdateSnippets({
       '    solvers:',
       '      - dns01:',
       '          rfc2136:',
-      `            nameserver: ${host}:${port}`,
+      `            nameserver: ${hostPort(host, port)}`,
       `            tsigKeyName: ${keyName}`,
       `            tsigAlgorithm: ${cmAlgorithm}`,
       '            tsigSecretSecretRef:',
@@ -126,7 +130,7 @@ export function buildDnsUpdateSnippets({
     {
       id: 'lego',
       code: [
-        `export DNSUPDATE_NAMESERVER="${host}:${port}"`,
+        `export DNSUPDATE_NAMESERVER="${hostPort(host, port)}"`,
         `export DNSUPDATE_TSIG_KEY="${keyName}"`,
         `export DNSUPDATE_TSIG_SECRET="${secret}"`,
         `export DNSUPDATE_TSIG_ALGORITHM="${algorithm}."`,
