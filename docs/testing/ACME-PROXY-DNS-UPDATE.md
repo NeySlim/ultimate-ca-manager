@@ -162,6 +162,17 @@ cert-manager: a Go program calls `rfc2136.NewDNSProviderCredentials` of cert-man
 
 win-acme and Posh-ACME were not run (Windows). Their message forms (trial updates from the registrable domain, TTL 60, delete class NONE, `nsupdate` for Posh-ACME) are covered by the handler tests and by the `nsupdate` runs.
 
+### miekg/dns (cert-manager, lego)
+
+cert-manager v1.21.3 and lego v4.35.2 use `github.com/miekg/dns` v1.1.72. Facts from its source:
+
+- `tsig.go`, `stripTsig`: a response with the header code `NOTAUTH` (9) gives `ErrAuth` ("bad authentication") before any MAC check. RFC 8945 puts every TSIG error under this header code, and RFC 2136 uses the same code for "not authoritative for the zone". So the client message is the same for `BADKEY`, `BADSIG`, `BADTIME` and a zone that is not in ACME Domains. The audit log of UCM tells them apart.
+- `client.go`, `Exchange`: one new connection per message, closed after the answer.
+- PR [miekg/dns#1316](https://github.com/miekg/dns/pull/1316) (merged 2021): the server side of the library does not sign `BADKEY` and `BADSIG` answers (RFC 8945 §5.3.2), the same rule as the UCM listener.
+- PR [miekg/dns#1654](https://github.com/miekg/dns/pull/1654) (closed without merge, 2026-01): a client that requires a TSIG record on every non-FORMERR answer to a signed request. UCM signs the answers it builds for a request with a valid TSIG, and its `BADKEY`/`BADSIG` answers carry a TSIG record with an empty MAC, so this change would not break normal use of UCM.
+
+The README of the GitHub repository says that it gets only specific fixes and that version 2 is at `codeberg.org/miekg/dns`. In v2 (checked: v0.6.121), `TSIGVerify` returns `ErrKey` for `BADKEY` and `ErrSig` for `BADSIG` and has no `NOTAUTH` shortcut, and `Client.Exchange` does not sign or verify TSIG by itself. A client that moves to v2 can show other messages.
+
 ### TSIG on one TCP connection (miekg/dns#1733)
 
 The issue [miekg/dns#1733](https://github.com/miekg/dns/issues/1733) (open on 2026-10-24) is about a client that sends several signed messages on one TCP connection. RFC 8945 §5.3.1 chains the prior MAC only for the messages of one multi-message response (for example a zone transfer). Each independent request is signed as a first message (§4.3.1: the request MAC is used only for the response). The listener verifies each request on its own and keeps no TSIG state per connection.
