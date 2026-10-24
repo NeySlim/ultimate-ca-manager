@@ -88,6 +88,7 @@ Zasada: cała logika protokołu jest w `handler.py` i `tsig.py`. Te moduły nie 
 | `client_jwk_thumbprint` | thumbprint klienta (RFC 7638) |
 | `identifier` | domena bez `*.` |
 | `record_name` | `_acme-challenge.<identifier>.`, małe litery |
+| `zone_name` | D: apex z „ACME → Domains” (`find_provider_for_domain(identifier)`, bez `*.`), liczony przy zapisie wiersza; dzięki temu odpowiedź SOA nie wymaga zapytania do DB |
 | `txt_value` | `base64url(SHA-256(token "." thumbprint))`, 43 znaki |
 | `upstream_challenge_url` | do diagnostyki |
 | `status` | `pending` / `closed` |

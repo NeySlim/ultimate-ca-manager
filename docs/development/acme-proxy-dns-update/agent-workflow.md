@@ -147,4 +147,42 @@ Every CLI flag, env var, file name and config key you write must be verified in 
 
 ### 5.5 Prompty dla PR 2
 
-Prompty dla części 2–9 planu powstaną z sekcji 2–7 planu. Każdy prompt zawiera: ID niezmienników z tabeli (z kolumnami P i N), kolejność przetwarzania z sekcji 3, decyzje z sekcji 5, pliki do zmiany i polecenia testów. Dopiszę je tutaj, gdy powstaną.
+Prompty dla części 2–9 planu powstają z sekcji 2–7 i 11 planu. Każdy prompt zawiera: ID niezmienników z tabeli (z kolumnami P i N), kolejność przetwarzania z sekcji 3, decyzje z sekcji 5, ustalenia security review z sekcji 11, pliki do zmiany, pliki, których agent nie może zmieniać (praca równoległa), i polecenia testów.
+
+Części 2 i 3 nie zależą od siebie, więc działają równolegle w tym samym worktree, na rozłącznych plikach.
+
+#### Część 3: moduł TSIG (`implementer`, Sonnet, medium)
+
+Najważniejsze elementy promptu:
+
+- dokładne publiczne API modułu (`TsigKeyMaterial`, `TsigOutcome`, `TsigResult`, `TimeWatermark`, `verify_request`, funkcje `render_*`), żeby handler w części 5 mógł z nich korzystać bez zgadywania;
+- kolejność weryfikacji krok po kroku z numerami sekcji RFC 8945 (§5.2: klucz, rozmiar MAC, MAC, czas, skrócenie) i z ustaleniami F5, F9, F11;
+- zakaz polegania na automatycznym podpisie dnspython (podpisuje czasem serwera i złym MAC żądania dla odpowiedzi z błędem);
+- wymóg **niezależnej** weryfikacji MAC w testach: test liczy HMAC modułem `hmac` z elementów z RFC 8945 §4.3, a nie funkcją dnspython, którą testuje;
+- dla każdego ID z tabeli S: test `_pos` i `_neg`, z opisem, co test negatywny zmienia.
+
+Fragment o kolejności (dosłownie):
+
+```text
+## verify_request — exact order (RFC 8945 §5.2), no shortcuts
+0. No TSIG in msg → `UNSIGNED`.
+1. rdata.error != 0 → `FORMERR` (§4.2: "In requests, this MUST be zero"; §5.2: cannot be interpreted).
+2. Key check (§5.2.1): `key = lookup_key(owner)`; `None` → `BADKEY`. `rdata.algorithm != key.algorithm` or `key.algorithm not in ALLOWED_TSIG_ALGORITHMS` → `BADKEY`. (Also BADKEY if key.secret is empty — defense in depth, F4.)
+3. MAC size (§5.2.2.1), with `full = dns.tsig.mac_sizes[key.algorithm]`, `m = len(rdata.mac)`: `m > full` → `FORMERR`; `m < max(10, full // 2)` → `FORMERR` (this includes m == 0 in a request).
+4. MAC check (§5.2.2):
+   - `m == full`: call public `dns.tsig.validate(wire, dnspython_key, owner, rdata, rdata.time_signed, b"", tsig_start_offset(wire))`. Passing `now=rdata.time_signed` neutralises its time check (dnspython checks time BEFORE the MAC, which contradicts §5.2 order; the spike proves this works).
+   - `m < full` (truncated, allowed range): build the request wire without the TSIG RR, compute the full MAC with public `dns.tsig.sign(...)` and compare with `hmac.compare_digest(full_mac[:m], rdata.mac)`. Mismatch → `BADSIG` (F5: never reach a signed response without a validated MAC).
+5. Time check (§5.2.3, §10): `window = min(rdata.fudge, MAX_FUDGE)`; `abs(now - rdata.time_signed) > window` → `BADTIME`; `watermark.is_older(key.key_id, rdata.time_signed)` → `BADTIME`.
+6. Truncation policy (§5.2.4): `m < full` → `BADTRUNC` (local policy requires the full MAC).
+7. `watermark.record(key.key_id, rdata.time_signed)`; return `OK`.
+```
+
+#### Część 2: modele, migracja 111, sprzątanie kluczy (`implementer`, Sonnet, medium)
+
+Najważniejsze elementy promptu:
+
+- kolumny, ograniczenia i indeksy obu tabel z planu (2.1);
+- szyfrowanie sekretu tą samą warstwą co HMAC EAB, ale getter zwraca `None` przy błędzie odszyfrowania, **nigdy** szyfrogram (F4, K7);
+- migracja dla SQLite i PostgreSQL według istniejących wzorców (027, 078, 110) i reguł `migration_runner.py`;
+- usuwanie kluczy w kodzie przy usunięciu EAB i konta proxy, bo SQLite w UCM nie wymusza kluczy obcych (F2, F3, K8, K9) — agent ma to sprawdzić, a nie przyjąć;
+- testy `_pos`/`_neg` dla K2, K3, K5, K8, K9 i ograniczenia UNIQUE, także przez API (usunięcie EAB i konta).
