@@ -11,7 +11,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
-- ACME proxy: an optional DNS UPDATE (RFC 2136) listener, off by default, so that cert-manager, lego, certbot, acme.sh, win-acme and Posh-ACME can answer DNS-01 challenges through TSIG-signed updates. It has per-account keys and no effect on DNS: UCM still publishes the records. The Docker image exposes `8053/udp` and `8053/tcp`, the Helm chart has a separate `dnsUpdate` Service (chart 0.4.0), and the Admin Guide and `docs/integrations/acme-proxy-dns-update.md` describe it (#416).
+- ACME proxy: optional DNS UPDATE (RFC 2136) listener, off by default, so standard rfc2136 solvers can answer DNS-01 through the proxy with per-account TSIG keys (#416).
+
+### Fixed
+
+- ACME proxy: a challenge response now carries `Link: rel="up"` even when the upstream CA omits it (Pebble), which certbot and lego require (#420, reported by @WMP).
+
+### Documentation
+
+- New guide `docs/integrations/acme-proxy-clients.md`: how to use the ACME proxy from hosts without DNS API access, with a no-op DNS-01 step for certbot, acme.sh, lego, cert-manager (stub acme-dns example in `examples/kubernetes/cert-manager/`), win-acme and Posh-ACME, and the DNS resolver limits of each client (#416).
 
 ## [2.245] - 2026-10-23
 

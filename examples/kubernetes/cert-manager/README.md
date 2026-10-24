@@ -12,6 +12,7 @@ for any Kubernetes workload using your private UCM-managed CA.
 | `clusterissuer-ucm-dns01.yaml` | ClusterIssuer for DNS-01 + EAB (wildcards, internal-only workloads) |
 | `clusterissuer-ucm-proxy-rfc2136.yaml` | Secret + ClusterIssuer for the UCM ACME proxy with DNS-01 through the UCM DNS UPDATE (RFC 2136) listener |
 | `eab-secret.yaml` | Holds the HMAC for External Account Binding |
+| `clusterissuer-ucm-proxy-acmedns-stub.yaml` | ACME **proxy** (UCM gets the certificate from an external CA): stub acme-dns solver, ClusterIssuer |
 | `certificate-example.yaml` | Sample `Certificate` (single-host + wildcard) |
 
 ## Prerequisites
@@ -85,6 +86,29 @@ kubectl wait --for=condition=Ready clusterissuer/ucm-acme-dns01 --timeout=60s
 kubectl apply -f certificate-example.yaml
 kubectl wait --for=condition=Ready certificate/wildcard-example --timeout=300s
 ```
+
+## ACME proxy (UCM obtains certificates from an external CA)
+
+UCM can also act as an ACME proxy: cert-manager asks UCM at
+`https://<ucm-host>:8443/acme/proxy/<slug>/directory`, and UCM gets the
+certificate from an external CA such as Let's Encrypt. UCM creates the
+`_acme-challenge` TXT record itself through the DNS provider set in
+**ACME → Domains**, so the cluster needs no DNS credentials.
+
+cert-manager has no no-op solver, so `clusterissuer-ucm-proxy-acmedns-stub.yaml`
+uses the built-in `acmeDNS` solver with a small nginx stub that answers
+every update call with HTTP 200.
+
+```bash
+# Edit the file: UCM host and slug, e-mail, domain names in the Secret.
+kubectl apply -f clusterissuer-ucm-proxy-acmedns-stub.yaml
+kubectl wait --for=condition=Ready clusterissuer/ucm-acme-proxy --timeout=60s
+```
+
+cert-manager still checks that the TXT record is visible. If the cluster DNS does
+not see the public zone, set `--dns01-recursive-nameservers` and
+`--dns01-recursive-nameservers-only` on the controller. Details, other clients,
+and troubleshooting: [docs/integrations/acme-proxy-clients.md](../../../docs/integrations/acme-proxy-clients.md).
 
 ## DNS-01 through the UCM ACME proxy (DNS UPDATE listener)
 

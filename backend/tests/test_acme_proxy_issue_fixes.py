@@ -86,6 +86,52 @@ class TestAuthzLinkNotDoubled:
         assert link.count('/acme/proxy/') == 1
 
 
+class TestChallengeUpLinkFallback:
+    """#420 — an upstream CA that omits Link rel="up" on the challenge response
+    (Pebble) still yields one: certbot and lego refuse a response without it."""
+
+    AUTHZ = f'{UPSTREAM}/authZ/abc'
+    CHALL = f'{UPSTREAM}/chalZ/def'
+
+    def _respond(self, app, monkeypatch, upstream_headers, status='valid'):
+        from services.acme.acme_proxy_service import _challenge_order_cache
+        svc = _make_service(app)
+        order = _seed_proxy_order(
+            upstream_authz_urls=json.dumps([self.AUTHZ]),
+            account_id='acct-up', client_jwk_thumbprint='thumb-up',
+        )
+        if status == 'pending':
+            order.set_challenges_dict({self.CHALL: {'status': 'initiated'}})
+            db.session.commit()
+        # What get_authz records for the challenges of an authorization.
+        _challenge_order_cache.put(
+            svc._challenge_cache_key(self.CHALL, 'acct-up', 'thumb-up'),
+            (order.id, 'proxy-fix.test', self.AUTHZ),
+        )
+        resp = SimpleNamespace(
+            status_code=200, headers=upstream_headers, text='',
+            json=lambda: {'type': 'dns-01', 'url': self.CHALL,
+                          'status': status, 'token': 't'},
+        )
+        monkeypatch.setattr(svc, '_post_with_account', lambda *_a, **_k: resp)
+        return svc.respond_challenge(
+            _b64(self.CHALL), requester_account_id='acct-up',
+            requester_thumbprint='thumb-up')
+
+    @pytest.mark.parametrize('status', ['valid', 'processing', 'pending'])
+    def test_missing_upstream_link_falls_back_to_known_authz(self, app, monkeypatch, status):
+        with app.app_context():
+            _data, link = self._respond(app, monkeypatch, {}, status=status)
+        assert link == f'<https://ucm.example/acme/proxy/authz/{_b64(self.AUTHZ)}>;rel="up"'
+
+    def test_upstream_link_wins_over_known_authz(self, app, monkeypatch):
+        other = f'{UPSTREAM}/authZ/other'
+        with app.app_context():
+            _data, link = self._respond(
+                app, monkeypatch, {'Link': f'<{other}>;rel="up"'})
+        assert link == f'<https://ucm.example/acme/proxy/authz/{_b64(other)}>;rel="up"'
+
+
 class TestCertificateUrlPersistence:
     """#219 — persisted certificate_url enables an indexed order lookup."""
 

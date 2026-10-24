@@ -1,0 +1,193 @@
+# ClusterIssuer for UCM's ACME *proxy* (UCM obtains the certificate from an
+# external CA such as Let's Encrypt), with a stub acme-dns server as the
+# DNS-01 solver.
+#
+# Why a stub: cert-manager has no script or no-op solver, and a DNS-01
+# challenge needs one. With the UCM ACME proxy, UCM itself creates the
+# _acme-challenge TXT record through the DNS provider set in ACME -> Domains.
+# cert-manager therefore has nothing to do in its solver step. The built-in
+# `acmeDNS` solver only sends `POST <host>/update` and accepts any 2xx
+# answer, so a small web server that always answers 200 is enough.
+#
+# Prerequisites:
+#   - cert-manager installed in the `cert-manager` namespace.
+#   - The domain (or a parent) is in UCM ACME -> Domains with a DNS provider.
+#   - An upstream CA account in UCM with "Expose via ACME proxy" enabled;
+#     its slug goes into `spec.acme.server` below.
+#   - cert-manager can resolve the TXT record before it continues. See
+#     docs/integrations/acme-proxy-clients.md ("DNS resolver limits"):
+#     set --dns01-recursive-nameservers and --dns01-recursive-nameservers-only
+#     on the cert-manager controller when the cluster DNS does not see the
+#     public zone.
+#
+# Replace before applying:
+#   - ucm.example.com and <slug>        UCM host and proxy slug
+#   - admin@example.com                 ACME account e-mail
+#   - the domain keys in the Secret     one entry per domain name you request
+#                                       (for *.example.com use "example.com")
+#
+# Apply:
+#   kubectl apply -f clusterissuer-ucm-proxy-acmedns-stub.yaml
+---
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: ucm-acmedns-stub
+  namespace: cert-manager
+data:
+  nginx.conf: |
+    worker_processes 1;
+    pid /tmp/nginx.pid;
+    events { worker_connections 64; }
+    http {
+      access_log /dev/stdout;
+      error_log  /dev/stderr warn;
+      client_body_temp_path /tmp/client_temp;
+      proxy_temp_path       /tmp/proxy_temp;
+      fastcgi_temp_path     /tmp/fastcgi_temp;
+      uwsgi_temp_path       /tmp/uwsgi_temp;
+      scgi_temp_path        /tmp/scgi_temp;
+      server {
+        listen 8080;
+        # acme-dns "update" call: accept everything, change nothing.
+        location = /update {
+          default_type application/json;
+          return 200 '{"txt":"noop"}';
+        }
+        location = /health {
+          default_type text/plain;
+          return 200 "ok\n";
+        }
+        location / {
+          return 404;
+        }
+      }
+    }
+---
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: ucm-acmedns-stub
+  namespace: cert-manager
+  labels:
+    app: ucm-acmedns-stub
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: ucm-acmedns-stub
+  template:
+    metadata:
+      labels:
+        app: ucm-acmedns-stub
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        seccompProfile:
+          type: RuntimeDefault
+      containers:
+        - name: nginx
+          # Pin a tag (or digest) that you have reviewed.
+          image: nginxinc/nginx-unprivileged:1.27-alpine
+          args: ["nginx", "-c", "/etc/nginx-stub/nginx.conf", "-g", "daemon off;"]
+          ports:
+            - containerPort: 8080
+          readinessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+          livenessProbe:
+            httpGet:
+              path: /health
+              port: 8080
+          securityContext:
+            allowPrivilegeEscalation: false
+            readOnlyRootFilesystem: true
+            capabilities:
+              drop: ["ALL"]
+          resources:
+            requests:
+              cpu: 10m
+              memory: 16Mi
+            limits:
+              memory: 64Mi
+          volumeMounts:
+            - name: conf
+              mountPath: /etc/nginx-stub
+              readOnly: true
+            - name: tmp
+              mountPath: /tmp
+      volumes:
+        - name: conf
+          configMap:
+            name: ucm-acmedns-stub
+        - name: tmp
+          emptyDir: {}
+---
+apiVersion: v1
+kind: Service
+metadata:
+  name: ucm-acmedns-stub
+  namespace: cert-manager
+spec:
+  selector:
+    app: ucm-acmedns-stub
+  ports:
+    - name: http
+      port: 8080
+      targetPort: 8080
+---
+# acme-dns account file read by the cert-manager `acmeDNS` solver.
+# It is a JSON object keyed by the domain name of the challenge
+# (the identifier without "*."). cert-manager only looks the key up and
+# sends `subdomain`, `username` and `password` to the stub, which ignores
+# them. The values below are placeholders.
+apiVersion: v1
+kind: Secret
+metadata:
+  name: ucm-acmedns-stub-accounts
+  namespace: cert-manager
+type: Opaque
+stringData:
+  acmedns.json: |
+    {
+      "example.com": {
+        "username": "unused",
+        "password": "unused",
+        "fulldomain": "unused.example.com",
+        "subdomain": "unused",
+        "server_url": "http://ucm-acmedns-stub.cert-manager.svc:8080"
+      },
+      "app.example.com": {
+        "username": "unused",
+        "password": "unused",
+        "fulldomain": "unused.example.com",
+        "subdomain": "unused",
+        "server_url": "http://ucm-acmedns-stub.cert-manager.svc:8080"
+      }
+    }
+---
+apiVersion: cert-manager.io/v1
+kind: ClusterIssuer
+metadata:
+  name: ucm-acme-proxy
+spec:
+  acme:
+    # UCM ACME proxy directory. Per-CA form (recommended):
+    #   https://ucm.example.com:8443/acme/proxy/<slug>/directory
+    # Default form (account chosen in the proxy settings):
+    #   https://ucm.example.com:8443/acme/proxy/directory
+    server: https://ucm.example.com:8443/acme/proxy/<slug>/directory
+    email: admin@example.com
+    privateKeySecretRef:
+      name: ucm-acme-proxy-account-key
+    # In production, distribute UCM's CA to cert-manager instead.
+    # See README.md ("Trusting UCM's TLS cert").
+    skipTLSVerify: true
+    solvers:
+      - dns01:
+          acmeDNS:
+            host: http://ucm-acmedns-stub.cert-manager.svc:8080
+            accountSecretRef:
+              name: ucm-acmedns-stub-accounts
+              key: acmedns.json
