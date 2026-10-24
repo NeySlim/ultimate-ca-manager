@@ -33,8 +33,8 @@ if int(cryptography.__version__.split('.')[0]) < 49:
 # settings.py reads SECRET_KEY at class-body load time, so it
 # must be present before the first `from app import create_app` (which can be
 # triggered by any test module's import or fixture).
-# A Redis URL from the shell or /etc/ucm/ucm.env would switch sessions and Socket.IO
-# to Redis; an empty value, unlike a missing one, is never overridden by load_dotenv.
+# A Redis URL from the shell or the checkout's .env would switch sessions and
+# Socket.IO to Redis; an empty value, unlike a missing one, is never overridden by load_dotenv.
 os.environ['REDIS_URL'] = ''
 os.environ['UCM_REDIS_URL'] = ''
 os.environ.setdefault('SECRET_KEY', 'test-secret-key-for-testing')
@@ -43,10 +43,9 @@ os.environ.setdefault('HTTP_REDIRECT', 'false')
 os.environ.setdefault('INITIAL_ADMIN_PASSWORD', 'changeme123')
 os.environ.setdefault('CSRF_DISABLED', 'true')
 
-# Isolate DATA_DIR from the machine's live install. settings.py runs
-# load_dotenv("/etc/ucm/ucm.env"), which on a dev box points DATA_DIR at the
-# running service's data dir — tests would then write session files there
-# (root-owned, breaking the service's session pruning) and touch its
+# Isolate DATA_DIR from the machine's live install: a DATA_DIR from the shell or
+# the checkout's .env would have tests write session files into the running
+# service's data dir (root-owned, breaking its session pruning) and touch its
 # .restart_requested watcher signal. load_dotenv never overrides pre-set env
 # vars, so pinning a temp dir here keeps tests off the real data dir.
 # Under xdist the workers inherit the controller's environment, so a single
@@ -93,9 +92,9 @@ if 'DATA_DIR' not in os.environ or _xdist_worker:
     os.environ['DATA_DIR'] = _tmp_data_dir
     atexit.register(shutil.rmtree, _tmp_data_dir, ignore_errors=True)
 
-# ucm.env also names the live database, and create_app() hands the migration
-# runner whatever DATABASE_PATH / DATABASE_URL say while the app itself runs
-# in memory. Pinned before settings.py loads the file, like DATA_DIR above.
+# An env file can also name the live database, and create_app() hands the
+# migration runner whatever DATABASE_PATH / DATABASE_URL say while the app
+# itself runs in memory. Pinned before settings.py loads one, like DATA_DIR above.
 if 'DATABASE_PATH' not in os.environ or _xdist_worker:
     os.environ['DATABASE_PATH'] = os.path.join(os.environ['DATA_DIR'], 'ucm.db')
 os.environ.setdefault('DATABASE_URL', '')
@@ -112,7 +111,7 @@ if not UCM_TEST_ENV_FILE.exists():
 os.environ.setdefault('UCM_DEV_MODE', 'true')
 
 # The suite never reads the host's /etc/ucm/ucm.env, which CI does not have:
-# its FQDN and HTTP_PROTOCOL_PORT ended up in the certificates tests issue (#421).
+# a dev box otherwise runs with that service's settings (its FQDN hid #421).
 import dotenv as _dotenv  # noqa: E402
 
 _load_dotenv = _dotenv.load_dotenv
