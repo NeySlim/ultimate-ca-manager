@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Documentation
+
+- New guide `docs/integrations/acme-proxy-clients.md`: how to use the ACME proxy from hosts without DNS API access, with a no-op DNS-01 step for certbot, acme.sh, lego, cert-manager (stub acme-dns example in `examples/kubernetes/cert-manager/`), win-acme and Posh-ACME, and the DNS resolver limits of each client (#416).
+
 ## [2.245] - 2026-10-23
 
 ### Security

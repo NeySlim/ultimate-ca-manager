@@ -547,6 +547,11 @@ are comma-separated IPs with an optional port: `10.0.0.53, 127.0.0.1:5353,
 [2001:db8::53]:5300`. API: `dns01_resolver_mode` and `dns01_nameservers` on
 `PATCH /api/v2/acme/client/settings`.
 
+These settings apply to UCM only. ACME clients that use the ACME proxy run their
+own DNS checks. For per-client setup (certbot, acme.sh, lego, cert-manager,
+win-acme, Posh-ACME) and for the resolver limits of those clients, see
+[Using the ACME proxy from hosts without DNS API access](integrations/acme-proxy-clients.md).
+
 ### ACME client accounts: `preferred_chain` (RFC 8555 alternate chains)
 
 UCM can select an *alternate* chain advertised by the CA via `Link: rel="alternate"` (RFC 8555 §7.4.2). This choice is driven by the `preferred_chain` field on **ACME client accounts**.
