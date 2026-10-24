@@ -111,6 +111,24 @@ if not UCM_TEST_ENV_FILE.exists():
     UCM_TEST_ENV_FILE.write_text('# test sandbox\n')
 os.environ.setdefault('UCM_DEV_MODE', 'true')
 
+# The suite never reads the host's /etc/ucm/ucm.env, which CI does not have:
+# its FQDN and HTTP_PROTOCOL_PORT ended up in the certificates tests issue (#421).
+import dotenv as _dotenv  # noqa: E402
+
+_load_dotenv = _dotenv.load_dotenv
+
+
+def _load_dotenv_except_system(dotenv_path=None, *args, **kwargs):
+    if dotenv_path is not None and str(dotenv_path) == '/etc/ucm/ucm.env':
+        return False
+    return _load_dotenv(dotenv_path, *args, **kwargs)
+
+
+_dotenv.load_dotenv = _load_dotenv_except_system
+# Protocol URLs fall back to `hostname -f` before the app's FQDN: pinned so
+# they do not depend on the machine either.
+os.environ.setdefault('FQDN', 'ucm.test')
+
 # Add backend to Python path
 sys.path.insert(0, os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 
