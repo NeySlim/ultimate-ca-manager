@@ -1253,6 +1253,7 @@ class AcmeProxyService:
 
         link_authz_url = self._upstream_authz_url_from_link(resp.headers.get('Link'))
         authz_url = local_authz_url or link_authz_url
+        up_link = self._get_authz_link(resp.headers.get('Link'), authz_url)
         if not order:
             if not link_authz_url:
                 raise ProxyResourceNotFoundError(
@@ -1280,7 +1281,7 @@ class AcmeProxyService:
             # its already valid http-01/tls-alpn-01 challenge and a client may
             # poll it; nothing is triggered here.
             challenge_data['url'] = f"{self.base_url}/challenge/{chall_id_b64}"
-            return challenge_data, self._get_authz_link(resp.headers.get('Link'))
+            return challenge_data, up_link
 
         if challenge_type != 'dns-01':
             raise ProxyDns01OnlyError(
@@ -1297,7 +1298,7 @@ class AcmeProxyService:
             # Already triggered, just return 'processing'
             challenge_data['status'] = 'processing'
             challenge_data['url'] = f"{self.base_url}/challenge/{chall_id_b64}"
-            return challenge_data, self._get_authz_link(resp.headers.get('Link'))
+            return challenge_data, up_link
 
         # Fallback: Trigger if not already triggered (should be rare now)
         if not token:
@@ -1337,7 +1338,7 @@ class AcmeProxyService:
         challenge_data['status'] = 'processing'
         challenge_data['url'] = f"{self.base_url}/challenge/{chall_id_b64}"
 
-        return challenge_data, self._get_authz_link(resp.headers.get('Link'))
+        return challenge_data, up_link
 
     def _challenge_identifier(self, order, authz_url):
         """Identifier a challenge of a multi-domain order validates, read on the
@@ -1410,9 +1411,10 @@ class AcmeProxyService:
                 return url
         return None
 
-    def _get_authz_link(self, upstream_link):
-        """Extract and rewrite authz Link header from upstream response"""
-        authz_url = self._upstream_authz_url_from_link(upstream_link)
+    def _get_authz_link(self, upstream_link, fallback_authz_url=None):
+        """Rewrite the upstream Link rel="up"; without one (Pebble), point at the
+        authorization the proxy already knows (RFC 8555 §7.5.1)."""
+        authz_url = self._upstream_authz_url_from_link(upstream_link) or fallback_authz_url
         if authz_url:
             return f'<{self._proxy_url("authz", authz_url)}>;rel="up"'
         return None
