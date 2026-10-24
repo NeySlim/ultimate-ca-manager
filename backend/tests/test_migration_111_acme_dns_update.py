@@ -48,6 +48,13 @@ def test_sqlite_creates_tables_and_indexes():
     assert INDEXES <= _names(conn, 'index')
     cols = {r[1] for r in conn.execute("PRAGMA table_info(acme_proxy_dns_challenges)")}
     assert 'zone_name' in cols
+    info = {r[1]: r for r in conn.execute("PRAGMA table_info(acme_dns_update_keys)")}
+    assert 'eab_bound' in info
+    assert info['eab_bound'][3] == 1  # NOT NULL
+    conn.execute("INSERT INTO acme_client_accounts (id) VALUES (1)")
+    conn.execute("INSERT INTO acme_dns_update_keys (acme_client_account_id, name, secret) "
+                 "VALUES (1, 'k.', 's')")
+    assert conn.execute("SELECT eab_bound FROM acme_dns_update_keys").fetchone()[0] == 0
 
 
 def test_sqlite_unique_constraints():
@@ -104,6 +111,12 @@ def test_postgres_upgrade_twice_and_downgrade():
         tables = {r[0] for r in conn.execute(text(
             "SELECT tablename FROM pg_tables WHERE schemaname = :s"), {'s': schema})}
         assert TABLES <= tables
+        col = conn.execute(text(
+            "SELECT data_type, is_nullable, column_default FROM information_schema.columns "
+            "WHERE table_schema = :s AND table_name = 'acme_dns_update_keys' "
+            "AND column_name = 'eab_bound'"), {'s': schema}).fetchone()
+        assert col is not None and col[0] == 'boolean' and col[1] == 'NO'
+        assert 'false' in col[2].lower()
         indexes = {r[0] for r in conn.execute(text(
             "SELECT indexname FROM pg_indexes WHERE schemaname = :s"), {'s': schema})}
         assert INDEXES <= indexes

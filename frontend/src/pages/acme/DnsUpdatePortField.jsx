@@ -2,7 +2,7 @@ import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Warning } from '@phosphor-icons/react'
 import { Button, Badge, Input } from '../../components'
-import { parseDnsUpdatePort } from './dnsUpdatePort'
+import { parseDnsUpdatePort, effectiveDnsUpdatePort } from './dnsUpdatePort'
 
 /**
  * Port of the DNS UPDATE (RFC 2136) listener, in the ACME proxy section.
@@ -21,7 +21,12 @@ export default function DnsUpdatePortField({ clientSettings = {}, canWrite, onSa
 
   useEffect(() => { setValue(String(stored)) }, [stored])
 
-  const effective = overridden ? Number(envPort) : Number(stored)
+  // The server value wins: an invalid environment value gives 0 (listener off).
+  const hasEffective = clientSettings.dns_update_port_effective !== undefined
+    && clientSettings.dns_update_port_effective !== null
+  const effective = hasEffective
+    ? effectiveDnsUpdatePort(clientSettings)
+    : (overridden ? Number(envPort) : Number(stored))
   const listening = !!clientSettings.dns_update_listening
 
   const save = async () => {

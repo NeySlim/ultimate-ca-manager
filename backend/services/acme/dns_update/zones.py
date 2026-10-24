@@ -10,6 +10,8 @@ import dns.name
 
 logger = logging.getLogger(__name__)
 
+_RETRY_S = 2.0
+
 
 class ZoneIndex:
     def __init__(self, max_age_s: float = 10.0, clock=time.monotonic):
@@ -19,24 +21,29 @@ class ZoneIndex:
         self._zones: frozenset = frozenset()
         self._ancestors: frozenset = frozenset()
         self._loaded_at: Optional[float] = None
+        self._retry_at: Optional[float] = None
 
     def invalidate(self) -> None:
         with self._lock:
             self._loaded_at = None
+            self._retry_at = None
 
     def _ensure(self) -> None:
         with self._lock:
             now = self._clock()
             if self._loaded_at is not None and (now - self._loaded_at) < self._max_age:
                 return
+            if self._retry_at is not None and now < self._retry_at:
+                return
             try:
                 zones = self._load()
             except Exception as e:
+                # Keep the previous zones (availability), retry after _RETRY_S.
+                self._retry_at = now + _RETRY_S
                 logger.warning("DNS UPDATE zone reload failed, keeping previous cache: %s",
                                type(e).__name__)
-                if self._loaded_at is not None or self._zones:
-                    self._loaded_at = now
                 return
+            self._retry_at = None
             ancestors = set()
             for zone in zones:
                 parent = zone

@@ -2800,9 +2800,10 @@ Fields of the DNS UPDATE (RFC 2136) listener of the ACME proxy:
 
 | Field | Method | Description |
 |-------|--------|-------------|
-| `dns_update_port` | GET, PATCH | Port of the listener (UDP and TCP). `0` = disabled (default). Otherwise 1024 to 65535, and not the HTTPS port, the HTTP protocol port or the TLS-ALPN-01 port. A change needs a restart. The PATCH response has `restart_required` (`true` only when the stored value changed and `UCM_DNS_UPDATE_PORT` is not set) and, when that variable is set, `dns_update_port_env_override: true` |
+| `dns_update_port` | GET, PATCH | Port of the listener (UDP and TCP). `0` = disabled (default). Otherwise 1024 to 65535, and not the HTTPS port, the HTTP protocol port or the TLS-ALPN-01 port. A change needs a restart. The PATCH response has `restart_required` (`true` only when the new value differs from the port the listener uses now and `UCM_DNS_UPDATE_PORT` is not set) and, when that variable is set, `dns_update_port_env_override: true` |
 | `dns_update_port_env` | GET | Value of `UCM_DNS_UPDATE_PORT`, or `null` when it is not set or empty. When set, it wins over `dns_update_port` |
 | `dns_update_listening` | GET | `true` when the listener is running now |
+| `dns_update_port_effective` | GET | The port the listener uses at the next start: the environment variable when it is set, else `dns_update_port`; `0` when the value is invalid or the listener is off |
 
 ```http
 PATCH /api/v2/acme/client/settings

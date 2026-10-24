@@ -30,6 +30,8 @@ ACTIVE_MAX_AGE = timedelta(hours=24)
 PURGE_AFTER = timedelta(days=7)
 # Maximum age of the active-row snapshot, in seconds.
 CACHE_MAX_AGE_S = 5
+# After a failed reload, the next attempt waits this long, in seconds.
+_RETRY_S = 2.0
 
 _CHALLENGE_LABEL = '_acme-challenge'
 
@@ -120,9 +122,6 @@ def persist_expected_values(orders, identifier, token, challenge_url,
             unique_orders.setdefault(order.id, order)
         if not unique_orders:
             return 0
-        zone_name = zone_for(identifier)
-        if zone_name is None:
-            return 0
         expires_at = now + ACTIVE_MAX_AGE
         parsed = _parse_expires(authz_expires)
         if parsed is not None and parsed < expires_at:
@@ -151,6 +150,12 @@ def persist_expected_values(orders, identifier, token, challenge_url,
             logger.warning(
                 '[ACME DNS UPDATE] Could not store expected values: %s',
                 type(exc).__name__)
+            return 0
+        # Nothing new: no zone lookup, no purge, no commit.
+        if all((o.id, v) in existing for o, _t, v in wanted):
+            return 0
+        zone_name = zone_for(identifier)
+        if zone_name is None:
             return 0
         # One savepoint per row: a conflict (a concurrent request stored the
         # row first) loses that row only, not the rows of the other orders.
@@ -309,7 +314,8 @@ def _monotonic() -> float:
 
 class ActiveRecordCache:
     """Snapshot of active rows. Reloaded after invalidate() or when older
-    than CACHE_MAX_AGE_S. A reload error keeps the previous snapshot.
+    than CACHE_MAX_AGE_S. A reload error keeps the previous snapshot and
+    delays the next attempt by _RETRY_S (invalidate() clears the delay).
 
     The caller owns the session scope and ends its read transaction.
     The snapshot is not filtered again by time: a row that expires stays
@@ -321,20 +327,28 @@ class ActiveRecordCache:
         self._loaded_at: Optional[float] = None
         self._generation = 0
         self._loaded_generation = -1
+        self._retry_at: Optional[float] = None
 
     def invalidate(self) -> None:
         self._generation += 1
+        self._retry_at = None
 
     def _fresh(self) -> bool:
         return (self._loaded_at is not None
                 and self._loaded_generation == self._generation
                 and _monotonic() - self._loaded_at < CACHE_MAX_AGE_S)
 
+    def _backing_off(self) -> bool:
+        retry_at = self._retry_at
+        return retry_at is not None and _monotonic() < retry_at
+
     def snapshot(self, now: Optional[datetime] = None) -> ActiveSnapshot:
         if self._fresh():
             return self._snapshot
         with self._lock:
             if self._fresh():
+                return self._snapshot
+            if self._backing_off():
                 return self._snapshot
             generation = self._generation
             try:
@@ -347,7 +361,9 @@ class ActiveRecordCache:
                 logger.warning(
                     '[ACME DNS UPDATE] Active rows not reloaded, '
                     'previous snapshot kept: %s', type(exc).__name__)
+                self._retry_at = _monotonic() + _RETRY_S
                 return self._snapshot
+            self._retry_at = None
             self._snapshot = loaded
             self._loaded_at = _monotonic()
             self._loaded_generation = generation

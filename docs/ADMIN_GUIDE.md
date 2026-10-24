@@ -580,11 +580,11 @@ curl -k -X PATCH -H "Authorization: Bearer $UCM_API_KEY" -H "Content-Type: appli
 
 | Method | Value |
 |--------|-------|
-| Environment variable | `UCM_DNS_UPDATE_PORT=8053` (`/etc/ucm/ucm.env` natively, container environment in Docker). It wins over the setting. An empty value counts as not set |
+| Environment variable | `UCM_DNS_UPDATE_PORT=8053` (`/etc/ucm/ucm.env` natively, container environment in Docker). It wins over the setting. An empty value counts as not set. A value outside 0 to 65535 turns the listener off, with a warning in the log |
 | Setting | `acme.proxy.dns_update_port`, API field `dns_update_port` of `PATCH /api/v2/acme/client/settings` |
 | Off | unset, or `0` |
 
-The port is 1024 to 65535. It cannot be the HTTPS port, the HTTP protocol port or the TLS-ALPN-01 port of the ACME client. UCM serves UDP and TCP on the same port. `GET /api/v2/acme/client/settings` shows `dns_update_listening`, which is `true` when the listener runs.
+The port is 1024 to 65535. It cannot be the HTTPS port, the HTTP protocol port or the TLS-ALPN-01 port of the ACME client. UCM serves UDP and TCP on the same port. `GET /api/v2/acme/client/settings` shows `dns_update_listening` (`true` when the listener runs) and `dns_update_port_effective` (the port the next start uses).
 
 **Bind address.** By default the listener uses the same address as the HTTP protocol port (`HOST`). Set `UCM_DNS_UPDATE_HOST` to bind it to one internal address only.
 

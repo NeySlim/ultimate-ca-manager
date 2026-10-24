@@ -515,3 +515,22 @@ Bez zmian: CR1-7 (znacznik czasu na klucz, decyzja 9: RFC 8945 §5.2.3 SHOULD, k
 
 Przy okazji test kopii zapasowej między instalacjami wykazał, że przywracanie pomijało tabelę kluczy. Poprawka: sekcja w `restore_core.GENERIC_SECTIONS`, a po przywróceniu czyszczenie pamięci kluczy, stref i wierszy.
 
+Runda 2 `/code-review` (17 ustaleń):
+
+| ID | Problem | Zmiana |
+|---|---|---|
+| CR2-1 | Retransmisja przyjętego żądania po nowszym żądaniu tego klucza dostawała BADTIME (znacznik czasu S7) zamiast zapisanej odpowiedzi | sprawdzenie pamięci powtórek po MAC, a przed czasem (kolejność kroku 6e przed 6f); powtórka nie zmienia znacznika (S15) |
+| CR2-2 | `audit_logs.username` ma 80 znaków; długa nazwa klucza gubiła wpis na PostgreSQL | przycięcie pól do długości kolumn |
+| CR2-3 | Błąd odczytu wierszy powtarzał zapytanie DB dla każdego pakietu | ponowna próba po 2 s, także dla stref |
+| CR2-4 | Klucz z EAB po przywróceniu kopii bez poświadczenia EAB stawał się kluczem całego konta proxy | kolumna `eab_bound` (migracja 111): klucz związany z EAB bez poświadczenia nie pasuje do niczego (F2) |
+| CR2-5 | Zakres klucza z EAB w pamięci podręcznej nie widział nowo użytego EAB przez 30 s | `mark_eab_used` unieważnia pamięć kluczy |
+| CR2-6 | Unieważnienie w oknie ponownej próby czyściło pamięć bez próby odczytu | unieważnienie kasuje czas ponownej próby |
+| CR2-7, 8 | `restart_required` porównywał z zapisanym portem; kontrola portu TLS-ALPN-01 pomijała zmienną środowiskową | porównanie z portem, na którym nasłuch działa; port efektywny ze zmiennej |
+| CR2-9, 10 | Port ze zmiennej poza zakresem wyłączał nasłuch bez ostrzeżenia; UI pokazywał w przykładach nieprawidłowy port | ostrzeżenia w logu; API zwraca `dns_update_port_effective`, UI używa tej wartości |
+| CR2-11 | NetworkPolicy zamyka wszystkie inne porty poda, a komentarz mówił inaczej | `dnsUpdate.networkPolicy.extraPorts` i poprawny opis |
+| CR2-12 | QUERY z ANCOUNT > 0 przechodził do parsera | QUERY musi mieć ANCOUNT = 0 (2.4) |
+| CR2-13 | Każde pobranie authz robiło zapytanie o strefę, DELETE i COMMIT | bez nowych wierszy: brak zapisu |
+| CR2-15 | Trzy odczyty portu TLS-ALPN-01 | jedna funkcja `get_stored_tls_alpn_port()` |
+
+Bez zmian: CR2-14 (druga funkcja wartości TXT: unika cyklu importów, test R1 pilnuje zgodności), CR2-16 (dwie funkcje obcięcia odpowiedzi: podpisana odpowiedź TC ma RCODE NOERROR wg RFC 8945 §5.3, niepodpisana zachowuje RCODE), CR2-17 (haki proxy na sesji żądania: obecne miejsca wywołania nie mają niezapisanych zmian, a CR2-13 usuwa zbędne commity).
+

@@ -354,6 +354,10 @@ class DnsUpdateHandler:
         if len(wire) > MAX_MESSAGE_SIZE:
             self._log.note("oversize", logging.INFO, peer_ip)
             return None
+        # A QUERY has no answer RR (plan 2.4); an UPDATE keeps MAX_ANCOUNT (prerequisites).
+        if (flags >> 11) & 0xF == dns.opcode.QUERY and an != 0:
+            self._log.note("counts", logging.INFO, peer_ip)
+            return None
         if qd > MAX_QDCOUNT or an > MAX_ANCOUNT or ns > MAX_NSCOUNT or ar > MAX_ARCOUNT:
             self._log.note("counts", logging.INFO, peer_ip)
             return None
@@ -372,8 +376,11 @@ class DnsUpdateHandler:
             return _header_only(wire, dns.rcode.FORMERR)
 
         # 5. TSIG.
+        # The replay check runs inside, after the MAC and before the time (RFC 8945 §5.2).
+        digest = hashlib.sha256(wire).digest()
         result = tsig.verify_request(wire, msg, self._key_store.lookup, now_int,
-                                     self._watermark)
+                                     self._watermark,
+                                     is_replay=lambda: self._replay.seen(digest))
         outcome = result.outcome
         if outcome == TsigOutcome.FORMERR:
             self._log.note("formerr", logging.INFO, peer_ip)
@@ -390,7 +397,7 @@ class DnsUpdateHandler:
         replay_key = None
         suppress = False
         if signed:
-            replay_key = hashlib.sha256(wire).digest()
+            replay_key = digest
             cached = self._replay.get(replay_key, transport)
             if cached is not None:
                 return cached
@@ -401,7 +408,7 @@ class DnsUpdateHandler:
                 cached = self._replay.get(replay_key, transport)
                 if cached is not None:
                     return cached
-                suppress = self._replay.seen(replay_key)
+                suppress = result.replayed or self._replay.seen(replay_key)
                 return self._process(wire, msg, skeleton, result, opcode, peer_ip, transport,
                                      now, now_int, replay_key, suppress)
             finally:

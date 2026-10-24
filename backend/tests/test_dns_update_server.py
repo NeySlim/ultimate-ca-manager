@@ -316,9 +316,11 @@ def test_N3_free_port_listens_and_stop_clears_pos(app):
     assert r.ok is True
     assert status.is_listening() is True
     assert r.port > 0
+    assert status.listening_port() == r.port  # D4a
     assert udp_ask(r, b'a') == b'Ra'
     r.stop()
     assert status.is_listening() is False
+    assert status.listening_port() == 0
     with pytest.raises(OSError):
         socket.create_connection(('127.0.0.1', r.port), timeout=1)
 

@@ -78,6 +78,7 @@ class KeyStore:
         with self._lock:
             self._dirty = True
             self._loaded_at = None
+            self._retry_at = None
 
     def _ensure(self) -> None:
         with self._lock:
@@ -187,7 +188,7 @@ class KeyStore:
                 if not secret:
                     logger.warning("DNS UPDATE key %r skipped: secret unusable", key.name)
                     continue
-                eab_bound = key.eab_credential_id is not None
+                eab_bound = bool(key.eab_bound) or key.eab_credential_id is not None
                 eab_account_id = None
                 if eab_bound:
                     cred = creds.get(key.eab_credential_id)

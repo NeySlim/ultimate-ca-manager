@@ -28,6 +28,9 @@ class AcmeDnsUpdateKey(db.Model):
         db.ForeignKey('acme_eab_credentials.id', ondelete='CASCADE'),
         nullable=True, index=True,
     )
+    # Stays True when the credential reference is lost (restore, orphan):
+    # the key then matches nothing instead of the whole proxy account (F2).
+    eab_bound = db.Column(db.Boolean, nullable=False, default=False)
     # Absolute DNS name, lowercase, trailing dot (RFC 8945 §4.2).
     name = db.Column(db.String(255), unique=True, nullable=False)
     algorithm = db.Column(db.String(32), default='hmac-sha256', nullable=False)
@@ -102,6 +105,7 @@ class AcmeDnsUpdateKey(db.Model):
             'id': self.id,
             'acme_client_account_id': self.acme_client_account_id,
             'eab_credential_id': self.eab_credential_id,
+            'eab_bound': bool(self.eab_bound),
             'name': self.name,
             'algorithm': self.algorithm,
             'status': self.status,

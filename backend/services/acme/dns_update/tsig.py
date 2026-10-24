@@ -4,7 +4,7 @@ dnspython validates a TSIG in the wrong order for a server: it checks the time
 before the MAC, and it signs error responses with the server time and the
 wrong request MAC. This module therefore parses with ``keyring=False`` (no
 validation by dnspython) and does the checks itself in the order of
-RFC 8945 §5.2: key, MAC size, MAC, time, truncation policy. It uses only the
+RFC 8945 §5.2: key, MAC size, MAC, replay, time, truncation policy. It uses only the
 public dnspython API (``dns.tsig.sign``, ``dns.tsig.validate``).
 
 The module never logs and never puts a secret or a MAC in a ``repr``.
@@ -79,6 +79,7 @@ class TsigResult:
     keyname: Optional[dns.name.Name] = None
     rdata: Optional[dns.rdtypes.ANY.TSIG.TSIG] = None
     request_mac: bytes = b""
+    replayed: bool = False
 
     def __repr__(self) -> str:
         return (f"TsigResult(outcome={self.outcome.name}, key={self.key!r}, "
@@ -145,11 +146,20 @@ def _dns_key(key: TsigKeyMaterial) -> dns.tsig.Key:
 
 def verify_request(wire: bytes, msg: dns.message.Message,
                    lookup_key: Callable[[dns.name.Name], Optional[TsigKeyMaterial]],
-                   now: int, watermark: TimeWatermark) -> TsigResult:
+                   now: int, watermark: TimeWatermark,
+                   is_replay: Optional[Callable[[], bool]] = None) -> TsigResult:
     """Check the TSIG of a request in the order of RFC 8945 §5.2.
 
     ``msg`` is ``dns.message.from_wire(wire, keyring=False)``: dnspython does
     not validate anything then and keeps the TSIG in ``msg.tsig``.
+
+    Order: key, MAC size, MAC, replay, time, truncation policy. ``is_replay``
+    is called only after the MAC verified. When it returns True the result is
+    OK with ``replayed=True``: no time check, no truncation check, and the
+    watermark is not changed. Security: only a message whose MAC verified and
+    whose exact bytes were already answered within REPLAY_TTL_S can skip the
+    time check. It gets the stored answer (or the same answer rendered for the
+    other transport) and changes nothing.
     """
     if msg.tsig is None or len(msg.tsig) == 0:
         return TsigResult(TsigOutcome.UNSIGNED)
@@ -215,6 +225,12 @@ def verify_request(wire: bytes, msg: dns.message.Message,
 
     # The MAC is valid: the key is known to be the one that signed.
     result.key = key
+
+    # A retransmission of an answered request: stored answer, no time check.
+    if is_replay is not None and is_replay():
+        result.replayed = True
+        result.outcome = TsigOutcome.OK
+        return result
 
     # §5.2.3, §10: time.
     window = min(rdata.fudge, MAX_FUDGE)

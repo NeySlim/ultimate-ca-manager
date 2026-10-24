@@ -175,7 +175,7 @@ def test_K3_to_dict_has_metadata_pos(app):
     with app.app_context():
         key = _key(_account())
         d = key.to_dict()
-        assert {'id', 'acme_client_account_id', 'eab_credential_id', 'name', 'algorithm',
+        assert {'id', 'acme_client_account_id', 'eab_credential_id', 'eab_bound', 'name', 'algorithm',
                 'status', 'created_at', 'created_by_user_id', 'last_used_at',
                 'revoked_at', 'notes'} <= set(d)
         assert d['status'] == 'active' and d['algorithm'] == 'hmac-sha256'
@@ -303,3 +303,18 @@ def test_R_model_zone_name_required_neg(app):
         with pytest.raises(IntegrityError):
             db.session.commit()
         db.session.rollback()
+
+
+def test_D1_eab_bound_defaults_false_and_is_in_dict_pos(app):
+    with app.app_context():
+        d = _key(_account()).to_dict()
+        assert d['eab_bound'] is False
+
+
+def test_D1_eab_bound_can_be_true_without_credential_neg(app):
+    from models import db
+    with app.app_context():
+        key = _key(_account())
+        key.eab_bound = True
+        db.session.commit()
+        assert key.eab_credential_id is None and key.to_dict()['eab_bound'] is True

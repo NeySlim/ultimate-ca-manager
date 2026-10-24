@@ -547,7 +547,8 @@ def _seed_source():
     # the EAB credential, and recording the user who made it.
     tsig = add('acme_dns_update_keys', name='xinst-tsig.', algorithm='hmac-sha256',
                status='active', acme_client_account_id=client_accounts[1].id,
-               eab_credential_id=eab.id, created_by_user_id=users[1].id)
+               eab_credential_id=eab.id, eab_bound=True,
+               created_by_user_id=users[1].id)
     secret(tsig, 'acme_dns_update_keys', 'secret')
     db.session.flush()
 

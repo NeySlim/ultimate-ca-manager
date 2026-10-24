@@ -100,6 +100,7 @@ def create_dns_update_key(account_id):
     key = AcmeDnsUpdateKey(
         acme_client_account_id=account_id,
         eab_credential_id=eab_credential_id,
+        eab_bound=eab_credential_id is not None,
         name=name,
         algorithm=algorithm,
         status='active',

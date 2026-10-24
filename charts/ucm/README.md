@@ -55,7 +55,7 @@ The `*-etc` PVC mounts `/etc/ucm`, which holds `master.key` — the symmetric ke
 | `dnsUpdate.port` / `dnsUpdate.host` | `8053` / `""` | Container port (UDP and TCP, 1024-65535; sets `UCM_DNS_UPDATE_PORT`) and bind address (`UCM_DNS_UPDATE_HOST`, empty = default) |
 | `dnsUpdate.service.type` / `dnsUpdate.service.port` | `ClusterIP` / `53` | Type and client port of the separate DNS UPDATE Service (port 53 maps to `dnsUpdate.port`) |
 | `dnsUpdate.service.annotations` / `dnsUpdate.service.loadBalancerIP` | `{}` / `""` | Annotations and fixed address (type `LoadBalancer` only) |
-| `dnsUpdate.networkPolicy.enabled` / `dnsUpdate.networkPolicy.from` | `false` / `[]` | Additional NetworkPolicy: the listener ports accept only the listed peers |
+| `dnsUpdate.networkPolicy.enabled` / `dnsUpdate.networkPolicy.from` / `dnsUpdate.networkPolicy.extraPorts` | `false` / `[]` / `[]` | Additional NetworkPolicy: the listener ports accept only the `from` peers; `https`, `http` and `extraPorts` accept all sources; every other pod port is closed |
 | `ingress.enabled` | `false` | Expose the HTTPS UI via Ingress |
 | `ingress.protocolHttp.enabled` | `false` | Second Ingress for cleartext CDP/OCSP/ACME-HTTP-01 (port 8080) |
 | `proxy.behindProxy` | `false` | Set `UCM_BEHIND_PROXY=1` (honor `X-Forwarded-*` for one hop) |
@@ -119,7 +119,7 @@ dnsUpdate:
 - The pod runs as a non-root user and cannot bind port 53. The Service maps port 53 to `dnsUpdate.port`.
 - Keep `dnsUpdate.service.type: ClusterIP` unless clients outside the cluster must reach it. A `LoadBalancer` with UDP and TCP on the same port needs mixed-protocol support from your cloud or load balancer. Check the documentation of your provider.
 - kube-proxy can replace the client IP with a node IP (SNAT). UCM then sees many clients as one source, and its limits per source address apply to all of them together.
-- `dnsUpdate.networkPolicy.enabled: true` adds a NetworkPolicy that accepts the listener ports only from the peers in `dnsUpdate.networkPolicy.from`. The HTTPS and HTTP ports stay open as before. The policy works only with a CNI that enforces NetworkPolicy.
+- `dnsUpdate.networkPolicy.enabled: true` adds a NetworkPolicy that accepts the listener ports only from the peers in `dnsUpdate.networkPolicy.from`. The policy allows from all sources only the HTTPS port, the HTTP port and the ports in `dnsUpdate.networkPolicy.extraPorts` (list of `{port, protocol}`). Every other port of the pod is closed while the policy is enabled. For example, add the port of the ACME client TLS-ALPN-01 proof listener, or a port that you add through `extraEnv`, to `extraPorts`. The policy works only with a CNI that enforces NetworkPolicy.
 - The TSIG keys are created per proxy account in the UCM web interface. See [`docs/integrations/acme-proxy-dns-update.md`](../../docs/integrations/acme-proxy-dns-update.md) and the [Admin Guide](../../docs/ADMIN_GUIDE.md).
 
 ## Uninstall

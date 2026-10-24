@@ -675,3 +675,136 @@ def test_cache_reload_error_keeps_previous_snapshot_neg(app, env, monkeypatch):
         after = records.get_active_snapshot()
         assert after is before
         monkeypatch.undo()
+
+
+# ---------------------------------------------------------------- retry backoff (C3)
+
+def _failing_cache(monkeypatch, fail=True):
+    clock = [1000.0]
+    monkeypatch.setattr(records, '_monotonic', lambda: clock[0])
+    cache = records.ActiveRecordCache()
+    calls = []
+    state = {'fail': fail}
+
+    def _load(now):
+        calls.append(1)
+        if state['fail']:
+            raise OperationalError('SELECT', {}, Exception('db gone'))
+        return records.ActiveSnapshot({}, frozenset())
+
+    monkeypatch.setattr(cache, '_load', _load)
+    return cache, clock, calls, state
+
+
+def test_cache_failed_reload_is_not_retried_within_2s_pos(app, monkeypatch, caplog):
+    with app.app_context():
+        cache, clock, calls, _state = _failing_cache(monkeypatch)
+        first = cache.snapshot()
+        assert first is records._EMPTY_SNAPSHOT and calls == [1]
+        for _ in range(5):
+            clock[0] += 0.3
+            assert cache.snapshot() is first
+        assert calls == [1]
+        assert caplog.text.count('Active rows not reloaded') == 1
+
+
+def test_cache_failed_reload_is_retried_after_2s_neg(app, monkeypatch, caplog):
+    with app.app_context():
+        cache, clock, calls, state = _failing_cache(monkeypatch)
+        cache.snapshot()
+        clock[0] += records._RETRY_S + 0.1
+        cache.snapshot()
+        assert calls == [1, 1]
+        assert caplog.text.count('Active rows not reloaded') == 2
+        state['fail'] = False
+        clock[0] += records._RETRY_S + 0.1
+        cache.snapshot()
+        assert len(calls) == 3
+        for _ in range(3):  # loaded: fresh, no more loads
+            cache.snapshot()
+        assert len(calls) == 3
+
+
+def test_cache_failed_reload_keeps_previous_snapshot_during_backoff_pos(app, monkeypatch):
+    with app.app_context():
+        cache, clock, calls, state = _failing_cache(monkeypatch, fail=False)
+        loaded = cache.snapshot()
+        state['fail'] = True
+        clock[0] += records.CACHE_MAX_AGE_S + 1
+        assert cache.snapshot() is loaded
+        assert cache.snapshot() is loaded
+        assert len(calls) == 2
+
+
+def test_cache_invalidate_after_failure_retries_at_once_neg(app, monkeypatch):
+    with app.app_context():
+        cache, clock, calls, _state = _failing_cache(monkeypatch)
+        cache.snapshot()
+        cache.snapshot()
+        assert calls == [1]
+        cache.invalidate()
+        cache.snapshot()
+        assert calls == [1, 1]
+
+
+# ---------------------------------------------------------------- no write work when nothing is new (C4)
+
+def _count_statements():
+    statements = []
+
+    def _count(conn, cursor, statement, *_a):
+        statements.append(statement.lstrip().split(None, 1)[0].upper())
+
+    event.listen(db.engine, 'before_cursor_execute', _count)
+    return statements, lambda: event.remove(db.engine, 'before_cursor_execute', _count)
+
+
+def test_R3_nothing_new_does_no_zone_lookup_purge_or_commit_pos(app, env, monkeypatch):
+    with app.app_context():
+        a, b = _two_orders(env)
+        assert _persist([a, b]) == 2
+        zone_calls, commits, invalidations = [], [], []
+        real_zone_for, real_commit = records.zone_for, records._commit
+        monkeypatch.setattr(records, 'zone_for',
+                            lambda i: zone_calls.append(i) or real_zone_for(i))
+        monkeypatch.setattr(records, '_commit', lambda: commits.append(1) or real_commit())
+        monkeypatch.setattr(records, 'invalidate_cache', lambda: invalidations.append(1))
+        statements, stop = _count_statements()
+        try:
+            assert _persist([a, b]) == 0
+        finally:
+            stop()
+        assert zone_calls == [] and commits == [] and invalidations == []
+        assert 'DELETE' not in statements and 'COMMIT' not in statements
+        assert 'INSERT' not in statements
+        assert len(_rows()) == 2
+
+
+def test_R3_one_new_row_does_zone_lookup_insert_and_commit_neg(app, env, monkeypatch):
+    with app.app_context():
+        a, b = _two_orders(env)
+        assert _persist([a]) == 1
+        zone_calls, commits, invalidations = [], [], []
+        real_zone_for, real_commit = records.zone_for, records._commit
+        monkeypatch.setattr(records, 'zone_for',
+                            lambda i: zone_calls.append(i) or real_zone_for(i))
+        monkeypatch.setattr(records, '_commit', lambda: commits.append(1) or real_commit())
+        monkeypatch.setattr(records, 'invalidate_cache', lambda: invalidations.append(1))
+        statements, stop = _count_statements()
+        try:
+            assert _persist([a, b]) == 1
+        finally:
+            stop()
+        assert zone_calls == [IDENT] and commits == [1] and invalidations == [1]
+        assert 'INSERT' in statements and 'DELETE' in statements
+        assert {r.order_id for r in _rows()} == {a.id, b.id}
+
+
+def test_R3_new_row_without_zone_writes_nothing_neg(app, env, monkeypatch):
+    with app.app_context():
+        a, _b = _two_orders(env)
+        monkeypatch.setattr(records, 'zone_for', lambda i: None)
+        commits = []
+        monkeypatch.setattr(records, '_commit', lambda: commits.append(1) or True)
+        assert _persist([a]) == 0
+        assert commits == [] and _rows() == []

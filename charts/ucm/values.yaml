@@ -108,13 +108,22 @@ dnsUpdate:
     port: 53            # port that DNS clients use
     annotations: {}
     loadBalancerIP: ""
-  ## Additional NetworkPolicy: allows the listener ports only from these peers.
-  ## The HTTPS and HTTP ports stay open to all sources, as without a policy.
+  ## Additional NetworkPolicy. While it is enabled, it closes EVERY port of the
+  ## pod that it does not allow (NetworkPolicies are additive allow-lists):
+  ## - from all sources: the https and http ports and `extraPorts`;
+  ## - only from `from`: the DNS UPDATE ports.
   ## `from` is a list of NetworkPolicy peers (podSelector, namespaceSelector,
   ## ipBlock). An empty list with enabled: true denies all ingress to the
-  ## listener ports. The policy needs a CNI that enforces NetworkPolicy.
+  ## listener ports.
+  ## `extraPorts` lists other ports that must stay open to all sources, as
+  ## {port: <number or name>, protocol: TCP|UDP}. Example: the ACME client
+  ## TLS-ALPN-01 proof listener, or a port added through `extraEnv`.
+  ## The policy needs a CNI that enforces NetworkPolicy.
   networkPolicy:
     enabled: false
+    extraPorts: []
+      # - port: 8443
+      #   protocol: TCP
     from: []
       # - namespaceSelector:
       #     matchLabels:

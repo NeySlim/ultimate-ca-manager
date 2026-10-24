@@ -15,7 +15,9 @@ from utils.acme_public_url import get_acme_public_base, get_acme_proxy_public_ba
 from models import db, SystemConfig
 from utils.acme_debug import clear_acme_debug_cache
 from services.audit_service import AuditService
-from services.acme.acme_client_service import ACCOUNT_KEY_TYPES, CERT_KEY_TYPES, fips_key_type_refusal
+from services.acme.acme_client_service import (
+    ACCOUNT_KEY_TYPES, CERT_KEY_TYPES, fips_key_type_refusal, get_stored_tls_alpn_port,
+)
 from services.acme.dns_selfcheck import DNS_PROPAGATION_MAX_DELAY, dns_propagation_delay
 from security.encryption import encrypt_text
 from utils.dns_txt_lookup import (
@@ -29,14 +31,6 @@ from utils.dns_txt_lookup import (
 from services.acme.dns_update import status as dns_update_status
 
 logger = logging.getLogger(__name__)
-
-
-def _stored_tls_alpn_port() -> int:
-    cfg = SystemConfig.query.filter_by(key='acme.client.tls_alpn_port').first()
-    try:
-        return int(cfg.value) if cfg and cfg.value else 443
-    except (TypeError, ValueError):
-        return 443
 
 
 @bp.route('/api/v2/acme/client/settings', methods=['GET'])
@@ -110,17 +104,13 @@ def get_settings():
         proxy_eab_kid = None
         proxy_eab_hmac_set = False
     dns_timeout_cfg = SystemConfig.query.filter_by(key='acme.client.dns_propagation_timeout').first()
-    tls_alpn_port_cfg = SystemConfig.query.filter_by(key='acme.client.tls_alpn_port').first()
     debug_logging_cfg = SystemConfig.query.filter_by(key='acme.client.debug_logging').first()
     allow_loopback_cfg = SystemConfig.query.filter_by(key='acme.client.allow_loopback_upstream').first()
     try:
         dns_timeout = int(dns_timeout_cfg.value) if dns_timeout_cfg else 120
     except (ValueError, TypeError):
         dns_timeout = 120
-    try:
-        tls_alpn_port = int(tls_alpn_port_cfg.value) if tls_alpn_port_cfg else 443
-    except (ValueError, TypeError):
-        tls_alpn_port = 443
+    tls_alpn_port = get_stored_tls_alpn_port()
 
     return success_response(data={
         'email': email_cfg.value if email_cfg else None,
@@ -156,6 +146,7 @@ def get_settings():
         'acme_public_base_url': get_acme_public_base(request),
         'acme_proxy_public_base_url': get_acme_proxy_public_base(request),
         'dns_update_port': dns_update_status.get_stored_dns_update_port(),
+        'dns_update_port_effective': dns_update_status.get_dns_update_port(),
         'dns_update_port_env': dns_update_status.get_dns_update_port_env(),
         'dns_update_listening': dns_update_status.is_listening(),
     })
@@ -268,7 +259,7 @@ def update_settings():
                 'TLS-ALPN-01 listen port must be between 1 and 65535', 400
             )
         effective_dns_port = dns_update_status.get_dns_update_port()
-        if 'dns_update_port' in data:
+        if 'dns_update_port' in data and dns_update_status.get_dns_update_port_env() is None:
             try:
                 if not isinstance(data['dns_update_port'], bool):
                     effective_dns_port = int(data['dns_update_port'])
@@ -306,11 +297,10 @@ def update_settings():
                 return error_response(
                     'DNS UPDATE port cannot be the same as HTTP protocol port', 400)
             effective_tls_alpn = (tls_alpn_port if 'tls_alpn_port' in data
-                                  else _stored_tls_alpn_port())
+                                  else get_stored_tls_alpn_port())
             if dns_update_port == effective_tls_alpn:
                 return error_response(
                     'DNS UPDATE port cannot be the same as the TLS-ALPN-01 port', 400)
-        previous_dns_port = dns_update_status.get_stored_dns_update_port()
         env_override = dns_update_status.get_dns_update_port_env() is not None
         _set_config(
             dns_update_status.PORT_CONFIG_KEY,
@@ -319,7 +309,8 @@ def update_settings():
         )
         updates.append('dns_update_port')
         # The environment variable wins over the setting: no restart helps then.
-        restart_needed = dns_update_port != previous_dns_port and not env_override
+        restart_needed = (dns_update_port != dns_update_status.listening_port()
+                          and not env_override)
 
     if 'debug_logging' in data:
         try:

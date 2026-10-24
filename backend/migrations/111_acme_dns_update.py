@@ -34,7 +34,7 @@ _INDEXES = (
 )
 
 
-def _tables(pk, ts):
+def _tables(pk, ts, false):
     keys = f"""
     CREATE TABLE IF NOT EXISTS acme_dns_update_keys (
         id {pk},
@@ -42,6 +42,7 @@ def _tables(pk, ts):
             REFERENCES acme_client_accounts (id) ON DELETE CASCADE,
         eab_credential_id INTEGER
             REFERENCES acme_eab_credentials (id) ON DELETE CASCADE,
+        eab_bound BOOLEAN NOT NULL DEFAULT {false},
         name VARCHAR(255) NOT NULL UNIQUE,
         algorithm VARCHAR(32) NOT NULL DEFAULT 'hmac-sha256',
         secret TEXT NOT NULL,
@@ -77,13 +78,13 @@ def _tables(pk, ts):
 
 def upgrade(conn):
     if isinstance(conn, sqlite3.Connection):
-        for stmt in _tables('INTEGER PRIMARY KEY AUTOINCREMENT', 'DATETIME') + _INDEXES:
+        for stmt in _tables('INTEGER PRIMARY KEY AUTOINCREMENT', 'DATETIME', '0') + _INDEXES:
             conn.execute(stmt)
         conn.commit()
         logger.info("Migration 111: ensured DNS UPDATE tables (SQLite)")
     else:
         from sqlalchemy import text
-        for stmt in _tables('SERIAL PRIMARY KEY', 'TIMESTAMP') + _INDEXES:
+        for stmt in _tables('SERIAL PRIMARY KEY', 'TIMESTAMP', 'FALSE') + _INDEXES:
             conn.execute(text(stmt))
         logger.info("Migration 111: ensured DNS UPDATE tables (PostgreSQL)")
 

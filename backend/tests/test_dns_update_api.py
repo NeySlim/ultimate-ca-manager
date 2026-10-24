@@ -534,11 +534,16 @@ def test_B4_tls_alpn_port_with_disabled_dns_port_pos(auth_client, env, monkeypat
 
 def test_B4_restart_required_only_on_change_pos(auth_client, env, monkeypatch):
     monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
-    first = _patch_settings(auth_client, {'dns_update_port': 8053})
-    assert _data(first)['restart_required'] is True
-    second = _patch_settings(auth_client, {'dns_update_port': 8053})
-    assert second.status_code == 200
-    assert _data(second)['restart_required'] is False
+    from services.acme.dns_update import status
+    status.set_listening(True, 8053)
+    try:
+        first = _patch_settings(auth_client, {'dns_update_port': 9053})
+        assert _data(first)['restart_required'] is True
+        second = _patch_settings(auth_client, {'dns_update_port': 8053})
+        assert second.status_code == 200
+        assert _data(second)['restart_required'] is False
+    finally:
+        status.set_listening(False)
 
 
 def test_B4_restart_not_required_when_env_is_set_neg(auth_client, app, env, monkeypatch):
@@ -647,3 +652,101 @@ def test_no_secret_in_logs_neg(auth_client, env, caplog):
         from models.audit_log import AuditLog
         rows = AuditLog.query.filter(AuditLog.action.like('acme.dns_update.key.%')).all()
         assert rows and all(secret not in (row.details or '') for row in rows)
+
+
+# ------------------------------------------------------------------- D1 (API)
+
+def test_D1_create_with_eab_sets_bound_pos(auth_client, env):
+    acct = env.make_account()
+    r = _post(auth_client, acct, {'eab_credential_id': env.make_cred('active')})
+    assert r.status_code == 201 and _data(r)['eab_bound'] is True
+    with env.app.app_context():
+        assert AcmeDnsUpdateKey.query.get(_data(r)['id']).eab_bound is True
+
+
+def test_D1_create_without_eab_is_not_bound_neg(auth_client, env):
+    r = _post(auth_client, env.make_account())
+    assert r.status_code == 201 and _data(r)['eab_bound'] is False
+
+
+# ------------------------------------------------------------------- D4
+
+def test_D4a_restart_required_compares_with_running_port_pos(auth_client, env, monkeypatch):
+    from services.acme.dns_update import status
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    status.set_listening(True, 8053)
+    try:
+        assert status.listening_port() == 8053
+        assert _data(_patch_settings(auth_client, {'dns_update_port': 9053}))[
+            'restart_required'] is True
+        assert _data(_patch_settings(auth_client, {'dns_update_port': 8053}))[
+            'restart_required'] is False
+    finally:
+        status.set_listening(False)
+    assert status.listening_port() == 0
+
+
+def test_D4a_not_listening_compares_with_zero_neg(auth_client, env, monkeypatch):
+    from services.acme.dns_update import status
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    status.set_listening(False)
+    assert _data(_patch_settings(auth_client, {'dns_update_port': 0}))[
+        'restart_required'] is False
+    assert _data(_patch_settings(auth_client, {'dns_update_port': 8053}))[
+        'restart_required'] is True
+
+
+def test_D4b_tls_alpn_conflicts_with_env_dns_port_pos(auth_client, env, monkeypatch):
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '9443')
+    r = _patch_settings(auth_client, {'tls_alpn_port': 9443, 'dns_update_port': 0})
+    assert r.status_code == 400
+
+
+def test_D4b_tls_alpn_without_env_ignores_disabled_port_neg(auth_client, env, monkeypatch):
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    r = _patch_settings(auth_client, {'tls_alpn_port': 9443, 'dns_update_port': 0})
+    assert r.status_code == 200
+
+
+def test_D4c_env_out_of_range_is_zero_with_warning_pos(app, env, monkeypatch, caplog):
+    from services.acme.dns_update.status import get_dns_update_port
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '70000')
+    with app.app_context(), caplog.at_level(logging.WARNING):
+        assert get_dns_update_port() == 0
+    assert any('UCM_DNS_UPDATE_PORT' in r.getMessage() for r in caplog.records)
+
+
+def test_D4c_env_valid_port_no_warning_neg(app, env, monkeypatch, caplog):
+    from services.acme.dns_update.status import get_dns_update_port
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '8053')
+    with app.app_context(), caplog.at_level(logging.WARNING):
+        assert get_dns_update_port() == 8053
+    assert not caplog.records
+
+
+def test_D4c_env_privileged_port_kept_with_warning_pos(app, env, monkeypatch, caplog):
+    from services.acme.dns_update.status import get_dns_update_port
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '53')
+    with app.app_context(), caplog.at_level(logging.WARNING):
+        assert get_dns_update_port() == 53
+    assert any('CAP_NET_BIND_SERVICE' in r.getMessage() for r in caplog.records)
+
+
+def test_D4d_effective_port_follows_env_pos(auth_client, env, monkeypatch):
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '8054')
+    assert _data(auth_client.get('/api/v2/acme/client/settings'))[
+        'dns_update_port_effective'] == 8054
+
+
+def test_D4d_effective_port_invalid_env_is_zero_neg(auth_client, env, monkeypatch):
+    monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '70000')
+    assert _data(auth_client.get('/api/v2/acme/client/settings'))[
+        'dns_update_port_effective'] == 0
+
+
+def test_D4d_effective_port_from_db_without_env_pos(auth_client, app, env, monkeypatch):
+    monkeypatch.delenv('UCM_DNS_UPDATE_PORT', raising=False)
+    with app.app_context():
+        _set_cfg(PORT_KEY, '8053')
+    assert _data(auth_client.get('/api/v2/acme/client/settings'))[
+        'dns_update_port_effective'] == 8053

@@ -111,6 +111,15 @@ def csr_identifiers_match_order(
     return True, 'CSR identifiers match order'
 
 
+def get_stored_tls_alpn_port() -> int:
+    """Stored TLS-ALPN-01 listen port (``acme.client.tls_alpn_port``); 443 when missing or invalid."""
+    cfg = SystemConfig.query.filter_by(key='acme.client.tls_alpn_port').first()
+    try:
+        return int(cfg.value) if cfg and cfg.value else 443
+    except (TypeError, ValueError):
+        return 443
+
+
 def _legacy_directory_url() -> Optional[str]:
     """Read the legacy ``acme.client.directory_url`` SystemConfig value.
 
@@ -1343,11 +1352,7 @@ class AcmeClientService:
         if self._tls_alpn_port_override is not None:
             port = int(self._tls_alpn_port_override)
         else:
-            cfg = SystemConfig.query.filter_by(key='acme.client.tls_alpn_port').first()
-            try:
-                port = int(cfg.value) if cfg and cfg.value else 443
-            except (TypeError, ValueError):
-                port = 443
+            port = get_stored_tls_alpn_port()
         if not 1 <= port <= 65535:
             raise ValueError('TLS-ALPN-01 listen port must be between 1 and 65535')
         return port

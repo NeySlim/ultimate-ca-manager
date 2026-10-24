@@ -31,6 +31,7 @@ import OrderDetailPanel from './acme/OrderDetailPanel'
 import CreateAccountForm from './acme/CreateAccountForm'
 import RequestCertificateForm from './acme/RequestCertificateForm'
 import CaAccountsManager from './acme/CaAccountsManager'
+import { effectiveDnsUpdatePort } from './acme/dnsUpdatePort'
 import DnsProviderForm from './acme/DnsProviderForm'
 import DomainForm from './acme/DomainForm'
 import LocalDomainForm from './acme/LocalDomainForm'
@@ -1201,7 +1202,7 @@ export default function ACMEPage() {
             <CaAccountsManager
               accounts={caAccounts}
               proxyPublicBase={publicBaseUrl(clientSettings.acme_proxy_public_base_url, '/acme/proxy')}
-              dnsUpdatePort={clientSettings.dns_update_port_env ?? clientSettings.dns_update_port ?? 0}
+              dnsUpdatePort={effectiveDnsUpdatePort(clientSettings)}
               canWrite={canWrite('acme')}
               canDelete={canDelete('acme')}
               onCreate={handleCreateCaAccount}

@@ -185,7 +185,7 @@ class DnsUpdateServer:
         self._port = port
         self._hub = gevent.get_hub()
         self._stopped = Event()
-        status.set_listening(True)
+        status.set_listening(True, self._port)
         logger.info("DNS UPDATE listener started on %s port %d (UDP and TCP)", self._host, port)
         return True
 

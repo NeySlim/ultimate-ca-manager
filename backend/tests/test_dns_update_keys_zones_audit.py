@@ -46,9 +46,10 @@ def env(app):
             return a.id
 
         def make_key(account_id, name=None, status='active', algorithm='hmac-sha256',
-                     eab_credential_id=None):
+                     eab_credential_id=None, eab_bound=False):
             k = AcmeDnsUpdateKey(acme_client_account_id=account_id,
                                  eab_credential_id=eab_credential_id,
+                                 eab_bound=eab_bound,
                                  name=name or f'k{uuid.uuid4().hex[:8]}.example.',
                                  algorithm=algorithm, status=status)
             k.secret = B64_SECRET
@@ -441,9 +442,9 @@ def test_B1_dirty_cache_stays_closed_within_retry_window_pos(env, monkeypatch):
     calls = _failing_load(monkeypatch)
     store.invalidate()
     assert store.lookup(_n(k.name)) is None
-    store.invalidate()  # a second invalidation inside the retry window
-    assert store.lookup(_n(k.name)) is None
-    assert len(calls) == 1
+    store.invalidate()  # a second invalidation clears the retry time (D3a)
+    assert store.lookup(_n(k.name)) is None  # still fail closed
+    assert len(calls) == 2
 
 
 def test_B1_dirty_cache_recovers_when_db_is_back_pos(env, monkeypatch):
@@ -512,6 +513,103 @@ def test_B1_one_warning_per_failed_attempt_pos(env, monkeypatch, caplog):
             store.lookup(_n('w.example.'))
     warnings = [r for r in caplog.records if 'key reload failed' in r.getMessage()]
     assert len(warnings) == 2
+
+
+def test_D3a_invalidate_inside_retry_window_reloads_at_once_pos(env, monkeypatch):
+    from services.acme.dns_update.keys import KeyStore
+    clock = Clock()
+    k = env.make_key(env.make_account(), name='d3a.example.')
+    store = KeyStore(max_age_s=30.0, clock=clock)
+    assert store.lookup(_n(k.name)) is not None
+    with monkeypatch.context() as m:
+        m.setattr(KeyStore, '_load', staticmethod(
+            lambda: (_ for _ in ()).throw(RuntimeError('x'))))
+        clock.t += 31  # ordinary expiry: failure, cache kept, not dirty
+        assert store.lookup(_n(k.name)) is not None
+    clock.t += 0.5  # inside the retry window
+    store.invalidate()
+    assert store.lookup(_n(k.name)) is not None  # reloaded with a healthy DB
+
+
+def test_D3a_invalidate_with_failing_db_empties_cache_neg(env, monkeypatch):
+    from services.acme.dns_update.keys import KeyStore
+    clock = Clock()
+    k = env.make_key(env.make_account(), name='d3an.example.')
+    store = KeyStore(max_age_s=30.0, clock=clock)
+    assert store.lookup(_n(k.name)) is not None
+    _failing_load(monkeypatch)
+    clock.t += 31
+    assert store.lookup(_n(k.name)) is not None
+    clock.t += 0.5
+    store.invalidate()
+    assert store.lookup(_n(k.name)) is None
+    assert store.scope(k.id) is None
+
+
+def test_D1_bound_key_without_credential_matches_nothing_pos(env):
+    from services.acme.dns_update.keys import KeyStore
+    acct = env.make_account()
+    k = env.make_key(acct, eab_bound=True, eab_credential_id=None)
+    store = KeyStore()
+    assert store.lookup(_n(k.name)) is not None
+    scope = store.scope(k.id)
+    assert scope.eab_bound and scope.eab_account_id is None
+    assert not scope.allows(acct, 'acct-1')
+    assert not scope.allows(acct, None)
+
+
+def test_D1_unbound_key_matches_whole_proxy_account_neg(env):
+    from services.acme.dns_update.keys import KeyStore
+    acct = env.make_account()
+    k = env.make_key(acct, eab_bound=False, eab_credential_id=None)
+    scope = KeyStore().scope(k.id)
+    assert not scope.eab_bound
+    assert scope.allows(acct, 'acct-1') and scope.allows(acct, 'acct-2')
+    assert not scope.allows(acct + 1, 'acct-1')
+
+
+def test_D2_mark_eab_used_makes_scope_allow_at_once_pos(env):
+    from services.acme.dns_update.keys import key_store
+    from services.acme.acme_service import AcmeService
+    cred_id = env.make_cred('active', None)
+    acct = env.make_account()
+    k = env.make_key(acct, eab_credential_id=cred_id, eab_bound=True)
+    kid = env.db.session.get(__import__('models.acme_models', fromlist=['x']).AcmeEabCredential,
+                             cred_id).kid
+    key_store.invalidate()
+    assert not key_store.scope(k.id).allows(acct, 'acct-new')  # cached: unused
+    assert AcmeService().mark_eab_used(kid, 'acct-new') is True
+    assert key_store.scope(k.id).allows(acct, 'acct-new')  # no clock advance
+    key_store.invalidate()
+
+
+def test_D2_failed_mark_eab_used_keeps_return_value_neg(env):
+    from services.acme.dns_update.keys import key_store
+    from services.acme.acme_service import AcmeService
+    from models.acme_models import AcmeEabCredential
+    cred_id = env.make_cred('used', 'acct-1')
+    acct = env.make_account()
+    k = env.make_key(acct, eab_credential_id=cred_id, eab_bound=True)
+    kid = env.db.session.get(AcmeEabCredential, cred_id).kid
+    key_store.invalidate()
+    assert key_store.scope(k.id).allows(acct, 'acct-1')
+    assert AcmeService().mark_eab_used(kid, 'acct-other') is False
+    assert AcmeService().mark_eab_used(kid, 'acct-1') is True  # idempotent for the owner
+    assert not key_store.scope(k.id).allows(acct, 'acct-other')
+    key_store.invalidate()
+
+
+def test_D2_invalidation_error_never_changes_result_neg(env, monkeypatch):
+    from services.acme.acme_service import AcmeService
+    from services.acme.dns_update import keys as keys_mod
+    from models.acme_models import AcmeEabCredential
+    cred_id = env.make_cred('active', None)
+    kid = env.db.session.get(AcmeEabCredential, cred_id).kid
+
+    def boom():
+        raise RuntimeError('x')
+    monkeypatch.setattr(keys_mod, 'invalidate_keys', boom)
+    assert AcmeService().mark_eab_used(kid, 'acct-z') is True
 
 
 def _eab_statements(env, fn):
@@ -626,6 +724,69 @@ def test_U3_db_error_keeps_previous_pos(zone_env, monkeypatch):
         raise RuntimeError('db')
     monkeypatch.setattr(ZoneIndex, '_load', staticmethod(boom))
     clock.t += 100
+    assert zi.is_authoritative(_n('example.com.'))
+
+
+def test_D3b_zone_failure_retries_after_retry_interval_pos(zone_env, monkeypatch):
+    from services.acme.dns_update.zones import ZoneIndex, _RETRY_S
+    clock = Clock()
+    zi = ZoneIndex(clock=clock)
+    assert zi.is_authoritative(_n('example.com.'))
+    calls = []
+
+    def boom():
+        calls.append(1)
+        raise RuntimeError('db')
+    monkeypatch.setattr(ZoneIndex, '_load', staticmethod(boom))
+    clock.t += 100
+    for _ in range(5):
+        assert zi.is_authoritative(_n('example.com.'))  # previous zones kept
+    assert len(calls) == 1
+    clock.t += _RETRY_S - 0.5
+    zi.zones()
+    assert len(calls) == 1
+
+
+def test_D3b_zone_failure_retries_again_after_interval_neg(zone_env, monkeypatch):
+    from services.acme.dns_update.zones import ZoneIndex, _RETRY_S
+    clock = Clock()
+    zi = ZoneIndex(clock=clock)
+    calls = []
+
+    def boom():
+        calls.append(1)
+        raise RuntimeError('db')
+    monkeypatch.setattr(ZoneIndex, '_load', staticmethod(boom))
+    zi.zones()
+    clock.t += _RETRY_S + 0.1
+    zi.zones()
+    assert len(calls) == 2
+
+
+def test_D3b_first_failure_does_not_load_on_every_call_neg(zone_env, monkeypatch, caplog):
+    from services.acme.dns_update.zones import ZoneIndex
+    zi = ZoneIndex(clock=Clock())
+    calls = []
+
+    def boom():
+        calls.append(1)
+        raise RuntimeError('db')
+    monkeypatch.setattr(ZoneIndex, '_load', staticmethod(boom))
+    with caplog.at_level(logging.WARNING):
+        for _ in range(30):
+            assert not zi.is_authoritative(_n('example.com.'))
+    assert len(calls) == 1
+    assert len([r for r in caplog.records if 'zone reload failed' in r.getMessage()]) == 1
+
+
+def test_D3b_invalidate_clears_retry_time_pos(zone_env, monkeypatch):
+    from services.acme.dns_update.zones import ZoneIndex
+    zi = ZoneIndex(clock=Clock())
+    with monkeypatch.context() as m:
+        m.setattr(ZoneIndex, '_load', staticmethod(
+            lambda: (_ for _ in ()).throw(RuntimeError('x'))))
+        assert not zi.is_authoritative(_n('example.com.'))
+    zi.invalidate()
     assert zi.is_authoritative(_n('example.com.'))
 
 
@@ -749,7 +910,7 @@ def test_N13_attacker_strings_are_sanitized_neg(audit_env):
     row = _rows(audit_env)[0]
     expected = ('ab' + '??????' + 'x' * 400)[:255]
     assert row.resource_name == expected
-    assert row.username == 'dns-update:' + expected
+    assert row.username == ('dns-update:' + expected)[:80]
     d = json.loads(row.details)
     assert d['qname'] == expected and d['l'] == [expected] and d['n'] == 3
 
@@ -886,3 +1047,26 @@ def test_N11_no_secret_in_logs_neg(audit_env, caplog):
     assert RAW_SECRET.hex() not in text
     assert repr(RAW_SECRET) not in text
     assert repr(store.lookup(_n(good.name))).find(B64_SECRET) == -1
+
+
+# ---------------------------------------------------------------- D5
+
+def test_D5_long_key_name_is_truncated_to_column_limits_pos(audit_env):
+    from services.acme.dns_update.audit import AuditSink
+    sink = AuditSink(clock=Clock())
+    name = 'k' * 200 + '.example.'
+    assert _rec(sink, '192.0.2.77', keyname=name) is True
+    rows = [r for r in _rows(audit_env) if r.ip_address == '192.0.2.77']
+    assert len(rows) == 1
+    assert len(rows[0].username) <= 80 and rows[0].username.startswith('dns-update:')
+    assert len(rows[0].resource_name) <= 255
+    assert len(rows[0].ip_address) <= 45
+
+
+def test_D5_short_key_name_is_unchanged_neg(audit_env):
+    from services.acme.dns_update.audit import AuditSink
+    sink = AuditSink(clock=Clock())
+    _rec(sink, '192.0.2.78', keyname='short.example.')
+    row = [r for r in _rows(audit_env) if r.ip_address == '192.0.2.78'][0]
+    assert row.username == 'dns-update:short.example.'
+    assert row.resource_name == 'short.example.'

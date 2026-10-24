@@ -162,14 +162,15 @@ class AuditSink:
         """True when the row was stored (log_action returns None on a failed commit)."""
         from services.audit import AuditService
         key_s = sanitize_text(keyname) if keyname else None
+        # Column limits of audit_logs (PostgreSQL enforces them).
         result = AuditService.log_action(
-            action=sanitize_text(action),
+            action=sanitize_text(action, 100),
             resource_type='acme_dns_update',
-            resource_name=key_s or 'unauthenticated',
+            resource_name=(key_s or 'unauthenticated')[:255],
             details=json.dumps(_sanitize_details(details)),
             success=success,
-            username=f"dns-update:{key_s}" if key_s else "dns-update:unauthenticated",
-            ip_address=ip,
+            username=(f"dns-update:{key_s}" if key_s else "dns-update:unauthenticated")[:80],
+            ip_address=sanitize_text(ip, 45) if ip else ip,
         )
         return result is not None
 

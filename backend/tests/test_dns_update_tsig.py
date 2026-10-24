@@ -393,6 +393,77 @@ def test_S7_truncated_request_does_not_update_watermark_neg():
     assert not wm.is_older(1, 0)
 
 
+# --- S15 replay before time (plan step 6e before 6f) ------------------------------
+
+def _run_replay(wire, key, now, wm, seen):
+    calls = []
+
+    def is_replay():
+        calls.append(1)
+        return seen(wire)
+
+    res = verify_request(wire, parse(wire), lookup_for(key), now, wm, is_replay=is_replay)
+    return res, calls
+
+
+def test_S15_replay_older_than_watermark_is_ok_without_time_check_pos():
+    wm, key = TimeWatermark(), material()
+    a = client_update(t=NOW - 1)
+    b = client_update(t=NOW)
+    assert run(a, [key], now=NOW, wm=wm)[0].outcome is TsigOutcome.OK
+    assert run(b, [key], now=NOW, wm=wm)[0].outcome is TsigOutcome.OK
+    assert run(a, [key], now=NOW, wm=wm)[0].outcome is TsigOutcome.BADTIME  # without is_replay
+    res, calls = _run_replay(a, key, NOW, wm, lambda w: w == a)
+    assert res.outcome is TsigOutcome.OK and res.replayed and res.key == key
+    assert calls == [1]
+    assert wm.is_older(1, NOW - 1) and not wm.is_older(1, NOW)  # watermark unchanged
+
+
+def test_S15_replay_outside_time_window_is_ok_pos():
+    wm, key = TimeWatermark(), material()
+    a = client_update(t=NOW)
+    res, _ = _run_replay(a, key, NOW + 10_000, wm, lambda w: True)
+    assert res.outcome is TsigOutcome.OK and res.replayed
+    assert not wm.is_older(1, 0)  # nothing recorded for a replay
+
+
+def test_S15_new_request_older_than_watermark_is_badtime_neg():
+    wm, key = TimeWatermark(), material()
+    run(client_update(t=NOW), [key], now=NOW, wm=wm)
+    old = client_update(t=NOW - 1)
+    res, calls = _run_replay(old, key, NOW, wm, lambda w: False)
+    assert res.outcome is TsigOutcome.BADTIME and not res.replayed
+    assert calls == [1]
+    assert not wm.is_older(1, NOW)
+
+
+def test_S15_replay_with_bad_mac_is_badsig_and_cache_not_asked_neg():
+    wm, key = TimeWatermark(), material()
+    res, calls = _run_replay(flip_mac(client_update(t=NOW)), key, NOW, wm, lambda w: True)
+    assert res.outcome is TsigOutcome.BADSIG and not res.replayed
+    assert calls == []
+    assert not wm.is_older(1, 0)
+
+
+def test_S15_replay_with_unknown_key_cache_not_asked_neg():
+    res, calls = _run_replay(client_update(t=NOW), material(name=dns.name.from_text("x.example.")),
+                             NOW, TimeWatermark(), lambda w: True)
+    assert res.outcome is TsigOutcome.BADKEY and calls == []
+
+
+def test_S15_not_a_replay_outside_window_is_badtime_neg():
+    wm, key = TimeWatermark(), material()
+    res, _ = _run_replay(client_update(t=NOW), key, NOW + 10_000, wm, lambda w: False)
+    assert res.outcome is TsigOutcome.BADTIME and not res.replayed
+
+
+def test_S15_truncated_non_replay_is_still_badtrunc_neg():
+    wm, key = TimeWatermark(), material()
+    res, _ = _run_replay(truncated(client_update(t=NOW), 16), key, NOW, wm, lambda w: False)
+    assert res.outcome is TsigOutcome.BADTRUNC and not res.replayed
+    assert not wm.is_older(1, 0)
+
+
 def test_S7_watermark_class_pos():
     wm = TimeWatermark()
     assert not wm.is_older(1, 10)

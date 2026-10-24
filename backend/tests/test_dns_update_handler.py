@@ -1270,6 +1270,82 @@ def test_S15_refused_request_is_replayed_without_new_audit_pos(h):
     assert len(h.audit.records) == 1
 
 
+def _clocked_harness(t):
+    return Harness(clock=lambda: float(t[0]))
+
+
+def test_S15_replay_after_later_request_gets_stored_answer_pos():
+    t = [NOW]
+    h = _clocked_harness(t)
+    a = sign(good_update(), t=NOW - 1)
+    b = sign(good_update(), t=NOW)
+    first = h.send(a.wire)
+    assert verified(first, a, t=NOW).rcode() == dns.rcode.NOERROR
+    assert verified(h.send(b.wire), b).rcode() == dns.rcode.NOERROR
+    assert len(h.marks) == 2 and len(h.audit.authenticated) == 2 and len(h.keys.touched) == 2
+    assert h.audit.records == []
+    again = h.send(a.wire)
+    assert again == first
+    assert len(h.marks) == 2 and len(h.audit.authenticated) == 2 and len(h.keys.touched) == 2
+    assert h.audit.records == []  # no "rejected badtime" row
+    assert h.handler._watermark.is_older(1, NOW - 1) is True  # watermark stayed at NOW
+    assert h.handler._watermark.is_older(1, NOW) is False
+
+
+def test_S15_replay_over_other_transport_after_later_request_changes_nothing_pos():
+    t = [NOW]
+    h = _clocked_harness(t)
+    a = sign(good_update(), t=NOW - 1)
+    h.send(a.wire, "udp")
+    h.send(sign(good_update(), t=NOW).wire)
+    marks, aud, touched = len(h.marks), len(h.audit.authenticated), len(h.keys.touched)
+    tcp = h.send(a.wire, "tcp")
+    assert verified(tcp, a, t=NOW).rcode() == dns.rcode.NOERROR
+    assert (len(h.marks), len(h.audit.authenticated), len(h.keys.touched)) == (marks, aud, touched)
+    assert h.audit.records == []
+
+
+def test_S15_new_request_older_than_watermark_is_badtime_neg():
+    t = [NOW]
+    h = _clocked_harness(t)
+    h.send(sign(good_update(), t=NOW).wire)
+    marks, aud, touched = len(h.marks), len(h.audit.authenticated), len(h.keys.touched)
+    raw = h.send(sign(good_update(), t=NOW - 1).wire)
+    assert parse(raw).rcode() == dns.rcode.BADTIME or parse(raw).tsig[0].error == dns.rcode.BADTIME
+    assert len(h.audit.records) == 1 and h.audit.records[0]["reason"] == "badtime"
+    assert (len(h.marks), len(h.audit.authenticated), len(h.keys.touched)) == (marks, aud, touched)
+
+
+def test_S15_replay_with_changed_mac_is_badsig_and_cache_not_asked_neg():
+    h = Harness()
+    req = sign(good_update())
+    h.send(req.wire)
+    asked = []
+    real_seen = h.handler._replay.seen
+    h.handler._replay.seen = lambda k: asked.append(k) or real_seen(k)
+    mac = req.mac
+    i = req.wire.rfind(mac)
+    bad = bytearray(req.wire)
+    bad[i + 3] ^= 1
+    raw = h.send(bytes(bad))
+    assert parse(raw).tsig[0].error == dns.rcode.BADSIG
+    assert asked == []
+    assert len(h.marks) == 1 and len(h.audit.authenticated) == 1 and len(h.keys.touched) == 1
+    assert [r["reason"] for r in h.audit.records] == ["badsig"]
+
+
+def test_S15_replay_after_ttl_outside_window_is_badtime_neg():
+    t = [NOW]
+    h = _clocked_harness(t)
+    a = sign(good_update(), t=NOW)
+    h.send(a.wire)
+    t[0] = NOW + REPLAY_TTL_S + 1000  # entry expired and the time window is over
+    raw = h.send(a.wire)
+    assert parse(raw).tsig[0].error == dns.rcode.BADTIME
+    assert len(h.marks) == 1 and len(h.audit.authenticated) == 1 and len(h.keys.touched) == 1
+    assert [r["reason"] for r in h.audit.records] == ["badtime"]
+
+
 def test_S15_unsigned_request_is_not_cached_neg(h):
     wire = plain(good_update()).wire
     h.send(wire)
@@ -1334,8 +1410,13 @@ def test_A1_replay_outside_the_fudge_is_badtime_not_a_second_update_neg():
     clock = [float(NOW)]
     hh = Harness(clock=lambda: clock[0])
     req = sign(good_update(), t=NOW + 250)
-    hh.send(req.wire)
-    clock[0] = NOW + 551.0  # 301 s after Time Signed
+    first = hh.send(req.wire)
+    # 301 s after Time Signed, entry still live: the stored answer (S15, step 6e before 6f).
+    clock[0] = NOW + 551.0
+    assert hh.send(req.wire) == first
+    assert "badtime" not in hh.sampler.counts()
+    # The entry is gone after REPLAY_TTL_S: BADTIME, and no second update.
+    clock[0] = NOW + 250 + REPLAY_TTL_S + 1.0
     assert hh.send(req.wire) is not None
     assert hh.sampler.counts()["badtime"] == 1
     assert len(hh.marks) == 1 and len(hh.audit.authenticated) == 1 and hh.snap.calls == 1
@@ -1576,6 +1657,34 @@ def test_N9_counts_inside_limits_are_processed_pos(h):
     assert h.send(with_counts(q, qd=1)) is not None
     wire = with_counts(q, qd=16)  # in the limit: parse error, FORMERR
     header_only_ok(h.send(wire), dns.rcode.FORMERR, wire)
+
+
+def test_N9_query_with_answer_count_gets_no_response_and_no_parse_pos(h):
+    wire = with_counts(plain(soa_query("x.example.org.")).wire, an=1)
+    with mock.patch.object(handler_mod.dns.message, "from_wire") as parser:
+        assert h.send(wire) is None
+        assert parser.call_count == 0
+    assert h.sampler.counts()["counts"] == 1
+    assert h.quiet() and h.no_db()
+
+
+def test_N9_query_with_answer_count_16_gets_no_response_pos(h):
+    assert h.send(with_counts(plain(soa_query("x.example.org.")).wire, an=16)) is None
+
+
+def test_N9_query_with_zero_answers_is_answered_neg(h):
+    with mock.patch.object(handler_mod.dns.message, "from_wire",
+                           wraps=handler_mod.dns.message.from_wire) as parser:
+        assert h.send(plain(soa_query("x.example.org.")).wire) is not None
+        assert parser.called
+
+
+def test_N9_update_with_one_prerequisite_is_still_refused_neg(h):
+    u = upd(adds=[GOOD_ADD])
+    u.present(RECORD1)
+    raw = h.send(sign(u).wire)
+    assert parse(raw).rcode() == dns.rcode.REFUSED
+    assert len(h.audit.records) == 1 and h.audit.records[0]["reason"] == "prerequisite"
 
 
 @pytest.mark.parametrize("kw", [dict(ar=1000), dict(ar=5), dict(qd=17), dict(an=17), dict(ns=17)])

@@ -52,6 +52,7 @@ vi.mock('../../../components', async (importOriginal) => ({
   ),
 }))
 
+import { effectiveDnsUpdatePort } from '../dnsUpdatePort'
 import DnsUpdateKeysPanel from '../DnsUpdateKeysPanel'
 
 const ACCOUNT = { id: 7, label: 'Actalis', proxy_slug: 'actalis' }
@@ -232,6 +233,28 @@ describe('DnsUpdateKeysPanel', () => {
       expect(screen.queryByText('acme.dnsUpdate.notePort')).not.toBeInTheDocument()
       await openTab(user, 'acme.dnsUpdate.tabLego')
       expect(screen.getByTestId('dns-update-snippet-lego')).toHaveTextContent('DNSUPDATE_NAMESERVER="ucm.lan:53"')
+    })
+
+    it('uses port 53 and the disabled note when the env value is invalid (effective port 0)', async () => {
+      const user = userEvent.setup()
+      const settings = { dns_update_port: 8053, dns_update_port_env: '70000', dns_update_port_effective: 0 }
+      renderPanel({ dnsUpdatePort: effectiveDnsUpdatePort(settings) })
+      await createKey(user, {})
+      await screen.findByTestId('dns-update-created-secret')
+      expect(screen.getByText('acme.dnsUpdate.notePortDisabled')).toBeInTheDocument()
+      await openTab(user, 'acme.dnsUpdate.tabLego')
+      expect(screen.getByTestId('dns-update-snippet-lego')).toHaveTextContent('DNSUPDATE_NAMESERVER="ucm.lan:53"')
+    })
+
+    it('uses the effective port 8053 in the note and the snippets', async () => {
+      const user = userEvent.setup()
+      const settings = { dns_update_port: 0, dns_update_port_env: '8053', dns_update_port_effective: 8053 }
+      renderPanel({ dnsUpdatePort: effectiveDnsUpdatePort(settings) })
+      await createKey(user, {})
+      await screen.findByTestId('dns-update-created-secret')
+      expect(screen.getByText('acme.dnsUpdate.notePort')).toBeInTheDocument()
+      await openTab(user, 'acme.dnsUpdate.tabLego')
+      expect(screen.getByTestId('dns-update-snippet-lego')).toHaveTextContent('DNSUPDATE_NAMESERVER="ucm.lan:8053"')
     })
   })
 })

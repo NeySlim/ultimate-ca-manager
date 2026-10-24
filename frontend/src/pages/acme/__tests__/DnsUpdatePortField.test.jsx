@@ -8,7 +8,7 @@ vi.mock('react-i18next', () => ({
 }))
 
 import DnsUpdatePortField from '../DnsUpdatePortField'
-import { parseDnsUpdatePort } from '../dnsUpdatePort'
+import { parseDnsUpdatePort, effectiveDnsUpdatePort } from '../dnsUpdatePort'
 
 const onSave = vi.fn()
 const renderField = (settings = {}, props = {}) => render(
@@ -33,6 +33,15 @@ describe('parseDnsUpdatePort', () => {
     for (const bad of ['53', '1023', '65536', '70000', '-1', '', 'abc', '80.5']) {
       expect(parseDnsUpdatePort(bad), bad).toBeNull()
     }
+  })
+})
+
+describe('effectiveDnsUpdatePort', () => {
+  it('uses the server effective port, and 0 when the field is missing or invalid', () => {
+    expect(effectiveDnsUpdatePort({ dns_update_port: 8053, dns_update_port_env: '70000', dns_update_port_effective: 0 })).toBe(0)
+    expect(effectiveDnsUpdatePort({ dns_update_port: 0, dns_update_port_env: '8053', dns_update_port_effective: 8053 })).toBe(8053)
+    expect(effectiveDnsUpdatePort({ dns_update_port: 8053, dns_update_port_env: 5353 })).toBe(0)
+    expect(effectiveDnsUpdatePort(undefined)).toBe(0)
   })
 })
 
@@ -100,6 +109,13 @@ describe('DnsUpdatePortField', () => {
     unmount()
     renderField({ dns_update_port: 8053, dns_update_listening: false })
     expect(screen.getByText('acme.dnsUpdate.portNotListening')).toBeInTheDocument()
+  })
+
+  it('shows disabled, not "not listening", when the variable is set but the effective port is 0', () => {
+    renderField({ dns_update_port: 8053, dns_update_port_env: '70000', dns_update_port_effective: 0 })
+    expect(screen.getByText('acme.dnsUpdate.portDisabled')).toBeInTheDocument()
+    expect(screen.queryByText('acme.dnsUpdate.portNotListening')).not.toBeInTheDocument()
+    expect(input()).toHaveValue(70000)
   })
 
   it('has no save button without write permission', () => {
