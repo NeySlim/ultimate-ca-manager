@@ -524,6 +524,25 @@ def test_N13_row_has_peer_ip_and_username_pos(audit_env):
     assert rows['192.0.2.51'].success is False
 
 
+def test_N13_reason_is_in_details_pos(audit_env):
+    # The refusal reason is what an operator needs first (E2E finding).
+    from services.acme.dns_update.audit import AuditSink
+    sink = AuditSink(clock=Clock())
+    _rec(sink, '192.0.2.70', keyname='key1.example.', reason='value_mismatch',
+         details={'zone': 'example.com.'})
+    d = json.loads(_rows(audit_env)[0].details)
+    assert d['reason'] == 'value_mismatch' and d['zone'] == 'example.com.'
+
+
+def test_N13_authenticated_row_has_no_rate_limit_reason_neg(audit_env):
+    from services.acme.dns_update.audit import AuditSink
+    sink = AuditSink(clock=Clock())
+    sink.record_authenticated(action='acme.dns_update.accepted', peer_ip='192.0.2.71',
+                              keyname='key1.example.', success=True, details={'adds': 1})
+    d = json.loads(_rows(audit_env)[0].details)
+    assert 'reason' not in d and d['adds'] == 1
+
+
 def test_N13_attacker_strings_are_sanitized_neg(audit_env):
     from services.acme.dns_update.audit import AuditSink
     evil = ('ab\r\n\x00\x7fé中' + 'x' * 400)

@@ -117,7 +117,10 @@ class AuditSink:
                         {'reason': reason_s, 'dropped': summary_dropped}, ip=None)
         if not allowed:
             return False
-        self._write(action, keyname, success, details or {}, ip=ip_s)
+        # The reason (badkey, value_mismatch, ...) is what an operator needs first.
+        details = dict(details or {})
+        details.setdefault('reason', reason_s)
+        self._write(action, keyname, success, details, ip=ip_s)
         return True
 
     @staticmethod
