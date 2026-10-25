@@ -58,6 +58,14 @@ class ProxyResourceNotFoundError(LookupError):
     """No local proxy order tracks the requested upstream resource."""
 
 
+class ProxyAuthzStateError(ValueError):
+    """The authorization's status does not allow the request (RFC 8555 §7.5.2)."""
+
+
+class ProxyOrderNotReadyError(ValueError):
+    """The order cannot be finalized: one of its authorizations was deactivated."""
+
+
 def _dns01_txt_value(key_authorization: str) -> str:
     """RFC 8555 section 8.4: TXT value = b64url(SHA-256(key authorization))."""
     import base64
@@ -1037,12 +1045,12 @@ class AcmeProxyService:
         """
         return self._select_owning_order(
             self._orders_by_authz_url(authz_url),
-            requester_account_id, requester_thumbprint,
+            requester_account_id, requester_thumbprint, authz_url=authz_url,
         )
 
     @staticmethod
     def _select_owning_order(candidates, requester_account_id=None,
-                             requester_thumbprint=None):
+                             requester_thumbprint=None, authz_url=None):
         """Pick the candidate order that belongs to the requester.
 
         Two passes keep the AcmeAccount reconciliation off the common path: a
@@ -1055,6 +1063,11 @@ class AcmeProxyService:
             return None
         if len(candidates) == 1:
             return candidates[0]
+        if authz_url:
+            # A client that deactivated the authz on one order and placed a new
+            # one getting the same upstream authz (#422) is served the new order.
+            candidates = sorted(
+                candidates, key=lambda c: authz_url in c.deactivated_authz_list)
         for candidate in candidates:
             if ((candidate.account_id
                  and candidate.account_id == requester_account_id)
@@ -1124,6 +1137,7 @@ class AcmeProxyService:
             raise ProxyResourceNotFoundError("Authorization not found")
         order = self._select_owning_order(
             candidates, requester_account_id, requester_thumbprint,
+            authz_url=authz_url,
         )
         self._require_owner(
             order, requester_account_id, requester_thumbprint,
@@ -1146,6 +1160,9 @@ class AcmeProxyService:
             )
             raise ProxyResourceNotFoundError(
                 "Authorization identifier is not part of the order")
+
+        if authz_url in order.deactivated_authz_list:
+            return self._deactivated_view(authz), identifier
 
         # An authorization the upstream CA has already validated (pre-validated
         # or onboarded domain, typically on an EAB-bound account) carries no
@@ -1224,6 +1241,81 @@ class AcmeProxyService:
         authz['challenges'] = proxy_challenges
         return authz, identifier
 
+    def deactivate_authz(self, authz_id_b64, requester_account_id=None,
+                         requester_thumbprint=None):
+        """RFC 8555 §7.5.2: the client relinquishes a pending or valid authorization.
+
+        The upstream authz may be shared with other clients' orders (#307), so it
+        is deactivated upstream only when no other pending local order uses it;
+        otherwise only this client's order sees it deactivated (#422). Either way
+        a pending order is invalid from then on."""
+        authz_url = self._decode_proxy_id(authz_id_b64)
+        candidates = self._orders_by_authz_url(authz_url)
+        if not candidates:
+            raise ProxyResourceNotFoundError("Authorization not found")
+        order = self._select_owning_order(
+            candidates, requester_account_id, requester_thumbprint,
+            authz_url=authz_url,
+        )
+        self._require_owner(
+            order, requester_account_id, requester_thumbprint,
+            resource='Authorization')
+
+        resp = self._post_with_account(authz_url, "")
+        if resp.status_code != 200:
+            raise RuntimeError(f"Upstream authz fetch failed: {resp.status_code}")
+        authz = resp.json()
+        identifier = authz.get('identifier', {})
+        if not _order_covers_identifier(order, strip_wildcard(identifier.get('value', ''))):
+            raise ProxyResourceNotFoundError(
+                "Authorization identifier is not part of the order")
+
+        if authz_url in order.deactivated_authz_list:
+            return self._deactivated_view(authz), identifier
+        status = authz.get('status')
+        if status not in ('pending', 'valid', 'deactivated'):
+            raise ProxyAuthzStateError(
+                f"Authorization is {status}; only a pending or valid "
+                "authorization can be deactivated")
+
+        shared = [o for o in candidates
+                  if o.id != order.id and o.status == 'pending'
+                  and authz_url not in o.deactivated_authz_list]
+        if status != 'deactivated' and not shared:
+            resp = self._post_with_account(authz_url, {"status": "deactivated"})
+            if resp.status_code != 200:
+                raise RuntimeError(
+                    f"Upstream authz deactivation failed: {resp.status_code} {resp.text}")
+            authz = resp.json()
+            logger.info("[ACME Proxy] Authorization for %s deactivated upstream (order %s)",
+                        identifier.get('value'), order.id)
+        else:
+            logger.info("[ACME Proxy] Authorization for %s deactivated for order %s only: "
+                        "%d other order(s) share it", identifier.get('value'), order.id,
+                        len(shared))
+
+        order.mark_authz_deactivated(authz_url)
+        if order.status == 'pending':
+            order.status = 'invalid'
+        try:
+            db.session.commit()
+        except Exception:
+            db.session.rollback()
+            raise
+        return self._deactivated_view(authz), identifier
+
+    def _deactivated_view(self, authz):
+        """An authz as its deactivating client sees it: no automation, proxy URLs."""
+        view = copy.deepcopy(authz)
+        view['status'] = 'deactivated'
+        view['challenges'] = [
+            {**chall, 'url': f"{self.base_url}/challenge/{self._proxy_id(chall['url'])}"}
+            for chall in authz.get('challenges', [])
+            if chall.get('url') and (chall.get('type') == 'dns-01'
+                                     or chall.get('status') == 'valid')
+        ]
+        return view
+
     def respond_challenge(self, chall_id_b64, requester_account_id=None, requester_thumbprint=None):
         """Proxy challenge response, or its status once automation runs.
         Ownership is enforced before any challenge data is returned or
@@ -1240,6 +1332,8 @@ class AcmeProxyService:
                 order, requester_account_id, requester_thumbprint,
                 resource='Challenge',
             )
+            if local_authz_url and local_authz_url in order.deactivated_authz_list:
+                raise ProxyAuthzStateError("Authorization is deactivated, not pending")
 
         # Fetch the challenge to get token and status
         resp = self._post_with_account(chall_url, "")
@@ -1268,6 +1362,8 @@ class AcmeProxyService:
                 order, requester_account_id, requester_thumbprint,
                 resource='Challenge',
             )
+            if link_authz_url in order.deactivated_authz_list:
+                raise ProxyAuthzStateError("Authorization is deactivated, not pending")
             domain = _single_domain(order)
             _challenge_order_cache.put(
                 self._challenge_cache_key(chall_url, requester_account_id,
@@ -1698,6 +1794,21 @@ class AcmeProxyService:
             "signature": sig_b64
         }
 
+    def _order_by_upstream_url(self, order_url, requester_account_id=None,
+                               requester_thumbprint=None):
+        """The requester's local order for an upstream order URL.
+
+        A CA may hand the same pending order back to the proxy's one account, so
+        several local rows can share the URL; one without a deactivated authz
+        (#422) wins over an older one of the same client."""
+        from models import AcmeClientOrder
+
+        rows = (AcmeClientOrder.query
+                .filter_by(upstream_order_url=order_url, is_proxy_order=True)
+                .order_by(AcmeClientOrder.id.asc()).all())
+        rows.sort(key=lambda row: bool(row.deactivated_authz_list))
+        return self._select_owning_order(rows, requester_account_id, requester_thumbprint)
+
     def get_order(self, order_id_b64, requester_account_id=None, requester_thumbprint=None):
         """Get order status (POST-as-GET) — the order must be a tracked proxy
         order owned by the requester (#260)."""
@@ -1705,9 +1816,8 @@ class AcmeProxyService:
 
         order_url = self._decode_proxy_id(order_id_b64)
 
-        local_order = AcmeClientOrder.query.filter_by(
-            upstream_order_url=order_url, is_proxy_order=True
-        ).first()
+        local_order = self._order_by_upstream_url(
+            order_url, requester_account_id, requester_thumbprint)
         if local_order is None:
             raise ProxyResourceNotFoundError("Order not found")
         self._require_owner(local_order, requester_account_id, requester_thumbprint)
@@ -1717,6 +1827,9 @@ class AcmeProxyService:
 
         order = resp.json()
         _finalize_url_cache.put(order_url, order.get('finalize'))
+        if (local_order.deactivated_authz_list
+                and order.get('status') in ('pending', 'ready')):
+            order['status'] = 'invalid'
         return self._rewrite_order_urls(order, order_url, order_id_b64)
 
     def finalize_order(self, order_id_b64, csr_pem, requester_account_id=None,
@@ -1733,14 +1846,16 @@ class AcmeProxyService:
 
         order_url = self._decode_proxy_id(order_id_b64)
 
-        local_order = AcmeClientOrder.query.filter_by(
-            upstream_order_url=order_url, is_proxy_order=True
-        ).first()
+        local_order = self._order_by_upstream_url(
+            order_url, requester_account_id, requester_thumbprint)
         if local_order is None:
             raise ProxyResourceNotFoundError("Order not found")
         self._require_owner(
             local_order, requester_account_id, requester_thumbprint,
         )
+        if local_order.deactivated_authz_list:
+            raise ProxyOrderNotReadyError(
+                "Order is invalid: one of its authorizations was deactivated")
 
         from cryptography import x509
         csr = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())

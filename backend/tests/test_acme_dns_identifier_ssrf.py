@@ -59,6 +59,10 @@ class _StubSession:
     def rollback(self):
         pass
 
+    def refresh(self, *_args, **_kwargs):
+        # The stub objects are their own source of truth
+        pass
+
 
 class _StubDb:
     def __init__(self):

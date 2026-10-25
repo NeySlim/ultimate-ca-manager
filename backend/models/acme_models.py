@@ -401,6 +401,8 @@ class AcmeClientOrder(db.Model):
     client_jwk_thumbprint = db.Column(db.String(64))
     upstream_order_url = db.Column(db.Text)
     upstream_authz_urls = db.Column(db.Text)  # JSON array of authorization URLs
+    # Upstream authz URLs this order's client deactivated (RFC 8555 §7.5.2), JSON array
+    deactivated_authz_urls = db.Column(db.Text)
     # Link to local AcmeAccount (the proxy client account that initiated this order).
     # Nullable for direct (non-proxy) client orders or legacy rows pre-migration 021.
     account_id = db.Column(db.String(64), db.ForeignKey('acme_accounts.account_id'),
@@ -446,6 +448,20 @@ class AcmeClientOrder(db.Model):
     def set_challenges_dict(self, challenges):
         """Set challenges from dict"""
         self.challenges_data = json.dumps(challenges)
+
+    @property
+    def deactivated_authz_list(self):
+        """Upstream authz URLs deactivated by this order's client."""
+        try:
+            urls = json.loads(self.deactivated_authz_urls or '[]')
+        except (TypeError, ValueError):
+            return []
+        return [url for url in urls if isinstance(url, str)] if isinstance(urls, list) else []
+
+    def mark_authz_deactivated(self, authz_url):
+        urls = self.deactivated_authz_list
+        if authz_url not in urls:
+            self.deactivated_authz_urls = json.dumps(urls + [authz_url])
     
     @property
     def primary_domain(self):

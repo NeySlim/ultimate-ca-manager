@@ -405,6 +405,12 @@ the checks that the clients run.
 
 - Avoid concurrent requests for the same name. A second TXT record can replace
   the first one.
+- A client can deactivate an authorization (RFC 8555 §7.5.2), as lego does
+  after a failed validation. UCM uses one upstream account for all clients, so
+  several clients' orders for the same name can share one upstream
+  authorization. UCM deactivates it at the upstream CA only when no other
+  pending order uses it. Otherwise only the client that asked sees it
+  deactivated. In both cases that client's order becomes invalid.
 - The EAB credentials of the upstream CA account are set in UCM. They
   authenticate UCM with the upstream CA. They are not the credentials of your
   clients.

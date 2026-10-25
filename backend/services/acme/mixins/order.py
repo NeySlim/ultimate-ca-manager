@@ -569,6 +569,34 @@ class OrderMixin:
         self._commit_state_change('expire ACME order')
         return True
 
+    def deactivate_authorization(self, authorization: AcmeAuthorization) -> None:
+        """RFC 8555 §7.5.2: the account relinquishes a pending or valid authorization.
+
+        A reused authorization is a copy carrying its source's expiry (#338), so the
+        account's other valid copies of the same proof go with it; the open orders
+        of every deactivated row become invalid."""
+        if authorization.status == 'deactivated':
+            return
+        rows = [authorization]
+        if authorization.status == 'valid' and authorization.account_id:
+            rows += AcmeAuthorization.query.filter(
+                AcmeAuthorization.id != authorization.id,
+                AcmeAuthorization.account_id == authorization.account_id,
+                AcmeAuthorization.identifier == authorization.identifier,
+                AcmeAuthorization.wildcard == authorization.wildcard,
+                AcmeAuthorization.status == 'valid',
+                AcmeAuthorization.expires == authorization.expires,
+            ).all()
+        for row in rows:
+            row.status = 'deactivated'
+            order = row.order
+            if order is not None and order.status in ('pending', 'ready'):
+                order.status = 'invalid'
+                order.error = self._problem(
+                    'unauthorized',
+                    f'Authorization for {row.identifier_value} was deactivated')
+        self._commit_state_change('deactivate ACME authorization')
+
     def expire_authorization_if_needed(self, authorization: AcmeAuthorization) -> bool:
         """Lazily invalidate an expired pending authorization."""
         if authorization.status != 'pending' or authorization.expires >= utc_now():

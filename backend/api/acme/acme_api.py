@@ -1361,7 +1361,8 @@ def finalize_order(order_id: str):
 
 @acme_bp.route('/authz/<authorization_id>', methods=['POST'])
 def authorization_info(authorization_id: str):
-    """Get authorization status (RFC 8555 Section 7.5) — POST-as-GET"""
+    """Get authorization status (RFC 8555 Section 7.5) — POST-as-GET, or
+    deactivate it with {"status": "deactivated"} (Section 7.5.2)"""
     service = get_acme_service()
     
     # Verify JWS (POST-as-GET: empty payload)
@@ -1373,7 +1374,8 @@ def authorization_info(authorization_id: str):
     is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
     if not is_valid:
         return acme_error('malformed', f'Invalid JWS: {error}')
-    if payload or jws_data.get('payload') != '':
+    deactivate = isinstance(payload, dict) and payload.get('status') == 'deactivated'
+    if not deactivate and (payload or jws_data.get('payload') != ''):
         return acme_error('malformed', 'POST-as-GET must have empty payload')
 
     request_account_id = _account_id_from_jws(jws_data)
@@ -1393,6 +1395,11 @@ def authorization_info(authorization_id: str):
         return acme_error('unauthorized', 'Authorization does not belong to this account', 403)
 
     service.expire_authorization_if_needed(auth)
+    if deactivate:
+        if auth.status not in ('pending', 'valid', 'deactivated'):
+            return acme_error('malformed', f'Authorization is {auth.status}; only a '
+                              'pending or valid authorization can be deactivated')
+        service.deactivate_authorization(auth)
 
     # Build challenges list. On a valid authorization only the validated
     # challenge(s) are exposed (RFC 8555 §7.1.6; legacy rows may still carry

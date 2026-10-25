@@ -22,6 +22,7 @@ from services.acme.acme_proxy_service import (
     AcmeProxyService,
     ProxyChallengeIdentifierError,
     ProxyDns01OnlyError,
+    ProxyOrderNotReadyError,
     ProxyResourceNotFoundError,
 )
 from services.cert_service import CertificateService
@@ -664,21 +665,24 @@ def new_order(slug=None):
 
 @_dual_route('/authz/<authz_id>', methods=['POST'], endpoint='proxy_authz')
 def authz(authz_id, slug=None):
-    """Get authorization (RFC 8555 §7.5) — POST-as-GET"""
+    """Get authorization (RFC 8555 §7.5) — POST-as-GET, or deactivate it (§7.5.2)"""
     is_valid, payload, jwk, err = verify_proxy_jws()
     if not is_valid:
         return proxy_error("malformed", err)
 
-    err_resp = _require_empty_payload(payload)
-    if err_resp:
-        return err_resp
+    deactivate = isinstance(payload, dict) and payload.get('status') == 'deactivated'
+    if not deactivate:
+        err_resp = _require_empty_payload(payload)
+        if err_resp:
+            return err_resp
 
     requester_account_id, requester_thumbprint = _requester_identity(jwk)
     try:
         svc = get_proxy_service(slug)
-        result = svc.get_authz(authz_id,
-                               requester_account_id=requester_account_id,
-                               requester_thumbprint=requester_thumbprint)
+        fetch = svc.deactivate_authz if deactivate else svc.get_authz
+        result = fetch(authz_id,
+                       requester_account_id=requester_account_id,
+                       requester_thumbprint=requester_thumbprint)
         if not result:
             return proxy_error("malformed", "Authorization not found", 404)
 
@@ -817,6 +821,8 @@ def finalize(order_id, slug=None):
         return proxy_error("unauthorized", str(e), 403)
     except ProxyResourceNotFoundError as e:
         return proxy_error("malformed", str(e), 404)
+    except ProxyOrderNotReadyError as e:
+        return proxy_error("orderNotReady", str(e), 403)
     except ValueError as e:
         return proxy_error("malformed", str(e), 400)
     except Exception as e:

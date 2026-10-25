@@ -547,7 +547,10 @@ class ChallengeMixin:
         challenge.error = json.dumps(problem)
 
         authorization = challenge.authorization
-        if authorization is None:
+        if authorization is not None:
+            # A deactivation committed during the validation must be seen here
+            db.session.refresh(authorization, ['status'])
+        if authorization is None or authorization.status == 'deactivated':
             return
         authorization.status = 'invalid'
 
@@ -564,6 +567,13 @@ class ChallengeMixin:
         Args:
             auth: AcmeAuthorization object
         """
+        # A deactivated authorization is final (RFC 8555 §7.5.2): a validation
+        # that finishes afterwards must not bring it back, even one that started
+        # before the deactivation was committed.
+        db.session.refresh(auth, ['status'])
+        if auth.status == 'deactivated':
+            return
+
         # Check if any challenge is valid
         valid_challenges = [c for c in auth.challenges if c.status == "valid"]
         
