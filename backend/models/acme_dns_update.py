@@ -162,6 +162,8 @@ class AcmeProxyDnsChallenge(db.Model):
     status = db.Column(db.String(16), default='pending', nullable=False)
     created_at = db.Column(db.DateTime, default=utc_now)
     expires_at = db.Column(db.DateTime, nullable=False)
+    # Time of the last accepted DNS UPDATE for this row. Diagnostics only: no
+    # code reads it, the listener never decides on it.
     client_confirmed_at = db.Column(db.DateTime, nullable=True)
 
     def __repr__(self):
