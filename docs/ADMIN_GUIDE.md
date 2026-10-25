@@ -583,7 +583,7 @@ curl -k -X PATCH -H "Authorization: Bearer $UCM_API_KEY" -H "Content-Type: appli
 
 **Enable it.** The listener is **off by default**. A restart is needed after every change.
 
-**Reload and restart.** `systemctl reload` (HUP) starts a new worker while the old worker still holds the port. The new worker tries to bind the port again until it succeeds, first after 0.25 seconds, then at most every second. The old worker can hold the port longer than `graceful_timeout` while a long connection (for example the WebSocket of the web interface) is open. When the port is still busy after `graceful_timeout` + 5 seconds (35 seconds by default), UCM logs an error once and keeps trying. The listener starts as soon as the port is free. Another bind error (for example a wrong `UCM_DNS_UPDATE_HOST`) stops the retries, and the log shows it. `GET /api/v2/acme/client/settings` shows `dns_update_listening`.
+**Reload and restart.** `systemctl reload` (HUP) starts a new worker while the old worker still holds the port. The new worker tries to bind the port again until it succeeds, first after 0.25 seconds, then after a wait that doubles each time up to 1 second (0.5 seconds, then every second). The old worker can hold the port longer than `graceful_timeout` while a long connection (for example the WebSocket of the web interface) is open. When the port is still busy after `graceful_timeout` + 5 seconds (35 seconds by default), UCM logs an error once and keeps trying. The listener starts as soon as the port is free. Another bind error (for example a wrong `UCM_DNS_UPDATE_HOST`) stops the retries, and the log shows it. `GET /api/v2/acme/client/settings` shows `dns_update_listening`.
 
 | Method | Value |
 |--------|-------|
