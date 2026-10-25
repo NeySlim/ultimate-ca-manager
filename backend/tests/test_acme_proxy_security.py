@@ -473,6 +473,14 @@ class TestAcmeProxyCertOrderBinding:
 class TestFinalizeFailClosed:
     """An owned order must never finalize without any requester identity."""
 
+    @pytest.fixture(autouse=True)
+    def _drop_seeded_orders(self, app):
+        # The seeded account id has no acme_accounts row: a leftover order breaks the FK check of a later migration.
+        yield
+        with app.app_context():
+            AcmeClientOrder.query.filter_by(account_id='acct-owner-1').delete()
+            db.session.commit()
+
     def _seed_owned_order(self, app, **overrides):
         with app.app_context():
             AcmeClientOrder.query.filter_by(is_proxy_order=True).delete()
