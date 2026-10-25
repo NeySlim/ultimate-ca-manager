@@ -45,6 +45,8 @@ def app():
     app.config['TESTING'] = True
     app.config['WTF_CSRF_ENABLED'] = False
 
+    from tests.conftest import clear_admin_password_flag
+    clear_admin_password_flag(app)
     yield app
 
     if os.path.exists(temp_db):

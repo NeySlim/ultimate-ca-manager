@@ -214,11 +214,11 @@ def _admin_password_already_changed(request):
     The server refuses everything else to an account still flagged for a forced
     change; the tests of that gate set the flag themselves."""
     if 'app' in request.fixturenames:
-        _clear_admin_password_flag(request.getfixturevalue('app'))
+        clear_admin_password_flag(request.getfixturevalue('app'))
     yield
 
 
-def _clear_admin_password_flag(app):
+def clear_admin_password_flag(app):
     from models import db, User
     with app.app_context():
         User.query.filter_by(username='admin', force_password_change=True).update(
@@ -360,7 +360,7 @@ def app():
     application.config['FQDN'] = 'ucm.test'
 
     # Module fixtures are built before the per-test autouse that clears the flag.
-    _clear_admin_password_flag(application)
+    clear_admin_password_flag(application)
     _SESSION_APP.append(application)
     yield application
     _SESSION_APP.clear()

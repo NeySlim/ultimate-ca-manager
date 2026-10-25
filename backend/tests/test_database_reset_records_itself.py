@@ -73,6 +73,7 @@ def test_the_recreated_admin_is_forced_only_with_the_public_default(
     with app.app_context():
         admin = User.query.filter_by(username=app.config['INITIAL_ADMIN_USERNAME']).one()
         assert admin.force_password_change is forced
-        # Later files sign in as admin with the default password
+        # Later files sign in as admin with the default password, no change forced
         admin.set_password('changeme123')
+        admin.force_password_change = False
         db.session.commit()
