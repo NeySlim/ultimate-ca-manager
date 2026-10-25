@@ -798,12 +798,16 @@ class FakeServer:
 
 @pytest.fixture
 def retry(app, monkeypatch):
-    """start_dns_update_server with a fake server, a fake clock and no real sleep."""
+    """start_dns_update_server with a fake clock and no real sleep. With
+    fake=True (default) a fake server answers from a list of errnos (the last one
+    repeats); with fake=False the real server binds through a StreamServer that
+    raises the given exceptions in order."""
     clock = {'now': 1000.0}
     sleeps = []
 
     def fake_sleep(seconds):
         sleeps.append(seconds)
+        assert len(sleeps) < 100, 'the retry never stops'
         clock['now'] += seconds
         gevent.sleep(0)
 
@@ -812,15 +816,26 @@ def retry(app, monkeypatch):
         attempts = 0
 
     monkeypatch.setenv('UCM_DNS_UPDATE_PORT', '5353')
-    monkeypatch.setattr(srv_mod, 'DnsUpdateServer', Fake)
     monkeypatch.setattr(srv_mod, '_sleep', fake_sleep)
     monkeypatch.setattr(srv_mod, '_clock', lambda: clock['now'])
     monkeypatch.setattr(srv_mod, '_server', None)
     monkeypatch.setattr(srv_mod, '_retry', None)
 
-    def go(results, retry_for):
-        Fake.results = results
-        result = srv_mod.start_dns_update_server(app, retry_for=retry_for)
+    def go(results, error_after, fake=True):
+        if fake:
+            Fake.results = results
+            monkeypatch.setattr(srv_mod, 'DnsUpdateServer', fake if fake is not True else Fake)
+        else:
+            errors = list(results)
+            go.binds = 0
+
+            def stream_server(*_a, **_k):
+                go.binds += 1
+                raise errors.pop(0)
+
+            from gevent import server as gevent_server
+            monkeypatch.setattr(gevent_server, 'StreamServer', stream_server)
+        result = srv_mod.start_dns_update_server(app, error_after=error_after)
         if srv_mod._retry is not None:
             gevent.joinall([srv_mod._retry], timeout=5)
         return result
@@ -830,65 +845,112 @@ def retry(app, monkeypatch):
     return go
 
 
+def _errors(caplog):
+    return [r for r in caplog.records if r.levelno >= logging.ERROR]
+
+
 def test_retry_busy_port_then_success_starts_the_listener_pos(retry, caplog):
     caplog.set_level(logging.INFO, logger=srv_mod.logger.name)
     busy = errno.EADDRINUSE
     # The call returns at once with None: the greenlet does the retrying.
-    assert retry([busy, busy, None], retry_for=35) is None
+    assert retry([busy, busy, None], error_after=35) is None
     assert retry.cls.attempts == 3
     assert isinstance(srv_mod._server, retry.cls)
     assert retry.sleeps == [0.25, 0.5]
     warnings = [r for r in caplog.records if r.levelno == logging.WARNING]
-    assert len(warnings) == 1 and 'in use' in warnings[0].getMessage()
+    assert len(warnings) == 1 and 'busy' in warnings[0].getMessage()
     assert any('after 3 attempts' in r.getMessage() for r in caplog.records)
+    assert not _errors(caplog)
 
 
-def test_retry_does_not_block_the_caller_pos(retry, app):
-    retry.cls.results = [errno.EADDRINUSE, None]
-    assert srv_mod.start_dns_update_server(app, retry_for=35) is None
+def test_retry_does_not_block_the_caller_pos(retry, app, monkeypatch):
+    spawned = []
+    monkeypatch.setattr(srv_mod, '_spawn', lambda fn, *a: spawned.append((fn, a)))
+    assert retry([errno.EADDRINUSE, None], error_after=35) is None
     assert retry.cls.attempts == 1 and srv_mod._server is None
-    assert srv_mod._retry is not None and not srv_mod._retry.dead
-    gevent.joinall([srv_mod._retry], timeout=5)
+    assert len(spawned) == 1 and spawned[0][0] is srv_mod._retry_bind
+    assert retry.sleeps == []
+    srv_mod._retry_bind(*spawned[0][1])
     assert retry.cls.attempts == 2 and srv_mod._server is not None
 
 
-def test_retry_other_errno_stops_at_once_neg(retry, caplog):
-    assert retry([errno.EACCES], retry_for=35) is None
-    assert retry.cls.attempts == 1
+def test_retry_goes_on_past_error_after_and_reports_once_pos(retry, caplog):
+    busy = errno.EADDRINUSE
+    # 20 busy attempts after the first: far past error_after=10 (about 18 s slept).
+    assert retry([busy] * 21 + [None], error_after=10) is None
+    assert isinstance(srv_mod._server, retry.cls)
+    assert retry.cls.attempts == 22
+    errors = _errors(caplog)
+    assert len(errors) == 1
+    assert 'still busy after 10s, still retrying' in errors[0].getMessage()
+    assert sum(retry.sleeps) > 10
+
+
+def test_retry_never_gives_up_while_the_port_is_busy_pos(retry, caplog):
+    busy = errno.EADDRINUSE
+    # More than twice the window with nothing but a busy port, then the port is free.
+    assert retry([busy] * 80 + [None], error_after=35) is None
+    assert isinstance(srv_mod._server, retry.cls)
+    assert sum(retry.sleeps) > 70
+    assert len(_errors(caplog)) == 1
+
+
+def test_retry_delay_is_capped_pos(retry):
+    assert retry([errno.EADDRINUSE] * 6 + [None], error_after=35) is None
+    assert retry.sleeps == [0.25, 0.5, 1.0, 1.0, 1.0, 1.0]
+
+
+def test_retry_other_errno_at_the_first_start_stops_at_once_neg(retry, caplog):
+    exc = PermissionError(errno.EACCES, 'Permission denied')
+    assert retry([exc], error_after=35, fake=False) is None
+    assert retry.binds == 1
     assert retry.sleeps == []
     assert srv_mod._retry is None and srv_mod._server is None
-    # The first start was quiet (a retry was possible): the error is logged here.
-    errors = [r for r in caplog.records if r.levelno == logging.ERROR]
-    assert len(errors) == 1 and str(errno.EACCES) in errors[0].getMessage()
+    errors = _errors(caplog)
+    assert len(errors) == 1
+    assert 'Permission denied' in errors[0].getMessage()
+
+
+def test_retry_other_errno_without_a_retry_logs_the_exception_neg(retry, caplog):
+    exc = OSError(errno.EADDRNOTAVAIL, 'Cannot assign requested address')
+    assert retry([exc], error_after=0, fake=False) is None
+    errors = _errors(caplog)
+    assert len(errors) == 1
+    assert 'Cannot assign requested address' in errors[0].getMessage()
 
 
 def test_retry_other_errno_after_a_busy_port_stops_neg(retry, caplog):
-    assert retry([errno.EADDRINUSE, errno.EACCES], retry_for=35) is None
-    assert retry.cls.attempts == 2
+    busy = OSError(errno.EADDRINUSE, 'Address already in use')
+    denied = PermissionError(errno.EACCES, 'Permission denied')
+    assert retry([busy, busy, denied], error_after=35, fake=False) is None
+    assert retry.binds == 3
+    assert retry.sleeps == [0.25, 0.5]
     assert srv_mod._server is None
-    assert any(r.levelno == logging.ERROR for r in caplog.records)
+    errors = _errors(caplog)
+    assert len(errors) == 1
+    assert 'Permission denied' in errors[0].getMessage()
 
 
-def test_retry_for_zero_tries_once_neg(retry):
-    assert retry([errno.EADDRINUSE], retry_for=0) is None
+def test_retry_busy_port_is_not_an_error_while_retrying_neg(retry, caplog):
+    caplog.set_level(logging.DEBUG, logger=srv_mod.logger.name)
+    busy = OSError(errno.EADDRINUSE, 'Address already in use')
+    denied = PermissionError(errno.EACCES, 'Permission denied')
+    retry([busy, busy, denied], error_after=35, fake=False)
+    busy_lines = [r for r in caplog.records if 'Address already in use' in r.getMessage()]
+    assert len(busy_lines) == 2
+    assert all(r.levelno == logging.DEBUG for r in busy_lines)
+
+
+def test_retry_error_after_zero_tries_once_neg(retry, caplog):
+    assert retry([errno.EADDRINUSE], error_after=0) is None
     assert retry.cls.attempts == 1
     assert retry.sleeps == [] and srv_mod._retry is None
 
 
 def test_retry_first_start_works_without_a_retry_pos(retry):
-    server = retry([None], retry_for=35)
+    server = retry([None], error_after=35)
     assert server is not None and srv_mod._server is server
     assert retry.cls.attempts == 1 and srv_mod._retry is None
-
-
-def test_retry_gives_up_at_the_deadline_neg(retry, caplog):
-    assert retry([errno.EADDRINUSE], retry_for=10) is None
-    assert srv_mod._server is None
-    # 0.25 + 0.5 + 1 + 2 + 4 = 7.75 s, then 4 s steps: the deadline falls after 3 more.
-    assert retry.sleeps == [0.25, 0.5, 1.0, 2.0, 4.0, 4.0]
-    assert retry.cls.attempts == 7
-    errors = [r for r in caplog.records if r.levelno == logging.ERROR]
-    assert len(errors) == 1 and 'still in use' in errors[0].getMessage()
 
 
 def test_retry_exception_in_start_is_caught_neg(retry, caplog):
@@ -900,8 +962,7 @@ def test_retry_exception_in_start_is_caught_neg(retry, caplog):
             self.bind_errno = errno.EADDRINUSE
             return False
 
-    srv_mod.DnsUpdateServer = Boom  # restored by the retry fixture's monkeypatch
-    assert retry([], retry_for=35) is None
+    assert retry([], error_after=35, fake=Boom) is None
     assert srv_mod._server is None
     assert 'secret detail' not in caplog.text
     assert 'RuntimeError' in caplog.text
@@ -943,7 +1004,7 @@ def test_retry_real_sockets_listener_starts_after_the_port_is_freed_pos(app, mon
 
     def go():
         # Own thread, own hub: the retry greenlet runs while this thread waits.
-        result['first'] = srv_mod.start_dns_update_server(app, retry_for=8)
+        result['first'] = srv_mod.start_dns_update_server(app, error_after=8)
         if srv_mod._retry is not None:
             gevent.wait([srv_mod._retry])
         result['server'] = srv_mod._server
@@ -1006,13 +1067,13 @@ def test_startup_gunicorn_starts_the_dns_update_listener_with_a_retry_pos(gunico
     module.post_worker_init(_worker(30))
     assert [c[0] for c in calls] == ['http', 'dns']
     assert calls[1][1] is app
-    assert calls[1][2] == {'retry_for': 35.0}
+    assert calls[1][2] == {'error_after': 35.0}
 
 
-def test_startup_gunicorn_retry_follows_graceful_timeout_pos(gunicorn_conf):
+def test_startup_gunicorn_error_after_follows_graceful_timeout_pos(gunicorn_conf):
     module, calls = gunicorn_conf
     module.post_worker_init(_worker(60))
-    assert calls[1][2] == {'retry_for': 65.0}
+    assert calls[1][2] == {'error_after': 65.0}
 
 
 def test_startup_gunicorn_dns_update_starts_when_the_http_server_fails_neg(gunicorn_conf, monkeypatch):
