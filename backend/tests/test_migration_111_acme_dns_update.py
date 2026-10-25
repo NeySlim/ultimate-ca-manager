@@ -12,6 +12,8 @@ PG_URL = os.getenv('UCM_TEST_PG_URL')
 KEYS = AcmeDnsUpdateKey.__tablename__
 CHALLENGES = AcmeProxyDnsChallenge.__tablename__
 TABLES = {KEYS, CHALLENGES}
+KEYS_TABLE = AcmeDnsUpdateKey.__table__
+CHALLENGES_TABLE = AcmeProxyDnsChallenge.__table__
 INDEXES = {
     'ix_acme_dns_update_keys_acme_client_account_id',
     'ix_acme_dns_update_keys_eab_credential_id',
@@ -21,6 +23,7 @@ INDEXES = {
     'ix_acme_proxy_dns_challenges_record_name',
     'ix_acme_proxy_dns_challenges_zone_name',
     'idx_acme_proxy_dns_status_expires',
+    'idx_acme_proxy_dns_expires',
 }
 
 
@@ -95,7 +98,47 @@ def test_sqlite_downgrade_drops_tables():
     _migration().upgrade(conn)
     _migration().downgrade(conn)
     assert not (TABLES & _names(conn, 'table'))
+    assert not (INDEXES & _names(conn, 'index'))
     _migration().downgrade(conn)
+
+
+def test_expires_index_pos():
+    conn = _sqlite()
+    _migration().upgrade(conn)
+    cols = [r[2] for r in conn.execute("PRAGMA index_info(idx_acme_proxy_dns_expires)")]
+    assert cols == ['expires_at']
+    composite = [r[2] for r in conn.execute(
+        "PRAGMA index_info(idx_acme_proxy_dns_status_expires)")]
+    assert composite == ['status', 'expires_at']
+
+
+def _plan(conn):
+    # The filter of the row snapshot of the listener (records.ActiveRecordCache._load).
+    return ' '.join(str(r[-1]) for r in conn.execute(
+        f"EXPLAIN QUERY PLAN SELECT id FROM {CHALLENGES} WHERE expires_at > ?",
+        ('2026-01-01 00:00:00',)))
+
+
+def test_expires_index_serves_the_snapshot_query_pos():
+    conn = _sqlite()
+    _migration().upgrade(conn)
+    plan = _plan(conn)
+    assert plan.startswith('SEARCH') and 'idx_acme_proxy_dns_expires' in plan
+
+
+def test_snapshot_query_scans_without_the_expires_index_neg():
+    conn = _sqlite()
+    _migration().upgrade(conn)
+    conn.execute('DROP INDEX idx_acme_proxy_dns_expires')
+    # The composite index starts with status: it can only be scanned, not searched.
+    plan = _plan(conn)
+    assert plan.startswith('SCAN') and 'SEARCH' not in plan
+
+
+def test_model_and_migration_index_names_match_pos():
+    model = {i.name for i in CHALLENGES_TABLE.indexes} | {
+        i.name for t in (KEYS_TABLE,) for i in t.indexes}
+    assert model == INDEXES
 
 
 @pytest.mark.postgres
@@ -128,6 +171,9 @@ def test_postgres_upgrade_twice_and_downgrade():
         tables = {r[0] for r in conn.execute(text(
             "SELECT tablename FROM pg_tables WHERE schemaname = :s"), {'s': schema})}
         assert not (TABLES & tables)
+        indexes = {r[0] for r in conn.execute(text(
+            "SELECT indexname FROM pg_indexes WHERE schemaname = :s"), {'s': schema})}
+        assert not (INDEXES & indexes)
     finally:
         conn.rollback()
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))

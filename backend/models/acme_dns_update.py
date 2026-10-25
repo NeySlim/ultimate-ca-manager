@@ -137,6 +137,7 @@ class AcmeProxyDnsChallenge(db.Model):
         db.UniqueConstraint('order_id', 'record_name', 'txt_value',
                             name='uq_acme_proxy_dns_challenge'),
         db.Index('idx_acme_proxy_dns_status_expires', 'status', 'expires_at'),
+        db.Index('idx_acme_proxy_dns_expires', 'expires_at'),
     )
 
     id = db.Column(db.Integer, primary_key=True)

@@ -51,6 +51,10 @@ def create_dns_update_key(account_id):
     acct = db.session.get(AcmeClientAccount, account_id)
     if not acct:
         return error_response('ACME account not found', 404)
+    if not acct.proxy_enabled:
+        return error_response(
+            'The ACME proxy of this account is off, so a key would not work. '
+            'Turn the proxy on first.', 409)
 
     data = request.get_json(silent=True) or {}
     if not isinstance(data, dict):

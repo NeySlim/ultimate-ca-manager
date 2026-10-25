@@ -2898,7 +2898,7 @@ Content-Type: application/json
   "notes": "cert-manager, cluster A"
 }
 ```
-Requires `write:acme`. All fields are optional: `name` is generated when omitted, `algorithm` is `hmac-sha256` (also `hmac-sha384`, `hmac-sha512`), `notes` has at most 1000 characters. Answers `201`. The response contains the base64 `secret` **once**; UCM stores it encrypted and cannot show it again. A name that exists already gives `409`.
+Requires `write:acme`. All fields are optional: `name` is generated when omitted, `algorithm` is `hmac-sha256` (also `hmac-sha384`, `hmac-sha512`), `notes` has at most 1000 characters. Answers `201`. The response contains the base64 `secret` **once**; UCM stores it encrypted and cannot show it again. A name that exists already gives `409`. An account whose ACME proxy is off also gives `409`: a key of such an account would not work, so turn the proxy on first.
 
 ```http
 DELETE /api/v2/acme/client/accounts/{account_id}/dns-update-keys/{key_id}

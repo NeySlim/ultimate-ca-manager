@@ -31,6 +31,8 @@ _INDEXES = (
     "ON acme_proxy_dns_challenges (zone_name)",
     "CREATE INDEX IF NOT EXISTS idx_acme_proxy_dns_status_expires "
     "ON acme_proxy_dns_challenges (status, expires_at)",
+    "CREATE INDEX IF NOT EXISTS idx_acme_proxy_dns_expires "
+    "ON acme_proxy_dns_challenges (expires_at)",
 )
 
 

@@ -399,9 +399,30 @@ def test_account_list_key_count_zero_and_per_account_neg(auth_client, env):
 
 
 def test_account_list_key_count_proxy_off_pos(auth_client, env):
-    acct = env.make_account(enabled=False)
-    _post(auth_client, acct)
+    acct = env.make_account()
+    assert _post(auth_client, acct).status_code == 201
+    with env.app.app_context():
+        db.session.get(AcmeClientAccount, acct).proxy_enabled = False
+        db.session.commit()
     assert _list_accounts(auth_client)[acct]['dns_update_key_count'] == 1
+
+
+def test_create_key_proxy_off_neg(auth_client, env):
+    acct = env.make_account(enabled=False)
+    r = _post(auth_client, acct)
+    assert r.status_code == 409
+    assert 'proxy' in r.get_json()['message'].lower()
+    with env.app.app_context():
+        assert AcmeDnsUpdateKey.query.filter_by(acme_client_account_id=acct).count() == 0
+
+
+def test_create_key_proxy_turned_on_pos(auth_client, env):
+    acct = env.make_account(enabled=False)
+    assert _post(auth_client, acct).status_code == 409
+    with env.app.app_context():
+        db.session.get(AcmeClientAccount, acct).proxy_enabled = True
+        db.session.commit()
+    assert _post(auth_client, acct).status_code == 201
 
 
 def test_account_list_key_count_uses_one_query_neg(auth_client, env):
