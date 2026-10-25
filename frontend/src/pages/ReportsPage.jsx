@@ -278,7 +278,7 @@ export default function ReportsPage() {
       <div className="pl-8 space-y-3">
         <div className="flex flex-wrap gap-3 items-end">
           <div>
-            <label className="text-xs text-text-muted mb-1 block">{t('reports.frequency')}</label>
+            <label className="text-xs text-text-tertiary mb-1 block">{t('reports.frequency')}</label>
             <select
               value={form.frequency || 'weekly'}
               onChange={(e) => updateScheduleField(r.key, 'frequency', e.target.value)}
@@ -290,7 +290,7 @@ export default function ReportsPage() {
             </select>
           </div>
           <div>
-            <label className="text-xs text-text-muted mb-1 block">{t('reports.time')}</label>
+            <label className="text-xs text-text-tertiary mb-1 block">{t('reports.time')}</label>
             <input
               type="time"
               value={form.time || '08:00'}
@@ -300,7 +300,7 @@ export default function ReportsPage() {
           </div>
           {form.frequency === 'weekly' && (
             <div>
-              <label className="text-xs text-text-muted mb-1 block">{t('reports.dayOfWeek')}</label>
+              <label className="text-xs text-text-tertiary mb-1 block">{t('reports.dayOfWeek')}</label>
               <select
                 value={form.day_of_week ?? 1}
                 onChange={(e) => updateScheduleField(r.key, 'day_of_week', parseInt(e.target.value))}
@@ -314,7 +314,7 @@ export default function ReportsPage() {
           )}
           {form.frequency === 'monthly' && (
             <div>
-              <label className="text-xs text-text-muted mb-1 block">{t('reports.dayOfMonth')}</label>
+              <label className="text-xs text-text-tertiary mb-1 block">{t('reports.dayOfMonth')}</label>
               <select
                 value={form.day_of_month ?? 1}
                 onChange={(e) => updateScheduleField(r.key, 'day_of_month', parseInt(e.target.value))}
@@ -328,7 +328,7 @@ export default function ReportsPage() {
           )}
           {!r.formatLocked && (
             <div>
-              <label className="text-xs text-text-muted mb-1 block">{t('reports.format')}</label>
+              <label className="text-xs text-text-tertiary mb-1 block">{t('reports.format')}</label>
               <select
                 value={form.format || 'csv'}
                 onChange={(e) => updateScheduleField(r.key, 'format', e.target.value)}
@@ -341,14 +341,14 @@ export default function ReportsPage() {
           )}
           {r.formatLocked && (
             <div>
-              <label className="text-xs text-text-muted mb-1 block">{t('reports.format')}</label>
-              <span className="inline-block bg-bg-secondary border border-border rounded-md px-2.5 py-1.5 text-sm text-text-muted">PDF</span>
+              <label className="text-xs text-text-tertiary mb-1 block">{t('reports.format')}</label>
+              <span className="inline-block bg-bg-secondary border border-border rounded-md px-2.5 py-1.5 text-sm text-text-tertiary">PDF</span>
             </div>
           )}
         </div>
 
         <div>
-          <label className="text-xs text-text-muted mb-1 block">{t('reports.recipients')}</label>
+          <label className="text-xs text-text-tertiary mb-1 block">{t('reports.recipients')}</label>
           <div className="flex gap-2 mb-2">
             <Input
               value={recipientInputs[r.key] || ''}
@@ -374,7 +374,7 @@ export default function ReportsPage() {
                   <button
                     type="button"
                     onClick={() => removeRecipient(r.key, email)}
-                    className="ml-1.5 text-text-muted hover:text-status-danger"
+                    className="ml-1.5 text-text-tertiary hover:text-status-danger"
                   >×</button>
                 </Badge>
               ))}
@@ -470,7 +470,7 @@ export default function ReportsPage() {
               <div className="bg-bg-tertiary rounded-lg overflow-hidden">
                 <table className="w-full text-xs">
                   <thead>
-                    <tr className="border-b border-border-primary">
+                    <tr className="border-b border-border">
                       <th className="text-left px-3 py-1.5 text-text-secondary font-medium">{item.category === 'actions' ? 'Action' : item.category === 'users' ? 'User' : 'Resource'}</th>
                       <th className="text-right px-3 py-1.5 text-text-secondary font-medium">Count</th>
                     </tr>
@@ -500,7 +500,7 @@ export default function ReportsPage() {
           <div className="bg-bg-tertiary rounded-lg overflow-auto max-h-96">
             <table className="w-full text-xs">
               <thead className="sticky top-0 bg-bg-tertiary">
-                <tr className="border-b border-border-primary">
+                <tr className="border-b border-border">
                   {columns.map((col) => (
                     <th key={col} className="text-left px-3 py-2 text-text-secondary font-medium whitespace-nowrap">
                       {colLabel(col)}
@@ -557,7 +557,7 @@ export default function ReportsPage() {
                   <ChartBar size={16} className="text-accent-primary" />
                   {t('reports.dataReports')}
                 </h3>
-                <span className="text-xs text-text-muted">{reportEntries.length} {t('reports.available')}</span>
+                <span className="text-xs text-text-tertiary">{reportEntries.length} {t('reports.available')}</span>
               </div>
               <div className="divide-y divide-border">
                 {reportEntries.map(([key, report]) => {
@@ -581,7 +581,7 @@ export default function ReportsPage() {
                         <div className="text-sm font-medium text-text-primary">
                           {t(`reports.types.${key}.name`, { defaultValue: report.name })}
                         </div>
-                        <div className="text-xs text-text-muted mt-0.5 truncate">
+                        <div className="text-xs text-text-tertiary mt-0.5 truncate">
                           {t(`reports.types.${key}.description`, { defaultValue: report.description })}
                         </div>
                       </div>
@@ -673,7 +673,7 @@ export default function ReportsPage() {
             </div>
             <div className="p-4 space-y-4">
               {/* Data Reports group */}
-              <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
+              <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">
                 {t('reports.tabs.reports')}
               </div>
               {SCHEDULE_REPORTS.filter(r => r.group === 'data').map((r, idx) => {
@@ -700,7 +700,7 @@ export default function ReportsPage() {
 
               {/* PDF Reports group */}
               <div className="border-t border-border pt-4 mt-4">
-                <div className="text-xs font-semibold text-text-muted uppercase tracking-wider mb-2">
+                <div className="text-xs font-semibold text-text-tertiary uppercase tracking-wider mb-2">
                   {t('reports.tabs.pdf')}
                 </div>
               </div>
@@ -764,7 +764,7 @@ export default function ReportsPage() {
                             <div className="text-sm font-medium text-text-primary">
                               {t(`reports.pdf.template.${key}.name`, { defaultValue: tmpl.name })}
                             </div>
-                            <div className="text-xs text-text-muted mt-0.5">
+                            <div className="text-xs text-text-tertiary mt-0.5">
                               {tmpl.sections?.length || 0} {t('reports.pdf.sections').toLowerCase()}
                             </div>
                           </div>
@@ -835,7 +835,7 @@ export default function ReportsPage() {
                           onChange={() => toggleSection(sectionId)}
                           className="rounded border-border"
                         />
-                        <SIcon size={16} className={checked ? 'text-accent-primary' : 'text-text-muted'} />
+                        <SIcon size={16} className={checked ? 'text-accent-primary' : 'text-text-tertiary'} />
                         <span className="text-sm text-text-primary">
                           {t(`reports.pdf.section.${sectionId}`, { defaultValue: sectionId.replace(/_/g, ' ').replace(/\b\w/g, c => c.toUpperCase()) })}
                         </span>
@@ -870,7 +870,7 @@ export default function ReportsPage() {
                     {t('common.deselectAll')}
                   </Button>
                   {selectedSections.length > 0 && (
-                    <span className="text-xs text-text-muted">
+                    <span className="text-xs text-text-tertiary">
                       {selectedSections.length} / {pdfSections.length} {t('reports.pdf.sections').toLowerCase()}
                     </span>
                   )}

@@ -58,7 +58,7 @@ export function CACrlSection({ ca }) {
           {crlInfo ? (
             <>
               {crlInfo.is_stale && (
-                <div className="rounded-lg px-3 py-2 bg-status-warning/20 border border-status-warning/40 flex items-start gap-2">
+                <div className="rounded-lg px-3 py-2 bg-status-warning-op20 border border-status-warning-op40 flex items-start gap-2">
                   <Warning size={14} className="text-status-warning shrink-0 mt-0.5" />
                   <span className="text-2xs text-text-secondary">{t('cas.crlStaleWarning')}</span>
                 </div>

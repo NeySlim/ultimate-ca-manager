@@ -685,7 +685,7 @@ export default function DashboardPage() {
                               {daysLeft !== null && daysLeft <= 30 ? (
                                 <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
                                   daysLeft <= 7
-                                    ? 'bg-status-warning text-status-warning-foreground'
+                                    ? 'bg-status-warning text-black/80'
                                     : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
                                 }`}>
                                   {t('dashboard.expiresInDays', { count: daysLeft })}
@@ -1093,7 +1093,7 @@ export default function DashboardPage() {
                             {daysLeft !== null && daysLeft <= 30 ? (
                               <span className={`inline-flex items-center px-1.5 py-0.5 rounded text-[10px] font-semibold whitespace-nowrap ${
                                 daysLeft <= 7
-                                  ? 'bg-status-warning text-status-warning-foreground'
+                                  ? 'bg-status-warning text-black/80'
                                   : 'bg-yellow-500/10 text-yellow-600 dark:text-yellow-400'
                               }`}>
                                 {t('dashboard.expiresInDays', { count: daysLeft })}

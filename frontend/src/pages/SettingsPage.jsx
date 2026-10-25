@@ -2105,7 +2105,7 @@ export default function SettingsPage() {
         showClose={backupKeyConfirmed}
       >
         <div className="p-4 space-y-4">
-          <div className="p-3 rounded-lg bg-status-danger-op10 border border-status-danger/30">
+          <div className="p-3 rounded-lg bg-status-danger-op10 border border-status-danger-op30">
             <div className="flex items-start gap-2">
               <WarningCircle size={20} className="text-status-danger flex-shrink-0 mt-0.5" weight="fill" />
               <div className="text-sm text-text-primary">
@@ -2137,7 +2137,7 @@ export default function SettingsPage() {
             </Button>
           </div>
 
-          <label className={`flex items-start gap-2 cursor-pointer p-3 rounded-lg border ${backupKeyDownloaded ? 'border-border bg-bg-tertiary' : 'border-border/50 bg-bg-tertiary/40 opacity-60'}`}>
+          <label className={`flex items-start gap-2 cursor-pointer p-3 rounded-lg border ${backupKeyDownloaded ? 'border-border bg-bg-tertiary' : 'border-border-op50 bg-tertiary-op40 opacity-60'}`}>
             <input
               type="checkbox"
               checked={backupKeyConfirmed}

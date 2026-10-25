@@ -6,9 +6,30 @@ Avoids TLS certificate verification loops when clients fetch CRLs.
 Started automatically when http_protocol_port > 0 (default: 8080).
 Only serves /cdp/, /ca/, /ocsp, /.well-known/acme-challenge/ and /health — all other paths return 404.
 """
+import errno
 import logging
+import time
 
 logger = logging.getLogger(__name__)
+
+_server = None  # the running server, kept referenced
+
+# Bind retry after a reload: the old worker holds the port until it exits (seconds).
+RETRY_FIRST_DELAY = 0.25
+RETRY_MAX_DELAY = 1.0
+
+
+def _sleep(seconds):
+    import gevent
+    gevent.sleep(seconds)
+
+
+def _spawn(fn, *args):
+    import gevent
+    return gevent.spawn(fn, *args)
+
+
+_clock = time.monotonic  # tests replace _sleep, _spawn and _clock
 
 
 class ProtocolOnlyMiddleware:
@@ -59,26 +80,69 @@ def get_http_protocol_port():
     return 8080  # Default
 
 
-def start_http_protocol_server(flask_app, port=None):
-    """Start the HTTP protocol server. Returns the server or None on failure."""
+def _bind(flask_app, host, port):
+    from gevent.pywsgi import WSGIServer
+    server = WSGIServer((host, port), ProtocolOnlyMiddleware(flask_app), log=None)
+    server.start()
+    return server
+
+
+def _started(server, host, port):
+    global _server
+    _server = server
+    logger.info("HTTP protocol server (CDP/OCSP) started on %s port %d", host, port)
+    return server
+
+
+def _retry_bind(flask_app, host, port, error_after):
+    """Greenlet body: bind again with a growing delay while the port is busy.
+    Past ``error_after`` seconds the failure is logged once and the retries go
+    on, since the old worker may outlive graceful_timeout. Never raises."""
+    try:
+        deadline = _clock() + error_after
+        delay = RETRY_FIRST_DELAY
+        reported = False
+        while True:
+            _sleep(delay)
+            try:
+                return _started(_bind(flask_app, host, port), host, port)
+            except OSError as e:
+                if e.errno != errno.EADDRINUSE:
+                    logger.error("Cannot start HTTP protocol server on port %d: %s", port, e)
+                    return None
+                if not reported and _clock() >= deadline:
+                    logger.error("HTTP protocol port %d still busy after %gs, still retrying",
+                                 port, error_after)
+                    reported = True
+            delay = min(delay * 2, RETRY_MAX_DELAY)
+    except Exception as e:
+        logger.warning("HTTP protocol server startup failed: %s", e)
+        return None
+
+
+def start_http_protocol_server(flask_app, port=None, error_after=0):
+    """Start the HTTP protocol server. Returns the server, or None when it did
+    not start (yet).
+
+    With ``error_after`` > 0, a busy port is retried in a greenlet until it is
+    free (after a reload the old worker still holds it); an error is logged
+    once that many seconds have passed.
+    """
     if port is None:
         port = get_http_protocol_port()
     if port <= 0:
         return None
 
+    host = None
     try:
-        from gevent.pywsgi import WSGIServer
         from listen_address import get_bind_host
         host = get_bind_host()
-        server = WSGIServer(
-            (host, port),
-            ProtocolOnlyMiddleware(flask_app),
-            log=None,
-        )
-        server.start()
-        logger.info("HTTP protocol server (CDP/OCSP) started on %s port %d", host, port)
-        return server
+        return _started(_bind(flask_app, host, port), host, port)
     except OSError as e:
+        if e.errno == errno.EADDRINUSE and error_after > 0:
+            logger.warning("HTTP protocol port %d is busy, retrying until it is free", port)
+            _spawn(_retry_bind, flask_app, host, port, error_after)
+            return None
         logger.error("Cannot start HTTP protocol server on port %d: %s", port, e)
         return None
     except Exception as e:

@@ -42,6 +42,7 @@ export default {
         
         // Border
         'border': 'var(--border)',
+        'border-strong': 'var(--border-strong)',
         'border-hover': 'var(--text-tertiary)',
       },
       fontSize: {

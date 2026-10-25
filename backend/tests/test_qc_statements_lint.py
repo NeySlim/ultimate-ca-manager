@@ -60,6 +60,9 @@ def qualified_cert(app, auth_client, create_ca):
         row = db.session.get(CA, ca['id'])
         row.aia_ca_issuers_enabled = True
         row.aia_ca_issuers_url = json.dumps(['http://pki.example.com/ca.crt'])
+        # Public names only: the ETSI profile flags an internal domain (#421).
+        row.cdp_enabled = True
+        row.set_cdp_urls(['http://pki.example.com/crl.pem'])
         db.session.commit()
         tpl = CertificateTemplate(
             name=f'qc-lint-{next(_SEQ)}', template_type='custom', key_type='RSA-2048',

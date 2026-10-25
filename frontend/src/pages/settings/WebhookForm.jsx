@@ -531,7 +531,7 @@ export default function WebhookForm({ webhook, onSave, onCancel }) {
               )}
             </div>
             <code className="block text-xs font-mono text-text-primary bg-tertiary-50 rounded px-2 py-1.5 break-all">
-              <span className="text-accent-secondary">{preview.headerName}</span>
+              <span className="text-accent-pro">{preview.headerName}</span>
               <span className="text-text-tertiary">: </span>
               <span>{previewRevealed && preview.revealedValue ? preview.revealedValue : preview.maskedValue}</span>
             </code>

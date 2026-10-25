@@ -156,7 +156,7 @@ export default function PublicEndpointsPanel({ settings, updateSetting, refreshK
         <div className="rounded-lg border border-border p-3 space-y-2">
           <p className="text-xs font-medium text-text-secondary">{t('settings.publicEndpoints.preflightResults')}</p>
           {preflight.corporate_dns_servers?.length > 0 && (
-            <p className="text-xs text-text-muted">
+            <p className="text-xs text-text-tertiary">
               {t('settings.publicEndpoints.corporateDnsServers', {
                 servers: preflight.corporate_dns_servers.join(', '),
               })}
@@ -165,29 +165,29 @@ export default function PublicEndpointsPanel({ settings, updateSetting, refreshK
           {preflight.checks.map((c) => (
             <div key={c.label} className="flex flex-wrap items-center gap-2 text-sm">
               <span className="font-mono text-text-primary">{c.label}</span>
-              <span className="text-text-muted">{c.host || '—'}</span>
+              <span className="text-text-tertiary">{c.host || '—'}</span>
               {c.dns_local != null && c.dns_local !== 'skip' ? (
                 <>
-                  <span className="text-xs text-text-muted">{t('settings.publicEndpoints.dnsLocal')}</span>
+                  <span className="text-xs text-text-tertiary">{t('settings.publicEndpoints.dnsLocal')}</span>
                   <StatusBadge status={c.dns_local} />
                 </>
               ) : null}
               {c.dns_internal != null && c.dns_internal !== 'skip' ? (
                 <>
-                  <span className="text-xs text-text-muted">{t('settings.publicEndpoints.dnsInternal')}</span>
+                  <span className="text-xs text-text-tertiary">{t('settings.publicEndpoints.dnsInternal')}</span>
                   <StatusBadge status={c.dns_internal} />
                 </>
               ) : null}
               {c.dns_public != null && c.dns_public !== 'skip' ? (
                 <>
-                  <span className="text-xs text-text-muted">{t('settings.publicEndpoints.dnsPublic')}</span>
+                  <span className="text-xs text-text-tertiary">{t('settings.publicEndpoints.dnsPublic')}</span>
                   <StatusBadge status={c.dns_public} />
                 </>
               ) : (
                 <StatusBadge status={c.dns} />
               )}
               {c.tls !== 'skip' && <StatusBadge status={c.tls} />}
-              {c.detail && <span className="text-xs text-text-muted truncate max-w-full">{c.detail}</span>}
+              {c.detail && <span className="text-xs text-text-tertiary truncate max-w-full">{c.detail}</span>}
             </div>
           ))}
         </div>

@@ -266,7 +266,7 @@ export default function RequestCertificateForm({
       )}
       {formData.key_source !== 'csr' && <BrainpoolNotice label={formData.key_type} />}
 
-      <div className="p-3 rounded-lg border border-border bg-bg-secondary/50 space-y-3">
+      <div className="p-3 rounded-lg border border-border bg-secondary-op50 space-y-3">
         <p className="text-sm font-medium text-text-primary">{t('acme.preflightTitle')}</p>
         <p className="text-xs text-text-secondary">{t('acme.preflightDesc')}</p>
         <Select

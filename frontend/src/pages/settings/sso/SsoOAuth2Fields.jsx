@@ -27,7 +27,7 @@ export default function SsoOAuth2Fields({
       {/* Provider Preset */}
       <CompactSection title={t('sso.oauth2Preset')} icon={Lightning} collapsible defaultOpen>
         <div className="space-y-3">
-          <p className="text-xs text-text-muted">{t('sso.oauth2PresetHelp')}</p>
+          <p className="text-xs text-text-tertiary">{t('sso.oauth2PresetHelp')}</p>
           <div className="flex gap-2 flex-wrap">
             {[
               { id: 'custom', label: t('sso.oauth2PresetCustom') },
@@ -41,7 +41,7 @@ export default function SsoOAuth2Fields({
                 onClick={() => applyOAuth2Preset(preset.id)}
                 className={`px-3 py-1.5 text-xs rounded-lg border transition-all ${
                   oauth2Preset === preset.id
-                    ? 'border-accent bg-accent-op10 text-accent-primary font-medium'
+                    ? 'border-accent-primary bg-accent-op10 text-accent-primary font-medium'
                     : 'border-border bg-bg-secondary hover:bg-bg-tertiary text-text-secondary'
                 }`}
               >
@@ -120,7 +120,7 @@ export default function SsoOAuth2Fields({
         <div className="space-y-3">
           <div>
             <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.attributeMapping')}</p>
-            <p className="text-xs text-text-muted mb-2">{t('sso.attributeMappingHelp')}</p>
+            <p className="text-xs text-text-tertiary mb-2">{t('sso.attributeMappingHelp')}</p>
             <MappingEditor
               value={formData.attribute_mapping}
               onChange={val => handleChange('attribute_mapping', val)}
@@ -132,7 +132,7 @@ export default function SsoOAuth2Fields({
           </div>
           <div className="pt-2 border-t border-border">
             <p className="text-xs font-medium text-text-secondary mb-1">{t('sso.roleMapping')}</p>
-            <p className="text-xs text-text-muted mb-2">{t('sso.roleMappingHelp')}</p>
+            <p className="text-xs text-text-tertiary mb-2">{t('sso.roleMappingHelp')}</p>
             <RoleMappingEditor
               value={formData.role_mapping}
               onChange={val => handleChange('role_mapping', val)}

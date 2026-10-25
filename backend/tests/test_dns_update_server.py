@@ -990,7 +990,7 @@ def gunicorn_conf(app, monkeypatch):
     monkeypatch.setattr(gevent, 'get_hub', lambda: types.SimpleNamespace(handle_error=None))
     calls = []
     monkeypatch.setattr(protocol_http_server, 'start_http_protocol_server',
-                        lambda a: calls.append(('http', a)))
+                        lambda a, **kw: calls.append(('http', a, kw)))
     monkeypatch.setattr(srv_mod, 'start_dns_update_server',
                         lambda a, **kw: calls.append(('dns', a, kw)))
     return module, calls
@@ -1019,7 +1019,7 @@ def test_startup_gunicorn_dns_update_starts_when_the_http_server_fails_neg(gunic
     import protocol_http_server
     module, calls = gunicorn_conf
 
-    def boom(app):
+    def boom(app, **kw):
         raise RuntimeError('http down')
 
     monkeypatch.setattr(protocol_http_server, 'start_http_protocol_server', boom)

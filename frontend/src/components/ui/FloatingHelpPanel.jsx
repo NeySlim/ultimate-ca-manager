@@ -265,7 +265,7 @@ function QuickHelpContent({ content, t }) {
 
       {content.warnings?.length > 0 && (
         <div className="rounded-xl overflow-hidden border border-status-danger-op30">
-          <div className="visual-section-header !py-2" style={{ background: 'color-mix(in srgb, var(--status-danger) 10%, var(--bg-tertiary))' }}>
+          <div className="visual-section-header !py-2" style={{ background: 'color-mix(in srgb, var(--accent-danger) 10%, var(--bg-tertiary))' }}>
             <div className="w-6 h-6 rounded-md icon-bg-red flex items-center justify-center">
               <Warning size={12} weight="fill" />
             </div>

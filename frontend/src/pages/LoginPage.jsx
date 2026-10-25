@@ -539,7 +539,7 @@ export default function LoginPage() {
                 >
                   <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2 group-hover:bg-accent-op10 transition-colors" />
                   <div className="flex items-center gap-2 sm:gap-3">
-                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent to-accent-op70 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
+                    <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-op70 flex items-center justify-center shadow-lg group-hover:scale-105 transition-transform">
                       <User size={20} className="text-white sm:hidden" weight="bold" />
                       <User size={24} className="text-white hidden sm:block" weight="bold" />
                     </div>
@@ -547,7 +547,7 @@ export default function LoginPage() {
                       <p className="text-xs text-text-secondary uppercase tracking-wider font-medium">{t('auth.continueAs')}</p>
                       <p className="text-base sm:text-lg font-semibold text-text-primary truncate">{username}</p>
                     </div>
-                    <div className="text-accent group-hover:translate-x-1 transition-transform">
+                    <div className="text-accent-primary group-hover:translate-x-1 transition-transform">
                       <ArrowRight size={24} weight="bold" />
                     </div>
                   </div>
@@ -568,7 +568,7 @@ export default function LoginPage() {
                       localStorage.removeItem(STORAGE_AUTH_METHOD_KEY)
                     } catch { /* Safari private mode */ }
                   }}
-                  className="w-full text-sm text-text-secondary hover:text-accent transition-colors py-2"
+                  className="w-full text-sm text-text-secondary hover:text-accent-primary transition-colors py-2"
                   disabled={loading}
                 >
                   {t('auth.useDifferentAccount')}
@@ -618,7 +618,7 @@ export default function LoginPage() {
             <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4">
               <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent to-accent-op70 flex items-center justify-center shadow-lg">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-op70 flex items-center justify-center shadow-lg">
                   <User size={20} className="text-white sm:hidden" weight="bold" />
                   <User size={24} className="text-white hidden sm:block" weight="bold" />
                 </div>
@@ -628,7 +628,7 @@ export default function LoginPage() {
                 </div>
                 <button
                   onClick={handleChangeUser}
-                  className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-accent hover:bg-accent-op10 rounded-lg transition-all"
+                  className="px-3 py-1.5 text-xs font-medium text-text-secondary hover:text-accent-primary hover:bg-accent-op10 rounded-lg transition-all"
                   disabled={loading}
                 >
                   {t('common.change')}
@@ -641,8 +641,8 @@ export default function LoginPage() {
               <div className="flex flex-col items-center gap-2 py-2 sm:gap-4 sm:py-6">
                 <div className="relative">
                   <LoadingSpinner size="lg" />
-                  {authMethod === 'mtls' && <ShieldCheck size={24} className="absolute inset-0 m-auto text-accent" />}
-                  {authMethod === 'webauthn' && <Fingerprint size={24} className="absolute inset-0 m-auto text-accent" />}
+                  {authMethod === 'mtls' && <ShieldCheck size={24} className="absolute inset-0 m-auto text-accent-primary" />}
+                  {authMethod === 'webauthn' && <Fingerprint size={24} className="absolute inset-0 m-auto text-accent-primary" />}
                 </div>
                 <p className="text-sm text-text-secondary animate-pulse">
                   {statusMessage}
@@ -665,7 +665,7 @@ export default function LoginPage() {
                 
                 <button
                   onClick={() => setAuthMethod('password')}
-                  className="w-full text-sm text-text-secondary hover:text-accent transition-colors py-1.5 sm:py-2"
+                  className="w-full text-sm text-text-secondary hover:text-accent-primary transition-colors py-1.5 sm:py-2"
                 >
                   {t('auth.usePasswordInstead')}
                 </button>
@@ -722,7 +722,7 @@ export default function LoginPage() {
                   <div className="text-center">
                     <Link
                       to="/forgot-password"
-                      className="text-sm text-accent hover:text-accent-op80 hover:underline transition-colors"
+                      className="text-sm text-accent-primary hover:text-accent-op80 hover:underline transition-colors"
                     >
                       {t('auth.forgotPassword')}
                     </Link>
@@ -733,7 +733,7 @@ export default function LoginPage() {
                 {userMethods?.webauthn && authMethodsService.isWebAuthnSupported() && (
                   <button
                     onClick={() => attemptWebAuthn()}
-                    className="w-full text-sm text-text-secondary hover:text-accent transition-colors py-2 flex items-center justify-center gap-2"
+                    className="w-full text-sm text-text-secondary hover:text-accent-primary transition-colors py-2 flex items-center justify-center gap-2"
                     type="button"
                     disabled={loading}
                   >
@@ -760,18 +760,18 @@ export default function LoginPage() {
         {step === 'auth' && userMethods && (
           <div className="flex justify-center gap-1.5 sm:gap-2 pt-1 sm:pt-2">
             {userMethods.mtls && (
-              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'mtls' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary'}`}>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'mtls' ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}`}>
                 <ShieldCheck size={12} weight="fill" />
                 <span>mTLS</span>
               </div>
             )}
             {userMethods.webauthn && authMethodsService.isWebAuthnSupported() && (
-              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'webauthn' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary'}`}>
+              <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'webauthn' ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}`}>
                 <Fingerprint size={12} weight="fill" />
                 <span>{t('common.key')}</span>
               </div>
             )}
-            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'password' ? 'bg-accent text-white' : 'bg-bg-secondary text-text-secondary'}`}>
+            <div className={`flex items-center gap-1 px-2 py-1 rounded text-xs ${authMethod === 'password' ? 'bg-accent-primary text-white' : 'bg-bg-secondary text-text-secondary'}`}>
               <Key size={12} weight="fill" />
               <span>{t('common.password')}</span>
             </div>
@@ -861,7 +861,7 @@ export default function LoginPage() {
             <div className="relative overflow-hidden rounded-xl border border-border bg-gradient-to-br from-bg-secondary to-bg-tertiary p-3 sm:p-4">
               <div className="absolute top-0 right-0 w-20 h-20 sm:w-24 sm:h-24 bg-accent-op5 rounded-full -translate-y-1/2 translate-x-1/2" />
               <div className="flex items-center gap-2 sm:gap-3">
-                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent to-accent-op70 flex items-center justify-center shadow-lg text-xl">
+                <div className="w-10 h-10 sm:w-12 sm:h-12 rounded-full bg-gradient-to-br from-accent-primary to-accent-op70 flex items-center justify-center shadow-lg text-xl">
                   {selectedLdapProvider.icon || getSSOIcon(selectedLdapProvider)}
                 </div>
                 <div className="flex-1 min-w-0">
