@@ -48,12 +48,213 @@ npx vitest run src/pages/acme/__tests__/DnsUpdateKeysPanel.test.jsx \
 npm run check:i18n
 ```
 
+### Index of test IDs
+
+Every ID in a test name, in the module docstring of `handler.py` and in its comments is listed here. The Rule column says what must hold. The RFC column gives the section, or "—" for a rule of UCM. The Tests column names the files with a test of that ID.
+
+| Group | Meaning |
+|-------|---------|
+| `M` | message |
+| `E` | EDNS |
+| `S` | TSIG |
+| `T` | transport |
+| `U` | UPDATE |
+| `Q` | query and SOA discovery |
+| `R` | expected values |
+| `K` | keys |
+| `N` | server, logs and security |
+| `A` | hardening of the listener: replay cache, SERVFAIL, cost of SOA queries, row cache, IPv6 limits |
+| `B` | key cache that fails closed, audit limits, port setting, EAB link of keys |
+| `D` | keys bound to EAB, cache retry, port checks, length of audit fields |
+| `F` | regression test of a fixed defect |
+
+#### M: message
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| M1 | A message with QR=1 gets no response. | RFC 1035 §4.1.1 | `test_dns_update_handler.py` |
+| M2 | A message shorter than the 12 byte header gets no response. | RFC 1035 §4.1.1 | `test_dns_update_handler.py` |
+| M3 | Opcodes QUERY and UPDATE are served. Other opcodes get NOTIMP with a header only. | RFC 8906 §3.1.4, §7; RFC 2136 §3 | `test_dns_update_handler.py` |
+| M4 | A malformed message gets FORMERR with a header only. | RFC 8906 §7; RFC 2136 §3.1 | `test_dns_update_handler.py` |
+| M5 | A QUERY with QDCOUNT other than 1 gets FORMERR. | RFC 9619 §3; RFC 1035 §4.1.2 | `test_dns_update_handler.py` |
+| M6 | The Z bit is 0 in the response. The Z, AD and CD flags of the request are not echoed. | RFC 1035 §4.1.1; RFC 8906 §3.1.3 | `test_dns_update_handler.py` |
+| M7 | RD is copied from the request. RA is always 0. | RFC 1035 §4.1.1; RFC 8906 §3.1.3.1 | `test_dns_update_handler.py` |
+| M8 | The ID and the opcode are copied. A response for another ID does not match. | RFC 1035 §4.1.1; RFC 2136 §3.8 | `test_dns_update_handler.py` |
+
+#### E: EDNS
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| E1 | The response has an OPT record only when the request had one. The advertised payload size is the limit of the listener. | RFC 6891 §6.1.1, §7 | `test_dns_update_handler.py` |
+| E2 | One OPT record is valid. Two OPT records give FORMERR. | RFC 6891 §6.1.1 | `test_dns_update_handler.py` |
+| E3 | EDNS version 0 is served. Version 1 gives BADVERS with an OPT record of version 0. | RFC 6891 §6.1.3; RFC 8906 §7 | `test_dns_update_handler.py` |
+| E4 | Unknown EDNS options and flags are ignored and not echoed. | RFC 6891 §6.1.2, §6.1.4; RFC 8906 §3.2.3, §3.2.4 | `test_dns_update_handler.py` |
+| E5 | The response has no padding. A request with a padding option gets no padding back. | RFC 6891 §7 | `test_dns_update_handler.py` |
+
+#### S: TSIG
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| S1 | There is one TSIG record and it is last, else FORMERR. The TTL of the TSIG record is 0, else FORMERR. A message whose header ID changed is read as it was signed. If the names differ, the answer is FORMERR before the TSIG check. | RFC 8945 §4.2, §4.3.2, §5.1 | `test_dns_update_handler.py`, `test_dns_update_tsig.py` |
+| S2 | An unknown or empty-secret key gives BADKEY without a signature (MAC size 0). | RFC 8945 §5.2.1, §5.3.2 | `test_dns_update_handler.py`, `test_dns_update_tsig.py` |
+| S3 | The algorithm must be the algorithm of the key and one of sha256, sha384 or sha512. Else BADKEY. | RFC 8945 §5.2.1, §6, §7 | `test_dns_update_tsig.py` |
+| S4 | A wrong MAC (flipped byte, wrong secret, changed body) gives BADSIG without a signature. | RFC 8945 §5.2.2, §5.3.2 | `test_dns_update_handler.py`, `test_dns_update_tsig.py` |
+| S5 | The checks run in this order: key, MAC, time. A bad time with a good MAC gives BADTIME. A bad MAC gives BADSIG, an unknown key BADKEY. | RFC 8945 §5.2 | `test_dns_update_tsig.py` |
+| S6 | A time outside the fudge gives BADTIME, signed with the key. It has the server time in Other Data and the client fudge. A small request fudge is used as given. | RFC 8945 §5.2.3, §5.3.2 | `test_dns_update_handler.py`, `test_dns_update_tsig.py` |
+| S7 | A Time Signed older than the last accepted time of the key gives BADTIME. The time is kept for each key, is updated only by a valid request, and the table is bounded. | RFC 8945 §5.2.3 | `test_dns_update_tsig.py` |
+| S8 | The MAC size must be the digest size, or at least max(10, digest/2) bytes. Else FORMERR. A correct truncated MAC gives a signed BADTRUNC, because the policy needs a full MAC. A wrong truncated MAC gives BADSIG. | RFC 8945 §5.2.2.1, §5.2.4, §7 | `test_dns_update_handler.py`, `test_dns_update_tsig.py` |
+| S9 | The Error field of a request must be 0, else FORMERR. | RFC 8945 §4.2, §5.2 | `test_dns_update_tsig.py` |
+| S10 | A response to a signed request is signed and verifies. A response to an unsigned request has no TSIG. A response needs a validated key. | RFC 8945 §5.3 | `test_dns_update_handler.py`, `test_dns_update_tsig.py` |
+| S11 | The response MAC has the full length, also when the request MAC was truncated. | RFC 8945 §7 | `test_dns_update_tsig.py` |
+| S12 | A truncated signed response keeps the TSIG and sets TC. A response above the limit is truncated, also without OPT. | RFC 8945 §5.3 | `test_dns_update_handler.py`, `test_dns_update_tsig.py` |
+| S13 | Key names are compared without case. | RFC 8945 §4.2; RFC 1035 §2.3.3 | `test_dns_update_keys_zones_audit.py`, `test_dns_update_tsig.py` |
+| S14 | The time window is the smaller of the request fudge and 300 s. BADTIME returns the fudge of the client. | RFC 8945 §5.2.3, §10 | `test_dns_update_tsig.py` |
+| S15 | A replay (same key name and request MAC, any header ID, any transport) gets the stored response with no new side effects. A replay is checked after the MAC and before the time. A new request older than the watermark gets BADTIME. A replay with a wrong MAC gets BADSIG. A replay after the 600 s entry life is outside the window and gets BADTIME. Unsigned requests are not cached. The cache is bounded and thread safe. | RFC 8945 §10, §4.3.2 | `test_dns_update_handler.py`, `test_dns_update_tsig.py` |
+
+#### T: transport
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| T1 | Over UDP, an unsigned response is not longer than the request. If it is, it is truncated (TC=1). | RFC 1035 §4.2.1; RFC 6891 §7 | `test_dns_update_handler.py` |
+| T2 | Over UDP, a signed response may be up to 512 bytes (or the EDNS size). A longer one is truncated with TC and a TSIG. | RFC 1035 §4.2.1; RFC 6891 §6.2.3; RFC 8945 §5.3 | `test_dns_update_handler.py` |
+| T3 | Over TCP, messages have a 2 byte length. The listener handles pipelined messages in order and a length in a separate segment. A length of 0 or above the maximum closes the connection. Each signed request is verified on its own. | RFC 1035 §4.2.2; RFC 7766 §6.2.1, §8 | `test_dns_update_server.py` |
+| T4 | Over TCP, the response is full and not truncated. | RFC 8906 §3.2.7 | `test_dns_update_handler.py` |
+| T5 | The idle timer counts from a full message. A half message and silence close the connection. A slow drip does not reset the timer. A connection ends after its lifetime. | RFC 7766 §6.2.3 | `test_dns_update_server.py` |
+
+#### U: UPDATE
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| U1 | The zone section has exactly one record, of type SOA. Else FORMERR. | RFC 2136 §3.1.1 | `test_dns_update_handler.py` |
+| U2 | The zone class is IN, else NOTAUTH. (A meta class is rejected by the parser with FORMERR first.) | RFC 2136 §3.1.1 | `test_dns_update_handler.py` |
+| U3 | The zone must be a domain from ACME Domains or an ancestor of one. Else NOTAUTH. A zone below an entry is U16. | RFC 2136 §3.1.1 | `test_dns_update_handler.py`, `test_dns_update_keys_zones_audit.py` |
+| U4 | An UPDATE without TSIG is REFUSED at once, before the zone check, with no audit row and no database access. | RFC 3007 §2, §3; RFC 2136 §3.3.1 | `test_dns_update_handler.py` |
+| U5 | A non-empty prerequisite section is REFUSED (all five forms). | RFC 2136 §2.4, §3.2 | `test_dns_update_handler.py` |
+| U6 | The class of an update record is IN, ANY or NONE. Class CH gives FORMERR. | RFC 2136 §3.4.1 | `test_dns_update_handler.py` |
+| U7 | An update record name must be inside the zone, else NOTZONE. | RFC 2136 §3.4.1 | `test_dns_update_handler.py` |
+| U8 | Prescan: a delete of class ANY has TTL 0 and no RDATA. A delete of class NONE has TTL 0. Else FORMERR. | RFC 2136 §3.4.1.2 | `test_dns_update_handler.py` |
+| U9 | Only TXT at `_acme-challenge.<name>` can be changed. The first label is compared without case. Other types and names are REFUSED. | RFC 3007 §3.1; RFC 8555 §8.4 | `test_dns_update_handler.py` |
+| U10 | An add needs an active row in the key scope with the same value. Two strings of one TXT are joined. One different character, another proxy account, another row, a non-ASCII value, or no active row is REFUSED. | RFC 3007 §3; RFC 8555 §8.4; RFC 1035 §3.3.14 | `test_dns_update_handler.py` |
+| U11 | A delete of TXT (class NONE or ANY) is NOERROR and changes nothing, without a row. A delete of another type is REFUSED. A delete of all RRsets is U17. | RFC 2136 §2.5.2, §2.5.4, §3.4.2.3, §3.4.2.4 | `test_dns_update_handler.py` |
+| U12 | One bad record rejects the whole message. A delete followed by a valid add is accepted (the lego pattern). A good add after a bad add is not applied. | RFC 2136 §3.3.2, §3.7 | `test_dns_update_handler.py` |
+| U13 | Adding a value that was already added is NOERROR, also twice in one message. | RFC 2136 §2.5.1 | `test_dns_update_handler.py` |
+| U14 | The response has the ID and opcode of the request, QR=1 and no sections. The update section is never echoed. | RFC 2136 §3.8 | `test_dns_update_handler.py` |
+| U15 | An accepted update sets `client_confirmed_at` and `last_used_at` and writes an audit row. Nothing is written to DNS. A refused update changes nothing. | RFC 2136 §3.5 | `test_dns_update_handler.py` |
+| U16 | A zone below an ACME Domains entry is accepted. A record outside that zone gets NOTZONE. A zone below another domain gets NOTAUTH. | RFC 2136 §3.1.1, §3.4.1 | `test_dns_update_handler.py`, `test_dns_update_keys_zones_audit.py` |
+| U17 | A delete of all RRsets (class ANY, type ANY) at `_acme-challenge.<name>` is NOERROR and changes nothing. Type ANY with class IN or NONE, and the same delete at another name, are REFUSED. With RDATA it is FORMERR. | RFC 2136 §2.5.3, §3.4.1.2, §3.4.2.3 | `test_dns_update_handler.py` |
+
+#### Q: query and SOA discovery
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| Q1 | An SOA query for the zone of an active row gets NOERROR, AA and one SOA with fixed values (TTL 0, MINIMUM 0). Without a row the answer is REFUSED. | RFC 8906 §3.1.1; RFC 1035 §3.3.13 | `test_dns_update_handler.py` |
+| Q2 | A signed SOA query is answered with a signed response, for the rows of the key scope only. | RFC 8945 §5.3; RFC 3007 §3 | `test_dns_update_handler.py` |
+| Q3 | Every other type is REFUSED. The SOA of an ancestor of the zone is REFUSED. | RFC 1035 §4.1.1 | `test_dns_update_handler.py` |
+| Q4 | Class IN is served. Other classes are REFUSED. | RFC 1035 §4.1.1 | `test_dns_update_handler.py` |
+| Q5 | Meta types (AXFR, IXFR, ANY and others) are REFUSED. | RFC 1035 §4.1.1; RFC 8906 §3.1.2 | `test_dns_update_handler.py` |
+| Q6 | Names are compared without case. | RFC 1035 §2.3.3 | `test_dns_update_handler.py` |
+| Q7 | An SOA query for a name between the zone and the record name gets NOERROR with no answer and the SOA in AUTHORITY. This covers the nsupdate, certbot and lego patterns, also over TCP after a truncated UDP answer. A name without a row is REFUSED. | RFC 2308 §2.2 | `test_dns_update_handler.py` |
+| Q8 | Q1 and Q7 also work for a row for 24 h after `expires_at`, whatever its status. A signed query sees rows of the key scope only. An add with the value of a closed row is REFUSED. After the grace period the SOA is REFUSED. | RFC 2136 §3.1.1 | `test_dns_update_handler.py` |
+
+#### R: expected values
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| R1 | The value is base64url(SHA-256(token "." thumbprint)) without padding, in the RFC alphabet. | RFC 8555 §8.1, §8.4; RFC 4648 §5; RFC 7638 §3 | `test_dns_update_records.py` |
+| R2 | The record name is `_acme-challenge.` and the identifier without `*.`, in lower case. | RFC 8555 §8.4 | `test_dns_update_records.py` |
+| R3 | A row is stored when a client fetches the authorization: one for each order, also for sibling orders. Nothing is stored for a valid authorization, a foreign client, an order without a dns-01 challenge, a name without a zone, or when nothing is new. | RFC 8555 §7.5 | `test_dns_update_records.py` |
+| R4 | Rows close at the certificate download and at a failed state of the authorization or the challenge. Processing and valid keep them. `expires_at` is at most 24 h after creation. Old rows are purged. | RFC 8555 §7.1.4, §7.1.6 | `test_dns_update_records.py` |
+| R5 | The key scope is the proxy account, and the ACME account when the key is linked to EAB. Another proxy account or ACME account is REFUSED. | RFC 3007 §3 | `test_dns_update_handler.py` |
+| R6 | An error while a row is written (a duplicate, a flush error, a hook error) does not stop the authorization. | — | `test_dns_update_records.py` |
+| R7 | The row of a sibling order has its own thumbprint. An order without a thumbprint gets no row. | RFC 8555 §8.1 | `test_dns_update_records.py` |
+| R8 | The snapshot has two views: active rows (for adds) and rows up to 24 h after `expires_at` (for SOA discovery). A row older than that is in neither view. | RFC 2136 §3.1.1 | `test_dns_update_records.py` |
+| R9 | A row is also stored while the challenge is processing. A final authorization or challenge stores none. A processing challenge starts no automation. | RFC 8555 §7.1.6 | `test_dns_update_records.py` |
+
+#### K: keys
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| K1 | The secret comes from a random source. Its length is the digest size of the algorithm (32, 48, 64 bytes). Two keys never share a secret. | RFC 8945 §8 | `test_dns_update_api.py` |
+| K2 | The secret is encrypted at rest. A corrupt ciphertext reads as none. | — | `test_dns_update_models.py` |
+| K3 | The secret is returned only when the key is created. The list and `to_dict` never contain it. | — | `test_dns_update_api.py`, `test_dns_update_models.py` |
+| K4 | Only hmac-sha256, hmac-sha384 and hmac-sha512 are accepted. Other algorithms give 400. | RFC 8945 §6, §7 | `test_dns_update_api.py` |
+| K5 | A key name is a valid DNS name, normalized to lower case with a final dot. Each label has at most 63 bytes and only letters, digits, `_` and `-` (not at the start or end). The name is unique, also across accounts and ignoring case. A generated name uses the slug. Notes have at most 1000 characters. | RFC 8945 §4.2; RFC 1035 §2.3.1, §2.3.4 | `test_dns_update_api.py`, `test_dns_update_models.py` |
+| K6 | A key without rows changes nothing. An add gets REFUSED. | RFC 3007 §3 | `test_dns_update_handler.py` |
+| K7 | A secret that is empty, corrupt, not base64 or with a disallowed algorithm gives no key material. The key is then unknown (BADKEY), never an empty HMAC key. | RFC 8945 §5.2.1 | `test_dns_update_keys_zones_audit.py`, `test_dns_update_models.py` |
+| K8 | A key with an EAB credential matches nothing when the credential is deleted, not used, or has no account, or when the row has no account. A used credential allows its own account only. Revoking or deleting the credential revokes or deletes the key. | RFC 3007 §3 | `test_dns_update_keys_zones_audit.py`, `test_dns_update_models.py` |
+| K9 | Only an active key of an account with the proxy on is valid. A deleted account, a disabled proxy or a revoked key gives BADKEY. Deleting an account deletes its keys and rows. A new account does not inherit a key. | RFC 3007 §3 | `test_dns_update_keys_zones_audit.py`, `test_dns_update_models.py` |
+
+#### N: server, logs and security
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| N1 | The port comes from `UCM_DNS_UPDATE_PORT`, then from the setting. 0 disables the listener. An invalid variable gives 0 and a warning. The `dns_update_listening` flag follows the listener. | — | `test_dns_update_api.py`, `test_dns_update_server.py` |
+| N2 | The API accepts the port 0 or 1024 to 65535. It refuses other values, the HTTPS port and the HTTP protocol port. It shows the variable. A viewer gets 403. | — | `test_dns_update_api.py` |
+| N3 | A busy UDP or TCP port makes the start return false. The application runs on. A free port listens and stop clears it. | — | `test_dns_update_server.py` |
+| N4 | Limits: a global rate limit, a per-IP rate limit, a bounded per-IP table, a handler pool, and a TCP cap per source. Over the rate limit, a UDP packet or a TCP message gets no response. Over the TCP cap, the extra connection is closed. Traffic inside the limits is answered. | RFC 7766 §6.2.2, §6.2.3 | `test_dns_update_server.py` |
+| N5 | The handler makes no outgoing connection and does no recursion. | RFC 8906 §3.1.3.1 | `test_dns_update_handler.py` |
+| N6 | Unsigned and malformed requests are not audited. An accepted signed update is audited once with peer, key and transport. A signed refusal is audited with its reason. No row holds a TXT value. | — | `test_dns_update_handler.py` |
+| N7 | One IP address writes one audit row for each reason in a window. The IP table is bounded. | — | `test_dns_update_keys_zones_audit.py` |
+| N8 | Unsigned and BADKEY traffic runs no SQL. A signed accepted update uses the database. | — | `test_dns_update_handler.py` |
+| N9 | The header counts and the size are checked before the parse. A QUERY with ANCOUNT above 0, QDCOUNT or ANCOUNT or NSCOUNT above 16, ARCOUNT above 4, or a message above 4096 bytes gets no response. | — | `test_dns_update_handler.py` |
+| N10 | An exception gives SERVFAIL, signed when the TSIG was verified. The server goes on serving, also after an error in a side effect. | RFC 1035 §4.1.1; RFC 8945 §5.3 | `test_dns_update_handler.py`, `test_dns_update_server.py` |
+| N11 | No log line of the module holds a secret, a MAC or a TXT value. | — | `test_dns_update_handler.py`, `test_dns_update_keys_zones_audit.py` |
+| N12 | Audit rows for rejections have a global limit for each reason, for all IP addresses. A flood gives a bounded number of rows. | — | `test_dns_update_keys_zones_audit.py` |
+| N13 | An audit row has the peer address, the user name `dns-update:<key>` or `dns-update:unauthenticated`, and the reason in the details. Names from the packet are shortened and cleaned. Writing never raises. | — | `test_dns_update_keys_zones_audit.py` |
+
+#### A: hardening of the listener (replay, errors, cost, limits)
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| A1 | A replay is found by key name and request MAC. The entry lives 600 s (2 x 300 s fudge). A copy of a request that is still in work gets no response. A replay over the other transport has no new side effects. A different request is processed. | RFC 8945 §10, §4.3.2 | `test_dns_update_handler.py` |
+| A2 | An error while a signed request is processed gives a signed SERVFAIL. An unsigned request, or a failed signing, gives a SERVFAIL with a header only. A failure is not stored in the replay cache. | RFC 8945 §5.3 | `test_dns_update_handler.py` |
+| A3 | An SOA query for a name outside every zone of the snapshot parses no row names. Parsed names are cached (4096 entries). | — | `test_dns_update_handler.py` |
+| A4 | A conflict on one row does not drop the other rows. One conflicting row gives 0 new rows and the authorization is still returned. The row cache is cleared only when a row was inserted. | — | `test_dns_update_records.py` |
+| A5 | Per-address limits use the /64 network for IPv6 and the address for IPv4. The rate limit and the TCP cap per source use the same key. The TCP pool (128) needs 16 sources of 8 connections. | RFC 7766 §6.2.2 | `test_dns_update_server.py` |
+
+#### B: fixes of the key cache, audit, port setting and EAB link
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| B1 | The key cache fails closed. After an invalidation and a failed reload, no key is found. After an expiry and a failed reload, the old cache stays. A retry comes after 2 s at the earliest, with one warning for each failed attempt. Only the EAB credentials that a key refers to are read. | — | `test_dns_update_keys_zones_audit.py` |
+| B2 | An accepted update writes at most 120 audit rows for each key in a minute. The excess goes into one summary row. A per-IP drop is counted for its own reason. The key table is bounded. A failed audit write returns false. | — | `test_dns_update_keys_zones_audit.py` |
+| B3 | An empty `UCM_DNS_UPDATE_PORT` is the same as no variable, and the stored setting is used. A set variable wins over the setting. An invalid stored value is 0. | — | `test_dns_update_api.py` |
+| B4 | The DNS UPDATE port and the TLS-ALPN-01 port must differ. The check works in both directions and within one request. A disabled DNS UPDATE port (0) conflicts with nothing. `restart_required` is true only after a change, and not when the variable decides the port. | — | `test_dns_update_api.py` |
+| B5 | Revoking an ACME EAB credential revokes the linked key. Deleting the credential deletes the linked key. Each change has an audit row. Other keys stay. | — | `test_dns_update_api.py` |
+
+#### D: fixes of keys bound to EAB, cache retry, port checks and audit text
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| D1 | A key created with an EAB credential is marked `eab_bound`. A bound key whose credential is missing matches nothing. An unbound key matches the whole proxy account. | RFC 3007 §3 | `test_dns_update_api.py`, `test_dns_update_keys_zones_audit.py`, `test_dns_update_models.py` |
+| D2 | `mark_eab_used` clears the key cache, so the scope allows the account at once. A failed mark keeps its return value and an invalidation error never changes the result. | — | `test_dns_update_keys_zones_audit.py` |
+| D3a | `invalidate` inside the retry window reloads at once. With a failing database it empties the cache. | — | `test_dns_update_keys_zones_audit.py` |
+| D3b | The zone index retries a failed load after the retry interval (2 s), not on every call. `invalidate` clears the retry time. | — | `test_dns_update_keys_zones_audit.py` |
+| D4a | `restart_required` compares the new port with the port on which the listener runs. A listener that is not running counts as 0. | — | `test_dns_update_api.py` |
+| D4b | The TLS-ALPN-01 port is checked against the port from the environment variable. Without the variable, a disabled DNS UPDATE port is ignored. | — | `test_dns_update_api.py` |
+| D4c | A port in the variable outside 0 to 65535 is 0, with a warning. A port below 1024 is kept, with a warning. A valid port gives no warning. | — | `test_dns_update_api.py` |
+| D4d | The effective port follows the variable. An invalid variable gives 0. Without a variable the stored port is used. | — | `test_dns_update_api.py` |
+| D5 | The audit row fits the column limits: user name 80, resource name 255, address 45. A short key name is not changed. | — | `test_dns_update_keys_zones_audit.py` |
+
+#### F: regression tests of fixed defects
+
+| ID | Rule | RFC | Tests |
+|----|------|-----|-------|
+| F1 | A signed UDP answer that does not fit even in its truncated form is dropped and not cached. One that fits is sent with TC and cached. Key and zone lookups on a warm cache run no SQL. A cold cache does. | RFC 8945 §5.3; RFC 1035 §4.2.1 | `test_dns_update_handler.py`, `test_dns_update_keys_zones_audit.py`, `test_dns_update_tsig.py` |
+| F2 | A key change is visible after `invalidate` and after the cache age (30 s). A restore clears the key and zone caches. The audit summary row of an accepted update belongs to the key and succeeds. The summary row of a refusal stays unauthenticated and failed. | — | `test_dns_update_keys_zones_audit.py` |
+| F3 | A database error keeps the previous cache. On the first load it finds nothing. Deleting an account drops its rows from the warm row cache, and deleting another account does not. | — | `test_dns_update_api.py`, `test_dns_update_keys_zones_audit.py` |
+| F4 | `touch` sets `last_used_at`, at most once per 60 s, and never raises. The same invalid port variable gives one warning. Another invalid value warns again. | — | `test_dns_update_api.py`, `test_dns_update_keys_zones_audit.py` |
+| F5 | The settings GET reads the stored port once. A stored value that the caller gives is used without a database read. | — | `test_dns_update_api.py` |
+| F6 | An SOA query looks only at the rows of its own zone. With nested zones the deepest zone wins. The row index is built again only for a new snapshot. | — | `test_dns_update_handler.py` |
+| F8 | The listener binds `UCM_DNS_UPDATE_HOST`. Without it, it binds the HTTP host. | — | `test_dns_update_server.py` |
+| F11 | `repr` of a key and of a TSIG result hides the secret and the MAC. | — | `test_dns_update_tsig.py` |
+
 ### Scenarios of the review round
 
 | Scenario | Expected | Check |
 |----------|----------|-------|
 | Auditor permissions (`read:acme` only) | `GET` of keys and settings `200`. `POST` of a key, `DELETE` of a key and `PATCH` of `dns_update_port` give `403` and change nothing. A role with `write:acme` but not `delete:acme` gets `403` on `DELETE` | `test_dns_update_api.py`, `test_permissions_*` |
-| Bind retry after reload | After `systemctl reload`, the new worker retries the bind for up to `graceful_timeout` + 5 s (35 s by default) while the old worker holds the port. Then `dns_update_listening` is `true` | `test_dns_update_server.py`. Lab: `systemctl reload`, then read `dns_update_listening` |
+| Bind retry after reload | After `systemctl reload`, the new worker retries the bind while the old worker holds the port, first after 0.25 s, then every second, without a time limit. After `graceful_timeout` + 5 s (35 s by default) it logs one error and goes on. Another bind error stops the retries and is logged with its message. Then `dns_update_listening` is `true` | `test_dns_update_server.py`, `test_retry_*`. Lab: `kill -HUP` on the gunicorn master |
 | SOA after the rows close | The SOA query is answered for 24 hours after the expected value expires, also after a failed validation or a downloaded certificate. An add still gets `REFUSED` without a pending order | `test_dns_update_handler.py`, `test_dns_update_records.py` |
 | Zone below an entry | An UPDATE for a zone below an ACME Domains entry is accepted. A record outside that zone gets `NOTZONE` | `test_dns_update_handler.py`, `test_dns_update_keys_zones_audit.py` |
 | Delete of type ANY | `update delete <name>` without a type for an `_acme-challenge` name gets `NOERROR` and changes nothing | `test_dns_update_handler.py`. Lab: `nsupdate` with `update delete _acme-challenge.<name>` |

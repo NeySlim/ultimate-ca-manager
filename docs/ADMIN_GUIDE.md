@@ -583,7 +583,7 @@ curl -k -X PATCH -H "Authorization: Bearer $UCM_API_KEY" -H "Content-Type: appli
 
 **Enable it.** The listener is **off by default**. A restart is needed after every change.
 
-**Reload and restart.** `systemctl reload` (HUP) starts a new worker while the old worker still holds the port. The new worker tries to bind the port again until it succeeds, for up to `graceful_timeout` + 5 seconds (35 seconds by default). If the port is still busy after that time, the listener is not running. The log shows the reason. `GET /api/v2/acme/client/settings` shows `dns_update_listening`.
+**Reload and restart.** `systemctl reload` (HUP) starts a new worker while the old worker still holds the port. The new worker tries to bind the port again until it succeeds, first after 0.25 seconds, then at most every second. The old worker can hold the port longer than `graceful_timeout` while a long connection (for example the WebSocket of the web interface) is open. When the port is still busy after `graceful_timeout` + 5 seconds (35 seconds by default), UCM logs an error once and keeps trying. The listener starts as soon as the port is free. Another bind error (for example a wrong `UCM_DNS_UPDATE_HOST`) stops the retries, and the log shows it. `GET /api/v2/acme/client/settings` shows `dns_update_listening`.
 
 | Method | Value |
 |--------|-------|
@@ -616,7 +616,7 @@ Clients on the UCM host itself need the same rules in the `OUTPUT` chain. With n
 - The default algorithm is `hmac-sha256`. `hmac-sha384` and `hmac-sha512` are possible.
 - Revoke a key with `DELETE .../dns-update-keys/<key_id>`. A revoked key stops working at once (BADKEY). Another `DELETE` removes it. Deleting an ACME proxy account removes its keys.
 - Optional link to an EAB credential (`eab_credential_id`). The key then accepts only values for orders of the ACME account that registered with that credential, so the credential must be used already. A key without the link accepts values for all orders of its proxy account. Revoking the EAB credential revokes the keys linked to it, and deleting the credential deletes them. The audit log has an entry for each key.
-- The keys of an account whose ACME proxy is off stay in the database. They do not work (BADKEY). The **DNS UPDATE keys** button stays in the web interface for an account that has keys, with a warning. You can revoke and delete the keys there, but not create new ones. `GET /api/v2/acme/client/accounts` gives `dns_update_key_count` for each account (keys of any status).
+- The keys of an account whose ACME proxy is off stay in the database. They do not work (BADKEY). The **DNS UPDATE keys** button stays in the web interface for an account that has keys, with a warning. You can revoke and delete the keys there, but not create new ones: the API answers `409` to a new key for an account whose proxy is off. `GET /api/v2/acme/client/accounts` gives `dns_update_key_count` for each account (keys of any status).
 - `last_used_at` of a key shows when it last sent an accepted update.
 
 **What the listener accepts and answers.**
@@ -644,7 +644,7 @@ Clients on the UCM host itself need the same rules in the `OUTPUT` chain. With n
 | `BADKEY` | UCM does not know the key, or the key is not usable | Key name (with the trailing dot in some clients), key revoked, proxy account disabled, algorithm refused (`hmac-md5`, `hmac-sha1`: set `hmac-sha256`) |
 | `BADSIG` | The signature does not match | Wrong secret (copy it again from the creation dialog), secret not base64, a different algorithm than the key has. win-acme with `hmac-sha384` signs wrongly: use `hmac-sha256` |
 | `BADTIME` | The client clock is more than 300 s away from UCM, or the request was signed earlier than the last accepted request of the same key | Synchronize the time (NTP) on the client and on UCM. If the clocks are correct: several clients share one key, or parallel requests arrived out of order. Give each client its own key; the client normally retries |
-| `REFUSED` | The request is understood but not allowed | Unsigned UPDATE; value does not match the pending order (new order, new value); no pending order for that name (the client must fetch the authorization first; an add needs a pending order, also when the SOA query was answered); name is not `_acme-challenge.<name>`; record type is not TXT; the message has prerequisites; for a query, the name is not covered by a pending order |
+| `REFUSED` | The request is understood but not allowed | Unsigned UPDATE; value does not match the pending order (new order, new value); no pending order for that name (the client must fetch the authorization first; an add needs a pending order, also when the SOA query was answered); name is not `_acme-challenge.<name>`; record type is not TXT (a delete without a type is accepted for `_acme-challenge` names); the message has prerequisites; for a query, no order covers the name (the order is pending, or its expected value expired less than 24 hours ago) |
 | `NOTAUTH` | The zone is not served | The zone section is not an ACME Domains entry, a parent of one, or a name below one |
 | `NOTZONE` | A record of the update is outside the zone of the message | Every record must be in the zone. The client sent a zone and a record name that do not fit |
 

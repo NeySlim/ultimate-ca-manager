@@ -683,8 +683,8 @@ class DnsUpdateHandler:
             if rclass == _IN:
                 continue
             if rclass in (_ANY, _NONE):
-                # §3.4.1.3: class ANY has TTL 0 and RDLENGTH 0 (dnspython already
-                # refuses RDLENGTH != 0 at parse time).
+                # RFC 2136 §3.4.1.2: class ANY and NONE have TTL 0, class ANY has
+                # RDLENGTH 0 (dnspython already refuses RDLENGTH != 0 at parse time).
                 if ttl != 0 or (rclass == _ANY and rdlen != 0):
                     return self._refuse(resp, dns.rcode.FORMERR, "format", zone_text, names)
                 continue
@@ -703,7 +703,9 @@ class DnsUpdateHandler:
         row_ids: List[int] = []
         for rrset in msg.update:
             # "Delete all RRsets from a name" (RFC 2136 §2.5.3: class ANY, type ANY) is a
-            # delete like the others. Type ANY with class NONE or IN is not.
+            # delete like the others. Type ANY with class NONE or IN is not: §3.4.1.2 asks
+            # for FORMERR there, but this permission check (§3.3) runs before the prescan
+            # (§3.4), so such an RR gets REFUSED.
             delete_all = rrset.rdtype == dns.rdatatype.ANY and rrset.deleting == _ANY
             if ((rrset.rdtype != dns.rdatatype.TXT and not delete_all)
                     or len(rrset.name.labels) < 2
