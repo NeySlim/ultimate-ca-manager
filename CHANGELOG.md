@@ -15,6 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- PostgreSQL: the web worker reused the database connections that the main process opened at startup and kept using for scheduled tasks, so the replies of both could interleave (intermittent `PGRES_TUPLES_OK` errors, rows of another query, an unhealthy container). Each worker now opens its own.
 - The HTTP protocol server (CDP, OCSP, AIA, HTTP-01) stopped after `systemctl reload ucm` until the next restart, because the new worker could not take the port from the old one; it now waits for the port to be released.
 - ACME proxy: a challenge response now carries `Link: rel="up"` even when the upstream CA omits it (Pebble), which certbot and lego require (#420, reported by @WMP).
 - ACME: deactivating an authorization (RFC 8555 §7.5.2), as lego does after a failed validation, got `malformed` from the native server and the proxy. Both now accept it; the proxy deactivates the upstream authorization only when no other pending order shares it (#422, reported by @WMP).
