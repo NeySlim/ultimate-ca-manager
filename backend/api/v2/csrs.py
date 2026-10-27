@@ -56,31 +56,76 @@ def _ca_by_id_or_refid(ca_id):
 # Signing one of these is a CA-management action and requires 'write:cas'.
 _CA_CERT_TYPES = frozenset({'intermediate_ca'})
 
+# Longest search term the CSR lists accept; anything longer is cut, so a
+# client cannot make every row run against an arbitrarily long LIKE pattern
+_MAX_SEARCH_LEN = 200
+
+
+def _request_search_term():
+    """The ``search`` query argument, trimmed and bounded."""
+    return (request.args.get('search', '') or '').strip()[:_MAX_SEARCH_LEN]
+
+
+def _apply_request_search(query, search, include_signer=False):
+    """Filter a CSR listing by a free-text term (LIKE wildcards escaped).
+
+    Matches the subject, description and requester -- same contract as the
+    certificates list, so paginated consumers can search server-side (#294).
+    With ``include_signer`` it also matches the signing CA's name, which the
+    history table shows as "Signed By".
+    """
+    if not search:
+        return query
+    safe_search = search.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
+    pattern = f'%{safe_search}%'
+    conditions = [
+        Certificate.subject.ilike(pattern, escape='\\'),
+        Certificate.descr.ilike(pattern, escape='\\'),
+        Certificate.created_by.ilike(pattern, escape='\\'),
+    ]
+    if include_signer:
+        signer_refids = db.session.query(CA.refid).filter(CA.descr.ilike(pattern, escape='\\'))
+        conditions.append(Certificate.caref.in_(signer_refids))
+        # A row whose CA is gone shows the issuer's name as its signer
+        conditions.append(Certificate.issuer.ilike(pattern, escape='\\'))
+    return query.filter(or_(*conditions))
+
+
+# Table column key -> column the CSR lists may sort on. Only these: the
+# client's value never names a column directly
+_SORT_COLUMNS = {
+    'cn': Certificate.subject_cn,
+    'created_at': Certificate.created_at,
+    'key_type': Certificate.key_algo,
+    'signed_at': Certificate.valid_from,
+    'valid_to': Certificate.valid_to,
+}
+
+
+def _apply_request_sort(query):
+    """Order a CSR listing by the ``sort_by``/``sort_order`` arguments.
+
+    Unknown keys fall back to newest first. The id breaks ties in the same
+    direction, so a row never appears on two pages (or on none) when the
+    sorted values are equal.
+    """
+    column = _SORT_COLUMNS.get(request.args.get('sort_by', ''), Certificate.created_at)
+    if request.args.get('sort_order', 'desc') == 'asc':
+        return query.order_by(column.asc(), Certificate.id.asc())
+    return query.order_by(column.desc(), Certificate.id.desc())
+
+
 @bp.route('/api/v2/csrs', methods=['GET'])
 @require_auth(['read:csrs'])
 def list_csrs():
     """List all pending CSRs (Certificates with no crt)"""
     page, per_page = parse_request_pagination(default_per_page=20)
-    search = request.args.get('search', '').strip()
+    search = _request_search_term()
 
     # Requests still awaiting their certificate. The exact complement of the
     # certificates list, so a record shows up in one or the other, never in
     # both and never in neither
-    query = pending_requests()
-
-    # Apply search filter (escape LIKE wildcards) — same contract as the
-    # certificates list, so paginated consumers can search server-side (#294)
-    if search:
-        safe_search = search.replace('\\', '\\\\').replace('%', '\\%').replace('_', '\\_')
-        query = query.filter(
-            or_(
-                Certificate.subject.ilike(f'%{safe_search}%', escape='\\'),
-                Certificate.descr.ilike(f'%{safe_search}%', escape='\\'),
-                Certificate.created_by.ilike(f'%{safe_search}%', escape='\\')
-            )
-        )
-
-    query = query.order_by(Certificate.created_at.desc())
+    query = _apply_request_sort(_apply_request_search(pending_requests(), search))
 
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     
@@ -204,9 +249,11 @@ def list_csrs_history():
     """List all signed CSRs (Certificates that had a CSR and now have crt)"""
     
     page, per_page = parse_request_pagination(default_per_page=20)
-    
+    search = _request_search_term()
+
     # Requests that have received their certificate
-    query = signed_requests().order_by(Certificate.created_at.desc())
+    query = _apply_request_sort(
+        _apply_request_search(signed_requests(), search, include_signer=True))
     
     pagination = query.paginate(page=page, per_page=per_page, error_out=False)
     

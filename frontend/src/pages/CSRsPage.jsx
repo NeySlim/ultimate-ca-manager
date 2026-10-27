@@ -55,9 +55,17 @@ export default function CSRsPage() {
   // Tab state
   const [activeTab, setActiveTab] = useState(searchParams.get('tab') || 'pending')
   
-  // Data state
-  const [pendingCSRs, setPendingCSRs] = useState([])
-  const [historyCSRs, setHistoryCSRs] = useState([])
+  // Data state. The API pages both lists: only the active tab's current page
+  // is held here, and the counts come from the server's totals
+  const [rows, setRows] = useState([])
+  const [listTotal, setListTotal] = useState(0) // rows matching the search, active tab
+  const [pendingTotal, setPendingTotal] = useState(0)
+  const [historyTotal, setHistoryTotal] = useState(0)
+  // What the search box shows, and the term actually sent (debounced)
+  const [searchInput, setSearchInput] = useState('')
+  const [searchValue, setSearchValue] = useState('')
+  // Server-side sort; null = the API's default, newest first
+  const [sort, setSort] = useState(null)
   const [loading, setLoading] = useState(true)
   const [cas, setCAs] = useState([])
   
@@ -123,18 +131,26 @@ export default function CSRsPage() {
 
   // Handle tab change
   const handleTabChange = (tabId) => {
+    if (tabId !== activeTab) {
+      // The other tab's rows must not show under this tab's columns
+      setRows([])
+      setListTotal(0)
+      setSearchInput('')
+      setSearchValue('')
+      setLoading(true)
+    }
     setActiveTab(tabId)
     setSelectedCSR(null)
     setPage(1)
     setSearchParams({ tab: tabId })
   }
-  
+
   // Pagination state
   const [page, setPage] = useState(1)
   const [perPage, setPerPage] = useState(25)
 
   useEffect(() => {
-    loadData()
+    loadAux()
     if (searchParams.get('action') === 'upload') {
       openModal('upload')
       searchParams.delete('action')
@@ -142,25 +158,92 @@ export default function CSRsPage() {
     }
   }, [])
 
-  const loadData = async () => {
+  // The active tab's page, plus both tabs' unfiltered totals for the counts.
+  // A reload started earlier must not overwrite a later one (page or search
+  // changed while an action's reload was in flight)
+  const listSeq = useRef(0)
+  // Read through refs: the loader must change only when the query does, not
+  // whenever a caller hands in a new function identity
+  const showErrorRef = useRef(showError)
+  showErrorRef.current = showError
+  const tRef = useRef(t)
+  tRef.current = t
+  const loadLists = useCallback(async () => {
+    const seq = ++listSeq.current
+    const fetchPending = (params) => csrsService.getAll(params)
+    const fetchHistory = (params) => csrsService.getHistory(params)
+    const isPending = activeTab === 'pending'
+    const fetchActive = isPending ? fetchPending : fetchHistory
+    const fetchOther = isPending ? fetchHistory : fetchPending
+    const params = { page, per_page: perPage }
+    if (searchValue) params.search = searchValue
+    if (sort) {
+      params.sort_by = sort.key
+      params.sort_order = sort.direction
+    }
+    const totalOf = (res) => res?.meta?.total ?? (res?.data || []).length
     try {
       setLoading(true)
-      const [pendingRes, historyRes, casRes, mscaRes] = await Promise.all([
-        csrsService.getAll(),
-        csrsService.getHistory(),
+      const [activeRes, otherRes, activeAllRes] = await Promise.all([
+        fetchActive(params),
+        fetchOther({ page: 1, per_page: 1 }),
+        // While searching, the active page's total is the filtered one
+        searchValue ? fetchActive({ page: 1, per_page: 1 }) : null,
+      ])
+      if (seq !== listSeq.current) return
+      const filteredTotal = totalOf(activeRes)
+      const activeAll = activeAllRes ? totalOf(activeAllRes) : filteredTotal
+      const otherAll = totalOf(otherRes)
+      setRows(activeRes.data || [])
+      setListTotal(filteredTotal)
+      setPendingTotal(isPending ? activeAll : otherAll)
+      setHistoryTotal(isPending ? otherAll : activeAll)
+      // The last row of the last page went away: stay on a page that exists
+      const lastPage = Math.max(1, Math.ceil(filteredTotal / perPage))
+      if (page > lastPage) setPage(lastPage)
+    } catch (error) {
+      if (seq !== listSeq.current) return
+      showErrorRef.current(error.message || tRef.current('messages.errors.loadFailed.csrs'))
+    } finally {
+      if (seq === listSeq.current) setLoading(false)
+    }
+  }, [activeTab, page, perPage, searchValue, sort])
+
+  useEffect(() => {
+    loadLists()
+  }, [loadLists])
+
+  // Send the search once typing pauses, not on every keystroke
+  useEffect(() => {
+    const term = searchInput.trim()
+    if (term === searchValue) return
+    const timer = setTimeout(() => {
+      setSearchValue(term)
+      setPage(1)
+    }, 300)
+    return () => clearTimeout(timer)
+  }, [searchInput, searchValue])
+
+  const handleSortChange = useCallback((newSort) => {
+    setSort(newSort ? { key: newSort.key, direction: newSort.direction } : null)
+    setPage(1)
+  }, [])
+
+  // CAs and MS CA connections for the sign dialog
+  const loadAux = async () => {
+    try {
+      const [casRes, mscaRes] = await Promise.all([
         casService.getAll(),
         mscaService.getEnabled().catch(() => ({ data: [] }))
       ])
-      setPendingCSRs(pendingRes.data || [])
-      setHistoryCSRs(historyRes.data || [])
       setCAs(casRes.data || casRes.cas || [])
       setMscaConnections(mscaRes.data || [])
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.csrs'))
-    } finally {
-      setLoading(false)
     }
   }
+
+  const loadData = () => Promise.all([loadLists(), loadAux()])
 
   // Reload when the change was made elsewhere. The loader is read through a
   // ref so the listener never holds the filters of the moment it registered.
@@ -524,15 +607,15 @@ export default function CSRsPage() {
     setShowRekeyChoice(true)
   }
 
-  // Current data based on tab
-  const currentData = activeTab === 'pending' ? pendingCSRs : historyCSRs
+  // Current data: the active tab's page, as the API returned it
+  const currentData = rows
 
   // Stats
   const stats = useMemo(() => [
-    { icon: Warning, label: t('common.pending'), value: pendingCSRs.length, variant: 'warning' },
-    { icon: CheckCircle, label: t('csrs.signed'), value: historyCSRs.length, variant: 'success' },
-    { icon: FileText, label: t('common.total'), value: pendingCSRs.length + historyCSRs.length, variant: 'primary' }
-  ], [pendingCSRs, historyCSRs, t])
+    { icon: Warning, label: t('common.pending'), value: pendingTotal, variant: 'warning' },
+    { icon: CheckCircle, label: t('csrs.signed'), value: historyTotal, variant: 'success' },
+    { icon: FileText, label: t('common.total'), value: pendingTotal + historyTotal, variant: 'primary' }
+  ], [pendingTotal, historyTotal, t])
 
   // Pending table columns
   const pendingColumns = useMemo(() => [
@@ -565,6 +648,7 @@ export default function CSRsPage() {
     {
       key: 'organization',
       header: t('common.organization'),
+      sortable: false, // not a stored column: the server cannot order by it
       priority: 3,
       hideOnMobile: true,
       render: (val) => <span className="text-sm text-text-secondary">{val || '—'}</span>
@@ -629,6 +713,7 @@ export default function CSRsPage() {
     {
       key: 'signed_by',
       header: t('common.signedBy'),
+      sortable: false, // resolved from the CA table per row
       priority: 2,
       hideOnMobile: true,
       render: (val, row) => (
@@ -715,15 +800,15 @@ export default function CSRsPage() {
         <div className="visual-section-body">
           <div className="quick-info-grid">
             <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-warning">{pendingCSRs.length}</div>
+              <div className="help-stat-value help-stat-value-warning">{pendingTotal}</div>
               <div className="help-stat-label">{t('common.pending')}</div>
             </div>
             <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-success">{historyCSRs.length}</div>
+              <div className="help-stat-value help-stat-value-success">{historyTotal}</div>
               <div className="help-stat-label">{t('csrs.signed')}</div>
             </div>
             <div className="help-stat-card">
-              <div className="help-stat-value help-stat-value-primary">{pendingCSRs.length + historyCSRs.length}</div>
+              <div className="help-stat-value help-stat-value-primary">{pendingTotal + historyTotal}</div>
               <div className="help-stat-label">{t('common.total')}</div>
             </div>
           </div>
@@ -754,14 +839,14 @@ export default function CSRsPage() {
   // Tabs with counts
   const tabsWithCounts = TABS.map(tab => ({
     ...tab,
-    count: tab.id === 'pending' ? pendingCSRs.length : historyCSRs.length
+    count: tab.id === 'pending' ? pendingTotal : historyTotal
   }))
 
   return (
     <>
       <ResponsiveLayout
         title={t('common.csrs')}
-        subtitle={t('csrs.pendingSubtitle', { pending: pendingCSRs.length, signed: historyCSRs.length })}
+        subtitle={t('csrs.pendingSubtitle', { pending: pendingTotal, signed: historyTotal })}
         icon={FileText}
         stats={stats}
         helpPageKey="csrs"
@@ -818,7 +903,10 @@ export default function CSRsPage() {
           onRowClick={(item) => item ? loadCSRDetails(item) : setSelectedCSR(null)}
           searchable
           searchPlaceholder={activeTab === 'pending' ? t('csrs.searchPending') : t('csrs.searchSigned')}
-          searchKeys={['cn', 'common_name', 'subject', 'organization', 'signed_by']}
+          // Searched server-side across every page: no searchKeys, so the
+          // table does not filter the returned page a second time
+          externalSearch={searchInput}
+          onSearchChange={setSearchInput}
           columnStorageKey={`ucm-csrs-${activeTab}-columns`}
           densityStorageKey="ucm-csrs-density"
           toolbarActions={activeTab === 'pending' && canWrite('csrs') && (
@@ -845,7 +933,14 @@ export default function CSRsPage() {
             )
           )}
           sortable
-          pagination={true}
+          onSortChange={handleSortChange}
+          pagination={{
+            page,
+            total: listTotal,
+            perPage,
+            onChange: setPage,
+            onPerPageChange: (v) => { setPerPage(v); setPage(1) },
+          }}
           emptyIcon={activeTab === 'pending' ? Warning : CheckCircle}
           emptyTitle={activeTab === 'pending' ? t('csrs.noPendingCSRs') : t('csrs.noSignedCertificates')}
           emptyDescription={activeTab === 'pending' 
