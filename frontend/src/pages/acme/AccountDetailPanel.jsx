@@ -199,7 +199,7 @@ export default function AccountDetailPanel({ account, orders, challenges, detail
                           order.status?.toLowerCase() === 'valid' || order.status?.toLowerCase() === 'issued' ? 'success' : 
                           order.status?.toLowerCase() === 'pending' ? 'warning' :
                           order.status?.toLowerCase() === 'ready' ? 'info' :
-                          'error'
+                          'danger'
                         } 
                         size="sm"
                       >

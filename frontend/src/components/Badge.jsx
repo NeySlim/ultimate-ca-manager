@@ -58,6 +58,12 @@ export function Badge({
     teal: 'bg-accent-success',
     orange: 'bg-status-warning',
     amber: 'bg-status-warning',
+    emerald: 'status-success-bg-solid',
+    green: 'status-success-bg-solid',
+    red: 'status-danger-bg-solid',
+    blue: 'status-primary-bg-solid',
+    yellow: 'status-warning-bg-solid',
+    gray: 'bg-text-secondary',
   }
   
   

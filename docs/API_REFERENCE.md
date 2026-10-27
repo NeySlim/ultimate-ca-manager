@@ -326,7 +326,7 @@ DELETE /api/v2/account/apikeys/{key_id}
 
 The first `DELETE` revokes a key that still works (kept for the audit history); a second one, or one on an expired key, deletes it.
 
-An administrator (`write:users`) lists another user's keys and revokes a leaked or unused one, with the same revoke-then-delete rule. The secret is never returned. Each change is audited with the administrator, the account and the key. An API key cannot use these routes on its own account.
+An administrator (`write:users`) lists another user's keys and revokes a leaked or unused one, with the same revoke-then-delete rule. The secret is never returned. Each change is audited with the administrator, the account and the key. An API key cannot revoke or delete through them a key of its own account.
 ```http
 GET    /api/v2/users/{id}/apikeys                      // the user's keys
 DELETE /api/v2/users/{id}/apikeys/{key_id}             // revoke, then delete

@@ -5,7 +5,7 @@ import { Modal, Button, Badge } from '../../components'
 import { useNotification } from '../../contexts'
 import { settingsService } from '../../services'
 
-const STATUS_VARIANT = { delivered: 'success', failed: 'error', pending: 'warning' }
+const STATUS_VARIANT = { delivered: 'success', failed: 'danger', pending: 'warning' }
 
 function rel(iso) {
   if (!iso) return '—'

@@ -21,15 +21,35 @@ function sourceFiles(dir, acc = []) {
   return acc
 }
 
+// The opening tag ends at the first `>` outside braces: `v > 0` or an arrow
+// function inside a prop must not end it.
+function openingTags(text) {
+  const tags = []
+  for (const m of text.matchAll(/<Badge\b/g)) {
+    let depth = 0
+    for (let i = m.index; i < text.length; i++) {
+      const c = text[i]
+      if (c === '{') depth++
+      else if (c === '}') depth--
+      else if (c === '>' && depth === 0) {
+        tags.push({ tag: text.slice(m.index, i + 1), index: m.index })
+        break
+      }
+    }
+  }
+  return tags
+}
+
 function unknownLiterals(prop, known) {
+  const literal = new RegExp(`\\b${prop}=(?:\\{\\s*)?(["'])([^"']+)\\1`)
   const found = []
   for (const file of sourceFiles(SRC)) {
     const text = fs.readFileSync(file, 'utf8')
-    for (const tag of text.matchAll(/<Badge\b[^>]*?>/gs)) {
-      const m = tag[0].match(new RegExp(`\\b${prop}="([^"]+)"`))
-      if (m && !(m[1] in known)) {
-        const line = text.slice(0, tag.index).split('\n').length
-        found.push(`${m[1]} at ${path.relative(SRC, file)}:${line}`)
+    for (const { tag, index } of openingTags(text)) {
+      const m = tag.match(literal)
+      if (m && !(m[2] in known)) {
+        const line = text.slice(0, index).split('\n').length
+        found.push(`${m[2]} at ${path.relative(SRC, file)}:${line}`)
       }
     }
   }

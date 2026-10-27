@@ -10,8 +10,8 @@ import { useNotification } from '../contexts'
 import { formatDate } from '../lib/utils'
 
 function keyStatus(key) {
-  if (!key.is_active) return ['warning', 'common.revoked']
-  if (key.is_expired) return ['warning', 'common.expired']
+  if (!key.is_active) return ['secondary', 'common.revoked']
+  if (key.is_expired) return ['secondary', 'common.expired']
   return ['success', 'common.active']
 }
 
