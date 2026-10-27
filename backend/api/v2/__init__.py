@@ -67,6 +67,7 @@ from api.v2.users import password  # noqa: F401
 from api.v2.users import crud  # noqa: F401
 from api.v2.users import management  # noqa: F401
 from api.v2.users import mtls  # noqa: F401
+from api.v2.users import apikeys  # noqa: F401
 from api.v2.templates import bp as templates_bp
 from api.v2.truststore import bp as truststore_bp
 from api.v2.import_opnsense import bp as import_opnsense_bp

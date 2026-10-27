@@ -324,6 +324,14 @@ POST /api/v2/account/apikeys/{key_id}/regenerate
 DELETE /api/v2/account/apikeys/{key_id}
 ```
 
+The first `DELETE` revokes a key that still works (kept for the audit history); a second one, or one on an expired key, deletes it.
+
+An administrator (`write:users`) lists another user's keys and revokes a leaked or unused one, with the same revoke-then-delete rule. The secret is never returned. Each change is audited with the administrator, the account and the key. An API key cannot use these routes on its own account.
+```http
+GET    /api/v2/users/{id}/apikeys                      // the user's keys
+DELETE /api/v2/users/{id}/apikeys/{key_id}             // revoke, then delete
+```
+
 A key is sent as `X-API-Key: ucm_ak_...` or, equivalently, `Authorization: Bearer ucm_ak_...`. Both get the key's scopes and need no CSRF token; a key that fails is refused (401) even when a session cookie is present. A bearer token that does not start with `ucm_ak_` (an IdP token relayed by an authenticating proxy, for instance) is not taken for a key: it is ignored, gets no CSRF exemption, and the session cookie applies.
 
 ### WebAuthn Credentials

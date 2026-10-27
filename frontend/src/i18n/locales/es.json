@@ -1301,6 +1301,17 @@
       "loadFailed": "No se pudieron cargar las llaves de seguridad",
       "updateFailed": "No se pudo modificar la llave de seguridad"
     },
+    "apiKeys": {
+      "title": "Claves API",
+      "description": "Revoque una clave filtrada o que ya no se usa: deja de funcionar de inmediato. Una clave revocada o caducada puede eliminarse después",
+      "none": "Ninguna clave API",
+      "revokeConfirm": "¿Revocar la clave API «{{key}}» de {{name}}? Dejará de funcionar de inmediato.",
+      "deleteConfirm": "¿Eliminar permanentemente la clave API «{{key}}» de {{name}}?",
+      "revoked": "Clave API revocada",
+      "deleted": "Clave API eliminada",
+      "loadFailed": "No se pudieron cargar las claves API",
+      "updateFailed": "No se pudo modificar la clave API"
+    },
     "createUser": "Crear usuario",
     "editUser": "Editar usuario",
     "deleteUser": "Eliminar usuario",

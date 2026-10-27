@@ -9,6 +9,7 @@ from auth.permissions import get_effective_permissions, VALID_RESOURCES
 from services.audit_service import AuditService
 from utils.response import success_response, error_response, created_response
 from utils.db_transaction import safe_commit
+from services.api_key_revocation import revoke_or_delete
 
 from . import bp
 
@@ -238,40 +239,11 @@ def delete_api_key(key_id):
     if not api_key:
         return error_response('API key not found', 404)
 
-    key_name = api_key.name
-
-    if api_key.is_active and not api_key.is_expired:
-        api_key.is_active = False
-        ok, _err = safe_commit(logger, "Failed to revoke API key")
-        if not ok:
-            return _err
-
-        AuditService.log_action(
-            action='apikey_revoke',
-            resource_type='api_key',
-            resource_id=str(key_id),
-            resource_name=key_name,
-            details=f'Revoked API key: {key_name}',
-            success=True
-        )
-
-        return success_response(message='API key revoked')
-
-    db.session.delete(api_key)
-    ok, _err = safe_commit(logger, "Failed to delete API key")
-    if not ok:
-        return _err
-
-    AuditService.log_action(
-        action='apikey_delete',
-        resource_type='api_key',
-        resource_id=str(key_id),
-        resource_name=key_name,
-        details=f'Deleted API key: {key_name}',
-        success=True
-    )
-
-    return success_response(message='API key deleted')
+    verb, err = revoke_or_delete(
+        api_key, 'apikey', lambda verb, name: f'{verb} API key: {name}')
+    if err:
+        return err
+    return success_response(message=f'API key {verb}')
 
 
 @bp.route('/api/v2/account/apikeys/<int:key_id>/regenerate', methods=['POST'])

@@ -3953,6 +3953,17 @@
       "loadFailed": "Impossible de charger les clés de sécurité",
       "updateFailed": "Impossible de modifier la clé de sécurité"
     },
+    "apiKeys": {
+      "title": "Clés API",
+      "description": "Révoquez une clé compromise ou devenue inutile : elle cesse de fonctionner immédiatement. Une clé révoquée ou expirée peut ensuite être supprimée",
+      "none": "Aucune clé API",
+      "revokeConfirm": "Révoquer la clé API « {{key}} » de {{name}} ? Elle cessera de fonctionner immédiatement.",
+      "deleteConfirm": "Supprimer définitivement la clé API « {{key}} » de {{name}} ?",
+      "revoked": "Clé API révoquée",
+      "deleted": "Clé API supprimée",
+      "loadFailed": "Impossible de charger les clés API",
+      "updateFailed": "Impossible de modifier la clé API"
+    },
     "createUser": "Créer un utilisateur",
     "editUser": "Modifier l'utilisateur",
     "deleteUser": "Supprimer l'utilisateur",

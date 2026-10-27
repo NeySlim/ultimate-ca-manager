@@ -101,6 +101,7 @@ SELF_ADMIN_ROUTES = [
     ('patch', '/api/v2/users/{id}/webauthn/999999', {'enabled': False}),
     ('post', '/api/v2/users/{id}/mtls/certificates', {}),
     ('delete', '/api/v2/users/{id}/mtls/certificates/999999', None),
+    ('delete', '/api/v2/users/{id}/apikeys/999999', None),
 ]
 
 

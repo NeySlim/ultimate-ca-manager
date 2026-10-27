@@ -11,7 +11,7 @@ export default {
           { label: 'Ruoli', text: 'Assegna ruoli di sistema o personalizzati per controllare i permessi' },
           { label: 'Stato', text: 'Abilita o disabilita gli account utente' },
           { label: 'Reset password', text: 'Reimposta la password di un utente (azione amministratore)' },
-          { label: 'Chiavi API', text: 'Gestisci le chiavi API per utente per l\'accesso programmatico' },
+          { label: 'Chiavi API', text: 'Nei dettagli di un utente, elenca le sue chiavi API e revoca quella compromessa o inutilizzata: smette subito di funzionare, e una chiave revocata o scaduta può poi essere eliminata. I proprietari creano le proprie chiavi dalla pagina Account' },
           { label: 'Origine', text: 'Mostra la provenienza di ogni utente: Locale (gestito in UCM) oppure LDAP / OAuth2 / SAML (provvisto da un provider SSO). Il badge mostra il nome del provider di origine.' },
         ]
       },

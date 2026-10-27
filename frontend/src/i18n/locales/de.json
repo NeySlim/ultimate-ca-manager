@@ -1301,6 +1301,17 @@
       "loadFailed": "Die Sicherheitsschlüssel konnten nicht geladen werden",
       "updateFailed": "Der Sicherheitsschlüssel konnte nicht geändert werden"
     },
+    "apiKeys": {
+      "title": "API-Schlüssel",
+      "description": "Widerrufen Sie einen kompromittierten oder nicht mehr genutzten Schlüssel: Er funktioniert sofort nicht mehr. Ein widerrufener oder abgelaufener Schlüssel kann danach gelöscht werden",
+      "none": "Kein API-Schlüssel",
+      "revokeConfirm": "Den API-Schlüssel „{{key}}“ von {{name}} widerrufen? Er funktioniert sofort nicht mehr.",
+      "deleteConfirm": "Den API-Schlüssel „{{key}}“ von {{name}} endgültig löschen?",
+      "revoked": "API-Schlüssel widerrufen",
+      "deleted": "API-Schlüssel gelöscht",
+      "loadFailed": "Die API-Schlüssel konnten nicht geladen werden",
+      "updateFailed": "Der API-Schlüssel konnte nicht geändert werden"
+    },
     "createUser": "Benutzer erstellen",
     "editUser": "Benutzer bearbeiten",
     "deleteUser": "Benutzer löschen",

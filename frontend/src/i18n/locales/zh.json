@@ -1301,6 +1301,17 @@
       "loadFailed": "无法加载安全密钥",
       "updateFailed": "无法更新安全密钥"
     },
+    "apiKeys": {
+      "title": "API 密钥",
+      "description": "吊销已泄露或不再使用的密钥：它会立即失效。已吊销或已过期的密钥随后可以删除",
+      "none": "无 API 密钥",
+      "revokeConfirm": "吊销 {{name}} 的 API 密钥“{{key}}”？它将立即停止工作。",
+      "deleteConfirm": "永久删除 {{name}} 的 API 密钥“{{key}}”？",
+      "revoked": "API 密钥已吊销",
+      "deleted": "API 密钥已删除",
+      "loadFailed": "无法加载 API 密钥",
+      "updateFailed": "无法更新 API 密钥"
+    },
     "createUser": "创建用户",
     "editUser": "编辑用户",
     "deleteUser": "删除用户",

@@ -1301,6 +1301,17 @@
       "loadFailed": "セキュリティキーを読み込めませんでした",
       "updateFailed": "セキュリティキーを更新できませんでした"
     },
+    "apiKeys": {
+      "title": "APIキー",
+      "description": "漏えいしたキーや使用しなくなったキーを失効させてください。失効したキーは即座に使用できなくなります。失効済みまたは期限切れのキーは削除できます",
+      "none": "APIキーはありません",
+      "revokeConfirm": "{{name}} のAPIキー「{{key}}」を失効させますか？即座に使用できなくなります。",
+      "deleteConfirm": "{{name}} のAPIキー「{{key}}」を完全に削除しますか？",
+      "revoked": "APIキーを失効させました",
+      "deleted": "APIキーを削除しました",
+      "loadFailed": "APIキーを読み込めませんでした",
+      "updateFailed": "APIキーを更新できませんでした"
+    },
     "createUser": "ユーザーを作成",
     "editUser": "ユーザーを編集",
     "deleteUser": "ユーザーを削除",

@@ -781,7 +781,7 @@ export const helpContent = {
           { label: 'Roles', text: 'Assign system or custom roles to control permissions' },
           { label: 'Status', text: 'Enable or disable user accounts' },
           { label: 'Password Reset', text: 'Reset a user\'s password (admin action)' },
-          { label: 'API Keys', text: 'Manage per-user API keys for programmatic access' },
+          { label: 'API Keys', text: 'In a user\'s details, list their API keys and revoke a leaked or unused one: it stops working at once, and a revoked or expired key can then be deleted. Owners create their keys on their Account page' },
           { label: 'Source', text: 'Shows where each user comes from: Local (managed in UCM) or LDAP / OAuth2 / SAML (provisioned by an SSO provider). The badge displays the originating provider name.' },
         ]
       },

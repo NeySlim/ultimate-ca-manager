@@ -1301,6 +1301,17 @@
       "loadFailed": "Could not load the security keys",
       "updateFailed": "Could not update the security key"
     },
+    "apiKeys": {
+      "title": "API keys",
+      "description": "Revoke a key that leaked or is no longer used: it stops working at once. A revoked or expired key can then be deleted",
+      "none": "No API key",
+      "revokeConfirm": "Revoke the API key \"{{key}}\" of {{name}}? It stops working immediately.",
+      "deleteConfirm": "Permanently delete the API key \"{{key}}\" of {{name}}?",
+      "revoked": "API key revoked",
+      "deleted": "API key deleted",
+      "loadFailed": "Could not load the API keys",
+      "updateFailed": "Could not update the API key"
+    },
     "createUser": "Create User",
     "editUser": "Edit User",
     "deleteUser": "Delete User",

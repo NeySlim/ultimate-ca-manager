@@ -20,6 +20,7 @@ import {
 } from '../components'
 import { usersService, groupsService, rolesService, casService, accountService, ssoService } from '../services'
 import UserSecurityKeys from '../components/UserSecurityKeys'
+import UserApiKeys from '../components/UserApiKeys'
 import { useNotification, useMobile } from '../contexts'
 import { usePermission, useWebSocket, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
@@ -871,6 +872,8 @@ export default function UsersGroupsPage() {
       <UserSecuritySection user={selectedUser} />
 
       {canWrite('users') && <UserSecurityKeys user={selectedUser} />}
+
+      {canWrite('users') && <UserApiKeys user={selectedUser} />}
 
       {/* mTLS Certificates (admin only) */}
       {canWrite('users') && (

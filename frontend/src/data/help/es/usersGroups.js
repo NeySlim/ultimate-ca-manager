@@ -11,7 +11,7 @@ export default {
           { label: 'Roles', text: 'Asignar roles del sistema o personalizados para controlar los permisos' },
           { label: 'Estado', text: 'Activar o desactivar cuentas de usuario' },
           { label: 'Restablecer contraseña', text: 'Restablecer la contraseña de un usuario (acción de administrador)' },
-          { label: 'Claves API', text: 'Administrar claves API por usuario para acceso programático' },
+          { label: 'Claves API', text: 'En la ficha de un usuario, muestra sus claves API y permite revocar una filtrada o sin uso: deja de funcionar de inmediato, y una clave revocada o caducada puede eliminarse después. Cada titular crea sus claves en su página de Cuenta' },
           { label: 'Origen', text: 'Muestra el origen de cada usuario: Local (gestionado en UCM) o LDAP / OAuth2 / SAML (provisionado por un proveedor SSO). La insignia muestra el nombre del proveedor de origen.' },
         ]
       },

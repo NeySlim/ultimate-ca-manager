@@ -47,6 +47,14 @@ export const usersService = {
     return apiClient.patch(`/users/${id}/webauthn/${keyId}${confirmLastFactor ? '?confirm=last_factor' : ''}`, { enabled })
   },
 
+  async getApiKeys(id) {
+    return apiClient.get(`/users/${id}/apikeys`)
+  },
+
+  async deleteApiKey(id, keyId) {
+    return apiClient.delete(`/users/${id}/apikeys/${keyId}`)
+  },
+
   async getPasswordPolicy() {
     return apiClient.get('/users/password-policy')
   },

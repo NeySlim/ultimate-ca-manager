@@ -11,7 +11,7 @@ export default {
           { label: 'Rôles', text: 'Attribuer des rôles système ou personnalisés pour contrôler les permissions' },
           { label: 'Statut', text: 'Activer ou désactiver les comptes utilisateurs' },
           { label: 'Réinitialisation du mot de passe', text: 'Réinitialiser le mot de passe d\'un utilisateur (action administrateur)' },
-          { label: 'Clés API', text: 'Gérer les clés API par utilisateur pour l\'accès programmatique' },
+          { label: 'Clés API', text: 'Dans le détail d\'un utilisateur, liste ses clés API et révoque une clé compromise ou inutilisée : elle cesse de fonctionner immédiatement, et une clé révoquée ou expirée peut ensuite être supprimée. Les propriétaires créent leurs clés depuis leur page Compte' },
           { label: 'Source', text: 'Indique l\'origine de chaque utilisateur : Local (géré dans UCM) ou LDAP / OAuth2 / SAML (provisionné par un fournisseur SSO). Le badge affiche le nom du fournisseur d\'origine.' },
         ]
       },

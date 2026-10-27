@@ -11,7 +11,7 @@ export default {
           { label: 'Funções', text: 'Atribuir funções do sistema ou personalizadas para controlar permissões' },
           { label: 'Status', text: 'Ativar ou desativar contas de usuário' },
           { label: 'Redefinir Senha', text: 'Redefinir a senha de um usuário (ação de administrador)' },
-          { label: 'Chaves de API', text: 'Gerenciar chaves de API por usuário para acesso programático' },
+          { label: 'Chaves de API', text: 'Nos detalhes de um usuário, liste as chaves de API dele e revogue uma que tenha vazado ou não seja usada: ela deixa de funcionar imediatamente, e uma chave revogada ou expirada pode então ser excluída. Os proprietários criam suas chaves na página Conta' },
           { label: 'Origem', text: 'Mostra a origem de cada utilizador: Local (gerido no UCM) ou LDAP / OAuth2 / SAML (provisionado por um fornecedor SSO). O selo apresenta o nome do fornecedor de origem.' },
         ]
       },

@@ -1301,6 +1301,17 @@
       "loadFailed": "Impossibile caricare le chiavi di sicurezza",
       "updateFailed": "Impossibile modificare la chiave di sicurezza"
     },
+    "apiKeys": {
+      "title": "Chiavi API",
+      "description": "Revoca una chiave compromessa o non più utilizzata: smette subito di funzionare. Una chiave revocata o scaduta può poi essere eliminata",
+      "none": "Nessuna chiave API",
+      "revokeConfirm": "Revocare la chiave API «{{key}}» di {{name}}? Smetterà di funzionare immediatamente.",
+      "deleteConfirm": "Eliminare definitivamente la chiave API «{{key}}» di {{name}}?",
+      "revoked": "Chiave API revocata",
+      "deleted": "Chiave API eliminata",
+      "loadFailed": "Impossibile caricare le chiavi API",
+      "updateFailed": "Impossibile modificare la chiave API"
+    },
     "createUser": "Crea utente",
     "editUser": "Modifica utente",
     "deleteUser": "Elimina utente",

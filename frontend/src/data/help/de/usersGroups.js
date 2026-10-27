@@ -11,7 +11,7 @@ export default {
           { label: 'Rollen', text: 'System- oder benutzerdefinierte Rollen zur Steuerung der Berechtigungen zuweisen' },
           { label: 'Status', text: 'Benutzerkonten aktivieren oder deaktivieren' },
           { label: 'Passwort zurücksetzen', text: 'Passwort eines Benutzers zurücksetzen (Admin-Aktion)' },
-          { label: 'API-Schlüssel', text: 'Pro-Benutzer-API-Schlüssel für programmatischen Zugriff verwalten' },
+          { label: 'API-Schlüssel', text: 'In den Details eines Benutzers dessen API-Schlüssel auflisten und einen kompromittierten oder nicht genutzten widerrufen: Er funktioniert sofort nicht mehr, und ein widerrufener oder abgelaufener Schlüssel kann danach gelöscht werden. Die Eigentümer erstellen ihre Schlüssel auf ihrer Kontoseite' },
           { label: 'Quelle', text: 'Zeigt die Herkunft jedes Benutzers: Lokal (in UCM verwaltet) oder LDAP / OAuth2 / SAML (von einem SSO-Anbieter bereitgestellt). Das Badge zeigt den Namen des ursprünglichen Anbieters.' },
         ]
       },
