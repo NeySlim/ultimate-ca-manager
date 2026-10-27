@@ -2184,6 +2184,13 @@ input:focus, select:focus, textarea:focus {
   transform: translateY(-2px);
 }
 
+/* A card used as an active filter: here, not as utilities, which the rules above override */
+.rich-stat-item.rich-stat-item-active {
+  border-color: var(--accent-primary);
+  background: color-mix(in srgb, var(--accent-primary) 10%, var(--bg-secondary));
+  box-shadow: 0 0 0 2px color-mix(in srgb, var(--accent-primary) 50%, transparent);
+}
+
 .rich-stat-icon {
   @apply w-9 h-9 rounded-xl flex items-center justify-center shrink-0;
   box-shadow: 

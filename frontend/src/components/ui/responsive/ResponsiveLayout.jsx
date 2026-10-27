@@ -690,7 +690,7 @@ function StatsBar({ stats, isMobile, onStatClick, activeStatFilter }) {
             className={cn(
               "rich-stat-item",
               isClickable && "cursor-pointer hover:bg-tertiary-op50 rounded-lg transition-colors",
-              isActive && "ring-2 ring-accent-primary-op50 bg-accent-primary-op10"
+              isActive && "rich-stat-item-active"
             )}
             onClick={() => isClickable && onStatClick(stat.filterValue)}
             title={isClickable ? t('common.clickToFilterBy', { label: stat.label, defaultValue: `Click to filter by ${stat.label}` }) : undefined}
