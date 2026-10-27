@@ -45,7 +45,7 @@ def _history(client, **params):
 
 @pytest.fixture(scope='module')
 def signed_batch(auth_client, create_ca):
-    """SIGNED requests signed by a CA no other test uses."""
+    """SIGNED requests signed by a CA no other test uses, and one signed by another."""
     tag = uuid.uuid4().hex[:8]
     ca = create_ca(cn=f'Paging CA {tag}')
     ca_id = ca.get('id', ca.get('ca_id'))
@@ -54,6 +54,10 @@ def signed_batch(auth_client, create_ca):
         csr_id = _create_csr(auth_client, f'paging-{tag}-{i:02d}.example.com')
         _sign(auth_client, csr_id, ca_id)
         ids.append(csr_id)
+    # Same tag, another signer: a search by CA name must leave it out
+    other_ca = create_ca(cn=f'Other CA {tag}')
+    _sign(auth_client, _create_csr(auth_client, f'other-{tag}.example.com'),
+          other_ca.get('id', other_ca.get('ca_id')))
     return {'tag': tag, 'ids': ids, 'ca_name': f'Paging CA {tag}'}
 
 
