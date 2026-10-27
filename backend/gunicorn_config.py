@@ -243,12 +243,20 @@ def worker_abort(worker):
 
 def post_worker_init(worker):
     """Post-worker initialization:
+    0. Drop the database connections inherited from the master
     1. Suppress noisy SSL/connection tracebacks from gevent
     2. Start HTTP protocol server for CDP/OCSP (if configured)
     3. Start the DNS UPDATE listener (if configured)
     """
     import ssl
     import gevent
+
+    # Before any query: the pool still holds the master's connections
+    from models import db
+    from utils.db_fork import forget_inherited_connections
+    from wsgi import app as flask_app
+    with flask_app.app_context():
+        forget_inherited_connections(db.engine)
 
     hub = gevent.get_hub()
     _original_handle_error = hub.handle_error

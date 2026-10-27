@@ -144,6 +144,8 @@ def gunicorn_conf(app, monkeypatch):
     import gevent.monkey
 
     monkeypatch.setattr(gevent.monkey, 'patch_all', lambda *a, **k: None)
+    # Disposing the pool would drop the in-memory test database (test_db_fork.py)
+    monkeypatch.setattr('utils.db_fork.forget_inherited_connections', lambda engine: None)
     spec = importlib.util.spec_from_file_location('_ucm_gunicorn_config_reload',
                                                   BACKEND / 'gunicorn_config.py')
     module = importlib.util.module_from_spec(spec)
