@@ -250,6 +250,8 @@ SECRET_VALUES = {
     ('acme_eab_credentials', 'hmac_key_b64'): 'eGluc3QtZWFiLWhtYWMta2V5',
     ('acme_client_accounts', 'account_key'): 'xinst-acme-client-account-key',
     ('acme_client_accounts', 'eab_hmac_key'): 'xinst-acme-client-eab-key',
+    # Standard base64 of bytes(range(32)): what a TSIG key file holds.
+    ('acme_dns_update_keys', 'secret'): 'AAECAwQFBgcICQoLDA0ODxAREhMUFRYXGBkaGxwdHh8=',
     ('microsoft_cas', 'password'): 'xinst-msca-password',
     ('microsoft_cas', 'winrm_password'): 'xinst-winrm-password',
     ('microsoft_cas', 'client_key_pem'): (
@@ -273,6 +275,7 @@ SECRET_ROW = {
     'dns_providers': {'name': 'xinst-dns-b'},
     'acme_eab_credentials': {'kid': 'xinst-eab-kid'},
     'acme_client_accounts': {'label': 'xinst-client-b'},
+    'acme_dns_update_keys': {'name': 'xinst-tsig.'},
     'microsoft_cas': {'name': 'xinst-msca-b'},
     'intune_apps': {'name': 'xinst-intune'},
     'scep_profiles': {'name': 'xinst-scep'},
@@ -540,6 +543,15 @@ def _seed_source():
         secret(client_accounts[1], 'acme_client_accounts', column)
     db.session.flush()
 
+    # A TSIG key of the DNS UPDATE listener: bound to a proxy account and to
+    # the EAB credential, and recording the user who made it.
+    tsig = add('acme_dns_update_keys', name='xinst-tsig.', algorithm='hmac-sha256',
+               status='active', acme_client_account_id=client_accounts[1].id,
+               eab_credential_id=eab.id, eab_bound=True,
+               created_by_user_id=users[1].id)
+    secret(tsig, 'acme_dns_update_keys', 'secret')
+    db.session.flush()
+
     add('acme_client_orders', order_url='https://acme-b.example.test/order/1',
         domains='["xinst-order.example.test"]', challenge_type='http-01',
         environment='production', key_source='generate', status='valid',
@@ -699,7 +711,7 @@ RESTORABLE_SECTIONS = tuple(
         'auth_certificates', 'certificate_policies', 'approval_requests',
         'dns_providers', 'acme_accounts', 'acme_eab_credentials',
         'acme_domains', 'acme_local_domains', 'acme_client_accounts',
-        'acme_client_orders',
+        'acme_client_orders', 'acme_dns_update_keys',
         'ssh_cas', 'ssh_certificates', 'microsoft_cas', 'msca_requests',
         'scep_profiles', 'deploy_targets', 'scan_profiles', 'scan_runs',
         'intune_apps',
@@ -1263,6 +1275,7 @@ class TestNothingAbortsARestoreAnyMore:
 AT_REST_AFTER_A_RESTORE = {
     # Put back under the target's database key, as the design intends.
     ('acme_eab_credentials', 'hmac_key_b64'): 'database key',
+    ('acme_dns_update_keys', 'secret'): 'database key',
     ('ad_connector', 'bind_password'): 'database key',
     ('dns_providers', 'credentials'): 'database key',
     ('microsoft_cas', 'password'): 'database key',

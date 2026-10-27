@@ -161,6 +161,20 @@ export const acmeService = {
     return apiClient.post(`/acme/client/accounts/${id}/deactivate`)
   },
 
+  // DNS UPDATE (RFC 2136) TSIG keys of a proxy account. The secret is in the
+  // create response only.
+  async listDnsUpdateKeys(accountId) {
+    return apiClient.get(`/acme/client/accounts/${accountId}/dns-update-keys`)
+  },
+
+  async createDnsUpdateKey(accountId, data) {
+    return apiClient.post(`/acme/client/accounts/${accountId}/dns-update-keys`, data)
+  },
+
+  async deleteDnsUpdateKey(accountId, keyId) {
+    return apiClient.delete(`/acme/client/accounts/${accountId}/dns-update-keys/${keyId}`)
+  },
+
   // Client Orders (certificates from Let's Encrypt)
   async getClientOrders(status, environment) {
     return apiClient.get(`/acme/client/orders${buildQueryString({ status, environment })}`)

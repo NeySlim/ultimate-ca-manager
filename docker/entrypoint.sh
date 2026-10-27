@@ -51,6 +51,9 @@ validate_fqdn() {
     fi
 }
 
+# DNS UPDATE (RFC 2136) listener port check
+. "$(dirname "${BASH_SOURCE[0]}")/dns-update-port.sh"
+
 # =============================================================================
 # FIPS MODE (UCM_FIPS=1): module configuration written at every start
 # =============================================================================
@@ -203,6 +206,9 @@ if ! validate_port "$UCM_HTTP_PORT"; then
     echo -e "${RED}❌ Invalid HTTP port: $UCM_HTTP_PORT${NC}"
     exit 1
 fi
+
+# Validate the DNS UPDATE (RFC 2136) listener port (unset, blank or 0 = listener off)
+check_dns_update_port || exit 1
 
 echo -e "${GREEN}✅ Configuration validated${NC}"
 

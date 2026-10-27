@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- ACME proxy: optional DNS UPDATE (RFC 2136) listener, off by default, so standard rfc2136 solvers can answer DNS-01 through the proxy with per-account TSIG keys (#416).
+
 ### Fixed
 
 - The HTTP protocol server (CDP, OCSP, AIA, HTTP-01) stopped after `systemctl reload ucm` until the next restart, because the new worker could not take the port from the old one; it now waits for the port to be released.

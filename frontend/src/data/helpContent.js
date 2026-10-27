@@ -630,6 +630,18 @@ export const helpContent = {
         ]
       },
       {
+        title: 'DNS UPDATE (RFC 2136) for the ACME proxy',
+        items: [
+          { label: 'What it is', text: 'Clients use their standard rfc2136 solver (certbot, lego, cert-manager, acme.sh, win-acme, Posh-ACME) and point it at UCM. UCM still creates the TXT record through its own DNS provider' },
+          { label: 'Keys', text: 'Create keys for each proxy account under External CA Accounts. A key can be linked to an EAB credential: it then works only for orders of the ACME account registered with that credential. UCM shows the secret once' },
+          { label: 'Accepted changes', text: 'UCM accepts only a TXT record under _acme-challenge with the value it expects for the order. It refuses other changes. It always answers a delete with NOERROR' },
+          { label: 'Port and network', text: 'Set the listener port in the ACME proxy section (0 disables it, 1024 to 65535, a restart is needed). Use it in the internal network only. To use port 53, map it in Docker or Kubernetes, or with a firewall redirect' },
+          { label: 'Algorithms', text: 'hmac-sha256, hmac-sha384 and hmac-sha512. UCM refuses md5 and sha1, the defaults of many clients: set the algorithm in every client. cert-manager does not support sha384, and win-acme computes it wrongly' },
+          { label: 'Zone discovery (SOA)', text: 'Clients ask for the SOA record to find the zone, and UCM answers it. win-acme sends test updates instead, and always uses port 53' },
+          { label: 'Client DNS checks', text: 'Some clients check the TXT record in public DNS before they continue (lego, cert-manager, acme.sh). They need a resolver that sees the public zone, or a wait time: --dns.propagation-wait (lego), --dnssleep (acme.sh), --dns01-recursive-nameservers (cert-manager)' },
+        ]
+      },
+      {
         title: 'EAB Credentials (Server-side)',
         icon: Key,
         content: 'When UCM acts as an ACME server, External Account Binding (RFC 8555 §7.3.4) lets you require pre-issued credentials before clients can register accounts:',

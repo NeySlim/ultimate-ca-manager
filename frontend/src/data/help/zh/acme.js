@@ -56,6 +56,18 @@ export default {
         ]
       },
       {
+        title: 'ACME 代理的 DNS UPDATE (RFC 2136)',
+        items: [
+          { label: '功能', text: '客户端使用自己的标准 rfc2136 求解器（certbot、lego、cert-manager、acme.sh、win-acme、Posh-ACME），并指向 UCM。UCM 仍然通过自己的 DNS 提供商创建 TXT 记录' },
+          { label: '密钥', text: '在外部 CA 账户中为每个代理账户创建密钥。密钥可以关联 EAB 凭据：关联后，它只对使用该凭据注册的 ACME 账户的订单有效。UCM 只显示一次密文' },
+          { label: '接受的更改', text: 'UCM 只接受 _acme-challenge 下的 TXT 记录，且值必须与它为订单预期的值相同。其他更改会被拒绝。对删除请求，它总是回复 NOERROR' },
+          { label: '端口和网络', text: '在 ACME 代理部分设置监听端口（0 表示禁用，范围 1024 到 65535，需要重启）。只在内部网络中使用。要使用端口 53，请在 Docker 或 Kubernetes 中，或用防火墙重定向，把它映射到该端口' },
+          { label: '算法', text: 'hmac-sha256、hmac-sha384 和 hmac-sha512。UCM 会拒绝 md5 和 sha1（许多客户端的默认值）：请在每个客户端中设置算法。cert-manager 不支持 sha384，win-acme 对它的计算有误' },
+          { label: '区域发现 (SOA)', text: '客户端通过请求 SOA 记录来查找区域，UCM 会回答。win-acme 则发送测试更新，并且总是使用端口 53' },
+          { label: '客户端的 DNS 检查', text: '有些客户端会先在公共 DNS 中检查 TXT 记录，然后才继续（lego、cert-manager、acme.sh）。它们需要能看到公共区域的解析器，或者设置等待时间：--dns.propagation-wait (lego)、--dnssleep (acme.sh)、--dns01-recursive-nameservers (cert-manager)' },
+        ]
+      },
+      {
         title: 'EAB 凭据(服务器端)',
         content: '当 UCM 作为 ACME 服务器时,External Account Binding(RFC 8555 §7.3.4)允许在客户端注册账户之前要求预先发行的凭据:',
         items: [
@@ -339,6 +351,42 @@ certbot certonly \\
 > ⚠ 避免对同一 FQDN 并发请求（Certbot + UCM 界面）。
 
 > ℹ️ 自签名 HTTPS（实验环境）请为 Certbot 添加 \`--no-verify-ssl\`。
+
+### DNS UPDATE (RFC 2136)
+只能使用标准 rfc2136 求解器的客户端也可以使用 ACME 代理。它们把 DNS 更新发送给 UCM，UCM 用自己的 DNS 提供商创建 TXT 记录。
+
+#### 设置
+1. 在 CA 账户上启用 **通过 ACME 代理暴露**，并设置代理路径（见上文）
+2. 在 **ACME 代理** 部分设置 **DNS UPDATE 监听端口**（0 表示禁用，范围 1024 到 65535）。重启 UCM 使其生效
+3. 只让内部网络可以访问该端口。要使用端口 53，请在 Docker 或 Kubernetes 中，或用防火墙重定向，把它映射到监听器
+4. 在 CA 账户卡片上，点击 **DNS UPDATE 密钥 (RFC 2136)**，然后点击 **新建密钥**
+5. 选择算法（默认是 hmac-sha256），需要时再选择 EAB 凭据
+6. 复制密文和适合你的客户端的配置示例。UCM 只显示一次密文
+
+#### UCM 接受什么
+- 只接受 \`_acme-challenge\` 下的 TXT 记录，且值与 UCM 为订单预期的值相同
+- 对删除请求，UCM 总是回复 NOERROR
+- 密钥只对它所属的代理账户有效。如果关联了 EAB，它只对使用该凭据注册的 ACME 账户的订单有效
+- 吊销密钥可使其立即失效。删除已吊销的密钥可将其移除
+
+#### 客户端说明
+- **算法**：UCM 会拒绝许多客户端的默认值 (HMAC-MD5、hmac-sha1)。请在每个客户端中设置 hmac-sha256（或 sha512）
+- **certbot**：\`dns_rfc2136_server\` 必须是 IP 地址。设置 \`dns_rfc2136_algorithm = HMAC-SHA256\`
+- **lego**：设置 \`DNSUPDATE_TSIG_ALGORITHM\`。默认值是 hmac-sha1。如果 lego 看不到公共区域，请使用 \`--dns.propagation-wait\`
+- **cert-manager**：只支持 HMACSHA256 和 HMACSHA512，不支持 sha384。它通过自己的递归解析器查找区域：请把 \`--dns01-recursive-nameservers\` 设置为能看到公共区域的解析器
+- **acme.sh**：使用 \`dns_nsupdate\`，并让 \`NSUPDATE_KEY\` 指向 BIND 密钥文件。如果公共 DNS 检查失败，请使用 \`--dnssleep\`
+- **win-acme**：总是把更新发送到端口 53（\`--serverport\` 被用作超时），所以请把端口 53 映射到 UCM 监听器。它对 hmac-sha384 的计算有误：请使用 sha256
+- **Posh-ACME**：\`DDNSNameserver\` 为必填。没有它，nsupdate 会把更新发送到区域的 MNAME，端口 53
+
+示例 (acme.sh)：
+\`\`\`
+export NSUPDATE_SERVER="ucm.example.com"
+export NSUPDATE_SERVER_PORT="8053"
+export NSUPDATE_KEY="/etc/ucm-tsig.key"
+acme.sh --issue --dns dns_nsupdate --server https://ucm.example.com/acme/proxy/<slug>/directory -d www.example.com --dnssleep 30
+\`\`\`
+
+> ⚠ 只在内部网络中使用该监听器。不要把它发布到互联网上。
 
 ## 本地 ACME 服务器
 

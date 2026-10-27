@@ -14,6 +14,7 @@ from auth.unified import require_auth
 from utils.response import success_response, error_response, no_content_response
 from utils.db_transaction import safe_commit
 from utils.randomness import csp_bytes
+from services.acme.dns_update.keys import invalidate_keys
 
 from . import bp, logger
 
@@ -186,13 +187,54 @@ def patch_eab_credential(cred_id):
     return success_response(data=cred.to_dict(), message='EAB credential updated')
 
 
+def _linked_dns_update_keys(cred_id):
+    from models.acme_dns_update import AcmeDnsUpdateKey
+    return AcmeDnsUpdateKey.query.filter_by(eab_credential_id=cred_id).all()
+
+
+def _delete_linked_dns_update_keys(cred_id):
+    """Fail-closed: SQLite does not enforce the FK cascade. Same transaction.
+
+    Returns [(key_id, name)], captured before the commit."""
+    from models.acme_dns_update import AcmeDnsUpdateKey
+    linked = [(k.id, k.name) for k in _linked_dns_update_keys(cred_id)]
+    AcmeDnsUpdateKey.query.filter_by(eab_credential_id=cred_id).delete(
+        synchronize_session=False)
+    return linked
+
+
+def _revoke_linked_dns_update_keys(cred_id, now):
+    """Revoke the active linked keys, same transaction. Returns [(key_id, name)]."""
+    revoked = []
+    for key in _linked_dns_update_keys(cred_id):
+        if key.status == 'active':
+            key.status = 'revoked'
+            key.revoked_at = now
+            revoked.append((key.id, key.name))
+    return revoked
+
+
+def _audit_linked_keys(keys, action, verb, kid):
+    for key_id, name in keys:
+        AuditService.log_action(
+            action=action,
+            resource_type='acme_dns_update_key',
+            resource_id=str(key_id),
+            resource_name=name,
+            details=f'{verb} DNS UPDATE key {name}: EAB credential kid={kid} was removed',
+            success=True,
+        )
+
+
 @bp.route('/api/v2/acme/eab-credentials/<int:cred_id>', methods=['DELETE'])
 @require_auth(['delete:acme'])
 def revoke_eab_credential(cred_id):
     """Revoke or permanently delete an EAB credential.
 
-    * Active credentials are soft-revoked (status -> 'revoked').
-    * Used or already-revoked credentials are permanently deleted.
+    * Active credentials are soft-revoked (status -> 'revoked'). Their active
+      TSIG keys are revoked too.
+    * Used or already-revoked credentials are permanently deleted, with their
+      linked TSIG keys.
     """
     from utils.datetime_utils import utc_now as _utc_now
     cred = db.session.get(AcmeEabCredential, cred_id)
@@ -201,48 +243,42 @@ def revoke_eab_credential(cred_id):
 
     user_id = getattr(g, 'user_id', None) or (getattr(g, 'current_user', None).id if getattr(g, 'current_user', None) else None)
 
-    if cred.status == 'revoked':
-        # Permanent delete for already-revoked
+    if cred.status in ('revoked', 'used'):
+        # Permanent delete
         kid = cred.kid
+        was_used = cred.status == 'used'
+        deleted_keys = _delete_linked_dns_update_keys(cred_id)
         db.session.delete(cred)
         ok, err = safe_commit(logger, "Failed to delete EAB credential")
         if not ok:
             return err
+        invalidate_keys()
         AuditService.log_action(
             action='acme.eab_credential.deleted',
             resource_type='acme_eab_credential',
             resource_id=str(cred_id),
-            details=f'Permanently deleted EAB credential kid={kid}'
+            details=f'Permanently deleted {"used " if was_used else ""}EAB credential kid={kid}'
         )
-        return no_content_response()
-
-    if cred.status == 'used':
-        # Permanent delete for used credentials
-        kid = cred.kid
-        db.session.delete(cred)
-        ok, err = safe_commit(logger, "Failed to delete EAB credential")
-        if not ok:
-            return err
-        AuditService.log_action(
-            action='acme.eab_credential.deleted',
-            resource_type='acme_eab_credential',
-            resource_id=str(cred_id),
-            details=f'Permanently deleted used EAB credential kid={kid}'
-        )
+        _audit_linked_keys(deleted_keys, 'acme.dns_update.key.delete', 'Deleted', kid)
         return no_content_response()
 
     # Soft-revoke for active credentials
+    now = _utc_now()
     cred.status = 'revoked'
-    cred.revoked_at = _utc_now()
+    cred.revoked_at = now
     cred.revoked_by_user_id = user_id
+    kid = cred.kid
+    revoked_keys = _revoke_linked_dns_update_keys(cred_id, now)
     ok, err = safe_commit(logger, "Failed to revoke EAB credential")
     if not ok:
         return err
+    invalidate_keys()
 
     AuditService.log_action(
         action='acme.eab_credential.revoke',
         resource_type='acme_eab_credential',
         resource_id=str(cred_id),
-        details=f'Revoked EAB credential kid={cred.kid}'
+        details=f'Revoked EAB credential kid={kid}'
     )
+    _audit_linked_keys(revoked_keys, 'acme.dns_update.key.revoke', 'Revoked', kid)
     return success_response(data=cred.to_dict(), message='EAB credential revoked')

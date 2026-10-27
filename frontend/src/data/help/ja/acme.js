@@ -56,6 +56,18 @@ export default {
         ]
       },
       {
+        title: 'ACME プロキシの DNS UPDATE (RFC 2136)',
+        items: [
+          { label: '概要', text: 'クライアントは標準の rfc2136 ソルバー (certbot、lego、cert-manager、acme.sh、win-acme、Posh-ACME) を UCM に向けて使います。TXT レコードは、これまでどおり UCM が自身の DNS プロバイダーで作成します' },
+          { label: 'キー', text: '外部 CA アカウントで、プロキシアカウントごとにキーを作成します。キーは EAB 資格情報に紐付けられます。紐付けると、その資格情報で登録された ACME アカウントのオーダーでのみ使えます。シークレットは UCM が 1 回だけ表示します' },
+          { label: '受け付ける変更', text: 'UCM が受け付けるのは、オーダーで想定する値を持つ _acme-challenge 配下の TXT レコードだけです。ほかの変更は拒否します。削除には常に NOERROR を返します' },
+          { label: 'ポートとネットワーク', text: 'ACME プロキシのセクションでリスナーポートを設定します (0 で無効、1024 から 65535、再起動が必要)。内部ネットワークでのみ使用してください。ポート 53 を使うには、Docker や Kubernetes、またはファイアウォールのリダイレクトで、このポートに転送します' },
+          { label: 'アルゴリズム', text: 'hmac-sha256、hmac-sha384、hmac-sha512。UCM は多くのクライアントの既定値である md5 と sha1 を拒否します。各クライアントでアルゴリズムを指定してください。cert-manager は sha384 に対応せず、win-acme は sha384 を誤って計算します' },
+          { label: 'ゾーンの検出 (SOA)', text: 'クライアントはゾーンを探すために SOA レコードを要求し、UCM が応答します。win-acme は代わりにテスト更新を送り、常にポート 53 を使います' },
+          { label: 'クライアント側の DNS 確認', text: '一部のクライアントは、先に進む前に公開 DNS で TXT レコードを確認します (lego、cert-manager、acme.sh)。公開ゾーンを参照できるリゾルバーか、待ち時間が必要です: --dns.propagation-wait (lego)、--dnssleep (acme.sh)、--dns01-recursive-nameservers (cert-manager)' },
+        ]
+      },
+      {
         title: 'EAB クレデンシャル(サーバー側)',
         content: 'UCM が ACME サーバーとして動作する場合、External Account Binding(RFC 8555 §7.3.4)により、クライアントがアカウントを登録する前に事前発行クレデンシャルを要求できます:',
         items: [
@@ -339,6 +351,42 @@ certbot certonly \\
 > ⚠ 同一FQDNへの同時リクエスト（Certbot + UCM UI）を避けてください。
 
 > ℹ️ 自己署名HTTPS（ラボ）ではCertbotに \`--no-verify-ssl\` を追加。
+
+### DNS UPDATE (RFC 2136)
+標準の rfc2136 ソルバーしか使えないクライアントも、ACME プロキシを使えます。クライアントは DNS 更新を UCM に送り、UCM が自身の DNS プロバイダーで TXT レコードを作成します。
+
+#### 設定
+1. CA アカウントで **ACMEプロキシ経由で公開** を有効にし、プロキシパスを設定します (上記参照)
+2. **ACMEプロキシ** セクションで **DNS UPDATE リスナーポート** を設定します (0 で無効、1024 から 65535)。反映するには UCM を再起動します
+3. ポートには内部ネットワークからのみ到達できるようにします。ポート 53 を使うには、Docker や Kubernetes、またはファイアウォールのリダイレクトで、リスナーに転送します
+4. CA アカウントのカードで **DNS UPDATE キー (RFC 2136)** をクリックし、**新しいキー** をクリックします
+5. アルゴリズム (既定は hmac-sha256) を選び、必要なら EAB 資格情報を選びます
+6. シークレットと、使用するクライアント向けの設定例をコピーします。シークレットは UCM が 1 回だけ表示します
+
+#### UCM が受け付けるもの
+- オーダーで UCM が想定する値を持つ \`_acme-challenge\` 配下の TXT レコードのみ
+- UCM は削除に常に NOERROR を返します
+- キーは、そのキーが属するプロキシアカウントで使えます。EAB に紐付けた場合は、その資格情報で登録された ACME アカウントのオーダーでのみ使えます
+- キーをすぐに止めるには失効します。失効済みのキーを削除すると、キーが消えます
+
+#### クライアントの注意点
+- **アルゴリズム**: UCM は多くのクライアントの既定値 (HMAC-MD5、hmac-sha1) を拒否します。各クライアントで hmac-sha256 (または sha512) を指定してください
+- **certbot**: \`dns_rfc2136_server\` は IP アドレスにします。\`dns_rfc2136_algorithm = HMAC-SHA256\` を設定します
+- **lego**: \`DNSUPDATE_TSIG_ALGORITHM\` を設定します。既定は hmac-sha1 です。lego が公開ゾーンを参照できない場合は \`--dns.propagation-wait\` を使います
+- **cert-manager**: HMACSHA256 と HMACSHA512 のみ対応し、sha384 には対応しません。ゾーンは再帰リゾルバーで探します。\`--dns01-recursive-nameservers\` に、公開ゾーンを参照できるリゾルバーを指定します
+- **acme.sh**: \`dns_nsupdate\` を使い、\`NSUPDATE_KEY\` で BIND キーファイルを指します。公開 DNS の確認が失敗する場合は \`--dnssleep\` を使います
+- **win-acme**: 更新を常にポート 53 に送ります (\`--serverport\` はタイムアウトとして使われます)。そのため、ポート 53 を UCM リスナーに転送してください。hmac-sha384 を誤って計算するため、sha256 を使ってください
+- **Posh-ACME**: \`DDNSNameserver\` は必須です。指定しないと、nsupdate はゾーンの MNAME のポート 53 に更新を送ります
+
+例 (acme.sh):
+\`\`\`
+export NSUPDATE_SERVER="ucm.example.com"
+export NSUPDATE_SERVER_PORT="8053"
+export NSUPDATE_KEY="/etc/ucm-tsig.key"
+acme.sh --issue --dns dns_nsupdate --server https://ucm.example.com/acme/proxy/<slug>/directory -d www.example.com --dnssleep 30
+\`\`\`
+
+> ⚠ リスナーは内部ネットワークでのみ使用してください。インターネットには公開しないでください。
 
 ## ローカルACMEサーバー
 

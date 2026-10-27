@@ -1076,6 +1076,42 @@ certbot certonly \\
 
 > ℹ️ In lab/self-signed deployments, add \`--no-verify-ssl\` to Certbot.
 
+### DNS UPDATE (RFC 2136)
+Clients that can use only a standard rfc2136 solver can use the ACME proxy too. They send the DNS update to UCM, and UCM creates the TXT record with its own DNS provider.
+
+#### Set up
+1. Enable **Expose via ACME proxy** on the CA account and set a proxy path (see above)
+2. In the **ACME Proxy** section, set the **DNS UPDATE listener port** (0 disables it, 1024 to 65535). Restart UCM to apply it
+3. Make the port reachable from the internal network only. For port 53, map it to the listener in Docker or Kubernetes, or with a firewall redirect
+4. On the CA account card, click **DNS UPDATE keys (RFC 2136)**, then **New key**
+5. Pick an algorithm (hmac-sha256 is the default) and, if needed, an EAB credential
+6. Copy the secret and the configuration snippet for your client. UCM shows the secret once
+
+#### What UCM accepts
+- Only TXT records under \`_acme-challenge\` with the value that UCM expects for the order
+- UCM always answers a delete with NOERROR
+- A key works for the proxy account it belongs to. With an EAB link, it works only for orders of the ACME account registered with that credential
+- Revoke a key to stop it at once. Delete a revoked key to remove it
+
+#### Client notes
+- **Algorithm**: UCM refuses the defaults of many clients (HMAC-MD5, hmac-sha1). Set hmac-sha256 (or sha512) in every client
+- **certbot**: \`dns_rfc2136_server\` must be an IP address. Set \`dns_rfc2136_algorithm = HMAC-SHA256\`
+- **lego**: set \`DNSUPDATE_TSIG_ALGORITHM\`. The default is hmac-sha1. Use \`--dns.propagation-wait\` if lego cannot see the public zone
+- **cert-manager**: supports HMACSHA256 and HMACSHA512 only, not sha384. It finds the zone with its recursive resolvers: set \`--dns01-recursive-nameservers\` to a resolver that sees the public zone
+- **acme.sh**: use \`dns_nsupdate\` with \`NSUPDATE_KEY\` that points to the BIND key file. Use \`--dnssleep\` if the public DNS checks fail
+- **win-acme**: always sends the update to port 53 (\`--serverport\` is used as a timeout), so map port 53 to the UCM listener. It computes hmac-sha384 wrongly: use sha256
+- **Posh-ACME**: \`DDNSNameserver\` is required. Without it, nsupdate sends the update to the zone MNAME on port 53
+
+Example (acme.sh):
+\`\`\`
+export NSUPDATE_SERVER="ucm.example.com"
+export NSUPDATE_SERVER_PORT="8053"
+export NSUPDATE_KEY="/etc/ucm-tsig.key"
+acme.sh --issue --dns dns_nsupdate --server https://ucm.example.com/acme/proxy/<slug>/directory -d www.example.com --dnssleep 30
+\`\`\`
+
+> ⚠ Use the listener in the internal network only. Do not publish it on the internet.
+
 ## Local ACME Server
 
 ### Configuration
