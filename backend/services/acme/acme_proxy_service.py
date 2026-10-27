@@ -1342,6 +1342,7 @@ class AcmeProxyService:
         except Exception:
             db.session.rollback()
             raise
+        _dns_rows_hook('close_for_order', order.id)
         return self._deactivated_view(authz), identifier
 
     def _deactivated_view(self, authz):

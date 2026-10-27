@@ -224,6 +224,41 @@ class TestSharedAuthorization:
             assert order.id == fresh
 
 
+class TestDnsUpdateRows:
+    """The DNS UPDATE expected values of the invalidated order are closed."""
+
+    def _row(self, order_id, thumb):
+        from datetime import timedelta
+        from models import AcmeProxyDnsChallenge
+        from utils.datetime_utils import utc_now
+        row = AcmeProxyDnsChallenge(
+            order_id=order_id, client_jwk_thumbprint=thumb, identifier=DOMAIN,
+            record_name=f'_acme-challenge.{DOMAIN}.', txt_value=thumb,
+            zone_name='example.com.', upstream_challenge_url=CHALL_URL,
+            expires_at=utc_now() + timedelta(hours=1))
+        db.session.add(row)
+        db.session.commit()
+        return row.id
+
+    def test_only_the_rows_of_the_deactivating_order_are_closed(self, app, svc):
+        from models import AcmeProxyDnsChallenge
+        with app.app_context():
+            mine = self._row(_seed(), 'thumb-a')
+            theirs = self._row(
+                _seed(order_url=OTHER_ORDER_URL, account='acct-b', thumb='thumb-b'),
+                'thumb-b')
+            try:
+                _deactivate(svc)
+                db.session.expire_all()
+                assert db.session.get(AcmeProxyDnsChallenge, mine).status == 'closed'
+                assert db.session.get(AcmeProxyDnsChallenge, theirs).status == 'pending'
+            finally:
+                AcmeProxyDnsChallenge.query.filter(
+                    AcmeProxyDnsChallenge.id.in_([mine, theirs])).delete(
+                        synchronize_session=False)
+                db.session.commit()
+
+
 class TestRefusals:
     @pytest.mark.parametrize('status', ['invalid', 'expired', 'revoked'])
     def test_only_pending_or_valid_can_be_deactivated(self, app, svc, status):
