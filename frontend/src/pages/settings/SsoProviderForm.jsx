@@ -268,7 +268,7 @@ export default function SsoProviderForm({ provider, forcedType, onSave, onCancel
   const connectionBadge = connectionStatus === 'success'
     ? <Badge variant="success" size="sm" className="ml-2"><CheckCircle size={12} weight="bold" className="mr-1" />{t('sso.testConnectionSuccess')}</Badge>
     : connectionStatus === 'error'
-    ? <Badge variant="error" size="sm" className="ml-2"><XCircle size={12} weight="bold" className="mr-1" />{t('sso.testConnectionFailed')}</Badge>
+    ? <Badge variant="danger" size="sm" className="ml-2"><XCircle size={12} weight="bold" className="mr-1" />{t('sso.testConnectionFailed')}</Badge>
     : null
 
   const isLdap = formData.provider_type === 'ldap'

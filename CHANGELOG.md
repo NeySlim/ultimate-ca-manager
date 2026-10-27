@@ -13,6 +13,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Users: an administrator lists another user's API keys in their details and revokes a leaked or unused one, which stops working at once; a revoked or expired key can then be deleted. Each action is audited.
 
+### Fixed
+
+- UI: 17 badges asked for a size that does not exist and rendered without padding, and a few for a colour that does not exist (About, SSO connection test, Smart Import). They now use defined ones, and a test refuses an unknown size or colour.
+
 ## [2.246] - 2026-10-27
 
 ### Added

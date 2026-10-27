@@ -167,8 +167,8 @@ export function useCertificateColumns(t) {
             <span className="text-text-tertiary">{t('common.expires').substring(0, 3)}:</span>
             <span className="text-text-secondary font-mono">{formatDate(val)}</span>
           </div>
-          {row.isOrphan && <Badge variant="warning" size="xs" icon={LinkBreak}>{t('certificates.orphan')}</Badge>}
-          {getSourceBadge(row, 'xs')}
+          {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak}>{t('certificates.orphan')}</Badge>}
+          {getSourceBadge(row, 'sm')}
         </div>
       )
     },

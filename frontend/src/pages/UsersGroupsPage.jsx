@@ -661,7 +661,7 @@ export default function UsersGroupsPage() {
         return (
           <div className="flex items-center gap-2 text-xs">
             <span className="text-text-secondary truncate">{row.email || '—'}</span>
-            <Badge variant={config.variant} size="xs" dot={config.dot}>
+            <Badge variant={config.variant} size="sm" dot={config.dot}>
               {val === 'admin' && <Crown weight="fill" className="h-2.5 w-2.5 mr-0.5" />}
               {roleLabels[val] || t('common.viewer')}
             </Badge>
@@ -899,7 +899,7 @@ export default function UsersGroupsPage() {
                       </p>
                     </div>
                     <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                      <Badge variant={cert.enabled ? 'success' : 'warning'} size="xs">
+                      <Badge variant={cert.enabled ? 'success' : 'warning'} size="sm">
                         {cert.enabled ? t('common.active') : t('common.disabled')}
                       </Badge>
                       <Button type="button" size="xs" variant="ghost" onClick={() => handleDeleteUserMtls(cert.id)} aria-label={t('common.delete')}>
@@ -951,7 +951,7 @@ export default function UsersGroupsPage() {
         {(Array.isArray(selectedGroup.permissions) && selectedGroup.permissions.length > 0) ? (
           <div className="flex flex-wrap gap-1">
             {selectedGroup.permissions.map(p => (
-              <Badge key={p} size="xs">{p}</Badge>
+              <Badge key={p} size="sm">{p}</Badge>
             ))}
           </div>
         ) : (

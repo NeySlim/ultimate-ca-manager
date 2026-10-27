@@ -62,10 +62,10 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
             {obj.matched_key_index !== null && <Link size={16} className="text-status-success" title={t('import.hasMatchingKey')} />}
           </div>
           <div className="flex items-center gap-2 text-xs text-text-secondary">
-            <Badge variant={config.color} size="xs">{t(config.labelKey)}</Badge>
-            {obj.is_self_signed && <Badge variant="gray" size="xs">{t('import.selfSigned')}</Badge>}
-            {obj.chain_position === 'root' && <Badge variant="amber" size="xs">{t('common.root')}</Badge>}
-            {obj.chain_position === 'intermediate' && <Badge variant="blue" size="xs">{t('common.intermediate')}</Badge>}
+            <Badge variant={config.color} size="sm">{t(config.labelKey)}</Badge>
+            {obj.is_self_signed && <Badge variant="gray" size="sm">{t('import.selfSigned')}</Badge>}
+            {obj.chain_position === 'root' && <Badge variant="amber" size="sm">{t('common.root')}</Badge>}
+            {obj.chain_position === 'intermediate' && <Badge variant="blue" size="sm">{t('common.intermediate')}</Badge>}
           </div>
         </div>
         
@@ -119,12 +119,12 @@ function ChainCard({ chain, index }) {
     <div className={`border rounded-lg p-3 ${hasIssues ? 'alert-bg-amber' : 'border-border'}`}>
       <div className="flex items-center gap-2 mb-2">
         <span className="text-sm font-medium">{t('import.chain')} {index + 1}</span>
-        {chain.is_complete ? <Badge variant="green" size="xs">{t('import.complete')}</Badge> : <Badge variant="amber" size="xs">{t('import.incomplete')}</Badge>}
+        {chain.is_complete ? <Badge variant="green" size="sm">{t('import.complete')}</Badge> : <Badge variant="amber" size="sm">{t('import.incomplete')}</Badge>}
         {chain.trust_source === 'trust_store' && (
-          <Badge variant="teal" size="xs">✓ {t('import.verifiedTrustStore')}</Badge>
+          <Badge variant="teal" size="sm">✓ {t('import.verifiedTrustStore')}</Badge>
         )}
         {chain.trust_source === 'managed_ca' && (
-          <Badge variant="primary" size="xs">✓ {t('import.linkedToCA')}</Badge>
+          <Badge variant="primary" size="sm">✓ {t('import.linkedToCA')}</Badge>
         )}
         <span className="text-xs text-text-secondary ml-auto">{chain.chain_length} {t('common.certificates').toLowerCase()}</span>
       </div>
@@ -478,7 +478,7 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
                 <div className="flex items-center gap-2">
                   <File size={16} className="text-text-secondary shrink-0" />
                   <span className="text-sm flex-1 truncate">{file.name}</span>
-                  <Badge variant={file.type === 'binary' ? 'amber' : 'blue'} size="xs">
+                  <Badge variant={file.type === 'binary' ? 'amber' : 'blue'} size="sm">
                     {file.ext.toUpperCase().slice(1)}
                   </Badge>
                   <span className="text-xs text-text-secondary">{(file.size / 1024).toFixed(1)} KB</span>

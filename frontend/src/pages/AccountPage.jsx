@@ -803,8 +803,8 @@ export default function AccountPage() {
                   <div>
                     <div className="flex items-center gap-2">
                       <p className="text-sm font-medium text-text-primary">{key.name}</p>
-                      {!key.is_active && <Badge variant="secondary" size="xs">{t('common.revoked')}</Badge>}
-                      {key.is_active && key.is_expired && <Badge variant="secondary" size="xs">{t('common.expired')}</Badge>}
+                      {!key.is_active && <Badge variant="secondary" size="sm">{t('common.revoked')}</Badge>}
+                      {key.is_active && key.is_expired && <Badge variant="secondary" size="sm">{t('common.expired')}</Badge>}
                     </div>
                     <p className="text-xs text-text-tertiary font-mono inline-flex items-center gap-1">
                       {key.key_prefix ? (

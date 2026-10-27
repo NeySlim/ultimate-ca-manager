@@ -72,7 +72,7 @@ export default function AboutSection() {
       <div className="flex flex-col items-center py-6 mb-4">
         <Logo variant="vertical" size="lg" />
         <div className="mt-3">
-          <Badge variant="accent" size="sm">
+          <Badge variant="primary" size="sm">
             {loading ? '...' : `v${info?.version || __APP_VERSION__}`}
           </Badge>
         </div>

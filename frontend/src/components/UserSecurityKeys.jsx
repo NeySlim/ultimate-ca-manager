@@ -90,7 +90,7 @@ export default function UserSecurityKeys({ user }) {
                   </p>
                 </div>
                 <div className="flex items-center gap-1 ml-2 flex-shrink-0">
-                  <Badge variant={key.enabled ? 'success' : 'warning'} size="xs">
+                  <Badge variant={key.enabled ? 'success' : 'warning'} size="sm">
                     {key.enabled ? t('common.active') : t('common.disabled')}
                   </Badge>
                   <Button type="button" size="xs" variant="ghost" onClick={() => handleToggle(key)}>
