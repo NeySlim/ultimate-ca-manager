@@ -18,6 +18,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - The HTTP protocol server (CDP, OCSP, AIA, HTTP-01) stopped after `systemctl reload ucm` until the next restart, because the new worker could not take the port from the old one; it now waits for the port to be released.
 - ACME proxy: a challenge response now carries `Link: rel="up"` even when the upstream CA omits it (Pebble), which certbot and lego require (#420, reported by @WMP).
 - ACME: deactivating an authorization (RFC 8555 §7.5.2), as lego does after a failed validation, got `malformed` from the native server and the proxy. Both now accept it; the proxy deactivates the upstream authorization only when no other pending order shares it (#422, reported by @WMP).
+- ACME: `newAccount` with an already registered key got `externalAccountRequired`, or a refusal of its used EAB, when EAB is required. The native server and the proxy now return the existing account, as RFC 8555 §7.3.1 requires (reported by @WMP).
 - UI: the `danger-soft` and `warning-soft` buttons, the red icon tiles, the outline button hover and a few tinted panels (CA details, login, reports) referred to colour tokens that were never defined and rendered without their colour. A test now fails the suite when the source uses an undeclared token.
 
 ### Documentation

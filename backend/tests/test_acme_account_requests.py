@@ -468,3 +468,76 @@ class TestJwsProblemTypes:
         r = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True}, key,
                   jwk={'kty': 'oct', 'k': 'AAAA'})
         assert r.status_code == 400 and _type(r) == 'badPublicKey', r.get_json()
+
+
+def _set_eab_required(app, on):
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key='acme_eab_required').first()
+        if row is None:
+            row = SystemConfig(key='acme_eab_required')
+            db.session.add(row)
+        row.value = 'true' if on else 'false'
+        db.session.commit()
+
+
+@pytest.mark.parametrize('base', ['/acme/proxy', '/acme'])
+class TestKnownKeyBeforeEab:
+    """RFC 8555 §7.3.1: a known key gets its account back before any EAB check."""
+
+    @pytest.fixture(autouse=True)
+    def _eab_off_after(self, app):
+        yield
+        _set_eab_required(app, False)
+
+    def _create(self, client, base):
+        key, jwk = _key()
+        r = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True}, key, jwk=jwk)
+        assert r.status_code == 201, r.get_json()
+        return key, jwk, r.headers['Location']
+
+    def test_no_eab_returns_the_account(self, app, client, base):
+        key, jwk, kid = self._create(client, base)
+        _set_eab_required(app, True)
+        r = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True}, key, jwk=jwk)
+        assert r.status_code == 200, r.get_json()
+        assert r.headers['Location'] == kid
+        assert _accounts(app, jwk) == 1
+
+    def test_a_used_eab_returns_the_account(self, app, client, base):
+        cred = 'eab-known-key' + base.replace('/', '-')
+        with app.app_context():
+            AcmeEabCredential.query.filter_by(kid=cred).delete()
+            db.session.add(AcmeEabCredential(kid=cred, hmac_key_b64=_b64(b'eab-secret'),
+                                             status='active'))
+            db.session.commit()
+        _set_eab_required(app, True)
+        try:
+            key, jwk = _key()
+            url = f'http://localhost{base}/new-account'
+            payload = {'termsOfServiceAgreed': True,
+                       'externalAccountBinding': _eab(jwk, cred, b'eab-secret', url)}
+            first = _post(client, f'{base}/new-account', payload, key, jwk=jwk)
+            assert first.status_code == 201, first.get_json()
+            payload['externalAccountBinding'] = _eab(jwk, cred, b'eab-secret', url)
+            r = _post(client, f'{base}/new-account', payload, key, jwk=jwk)
+            assert r.status_code == 200, r.get_json()
+            assert r.headers['Location'] == first.headers['Location']
+            assert _accounts(app, jwk) == 1
+        finally:
+            with app.app_context():
+                AcmeEabCredential.query.filter_by(kid=cred).delete()
+                db.session.commit()
+
+    def test_a_closed_account_is_still_unauthorized(self, app, client, base):
+        key, jwk, _ = self._create(client, base)
+        _set_status(app, jwk, 'deactivated')
+        _set_eab_required(app, True)
+        r = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True}, key, jwk=jwk)
+        assert r.status_code == 401 and _type(r) == 'unauthorized'
+
+    def test_an_unknown_key_still_needs_eab(self, app, client, base):
+        _set_eab_required(app, True)
+        key, jwk = _key()
+        r = _post(client, f'{base}/new-account', {'termsOfServiceAgreed': True}, key, jwk=jwk)
+        assert r.status_code == 400 and _type(r) == 'externalAccountRequired'
+        assert _accounts(app, jwk) == 0

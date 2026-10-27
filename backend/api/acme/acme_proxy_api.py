@@ -394,22 +394,22 @@ def new_account(slug=None):
     except AccountRequestError as e:
         return _problem(e)
 
-    # onlyReturnExisting (RFC 8555 §7.3.1): never creates an account and needs
-    # no EAB; clients such as cert-manager use it to fetch their kid.
-    if fields['only_return_existing']:
-        try:
-            from models import AcmeAccount
-            thumbprint = jwk_thumbprint_or_none(jwk)
-            existing = (
-                AcmeAccount.query.filter_by(jwk_thumbprint=thumbprint).first()
-                if thumbprint else None
-            )
-        except Exception as e:
-            logger.error(f"ACME proxy account lookup error: {e}")
-            # proxy_error issues a nonce in this session, which a failed
-            # statement leaves unusable until it is rolled back.
-            db.session.rollback()
-            return proxy_error("serverInternal", "Failed to look up account", 500)
+    # RFC 8555 §7.3.1: a known key gets its account back before any EAB check,
+    # and onlyReturnExisting never creates one.
+    try:
+        from models import AcmeAccount
+        thumbprint = jwk_thumbprint_or_none(jwk)
+        existing = (
+            AcmeAccount.query.filter_by(jwk_thumbprint=thumbprint).first()
+            if thumbprint else None
+        )
+    except Exception as e:
+        logger.error(f"ACME proxy account lookup error: {e}")
+        # proxy_error issues a nonce in this session, which a failed
+        # statement leaves unusable until it is rolled back.
+        db.session.rollback()
+        return proxy_error("serverInternal", "Failed to look up account", 500)
+    if existing or fields['only_return_existing']:
         if not existing:
             return proxy_error('accountDoesNotExist', 'Account does not exist', 400)
         try:

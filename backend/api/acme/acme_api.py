@@ -643,10 +643,11 @@ def new_account():
         contact = fields['contact']
         terms_agreed = fields['terms_of_service_agreed']
 
-        # Handle onlyReturnExisting (RFC 8555 Section 7.3.1)
-        if fields['only_return_existing']:
-            thumbprint = service._compute_jwk_thumbprint(jwk)
-            existing = AcmeAccount.query.filter_by(jwk_thumbprint=thumbprint).first()
+        # RFC 8555 §7.3.1: a known key gets its account back before any EAB
+        # check, and onlyReturnExisting never creates one.
+        thumbprint = service._compute_jwk_thumbprint(jwk)
+        existing = AcmeAccount.query.filter_by(jwk_thumbprint=thumbprint).first()
+        if existing or fields['only_return_existing']:
             if not existing:
                 return acme_error('accountDoesNotExist', 'Account does not exist', 400)
             try:
