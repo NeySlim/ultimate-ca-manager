@@ -1219,7 +1219,9 @@ class AcmeProxyService:
             if (authz.get('status') == 'pending'
                     and chall.get('status') in ('pending', 'processing')
                     and not already_valid):
-                _dns_rows_hook('persist_expected_values', candidates, domain,
+                live = [o for o in candidates if o.status == 'pending'
+                        and authz_url not in o.deactivated_authz_list]
+                _dns_rows_hook('persist_expected_values', live, domain,
                                chall.get('token'), chall_url,
                                authz.get('expires'), utc_now())
 

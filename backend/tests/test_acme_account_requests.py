@@ -523,6 +523,9 @@ class TestKnownKeyBeforeEab:
             assert r.status_code == 200, r.get_json()
             assert r.headers['Location'] == first.headers['Location']
             assert _accounts(app, jwk) == 1
+            with app.app_context():
+                row = AcmeEabCredential.query.filter_by(kid=cred).first()
+                assert row.used_by_account_id == first.headers['Location'].rsplit('/', 1)[-1]
         finally:
             with app.app_context():
                 AcmeEabCredential.query.filter_by(kid=cred).delete()

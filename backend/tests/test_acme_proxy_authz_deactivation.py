@@ -258,6 +258,23 @@ class TestDnsUpdateRows:
                         synchronize_session=False)
                 db.session.commit()
 
+    def test_a_sibling_read_writes_no_row_for_the_deactivated_order(
+            self, app, svc, monkeypatch):
+        from services.acme.dns_update import records
+        written = []
+        monkeypatch.setattr(records, 'persist_expected_values',
+                            lambda orders, *_a: written.extend(o.id for o in orders))
+        monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
+                            lambda _d: None)
+        with app.app_context():
+            mine = _seed()
+            theirs = _seed(order_url=OTHER_ORDER_URL, account='acct-b', thumb='thumb-b')
+            _deactivate(svc)
+            svc.get_authz(_b64(AUTHZ_URL), requester_account_id='acct-b',
+                          requester_thumbprint='thumb-b')
+        assert theirs in written
+        assert mine not in written
+
 
 class TestRefusals:
     @pytest.mark.parametrize('status', ['invalid', 'expired', 'revoked'])
