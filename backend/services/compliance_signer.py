@@ -21,13 +21,20 @@ def scheme_for(public_key, signature_scheme=None):
     return None
 
 
+def softhsm_config(provider_type, config, name=''):
+    """Whether a PKCS#11 configuration names SoftHSM, by module path or name."""
+    if provider_type != 'pkcs11':
+        return False
+    module = str((config or {}).get('module_path') or '')
+    return 'softhsm' in module.lower() or 'softhsm' in (name or '').lower()
+
+
 def softhsm_provider(provider):
     """Whether an HSM provider row is SoftHSM: a PKCS#11 provider whose module
     path or name says softhsm."""
-    if provider is None or provider.type != 'pkcs11':
+    if provider is None:
         return False
-    module = str((provider.get_config() or {}).get('module_path') or '')
-    return 'softhsm' in module.lower() or 'softhsm' in (provider.name or '').lower()
+    return softhsm_config(provider.type, provider.get_config(), provider.name)
 
 
 # Providers whose keys are all in hardware; a cloud key says so key by key

@@ -159,6 +159,8 @@ class HsmService:
         certification, error = compliance_signer.normalize_certification(certification)
         if error:
             raise ValueError(error)
+        if compliance_signer.softhsm_config(provider_type, config, name):
+            fips_mode.refuse_softhsm()
 
         # Check name uniqueness
         if HsmProvider.query.filter_by(name=name).first():
@@ -216,6 +218,10 @@ class HsmService:
             certification, error = compliance_signer.normalize_certification(certification)
             if error:
                 raise ValueError(error)
+        # Turning a provider into SoftHSM is creating one; editing an existing one is not
+        if not compliance_signer.softhsm_provider(provider) and compliance_signer.softhsm_config(
+                provider.type, provider.get_config() if config is None else config, name or provider.name):
+            fips_mode.refuse_softhsm()
 
         if name:
             # Check name uniqueness
@@ -233,9 +239,10 @@ class HsmService:
             # ('***'/'********') so an operator updating non-secret fields
             # via the UI doesn't wipe stored credentials.
             provider.set_config(config)
-            # Reset status when config changes
+            # Reset status when config changes; the module read last may not be this one
             provider.status = 'unknown'
             provider.error_message = None
+            provider.module_info = None
         
         if certification_given:
             provider.certification = certification
@@ -304,6 +311,8 @@ class HsmService:
             provider.status = 'connected' if result.get('success') else 'error'
             provider.last_tested_at = utc_now()
             provider.error_message = None if result.get('success') else result.get('message')
+            if result.get('module'):
+                provider.module_info = json.dumps(result['module'])
             db.session.commit()
             
             return result

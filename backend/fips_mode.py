@@ -34,6 +34,14 @@ def refuse(what: str) -> None:
         raise FipsRestricted(f'{what} not available in FIPS mode')
 
 
+def refuse_softhsm() -> None:
+    """SoftHSM is not a validated module; UCM_FIPS_ALLOW_SOFTHSM=1 lets a test setup use it."""
+    allowed = os.environ.get('UCM_FIPS_ALLOW_SOFTHSM', '').strip().lower() in ('1', 'true', 'yes', 'on')
+    if enabled() and not allowed:
+        raise FipsRestricted('SoftHSM providers not available in FIPS mode: SoftHSM is not a '
+                             'validated module (UCM_FIPS_ALLOW_SOFTHSM=1 allows one for tests)')
+
+
 def library_version() -> str:
     from cryptography.hazmat.backends.openssl.backend import backend
     return backend.openssl_version_text()

@@ -3588,6 +3588,15 @@
         "fips-140-2-l3": "FIPS 140-2 级别 3",
         "other": "其他"
       }
+    },
+    "module": {
+      "title": "PKCS#11 模块",
+      "library": "库",
+      "manufacturer": "制造商",
+      "libraryVersion": "库版本",
+      "firmwareVersion": "固件版本",
+      "notRead": "测试连接以读取模块报告的信息。",
+      "softhsmFips": "SoftHSM 不是经过验证的模块：在 FIPS 模式下，其上的密钥不受 FIPS 保护。"
     }
   },
   "sso": {

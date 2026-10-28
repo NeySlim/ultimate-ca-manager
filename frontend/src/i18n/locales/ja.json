@@ -3590,6 +3590,15 @@
         "fips-140-2-l3": "FIPS 140-2 レベル 3",
         "other": "その他"
       }
+    },
+    "module": {
+      "title": "PKCS#11 モジュール",
+      "library": "ライブラリ",
+      "manufacturer": "製造元",
+      "libraryVersion": "ライブラリのバージョン",
+      "firmwareVersion": "ファームウェアのバージョン",
+      "notRead": "接続をテストして、モジュールが報告する情報を読み取ります。",
+      "softhsmFips": "SoftHSM は検証済みモジュールではありません。FIPS モードでは、その上の鍵は FIPS で保護されません。"
     }
   },
   "sso": {

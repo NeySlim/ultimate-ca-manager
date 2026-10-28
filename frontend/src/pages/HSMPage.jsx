@@ -8,7 +8,7 @@ import { useState, useEffect, useMemo, useCallback } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   Key, Plus, Trash, PencilSimple, CheckCircle, XCircle, TestTube,
-  Cloud, HardDrive, ArrowsClockwise, Lock, Warning, Copy, ShieldCheck
+  Cloud, HardDrive, ArrowsClockwise, Lock, Warning, Copy, ShieldCheck, Cpu
 } from '@phosphor-icons/react'
 import { 
   Badge, Button, FormModal, Input, Select, Textarea, ExperimentalBadge,
@@ -42,6 +42,7 @@ const PROVIDER_ICONS = {
 
 export default function HSMPage() {
   const { t } = useTranslation()
+  const fips = useFipsMode()
   const { canWrite, canDelete } = usePermission()
   const { copy } = useClipboard()
   const [providers, setProviders] = useState([])
@@ -143,6 +144,11 @@ export default function HSMPage() {
       if (response.data?.success) {
         showSuccess(response.data.message || t('messages.success.hsm.connectionOk'))
         loadData()
+        // The open panel shows the row as it was before the test read the module
+        const fresh = await hsmService.getProvider(provider.id).catch(() => null)
+        if (fresh?.data) {
+          setSelectedProvider(prev => (prev && prev.id === provider.id ? { ...prev, ...fresh.data } : prev))
+        }
       } else {
         showError(response.data?.message || t('messages.errors.hsm.testFailed'))
       }
@@ -366,6 +372,24 @@ export default function HSMPage() {
             value={provider.certification ? t(`hsm.certification.values.${provider.certification}`, provider.certification) : t('hsm.certification.notDeclared')}
           />
         </CompactSection>
+
+        {provider.provider_type === 'pkcs11' && (
+          <CompactSection title={t('hsm.module.title')} icon={Cpu} collapsible={false}>
+            {fips && provider.softhsm && (
+              <p className="text-xs text-status-warning mb-2">{t('hsm.module.softhsmFips')}</p>
+            )}
+            {provider.module_info ? (
+              <CompactGrid>
+                <CompactField label={t('hsm.module.library')} value={provider.module_info.library} />
+                <CompactField label={t('hsm.module.manufacturer')} value={provider.module_info.manufacturer} />
+                <CompactField label={t('hsm.module.libraryVersion')} value={provider.module_info.library_version} />
+                <CompactField label={t('hsm.module.firmwareVersion')} value={provider.module_info.firmware_version} />
+              </CompactGrid>
+            ) : (
+              <p className="text-xs text-text-secondary">{t('hsm.module.notRead')}</p>
+            )}
+          </CompactSection>
+        )}
 
         {provider.last_error && (
           <div className="p-3 rounded-lg bg-status-danger-op10 border border-status-danger-op30">

@@ -124,6 +124,8 @@ def create_provider():
         
         return created_response(data=provider.to_dict())
         
+    except FipsRestricted:
+        raise
     except ValueError as e:
         logger.warning(f"HSM provider validation error: {e}")
         return error_response('Invalid provider configuration', 400)
@@ -255,6 +257,8 @@ def update_provider(provider_id):
         
         return success_response(data=updated.to_dict(include_config=True))
         
+    except FipsRestricted:
+        raise
     except ValueError as e:
         logger.warning(f"HSM provider update validation error: {e}")
         return error_response('Invalid provider configuration', 400)

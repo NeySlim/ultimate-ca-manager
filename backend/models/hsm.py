@@ -32,6 +32,15 @@ _SENSITIVE_KEYS = frozenset({
 _MASK_SENTINELS = ('***', '********')
 
 
+def _json_or_none(text):
+    """A stored JSON object, or None when the column is empty or unreadable."""
+    try:
+        value = json.loads(text) if text else None
+    except (json.JSONDecodeError, TypeError):
+        return None
+    return value if isinstance(value, dict) else None
+
+
 def _is_sensitive_key(key: str) -> bool:
     if not key:
         return False
@@ -63,6 +72,9 @@ class HsmProvider(db.Model if db else object):
 
     # Certification the operator declares for the module (not verified by UCM)
     certification = db.Column(db.String(32), nullable=True)
+
+    # What the PKCS#11 module said it is at the last successful test (JSON)
+    module_info = db.Column(db.Text, nullable=True)
     
     # Audit fields
     created_at = db.Column(db.DateTime, default=utc_now)
@@ -82,6 +94,12 @@ class HsmProvider(db.Model if db else object):
     # Valid statuses
     VALID_STATUSES = ['connected', 'disconnected', 'error', 'unknown']
     
+    @property
+    def is_softhsm(self):
+        from services.compliance_signer import softhsm_config
+        # module_path is not a secret: the raw JSON is enough, nothing to decrypt
+        return softhsm_config(self.type, _json_or_none(self.config), self.name)
+
     def to_dict(self, include_config=False):
         """
         Convert to dict for API response
@@ -97,6 +115,8 @@ class HsmProvider(db.Model if db else object):
             'last_tested_at': utc_isoformat(self.last_tested_at),
             'error_message': self.error_message,
             'certification': self.certification,
+            'module_info': _json_or_none(self.module_info),
+            'softhsm': self.is_softhsm,
             'created_at': utc_isoformat(self.created_at),
             'updated_at': utc_isoformat(self.updated_at),
             'key_count': self.keys.count() if self.keys else 0

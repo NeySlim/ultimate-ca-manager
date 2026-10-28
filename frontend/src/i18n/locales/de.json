@@ -3588,6 +3588,15 @@
         "fips-140-2-l3": "FIPS 140-2 Level 3",
         "other": "Andere"
       }
+    },
+    "module": {
+      "title": "PKCS#11-Modul",
+      "library": "Bibliothek",
+      "manufacturer": "Hersteller",
+      "libraryVersion": "Bibliotheksversion",
+      "firmwareVersion": "Firmware-Version",
+      "notRead": "Testen Sie die Verbindung, um die Angaben des Moduls auszulesen.",
+      "softhsmFips": "SoftHSM ist kein validiertes Modul: Im FIPS-Modus sind Schlüssel darauf nicht FIPS-geschützt."
     }
   },
   "sso": {

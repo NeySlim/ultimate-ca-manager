@@ -11,6 +11,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
+- HSM: a connection test records what a PKCS#11 module reports (library, manufacturer, library and firmware versions), shown on the provider's page. In FIPS mode a new SoftHSM provider is refused, since SoftHSM is not a validated module; `UCM_FIPS_ALLOW_SOFTHSM=1` allows one for tests.
+
 - Users: an administrator lists another user's API keys in their details and revokes a leaked or unused one, which stops working at once; a revoked or expired key can then be deleted. Each action is audited.
 
 ### Fixed
