@@ -44,6 +44,17 @@ def list_cross_certificates(ca_id):
     return success_response(data=[row.to_dict() for row in cross_certs.list_for(ca)])
 
 
+@bp.route('/api/v2/cas/<int:ca_id>/chain-variants', methods=['GET'])
+@require_auth(['read:cas'])
+def chain_variants_of_ca(ca_id):
+    """The chains this CA can present on export: ``primary`` and one per cross-certificate on its path."""
+    from utils.ca_chain import chain_variants
+    ca, _, err = _ca_and_row(ca_id)
+    if err:
+        return err
+    return success_response(data=chain_variants(ca))
+
+
 @bp.route('/api/v2/cas/<int:ca_id>/cross-certificates', methods=['POST'])
 @require_auth(['write:cas'])
 def attach_cross_certificate(ca_id):

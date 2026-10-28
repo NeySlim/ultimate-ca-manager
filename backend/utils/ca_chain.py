@@ -22,6 +22,7 @@ legitimately meet is longer.
 
 import base64
 from typing import NamedTuple
+from utils.datetime_utils import utc_isoformat
 
 MAX_CHAIN_DEPTH = 64
 PRIMARY = 'primary'
@@ -189,13 +190,17 @@ def chain_variants(start):
     """Every chain *start* can present: ``primary`` plus one per cross-certificate on its path.
 
     Each entry: ``id`` (``primary`` / ``cross:<id>``), ``ca_id``, ``cross_certificate_id``,
-    ``served``, ``servable`` and ``default`` (the one ``auto`` resolves to)."""
+    ``served``, ``servable`` and ``default`` (the one ``auto`` resolves to), plus ``ca_name``, and
+    ``issuer`` and ``valid_to`` of a cross-certificate."""
     variants = [{'id': PRIMARY, 'ca_id': getattr(start, 'id', None), 'cross_certificate_id': None,
-                 'served': False, 'servable': True, 'default': False}]
+                 'served': False, 'servable': True, 'default': False,
+                 'ca_name': getattr(start, 'descr', None), 'issuer': None, 'valid_to': None}]
     for ca in walk_ca_chain(start):
         for row in ca.cross_certificates:
             variants.append({'id': f'cross:{row.id}', 'ca_id': ca.id, 'cross_certificate_id': row.id,
-                             'served': bool(row.served), 'servable': row.servable, 'default': False})
+                             'served': bool(row.served), 'servable': row.servable, 'default': False,
+                             'ca_name': ca.descr, 'issuer': row.issuer,
+                             'valid_to': utc_isoformat(row.valid_to)})
     chosen = next((link.cross.id for link in issuer_chain(start) if link.cross is not None), None)
     wanted = f'cross:{chosen}' if chosen is not None else PRIMARY
     for entry in variants:

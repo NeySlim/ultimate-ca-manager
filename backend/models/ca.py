@@ -563,6 +563,12 @@ class CA(db.Model):
             parent_ca = CA.query.filter_by(refid=self.caref).first()
             parent_id = parent_ca.id if parent_ca else None
         
+        # Aggregates, so the rows are not loaded into the session
+        from models.ca_cross_certificate import CACrossCertificate as _Cross
+        cross_total, cross_served = (0, 0) if self.id is None else db.session.query(
+            db.func.count(_Cross.id), db.func.coalesce(db.func.sum(db.case((_Cross.served.is_(True), 1), else_=0)), 0)
+        ).filter(_Cross.ca_id == self.id).one()
+
         data = {
             "id": self.id,
             "refid": self.refid,
@@ -609,6 +615,8 @@ class CA(db.Model):
             "pending": self.is_pending,
             "has_csr": bool(self.csr),
             "certs": self.certificates.count() if self.certificates else 0,  # Count of issued certificates
+            "cross_certificate_count": cross_total,
+            "cross_certificate_served": bool(cross_served),
             "key_type": self.key_type,
             "hash_algorithm": self.hash_algorithm,
             "signature_scheme": self.signature_scheme or 'pkcs1v15',
