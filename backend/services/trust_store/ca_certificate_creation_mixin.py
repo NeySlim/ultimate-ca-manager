@@ -56,8 +56,10 @@ class CACertificateCreationMixin:
         key_usage: Optional[List[str]] = None,
         extended_key_usage: Optional[List[str]] = None,
         not_valid_after_max: Optional[datetime] = None,
+        subject_public_key=None,
     ) -> Tuple[bytes, bytes]:
-        """Create a CA certificate."""
+        """Create a CA certificate; *subject_public_key* certifies a key this call does not hold."""
+        public_key = subject_public_key or private_key.public_key()
         # Normalize URL params: merge singular into list
         all_cdp_urls = cdp_urls or ([cdp_url] if cdp_url else [])
         all_ocsp_uris = ocsp_uris or ([ocsp_uri] if ocsp_uri else [])
@@ -74,7 +76,7 @@ class CACertificateCreationMixin:
         builder = x509.CertificateBuilder()
         builder = builder.subject_name(subject)
         builder = builder.issuer_name(issuer)
-        builder = builder.public_key(private_key.public_key())
+        builder = builder.public_key(public_key)
         builder = builder.serial_number(
             serial if serial else x509.random_serial_number()
         )
@@ -116,7 +118,7 @@ class CACertificateCreationMixin:
 
         # Subject Key Identifier
         builder = builder.add_extension(
-            x509.SubjectKeyIdentifier.from_public_key(private_key.public_key()),
+            x509.SubjectKeyIdentifier.from_public_key(public_key),
             critical=False,
         )
 
@@ -242,7 +244,7 @@ class CACertificateCreationMixin:
         except ImportError:
             is_hsm_private_key = lambda _k: False  # noqa: E731
 
-        if is_hsm_private_key(private_key):
+        if private_key is None or is_hsm_private_key(private_key):
             key_pem = None
         else:
             key_pem = private_key_to_pem(private_key)

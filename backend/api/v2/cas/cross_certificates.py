@@ -2,6 +2,7 @@
 import logging
 from datetime import datetime, timedelta
 
+from cryptography.hazmat.primitives import serialization
 from flask import Response, g, request
 
 from auth.unified import require_auth
@@ -189,3 +190,45 @@ def export_cross_certificate(ca_id, xid):
                         headers={'Content-Disposition': f'attachment; filename="{name}.cer"'})
     return Response(cert.public_bytes(serialization.Encoding.PEM), mimetype='application/x-pem-file',
                     headers={'Content-Disposition': f'attachment; filename="{name}.pem"'})
+
+
+@bp.route('/api/v2/cas/<int:ca_id>/cross-sign', methods=['POST'])
+@require_auth(['write:cas'])
+def cross_sign(ca_id):
+    """Body (JSON): ``{subject_ca_id, validity_days?, path_length?}``. Signs the subject CA's key with this CA."""
+    from fips_mode import FipsRestricted
+    from services.ca import cross_signing
+    issuer, _, err = _ca_and_row(ca_id)
+    if err:
+        return err
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict):
+        return error_response('JSON body must be an object', 400)
+    subject_id = data.get('subject_ca_id')
+    if isinstance(subject_id, bool) or not isinstance(subject_id, int):
+        return error_response('subject_ca_id must be a CA id', 400)
+    subject = db.session.get(CA, subject_id)
+    if not subject:
+        return error_response('Subject CA not found', 404)
+    args = {}
+    if 'validity_days' in data:
+        args['validity_days'] = data['validity_days']
+    if 'path_length' in data:
+        args['path_length'] = data['path_length']
+    try:
+        row, warnings = cross_signing.cross_sign(issuer, subject, username=_username(), **args)
+    except CrossCertError as e:
+        db.session.rollback()
+        return error_response(e.message, e.status, details={'code': e.code})
+    except FipsRestricted:
+        raise
+    except ValueError as e:
+        db.session.rollback()
+        return error_response(str(e), 400)
+    except Exception:
+        db.session.rollback()
+        logger.error('Cross-signing failed', exc_info=True)
+        return error_response('Cross-signing failed', 500)
+    cross_certs.announce(subject, 'issued', row, _username(), {'issuer_ca_id': issuer.id})
+    return created_response({**row.to_dict(), 'certificate': cross_certs.certificate_of(row).public_bytes(
+        serialization.Encoding.PEM).decode(), 'warnings': warnings}, 'Cross-certificate issued')
