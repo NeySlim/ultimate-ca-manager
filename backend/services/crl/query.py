@@ -4,6 +4,7 @@ from sqlalchemy import or_
 from models import db, CA, Certificate
 from models.crl import CRLMetadata
 from services.cert.serial_resolution import resolve_record_serial, same_serial
+from utils.cert_issuer import same_key_refids
 from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
@@ -81,7 +82,7 @@ class CRLQueryMixin:
         from models.revoked_serial import RevokedSerial
         now = utc_now()
         certificates = Certificate.query.filter(
-            Certificate.caref == ca.refid,
+            Certificate.caref.in_(same_key_refids(ca)),
             Certificate.revoked == True,  # noqa: E712
             _not_expired(Certificate.valid_to, now),
         ).order_by(Certificate.id).all()
@@ -89,7 +90,7 @@ class CRLQueryMixin:
         # The certificate record comes first: it carries the invalidity date
         live = _dedupe_live_records(certificates + child_cas)
         persisted = RevokedSerial.query.filter(
-            RevokedSerial.caref == ca.refid,
+            RevokedSerial.caref.in_(same_key_refids(ca)),
             RevokedSerial.valid_to > now,
         ).order_by(RevokedSerial.revoked_at, RevokedSerial.id).all()
         return live + CRLQueryMixin._filter_orphan_serials(persisted, live)

@@ -4261,7 +4261,8 @@
       "csr": "Firma CSR",
       "renewal": "Rinnovo",
       "revocation": "Revoca",
-      "ca_revocation": "Revoca CA"
+      "ca_revocation": "Revoca CA",
+      "cross_revocation": "Revoca di certificato incrociato"
     },
     "revocationPerformed": "Approvata: la revoca è stata eseguita",
     "summarySerial": "Numero di serie",

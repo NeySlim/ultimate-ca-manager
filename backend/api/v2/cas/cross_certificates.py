@@ -141,9 +141,12 @@ def revoke_cross_certificate(ca_id, xid):
         from utils.datetime_utils import utc_now
         if invalidity_at > utc_now() + timedelta(minutes=5):
             return error_response('invalidity_date cannot be in the future', 400)
+    if reason in ('certificateHold', 'certificate_hold'):
+        return error_response('A cross-certificate cannot be put on hold: revocation is permanent', 400)
     if not row.revoked:
         issuer = cross_certs.issuer_of(row)
-        if issuer is not None:
+        # A serial the issuer already publishes needs no approval: only the row is brought in line
+        if issuer is not None and not cross_certs.published_record(row, issuer):
             try:
                 from services.approval_gate import approval_payload, queue_cross_revocation
                 policy, approval = queue_cross_revocation(
@@ -157,6 +160,7 @@ def revoke_cross_certificate(ca_id, xid):
                                         message='Cross-certificate revocation submitted for approval')
     try:
         warnings = cross_certs.revoke(row, reason, _username(), invalidity_at)
+        db.session.commit()
     except CrossCertError as e:
         db.session.rollback()
         return error_response(e.message, e.status, details={'code': e.code})

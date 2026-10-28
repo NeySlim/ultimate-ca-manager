@@ -4261,7 +4261,8 @@
       "csr": "CSR-Signierung",
       "renewal": "Erneuerung",
       "revocation": "Widerruf",
-      "ca_revocation": "CA-Widerruf"
+      "ca_revocation": "CA-Widerruf",
+      "cross_revocation": "Widerruf eines Cross-Zertifikats"
     },
     "revocationPerformed": "Genehmigt: der Widerruf wurde ausgeführt",
     "summarySerial": "Seriennummer",

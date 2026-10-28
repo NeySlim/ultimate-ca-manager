@@ -4264,7 +4264,8 @@
       "csr": "CSR 署名",
       "renewal": "更新",
       "revocation": "失効",
-      "ca_revocation": "CA の失効"
+      "ca_revocation": "CA の失効",
+      "cross_revocation": "クロス証明書の失効"
     },
     "revocationPerformed": "承認済み: 失効が実行されました",
     "summarySerial": "シリアル番号",

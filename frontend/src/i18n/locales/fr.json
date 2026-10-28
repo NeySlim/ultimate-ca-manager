@@ -4335,7 +4335,8 @@
       "csr": "Signature de CSR",
       "renewal": "Renouvellement",
       "revocation": "Révocation",
-      "ca_revocation": "Révocation de CA"
+      "ca_revocation": "Révocation de CA",
+      "cross_revocation": "Révocation de certificat croisé"
     },
     "revocationPerformed": "Approuvée : la révocation a été effectuée",
     "summarySerial": "Numéro de série",

@@ -184,7 +184,7 @@ def test_revoking_keeps_the_record_the_issuer_already_holds(app, auth_client, wo
                                      valid_to=utc_now() + timedelta(days=30)))
         db.session.commit()
     r = auth_client.post(_x(b, xid, '/revoke'), json={'reason': 'superseded'})
-    assert r.status_code == 409
+    assert r.status_code == 200 and r.get_json()['data']['warnings']
     with app.app_context():
         record = RevokedSerial.query.filter_by(serial_number=str(pki.cross_b.serial_number)).one()
         assert record.revoke_reason == 'keyCompromise' and record.revoked_at == earlier

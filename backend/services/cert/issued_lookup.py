@@ -32,8 +32,9 @@ SUPERSEDED = 'superseded'
 
 
 def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
-    """Every row under ``ca`` holding exactly ``cert`` (normally one; a
-    duplicate left by an inconsistent restore still counts)."""
+    """Every row under ``ca``, or under another record of its subject and key,
+    holding exactly ``cert`` (normally one; a duplicate left by an inconsistent
+    restore still counts)."""
     from utils.cert_issuer import same_key_refids
     presented = cert.public_bytes(Encoding.DER)
     candidates = Certificate.query.filter(
@@ -53,7 +54,7 @@ def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
 
 
 def find_issued_row(ca: CA, cert: x509.Certificate) -> Optional[Certificate]:
-    """The row under ``ca`` holding exactly ``cert``, or None."""
+    """The row under ``ca`` (or a record of its key) holding exactly ``cert``, or None."""
     rows = find_issued_rows(ca, cert)
     return rows[0] if rows else None
 

@@ -4261,7 +4261,8 @@
       "csr": "CSR 签署",
       "renewal": "续期",
       "revocation": "吊销",
-      "ca_revocation": "CA 吊销"
+      "ca_revocation": "CA 吊销",
+      "cross_revocation": "交叉证书吊销"
     },
     "revocationPerformed": "已批准：吊销已执行",
     "summarySerial": "序列号",

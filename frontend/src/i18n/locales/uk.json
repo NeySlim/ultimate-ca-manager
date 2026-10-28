@@ -4313,7 +4313,8 @@
       "csr": "Підписання CSR",
       "renewal": "Оновлення",
       "revocation": "Відкликання",
-      "ca_revocation": "Відкликання ЦС"
+      "ca_revocation": "Відкликання ЦС",
+      "cross_revocation": "Відкликання перехресного сертифіката"
     },
     "revocationPerformed": "Схвалено: відкликання виконано",
     "summarySerial": "Серійний номер",

@@ -68,15 +68,38 @@ def _encoded_private_key(row):
 
 
 def _keep_attached_key(ca, entry, stats):
-    """The key an OPNsense cross entry carries is the counterpart's own: stored when it has none, else reported."""
+    """Store the key an OPNsense cross entry carries (the counterpart's own) under the guards of the key import."""
     key = _encoded_private_key(entry)
     if not key:
         return
-    if not ca.prv and stored_private_key_matches(key, x509.load_pem_x509_certificate(base64.b64decode(ca.crt))):
-        ca.prv = key
-    else:
-        stats['errors'].append(f"Private key of cross-certificate '{entry.get('descr')}' not imported: "
-                               f"CA '{ca.descr}' already has a key or this one does not match")
+    label = f"Private key of cross-certificate '{entry.get('descr')}' not imported: CA '{ca.descr}'"
+    if ca.offline or ca.hsm_key_id or ca.is_pending:
+        stats['errors'].append(f"{label} is offline, HSM-bound or awaiting its certificate")
+        return
+    try:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ed448, ed25519
+        from utils.key_codec import load_pem_bytes
+        private_key = serialization.load_pem_private_key(load_pem_bytes(key), password=None)
+    except Exception:
+        stats['errors'].append(f"{label}: the key could not be read")
+        return
+    if isinstance(private_key, (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)):
+        stats['errors'].append(f"{label}: Ed25519 and Ed448 CA keys are not supported")
+        return
+    cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+    if ca.prv:
+        if stored_private_key_matches(ca.prv, cert) is not True or \
+                stored_private_key_matches(key, cert) is not True:
+            stats['errors'].append(f"{label} already has a different key")
+        return
+    if stored_private_key_matches(key, cert) is not True:
+        stats['errors'].append(f"{label}: the key does not match its certificate")
+        return
+    ca.prv = key
+    AuditService.log_action(action='ca_key_imported', resource_type='ca', resource_id=ca.id,
+                            resource_name=ca.descr, details=f'Private key imported for CA: {ca.descr}',
+                            success=True)
 
 
 def _is_self_signed(encoded_crt):

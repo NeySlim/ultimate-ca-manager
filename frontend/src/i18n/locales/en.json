@@ -4322,7 +4322,8 @@
       "csr": "CSR signing",
       "renewal": "Renewal",
       "revocation": "Revocation",
-      "ca_revocation": "CA revocation"
+      "ca_revocation": "CA revocation",
+      "cross_revocation": "Cross-certificate revocation"
     },
     "revocationPerformed": "Approved: the revocation was performed",
     "summarySerial": "Serial number",
