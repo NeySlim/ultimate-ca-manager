@@ -17,6 +17,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- DEB and RPM: an upgrade stopped UCM while it rebuilt the Python environment, about five minutes with `UCM_FIPS_BUILD=1`. The new environment is now built next to the running one, and the service stops only to switch to it.
 - UI: 17 badges asked for a size that does not exist and rendered without padding, and a few for a colour that does not exist (About, SSO tests, Smart Import, failed webhook deliveries, ACME order status). They now use defined ones, and a test refuses an unknown size or colour.
 - UI: a stat card clicked to filter a list (Certificates, SSH and user certificates, Policies, Discovery, Approvals) showed no active state on desktop, so nothing said which filters were on. Active cards are outlined again.
 - CSRs: the Pending and History tabs showed at most 20 requests and every count stopped at 20; both lists now page, search and sort on the server, and History also searches by signing CA (#424, thanks @clinde04).

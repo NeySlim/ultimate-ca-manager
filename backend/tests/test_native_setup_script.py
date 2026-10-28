@@ -285,16 +285,34 @@ def test_unsupported_distributions_are_refused(tmp_path, os_release):
 
 # ----------------------------------------------------------------- venv
 
+# Fake pip body: installing the requirements gives the venv a gunicorn, run by the venv's python
+GUNICORN = 'case "$*" in *" -r "*) d=$(dirname "$0"); printf "#!$d/python\\n" > "$d/gunicorn"; chmod +x "$d/gunicorn";; esac'
+
+
 def _fake_python(tmp_path, pip_body):
-    """`python -m venv DIR` lays out a venv whose pip records its calls, then runs pip_body."""
+    """`python -m venv DIR` lays out a venv that writes DIR where the real one does (pyvenv.cfg,
+    activate*, the pip shebang); its python runs scripts, so a stale shebang fails as for real.
+    pip records its calls and the ucm state, lays out gunicorn with the requirements, then runs pip_body."""
     record = tmp_path / 'pip-calls'
     templates = tmp_path / 'templates'
     _stub(templates / 'pip',
           f'echo "ARGS $*" >> {record}\necho "PATH $PATH" >> {record}\necho "RUSTC ${{RUSTC:-}}" >> {record}\n'
-          f'prev=""; for a in "$@"; do [ "$prev" = -r ] && cat "$a" >> {record}; prev=$a; done\n{pip_body}')
-    _stub(templates / 'python', 'cat > /dev/null; echo "cryptography, hashlib and psycopg2 use the system OpenSSL"')
-    body = (f'if [ "$1" = -m ] && [ "$2" = venv ]; then\n'
-            f'  mkdir -p "$3/bin" && cp {templates}/pip {templates}/python "$3/bin/"\nfi\nexit 0')
+          f'echo "UCM $(cat {tmp_path}/ucm-state 2>/dev/null)" >> {record}\n'
+          f'prev=""; for a in "$@"; do [ "$prev" = -r ] && cat "$a" >> {record}; prev=$a; done\n{GUNICORN}\n{pip_body}')
+    _stub(templates / 'python', f'''case "${{1:-}}" in
+  -c) exit 0 ;;
+  -) cat > /dev/null; echo "cryptography, hashlib and psycopg2 use the system OpenSSL" ;;
+  *) exec {BASH} "$@" ;;
+esac''')
+    body = f'''if [ "$1" = -m ] && [ "$2" = venv ]; then
+  mkdir -p "$3/bin" && cp {templates}/python "$3/bin/"
+  {{ printf '#!%s/bin/python\\n' "$3"; tail -n +2 {templates}/pip; }} > "$3/bin/pip" && chmod +x "$3/bin/pip"
+  printf 'home = /usr/bin\\ncommand = %s %s\\n' "$0" "$*" > "$3/pyvenv.cfg"
+  printf 'VIRTUAL_ENV="%s"\\n' "$3" > "$3/bin/activate"
+  printf 'setenv VIRTUAL_ENV "%s"\\n' "$3" > "$3/bin/activate.csh"
+  printf 'set -gx VIRTUAL_ENV "%s"\\n' "$3" > "$3/bin/activate.fish"
+fi
+exit 0'''
     return _stub(tmp_path / 'python', body), record
 
 
@@ -418,25 +436,26 @@ def test_the_standard_install_is_unchanged(tmp_path):
         f'ARGS install --quiet -r {home}/requirements.txt',
         'ARGS install --quiet --no-deps pyjks==20.0.0',
     ]
-    # The previous venv was set aside during the build, then dropped
+    # The previous venv was set aside at the switch, then dropped
     assert not (home / 'venv.prev').exists() and not (home / 'venv' / 'previous').exists()
+    assert not (home / 'venv.next').exists()
 
 
 # ------------------------------------------------------- running service
 
-# Fake pip body: installing the requirements gives the venv its gunicorn
-GUNICORN = 'case "$*" in *" -r "*) d=$(dirname "$0"); printf "#!/bin/sh\\n" > "$d/gunicorn"; chmod +x "$d/gunicorn";; esac'
+def _systemd(tmp_path, bin_dir, record, state='active', hold_stop=None):
+    """A booted systemd whose systemctl logs each call, with the venv's content at that moment.
 
-def _systemd(tmp_path, bin_dir, record, state='active'):
-    """A booted systemd whose systemctl logs each call, with the venv's content at that moment."""
+    With hold_stop, `stop` stops ucm, creates that file and waits to be killed."""
     (tmp_path / 'run-systemd').mkdir()
     (tmp_path / 'ucm-state').write_text(state)
     venv = tmp_path / 'opt' / 'venv'
+    hold = f'touch {hold_stop}; while :; do {shutil.which("sleep")} 0.05; done' if hold_stop else ':'
     _stub(bin_dir / 'systemctl', f"""echo "SYSTEMCTL $* [$({shutil.which('ls')} {venv} 2>/dev/null | tr '\\n' ' ')]" >> {record}
 state=$(cat {tmp_path}/ucm-state)
 case "$1" in
   is-active) [ "$state" = active ] ;;
-  stop) echo inactive > {tmp_path}/ucm-state ;;
+  stop) echo inactive > {tmp_path}/ucm-state; {hold} ;;
   start|restart) echo active > {tmp_path}/ucm-state ;;
 esac""")
     return {'PATH': str(bin_dir), 'UCM_SETUP_SYSTEMD_RUN': str(tmp_path / 'run-systemd')}
@@ -447,15 +466,16 @@ def _calls(record):
             for line in record.read_text().splitlines() if line.startswith(('SYSTEMCTL', 'ARGS'))]
 
 
-def test_a_running_service_is_stopped_before_its_venv_is_replaced(tmp_path):
+def test_a_running_service_is_stopped_only_once_its_new_venv_is_built(tmp_path):
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
-    python, record = _fake_python(tmp_path, GUNICORN)
+    python, record = _fake_python(tmp_path, 'exit 0')
     home, envfile = _home(tmp_path)
     envfile.write_text('SECRET_KEY=a\n')
     extra = _systemd(tmp_path, bin_dir, record)
     result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, DEBIAN, extra))
     assert result.returncode == 0, result.stderr
-    assert _calls(record)[:3] == ['SYSTEMCTL is-active --quiet ucm', 'SYSTEMCTL stop ucm', 'ARGS install']
+    assert _calls(record) == ['ARGS install'] * 3 + ['SYSTEMCTL is-active --quiet ucm', 'SYSTEMCTL stop ucm']
+    # Stopped while the previous venv is still in place
     assert 'SYSTEMCTL stop ucm [previous ]' in record.read_text()
     # Started again by the package script, after the permissions and the FIPS step
     assert (home / 'venv' / 'bin' / 'gunicorn').exists()
@@ -477,37 +497,43 @@ def test_a_stopped_service_or_a_chroot_is_left_alone(tmp_path, state, booted):
     assert [c for c in _calls(record) if c.startswith('SYSTEMCTL')] == expected
 
 
-def test_a_failed_fips_build_starts_the_service_again_on_the_previous_venv(tmp_path):
+@pytest.mark.parametrize('fips', [True, False])
+def test_the_service_runs_during_the_whole_build(tmp_path, fips):
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
-    python, record = _fake_python(tmp_path, 'case "$*" in *no-binary*) exit 1;; esac; exit 0')
+    python, record = _fake_python(tmp_path, 'exit 0')
     home, envfile = _home(tmp_path)
+    if not fips:
+        envfile.write_text('SECRET_KEY=a\n')
+    _stub(home / 'venv' / 'bin' / 'pip')  # `pip show requests-kerberos` succeeds: reinstalled too
+    extra = _systemd(tmp_path, bin_dir, record)
+    result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, extra))
+    assert result.returncode == 0, result.stderr
+    lines = record.read_text().splitlines()
+    # pip, requirements, pyjks, then the two Kerberos reinstalls
+    assert [line for line in lines if line.startswith('UCM')] == ['UCM active'] * 5
+    assert 'ARGS install --quiet requests-kerberos' in lines and "ARGS install --quiet pyspnego[kerberos]" in lines
+    calls = _calls(record)
+    assert calls[-2:] == ['SYSTEMCTL is-active --quiet ucm', 'SYSTEMCTL stop ucm']
+    assert all(c.startswith('ARGS') for c in calls[:-2])
+
+
+@pytest.mark.parametrize('fips', [True, False])
+def test_a_failed_build_never_stops_the_service(tmp_path, fips):
+    """PyPI unreachable or a failed compilation: ucm goes on running the venv it had."""
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    python, record = _fake_python(tmp_path, 'case "$*" in *" -r "*) exit 1;; esac; exit 0')
+    home, envfile = _home(tmp_path)
+    if not fips:
+        envfile.write_text('SECRET_KEY=a\n')
     shutil.rmtree(home / 'venv')
     _venv_dir(home / 'venv')
     extra = _systemd(tmp_path, bin_dir, record)
     result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, extra))
-    assert result.returncode == 1
-    # Started once the previous venv is back in place, not on the half-built one
-    assert [line for line in record.read_text().splitlines() if line.startswith('SYSTEMCTL')] == [
-        'SYSTEMCTL is-active --quiet ucm [bin good ]', 'SYSTEMCTL stop ucm [bin good ]', 'SYSTEMCTL start ucm [bin good ]']
-    assert _calls(record).index('SYSTEMCTL stop ucm') < _calls(record).index('ARGS install')
-    assert (tmp_path / 'ucm-state').read_text().strip() == 'active'
-
-
-def test_a_failed_standard_build_starts_the_service_again_on_the_previous_venv(tmp_path):
-    """PyPI unreachable: ucm goes on running the venv it had, as before the stop existed."""
-    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
-    python, record = _fake_python(tmp_path, 'case "$*" in *-r*) exit 1;; esac; exit 0')
-    home, envfile = _home(tmp_path)
-    envfile.write_text('SECRET_KEY=a\n')
-    shutil.rmtree(home / 'venv')
-    _venv_dir(home / 'venv')
-    extra = _systemd(tmp_path, bin_dir, record)
-    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, DEBIAN, extra))
     assert result.returncode != 0
-    assert [line for line in record.read_text().splitlines() if line.startswith('SYSTEMCTL')] == [
-        'SYSTEMCTL is-active --quiet ucm [bin good ]', 'SYSTEMCTL stop ucm [bin good ]', 'SYSTEMCTL start ucm [bin good ]']
-    assert 'ARGS install' in _calls(record)
-    assert not (home / 'venv.prev').exists()
+    assert 'ARGS install' in _calls(record) and _systemctl_lines(record) == []
+    assert (tmp_path / 'ucm-state').read_text().strip() == 'active'
+    assert (home / 'venv' / 'good').exists()
+    assert not (home / 'venv.prev').exists() and not (home / 'venv.next').exists()
 
 
 def test_a_failed_build_without_a_working_previous_venv_starts_nothing(tmp_path):
@@ -518,8 +544,116 @@ def test_a_failed_build_without_a_working_previous_venv_starts_nothing(tmp_path)
     extra = _systemd(tmp_path, bin_dir, record)
     result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, DEBIAN, extra))
     assert result.returncode != 0
-    assert [c for c in _calls(record) if c.startswith('SYSTEMCTL')] == [
-        'SYSTEMCTL is-active --quiet ucm', 'SYSTEMCTL stop ucm']
+    assert [c for c in _calls(record) if c.startswith('SYSTEMCTL')] == []
+
+
+@pytest.mark.parametrize('fips', [True, False])
+def test_the_final_venv_holds_no_path_of_venv_next(tmp_path, fips):
+    """Shebangs, activate scripts and pyvenv.cfg name the final directory; a binary is left as it is."""
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
+    binary = b'\x7fELF\x00\x00 %s \x00'
+    python, _ = _fake_python(tmp_path, 'case "$*" in *pyjks*) d=$(dirname "$0"); '
+                                       'printf \'\\177ELF\\000\\000 %s \\000\' "${d%/bin}" > "$d/native";; esac')
+    home, envfile = _home(tmp_path)
+    if not fips:
+        envfile.write_text('SECRET_KEY=a\n')
+    result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, {'PATH': str(bin_dir)}))
+    assert result.returncode == 0, result.stderr
+    venv = home / 'venv'
+    assert not (home / 'venv.next').exists()
+    assert (venv / 'bin' / 'gunicorn').read_text().splitlines()[0] == f'#!{venv}/bin/python'
+    assert (venv / 'bin' / 'pip').read_text().splitlines()[0] == f'#!{venv}/bin/python'
+    assert f'-m venv {venv} --prompt venv' in (venv / 'pyvenv.cfg').read_text()
+    for name in ('activate', 'activate.csh', 'activate.fish'):
+        assert f'"{venv}"' in (venv / 'bin' / name).read_text()
+    texts = [f for f in venv.rglob('*') if f.is_file() and f.name != 'native']
+    assert texts and not [f for f in texts if 'venv.next' in f.read_text()]
+    assert (venv / 'bin' / 'native').read_bytes() == binary % str(home / 'venv.next').encode()
+    assert _run(['venv-ok', str(home)], _env(tmp_path)).returncode == 0
+
+
+@pytest.mark.parametrize('build', ['exit 0', 'case "$*" in *" -r "*) exit 1;; esac; exit 0'])
+def test_a_leftover_venv_next_is_replaced(tmp_path, build):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    python, _ = _fake_python(tmp_path, build)
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    _venv_dir(home / 'venv.next', tag='stale')
+    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, DEBIAN, {'PATH': str(bin_dir)}))
+    assert (result.returncode == 0) is (build == 'exit 0'), result.stderr
+    assert not (home / 'venv.next').exists() and not (home / 'venv' / 'stale').exists()
+    assert (home / 'venv' / 'previous').exists() is (build != 'exit 0')
+
+
+def _held_gunicorn(started, exit_code=None):
+    """Fake pip body: the new venv's gunicorn creates `started` on --version and waits to be killed,
+    or with exit_code, fails."""
+    sleep = shutil.which('sleep')
+    body = started.parent / f'gunicorn-body-{exit_code}'
+    body.write_text('[ "$1" = --version ] || exit 0\n' + (
+        f'exit {exit_code}\n' if exit_code is not None else
+        f"trap 'kill $p 2>/dev/null; exit 1' TERM INT HUP\n{sleep} 30 & p=$!; touch {started}; wait $p\n"))
+    return (f'case "$*" in *" -r "*) d=$(dirname "$0"); '
+            f'{{ printf "#!$d/python\\n"; cat {body}; }} > "$d/gunicorn";; esac')
+
+
+@pytest.mark.parametrize('sig', [signal.SIGTERM, signal.SIGINT, signal.SIGHUP])
+@pytest.mark.parametrize('point', ['stopped', 'switched'])
+def test_an_interruption_after_the_stop_restarts_the_service_on_the_previous_venv(tmp_path, sig, point):
+    """Cut once ucm is stopped: before the switch (systemctl stop still running), or after it,
+    while the new venv is being checked."""
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    held = tmp_path / 'held'
+    python, record = _fake_python(tmp_path, _held_gunicorn(held) if point == 'switched' else 'exit 0')
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    shutil.rmtree(home / 'venv')
+    _venv_dir(home / 'venv')
+    extra = _systemd(tmp_path, bin_dir, record, hold_stop=held if point == 'stopped' else None)
+    proc = _spawn(tmp_path, home, python, envfile, extra)
+    _wait_for(held, proc)
+    os.killpg(proc.pid, sig)
+    _out, err = _reap(proc)
+    assert proc.returncode != 0, err
+    # The build was complete before the stop
+    assert _calls(record)[:3] == ['ARGS install'] * 3
+    assert (home / 'venv' / 'good').exists()
+    assert not (home / 'venv.prev').exists() and not (home / 'venv.next').exists()
+    assert _systemctl_lines(record) == RESTARTED
+    assert (tmp_path / 'ucm-state').read_text().strip() == 'active'
+
+
+def test_a_new_venv_that_does_not_start_is_rolled_back(tmp_path):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    python, record = _fake_python(tmp_path, _held_gunicorn(tmp_path / 'unused', exit_code=1))
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    shutil.rmtree(home / 'venv')
+    _venv_dir(home / 'venv')
+    extra = _systemd(tmp_path, bin_dir, record)
+    result = _run(['venv', str(home), str(python), 'deb', str(envfile)], _env(tmp_path, DEBIAN, extra))
+    assert result.returncode == 1
+    assert 'the new Python environment does not start' in result.stderr
+    assert 'Restored the previous Python environment.' in result.stderr
+    assert (home / 'venv' / 'good').exists()
+    assert not (home / 'venv.prev').exists() and not (home / 'venv.next').exists()
+    assert _systemctl_lines(record) == RESTARTED
+
+
+def test_a_first_install_cut_after_the_switch_leaves_no_venv(tmp_path):
+    bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
+    held = tmp_path / 'held'
+    python, _ = _fake_python(tmp_path, _held_gunicorn(held))
+    home, envfile = _home(tmp_path)
+    envfile.write_text('SECRET_KEY=a\n')
+    shutil.rmtree(home / 'venv')
+    proc = _spawn(tmp_path, home, python, envfile, {'PATH': str(bin_dir)})
+    _wait_for(held, proc)
+    assert (home / 'venv' / 'bin' / 'gunicorn').exists()  # switched, not yet checked
+    os.killpg(proc.pid, signal.SIGTERM)
+    _reap(proc)
+    assert proc.returncode != 0
+    assert not (home / 'venv').exists() and not (home / 'venv.next').exists()
 
 
 def _default_signals():
@@ -529,7 +663,7 @@ def _default_signals():
 
 @pytest.mark.parametrize('sig', [signal.SIGTERM, signal.SIGINT, signal.SIGHUP])
 @pytest.mark.parametrize('step', ['*no-binary*', '*" -r "*', '*pyjks*'])
-def test_an_interrupted_build_restores_the_previous_venv_and_the_service(tmp_path, sig, step):
+def test_an_interrupted_build_keeps_the_previous_venv_and_the_running_service(tmp_path, sig, step):
     """The signal reaches the whole process group while pip runs, as when dpkg or the updater is stopped.
 
     At the pyjks step the new venv already has gunicorn, yet it is incomplete."""
@@ -540,8 +674,7 @@ def test_an_interrupted_build_restores_the_previous_venv_and_the_service(tmp_pat
     # `started` appears once the sleep exists and `wait` lets the trap run at once (a signal sent
     # before the sleep's fork waited 30 s); the trap kills the sleep, which ignores SIGINT in background.
     sleep = shutil.which('sleep')
-    python, record = _fake_python(tmp_path, f'''{GUNICORN}
-case "$*" in {step})
+    python, record = _fake_python(tmp_path, f'''case "$*" in {step})
   trap 'kill $p 2>/dev/null; {sleep} 0.3; : > "$(dirname "$0")/late"; exit 1' TERM INT HUP
   {sleep} 30 & p=$!; touch {started}; wait $p;;
 esac; exit 0''')
@@ -563,21 +696,21 @@ esac; exit 0''')
     _out, err = _reap(proc)
     assert proc.returncode != 0, err
     assert (home / 'venv' / 'good').exists() and not (home / 'venv.prev').exists()
-    assert not (home / 'venv' / 'bin' / 'late').exists()
-    assert [line for line in record.read_text().splitlines() if line.startswith('SYSTEMCTL')] == [
-        'SYSTEMCTL is-active --quiet ucm [bin good ]', 'SYSTEMCTL stop ucm [bin good ]', 'SYSTEMCTL start ucm [bin good ]']
+    assert not (home / 'venv' / 'bin' / 'late').exists() and not (home / 'venv.next').exists()
+    assert _systemctl_lines(record) == []
     assert (tmp_path / 'ucm-state').read_text().strip() == 'active'
 
 
 def test_a_failed_first_fips_build_leaves_no_venv_that_looks_usable(tmp_path):
     """Refused by the build or by verify_fips_venv, a venv with gunicorn must not stay behind."""
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
-    python, _ = _fake_python(tmp_path, f'{GUNICORN}\ncase "$*" in *no-binary*) exit 1;; esac; exit 0')
+    python, _ = _fake_python(tmp_path, 'case "$*" in *no-binary*) exit 1;; esac; exit 0')
     home, envfile = _home(tmp_path)
     shutil.rmtree(home / 'venv')
     result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, {'PATH': str(bin_dir)}))
     assert result.returncode == 1
     assert _run(['venv-ok', str(home)], _env(tmp_path)).returncode != 0
+    assert not (home / 'venv.next').exists()
 
 
 def _reap(proc, timeout=20, pipes=True):
@@ -600,8 +733,7 @@ def _reap(proc, timeout=20, pipes=True):
 def _slow_pip(step, started):
     """Fake pip body that sleeps at the given step and, like pip, takes a moment to die."""
     sleep = shutil.which('sleep')
-    return f'''{GUNICORN}
-case "$*" in {step})
+    return f'''case "$*" in {step})
   trap 'kill $p 2>/dev/null; {sleep} 0.3; : > "$(dirname "$0")/late"; exit 1' TERM INT HUP
   {sleep} 30 & p=$!; touch {started}; wait $p;;
 esac; exit 0'''
@@ -628,12 +760,15 @@ RESTARTED = ['SYSTEMCTL is-active --quiet ucm [bin good ]', 'SYSTEMCTL stop ucm 
              'SYSTEMCTL start ucm [bin good ]']
 
 
-@pytest.mark.parametrize('trigger', ['pip fails', 'SIGHUP'])
+@pytest.mark.parametrize('trigger', ['pip fails', 'SIGHUP', 'SIGHUP after the switch', 'new venv fails'])
 def test_a_dead_terminal_does_not_cut_the_recovery_short(tmp_path, trigger):
     """After an SSH disconnection every write to the terminal fails; the recovery must still finish."""
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
     started = tmp_path / 'pip-started'
-    body = 'case "$*" in *" -r "*) exit 1;; esac; exit 0' if trigger == 'pip fails' else _slow_pip('*" -r "*', started)
+    body = {'pip fails': 'case "$*" in *" -r "*) exit 1;; esac; exit 0',
+            'SIGHUP': _slow_pip('*" -r "*', started),
+            'SIGHUP after the switch': _held_gunicorn(started),
+            'new venv fails': _held_gunicorn(started, exit_code=1)}[trigger]
     python, record = _fake_python(tmp_path, body)
     home, envfile = _home(tmp_path)
     envfile.write_text('SECRET_KEY=a\n')
@@ -642,26 +777,28 @@ def test_a_dead_terminal_does_not_cut_the_recovery_short(tmp_path, trigger):
     extra = _systemd(tmp_path, bin_dir, record)
     with open('/dev/full', 'w') as dead:
         proc = _spawn(tmp_path, home, python, envfile, extra, stderr=dead)
-        if trigger == 'SIGHUP':
+        if trigger.startswith('SIGHUP'):
             _wait_for(started, proc)
             os.killpg(proc.pid, signal.SIGHUP)
         _reap(proc)
     assert proc.returncode != 0
     assert (home / 'venv' / 'good').exists() and not (home / 'venv.prev').exists()
-    assert _systemctl_lines(record) == RESTARTED
+    assert not (home / 'venv.next').exists()
+    stopped = trigger in ('SIGHUP after the switch', 'new venv fails')
+    assert _systemctl_lines(record) == (RESTARTED if stopped else [])
 
 
 @pytest.mark.parametrize('case', ['standard pip fails', 'fips build succeeds', 'kerberos reinstall'])
 def test_a_closed_session_does_not_cost_the_service(tmp_path, case):
     """ssh without a tty, or a pipe reader that dies: every later write raises SIGPIPE.
 
-    With requests-kerberos in the previous venv, bash itself writes after the build."""
+    With requests-kerberos in the previous venv, bash writes before the switch."""
     fips = case == 'fips build succeeds'
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path='1.92.0')
     started, go = tmp_path / 'pip-started', tmp_path / 'go'
     step = '*no-binary*' if fips else '*" -r "*'
     wait = f'while [ ! -e {go} ]; do {shutil.which("sleep")} 0.05; done'
-    python, record = _fake_python(tmp_path, f'{GUNICORN}\ncase "$*" in {step}) touch {started}; {wait}; '
+    python, record = _fake_python(tmp_path, f'case "$*" in {step}) touch {started}; {wait}; '
                                             f'exit {1 if case == "standard pip fails" else 0};; esac; exit 0')
     home, envfile = _home(tmp_path)
     if not fips:
@@ -677,22 +814,15 @@ def test_a_closed_session_does_not_cost_the_service(tmp_path, case):
     proc.stderr.close()
     go.touch()
     _reap(proc, pipes=False)
+    # The first write after the build ("Stopping UCM", "Reinstalling") ends the run before the stop:
+    # ucm goes on running the previous venv
+    assert proc.returncode == (141 if case != 'standard pip fails' else 1)
+    assert (home / 'venv' / 'good').exists()
+    assert _systemctl_lines(record) == (RESTARTED[:1] if fips else [])
+    assert (tmp_path / 'ucm-state').read_text().strip() == 'active'
     if fips:
-        # The verified build is kept; the package script starts ucm at the end
-        assert proc.returncode == 0
-        assert (home / 'venv' / 'bin' / 'gunicorn').exists() and not (home / 'venv' / 'good').exists()
-        assert not (tmp_path / 'log' / 'fips-build.failed').exists()
-        assert _systemctl_lines(record) == RESTARTED[:2]
-    elif case == 'kerberos reinstall':
-        # Complete before the first failed write: ucm starts again on the new venv
-        assert proc.returncode == 141
-        assert (home / 'venv' / 'bin' / 'gunicorn').exists() and not (home / 'venv' / 'good').exists()
-        assert _systemctl_lines(record)[-1].startswith('SYSTEMCTL start ucm')
-    else:
-        assert proc.returncode != 0
-        assert (home / 'venv' / 'good').exists()
-        assert _systemctl_lines(record) == RESTARTED
-    assert not (home / 'venv.prev').exists()
+        assert (tmp_path / 'log' / 'fips-build.failed').exists()
+    assert not (home / 'venv.prev').exists() and not (home / 'venv.next').exists()
 
 
 def test_a_signal_while_the_previous_venv_is_dropped_keeps_the_new_one(tmp_path):
@@ -702,7 +832,7 @@ def test_a_signal_while_the_previous_venv_is_dropped_keeps_the_new_one(tmp_path)
     (bin_dir / 'rm').unlink()
     _stub(bin_dir / 'rm', f'case "$2" in */venv.prev) if [ -d "$2" ]; then {shutil.which("rm")} -f "$2/bin/gunicorn"; '
                           f'touch {removing}; {shutil.which("sleep")} 1; fi;; esac\nexec {shutil.which("rm")} "$@"')
-    python, record = _fake_python(tmp_path, GUNICORN)
+    python, record = _fake_python(tmp_path, 'exit 0')
     home, envfile = _home(tmp_path)
     envfile.write_text('SECRET_KEY=a\n')
     shutil.rmtree(home / 'venv')
@@ -730,13 +860,13 @@ def test_a_malformed_requirements_file_leaves_no_temporary_file(tmp_path):
 
 
 def test_a_second_signal_does_not_cut_the_recovery_short(tmp_path):
-    """Ctrl-C pressed again while the incomplete venv is being removed."""
+    """Ctrl-C pressed again while the new venv, cut after the switch, is being removed."""
     bin_dir, _ = _toolbox(tmp_path, rustc_in_path=None)
-    started, removing = tmp_path / 'pip-started', tmp_path / 'rm-started'
+    started, removing = tmp_path / 'held', tmp_path / 'rm-started'
     (bin_dir / 'rm').unlink()
-    _stub(bin_dir / 'rm', f'case "$*" in *"/opt/venv") touch {removing}; {shutil.which("sleep")} 1;; esac\n'
+    _stub(bin_dir / 'rm', f'[ "$*" = "-rf {tmp_path}/opt/venv" ] && {{ touch {removing}; {shutil.which("sleep")} 1; }}\n'
                           f'exec {shutil.which("rm")} "$@"')
-    python, record = _fake_python(tmp_path, _slow_pip('*" -r "*', started))
+    python, record = _fake_python(tmp_path, _held_gunicorn(started))
     home, envfile = _home(tmp_path)
     envfile.write_text('SECRET_KEY=a\n')
     shutil.rmtree(home / 'venv')
@@ -780,7 +910,7 @@ def test_a_failed_fips_build_reports_the_restore_after_doing_it(tmp_path):
     result = _run(['venv', str(home), str(python), 'rpm', str(envfile)], _env(tmp_path, ALMA, {'PATH': str(bin_dir)}))
     assert result.returncode == 1
     err = result.stderr
-    assert err.index('the UCM_FIPS_BUILD=1 build failed') < err.index('Restored the previous Python environment.')
+    assert err.index('the UCM_FIPS_BUILD=1 build failed') < err.index('Kept the previous Python environment.')
     assert (home / 'venv' / 'previous').exists()
 
 

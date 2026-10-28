@@ -12,7 +12,7 @@ SYSTEMD_RUN=${UCM_SETUP_SYSTEMD_RUN:-/run/systemd/system}
 # Present while the last UCM_FIPS_BUILD=1 build failed: rpm reports success despite a failed %post
 BUILD_FAILED=${BUILD_LOG%.log}.failed
 RUST_MIN=1.83
-GUARDED_VENV="" GUARDED_TMP="" SERVICE_STOPPED="" VENV_BUILDING=""
+GUARDED_VENV="" GUARDED_TMP="" SERVICE_STOPPED="" VENV_BUILDING="" HAD_VENV=""
 
 say() { echo "$*"; }
 die() { echo "ERROR: $*" >&2; exit 1; }
@@ -208,8 +208,8 @@ fips_requirements() {
 
 # Same steps as the standard install, with the OpenSSL-linked packages from source.
 build_fips_venv() {
-    local python=$1 venv=$2 reqs=$3
-    "$python" -m venv "$venv" &&
+    local python=$1 venv=$2 reqs=$3 prompt=$4
+    "$python" -m venv "$venv" --prompt "$prompt" &&
     "$venv/bin/pip" install --upgrade pip &&
     "$venv/bin/pip" install --no-binary cryptography,psycopg2,lxml,xmlsec -r "$reqs" &&
     "$venv/bin/pip" install --no-deps pyjks==20.0.0
@@ -217,12 +217,33 @@ build_fips_venv() {
 
 # A venv the service can start: an interrupted build leaves one without gunicorn or python.
 venv_ok() {
-    [ -x "$1/bin/gunicorn" ] && "$1/bin/python" -c '' >/dev/null 2>&1
+    [ -x "$1/bin/gunicorn" ] && "$1/bin/python" -c '' </dev/null >/dev/null 2>&1
+}
+
+# venv_ok, plus: python takes the directory as its venv and gunicorn's shebang resolves.
+venv_starts() {
+    venv_ok "$1" &&
+    "$1/bin/python" -c 'import os, sys; sys.exit(os.path.realpath(sys.prefix) != os.path.realpath(sys.argv[1]))' \
+        "$1" </dev/null >/dev/null 2>&1 &&
+    "$1/bin/gunicorn" --version </dev/null >/dev/null 2>&1
+}
+
+# Venv $1 to be moved to $2: rewrites its path where venv and pip write it, pyvenv.cfg and the text
+# files of bin/ (shebangs, activate*). Binaries are skipped (-I): a shorter path would corrupt them.
+relocate_venv() {
+    local dir=$1 from=$1 to=$2 pat rep f
+    pat=$(printf '%s\n' "$from" | sed 's/[][\.*^$/]/\\&/g')
+    rep=$(printf '%s\n' "$to" | sed 's/[\&/]/\\&/g')
+    for f in "$dir/pyvenv.cfg" "$dir"/bin/*; do
+        [ -f "$f" ] && [ ! -L "$f" ] && grep -qIF -e "$from" "$f" || continue
+        sed -i "s/$pat/$rep/g" "$f"
+    done
+    ! grep -rqsIF -e "$from" "$dir/pyvenv.cfg" "$dir/bin"
 }
 
 # Every OpenSSL the venv loads must be the system one.
 verify_fips_venv() {
-    "$1/venv/bin/python" - <<'PY'
+    "$1/bin/python" - <<'PY'
 import glob, importlib.metadata as md, os, ssl, subprocess, sys, sysconfig
 import _hashlib
 from cryptography.hazmat.backends.openssl.backend import backend
@@ -264,19 +285,14 @@ print(f'cryptography, hashlib and psycopg2 use the system {ssl.OPENSSL_VERSION}'
 PY
 }
 
-# Until the new venv is complete, any exit (failure or signal) puts the previous one back and
-# starts ucm again if it was stopped here; on success the package script starts it at the end.
+# The new venv is built in venv.next while ucm runs. Until it is in place and starts, any exit
+# (failure or signal) drops it, keeps or puts back the previous one, and starts ucm again if it was
+# stopped here; on success the package script starts it at the end.
 guard_venv() {
     GUARDED_VENV=$1 GUARDED_TMP=${2:-}
     trap recover_venv EXIT
     # Trapped, a signal is handled once pip has exited: recover_venv never races a dying pip
     trap 'exit 129' HUP; trap 'exit 130' INT; trap 'exit 143' TERM; trap 'exit 141' PIPE
-    # Skipped in a chroot or container without systemd
-    if [ -d "$SYSTEMD_RUN" ] && systemctl is-active --quiet ucm; then
-        say "Stopping UCM while its Python environment is rebuilt..."
-        SERVICE_STOPPED=1
-        systemctl stop ucm || say "WARNING: could not stop UCM; rebuilding its environment anyway"
-    fi
 }
 
 recover_venv() {
@@ -286,10 +302,15 @@ recover_venv() {
     local venv=$GUARDED_VENV
     [ -z "$GUARDED_TMP" ] || rm -f "$GUARDED_TMP"
     case $VENV_BUILDING in
-        moved) [ ! -e "$venv.prev" ] || { rm -rf "$venv" && mv -T "$venv.prev" "$venv" \
-                   && say "Restored the previous Python environment." >&2; } ;;
-        # A first install has no previous venv: an incomplete one must not pass venv-ok
-        fresh) rm -rf "$venv" ;;
+        next) rm -rf "$venv.next"
+              [ ! -e "$venv" ] || say "Kept the previous Python environment." >&2 ;;
+        swap) rm -rf "$venv.next"
+              if [ -e "$venv.prev" ]; then
+                  rm -rf "$venv" && mv -T "$venv.prev" "$venv" && say "Restored the previous Python environment." >&2
+              # A first install has no previous venv: an unchecked one must not pass venv-ok
+              elif [ -z "$HAD_VENV" ]; then
+                  rm -rf "$venv"
+              fi ;;
         *) if [ -e "$venv.prev" ] && ! venv_ok "$venv"; then rm -rf "$venv" && mv -T "$venv.prev" "$venv"; fi ;;
     esac
     if [ -n "$SERVICE_STOPPED" ] && venv_ok "$venv"; then
@@ -298,22 +319,39 @@ recover_venv() {
     fi
 }
 
-# Moves the venv aside as venv.prev, after resolving what an interrupted build left behind.
-set_aside_venv() {
+# Resolves what an interrupted run left behind (venv.prev, venv.next), then marks the build started.
+clear_leftovers() {
     if [ -e "$1.prev" ] && ! venv_ok "$1"; then
         rm -rf "$1" && mv -T "$1.prev" "$1"
     fi
-    rm -rf "$1.prev"
-    if [ -e "$1" ]; then
-        mv -T "$1" "$1.prev"
-        VENV_BUILDING=moved
-    else
-        VENV_BUILDING=fresh
+    rm -rf "$1.prev" "$1.next"
+    VENV_BUILDING=next
+}
+
+stop_service() {
+    # Skipped in a chroot or container without systemd
+    if [ -d "$SYSTEMD_RUN" ] && systemctl is-active --quiet ucm; then
+        say "Stopping UCM to switch to its new Python environment..."
+        SERVICE_STOPPED=1
+        systemctl stop ucm || say "WARNING: could not stop UCM; switching its environment anyway"
     fi
 }
 
+# venv.next becomes venv (the previous one venv.prev); ucm is stopped for this step only.
+switch_venv() {
+    local venv=$1
+    # From here venv.next/bin/pip runs the interpreter of $venv: no pip call after this line
+    relocate_venv "$venv.next" "$venv" || die "could not rewrite the paths of the new Python environment"
+    stop_service
+    [ ! -e "$venv" ] || HAD_VENV=1
+    VENV_BUILDING=swap
+    [ -z "$HAD_VENV" ] || mv -T "$venv" "$venv.prev"
+    mv -T "$venv.next" "$venv"
+    venv_starts "$venv" || die "the new Python environment does not start"
+}
+
 cmd_venv() {
-    local home=$1 python=$2 format=$3 envfile=$4 venv=$1/venv rust reqs
+    local home=$1 python=$2 format=$3 envfile=$4 venv=$1/venv rust reqs=""
     local had_requests_kerberos="" had_pyspnego_kerberos=""
 
     # requests-kerberos and pyspnego[kerberos] are optional and admin-installed:
@@ -333,44 +371,44 @@ cmd_venv() {
         reqs=$(mktemp)
         guard_venv "$venv" "$reqs"
         fips_requirements "$home/requirements.txt" "$reqs"
-        set_aside_venv "$venv"
+        clear_leftovers "$venv"
         echo "build failed" > "$BUILD_FAILED"
-        if ! build_fips_venv "$python" "$venv" "$reqs" > "$BUILD_LOG" 2>&1 \
-                || ! verify_fips_venv "$home" >> "$BUILD_LOG" 2>&1; then
+        if ! build_fips_venv "$python" "$venv.next" "$reqs" "${venv##*/}" > "$BUILD_LOG" 2>&1 \
+                || ! verify_fips_venv "$venv.next" >> "$BUILD_LOG" 2>&1; then
             tail -n 25 "$BUILD_LOG" >&2 || true
-            # recover_venv then drops the new venv, even one verify_fips_venv refused with gunicorn in it
             echo "ERROR: the UCM_FIPS_BUILD=1 build failed (full log: $BUILD_LOG)." >&2
             echo "Fix the cause, or remove UCM_FIPS_BUILD from $envfile for the standard build, and" >&2
             retry_hint "$format" >&2
             exit 1
         fi
-        # Verified: from here on no exit may drop the new venv
-        VENV_BUILDING=""
-        rm -f "$reqs" "$BUILD_FAILED"
+        rm -f "$reqs"
         tail -n 1 "$BUILD_LOG" || true
     else
         guard_venv "$venv"
-        set_aside_venv "$venv"
-        "$python" -m venv "$venv"
-        "$venv/bin/pip" install --quiet --upgrade pip
-        "$venv/bin/pip" install --quiet -r "$home/requirements.txt"
+        clear_leftovers "$venv"
+        "$python" -m venv "$venv.next" --prompt "${venv##*/}"
+        "$venv.next/bin/pip" install --quiet --upgrade pip
+        "$venv.next/bin/pip" install --quiet -r "$home/requirements.txt"
         # --no-deps keeps out twofish, an sdist-only dependency UCM never uses (see requirements.txt)
-        "$venv/bin/pip" install --quiet --no-deps pyjks==20.0.0
+        "$venv.next/bin/pip" install --quiet --no-deps pyjks==20.0.0
     fi
-    # Complete: the previous venv is no longer needed (flag first, so no exit drops the new one)
-    VENV_BUILDING=""
-    rm -rf "$venv.prev"
 
     if [ -n "$had_requests_kerberos" ]; then
         say "Reinstalling requests-kerberos (was present before upgrade)..."
-        "$venv/bin/pip" install --quiet requests-kerberos || \
+        "$venv.next/bin/pip" install --quiet requests-kerberos || \
             say "WARNING: requests-kerberos reinstall failed, Kerberos auth to the upstream CA is unavailable until 'pip install requests-kerberos' is run manually in $venv"
     fi
     if [ -n "$had_pyspnego_kerberos" ]; then
         say "Reinstalling pyspnego[kerberos] (was present before upgrade)..."
-        "$venv/bin/pip" install --quiet 'pyspnego[kerberos]' || \
+        "$venv.next/bin/pip" install --quiet 'pyspnego[kerberos]' || \
             say "WARNING: pyspnego[kerberos] reinstall failed (needs libkrb5-dev/gcc), Autoenrollment's Kerberos/SPNEGO binding is unavailable until 'pip install pyspnego[kerberos]' is run manually in $venv"
     fi
+
+    switch_venv "$venv"
+    # In place and starting: the previous venv is no longer needed (flag first, so no exit drops the new one)
+    VENV_BUILDING=""
+    [ -z "$reqs" ] || rm -f "$BUILD_FAILED"
+    rm -rf "$venv.prev"
     trap - EXIT HUP INT TERM PIPE
 }
 
