@@ -25,6 +25,10 @@ from utils.key_codec import private_key_to_pem
 from utils.signing_hash import signing_hash_for, rsa_padding_for
 
 
+def _spki_der(key) -> bytes:
+    return key.public_bytes(serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+
+
 class CACertificateCreationMixin:
     """CA X.509 certificate creation mixin"""
 
@@ -57,6 +61,8 @@ class CACertificateCreationMixin:
         extended_key_usage: Optional[List[str]] = None,
         not_valid_after_max: Optional[datetime] = None,
         subject_public_key=None,
+        subject_key_identifier: Optional[x509.SubjectKeyIdentifier] = None,
+        copied_extensions: Optional[List[x509.Extension]] = None,
     ) -> Tuple[bytes, bytes]:
         """Create a CA certificate; *subject_public_key* certifies a key this call does not hold."""
         public_key = subject_public_key or private_key.public_key()
@@ -100,7 +106,10 @@ class CACertificateCreationMixin:
             critical=True,
         )
 
-        is_root = issuer == subject
+        # Root means signed by its own key: a same-name certificate under another key is not
+        self_signed = issuer == subject and (issuer_cert is None or _spki_der(issuer_cert.public_key()) == _spki_der(public_key))
+        is_root = self_signed
+        copied = list(copied_extensions or [])
         ku_names = key_usage if key_usage is not None else default_key_usage_for_ca(is_root)
         builder = builder.add_extension(
             build_key_usage_extension(ku_names),
@@ -113,17 +122,17 @@ class CACertificateCreationMixin:
             else extended_key_usage
         )
         eku_ext = build_extended_key_usage_extension(eku_names)
-        if eku_ext is not None:
+        if eku_ext is not None and not any(e.oid == x509.oid.ExtensionOID.EXTENDED_KEY_USAGE for e in copied):
             builder = builder.add_extension(eku_ext, critical=False)
 
         # Subject Key Identifier
         builder = builder.add_extension(
-            x509.SubjectKeyIdentifier.from_public_key(public_key),
+            subject_key_identifier or x509.SubjectKeyIdentifier.from_public_key(public_key),
             critical=False,
         )
 
         # Authority Key Identifier (for intermediate CAs)
-        if issuer != subject:
+        if not self_signed:
             if issuer_cert is not None:
                 aki = authority_key_identifier_from_issuer(issuer_cert)
             else:
@@ -225,6 +234,9 @@ class CACertificateCreationMixin:
                 x509.SubjectInformationAccess(sia_descriptions),
                 critical=False,
             )
+
+        for ext in copied:
+            builder = builder.add_extension(ext.value, critical=ext.critical)
 
         # Sign certificate
         sign_hash = signing_hash_for(issuer_private_key, hash_algorithm(digest))
