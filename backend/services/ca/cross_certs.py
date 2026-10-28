@@ -214,14 +214,8 @@ def attach_certificate(ca: CA, cert: x509.Certificate, username: str = 'system',
 
 def _apply_persisted_revocation(row):
     """A cross-certificate its issuer revoked before it was detached stays revoked."""
-    if not row.issuer_caref:
-        return
-    from models.revoked_serial import RevokedSerial
-    from utils.serial_format import serial_variants
-    record = RevokedSerial.query.filter(
-        RevokedSerial.caref == row.issuer_caref,
-        RevokedSerial.serial_number.in_(serial_variants(int(row.serial_number))),
-    ).first()
+    issuer = CA.query.filter_by(refid=row.issuer_caref).first() if row.issuer_caref else None
+    record = published_record(row, issuer) if issuer is not None else None
     if record is not None:
         row.revoked, row.revoked_at, row.revoke_reason = True, record.revoked_at, record.revoke_reason
 

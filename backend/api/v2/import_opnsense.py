@@ -68,7 +68,9 @@ def _encoded_private_key(row):
 
 
 def _keep_attached_key(ca, entry, stats):
-    """Store the key an OPNsense cross entry carries (the counterpart's own) under the guards of the key import."""
+    """Store the key an OPNsense cross entry carries (the counterpart's own) under the guards of the key import.
+
+    Returns True when stored; the caller records the audit entry after its commit."""
     key = _encoded_private_key(entry)
     if not key:
         return
@@ -97,9 +99,7 @@ def _keep_attached_key(ca, entry, stats):
         stats['errors'].append(f"{label}: the key does not match its certificate")
         return
     ca.prv = key
-    AuditService.log_action(action='ca_key_imported', resource_type='ca', resource_id=ca.id,
-                            resource_name=ca.descr, details=f'Private key imported for CA: {ca.descr}',
-                            success=True)
+    return True
 
 
 def _is_self_signed(encoded_crt):
@@ -581,6 +581,7 @@ def import_items():
         # Import CAs first so certificate caref links can resolve in the same transaction;
         # self-signed ones before their cross-certificates, which attach to them.
         attached_cross = []
+        keys_stored = []
         attached_refids = {}
         for item_id in sorted((i for i in selected_ids if i in all_cas),
                               key=lambda i: not _is_self_signed(_encoded_cert(all_cas[i]))):
@@ -611,7 +612,8 @@ def import_items():
                 attached_cross.append(attached)
                 attached_refids[ca_refid] = attached[0].refid
                 stats['cas_cross_attached'] = stats.get('cas_cross_attached', 0) + 1
-                _keep_attached_key(attached[0], ca_data, stats)
+                if _keep_attached_key(attached[0], ca_data, stats):
+                    keys_stored.append(attached[0])
                 continue
 
             # Check for duplicate by description (same CA, different refid from OPNsense)
@@ -720,6 +722,10 @@ def import_items():
             return _err
         for ca, row in attached_cross:
             cross_certs.announce(ca, 'attached', row, 'import')
+        for ca in keys_stored:
+            AuditService.log_action(action='ca_key_imported', resource_type='ca', resource_id=ca.id,
+                                    resource_name=ca.descr, details=f'Private key imported for CA: {ca.descr}',
+                                    success=True)
         
         AuditService.log_action(
             action='opnsense_import',

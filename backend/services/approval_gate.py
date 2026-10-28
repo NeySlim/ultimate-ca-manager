@@ -147,9 +147,12 @@ def queue_cross_revocation(user, row, issuer, *, reason: str, invalidity_at=None
                            ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
     """Queue the revocation of a cross-certificate, held by the revocation
     policies of the issuing CA whose CRL will carry it; ``(None, None)`` when none requires approval."""
+    from models import CA
+    from utils.cert_issuer import same_key_refids
     from utils.datetime_utils import utc_isoformat
+    scope = tuple(c.id for c in CA.query.filter(CA.refid.in_(same_key_refids(issuer))).all())
     return queue_if_approval_required(
-        user, ca_id=issuer.id, template_id=None, cn=row.ca.common_name, san_list=[],
+        user, ca_id=scope, template_id=None, cn=row.ca.common_name, san_list=[],
         request_type='cross_revocation', operation='revocation', comment=comment,
         request_data={'cross_certificate_id': row.id, 'serial_number': row.serial_number,
                       'ca_id': issuer.id, 'cn': row.ca.common_name, 'reason': reason,
