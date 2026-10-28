@@ -151,6 +151,18 @@ def _child_ca_for_serial(issuer: CA, cert_serial: int, variants) -> Optional[CA]
     return None
 
 
+def _cross_certificate_for_serial(issuer: CA, cert_serial: int, variants):
+    """The cross-certificate *issuer* signed that carries *cert_serial*, or None."""
+    from models.ca_cross_certificate import CACrossCertificate
+    for row in CACrossCertificate.query.filter(
+        CACrossCertificate.issuer_caref == issuer.refid,
+        CACrossCertificate.serial_number.in_(variants),
+    ).all():
+        if _record_holds_serial(row, cert_serial) is not False:
+            return row
+    return None
+
+
 class _PlaceholderRSAKey:
     """Lets pyca encode a response whose signature is then replaced: its
     OCSP builder cannot sign RSA-PSS."""
@@ -638,7 +650,18 @@ class OCSPService:
                         ),
                     )
                 certificate = child_ca
-        if certificate is None or isinstance(certificate, CA):
+            else:
+                # A cross-certificate of another CA's key lives in its own table (#400)
+                cross = _cross_certificate_for_serial(ca, cert_serial, variants)
+                if cross is not None and cross.revoked:
+                    return (
+                        cross,
+                        'revoked',
+                        cross.revoked_at or utc_now(),
+                        _REASON_MAP.get(cross.revoke_reason, x509.ReasonFlags.unspecified),
+                    )
+                certificate = cross
+        if certificate is None or not isinstance(certificate, Certificate):
             # Persistent revocation table: deleted certificates, and a CA
             # deleted after its revocation and imported again (its row is
             # new, the parent's record is not)

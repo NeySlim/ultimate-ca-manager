@@ -88,7 +88,8 @@ _DISCARDED_WITH_CA = {'ocsp_responses'}
 # Tables unique on (CA, column): the duplicate's rows the keeper already has are dropped
 _UNIQUE_PER_CA = {'ca_template_pins': 'template_id', 'crl_deploy_bindings': 'target_id'}
 # Parent references declared without a foreign key
-_UNDECLARED_CAREF = (('certificate_authorities', 'caref'), ('crls', 'caref'))
+_UNDECLARED_CAREF = (('certificate_authorities', 'caref'), ('crls', 'caref'),
+                     ('ca_cross_certificates', 'issuer_caref'))
 
 
 def _move_ca_dependents(db, dupe, keeper):

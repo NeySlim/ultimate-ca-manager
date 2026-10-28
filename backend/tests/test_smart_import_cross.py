@@ -42,17 +42,21 @@ def test_bundle_keeps_the_self_signed_root_only(app, pki, order, skip_duplicates
             hashes.SHA256())
         assert record.caref is None
         codes = [w['code'] for w in result.to_dict()['warning_details']]
-        assert codes == ['cross_certificate_skipped']
+        assert codes == ['cross_certificate_attached']
+        assert [x.serial_number for x in record.cross_certificates] == [str(pki.cross_b.serial_number)]
 
 
-def test_cross_certificate_alone_is_skipped_against_a_stored_root(app, pki):
+def test_cross_certificate_alone_is_attached_to_a_stored_root(app, pki):
     with app.app_context():
         SmartImporter().execute(_bundle(pki.root_a, pki.root_b))
         before = _rows(pki.name_b)[0][0].crt
         result = SmartImporter().execute(_bundle(pki.cross_b), options={'skip_duplicates': False})
         rows = _rows(pki.name_b)
         assert len(rows) == 1 and rows[0][0].crt == before
-        assert [w['code'] for w in result.to_dict()['warning_details']] == ['cross_certificate_skipped']
+        assert [w['code'] for w in result.to_dict()['warning_details']] == ['cross_certificate_attached']
+        again = SmartImporter().execute(_bundle(pki.cross_b), options={'skip_duplicates': False})
+        assert [w['code'] for w in again.to_dict()['warning_details']] == ['cross_certificate_skipped']
+        assert len(rows[0][0].cross_certificates) == 1
 
 
 def test_self_signed_root_is_imported_when_only_its_cross_certificate_is_stored(app, pki):

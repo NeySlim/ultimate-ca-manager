@@ -204,6 +204,19 @@ class CrossCertificateImport(AmbiguousImportTarget):
 
     code = 'cross_certificate_detected'
 
+    def __init__(self, message, record=None):
+        super().__init__(message)
+        self.record = record
+
+    @property
+    def details(self):
+        details = {'code': self.code}
+        if self.record is not None:
+            stored = _record_identity(self.record)[0]
+            details['ca_id'] = self.record.id
+            details['options'] = ['attach'] if stored is not None and is_self_signed(stored) else ['attach', 'replace']
+        return details
+
 
 class ImportConflict(ValueError):
     """The record cannot be updated from the imported certificate; nothing was changed."""
@@ -443,7 +456,7 @@ def _would_replace_valid_certificate(stored, new):
     return stored.not_valid_after_utc > now and new.not_valid_after_utc > now
 
 
-def _select_existing(candidates, cert, kind):
+def _select_existing(candidates, cert, kind, replace_cross=False):
     """Among *candidates*, the records sharing the certificate's names, the
     one the certificate belongs to; None when there is none (#347 review).
 
@@ -488,12 +501,13 @@ def _select_existing(candidates, cert, kind):
             f"does not tell them apart; the record to update cannot be determined")
     if len(same_key) == 1:
         stored_cert, _ = _record_identity(same_key[0])
-        if kind == 'CA' and stored_cert is not None and _would_replace_valid_certificate(stored_cert, cert):
+        if kind == 'CA' and stored_cert is not None and _would_replace_valid_certificate(stored_cert, cert) \
+                and not (replace_cross and not is_self_signed(stored_cert)):
             raise CrossCertificateImport(
                 f"This certificate re-certifies the key of the {kind} "
                 f"'{getattr(same_key[0], 'descr', '')}' under another issuer "
                 f"(a cross-certificate); importing it would replace the certificate that record "
-                f"holds, so it is refused")
+                f"holds, so it is refused", record=same_key[0])
         return same_key[0]
     if same_key:
         raise AmbiguousImportTarget(
@@ -538,15 +552,49 @@ def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=No
     return ca_dict, warnings, superseded
 
 
-def find_existing_ca(cert_info, cert):
+def find_existing_ca(cert_info, cert, replace_cross=False):
     """
     The existing CA record *cert* belongs to, by subject, or None.
     Raises AmbiguousImportTarget when several CAs share the subject and
-    the certificate's key does not single one out.
+    the certificate's key does not single one out; CrossCertificateImport
+    when it would overwrite a certificate that is valid (``replace_cross``
+    allows that for an intermediate, never for a self-signed root).
     """
     from models import CA
     candidates = CA.query.filter_by(subject=cert_info['subject']).order_by(CA.id).all()
-    return _select_existing(candidates, cert, 'CA')
+    return _select_existing(candidates, cert, 'CA', replace_cross=replace_cross)
+
+
+CROSS_MODES = ('auto', 'attach', 'replace', 'refuse')
+
+
+def cross_mode_from(value):
+    """The requested cross_mode, 'auto' when absent, None when unknown."""
+    mode = (value or 'auto').strip().lower() if isinstance(value, str) or value is None else None
+    return mode if mode in CROSS_MODES else None
+
+
+def find_existing_ca_for_import(cert_info, cert, cross_mode='auto', username='system'):
+    """``(existing, attached)``: find_existing_ca, with a cross-certificate handled by *cross_mode*.
+
+    ``auto`` attaches it to a self-signed root and refuses on an intermediate; ``attach``
+    attaches on either; ``replace`` lets an intermediate be overwritten; ``refuse`` never
+    touches the record. *attached* is ``(row, warnings)`` once the certificate was stored
+    as a cross-certificate of *existing*; the caller commits."""
+    try:
+        return find_existing_ca(cert_info, cert, replace_cross=cross_mode == 'replace'), None
+    except CrossCertificateImport as e:
+        record = e.record
+        if cross_mode in ('refuse', 'replace') or record is None:
+            raise
+        stored = _record_identity(record)[0]
+        if cross_mode == 'auto' and not (stored is not None and is_self_signed(stored)):
+            raise
+        from services.ca import cross_certs
+        try:
+            return record, cross_certs.attach_certificate(record, cert, username, commit=False)
+        except cross_certs.CrossCertError as err:
+            raise ImportConflict(err.message) from err
 
 
 def find_existing_certificate(cert_info, cert):
@@ -617,3 +665,13 @@ def serialize_key_to_pem(private_key):
     if not private_key:
         return None
     return private_key_to_pem(private_key)
+
+
+def finish_cross_attach(ca, attached, username):
+    """Commit a cross-certificate attached by an import and announce it; returns the response data."""
+    from models import db
+    from services.ca import cross_certs
+    row, warnings = attached
+    db.session.commit()
+    cross_certs.announce(ca, 'attached', row, username)
+    return {**ca.to_dict(), 'cross_certificate': row.to_dict(), 'warnings': warnings}

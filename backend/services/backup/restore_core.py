@@ -74,6 +74,7 @@ GENERIC_SECTIONS = (
     'intune_apps',
     'scep_profiles',
     'ca_template_pins',
+    'ca_cross_certificates',
     'acme_client_accounts',
     # After its proxy account, EAB credential and creator (users and
     # acme_eab_credentials have their own restorers, run before these).

@@ -16,7 +16,8 @@ from services.audit_service import AuditService
 from utils.cert_issuer import find_ca_by_ski, private_key_matches, stored_private_key_matches
 from services.import_service import (
     parse_certificate_file, is_ca_certificate, extract_cert_info,
-    find_existing_ca, find_existing_certificate, find_pending_csr_for_certificate,
+    find_existing_ca_for_import, cross_mode_from, finish_cross_attach,
+    find_existing_certificate, find_pending_csr_for_certificate,
     AmbiguousImportTarget, CrossCertificateImport, ImportConflict, update_ca_from_import, install_on_pending_ca, stored_certificate_serial,
     serialize_cert_to_pem, serialize_key_to_pem
 )
@@ -86,6 +87,9 @@ def import_certificate():
     ca_id = request.form.get('ca_id', type=int)
     import_key = request.form.get('import_key', 'true').lower() == 'true'
     update_existing = request.form.get('update_existing', 'true').lower() == 'true'
+    cross_mode = cross_mode_from(request.form.get('cross_mode'))
+    if cross_mode is None:
+        return error_response('cross_mode must be auto, attach, replace or refuse', 400)
 
     try:
         # Parse certificate using shared service
@@ -117,10 +121,17 @@ def import_certificate():
         # Check if this is a CA certificate - auto-route to CA table
         if is_ca_certificate(cert):
             # Check for existing CA
+            username = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
             try:
-                existing_ca = find_existing_ca(cert_info, cert)
+                existing_ca, attached = find_existing_ca_for_import(cert_info, cert, cross_mode, username)
             except AmbiguousImportTarget as e:
                 return error_response(str(e), 409, e.details)
+            except ImportConflict as e:
+                db.session.rollback()
+                return error_response(str(e), 409)
+            if attached:
+                data = finish_cross_attach(existing_ca, attached, username)
+                return created_response(data=data, message=f'Cross-certificate attached to CA "{existing_ca.descr}"')
 
             if existing_ca:
                 if not update_existing:

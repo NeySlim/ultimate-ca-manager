@@ -469,6 +469,8 @@ def _seed_source():
     # -- the rows that point at them ---------------------------------------
     add('role_permissions', role_id=roles[1].id, permission='read:certificates')
     add('ca_template_pins', ca_id=authorities[1].id, template_id=templates[1].id)
+    add('ca_cross_certificates', ca_id=authorities[1].id, crt='xinst-cross-crt',
+        fingerprint_sha256='xinst-cross-fingerprint', issuer_caref='xinst-ca-a')
     add('group_members', group_id=groups[1].id, user_id=users[1].id, role='member')
     add('api_keys', user_id=users[1].id, key_hash='xinst-api-key-hash',
         name='xinst-api-key', permissions='[]')
@@ -724,6 +726,7 @@ RESTORABLE_SECTIONS = tuple(
         # round trip like any other.
         'role_permissions', 'group_members', 'webauthn_credentials',
         'deploy_bindings', 'crl_deploy_bindings', 'ca_template_pins',
+        'ca_cross_certificates',
         'key_recovery_requests',
     ) if name not in ABORTS_THE_RESTORE
 )

@@ -131,6 +131,7 @@ class SmartImporter:
         self.matcher = KeyMatcher()
         self.validator = ImportValidator()
         self._pending_audit = []
+        self._attached_cross = []
     
     def analyze(self, content: str | bytes, password: Optional[str] = None) -> AnalysisResult:
         """
@@ -217,6 +218,7 @@ class SmartImporter:
         
         result = ImportResult()
         self._pending_audit = []
+        self._attached_cross = []
 
         try:
             # Parse
@@ -242,6 +244,9 @@ class SmartImporter:
 
             self._stage_audit()
             db.session.commit()
+            from services.ca import cross_certs
+            for target, row in self._attached_cross:
+                cross_certs.announce(target, 'attached', row, username)
 
             # Fire certificate.imported for each successfully imported certificate
             # (CAs live in a separate table and have their own ca.created event)
@@ -292,11 +297,20 @@ class SmartImporter:
             counterpart = self._cross_counterpart(ca_obj, bundle_roots)
             if counterpart is not None:
                 cn = self._get_cn(ca_obj.subject)
-                result.warnings.append(
-                    f"Skipped cross-certificate: {cn} issued by {self._get_cn(ca_obj.issuer)} "
-                    f"(the self-signed {cn} is kept)")
-                result.warning_details.append({
-                    'code': 'cross_certificate_skipped', 'subject': ca_obj.subject, 'issuer': ca_obj.issuer})
+                refid = counterpart or subject_to_refid.get(ca_obj.subject)
+                attached = self._attach_cross(refid, ca_obj, username)
+                if attached is True:
+                    result.warnings.append(
+                        f"Attached cross-certificate: {cn} issued by {self._get_cn(ca_obj.issuer)} "
+                        f"(the self-signed {cn} is kept)")
+                    result.warning_details.append({
+                        'code': 'cross_certificate_attached', 'subject': ca_obj.subject, 'issuer': ca_obj.issuer})
+                else:
+                    result.warnings.append(
+                        f"Skipped cross-certificate: {cn} issued by {self._get_cn(ca_obj.issuer)} "
+                        f"(the self-signed {cn} is kept{'; ' + attached if attached else ''})")
+                    result.warning_details.append({
+                        'code': 'cross_certificate_skipped', 'subject': ca_obj.subject, 'issuer': ca_obj.issuer})
                 if counterpart:
                     subject_to_refid.setdefault(ca_obj.subject, counterpart)
                 continue
@@ -383,6 +397,20 @@ class SmartImporter:
     def _is_self_signed_record(ca) -> bool:
         cert = _stored_cert(ca)
         return cert is not None and cert.subject == cert.issuer
+
+    def _attach_cross(self, refid, ca_obj, username):
+        """True once *ca_obj* is attached to the CA *refid*; else the reason it was not ('' if unknown)."""
+        from services.ca import cross_certs
+        target = CA.query.filter_by(refid=refid).first() if refid else None
+        if target is None:
+            return ''
+        try:
+            cert = x509.load_pem_x509_certificate(ca_obj.raw_pem.encode(), default_backend())
+            row, _ = cross_certs.attach_certificate(target, cert, username, commit=False)
+        except cross_certs.CrossCertError as e:
+            return e.message
+        self._attached_cross.append((target, row))
+        return True
 
     def _cross_counterpart(self, ca_obj: ParsedObject, bundle_roots: List[ParsedObject]) -> Optional[str]:
         """Refid (or '') of the self-signed CA whose key *ca_obj* cross-certifies, else None.

@@ -20,6 +20,7 @@ from utils.safe_requests import create_session
 from utils.ssrf_protection import (
     pin_host, validate_url_not_cloud_metadata, validated_addresses)
 from services.audit_service import AuditService
+from services.ca import cross_certs
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -63,6 +64,14 @@ def _encoded_private_key(row):
     if row.get('prv_payload'):
         return store_pem_bytes(row['prv_payload'].encode('utf-8'))
     return None
+
+
+def _is_self_signed(encoded_crt):
+    try:
+        cert = x509.load_pem_x509_certificate(base64.b64decode(encoded_crt))
+        return cert.subject == cert.issuer
+    except Exception:
+        return False
 
 
 def _parse_cert(encoded_crt):
@@ -533,10 +542,11 @@ def import_items():
         if ca_selected and not has_permission('write:cas', g.permissions):
             return error_response('write:cas permission required to import CAs', 403)
 
-        # Import CAs first so certificate caref links can resolve in the same transaction.
-        for item_id in selected_ids:
-            if item_id not in all_cas:
-                continue
+        # Import CAs first so certificate caref links can resolve in the same transaction;
+        # self-signed ones before their cross-certificates, which attach to them.
+        attached_cross = []
+        for item_id in sorted((i for i in selected_ids if i in all_cas),
+                              key=lambda i: not _is_self_signed(_encoded_cert(all_cas[i]))):
 
             ca_data = all_cas[item_id]
             ca_refid = _refid(ca_data)
@@ -553,6 +563,18 @@ def import_items():
                 stats['cas_skipped'] += 1
                 continue
             
+            # A cross-certificate of a CA already held is attached to it, not stored as a second CA
+            try:
+                attached = cross_certs.attach_to_counterpart(crt, 'import')
+            except cross_certs.CrossCertError as e:
+                stats['cas_skipped'] += 1
+                stats['errors'].append(f"CA '{ca_data.get('descr')}': {e.message}")
+                continue
+            if attached:
+                attached_cross.append(attached)
+                stats['cas_cross_attached'] = stats.get('cas_cross_attached', 0) + 1
+                continue
+
             # Check for duplicate by description (same CA, different refid from OPNsense)
             duplicate_by_name = CA.query.filter_by(
                 descr=ca_data.get('descr'),
@@ -656,6 +678,8 @@ def import_items():
         ok, _err = safe_commit(logger, "Failed to import OPNsense data")
         if not ok:
             return _err
+        for ca, row in attached_cross:
+            cross_certs.announce(ca, 'attached', row, 'import')
         
         AuditService.log_action(
             action='opnsense_import',
@@ -672,6 +696,7 @@ def import_items():
                 "cas": stats['cas_imported'],
                 "certificates": stats['certs_imported']
             },
+            "cross_certificates_attached": stats.get('cas_cross_attached', 0),
             "skipped": stats['cas_skipped'] + stats['certs_skipped'],
             "errors": stats['errors']
         })
