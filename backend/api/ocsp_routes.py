@@ -184,7 +184,8 @@ def _find_ca_by_issuer_hash(issuer_name_hash, issuer_key_hash, hash_algorithm):
     that share the same Subject DN.
     """
     try:
-        cas = CA.query.filter(CA.crt.isnot(None), CA.crt != '').all()
+        from utils.cert_issuer import self_signed_first
+        cas = self_signed_first(CA.query.filter(CA.crt.isnot(None), CA.crt != '').order_by(CA.id).all())
         for ca in cas:
             try:
                 # ca.crt is base64-encoded PEM in DB

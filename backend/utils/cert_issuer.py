@@ -172,3 +172,8 @@ def find_ca_by_ski(ski, exclude_id=None):
     """The stored CA with this SKI; at equal SKI the self-signed record, not a cross-certificate."""
     found = cas_by_ski(ski, exclude_id)
     return found[0] if found else None
+
+
+def self_signed_first(cas):
+    """*cas* reordered so a self-signed record precedes a cross-certificate of the same key."""
+    return sorted(cas, key=lambda ca: 0 if ca.subject == ca.issuer else 1)
