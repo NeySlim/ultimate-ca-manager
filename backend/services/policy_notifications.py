@@ -25,6 +25,7 @@ _OPERATION_LABELS = {
     'issuance': 'Issuance', 'renewal': 'Renewal', 'revocation': 'Revocation',
     'certificate': 'Issuance', 'csr': 'CSR signing',
     'ca_revocation': 'CA revocation', 'ca_creation': 'CA creation',
+    'cross_revocation': 'Cross-certificate revocation',
 }
 
 

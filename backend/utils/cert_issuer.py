@@ -5,10 +5,12 @@ decoy root imported under a parent's name, a re-keyed root), so anything
 that resolves "the CA that issued this certificate" must check the
 signature with the candidate's key, not the name (#343 review).
 """
+import base64
 import logging
 
 from cryptography import x509
 from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, padding, rsa
 
 
@@ -174,6 +176,39 @@ def find_ca_by_ski(ski, exclude_id=None):
     return found[0] if found else None
 
 
+def _is_self_signed_record(ca):
+    if ca.subject != ca.issuer:
+        return False
+    try:
+        return is_self_signed(x509.load_pem_x509_certificate(base64.b64decode(ca.crt)))
+    except Exception:
+        return True
+
+
 def self_signed_first(cas):
-    """*cas* reordered so a self-signed record precedes a cross-certificate of the same key."""
-    return sorted(cas, key=lambda ca: 0 if ca.subject == ca.issuer else 1)
+    """*cas* reordered so a record holding a self-signed certificate precedes a
+    cross-certificate (self-issued ones included) of the same key."""
+    return sorted(cas, key=lambda ca: 0 if _is_self_signed_record(ca) else 1)
+
+
+def same_key_refids(ca):
+    """Refids of every stored CA record with *ca*'s subject and public key, *ca* included.
+
+    A root and its cross-certificate stored as two records share them; what was
+    linked to one is the same issuer's for status purposes."""
+    from models import CA
+    refids = [ca.refid]
+    try:
+        wanted = x509.load_pem_x509_certificate(base64.b64decode(ca.crt)).public_key().public_bytes(
+            serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    except Exception:
+        return refids
+    for other in CA.query.filter(CA.subject == ca.subject, CA.id != ca.id, CA.crt.isnot(None)).all():
+        try:
+            spki = x509.load_pem_x509_certificate(base64.b64decode(other.crt)).public_key().public_bytes(
+                serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+        except Exception:
+            continue
+        if spki == wanted:
+            refids.append(other.refid)
+    return refids

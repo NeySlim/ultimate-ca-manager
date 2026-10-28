@@ -6,7 +6,7 @@ import uuid
 import json
 import traceback
 from flask import request, g
-from auth.unified import require_auth
+from auth.unified import has_permission, require_auth
 from fips_mode import FipsRestricted
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response, created_response
@@ -121,6 +121,8 @@ def import_certificate():
         # Check if this is a CA certificate - auto-route to CA table
         if is_ca_certificate(cert):
             # Check for existing CA
+            if not has_permission('write:cas', g.permissions):
+                return error_response('write:cas permission required to import a CA certificate', 403)
             username = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
             try:
                 existing_ca, attached = find_existing_ca_for_import(cert_info, cert, cross_mode, username)

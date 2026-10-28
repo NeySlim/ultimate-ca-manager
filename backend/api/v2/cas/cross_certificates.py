@@ -11,6 +11,7 @@ from services.audit_service import AuditService
 from services.ca import cross_certs
 from services.ca.cross_certs import CrossCertError
 from utils.response import created_response, error_response, no_content_response, success_response
+from utils.sanitize import sanitize_filename
 
 from . import bp
 
@@ -52,10 +53,12 @@ def attach_cross_certificate(ca_id):
     data = request.get_json(silent=True)
     if not isinstance(data, dict):
         return error_response('JSON body must be an object', 400)
+    served = data.get('served', False)
+    if not isinstance(served, bool):
+        return error_response('served must be true or false', 400)
     try:
         cert = cross_certs.parse_certificate(data.get('certificate') or data.get('pem') or '')
-        row, warnings = cross_certs.attach_certificate(
-            ca, cert, _username(), served=bool(data.get('served', False)))
+        row, warnings = cross_certs.attach_certificate(ca, cert, _username(), served=served)
     except CrossCertError as e:
         db.session.rollback()
         return error_response(e.message, e.status, details={'code': e.code})
@@ -117,7 +120,12 @@ def revoke_cross_certificate(ca_id, xid):
     ca, row, err = _ca_and_row(ca_id, xid)
     if err:
         return err
-    data = request.get_json(silent=True) or {}
+    # A malformed body must not become an "unspecified" revocation
+    data = request.get_json(silent=True)
+    if data is None:
+        if request.get_data(cache=True).strip():
+            return error_response('Invalid JSON body', 400)
+        data = {}
     if not isinstance(data, dict):
         return error_response('JSON body must be an object', 400)
     reason = normalize_revocation_reason(data.get('reason', 'unspecified'))
@@ -133,6 +141,20 @@ def revoke_cross_certificate(ca_id, xid):
         from utils.datetime_utils import utc_now
         if invalidity_at > utc_now() + timedelta(minutes=5):
             return error_response('invalidity_date cannot be in the future', 400)
+    if not row.revoked:
+        issuer = cross_certs.issuer_of(row)
+        if issuer is not None:
+            try:
+                from services.approval_gate import approval_payload, queue_cross_revocation
+                policy, approval = queue_cross_revocation(
+                    g.current_user, row, issuer, reason=reason, invalidity_at=invalidity_at,
+                    comment=data.get('approval_comment'))
+            except Exception as e:
+                logger.error(f"Policy evaluation failed for cross-certificate {xid}: {e}", exc_info=True)
+                return error_response('Policy evaluation failed; the cross-certificate was not revoked', 500)
+            if approval is not None:
+                return success_response(data=approval_payload(policy, approval),
+                                        message='Cross-certificate revocation submitted for approval')
     try:
         warnings = cross_certs.revoke(row, reason, _username(), invalidity_at)
     except CrossCertError as e:
@@ -157,7 +179,7 @@ def export_cross_certificate(ca_id, xid):
         cert = cross_certs.certificate_of(row)
     except CrossCertError as e:
         return error_response(e.message, e.status)
-    name = f'{(ca.descr or "ca").replace(" ", "_")}-cross-{row.id}'
+    name = f'{sanitize_filename(ca.descr or ca.refid)}-cross-{row.id}'
     if fmt == 'der':
         return Response(cert.public_bytes(serialization.Encoding.DER), mimetype='application/pkix-cert',
                         headers={'Content-Disposition': f'attachment; filename="{name}.cer"'})

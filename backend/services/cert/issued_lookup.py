@@ -34,9 +34,10 @@ SUPERSEDED = 'superseded'
 def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
     """Every row under ``ca`` holding exactly ``cert`` (normally one; a
     duplicate left by an inconsistent restore still counts)."""
+    from utils.cert_issuer import same_key_refids
     presented = cert.public_bytes(Encoding.DER)
     candidates = Certificate.query.filter(
-        Certificate.caref == ca.refid,
+        Certificate.caref.in_(same_key_refids(ca)),
         Certificate.serial_number.in_(serial_variants(cert.serial_number)),
         Certificate.crt.isnot(None),
     ).all()
@@ -65,8 +66,9 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
     rows = find_issued_rows(ca, cert)
     row = rows[0] if rows else None
     variants = serial_variants(cert.serial_number)
+    from utils.cert_issuer import same_key_refids
     persistent = RevokedSerial.query.filter(
-        RevokedSerial.caref == ca.refid,
+        RevokedSerial.caref.in_(same_key_refids(ca)),
         RevokedSerial.serial_number.in_(variants),
     ).first()
     if row is None:
@@ -84,35 +86,6 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
     if not_after <= now or (row.valid_to and row.valid_to < now):
         return row, EXPIRED
     return row, OK
-
-
-def cross_certificate_status(issuer: CA, cert: x509.Certificate):
-    """``(row, status)`` of a cross-certificate *issuer* signed, from its own table.
-
-    UNKNOWN when the issuer did not sign a stored cross-certificate with exactly
-    this certificate; a persistent revocation at the issuer counts as REVOKED."""
-    from models.ca_cross_certificate import CACrossCertificate
-    presented = cert.public_bytes(Encoding.DER)
-    for row in CACrossCertificate.query.filter(
-        CACrossCertificate.issuer_caref == issuer.refid,
-        CACrossCertificate.serial_number.in_(serial_variants(cert.serial_number)),
-    ).all():
-        try:
-            stored = x509.load_pem_x509_certificate(base64.b64decode(row.crt), default_backend())
-        except Exception:
-            continue
-        if stored.public_bytes(Encoding.DER) != presented:
-            continue
-        persistent = RevokedSerial.query.filter(
-            RevokedSerial.caref == issuer.refid,
-            RevokedSerial.serial_number.in_(serial_variants(cert.serial_number)),
-        ).first()
-        if row.revoked or persistent is not None:
-            return row, REVOKED
-        if row.expired:
-            return row, EXPIRED
-        return row, OK
-    return None, UNKNOWN
 
 
 def _san_identity(cert_or_csr):

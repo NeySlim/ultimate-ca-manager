@@ -445,18 +445,19 @@ def _same_issuer(stored_cert, cert, parents_by_name):
     return stored_id[1] == new_id[1]
 
 
-def _would_replace_valid_certificate(stored, new):
+def _would_replace_valid_certificate(stored, new, any_validity=False):
     """Of one key and two issuers (the caller checked): a self-signed certificate replaced by
-    another, or two unexpired certificates, is a cross-certificate, not a renewal."""
+    another, or two unexpired certificates (whatever their validity if *any_validity*), is a
+    cross-certificate, not a renewal."""
     if is_self_signed(new):
         return False
-    if is_self_signed(stored):
+    if is_self_signed(stored) or any_validity:
         return True
     now = datetime.now(timezone.utc)
     return stored.not_valid_after_utc > now and new.not_valid_after_utc > now
 
 
-def _select_existing(candidates, cert, kind, replace_cross=False):
+def _select_existing(candidates, cert, kind, replace_cross=False, any_validity=False):
     """Among *candidates*, the records sharing the certificate's names, the
     one the certificate belongs to; None when there is none (#347 review).
 
@@ -501,7 +502,7 @@ def _select_existing(candidates, cert, kind, replace_cross=False):
             f"does not tell them apart; the record to update cannot be determined")
     if len(same_key) == 1:
         stored_cert, _ = _record_identity(same_key[0])
-        if kind == 'CA' and stored_cert is not None and _would_replace_valid_certificate(stored_cert, cert) \
+        if kind == 'CA' and stored_cert is not None and _would_replace_valid_certificate(stored_cert, cert, any_validity) \
                 and not (replace_cross and not is_self_signed(stored_cert)):
             raise CrossCertificateImport(
                 f"This certificate re-certifies the key of the {kind} "
@@ -552,7 +553,7 @@ def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=No
     return ca_dict, warnings, superseded
 
 
-def find_existing_ca(cert_info, cert, replace_cross=False):
+def find_existing_ca(cert_info, cert, replace_cross=False, any_validity=False):
     """
     The existing CA record *cert* belongs to, by subject, or None.
     Raises AmbiguousImportTarget when several CAs share the subject and
@@ -562,7 +563,7 @@ def find_existing_ca(cert_info, cert, replace_cross=False):
     """
     from models import CA
     candidates = CA.query.filter_by(subject=cert_info['subject']).order_by(CA.id).all()
-    return _select_existing(candidates, cert, 'CA', replace_cross=replace_cross)
+    return _select_existing(candidates, cert, 'CA', replace_cross=replace_cross, any_validity=any_validity)
 
 
 CROSS_MODES = ('auto', 'attach', 'replace', 'refuse')
@@ -582,7 +583,8 @@ def find_existing_ca_for_import(cert_info, cert, cross_mode='auto', username='sy
     touches the record. *attached* is ``(row, warnings)`` once the certificate was stored
     as a cross-certificate of *existing*; the caller commits."""
     try:
-        return find_existing_ca(cert_info, cert, replace_cross=cross_mode == 'replace'), None
+        return find_existing_ca(cert_info, cert, replace_cross=cross_mode == 'replace',
+                                any_validity=cross_mode in ('refuse', 'attach')), None
     except CrossCertificateImport as e:
         record = e.record
         if cross_mode in ('refuse', 'replace') or record is None:

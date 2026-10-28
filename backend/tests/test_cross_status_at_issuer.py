@@ -80,19 +80,11 @@ def test_ocsp_for_a_serial_the_issuer_never_signed_is_still_unknown(app, world):
         assert _ocsp(world['a'], world['root_b'].serial_number)[1] == 'unknown'
 
 
-def test_cross_certificate_status_follows_the_row(app, auth_client, world):
+def test_revoked_cross_certificate_stays_revoked_at_its_issuer_lookup(app, auth_client, world):
     from services.cert import issued_lookup as lookup
-    with app.app_context():
-        issuer = db.session.get(CA, world['a'])
-        assert lookup.cross_certificate_status(issuer, world['cross'])[1] == lookup.OK
-        assert lookup.cross_certificate_status(issuer, world['root_b'])[1] == lookup.UNKNOWN
-        db.session.get(CACrossCertificate, world['xid']).valid_to = utc_now() - timedelta(days=1)
-        db.session.commit()
-        assert lookup.cross_certificate_status(issuer, world['cross'])[1] == lookup.EXPIRED
     auth_client.post(f"/api/v2/cas/{world['b']}/cross-certificates/{world['xid']}/revoke", json={})
     with app.app_context():
         issuer = db.session.get(CA, world['a'])
-        assert lookup.cross_certificate_status(issuer, world['cross'])[1] == lookup.REVOKED
         assert lookup.issued_certificate_status(issuer, world['cross'])[1] == lookup.REVOKED
 
 
@@ -105,10 +97,10 @@ def test_expiry_pass_announces_a_cross_certificate_close_to_its_end(app, world, 
                         lambda cert, ca_refid=None: seen.append(('expired', cert, ca_refid)))
     with app.app_context():
         row = db.session.get(CACrossCertificate, world['xid'])
-        refid = row.ca.refid
+        refid = row.issuer_caref
 
         def mine():
-            return [s for s in seen if s[1].get('type') == 'ca_cross_certificate' and s[1]['id'] == row.id]
+            return [s for s in seen if s[1].get('type') == 'ca_cross_certificate' and s[1]['cross_certificate_id'] == row.id]
 
         expiry_alert_service._emit_expiry_webhooks()
         assert not mine()

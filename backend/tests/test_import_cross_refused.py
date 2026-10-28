@@ -131,7 +131,7 @@ class TestIntermediateReissuedByAnotherIssuer:
     """An intermediate re-certified under a different issuer while both are valid is ambiguous (#400)."""
 
     @staticmethod
-    def _setup(auth_client, *, stored_expired=False):
+    def _setup(auth_client, *, stored_expired=False, new_expired=False):
         from tests.fixtures.cross_pki import build_cross_pki, make_cert, pem
         from datetime import datetime, timedelta, timezone
         pki = build_cross_pki()
@@ -149,7 +149,11 @@ class TestIntermediateReissuedByAnotherIssuer:
         r = auth_client.post('/api/v2/cas/import', data={'pem_content': pem(stored)},
                              content_type='multipart/form-data')
         assert r.status_code in (200, 201), r.data
-        again = make_cert(name, key, pki.name_a, pki.key_a, days=300)
+        if new_expired:
+            now = datetime.now(timezone.utc)
+            again = make_cert(name, key, pki.name_a, pki.key_a, days=-1, not_before=now - timedelta(days=30))
+        else:
+            again = make_cert(name, key, pki.name_a, pki.key_a, days=300)
         return pki, name, stored, again
 
     def test_refused_while_both_are_valid_offering_attach_and_replace(self, app, auth_client):
@@ -191,6 +195,16 @@ class TestIntermediateReissuedByAnotherIssuer:
             row = CA.query.filter(CA.descr == name).one()
             assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == again.serial_number
             assert row.caref == CA.query.filter(CA.descr == pki.name_a).one().refid
+
+    @pytest.mark.parametrize('mode', ['refuse', 'attach'])
+    def test_an_expired_cross_certificate_never_overwrites_a_valid_intermediate(self, app, auth_client, mode):
+        _, name, stored, expired = self._setup(auth_client, new_expired=True)
+        r = auth_client.post('/api/v2/cas/import', data={'pem_content': _pem(expired), 'cross_mode': mode},
+                             content_type='multipart/form-data')
+        assert r.status_code in (201, 409), r.data
+        with app.app_context():
+            row = CA.query.filter(CA.descr == name).one()
+            assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == stored.serial_number
 
     def test_renewal_under_the_same_issuer_still_updates(self, app, auth_client):
         from tests.fixtures.cross_pki import make_cert

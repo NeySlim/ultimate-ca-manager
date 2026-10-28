@@ -29,6 +29,8 @@ class CrossCertError(Exception):
 
 def parse_certificate(data) -> x509.Certificate:
     """A certificate from PEM, base64 PEM or DER bytes/text."""
+    if data is not None and not isinstance(data, (str, bytes, bytearray)):
+        raise CrossCertError('Certificate must be text or bytes')
     raw = data.encode() if isinstance(data, str) else bytes(data or b'')
     raw = raw.strip()
     if not raw:
@@ -86,7 +88,8 @@ def _resolve_issuer(cert, ca) -> Tuple[Optional[CA], bool]:
     from utils.cert_issuer import UnsupportedIssuerKey, certificate_signed_by
     candidates = _issuer_candidates(cert, ca.id)
     unverifiable = False
-    for candidate in sorted(candidates, key=lambda c: c.id):
+    from utils.cert_issuer import self_signed_first
+    for candidate in self_signed_first(sorted(candidates, key=lambda c: c.id)):
         issuer_cert = _load_record(candidate)
         if issuer_cert is None:
             continue
@@ -98,6 +101,44 @@ def _resolve_issuer(cert, ca) -> Tuple[Optional[CA], bool]:
     if candidates and not unverifiable:
         raise CrossCertError('The signature does not verify with the issuer held here', 400, 'bad_signature')
     return None, False
+
+
+def issuer_of(row: CACrossCertificate) -> Optional[CA]:
+    """The held CA that signed *row*; a missing or dangling link is resolved by signature and stored."""
+    if row.issuer_caref:
+        linked = CA.query.filter_by(refid=row.issuer_caref).first()
+        if linked is not None:
+            return linked
+    cert = _load_record(row)
+    if cert is None or row.ca is None:
+        return None
+    try:
+        issuer, _ = _resolve_issuer(cert, row.ca)
+    except CrossCertError:
+        return None
+    if issuer is not None:
+        row.issuer_caref = issuer.refid
+        db.session.flush()
+    return issuer
+
+
+def rows_of_issuer(issuer: CA, variants) -> List[CACrossCertificate]:
+    """Cross-certificates *issuer* (or a record of its key) signed, among those with one of the serial *variants*."""
+    from utils.cert_issuer import same_key_refids
+    refids = set(same_key_refids(issuer))
+    found, relinked = [], False
+    for row in CACrossCertificate.query.filter(CACrossCertificate.serial_number.in_(list(variants))).all():
+        if row.issuer_caref in refids:
+            found.append(row)
+        elif row.issuer == issuer.subject:
+            before = row.issuer_caref
+            linked = issuer_of(row)
+            relinked = relinked or row.issuer_caref != before
+            if linked is not None and linked.refid in refids:
+                found.append(row)
+    if relinked:
+        db.session.commit()
+    return found
 
 
 def attach_certificate(ca: CA, cert: x509.Certificate, username: str = 'system', *,
@@ -224,7 +265,7 @@ def certificate_of(row: CACrossCertificate) -> x509.Certificate:
 def revoke(row: CACrossCertificate, reason: str = 'unspecified', username: str = 'system',
            invalidity_at=None) -> List[str]:
     """Revoke the cross-certificate at its issuer (CRL and OCSP); the CA it certifies stays valid."""
-    issuer = CA.query.filter_by(refid=row.issuer_caref).first() if row.issuer_caref else None
+    issuer = issuer_of(row)
     if issuer is None:
         raise CrossCertError('The issuing CA is not held here: revoke it at that issuer', 400, 'issuer_not_held')
     if row.revoked:
@@ -232,16 +273,21 @@ def revoke(row: CACrossCertificate, reason: str = 'unspecified', username: str =
     if reason in ('certificateHold', 'certificate_hold'):
         raise CrossCertError('A cross-certificate cannot be put on hold: revocation is permanent')
     from models.revoked_serial import RevokedSerial
+    from utils.serial_format import serial_variants
+    existing = RevokedSerial.query.filter(
+        RevokedSerial.caref == issuer.refid,
+        RevokedSerial.serial_number.in_(serial_variants(int(row.serial_number)))).first()
+    if existing:
+        # The issuer already publishes it: keep its date and reason, and only record that here
+        row.revoked, row.revoked_at, row.revoke_reason, row.served = (
+            True, existing.revoked_at, existing.revoke_reason, False)
+        db.session.commit()
+        raise CrossCertError('Cross-certificate is already revoked at its issuer', 409, 'already_revoked')
     now = utc_now()
     row.revoked, row.revoked_at, row.revoke_reason, row.served = True, now, reason, False
-    existing = RevokedSerial.query.filter_by(caref=issuer.refid, serial_number=row.serial_number).first()
-    if existing:
-        existing.revoked_at, existing.revoke_reason = now, reason
-        existing.invalidity_at, existing.valid_to = invalidity_at, row.valid_to
-    else:
-        db.session.add(RevokedSerial(caref=issuer.refid, serial_number=row.serial_number, revoked_at=now,
-                                     revoke_reason=reason, invalidity_at=invalidity_at,
-                                     valid_to=row.valid_to, certificate_id=None))
+    db.session.add(RevokedSerial(caref=issuer.refid, serial_number=row.serial_number, revoked_at=now,
+                                 revoke_reason=reason, invalidity_at=invalidity_at,
+                                 valid_to=row.valid_to, certificate_id=None))
     db.session.commit()
     from models.ca import clear_request_caches
     clear_request_caches()
@@ -311,13 +357,16 @@ def attach_to_counterpart(encoded_pem, username: str = 'system'):
 def _alert_payload(row, now):
     from utils.days_remaining import days_remaining
     from utils.datetime_utils import utc_isoformat
-    return {'type': 'ca_cross_certificate', 'id': row.id, 'ca_id': row.ca_id, 'subject': row.subject,
+    return {'type': 'ca_cross_certificate', 'cross_certificate_id': row.id, 'ca_id': row.ca_id,
+            'ca_refid': row.ca.refid, 'subject': row.subject,
             'issuer': row.issuer, 'serial_number': row.serial_number, 'served': bool(row.served),
             'valid_to': utc_isoformat(row.valid_to), 'days_until_expiry': days_remaining(row.valid_to, now)}
 
 
 def expiring_alerts(days: int = 30, expired_within_hours: int = 24):
-    """``(expiring, just_expired)`` payloads, each ``(ca_refid, dict)``, for unrevoked cross-certificates."""
+    """``(expiring, just_expired)`` payloads, each ``(scope_refid, dict)``, for unrevoked cross-certificates.
+
+    The scope is the issuing CA when held, else the certified CA; ``ca_refid`` in the payload is the certified CA."""
     from datetime import timedelta
     now = utc_now()
     base = CACrossCertificate.query.join(CA, CA.id == CACrossCertificate.ca_id).filter(
@@ -326,5 +375,5 @@ def expiring_alerts(days: int = 30, expired_within_hours: int = 24):
                        CACrossCertificate.valid_to <= now + timedelta(days=days)).all()
     gone = base.filter(CACrossCertificate.valid_to <= now,
                        CACrossCertificate.valid_to > now - timedelta(hours=expired_within_hours)).all()
-    return ([(row.ca.refid, _alert_payload(row, now)) for row in soon],
-            [(row.ca.refid, _alert_payload(row, now)) for row in gone])
+    return ([(row.issuer_caref or row.ca.refid, _alert_payload(row, now)) for row in soon],
+            [(row.issuer_caref or row.ca.refid, _alert_payload(row, now)) for row in gone])

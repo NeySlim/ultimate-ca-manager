@@ -28,7 +28,7 @@ APPROVAL_REQUEST_LIFETIME = timedelta(days=7)
 
 
 _REQUEST_LABELS = {'renewal': 'Renewal', 'revocation': 'Revocation',
-                   'ca_revocation': 'CA revocation'}
+                   'ca_revocation': 'CA revocation', 'cross_revocation': 'Cross-certificate revocation'}
 
 
 class PolicyViolation(ValueError):

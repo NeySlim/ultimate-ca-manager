@@ -142,8 +142,22 @@ def queue_ca_revocation(user, ca, parent, *, reason: str, invalidity_at=None,
                       'invalidity_at': utc_isoformat(invalidity_at) if invalidity_at else None})
 
 
+def queue_cross_revocation(user, row, issuer, *, reason: str, invalidity_at=None,
+                           comment: Optional[str] = None
+                           ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
+    """Queue the revocation of a cross-certificate, held by the revocation
+    policies of the issuing CA whose CRL will carry it; ``(None, None)`` when none requires approval."""
+    from utils.datetime_utils import utc_isoformat
+    return queue_if_approval_required(
+        user, ca_id=issuer.id, template_id=None, cn=row.ca.common_name, san_list=[],
+        request_type='cross_revocation', operation='revocation', comment=comment,
+        request_data={'cross_certificate_id': row.id, 'serial_number': row.serial_number,
+                      'ca_id': issuer.id, 'cn': row.ca.common_name, 'reason': reason,
+                      'invalidity_at': utc_isoformat(invalidity_at) if invalidity_at else None})
+
+
 _PAYLOAD_SUBJECTS = {'renewal': 'Certificate renewal', 'revocation': 'Certificate revocation',
-                     'ca_revocation': 'CA revocation'}
+                     'ca_revocation': 'CA revocation', 'cross_revocation': 'Cross-certificate revocation'}
 
 
 def approval_payload(policy: CertificatePolicy, approval: ApprovalRequest) -> dict:

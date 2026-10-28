@@ -121,8 +121,9 @@ def _child_ca_for_serial(issuer: CA, cert_serial: int, variants) -> Optional[CA]
     names its real issuer (renewed or cross-signed under another record) is
     found by its certificate: same serial, issued by and verifying against
     this issuer, as revocation resolves the issuer (self-review of #347)."""
+    from utils.cert_issuer import same_key_refids
     for child in CA.query.filter(
-        CA.caref == issuer.refid,
+        CA.caref.in_(same_key_refids(issuer)),
         CA.serial_number.in_(variants),
     ).all():
         if _record_holds_serial(child, cert_serial) is not False:
@@ -153,11 +154,8 @@ def _child_ca_for_serial(issuer: CA, cert_serial: int, variants) -> Optional[CA]
 
 def _cross_certificate_for_serial(issuer: CA, cert_serial: int, variants):
     """The cross-certificate *issuer* signed that carries *cert_serial*, or None."""
-    from models.ca_cross_certificate import CACrossCertificate
-    for row in CACrossCertificate.query.filter(
-        CACrossCertificate.issuer_caref == issuer.refid,
-        CACrossCertificate.serial_number.in_(variants),
-    ).all():
+    from services.ca import cross_certs
+    for row in cross_certs.rows_of_issuer(issuer, variants):
         if _record_holds_serial(row, cert_serial) is not False:
             return row
     return None
@@ -593,8 +591,9 @@ class OCSPService:
     def _certificates_with_serial(ca: CA, variants) -> list:
         """Certificates of *ca* whose column is one of *variants*, revoked
         rows first so a duplicate never hides a revocation the CRL lists."""
+        from utils.cert_issuer import same_key_refids
         return Certificate.query.filter(
-            Certificate.caref == ca.refid,
+            Certificate.caref.in_(same_key_refids(ca)),
             Certificate.serial_number.in_(list(variants)),
         ).order_by(
             case((Certificate.revoked == True, 0), else_=1),  # noqa: E712
@@ -607,8 +606,9 @@ class OCSPService:
         record of *ca* for one of *variants*, else None; ``valid_to`` is not
         consulted."""
         from models.revoked_serial import RevokedSerial
+        from utils.cert_issuer import same_key_refids
         row = RevokedSerial.query.filter(
-            RevokedSerial.caref == ca.refid,
+            RevokedSerial.caref.in_(same_key_refids(ca)),
             RevokedSerial.serial_number.in_(list(variants)),
         ).order_by(RevokedSerial.revoked_at, RevokedSerial.id).first()
         if row is None:
