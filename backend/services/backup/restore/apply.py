@@ -29,7 +29,7 @@ from sqlalchemy.types import (
 
 from models import db
 
-from ..export_generic import REFERENCE_SUFFIX, load_model
+from ..export_generic import CHAIN_VARIANT_FINGERPRINT, REFERENCE_SUFFIX, load_model
 from ..manifest import SECTIONS
 from .plan import RestorePlan, RestoreValidationError
 
@@ -212,10 +212,27 @@ def _apply_row(section_name, section, instance, row, columns, attribute_of, plan
             setattr(instance, name, _secret_as_stored(section, name, value))
             continue
 
+        if section_name == 'deploy_bindings' and name == 'chain_variant':
+            value = _restored_chain_variant(row, value)
+
         setattr(instance, attribute_of.get(name, name),
                 _coerce(value, column, f"{section_name}.{name}"))
     for column, value in legacy_defaults(section_name, row, plan).items():
         setattr(instance, attribute_of.get(column, column), value)
+
+
+def _restored_chain_variant(row, value):
+    """`cross:<id>` names a row renumbered on restore: found again by fingerprint, else `auto`."""
+    if not str(value or '').startswith('cross:'):
+        return value
+    from models.ca_cross_certificate import CACrossCertificate
+    fingerprint = row.get(CHAIN_VARIANT_FINGERPRINT)
+    target = CACrossCertificate.query.filter_by(fingerprint_sha256=fingerprint).first() if fingerprint else None
+    if target is None:
+        logger.warning("Deploy binding chain_variant %s: its cross-certificate is not on this "
+                       "installation, the binding falls back to 'auto'", value)
+        return 'auto'
+    return f'cross:{target.id}'
 
 
 def _unplaceable_reference(section_name, section, name, row, column) -> None:
