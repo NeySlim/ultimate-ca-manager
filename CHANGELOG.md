@@ -15,7 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Users: an administrator lists another user's API keys in their details and revokes a leaked or unused one, which stops working at once; a revoked or expired key can then be deleted. Each action is audited.
 
-- CAs: a CA can carry cross-certificates (same subject and key, another issuer) beside its own certificate: attach one, serve it in the default chain, revoke it at its issuer, export it, or cross-sign a held CA's key with another from the CA details. Its expiry raises the usual alerts and its revocation follows the approval policies (#400).
+- CAs: a CA can carry cross-certificates (same subject and key, another issuer) beside its own certificate: attach one, serve it in the default chain, export it, or cross-sign a held CA's key with another from the CA details; revoking one at its issuer is done through the API. Its expiry raises the usual alerts and its revocation follows the approval policies (#400).
 
 - Chains: exports, deployments, TLS, PKCS#12, ACME, WSTEP and TSA use one chain builder that follows the served cross-certificate; `chain_variant` (`auto`, `primary`, `cross:<id>`) picks another chain on CA and certificate exports and on a deploy binding, and EST `/cacerts` adds the served cross-certificates (#400).
 

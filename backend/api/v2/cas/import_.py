@@ -127,7 +127,8 @@ def import_ca():
                 username = getattr(getattr(g, 'current_user', None), 'username', None) or 'system'
                 try:
                     ca_dict, warnings, superseded = install_on_pending_ca(
-                        existing_ca, cert_pem, username, encrypted_prv=encrypted_prv, name=name or None)
+                        existing_ca, cert_pem, username, encrypted_prv=encrypted_prv, name=name or None,
+                        replace_cross=cross_mode == 'replace')
                 except CrossCertificateImport as e:
                     db.session.rollback()
                     return error_response(str(e), 409, e.details)

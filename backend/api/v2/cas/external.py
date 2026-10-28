@@ -20,7 +20,7 @@ from utils.response import success_response, error_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.sanitize import sanitize_filename
 from services.ca_service import CAService
-from services.import_service import CrossCertificateImport
+from services.import_service import CrossCertificateImport, cross_mode_from
 from services.crl import CRLService, ExternalCRLConflict
 from models import CA, db
 
@@ -104,10 +104,15 @@ def install_ca_certificate(ca_id):
     except Exception:
         return error_response('Invalid certificate file', 400)
 
+    raw_mode = request.form.get('cross_mode') or (request.get_json(silent=True) or {}).get('cross_mode')
+    cross_mode = cross_mode_from(raw_mode)
+    if cross_mode is None:
+        return error_response('cross_mode must be auto, attach, replace or refuse', 400)
+
     username = _actor_username()
     try:
         ca, warnings, superseded = CAService.complete_external_ca(
-            ca, cert_pem, username=username)
+            ca, cert_pem, username=username, replace_cross=cross_mode == 'replace')
     except CrossCertificateImport as e:
         db.session.rollback()
         return error_response(str(e), 409, e.details)

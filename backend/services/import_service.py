@@ -527,7 +527,7 @@ def _select_existing(candidates, cert, kind, replace_cross=False, any_validity=F
         f"certificate's key; the record to update cannot be determined")
 
 
-def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=None):
+def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=None, replace_cross=False):
     """Install *cert_pem* on a CA waiting for its certificate, or holding an
     outstanding renewal request, through the same path as the dedicated
     upload (key match, validity, chain to the issuer, activation, the
@@ -543,7 +543,8 @@ def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=No
     from services.webhook_service import emit_ca_updated
     if encrypted_prv and not ca.prv and not ca.hsm_key_id:
         ca.prv = encrypted_prv
-    ca, warnings, superseded = CAService.complete_external_ca(ca, cert_pem, username=username)
+    ca, warnings, superseded = CAService.complete_external_ca(
+        ca, cert_pem, username=username, replace_cross=replace_cross)
     if name and name != ca.descr:
         ca.descr = name
         db.session.commit()
