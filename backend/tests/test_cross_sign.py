@@ -155,7 +155,7 @@ def test_issuer_without_a_key_is_refused(app, auth_client):
         assert CACrossCertificate.query.filter_by(ca_id=b).count() == 0
 
 
-def test_path_length_defaults_to_the_subject_and_is_capped_by_the_issuer(app, auth_client):
+def test_path_length_defaults_to_the_subject_and_is_capped_by_subject_and_issuer(app, auth_client):
     from tests.fixtures.cross_pki import make_cert
     pki = build_cross_pki()
     with app.app_context():
@@ -173,8 +173,8 @@ def test_path_length_defaults_to_the_subject_and_is_capped_by_the_issuer(app, au
         return _cert_of(r).extensions.get_extension_for_class(x509.BasicConstraints).value.path_length
     assert length() == 1
     assert length(path_length=0) == 0
-    assert length(path_length=None) == 4  # unlimited is capped to what the issuer allows below it
-    assert length(path_length=9) == 4
+    assert length(path_length=None) == 1  # never looser than the subject's own limit
+    assert length(path_length=9) == 1
     assert _sign(auth_client, a_id, b_id, path_length=-1).status_code == 400
     assert _sign(auth_client, a_id, b_id, path_length='x').status_code == 400
 

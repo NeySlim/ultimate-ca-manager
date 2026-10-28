@@ -57,15 +57,56 @@ def _chain_has_key(start: CA, key_spki: bytes, include_start: bool) -> bool:
     return False
 
 
+def _signed_by(cert: x509.Certificate, issuer: x509.Certificate) -> bool:
+    from utils.cert_issuer import UnsupportedIssuerKey, certificate_signed_by
+    try:
+        return certificate_signed_by(cert, issuer)
+    except UnsupportedIssuerKey:
+        return False
+
+
 def _refuse_degenerate_pair(issuer: CA, subject: CA) -> None:
-    """A cross-certificate must join two hierarchies: not a parent re-certifying its child, nor the reverse."""
-    if _chain_has_key(subject, cross_certs._spki(_own_certificate(issuer, 'issuing')), include_start=False):
+    """Refuse a parent re-certifying its descendant, or the reverse, however the link is recorded."""
+    issuer_cert, subject_cert = _own_certificate(issuer, 'issuing'), _own_certificate(subject, 'subject')
+    if _chain_has_key(subject, cross_certs._spki(issuer_cert), include_start=False) \
+            or _signed_by(subject_cert, issuer_cert):
         raise CrossCertError('The issuing CA is already an ancestor of the subject CA', 409, 'issuer_is_ancestor')
-    if _chain_has_key(issuer, cross_certs._spki(_own_certificate(subject, 'subject')), include_start=False):
+    if _chain_has_key(issuer, cross_certs._spki(subject_cert), include_start=False) \
+            or _signed_by(issuer_cert, subject_cert):
         raise CrossCertError('The subject CA is an ancestor of the issuing CA', 409, 'subject_is_ancestor')
 
 
 _COPIED = (x509.NameConstraints, x509.PolicyConstraints, x509.InhibitAnyPolicy, x509.ExtendedKeyUsage)
+
+
+def _policies_for(subject_cert: x509.Certificate, copied: list, cps_uri, cps_oid):
+    """The subject's CertificatePolicies plus the issuer's CPS, needed once policy constraints are copied."""
+    if not any(isinstance(e.value, (x509.PolicyConstraints, x509.InhibitAnyPolicy)) for e in copied):
+        return None
+    try:
+        infos = list(subject_cert.extensions.get_extension_for_class(x509.CertificatePolicies).value)
+    except x509.ExtensionNotFound:
+        return None
+    if cps_uri:
+        oid = x509.ObjectIdentifier(cps_oid or '2.5.29.32.0')
+        if all(i.policy_identifier != oid for i in infos):
+            infos.append(x509.PolicyInformation(oid, [cps_uri]))
+    return x509.Extension(x509.oid.ExtensionOID.CERTIFICATE_POLICIES, False, x509.CertificatePolicies(infos))
+
+
+def _key_usage_names(cert: x509.Certificate):
+    from utils.ca_profile import KU_NAME_TO_ATTR
+    try:
+        ku = cert.extensions.get_extension_for_class(x509.KeyUsage).value
+    except x509.ExtensionNotFound:
+        return None
+    names = []
+    for name, attr in KU_NAME_TO_ATTR.items():
+        if name == 'nonRepudiation' or (attr in ('encipher_only', 'decipher_only') and not ku.key_agreement):
+            continue
+        if getattr(ku, attr):
+            names.append(name)
+    return names or None
 
 
 def _constraints_of(cert: x509.Certificate) -> list:
@@ -104,8 +145,10 @@ def cross_sign(issuer: CA, subject: CA, validity_days=DEFAULT_VALIDITY_DAYS, pat
         raise CrossCertError(str(e), 409, 'issuer_offline')
     try:
         check_issuer_window(issuer_cert)
-        if path_length is _UNSET:
+        if path_length is _UNSET or path_length is None:
             path_length = subject_length
+        elif subject_length is not None:
+            path_length = min(path_length, subject_length)
     except (IssuerWindowError, ValueError) as e:
         raise CrossCertError(str(e))
 
@@ -128,6 +171,11 @@ def cross_sign(issuer: CA, subject: CA, validity_days=DEFAULT_VALIDITY_DAYS, pat
     except x509.ExtensionNotFound:
         ski = None
     cps = issuer.cps_uri if issuer.cps_enabled and issuer.cps_uri else None
+    copied = _constraints_of(subject_cert)
+    merged = _policies_for(subject_cert, copied, cps, issuer.cps_oid if cps else None)
+    if merged is not None:
+        copied.append(merged)
+        cps = None
     pem, _ = TrustStoreService.create_ca_certificate(
         subject=subject_cert.subject, private_key=None, subject_public_key=subject_cert.public_key(),
         issuer=issuer_cert.subject, issuer_private_key=issuer_key, issuer_cert=issuer_cert,
@@ -135,14 +183,15 @@ def cross_sign(issuer: CA, subject: CA, validity_days=DEFAULT_VALIDITY_DAYS, pat
         ocsp_uris=ocsp, cdp_urls=cdp, aia_ca_issuers_urls=aia,
         cps_uri=cps, cps_oid=issuer.cps_oid if cps else None, path_length=path_length,
         not_valid_after_max=to_naive_utc(issuer_cert.not_valid_after_utc),
-        copied_extensions=_constraints_of(subject_cert), subject_key_identifier=ski)
+        copied_extensions=copied, subject_key_identifier=ski,
+        key_usage=_key_usage_names(subject_cert))
     cert = x509.load_pem_x509_certificate(pem)
     row, warnings = cross_certs.attach_certificate(subject, cert, username)
     notices = []
     if capped_by and validity_days < requested_days:
         notices.append(notices_mod.validity_shortened(
             requested_days, validity_days, notices_mod.policy_validity_reason(capped_by, validity_days)))
-    elif to_naive_utc(issuer_cert.not_valid_after_utc) < utc_now() + timedelta(days=validity_days):
+    if to_naive_utc(issuer_cert.not_valid_after_utc) < utc_now() + timedelta(days=validity_days):
         granted = max((to_naive_utc(cert.not_valid_after_utc) - utc_now()).days, 0)
         notices.append(notices_mod.validity_shortened(
             validity_days, granted, notices_mod.issuer_expiry_reason(issuer_cert.not_valid_after_utc)))
