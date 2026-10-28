@@ -3,9 +3,11 @@ import base64
 import uuid
 
 from cryptography import x509
+from cryptography.hazmat.primitives import serialization
 
 from models import CA, db
 from models.ca_cross_certificate import CACrossCertificate
+from services.ca import cross_certs
 from services.ski_aki_backfill import backfill_ski_aki
 from tests.fixtures.cross_pki import build_cross_pki, key_pem, openssl_verify, pem
 from utils.key_codec import store_pem_bytes
@@ -167,20 +169,21 @@ def test_convert_moves_the_ca_settings_to_the_root(app, auth_client):
     with app.app_context():
         x_ref, b_ref = db.session.get(CA, ids['x']).refid, db.session.get(CA, ids['b']).refid
         for key in ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'wstep_ca_refid',
-                    'xcep_ca_refid', 'mtls_trusted_ca_id'):
+                    'xcep_ca_refid', 'mtls_trusted_ca_id', 'scep_ca_id'):
             SystemConfig.query.filter_by(key=key).delete()
         _set_config(acme__issuing_ca_id=x_ref, est_ca_refid=x_ref, tsa_ca_refid=x_ref, wstep_ca_refid=x_ref,
-                    xcep_ca_refid=x_ref, mtls_trusted_ca_id=x_ref)
+                    xcep_ca_refid=x_ref, mtls_trusted_ca_id=x_ref, scep_ca_id=str(ids['x']))
         _set_config(**{f"ocsp_responder_cert_{ids['x']}": '77'})
     assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
     with app.app_context():
         for key in ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'wstep_ca_refid',
                     'xcep_ca_refid', 'mtls_trusted_ca_id'):
             assert _config(key) == b_ref, key
+        assert _config('scep_ca_id') == str(ids['b'])
         assert _config(f"ocsp_responder_cert_{ids['b']}") == '77'
         assert _config(f"ocsp_responder_cert_{ids['x']}") is None
         for key in ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'wstep_ca_refid',
-                    'xcep_ca_refid', 'mtls_trusted_ca_id', f"ocsp_responder_cert_{ids['b']}"):
+                    'xcep_ca_refid', 'mtls_trusted_ca_id', 'scep_ca_id', f"ocsp_responder_cert_{ids['b']}"):
             SystemConfig.query.filter_by(key=key).delete()
         db.session.commit()
 
@@ -190,20 +193,17 @@ def test_urls_embedded_by_the_removed_duplicate_still_resolve(app, auth_client, 
     with app.app_context():
         x = db.session.get(CA, ids['x'])
         x.url_slug = f'dup-{pki.tag}'
+        x.cdp_enabled = True
         db.session.commit()
         x_ref, x_slug = x.refid, x.url_slug
         b_ref = db.session.get(CA, ids['b']).refid
     assert client.get(f'/ca/{x_ref}.cer').status_code == 200
     assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
-    with app.app_context():
-        db.session.get(CA, ids['b']).cdp_enabled = True
-        db.session.commit()
     assert client.get(f'/cdp/{b_ref}.crl').status_code == 200
-    root_der = client.get(f'/ca/{b_ref}.cer').data
-    for ref in (x_ref, x_slug):
-        r = client.get(f'/ca/{ref}.cer')
-        assert r.status_code == 200 and r.data == root_der, ref
+    for ref in (x_ref, x_slug, str(ids['x'])):
         assert client.get(f'/cdp/{ref}.crl').status_code == 200, ref
+    for ref in (x_ref, x_slug):
+        assert client.get(f'/ca/{ref}.cer').status_code == 200, ref
     assert client.get('/ca/00000000-0000-0000-0000-000000000000.cer').status_code == 404
 
 
@@ -295,13 +295,109 @@ def test_the_unexpired_root_is_the_one_a_duplicate_is_converted_onto(app, auth_c
         assert db.session.get(CA, ids['i']).caref == db.session.get(CA, new_id).refid
 
 
-def test_a_lost_root_collision_offers_restore_primary(app, auth_client):
-    pki = build_cross_pki()
+def test_convert_keeps_the_revocation_publication_of_the_duplicate(app, auth_client):
+    pki, ids = _world(app)
     with app.app_context():
-        a = _row(pki.root_a, pki.name_a, pki.key_a)
-        ref = db.session.get(CA, a).refid
-        _row(pki.cross_b, 'one', pki.key_b, caref=ref)
-        from tests.fixtures.cross_pki import make_cert
-        _row(make_cert(pki.name_b, pki.key_b, pki.name_a, pki.key_a, days=200), 'two', pki.key_b, caref=ref)
-    found, _ = _findings(auth_client, pki)
-    assert found[0]['actions'] == ['restore_primary']
+        x, b = db.session.get(CA, ids['x']), db.session.get(CA, ids['b'])
+        x.cdp_enabled, x.ocsp_enabled, x.delta_crl_enabled = True, True, True
+        x.crl_validity_days, x.crl_publish_interval_hours, x.crl_digest = 3, 6, 'sha384'
+        b.cdp_enabled = b.ocsp_enabled = b.delta_crl_enabled = False
+        b.crl_validity_days = b.crl_publish_interval_hours = b.crl_digest = None
+        db.session.commit()
+    assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+    with app.app_context():
+        b = db.session.get(CA, ids['b'])
+        assert (b.cdp_enabled, b.ocsp_enabled, b.delta_crl_enabled) == (True, True, True)
+        assert (b.crl_validity_days, b.crl_publish_interval_hours, b.crl_digest) == (3, 6, 'sha384')
+
+
+def test_convert_does_not_switch_off_what_the_root_publishes(app, auth_client):
+    pki, ids = _world(app)
+    with app.app_context():
+        b = db.session.get(CA, ids['b'])
+        b.cdp_enabled, b.ocsp_enabled, b.crl_validity_days = True, True, 9
+        db.session.get(CA, ids['x']).crl_validity_days = 3
+        db.session.commit()
+    assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+    with app.app_context():
+        b = db.session.get(CA, ids['b'])
+        assert b.cdp_enabled and b.ocsp_enabled and b.crl_validity_days == 9
+
+
+def test_the_aia_url_of_the_duplicate_keeps_serving_the_cross_certificate(app, auth_client, client):
+    pki, ids = _world(app)
+    with app.app_context():
+        x_ref = db.session.get(CA, ids['x']).refid
+        b_ref = db.session.get(CA, ids['b']).refid
+    cross_der = pki.cross_b.public_bytes(serialization.Encoding.DER)
+    root_der = pki.root_b.public_bytes(serialization.Encoding.DER)
+    assert client.get(f'/ca/{x_ref}.cer').data == cross_der
+    assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+    assert client.get(f'/ca/{x_ref}.cer').data == cross_der
+    assert x509.load_pem_x509_certificate(client.get(f'/ca/{x_ref}.pem').data) == pki.cross_b
+    assert client.get(f'/ca/{b_ref}.cer').data == root_der
+
+
+def test_convert_moves_the_scep_challenge_with_the_scep_ca(app, auth_client):
+    from api.v2.scep import challenge_age_state
+    pki, ids = _world(app)
+    with app.app_context():
+        _set_config(scep_ca_id=str(ids['x']))
+        _set_config(**{f"scep_challenge_{ids['x']}": 'secret-x',
+                       f"scep_challenge_{ids['x']}_generated_at": '2026-01-01T00:00:00'})
+    assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+    with app.app_context():
+        assert challenge_age_state(ids['b'])[0] == 'secret-x'
+        assert _config(f"scep_challenge_{ids['x']}") is None
+        assert _config(f"scep_challenge_{ids['x']}_generated_at") is None
+        from models import SystemConfig
+        SystemConfig.query.filter(SystemConfig.key.like('scep_%')).delete(synchronize_session=False)
+        db.session.commit()
+
+
+def test_convert_drops_the_challenge_of_the_duplicate_when_the_root_has_one(app, auth_client):
+    pki, ids = _world(app)
+    with app.app_context():
+        _set_config(**{f"scep_challenge_{ids['x']}": 'secret-x', f"scep_challenge_{ids['b']}": 'secret-b'})
+    assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+    with app.app_context():
+        assert _config(f"scep_challenge_{ids['b']}") == 'secret-b'
+        assert _config(f"scep_challenge_{ids['x']}") is None
+        from models import SystemConfig
+        SystemConfig.query.filter(SystemConfig.key.like('scep_challenge_%')).delete(synchronize_session=False)
+        db.session.commit()
+
+
+def test_a_second_conversion_with_a_known_slug_succeeds_and_new_cas_avoid_the_alias_slug(app, auth_client):
+    from models import SystemConfig
+    from services.ca.ca_creation import CACreationMixin as CAService
+    pki, ids = _world(app)
+    slug = f'dup-{pki.tag}'.lower()
+    with app.app_context():
+        b_ref = db.session.get(CA, ids['b']).refid
+        db.session.get(CA, ids['x']).url_slug = slug
+        db.session.add(SystemConfig(key=f'ca_url_alias_{slug}', value='older-ref'))
+        db.session.commit()
+        gone = f'gone-{pki.tag}'.lower()
+        db.session.add(SystemConfig(key=f'ca_url_alias_{gone}', value='older-ref'))
+        db.session.commit()
+        assert CAService._unique_url_slug(gone) not in (gone, None)
+    r = auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert _config(f'ca_url_alias_{slug}') == b_ref
+
+
+def test_convert_goes_to_the_root_that_already_carries_the_cross_certificate(app, auth_client):
+    from datetime import datetime, timedelta, timezone
+    from tests.fixtures.cross_pki import make_cert
+    pki, ids = _world(app, with_root_b=False)
+    with app.app_context():
+        soon = make_cert(pki.name_b, pki.key_b, days=30)
+        short_id = _row(soon, 'short root')
+        long_id = _row(pki.root_b, 'long root')
+        row, _ = cross_certs.attach_certificate(db.session.get(CA, short_id), pki.cross_b, 'test')
+    assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+    with app.app_context():
+        assert CACrossCertificate.query.filter_by(ca_id=short_id).count() == 1
+        assert db.session.get(CA, ids['i']).caref == db.session.get(CA, short_id).refid

@@ -202,7 +202,9 @@ class CACreationMixin:
             base += '-ca'
         slug = base
         i = 2
-        while CA.query.filter_by(url_slug=slug).first() is not None:
+        from models import SystemConfig
+        while (CA.query.filter_by(url_slug=slug).first() is not None
+               or SystemConfig.query.filter_by(key=f'ca_url_alias_{slug}').first() is not None):
             slug = f"{base}-{i}"
             i += 1
         return slug

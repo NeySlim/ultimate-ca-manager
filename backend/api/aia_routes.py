@@ -25,12 +25,12 @@ def _resolve_ca(ca_ref):
     ca = CA.query.filter_by(url_slug=ca_ref).first()
     if ca:
         return ca
+    from services.ca.cross_repair import alias_target
     try:
-        ca_id_int = int(ca_ref)
-        return db.session.get(CA, ca_id_int)
+        ca = db.session.get(CA, int(ca_ref))
     except (ValueError, TypeError):
-        from services.ca.cross_repair import alias_target
-        return alias_target(ca_ref)
+        ca = None
+    return ca or alias_target(ca_ref)
 
 
 # Clients and proxies keep an AIA answer for 24 h: a change of the served cross-certificate
@@ -38,10 +38,16 @@ def _resolve_ca(ca_ref):
 AIA_CACHE_CONTROL = 'public, max-age=86400, must-revalidate'
 
 
-def _issuer_certificate(ca):
-    """The certificate AIA presents for *ca*: its served cross-certificate if any, else its own."""
+def _issuer_certificate(ca, ref=None):
+    """The certificate AIA presents for *ca*: its served cross-certificate if any, else its own.
+
+    A URL of a converted duplicate (*ref*) keeps presenting the cross-certificate it served."""
     from services.ca import cross_certs
-    row = cross_certs.served_for(ca)
+    from services.ca.cross_repair import alias_cross
+    row = None
+    if ref and ref not in (ca.refid, ca.url_slug):
+        row = alias_cross(ref, ca)
+    row = row or cross_certs.served_for(ca)
     return cross_certs.certificate_of(row) if row is not None else x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
 
 
@@ -59,7 +65,7 @@ def get_ca_cert_der(ca_ref):
     if not ca or not ca.crt:
         abort(404)
     try:
-        cert_der = _issuer_certificate(ca).public_bytes(Encoding.DER)
+        cert_der = _issuer_certificate(ca, ca_ref).public_bytes(Encoding.DER)
     except Exception as e:
         logger.error(f"AIA: failed to encode CA {ca_ref} certificate: {e}")
         abort(500)
@@ -73,7 +79,7 @@ def get_ca_cert_pem(ca_ref):
     if not ca or not ca.crt:
         abort(404)
     try:
-        cert_pem = _issuer_certificate(ca).public_bytes(Encoding.PEM)
+        cert_pem = _issuer_certificate(ca, ca_ref).public_bytes(Encoding.PEM)
     except Exception as e:
         logger.error(f"AIA: failed to load CA {ca_ref} certificate: {e}")
         abort(500)

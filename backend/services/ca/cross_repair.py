@@ -20,6 +20,7 @@ NOTE = ('A self-signed root that was overwritten or deleted is not recovered her
 _SETTINGS = ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'wstep_ca_refid', 'xcep_ca_refid',
              'mtls_trusted_ca_id', 'scep_ca_id')
 _ALIAS_PREFIX = 'ca_url_alias_'
+_CROSS_PREFIX = 'ca_url_cross_'
 
 
 def _identity(record):
@@ -87,7 +88,7 @@ def _record(ca_id) -> CA:
     return record
 
 
-def _move_settings(record, root):
+def _move_settings(record, root, cross=None):
     """Point the CA settings, the OCSP responder choice and the public URLs of *record* at *root*."""
     from models import SystemConfig
     for key in _SETTINGS:
@@ -107,9 +108,47 @@ def _move_settings(record, root):
     for old in SystemConfig.query.filter(SystemConfig.key.like(f'{_ALIAS_PREFIX}%'),
                                          SystemConfig.value == record.refid).all():
         old.value = root.refid
-    for ref in filter(None, (record.refid, record.url_slug)):
-        db.session.add(SystemConfig(key=f'{_ALIAS_PREFIX}{ref}', value=root.refid,
-                                    description='URL of a removed duplicate CA record'))
+    for ref in filter(None, (record.refid, record.url_slug, str(record.id))):
+        key = f'{_ALIAS_PREFIX}{ref}'[:100]
+        alias = SystemConfig.query.filter_by(key=key).first()
+        if alias is None:
+            db.session.add(SystemConfig(key=key, value=root.refid,
+                                        description='URL of a removed duplicate CA record'))
+        else:
+            alias.value = root.refid
+    if cross is not None:
+        for ref in filter(None, (record.refid, record.url_slug)):
+            _upsert(f'{_CROSS_PREFIX}{ref}'[:100], str(cross.id))
+
+
+def _upsert(key, value):
+    from models import SystemConfig
+    cfg = SystemConfig.query.filter_by(key=key).first()
+    if cfg is None:
+        db.session.add(SystemConfig(key=key, value=value, description='URL of a removed duplicate CA record'))
+    else:
+        cfg.value = value
+
+
+def _move_publication(record, root):
+    """Keep CRL/OCSP publication on: a root left disabled would never regenerate the moved CRL."""
+    for flag in ('cdp_enabled', 'ocsp_enabled', 'delta_crl_enabled'):
+        setattr(root, flag, bool(getattr(root, flag) or getattr(record, flag)))
+    for field in ('crl_validity_days', 'crl_publish_interval_hours', 'crl_digest'):
+        if not getattr(root, field):
+            setattr(root, field, getattr(record, field))
+
+
+def _move_scep_challenge(record, root):
+    from models import SystemConfig
+    for suffix in ('', '_generated_at'):
+        old = SystemConfig.query.filter_by(key=f'scep_challenge_{record.id}{suffix}').first()
+        if old is None:
+            continue
+        if SystemConfig.query.filter_by(key=f'scep_challenge_{root.id}{suffix}').first() is None:
+            old.key = f'scep_challenge_{root.id}{suffix}'
+        else:
+            db.session.delete(old)
 
 
 def alias_target(ref):
@@ -117,6 +156,15 @@ def alias_target(ref):
     from models import SystemConfig
     cfg = SystemConfig.query.filter_by(key=f'{_ALIAS_PREFIX}{ref}'[:100]).first()
     return CA.query.filter_by(refid=cfg.value).first() if cfg and cfg.value else None
+
+
+def alias_cross(ref, ca):
+    """The cross-certificate row the duplicate URL *ref* served, if it belongs to *ca* and is servable."""
+    from models import SystemConfig
+    from models.ca_cross_certificate import CACrossCertificate
+    cfg = SystemConfig.query.filter_by(key=f'{_CROSS_PREFIX}{ref}'[:100]).first()
+    row = db.session.get(CACrossCertificate, int(cfg.value)) if cfg and (cfg.value or '').isdigit() else None
+    return row if row is not None and row.ca_id == ca.id and row.servable else None
 
 
 def convert_to_cross(ca_id: int, username: str = 'system'):
@@ -133,7 +181,13 @@ def convert_to_cross(ca_id: int, username: str = 'system'):
         raise CrossCertError('Only a record holding a certificate that is not self-signed can be converted',
                              409, 'not_convertible')
     cert, fp, spki, _ = ident
-    root = _find_root(cert, spki, fp, _held())
+    held = _held()
+    root = _find_root(cert, spki, fp, held)
+    if root is not None:
+        carrier = CACrossCertificate.query.filter_by(fingerprint_sha256=fp).first()
+        if carrier is not None and carrier.ca_id != root.id:
+            root = next((r for r, c, _f, k, selfs in held
+                         if r.id == carrier.ca_id and selfs and k == spki and c.subject == cert.subject), root)
     if root is None:
         raise CrossCertError('No self-signed record holds this subject and key: restore a backup, or '
                              'give the self-signed certificate to restore-primary', 409, 'no_root')
@@ -148,7 +202,9 @@ def convert_to_cross(ca_id: int, username: str = 'system'):
     if not root.prv and not root.hsm_key_id:
         root.prv, root.hsm_key_id = record.prv, record.hsm_key_id
     _move_ca_dependents(db, record, root)
-    _move_settings(record, root)
+    _move_settings(record, root, row)
+    _move_scep_challenge(record, root)
+    _move_publication(record, root)
     snapshot_dict = record.to_dict()
     files = SimpleNamespace(**{c.key: getattr(record, c.key) for c in CA.__table__.columns})
     db.session.execute(db.text('DELETE FROM certificate_authorities WHERE id = :id'), {'id': record.id})
