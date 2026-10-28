@@ -457,3 +457,53 @@ def test_a_ca_with_a_key_pyca_cannot_load_does_not_break_the_findings(app, auth_
     found, _ = _findings(auth_client, pki)
     assert [f['kind'] for f in found] == ['shadowed_root'] and found[0]['ca_id'] == ids['x']
     assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+
+
+def _foreign_record(app, pki, kind, issuer_cn=None):
+    from tests.test_tolerant_foreign_algorithms import build_cert, pem as foreign_pem
+    cn = f'F {pki.tag}'
+    with app.app_context():
+        record = CA(refid=str(uuid.uuid4()), descr=f'foreign {kind} {pki.tag}', serial=0,
+                    crt=base64.b64encode(foreign_pem(build_cert(kind, cn, issuer_cn=issuer_cn, is_ca=True)).encode()).decode(),
+                    subject=f'CN={cn}', issuer=f'CN={issuer_cn or cn}', ski=f'AA:{pki.tag[:2]}')
+        db.session.add(record)
+        db.session.commit()
+        return record.id
+
+
+@pytest.mark.parametrize('route', ['convert-to-cross', 'restore-primary'])
+def test_a_foreign_key_record_is_refused_for_its_key_not_for_being_self_signed(app, auth_client, route):
+    pki, _ = _world(app)
+    rid = _foreign_record(app, pki, 'gost', issuer_cn=f'Other {pki.tag}')
+    body = {'certificate': pem(pki.root_a)} if route == 'restore-primary' else {}
+    r = auth_client.post(f'/api/v2/cas/{rid}/{route}', json=body)
+    assert r.status_code == 409, r.data
+    assert r.get_json()['details']['code'] == 'unsupported_key'
+
+
+def test_attaching_to_a_foreign_key_ca_is_refused_not_a_500(app, auth_client):
+    from datetime import datetime, timedelta, timezone
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.hazmat.primitives.asymmetric import ec
+    pki, ids = _world(app)
+    rid = _foreign_record(app, pki, 'gost')
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(x509.oid.NameOID.COMMON_NAME, f'F {pki.tag}')])
+    now = datetime.now(timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(pki.root_a.subject)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), True)
+            .sign(pki.key_a, hashes.SHA256()))
+    r = auth_client.post(f'/api/v2/cas/{rid}/cross-certificates', json={'certificate': pem(cert)})
+    assert r.status_code == 409, r.data
+    assert r.get_json()['details']['code'] == 'unsupported_key'
+
+
+def test_restoring_a_self_signed_certificate_with_a_foreign_key_is_refused_not_a_500(app, auth_client):
+    from tests.test_tolerant_foreign_algorithms import build_cert, pem as foreign_pem
+    pki, ids = _world(app, with_root_b=False)
+    cn = pki.root_b.subject.get_attributes_for_oid(x509.oid.NameOID.COMMON_NAME)[0].value
+    foreign = foreign_pem(build_cert('gost', cn, is_ca=True))
+    r = auth_client.post(f"/api/v2/cas/{ids['x']}/restore-primary", json={'certificate': foreign})
+    assert r.status_code in (400, 409), r.data

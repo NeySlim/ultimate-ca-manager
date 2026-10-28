@@ -37,6 +37,13 @@ def _identity(record):
         return None  # a key pyca cannot load (SM2, GOST, FRP256v1): never part of a repair
 
 
+def _refuse_unconvertible(record, message, code):
+    """409 for a record that cannot be repaired: its key when the certificate is readable but unsupported."""
+    if cross_certs._load_record(record) is not None:
+        raise CrossCertError('The key algorithm of this record is not supported', 409, 'unsupported_key')
+    raise CrossCertError(message, 409, code)
+
+
 def _held():
     held = []
     for record in CA.query.order_by(CA.id).all():
@@ -203,7 +210,10 @@ def convert_to_cross(ca_id: int, username: str = 'system'):
     from models.ca_cross_certificate import CACrossCertificate
     record = _record(ca_id)
     ident = _identity(record)
-    if ident is None or ident[3]:
+    if ident is None:
+        _refuse_unconvertible(record, 'Only a record holding a certificate that is not self-signed can be converted',
+                              'not_convertible')
+    if ident[3]:
         raise CrossCertError('Only a record holding a certificate that is not self-signed can be converted',
                              409, 'not_convertible')
     cert, fp, spki, _ = ident
@@ -273,7 +283,10 @@ def restore_primary(ca_id: int, certificate, username: str = 'system'):
     from utils.cert_issuer import is_self_signed
     record = _record(ca_id)
     ident = _identity(record)
-    if ident is None or ident[3]:
+    if ident is None:
+        _refuse_unconvertible(record, 'Only a record holding a certificate that is not self-signed can be restored',
+                              'not_restorable')
+    if ident[3]:
         raise CrossCertError('Only a record holding a certificate that is not self-signed can be restored',
                              409, 'not_restorable')
     old, old_fp, spki, _ = ident

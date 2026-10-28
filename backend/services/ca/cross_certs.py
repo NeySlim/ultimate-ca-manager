@@ -9,6 +9,7 @@ import hashlib
 import logging
 from typing import List, Optional, Tuple
 
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 
@@ -55,8 +56,11 @@ def parse_certificate(data) -> x509.Certificate:
 
 
 def _spki(cert):
-    return cert.public_key().public_bytes(serialization.Encoding.DER,
-                                          serialization.PublicFormat.SubjectPublicKeyInfo)
+    try:
+        return cert.public_key().public_bytes(serialization.Encoding.DER,
+                                              serialization.PublicFormat.SubjectPublicKeyInfo)
+    except UnsupportedAlgorithm as e:
+        raise CrossCertError('The key algorithm is not supported', 409, 'unsupported_key') from e
 
 
 def _naive(moment):
