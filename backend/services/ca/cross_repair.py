@@ -148,14 +148,16 @@ def _move_scep_challenge(record, root, was_scep_ca=False):
     from models import SystemConfig
     pair = [SystemConfig.query.filter_by(key=f'scep_challenge_{record.id}{suffix}').first()
             for suffix in ('', '_generated_at')]
-    if pair[0] is None and pair[1] is None:
-        return
     mine = SystemConfig.query.filter(SystemConfig.key.in_(
         [f'scep_challenge_{root.id}', f'scep_challenge_{root.id}_generated_at'])).all()
     if mine and not was_scep_ca:
         for old in pair:
             if old is not None:
                 db.session.delete(old)
+        return
+    if mine and all(old is None for old in pair):
+        for old in mine:
+            db.session.delete(old)
         return
     for old in mine:
         db.session.delete(old)
@@ -181,6 +183,16 @@ def alias_cross(ref, ca):
     return row if row is not None and row.ca_id == ca.id and row.servable else None
 
 
+def _repoint_cross_urls(carrier, old_ca, root):
+    """Duplicate URLs that served *carrier* from *old_ca* now resolve to *root*."""
+    from models import SystemConfig
+    for cfg in SystemConfig.query.filter(SystemConfig.key.like(f'{_CROSS_PREFIX}%'),
+                                         SystemConfig.value == str(carrier.id)).all():
+        alias = SystemConfig.query.filter_by(key=f'{_ALIAS_PREFIX}{cfg.key[len(_CROSS_PREFIX):]}'[:100]).first()
+        if alias is not None and old_ca is not None and alias.value == old_ca.refid:
+            alias.value = root.refid
+
+
 def convert_to_cross(ca_id: int, username: str = 'system'):
     """Turn a non-self-signed record shadowing a held root into that root's cross-certificate.
 
@@ -197,6 +209,7 @@ def convert_to_cross(ca_id: int, username: str = 'system'):
     cert, fp, spki, _ = ident
     held = _held()
     root = _find_root(cert, spki, fp, held)
+    moved_from = None
     if root is not None:
         carrier = CACrossCertificate.query.filter_by(fingerprint_sha256=fp).first()
         if carrier is not None and carrier.ca_id != root.id:
@@ -206,7 +219,9 @@ def convert_to_cross(ca_id: int, username: str = 'system'):
             if holder is not None:
                 root = holder
             else:
-                carrier.ca_id = root.id
+                moved_from = db.session.get(CA, carrier.ca_id)
+                _repoint_cross_urls(carrier, moved_from, root)
+                carrier.ca_id, carrier.served = root.id, False
     if root is None:
         raise CrossCertError('No self-signed record holds this subject and key: restore a backup, or '
                              'give the self-signed certificate to restore-primary', 409, 'no_root')
@@ -244,6 +259,9 @@ def convert_to_cross(ca_id: int, username: str = 'system'):
                         f'Duplicate record {snapshot} converted into a cross-certificate of {root.descr}',
                         username=username)
     cross_certs.announce(root, 'attached', row, username, {'converted_ca': snapshot})
+    if moved_from is not None:
+        AuditService.log_ca('ca_cross_certificate_detached', moved_from,
+                            f'Cross-certificate moved from CA {moved_from.descr} to {root.descr}', username=username)
     return root, row, warnings
 
 

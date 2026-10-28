@@ -671,7 +671,8 @@
       "scanNetwork": "Scan Network",
       "generateReport": "Generate Report"
     },
-    "expiresInDays": "Expires in {{count}} days"
+    "expiresInDays": "Expires in {{count}} days",
+    "chainRepairSameKey": "shared keys, distinct certificates (cross-certificate?)"
   },
   "certificates": {
     "createCertificate": "Create Certificate",
@@ -4045,7 +4046,11 @@
     "typePrivateKey": "Private Key",
     "verifiedTrustStore": "Trust Store",
     "linkedToCA": "Managed CA",
-    "trustAnchor": "Trust anchor"
+    "trustAnchor": "Trust anchor",
+    "crossAttached_one": "{{count}} cross-certificate attached to a CA already held",
+    "crossAttached_other": "{{count}} cross-certificates attached to CAs already held",
+    "crossSkipped_one": "{{count}} cross-certificate was left out; the self-signed CA is kept",
+    "crossSkipped_other": "{{count}} cross-certificates were left out; the self-signed CAs are kept"
   },
   "webhooks": {
     "eventLabels": {
@@ -5703,5 +5708,65 @@
     "linesOpt": "{{count}} lines",
     "filters": "Filters",
     "exclude": "Exclude"
+  },
+  "crossCerts": {
+    "title": "Cross certificates",
+    "none": "No cross-certificate. Attach one issued by another CA for this key, or sign one from a CA held in UCM.",
+    "issuedBy": "Issued by {{issuer}}",
+    "served": "Served",
+    "state": {
+      "revoked": "Revoked",
+      "expired": "Expired",
+      "notYetValid": "Not yet valid"
+    },
+    "serve": "Serve",
+    "stopServing": "Stop serving",
+    "servedNow": "This cross-certificate is now served in the default chain",
+    "unserved": "This cross-certificate is no longer served",
+    "updateFailed": "Could not update the cross-certificate",
+    "attach": "Attach",
+    "attachTitle": "Attach a cross-certificate",
+    "attachHint": "Paste or pick a certificate that carries this CA's subject and key and is issued by another CA. The CA's own certificate is kept.",
+    "serveNow": "Serve it in the default chain",
+    "attached": "Cross-certificate attached",
+    "attachFailed": "Could not attach the cross-certificate",
+    "attachAsCross": "Attach as cross certificate",
+    "offerHint": "This certificate is another certificate of this CA's key. Attach it beside the CA's own certificate instead of replacing it.",
+    "sign": "Cross-sign",
+    "signTitle": "Cross-sign this CA",
+    "signHint": "Sign the key of {{name}} with another CA held in UCM. The result is stored here as a cross-certificate.",
+    "signIssuer": "Signing CA",
+    "selectIssuer": "Select a CA",
+    "signValidity": "Validity (days)",
+    "signed": "Cross-certificate issued",
+    "signFailed": "Cross-signing failed",
+    "detach": "Detach",
+    "detachConfirm": "Detach the cross-certificate issued by {{issuer}}? The certificate is removed from UCM.",
+    "detached": "Cross-certificate detached",
+    "badge": "Cross-signed",
+    "findings_one": "{{count}} cross-certificate finding",
+    "findings_other": "{{count}} cross-certificate findings",
+    "findingsNote": "A self-signed root that was overwritten or deleted is not recovered here: restore it from a backup, or give its certificate to Restore as primary.",
+    "findingShadowed": "{{name}} holds the cross-certificate of {{root}}",
+    "findingSameKey": "Several certificates share the key of {{subject}}",
+    "convertToCross": "Convert to cross-certificate",
+    "convertConfirm": "Turn {{name}} into a cross-certificate of {{root}}? Its child CAs and issued certificates move to {{root}} and the duplicate record is deleted.",
+    "converted": "The duplicate was converted into a cross-certificate",
+    "convertFailed": "Could not convert the duplicate",
+    "restorePrimary": "Restore as primary",
+    "restorePrimaryOn": "Restore on {{name}}",
+    "restoreHint": "Give the self-signed certificate of this CA's key. The certificate the record holds now is kept as a cross-certificate.",
+    "restored": "Self-signed certificate restored",
+    "restoreFailed": "Could not restore the self-signed certificate"
+  },
+  "chainVariant": {
+    "label": "Chain to present",
+    "auto": "Default (the chain UCM serves)",
+    "primary": "Self-signed root",
+    "cross": "Cross-certificate of {{name}} by {{issuer}}",
+    "served": "served",
+    "notServable": "revoked, expired or not yet valid",
+    "exportHint": "A cross-certificate lets clients that trust another root build a path to this CA.",
+    "deployHint": "The chain written to the full chain file. A revoked, expired or not yet valid cross-certificate is never pushed."
   }
 }

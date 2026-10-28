@@ -12,6 +12,8 @@ import { Badge } from '../Badge'
 import { Button } from '../Button'
 import { CompactSection } from '../DetailCard'
 import { Modal } from '../Modal'
+import { ChainVariantSelect, variantLabel } from '../ChainVariantSelect'
+import { fetchChainVariants } from '../../lib/crossCertificates'
 import { deployService } from '../../services'
 import { useNotification } from '../../contexts'
 import { usePermission } from '../../hooks'
@@ -30,9 +32,10 @@ export function CertDeploySection({ certificate }) {
   const [editing, setEditing] = useState(null)
   const [saving, setSaving] = useState(false)
   const [deploying, setDeploying] = useState(null)
+  const [chainVariants, setChainVariants] = useState([])
   const [form, setForm] = useState({
     target_id: '', cert_path: '', key_path: '', fullchain_path: '', include_root: false,
-    reload_command: '',
+    reload_command: '', chain_variant: 'auto',
   })
 
   const allowed = hasPermission('read:deploy')
@@ -49,6 +52,12 @@ export function CertDeploySection({ certificate }) {
     if (eligible) load()
   }, [certificate?.id, eligible])
 
+  // Chains a cross-certificate makes possible (#400); a binding may pin one
+  useEffect(() => {
+    setChainVariants([])
+    if (eligible) fetchChainVariants({ type: 'certificate', id: certificate.id }).then(setChainVariants)
+  }, [certificate?.id, eligible])
+
   if (!eligible || bindings === null) return null
   if (bindings.length === 0 && !hasPermission('write:deploy')) return null
 
@@ -60,7 +69,7 @@ export function CertDeploySection({ certificate }) {
       setTargets(all.filter(target => target.enabled && !bound.has(target.id)))
     } catch { setTargets([]) }
     setForm({ target_id: '', cert_path: '', key_path: '', fullchain_path: '', include_root: false,
-      reload_command: '' })
+      reload_command: '', chain_variant: 'auto' })
     setAddOpen(true)
   }
 
@@ -73,6 +82,7 @@ export function CertDeploySection({ certificate }) {
       fullchain_path: binding.fullchain_path || '',
       include_root: Boolean(binding.include_root),
       reload_command: binding.reload_command || '',
+      chain_variant: binding.chain_variant || 'auto',
     })
     setAddOpen(true)
   }
@@ -88,6 +98,8 @@ export function CertDeploySection({ certificate }) {
         fullchain_path: optionalPath(form.fullchain_path),
         include_root: Boolean(form.fullchain_path.trim() && form.include_root),
         reload_command: form.reload_command.trim(),
+        ...(form.chain_variant !== 'auto' || (editing?.chain_variant && editing.chain_variant !== 'auto')
+          ? { chain_variant: form.fullchain_path.trim() ? form.chain_variant : 'auto' } : {}),
       }
       if (editing) {
         await deployService.updateBinding(editing.id, payload)
@@ -156,6 +168,11 @@ export function CertDeploySection({ certificate }) {
                   )}
                   {binding.fullchain_path && binding.include_root && (
                     <Badge variant="secondary" size="sm">{t('deploy.rootIncluded')}</Badge>
+                  )}
+                  {binding.fullchain_path && binding.chain_variant && binding.chain_variant !== 'auto' && (
+                    <Badge variant="secondary" size="sm" data-testid="binding-variant">
+                      {variantLabel(chainVariants.find(v => v.id === binding.chain_variant) || { id: binding.chain_variant, ca_name: '' }, t)}
+                    </Badge>
                   )}
                   {binding.last_delivery && (
                     <Badge variant={STATUS_VARIANT[binding.last_delivery.status] || 'secondary'} size="sm"
@@ -269,6 +286,17 @@ export function CertDeploySection({ certificate }) {
                 <div className="text-xs text-text-tertiary">{t('export.includeRootDesc')}</div>
               </div>
             </label>
+          )}
+          {form.fullchain_path.trim() && chainVariants.length > 1 && (
+            <div className="space-y-1">
+              <label htmlFor="deploy-chain-variant" className="block text-xs font-medium text-text-secondary">
+                {t('chainVariant.label')}
+              </label>
+              <ChainVariantSelect id="deploy-chain-variant" variants={chainVariants} disableUnservable
+                                  value={form.chain_variant}
+                                  onChange={(value) => setForm({ ...form, chain_variant: value })} />
+              <p className="text-2xs text-text-tertiary">{t('chainVariant.deployHint')}</p>
+            </div>
           )}
           <div className="space-y-1">
             <label className="block text-xs font-medium text-text-secondary">

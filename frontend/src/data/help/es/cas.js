@@ -42,6 +42,19 @@ export default {
         ]
       },
       {
+        title: 'Certificados cruzados',
+        content: 'Un certificado cruzado lleva el sujeto y la clave de una CA bajo otro emisor, de modo que los clientes que solo confían en esa otra raíz pueden construir una ruta. Se coloca junto al certificado propio de la CA y nunca lo reemplaza.',
+        items: [
+          { label: 'Dónde', text: 'Detalles de la CA › Certificados cruzados; una CA que tiene uno muestra una insignia Firmada de forma cruzada' },
+          { label: 'Adjuntar', text: 'Pegue o elija un certificado (PEM o DER) emitido por otra CA para la clave de esta CA; se informa de las restricciones de nombre o de política que contenga' },
+          { label: 'Firmar de forma cruzada', text: 'Firme la clave de esta CA con otra CA presente en UCM, indicando una validez y una longitud de ruta' },
+          { label: 'Servir', text: 'Como máximo uno por CA se sirve en la cadena predeterminada (TLS, PKCS#12, ACME, WSTEP, TSA, despliegues, AIA .cer y .pem). Uno revocado, caducado o aún no válido nunca se sirve' },
+          { label: 'Cadena a presentar', text: 'Las exportaciones y los enlaces de despliegue pueden fijar la cadena predeterminada, la raíz autofirmada o un certificado cruzado. ACME ofrece las demás cadenas como alternativas (certbot --preferred-chain)' },
+          { label: 'Importar', text: 'Un certificado sobre la clave de una CA presente se adjunta a una raíz autofirmada; en una intermedia el 409 ofrece Adjuntar como certificado cruzado. La importación inteligente lo adjunta junto a una raíz presente o lo informa como omitido' },
+          { label: 'Reparar', text: 'La barra bajo las estadísticas lista los registros dañados por una importación anterior: Convertir en certificado cruzado (requiere delete:cas) y Restaurar como principal. Nada se ejecuta por sí solo' },
+        ]
+      },
+      {
         title: 'CAs respaldadas por HSM',
         items: [
           { label: 'Almacenamiento de clave', text: 'Elija Local (cifrado en BD) o HSM al crear la CA' },
@@ -84,7 +97,8 @@ export default {
       'Eliminar una CA NO revocará los certificados que haya emitido: revócalos primero',
       'Las claves privadas se almacenan cifradas; perder la base de datos significa perder las claves',
       'Las contraseñas del modo sin conexión NO son recuperables: guárdelas en su gestor de contraseñas / vault antes de confirmar',
-      'Se rechaza un certificado cruzado de una raíz autofirmada (mismo sujeto y clave, otro emisor), al importar y al subirlo tras Renovar mediante CSR: reemplazaría el certificado propio de la raíz',
+      'Un certificado cruzado nunca reemplaza el certificado propio de una CA: se rechaza (409) una intermedia que se recertificaría bajo otro emisor, salvo que la adjunte como certificado cruzado',
+      'Una raíz autofirmada sobrescrita o eliminada no se recupera con Convertir en certificado cruzado: restáurela desde una copia de seguridad o entregue su certificado a Restaurar como principal',
     ],
   },
   helpGuides: {
@@ -158,7 +172,7 @@ Importa certificados CA existentes mediante:
 
 Al importar sin clave privada, la CA puede verificar certificados pero no puede firmar nuevos.
 
-Se rechaza un certificado cruzado de una raíz autofirmada ya presente en UCM (mismo sujeto y clave, otro emisor), al importar y al subirlo tras **Renovar mediante CSR**: instalarlo reemplazaría el certificado propio de la raíz.
+Un certificado que lleva el sujeto y la clave de una CA ya presente en UCM, bajo otro emisor, es un certificado cruzado y nunca reemplaza el certificado propio de la CA. En una raíz autofirmada se adjunta como certificado cruzado. En una intermedia, y al subirlo tras **Renovar mediante CSR**, la importación se rechaza (409) y ofrece **Adjuntar como certificado cruzado**. La importación inteligente adjunta el que encuentra junto a una raíz presente y lo indica en el resultado; el que no puede adjuntar se omite y se informa como omitido.
 
 ## Exportar una CA
 
@@ -167,7 +181,25 @@ Formatos de exportación:
 - **DER**: Formato binario
 - **PKCS#12 (P12/PFX)**: Certificado + clave privada + cadena, protegido con contraseña
 
+Cuando un certificado cruzado ofrece otra ruta, el diálogo de exportación muestra **Cadena a presentar**: la cadena predeterminada que sirve UCM, la raíz autofirmada o un certificado cruzado.
+
 > 💡 La exportación PKCS#12 incluye la cadena completa de certificados y es ideal para respaldo.
+
+## Certificados cruzados
+
+Un certificado cruzado lleva el sujeto y la clave de una CA bajo la firma de otra CA. Los clientes que solo confían en la otra raíz construyen a través de él una ruta hasta su CA, así se renueva o migra una raíz sin romperlos. Se coloca junto al certificado propio de la CA, que nunca se reemplaza. Una CA que tiene uno muestra una insignia **Firmada de forma cruzada**.
+
+En los detalles de la CA, **Certificados cruzados** los lista:
+- **Adjuntar**: pegue o elija un certificado emitido por otra CA para la clave de esta CA (PEM o DER). Se informa de las restricciones de nombre o de política que contenga.
+- **Firmar de forma cruzada**: firme la clave de esta CA con otra CA presente en UCM; elija la validez y la longitud de ruta.
+- **Servir / Dejar de servir**: como máximo uno por CA se sirve, en la cadena predeterminada de TLS, PKCS#12, ACME, WSTEP, TSA y despliegues, y en las URL AIA \`.cer\` y \`.pem\`. Uno revocado, caducado o aún no válido se conserva y se puede exportar, pero nunca se sirve.
+- **Exportar** y **Desvincular**.
+
+Las exportaciones y los enlaces de despliegue pueden fijar otra cadena (**Cadena a presentar** / **Variante de cadena**). El servidor ACME ofrece las demás cadenas como alternativas, que el cliente elige con \`--preferred-chain\`. Los cambios llegan a los clientes tras la siguiente emisión o despliegue, y tras la caché de 24 horas de las URL AIA.
+
+### Reparar registros dañados
+
+Una barra bajo las estadísticas de la CA lista los registros que dejó una importación anterior: un registro duplicado que contiene el certificado cruzado de una raíz también presente (**Convertir en certificado cruzado** traslada sus CAs hijas y certificados a la raíz y elimina el duplicado), o una clave compartida por certificados distintos sin registro autofirmado (**Restaurar como principal** toma el certificado autofirmado). No se cambia nada sin un clic. Una raíz autofirmada sobrescrita o eliminada solo se recupera desde una copia de seguridad o mediante **Restaurar como principal**.
 
 ## Claves privadas
 

@@ -42,6 +42,19 @@ export default {
         ]
       },
       {
+        title: 'Certificati incrociati',
+        content: 'Un certificato incrociato riporta soggetto e chiave di una CA sotto un altro emittente, così i client che si fidano solo di quell\'altra root possono comunque costruire un percorso. Sta accanto al certificato della CA e non lo sostituisce mai.',
+        items: [
+          { label: 'Dove', text: 'Dettagli CA › Certificati incrociati; una CA che ne possiede uno mostra il badge Firmata in modo incrociato' },
+          { label: 'Associa', text: 'Incolla o scegli un certificato (PEM o DER) emesso da un\'altra CA per la chiave di questa CA; i vincoli di nome o di policy che contiene vengono segnalati' },
+          { label: 'Firma incrociata', text: 'Firma la chiave di questa CA con un\'altra CA presente in UCM, con una validità e una lunghezza del percorso' },
+          { label: 'Servi', text: 'Al massimo uno per CA è servito nella catena predefinita (TLS, PKCS#12, ACME, WSTEP, TSA, distribuzioni, AIA .cer e .pem). Uno revocato, scaduto o non ancora valido non viene mai servito' },
+          { label: 'Catena da presentare', text: 'Esportazioni e binding di distribuzione possono fissare la catena predefinita, la root autofirmata o un certificato incrociato. ACME propone le altre catene come alternative (certbot --preferred-chain)' },
+          { label: 'Importazione', text: 'Un certificato sulla chiave di una CA presente viene associato a una root autofirmata; su una intermedia il 409 propone Associa come certificato incrociato. Smart Import lo associa accanto a una root presente oppure lo segnala come escluso' },
+          { label: 'Riparazione', text: 'La barra sotto le statistiche elenca i record danneggiati da un\'importazione precedente: Converti in certificato incrociato (richiede delete:cas) e Ripristina come principale. Nulla viene eseguito automaticamente' },
+        ]
+      },
+      {
         title: 'CA supportate da HSM',
         items: [
           { label: 'Archiviazione chiave', text: 'Alla creazione della CA scegli Locale (cifrato in DB) o HSM' },
@@ -84,7 +97,8 @@ export default {
       'L\'eliminazione di una CA NON revoca i certificati che ha emesso: revocali prima',
       'Le chiavi private sono memorizzate crittografate; la perdita del database significa la perdita delle chiavi',
       'Le password della modalità offline NON sono recuperabili: conservale nel tuo password manager / vault prima di confermare',
-      'Un certificato incrociato di una root autofirmata (stesso soggetto e stessa chiave, altro emittente) viene rifiutato, all\'importazione e quando viene caricato dopo Rinnova tramite CSR: sostituirebbe il certificato della root stessa',
+      'Un certificato incrociato non sostituisce mai il certificato di una CA: una intermedia che verrebbe ricertificata sotto un altro emittente viene rifiutata (409) a meno che tu non la associ come certificato incrociato',
+      'Una root autofirmata sovrascritta o eliminata non viene recuperata da Converti in certificato incrociato: ripristinala da un backup, oppure fornisci il suo certificato a Ripristina come principale',
     ],
   },
   helpGuides: {
@@ -158,7 +172,7 @@ Importa certificati CA esistenti tramite:
 
 Quando si importa senza chiave privata, la CA può verificare i certificati ma non può firmarne di nuovi.
 
-Un certificato incrociato di una root autofirmata già presente in UCM (stesso soggetto e stessa chiave, altro emittente) viene rifiutato, all'importazione e quando viene caricato dopo **Rinnova tramite CSR**: installarlo sostituirebbe il certificato della root stessa.
+Un certificato che riporta soggetto e chiave di una CA già presente in UCM, sotto un altro emittente, è un certificato incrociato e non sostituisce mai il certificato della CA. Su una root autofirmata viene associato come certificato incrociato. Su una intermedia, e quando viene caricato dopo **Rinnova tramite CSR**, l'importazione viene rifiutata (409) e propone **Associa come certificato incrociato**. Smart Import associa quello trovato accanto a una root presente e lo elenca nel risultato; quello che non può associare viene escluso e segnalato come saltato.
 
 ## Esportazione di una CA
 
@@ -167,7 +181,25 @@ Formati di esportazione:
 - **DER**: Formato binario
 - **PKCS#12 (P12/PFX)**: Certificato + chiave privata + catena, protetto da password
 
+Quando un certificato incrociato offre un altro percorso, la finestra di esportazione mostra **Catena da presentare**: la catena predefinita servita da UCM, la root autofirmata o un certificato incrociato.
+
 > 💡 L'esportazione PKCS#12 include la catena completa dei certificati ed è ideale per il backup.
+
+## Certificati incrociati
+
+Un certificato incrociato riporta soggetto e chiave di una CA con la firma di un'altra CA. I client che si fidano solo dell'altra root costruiscono tramite esso un percorso verso la tua CA, ed è così che una root viene rinnovata o migrata senza interromperli. Sta accanto al certificato della CA, che non viene mai sostituito. Una CA che ne possiede uno mostra il badge **Firmata in modo incrociato**.
+
+Nei dettagli della CA, **Certificati incrociati** li elenca:
+- **Associa**: incolla o scegli un certificato emesso da un'altra CA per la chiave di questa CA (PEM o DER). I vincoli di nome o di policy che contiene vengono segnalati.
+- **Firma incrociata**: firma la chiave di questa CA con un'altra CA presente in UCM; scegli la validità e la lunghezza del percorso.
+- **Servi / Smetti di servire**: al massimo uno per CA è servito, nella catena predefinita di TLS, PKCS#12, ACME, WSTEP, TSA e distribuzioni, e dagli URL AIA \`.cer\` e \`.pem\`. Uno revocato, scaduto o non ancora valido viene conservato ed è esportabile, ma non viene mai servito.
+- **Esporta** e **Dissocia**.
+
+Esportazioni e binding di distribuzione possono fissare un'altra catena (**Catena da presentare** / **Variante di catena**). Il server ACME propone le altre catene come alternative, selezionate da un client con \`--preferred-chain\`. Le modifiche raggiungono i client dopo la prossima emissione o distribuzione, e dopo la cache di 24 ore degli URL AIA.
+
+### Riparazione dei record danneggiati
+
+Una barra sotto le statistiche delle CA elenca i record lasciati da un'importazione precedente: un record duplicato che contiene il certificato incrociato di una root presente anch'essa (**Converti in certificato incrociato** sposta i suoi figli e certificati sulla root ed elimina il duplicato), oppure una chiave condivisa da certificati distinti senza record autofirmato (**Ripristina come principale** prende il certificato autofirmato). Nulla viene modificato senza un clic. Una root autofirmata sovrascritta o eliminata torna solo da un backup o tramite **Ripristina come principale**.
 
 ## Chiavi private
 

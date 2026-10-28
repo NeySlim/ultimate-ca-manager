@@ -36,10 +36,10 @@ def _export_chain(ca, include_chain, variant, explicit=False):
     *ca*'s own certificate becomes its cross-certificate only when the caller named a variant;
     the CAs above it follow the served rule either way."""
     from utils.ca_chain import issuer_chain
-    if not include_chain:
+    if not include_chain and not explicit:
         return base64.b64decode(ca.crt), []
     links = issuer_chain(ca, variant, substitute_start=explicit)
-    return links[0].pem, [link.pem for link in links[1:]]
+    return links[0].pem, ([link.pem for link in links[1:]] if include_chain else [])
 
 
 def _requested_variant(source, ca):

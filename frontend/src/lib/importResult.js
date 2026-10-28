@@ -8,3 +8,12 @@ export function soleImported(result) {
   const found = KINDS.flatMap(([type, key]) => (ids[key] || []).map((id) => ({ type, id })))
   return found.length === 1 ? found[0] : null
 }
+
+// Cross-certificates a Smart Import attached to a held root, or left out because it could not (#400)
+export function crossSummary(result) {
+  const details = result?.warning_details || []
+  return {
+    attached: details.filter(d => d.code === 'cross_certificate_attached').length,
+    skipped: details.filter(d => d.code === 'cross_certificate_skipped').length,
+  }
+}

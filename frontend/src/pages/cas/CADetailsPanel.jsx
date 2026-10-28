@@ -14,6 +14,7 @@ import { RestoreModal } from '../../components/cas/RestoreModal'
 import { RevokeCertificateModal } from '../../components/RevokeCertificateModal'
 import { ManageTemplatePinsModal } from '../../components/cas/ManageTemplatePinsModal'
 import { CACrlSection } from '../../components/cas/CACrlSection'
+import { CrossCertificatesSection } from '../../components/cas/CrossCertificatesSection'
 import { SignatureSchemeField } from '../../components/cas/SignatureSchemeField'
 import { ComplianceProfileField } from '../../components/cas/ComplianceProfileField'
 import { UploadCACertModal } from './UploadCACertModal'
@@ -114,6 +115,11 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
             <Badge variant={ca.type === 'root' || ca.is_root ? 'warning' : 'primary'} size="sm">
               {ca.type === 'root' || ca.is_root ? t('common.rootCA') : t('common.intermediateCA')}
             </Badge>
+            {ca.cross_certificate_count > 0 && (
+              <Badge variant="info" size="sm" data-testid="cross-badge">
+                {t('crossCerts.badge', { count: ca.cross_certificate_count })}
+              </Badge>
+            )}
             {ca.uses_hsm && (
               <Badge variant="info" size="sm" title={[ca.hsm_provider_name, ca.hsm_key_label].filter(Boolean).join(' / ')}>
                 {t('cas.detail.hsmBacked')}
@@ -273,6 +279,9 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
       {/* Revocation list — key-less/offline CA served from an external CRL (#302) */}
       <CACrlSection ca={ca} />
 
+      {/* Cross-certificates of this CA's key (#400) */}
+      <CrossCertificatesSection ca={ca} canWrite={canWrite('cas')} />
+
       {/* Subject Info */}
       <CompactSection title={t('common.subject')}>
         <CompactGrid>
@@ -334,6 +343,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
       canExportKey={canExportPrivateKey('ca', { canWrite, hasPermission, usesHsm: !!ca.uses_hsm })}
       isHsmBacked={!!ca.uses_hsm}
       onExport={onExport}
+      chainVariantsFor={{ type: 'ca', id: ca.id }}
     />
 
     <TakeOfflineModal

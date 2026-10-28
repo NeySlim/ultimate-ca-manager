@@ -47,12 +47,12 @@ def list_cross_certificates(ca_id):
 @bp.route('/api/v2/cas/<int:ca_id>/chain-variants', methods=['GET'])
 @require_auth(['read:cas'])
 def chain_variants_of_ca(ca_id):
-    """The chains this CA can present on export: ``primary`` and one per cross-certificate on its path."""
+    """The chains this CA can present on export (``default`` is what a plain export returns): ``primary`` and one per cross-certificate on its path."""
     from utils.ca_chain import chain_variants
     ca, _, err = _ca_and_row(ca_id)
     if err:
         return err
-    return success_response(data=chain_variants(ca))
+    return success_response(data=chain_variants(ca, substitute_start=False))
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/cross-certificates', methods=['POST'])

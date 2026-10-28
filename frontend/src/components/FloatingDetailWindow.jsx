@@ -332,6 +332,7 @@ export function FloatingDetailWindow({ windowInfo }) {
       hasPermission, canWrite, usesHsm: !!data?.uses_hsm,
     }),
     entityType: isCA ? 'ca' : 'certificate',
+    chainVariantsFor: isCA || isCert ? { type: isCA ? 'ca' : 'certificate', id: windowInfo.entityId } : undefined,
     entityName: title,
     onLint: (isCert || isUserCert) ? () => setLintOpen(true) : null,
     onRequestKeyRecovery: (isCert || isUserCert) && hasPrivateKey && hasPermission('write:key_recovery') ? () => setKeyRecoveryOpen(true) : null,
@@ -515,7 +516,7 @@ function DetailContent({ type, data, canWrite, canDelete, hasPermission, onExpor
 /**
  * ActionBar — Toolbar under the window header with labeled action buttons
  */
-function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityName, onLint, onRequestKeyRecovery, onRenew, onRevoke, onUnhold, onOffline, onRestore, onManagePins, onDelete, canExport = true, onDownloadCsr, onUploadCertificate, onRenewCsr, t }) {
+function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityName, onLint, onRequestKeyRecovery, onRenew, onRevoke, onUnhold, onOffline, onRestore, onManagePins, onDelete, canExport = true, onDownloadCsr, onUploadCertificate, onRenewCsr, chainVariantsFor, t }) {
   const [showExportModal, setShowExportModal] = useState(false)
   const btnBase = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150'
 
@@ -637,6 +638,7 @@ function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityNa
       hasPrivateKey={hasPrivateKey}
       canExportKey={canExportKey}
       onExport={onExport}
+      chainVariantsFor={chainVariantsFor}
     />
     </>
   )

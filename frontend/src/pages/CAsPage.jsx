@@ -24,6 +24,7 @@ import { CADetailsPanel } from './cas/CADetailsPanel'
 import { ManageTemplatePinsModal } from '../components/cas/ManageTemplatePinsModal'
 import { ChainRepairBar } from './cas/ChainRepairBar'
 import { CreateCAModal } from './cas/CreateCAModal'
+import { RestorePrimaryModal } from '../components/cas/RestorePrimaryModal'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 
@@ -34,7 +35,7 @@ export default function CAsPage() {
   const { isMobile } = useMobile()
   const { openWindow } = useWindowManager()
   const openEntity = useOpenEntity()
-  const { showSuccess, showError, showConfirm } = useNotification()
+  const { showSuccess, showError, showWarning, showConfirm } = useNotification()
   const { canWrite, canDelete, hasPermission } = usePermission()
   const { muteToasts } = useWebSocket()
   const [searchParams, setSearchParams] = useSearchParams()
@@ -56,6 +57,9 @@ export default function CAsPage() {
   // Chain repair state
   const [chainRepair, setChainRepair] = useState(null)
   const [chainRepairRunning, setChainRepairRunning] = useState(false)
+  // CA records damaged before cross-certificates existed (#400), with their explicit repairs
+  const [crossFindings, setCrossFindings] = useState([])
+  const [restoreFinding, setRestoreFinding] = useState(null)
   
   // Pagination state
   const [page, setPage] = useState(1)
@@ -95,6 +99,9 @@ export default function CAsPage() {
       casService.getChainRepairStatus()
         .then(res => setChainRepair(res.data || null))
         .catch(() => {})
+      casService.getCrossFindings()
+        .then(res => setCrossFindings(res.data?.findings || []))
+        .catch(() => setCrossFindings([]))
     }
   }, [canWriteCAs, showError, t])
 
@@ -217,6 +224,23 @@ export default function CAsPage() {
     finally { setChainRepairRunning(false) }
   // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [])
+
+  const handleConvertToCross = async (finding) => {
+    const confirmed = await showConfirm(t('crossCerts.convertConfirm', { name: finding.ca_name, root: finding.root_name }), {
+      title: t('crossCerts.convertToCross'),
+      confirmText: t('crossCerts.convertToCross'),
+      variant: 'danger'
+    })
+    if (!confirmed) return
+    try {
+      const res = await casService.convertToCross(finding.ca_id)
+      for (const w of res?.data?.warnings || []) showWarning(w)
+      showSuccess(t('crossCerts.converted'))
+      loadCAs()
+    } catch (error) {
+      showError(error.message || t('crossCerts.convertFailed'))
+    }
+  }
 
   const handleDelete = async (id) => {
     const confirmed = await showConfirm(t('messages.confirm.delete.ca'), {
@@ -405,7 +429,10 @@ export default function CAsPage() {
         subtitle={t('cas.subtitle', { count: cas.length })}
         icon={ShieldCheck}
         stats={stats}
-        afterStats={<ChainRepairBar data={chainRepair} running={chainRepairRunning} onRun={runChainRepair} canRunRepair={canWrite('cas')} t={t} />}
+        afterStats={<ChainRepairBar data={chainRepair} running={chainRepairRunning} onRun={runChainRepair} canRunRepair={canWrite('cas')} t={t}
+          findings={crossFindings} canConvert={canWrite('cas') && canDelete('cas')} canRestore={canWrite('cas')}
+          onConvert={handleConvertToCross} onRestore={(finding, caId) => setRestoreFinding({ ...finding, caId })}
+          caName={(id) => cas.find(c => c.id === id)?.name || `#${id}`} />}
         helpPageKey="cas"
         // Split view on xl+ screens - panel always visible
         splitView={isMobile}
@@ -611,6 +638,13 @@ export default function CAsPage() {
           if (sole?.type === 'ca') loadCADetails({ id: sole.id })
           else if (sole) openEntity(sole.type, sole.id)
         }}
+      />
+
+      <RestorePrimaryModal
+        open={!!restoreFinding}
+        onClose={() => setRestoreFinding(null)}
+        ca={restoreFinding ? cas.find(c => c.id === restoreFinding.caId) : null}
+        onDone={loadCAs}
       />
 
       {/* Manage Template Pins Modal */}

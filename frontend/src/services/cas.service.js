@@ -37,6 +37,7 @@ export const casService = {
       include_chain: options.includeChain ?? false,
       password: options.password,
       legacy: options.legacy ?? false,
+      ...(options.chainVariant ? { chain_variant: options.chainVariant } : {}),
     }, { responseType: 'blob' })
   },
 
@@ -44,8 +45,54 @@ export const casService = {
     return apiClient.post(`/cas/export`, {
       format,
       include_chain: options.includeChain ?? false,
-      password: options.password
+      password: options.password,
+      ...(options.chainVariant ? { chain_variant: options.chainVariant } : {}),
     }, { responseType: 'blob' })
+  },
+
+  // Cross-certificates (#400)
+  async getCrossCertificates(id) {
+    return apiClient.get(`/cas/${id}/cross-certificates`)
+  },
+
+  async attachCrossCertificate(id, certificate, { served = false } = {}) {
+    return apiClient.post(`/cas/${id}/cross-certificates`, { certificate, served })
+  },
+
+  async setCrossCertificateServed(id, xid, served) {
+    return apiClient.patch(`/cas/${id}/cross-certificates/${xid}`, { served })
+  },
+
+  async detachCrossCertificate(id, xid) {
+    return apiClient.delete(`/cas/${id}/cross-certificates/${xid}`)
+  },
+
+  async exportCrossCertificate(id, xid, format = 'pem') {
+    return apiClient.get(`/cas/${id}/cross-certificates/${xid}/export?format=${format}`, { responseType: 'blob' })
+  },
+
+  async crossSign(issuerId, { subjectCaId, validityDays, pathLength } = {}) {
+    const body = { subject_ca_id: subjectCaId }
+    if (validityDays) body.validity_days = validityDays
+    if (pathLength !== undefined && pathLength !== null && pathLength !== '') body.path_length = pathLength
+    return apiClient.post(`/cas/${issuerId}/cross-sign`, body)
+  },
+
+  async getChainVariants(id) {
+    return apiClient.get(`/cas/${id}/chain-variants`)
+  },
+
+  // Repairs of records damaged before cross-certificates existed
+  async getCrossFindings() {
+    return apiClient.get('/cas/cross-findings')
+  },
+
+  async convertToCross(id) {
+    return apiClient.post(`/cas/${id}/convert-to-cross`, {})
+  },
+
+  async restorePrimary(id, certificate) {
+    return apiClient.post(`/cas/${id}/restore-primary`, { certificate })
   },
 
   /**

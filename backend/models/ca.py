@@ -565,9 +565,13 @@ class CA(db.Model):
         
         # Aggregates, so the rows are not loaded into the session
         from models.ca_cross_certificate import CACrossCertificate as _Cross
-        cross_total, cross_served = (0, 0) if self.id is None else db.session.query(
-            db.func.count(_Cross.id), db.func.coalesce(db.func.sum(db.case((_Cross.served.is_(True), 1), else_=0)), 0)
-        ).filter(_Cross.ca_id == self.id).one()
+        cross_total = 0 if self.id is None else db.session.query(db.func.count(_Cross.id)).filter(
+            _Cross.ca_id == self.id).scalar()
+        if cross_total:
+            from services.ca import cross_certs
+            cross_served = cross_certs.served_for(self) is not None
+        else:
+            cross_served = False
 
         data = {
             "id": self.id,

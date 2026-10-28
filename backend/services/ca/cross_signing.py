@@ -9,6 +9,7 @@ from datetime import timedelta
 from typing import List, Optional, Tuple
 
 from cryptography import x509
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 
 from models import CA
@@ -52,8 +53,11 @@ def _chain_has_key(start: CA, key_spki: bytes, include_start: bool) -> bool:
     from utils.ca_chain import walk_ca_chain
     for ca in walk_ca_chain(start, include_start=include_start):
         cert = cross_certs._load_record(ca) if ca.crt else None
-        if cert is not None and cross_certs._spki(cert) == key_spki:
-            return True
+        try:
+            if cert is not None and cross_certs._spki(cert) == key_spki:
+                return True
+        except UnsupportedAlgorithm:
+            continue
     return False
 
 

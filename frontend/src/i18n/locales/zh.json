@@ -671,7 +671,8 @@
       "scanNetwork": "扫描网络",
       "generateReport": "生成报告"
     },
-    "expiresInDays": "{{count}} 天后到期"
+    "expiresInDays": "{{count}} 天后到期",
+    "chainRepairSameKey": "共用密钥、证书不同（交叉证书？）"
   },
   "certificates": {
     "createCertificate": "创建证书",
@@ -4042,7 +4043,11 @@
     "typePrivateKey": "私钥",
     "verifiedTrustStore": "信任存储",
     "linkedToCA": "托管CA",
-    "trustAnchor": "信任锚"
+    "trustAnchor": "信任锚",
+    "crossAttached_one": "已将 {{count}} 个交叉证书附加到已持有的 CA",
+    "crossAttached_other": "已将 {{count}} 个交叉证书附加到已持有的 CA",
+    "crossSkipped_one": "已排除 {{count}} 个交叉证书；自签名 CA 予以保留",
+    "crossSkipped_other": "已排除 {{count}} 个交叉证书；自签名 CA 予以保留"
   },
   "webhooks": {
     "eventLabels": {
@@ -5700,5 +5705,65 @@
     "linesOpt": "{{count}} 行",
     "filters": "筛选",
     "exclude": "排除"
+  },
+  "crossCerts": {
+    "title": "交叉证书",
+    "none": "没有交叉证书。请附加由另一个 CA 为此密钥签发的证书，或从 UCM 中持有的 CA 签发一个。",
+    "issuedBy": "签发者：{{issuer}}",
+    "served": "已提供",
+    "state": {
+      "revoked": "已吊销",
+      "expired": "已过期",
+      "notYetValid": "尚未生效"
+    },
+    "serve": "提供",
+    "stopServing": "停止提供",
+    "servedNow": "此交叉证书现已在默认链中提供",
+    "unserved": "此交叉证书不再被提供",
+    "updateFailed": "无法更新交叉证书",
+    "attach": "附加",
+    "attachTitle": "附加交叉证书",
+    "attachHint": "粘贴或选择携带此 CA 的主题和密钥、并由另一个 CA 签发的证书。该 CA 自身的证书会被保留。",
+    "serveNow": "在默认链中提供",
+    "attached": "交叉证书已附加",
+    "attachFailed": "无法附加交叉证书",
+    "attachAsCross": "附加为交叉证书",
+    "offerHint": "此证书是该 CA 密钥的另一个证书。请将其附加在 CA 自身证书旁，而不是替换它。",
+    "sign": "交叉签名",
+    "signTitle": "对此 CA 进行交叉签名",
+    "signHint": "使用 UCM 中持有的另一个 CA 为 {{name}} 的密钥签名。结果将作为交叉证书存储在此处。",
+    "signIssuer": "签名 CA",
+    "selectIssuer": "选择 CA",
+    "signValidity": "有效期（天）",
+    "signed": "交叉证书已签发",
+    "signFailed": "交叉签名失败",
+    "detach": "分离",
+    "detachConfirm": "分离由 {{issuer}} 签发的交叉证书？该证书将从 UCM 中移除。",
+    "detached": "交叉证书已分离",
+    "badge": "已交叉签名",
+    "findings_one": "{{count}} 个交叉证书问题",
+    "findings_other": "{{count}} 个交叉证书问题",
+    "findingsNote": "被覆盖或删除的自签名根 CA 无法在此找回：请从备份恢复，或将其证书交给“恢复为主证书”。",
+    "findingShadowed": "{{name}} 持有 {{root}} 的交叉证书",
+    "findingSameKey": "多个证书共用 {{subject}} 的密钥",
+    "convertToCross": "转换为交叉证书",
+    "convertConfirm": "将 {{name}} 转为 {{root}} 的交叉证书？其子 CA 和已签发的证书将移至 {{root}}，重复记录将被删除。",
+    "converted": "重复记录已转换为交叉证书",
+    "convertFailed": "无法转换重复记录",
+    "restorePrimary": "恢复为主证书",
+    "restorePrimaryOn": "在 {{name}} 上恢复",
+    "restoreHint": "提供此 CA 密钥的自签名证书。记录当前持有的证书将作为交叉证书保留。",
+    "restored": "自签名证书已恢复",
+    "restoreFailed": "无法恢复自签名证书"
+  },
+  "chainVariant": {
+    "label": "要呈现的链",
+    "auto": "默认（UCM 提供的链）",
+    "primary": "自签名根",
+    "cross": "{{issuer}} 对 {{name}} 的交叉证书",
+    "served": "已提供",
+    "notServable": "已吊销、已过期或尚未生效",
+    "exportHint": "交叉证书使信任另一根 CA 的客户端能够构建到此 CA 的路径。",
+    "deployHint": "写入完整链文件的链。已吊销、已过期或尚未生效的交叉证书绝不会被推送。"
   }
 }

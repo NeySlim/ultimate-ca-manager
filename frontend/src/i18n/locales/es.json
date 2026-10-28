@@ -671,7 +671,8 @@
       "scanNetwork": "Escanear red",
       "generateReport": "Generar informe"
     },
-    "expiresInDays": "Expira en {{count}} días"
+    "expiresInDays": "Expira en {{count}} días",
+    "chainRepairSameKey": "claves compartidas, certificados distintos (¿certificado cruzado?)"
   },
   "certificates": {
     "createCertificate": "Crear certificado",
@@ -4042,7 +4043,11 @@
     "typePrivateKey": "Clave privada",
     "verifiedTrustStore": "Trust Store",
     "linkedToCA": "CA gestionada",
-    "trustAnchor": "Ancla de confianza"
+    "trustAnchor": "Ancla de confianza",
+    "crossAttached_one": "{{count}} certificado cruzado adjuntado a una CA ya presente",
+    "crossAttached_other": "{{count}} certificados cruzados adjuntados a CAs ya presentes",
+    "crossSkipped_one": "{{count}} certificado cruzado omitido; se conserva la CA autofirmada",
+    "crossSkipped_other": "{{count}} certificados cruzados omitidos; se conservan las CAs autofirmadas"
   },
   "webhooks": {
     "eventLabels": {
@@ -5700,5 +5705,65 @@
     "linesOpt": "{{count}} líneas",
     "filters": "Filtros",
     "exclude": "Excluir"
+  },
+  "crossCerts": {
+    "title": "Certificados cruzados",
+    "none": "Ningún certificado cruzado. Adjunte uno emitido por otra CA para esta clave, o firme uno desde una CA presente en UCM.",
+    "issuedBy": "Emitido por {{issuer}}",
+    "served": "Servido",
+    "state": {
+      "revoked": "Revocado",
+      "expired": "Caducado",
+      "notYetValid": "Aún no válido"
+    },
+    "serve": "Servir",
+    "stopServing": "Dejar de servir",
+    "servedNow": "Este certificado cruzado se sirve ahora en la cadena predeterminada",
+    "unserved": "Este certificado cruzado ya no se sirve",
+    "updateFailed": "No se pudo actualizar el certificado cruzado",
+    "attach": "Adjuntar",
+    "attachTitle": "Adjuntar un certificado cruzado",
+    "attachHint": "Pegue o elija un certificado que lleve el sujeto y la clave de esta CA y esté emitido por otra CA. Se conserva el certificado propio de la CA.",
+    "serveNow": "Servirlo en la cadena predeterminada",
+    "attached": "Certificado cruzado adjuntado",
+    "attachFailed": "No se pudo adjuntar el certificado cruzado",
+    "attachAsCross": "Adjuntar como certificado cruzado",
+    "offerHint": "Este certificado es otro certificado de la clave de esta CA. Adjúntelo junto al certificado propio de la CA en lugar de reemplazarlo.",
+    "sign": "Firmar de forma cruzada",
+    "signTitle": "Firmar de forma cruzada esta CA",
+    "signHint": "Firme la clave de {{name}} con otra CA presente en UCM. El resultado se guarda aquí como certificado cruzado.",
+    "signIssuer": "CA firmante",
+    "selectIssuer": "Seleccione una CA",
+    "signValidity": "Validez (días)",
+    "signed": "Certificado cruzado emitido",
+    "signFailed": "Falló la firma cruzada",
+    "detach": "Desvincular",
+    "detachConfirm": "¿Desvincular el certificado cruzado emitido por {{issuer}}? El certificado se elimina de UCM.",
+    "detached": "Certificado cruzado desvinculado",
+    "badge": "Firmada de forma cruzada",
+    "findings_one": "{{count}} hallazgo de certificado cruzado",
+    "findings_other": "{{count}} hallazgos de certificado cruzado",
+    "findingsNote": "Una raíz autofirmada sobrescrita o eliminada no se recupera aquí: restáurela desde una copia de seguridad o entregue su certificado a Restaurar como principal.",
+    "findingShadowed": "{{name}} contiene el certificado cruzado de {{root}}",
+    "findingSameKey": "Varios certificados comparten la clave de {{subject}}",
+    "convertToCross": "Convertir en certificado cruzado",
+    "convertConfirm": "¿Convertir {{name}} en certificado cruzado de {{root}}? Sus CAs hijas y certificados emitidos pasan a {{root}} y el registro duplicado se elimina.",
+    "converted": "El duplicado se convirtió en certificado cruzado",
+    "convertFailed": "No se pudo convertir el duplicado",
+    "restorePrimary": "Restaurar como principal",
+    "restorePrimaryOn": "Restaurar en {{name}}",
+    "restoreHint": "Entregue el certificado autofirmado de la clave de esta CA. El certificado que contiene ahora el registro se conserva como certificado cruzado.",
+    "restored": "Certificado autofirmado restaurado",
+    "restoreFailed": "No se pudo restaurar el certificado autofirmado"
+  },
+  "chainVariant": {
+    "label": "Cadena a presentar",
+    "auto": "Predeterminada (la cadena que sirve UCM)",
+    "primary": "Raíz autofirmada",
+    "cross": "Certificado cruzado de {{name}} por {{issuer}}",
+    "served": "servido",
+    "notServable": "revocado, caducado o aún no válido",
+    "exportHint": "Un certificado cruzado permite a los clientes que confían en otra raíz construir una ruta hasta esta CA.",
+    "deployHint": "La cadena escrita en el archivo de cadena completa. Un certificado cruzado revocado, caducado o aún no válido nunca se envía."
   }
 }

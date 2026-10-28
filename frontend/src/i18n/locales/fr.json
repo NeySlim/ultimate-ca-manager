@@ -1989,7 +1989,8 @@
       "scanNetwork": "Scanner le réseau",
       "generateReport": "Générer un rapport"
     },
-    "expiresInDays": "Expire dans {{count}} jours"
+    "expiresInDays": "Expire dans {{count}} jours",
+    "chainRepairSameKey": "clés partagées, certificats distincts (certificat croisé ?)"
   },
   "revocation": {
     "reasonHelpNoHold": "Le motif est publié dans la CRL du parent et ne peut plus être modifié ; la révocation d'une CA est définitive.",
@@ -2283,7 +2284,11 @@
     "typePrivateKey": "Clé privée",
     "verifiedTrustStore": "Trust Store",
     "linkedToCA": "CA gérée",
-    "trustAnchor": "Ancre de confiance"
+    "trustAnchor": "Ancre de confiance",
+    "crossAttached_one": "{{count}} certificat croisé rattaché à une CA déjà détenue",
+    "crossAttached_other": "{{count}} certificats croisés rattachés à des CA déjà détenues",
+    "crossSkipped_one": "{{count}} certificat croisé écarté ; la CA auto-signée est conservée",
+    "crossSkipped_other": "{{count}} certificats croisés écartés ; les CA auto-signées sont conservées"
   },
   "importExport": {
     "importCA": "Importer une AC",
@@ -5703,5 +5708,65 @@
     "linesOpt": "{{count}} lignes",
     "filters": "Filtres",
     "exclude": "Exclure"
+  },
+  "crossCerts": {
+    "title": "Certificats croisés",
+    "none": "Aucun certificat croisé. Rattachez-en un émis par une autre CA pour cette clé, ou signez-en un depuis une CA détenue dans UCM.",
+    "issuedBy": "Émis par {{issuer}}",
+    "served": "Servi",
+    "state": {
+      "revoked": "Révoqué",
+      "expired": "Expiré",
+      "notYetValid": "Pas encore valide"
+    },
+    "serve": "Servir",
+    "stopServing": "Ne plus servir",
+    "servedNow": "Ce certificat croisé est désormais servi dans la chaîne par défaut",
+    "unserved": "Ce certificat croisé n'est plus servi",
+    "updateFailed": "Impossible de mettre à jour le certificat croisé",
+    "attach": "Rattacher",
+    "attachTitle": "Rattacher un certificat croisé",
+    "attachHint": "Collez ou choisissez un certificat qui porte le sujet et la clé de cette CA et qui est émis par une autre CA. Le certificat propre de la CA est conservé.",
+    "serveNow": "Le servir dans la chaîne par défaut",
+    "attached": "Certificat croisé rattaché",
+    "attachFailed": "Impossible de rattacher le certificat croisé",
+    "attachAsCross": "Rattacher comme certificat croisé",
+    "offerHint": "Ce certificat est un autre certificat de la clé de cette CA. Rattachez-le à côté du certificat propre de la CA au lieu de le remplacer.",
+    "sign": "Signer en croisé",
+    "signTitle": "Signer cette CA en croisé",
+    "signHint": "Signez la clé de {{name}} avec une autre CA détenue dans UCM. Le résultat est stocké ici comme certificat croisé.",
+    "signIssuer": "CA signataire",
+    "selectIssuer": "Sélectionner une CA",
+    "signValidity": "Validité (jours)",
+    "signed": "Certificat croisé émis",
+    "signFailed": "Échec de la signature croisée",
+    "detach": "Détacher",
+    "detachConfirm": "Détacher le certificat croisé émis par {{issuer}} ? Le certificat est supprimé d'UCM.",
+    "detached": "Certificat croisé détaché",
+    "badge": "Signée en croisé",
+    "findings_one": "{{count}} constat sur les certificats croisés",
+    "findings_other": "{{count}} constats sur les certificats croisés",
+    "findingsNote": "Une racine auto-signée écrasée ou supprimée n'est pas récupérée ici : restaurez-la depuis une sauvegarde, ou fournissez son certificat à Restaurer comme principal.",
+    "findingShadowed": "{{name}} détient le certificat croisé de {{root}}",
+    "findingSameKey": "Plusieurs certificats partagent la clé de {{subject}}",
+    "convertToCross": "Convertir en certificat croisé",
+    "convertConfirm": "Transformer {{name}} en certificat croisé de {{root}} ? Ses CA filles et les certificats émis passent sous {{root}} et l'enregistrement en double est supprimé.",
+    "converted": "Le doublon a été converti en certificat croisé",
+    "convertFailed": "Impossible de convertir le doublon",
+    "restorePrimary": "Restaurer comme principal",
+    "restorePrimaryOn": "Restaurer sur {{name}}",
+    "restoreHint": "Fournissez le certificat auto-signé de la clé de cette CA. Le certificat que l'enregistrement détient actuellement est conservé comme certificat croisé.",
+    "restored": "Certificat auto-signé restauré",
+    "restoreFailed": "Impossible de restaurer le certificat auto-signé"
+  },
+  "chainVariant": {
+    "label": "Chaîne à présenter",
+    "auto": "Par défaut (la chaîne servie par UCM)",
+    "primary": "Racine auto-signée",
+    "cross": "Certificat croisé de {{name}} par {{issuer}}",
+    "served": "servi",
+    "notServable": "révoqué, expiré ou pas encore valide",
+    "exportHint": "Un certificat croisé permet aux clients qui font confiance à une autre racine de construire un chemin vers cette CA.",
+    "deployHint": "La chaîne écrite dans le fichier de chaîne complète. Un certificat croisé révoqué, expiré ou pas encore valide n'est jamais poussé."
   }
 }

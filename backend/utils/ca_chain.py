@@ -186,12 +186,13 @@ def anchor_chain(start):
     return links + extra
 
 
-def chain_variants(start):
+def chain_variants(start, substitute_start=True):
     """Every chain *start* can present: ``primary`` plus one per cross-certificate on its path.
 
     Each entry: ``id`` (``primary`` / ``cross:<id>``), ``ca_id``, ``cross_certificate_id``,
     ``served``, ``servable`` and ``default`` (the one ``auto`` resolves to), plus ``ca_name``, and
-    ``issuer`` and ``valid_to`` of a cross-certificate."""
+    ``issuer`` and ``valid_to`` of a cross-certificate.
+    ``substitute_start=False`` marks the default of an export, which keeps *start*'s own certificate."""
     variants = [{'id': PRIMARY, 'ca_id': getattr(start, 'id', None), 'cross_certificate_id': None,
                  'served': False, 'servable': True, 'default': False,
                  'ca_name': getattr(start, 'descr', None), 'issuer': None, 'valid_to': None}]
@@ -201,7 +202,7 @@ def chain_variants(start):
                              'served': bool(row.served), 'servable': row.servable, 'default': False,
                              'ca_name': ca.descr, 'issuer': row.issuer,
                              'valid_to': utc_isoformat(row.valid_to)})
-    chosen = next((link.cross.id for link in issuer_chain(start) if link.cross is not None), None)
+    chosen = next((link.cross.id for link in issuer_chain(start, substitute_start=substitute_start) if link.cross is not None), None)
     wanted = f'cross:{chosen}' if chosen is not None else PRIMARY
     for entry in variants:
         entry['default'] = entry['id'] == wanted

@@ -590,6 +590,7 @@ export function CertificateDetails({
       hasPrivateKey={!!cert.has_private_key}
       canExportKey={canExportKey}
       onExport={onExport}
+      chainVariantsFor={{ type: 'certificate', id: cert.id }}
     />
 
     {/* Conformance Lint Modal */}

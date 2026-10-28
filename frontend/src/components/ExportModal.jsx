@@ -20,7 +20,9 @@ import { useTranslation } from 'react-i18next'
 import { Download, Lock, Certificate, ShieldCheck } from '@phosphor-icons/react'
 import { Modal } from './Modal'
 import { Button } from './Button'
+import { ChainVariantSelect } from './ChainVariantSelect'
 import { cn } from '../lib/utils'
+import { fetchChainVariants } from '../lib/crossCertificates'
 import { exportPasswordPolicy, isExportPasswordValid, loadExportPasswordPolicy } from '../lib/exportPassword'
 
 const FORMATS = [
@@ -42,6 +44,7 @@ export function ExportModal({
   isHsmBacked = false,
   defaultFormat = 'pem',
   onExport,
+  chainVariantsFor,
 }) {
   const { t } = useTranslation()
   const [format, setFormat] = useState('pem')
@@ -53,6 +56,9 @@ export function ExportModal({
   // AES-256/SHA-256 default as a wrong password (#331); per-export, off by default
   const [legacy, setLegacy] = useState(false)
   const [exporting, setExporting] = useState(false)
+  // Chains a cross-certificate makes possible (#400); empty when there is no choice
+  const [chainVariants, setChainVariants] = useState([])
+  const [chainVariant, setChainVariant] = useState('auto')
 
   // Reset state when modal opens
   useEffect(() => {
@@ -64,8 +70,19 @@ export function ExportModal({
       setPassword('')
       setLegacy(false)
       setExporting(false)
+      setChainVariant('auto')
     }
   }, [open, defaultFormat])
+
+  useEffect(() => {
+    setChainVariants([])
+    if (!open || !chainVariantsFor?.id) return undefined
+    let cancelled = false
+    fetchChainVariants(chainVariantsFor)
+      .then((variants) => { if (!cancelled) setChainVariants(Array.isArray(variants) ? variants : []) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [open, chainVariantsFor?.type, chainVariantsFor?.id])
 
   // PKCS12 always includes key — sync state
   const isPkcs12 = format === 'pkcs12'
@@ -103,6 +120,7 @@ export function ExportModal({
         includeKey: effectiveIncludeKey,
         password: (isPkcs12 || isJks) ? password : undefined,
         legacy: isPkcs12 ? legacy : undefined,
+        chainVariant: includeChain && chainVariant !== 'auto' ? chainVariant : undefined,
       })
       onClose()
     } catch {
@@ -183,6 +201,22 @@ export function ExportModal({
               <div className="text-xs text-text-tertiary">{t('export.includeChainDesc', 'Include issuing CA certificates')}</div>
             </div>
           </label>
+
+          {/* Which chain to present when a cross-certificate offers another path (#400) */}
+          {includeChain && chainVariants.length > 1 && (
+            <div className="ml-6 px-3 py-2 space-y-1">
+              <label htmlFor="export-chain-variant" className="text-sm text-text-primary">
+                {t('chainVariant.label')}
+              </label>
+              <ChainVariantSelect
+                id="export-chain-variant"
+                variants={chainVariants}
+                value={chainVariant}
+                onChange={setChainVariant}
+              />
+              <div className="text-xs text-text-tertiary">{t('chainVariant.exportHint')}</div>
+            </div>
+          )}
 
           {/* Root trust anchors are normally installed on clients, not served. */}
           {entityType === 'certificate' && includeChain && (
