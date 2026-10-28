@@ -7,6 +7,7 @@ from utils.response import success_response, error_response
 from models import Certificate, CA, db
 from models.truststore import TrustedCertificate
 from services.compliance_service import calculate_compliance_score
+from utils.cert_issuer import find_ca_by_ski
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -91,7 +92,7 @@ def _validate_cert_chain(cert):
     else:
         # No caref — try AKI lookup
         if cert.aki:
-            ca = CA.query.filter(CA.ski == cert.aki).first()
+            ca = find_ca_by_ski(cert.aki)
             if ca:
                 chain.append({'name': ca.common_name or ca.descr, 'type': 'managed_ca'})
                 status = 'partial'

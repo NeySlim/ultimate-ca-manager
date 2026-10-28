@@ -13,7 +13,7 @@ from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from models import Certificate, CA, db
 from services.audit_service import AuditService
-from utils.cert_issuer import private_key_matches, stored_private_key_matches
+from utils.cert_issuer import find_ca_by_ski, private_key_matches, stored_private_key_matches
 from services.import_service import (
     parse_certificate_file, is_ca_certificate, extract_cert_info,
     find_existing_ca, find_existing_certificate, find_pending_csr_for_certificate,
@@ -37,7 +37,7 @@ def _resolve_caref(ca_id, cert_info):
         return ca.refid if ca else None
     aki = cert_info.get('aki')
     if aki:
-        ca = CA.query.filter_by(ski=aki).first()
+        ca = find_ca_by_ski(aki)
         if ca:
             return ca.refid
     ca = CA.query.filter_by(subject=cert_info['issuer']).first()

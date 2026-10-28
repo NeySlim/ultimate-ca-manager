@@ -183,3 +183,23 @@ def test_duplicates_bound_to_the_same_deploy_target_are_merged(app):
         assert db.session.get(CA, dupe_id) is None
         assert stats['deduplicated'] >= 1
         assert CRLDeployBinding.query.filter_by(target_id=target.id).count() == 1
+
+
+def test_merge_carries_the_duplicates_crl_numbers_to_the_keeper(app):
+    """CRL numbers stay monotonic for a CA key: the keeper continues after the duplicate's last one."""
+    from models import CRLMetadata
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Crl Number Root')
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    with app.app_context():
+        keeper_id = _row(cert, key)
+        dupe_id = _row(cert)
+        db.session.add(CRLMetadata(ca_id=dupe_id, crl_number=12, this_update=now,
+                                   next_update=now + timedelta(days=1), crl_pem='x', crl_der=b'x'))
+        db.session.commit()
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        assert db.session.get(CA, dupe_id) is None
+        assert [m.crl_number for m in CRLMetadata.query.filter_by(ca_id=keeper_id)] == [12]

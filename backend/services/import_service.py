@@ -7,7 +7,7 @@ from cryptography.hazmat.primitives import serialization
 import re
 import base64
 from datetime import datetime, timezone
-from utils.cert_issuer import is_self_signed
+from utils.cert_issuer import cas_by_ski, is_self_signed
 from utils.foreign_algorithms import describe_public_key, spki_der
 from utils.key_codec import private_key_to_pem, refuse_eddsa_key
 from utils.pkcs12_import import refuse_pkcs12_import
@@ -199,9 +199,8 @@ class AmbiguousImportTarget(ValueError):
 
 
 class CrossCertificateImport(AmbiguousImportTarget):
-    """The certificate re-certifies a CA's key under another issuer while the
-    stored certificate is still valid: applying it would replace the CA's own
-    certificate and parent it under that issuer."""
+    """The certificate re-certifies a CA's key under another issuer: applying it
+    would replace the stored certificate and parent the CA under that issuer."""
 
     code = 'cross_certificate_detected'
 
@@ -308,7 +307,7 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
     if is_self_signed(cert):
         return None
     aki = authority_key_identifier_hex(cert)
-    candidates = CA.query.filter(CA.ski == aki).all() if aki else []
+    candidates = cas_by_ski(aki) if aki else []
     if not candidates:
         candidates = CA.query.filter(CA.subject == cert.issuer.rfc4514_string()).all()
     for parent in candidates:
@@ -492,9 +491,9 @@ def _select_existing(candidates, cert, kind):
         if kind == 'CA' and stored_cert is not None and _would_replace_valid_certificate(stored_cert, cert):
             raise CrossCertificateImport(
                 f"This certificate re-certifies the key of the {kind} "
-                f"'{getattr(same_key[0], 'descr', '')}' under another issuer while its own certificate "
-                f"is still valid (a cross-certificate); importing it would replace that certificate, "
-                f"so it is refused")
+                f"'{getattr(same_key[0], 'descr', '')}' under another issuer "
+                f"(a cross-certificate); importing it would replace the certificate that record "
+                f"holds, so it is refused")
         return same_key[0]
     if same_key:
         raise AmbiguousImportTarget(

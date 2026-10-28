@@ -95,3 +95,13 @@ def test_children_of_a_root_link_to_its_self_signed_record(app, pki):
         assert CA.query.filter_by(descr=f'Direct Int {pki.tag}').one().caref == root.refid
         from models import Certificate
         assert Certificate.query.filter(Certificate.descr.contains(f'direct-{pki.tag}')).one().caref == root.refid
+
+
+@pytest.mark.parametrize('order', ['root_first', 'cross_first'])
+def test_cross_certificate_record_is_linked_to_its_issuing_root(app, pki, order):
+    certs = [pki.root_a, pki.cross_b] if order == 'root_first' else [pki.cross_b, pki.root_a]
+    with app.app_context():
+        result = SmartImporter().execute(_bundle(*certs))
+        assert result.success, result.errors
+        cross = _rows(pki.name_b)[0][0]
+        assert cross.caref == _rows(pki.name_a)[0][0].refid

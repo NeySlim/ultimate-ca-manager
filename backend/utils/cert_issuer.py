@@ -156,3 +156,19 @@ def hsm_key_binding_matches(hsm_key_id, cert: x509.Certificate):
         return spki(public_key) == spki(cert.public_key())
     except Exception:
         return None
+
+
+def cas_by_ski(ski, exclude_id=None):
+    """Stored CAs with this SKI, the self-signed record first: a cross-certificate shares its root's SKI."""
+    from sqlalchemy import case
+    from models import CA
+    query = CA.query.filter(CA.ski == ski)
+    if exclude_id is not None:
+        query = query.filter(CA.id != exclude_id)
+    return query.order_by(case((CA.subject == CA.issuer, 0), else_=1), CA.id).all()
+
+
+def find_ca_by_ski(ski, exclude_id=None):
+    """The stored CA with this SKI; at equal SKI the self-signed record, not a cross-certificate."""
+    found = cas_by_ski(ski, exclude_id)
+    return found[0] if found else None

@@ -280,8 +280,8 @@ class SmartImporter:
         # Get all CAs from objects
         ca_objects = [o for o in objects if o.type == ObjectType.CERTIFICATE and _is_ca_import_target(o)]
         
-        # Sort by chain depth (roots first)
-        ca_objects.sort(key=lambda o: o.chain_depth, reverse=True)
+        # Self-signed roots first, then the deepest chain position
+        ca_objects.sort(key=lambda o: (o.is_self_signed, o.chain_depth), reverse=True)
 
         # Map old subject to new refid for parent linking
         subject_to_refid: Dict[str, str] = {}

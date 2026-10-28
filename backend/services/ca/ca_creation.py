@@ -19,7 +19,7 @@ from models.hsm import HsmKey
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
 from services.import_service import CrossCertificateImport
-from utils.cert_issuer import is_self_signed
+from utils.cert_issuer import find_ca_by_ski, is_self_signed
 from utils.datetime_utils import to_naive_utc, utc_isoformat, utc_now
 from utils.serial_format import serial_to_int
 from .helpers import save_ca_files, save_ca_key_file
@@ -765,7 +765,7 @@ class CACreationMixin:
             )
             if aki_ext.value.key_identifier:
                 aki_hex = aki_ext.value.key_identifier.hex(':').upper()
-                parent = CA.query.filter(CA.ski == aki_hex, CA.id != ca.id).first()
+                parent = find_ca_by_ski(aki_hex, exclude_id=ca.id)
         except x509.ExtensionNotFound:
             pass
         if parent is None:

@@ -15,6 +15,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.x509.oid import ExtensionOID
+from utils.cert_issuer import find_ca_by_ski
 
 logger = logging.getLogger(__name__)
 
@@ -82,7 +83,8 @@ def _merge_ca_group(db, cas_with_ski, stats):
 
 
 # Derived per-CA data the keeper regenerates; every other reference moves to it
-_DISCARDED_WITH_CA = {'crl_metadata', 'ocsp_responses'}
+# (CRL history included: CRL numbers must not restart below the published ones)
+_DISCARDED_WITH_CA = {'ocsp_responses'}
 # Tables unique on (CA, column): the duplicate's rows the keeper already has are dropped
 _UNIQUE_PER_CA = {'ca_template_pins': 'template_id', 'crl_deploy_bindings': 'target_id'}
 # Parent references declared without a foreign key
@@ -219,7 +221,7 @@ def backfill_ski_aki():
             if aki == ca.ski:
                 continue
 
-            parent = CA.query.filter(CA.ski == aki, CA.id != ca.id).first()
+            parent = find_ca_by_ski(aki, exclude_id=ca.id)
             if parent:
                 ca.caref = parent.refid
                 stats['rechained_cas'] += 1
@@ -240,7 +242,7 @@ def backfill_ski_aki():
         if cert.caref and cert.caref in ca_refids:
             continue
         try:
-            parent = CA.query.filter(CA.ski == cert.aki).first()
+            parent = find_ca_by_ski(cert.aki)
             if parent:
                 old_caref = cert.caref
                 cert.caref = parent.refid
@@ -264,7 +266,7 @@ def backfill_ski_aki():
                 by_cert.setdefault(fingerprint, []).append(c)
         if len(by_cert) > 1:
             stats['same_key_distinct_certs'] += 1
-            logger.warning(f"SKI/AKI backfill: CAs {[c.id for c in cas_with_ski]} share SKI {dupe_ski} "
+            logger.info(f"SKI/AKI backfill: CAs {[c.id for c in cas_with_ski]} share SKI {dupe_ski} "
                            f"with distinct certificates (cross-certificate?), not merged")
         for group in by_cert.values():
             if len(group) > 1:

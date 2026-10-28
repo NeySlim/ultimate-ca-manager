@@ -171,6 +171,7 @@ def test_expired_self_signed_root_is_still_not_replaced_by_a_cross_certificate(a
         assert r.status_code in (200, 201), r.data
     r = _import(auth_client, '/api/v2/cas/import', pki.cross_b)
     assert r.status_code == 409, r.data
+    assert b'still valid' not in r.data
     with app.app_context():
         row = CA.query.filter(CA.descr == pki.name_b).one()
         assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == expired.serial_number

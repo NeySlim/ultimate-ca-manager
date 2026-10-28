@@ -256,7 +256,7 @@ class CA(db.Model):
         import base64
         from cryptography import x509
         from utils.cert_issuer import (
-            authority_key_identifier_hex, certificate_signed_by, is_self_signed,
+            authority_key_identifier_hex, cas_by_ski, certificate_signed_by, is_self_signed,
         )
         try:
             cert = x509.load_pem_x509_certificate(base64.b64decode(self.crt))
@@ -277,7 +277,7 @@ class CA(db.Model):
             _add([CA.query.filter_by(refid=self.caref).first()])
         aki = authority_key_identifier_hex(cert)
         if aki:
-            _add(CA.query.filter(CA.ski == aki).all())
+            _add(cas_by_ski(aki))
         if self.issuer:
             _add(CA.query.filter(CA.subject == self.issuer).all())
 
