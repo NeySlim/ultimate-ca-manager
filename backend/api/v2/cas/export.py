@@ -30,12 +30,16 @@ from services.key_export_audit import audit_key_export
 logger = logging.getLogger(__name__)
 
 
-def _export_chain(ca, include_chain, variant):
-    """``(own certificate PEM, parent PEMs)``; the chain variant may swap *ca*'s own certificate for its cross-certificate."""
+def _export_chain(ca, include_chain, variant, explicit=False):
+    """``(own certificate PEM, parent PEMs)``.
+
+    *ca*'s own certificate becomes its cross-certificate only when the caller named a variant."""
     from utils.ca_chain import issuer_chain
     if not include_chain:
         return base64.b64decode(ca.crt), []
     links = issuer_chain(ca, variant)
+    if links[0].cross is not None and not explicit:
+        links = issuer_chain(ca, 'primary')
     return links[0].pem, [link.pem for link in links[1:]]
 
 
@@ -221,7 +225,8 @@ def export_ca(ca_id):
         return error_response(pw_err, 400)
 
     try:
-        cert_pem, parent_pems = _export_chain(ca, include_chain, variant)
+        explicit = bool((data if request.method == 'POST' and request.is_json else request.args).get('chain_variant'))
+        cert_pem, parent_pems = _export_chain(ca, include_chain, variant, explicit)
 
         # Private key only export
         if export_format == 'key':

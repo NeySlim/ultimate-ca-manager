@@ -39,9 +39,13 @@ class CACrossCertificate(db.Model):
         return bool(self.valid_to and self.valid_to <= utc_now())
 
     @property
+    def not_yet_valid(self):
+        return bool(self.valid_from and self.valid_from > utc_now())
+
+    @property
     def servable(self):
-        """Only a valid, unrevoked cross-certificate may be served or offered."""
-        return not self.revoked and not self.expired
+        """Only an unrevoked cross-certificate inside its validity period may be served or offered."""
+        return not self.revoked and not self.expired and not self.not_yet_valid
 
     def to_dict(self):
         return {

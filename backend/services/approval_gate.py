@@ -75,6 +75,17 @@ def certificate_scope(cert) -> Tuple[Optional[int], Optional[int], Optional[str]
     return (ca.id if ca else None), getattr(cert, 'template_id', None), cn, dns
 
 
+def issuer_scope(ca):
+    """The ids of every stored record of *ca*'s key (its CRL's scope), for a revocation policy lookup;
+    None when *ca* is None."""
+    if ca is None:
+        return None
+    from models import CA
+    from utils.cert_issuer import same_key_refids
+    ids = tuple(c.id for c in CA.query.filter(CA.refid.in_(same_key_refids(ca))).all())
+    return ids or (ca.id,)
+
+
 def queue_renewal(user, cert, *, validity_days=None, comment: Optional[str] = None,
                   scheduled_by: Optional[str] = None
                   ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
@@ -93,12 +104,18 @@ def queue_renewal(user, cert, *, validity_days=None, comment: Optional[str] = No
         operation='renewal' if scheduled_by else RENEWAL_OPERATIONS)
 
 
+def _revocation_scope(ca_id):
+    """*ca_id* widened to the records of its key; None stays None."""
+    from models import CA
+    return (issuer_scope(db.session.get(CA, ca_id)) if ca_id else None) or ca_id
+
+
 def revocation_policy_for(cert) -> Optional[CertificatePolicy]:
     """The policy that requires approval to revoke ``cert``, whoever asks
     (for the callers that cannot queue a request: ACME, enrolment removal)."""
     ca_id, template_id, cn, dns = certificate_scope(cert)
     return PolicyEvaluationService.check_approval_required(
-        ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns, operation='revocation')
+        ca_id=_revocation_scope(ca_id), template_id=template_id, cn=cn, san_list=dns, operation='revocation')
 
 
 def queue_revocation(user, cert, *, reason: str, invalidity_at=None,
@@ -111,7 +128,7 @@ def queue_revocation(user, cert, *, reason: str, invalidity_at=None,
     from utils.datetime_utils import utc_isoformat
     ca_id, template_id, cn, dns = certificate_scope(cert)
     return queue_if_approval_required(
-        user, ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns,
+        user, ca_id=_revocation_scope(ca_id), template_id=template_id, cn=cn, san_list=dns,
         request_type='revocation', operation='revocation', comment=comment,
         request_data={'certificate_id': cert.id, 'serial_number': cert.serial_number,
                       'ca_id': ca_id, 'cn': cn or cert.common_name, 'reason': reason,
@@ -126,6 +143,10 @@ def ca_certificate_serial(ca) -> Optional[str]:
     return str(x509.load_pem_x509_certificate(base64.b64decode(ca.crt)).serial_number)
 
 
+def _ca_revocation_scope(parent, ca):
+    return tuple(dict.fromkeys(issuer_scope(parent) + (ca.id,)))
+
+
 def queue_ca_revocation(user, ca, parent, *, reason: str, invalidity_at=None,
                         comment: Optional[str] = None
                         ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
@@ -135,7 +156,7 @@ def queue_ca_revocation(user, ca, parent, *, reason: str, invalidity_at=None,
     requires approval."""
     from utils.datetime_utils import utc_isoformat
     return queue_if_approval_required(
-        user, ca_id=(parent.id, ca.id), template_id=None, cn=ca.common_name, san_list=[],
+        user, ca_id=_ca_revocation_scope(parent, ca), template_id=None, cn=ca.common_name, san_list=[],
         request_type='ca_revocation', operation='revocation', comment=comment,
         request_data={'target_ca_id': ca.id, 'serial_number': ca_certificate_serial(ca),
                       'ca_id': parent.id, 'cn': ca.common_name, 'reason': reason,
@@ -147,12 +168,9 @@ def queue_cross_revocation(user, row, issuer, *, reason: str, invalidity_at=None
                            ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
     """Queue the revocation of a cross-certificate, held by the revocation
     policies of the issuing CA whose CRL will carry it; ``(None, None)`` when none requires approval."""
-    from models import CA
-    from utils.cert_issuer import same_key_refids
     from utils.datetime_utils import utc_isoformat
-    scope = tuple(c.id for c in CA.query.filter(CA.refid.in_(same_key_refids(issuer))).all())
     return queue_if_approval_required(
-        user, ca_id=scope, template_id=None, cn=row.ca.common_name, san_list=[],
+        user, ca_id=issuer_scope(issuer), template_id=None, cn=row.ca.common_name, san_list=[],
         request_type='cross_revocation', operation='revocation', comment=comment,
         request_data={'cross_certificate_id': row.id, 'serial_number': row.serial_number,
                       'ca_id': issuer.id, 'cn': row.ca.common_name, 'reason': reason,

@@ -64,11 +64,11 @@ def _validate_cert_chain(cert):
         ca = CA.query.filter_by(refid=cert.caref).first()
         if ca:
             chain.append({'name': ca.common_name or ca.descr, 'type': 'managed_ca'})
-            # The chain the CA serves, to the issuing CA plus ten levels at most; a cross-certificate
-            # is not a root, so the walk goes on through its issuer when it is held.
+            # The chain the CA serves, the issuing CA plus ten levels at most; a cross-certificate is
+            # not a root, so the walk goes on through its issuer when it is held.
             from utils.ca_chain import chain_variants, issuer_chain
             top_issuer = ca.issuer
-            for link in issuer_chain(ca)[:12]:
+            for link in issuer_chain(ca)[:11]:
                 node = link.ca
                 if node is not ca:
                     chain.append({'name': node.common_name or node.descr, 'type': 'managed_ca'})
@@ -91,7 +91,15 @@ def _validate_cert_chain(cert):
                     trust_source = 'trust_store'
                     trust_anchor = trusted.name
                 else:
-                    status = 'incomplete'
+                    # A served cross-certificate whose issuer is not held leaves the primary anchor standing.
+                    primary = issuer_chain(ca, 'primary')
+                    primary_top = primary[-1].ca if primary else None
+                    if primary_top is not None and primary_top.is_root:
+                        status = 'complete'
+                        trust_source = 'managed_ca'
+                        trust_anchor = primary_top.common_name or primary_top.descr
+                    else:
+                        status = 'incomplete'
     else:
         # No caref — try AKI lookup
         if cert.aki:

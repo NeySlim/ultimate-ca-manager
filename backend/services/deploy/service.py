@@ -116,6 +116,7 @@ class DeployService:
         from cryptography.hazmat.primitives import serialization
         from api.v2.certificates.export import _build_ca_chain
         from utils.ca_chain import ChainVariantError
+        DeployService.check_chain_variant(certificate, variant)
         try:
             chain = _build_ca_chain(
                 certificate, cert_pem.encode(), include_root=include_root, variant=variant)
@@ -631,12 +632,15 @@ class DeployService:
 
     @staticmethod
     def check_chain_variant(certificate: Certificate, variant: str):
-        """ValueError unless *variant* is one the chain of *certificate* can present."""
+        """ValueError unless *variant* is one the chain of *certificate* can present now (a binding never pushes
+        a revoked, expired or not yet valid cross-certificate)."""
         from models import CA
-        from utils.ca_chain import ChainVariantError, variant_ids
+        from utils.ca_chain import ChainVariantError, chain_variants, variant_ids
         start = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
         if variant not in variant_ids(start):
             raise ChainVariantError(f'Chain variant {variant} is not part of the chain of this certificate')
+        if any(v['id'] == variant and not v['servable'] for v in chain_variants(start)):
+            raise ChainVariantError(f'Chain variant {variant} is revoked, expired or not yet valid')
 
     @staticmethod
     def validate_crl_binding(data: dict, partial: bool = False) -> dict:

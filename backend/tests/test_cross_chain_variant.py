@@ -59,6 +59,9 @@ def test_a_ca_export_swaps_the_ca_certificate_for_its_cross_certificate(auth_cli
     assert _roots(_loads(r.data), world) == ['cross', 'A']
     set_served(auth_client, world, True)
     r = auth_client.post(f'/api/v2/cas/{world.b_id}/export', json={'format': 'pem', 'include_chain': True})
+    assert _roots(_loads(r.data), world) == ['B']
+    r = auth_client.post(f'/api/v2/cas/{world.b_id}/export',
+                         json={'format': 'pem', 'include_chain': True, 'chain_variant': 'auto'})
     assert _roots(_loads(r.data), world) == ['cross', 'A']
     r = auth_client.post(f'/api/v2/cas/{world.b_id}/export',
                          json={'format': 'pem', 'include_chain': True, 'chain_variant': 'primary'})
