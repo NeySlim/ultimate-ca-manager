@@ -29,7 +29,8 @@ def _resolve_ca(ca_ref):
         ca_id_int = int(ca_ref)
         return db.session.get(CA, ca_id_int)
     except (ValueError, TypeError):
-        return None
+        from services.ca.cross_repair import alias_target
+        return alias_target(ca_ref)
 
 
 # Clients and proxies keep an AIA answer for 24 h: a change of the served cross-certificate

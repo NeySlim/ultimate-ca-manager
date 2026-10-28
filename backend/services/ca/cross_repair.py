@@ -1,9 +1,10 @@
 """Findings and explicit repairs for CA records damaged before cross-certificates were modelled (#400).
 
 Nothing here runs by itself: a self-signed root that was overwritten or deleted only
-comes back from a backup or by importing its certificate again.
+comes back from a backup or through restore-primary.
 """
 import base64
+import logging
 from typing import List, Optional
 
 from cryptography import x509
@@ -12,8 +13,13 @@ from models import CA, db
 from services.ca import cross_certs
 from services.ca.cross_certs import CrossCertError
 
+logger = logging.getLogger(__name__)
+
 NOTE = ('A self-signed root that was overwritten or deleted is not recovered here: '
-        'restore it from a backup or import its certificate again (restore-primary).')
+        'restore it from a backup, or give its certificate to restore-primary.')
+_SETTINGS = ('acme.issuing_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'wstep_ca_refid', 'xcep_ca_refid',
+             'mtls_trusted_ca_id', 'scep_ca_id')
+_ALIAS_PREFIX = 'ca_url_alias_'
 
 
 def _identity(record):
@@ -36,11 +42,15 @@ def _held():
 
 
 def _find_root(x_cert, x_spki, x_fp, held):
-    """The self-signed record with the subject and key of a non-self-signed one, or None."""
+    """The self-signed record with the subject and key of a non-self-signed one, or None.
+
+    Several candidates: the one valid the longest."""
+    best = None
     for record, cert, fp, spki, selfs in held:
         if selfs and fp != x_fp and spki == x_spki and cert.subject == x_cert.subject:
-            return record
-    return None
+            if best is None or cert.not_valid_after_utc > best[0]:
+                best = (cert.not_valid_after_utc, record)
+    return best[1] if best else None
 
 
 def findings() -> List[dict]:
@@ -57,6 +67,7 @@ def findings() -> List[dict]:
                     'root_id': root.id, 'root_name': root.descr, 'subject': record.subject,
                     'ski': record.ski, 'actions': ['convert_to_cross']})
     groups = {}
+    selfsigned = {record.id for record, _c, _f, _s, selfs in held if selfs}
     for record, _cert, fp, _spki, _selfs in held:
         if record.ski and record.id not in covered:
             groups.setdefault(record.ski, {})[record.id] = (record, fp)
@@ -65,7 +76,7 @@ def findings() -> List[dict]:
             continue
         first = next(iter(members.values()))[0]
         out.append({'kind': 'same_key_distinct_certs', 'ca_ids': sorted(members), 'subject': first.subject,
-                    'ski': ski, 'actions': []})
+                    'ski': ski, 'actions': [] if selfsigned & set(members) else ['restore_primary']})
     return out
 
 
@@ -76,11 +87,46 @@ def _record(ca_id) -> CA:
     return record
 
 
+def _move_settings(record, root):
+    """Point the CA settings, the OCSP responder choice and the public URLs of *record* at *root*."""
+    from models import SystemConfig
+    for key in _SETTINGS:
+        cfg = SystemConfig.query.filter_by(key=key).first()
+        if cfg is None:
+            continue
+        if cfg.value == record.refid:
+            cfg.value = root.refid
+        elif cfg.value == str(record.id):
+            cfg.value = str(root.id)
+    responder = SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{record.id}').first()
+    if responder is not None:
+        if SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{root.id}').first() is None:
+            responder.key = f'ocsp_responder_cert_{root.id}'
+        else:
+            db.session.delete(responder)
+    for old in SystemConfig.query.filter(SystemConfig.key.like(f'{_ALIAS_PREFIX}%'),
+                                         SystemConfig.value == record.refid).all():
+        old.value = root.refid
+    for ref in filter(None, (record.refid, record.url_slug)):
+        db.session.add(SystemConfig(key=f'{_ALIAS_PREFIX}{ref}', value=root.refid,
+                                    description='URL of a removed duplicate CA record'))
+
+
+def alias_target(ref):
+    """The CA now serving the URLs of a duplicate record that was converted, or None."""
+    from models import SystemConfig
+    cfg = SystemConfig.query.filter_by(key=f'{_ALIAS_PREFIX}{ref}'[:100]).first()
+    return CA.query.filter_by(refid=cfg.value).first() if cfg and cfg.value else None
+
+
 def convert_to_cross(ca_id: int, username: str = 'system'):
     """Turn a non-self-signed record shadowing a held root into that root's cross-certificate.
 
-    Its children, issued certificates and settings move to the root; returns ``(root, row, warnings)``."""
+    Its children, issued certificates and settings move to the root, and its URLs keep resolving to it;
+    returns ``(root, row, warnings)``."""
+    from types import SimpleNamespace
     from services.ski_aki_backfill import _move_ca_dependents
+    from models.ca_cross_certificate import CACrossCertificate
     record = _record(ca_id)
     ident = _identity(record)
     if ident is None or ident[3]:
@@ -89,19 +135,32 @@ def convert_to_cross(ca_id: int, username: str = 'system'):
     cert, fp, spki, _ = ident
     root = _find_root(cert, spki, fp, _held())
     if root is None:
-        raise CrossCertError('No self-signed record holds this subject and key: import the self-signed '
-                             'certificate again (restore-primary) or restore a backup', 409, 'no_root')
+        raise CrossCertError('No self-signed record holds this subject and key: restore a backup, or '
+                             'give the self-signed certificate to restore-primary', 409, 'no_root')
     snapshot = record.descr
     for row in cross_certs.list_for(record):
         row.served = False
     db.session.flush()
-    row, warnings = cross_certs.attach_certificate(root, cert, username, commit=False)
+    row = CACrossCertificate.query.filter_by(ca_id=root.id, fingerprint_sha256=fp).first()
+    warnings = []
+    if row is None:
+        row, warnings = cross_certs.attach_certificate(root, cert, username, commit=False)
     if not root.prv and not root.hsm_key_id:
         root.prv, root.hsm_key_id = record.prv, record.hsm_key_id
     _move_ca_dependents(db, record, root)
+    _move_settings(record, root)
+    snapshot_dict = record.to_dict()
+    files = SimpleNamespace(**{c.key: getattr(record, c.key) for c in CA.__table__.columns})
     db.session.execute(db.text('DELETE FROM certificate_authorities WHERE id = :id'), {'id': record.id})
     db.session.expunge(record)
     db.session.commit()
+    try:
+        from services.ca.helpers import delete_ca_files
+        delete_ca_files(files)
+    except Exception as e:
+        logger.warning(f'Converted duplicate {snapshot}: its files could not be removed: {e}')
+    from services.webhook_service import emit_ca_deleted
+    emit_ca_deleted(snapshot_dict, actor=username)
     from services.audit_service import AuditService
     AuditService.log_ca('ca_cross_repair_converted', root,
                         f'Duplicate record {snapshot} converted into a cross-certificate of {root.descr}',

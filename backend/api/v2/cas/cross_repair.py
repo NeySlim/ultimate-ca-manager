@@ -31,11 +31,11 @@ def _run(action, message, ca_id, *args):
         db.session.rollback()
         return error_response(e.message, e.status, details={'code': e.code})
     return success_response(data={**ca.to_dict(), 'cross_certificate': row.to_dict(), 'warnings': warnings},
-                            message=f'{message}. {cross_repair.NOTE}')
+                            message=message)
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/convert-to-cross', methods=['POST'])
-@require_auth(['write:cas'])
+@require_auth(['write:cas', 'delete:cas'])
 def convert_to_cross(ca_id):
     return _run(cross_repair.convert_to_cross, 'Duplicate converted into a cross-certificate', ca_id)
 
