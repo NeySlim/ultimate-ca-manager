@@ -30,16 +30,53 @@ from services.key_export_audit import audit_key_export
 logger = logging.getLogger(__name__)
 
 
-def _parent_cas(ca):
-    """The CAs above *ca*, nearest first, skipping any without a certificate.
+def _export_chain(ca, include_chain, variant):
+    """``(own certificate PEM, parent PEMs)``; the chain variant may swap *ca*'s own certificate for its cross-certificate."""
+    from utils.ca_chain import issuer_chain
+    if not include_chain:
+        return base64.b64decode(ca.crt), []
+    links = issuer_chain(ca, variant)
+    return links[0].pem, [link.pem for link in links[1:]]
 
-    Every export format walked the hierarchy itself, and none of the five
-    copies had a loop guard: a ``caref`` pointing back down the chain kept
-    appending forever — filling memory, and for the p7b branch filling the
-    temporary file it never got to unlink.
-    """
-    from utils.ca_chain import walk_ca_chain
-    return [parent for parent in walk_ca_chain(ca, include_start=False) if parent.crt]
+
+def _requested_variant(source, ca):
+    """``(variant, None)``, or ``(None, 400 response)`` when the chain of *ca* cannot present it."""
+    from utils.ca_chain import AUTO, ChainVariantError, parse_variant, variant_ids
+    value = source.get('chain_variant') or AUTO
+    try:
+        parse_variant(value)
+        if value not in variant_ids(ca):
+            raise ChainVariantError(f'Chain variant {value} is not part of the chain of this CA')
+    except ChainVariantError as exc:
+        return None, error_response(str(exc), 400)
+    return value, None
+
+
+def _bulk_pems(cas, option):
+    """The CA certificates of a bulk export, each followed by the cross-certificates *option* adds.
+
+    ``primary`` (default) adds none, ``auto`` the served ones, ``all`` every attached one, ``cross:<id>`` that one.
+    Raises ChainVariantError for any other value."""
+    from services.ca import cross_certs
+    from utils.ca_chain import ChainVariantError, parse_variant
+    value = option or 'primary'
+    wanted = parse_variant(value) if value != 'all' else 'all'
+    pems, found = [], False
+    for ca in cas:
+        pems.append(base64.b64decode(ca.crt))
+        if wanted == 'primary':
+            continue
+        if wanted == 'auto':
+            rows = [r for r in [cross_certs.served_for(ca)] if r is not None]
+        elif wanted == 'all':
+            rows = list(ca.cross_certificates)
+        else:
+            rows = [r for r in ca.cross_certificates if r.id == wanted[1]]
+            found = found or bool(rows)
+        pems.extend(base64.b64decode(r.crt) for r in rows)
+    if isinstance(wanted, tuple) and not found:
+        raise ChainVariantError(f'Cross-certificate {value} does not exist')
+    return pems
 
 
 # The bounds, and the reason for the ceiling, now live in
@@ -63,21 +100,28 @@ def export_all_cas():
     if request.method == 'POST' and request.is_json:
         data = request.get_json()
         export_format = data.get('format', 'pem').lower()
+        variant_option = data.get('chain_variant')
     else:
         export_format = request.args.get('format', 'pem').lower()
+        variant_option = request.args.get('chain_variant')
 
     cas = CA.query.filter(CA.crt.isnot(None), CA.crt != '').all()
     if not cas:
         return error_response('No CAs to export', 404)
 
+    from utils.ca_chain import ChainVariantError
+    try:
+        pems = _bulk_pems(cas, variant_option)
+    except ChainVariantError as exc:
+        return error_response(str(exc), 400)
+
     try:
         if export_format == 'pem':
             pem_data = b''
-            for ca in cas:
-                if ca.crt:
-                    pem_data += base64.b64decode(ca.crt)
-                    if not pem_data.endswith(b'\n'):
-                        pem_data += b'\n'
+            for pem_cert in pems:
+                pem_data += pem_cert
+                if not pem_data.endswith(b'\n'):
+                    pem_data += b'\n'
 
             return Response(
                 pem_data,
@@ -87,10 +131,9 @@ def export_all_cas():
 
         elif export_format == 'pkcs7' or export_format == 'p7b':
             with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
-                for ca in cas:
-                    if ca.crt:
-                        f.write(base64.b64decode(ca.crt))
-                        f.write(b'\n')
+                for pem_cert in pems:
+                    f.write(pem_cert)
+                    f.write(b'\n')
                 pem_file = f.name
 
             try:
@@ -143,12 +186,14 @@ def export_ca(ca_id):
         include_chain = bool(data.get('include_chain', False))
         password = data.get('password')
         legacy = legacy_flag(data.get('legacy'))  # 3DES/SHA-1 profile (#331)
+        variant, variant_err = _requested_variant(data, ca)
     else:
         export_format = request.args.get('format', 'pem').lower()
         include_key = request.args.get('include_key', 'false').lower() == 'true'
         include_chain = request.args.get('include_chain', 'false').lower() == 'true'
         password = request.args.get('password')
         legacy = False
+        variant, variant_err = _requested_variant(request.args, ca)
         # Passwords and key-bearing formats must not travel in the URL
         if password or include_key or export_format in ('pkcs12', 'p12', 'pfx', 'jks', 'key'):
             if password:
@@ -156,6 +201,9 @@ def export_ca(ca_id):
             return error_response(
                 'Password and private key exports must use POST with a JSON body, '
                 'not the query string', 400)
+
+    if variant_err:
+        return variant_err
 
     # A CA key leaves UCM only with read:private_keys, as a certificate key does
     if include_key or export_format in ('pkcs12', 'pfx', 'key', 'jks'):
@@ -173,7 +221,7 @@ def export_ca(ca_id):
         return error_response(pw_err, 400)
 
     try:
-        cert_pem = base64.b64decode(ca.crt)
+        cert_pem, parent_pems = _export_chain(ca, include_chain, variant)
 
         # Private key only export
         if export_format == 'key':
@@ -208,9 +256,8 @@ def export_ca(ca_id):
                 filename = f"{sanitize_filename(ca.descr or ca.refid)}_with_key.pem"
 
             # Include parent CA chain if requested
-            if include_chain and ca.caref:
-                for parent in _parent_cas(ca):
-                    parent_cert = base64.b64decode(parent.crt)
+            if include_chain:
+                for parent_cert in parent_pems:
                     if not result.endswith(b'\n'):
                         result += b'\n'
                     result += parent_cert
@@ -249,12 +296,8 @@ def export_ca(ca_id):
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
 
             # Build parent CA chain if available and requested
-            ca_certs = []
-            if include_chain and ca.caref:
-                for parent in _parent_cas(ca):
-                    ca_certs.append(x509.load_pem_x509_certificate(
-                        base64.b64decode(parent.crt), default_backend()
-                    ))
+            ca_certs = [x509.load_pem_x509_certificate(parent_pem, default_backend())
+                        for parent_pem in parent_pems]
 
             p12_bytes = pkcs12.serialize_key_and_certificates(
                 name=(ca.descr or ca.refid).encode(),
@@ -277,10 +320,9 @@ def export_ca(ca_id):
             with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
                 f.write(cert_pem)
                 # Include parent chain
-                if include_chain and ca.caref:
-                    for parent in _parent_cas(ca):
-                        f.write(b'\n')
-                        f.write(base64.b64decode(parent.crt))
+                for parent_pem in parent_pems:
+                    f.write(b'\n')
+                    f.write(parent_pem)
                 pem_file = f.name
 
             try:
@@ -310,12 +352,8 @@ def export_ca(ca_id):
             private_key = serialization.load_pem_private_key(key_pem_data, password=None, backend=default_backend())
 
             # Build parent CA chain if available and requested
-            ca_certs = []
-            if include_chain and ca.caref:
-                for parent in _parent_cas(ca):
-                    ca_certs.append(x509.load_pem_x509_certificate(
-                        base64.b64decode(parent.crt), default_backend()
-                    ))
+            ca_certs = [x509.load_pem_x509_certificate(parent_pem, default_backend())
+                        for parent_pem in parent_pems]
 
             p12_bytes = pkcs12.serialize_key_and_certificates(
                 name=(ca.descr or ca.refid).encode(),
@@ -355,12 +393,9 @@ def export_ca(ca_id):
 
             cert_chain = [("X.509", cert_der)]
 
-            if include_chain and ca.caref:
-                for parent in _parent_cas(ca):
-                    parent_cert = x509.load_pem_x509_certificate(
-                        base64.b64decode(parent.crt), default_backend()
-                    )
-                    cert_chain.append(("X.509", parent_cert.public_bytes(serialization.Encoding.DER)))
+            for parent_pem in parent_pems:
+                parent_cert = x509.load_pem_x509_certificate(parent_pem, default_backend())
+                cert_chain.append(("X.509", parent_cert.public_bytes(serialization.Encoding.DER)))
 
             ts = int(time.time() * 1000)
             pke = pyjks.PrivateKeyEntry(

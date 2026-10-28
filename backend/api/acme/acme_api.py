@@ -1612,14 +1612,11 @@ def download_certificate(order_id: str):
     chain_pems.append(cert_pem.strip())
     
     # Add CA chain
-    from utils.ca_chain import walk_ca_chain
+    from utils.ca_chain import issuer_chain
     start_ca = CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
 
-    for ca in walk_ca_chain(start_ca):
-        if not ca.crt:
-            break
-
-        ca_cert_pem = base64.b64decode(ca.crt).decode('utf-8')
+    for link in issuer_chain(start_ca):
+        ca_cert_pem = link.pem.decode('utf-8')
         if not ca_cert_pem.strip().startswith('-----BEGIN CERTIFICATE-----'):
             # CA cert might be raw DER, wrap it
             ca_cert_pem = f"-----BEGIN CERTIFICATE-----\n{ca_cert_pem}\n-----END CERTIFICATE-----"

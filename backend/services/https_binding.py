@@ -35,12 +35,25 @@ def _decode(value):
         return value
 
 
+def with_ca_chain(cert, cert_text: str) -> str:
+    """*cert_text* followed by the chain of the CA that issued *cert* (root included), as the CA serves it."""
+    from models import CA
+    from services.ca_service import CAService
+
+    ca = CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
+    if ca is None:
+        return cert_text
+    for chain_cert in CAService.get_ca_chain(ca.id):
+        chain_str = chain_cert.decode('utf-8') if isinstance(chain_cert, bytes) else chain_cert
+        if not cert_text.endswith('\n'):
+            cert_text += '\n'
+        cert_text += chain_str
+    return cert_text
+
+
 def materialize_https_cert(cert) -> None:
     """Write cert+key (+CA chain) to the HTTPS file pair. Raises on failure."""
     import shutil
-
-    from models import CA
-    from services.ca_service import CAService
 
     cert_path, key_path = _paths()
 
@@ -55,15 +68,7 @@ def materialize_https_cert(cert) -> None:
         cert.prv, context=f"certificate {cert.id}"
     ).decode('utf-8')
 
-    full_cert = cert_data
-    if cert.caref:
-        ca = CA.query.filter_by(refid=cert.caref).first()
-        if ca:
-            for chain_cert in CAService.get_ca_chain(ca.id):
-                chain_str = chain_cert.decode('utf-8') if isinstance(chain_cert, bytes) else chain_cert
-                if not full_cert.endswith('\n'):
-                    full_cert += '\n'
-                full_cert += chain_str
+    full_cert = with_ca_chain(cert, cert_data)
 
     cert_path.write_text(full_cert)
     key_path.write_text(key_data)

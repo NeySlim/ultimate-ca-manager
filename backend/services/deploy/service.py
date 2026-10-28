@@ -88,7 +88,8 @@ class DeployService:
             files.append((binding.key_path, key_pem, MODE_PRIVATE))
         if binding.fullchain_path:
             chain_pem = DeployService._chain_pem(
-                certificate, pem_data, include_root=bool(binding.include_root))
+                certificate, pem_data, include_root=bool(binding.include_root),
+                variant=binding.chain_variant or 'auto')
             files.append((binding.fullchain_path, (leaf_pem + chain_pem).encode(), MODE_PUBLIC))
         if not files:
             raise ValueError("Binding has no destination path configured")
@@ -110,13 +111,16 @@ class DeployService:
 
     @staticmethod
     def _chain_pem(certificate: Certificate, cert_pem: str,
-                   include_root: bool = False) -> str:
+                   include_root: bool = False, variant: str = 'auto') -> str:
         """Issuing chain (excluding the leaf), reusing the export chain walker."""
         from cryptography.hazmat.primitives import serialization
         from api.v2.certificates.export import _build_ca_chain
+        from utils.ca_chain import ChainVariantError
         try:
             chain = _build_ca_chain(
-                certificate, cert_pem.encode(), include_root=include_root)
+                certificate, cert_pem.encode(), include_root=include_root, variant=variant)
+        except ChainVariantError:
+            raise  # a binding naming a detached cross-certificate must fail, not push a short chain
         except Exception as e:
             logger.warning(f"Deploy: chain build failed for cert {certificate.id}: {e}")
             chain = []
@@ -620,8 +624,19 @@ class DeployService:
             out['enabled'] = bool(data['enabled'])
         if 'include_root' in data:
             out['include_root'] = json_boolean(data, 'include_root')
+        if 'chain_variant' in data:
+            out['chain_variant'] = data['chain_variant'] or 'auto'
         DeployService._validate_reload_command(data, out, partial)
         return out
+
+    @staticmethod
+    def check_chain_variant(certificate: Certificate, variant: str):
+        """ValueError unless *variant* is one the chain of *certificate* can present."""
+        from models import CA
+        from utils.ca_chain import ChainVariantError, variant_ids
+        start = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
+        if variant not in variant_ids(start):
+            raise ChainVariantError(f'Chain variant {variant} is not part of the chain of this certificate')
 
     @staticmethod
     def validate_crl_binding(data: dict, partial: bool = False) -> dict:

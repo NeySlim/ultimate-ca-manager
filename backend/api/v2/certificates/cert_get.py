@@ -54,6 +54,7 @@ def _validate_cert_chain(cert):
     """Validate certificate chain and return status info"""
 
     chain = []
+    variants = []
     status = 'unknown'
     trust_source = None
     trust_anchor = None
@@ -63,25 +64,27 @@ def _validate_cert_chain(cert):
         ca = CA.query.filter_by(refid=cert.caref).first()
         if ca:
             chain.append({'name': ca.common_name or ca.descr, 'type': 'managed_ca'})
-            # Walk up to root. The depth ceiling keeps the reach this display
-            # has always had (the issuing CA plus ten levels); the shared walk
-            # adds the loop guard it never had — a caref cycle used to list the
-            # same two CAs ten times over.
-            from utils.ca_chain import walk_ca_chain
-            current_ca = ca
-            for node in walk_ca_chain(ca, max_depth=11):
+            # The chain the CA serves, to the issuing CA plus ten levels at most; a cross-certificate
+            # is not a root, so the walk goes on through its issuer when it is held.
+            from utils.ca_chain import chain_variants, issuer_chain
+            top_issuer = ca.issuer
+            for link in issuer_chain(ca)[:12]:
+                node = link.ca
                 if node is not ca:
                     chain.append({'name': node.common_name or node.descr, 'type': 'managed_ca'})
-                current_ca = node
-                if node.is_root:
+                elif link.cross is not None:
+                    chain[0]['cross_certificate_id'] = link.cross.id
+                top_issuer = link.cross.issuer if link.cross is not None else node.issuer
+                if link.cross is None and node.is_root:
                     status = 'complete'
                     trust_source = 'managed_ca'
                     trust_anchor = node.common_name or node.descr
                     break
+            variants = chain_variants(ca)
 
             # If chain is not complete, check Trust Store for the top CA's issuer
-            if status != 'complete' and current_ca:
-                trusted = TrustedCertificate.query.filter_by(subject=current_ca.issuer).first()
+            if status != 'complete':
+                trusted = TrustedCertificate.query.filter_by(subject=top_issuer).first()
                 if trusted:
                     chain.append({'name': trusted.name, 'type': 'trust_store'})
                     status = 'complete'
@@ -129,4 +132,5 @@ def _validate_cert_chain(cert):
         'trust_anchor': trust_anchor,
         'chain': chain,
         'chain_length': len(chain),
+        'variants': variants,
     }

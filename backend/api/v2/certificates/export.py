@@ -109,7 +109,7 @@ def _resolve_issuer_cert(cert):
     return None
 
 
-def _build_ca_chain(certificate, cert_pem, include_root=True):
+def _build_ca_chain(certificate, cert_pem, include_root=True, variant='auto'):
     """Build the issuing CA chain, preserving the historical full-chain default.
 
     Order of preference:
@@ -126,16 +126,13 @@ def _build_ca_chain(certificate, cert_pem, include_root=True):
 
     # 2. Managed CA walk via caref (only when nothing came inline)
     if not chain and certificate.caref:
-        from utils.ca_chain import walk_ca_chain
+        from utils.ca_chain import issuer_chain
         start = CA.query.filter_by(refid=certificate.caref).first()
-        for ca in walk_ca_chain(start):
-            if ca.crt:
-                try:
-                    chain.append(
-                        x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend())
-                    )
-                except Exception:
-                    pass
+        for link in issuer_chain(start, variant):
+            try:
+                chain.append(x509.load_pem_x509_certificate(link.pem, default_backend()))
+            except Exception:
+                pass
 
     # 3. Extend/complete the chain using locally known issuers until we reach a
     #    self-signed root (or can no longer resolve the next issuer).
@@ -165,6 +162,20 @@ def _build_ca_chain(certificate, cert_pem, include_root=True):
             chain.pop()
 
     return chain
+
+
+def requested_chain_variant(source, certificate):
+    """``(variant, None)`` from ``chain_variant`` in *source*, or ``(None, 400 response)`` when the chain cannot present it."""
+    from utils.ca_chain import AUTO, ChainVariantError, parse_variant, variant_ids
+    value = source.get('chain_variant') or AUTO
+    try:
+        parse_variant(value)
+        start = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
+        if value not in variant_ids(start):
+            raise ChainVariantError(f'Chain variant {value} is not part of the chain of this certificate')
+    except ChainVariantError as exc:
+        return None, error_response(str(exc), 400)
+    return value, None
 
 
 def _named_cas(ca_certs):
@@ -301,6 +312,7 @@ def export_certificate(cert_id):
         # PKCS#12 compatibility profile (3DES/SHA-1) for importers that
         # reject the AES-256/SHA-256 default (#331)
         legacy = legacy_flag(legacy_value)
+        variant, variant_err = requested_chain_variant(data, certificate)
     else:
         export_format = request.args.get('format', 'pem').lower()
         try:
@@ -311,6 +323,7 @@ def export_certificate(cert_id):
             return error_response(str(exc), 400)
         password = request.args.get('password')
         legacy = False
+        variant, variant_err = requested_chain_variant(request.args, certificate)
         # SECURITY: never accept passwords via query string
         if password or export_format in ('pkcs12', 'pfx', 'jks'):
             if password:
@@ -323,6 +336,9 @@ def export_certificate(cert_id):
                 'Password must be sent via POST body (JSON), not query string',
                 400,
             )
+
+    if variant_err:
+        return variant_err
 
     # One rule for the password that encrypts the bundle (utils/export_password).
     # This route used to check presence only, so a one-character password
@@ -392,7 +408,7 @@ def export_certificate(cert_id):
             # Include CA chain if requested
             if include_chain:
                 for ca_cert in _build_ca_chain(
-                    certificate, cert_pem, include_root=include_root
+                    certificate, cert_pem, include_root=include_root, variant=variant
                 ):
                     if not result.endswith(b'\n'):
                         result += b'\n'
@@ -433,7 +449,7 @@ def export_certificate(cert_id):
 
             # Build CA chain if requested (inline stored chain or managed CA)
             ca_certs = (
-                _build_ca_chain(certificate, cert_pem, include_root=include_root)
+                _build_ca_chain(certificate, cert_pem, include_root=include_root, variant=variant)
                 if include_chain else []
             )
 
@@ -460,7 +476,7 @@ def export_certificate(cert_id):
                 # Include CA chain if requested
                 if include_chain:
                     for ca_cert in _build_ca_chain(
-                        certificate, cert_pem, include_root=include_root
+                        certificate, cert_pem, include_root=include_root, variant=variant
                     ):
                         f.write(b'\n')
                         f.write(ca_cert.public_bytes(serialization.Encoding.PEM))
@@ -495,7 +511,7 @@ def export_certificate(cert_id):
 
             # Build CA chain if requested (inline stored chain or managed CA)
             ca_certs = (
-                _build_ca_chain(certificate, cert_pem, include_root=include_root)
+                _build_ca_chain(certificate, cert_pem, include_root=include_root, variant=variant)
                 if include_chain else []
             )
 
@@ -540,7 +556,7 @@ def export_certificate(cert_id):
 
             if include_chain:
                 for ca_cert in _build_ca_chain(
-                    certificate, cert_pem, include_root=include_root
+                    certificate, cert_pem, include_root=include_root, variant=variant
                 ):
                     cert_chain.append(("X.509", ca_cert.public_bytes(serialization.Encoding.DER)))
 

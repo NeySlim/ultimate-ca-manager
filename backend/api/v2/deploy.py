@@ -238,6 +238,7 @@ def create_binding():
 
     try:
         fields = DeployService.validate_binding_paths(data)
+        DeployService.check_chain_variant(certificate, fields.get('chain_variant', 'auto'))
         DeployService.ensure_distinct_paths(
             fields.get('cert_path'), fields.get('key_path'), fields.get('fullchain_path'))
     except ValueError as e:
@@ -306,6 +307,8 @@ def update_binding(binding_id):
     data = request.get_json() or {}
     try:
         fields = DeployService.validate_binding_paths(data, partial=True)
+        if 'chain_variant' in fields:
+            DeployService.check_chain_variant(binding.certificate, fields['chain_variant'])
     except ValueError as e:
         return error_response(str(e), 400)
     changed_fields = [key for key, value in fields.items()
