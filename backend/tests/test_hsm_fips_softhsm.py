@@ -100,3 +100,66 @@ class TestModuleInfo:
         from models.hsm import HsmProvider
         row = HsmProvider(type='pkcs11', name='x', config=json.dumps({}), module_info='not json')
         assert row.to_dict()['module_info'] is None
+
+
+class TestSoftHsmOutsideTheApi:
+
+    @staticmethod
+    def _boot(monkeypatch):
+        from unittest.mock import patch
+        from models import db
+        from models.hsm import HsmProvider
+        from services.hsm.hsm_service import HsmService
+        HsmProvider.query.filter_by(name='SoftHSM-Default').delete()
+        db.session.commit()
+        monkeypatch.setenv('HSM_DEFAULT_PIN', '1234')
+        with patch('utils.hsm_check._find_softhsm', return_value=SOFTHSM_PATH):
+            HsmService.auto_register_softhsm()
+        return HsmProvider.query.filter_by(name='SoftHSM-Default').first()
+
+    def test_the_boot_registers_no_softhsm_in_fips(self, app, fips_on, monkeypatch, caplog):
+        with app.app_context():
+            assert self._boot(monkeypatch) is None
+            assert 'UCM_FIPS_ALLOW_SOFTHSM' in caplog.text
+
+    def test_the_escape_hatch_lets_the_boot_register_it(self, app, fips_on, monkeypatch):
+        from models import db
+        monkeypatch.setenv('UCM_FIPS_ALLOW_SOFTHSM', '1')
+        with app.app_context():
+            row = self._boot(monkeypatch)
+            assert row is not None and row.is_softhsm
+            db.session.delete(row)
+            db.session.commit()
+
+    def test_a_restored_softhsm_provider_is_flagged_in_fips(self, app, fips_on, caplog):
+        from models import db
+        from models.hsm import HsmProvider
+        from tests.test_backup_hsm_and_key_pairs import _service
+        name = f'restored-softhsm-{uuid.uuid4().hex[:6]}'
+        item = {'name': name, 'type': 'pkcs11', 'config': json.dumps({'module_path': SOFTHSM_PATH})}
+        with app.app_context():
+            try:
+                _service()._restore_hsm_providers({'hsm_providers': [item]}, {'hsm_providers': 0})
+                db.session.commit()
+                assert HsmProvider.query.filter_by(name=name).first() is not None
+                assert name in caplog.text and 'SoftHSM' in caplog.text
+            finally:
+                db.session.rollback()
+                HsmProvider.query.filter_by(name=name).delete()
+                db.session.commit()
+
+
+class TestUnreadableModule:
+
+    def test_a_module_that_cannot_describe_itself_still_tests_ok(self):
+        from types import SimpleNamespace
+        from services.hsm.pkcs11_provider import Pkcs11Provider
+
+        class Silent:
+            def __getattr__(self, name):
+                raise RuntimeError(f'{name} not supported')
+
+        provider = Pkcs11Provider.__new__(Pkcs11Provider)
+        provider._lib = Silent()
+        provider._token = SimpleNamespace(slot=Silent())
+        assert provider._module_info() == {}

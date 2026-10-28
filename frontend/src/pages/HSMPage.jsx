@@ -373,23 +373,7 @@ export default function HSMPage() {
           />
         </CompactSection>
 
-        {provider.provider_type === 'pkcs11' && (
-          <CompactSection title={t('hsm.module.title')} icon={Cpu} collapsible={false}>
-            {fips && provider.softhsm && (
-              <p className="text-xs text-status-warning mb-2">{t('hsm.module.softhsmFips')}</p>
-            )}
-            {provider.module_info ? (
-              <CompactGrid>
-                <CompactField label={t('hsm.module.library')} value={provider.module_info.library} />
-                <CompactField label={t('hsm.module.manufacturer')} value={provider.module_info.manufacturer} />
-                <CompactField label={t('hsm.module.libraryVersion')} value={provider.module_info.library_version} />
-                <CompactField label={t('hsm.module.firmwareVersion')} value={provider.module_info.firmware_version} />
-              </CompactGrid>
-            ) : (
-              <p className="text-xs text-text-secondary">{t('hsm.module.notRead')}</p>
-            )}
-          </CompactSection>
-        )}
+        <ModuleSection provider={provider} fips={fips} />
 
         {provider.last_error && (
           <div className="p-3 rounded-lg bg-status-danger-op10 border border-status-danger-op30">
@@ -657,6 +641,31 @@ const SECRET_TARGETS = {
   'azure-keyvault': ['azure_client_secret', ['azure_vault_url', 'azure_tenant_id', 'azure_client_id']],
   openbao: ['openbao_token', ['openbao_url', 'openbao_mount_path', 'openbao_namespace',
     'openbao_tls_skip_verify']],
+}
+
+// Providers served by the PKCS#11 driver record what their module reports
+const PKCS11_DRIVEN = ['pkcs11', 'aws-cloudhsm']
+
+export function ModuleSection({ provider, fips }) {
+  const { t } = useTranslation()
+  if (!PKCS11_DRIVEN.includes(provider.provider_type)) return null
+  return (
+    <CompactSection title={t('hsm.module.title')} icon={Cpu} collapsible={false}>
+      {fips && provider.softhsm && (
+        <p className="text-xs text-status-warning mb-2">{t('hsm.module.softhsmFips')}</p>
+      )}
+      {provider.module_info ? (
+        <CompactGrid>
+          <CompactField label={t('hsm.module.library')} value={provider.module_info.library} />
+          <CompactField label={t('hsm.module.manufacturer')} value={provider.module_info.manufacturer} />
+          <CompactField label={t('hsm.module.libraryVersion')} value={provider.module_info.library_version} />
+          <CompactField label={t('hsm.module.firmwareVersion')} value={provider.module_info.firmware_version} />
+        </CompactGrid>
+      ) : (
+        <p className="text-xs text-text-secondary">{t('hsm.module.notRead')}</p>
+      )}
+    </CompactSection>
+  )
 }
 
 export const HSM_CERTIFICATIONS = ['cc-eal4+', 'eucc-high', 'fips-140-3-l3', 'fips-140-2-l3', 'other']

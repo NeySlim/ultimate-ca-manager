@@ -791,6 +791,11 @@ class HsmService:
         if not lib_path:
             logger.debug("HSM_DEFAULT_PIN set but SoftHSM library not found, skipping auto-register")
             return
+        try:
+            fips_mode.refuse_softhsm()
+        except fips_mode.FipsRestricted as e:
+            logger.warning("SoftHSM-Default not registered: %s", e)
+            return
 
         try:
             provider = HsmProvider(

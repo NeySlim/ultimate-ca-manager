@@ -821,7 +821,10 @@ def test_a_closed_session_does_not_cost_the_service(tmp_path, case):
     assert _systemctl_lines(record) == (RESTARTED[:1] if fips else [])
     assert (tmp_path / 'ucm-state').read_text().strip() == 'active'
     if fips:
-        assert (tmp_path / 'log' / 'fips-build.failed').exists()
+        # The build itself succeeded: the update is reported as cut short, not as a failed build
+        report = _build_ok(tmp_path, envfile)
+        assert report.returncode == 1 and 'did not complete' in report.stderr
+        assert 'build failed' not in report.stderr
     assert not (home / 'venv.prev').exists() and not (home / 'venv.next').exists()
 
 

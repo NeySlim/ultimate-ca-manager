@@ -202,16 +202,21 @@ class Pkcs11Provider(BaseHsmProvider):
         """What the PKCS#11 library and the token's slot say they are."""
         def version(value):
             return '.'.join(str(part) for part in value) if isinstance(value, (tuple, list)) else str(value)
-        lib, slot = self._lib, self._token.slot
-        return {
-            'library': str(lib.library_description).strip(),
-            'manufacturer': str(lib.manufacturer_id).strip(),
-            'library_version': version(lib.library_version),
-            'cryptoki_version': version(lib.cryptoki_version),
-            'slot': str(slot.slot_description).strip(),
-            'hardware_version': version(slot.hardware_version),
-            'firmware_version': version(slot.firmware_version),
-        }
+        # Informative only: a module that cannot describe itself does not fail the test
+        try:
+            lib, slot = self._lib, self._token.slot
+            return {
+                'library': str(lib.library_description).strip(),
+                'manufacturer': str(lib.manufacturer_id).strip(),
+                'library_version': version(lib.library_version),
+                'cryptoki_version': version(lib.cryptoki_version),
+                'slot': str(slot.slot_description).strip(),
+                'hardware_version': version(slot.hardware_version),
+                'firmware_version': version(slot.firmware_version),
+            }
+        except Exception as e:
+            logger.warning("PKCS#11 module did not describe itself: %s", e)
+            return {}
 
     def list_keys(self) -> List[HsmKeyInfo]:
         """List all keys in the token; keys that could not be read land in ``list_errors``."""

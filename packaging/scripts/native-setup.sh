@@ -382,6 +382,8 @@ cmd_venv() {
             exit 1
         fi
         rm -f "$reqs"
+        # Built: from here the marker only says the switch did not happen
+        echo "switch not completed" > "$BUILD_FAILED"
         tail -n 1 "$BUILD_LOG" || true
     else
         guard_venv "$venv"
@@ -465,10 +467,13 @@ cmd_update_precheck() {
 }
 
 cmd_fips_build_ok() {
-    if fips_requested "$1" && [ -e "$BUILD_FAILED" ]; then
+    fips_requested "$1" && [ -e "$BUILD_FAILED" ] || return 0
+    if [ "$(cat "$BUILD_FAILED" 2>/dev/null)" = "switch not completed" ]; then
+        echo "the UCM_FIPS_BUILD=1 update did not complete after the build (log: $BUILD_LOG); the previous environment was kept" >&2
+    else
         echo "the UCM_FIPS_BUILD=1 build failed (log: $BUILD_LOG); the previous environment was kept" >&2
-        return 1
     fi
+    return 1
 }
 
 # Post-install banner; IPv6 addresses are bracketed in the URLs.

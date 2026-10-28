@@ -23,6 +23,7 @@ import base64
 import logging
 from typing import Dict, Optional
 
+import fips_mode
 from models import db
 
 from .errors import BackupSchemaError
@@ -109,6 +110,10 @@ class RestoreAuthMixin:
                                   config=hsm_data.get('config') or '{}')
                 db.session.add(hsm)
             apply_columns(hsm, 'hsm_providers', hsm_data, plan)
+            if fips_mode.enabled() and hsm.is_softhsm:
+                # Restored as it was: the backup is the operator's, the HSM page flags it
+                logger.warning("Restored SoftHSM provider %r in FIPS mode: SoftHSM is not a validated module",
+                               hsm.name)
             results['hsm_providers'] += 1
 
     def _restore_api_keys(self, backup_data: Dict, results: Dict,
