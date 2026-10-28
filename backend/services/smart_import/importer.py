@@ -24,7 +24,7 @@ from fips_mode import FipsRestricted
 from utils.trusted_proxy import client_ip
 from models import db, Certificate, CA, AuditLog
 from .parser import ParsedObject, ObjectType, SmartParser
-from .chain_builder import ChainBuilder, ChainInfo
+from .chain_builder import ChainBuilder, ChainInfo, find_ca_by_ski
 from security.encryption import encrypt_private_key
 
 
@@ -327,7 +327,7 @@ class SmartImporter:
                 if ca_obj.aki:
                     caref = ski_to_refid.get(ca_obj.aki)
                     if not caref:
-                        parent = CA.query.filter_by(ski=ca_obj.aki).first()
+                        parent = find_ca_by_ski(ca_obj.aki)
                         if parent:
                             caref = parent.refid
                 if not caref:
@@ -435,7 +435,7 @@ class SmartImporter:
             # Find issuing CA: AKI→SKI first, then issuer DN fallback
             caref = None
             if cert_obj.aki:
-                ca = CA.query.filter_by(ski=cert_obj.aki).first()
+                ca = find_ca_by_ski(cert_obj.aki)
                 if ca:
                     caref = ca.refid
             if not caref:

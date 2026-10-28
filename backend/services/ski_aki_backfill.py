@@ -83,6 +83,10 @@ def _merge_ca_group(db, cas_with_ski, stats):
 
 # Derived per-CA data the keeper regenerates; every other reference moves to it
 _DISCARDED_WITH_CA = {'crl_metadata', 'ocsp_responses'}
+# Tables unique on (CA, column): the duplicate's rows the keeper already has are dropped
+_UNIQUE_PER_CA = {'ca_template_pins': 'template_id', 'crl_deploy_bindings': 'target_id'}
+# Parent references declared without a foreign key
+_UNDECLARED_CAREF = (('certificate_authorities', 'caref'), ('crls', 'caref'))
 
 
 def _move_ca_dependents(db, dupe, keeper):
@@ -95,13 +99,16 @@ def _move_ca_dependents(db, dupe, keeper):
             old, new = ((dupe.refid, keeper.refid) if fk.column.name == 'refid' else (dupe.id, keeper.id))
             if table.name in _DISCARDED_WITH_CA:
                 db.session.execute(table.delete().where(fk.parent == old))
-            elif table.name == 'ca_template_pins':
+            elif table.name in _UNIQUE_PER_CA:
+                other = table.c[_UNIQUE_PER_CA[table.name]]
                 db.session.execute(table.delete().where(
-                    (fk.parent == old) & table.c.template_id.in_(
-                        db.select(table.c.template_id).where(fk.parent == new))))
+                    (fk.parent == old) & other.in_(db.select(other).where(fk.parent == new))))
                 db.session.execute(table.update().where(fk.parent == old).values({column: new}))
             else:
                 db.session.execute(table.update().where(fk.parent == old).values({column: new}))
+    for name, column in _UNDECLARED_CAREF:
+        table = db.metadata.tables[name]
+        db.session.execute(table.update().where(table.c[column] == dupe.refid).values({column: keeper.refid}))
 
 
 def backfill_ski_aki():

@@ -19,6 +19,14 @@ from utils.cert_issuer import UnsupportedIssuerKey, verify_certificate_signature
 from .parser import ParsedObject, ObjectType
 
 
+def find_ca_by_ski(ski):
+    """The stored CA with this SKI; at equal SKI the self-signed record, not a cross-certificate."""
+    from sqlalchemy import case
+    from models import CA
+    return CA.query.filter_by(ski=ski).order_by(
+        case((CA.subject == CA.issuer, 0), else_=1), CA.id).first()
+
+
 @dataclass
 class ChainInfo:
     """Information about a certificate chain"""
@@ -248,7 +256,7 @@ class ChainBuilder:
         
         # AKI→SKI matching (reliable)
         if cert.aki:
-            ca = CA.query.filter_by(ski=cert.aki).first()
+            ca = find_ca_by_ski(cert.aki)
             if ca:
                 return ca.refid
         

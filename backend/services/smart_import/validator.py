@@ -16,7 +16,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 
 from .parser import ParsedObject, ObjectType
-from .chain_builder import ChainInfo
+from .chain_builder import ChainInfo, find_ca_by_ski
 
 
 def _compute_cert_fingerprint(pem_or_b64: Optional[str]) -> Optional[str]:
@@ -254,7 +254,7 @@ class ImportValidator:
                 # 1. Look for issuer in managed CAs (by AKI→SKI first, then subject)
                 existing_ca = None
                 if top_cert.aki:
-                    existing_ca = CA.query.filter(CA.ski == top_cert.aki).first()
+                    existing_ca = find_ca_by_ski(top_cert.aki)
                 if not existing_ca:
                     existing_ca = CA.query.filter(CA.subject == issuer).first()
                 

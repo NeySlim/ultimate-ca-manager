@@ -137,3 +137,49 @@ def test_merging_a_duplicate_leaves_no_orphan_rows(app):
         assert RevokedSerial.query.filter_by(caref=keeper_refid, serial_number='02').count() == 1
         assert Certificate.query.filter_by(descr='issued').one().caref == keeper_refid
         assert CATemplatePin.query.filter_by(ca_id=keeper_id, template_id=template.id).count() == 1
+
+
+def test_merging_a_duplicate_moves_child_cas_and_crl_rows(app):
+    """caref columns carry no foreign key: children and legacy CRL rows still follow the keeper."""
+    from models.crl_list import CRL
+
+    key, child_key = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Caref Root')
+    with app.app_context():
+        keeper_id = _row(cert, key)
+        dupe_id = _row(cert)
+        dupe_refid = db.session.get(CA, dupe_id).refid
+        keeper_refid = db.session.get(CA, keeper_id).refid
+        child_id = _row(_cert(child_key, 'Caref Child', key, 'Caref Root'), child_key, caref=dupe_refid)
+        db.session.add(CRL(caref=dupe_refid, descr='legacy', text='x'))
+        db.session.commit()
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        assert db.session.get(CA, dupe_id) is None
+        assert db.session.get(CA, child_id).caref == keeper_refid
+        assert CRL.query.filter_by(descr='legacy').one().caref == keeper_refid
+
+
+def test_duplicates_bound_to_the_same_deploy_target_are_merged(app):
+    from models.deploy import CRLDeployBinding, DeployTarget
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Binding Root')
+    with app.app_context():
+        keeper_id = _row(cert, key)
+        dupe_id = _row(cert)
+        target = DeployTarget(name=f'bind-{uuid.uuid4().hex[:8]}', host='h', username='u', private_key='k')
+        db.session.add(target)
+        db.session.flush()
+        db.session.add_all([CRLDeployBinding(target_id=target.id, ca_id=i, crl_path=f'/c{i}.crl')
+                            for i in (keeper_id, dupe_id)])
+        db.session.commit()
+
+        stats = backfill_ski_aki()
+
+        db.session.expire_all()
+        assert db.session.get(CA, dupe_id) is None
+        assert stats['deduplicated'] >= 1
+        assert CRLDeployBinding.query.filter_by(target_id=target.id).count() == 1

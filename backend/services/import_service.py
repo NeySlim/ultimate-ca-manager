@@ -436,7 +436,9 @@ def _same_issuer(stored_cert, cert, parents_by_name):
 def _would_replace_valid_certificate(stored, new):
     """Of one key and two issuers (the caller checked): a self-signed certificate replaced by
     another, or two unexpired certificates, is a cross-certificate, not a renewal."""
-    if is_self_signed(stored) and not is_self_signed(new):
+    if is_self_signed(new):
+        return False
+    if is_self_signed(stored):
         return True
     now = datetime.now(timezone.utc)
     return stored.not_valid_after_utc > now and new.not_valid_after_utc > now

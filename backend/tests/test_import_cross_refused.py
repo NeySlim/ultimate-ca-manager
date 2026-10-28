@@ -174,3 +174,19 @@ def test_expired_self_signed_root_is_still_not_replaced_by_a_cross_certificate(a
     with app.app_context():
         row = CA.query.filter(CA.descr == pki.name_b).one()
         assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == expired.serial_number
+
+
+@pytest.mark.parametrize('path', ['/api/v2/cas/import', '/api/v2/certificates/import'])
+def test_self_signed_root_replaces_a_stored_cross_certificate(app, auth_client, path):
+    """The recovery from an older overwrite: the root's own PEM becomes the record's certificate again."""
+    from tests.fixtures.cross_pki import build_cross_pki, pem
+    pki = build_cross_pki()
+    for cert in (pki.root_a, pki.cross_b):
+        r = auth_client.post('/api/v2/cas/import', data={'pem_content': pem(cert)}, content_type='multipart/form-data')
+        assert r.status_code in (200, 201), r.data
+    r = _import(auth_client, path, pki.root_b)
+    assert r.status_code in (200, 201), r.data
+    with app.app_context():
+        row = CA.query.filter(CA.descr == pki.name_b).one()
+        assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == pki.root_b.serial_number
+        assert row.caref is None

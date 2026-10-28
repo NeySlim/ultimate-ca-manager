@@ -76,3 +76,22 @@ def test_chain_of_a_leaf_ends_on_the_self_signed_root(pki, order):
     root = chains[0].root
     assert root is not None and root.is_self_signed
     assert str(root.serial_number) == str(pki.root_b.serial_number)
+
+
+def test_children_of_a_root_link_to_its_self_signed_record(app, pki):
+    """With the root and its cross-certificate both stored, an issued CA and a leaf hang under the root."""
+    from tests.fixtures.cross_pki import make_cert, new_key
+    int_key, leaf_key = new_key(), new_key()
+    int_c = make_cert(f'Direct Int {pki.tag}', int_key, pki.name_b, pki.key_b)
+    leaf = make_cert(f'direct-{pki.tag}.example', leaf_key, pki.name_b, pki.key_b, ca=False)
+    with app.app_context():
+        SmartImporter().execute(_bundle(pki.root_a, pki.cross_b))
+        SmartImporter().execute(_bundle(pki.root_b))
+        rows = _rows(pki.name_b)
+        assert len(rows) == 2
+        root = next(r for r, c in rows if c.subject == c.issuer)
+        SmartImporter().execute(_bundle(int_c))
+        SmartImporter().execute(_bundle(leaf))
+        assert CA.query.filter_by(descr=f'Direct Int {pki.tag}').one().caref == root.refid
+        from models import Certificate
+        assert Certificate.query.filter(Certificate.descr.contains(f'direct-{pki.tag}')).one().caref == root.refid
