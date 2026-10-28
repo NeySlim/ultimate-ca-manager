@@ -40,6 +40,49 @@ def test_cross_certificate_keeps_the_policy_chain_valid_under_explicit_policy(ap
     assert done.returncode == 0, done.stdout + done.stderr
 
 
+def _policy_verify(leaf, int_b, cross, root_a):
+    import subprocess, tempfile, pathlib
+    from tests.fixtures.cross_pki import pem
+    with tempfile.TemporaryDirectory() as tmp:
+        t = pathlib.Path(tmp)
+        (t / 'leaf.pem').write_text(pem(leaf))
+        (t / 'root.pem').write_text(pem(root_a))
+        (t / 'un.pem').write_text(pem(int_b) + pem(cross))
+        return subprocess.run(['openssl', 'verify', '-policy_check', '-policy', POLICY.dotted_string,
+                               '-no-CApath', '-no-CAstore', '-CAfile', str(t / 'root.pem'), '-untrusted',
+                               str(t / 'un.pem'), str(t / 'leaf.pem')], capture_output=True, text=True, timeout=30)
+
+
+def test_policies_are_copied_when_the_requirement_comes_from_a_descendant(app, auth_client):
+    tag, ka, kb, ki = _tag(), new_key(), new_key(), new_key()
+    pc = x509.PolicyConstraints(require_explicit_policy=0, inhibit_policy_mapping=None)
+    root_b = _mk(f'RB {tag}', kb, extras=[(_policies(), False)])
+    int_b = _mk(f'IB {tag}', ki, f'RB {tag}', kb, path_length=0, extras=[(pc, True), (_policies(), False)])
+    leaf = _mk(f'l-{tag}.example', new_key(), f'IB {tag}', ki, ca=False, san=f'l-{tag}.example',
+               extras=[(_policies(), False)])
+    ids = _import(app, [_mk(f'RA {tag}', ka), root_b, int_b], keyed=[(f'RA {tag}', ka)])
+    r = _sign(auth_client, ids[f'RA {tag}'][0], ids[f'RB {tag}'][0])
+    assert r.status_code == 201, r.data
+    root_a = x509.load_pem_x509_certificate(db_pem(app, ids[f'RA {tag}'][0]))
+    done = _policy_verify(leaf, int_b, _cert_of(r), root_a)
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
+def test_a_subject_without_policies_gets_any_policy(app, auth_client):
+    tag, ka, kb, ki = _tag(), new_key(), new_key(), new_key()
+    pc = x509.PolicyConstraints(require_explicit_policy=0, inhibit_policy_mapping=None)
+    root_b = _mk(f'RB {tag}', kb)
+    int_b = _mk(f'IB {tag}', ki, f'RB {tag}', kb, path_length=0, extras=[(pc, True), (_policies(), False)])
+    leaf = _mk(f'l-{tag}.example', new_key(), f'IB {tag}', ki, ca=False, san=f'l-{tag}.example',
+               extras=[(_policies(), False)])
+    ids = _import(app, [_mk(f'RA {tag}', ka), root_b, int_b], keyed=[(f'RA {tag}', ka)])
+    r = _sign(auth_client, ids[f'RA {tag}'][0], ids[f'RB {tag}'][0])
+    assert r.status_code == 201, r.data
+    root_a = x509.load_pem_x509_certificate(db_pem(app, ids[f'RA {tag}'][0]))
+    done = _policy_verify(leaf, int_b, _cert_of(r), root_a)
+    assert done.returncode == 0, done.stdout + done.stderr
+
+
 def test_both_validity_notices_are_reported_when_policy_and_issuer_expiry_shorten(app, auth_client):
     a, b = _pair(app, days_a=100)
     pid = _policy(app, a, {'max_validity_days': 1000})

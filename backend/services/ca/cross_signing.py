@@ -79,18 +79,20 @@ def _refuse_degenerate_pair(issuer: CA, subject: CA) -> None:
 _COPIED = (x509.NameConstraints, x509.PolicyConstraints, x509.InhibitAnyPolicy, x509.ExtendedKeyUsage)
 
 
-def _policies_for(subject_cert: x509.Certificate, copied: list, cps_uri, cps_oid):
-    """The subject's CertificatePolicies plus the issuer's CPS, needed once policy constraints are copied."""
-    if not any(isinstance(e.value, (x509.PolicyConstraints, x509.InhibitAnyPolicy)) for e in copied):
-        return None
+def _policies_for(subject_cert: x509.Certificate, cps_uri, cps_oid):
+    """The subject's CertificatePolicies (anyPolicy when it has none) plus the issuer's CPS.
+
+    Always present: a verifier requiring an explicit policy anywhere below needs the cross to carry one."""
     try:
         infos = list(subject_cert.extensions.get_extension_for_class(x509.CertificatePolicies).value)
     except x509.ExtensionNotFound:
-        return None
+        infos = []
     if cps_uri:
         oid = x509.ObjectIdentifier(cps_oid or '2.5.29.32.0')
         if all(i.policy_identifier != oid for i in infos):
             infos.append(x509.PolicyInformation(oid, [cps_uri]))
+    if not infos:
+        infos = [x509.PolicyInformation(x509.ObjectIdentifier('2.5.29.32.0'), None)]
     return x509.Extension(x509.oid.ExtensionOID.CERTIFICATE_POLICIES, False, x509.CertificatePolicies(infos))
 
 
@@ -172,10 +174,8 @@ def cross_sign(issuer: CA, subject: CA, validity_days=DEFAULT_VALIDITY_DAYS, pat
         ski = None
     cps = issuer.cps_uri if issuer.cps_enabled and issuer.cps_uri else None
     copied = _constraints_of(subject_cert)
-    merged = _policies_for(subject_cert, copied, cps, issuer.cps_oid if cps else None)
-    if merged is not None:
-        copied.append(merged)
-        cps = None
+    copied.append(_policies_for(subject_cert, cps, issuer.cps_oid if cps else None))
+    cps = None
     pem, _ = TrustStoreService.create_ca_certificate(
         subject=subject_cert.subject, private_key=None, subject_public_key=subject_cert.public_key(),
         issuer=issuer_cert.subject, issuer_private_key=issuer_key, issuer_cert=issuer_cert,
