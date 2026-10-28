@@ -15,11 +15,10 @@ from fips_mode import FipsRestricted
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
-from utils.cert_issuer import private_key_matches, stored_private_key_matches, hsm_key_binding_matches
+from utils.cert_issuer import private_key_matches
 from services.import_service import (
-    parse_certificate_file, extract_cert_info, find_existing_ca, AmbiguousImportTarget,
-    install_on_pending_ca, find_pending_csr_for_certificate, stored_certificate_serial,
-    relink_parent_caref, path_length_of,
+    parse_certificate_file, extract_cert_info, find_existing_ca, AmbiguousImportTarget, CrossCertificateImport, ImportConflict, update_ca_from_import,
+    install_on_pending_ca, find_pending_csr_for_certificate,
     serialize_cert_to_pem, serialize_key_to_pem
 )
 from security.encryption import encrypt_private_key
@@ -102,7 +101,7 @@ def import_ca():
         try:
             existing_ca = find_existing_ca(cert_info, cert)
         except AmbiguousImportTarget as e:
-            return error_response(str(e), 409)
+            return error_response(str(e), 409, e.details)
 
         if existing_ca:
             if not update_existing:
@@ -119,6 +118,9 @@ def import_ca():
                 try:
                     ca_dict, warnings, superseded = install_on_pending_ca(
                         existing_ca, cert_pem, username, encrypted_prv=encrypted_prv, name=name or None)
+                except CrossCertificateImport as e:
+                    db.session.rollback()
+                    return error_response(str(e), 409, e.details)
                 except ValueError as e:
                     db.session.rollback()
                     return error_response(str(e), 400)
@@ -131,65 +133,13 @@ def import_ca():
                     data['superseded_valid_to'] = superseded['valid_to']
                 return success_response(data=data, message=message)
 
-            # Decide what becomes of the stored key before touching the record:
-            # the HSM lookup may commit its public key cache, and a record already
-            # half-updated would be persisted with the old binding (#347 review)
-            key_dropped = False
-            if key_pem:
-                # The new certificate's key arrived with it: it replaces whatever
-                # the record held, an HSM binding included
-                pass
-            elif existing_ca.hsm_key_id:
-                # An HSM-backed CA holds no key column: the binding is checked
-                # against the HSM key's public key, and left untouched when that
-                # key cannot be reached rather than kept or dropped on a guess
-                bound = hsm_key_binding_matches(existing_ca.hsm_key_id, cert)
-                if bound is None:
-                    db.session.rollback()
-                    return error_response(
-                        'Cannot verify the HSM key bound to this CA against the new '
-                        'certificate; the HSM key is unreachable', 409)
-                key_dropped = bound is False
-            elif existing_ca.prv:
-                # The new certificate is not the stored key's: keeping the key
-                # would leave a pair that signs nothing verifiable (re-keyed
-                # certificate imported without its key). A key that cannot be
-                # read is not shown to be foreign: the update is refused
-                matches = stored_private_key_matches(existing_ca.prv, cert, context=f"CA {existing_ca.id}")
-                if matches is None:
-                    db.session.rollback()
-                    return error_response(
-                        'Cannot verify the stored private key against the new '
-                        'certificate; the stored key could not be read', 409)
-                key_dropped = matches is False
-
-            # Update existing CA
-            old_serial = stored_certificate_serial(existing_ca)
-            existing_ca.descr = name or cert_info['cn'] or existing_ca.descr
-            existing_ca.crt = base64.b64encode(cert_pem).decode('utf-8')
-            if key_pem:
-                existing_ca.prv = encrypted_prv
-                existing_ca.hsm_key_id = None
-            elif key_dropped:
-                existing_ca.prv = None
-                existing_ca.hsm_key_id = None
-            existing_ca.issuer = cert_info['issuer']
-            existing_ca.valid_from = cert_info['valid_from']
-            existing_ca.valid_to = cert_info['valid_to']
-            existing_ca.ski = cert_info.get('ski')
-            if old_serial is not None and old_serial != cert.serial_number:
-                # Revocation is per certificate (RFC 5280): a new certificate is
-                # not the revoked one, whose serial stays on the parent's list
-                existing_ca.revoked = False
-                existing_ca.revoked_at = None
-                existing_ca.revoke_reason = None
-                existing_ca.invalidity_at = None
-            existing_ca.serial_number = str(cert.serial_number)
-            existing_ca.caref = relink_parent_caref(cert, existing_ca.caref, exclude_ca_id=existing_ca.id)
-            existing_ca.path_length = path_length_of(cert)
-            # Deleted after its revocation and imported again, or renewed into
-            # a serial its parent already revoked: still revoked (#343)
-            CAService.apply_persisted_revocation(existing_ca)
+            try:
+                key_dropped = update_ca_from_import(
+                    existing_ca, cert, cert_pem, cert_info,
+                    key_pem=key_pem, encrypted_prv=encrypted_prv, name=name)
+            except ImportConflict as e:
+                db.session.rollback()
+                return error_response(str(e), 409)
 
             ok, err = safe_commit(logger, "Failed to update CA")
             if not ok:

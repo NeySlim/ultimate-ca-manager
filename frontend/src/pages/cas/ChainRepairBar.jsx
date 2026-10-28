@@ -25,6 +25,7 @@ export function ChainRepairBar({ data, running, onRun, canRunRepair, t }) {
 
   const total = crStats.total_cas || 0
   const orphans = crStats.orphan_cas || 0
+  const sameKey = crStats.same_key_distinct_certs || 0
   const linked = total - orphans
   const pct = total > 0 ? Math.round((linked / total) * 100) : 100
 
@@ -51,6 +52,11 @@ export function ChainRepairBar({ data, running, onRun, canRunRepair, t }) {
         <span>{crStats.total_cas || 0} CA{(crStats.total_cas || 0) > 1 ? 's' : ''}</span>
         <span>{crStats.total_certs || 0} certs</span>
         {orphans > 0 && <span className="text-accent-warning">{orphans} {t('dashboard.chainRepairOrphans')}</span>}
+        {sameKey > 0 && (
+          <span className="text-accent-warning">
+            {sameKey} {t('dashboard.chainRepairSameKey', { defaultValue: 'shared keys, distinct certificates (cross-certificate?)' })}
+          </span>
+        )}
       </div>
 
       <div className="flex items-center gap-2 shrink-0">

@@ -291,7 +291,7 @@ class TestActiveCaWithRequest:
         assert body['data'].get('superseded_serial') == format(first.serial_number, 'x')
         assert _row(app, CA, ca_id, 'csr', 'serial_number') == (None, str(renewed.serial_number))
 
-    def test_generic_update_relinks_parent_and_path_length(self, app, auth_client, create_ca):
+    def test_generic_update_refuses_reparenting_while_both_are_valid(self, app, auth_client, create_ca):
         from models import CA
         parent_a = create_ca(cn='Relink Parent A')
         parent_b = create_ca(cn='Relink Parent B')
@@ -302,9 +302,9 @@ class TestActiveCaWithRequest:
         ca_id, _ = _store_ca(app, under_a, key, caref=a_refid, path_length=0)
         under_b = _cert('Relinked Sub CA', key, issuer_cert=b_cert, signer=b_key, ca=True, path_length=2)
         r = _import(auth_client, CA_IMPORT, under_b)
-        assert r.status_code == 200, r.data
-        assert json.loads(r.data)['data']['id'] == ca_id
-        assert _row(app, CA, ca_id, 'caref', 'path_length') == (b_refid, 2)
+        assert r.status_code == 409, r.data
+        assert json.loads(r.data)['details']['code'] == 'cross_certificate_detected'
+        assert _row(app, CA, ca_id, 'caref', 'path_length') == (a_refid, 0)
 
 
 class TestCertificateParentResolvedWithoutCaId:

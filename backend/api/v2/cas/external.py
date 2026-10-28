@@ -20,6 +20,7 @@ from utils.response import success_response, error_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.sanitize import sanitize_filename
 from services.ca_service import CAService
+from services.import_service import CrossCertificateImport
 from services.crl import CRLService, ExternalCRLConflict
 from models import CA, db
 
@@ -107,6 +108,9 @@ def install_ca_certificate(ca_id):
     try:
         ca, warnings, superseded = CAService.complete_external_ca(
             ca, cert_pem, username=username)
+    except CrossCertificateImport as e:
+        db.session.rollback()
+        return error_response(str(e), 409, e.details)
     except ValueError as e:
         db.session.rollback()
         logger.info(f"Certificate install refused for CA {ca_id}: {e}")

@@ -68,22 +68,40 @@ def _merge_ca_group(db, cas_with_ski, stats):
     for c in cas_with_ski:
         if c.id == keeper.id:
             continue
-        # Use raw SQL to avoid ORM cascade issues with incomplete schemas
-        db.session.execute(
-            db.text("UPDATE certificates SET caref = :new_ref WHERE caref = :old_ref"),
-            {'new_ref': keeper.refid, 'old_ref': c.refid}
-        )
-        db.session.execute(
-            db.text("UPDATE certificate_authorities SET caref = :new_ref WHERE caref = :old_ref"),
-            {'new_ref': keeper.refid, 'old_ref': c.refid}
-        )
-        db.session.execute(
-            db.text("DELETE FROM certificate_authorities WHERE id = :id"),
-            {'id': c.id}
-        )
+        try:
+            with db.session.begin_nested():
+                _move_ca_dependents(db, c, keeper)
+                # Raw SQL to avoid ORM cascade issues with incomplete schemas
+                db.session.execute(db.text("DELETE FROM certificate_authorities WHERE id = :id"), {'id': c.id})
+        except Exception as exc:
+            logger.warning(f"SKI/AKI backfill: CA '{c.descr}' (id={c.id}) not merged into id={keeper.id}: {exc}")
+            continue
         db.session.expunge(c)
         logger.info(f"SKI/AKI backfill: dedup CA '{c.descr}' (id={c.id}) -> merged into '{keeper.descr}' (id={keeper.id})")
         stats['deduplicated'] += 1
+
+
+# Derived per-CA data the keeper regenerates; every other reference moves to it
+_DISCARDED_WITH_CA = {'crl_metadata', 'ocsp_responses'}
+
+
+def _move_ca_dependents(db, dupe, keeper):
+    """Point every row referencing *dupe* (by refid or id) at *keeper*, so none is orphaned."""
+    for table in db.metadata.sorted_tables:
+        for fk in table.foreign_keys:
+            if fk.column.table.name != 'certificate_authorities' or fk.column.name not in ('id', 'refid'):
+                continue
+            column = fk.parent.name
+            old, new = ((dupe.refid, keeper.refid) if fk.column.name == 'refid' else (dupe.id, keeper.id))
+            if table.name in _DISCARDED_WITH_CA:
+                db.session.execute(table.delete().where(fk.parent == old))
+            elif table.name == 'ca_template_pins':
+                db.session.execute(table.delete().where(
+                    (fk.parent == old) & table.c.template_id.in_(
+                        db.select(table.c.template_id).where(fk.parent == new))))
+                db.session.execute(table.update().where(fk.parent == old).values({column: new}))
+            else:
+                db.session.execute(table.update().where(fk.parent == old).values({column: new}))
 
 
 def backfill_ski_aki():

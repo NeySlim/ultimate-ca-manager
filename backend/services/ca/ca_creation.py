@@ -18,6 +18,7 @@ from models import CA, db
 from models.hsm import HsmKey
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
+from services.import_service import CrossCertificateImport
 from utils.cert_issuer import is_self_signed
 from utils.datetime_utils import to_naive_utc, utc_isoformat, utc_now
 from utils.serial_format import serial_to_int
@@ -716,8 +717,9 @@ class CACreationMixin:
         if not was_pending and ca.crt and not is_self_signed(cert):
             stored = x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend())
             if is_self_signed(stored):
-                raise ValueError("This certificate is a cross-certificate of this self-signed CA; "
-                                 "installing it would replace the CA's own certificate, so it is refused")
+                raise CrossCertificateImport(
+                    "This certificate is a cross-certificate of this self-signed CA; "
+                    "installing it would replace the CA's own certificate, so it is refused")
 
         # 2. CA constraints (same rules as CA import)
         ca_warning = validate_ca_certificate(cert)

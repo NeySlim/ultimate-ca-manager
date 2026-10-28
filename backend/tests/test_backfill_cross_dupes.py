@@ -94,3 +94,46 @@ def test_record_without_certificate_is_not_merged(app):
         db.session.expire_all()
         assert db.session.get(CA, imported).crt
         assert db.session.get(CA, pending) is not None
+
+
+def test_merging_a_duplicate_leaves_no_orphan_rows(app):
+    """CRL, OCSP and pin rows of the deleted record go with it; its issued state moves to the keeper."""
+    from models import CertificateTemplate, CATemplatePin, CRLMetadata, OCSPResponse
+    from models.certificate import Certificate
+    from models.revoked_serial import RevokedSerial
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Orphan Root')
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    with app.app_context():
+        keeper_id = _row(cert, key)
+        dupe_id = _row(cert)
+        keeper, dupe = db.session.get(CA, keeper_id), db.session.get(CA, dupe_id)
+        keeper_refid, dupe_refid = keeper.refid, dupe.refid
+        template = CertificateTemplate(name=f'orphan-{uuid.uuid4().hex[:8]}', template_type='server',
+                                       extensions_template='{}')
+        db.session.add(template)
+        db.session.flush()
+        db.session.add_all([
+            CRLMetadata(ca_id=dupe_id, crl_number=1, this_update=now, next_update=now + timedelta(days=1),
+                        crl_pem='x', crl_der=b'x'),
+            OCSPResponse(ca_id=dupe_id, cert_serial='01', response_der=b'x', status='good',
+                         this_update=now, next_update=now + timedelta(days=1)),
+            CATemplatePin(ca_id=dupe_id, template_id=template.id),
+            RevokedSerial(caref=dupe_refid, serial_number='02', valid_to=now + timedelta(days=30)),
+            Certificate(refid=str(uuid.uuid4()), descr='issued', caref=dupe_refid, crt='', subject='CN=issued',
+                        serial_number='03'),
+        ])
+        db.session.commit()
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        assert db.session.get(CA, dupe_id) is None
+        assert CRLMetadata.query.filter_by(ca_id=dupe_id).count() == 0
+        assert OCSPResponse.query.filter_by(ca_id=dupe_id).count() == 0
+        assert CATemplatePin.query.filter_by(ca_id=dupe_id).count() == 0
+        assert RevokedSerial.query.filter_by(caref=dupe_refid).count() == 0
+        assert RevokedSerial.query.filter_by(caref=keeper_refid, serial_number='02').count() == 1
+        assert Certificate.query.filter_by(descr='issued').one().caref == keeper_refid
+        assert CATemplatePin.query.filter_by(ca_id=keeper_id, template_id=template.id).count() == 1

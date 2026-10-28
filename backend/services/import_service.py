@@ -6,6 +6,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 import re
 import base64
+from datetime import datetime, timezone
 from utils.cert_issuer import is_self_signed
 from utils.foreign_algorithms import describe_public_key, spki_der
 from utils.key_codec import private_key_to_pem, refuse_eddsa_key
@@ -190,10 +191,23 @@ class AmbiguousImportTarget(ValueError):
     """Several records share the certificate's names and none can be told
     to be the one it belongs to."""
 
+    code = None
+
+    @property
+    def details(self):
+        return {'code': self.code} if self.code else None
+
 
 class CrossCertificateImport(AmbiguousImportTarget):
-    """The certificate cross-certifies a self-signed CA already stored: applying
-    it would replace the root's own certificate and parent it under another CA."""
+    """The certificate re-certifies a CA's key under another issuer while the
+    stored certificate is still valid: applying it would replace the CA's own
+    certificate and parent it under that issuer."""
+
+    code = 'cross_certificate_detected'
+
+
+class ImportConflict(ValueError):
+    """The record cannot be updated from the imported certificate; nothing was changed."""
 
 
 def _spki(public_key):
@@ -309,6 +323,61 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
     return current_caref
 
 
+def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=None, encrypted_prv=None, name=None):
+    """Apply an imported CA certificate to its existing record; returns whether the stored key was unbound.
+
+    The stored key is checked before anything is changed; raises ImportConflict
+    when it cannot be (HSM unreachable, key unreadable). The caller commits.
+    """
+    from services.ca_service import CAService
+    from utils.cert_issuer import stored_private_key_matches, hsm_key_binding_matches
+    # An HSM lookup may commit its public key cache, so the key is decided before the record is touched
+    key_dropped = False
+    if key_pem:
+        # The new certificate's key arrived with it: it replaces whatever the record held
+        pass
+    elif existing_ca.hsm_key_id:
+        # Unreachable HSM key: left untouched rather than kept or dropped on a guess
+        bound = hsm_key_binding_matches(existing_ca.hsm_key_id, cert)
+        if bound is None:
+            raise ImportConflict('Cannot verify the HSM key bound to this CA against the new '
+                                 'certificate; the HSM key is unreachable')
+        key_dropped = bound is False
+    elif existing_ca.prv:
+        # A re-keyed certificate imported without its key would leave a pair that signs nothing verifiable
+        matches = stored_private_key_matches(existing_ca.prv, cert, context=f"CA {existing_ca.id}")
+        if matches is None:
+            raise ImportConflict('Cannot verify the stored private key against the new '
+                                 'certificate; the stored key could not be read')
+        key_dropped = matches is False
+
+    old_serial = stored_certificate_serial(existing_ca)
+    existing_ca.descr = name or cert_info['cn'] or existing_ca.descr
+    existing_ca.crt = base64.b64encode(cert_pem).decode('utf-8')
+    if key_pem:
+        existing_ca.prv = encrypted_prv
+        existing_ca.hsm_key_id = None
+    elif key_dropped:
+        existing_ca.prv = None
+        existing_ca.hsm_key_id = None
+    existing_ca.issuer = cert_info['issuer']
+    existing_ca.valid_from = cert_info['valid_from']
+    existing_ca.valid_to = cert_info['valid_to']
+    existing_ca.ski = cert_info.get('ski')
+    if old_serial is not None and old_serial != cert.serial_number:
+        # Revocation is per certificate (RFC 5280): the new one is not the revoked one
+        existing_ca.revoked = False
+        existing_ca.revoked_at = None
+        existing_ca.revoke_reason = None
+        existing_ca.invalidity_at = None
+    existing_ca.serial_number = str(cert.serial_number)
+    existing_ca.caref = relink_parent_caref(cert, existing_ca.caref, exclude_ca_id=existing_ca.id)
+    existing_ca.path_length = path_length_of(cert)
+    # Deleted after its revocation and imported again, or renewed into a serial its parent revoked (#343)
+    CAService.apply_persisted_revocation(existing_ca)
+    return key_dropped
+
+
 def _issuer_identity(cert, parents_by_name):
     """What identifies the authority that signed *cert* beyond its name, or None.
 
@@ -364,6 +433,15 @@ def _same_issuer(stored_cert, cert, parents_by_name):
     return stored_id[1] == new_id[1]
 
 
+def _would_replace_valid_certificate(stored, new):
+    """Of one key and two issuers (the caller checked): a self-signed certificate replaced by
+    another, or two unexpired certificates, is a cross-certificate, not a renewal."""
+    if is_self_signed(stored) and not is_self_signed(new):
+        return True
+    now = datetime.now(timezone.utc)
+    return stored.not_valid_after_utc > now and new.not_valid_after_utc > now
+
+
 def _select_existing(candidates, cert, kind):
     """Among *candidates*, the records sharing the certificate's names, the
     one the certificate belongs to; None when there is none (#347 review).
@@ -409,11 +487,12 @@ def _select_existing(candidates, cert, kind):
             f"does not tell them apart; the record to update cannot be determined")
     if len(same_key) == 1:
         stored_cert, _ = _record_identity(same_key[0])
-        if stored_cert is not None and is_self_signed(stored_cert) and not is_self_signed(cert):
+        if kind == 'CA' and stored_cert is not None and _would_replace_valid_certificate(stored_cert, cert):
             raise CrossCertificateImport(
-                f"This certificate is a cross-certificate of the self-signed {kind} "
-                f"'{getattr(same_key[0], 'descr', '')}' (same subject and key, another issuer); "
-                f"importing it would replace that {kind}'s own certificate, so it is refused")
+                f"This certificate re-certifies the key of the {kind} "
+                f"'{getattr(same_key[0], 'descr', '')}' under another issuer while its own certificate "
+                f"is still valid (a cross-certificate); importing it would replace that certificate, "
+                f"so it is refused")
         return same_key[0]
     if same_key:
         raise AmbiguousImportTarget(
