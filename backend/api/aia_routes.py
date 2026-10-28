@@ -6,8 +6,7 @@ Supports both refid-based (preferred) and legacy numeric ID-based URLs.
 import base64
 from flask import Blueprint, Response, abort
 from cryptography import x509
-from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives.serialization import Encoding
+from cryptography.hazmat.primitives.serialization import Encoding, pkcs7
 import logging
 
 from models import db, CA
@@ -33,56 +32,82 @@ def _resolve_ca(ca_ref):
         return None
 
 
+# Clients and proxies keep an AIA answer for 24 h: a change of the served cross-certificate
+# reaches them only after that delay.
+AIA_CACHE_CONTROL = 'public, max-age=86400, must-revalidate'
+
+
+def _issuer_certificate(ca):
+    """The certificate AIA presents for *ca*: its served cross-certificate if any, else its own."""
+    from services.ca import cross_certs
+    row = cross_certs.served_for(ca)
+    return cross_certs.certificate_of(row) if row is not None else x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+
+
+def _aia_response(body, mimetype, filename):
+    return Response(body, status=200, mimetype=mimetype, headers={
+        'Content-Disposition': f'inline; filename="{filename}"',
+        'Cache-Control': AIA_CACHE_CONTROL,
+    })
+
+
 @aia_bp.route('/<ca_ref>.cer')
 def get_ca_cert_der(ca_ref):
-    """
-    Serve CA certificate in DER format (application/pkix-cert).
-    This is the standard format for AIA CA Issuers (RFC 5280).
-    """
+    """CA certificate in DER (application/pkix-cert), the standard AIA CA Issuers format (RFC 5280)."""
     ca = _resolve_ca(ca_ref)
     if not ca or not ca.crt:
         abort(404)
-
     try:
-        cert_pem = base64.b64decode(ca.crt)
-        cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
-        cert_der = cert.public_bytes(Encoding.DER)
+        cert_der = _issuer_certificate(ca).public_bytes(Encoding.DER)
     except Exception as e:
         logger.error(f"AIA: failed to encode CA {ca_ref} certificate: {e}")
         abort(500)
-
-    return Response(
-        cert_der,
-        status=200,
-        mimetype='application/pkix-cert',
-        headers={
-            'Content-Disposition': f'inline; filename="{ca.refid}.cer"',
-            'Cache-Control': 'public, max-age=86400, must-revalidate',
-        }
-    )
+    return _aia_response(cert_der, 'application/pkix-cert', f'{ca.refid}.cer')
 
 
 @aia_bp.route('/<ca_ref>.pem')
 def get_ca_cert_pem(ca_ref):
-    """Serve CA certificate in PEM format."""
+    """CA certificate in PEM."""
     ca = _resolve_ca(ca_ref)
     if not ca or not ca.crt:
         abort(404)
-
     try:
-        cert_pem = base64.b64decode(ca.crt)
-        # Validate it's a proper PEM certificate
-        x509.load_pem_x509_certificate(cert_pem, default_backend())
+        cert_pem = _issuer_certificate(ca).public_bytes(Encoding.PEM)
     except Exception as e:
         logger.error(f"AIA: failed to load CA {ca_ref} certificate: {e}")
         abort(500)
+    return _aia_response(cert_pem, 'application/x-pem-file', f'{ca.refid}.pem')
 
-    return Response(
-        cert_pem,
-        status=200,
-        mimetype='application/x-pem-file',
-        headers={
-            'Content-Disposition': f'inline; filename="{ca.refid}.pem"',
-            'Cache-Control': 'public, max-age=86400, must-revalidate',
-        }
-    )
+
+@aia_bp.route('/<ca_ref>.p7c')
+def get_ca_certs_p7c(ca_ref):
+    """Certs-only CMS bundle (RFC 5280 4.2.2.1): the CA's own certificate and its servable cross-certificates."""
+    from services.ca import cross_certs
+    ca = _resolve_ca(ca_ref)
+    if not ca or not ca.crt:
+        abort(404)
+    try:
+        certs = [x509.load_pem_x509_certificate(base64.b64decode(ca.crt))]
+        certs += [cross_certs.certificate_of(row) for row in cross_certs.list_for(ca) if row.servable]
+        bundle = pkcs7.serialize_certificates(certs, Encoding.DER)
+    except Exception as e:
+        logger.error(f"AIA: failed to build the bundle of CA {ca_ref}: {e}")
+        abort(500)
+    return _aia_response(bundle, 'application/pkcs7-mime', f'{ca.refid}.p7c')
+
+
+@aia_bp.route('/<ca_ref>/cross/<int:xid>.cer')
+def get_ca_cross_cert_der(ca_ref, xid):
+    """One cross-certificate of the CA in DER; a revoked, expired or not yet valid one is not published."""
+    from services.ca import cross_certs
+    from models.ca_cross_certificate import CACrossCertificate
+    ca = _resolve_ca(ca_ref)
+    row = db.session.get(CACrossCertificate, xid) if ca else None
+    if row is None or row.ca_id != ca.id or not row.servable:
+        abort(404)
+    try:
+        cert_der = cross_certs.certificate_of(row).public_bytes(Encoding.DER)
+    except Exception as e:
+        logger.error(f"AIA: failed to encode cross-certificate {xid} of CA {ca_ref}: {e}")
+        abort(500)
+    return _aia_response(cert_der, 'application/pkix-cert', f'{ca.refid}-cross-{xid}.cer')

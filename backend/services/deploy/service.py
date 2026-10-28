@@ -644,7 +644,7 @@ class DeployService:
 
     @staticmethod
     def push_chain_variant(certificate: Certificate, variant: str) -> str:
-        """The variant a push uses: a revoked cross-certificate fails; an expired or not yet valid one falls back to auto."""
+        """The variant a push uses: a revoked, expired or not yet valid cross-certificate falls back to auto."""
         from models import CA
         from models.ca_cross_certificate import CACrossCertificate
         from utils.ca_chain import ChainVariantError, parse_variant, variant_ids
@@ -654,10 +654,8 @@ class DeployService:
         wanted = parse_variant(variant)
         if isinstance(wanted, tuple):
             row = db.session.get(CACrossCertificate, wanted[1])
-            if row is not None and row.revoked:
-                raise ChainVariantError(f'Chain variant {variant} is revoked')
-            if row is not None and not row.servable:
-                logger.warning(f'Deploy: {variant} is outside its validity period, using the auto chain')
+            if row is not None and (row.revoked or not row.servable):
+                logger.warning(f'Deploy: {variant} is revoked or outside its validity period, using the auto chain')
                 return 'auto'
         return variant
 

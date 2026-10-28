@@ -74,17 +74,6 @@ def test_a_binding_refuses_a_revoked_cross_certificate(auth_client, world):
     assert _binding(auth_client, world, chain_variant=f'cross:{world.xid}').status_code == 400
 
 
-def test_a_binding_whose_cross_certificate_was_revoked_fails_instead_of_pushing_it(app, auth_client, world):
-    from services.deploy.service import DeployService
-    from utils.ca_chain import ChainVariantError
-    _revoke(auth_client, world)
-    with app.app_context():
-        binding = DeployBinding(fullchain_path='/srv/fullchain.pem', include_root=True,
-                                chain_variant=f'cross:{world.xid}')
-        with pytest.raises(ChainVariantError):
-            DeployService.resolve_files(binding, db.session.get(Certificate, world.leaf_id))
-
-
 def test_a_cross_certificate_not_yet_valid_is_neither_served_nor_presented(app, auth_client, world):
     with app.app_context():
         db.session.get(CACrossCertificate, world.xid).valid_from = utc_now() + timedelta(days=200)

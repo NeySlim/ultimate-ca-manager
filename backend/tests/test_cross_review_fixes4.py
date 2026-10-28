@@ -105,3 +105,17 @@ def test_the_chain_status_lists_the_issuing_ca_and_ten_levels_at_most(app, auth_
             for cid in created:
                 db.session.delete(db.session.get(CA, cid))
             db.session.commit()
+
+
+def test_a_binding_pinned_to_a_revoked_cross_certificate_still_pushes_leaf_and_key_with_the_auto_chain(
+        app, auth_client, world):
+    from services.deploy.service import DeployService
+    r = auth_client.post(f'/api/v2/cas/{world.b_id}/cross-certificates/{world.xid}/revoke', json={})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        binding = DeployBinding(cert_path='/srv/cert.pem', key_path='/srv/key.pem',
+                                fullchain_path='/srv/fullchain.pem', include_root=True,
+                                chain_variant=f'cross:{world.xid}')
+        files = {f[0]: f[1] for f in DeployService.resolve_files(binding, db.session.get(Certificate, world.leaf_id))}
+    assert set(files) == {'/srv/cert.pem', '/srv/key.pem', '/srv/fullchain.pem'}
+    assert _der(world.pki.cross_b) not in [_der(c) for c in _loads(files['/srv/fullchain.pem'])]
