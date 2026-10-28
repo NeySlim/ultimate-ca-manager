@@ -666,6 +666,7 @@ export default function CSRsPage() {
     {
       key: 'key_type',
       header: t('common.key'),
+      sortable: false, // key_algo is only stored once the request is signed
       priority: 4,
       hideOnMobile: true,
       render: (val, row) => (

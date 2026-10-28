@@ -10,7 +10,7 @@ import datetime
 import base64
 import uuid
 from flask import Blueprint, request, jsonify, g, Response
-from sqlalchemy import or_
+from sqlalchemy import func, or_
 from auth.unified import require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils import notices as notices_mod
@@ -86,7 +86,7 @@ def _apply_request_search(query, search, include_signer=False):
     if include_signer:
         signer_refids = db.session.query(CA.refid).filter(CA.descr.ilike(pattern, escape='\\'))
         conditions.append(Certificate.caref.in_(signer_refids))
-        # A row whose CA is gone shows the issuer's name as its signer
+        # Also the issuer DN, which is what a row shows once its CA is gone
         conditions.append(Certificate.issuer.ilike(pattern, escape='\\'))
     return query.filter(or_(*conditions))
 
@@ -94,7 +94,8 @@ def _apply_request_search(query, search, include_signer=False):
 # Table column key -> column the CSR lists may sort on. Only these: the
 # client's value never names a column directly
 _SORT_COLUMNS = {
-    'cn': Certificate.subject_cn,
+    # Pending requests store no subject_cn: fall back to the name the row shows
+    'cn': func.coalesce(Certificate.subject_cn, Certificate.descr),
     'created_at': Certificate.created_at,
     'key_type': Certificate.key_algo,
     'signed_at': Certificate.valid_from,

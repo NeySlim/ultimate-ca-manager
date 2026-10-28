@@ -136,3 +136,26 @@ class TestPendingSearch:
         # The signer clause is history-only: pending rows have no signer yet
         r = auth_client.get(f'{CSRS}?search=pending-{tag}%25')
         assert _json(r)['meta']['total'] == 0
+
+
+class TestPendingSortByName:
+
+    def test_pending_requests_sort_by_their_name(self, auth_client):
+        # A pending request stores no subject_cn: the sort reads the name it shows
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.x509.oid import NameOID
+        tag = uuid.uuid4().hex[:8]
+        created = _create_csr(auth_client, f'z-{tag}.example.com')
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.ORGANIZATION_NAME, 'No CN')]))
+               .sign(ec.generate_private_key(ec.SECP256R1()), hashes.SHA256()))
+        r = auth_client.post(f'{CSRS}/import', data={
+            'pem_content': csr.public_bytes(serialization.Encoding.PEM).decode(),
+            'name': f'a-{tag}'})
+        assert r.status_code in (200, 201), r.data
+        imported = _json(r)['data']['id']
+        for order, expected in (('asc', [imported, created]), ('desc', [created, imported])):
+            r = auth_client.get(f'{CSRS}?search={tag}&sort_by=cn&sort_order={order}')
+            assert [row['id'] for row in _json(r)['data']] == expected
