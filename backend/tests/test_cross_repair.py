@@ -2,6 +2,7 @@
 import base64
 import uuid
 
+import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 
@@ -355,7 +356,7 @@ def test_convert_moves_the_scep_challenge_with_the_scep_ca(app, auth_client):
         db.session.commit()
 
 
-def test_convert_drops_the_challenge_of_the_duplicate_when_the_root_has_one(app, auth_client):
+def test_convert_drops_the_challenge_of_a_non_scep_duplicate_when_the_root_has_one(app, auth_client):
     pki, ids = _world(app)
     with app.app_context():
         _set_config(**{f"scep_challenge_{ids['x']}": 'secret-x', f"scep_challenge_{ids['b']}": 'secret-b'})
@@ -401,3 +402,58 @@ def test_convert_goes_to_the_root_that_already_carries_the_cross_certificate(app
     with app.app_context():
         assert CACrossCertificate.query.filter_by(ca_id=short_id).count() == 1
         assert db.session.get(CA, ids['i']).caref == db.session.get(CA, short_id).refid
+
+
+def test_an_expired_root_carrying_the_cross_does_not_win_over_the_valid_root(app, auth_client):
+    from datetime import datetime, timedelta, timezone
+    from tests.fixtures.cross_pki import make_cert
+    pki, ids = _world(app, with_root_b=False)
+    with app.app_context():
+        old = make_cert(pki.name_b, pki.key_b, days=-5,
+                        not_before=datetime.now(timezone.utc) - timedelta(days=400))
+        old_id = _row(old, 'expired root')
+        new_id = _row(pki.root_b, 'current root')
+        cross_certs.attach_certificate(db.session.get(CA, old_id), pki.cross_b, 'test')
+    r = auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert CACrossCertificate.query.filter_by(ca_id=new_id).count() == 1
+        assert CACrossCertificate.query.filter_by(ca_id=old_id).count() == 0
+        assert db.session.get(CA, ids['i']).caref == db.session.get(CA, new_id).refid
+
+
+def test_convert_keeps_the_challenge_of_the_configured_scep_ca_with_its_timestamp(app, auth_client):
+    from api.v2.scep import challenge_age_state
+    pki, ids = _world(app)
+    with app.app_context():
+        _set_config(scep_ca_id=str(ids['x']))
+        _set_config(**{f"scep_challenge_{ids['x']}": 'live-x',
+                       f"scep_challenge_{ids['x']}_generated_at": datetime_now_iso(),
+                       f"scep_challenge_{ids['b']}": 'stale-b'})
+    assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200
+    with app.app_context():
+        assert challenge_age_state(ids['b'])[0] == 'live-x'
+        assert _config(f"scep_challenge_{ids['b']}_generated_at") is not None
+        from models import SystemConfig
+        SystemConfig.query.filter(SystemConfig.key.like('scep_%')).delete(synchronize_session=False)
+        db.session.commit()
+
+
+def datetime_now_iso():
+    from datetime import datetime
+    return datetime.now().replace(microsecond=0).isoformat()
+
+
+@pytest.mark.parametrize('kind', ['frp', 'gost', 'sm2'])
+def test_a_ca_with_a_key_pyca_cannot_load_does_not_break_the_findings(app, auth_client, kind):
+    from tests.test_tolerant_foreign_algorithms import build_cert, pem as foreign_pem
+    pki, ids = _world(app)
+    with app.app_context():
+        record = CA(refid=str(uuid.uuid4()), descr=f'foreign {kind} {pki.tag}', serial=0,
+                    crt=base64.b64encode(foreign_pem(build_cert(kind, f'F {pki.tag}', is_ca=True)).encode()).decode(),
+                    subject=f'CN=F {pki.tag}', issuer=f'CN=F {pki.tag}', ski=f'AA:{pki.tag[:2]}')
+        db.session.add(record)
+        db.session.commit()
+    found, _ = _findings(auth_client, pki)
+    assert [f['kind'] for f in found] == ['shadowed_root'] and found[0]['ca_id'] == ids['x']
+    assert auth_client.post(f"/api/v2/cas/{ids['x']}/convert-to-cross", json={}).status_code == 200

@@ -5,6 +5,7 @@ comes back from a backup or through restore-primary.
 """
 import base64
 import logging
+from datetime import datetime, timezone
 from typing import List, Optional
 
 from cryptography import x509
@@ -30,7 +31,10 @@ def _identity(record):
     if cert is None:
         return None
     from cryptography.hazmat.primitives import hashes
-    return cert, cert.fingerprint(hashes.SHA256()).hex(), cross_certs._spki(cert), is_self_signed(cert)
+    try:
+        return cert, cert.fingerprint(hashes.SHA256()).hex(), cross_certs._spki(cert), is_self_signed(cert)
+    except Exception:
+        return None  # a key pyca cannot load (SM2, GOST, FRP256v1): never part of a repair
 
 
 def _held():
@@ -139,16 +143,26 @@ def _move_publication(record, root):
             setattr(root, field, getattr(record, field))
 
 
-def _move_scep_challenge(record, root):
+def _move_scep_challenge(record, root, was_scep_ca=False):
+    """Move the challenge and its timestamp together; the configured SCEP CA's pair wins over the root's."""
     from models import SystemConfig
-    for suffix in ('', '_generated_at'):
-        old = SystemConfig.query.filter_by(key=f'scep_challenge_{record.id}{suffix}').first()
-        if old is None:
-            continue
-        if SystemConfig.query.filter_by(key=f'scep_challenge_{root.id}{suffix}').first() is None:
+    pair = [SystemConfig.query.filter_by(key=f'scep_challenge_{record.id}{suffix}').first()
+            for suffix in ('', '_generated_at')]
+    if pair[0] is None and pair[1] is None:
+        return
+    mine = SystemConfig.query.filter(SystemConfig.key.in_(
+        [f'scep_challenge_{root.id}', f'scep_challenge_{root.id}_generated_at'])).all()
+    if mine and not was_scep_ca:
+        for old in pair:
+            if old is not None:
+                db.session.delete(old)
+        return
+    for old in mine:
+        db.session.delete(old)
+    db.session.flush()
+    for old, suffix in zip(pair, ('', '_generated_at')):
+        if old is not None:
             old.key = f'scep_challenge_{root.id}{suffix}'
-        else:
-            db.session.delete(old)
 
 
 def alias_target(ref):
@@ -186,8 +200,13 @@ def convert_to_cross(ca_id: int, username: str = 'system'):
     if root is not None:
         carrier = CACrossCertificate.query.filter_by(fingerprint_sha256=fp).first()
         if carrier is not None and carrier.ca_id != root.id:
-            root = next((r for r, c, _f, k, selfs in held
-                         if r.id == carrier.ca_id and selfs and k == spki and c.subject == cert.subject), root)
+            holder = next((r for r, c, _f, k, selfs in held
+                           if r.id == carrier.ca_id and selfs and k == spki and c.subject == cert.subject
+                           and c.not_valid_after_utc > datetime.now(timezone.utc)), None)
+            if holder is not None:
+                root = holder
+            else:
+                carrier.ca_id = root.id
     if root is None:
         raise CrossCertError('No self-signed record holds this subject and key: restore a backup, or '
                              'give the self-signed certificate to restore-primary', 409, 'no_root')
@@ -202,8 +221,11 @@ def convert_to_cross(ca_id: int, username: str = 'system'):
     if not root.prv and not root.hsm_key_id:
         root.prv, root.hsm_key_id = record.prv, record.hsm_key_id
     _move_ca_dependents(db, record, root)
+    from models import SystemConfig
+    scep_cfg = SystemConfig.query.filter_by(key='scep_ca_id').first()
+    was_scep_ca = bool(scep_cfg and scep_cfg.value in (str(record.id), record.refid))
     _move_settings(record, root, row)
-    _move_scep_challenge(record, root)
+    _move_scep_challenge(record, root, was_scep_ca)
     _move_publication(record, root)
     snapshot_dict = record.to_dict()
     files = SimpleNamespace(**{c.key: getattr(record, c.key) for c in CA.__table__.columns})
