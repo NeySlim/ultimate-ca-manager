@@ -86,21 +86,17 @@ def chain_root_common_name(pem_chain: str) -> Optional[str]:
 
 
 def chain_matches_preferred_cn(pem_chain: str, preferred_cn: str) -> bool:
-    """True when the last cert's subject or issuer CN matches *preferred_cn*.
+    """True when the issuer CN of the topmost certificate is *preferred_cn* (certbot's rule).
 
-    RFC 8555 chains often omit the self-signed root; certbot/acme.sh match the
-    issuer CN of the topmost certificate in that case.
+    A self-signed root is its own issuer; a cross certificate is issued by the
+    other root, so it never matches its own subject.
     """
     blocks = split_pem_certificates(pem_chain)
     if not blocks:
         return False
-    preferred_lower = preferred_cn.casefold()
     try:
-        last = _load_cert(blocks[-1])
-        for name in (last.subject, last.issuer):
-            cn = _cert_common_name(name)
-            if cn and cn.casefold() == preferred_lower:
-                return True
+        cn = _cert_common_name(_load_cert(blocks[-1]).issuer)
+        return bool(cn) and cn.casefold() == preferred_cn.casefold()
     except Exception as exc:
         logger.warning('Could not evaluate preferred chain match: %s', exc)
     return False
@@ -188,11 +184,13 @@ def select_acme_certificate_chain(
 ) -> str:
     """Pick an ACME certificate chain, optionally matching preferred_root_cn.
 
+    Like certbot: the first chain, default before alternates, whose topmost
+    certificate was issued by *preferred_root_cn*; the default when none is.
+
     Args:
         default_pem: PEM chain from the primary certificate URL response.
         link_headers: Response headers (or pre-joined Link string) with alternates.
-        preferred_root_cn: Desired trust-anchor CN (e.g. ``ISRG Root X1``). Matches
-            the last certificate's subject CN or issuer CN when the root is omitted.
+        preferred_root_cn: Desired trust-anchor CN (e.g. ``ISRG Root X1``).
         fetch_alternate: Callable that POST-as-GETs an alternate cert URL and returns PEM.
 
     Returns:
@@ -202,56 +200,21 @@ def select_acme_certificate_chain(
     if not preferred:
         return default_pem
 
-    preferred_lower = preferred.casefold()
-    alternate_urls = _collect_alternate_urls(link_headers)
-    default_root = chain_root_common_name(default_pem)
-    default_issuers = chain_issuer_serials(default_pem)
-
-    if chain_matches_preferred_cn(default_pem, preferred_lower) and not alternate_urls:
+    if chain_matches_preferred_cn(default_pem, preferred):
         return default_pem
 
-    best_pem: Optional[str] = None
-    best_issuers: Optional[Tuple[int, ...]] = None
-    best_is_alternate = False
-
-    def _consider_candidate(pem: str, is_alternate: bool) -> None:
-        nonlocal best_pem, best_issuers, best_is_alternate
-        if not chain_matches_preferred_cn(pem, preferred_lower):
-            return
-        rebuilt = rebuild_acme_chain(default_pem, pem)
-        issuers = chain_issuer_serials(rebuilt)
-        if best_pem is None:
-            best_pem, best_issuers, best_is_alternate = rebuilt, issuers, is_alternate
-            return
-        # Default already matches — keep it unless an alternate offers different issuers.
-        if not best_is_alternate:
-            if is_alternate and issuers != best_issuers:
-                best_pem, best_issuers, best_is_alternate = rebuilt, issuers, True
-            return
-        # First matching alternate wins (certbot-style).
-    _consider_candidate(default_pem, is_alternate=False)
-
-    for url in alternate_urls:
+    for url in _collect_alternate_urls(link_headers):
         try:
             alt_pem = fetch_alternate(url)
-            if alt_pem and alt_pem.strip():
-                _consider_candidate(alt_pem, is_alternate=True)
         except Exception as exc:
             logger.warning('Failed to fetch alternate ACME chain from %s: %s', url, exc)
+            continue
+        if alt_pem and alt_pem.strip() and chain_matches_preferred_cn(alt_pem, preferred):
+            rebuilt = rebuild_acme_chain(default_pem, alt_pem)
+            logger.info('Selected alternate ACME chain (root CN=%s, issuers=%s)',
+                        chain_root_common_name(rebuilt), chain_issuer_serials(rebuilt))
+            return rebuilt
 
-    if best_pem is not None:
-        if best_is_alternate:
-            logger.info(
-                'Selected alternate ACME chain (root CN=%s, issuers=%s)',
-                chain_root_common_name(best_pem),
-                best_issuers,
-            )
-        return best_pem
-
-    logger.warning(
-        'preferred_chain %r did not match any alternate (default root=%r); '
-        'keeping default chain',
-        preferred,
-        default_root,
-    )
+    logger.warning('preferred_chain %r did not match any chain (default root=%r); '
+                   'keeping default chain', preferred, chain_root_common_name(default_pem))
     return default_pem
