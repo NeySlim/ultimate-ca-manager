@@ -94,7 +94,7 @@ def _apply_request_search(query, search, include_signer=False):
 # Table column key -> column the CSR lists may sort on. Only these: the
 # client's value never names a column directly
 _SORT_COLUMNS = {
-    # Pending requests store no subject_cn: fall back to the name the row shows
+    # A generated request stores no subject_cn, an imported one only with a CN
     'cn': func.coalesce(Certificate.subject_cn, Certificate.descr),
     'created_at': Certificate.created_at,
     'key_type': Certificate.key_algo,
