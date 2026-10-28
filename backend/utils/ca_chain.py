@@ -131,13 +131,14 @@ def _issuer_pem(ca):
     return base64.b64decode(ca.crt) if ca.crt else b''
 
 
-def issuer_chain(start, variant=AUTO, include_root=True, include_start=True):
+def issuer_chain(start, variant=AUTO, include_root=True, include_start=True, substitute_start=True):
     """The certificates presenting *start*'s chain, nearest first, as ``ChainLink`` entries.
 
     At most one CA's certificate is replaced by a cross-certificate of the same key; the
     chain then continues with the cross-certificate's issuer when it is held, else ends.
     ``auto`` replaces the CA nearest *start* that serves a valid cross-certificate;
     ``cross:<id>`` replaces its CA whatever the state of that row (it is the caller's explicit choice).
+    ``substitute_start=False`` keeps *start*'s own certificate and applies the rule to the CAs above it.
     """
     from services.ca.cross_certs import issuer_of
     from models import CA
@@ -146,7 +147,7 @@ def issuer_chain(start, variant=AUTO, include_root=True, include_start=True):
     links, seen, substituted, ca = [], set(), False, start
     while ca is not None and len(seen) < MAX_CHAIN_DEPTH and ca.refid not in seen:
         seen.add(ca.refid)
-        row = None if substituted else _cross_for(ca, wanted)
+        row = None if substituted or (ca is start and not substitute_start) else _cross_for(ca, wanted)
         if row is not None:
             substituted = True
             nxt = issuer_of(row)

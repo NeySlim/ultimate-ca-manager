@@ -116,7 +116,7 @@ class DeployService:
         from cryptography.hazmat.primitives import serialization
         from api.v2.certificates.export import _build_ca_chain
         from utils.ca_chain import ChainVariantError
-        DeployService.check_chain_variant(certificate, variant)
+        variant = DeployService.push_chain_variant(certificate, variant)
         try:
             chain = _build_ca_chain(
                 certificate, cert_pem.encode(), include_root=include_root, variant=variant)
@@ -641,6 +641,25 @@ class DeployService:
             raise ChainVariantError(f'Chain variant {variant} is not part of the chain of this certificate')
         if any(v['id'] == variant and not v['servable'] for v in chain_variants(start)):
             raise ChainVariantError(f'Chain variant {variant} is revoked, expired or not yet valid')
+
+    @staticmethod
+    def push_chain_variant(certificate: Certificate, variant: str) -> str:
+        """The variant a push uses: a revoked cross-certificate fails; an expired or not yet valid one falls back to auto."""
+        from models import CA
+        from models.ca_cross_certificate import CACrossCertificate
+        from utils.ca_chain import ChainVariantError, parse_variant, variant_ids
+        start = CA.query.filter_by(refid=certificate.caref).first() if certificate.caref else None
+        if variant not in variant_ids(start):
+            raise ChainVariantError(f'Chain variant {variant} is not part of the chain of this certificate')
+        wanted = parse_variant(variant)
+        if isinstance(wanted, tuple):
+            row = db.session.get(CACrossCertificate, wanted[1])
+            if row is not None and row.revoked:
+                raise ChainVariantError(f'Chain variant {variant} is revoked')
+            if row is not None and not row.servable:
+                logger.warning(f'Deploy: {variant} is outside its validity period, using the auto chain')
+                return 'auto'
+        return variant
 
     @staticmethod
     def validate_crl_binding(data: dict, partial: bool = False) -> dict:

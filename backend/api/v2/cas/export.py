@@ -33,13 +33,12 @@ logger = logging.getLogger(__name__)
 def _export_chain(ca, include_chain, variant, explicit=False):
     """``(own certificate PEM, parent PEMs)``.
 
-    *ca*'s own certificate becomes its cross-certificate only when the caller named a variant."""
+    *ca*'s own certificate becomes its cross-certificate only when the caller named a variant;
+    the CAs above it follow the served rule either way."""
     from utils.ca_chain import issuer_chain
     if not include_chain:
         return base64.b64decode(ca.crt), []
-    links = issuer_chain(ca, variant)
-    if links[0].cross is not None and not explicit:
-        links = issuer_chain(ca, 'primary')
+    links = issuer_chain(ca, variant, substitute_start=explicit)
     return links[0].pem, [link.pem for link in links[1:]]
 
 

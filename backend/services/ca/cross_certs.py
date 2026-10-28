@@ -2,7 +2,7 @@
 
 A cross-certificate carries the CA's subject and key under another issuer. It
 sits beside the CA's own certificate, never in place of it. At most one per CA
-is served; an expired or revoked one is kept and exportable but never served.
+is served; a revoked, expired or not yet valid one is kept and exportable but never served.
 """
 import base64
 import hashlib
@@ -222,7 +222,7 @@ def _apply_persisted_revocation(row):
 
 def _serve(ca, row):
     if not row.servable:
-        raise CrossCertError('An expired or revoked cross-certificate cannot be served', 409, 'not_servable')
+        raise CrossCertError('A revoked, expired or not yet valid cross-certificate cannot be served', 409, 'not_servable')
     for other in CACrossCertificate.query.filter(CACrossCertificate.ca_id == ca.id,
                                                  CACrossCertificate.id != row.id).all():
         other.served = False
@@ -251,7 +251,7 @@ def list_for(ca: CA) -> List[CACrossCertificate]:
 
 
 def served_for(ca: CA) -> Optional[CACrossCertificate]:
-    """The cross-certificate this CA serves now; never an expired or revoked one."""
+    """The cross-certificate this CA serves now; never a revoked, expired or not yet valid one."""
     for row in CACrossCertificate.query.filter_by(ca_id=ca.id, served=True).all():
         if row.servable:
             return row

@@ -64,6 +64,7 @@ class CACrossCertificate(db.Model):
             'revoked_at': utc_isoformat(self.revoked_at),
             'revoke_reason': self.revoke_reason,
             'expired': self.expired,
+            'not_yet_valid': self.not_yet_valid,
             'created_at': utc_isoformat(self.created_at),
             'created_by': self.created_by,
         }
