@@ -105,7 +105,7 @@ PYEOF
     fi
 }
 
-# Records a failed UCM_FIPS_BUILD=1 build of this update as its result
+# Records a failed or interrupted UCM_FIPS_BUILD=1 build of this update as its result
 fips_build_ok() {
     local msg
     if [ -f "$SETUP" ] && ! msg=$(bash "$SETUP" fips-build-ok "$UCM_ENV" 2>&1); then

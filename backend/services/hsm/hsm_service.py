@@ -311,8 +311,8 @@ class HsmService:
             provider.status = 'connected' if result.get('success') else 'error'
             provider.last_tested_at = utc_now()
             provider.error_message = None if result.get('success') else result.get('message')
-            if result.get('module'):
-                provider.module_info = json.dumps(result['module'])
+            if result.get('success'):
+                provider.module_info = json.dumps(result['module']) if result.get('module') else None
             db.session.commit()
             
             return result

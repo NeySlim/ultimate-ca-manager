@@ -163,3 +163,37 @@ class TestUnreadableModule:
         provider._lib = Silent()
         provider._token = SimpleNamespace(slot=Silent())
         assert provider._module_info() == {}
+
+    def test_a_failed_description_closes_the_session(self, monkeypatch):
+        from types import SimpleNamespace
+        from services.hsm.pkcs11_provider import Pkcs11Provider
+
+        class Unreadable:
+            def __getattr__(self, name):
+                raise RuntimeError(f'{name} not supported')
+
+        provider = Pkcs11Provider.__new__(Pkcs11Provider)
+        closed = []
+        monkeypatch.setattr(provider, 'connect', lambda: setattr(provider, '_token', Unreadable()), raising=False)
+        monkeypatch.setattr(provider, 'disconnect', lambda: closed.append(True), raising=False)
+        assert provider.test_connection()['success'] is False
+        assert closed
+
+    def test_a_module_that_no_longer_describes_itself_forgets_the_old_description(self, app, monkeypatch):
+        from models import db
+        from models.hsm import HsmProvider
+        from services.hsm import HsmService
+        with app.app_context():
+            row = HsmProvider(name=f'stale-{uuid.uuid4().hex[:8]}', type='pkcs11',
+                              config=json.dumps({'module_path': VENDOR_PATH}),
+                              module_info=json.dumps({'library': 'old'}))
+            db.session.add(row)
+            db.session.commit()
+            fake = type('Fake', (), {'test_connection': lambda self: {'success': True, 'module': {}}})()
+            monkeypatch.setattr(HsmService, '_get_provider_instance', classmethod(lambda cls, p: fake))
+            try:
+                HsmService.test_provider(row.id)
+                assert db.session.get(HsmProvider, row.id).module_info is None
+            finally:
+                HsmProvider.query.filter_by(id=row.id).delete()
+                db.session.commit()

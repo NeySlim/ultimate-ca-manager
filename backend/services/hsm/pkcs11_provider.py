@@ -183,8 +183,6 @@ class Pkcs11Provider(BaseHsmProvider):
                 },
                 'module': self._module_info(),
             }
-            
-            self.disconnect()
             return info
             
         except HsmConnectionError as e:
@@ -197,6 +195,8 @@ class Pkcs11Provider(BaseHsmProvider):
                 'success': False,
                 'message': f"Test failed: {str(e)}"
             }
+        finally:
+            self.disconnect()
     
     def _module_info(self) -> Dict[str, str]:
         """What the PKCS#11 library and the token's slot say they are."""
