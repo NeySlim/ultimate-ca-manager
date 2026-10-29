@@ -21,7 +21,7 @@ export default {
         title: 'Pestañas',
         items: [
           { label: 'Pendientes', text: 'CSR en espera de revisión y firma' },
-          { label: 'Historial', text: 'Solicitudes firmadas con su certificado: descargue uno u otro, o firme la solicitud de nuevo' },
+          { label: 'Historial', text: 'Solicitudes firmadas con su certificado: descargue uno u otro, o firme la solicitud de nuevo. Ambas pestañas paginan, buscan y ordenan sobre todas las solicitudes; Historial también busca por CA firmante' },
         ]
       },
     ],

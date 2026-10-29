@@ -19,6 +19,7 @@ import {
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
 import { usersService, groupsService, rolesService, casService, accountService, ssoService } from '../services'
+import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import UserSecurityKeys from '../components/UserSecurityKeys'
 import UserApiKeys from '../components/UserApiKeys'
 import { useNotification, useMobile } from '../contexts'
@@ -1275,7 +1276,8 @@ export default function UsersGroupsPage() {
                       value={mtlsForm.ca_id}
                       onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
                       placeholder={t('account.mtlsDefaultCA')}
-                      options={cas.filter(ca => ca.has_private_key !== false).map(ca => ({ value: ca.refid || String(ca.id), label: ca.descr || ca.subject || ca.refid }))}
+                      options={pickerCas(cas, mtlsForm.ca_id).map(ca => ({ value: ca.refid || String(ca.id), label: ca.descr || ca.subject || ca.refid }))}
+                      helperText={unlistedPickerCas(cas, mtlsForm.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, mtlsForm.ca_id) }) : undefined}
                     />
                     <Input label={t('account.mtlsValidityDays')} type="number" value={mtlsForm.validity_days} onChange={(e) => setMtlsForm(prev => ({ ...prev, validity_days: parseInt(e.target.value) || 365 }))} min="1" max="3650" />
                     <div className="flex justify-end gap-2 pt-4 border-t border-border">

@@ -19,7 +19,7 @@ import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import MappingEditor from './settings/MappingEditor'
-import { pickerCas } from '../lib/caSelection'
+import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
 
 export default function ESTPage() {
   const { t } = useTranslation()
@@ -192,6 +192,7 @@ export default function ESTPage() {
               value={config.ca_id?.toString() || ''}
               onChange={(val) => setConfig({ ...config, ca_id: parseInt(val) })}
               disabled={!config.enabled}
+              helperText={unlistedPickerCas(cas, config.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, config.ca_id) }) : undefined}
             />
 
             <Input
@@ -227,10 +228,15 @@ export default function ESTPage() {
               keyLabel={t('est.labelName')}
               valueLabel={t('common.issuingCA')}
               keyPlaceholder={t('est.labelPlaceholder')}
-              valueOptions={cas
+              valueOptions={pickerCas(cas, ...Object.values(config.labels || {}))
                 .filter(ca => ca.refid)
                 .map(ca => ({ value: ca.refid, label: ca.name || ca.subject }))}
             />
+            {unlistedPickerCas(cas, ...Object.values(config.labels || {})) > 0 && (
+              <p className="text-xs text-text-tertiary">
+                {t('cas.notListedForSigning', { count: unlistedPickerCas(cas, ...Object.values(config.labels || {})) })}
+              </p>
+            )}
           </Card>
 
           <Card className="p-4 space-y-4">

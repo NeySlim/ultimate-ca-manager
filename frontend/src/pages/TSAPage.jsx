@@ -18,7 +18,7 @@ import { tsaService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
-import { pickerCas } from '../lib/caSelection'
+import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { certificateLabel } from '../lib/utils'
 import { TSA_LABELS, groupedOptions, listAlgorithms, signerKeyParams } from '../lib/keyAlgorithms'
 import { useFipsMode } from '../lib/policyAlgorithms'
@@ -220,6 +220,7 @@ export default function TSAPage() {
               value={config.ca_refid || ''}
               onChange={(val) => setConfig({ ...config, ca_refid: val })}
               disabled={!config.enabled}
+              helperText={unlistedPickerCas(cas, config.ca_refid) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, config.ca_refid) }) : undefined}
             />
 
             <Input
@@ -373,6 +374,7 @@ export default function TSAPage() {
                 }))}
                 value={genForm.ca_refid}
                 onChange={(val) => setGenForm({ ...genForm, ca_refid: val })}
+                helperText={unlistedPickerCas(cas, genForm.ca_refid) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, genForm.ca_refid) }) : undefined}
               />
               <Input
                 label={t('tsa.signerGenerateCn')}

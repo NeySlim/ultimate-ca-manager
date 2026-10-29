@@ -9,7 +9,7 @@ import remarkBreaks from 'remark-breaks'
 import remarkGfm from 'remark-gfm'
 import { MARKDOWN_ELEMENT_CLASSES } from '../../lib/markdown'
 import ProfilesEditor from './ProfilesEditor'
-import { pickerCas } from '../../lib/caSelection'
+import { pickerCas, unlistedPickerCas } from '../../lib/caSelection'
 
 /** Render a markdown ToS preview.
  *
@@ -116,6 +116,7 @@ export default function ConfigTab({ acmeSettings, cas, templates = [], updateSet
               value: ca.id.toString(), 
               label: ca.name || ca.common_name 
             }))}
+            helperText={unlistedPickerCas(cas, acmeSettings.issuing_ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, acmeSettings.issuing_ca_id) }) : undefined}
           />
         </div>
       </CompactSection>

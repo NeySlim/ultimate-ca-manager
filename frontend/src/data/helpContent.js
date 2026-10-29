@@ -328,7 +328,7 @@ export const helpContent = {
         icon: ListChecks,
         items: [
           { label: 'Pending', text: 'CSRs awaiting review and signing' },
-          { label: 'History', text: 'Signed requests with their certificate: download either one, or sign the request again' },
+          { label: 'History', text: 'Signed requests with their certificate: download either one, or sign the request again. Both tabs page, search and sort across every request; History also searches by signing CA' },
         ]
       },
     ],
@@ -1312,7 +1312,7 @@ export const helpContent = {
         icon: Key,
         items: [
           { label: 'Add Provider', text: 'Configure connection to an HSM (library path, credentials, slot)' },
-          { label: 'Test Connection', text: 'Verify the HSM is reachable and credentials are valid' },
+          { label: 'Test Connection', text: 'Verify the HSM is reachable and credentials are valid; for a PKCS#11 module, also record what it reports (library, manufacturer, library and firmware versions), shown on the provider page' },
           { label: 'Generate Key', text: 'Create a new key pair directly on the HSM' },
           { label: 'Status', text: 'Monitor provider connection health' },
           { label: 'Certification', text: 'Declare the certification of the HSM: Common Criteria EAL 4+, EUCC high, FIPS 140-3 level 3, FIPS 140-2 level 3 or other. Left empty, it is not declared. The eu-acm compliance profile accepts only Common Criteria EAL 4+, EUCC high, and FIPS 140-3 level 3 (until 31 December 2030) for an HSM-backed CA' },

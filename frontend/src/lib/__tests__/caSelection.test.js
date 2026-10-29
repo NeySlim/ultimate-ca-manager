@@ -3,7 +3,7 @@
  * and its key import is offered whether its key was expected or not (#426).
  */
 import { describe, it, expect } from 'vitest'
-import { holdsNoKey, needsKeyImport, signingCas, unlistedSigningCas } from '../caSelection'
+import { holdsNoKey, needsKeyImport, signingCas, unlistedPickerCas, unlistedSigningCas } from '../caSelection'
 
 const keylessRoot = { id: 1, is_root: true, type: 'root', certificate_only: true, has_private_key: false }
 const keylessIntermediate = { id: 2, is_root: false, type: 'intermediate', certificate_only: true, has_private_key: false }
@@ -35,5 +35,12 @@ describe('CAs held without their key', () => {
     const cas = [signer, { id: 5, has_private_key: true, revoked: true }, { id: 6, has_private_key: true, pending: true },
       { id: 7, has_private_key: true, offline: true }, { id: 8, has_private_key: true, revoked_in_chain: true }]
     expect(unlistedSigningCas(cas)).toBe(4)
+  })
+
+  it('does not count a selected CA that a picker keeps showing, by id or refid', () => {
+    const cas = [signer, { ...keylessRoot, refid: 'abc' }, keylessIntermediate]
+    expect(unlistedPickerCas(cas)).toBe(2)
+    expect(unlistedPickerCas(cas, '2')).toBe(1)
+    expect(unlistedPickerCas(cas, 'abc', 2)).toBe(0)
   })
 })

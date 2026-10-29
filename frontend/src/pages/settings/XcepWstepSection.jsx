@@ -8,7 +8,7 @@ import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { xcepWstepService, casService, adConnectorService, kerberosService, templatesService } from '../../services'
 import { useNotification } from '../../contexts'
 import CopyableUrl from './CopyableUrl'
-import { pickerCas } from '../../lib/caSelection'
+import { pickerCas, unlistedPickerCas } from '../../lib/caSelection'
 
 const EMPTY_XCEP = { enabled: false, ca_id: null, username: '', password_set: false }
 const EMPTY_WSTEP = { enabled: false, ca_id: null, username: '', password_set: false, validity_days: 365 }
@@ -119,6 +119,8 @@ export default function XcepWstepSection() {
   useEffect(() => { loadAll() }, [loadAll])
 
   const caOptions = pickerCas(cas, xcep?.ca_id, wstep?.ca_id).map(ca => ({ value: String(ca.id), label: ca.descr || ca.common_name }))
+  const unlistedCas = unlistedPickerCas(cas, xcep?.ca_id, wstep?.ca_id)
+  const caHelp = unlistedCas > 0 ? t('cas.notListedForSigning', { count: unlistedCas }) : undefined
 
   const handleXcepSave = async () => {
     setXcepSaving(true)
@@ -228,6 +230,7 @@ export default function XcepWstepSection() {
             value={xcep.ca_id ? String(xcep.ca_id) : ''}
             onChange={(val) => setXcep(prev => ({ ...prev, ca_id: val ? parseInt(val, 10) : null }))}
             options={caOptions}
+            helperText={caHelp}
             placeholder={t('xcepWstep.selectCa')}
           />
           <div className="grid grid-cols-2 gap-4">
@@ -266,6 +269,7 @@ export default function XcepWstepSection() {
             value={wstep.ca_id ? String(wstep.ca_id) : ''}
             onChange={(val) => setWstep(prev => ({ ...prev, ca_id: val ? parseInt(val, 10) : null }))}
             options={caOptions}
+            helperText={caHelp}
             placeholder={t('xcepWstep.selectCa')}
           />
           <div className="grid grid-cols-2 gap-4">

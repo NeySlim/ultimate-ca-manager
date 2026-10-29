@@ -21,7 +21,7 @@ export default {
         title: 'Tabs',
         items: [
           { label: 'Ausstehend', text: 'CSRs, die auf Prüfung und Signierung warten' },
-          { label: 'Verlauf', text: 'Signierte Anfragen mit ihrem Zertifikat: beides lässt sich herunterladen, oder die Anfrage wird erneut signiert' },
+          { label: 'Verlauf', text: 'Signierte Anfragen mit ihrem Zertifikat: beides lässt sich herunterladen, oder die Anfrage wird erneut signiert. Beide Tabs blättern, suchen und sortieren über alle Anfragen; der Verlauf durchsucht außerdem die signierende CA' },
         ]
       },
     ],

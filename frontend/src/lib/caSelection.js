@@ -30,6 +30,9 @@ export const pickerCas = (cas, ...selected) => {
   return out
 }
 
+/** How many CAs a picker built with pickerCas leaves out (#426). */
+export const unlistedPickerCas = (cas, ...selected) => (cas || []).length - pickerCas(cas, ...selected).length
+
 /** A CA held without its private key, a root imported on its own included: it cannot sign (#426). */
 export const holdsNoKey = (ca) => !!ca?.certificate_only && !ca?.pending && !ca?.offline
 

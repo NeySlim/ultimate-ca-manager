@@ -21,7 +21,7 @@ export default {
         title: 'Onglets',
         items: [
           { label: 'En attente', text: 'CSR en attente d\'examen et de signature' },
-          { label: 'Historique', text: 'Demandes signées avec leur certificat : téléchargez l\'un ou l\'autre, ou signez la demande à nouveau' },
+          { label: 'Historique', text: 'Demandes signées avec leur certificat : téléchargez l\'un ou l\'autre, ou signez la demande à nouveau. Les deux onglets paginent, recherchent et trient sur toutes les demandes ; Historique recherche aussi par CA signataire' },
         ]
       },
     ],

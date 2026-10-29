@@ -21,7 +21,7 @@ export default {
         title: 'Abas',
         items: [
           { label: 'Pendentes', text: 'CSRs aguardando revisão e assinatura' },
-          { label: 'Histórico', text: 'Pedidos assinados com o respetivo certificado: descarregue um ou outro, ou assine o pedido novamente' },
+          { label: 'Histórico', text: 'Pedidos assinados com o respetivo certificado: descarregue um ou outro, ou assine o pedido novamente. Os dois separadores paginam, pesquisam e ordenam sobre todos os pedidos; o Histórico pesquisa também pela CA de assinatura' },
         ]
       },
     ],

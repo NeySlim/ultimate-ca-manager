@@ -21,7 +21,7 @@ export default {
         title: 'Schede',
         items: [
           { label: 'In attesa', text: 'CSR in attesa di revisione e firma' },
-          { label: 'Cronologia', text: 'Richieste firmate con il loro certificato: scarica l\'uno o l\'altro, oppure firma di nuovo la richiesta' },
+          { label: 'Cronologia', text: 'Richieste firmate con il loro certificato: scarica l\'uno o l\'altro, oppure firma di nuovo la richiesta. Entrambe le schede hanno paginazione, ricerca e ordinamento su tutte le richieste; Cronologia cerca anche per CA firmataria' },
         ]
       },
     ],
