@@ -15,7 +15,7 @@ import { casService, hsmService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useWebSocket } from '../../hooks'
 import { extractData, cn, downloadBlob } from '../../lib/utils'
-import { signingCas } from '../../lib/caSelection'
+import { signingCas, unlistedSigningCas } from '../../lib/caSelection'
 import { CA_KEY_CHOICES, POLICY_DIGESTS, caKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 import { PSS_HSM_TYPES } from '../../lib/signatureName'
 import { KEY_ALGORITHMS, defaultDigestFor, groupedOptions, listAlgorithms } from '../../lib/keyAlgorithms'
@@ -717,6 +717,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
               }))}
               value={createFormParentCAId}
               onChange={(value) => setCreateFormParentCAId(value)}
+              helperText={unlistedSigningCas(cas) > 0 ? t('cas.notListedForSigning', { count: unlistedSigningCas(cas) }) : undefined}
               required
             />
           )}

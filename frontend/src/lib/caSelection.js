@@ -13,6 +13,9 @@ export const canSignNow = (ca) => !!ca
 
 export const signingCas = (cas) => (cas || []).filter(canSignNow)
 
+/** How many CAs a signing picker leaves out, so it can say so instead of hiding them (#426). */
+export const unlistedSigningCas = (cas) => (cas || []).length - signingCas(cas).length
+
 /**
  * The CAs a picker shows: those able to sign now, plus the one currently
  * selected when it no longer is, so a saved setting keeps showing its CA
@@ -27,11 +30,14 @@ export const pickerCas = (cas, ...selected) => {
   return out
 }
 
+/** A CA held without its private key, a root imported on its own included: it cannot sign (#426). */
+export const holdsNoKey = (ca) => !!ca?.certificate_only && !ca?.pending && !ca?.offline
+
 /**
  * Whether the "certificate only" state is worth a banner and a key import:
  * a CA created by signing an external request, or an intermediate held
  * without its key. A trust-store root imported on purpose without a key is
  * not one (#348).
  */
-export const needsKeyImport = (ca) => !!ca?.certificate_only && !ca?.pending && !ca?.offline
+export const needsKeyImport = (ca) => holdsNoKey(ca)
   && (ca?.imported_from === 'csr_signed' || ca?.is_root === false || ca?.type === 'intermediate')

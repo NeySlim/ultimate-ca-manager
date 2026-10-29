@@ -23,7 +23,7 @@ import { ImportCaKeyModal } from '../../components/cas/ImportCaKeyModal'
 import { casService } from '../../services'
 import { formatDate, downloadBlob } from '../../lib/utils'
 import { useNotification } from '../../contexts/NotificationContext'
-import { needsKeyImport } from '../../lib/caSelection'
+import { holdsNoKey, needsKeyImport } from '../../lib/caSelection'
 import { canExportPrivateKey } from '../../lib/exportPermissions'
 
 // =============================================================================
@@ -189,6 +189,22 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
             <span className="text-xs font-medium">{t('cas.certificateOnly')}</span>
           </div>
           <p className="text-xs text-text-secondary mt-1">{t('cas.certificateOnlyBanner')}</p>
+          {canWrite('cas') && (
+            <Button type="button" size="xs" variant="secondary" className="mt-2" onClick={() => setShowImportKeyModal(true)}>
+              <UploadSimple size={14} /> {t('cas.importPrivateKey')}
+            </Button>
+          )}
+        </div>
+      )}
+
+      {/* Held without its key on purpose (a trust anchor, #348), but it cannot sign until one is imported (#426) */}
+      {holdsNoKey(ca) && !needsKeyImport(ca) && (
+        <div className="rounded-lg px-3 py-2 bg-tertiary-40 border border-border">
+          <div className="flex items-center gap-2 text-text-secondary">
+            <Key size={16} />
+            <span className="text-xs font-medium">{t('cas.noPrivateKey')}</span>
+          </div>
+          <p className="text-xs text-text-secondary mt-1">{t('cas.noPrivateKeyBanner')}</p>
           {canWrite('cas') && (
             <Button type="button" size="xs" variant="secondary" className="mt-2" onClick={() => setShowImportKeyModal(true)}>
               <UploadSimple size={14} /> {t('cas.importPrivateKey')}

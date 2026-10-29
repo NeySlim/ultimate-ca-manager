@@ -41,7 +41,7 @@ import { SignatureSchemeField } from './cas/SignatureSchemeField'
 import { ComplianceProfileField } from './cas/ComplianceProfileField'
 import { cn } from '../lib/utils'
 import { useClipboard } from '../hooks/useClipboard'
-import { needsKeyImport } from '../lib/caSelection'
+import { holdsNoKey, needsKeyImport } from '../lib/caSelection'
 
 // Format date helper - delegates to shared util
 function formatDate(dateStr) {
@@ -219,9 +219,10 @@ export function CADetails({
       )}
 
       {/* Certificate only: the key stayed where the request was made (#348) */}
-      {needsKeyImport(ca) && (
-        <div className="rounded-lg px-3 py-2 bg-status-warning-op15 border border-status-warning-op40 text-xs text-text-secondary flex items-start gap-2 flex-wrap">
-          <span className="flex-1 min-w-[12rem]">{t('cas.certificateOnlyBanner')}</span>
+      {holdsNoKey(ca) && (
+        <div className={`rounded-lg px-3 py-2 border text-xs text-text-secondary flex items-start gap-2 flex-wrap ${
+          needsKeyImport(ca) ? 'bg-status-warning-op15 border-status-warning-op40' : 'bg-tertiary-40 border-border'}`}>
+          <span className="flex-1 min-w-[12rem]">{t(needsKeyImport(ca) ? 'cas.certificateOnlyBanner' : 'cas.noPrivateKeyBanner')}</span>
           {onImportKey && (
             <Button type="button" size="xs" variant="secondary" onClick={onImportKey}>
               <Key size={12} /> {t('cas.importPrivateKey')}

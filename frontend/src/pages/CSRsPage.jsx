@@ -26,7 +26,7 @@ import { extractData, formatDate, cn , downloadBlob} from '../lib/utils'
 import { getSanValidationError, sanRowsToPayload } from '../lib/sanValidate'
 import { daysSinceExpiry, expiryVariant, hasExpiry } from '../lib/expiry'
 import { VALIDITY } from '../constants/config'
-import { signingCas } from '../lib/caSelection'
+import { signingCas, unlistedSigningCas } from '../lib/caSelection'
 import { soleImported } from '../lib/importResult'
 import { CSR_LABELS, KEY_ALGORITHMS, groupedOptions, listAlgorithms } from '../lib/keyAlgorithms'
 import { useFipsMode } from '../lib/policyAlgorithms'
@@ -1065,6 +1065,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
                 value={signCA}
                 onChange={setSignCA}
                 placeholder={t('csrs.selectCA')}
+                helperText={unlistedSigningCas(cas) > 0 ? t('cas.notListedForSigning', { count: unlistedSigningCas(cas) }) : undefined}
               />
 
               <Select
