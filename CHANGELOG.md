@@ -23,6 +23,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Import: a certificate that re-certifies a held CA's key is attached as a cross-certificate on a self-signed root, and on an intermediate after the **Attach as cross certificate** choice (`cross_mode`). Smart Import attaches one next to a held root and reports `cross_certificate_attached` (#400).
 
+- CAs: a CA's details list the certificates and deploy bindings that still chain to it, directly or through a cross-certificate, to show when an old root can be retired; `GET /api/v2/cas/{id}/chain-usage` (#400).
+
 - CAs: the chain repair bar lists records damaged before cross-certificates were modelled, with **Convert to cross-certificate** and **Restore as primary**; nothing is changed without a click (#400).
 
 ### Fixed

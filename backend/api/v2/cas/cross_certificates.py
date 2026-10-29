@@ -10,6 +10,7 @@ from models import CA, db
 from models.ca_cross_certificate import CACrossCertificate
 from services.audit_service import AuditService
 from services.ca import cross_certs
+from services.ca.chain_usage import chain_usage
 from services.ca.cross_certs import CrossCertError
 from utils.response import created_response, error_response, no_content_response, success_response
 from utils.sanitize import sanitize_filename
@@ -53,6 +54,16 @@ def chain_variants_of_ca(ca_id):
     if err:
         return err
     return success_response(data=chain_variants(ca, substitute_start=False))
+
+
+@bp.route('/api/v2/cas/<int:ca_id>/chain-usage', methods=['GET'])
+@require_auth(['read:cas', 'read:certificates'])
+def chain_usage_of_ca(ca_id):
+    """Certificates and deploy bindings that still chain to this CA (needs both permissions)."""
+    ca, _, err = _ca_and_row(ca_id)
+    if err:
+        return err
+    return success_response(data=chain_usage(ca))
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/cross-certificates', methods=['POST'])

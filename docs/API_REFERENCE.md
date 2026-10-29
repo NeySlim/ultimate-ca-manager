@@ -625,6 +625,7 @@ DELETE /api/v2/cas/{ca_id}/cross-certificates/{xid}
 POST   /api/v2/cas/{ca_id}/cross-certificates/{xid}/revoke
 GET    /api/v2/cas/{ca_id}/cross-certificates/{xid}/export?format=pem|der
 GET    /api/v2/cas/{ca_id}/chain-variants
+GET    /api/v2/cas/{ca_id}/chain-usage
 POST   /api/v2/cas/{ca_id}/cross-sign
 ```
 
@@ -642,6 +643,13 @@ A revocation under an approval policy answers with the approval request instead.
 **Chain variants** (`GET .../chain-variants`): the chains the CA can present, `primary` and one per
 cross-certificate on its path. Each entry has `id` (`primary` or `cross:<id>`), `ca_id`, `ca_name`,
 `cross_certificate_id`, `issuer`, `valid_to`, `served`, `servable` and `default` (what a plain export of this CA returns).
+
+**Chain usage** (`GET .../chain-usage`, needs `read:cas` and `read:certificates`): what still chains to the CA, to tell when
+it can be retired. `issued`: unrevoked, unexpired certificates issued by the CA or a CA below it. `via_cross`: those whose
+default chain goes through a servable cross-certificate issued by the CA (or a record of its key), with the `cross_certificates`
+involved (`id`, `ca_id`, `ca_name`, `served`). `deployments`: enabled bindings with a full chain path that push such a chain.
+Each section has `count`, `items` (at most 100, soonest expiry first) and `truncated`; `note` says UCM only sees what it issues
+and delivers. Items are certificates (`id`, `name`, `cn`, `ca`, `valid_to`) or bindings (`id`, `target`, `certificate`, `variant`).
 
 **Cross-sign from UCM** (`POST /api/v2/cas/{issuer_id}/cross-sign`, `201`): signs the key of another
 CA held in UCM with this one and stores the result on the subject CA.
