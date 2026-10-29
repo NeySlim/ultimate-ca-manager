@@ -256,7 +256,7 @@ def list_for(ca: CA) -> List[CACrossCertificate]:
 
 def served_for(ca: CA) -> Optional[CACrossCertificate]:
     """The cross-certificate this CA serves now; never a revoked, expired or not yet valid one."""
-    for row in CACrossCertificate.query.filter_by(ca_id=ca.id, served=True).all():
+    for row in CACrossCertificate.query.filter_by(ca_id=ca.id, served=True).order_by(CACrossCertificate.id).all():
         if row.servable:
             return row
     return None

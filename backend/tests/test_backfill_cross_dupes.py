@@ -203,3 +203,30 @@ def test_merge_carries_the_duplicates_crl_numbers_to_the_keeper(app):
         db.session.expire_all()
         assert db.session.get(CA, dupe_id) is None
         assert [m.crl_number for m in CRLMetadata.query.filter_by(ca_id=keeper_id)] == [12]
+
+
+def test_merge_keeps_a_single_served_cross_certificate(app):
+    """The duplicate's served cross-certificate moves unserved when the keeper already serves one."""
+    from models.ca_cross_certificate import CACrossCertificate
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Served Root')
+    with app.app_context():
+        keeper_id = _row(cert, key)
+        dupe_id = _row(cert)
+        ids = {}
+        for owner, label in ((keeper_id, 'keeper'), (dupe_id, 'dupe')):
+            row = CACrossCertificate(ca_id=owner, crt='x', fingerprint_sha256=uuid.uuid4().hex * 2, served=True)
+            db.session.add(row)
+            db.session.flush()
+            ids[label] = row.id
+        db.session.commit()
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        rows = CACrossCertificate.query.filter_by(ca_id=keeper_id).order_by(CACrossCertificate.id).all()
+        assert sorted(r.id for r in rows) == sorted(ids.values())
+        assert [r.id for r in rows if r.served] == [ids['keeper']]
+        CACrossCertificate.query.filter(CACrossCertificate.id.in_(ids.values())).delete()
+        db.session.commit()

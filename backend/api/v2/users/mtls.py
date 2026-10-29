@@ -99,7 +99,9 @@ def create_user_mtls_certificate(user_id):
             Certificate, serial, issuer_dn, pem_text
         )
         if not existing_cert:
-            issuer_ca = CA.query.filter(CA.subject == issuer_dn).first()
+            from utils.cert_issuer import self_signed_first
+            issuer_ca = next(iter(self_signed_first(
+                CA.query.filter(CA.subject == issuer_dn).order_by(CA.id).all())), None)
             existing_cert = Certificate(
                 refid=str(uuid.uuid4()),
                 descr=cert_name,

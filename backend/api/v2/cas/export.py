@@ -224,7 +224,7 @@ def export_ca(ca_id):
         return error_response(pw_err, 400)
 
     try:
-        explicit = bool((data if request.method == 'POST' and request.is_json else request.args).get('chain_variant'))
+        explicit = (data if request.method == 'POST' and request.is_json else request.args).get('chain_variant') not in (None, '', 'auto')
         cert_pem, parent_pems = _export_chain(ca, include_chain, variant, explicit)
 
         # Private key only export

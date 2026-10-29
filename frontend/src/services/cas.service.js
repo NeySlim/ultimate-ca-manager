@@ -68,7 +68,7 @@ export const casService = {
   },
 
   async exportCrossCertificate(id, xid, format = 'pem') {
-    return apiClient.get(`/cas/${id}/cross-certificates/${xid}/export?format=${format}`, { responseType: 'blob' })
+    return apiClient.get(`/cas/${id}/cross-certificates/${xid}/export${buildQueryString({ format })}`, { responseType: 'blob' })
   },
 
   async crossSign(issuerId, { subjectCaId, validityDays, pathLength } = {}) {
