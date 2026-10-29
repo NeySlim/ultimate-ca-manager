@@ -5732,6 +5732,8 @@
     "attachFailed": "Impossible de rattacher le certificat croisé",
     "attachAsCross": "Rattacher comme certificat croisé",
     "offerHint": "Ce certificat est un autre certificat de la clé de cette CA. Rattachez-le à côté du certificat propre de la CA au lieu de le remplacer.",
+    "replaceCurrent": "Remplacer",
+    "replaceHint": "Remplacer installe ce certificat à la place de celui de la CA : cette CA n'utilisera plus le certificat actuel.",
     "sign": "Signer en croisé",
     "signTitle": "Signer cette CA en croisé",
     "signHint": "Signez la clé de {{name}} avec une autre CA détenue dans UCM. Le résultat est stocké ici comme certificat croisé.",

@@ -11,7 +11,7 @@ import { Button } from '../../components/Button'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts'
 import { extractData } from '../../lib/utils'
-import { crossAttachOffered } from '../../lib/crossCertificates'
+import { crossAttachOffered, crossReplaceOffered } from '../../lib/crossCertificates'
 
 const MAX_FILE_SIZE = 256 * 1024
 
@@ -23,7 +23,7 @@ export function UploadCACertModal({ open, onClose, ca, onSuccess }) {
   const [certFile, setCertFile] = useState(null)
   const [submitting, setSubmitting] = useState(false)
   // The certificate re-certifies this CA's key: offered as a cross-certificate instead (#400)
-  const [crossOffer, setCrossOffer] = useState(null)
+  const [crossOffer, setCrossOffer] = useState(null) // { message, attach, replace }
 
   const fileTooLarge = certFile && certFile.size > MAX_FILE_SIZE
   const canSubmit = !submitting && !fileTooLarge && (certFile || pemContent.trim().length > 0)
@@ -41,14 +41,13 @@ export function UploadCACertModal({ open, onClose, ca, onSuccess }) {
     onClose?.()
   }
 
-  const handleSubmit = async (e) => {
-    e?.preventDefault?.()
-    if (!canSubmit) return
+  const install = async (crossMode) => {
     setSubmitting(true)
     try {
       const response = await casService.uploadCertificate(ca.id, {
         pemContent: certFile ? undefined : pemContent.trim(),
         file: certFile || undefined,
+        crossMode,
       })
       const data = extractData(response) || {}
       showSuccess(t('cas.certInstalled'))
@@ -69,10 +68,20 @@ export function UploadCACertModal({ open, onClose, ca, onSuccess }) {
       reset()
       onClose?.()
     } catch (err) {
-      if (crossAttachOffered(err)) setCrossOffer(err.message)
-      else showError(err?.message || t('cas.certInstallFailed'))
+      if (crossAttachOffered(err) || crossReplaceOffered(err)) {
+        setCrossOffer({
+          message: err.message,
+          attach: crossAttachOffered(err),
+          replace: crossReplaceOffered(err),
+        })
+      } else showError(err?.message || t('cas.certInstallFailed'))
       setSubmitting(false)
     }
+  }
+
+  const handleSubmit = (e) => {
+    e?.preventDefault?.()
+    if (canSubmit) install()
   }
 
   const handleAttachCross = async () => {
@@ -153,11 +162,22 @@ export function UploadCACertModal({ open, onClose, ca, onSuccess }) {
         {crossOffer && (
           <div className="p-3 rounded-md bg-status-warning-op15 border border-status-warning-op40 space-y-2"
                data-testid="cross-offer">
-            <p className="text-xs text-text-secondary">{crossOffer}</p>
-            <p className="text-xs text-text-secondary">{t('crossCerts.offerHint')}</p>
-            <Button type="button" size="xs" variant="primary" onClick={handleAttachCross} loading={submitting}>
-              {t('crossCerts.attachAsCross')}
-            </Button>
+            <p className="text-xs text-text-secondary">{crossOffer.message}</p>
+            {crossOffer.attach && <p className="text-xs text-text-secondary">{t('crossCerts.offerHint')}</p>}
+            {crossOffer.replace && <p className="text-xs text-text-secondary">{t('crossCerts.replaceHint')}</p>}
+            <div className="flex gap-2">
+              {crossOffer.attach && (
+                <Button type="button" size="xs" variant="primary" onClick={handleAttachCross} loading={submitting}>
+                  {t('crossCerts.attachAsCross')}
+                </Button>
+              )}
+              {crossOffer.replace && (
+                <Button type="button" size="xs" variant="secondary" onClick={() => install('replace')}
+                        disabled={submitting}>
+                  {t('crossCerts.replaceCurrent')}
+                </Button>
+              )}
+            </div>
           </div>
         )}
 

@@ -3,6 +3,7 @@ CA Model - Certificate Authority
 """
 import json
 import logging
+from typing import Optional
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -351,17 +352,23 @@ class CA(db.Model):
         not end within MAX_CHAIN_DEPTH is reported as revoked: stopping the
         walk and answering "not revoked" would let a loop, or a hierarchy
         deep enough to hide the revoked ancestor, sign again (#343 review)."""
+        return self.chain_revocation is not None
+
+    @property
+    def chain_revocation(self) -> Optional[str]:
+        """'revoked' when this CA or an ancestor is revoked, 'broken' when the
+        chain loops or is too deep to walk, None otherwise."""
         ca, depth, seen = self, 0, set()
         while ca is not None:
             if ca.is_revoked:
-                return True
+                return 'revoked'
             if ca.id is not None:
                 if ca.id in seen:
                     logger.warning(
                         "CA chain of %s loops at CA %s; treating it as revoked",
                         self.descr, ca.descr,
                     )
-                    return True
+                    return 'broken'
                 seen.add(ca.id)
             depth += 1
             if depth > CA.MAX_CHAIN_DEPTH:
@@ -369,10 +376,10 @@ class CA(db.Model):
                     "CA chain of %s exceeds %s levels; treating it as revoked",
                     self.descr, CA.MAX_CHAIN_DEPTH,
                 )
-                return True
+                return 'broken'
             ca = ca.issuing_ca()
-        return False
-    
+        return None
+
     @property
     def key_type(self) -> str:
         """Parse key type from certificate (or from the CSR while pending)"""

@@ -446,15 +446,31 @@ def _same_issuer(stored_cert, cert, parents_by_name):
 
 
 def _would_replace_valid_certificate(stored, new, any_validity=False):
-    """Of one key and two issuers (the caller checked): a self-signed certificate replaced by
-    another, or two unexpired certificates (whatever their validity if *any_validity*), is a
-    cross-certificate, not a renewal."""
+    """Of one key (the caller checked): a self-signed certificate replaced by another, or two
+    unexpired certificates from issuers of different names (whatever their validity if
+    *any_validity*), is a cross-certificate. The same issuer name under a new key is a root
+    rollover: the new certificate replaces the old one."""
     if is_self_signed(new):
         return False
     if is_self_signed(stored) or any_validity:
         return True
+    if stored.issuer == new.issuer:
+        return False
     now = datetime.now(timezone.utc)
     return stored.not_valid_after_utc > now and new.not_valid_after_utc > now
+
+
+def refused_as_cross_certificate(record, stored, new, replace_cross=False, any_validity=False):
+    """Whether installing *new* over *record*'s *stored* certificate is refused as a
+    cross-certificate. ``replace_cross`` lets an intermediate be overwritten, a revoked
+    ancestor (not a looping chain) makes the old certificate not worth keeping."""
+    if not _would_replace_valid_certificate(stored, new, any_validity):
+        return False
+    if is_self_signed(stored):
+        return True
+    if replace_cross:
+        return False
+    return any_validity or getattr(record, 'chain_revocation', None) != 'revoked'
 
 
 def _select_existing(candidates, cert, kind, replace_cross=False, any_validity=False):
@@ -502,8 +518,8 @@ def _select_existing(candidates, cert, kind, replace_cross=False, any_validity=F
             f"does not tell them apart; the record to update cannot be determined")
     if len(same_key) == 1:
         stored_cert, _ = _record_identity(same_key[0])
-        if kind == 'CA' and stored_cert is not None and _would_replace_valid_certificate(stored_cert, cert, any_validity) \
-                and not (replace_cross and not is_self_signed(stored_cert)):
+        if kind == 'CA' and stored_cert is not None and refused_as_cross_certificate(
+                same_key[0], stored_cert, cert, replace_cross, any_validity):
             raise CrossCertificateImport(
                 f"This certificate re-certifies the key of the {kind} "
                 f"'{getattr(same_key[0], 'descr', '')}' under another issuer "

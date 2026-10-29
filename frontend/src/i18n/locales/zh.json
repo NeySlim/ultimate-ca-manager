@@ -5729,6 +5729,8 @@
     "attachFailed": "无法附加交叉证书",
     "attachAsCross": "附加为交叉证书",
     "offerHint": "此证书是该 CA 密钥的另一个证书。请将其附加在 CA 自身证书旁，而不是替换它。",
+    "replaceCurrent": "替换",
+    "replaceHint": "替换会安装此证书以取代该 CA 的当前证书：该 CA 将不再使用当前证书。",
     "sign": "交叉签名",
     "signTitle": "对此 CA 进行交叉签名",
     "signHint": "使用 UCM 中持有的另一个 CA 为 {{name}} 的密钥签名。结果将作为交叉证书存储在此处。",

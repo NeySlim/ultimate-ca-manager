@@ -18,9 +18,18 @@ vi.mock('../../../components/Modal', () => ({
 }))
 
 const PEM = '-----BEGIN CERTIFICATE-----\nAA\n-----END CERTIFICATE-----'
-const refusal = (options) => Object.assign(new Error('cross-certificate refused'), {
-  status: 409, data: { details: { code: 'cross_certificate_detected', options } },
-})
+// The 409 body the backend sends (problem+json with the legacy keys)
+const refusal = (options) => {
+  const message = "This certificate is a cross-certificate of this CA; installing it would replace the CA's own certificate, so it is refused"
+  return Object.assign(new Error(message), {
+    status: 409,
+    data: {
+      code: 409, error: true, status: 409, title: 'Conflict', type: 'about:blank', message, detail: message,
+      instance: '/api/v2/cas/5/certificate',
+      details: { ca_id: 5, code: 'cross_certificate_detected', options },
+    },
+  })
+}
 
 async function submit() {
   const onSuccess = vi.fn()
@@ -35,7 +44,7 @@ describe('UploadCACertModal cross-certificate offer', () => {
   beforeEach(() => vi.clearAllMocks())
 
   it('offers to attach on the cross-certificate 409 and attaches with cross_mode=attach', async () => {
-    uploadCertificate.mockRejectedValue(refusal(['attach']))
+    uploadCertificate.mockRejectedValue(refusal(['attach', 'replace']))
     importCa.mockResolvedValue({ data: { warnings: ['w'] } })
     const onSuccess = await submit()
     expect(showError).not.toHaveBeenCalled()
@@ -47,6 +56,26 @@ describe('UploadCACertModal cross-certificate offer', () => {
     expect(showSuccess).toHaveBeenCalledWith('crossCerts.attached')
     expect(showWarning).toHaveBeenCalledWith('w')
     expect(onSuccess).toHaveBeenCalled()
+  })
+
+  it('offers to replace and resends the upload with cross_mode=replace', async () => {
+    uploadCertificate.mockRejectedValueOnce(refusal(['attach', 'replace']))
+    uploadCertificate.mockResolvedValueOnce({ data: {} })
+    const onSuccess = await submit()
+    expect(screen.getByText('crossCerts.replaceHint')).toBeTruthy()
+    fireEvent.click(await screen.findByText('crossCerts.replaceCurrent'))
+    await waitFor(() => expect(uploadCertificate).toHaveBeenCalledTimes(2))
+    expect(uploadCertificate.mock.calls[1][1]).toMatchObject({ pemContent: PEM, crossMode: 'replace' })
+    expect(importCa).not.toHaveBeenCalled()
+    expect(showSuccess).toHaveBeenCalledWith('cas.certInstalled')
+    expect(onSuccess).toHaveBeenCalled()
+  })
+
+  it('offers no replace button when the backend does not list it', async () => {
+    uploadCertificate.mockRejectedValue(refusal(['attach']))
+    await submit()
+    expect(await screen.findByText('crossCerts.attachAsCross')).toBeTruthy()
+    expect(screen.queryByText('crossCerts.replaceCurrent')).toBeNull()
   })
 
   it('shows the error of any other refusal and offers nothing', async () => {

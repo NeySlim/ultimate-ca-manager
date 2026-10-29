@@ -5732,6 +5732,8 @@
     "attachFailed": "Could not attach the cross-certificate",
     "attachAsCross": "Attach as cross certificate",
     "offerHint": "This certificate is another certificate of this CA's key. Attach it beside the CA's own certificate instead of replacing it.",
+    "replaceCurrent": "Replace",
+    "replaceHint": "Replace installs this certificate in place of the CA's current one: this CA will no longer use the current certificate.",
     "sign": "Cross-sign",
     "signTitle": "Cross-sign this CA",
     "signHint": "Sign the key of {{name}} with another CA held in UCM. The result is stored here as a cross-certificate.",

@@ -5729,6 +5729,8 @@
     "attachFailed": "Das Cross-Zertifikat konnte nicht angehängt werden",
     "attachAsCross": "Als Cross-Zertifikat anhängen",
     "offerHint": "Dieses Zertifikat ist ein weiteres Zertifikat des Schlüssels dieser CA. Hängen Sie es neben dem eigenen Zertifikat der CA an, statt es zu ersetzen.",
+    "replaceCurrent": "Ersetzen",
+    "replaceHint": "Ersetzen installiert dieses Zertifikat anstelle des aktuellen Zertifikats der CA: Diese CA verwendet das aktuelle Zertifikat nicht mehr.",
     "sign": "Cross-signieren",
     "signTitle": "Diese CA cross-signieren",
     "signHint": "Signieren Sie den Schlüssel von {{name}} mit einer anderen in UCM vorhandenen CA. Das Ergebnis wird hier als Cross-Zertifikat gespeichert.",

@@ -40,6 +40,13 @@ export function crossAttachOffered(err) {
     && (details.options || []).includes('attach')
 }
 
+// The 409 offers to replace the CA's current certificate
+export function crossReplaceOffered(err) {
+  const details = err?.data?.details
+  return err?.status === 409 && details?.code === 'cross_certificate_detected'
+    && (details.options || []).includes('replace')
+}
+
 // The chains a CA or certificate can present, [] when it has no choice or the lookup fails
 export async function fetchChainVariants({ type, id }) {
   try {

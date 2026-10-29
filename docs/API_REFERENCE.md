@@ -2599,7 +2599,8 @@ intermediate be overwritten, `refuse` never attaches. The attached answer is `20
 `cross_certificate` and `warnings`. The `409` carries `details.code = "cross_certificate_detected"`,
 `details.ca_id` and `details.options` (`["attach"]` for a self-signed root, `["attach", "replace"]`
 otherwise). Installing such a certificate on a CA that is not awaiting one, after **Renew via CSR**
-(`POST /api/v2/cas/{ca_id}/certificate`), answers the same `409`, and accepts `cross_mode=replace`. The same options apply to `POST /api/v2/certificates/import`.
+(`POST /api/v2/cas/{ca_id}/certificate`), answers the same `409`; that route accepts only `cross_mode=auto` or `replace` (`400` otherwise). The same options apply to `POST /api/v2/certificates/import`.
+Only an issuer of another name makes a certificate a cross-certificate: the same issuer name under a new key (a root rollover) replaces the certificate, as a renewal does.
 
 Smart Import (`POST /api/v2/import/execute`) attaches a cross-certificate found next to a held root and
 reports it in `warning_details` with `code` `cross_certificate_attached` or `cross_certificate_skipped`

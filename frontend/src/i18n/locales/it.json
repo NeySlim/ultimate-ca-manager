@@ -5729,6 +5729,8 @@
     "attachFailed": "Impossibile associare il certificato incrociato",
     "attachAsCross": "Associa come certificato incrociato",
     "offerHint": "Questo certificato è un altro certificato della chiave di questa CA. Associalo accanto al certificato della CA invece di sostituirlo.",
+    "replaceCurrent": "Sostituisci",
+    "replaceHint": "Sostituisci installa questo certificato al posto di quello attuale della CA: questa CA non userà più il certificato attuale.",
     "sign": "Firma incrociata",
     "signTitle": "Firma incrociata di questa CA",
     "signHint": "Firma la chiave di {{name}} con un'altra CA presente in UCM. Il risultato viene memorizzato qui come certificato incrociato.",

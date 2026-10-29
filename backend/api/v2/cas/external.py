@@ -78,6 +78,8 @@ def install_ca_certificate(ca_id):
     Accepts multipart 'file' (PEM or DER) or 'pem_content' (form or JSON).
     Serves the first activation of a pending CA and same-key renewals — the
     certificate's public key must match the CA's stored private key.
+    `cross_mode` is `auto` (default) or `replace`: a certificate from an issuer of
+    another name is refused with 409 unless `replace` is given.
     """
     ca = db.session.get(CA, ca_id)
     if not ca:
@@ -106,8 +108,8 @@ def install_ca_certificate(ca_id):
 
     raw_mode = request.form.get('cross_mode') or (request.get_json(silent=True) or {}).get('cross_mode')
     cross_mode = cross_mode_from(raw_mode)
-    if cross_mode is None:
-        return error_response('cross_mode must be auto, attach, replace or refuse', 400)
+    if cross_mode not in ('auto', 'replace'):
+        return error_response('cross_mode must be auto or replace on this route', 400)
 
     username = _actor_username()
     try:

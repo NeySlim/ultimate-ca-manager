@@ -5729,6 +5729,8 @@
     "attachFailed": "No se pudo adjuntar el certificado cruzado",
     "attachAsCross": "Adjuntar como certificado cruzado",
     "offerHint": "Este certificado es otro certificado de la clave de esta CA. Adjúntelo junto al certificado propio de la CA en lugar de reemplazarlo.",
+    "replaceCurrent": "Reemplazar",
+    "replaceHint": "Reemplazar instala este certificado en lugar del actual de la CA: esta CA dejará de usar el certificado actual.",
     "sign": "Firmar de forma cruzada",
     "signTitle": "Firmar de forma cruzada esta CA",
     "signHint": "Firme la clave de {{name}} con otra CA presente en UCM. El resultado se guarda aquí como certificado cruzado.",

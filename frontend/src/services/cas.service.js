@@ -151,14 +151,19 @@ export const casService = {
    * Install the externally signed certificate.
    * - pass { pemContent } for pasted PEM
    * - pass { file } for an uploaded file (PEM or DER)
+   * - pass { crossMode: 'replace' } to overwrite the current certificate of another issuer
    */
-  async uploadCertificate(id, { pemContent, file } = {}) {
+  async uploadCertificate(id, { pemContent, file, crossMode } = {}) {
     if (file) {
       const fd = new FormData()
       fd.append('file', file)
+      if (crossMode) fd.append('cross_mode', crossMode)
       return apiClient.upload(`/cas/${id}/certificate`, fd)
     }
-    return apiClient.post(`/cas/${id}/certificate`, { pem_content: pemContent })
+    return apiClient.post(`/cas/${id}/certificate`, {
+      pem_content: pemContent,
+      ...(crossMode ? { cross_mode: crossMode } : {}),
+    })
   },
 
   async renewCsr(id, { digest } = {}) {
