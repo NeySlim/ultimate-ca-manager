@@ -256,4 +256,5 @@ def test_a_dupe_keeps_its_served_cross_when_the_keepers_is_no_longer_usable(app)
         db.session.expire_all()
         row = db.session.get(CACrossCertificate, live)
         assert row.ca_id == keeper_id and row.served is True
-        assert db.session.get(CACrossCertificate, dead).served is True
+        # One served row per CA: the keeper's unusable one gives way
+        assert db.session.get(CACrossCertificate, dead).served is False
