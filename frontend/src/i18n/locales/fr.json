@@ -5709,6 +5709,18 @@
     "filters": "Filtres",
     "exclude": "Exclure"
   },
+  "chainUsage": {
+    "title": "Chaîne encore liée à cette CA",
+    "empty": "Plus rien dans UCM ne dépend de cette CA : aucun certificat, chaîne par défaut ni déploiement ne passe par elle.",
+    "issued": "Certificats émis par cette CA ou en dessous",
+    "viaCross": "Chaîne par défaut via un certificat croisé de cette CA",
+    "deployments": "Liaisons de déploiement qui poussent une telle chaîne",
+    "expires": "Expire le {{date}}",
+    "truncated": "Affichage des {{count}} premiers",
+    "crossRow": "Certificat croisé n° {{id}} sur {{ca}}",
+    "notServed": "Non servi",
+    "note": "UCM ne voit que ce qu'il émet et livre : un client qui a mis une chaîne en cache, ou l'a obtenue ailleurs, n'est pas compté."
+  },
   "crossCerts": {
     "title": "Certificats croisés",
     "none": "Aucun certificat croisé. Rattachez-en un émis par une autre CA pour cette clé, ou signez-en un depuis une CA détenue dans UCM.",

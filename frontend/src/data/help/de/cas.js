@@ -51,6 +51,7 @@ export default {
           { label: 'Ausliefern', text: 'Höchstens eines pro CA wird in der Standardkette ausgeliefert (TLS, PKCS#12, ACME, WSTEP, TSA, Deployments, AIA .cer und .pem). Ein widerrufenes, abgelaufenes oder noch nicht gültiges wird nie ausgeliefert' },
           { label: 'Zu präsentierende Kette', text: 'Exporte und Deploy-Bindungen können die Standardkette, die selbstsignierte Root oder ein Cross-Zertifikat festlegen. ACME bietet die anderen Ketten als Alternativen an (certbot --preferred-chain)' },
           { label: 'Import', text: 'Ein Zertifikat über dem Schlüssel einer vorhandenen CA wird an eine selbstsignierte Root angehängt; bei einer Intermediate bietet der Fehler 409 „Als Cross-Zertifikat anhängen“ oder „Ersetzen“ an. Smart Import hängt es neben einer vorhandenen Root an oder meldet es als übersprungen' },
+          { label: 'Weiterhin verkettet', text: 'CA-Details › Weiterhin mit dieser CA verkettet listet die Zertifikate und Deploy-Bindings auf, die direkt oder über ein Cross-Zertifikat noch mit der CA verkettet sind, um zu erkennen, wann eine alte Root außer Betrieb genommen werden kann; eine Chain im Cache eines Clients wird nicht gezählt' },
           { label: 'Reparatur', text: 'Die Leiste unter den Statistiken listet Einträge, die ein älterer Import beschädigt hat: In Cross-Zertifikat umwandeln (erfordert delete:cas) und Als primär wiederherstellen. Nichts läuft automatisch' },
         ]
       },

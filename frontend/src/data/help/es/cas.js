@@ -51,6 +51,7 @@ export default {
           { label: 'Servir', text: 'Como máximo uno por CA se sirve en la cadena predeterminada (TLS, PKCS#12, ACME, WSTEP, TSA, despliegues, AIA .cer y .pem). Uno revocado, caducado o aún no válido nunca se sirve' },
           { label: 'Cadena a presentar', text: 'Las exportaciones y los enlaces de despliegue pueden fijar la cadena predeterminada, la raíz autofirmada o un certificado cruzado. ACME ofrece las demás cadenas como alternativas (certbot --preferred-chain)' },
           { label: 'Importar', text: 'Un certificado sobre la clave de una CA presente se adjunta a una raíz autofirmada; en una intermedia el 409 ofrece Adjuntar como certificado cruzado o Reemplazar. La importación inteligente lo adjunta junto a una raíz presente o lo informa como omitido' },
+          { label: 'Aún encadenadas', text: 'Detalles de la CA › Aún encadenadas a esta CA lista los certificados y los deploy bindings que siguen encadenados a la CA, directamente o mediante un certificado cruzado, para saber cuándo se puede retirar una raíz antigua; un cliente que guardó una cadena en caché no se cuenta' },
           { label: 'Reparar', text: 'La barra bajo las estadísticas lista los registros dañados por una importación anterior: Convertir en certificado cruzado (requiere delete:cas) y Restaurar como principal. Nada se ejecuta por sí solo' },
         ]
       },

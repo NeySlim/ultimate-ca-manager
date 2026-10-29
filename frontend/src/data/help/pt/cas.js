@@ -51,6 +51,7 @@ export default {
           { label: 'Servir', text: 'No máximo um por CA é servido na cadeia predefinida (TLS, PKCS#12, ACME, WSTEP, TSA, implantações, AIA .cer e .pem). Um revogado, expirado ou ainda não válido nunca é servido' },
           { label: 'Cadeia a apresentar', text: 'Exportações e vínculos de implantação podem fixar a cadeia predefinida, a raiz autoassinada ou um certificado cruzado. O ACME oferece as outras cadeias como alternativas (certbot --preferred-chain)' },
           { label: 'Importar', text: 'Um certificado sobre a chave de uma CA mantida é anexado a uma raiz autoassinada; em uma intermediária, o 409 oferece Anexar como certificado cruzado ou Substituir. A Importação Inteligente o anexa ao lado de uma raiz mantida ou o informa como omitido' },
+          { label: 'Ainda encadeia', text: 'Detalhes da CA › Ainda encadeia nesta CA lista os certificados e vínculos de implantação que ainda encadeiam na CA, direta ou por um certificado cruzado, para saber quando uma raiz antiga pode ser aposentada; um cliente que guardou uma cadeia em cache não é contado' },
           { label: 'Reparo', text: 'A barra sob as estatísticas lista registros que uma importação antiga danificou: Converter em certificado cruzado (requer delete:cas) e Restaurar como principal. Nada é executado sozinho' },
         ]
       },

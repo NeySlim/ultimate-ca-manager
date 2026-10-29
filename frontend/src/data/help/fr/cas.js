@@ -51,6 +51,7 @@ export default {
           { label: 'Servir', text: 'Au plus un par CA est servi dans la chaîne par défaut (TLS, PKCS#12, ACME, WSTEP, TSA, déploiements, AIA .cer et .pem). Un certificat révoqué, expiré ou pas encore valide n\'est jamais servi' },
           { label: 'Chaîne à présenter', text: 'Les exports et les liaisons de déploiement peuvent imposer la chaîne par défaut, la racine auto-signée ou un certificat croisé. ACME propose les autres chaînes comme alternatives (certbot --preferred-chain)' },
           { label: 'Import', text: 'Un certificat sur la clé d\'une CA détenue est rattaché à une racine auto-signée ; sur une intermédiaire, le 409 propose Rattacher comme certificat croisé ou Remplacer. L\'import intelligent le rattache à côté d\'une racine détenue ou le signale comme écarté' },
+          { label: 'Chaîne encore liée', text: 'Détails de la CA › Chaîne encore liée à cette CA liste les certificats et les liaisons de déploiement qui passent encore par la CA, directement ou via un certificat croisé, pour savoir quand une ancienne racine peut être retirée ; un client qui a mis une chaîne en cache n\'est pas compté' },
           { label: 'Réparation', text: 'La barre sous les statistiques liste les enregistrements qu\'un ancien import a abîmés : Convertir en certificat croisé (nécessite delete:cas) et Restaurer comme principal. Rien ne s\'exécute seul' },
         ]
       },

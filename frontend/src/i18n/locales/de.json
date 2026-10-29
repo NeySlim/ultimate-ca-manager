@@ -5706,6 +5706,18 @@
     "filters": "Filter",
     "exclude": "Ausschließen"
   },
+  "chainUsage": {
+    "title": "Weiterhin mit dieser CA verkettet",
+    "empty": "In UCM hängt nichts mehr von dieser CA ab: kein Zertifikat, keine Standard-Chain und kein Deployment läuft über sie.",
+    "issued": "Von dieser CA oder darunter ausgestellte Zertifikate",
+    "viaCross": "Standard-Chain über ein Cross-Zertifikat dieser CA",
+    "deployments": "Deploy-Bindings, die eine solche Chain ausliefern",
+    "expires": "Läuft ab am {{date}}",
+    "truncated": "Die ersten {{count}} werden angezeigt",
+    "crossRow": "Cross-Zertifikat #{{id}} auf {{ca}}",
+    "notServed": "Nicht ausgeliefert",
+    "note": "UCM sieht nur, was es ausstellt und ausliefert: Ein Client, der eine Chain zwischengespeichert oder anderswo bezogen hat, wird nicht gezählt."
+  },
   "crossCerts": {
     "title": "Cross-Zertifikate",
     "none": "Kein Cross-Zertifikat. Hängen Sie eines an, das eine andere CA für diesen Schlüssel ausgestellt hat, oder signieren Sie eines mit einer in UCM vorhandenen CA.",

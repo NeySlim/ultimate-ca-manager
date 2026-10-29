@@ -5706,6 +5706,18 @@
     "filters": "Filtri",
     "exclude": "Escludi"
   },
+  "chainUsage": {
+    "title": "Ancora concatenati a questa CA",
+    "empty": "Nulla in UCM dipende più da questa CA: nessun certificato, catena predefinita o distribuzione passa da essa.",
+    "issued": "Certificati emessi da questa CA o sotto di essa",
+    "viaCross": "Catena predefinita tramite un certificato incrociato di questa CA",
+    "deployments": "Binding di distribuzione che inviano una tale catena",
+    "expires": "Scade il {{date}}",
+    "truncated": "Mostrati i primi {{count}}",
+    "crossRow": "Certificato incrociato #{{id}} su {{ca}}",
+    "notServed": "Non servito",
+    "note": "UCM vede solo ciò che emette e consegna: un client che ha memorizzato una catena in cache, o l'ha ottenuta altrove, non viene conteggiato."
+  },
   "crossCerts": {
     "title": "Certificati incrociati",
     "none": "Nessun certificato incrociato. Associane uno emesso da un'altra CA per questa chiave, oppure firmane uno da una CA presente in UCM.",

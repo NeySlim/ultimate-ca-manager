@@ -5706,6 +5706,18 @@
     "filters": "筛选",
     "exclude": "排除"
   },
+  "chainUsage": {
+    "title": "仍链接到此 CA",
+    "empty": "UCM 中已没有任何内容依赖此 CA：没有证书、默认链或部署经过它。",
+    "issued": "由此 CA 或其下级签发的证书",
+    "viaCross": "经由此 CA 的交叉证书的默认链",
+    "deployments": "推送此类链的部署绑定",
+    "expires": "到期时间 {{date}}",
+    "truncated": "显示前 {{count}} 项",
+    "crossRow": "{{ca}} 上的交叉证书 #{{id}}",
+    "notServed": "未提供",
+    "note": "UCM 只能看到自己签发和交付的内容：缓存了链或从其他途径获得链的客户端不会被计入。"
+  },
   "crossCerts": {
     "title": "交叉证书",
     "none": "没有交叉证书。请附加由另一个 CA 为此密钥签发的证书，或从 UCM 中持有的 CA 签发一个。",

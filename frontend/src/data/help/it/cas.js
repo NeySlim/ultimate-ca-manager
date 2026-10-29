@@ -51,6 +51,7 @@ export default {
           { label: 'Servi', text: 'Al massimo uno per CA è servito nella catena predefinita (TLS, PKCS#12, ACME, WSTEP, TSA, distribuzioni, AIA .cer e .pem). Uno revocato, scaduto o non ancora valido non viene mai servito' },
           { label: 'Catena da presentare', text: 'Esportazioni e binding di distribuzione possono fissare la catena predefinita, la root autofirmata o un certificato incrociato. ACME propone le altre catene come alternative (certbot --preferred-chain)' },
           { label: 'Importazione', text: 'Un certificato sulla chiave di una CA presente viene associato a una root autofirmata; su una intermedia il 409 propone Associa come certificato incrociato o Sostituisci. Smart Import lo associa accanto a una root presente oppure lo segnala come escluso' },
+          { label: 'Ancora concatenati', text: 'Dettagli CA › Ancora concatenati a questa CA elenca i certificati e i binding di distribuzione che sono ancora concatenati alla CA, direttamente o tramite un certificato incrociato, per capire quando una vecchia root può essere ritirata; un client che ha memorizzato una catena in cache non viene conteggiato' },
           { label: 'Riparazione', text: 'La barra sotto le statistiche elenca i record danneggiati da un\'importazione precedente: Converti in certificato incrociato (richiede delete:cas) e Ripristina come principale. Nulla viene eseguito automaticamente' },
         ]
       },
