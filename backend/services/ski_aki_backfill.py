@@ -95,8 +95,8 @@ _UNDECLARED_CAREF = (('certificate_authorities', 'caref'), ('crls', 'caref'),
 def _move_ca_dependents(db, dupe, keeper):
     """Point every row referencing *dupe* (by refid or id) at *keeper*, so none is orphaned."""
     crosses = db.metadata.tables['ca_cross_certificates']
-    if db.session.execute(db.select(crosses.c.id).where(
-            (crosses.c.ca_id == keeper.id) & crosses.c.served.is_(True))).first():
+    from services.ca.cross_certs import served_for
+    if served_for(keeper) is not None:
         db.session.execute(crosses.update().where(crosses.c.ca_id == dupe.id).values(served=False))
     for table in db.metadata.sorted_tables:
         for fk in table.foreign_keys:

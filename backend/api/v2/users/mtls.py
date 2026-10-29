@@ -100,7 +100,8 @@ def create_user_mtls_certificate(user_id):
         )
         if not existing_cert:
             from utils.cert_issuer import self_signed_first
-            issuer_ca = next(iter(self_signed_first(
+            from services.mtls_enrollment import issuing_ca_for
+            issuer_ca = issuing_ca_for(cert_obj) or next(iter(self_signed_first(
                 CA.query.filter(CA.subject == issuer_dn).order_by(CA.id).all())), None)
             existing_cert = Certificate(
                 refid=str(uuid.uuid4()),

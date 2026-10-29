@@ -230,3 +230,30 @@ def test_merge_keeps_a_single_served_cross_certificate(app):
         assert [r.id for r in rows if r.served] == [ids['keeper']]
         CACrossCertificate.query.filter(CACrossCertificate.id.in_(ids.values())).delete()
         db.session.commit()
+
+
+def test_a_dupe_keeps_its_served_cross_when_the_keepers_is_no_longer_usable(app):
+    from datetime import timedelta as td
+    from models.ca_cross_certificate import CACrossCertificate
+    from utils.datetime_utils import utc_now
+    key, other = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Served Dupe Root')
+    with app.app_context():
+        keeper_id, dupe_id = _row(cert, key), _row(cert)
+
+        def cross(ca_id, fingerprint, **flags):
+            row = CACrossCertificate(ca_id=ca_id, crt='x', fingerprint_sha256=fingerprint, served=True,
+                                     valid_from=utc_now() - td(days=1), valid_to=utc_now() + td(days=30), **flags)
+            db.session.add(row)
+            db.session.commit()
+            return row.id
+
+        dead = cross(keeper_id, uuid.uuid4().hex * 2, revoked=True)
+        live = cross(dupe_id, uuid.uuid4().hex * 2)
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        row = db.session.get(CACrossCertificate, live)
+        assert row.ca_id == keeper_id and row.served is True
+        assert db.session.get(CACrossCertificate, dead).served is True

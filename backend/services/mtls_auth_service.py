@@ -116,7 +116,8 @@ class MTLSAuthService:
                 elif issuer is not None:
                     from models import RevokedSerial as _RevokedSerial
                     from utils.serial_format import serial_variants
-                    from utils.cert_issuer import same_key_refids
+                    # No PEM to tell the records of one name apart: any of them closes it
+                    refids = [r for (r,) in _CA.query.filter(_CA.subject == issuer.subject).with_entities(_CA.refid)]
                     variants = set()
                     for base in (10, 16):
                         try:
@@ -124,7 +125,7 @@ class MTLSAuthService:
                         except ValueError:
                             continue
                     revoked = bool(variants) and _RevokedSerial.query.filter(
-                        _RevokedSerial.caref.in_(same_key_refids(issuer)),
+                        _RevokedSerial.caref.in_(set(refids) | {issuer.refid}),
                         _RevokedSerial.serial_number.in_(variants),
                     ).first() is not None
             except Exception as exc:
