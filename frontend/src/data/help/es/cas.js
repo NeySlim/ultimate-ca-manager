@@ -22,7 +22,7 @@ export default {
           { label: 'Renovar CA', text: 'Reemite el certificado CA con un nuevo período de validez' },
           { label: 'Revocar', text: 'Revoca una CA intermedia desde su CA padre: se publica en la CRL y el OCSP del padre, y la CA ya no puede firmar (permanente)' },
           { label: 'Reparar cadena', text: 'Corrige automáticamente las relaciones padre-hijo rotas' },
-          { label: 'Importar clave privada', text: 'Adjuntar la clave privada de una CA que solo tiene su certificado (firmado a partir de una solicitud externa) para que pueda firmar' },
+          { label: 'Importar clave privada', text: 'Adjuntar la clave privada de una CA que solo tiene su certificado para que pueda firmar' },
           { label: 'Clave y validez', text: 'RSA-3072 por defecto, local o HSM. Validez de 1, 2, 3, 5, 10, 15 o 20 años, o Personalizada (días) hasta 50 años. Se señala una CA RSA-2048 que sobreviviría a 2030: la ANSSI acepta RSA-2048 hasta finales de 2030, ETSI TS 119 312 hasta finales de 2026' },
           { label: 'Restricciones de nombre', text: 'Restricciones avanzadas (RFC 5280): los subárboles permitidos y excluidos (DNS, rango IP, correo) limitan los nombres que la CA puede certificar. En una CA firmada externamente los fija la CA firmante' },
           { label: 'Esquema de firma RSA', text: 'PKCS#1 v1.5 por defecto, o RSA-PSS (sal tan larga como el hash) para una CA RSA con clave local, PKCS#11 u OpenBao. Se aplica a los certificados, CRL, respuestas OCSP y respuestas SCEP que firma la CA; las marcas de tiempo siguen en PKCS#1 v1.5, el esquema que verifica openssl ts -verify. «Firmar con RSA-PSS» en los detalles de la CA cambia una CA existente en ambos sentidos: los certificados ya emitidos conservan su firma' },

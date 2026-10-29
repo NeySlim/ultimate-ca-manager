@@ -2,7 +2,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { render, screen } from '@testing-library/react'
 
 vi.mock('../../../stores/timezoneStore', () => ({ getAppTimezone: () => 'UTC' }))
-vi.mock('../../../lib/caSelection', () => ({ needsKeyImport: () => false }))
+vi.mock('../../../lib/caSelection', () => ({ needsKeyImport: () => false, holdsNoKey: () => false }))
 
 import { CAInfoLine } from '../CAListUtils'
 

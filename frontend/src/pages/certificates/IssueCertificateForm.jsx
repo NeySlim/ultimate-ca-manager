@@ -4,7 +4,7 @@ import { Button, Select, Input, DatePicker, EkuMultiSelect } from '../../compone
 import { templatesService, ekuService } from '../../services'
 import { getSanValidationError, getAutoSansFromCn } from '../../lib/sanValidate'
 import { useNotification } from '../../contexts'
-import { signingCas } from '../../lib/caSelection'
+import { signingCas, unlistedSigningCas } from '../../lib/caSelection'
 import { daysRemaining } from '../../lib/utils'
 import { ISSUE_KEY_CHOICES, issueKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 import { KEY_ALGORITHMS, findAlgorithm, groupedOptions, isFipsApproved } from '../../lib/keyAlgorithms'
@@ -405,6 +405,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
           onChange={(val) => update('ca_id', val)}
           placeholder={t('certificates.selectCA')}
           options={signingCas(cas).map(ca => ({ value: String(ca.id), label: ca.descr || ca.common_name }))}
+          helperText={unlistedSigningCas(cas) > 0 ? t('cas.notListedForSigning', { count: unlistedSigningCas(cas) }) : undefined}
         />
         <div>
           <Select
