@@ -751,11 +751,14 @@ class TestDns01Thread:
         from contextlib import contextmanager
         held = []
 
+        stored_at_release = []
+
         @contextmanager
         def _recording(name):
             held.append(name)
             yield
             held.remove(name)
+            stored_at_release.append(db.session.get(AcmeClientOrder, order_id).dns_records_created)
 
         provider = self._patch_dns(monkeypatch)
         writes = []
@@ -768,6 +771,25 @@ class TestDns01Thread:
             svc = AcmeProxyService('https://ucm.example/acme/proxy')
         svc._bg_respond_challenge(app, f'{UPSTREAM}/acme/chall-v3/lk/x', 'tok.up', f'*.{DOMAIN}', order_id)
         assert writes and all(h == [f'_acme-challenge.{DOMAIN}'] for h in writes)
+        # the cleanup list is stored before the lock is released
+        assert stored_at_release and stored_at_release[0]
+
+    def test_txt_record_lock_does_not_block_another_name(self, app):
+        entered = threading.Event()
+
+        def _hold():
+            with app.app_context(), proxy_mod._txt_record_lock('_acme-challenge.a.example.com'):
+                entered.set()
+                time.sleep(2)
+
+        holder = threading.Thread(target=_hold)
+        holder.start()
+        assert entered.wait(10)
+        started = time.monotonic()
+        with app.app_context(), proxy_mod._txt_record_lock('_acme-challenge.b.example.com'):
+            waited = time.monotonic() - started
+        holder.join(10)
+        assert waited < 1
 
     def test_txt_published_even_when_the_name_stays_locked(self, app, monkeypatch, stub_directory):
         """Past the wait, publishing unprotected beats abandoning the challenge."""

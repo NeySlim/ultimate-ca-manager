@@ -122,3 +122,16 @@ def test_cleanup_called_once_per_challenge_succeeds_twice(api):
         ok, msg = provider.delete_txt_record('example.com', NAME)
         assert ok, msg
     assert api.rrsets == {}
+
+
+def test_delete_answered_404_without_text_is_a_success(api, monkeypatch):
+    real = api.__call__
+
+    def gone(method, url, **kwargs):
+        if method == 'DELETE':
+            return _Response(404, {'detail': 'Gone.'})
+        return real(method, url, **kwargs)
+
+    monkeypatch.setattr(requests, 'request', gone)
+    ok, msg = _provider().delete_txt_record('example.com', '_acme-challenge.example.com')
+    assert ok, msg

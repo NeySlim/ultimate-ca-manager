@@ -254,7 +254,6 @@ def _link_values(header: str):
         position = cursor + 1
 
 
-
 @contextmanager
 def _txt_record_lock(record_name):
     """Serialise the read-merge-write of one TXT name across workers; past the wait,
@@ -269,6 +268,7 @@ def _txt_record_lock(record_name):
             logger.warning("[ACME Proxy BG] %s still locked after 120s, publishing without the lock",
                            record_name)
         yield
+
 
 class AcmeProxyService:
     # Default upstream (Let's Encrypt Staging for safety by default, user can change)

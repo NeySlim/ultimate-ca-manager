@@ -116,3 +116,11 @@ def test_key_without_list_permission_still_writes_its_value(api):
     ok, msg = provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok1')
     assert ok, msg
     assert fake.values() == ['"tok1"']
+
+
+def test_access_denied_only_by_text_is_not_a_permission_fallback(api):
+    provider, fake = api
+    fake.list_error = RuntimeError('proxy said: AccessDenied')
+    ok, _ = provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok1')
+    assert not ok
+    assert 'change' not in fake.calls
