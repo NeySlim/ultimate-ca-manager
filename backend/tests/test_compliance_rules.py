@@ -700,7 +700,6 @@ class TestLegacyPkcs12:
         assert r.status_code == 400 and 'bsi' in r.get_json()['message'], r.data[:200]
 
     def test_the_service_exports_refuse_legacy_under_a_profile(self, app, auth_client, create_ca):
-        from services.ca_service import CAService
         from services.cert_service import CertificateService
         ca = _new_ca(create_ca, app, 'P12 service CA', profile='anssi')
         r = _leaf(auth_client, ca['id'], 'p12.service.test')
@@ -710,7 +709,5 @@ class TestLegacyPkcs12:
             with pytest.raises(compliance_profiles.ProfileRestricted, match='anssi'):
                 CertificateService.export_certificate_with_options(
                     cert_id, 'pkcs12', password='Sup3r-secret-pw!', legacy=True)
-            with pytest.raises(compliance_profiles.ProfileRestricted, match='anssi'):
-                CAService.export_ca_with_options(ca['id'], 'pkcs12', password='Sup3r-secret-pw!', legacy=True)
             assert CertificateService.export_certificate_with_options(
                 cert_id, 'pkcs12', password='Sup3r-secret-pw!')

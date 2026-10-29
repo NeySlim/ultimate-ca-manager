@@ -22,6 +22,8 @@ from api.v2.cas import ocsp  # noqa: F401
 from api.v2.cas import certificates  # noqa: F401
 from api.v2.cas import external  # noqa: F401
 from api.v2.cas import key  # noqa: F401
+from api.v2.cas import cross_certificates  # noqa: F401
+from api.v2.cas import cross_repair  # noqa: F401
 # Certificates: import package (creates bp) then all route modules
 from api.v2.certificates import bp as certificates_bp
 from api.v2.certificates import crud  # noqa: F401

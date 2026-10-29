@@ -6,9 +6,8 @@ from . import bp
 from flask import request, current_app, Response
 from auth.unified import require_auth
 from utils.response import success_response, error_response
-from models import Certificate, CA, db, SystemConfig
+from models import Certificate, db, SystemConfig
 from services.audit_service import AuditService
-from services.ca_service import CAService
 from pathlib import Path
 import os
 import shutil
@@ -306,16 +305,8 @@ def apply_https_cert():
                 pass  # Already decoded or different format
 
         # Write new certificate with full chain (leaf + intermediates + root)
-        full_cert = cert_data
-        if cert.caref:
-            ca = CA.query.filter_by(refid=cert.caref).first()
-            if ca:
-                chain_pems = CAService.get_ca_chain(ca.id)
-                for chain_cert in chain_pems:
-                    chain_str = chain_cert.decode('utf-8') if isinstance(chain_cert, bytes) else chain_cert
-                    if not full_cert.endswith('\n'):
-                        full_cert += '\n'
-                    full_cert += chain_str
+        from services.https_binding import with_ca_chain
+        full_cert = with_ca_chain(cert, cert_data)
 
         cert_path.write_text(full_cert)
 

@@ -671,7 +671,8 @@
       "scanNetwork": "Netzwerk scannen",
       "generateReport": "Bericht erstellen"
     },
-    "expiresInDays": "Läuft in {{count}} Tagen ab"
+    "expiresInDays": "Läuft in {{count}} Tagen ab",
+    "chainRepairSameKey": "gemeinsame Schlüssel, verschiedene Zertifikate (Cross-Zertifikat?)"
   },
   "certificates": {
     "createCertificate": "Zertifikat erstellen",
@@ -4042,7 +4043,11 @@
     "typePrivateKey": "Privater Schlüssel",
     "verifiedTrustStore": "Trust Store",
     "linkedToCA": "Verwaltete CA",
-    "trustAnchor": "Vertrauensanker"
+    "trustAnchor": "Vertrauensanker",
+    "crossAttached_one": "{{count}} Cross-Zertifikat an eine bereits vorhandene CA angehängt",
+    "crossAttached_other": "{{count}} Cross-Zertifikate an bereits vorhandene CAs angehängt",
+    "crossSkipped_one": "{{count}} Cross-Zertifikat wurde ausgelassen; die selbstsignierte CA bleibt erhalten",
+    "crossSkipped_other": "{{count}} Cross-Zertifikate wurden ausgelassen; die selbstsignierten CAs bleiben erhalten"
   },
   "webhooks": {
     "eventLabels": {
@@ -4261,7 +4266,8 @@
       "csr": "CSR-Signierung",
       "renewal": "Erneuerung",
       "revocation": "Widerruf",
-      "ca_revocation": "CA-Widerruf"
+      "ca_revocation": "CA-Widerruf",
+      "cross_revocation": "Widerruf eines Cross-Zertifikats"
     },
     "revocationPerformed": "Genehmigt: der Widerruf wurde ausgeführt",
     "summarySerial": "Seriennummer",
@@ -5699,5 +5705,67 @@
     "linesOpt": "{{count}} Zeilen",
     "filters": "Filter",
     "exclude": "Ausschließen"
+  },
+  "crossCerts": {
+    "title": "Cross-Zertifikate",
+    "none": "Kein Cross-Zertifikat. Hängen Sie eines an, das eine andere CA für diesen Schlüssel ausgestellt hat, oder signieren Sie eines mit einer in UCM vorhandenen CA.",
+    "issuedBy": "Ausgestellt von {{issuer}}",
+    "served": "Ausgeliefert",
+    "state": {
+      "revoked": "Widerrufen",
+      "expired": "Abgelaufen",
+      "notYetValid": "Noch nicht gültig"
+    },
+    "serve": "Ausliefern",
+    "stopServing": "Auslieferung beenden",
+    "servedNow": "Dieses Cross-Zertifikat wird jetzt in der Standardkette ausgeliefert",
+    "unserved": "Dieses Cross-Zertifikat wird nicht mehr ausgeliefert",
+    "updateFailed": "Das Cross-Zertifikat konnte nicht aktualisiert werden",
+    "attach": "Anhängen",
+    "attachTitle": "Cross-Zertifikat anhängen",
+    "attachHint": "Fügen Sie ein Zertifikat ein oder wählen Sie eines aus, das Subject und Schlüssel dieser CA trägt und von einer anderen CA ausgestellt wurde. Das eigene Zertifikat der CA bleibt erhalten.",
+    "serveNow": "In der Standardkette ausliefern",
+    "attached": "Cross-Zertifikat angehängt",
+    "attachFailed": "Das Cross-Zertifikat konnte nicht angehängt werden",
+    "attachAsCross": "Als Cross-Zertifikat anhängen",
+    "offerHint": "Dieses Zertifikat ist ein weiteres Zertifikat des Schlüssels dieser CA. Hängen Sie es neben dem eigenen Zertifikat der CA an, statt es zu ersetzen.",
+    "replaceCurrent": "Ersetzen",
+    "replaceHint": "Ersetzen installiert dieses Zertifikat anstelle des aktuellen Zertifikats der CA: Diese CA verwendet das aktuelle Zertifikat nicht mehr.",
+    "sign": "Cross-signieren",
+    "signTitle": "Diese CA cross-signieren",
+    "signHint": "Signieren Sie den Schlüssel von {{name}} mit einer anderen in UCM vorhandenen CA. Das Ergebnis wird hier als Cross-Zertifikat gespeichert.",
+    "signIssuer": "Signierende CA",
+    "selectIssuer": "CA auswählen",
+    "signValidity": "Gültigkeit (Tage)",
+    "signed": "Cross-Zertifikat ausgestellt",
+    "signFailed": "Cross-Signierung fehlgeschlagen",
+    "detach": "Entfernen",
+    "detachConfirm": "Das von {{issuer}} ausgestellte Cross-Zertifikat entfernen? Das Zertifikat wird aus UCM gelöscht.",
+    "detached": "Cross-Zertifikat entfernt",
+    "badge": "Cross-signiert",
+    "findings_one": "{{count}} Befund zu Cross-Zertifikaten",
+    "findings_other": "{{count}} Befunde zu Cross-Zertifikaten",
+    "findingsNote": "Eine überschriebene oder gelöschte selbstsignierte Root wird hier nicht wiederhergestellt: Stellen Sie sie aus einer Sicherung wieder her oder übergeben Sie ihr Zertifikat an „Als primär wiederherstellen“.",
+    "findingShadowed": "{{name}} enthält das Cross-Zertifikat von {{root}}",
+    "findingSameKey": "Mehrere Zertifikate teilen sich den Schlüssel von {{subject}}",
+    "convertToCross": "In Cross-Zertifikat umwandeln",
+    "convertConfirm": "{{name}} in ein Cross-Zertifikat von {{root}} umwandeln? Die untergeordneten CAs und ausgestellten Zertifikate wechseln zu {{root}}, und der doppelte Eintrag wird gelöscht.",
+    "converted": "Das Duplikat wurde in ein Cross-Zertifikat umgewandelt",
+    "convertFailed": "Das Duplikat konnte nicht umgewandelt werden",
+    "restorePrimary": "Als primär wiederherstellen",
+    "restorePrimaryOn": "Auf {{name}} wiederherstellen",
+    "restoreHint": "Geben Sie das selbstsignierte Zertifikat des Schlüssels dieser CA an. Das Zertifikat, das der Eintrag jetzt enthält, bleibt als Cross-Zertifikat erhalten.",
+    "restored": "Selbstsigniertes Zertifikat wiederhergestellt",
+    "restoreFailed": "Das selbstsignierte Zertifikat konnte nicht wiederhergestellt werden"
+  },
+  "chainVariant": {
+    "label": "Zu präsentierende Kette",
+    "auto": "Standard (die von UCM ausgelieferte Kette)",
+    "primary": "Selbstsignierte Root",
+    "cross": "Cross-Zertifikat von {{name}} durch {{issuer}}",
+    "served": "ausgeliefert",
+    "notServable": "widerrufen, abgelaufen oder noch nicht gültig",
+    "exportHint": "Ein Cross-Zertifikat ermöglicht Clients, die einer anderen Root vertrauen, einen Pfad zu dieser CA aufzubauen.",
+    "deployHint": "Die Kette, die in die Datei der vollständigen Kette geschrieben wird. Ein widerrufenes, abgelaufenes oder noch nicht gültiges Cross-Zertifikat wird nie übertragen."
   }
 }

@@ -148,6 +148,12 @@ SECTIONS: Dict[str, Section] = {
         exclude={**_SURROGATE},
         references={'ca_id': 'certificate_authorities', 'template_id': 'certificate_templates'},
     ),
+    'ca_cross_certificates': Section(
+        model='models.ca_cross_certificate:CACrossCertificate',
+        identity=('fingerprint_sha256',),
+        exclude={**_SURROGATE},
+        references={'ca_id': 'certificate_authorities'},
+    ),
     'trusted_certificates': Section(
         model='models.truststore:TrustedCertificate',
         identity=('fingerprint_sha256',),

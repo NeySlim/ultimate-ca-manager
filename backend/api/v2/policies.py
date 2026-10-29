@@ -145,7 +145,7 @@ def _approval_target_gone(approval):
     (its request row, certificate or signing CA is gone, or the certificate
     to revoke was replaced since the request), else None."""
     from services.policy_service import PolicyEvaluationService
-    if approval.request_type not in ('csr', 'renewal', 'revocation', 'ca_revocation'):
+    if approval.request_type not in ('csr', 'renewal', 'revocation', 'ca_revocation', 'cross_revocation'):
         return None
     data = PolicyEvaluationService.get_request_data(approval) or {}
     if approval.request_type == 'csr':
@@ -154,6 +154,14 @@ def _approval_target_gone(approval):
             return 'The request to sign no longer exists'
         if _ca_for_request(data) is None:
             return 'The signing CA no longer exists'
+        return None
+    if approval.request_type == 'cross_revocation':
+        from models.ca_cross_certificate import CACrossCertificate
+        row = _row(CACrossCertificate, data.get('cross_certificate_id'))
+        if row is None:
+            return 'The cross-certificate to revoke no longer exists'
+        if row.serial_number != data.get('serial_number'):
+            return 'The cross-certificate changed since the request; request its revocation again'
         return None
     if approval.request_type == 'ca_revocation':
         from services.approval_gate import ca_certificate_serial
@@ -386,6 +394,27 @@ def _revoke_approved_ca(approval, data):
             'reason': reason, 'warnings': warnings}
 
 
+def _revoke_approved_cross_certificate(approval, data):
+    """Revoke the cross-certificate an approved 'cross_revocation' request names."""
+    from models.ca_cross_certificate import CACrossCertificate
+    from services.ca import cross_certs
+    row = _row(CACrossCertificate, data.get('cross_certificate_id'))
+    if row is None:
+        raise ValueError('The cross-certificate to revoke no longer exists')
+    if row.revoked:
+        return {'id': None, 'ca_id': row.ca_id, 'cn': data.get('cn'), 'revoked': True, 'already_revoked': True}
+    reason, invalidity_at = _approved_revocation_params(data)
+    _close_duplicate_requests(approval, 'cross_certificate_id', row.id)
+    username = _requester_name(approval, data)
+    try:
+        warnings = cross_certs.revoke(row, reason, username, invalidity_at)
+    except cross_certs.CrossCertError as e:
+        raise ValueError(e.message) from e
+    cross_certs.announce(row.ca, 'revoked', row, username, {'reason': reason})
+    return {'id': None, 'ca_id': row.ca_id, 'cn': data.get('cn'), 'revoked': True,
+            'reason': reason, 'warnings': warnings}
+
+
 def _issue_approved_certificate(approval):
     """Issue a certificate from an approved request's stored data.
     
@@ -411,6 +440,8 @@ def _issue_approved_certificate(approval):
         return _revoke_approved_certificate(approval, data)
     if approval.request_type == 'ca_revocation':
         return _revoke_approved_ca(approval, data)
+    if approval.request_type == 'cross_revocation':
+        return _revoke_approved_cross_certificate(approval, data)
 
     # Resolve the template the request was made against (issue #226 semantics:
     # templates govern issuance — KU/EKU, digest, and the defaults for key

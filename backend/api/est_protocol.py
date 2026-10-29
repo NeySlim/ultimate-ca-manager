@@ -611,9 +611,10 @@ def get_ca_certs(label=None):
         return ca_error
     
     try:
-        # Build certificate chain
-        chain = CAService.get_certificate_chain(ca.refid)
-        
+        # Trust anchors: the primary chain plus any served cross-certificate, never a substitute
+        from utils.ca_chain import anchor_chain
+        chain = [link.pem.decode() for link in anchor_chain(ca)]
+
         # Create PKCS#7 certs-only
         from cryptography import x509
         from cryptography.hazmat.primitives.serialization import pkcs7

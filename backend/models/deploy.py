@@ -88,6 +88,8 @@ class DeployBinding(db.Model):
     # in a TLS server's fullchain. Keep the exceptional legacy behaviour as
     # an explicit per-binding choice.
     include_root = db.Column(db.Boolean, nullable=False, default=False)
+    # 'auto' = the chain the CA serves; otherwise a variant id ('primary', 'cross:<id>')
+    chain_variant = db.Column(db.String(40), nullable=False, default='auto', server_default='auto')
     # Optional command for this certificate deployment only. The same SSH
     # target can therefore serve different daemons with different reloads.
     reload_command = db.Column(db.String(512))
@@ -108,6 +110,7 @@ class DeployBinding(db.Model):
             'key_path': self.key_path,
             'fullchain_path': self.fullchain_path,
             'include_root': self.include_root,
+            'chain_variant': self.chain_variant or 'auto',
             'reload_command': self.reload_command,
             'enabled': self.enabled,
             'created_at': utc_isoformat(self.created_at),

@@ -3,6 +3,7 @@ CA Model - Certificate Authority
 """
 import json
 import logging
+from typing import Optional
 from models import db
 from utils.datetime_utils import utc_now, utc_isoformat
 
@@ -256,7 +257,7 @@ class CA(db.Model):
         import base64
         from cryptography import x509
         from utils.cert_issuer import (
-            authority_key_identifier_hex, certificate_signed_by, is_self_signed,
+            authority_key_identifier_hex, cas_by_ski, certificate_signed_by, is_self_signed,
         )
         try:
             cert = x509.load_pem_x509_certificate(base64.b64decode(self.crt))
@@ -277,7 +278,7 @@ class CA(db.Model):
             _add([CA.query.filter_by(refid=self.caref).first()])
         aki = authority_key_identifier_hex(cert)
         if aki:
-            _add(CA.query.filter(CA.ski == aki).all())
+            _add(cas_by_ski(aki))
         if self.issuer:
             _add(CA.query.filter(CA.subject == self.issuer).all())
 
@@ -351,17 +352,23 @@ class CA(db.Model):
         not end within MAX_CHAIN_DEPTH is reported as revoked: stopping the
         walk and answering "not revoked" would let a loop, or a hierarchy
         deep enough to hide the revoked ancestor, sign again (#343 review)."""
+        return self.chain_revocation is not None
+
+    @property
+    def chain_revocation(self) -> Optional[str]:
+        """'revoked' when this CA or an ancestor is revoked, 'broken' when the
+        chain loops or is too deep to walk, None otherwise."""
         ca, depth, seen = self, 0, set()
         while ca is not None:
             if ca.is_revoked:
-                return True
+                return 'revoked'
             if ca.id is not None:
                 if ca.id in seen:
                     logger.warning(
                         "CA chain of %s loops at CA %s; treating it as revoked",
                         self.descr, ca.descr,
                     )
-                    return True
+                    return 'broken'
                 seen.add(ca.id)
             depth += 1
             if depth > CA.MAX_CHAIN_DEPTH:
@@ -369,10 +376,10 @@ class CA(db.Model):
                     "CA chain of %s exceeds %s levels; treating it as revoked",
                     self.descr, CA.MAX_CHAIN_DEPTH,
                 )
-                return True
+                return 'broken'
             ca = ca.issuing_ca()
-        return False
-    
+        return None
+
     @property
     def key_type(self) -> str:
         """Parse key type from certificate (or from the CSR while pending)"""
@@ -563,6 +570,16 @@ class CA(db.Model):
             parent_ca = CA.query.filter_by(refid=self.caref).first()
             parent_id = parent_ca.id if parent_ca else None
         
+        # Aggregates, so the rows are not loaded into the session
+        from models.ca_cross_certificate import CACrossCertificate as _Cross
+        cross_total = 0 if self.id is None else db.session.query(db.func.count(_Cross.id)).filter(
+            _Cross.ca_id == self.id).scalar()
+        if cross_total:
+            from services.ca import cross_certs
+            cross_served = cross_certs.served_for(self) is not None
+        else:
+            cross_served = False
+
         data = {
             "id": self.id,
             "refid": self.refid,
@@ -609,6 +626,8 @@ class CA(db.Model):
             "pending": self.is_pending,
             "has_csr": bool(self.csr),
             "certs": self.certificates.count() if self.certificates else 0,  # Count of issued certificates
+            "cross_certificate_count": cross_total,
+            "cross_certificate_served": bool(cross_served),
             "key_type": self.key_type,
             "hash_algorithm": self.hash_algorithm,
             "signature_scheme": self.signature_scheme or 'pkcs1v15',

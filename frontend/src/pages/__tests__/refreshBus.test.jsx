@@ -92,6 +92,7 @@ vi.mock('../../services', () => ({
   casService: {
     getAll: (...a) => casGetAll(...a),
     getChainRepairStatus: vi.fn().mockResolvedValue({ data: null }),
+    getCrossFindings: vi.fn().mockResolvedValue({ data: { findings: [] } }),
     getById: vi.fn().mockResolvedValue({ data: {} }),
     export: vi.fn(),
   },

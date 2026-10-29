@@ -560,12 +560,22 @@ GET /api/v2/cas/{ca_id}/certificates?status=active&page=1&per_page=50
 GET /api/v2/cas/{ca_id}/export?format=pem
 GET /api/v2/cas/{ca_id}/export?format=der
 GET /api/v2/cas/{ca_id}/export?format=chain
+
+# Chain through a cross-certificate (POST accepts the same field in its JSON body)
+GET /api/v2/cas/{ca_id}/export?format=pem&include_chain=true&chain_variant=cross:4
 ```
+
+`chain_variant` is `auto` (default: the chain UCM serves), `primary` (the self-signed root)
+or `cross:<id>`; any other value, or one that is not part of the chain of this CA, answers 400.
 
 ### Export All CAs
 ```http
 GET /api/v2/cas/export
+GET /api/v2/cas/export?chain_variant=all
 ```
+
+`chain_variant` adds cross-certificates after each CA certificate: `primary` (default) adds none,
+`auto` the served ones, `all` every attached one, `cross:<id>` that one.
 
 ### Bulk Delete CAs
 ```http
@@ -598,6 +608,60 @@ Content-Type: application/json
 ```
 
 Returns a ZIP file containing the exported CA certificates.
+
+### Cross-certificates
+
+A cross-certificate carries a CA's subject and public key under another issuer. It is stored beside
+the CA's own certificate, which is never replaced. At most one per CA is *served* (placed in the
+default chain); a revoked, expired or not yet valid one is kept and exportable but never served.
+Reading needs `read:cas`, everything else `write:cas`. Refusals carry `details.code`.
+
+```http
+GET    /api/v2/cas/{ca_id}/cross-certificates
+POST   /api/v2/cas/{ca_id}/cross-certificates
+GET    /api/v2/cas/{ca_id}/cross-certificates/{xid}
+PATCH  /api/v2/cas/{ca_id}/cross-certificates/{xid}
+DELETE /api/v2/cas/{ca_id}/cross-certificates/{xid}
+POST   /api/v2/cas/{ca_id}/cross-certificates/{xid}/revoke
+GET    /api/v2/cas/{ca_id}/cross-certificates/{xid}/export?format=pem|der
+GET    /api/v2/cas/{ca_id}/chain-variants
+POST   /api/v2/cas/{ca_id}/cross-sign
+```
+
+**Attach** (`201`; `warnings` lists NameConstraints or PolicyConstraints the certificate carries):
+```json
+{"certificate": "-----BEGIN CERTIFICATE-----...", "served": false}
+```
+
+**Serve or stop serving** (`PATCH`): `{"served": true}`. Serving another one of the same CA un-serves the first.
+
+**Revoke** (`POST .../revoke`): `{"reason": "superseded", "invalidity_date": "2026-10-01T00:00:00Z"}`.
+The serial is published on the issuer's CRL and OCSP; the CA it certifies is not revoked.
+A revocation under an approval policy answers with the approval request instead.
+
+**Chain variants** (`GET .../chain-variants`): the chains the CA can present, `primary` and one per
+cross-certificate on its path. Each entry has `id` (`primary` or `cross:<id>`), `ca_id`, `ca_name`,
+`cross_certificate_id`, `issuer`, `valid_to`, `served`, `servable` and `default` (what a plain export of this CA returns).
+
+**Cross-sign from UCM** (`POST /api/v2/cas/{issuer_id}/cross-sign`, `201`): signs the key of another
+CA held in UCM with this one and stores the result on the subject CA.
+```json
+{"subject_ca_id": 5, "validity_days": 1825, "path_length": 0}
+```
+`validity_days` (default 1825, at most 3650) and `path_length` are optional.
+
+**Findings and repairs** for records damaged before cross-certificates were modelled. Nothing runs by itself:
+```http
+GET  /api/v2/cas/cross-findings
+POST /api/v2/cas/{ca_id}/convert-to-cross      # write:cas and delete:cas
+POST /api/v2/cas/{ca_id}/restore-primary       # {"certificate": "<self-signed PEM>"}
+```
+`cross-findings` returns `{"findings": [...], "note": "..."}` with `kind` `shadowed_root` (a record whose
+subject and key match a held self-signed root; action `convert_to_cross`) or `same_key_distinct_certs`
+(action `restore_primary` when no self-signed record exists). `convert-to-cross` moves the record's child CAs,
+issued certificates and settings to the root and deletes the duplicate; `restore-primary` puts a
+self-signed certificate back and keeps the replaced one as a cross-certificate. A self-signed root that was
+overwritten or deleted only comes back from a backup or through `restore-primary`.
 
 ---
 
@@ -692,6 +756,11 @@ packaged. `include_root` defaults to `false`, because a TLS server normally send
 the leaf and intermediate certificates while clients keep the Root CA in their
 trust store. Both options, as well as `include_key` and `legacy`, must be actual
 JSON booleans in POST bodies; strings such as `"false"` are rejected.
+
+`chain_variant` (`auto` by default, `primary`, or `cross:<id>`) picks the chain a cross-certificate makes
+possible; it is read from the JSON body or the query string. The variants of a certificate are listed in
+`chain_status.variants` of `GET /api/v2/certificates/{cert_id}`. An unknown value, or one that is not part of
+the chain, answers 400.
 
 ### Renew Certificate
 ```http
@@ -1303,6 +1372,19 @@ Content-Type: application/json
 
 `profiles` holds the certificate profiles advertised in the ACME directory (draft-ietf-acme-profiles), keyed by the name a client sends in `profile`. `template_id` (optional) binds a certificate template: its key usage and extended key usage govern every certificate issued under the profile, while validity and digest stay those of the profile. CA templates and templates carrying OCSP signing, timestamping, any-purpose or smartcard logon EKUs are refused (400), and a bound template cannot be deleted until the profile is unbound. `GET` returns the profiles with `template_id` (null when unbound).
 
+### Alternate chains (RFC 8555 section 7.4.2)
+```http
+POST /acme/cert/{order_id}
+POST /acme/cert/{order_id}/alt/{variant}
+```
+
+The certificate is served with the default chain (`auto`: the served cross-certificate when there is one,
+otherwise the primary chain). Every other servable chain is offered in a `Link: <.../acme/cert/{order_id}/alt/{variant}>;rel="alternate"`
+header, `variant` being `primary` or `cross:<id>`. The alternate route applies the same checks as the main
+one (account, ownership, order state, exact URL, JWS) and answers `404` for a chain that is not offered.
+A client picks one with `certbot --preferred-chain`, which matches the CN of the issuer of the topmost
+certificate; `auto` is tried first.
+
 ### Get Statistics
 ```http
 GET /api/v2/acme/stats
@@ -1487,6 +1569,22 @@ GET /ca/{ca_refid}.pem
 ```bash
 curl http://your-server:8080/ca/550e8400-e29b-41d4-a716-446655440000.pem -o ca.pem
 ```
+
+### Download CA Certificates Bundle (PKCS#7)
+```http
+GET /ca/{ca_refid}.p7c
+```
+
+**Response**: `application/pkcs7-mime`: certs-only CMS (RFC 5280 section 4.2.2.1) holding the CA certificate
+and its servable cross-certificates.
+
+### Download a Cross-certificate
+```http
+GET /ca/{ca_refid}/cross/{xid}.cer
+```
+
+**Response**: `application/pkix-cert`. A revoked, expired or not yet valid cross-certificate answers `404`.
+`.cer` and `.pem` return the served cross-certificate when the CA has one, otherwise its own certificate. Responses are cached for 24 hours, so a change reaches clients after that delay.
 
 ### AIA CA Issuers Configuration
 
@@ -2442,6 +2540,7 @@ name: "My Certificate"            # Optional: display name
 password: "pkcs12password"        # Optional: for PKCS12 files
 ca_id: 1                          # Optional: link to specific CA (auto-detected if omitted)
 import_key: true                  # Optional: import private key (default: true)
+cross_mode: auto                  # Optional: auto | attach | replace | refuse (default: auto)
 
 # Response (201 Created)
 {
@@ -2492,6 +2591,20 @@ import_key: true                  # Optional: import private key (default: true)
   "message": "CA \"My Root CA\" imported successfully"
 }
 ```
+
+A certificate that carries the subject and key of a CA already held, under another issuer, is a
+cross-certificate (#400). `cross_mode` decides what happens: `auto` attaches it to a self-signed root
+and answers `409` for an intermediate, `attach` attaches it in both cases, `replace` lets an
+intermediate be overwritten, `refuse` never attaches. The attached answer is `201` with the CA,
+`cross_certificate` and `warnings`. The `409` carries `details.code = "cross_certificate_detected"`,
+`details.ca_id` and `details.options` (`["attach"]` for a self-signed root, `["attach", "replace"]`
+otherwise). Installing such a certificate on a CA that is not awaiting one, after **Renew via CSR**
+(`POST /api/v2/cas/{ca_id}/certificate`), answers the same `409`; that route accepts only `cross_mode=auto` or `replace` (`400` otherwise). The same options apply to `POST /api/v2/certificates/import`.
+With `cross_mode=auto`, an intermediate's certificate is taken for a cross-certificate when its issuer has another name, or the same name while UCM holds CAs of that name and none of them signed it (a homonym from another hierarchy). The same issuer name under a key UCM does not hold, or under a held new root, is a root rollover and replaces the certificate as a renewal does. A self-signed root is never replaced by another issuer's certificate, `attach` and `refuse` treat any such certificate as a cross-certificate, and a real revocation in the CA's chain lets `auto` replace it.
+
+Smart Import (`POST /api/v2/import/execute`) attaches a cross-certificate found next to a held root and
+reports it in `warning_details` with `code` `cross_certificate_attached` or `cross_certificate_skipped`
+(the self-signed CA is kept in both cases); its `cas_imported` does not count it.
 
 ### OPNsense Import
 ```http

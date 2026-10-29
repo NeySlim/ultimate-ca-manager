@@ -106,7 +106,9 @@ class MTLSAuthService:
                 if issuer is None and enrolled is not None:
                     issuer = issuing_ca_for(enrolled)
                 if issuer is None and auth_cert.cert_issuer:
-                    issuer = _CA.query.filter(_CA.subject == auth_cert.cert_issuer).first()
+                    from utils.cert_issuer import self_signed_first
+                    issuer = next(iter(self_signed_first(
+                        _CA.query.filter(_CA.subject == auth_cert.cert_issuer).order_by(_CA.id).all())), None)
                 if issuer is not None and enrolled is not None:
                     # The row may be gone (certificate deleted after its
                     # revocation): the persistent revocation record remains
@@ -114,6 +116,8 @@ class MTLSAuthService:
                 elif issuer is not None:
                     from models import RevokedSerial as _RevokedSerial
                     from utils.serial_format import serial_variants
+                    # No PEM to tell the records of one name apart: any of them closes it
+                    refids = [r for (r,) in _CA.query.filter(_CA.subject == issuer.subject).with_entities(_CA.refid)]
                     variants = set()
                     for base in (10, 16):
                         try:
@@ -121,7 +125,7 @@ class MTLSAuthService:
                         except ValueError:
                             continue
                     revoked = bool(variants) and _RevokedSerial.query.filter(
-                        _RevokedSerial.caref == issuer.refid,
+                        _RevokedSerial.caref.in_(set(refids) | {issuer.refid}),
                         _RevokedSerial.serial_number.in_(variants),
                     ).first() is not None
             except Exception as exc:

@@ -27,6 +27,7 @@ const REQUEST_TYPES = {
   renewal: { labelKey: 'approvals.requestType.renewal', variant: 'success' },
   revocation: { labelKey: 'approvals.requestType.revocation', variant: 'danger' },
   ca_revocation: { labelKey: 'approvals.requestType.ca_revocation', variant: 'danger' },
+  cross_revocation: { labelKey: 'approvals.requestType.cross_revocation', variant: 'danger' },
 }
 
 function RequestTypeBadge({ type, t }) {

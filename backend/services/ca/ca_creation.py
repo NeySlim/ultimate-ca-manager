@@ -18,7 +18,8 @@ from models import CA, db
 from models.hsm import HsmKey
 from services.audit_service import AuditService
 from services.trust_store import TrustStoreService
-from utils.cert_issuer import is_self_signed
+from services.import_service import CrossCertificateImport, refused_as_cross_certificate
+from utils.cert_issuer import find_ca_by_ski, is_self_signed
 from utils.datetime_utils import to_naive_utc, utc_isoformat, utc_now
 from utils.serial_format import serial_to_int
 from .helpers import save_ca_files, save_ca_key_file
@@ -201,7 +202,9 @@ class CACreationMixin:
             base += '-ca'
         slug = base
         i = 2
-        while CA.query.filter_by(url_slug=slug).first() is not None:
+        from models import SystemConfig
+        while (CA.query.filter_by(url_slug=slug).first() is not None
+               or SystemConfig.query.filter_by(key=f'ca_url_alias_{slug}').first() is not None):
             slug = f"{base}-{i}"
             i += 1
         return slug
@@ -673,6 +676,7 @@ class CACreationMixin:
         ca: CA,
         cert_pem: bytes,
         username: str = 'system',
+        replace_cross: bool = False,
     ) -> Tuple[CA, List[str]]:
         """Install the externally signed certificate on an external-CSR CA.
 
@@ -711,13 +715,16 @@ class CACreationMixin:
             raise ValueError("CA private key is not available")
         if not certificate_matches_private_key(cert, private_key):
             raise ValueError("Certificate public key does not match this CA's private key")
-        # A self-signed root re-certified by another CA is a cross-certificate:
-        # installing it would replace the root's own certificate (#400)
+        # A certificate from another issuer than the stored one, while that one is
+        # still valid, is a cross-certificate (#400); replace_cross lets an intermediate
+        # be overwritten, never a self-signed root. Under a revoked ancestor the stored one is
+        # not worth keeping: a healthy issuer is the way out.
         if not was_pending and ca.crt and not is_self_signed(cert):
             stored = x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend())
-            if is_self_signed(stored):
-                raise ValueError("This certificate is a cross-certificate of this self-signed CA; "
-                                 "installing it would replace the CA's own certificate, so it is refused")
+            if refused_as_cross_certificate(ca, stored, cert, replace_cross):
+                raise CrossCertificateImport(
+                    "This certificate is a cross-certificate of this CA; installing it "
+                    "would replace the CA's own certificate, so it is refused", record=ca)
 
         # 2. CA constraints (same rules as CA import)
         ca_warning = validate_ca_certificate(cert)
@@ -763,7 +770,7 @@ class CACreationMixin:
             )
             if aki_ext.value.key_identifier:
                 aki_hex = aki_ext.value.key_identifier.hex(':').upper()
-                parent = CA.query.filter(CA.ski == aki_hex, CA.id != ca.id).first()
+                parent = find_ca_by_ski(aki_hex, exclude_id=ca.id)
         except x509.ExtensionNotFound:
             pass
         if parent is None:

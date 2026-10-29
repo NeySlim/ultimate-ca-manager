@@ -10,6 +10,7 @@ from cryptography.hazmat.backends import default_backend
 
 from models import db, CA, Certificate
 from models.crl import CRLMetadata
+from utils.cert_issuer import same_key_refids
 from utils.datetime_utils import utc_now
 from services.cert.serial_resolution import resolve_record_serial
 from utils.x509_aki import authority_key_identifier_from_issuer
@@ -349,7 +350,7 @@ class CRLGenerationMixin:
 
         now = utc_now()  # one instant for the filters below and the CRL dates
         revoked_certs = Certificate.query.filter(
-            Certificate.caref == ca.refid,
+            Certificate.caref.in_(same_key_refids(ca)),
             Certificate.revoked == True,
             _not_expired(Certificate.valid_to, now),
             Certificate.revoked_at > base_crl.this_update).all()
@@ -363,7 +364,7 @@ class CRLGenerationMixin:
         # Persistent records revoked since the base: deleted or renewed serials
         from models.revoked_serial import RevokedSerial
         persisted = RevokedSerial.query.filter(
-            RevokedSerial.caref == ca.refid,
+            RevokedSerial.caref.in_(same_key_refids(ca)),
             RevokedSerial.revoked_at > base_crl.this_update,
             RevokedSerial.valid_to > now,
         ).order_by(RevokedSerial.revoked_at, RevokedSerial.id).all()

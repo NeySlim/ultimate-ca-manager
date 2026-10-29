@@ -138,6 +138,14 @@ describe('ApprovalsPage — what a request asks for', () => {
     expect(await screen.findByText('approvals.requestType.ca_revocation')).toBeTruthy()
     expect(screen.queryByText('ca_revocation')).toBeNull()
   })
+
+  it('names a cross-certificate revocation, not the raw type', async () => {
+    list.mockResolvedValue({ data: [{ ...REQUEST, id: 6, request_type: 'cross_revocation',
+      request_summary: { cn: 'Root B', reason: 'keyCompromise' } }] })
+    renderPage()
+    expect(await screen.findByText('approvals.requestType.cross_revocation')).toBeTruthy()
+    expect(screen.queryByText('cross_revocation')).toBeNull()
+  })
 })
 
 describe('ApprovalsPage deep link', () => {

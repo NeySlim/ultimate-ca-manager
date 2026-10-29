@@ -111,9 +111,9 @@ def resolve_issuing_ca(cert: Certificate) -> 'CA | None':
         leaf = x509.load_pem_x509_certificate(b64decode(cert.crt))
     except Exception:
         return
-    from utils.cert_issuer import authority_key_identifier_hex, certificate_signed_by
-    named = CA.query.filter(CA.subject == cert.issuer).all() if cert.issuer else []
-    others = [c for c in CA.query.all() if c not in named]
+    from utils.cert_issuer import authority_key_identifier_hex, certificate_signed_by, self_signed_first
+    named = self_signed_first(CA.query.filter(CA.subject == cert.issuer).order_by(CA.id).all()) if cert.issuer else []
+    others = self_signed_first([c for c in CA.query.order_by(CA.id).all() if c not in named])
     leaf_aki = authority_key_identifier_hex(leaf)
     verified = []
     for candidate in named + others:

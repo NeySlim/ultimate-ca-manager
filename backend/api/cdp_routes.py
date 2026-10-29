@@ -56,11 +56,12 @@ def _resolve_ca(ca_ref):
     if ca:
         return ca
     # Fallback to numeric ID for backwards compatibility
+    from services.ca.cross_repair import alias_target
     try:
-        ca_id_int = int(ca_ref)
-        return db.session.get(CA, ca_id_int)
+        ca = db.session.get(CA, int(ca_ref))
     except (ValueError, TypeError):
-        return None
+        ca = None
+    return ca or alias_target(ca_ref)
 
 
 @cdp_bp.route('/<ca_ref>.crl')

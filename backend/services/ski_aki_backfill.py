@@ -15,6 +15,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.x509.oid import ExtensionOID
+from utils.cert_issuer import find_ca_by_ski
 
 logger = logging.getLogger(__name__)
 
@@ -68,22 +69,58 @@ def _merge_ca_group(db, cas_with_ski, stats):
     for c in cas_with_ski:
         if c.id == keeper.id:
             continue
-        # Use raw SQL to avoid ORM cascade issues with incomplete schemas
-        db.session.execute(
-            db.text("UPDATE certificates SET caref = :new_ref WHERE caref = :old_ref"),
-            {'new_ref': keeper.refid, 'old_ref': c.refid}
-        )
-        db.session.execute(
-            db.text("UPDATE certificate_authorities SET caref = :new_ref WHERE caref = :old_ref"),
-            {'new_ref': keeper.refid, 'old_ref': c.refid}
-        )
-        db.session.execute(
-            db.text("DELETE FROM certificate_authorities WHERE id = :id"),
-            {'id': c.id}
-        )
+        try:
+            with db.session.begin_nested():
+                _move_ca_dependents(db, c, keeper)
+                # Raw SQL to avoid ORM cascade issues with incomplete schemas
+                db.session.execute(db.text("DELETE FROM certificate_authorities WHERE id = :id"), {'id': c.id})
+        except Exception as exc:
+            logger.warning(f"SKI/AKI backfill: CA '{c.descr}' (id={c.id}) not merged into id={keeper.id}: {exc}")
+            continue
         db.session.expunge(c)
         logger.info(f"SKI/AKI backfill: dedup CA '{c.descr}' (id={c.id}) -> merged into '{keeper.descr}' (id={keeper.id})")
         stats['deduplicated'] += 1
+
+
+# Derived per-CA data the keeper regenerates; every other reference moves to it
+# (CRL history included: CRL numbers must not restart below the published ones)
+_DISCARDED_WITH_CA = {'ocsp_responses'}
+# Tables unique on (CA, column): the duplicate's rows the keeper already has are dropped
+_UNIQUE_PER_CA = {'ca_template_pins': 'template_id', 'crl_deploy_bindings': 'target_id'}
+# Parent references declared without a foreign key
+_UNDECLARED_CAREF = (('certificate_authorities', 'caref'), ('crls', 'caref'),
+                     ('ca_cross_certificates', 'issuer_caref'))
+
+
+def _move_ca_dependents(db, dupe, keeper):
+    """Point every row referencing *dupe* (by refid or id) at *keeper*, so none is orphaned."""
+    crosses = db.metadata.tables['ca_cross_certificates']
+    from services.ca.cross_certs import served_for
+    # At most one served row per CA after the move: a usable one wins, the keeper's otherwise
+    keeper_serves = db.session.query(crosses.c.id).filter(
+        crosses.c.ca_id == keeper.id, crosses.c.served.is_(True)).first() is not None
+    if served_for(keeper) is None and served_for(dupe) is not None:
+        db.session.execute(crosses.update().where(crosses.c.ca_id == keeper.id).values(served=False))
+    elif keeper_serves:
+        db.session.execute(crosses.update().where(crosses.c.ca_id == dupe.id).values(served=False))
+    for table in db.metadata.sorted_tables:
+        for fk in table.foreign_keys:
+            if fk.column.table.name != 'certificate_authorities' or fk.column.name not in ('id', 'refid'):
+                continue
+            column = fk.parent.name
+            old, new = ((dupe.refid, keeper.refid) if fk.column.name == 'refid' else (dupe.id, keeper.id))
+            if table.name in _DISCARDED_WITH_CA:
+                db.session.execute(table.delete().where(fk.parent == old))
+            elif table.name in _UNIQUE_PER_CA:
+                other = table.c[_UNIQUE_PER_CA[table.name]]
+                db.session.execute(table.delete().where(
+                    (fk.parent == old) & other.in_(db.select(other).where(fk.parent == new))))
+                db.session.execute(table.update().where(fk.parent == old).values({column: new}))
+            else:
+                db.session.execute(table.update().where(fk.parent == old).values({column: new}))
+    for name, column in _UNDECLARED_CAREF:
+        table = db.metadata.tables[name]
+        db.session.execute(table.update().where(table.c[column] == dupe.refid).values({column: keeper.refid}))
 
 
 def backfill_ski_aki():
@@ -194,7 +231,7 @@ def backfill_ski_aki():
             if aki == ca.ski:
                 continue
 
-            parent = CA.query.filter(CA.ski == aki, CA.id != ca.id).first()
+            parent = find_ca_by_ski(aki, exclude_id=ca.id)
             if parent:
                 ca.caref = parent.refid
                 stats['rechained_cas'] += 1
@@ -215,7 +252,7 @@ def backfill_ski_aki():
         if cert.caref and cert.caref in ca_refids:
             continue
         try:
-            parent = CA.query.filter(CA.ski == cert.aki).first()
+            parent = find_ca_by_ski(cert.aki)
             if parent:
                 old_caref = cert.caref
                 cert.caref = parent.refid
@@ -239,7 +276,7 @@ def backfill_ski_aki():
                 by_cert.setdefault(fingerprint, []).append(c)
         if len(by_cert) > 1:
             stats['same_key_distinct_certs'] += 1
-            logger.warning(f"SKI/AKI backfill: CAs {[c.id for c in cas_with_ski]} share SKI {dupe_ski} "
+            logger.info(f"SKI/AKI backfill: CAs {[c.id for c in cas_with_ski]} share SKI {dupe_ski} "
                            f"with distinct certificates (cross-certificate?), not merged")
         for group in by_cert.values():
             if len(group) > 1:

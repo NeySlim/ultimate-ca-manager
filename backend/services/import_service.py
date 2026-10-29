@@ -6,7 +6,8 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 import re
 import base64
-from utils.cert_issuer import is_self_signed
+from datetime import datetime, timezone
+from utils.cert_issuer import cas_by_ski, is_self_signed
 from utils.foreign_algorithms import describe_public_key, spki_der
 from utils.key_codec import private_key_to_pem, refuse_eddsa_key
 from utils.pkcs12_import import refuse_pkcs12_import
@@ -190,10 +191,35 @@ class AmbiguousImportTarget(ValueError):
     """Several records share the certificate's names and none can be told
     to be the one it belongs to."""
 
+    code = None
+
+    @property
+    def details(self):
+        return {'code': self.code} if self.code else None
+
 
 class CrossCertificateImport(AmbiguousImportTarget):
-    """The certificate cross-certifies a self-signed CA already stored: applying
-    it would replace the root's own certificate and parent it under another CA."""
+    """The certificate re-certifies a CA's key under another issuer: applying it
+    would replace the stored certificate and parent the CA under that issuer."""
+
+    code = 'cross_certificate_detected'
+
+    def __init__(self, message, record=None):
+        super().__init__(message)
+        self.record = record
+
+    @property
+    def details(self):
+        details = {'code': self.code}
+        if self.record is not None:
+            stored = _record_identity(self.record)[0]
+            details['ca_id'] = self.record.id
+            details['options'] = ['attach'] if stored is not None and is_self_signed(stored) else ['attach', 'replace']
+        return details
+
+
+class ImportConflict(ValueError):
+    """The record cannot be updated from the imported certificate; nothing was changed."""
 
 
 def _spki(public_key):
@@ -294,7 +320,7 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
     if is_self_signed(cert):
         return None
     aki = authority_key_identifier_hex(cert)
-    candidates = CA.query.filter(CA.ski == aki).all() if aki else []
+    candidates = cas_by_ski(aki) if aki else []
     if not candidates:
         candidates = CA.query.filter(CA.subject == cert.issuer.rfc4514_string()).all()
     for parent in candidates:
@@ -307,6 +333,61 @@ def relink_parent_caref(cert, current_caref, exclude_ca_id=None):
         except Exception:
             continue
     return current_caref
+
+
+def update_ca_from_import(existing_ca, cert, cert_pem, cert_info, *, key_pem=None, encrypted_prv=None, name=None):
+    """Apply an imported CA certificate to its existing record; returns whether the stored key was unbound.
+
+    The stored key is checked before anything is changed; raises ImportConflict
+    when it cannot be (HSM unreachable, key unreadable). The caller commits.
+    """
+    from services.ca_service import CAService
+    from utils.cert_issuer import stored_private_key_matches, hsm_key_binding_matches
+    # An HSM lookup may commit its public key cache, so the key is decided before the record is touched
+    key_dropped = False
+    if key_pem:
+        # The new certificate's key arrived with it: it replaces whatever the record held
+        pass
+    elif existing_ca.hsm_key_id:
+        # Unreachable HSM key: left untouched rather than kept or dropped on a guess
+        bound = hsm_key_binding_matches(existing_ca.hsm_key_id, cert)
+        if bound is None:
+            raise ImportConflict('Cannot verify the HSM key bound to this CA against the new '
+                                 'certificate; the HSM key is unreachable')
+        key_dropped = bound is False
+    elif existing_ca.prv:
+        # A re-keyed certificate imported without its key would leave a pair that signs nothing verifiable
+        matches = stored_private_key_matches(existing_ca.prv, cert, context=f"CA {existing_ca.id}")
+        if matches is None:
+            raise ImportConflict('Cannot verify the stored private key against the new '
+                                 'certificate; the stored key could not be read')
+        key_dropped = matches is False
+
+    old_serial = stored_certificate_serial(existing_ca)
+    existing_ca.descr = name or cert_info['cn'] or existing_ca.descr
+    existing_ca.crt = base64.b64encode(cert_pem).decode('utf-8')
+    if key_pem:
+        existing_ca.prv = encrypted_prv
+        existing_ca.hsm_key_id = None
+    elif key_dropped:
+        existing_ca.prv = None
+        existing_ca.hsm_key_id = None
+    existing_ca.issuer = cert_info['issuer']
+    existing_ca.valid_from = cert_info['valid_from']
+    existing_ca.valid_to = cert_info['valid_to']
+    existing_ca.ski = cert_info.get('ski')
+    if old_serial is not None and old_serial != cert.serial_number:
+        # Revocation is per certificate (RFC 5280): the new one is not the revoked one
+        existing_ca.revoked = False
+        existing_ca.revoked_at = None
+        existing_ca.revoke_reason = None
+        existing_ca.invalidity_at = None
+    existing_ca.serial_number = str(cert.serial_number)
+    existing_ca.caref = relink_parent_caref(cert, existing_ca.caref, exclude_ca_id=existing_ca.id)
+    existing_ca.path_length = path_length_of(cert)
+    # Deleted after its revocation and imported again, or renewed into a serial its parent revoked (#343)
+    CAService.apply_persisted_revocation(existing_ca)
+    return key_dropped
 
 
 def _issuer_identity(cert, parents_by_name):
@@ -364,7 +445,52 @@ def _same_issuer(stored_cert, cert, parents_by_name):
     return stored_id[1] == new_id[1]
 
 
-def _select_existing(candidates, cert, kind):
+def _signed_by_held_ca(cert):
+    """None when UCM holds no CA named as *cert*'s issuer, else whether one of them signed it."""
+    from models import CA
+    from utils.cert_issuer import certificate_signed_by
+    held = [ca for ca in CA.query.filter(CA.subject == cert.issuer.rfc4514_string()).all() if ca.crt]
+    if not held:
+        return None
+    for ca in held:
+        try:
+            if certificate_signed_by(cert, x509.load_pem_x509_certificate(base64.b64decode(ca.crt))):
+                return True
+        except Exception:
+            continue
+    return False
+
+
+def _would_replace_valid_certificate(stored, new, any_validity=False):
+    """Of one key (the caller checked): a self-signed certificate replaced by another is a
+    cross-certificate, and so is any other with *any_validity* (explicit attach or refuse).
+    Otherwise two unexpired certificates are one when their issuers' names differ, or when a
+    held CA of that name exists and none of them signed the new one (another hierarchy's
+    homonym); the same name with an unknown or held new key is a root rollover."""
+    if is_self_signed(new):
+        return False
+    if is_self_signed(stored) or any_validity:
+        return True
+    now = datetime.now(timezone.utc)
+    if stored.not_valid_after_utc <= now or new.not_valid_after_utc <= now:
+        return False
+    return stored.issuer != new.issuer or _signed_by_held_ca(new) is False
+
+
+def refused_as_cross_certificate(record, stored, new, replace_cross=False, any_validity=False):
+    """Whether installing *new* over *record*'s *stored* certificate is refused as a
+    cross-certificate. ``replace_cross`` lets an intermediate be overwritten, a revoked
+    ancestor (not a looping chain) makes the old certificate not worth keeping."""
+    if not _would_replace_valid_certificate(stored, new, any_validity):
+        return False
+    if is_self_signed(stored):
+        return True
+    if replace_cross:
+        return False
+    return any_validity or getattr(record, 'chain_revocation', None) != 'revoked'
+
+
+def _select_existing(candidates, cert, kind, replace_cross=False, any_validity=False):
     """Among *candidates*, the records sharing the certificate's names, the
     one the certificate belongs to; None when there is none (#347 review).
 
@@ -409,11 +535,13 @@ def _select_existing(candidates, cert, kind):
             f"does not tell them apart; the record to update cannot be determined")
     if len(same_key) == 1:
         stored_cert, _ = _record_identity(same_key[0])
-        if stored_cert is not None and is_self_signed(stored_cert) and not is_self_signed(cert):
+        if kind == 'CA' and stored_cert is not None and refused_as_cross_certificate(
+                same_key[0], stored_cert, cert, replace_cross, any_validity):
             raise CrossCertificateImport(
-                f"This certificate is a cross-certificate of the self-signed {kind} "
-                f"'{getattr(same_key[0], 'descr', '')}' (same subject and key, another issuer); "
-                f"importing it would replace that {kind}'s own certificate, so it is refused")
+                f"This certificate re-certifies the key of the {kind} "
+                f"'{getattr(same_key[0], 'descr', '')}' under another issuer "
+                f"(a cross-certificate); importing it would replace the certificate that record "
+                f"holds, so it is refused", record=same_key[0])
         return same_key[0]
     if same_key:
         raise AmbiguousImportTarget(
@@ -432,7 +560,7 @@ def _select_existing(candidates, cert, kind):
         f"certificate's key; the record to update cannot be determined")
 
 
-def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=None):
+def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=None, replace_cross=False):
     """Install *cert_pem* on a CA waiting for its certificate, or holding an
     outstanding renewal request, through the same path as the dedicated
     upload (key match, validity, chain to the issuer, activation, the
@@ -448,7 +576,8 @@ def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=No
     from services.webhook_service import emit_ca_updated
     if encrypted_prv and not ca.prv and not ca.hsm_key_id:
         ca.prv = encrypted_prv
-    ca, warnings, superseded = CAService.complete_external_ca(ca, cert_pem, username=username)
+    ca, warnings, superseded = CAService.complete_external_ca(
+        ca, cert_pem, username=username, replace_cross=replace_cross)
     if name and name != ca.descr:
         ca.descr = name
         db.session.commit()
@@ -458,15 +587,50 @@ def install_on_pending_ca(ca, cert_pem, username, *, encrypted_prv=None, name=No
     return ca_dict, warnings, superseded
 
 
-def find_existing_ca(cert_info, cert):
+def find_existing_ca(cert_info, cert, replace_cross=False, any_validity=False):
     """
     The existing CA record *cert* belongs to, by subject, or None.
     Raises AmbiguousImportTarget when several CAs share the subject and
-    the certificate's key does not single one out.
+    the certificate's key does not single one out; CrossCertificateImport
+    when it would overwrite a certificate that is valid (``replace_cross``
+    allows that for an intermediate, never for a self-signed root).
     """
     from models import CA
     candidates = CA.query.filter_by(subject=cert_info['subject']).order_by(CA.id).all()
-    return _select_existing(candidates, cert, 'CA')
+    return _select_existing(candidates, cert, 'CA', replace_cross=replace_cross, any_validity=any_validity)
+
+
+CROSS_MODES = ('auto', 'attach', 'replace', 'refuse')
+
+
+def cross_mode_from(value):
+    """The requested cross_mode, 'auto' when absent, None when unknown."""
+    mode = (value or 'auto').strip().lower() if isinstance(value, str) or value is None else None
+    return mode if mode in CROSS_MODES else None
+
+
+def find_existing_ca_for_import(cert_info, cert, cross_mode='auto', username='system'):
+    """``(existing, attached)``: find_existing_ca, with a cross-certificate handled by *cross_mode*.
+
+    ``auto`` attaches it to a self-signed root and refuses on an intermediate; ``attach``
+    attaches on either; ``replace`` lets an intermediate be overwritten; ``refuse`` never
+    touches the record. *attached* is ``(row, warnings)`` once the certificate was stored
+    as a cross-certificate of *existing*; the caller commits."""
+    try:
+        return find_existing_ca(cert_info, cert, replace_cross=cross_mode == 'replace',
+                                any_validity=cross_mode in ('refuse', 'attach')), None
+    except CrossCertificateImport as e:
+        record = e.record
+        if cross_mode in ('refuse', 'replace') or record is None:
+            raise
+        stored = _record_identity(record)[0]
+        if cross_mode == 'auto' and not (stored is not None and is_self_signed(stored)):
+            raise
+        from services.ca import cross_certs
+        try:
+            return record, cross_certs.attach_certificate(record, cert, username, commit=False)
+        except cross_certs.CrossCertError as err:
+            raise ImportConflict(err.message) from err
 
 
 def find_existing_certificate(cert_info, cert):
@@ -537,3 +701,13 @@ def serialize_key_to_pem(private_key):
     if not private_key:
         return None
     return private_key_to_pem(private_key)
+
+
+def finish_cross_attach(ca, attached, username):
+    """Commit a cross-certificate attached by an import and announce it; returns the response data."""
+    from models import db
+    from services.ca import cross_certs
+    row, warnings = attached
+    db.session.commit()
+    cross_certs.announce(ca, 'attached', row, username)
+    return {**ca.to_dict(), 'cross_certificate': row.to_dict(), 'warnings': warnings}

@@ -671,7 +671,8 @@
       "scanNetwork": "Scansiona rete",
       "generateReport": "Genera rapporto"
     },
-    "expiresInDays": "Scade tra {{count}} giorni"
+    "expiresInDays": "Scade tra {{count}} giorni",
+    "chainRepairSameKey": "chiavi condivise, certificati distinti (certificato incrociato?)"
   },
   "certificates": {
     "createCertificate": "Crea certificato",
@@ -4042,7 +4043,11 @@
     "typePrivateKey": "Chiave privata",
     "verifiedTrustStore": "Trust Store",
     "linkedToCA": "CA gestita",
-    "trustAnchor": "Ancora di fiducia"
+    "trustAnchor": "Ancora di fiducia",
+    "crossAttached_one": "{{count}} certificato incrociato associato a una CA già presente",
+    "crossAttached_other": "{{count}} certificati incrociati associati a CA già presenti",
+    "crossSkipped_one": "{{count}} certificato incrociato escluso; la CA autofirmata viene mantenuta",
+    "crossSkipped_other": "{{count}} certificati incrociati esclusi; le CA autofirmate vengono mantenute"
   },
   "webhooks": {
     "eventLabels": {
@@ -4261,7 +4266,8 @@
       "csr": "Firma CSR",
       "renewal": "Rinnovo",
       "revocation": "Revoca",
-      "ca_revocation": "Revoca CA"
+      "ca_revocation": "Revoca CA",
+      "cross_revocation": "Revoca di certificato incrociato"
     },
     "revocationPerformed": "Approvata: la revoca è stata eseguita",
     "summarySerial": "Numero di serie",
@@ -5699,5 +5705,67 @@
     "linesOpt": "{{count}} righe",
     "filters": "Filtri",
     "exclude": "Escludi"
+  },
+  "crossCerts": {
+    "title": "Certificati incrociati",
+    "none": "Nessun certificato incrociato. Associane uno emesso da un'altra CA per questa chiave, oppure firmane uno da una CA presente in UCM.",
+    "issuedBy": "Emesso da {{issuer}}",
+    "served": "Servito",
+    "state": {
+      "revoked": "Revocato",
+      "expired": "Scaduto",
+      "notYetValid": "Non ancora valido"
+    },
+    "serve": "Servi",
+    "stopServing": "Smetti di servire",
+    "servedNow": "Questo certificato incrociato è ora servito nella catena predefinita",
+    "unserved": "Questo certificato incrociato non è più servito",
+    "updateFailed": "Impossibile aggiornare il certificato incrociato",
+    "attach": "Associa",
+    "attachTitle": "Associa un certificato incrociato",
+    "attachHint": "Incolla o scegli un certificato che riporta il soggetto e la chiave di questa CA ed è emesso da un'altra CA. Il certificato della CA viene mantenuto.",
+    "serveNow": "Servilo nella catena predefinita",
+    "attached": "Certificato incrociato associato",
+    "attachFailed": "Impossibile associare il certificato incrociato",
+    "attachAsCross": "Associa come certificato incrociato",
+    "offerHint": "Questo certificato è un altro certificato della chiave di questa CA. Associalo accanto al certificato della CA invece di sostituirlo.",
+    "replaceCurrent": "Sostituisci",
+    "replaceHint": "Sostituisci installa questo certificato al posto di quello attuale della CA: questa CA non userà più il certificato attuale.",
+    "sign": "Firma incrociata",
+    "signTitle": "Firma incrociata di questa CA",
+    "signHint": "Firma la chiave di {{name}} con un'altra CA presente in UCM. Il risultato viene memorizzato qui come certificato incrociato.",
+    "signIssuer": "CA firmataria",
+    "selectIssuer": "Seleziona una CA",
+    "signValidity": "Validità (giorni)",
+    "signed": "Certificato incrociato emesso",
+    "signFailed": "Firma incrociata non riuscita",
+    "detach": "Dissocia",
+    "detachConfirm": "Dissociare il certificato incrociato emesso da {{issuer}}? Il certificato viene rimosso da UCM.",
+    "detached": "Certificato incrociato dissociato",
+    "badge": "Firmata in modo incrociato",
+    "findings_one": "{{count}} rilevamento sui certificati incrociati",
+    "findings_other": "{{count}} rilevamenti sui certificati incrociati",
+    "findingsNote": "Una root autofirmata sovrascritta o eliminata non viene recuperata qui: ripristinala da un backup, oppure fornisci il suo certificato a Ripristina come principale.",
+    "findingShadowed": "{{name}} contiene il certificato incrociato di {{root}}",
+    "findingSameKey": "Più certificati condividono la chiave di {{subject}}",
+    "convertToCross": "Converti in certificato incrociato",
+    "convertConfirm": "Trasformare {{name}} in un certificato incrociato di {{root}}? Le sue CA figlie e i certificati emessi passano a {{root}} e il record duplicato viene eliminato.",
+    "converted": "Il duplicato è stato convertito in certificato incrociato",
+    "convertFailed": "Impossibile convertire il duplicato",
+    "restorePrimary": "Ripristina come principale",
+    "restorePrimaryOn": "Ripristina su {{name}}",
+    "restoreHint": "Fornisci il certificato autofirmato della chiave di questa CA. Il certificato attualmente nel record viene mantenuto come certificato incrociato.",
+    "restored": "Certificato autofirmato ripristinato",
+    "restoreFailed": "Impossibile ripristinare il certificato autofirmato"
+  },
+  "chainVariant": {
+    "label": "Catena da presentare",
+    "auto": "Predefinita (la catena servita da UCM)",
+    "primary": "Root autofirmata",
+    "cross": "Certificato incrociato di {{name}} da {{issuer}}",
+    "served": "servito",
+    "notServable": "revocato, scaduto o non ancora valido",
+    "exportHint": "Un certificato incrociato permette ai client che si fidano di un'altra root di costruire un percorso verso questa CA.",
+    "deployHint": "La catena scritta nel file della catena completa. Un certificato incrociato revocato, scaduto o non ancora valido non viene mai inviato."
   }
 }

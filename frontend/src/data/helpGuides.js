@@ -146,7 +146,7 @@ Import existing CA certificates via:
 
 When importing without a private key, the CA can verify certificates but cannot sign new ones.
 
-A cross-certificate of a self-signed root already in UCM (same subject and key, another issuer) is refused, at import and when uploaded after **Renew via CSR**: installing it would replace the root's own certificate.
+A certificate that carries the subject and key of a CA already in UCM, under another issuer, is a cross-certificate and never replaces the CA's own certificate. On a self-signed root it is attached as a cross-certificate. On an intermediate, and when uploaded after **Renew via CSR**, the import is refused (409) and offers **Attach as cross certificate** or **Replace**; a root rollover (same issuer name, new key) replaces the certificate as a renewal does. Smart Import attaches one found next to a held root and lists it in the result; one it cannot attach is left out and reported as skipped.
 
 ## Exporting a CA
 
@@ -155,7 +155,25 @@ Export formats:
 - **DER**: Binary format
 - **PKCS#12 (P12/PFX)**: Certificate + private key + chain, password-protected
 
+When a cross-certificate offers another path, the export dialog shows **Chain to present**: the default chain UCM serves, the self-signed root, or a cross-certificate.
+
 > 💡 PKCS#12 export includes the full certificate chain and is ideal for backup.
+
+## Cross-certificates
+
+A cross-certificate carries a CA's subject and key under the signature of another CA. Clients that trust only the other root build a path to your CA through it, which is how a root is renewed or migrated without breaking them. It sits beside the CA's own certificate, which is never replaced. A CA that carries one shows a **Cross-signed** badge.
+
+In the CA details, **Cross certificates** lists them:
+- **Attach**: paste or pick a certificate issued by another CA for this CA's key (PEM or DER). Name or policy constraints it carries are reported.
+- **Cross-sign**: sign this CA's key with another CA held in UCM; choose the validity and the path length.
+- **Serve / Stop serving**: at most one per CA is served, in the default chain of TLS, PKCS#12, ACME, WSTEP, TSA and deployments, and by the AIA \`.cer\` and \`.pem\` URLs. A revoked, expired or not yet valid one is kept and exportable but never served.
+- **Export** and **Detach**.
+
+Exports and deploy bindings can pin another chain (**Chain to present** / **Chain variant**). The ACME server offers the other chains as alternates, selected by a client with \`--preferred-chain\`. Changes reach clients after the next issuance or deployment, and after the 24 hour cache of the AIA URLs.
+
+### Repairing damaged records
+
+A bar under the CA statistics lists records an older import left behind: a duplicate record holding the cross-certificate of a root that is also held (**Convert to cross-certificate** moves its children and certificates to the root and deletes the duplicate), or a key shared by distinct certificates with no self-signed record (**Restore as primary** takes the self-signed certificate). Nothing is changed without a click. A self-signed root that was overwritten or deleted only comes back from a backup or through **Restore as primary**.
 
 ## Private Keys
 

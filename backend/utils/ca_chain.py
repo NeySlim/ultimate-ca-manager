@@ -20,7 +20,24 @@ hierarchy deeper than that is refused at issuance, so no chain this walk can
 legitimately meet is longer.
 """
 
+import base64
+from typing import NamedTuple
+from utils.datetime_utils import utc_isoformat
+
 MAX_CHAIN_DEPTH = 64
+PRIMARY = 'primary'
+AUTO = 'auto'
+
+
+class ChainVariantError(ValueError):
+    """A chain variant id that is malformed or not part of the chain asked for."""
+
+
+class ChainLink(NamedTuple):
+    """One certificate of a chain: the CA it belongs to, the cross-certificate row if it is one, its PEM."""
+    ca: object
+    cross: object
+    pem: bytes
 
 
 def walk_ca_chain(start, *, include_start=True, max_depth=MAX_CHAIN_DEPTH,
@@ -88,4 +105,115 @@ def walk_ca_chain(start, *, include_start=True, max_depth=MAX_CHAIN_DEPTH,
         ca = parent
 
 
-__all__ = ['MAX_CHAIN_DEPTH', 'walk_ca_chain']
+def parse_variant(value):
+    """``'auto'``, ``'primary'`` or ``('cross', id)``; ChainVariantError for anything else."""
+    if value is None or value == '':
+        return AUTO
+    if isinstance(value, str):
+        if value in (AUTO, PRIMARY):
+            return value
+        head, _, tail = value.partition(':')
+        if head == 'cross' and tail.isascii() and tail.isdigit():
+            return ('cross', int(tail))
+    raise ChainVariantError('Unknown chain variant: use auto, primary or cross:<id>')
+
+
+def _cross_for(ca, wanted):
+    """The cross-certificate of *ca* that variant *wanted* substitutes for it, or None."""
+    from services.ca import cross_certs
+    if wanted == PRIMARY:
+        return None
+    if wanted == AUTO:
+        return cross_certs.served_for(ca)
+    return next((row for row in ca.cross_certificates if row.id == wanted[1]), None)
+
+
+def _issuer_pem(ca):
+    return base64.b64decode(ca.crt) if ca.crt else b''
+
+
+def issuer_chain(start, variant=AUTO, include_root=True, include_start=True, substitute_start=True):
+    """The certificates presenting *start*'s chain, nearest first, as ``ChainLink`` entries.
+
+    At most one CA's certificate is replaced by a cross-certificate of the same key; the
+    chain then continues with the cross-certificate's issuer when it is held, else ends.
+    ``auto`` replaces the CA nearest *start* that serves a valid cross-certificate;
+    ``cross:<id>`` replaces its CA whatever the state of that row (it is the caller's explicit choice).
+    ``substitute_start=False`` keeps *start*'s own certificate and applies the rule to the CAs above it.
+    """
+    from services.ca.cross_certs import issuer_of
+    from models import CA
+
+    wanted = parse_variant(variant)
+    links, seen, substituted, ca = [], set(), False, start
+    while ca is not None and len(seen) < MAX_CHAIN_DEPTH and ca.refid not in seen:
+        seen.add(ca.refid)
+        row = None if substituted or (ca is start and not substitute_start) else _cross_for(ca, wanted)
+        if row is not None:
+            substituted = True
+            nxt = issuer_of(row)
+            pem = base64.b64decode(row.crt)
+        else:
+            nxt = CA.query.filter_by(refid=ca.caref).first() if ca.caref else None
+            pem = _issuer_pem(ca)
+        if pem and (include_start or ca is not start):
+            links.append(ChainLink(ca, row, pem))
+        ca = nxt
+    if wanted not in (AUTO, PRIMARY) and not substituted:
+        raise ChainVariantError(f'Chain variant cross:{wanted[1]} is not part of this chain')
+    if not include_root and links:
+        from cryptography import x509
+        from utils.cert_issuer import is_self_signed
+        try:
+            if is_self_signed(x509.load_pem_x509_certificate(links[-1].pem)):
+                links.pop()
+        except Exception:
+            pass
+    return links
+
+
+def anchor_chain(start):
+    """The primary chain of *start* followed by the served cross-certificate of each of its CAs.
+
+    For bags of trust anchors (EST ``/cacerts``): a cross-certificate is added, never substituted."""
+    from services.ca import cross_certs
+    links = issuer_chain(start, PRIMARY)
+    extra = []
+    for link in links:
+        row = cross_certs.served_for(link.ca)
+        if row is not None:
+            extra.append(ChainLink(link.ca, row, base64.b64decode(row.crt)))
+    return links + extra
+
+
+def chain_variants(start, substitute_start=True):
+    """Every chain *start* can present: ``primary`` plus one per cross-certificate on its path.
+
+    Each entry: ``id`` (``primary`` / ``cross:<id>``), ``ca_id``, ``cross_certificate_id``,
+    ``served``, ``servable`` and ``default`` (the one ``auto`` resolves to), plus ``ca_name``, and
+    ``issuer`` and ``valid_to`` of a cross-certificate.
+    ``substitute_start=False`` marks the default of an export, which keeps *start*'s own certificate."""
+    variants = [{'id': PRIMARY, 'ca_id': getattr(start, 'id', None), 'cross_certificate_id': None,
+                 'served': False, 'servable': True, 'default': False,
+                 'ca_name': getattr(start, 'descr', None), 'issuer': None, 'valid_to': None}]
+    for ca in walk_ca_chain(start):
+        for row in ca.cross_certificates:
+            variants.append({'id': f'cross:{row.id}', 'ca_id': ca.id, 'cross_certificate_id': row.id,
+                             'served': bool(row.served), 'servable': row.servable, 'default': False,
+                             'ca_name': ca.descr, 'issuer': row.issuer,
+                             'valid_to': utc_isoformat(row.valid_to)})
+    chosen = next((link.cross.id for link in issuer_chain(start, substitute_start=substitute_start) if link.cross is not None), None)
+    wanted = f'cross:{chosen}' if chosen is not None else PRIMARY
+    for entry in variants:
+        entry['default'] = entry['id'] == wanted
+    return variants
+
+
+def variant_ids(start):
+    """The variant ids valid for *start*, ``auto`` included."""
+    return [AUTO] + [v['id'] for v in chain_variants(start)]
+
+
+__all__ = ['AUTO', 'PRIMARY', 'MAX_CHAIN_DEPTH', 'ChainLink', 'ChainVariantError', 'anchor_chain',
+           'chain_variants',
+           'issuer_chain', 'parse_variant', 'variant_ids', 'walk_ca_chain']

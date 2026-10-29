@@ -50,6 +50,12 @@ export function CAInfoLine({ ca, isMobile, t }) {
           {t('cas.certificateCount', { count: ca.certs || 0 })}
         </span>
       </span>
+      {ca.cross_certificate_count > 0 && (
+        <span className="px-1.5 py-px rounded-full text-2xs font-medium status-primary-bg status-primary-text"
+              data-testid="cross-badge">
+          {t('crossCerts.badge', { count: ca.cross_certificate_count })}
+        </span>
+      )}
       {expiry && (
         <>
           <span className="text-border">·</span>

@@ -671,7 +671,8 @@
       "scanNetwork": "ネットワークスキャン",
       "generateReport": "レポートを生成"
     },
-    "expiresInDays": "{{count}} 日後に期限切れ"
+    "expiresInDays": "{{count}} 日後に期限切れ",
+    "chainRepairSameKey": "鍵が共通で証明書が異なる（クロス証明書？）"
   },
   "certificates": {
     "createCertificate": "証明書を作成",
@@ -4045,7 +4046,11 @@
     "typePrivateKey": "秘密鍵",
     "verifiedTrustStore": "トラストストア",
     "linkedToCA": "管理対象CA",
-    "trustAnchor": "トラストアンカー"
+    "trustAnchor": "トラストアンカー",
+    "crossAttached_one": "{{count}} 件のクロス証明書を管理対象の CA に紐付けました",
+    "crossAttached_other": "{{count}} 件のクロス証明書を管理対象の CA に紐付けました",
+    "crossSkipped_one": "{{count}} 件のクロス証明書を除外しました。自己署名 CA はそのまま保持されます",
+    "crossSkipped_other": "{{count}} 件のクロス証明書を除外しました。自己署名 CA はそのまま保持されます"
   },
   "webhooks": {
     "eventLabels": {
@@ -4264,7 +4269,8 @@
       "csr": "CSR 署名",
       "renewal": "更新",
       "revocation": "失効",
-      "ca_revocation": "CA の失効"
+      "ca_revocation": "CA の失効",
+      "cross_revocation": "クロス証明書の失効"
     },
     "revocationPerformed": "承認済み: 失効が実行されました",
     "summarySerial": "シリアル番号",
@@ -5702,5 +5708,67 @@
     "linesOpt": "{{count}} 行",
     "filters": "フィルター",
     "exclude": "除外"
+  },
+  "crossCerts": {
+    "title": "クロス証明書",
+    "none": "クロス証明書はありません。この鍵に対して別の CA が発行した証明書を紐付けるか、UCM で管理している CA から署名してください。",
+    "issuedBy": "発行者: {{issuer}}",
+    "served": "配信中",
+    "state": {
+      "revoked": "失効済み",
+      "expired": "期限切れ",
+      "notYetValid": "有効期間前"
+    },
+    "serve": "配信する",
+    "stopServing": "配信を停止",
+    "servedNow": "このクロス証明書をデフォルトのチェーンで配信するようになりました",
+    "unserved": "このクロス証明書は配信されなくなりました",
+    "updateFailed": "クロス証明書を更新できませんでした",
+    "attach": "紐付け",
+    "attachTitle": "クロス証明書を紐付け",
+    "attachHint": "この CA のサブジェクトと鍵を持ち、別の CA が発行した証明書を貼り付けるか選択してください。CA 自身の証明書は保持されます。",
+    "serveNow": "デフォルトのチェーンで配信する",
+    "attached": "クロス証明書を紐付けました",
+    "attachFailed": "クロス証明書を紐付けできませんでした",
+    "attachAsCross": "クロス証明書として紐付け",
+    "offerHint": "この証明書は、この CA の鍵に対する別の証明書です。CA 自身の証明書を置き換えず、その横に紐付けてください。",
+    "replaceCurrent": "置き換え",
+    "replaceHint": "置き換えると、この証明書が CA の現在の証明書の代わりにインストールされます。この CA は現在の証明書を使用しなくなります。",
+    "sign": "クロス署名",
+    "signTitle": "この CA をクロス署名",
+    "signHint": "{{name}} の鍵を、UCM で管理している別の CA で署名します。結果はクロス証明書としてここに保存されます。",
+    "signIssuer": "署名 CA",
+    "selectIssuer": "CA を選択",
+    "signValidity": "有効期間（日）",
+    "signed": "クロス証明書を発行しました",
+    "signFailed": "クロス署名に失敗しました",
+    "detach": "切り離す",
+    "detachConfirm": "{{issuer}} が発行したクロス証明書を切り離しますか？この証明書は UCM から削除されます。",
+    "detached": "クロス証明書を切り離しました",
+    "badge": "クロス署名済み",
+    "findings_one": "クロス証明書の検出 {{count}} 件",
+    "findings_other": "クロス証明書の検出 {{count}} 件",
+    "findingsNote": "上書きまたは削除された自己署名ルートはここでは復元されません。バックアップから復元するか、その証明書を「プライマリとして復元」に渡してください。",
+    "findingShadowed": "{{name}} は {{root}} のクロス証明書を保持しています",
+    "findingSameKey": "複数の証明書が {{subject}} の鍵を共有しています",
+    "convertToCross": "クロス証明書に変換",
+    "convertConfirm": "{{name}} を {{root}} のクロス証明書に変換しますか？その子 CA と発行済み証明書は {{root}} に移され、重複レコードは削除されます。",
+    "converted": "重複レコードをクロス証明書に変換しました",
+    "convertFailed": "重複レコードを変換できませんでした",
+    "restorePrimary": "プライマリとして復元",
+    "restorePrimaryOn": "{{name}} に復元",
+    "restoreHint": "この CA の鍵に対する自己署名証明書を指定してください。レコードが現在保持している証明書はクロス証明書として保持されます。",
+    "restored": "自己署名証明書を復元しました",
+    "restoreFailed": "自己署名証明書を復元できませんでした"
+  },
+  "chainVariant": {
+    "label": "提示するチェーン",
+    "auto": "デフォルト（UCM が配信するチェーン）",
+    "primary": "自己署名ルート",
+    "cross": "{{name}} のクロス証明書（発行者: {{issuer}}）",
+    "served": "配信中",
+    "notServable": "失効済み、期限切れ、または有効期間前",
+    "exportHint": "クロス証明書により、別のルートを信頼するクライアントもこの CA へのパスを構築できます。",
+    "deployHint": "フルチェーンファイルに書き込まれるチェーンです。失効済み、期限切れ、または有効期間前のクロス証明書は送信されません。"
   }
 }

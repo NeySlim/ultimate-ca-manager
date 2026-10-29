@@ -94,3 +94,195 @@ def test_record_without_certificate_is_not_merged(app):
         db.session.expire_all()
         assert db.session.get(CA, imported).crt
         assert db.session.get(CA, pending) is not None
+
+
+def test_merging_a_duplicate_leaves_no_orphan_rows(app):
+    """CRL, OCSP and pin rows of the deleted record go with it; its issued state moves to the keeper."""
+    from models import CertificateTemplate, CATemplatePin, CRLMetadata, OCSPResponse
+    from models.certificate import Certificate
+    from models.revoked_serial import RevokedSerial
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Orphan Root')
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    with app.app_context():
+        keeper_id = _row(cert, key)
+        dupe_id = _row(cert)
+        keeper, dupe = db.session.get(CA, keeper_id), db.session.get(CA, dupe_id)
+        keeper_refid, dupe_refid = keeper.refid, dupe.refid
+        template = CertificateTemplate(name=f'orphan-{uuid.uuid4().hex[:8]}', template_type='server',
+                                       extensions_template='{}')
+        db.session.add(template)
+        db.session.flush()
+        db.session.add_all([
+            CRLMetadata(ca_id=dupe_id, crl_number=1, this_update=now, next_update=now + timedelta(days=1),
+                        crl_pem='x', crl_der=b'x'),
+            OCSPResponse(ca_id=dupe_id, cert_serial='01', response_der=b'x', status='good',
+                         this_update=now, next_update=now + timedelta(days=1)),
+            CATemplatePin(ca_id=dupe_id, template_id=template.id),
+            RevokedSerial(caref=dupe_refid, serial_number='02', valid_to=now + timedelta(days=30)),
+            Certificate(refid=str(uuid.uuid4()), descr='issued', caref=dupe_refid, crt='', subject='CN=issued',
+                        serial_number='03'),
+        ])
+        db.session.commit()
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        assert db.session.get(CA, dupe_id) is None
+        assert CRLMetadata.query.filter_by(ca_id=dupe_id).count() == 0
+        assert OCSPResponse.query.filter_by(ca_id=dupe_id).count() == 0
+        assert CATemplatePin.query.filter_by(ca_id=dupe_id).count() == 0
+        assert RevokedSerial.query.filter_by(caref=dupe_refid).count() == 0
+        assert RevokedSerial.query.filter_by(caref=keeper_refid, serial_number='02').count() == 1
+        assert Certificate.query.filter_by(descr='issued').one().caref == keeper_refid
+        assert CATemplatePin.query.filter_by(ca_id=keeper_id, template_id=template.id).count() == 1
+
+
+def test_merging_a_duplicate_moves_child_cas_and_crl_rows(app):
+    """caref columns carry no foreign key: children and legacy CRL rows still follow the keeper."""
+    from models.crl_list import CRL
+
+    key, child_key = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Caref Root')
+    with app.app_context():
+        keeper_id = _row(cert, key)
+        dupe_id = _row(cert)
+        dupe_refid = db.session.get(CA, dupe_id).refid
+        keeper_refid = db.session.get(CA, keeper_id).refid
+        child_id = _row(_cert(child_key, 'Caref Child', key, 'Caref Root'), child_key, caref=dupe_refid)
+        db.session.add(CRL(caref=dupe_refid, descr='legacy', text='x'))
+        db.session.commit()
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        assert db.session.get(CA, dupe_id) is None
+        assert db.session.get(CA, child_id).caref == keeper_refid
+        assert CRL.query.filter_by(descr='legacy').one().caref == keeper_refid
+
+
+def test_duplicates_bound_to_the_same_deploy_target_are_merged(app):
+    from models.deploy import CRLDeployBinding, DeployTarget
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Binding Root')
+    with app.app_context():
+        keeper_id = _row(cert, key)
+        dupe_id = _row(cert)
+        target = DeployTarget(name=f'bind-{uuid.uuid4().hex[:8]}', host='h', username='u', private_key='k')
+        db.session.add(target)
+        db.session.flush()
+        db.session.add_all([CRLDeployBinding(target_id=target.id, ca_id=i, crl_path=f'/c{i}.crl')
+                            for i in (keeper_id, dupe_id)])
+        db.session.commit()
+
+        stats = backfill_ski_aki()
+
+        db.session.expire_all()
+        assert db.session.get(CA, dupe_id) is None
+        assert stats['deduplicated'] >= 1
+        assert CRLDeployBinding.query.filter_by(target_id=target.id).count() == 1
+
+
+def test_merge_carries_the_duplicates_crl_numbers_to_the_keeper(app):
+    """CRL numbers stay monotonic for a CA key: the keeper continues after the duplicate's last one."""
+    from models import CRLMetadata
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Crl Number Root')
+    now = datetime.now(timezone.utc).replace(tzinfo=None)
+    with app.app_context():
+        keeper_id = _row(cert, key)
+        dupe_id = _row(cert)
+        db.session.add(CRLMetadata(ca_id=dupe_id, crl_number=12, this_update=now,
+                                   next_update=now + timedelta(days=1), crl_pem='x', crl_der=b'x'))
+        db.session.commit()
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        assert db.session.get(CA, dupe_id) is None
+        assert [m.crl_number for m in CRLMetadata.query.filter_by(ca_id=keeper_id)] == [12]
+
+
+def test_merge_keeps_a_single_served_cross_certificate(app):
+    """The duplicate's served cross-certificate moves unserved when the keeper already serves one."""
+    from models.ca_cross_certificate import CACrossCertificate
+
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Served Root')
+    with app.app_context():
+        keeper_id = _row(cert, key)
+        dupe_id = _row(cert)
+        ids = {}
+        for owner, label in ((keeper_id, 'keeper'), (dupe_id, 'dupe')):
+            row = CACrossCertificate(ca_id=owner, crt='x', fingerprint_sha256=uuid.uuid4().hex * 2, served=True)
+            db.session.add(row)
+            db.session.flush()
+            ids[label] = row.id
+        db.session.commit()
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        rows = CACrossCertificate.query.filter_by(ca_id=keeper_id).order_by(CACrossCertificate.id).all()
+        assert sorted(r.id for r in rows) == sorted(ids.values())
+        assert [r.id for r in rows if r.served] == [ids['keeper']]
+        CACrossCertificate.query.filter(CACrossCertificate.id.in_(ids.values())).delete()
+        db.session.commit()
+
+
+def test_a_dupe_keeps_its_served_cross_when_the_keepers_is_no_longer_usable(app):
+    from datetime import timedelta as td
+    from models.ca_cross_certificate import CACrossCertificate
+    from utils.datetime_utils import utc_now
+    key, other = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Served Dupe Root')
+    with app.app_context():
+        keeper_id, dupe_id = _row(cert, key), _row(cert)
+
+        def cross(ca_id, fingerprint, **flags):
+            row = CACrossCertificate(ca_id=ca_id, crt='x', fingerprint_sha256=fingerprint, served=True,
+                                     valid_from=utc_now() - td(days=1), valid_to=utc_now() + td(days=30), **flags)
+            db.session.add(row)
+            db.session.commit()
+            return row.id
+
+        dead = cross(keeper_id, uuid.uuid4().hex * 2, revoked=True)
+        live = cross(dupe_id, uuid.uuid4().hex * 2)
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        row = db.session.get(CACrossCertificate, live)
+        assert row.ca_id == keeper_id and row.served is True
+        # One served row per CA: the keeper's unusable one gives way
+        assert db.session.get(CACrossCertificate, dead).served is False
+        CACrossCertificate.query.filter(CACrossCertificate.id.in_((dead, live))).delete()
+        db.session.commit()
+
+
+def test_two_unusable_served_rows_leave_one_served(app):
+    """Not yet valid on both sides: both become servable later, so only one may stay served."""
+    from datetime import timedelta as td
+    from models.ca_cross_certificate import CACrossCertificate
+    from utils.datetime_utils import utc_now
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Future Served Root')
+    with app.app_context():
+        keeper_id, dupe_id = _row(cert, key), _row(cert)
+        ids = []
+        for owner in (keeper_id, dupe_id):
+            row = CACrossCertificate(ca_id=owner, crt='x', fingerprint_sha256=uuid.uuid4().hex * 2, served=True,
+                                     valid_from=utc_now() + td(days=1), valid_to=utc_now() + td(days=30))
+            db.session.add(row)
+            db.session.commit()
+            ids.append(row.id)
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        served = [r.id for r in CACrossCertificate.query.filter(CACrossCertificate.id.in_(ids)) if r.served]
+        assert served == [ids[0]]
+        CACrossCertificate.query.filter(CACrossCertificate.id.in_(ids)).delete()
+        db.session.commit()

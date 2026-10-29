@@ -1,11 +1,12 @@
-"""Importing a cross-certificate no longer overwrites the self-signed root.
+"""Importing a cross-certificate never overwrites a valid certificate silently (#400).
 
-The cross-certificate of root B by root A shares B's subject and key, so the
-import matched it to B and replaced B's own certificate, parent and validity
-with A's (#400). Until cross-certificates can be attached, it is refused.
+The cross-certificate of root B by root A shares B's subject and key. It is
+attached to the self-signed root (cross_mode=auto), refused on request, and on
+an intermediate the choice between attach and replace is the caller's.
 """
 import base64
 import json
+import uuid
 from datetime import datetime, timedelta, timezone
 
 import pytest
@@ -41,7 +42,7 @@ def _import(auth_client, path, cert):
 
 @pytest.fixture
 def roots(auth_client, request):
-    tag = request.node.name[-24:]
+    tag = uuid.uuid4().hex[:12]
     key_a, key_b = ec.generate_private_key(ec.SECP256R1()), ec.generate_private_key(ec.SECP256R1())
     root_a, root_b = _cert(key_a, f'XRoot A {tag}'), _cert(key_b, f'XRoot B {tag}')
     for cert in (root_a, root_b):
@@ -52,17 +53,39 @@ def roots(auth_client, request):
 
 
 @pytest.mark.parametrize('path', ['/api/v2/cas/import', '/api/v2/certificates/import'])
-def test_cross_certificate_does_not_replace_the_root(app, auth_client, roots, path):
+def test_cross_certificate_is_attached_to_the_root_not_replacing_it(app, auth_client, roots, path):
     root_b, cross, _ = roots
     r = _import(auth_client, path, cross)
-    assert r.status_code == 409, r.data
-    assert b'cross-certificate' in r.data
+    assert r.status_code == 201, r.data
+    assert json.loads(r.data)['data']['cross_certificate']['served'] is False
     with app.app_context():
         rows = CA.query.filter(CA.subject == root_b.subject.rfc4514_string()).all()
         assert len(rows) == 1
         stored = x509.load_pem_x509_certificate(base64.b64decode(rows[0].crt))
         assert stored.serial_number == root_b.serial_number
         assert rows[0].caref is None
+        assert [x.serial_number for x in rows[0].cross_certificates] == [str(cross.serial_number)]
+
+
+@pytest.mark.parametrize('path', ['/api/v2/cas/import', '/api/v2/certificates/import'])
+@pytest.mark.parametrize('mode', ['refuse', 'replace'])
+def test_root_is_kept_when_refusing_or_replacing(app, auth_client, roots, path, mode):
+    root_b, cross, _ = roots
+    r = auth_client.post(path, data={'pem_content': _pem(cross), 'cross_mode': mode},
+                         content_type='multipart/form-data')
+    assert r.status_code == 409, r.data
+    assert json.loads(r.data)['details']['code'] == 'cross_certificate_detected'
+    with app.app_context():
+        rows = CA.query.filter(CA.subject == root_b.subject.rfc4514_string()).all()
+        assert len(rows) == 1 and not rows[0].cross_certificates
+        assert x509.load_pem_x509_certificate(base64.b64decode(rows[0].crt)).serial_number == root_b.serial_number
+
+
+def test_unknown_cross_mode_is_a_400(auth_client, roots):
+    _, cross, _ = roots
+    r = auth_client.post('/api/v2/cas/import', data={'pem_content': _pem(cross), 'cross_mode': 'nope'},
+                         content_type='multipart/form-data')
+    assert r.status_code == 400
 
 
 def test_reissued_self_signed_root_still_updates_its_record(app, auth_client, roots):
@@ -89,8 +112,141 @@ def test_cross_signed_renewal_csr_does_not_replace_the_root(app, auth_client, cr
         before = db.session.get(CA, root['id']).crt
     r = auth_client.post(f"/api/v2/cas/{root['id']}/certificate", data=json.dumps({'pem_content': cross}),
                          content_type='application/json')
-    assert r.status_code in (400, 409), r.data
-    assert b'cross-certificate' in r.data
+    assert r.status_code == 409, r.data
+    assert json.loads(r.data)['details']['code'] == 'cross_certificate_detected'
     with app.app_context():
         ca = db.session.get(CA, root['id'])
         assert ca.crt == before and ca.caref is None
+
+
+def test_refusal_carries_the_cross_certificate_code(auth_client, roots):
+    _, cross, _ = roots
+    r = auth_client.post('/api/v2/cas/import', data={'pem_content': _pem(cross), 'cross_mode': 'refuse'},
+                         content_type='multipart/form-data')
+    assert r.status_code == 409
+    assert json.loads(r.data)['details']['code'] == 'cross_certificate_detected'
+
+
+class TestIntermediateReissuedByAnotherIssuer:
+    """An intermediate re-certified under a different issuer while both are valid is ambiguous (#400)."""
+
+    @staticmethod
+    def _setup(auth_client, *, stored_expired=False, new_expired=False):
+        from tests.fixtures.cross_pki import build_cross_pki, make_cert, pem
+        from datetime import datetime, timedelta, timezone
+        pki = build_cross_pki()
+        for root in (pki.root_a, pki.root_b):
+            r = auth_client.post('/api/v2/cas/import', data={'pem_content': pem(root)},
+                                 content_type='multipart/form-data')
+            assert r.status_code in (200, 201), r.data
+        name = f'Cross Int {pki.tag}'
+        key = ec.generate_private_key(ec.SECP256R1())
+        if stored_expired:
+            now = datetime.now(timezone.utc)
+            stored = make_cert(name, key, pki.name_b, pki.key_b, days=-1, not_before=now - timedelta(days=30))
+        else:
+            stored = make_cert(name, key, pki.name_b, pki.key_b, days=200)
+        r = auth_client.post('/api/v2/cas/import', data={'pem_content': pem(stored)},
+                             content_type='multipart/form-data')
+        assert r.status_code in (200, 201), r.data
+        if new_expired:
+            now = datetime.now(timezone.utc)
+            again = make_cert(name, key, pki.name_a, pki.key_a, days=-1, not_before=now - timedelta(days=30))
+        else:
+            again = make_cert(name, key, pki.name_a, pki.key_a, days=300)
+        return pki, name, stored, again
+
+    def test_refused_while_both_are_valid_offering_attach_and_replace(self, app, auth_client):
+        _, name, stored, again = self._setup(auth_client)
+        r = _import(auth_client, '/api/v2/cas/import', again)
+        assert r.status_code == 409, r.data
+        details = json.loads(r.data)['details']
+        assert details['code'] == 'cross_certificate_detected'
+        assert details['options'] == ['attach', 'replace']
+        with app.app_context():
+            row = CA.query.filter(CA.descr == name).one()
+            assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == stored.serial_number
+
+    def test_attach_keeps_the_stored_certificate(self, app, auth_client):
+        _, name, stored, again = self._setup(auth_client)
+        r = auth_client.post('/api/v2/cas/import', data={'pem_content': _pem(again), 'cross_mode': 'attach'},
+                             content_type='multipart/form-data')
+        assert r.status_code == 201, r.data
+        with app.app_context():
+            row = CA.query.filter(CA.descr == name).one()
+            assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == stored.serial_number
+            assert [x.serial_number for x in row.cross_certificates] == [str(again.serial_number)]
+
+    def test_replace_overwrites_the_intermediate_on_request(self, app, auth_client):
+        pki, name, _, again = self._setup(auth_client)
+        r = auth_client.post('/api/v2/cas/import', data={'pem_content': _pem(again), 'cross_mode': 'replace'},
+                             content_type='multipart/form-data')
+        assert r.status_code in (200, 201), r.data
+        with app.app_context():
+            row = CA.query.filter(CA.descr == name).one()
+            assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == again.serial_number
+            assert not row.cross_certificates
+
+    def test_accepted_once_the_stored_one_has_expired(self, app, auth_client):
+        pki, name, _, again = self._setup(auth_client, stored_expired=True)
+        r = _import(auth_client, '/api/v2/cas/import', again)
+        assert r.status_code in (200, 201), r.data
+        with app.app_context():
+            row = CA.query.filter(CA.descr == name).one()
+            assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == again.serial_number
+            assert row.caref == CA.query.filter(CA.descr == pki.name_a).one().refid
+
+    @pytest.mark.parametrize('mode', ['refuse', 'attach'])
+    def test_an_expired_cross_certificate_never_overwrites_a_valid_intermediate(self, app, auth_client, mode):
+        _, name, stored, expired = self._setup(auth_client, new_expired=True)
+        r = auth_client.post('/api/v2/cas/import', data={'pem_content': _pem(expired), 'cross_mode': mode},
+                             content_type='multipart/form-data')
+        assert r.status_code in (201, 409), r.data
+        with app.app_context():
+            row = CA.query.filter(CA.descr == name).one()
+            assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == stored.serial_number
+
+    def test_renewal_under_the_same_issuer_still_updates(self, app, auth_client):
+        from tests.fixtures.cross_pki import make_cert
+        pki, name, _, _ = self._setup(auth_client)
+        key = ec.generate_private_key(ec.SECP256R1())
+        first = make_cert(f'{name} same', key, pki.name_b, pki.key_b, days=100)
+        renewed = make_cert(f'{name} same', key, pki.name_b, pki.key_b, days=400)
+        for cert in (first, renewed):
+            r = _import(auth_client, '/api/v2/cas/import', cert)
+            assert r.status_code in (200, 201), r.data
+        with app.app_context():
+            row = CA.query.filter(CA.descr == f'{name} same').one()
+            assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == renewed.serial_number
+
+
+
+def test_expired_self_signed_root_is_not_replaced_by_a_cross_certificate_either(app, auth_client):
+    from datetime import datetime, timedelta, timezone
+    from tests.fixtures.cross_pki import build_cross_pki, make_cert, pem
+    pki = build_cross_pki()
+    expired = make_cert(pki.name_b, pki.key_b, days=-1, not_before=datetime.now(timezone.utc) - timedelta(days=30))
+    for cert in (pki.root_a, expired):
+        r = auth_client.post('/api/v2/cas/import', data={'pem_content': pem(cert)}, content_type='multipart/form-data')
+        assert r.status_code in (200, 201), r.data
+    r = _import(auth_client, '/api/v2/cas/import', pki.cross_b)
+    assert r.status_code == 201, r.data
+    with app.app_context():
+        row = CA.query.filter(CA.descr == pki.name_b).one()
+        assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == expired.serial_number
+
+
+@pytest.mark.parametrize('path', ['/api/v2/cas/import', '/api/v2/certificates/import'])
+def test_self_signed_root_replaces_a_stored_cross_certificate(app, auth_client, path):
+    """The recovery from an older overwrite: the root's own PEM becomes the record's certificate again."""
+    from tests.fixtures.cross_pki import build_cross_pki, pem
+    pki = build_cross_pki()
+    for cert in (pki.root_a, pki.cross_b):
+        r = auth_client.post('/api/v2/cas/import', data={'pem_content': pem(cert)}, content_type='multipart/form-data')
+        assert r.status_code in (200, 201), r.data
+    r = _import(auth_client, path, pki.root_b)
+    assert r.status_code in (200, 201), r.data
+    with app.app_context():
+        row = CA.query.filter(CA.descr == pki.name_b).one()
+        assert x509.load_pem_x509_certificate(base64.b64decode(row.crt)).serial_number == pki.root_b.serial_number
+        assert row.caref is None

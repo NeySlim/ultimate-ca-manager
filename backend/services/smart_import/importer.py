@@ -24,7 +24,7 @@ from fips_mode import FipsRestricted
 from utils.trusted_proxy import client_ip
 from models import db, Certificate, CA, AuditLog
 from .parser import ParsedObject, ObjectType, SmartParser
-from .chain_builder import ChainBuilder, ChainInfo
+from .chain_builder import ChainBuilder, ChainInfo, find_ca_by_ski
 from security.encryption import encrypt_private_key
 
 
@@ -37,6 +37,18 @@ from .validator import ImportValidator, ValidationResult
 from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
+
+
+def _stored_cert(ca):
+    try:
+        return x509.load_pem_x509_certificate(base64.b64decode(ca.crt), default_backend())
+    except Exception:
+        return None
+
+
+def _spki_der(cert):
+    return cert.public_key().public_bytes(serialization.Encoding.DER,
+                                          serialization.PublicFormat.SubjectPublicKeyInfo)
 
 
 def _is_ca_import_target(obj: ParsedObject) -> bool:
@@ -59,6 +71,7 @@ class ImportResult:
     csrs_imported: int = 0
     errors: List[str] = field(default_factory=list)
     warnings: List[str] = field(default_factory=list)
+    warning_details: List[Dict] = field(default_factory=list)
     imported_ids: Dict[str, List[int]] = field(default_factory=lambda: {
         "certificates": [],
         "cas": [],
@@ -74,6 +87,7 @@ class ImportResult:
             "csrs_imported": self.csrs_imported,
             "errors": self.errors,
             "warnings": self.warnings,
+            "warning_details": self.warning_details,
             "imported_ids": self.imported_ids
         }
 
@@ -117,6 +131,7 @@ class SmartImporter:
         self.matcher = KeyMatcher()
         self.validator = ImportValidator()
         self._pending_audit = []
+        self._attached_cross = []
     
     def analyze(self, content: str | bytes, password: Optional[str] = None) -> AnalysisResult:
         """
@@ -203,6 +218,7 @@ class SmartImporter:
         
         result = ImportResult()
         self._pending_audit = []
+        self._attached_cross = []
 
         try:
             # Parse
@@ -228,6 +244,9 @@ class SmartImporter:
 
             self._stage_audit()
             db.session.commit()
+            from services.ca import cross_certs
+            for target, row in self._attached_cross:
+                cross_certs.announce(target, 'attached', row, username)
 
             # Fire certificate.imported for each successfully imported certificate
             # (CAs live in a separate table and have their own ca.created event)
@@ -266,19 +285,44 @@ class SmartImporter:
         # Get all CAs from objects
         ca_objects = [o for o in objects if o.type == ObjectType.CERTIFICATE and _is_ca_import_target(o)]
         
-        # Sort by chain depth (roots first)
-        ca_objects.sort(key=lambda o: o.chain_depth, reverse=True)
-        
+        # Self-signed roots first, then the deepest chain position
+        ca_objects.sort(key=lambda o: (o.is_self_signed, o.chain_depth), reverse=True)
+
         # Map old subject to new refid for parent linking
         subject_to_refid: Dict[str, str] = {}
         ski_to_refid: Dict[str, str] = {}
-        
+        bundle_roots = [o for o in ca_objects if o.is_self_signed and o.ski]
+
         for ca_obj in ca_objects:
+            counterpart = self._cross_counterpart(ca_obj, bundle_roots)
+            if counterpart is not None:
+                cn = self._get_cn(ca_obj.subject)
+                refid = counterpart or subject_to_refid.get(ca_obj.subject)
+                attached = self._attach_cross(refid, ca_obj, username)
+                if attached is True:
+                    result.warnings.append(
+                        f"Attached cross-certificate: {cn} issued by {self._get_cn(ca_obj.issuer)} "
+                        f"(the self-signed {cn} is kept)")
+                    result.warning_details.append({
+                        'code': 'cross_certificate_attached', 'subject': ca_obj.subject, 'issuer': ca_obj.issuer})
+                else:
+                    result.warnings.append(
+                        f"Skipped cross-certificate: {cn} issued by {self._get_cn(ca_obj.issuer)} "
+                        f"(the self-signed {cn} is kept{'; ' + attached if attached else ''})")
+                    result.warning_details.append({
+                        'code': 'cross_certificate_skipped', 'subject': ca_obj.subject, 'issuer': ca_obj.issuer})
+                if counterpart:
+                    subject_to_refid.setdefault(ca_obj.subject, counterpart)
+                continue
+
             # Check duplicate by SKI first, then (serial_number, issuer) + fingerprint (#85)
             if skip_duplicates:
                 existing = None
                 if ca_obj.ski:
-                    existing = CA.query.filter_by(ski=ca_obj.ski).first()
+                    same_ski = CA.query.filter_by(ski=ca_obj.ski).order_by(CA.id).all()
+                    existing = next((c for c in same_ski if self._is_self_signed_record(c)), None)
+                    if existing is None and not ca_obj.is_self_signed and same_ski:
+                        existing = same_ski[0]
                 if not existing and ca_obj.serial_number:
                     from services.smart_import.validator import find_existing_cert_by_identity
                     existing = find_existing_cert_by_identity(
@@ -290,14 +334,14 @@ class SmartImporter:
                     if existing.ski:
                         ski_to_refid[existing.ski] = existing.refid
                     continue
-            
+
             # Find parent CA: AKI→SKI first, then issuer DN fallback
             caref = None
             if not ca_obj.is_self_signed:
                 if ca_obj.aki:
                     caref = ski_to_refid.get(ca_obj.aki)
                     if not caref:
-                        parent = CA.query.filter_by(ski=ca_obj.aki).first()
+                        parent = find_ca_by_ski(ca_obj.aki)
                         if parent:
                             caref = parent.refid
                 if not caref:
@@ -349,6 +393,47 @@ class SmartImporter:
             # Audit log
             self._log_audit("import_ca", ca.id, ca.descr, username)
     
+    @staticmethod
+    def _is_self_signed_record(ca) -> bool:
+        cert = _stored_cert(ca)
+        return cert is not None and cert.subject == cert.issuer
+
+    def _attach_cross(self, refid, ca_obj, username):
+        """True once *ca_obj* is attached to the CA *refid*; else the reason it was not ('' if unknown)."""
+        from services.ca import cross_certs
+        target = CA.query.filter_by(refid=refid).first() if refid else None
+        if target is None:
+            return ''
+        try:
+            cert = x509.load_pem_x509_certificate(ca_obj.raw_pem.encode(), default_backend())
+            row, _ = cross_certs.attach_certificate(target, cert, username, commit=False)
+        except cross_certs.CrossCertError as e:
+            return e.message
+        self._attached_cross.append((target, row))
+        return True
+
+    def _cross_counterpart(self, ca_obj: ParsedObject, bundle_roots: List[ParsedObject]) -> Optional[str]:
+        """Refid (or '') of the self-signed CA whose key *ca_obj* cross-certifies, else None.
+
+        Looked up in the bundle's own roots, then among stored CAs sharing the SKI.
+        """
+        if ca_obj.is_self_signed or not ca_obj.ski:
+            return None
+        try:
+            mine = x509.load_pem_x509_certificate(ca_obj.raw_pem.encode(), default_backend())
+            wanted = _spki_der(mine)
+            for root in bundle_roots:
+                if root.ski == ca_obj.ski and root.subject == ca_obj.subject and _spki_der(
+                        x509.load_pem_x509_certificate(root.raw_pem.encode(), default_backend())) == wanted:
+                    return ''
+            for stored in CA.query.filter_by(ski=ca_obj.ski).order_by(CA.id).all():
+                cert = _stored_cert(stored)
+                if cert is not None and cert.subject == cert.issuer and _spki_der(cert) == wanted:
+                    return stored.refid
+        except Exception:
+            return None
+        return None
+
     def _import_certificates(
         self,
         objects: List[ParsedObject],
@@ -378,7 +463,7 @@ class SmartImporter:
             # Find issuing CA: AKI→SKI first, then issuer DN fallback
             caref = None
             if cert_obj.aki:
-                ca = CA.query.filter_by(ski=cert_obj.aki).first()
+                ca = find_ca_by_ski(cert_obj.aki)
                 if ca:
                     caref = ca.refid
             if not caref:

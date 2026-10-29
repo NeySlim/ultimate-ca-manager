@@ -117,8 +117,24 @@ def export_section(section_name: str, index: IdentityIndex) -> List[Dict[str, An
             data[f'{column}{REFERENCE_SUFFIX}'] = index.of(
                 target, getattr(row, attribute_of.get(column, column), None))
 
+        if section_name == 'deploy_bindings':
+            data[CHAIN_VARIANT_FINGERPRINT] = _pinned_cross_fingerprint(row.chain_variant)
+
         rows.append(data)
     return rows
+
+
+CHAIN_VARIANT_FINGERPRINT = 'chain_variant_fingerprint'
+
+
+def _pinned_cross_fingerprint(chain_variant):
+    """Fingerprint of the cross-certificate a binding is pinned to; its id is renumbered on restore."""
+    kind, _, ident = (chain_variant or '').partition(':')
+    if kind != 'cross' or not ident.isdigit():
+        return None
+    from models.ca_cross_certificate import CACrossCertificate
+    row = CACrossCertificate.query.get(int(ident))
+    return row.fingerprint_sha256 if row else None
 
 
 def _label(section_name: str, row, section: Section) -> str:

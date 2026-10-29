@@ -42,6 +42,7 @@ class RestorePlan:
         self.target_ids: Dict[str, Dict[Tuple, Any]] = {}
         self.rows: Dict[str, List[Dict[str, Any]]] = {}
         self.warnings: List[str] = []
+        self.chain_variant_fallbacks: List[str] = []
         # Archived rows by the identity they carry, built once per section it
         # is asked for: a reference is resolved for every row of every section
         # that declares one, and walking the archive again each time would

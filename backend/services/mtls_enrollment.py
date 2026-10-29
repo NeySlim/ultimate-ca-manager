@@ -79,7 +79,8 @@ def issuing_ca_for(cert: x509.Certificate) -> Optional[CA]:
     of the server's CAs, so such a certificate could never authenticate.
     """
     issuer_dn = cert.issuer.rfc4514_string()
-    for ca in CA.query.filter(CA.subject == issuer_dn).all():
+    from utils.cert_issuer import self_signed_first
+    for ca in self_signed_first(CA.query.filter(CA.subject == issuer_dn).order_by(CA.id).all()):
         ca_cert = _load(base64.b64decode(ca.crt)) if ca.crt else None
         if ca_cert is None:
             continue

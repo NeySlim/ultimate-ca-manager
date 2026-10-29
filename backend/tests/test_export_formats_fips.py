@@ -173,17 +173,14 @@ def test_converter_pkcs12_stays_in_fips_mode(fips_on, auth_client, app, material
 
 # Service helpers no route calls today: they share the same encryption choice.
 def _service_exports(material):
-    from services.ca.ca_service import CAService
     from services.cert.service import CertificateService
     return {
         'certificate-service': lambda legacy: CertificateService.export_certificate_with_options(
             material['cert'], 'pkcs12', password=PASSWORD, legacy=legacy),
-        'ca-service': lambda legacy: CAService.export_ca_with_options(
-            material['ca'], 'pkcs12', password=PASSWORD, legacy=legacy),
     }
 
 
-@pytest.mark.parametrize('site', ['certificate-service', 'ca-service'])
+@pytest.mark.parametrize('site', ['certificate-service'])
 def test_service_layer_refuses_legacy_in_fips_mode(site, fips_on, app, material):
     with app.app_context():
         export = _service_exports(material)[site]

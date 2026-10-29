@@ -17,6 +17,7 @@ import { Modal } from './Modal'
 import { apiClient as api } from '../services'
 import { useNotification } from '../contexts/NotificationContext'
 import { formatDate } from '../lib/utils'
+import { crossSummary } from '../lib/importResult'
 
 // Supported file formats
 const SUPPORTED_FORMATS = {
@@ -187,6 +188,90 @@ function ValidationIssues({ validation }) {
           <CheckCircle size={16} className="shrink-0 mt-0.5" /><span>{inf}</span>
         </div>
       ))}
+    </div>
+  )
+}
+
+// Result of an import: what was created, cross-certificates attached or left out, warnings, errors
+export function ImportResultStep({ importResult, onReset, onDone }) {
+  const { t } = useTranslation()
+
+  // Backend returns: csrs_imported, certificates_imported, cas_imported, imported_ids, errors, warnings
+  const totalImported = (importResult?.csrs_imported || 0) + 
+                       (importResult?.certificates_imported || 0) + 
+                       (importResult?.cas_imported || 0)
+  const errors = importResult?.errors || []
+  const warnings = importResult?.warnings || []
+  const cross = crossSummary(importResult)
+  const importedIds = importResult?.imported_ids || {}
+  
+  return (
+    <div className="space-y-4">
+      <div className="text-center py-6">
+        {totalImported > 0 || cross.attached > 0 ? (
+          <>
+            <CheckCircle size={48} className="text-status-success mx-auto mb-3" weight="fill" />
+            <h3 className="text-lg font-medium">{t('import.importComplete')}</h3>
+            {totalImported > 0 && (
+              <p className="text-sm text-text-secondary">{t('import.successImported', { count: totalImported })}</p>
+            )}
+          </>
+        ) : (
+          <>
+            <WarningCircle size={48} className="text-status-warning mx-auto mb-3" />
+            <h3 className="text-lg font-medium">{t('import.noObjectsImported')}</h3>
+            <p className="text-sm text-text-secondary">{errors.length > 0 ? errors[0] : t('import.allSkipped')}</p>
+          </>
+        )}
+      </div>
+      
+      {/* Show what was imported */}
+      {(totalImported > 0 || cross.attached > 0) && (
+        <div className="space-y-1">
+          <h4 className="text-sm font-medium text-status-success">{t('common.imported')}:</h4>
+          {importResult?.csrs_imported > 0 && (
+            <div className="text-sm pl-4">✓ {importResult.csrs_imported} CSR{importResult.csrs_imported > 1 ? 's' : ''}</div>
+          )}
+          {importResult?.certificates_imported > 0 && (
+            <div className="text-sm pl-4">✓ {importResult.certificates_imported} {t('common.certificate')}{importResult.certificates_imported > 1 ? 's' : ''}</div>
+          )}
+          {importResult?.cas_imported > 0 && (
+            <div className="text-sm pl-4">✓ {importResult.cas_imported} CA{importResult.cas_imported > 1 ? 's' : ''}</div>
+          )}
+          {cross.attached > 0 && (
+            <div className="text-sm pl-4" data-testid="cross-attached">✓ {t('import.crossAttached', { count: cross.attached })}</div>
+          )}
+          {importResult?.keys_matched > 0 && (
+            <div className="text-sm pl-4 text-text-secondary">🔑 {importResult.keys_matched} {t('import.privateKeysMatched')}</div>
+          )}
+        </div>
+      )}
+      
+      {cross.skipped > 0 && (
+        <div className="text-sm pl-4 text-status-warning" data-testid="cross-skipped">
+          {t('import.crossSkipped', { count: cross.skipped })}
+        </div>
+      )}
+
+      {warnings.length > 0 && (
+        <div className="space-y-1">
+          <h4 className="text-sm font-medium text-status-warning">{t('common.warnings')}:</h4>
+          {warnings.map((w, i) => <div key={i} className="text-sm pl-4">⚠ {w}</div>)}
+        </div>
+      )}
+      
+      {errors.length > 0 && (
+        <div className="space-y-1">
+          <h4 className="text-sm font-medium text-status-danger">{t('common.errors')}:</h4>
+          {errors.map((e, i) => <div key={i} className="text-sm pl-4">✗ {e}</div>)}
+        </div>
+      )}
+      
+      {/* Actions */}
+      <div className="flex justify-end gap-2 pt-4">
+        <Button type="button" variant="secondary" onClick={onReset}>{t('import.importMore')}</Button>
+        <Button type="button" onClick={onDone}>{t('common.done')}</Button>
+      </div>
     </div>
   )
 }
@@ -648,75 +733,13 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
     </div>
   )
   
-  // Render result step
-  const renderResultStep = () => {
-    // Backend returns: csrs_imported, certificates_imported, cas_imported, imported_ids, errors, warnings
-    const totalImported = (importResult?.csrs_imported || 0) + 
-                         (importResult?.certificates_imported || 0) + 
-                         (importResult?.cas_imported || 0)
-    const errors = importResult?.errors || []
-    const warnings = importResult?.warnings || []
-    const importedIds = importResult?.imported_ids || {}
-    
-    return (
-      <div className="space-y-4">
-        <div className="text-center py-6">
-          {totalImported > 0 ? (
-            <>
-              <CheckCircle size={48} className="text-status-success mx-auto mb-3" weight="fill" />
-              <h3 className="text-lg font-medium">{t('import.importComplete')}</h3>
-              <p className="text-sm text-text-secondary">{t('import.successImported', { count: totalImported })}</p>
-            </>
-          ) : (
-            <>
-              <WarningCircle size={48} className="text-status-warning mx-auto mb-3" />
-              <h3 className="text-lg font-medium">{t('import.noObjectsImported')}</h3>
-              <p className="text-sm text-text-secondary">{errors.length > 0 ? errors[0] : t('import.allSkipped')}</p>
-            </>
-          )}
-        </div>
-        
-        {/* Show what was imported */}
-        {totalImported > 0 && (
-          <div className="space-y-1">
-            <h4 className="text-sm font-medium text-status-success">{t('common.imported')}:</h4>
-            {importResult?.csrs_imported > 0 && (
-              <div className="text-sm pl-4">✓ {importResult.csrs_imported} CSR{importResult.csrs_imported > 1 ? 's' : ''}</div>
-            )}
-            {importResult?.certificates_imported > 0 && (
-              <div className="text-sm pl-4">✓ {importResult.certificates_imported} {t('common.certificate')}{importResult.certificates_imported > 1 ? 's' : ''}</div>
-            )}
-            {importResult?.cas_imported > 0 && (
-              <div className="text-sm pl-4">✓ {importResult.cas_imported} CA{importResult.cas_imported > 1 ? 's' : ''}</div>
-            )}
-            {importResult?.keys_matched > 0 && (
-              <div className="text-sm pl-4 text-text-secondary">🔑 {importResult.keys_matched} {t('import.privateKeysMatched')}</div>
-            )}
-          </div>
-        )}
-        
-        {warnings.length > 0 && (
-          <div className="space-y-1">
-            <h4 className="text-sm font-medium text-status-warning">{t('common.warnings')}:</h4>
-            {warnings.map((w, i) => <div key={i} className="text-sm pl-4">⚠ {w}</div>)}
-          </div>
-        )}
-        
-        {errors.length > 0 && (
-          <div className="space-y-1">
-            <h4 className="text-sm font-medium text-status-danger">{t('common.errors')}:</h4>
-            {errors.map((e, i) => <div key={i} className="text-sm pl-4">✗ {e}</div>)}
-          </div>
-        )}
-        
-        {/* Actions */}
-        <div className="flex justify-end gap-2 pt-4">
-          <Button type="button" variant="secondary" onClick={reset}>{t('import.importMore')}</Button>
-          <Button type="button" onClick={() => { onImportComplete?.(importResult); }}>{t('common.done')}</Button>
-        </div>
-      </div>
-    )
-  }
+  const renderResultStep = () => (
+    <ImportResultStep
+      importResult={importResult}
+      onReset={reset}
+      onDone={() => onImportComplete?.(importResult)}
+    />
+  )
   
   return (
     <div className={compact ? '' : 'space-y-4'}>

@@ -15,8 +15,23 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Users: an administrator lists another user's API keys in their details and revokes a leaked or unused one, which stops working at once; a revoked or expired key can then be deleted. Each action is audited.
 
+- CAs: a CA can carry cross-certificates (same subject and key, another issuer) beside its own certificate: attach one, serve it in the default chain, export it, or cross-sign a held CA's key with another from the CA details; revoking one at its issuer is done through the API. Its expiry raises the usual alerts and its revocation follows the approval policies (#400).
+
+- Chains: exports, deployments, TLS, PKCS#12, ACME, WSTEP and TSA use one chain builder that follows the served cross-certificate; `chain_variant` (`auto`, `primary`, `cross:<id>`) picks another chain on CA and certificate exports and on a deploy binding, and EST `/cacerts` adds the served cross-certificates (#400).
+
+- ACME: the server offers the other chains of an order as RFC 8555 §7.4.2 alternates for `certbot --preferred-chain`. AIA serves `/ca/{ref}.p7c` and `/ca/{ref}/cross/{id}.cer`, and `.cer` and `.pem` follow the served cross-certificate (#400).
+
+- Import: a certificate that re-certifies a held CA's key is attached as a cross-certificate on a self-signed root, and on an intermediate after the **Attach as cross certificate** choice (`cross_mode`). Smart Import attaches one next to a held root and reports `cross_certificate_attached` (#400).
+
+- CAs: the chain repair bar lists records damaged before cross-certificates were modelled, with **Convert to cross-certificate** and **Restore as primary**; nothing is changed without a click (#400).
+
 ### Fixed
 
+- Import: a CA certificate re-issued by another CA over the same key overwrote the self-signed root and re-parented it. An intermediate in that case now answers 409 `cross_certificate_detected`, and so does installing it after **Renew via CSR**, with **Attach as cross certificate** and **Replace** offered; a root rollover under the same issuer name still replaces the certificate (#400).
+- Smart Import: a cross-certificate in a bundle replaced the self-signed root or was dropped under a generic duplicate warning depending on file order. The root is kept and the result reports `cross_certificate_attached` or `cross_certificate_skipped` (#400).
+- CAs: the hourly chain repair deleted a self-signed root when a second record shared its key. It now merges only identical certificates and reports the rest (#400).
+- ACME client: `preferred_chain` matched the subject or issuer of the last certificate and preferred an alternate, so a cross-certificate could win a request for the other root. It now follows certbot: the issuer CN of the topmost certificate, default chain first (#400).
+- OCSP, mTLS and renewal resolved a CA through whichever record shared its key, so a cross-certificate could stand in for the self-signed root. They now prefer the self-signed record (#400).
 - DEB and RPM: an upgrade stopped UCM while it rebuilt the Python environment, about five minutes with `UCM_FIPS_BUILD=1`. The new environment is now built next to the running one, and the service stops only to switch to it.
 - UI: 17 badges asked for a size that does not exist and rendered without padding, and a few for a colour that does not exist (About, SSO tests, Smart Import, failed webhook deliveries, ACME order status). They now use defined ones, and a test refuses an unknown size or colour.
 - UI: a stat card clicked to filter a list (Certificates, SSH and user certificates, Policies, Discovery, Approvals) showed no active state on desktop, so nothing said which filters were on. Active cards are outlined again.

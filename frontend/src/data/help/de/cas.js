@@ -42,6 +42,19 @@ export default {
         ]
       },
       {
+        title: 'Cross-Zertifikate',
+        content: 'Ein Cross-Zertifikat trägt Subject und Schlüssel einer CA unter einem anderen Aussteller, sodass Clients, die nur dieser anderen Root vertrauen, trotzdem einen Pfad aufbauen können. Es liegt neben dem eigenen Zertifikat der CA und ersetzt es nie.',
+        items: [
+          { label: 'Wo', text: 'CA-Details › Cross-Zertifikate; eine CA mit Cross-Zertifikat zeigt ein Badge Cross-signiert' },
+          { label: 'Anhängen', text: 'Ein Zertifikat (PEM oder DER) einfügen oder auswählen, das eine andere CA für den Schlüssel dieser CA ausgestellt hat; enthaltene Name- oder Policy-Constraints werden gemeldet' },
+          { label: 'Cross-signieren', text: 'Den Schlüssel dieser CA mit einer anderen in UCM vorhandenen CA signieren, mit Gültigkeit und Pfadlänge' },
+          { label: 'Ausliefern', text: 'Höchstens eines pro CA wird in der Standardkette ausgeliefert (TLS, PKCS#12, ACME, WSTEP, TSA, Deployments, AIA .cer und .pem). Ein widerrufenes, abgelaufenes oder noch nicht gültiges wird nie ausgeliefert' },
+          { label: 'Zu präsentierende Kette', text: 'Exporte und Deploy-Bindungen können die Standardkette, die selbstsignierte Root oder ein Cross-Zertifikat festlegen. ACME bietet die anderen Ketten als Alternativen an (certbot --preferred-chain)' },
+          { label: 'Import', text: 'Ein Zertifikat über dem Schlüssel einer vorhandenen CA wird an eine selbstsignierte Root angehängt; bei einer Intermediate bietet der Fehler 409 „Als Cross-Zertifikat anhängen“ oder „Ersetzen“ an. Smart Import hängt es neben einer vorhandenen Root an oder meldet es als übersprungen' },
+          { label: 'Reparatur', text: 'Die Leiste unter den Statistiken listet Einträge, die ein älterer Import beschädigt hat: In Cross-Zertifikat umwandeln (erfordert delete:cas) und Als primär wiederherstellen. Nichts läuft automatisch' },
+        ]
+      },
+      {
         title: 'HSM-gesicherte CAs',
         items: [
           { label: 'Schlüsselspeicher', text: 'Bei der CA-Erstellung Lokal (in DB verschlüsselt) oder HSM wählen' },
@@ -84,7 +97,8 @@ export default {
       'Das Löschen einer CA widerruft NICHT die von ihr ausgestellten Zertifikate: widerrufen Sie diese zuerst',
       'Private Schlüssel werden verschlüsselt gespeichert; der Verlust der Datenbank bedeutet den Verlust der Schlüssel',
       'Offline-Modus-Passwörter sind NICHT wiederherstellbar: bewahren Sie sie vor der Bestätigung in Ihrem Passwortmanager / Vault auf',
-      'Ein Cross-Zertifikat einer selbstsignierten Root (gleiches Subject und gleicher Schlüssel, anderer Aussteller) wird abgelehnt, beim Import und beim Hochladen nach „Über CSR erneuern": Es würde das eigene Zertifikat der Root ersetzen',
+      'Ein Cross-Zertifikat ersetzt nie das eigene Zertifikat einer CA: Eine Intermediate, die unter einem anderen Aussteller neu zertifiziert würde, wird abgelehnt (409), es sei denn, Sie hängen sie als Cross-Zertifikat an oder ersetzen das aktuelle Zertifikat; eine Root-Ablösung unter demselben Ausstellernamen ersetzt es',
+      'Eine überschriebene oder gelöschte selbstsignierte Root wird durch „In Cross-Zertifikat umwandeln“ nicht wiederhergestellt: Stellen Sie sie aus einer Sicherung wieder her oder übergeben Sie ihr Zertifikat an „Als primär wiederherstellen“',
     ],
   },
   helpGuides: {
@@ -158,7 +172,7 @@ Importieren Sie vorhandene CA-Zertifikate über:
 
 Beim Import ohne privaten Schlüssel kann die CA Zertifikate verifizieren, aber keine neuen signieren.
 
-Ein Cross-Zertifikat einer bereits in UCM vorhandenen selbstsignierten Root (gleiches Subject und gleicher Schlüssel, anderer Aussteller) wird abgelehnt, beim Import und beim Hochladen nach **Über CSR erneuern**: Die Installation würde das eigene Zertifikat der Root ersetzen.
+Ein Zertifikat, das Subject und Schlüssel einer bereits in UCM vorhandenen CA unter einem anderen Aussteller trägt, ist ein Cross-Zertifikat und ersetzt nie das eigene Zertifikat der CA. Bei einer selbstsignierten Root wird es als Cross-Zertifikat angehängt. Bei einer Intermediate und beim Hochladen nach **Über CSR erneuern** wird der Import abgelehnt (409) und bietet **Als Cross-Zertifikat anhängen** oder **Ersetzen** an; eine Root-Ablösung (gleicher Ausstellername, neuer Schlüssel) ersetzt das Zertifikat wie eine Erneuerung. Smart Import hängt ein neben einer vorhandenen Root gefundenes an und listet es im Ergebnis auf; eines, das nicht angehängt werden kann, wird ausgelassen und als übersprungen gemeldet.
 
 ## Eine CA exportieren
 
@@ -167,7 +181,25 @@ Exportformate:
 - **DER**: Binärformat
 - **PKCS#12 (P12/PFX)**: Zertifikat + privater Schlüssel + Kette, passwortgeschützt
 
+Wenn ein Cross-Zertifikat einen anderen Pfad bietet, zeigt der Exportdialog **Zu präsentierende Kette**: die von UCM ausgelieferte Standardkette, die selbstsignierte Root oder ein Cross-Zertifikat.
+
 > 💡 PKCS#12-Export enthält die vollständige Zertifikatskette und ist ideal für Sicherungen.
+
+## Cross-Zertifikate
+
+Ein Cross-Zertifikat trägt Subject und Schlüssel einer CA unter der Signatur einer anderen CA. Clients, die nur der anderen Root vertrauen, bauen darüber einen Pfad zu Ihrer CA auf, so lässt sich eine Root erneuern oder migrieren, ohne sie zu unterbrechen. Es liegt neben dem eigenen Zertifikat der CA, das nie ersetzt wird. Eine CA mit Cross-Zertifikat zeigt ein Badge **Cross-signiert**.
+
+In den CA-Details listet **Cross-Zertifikate** sie auf:
+- **Anhängen**: ein Zertifikat einfügen oder auswählen, das eine andere CA für den Schlüssel dieser CA ausgestellt hat (PEM oder DER). Enthaltene Name- oder Policy-Constraints werden gemeldet.
+- **Cross-signieren**: den Schlüssel dieser CA mit einer anderen in UCM vorhandenen CA signieren; Gültigkeit und Pfadlänge wählen.
+- **Ausliefern / Auslieferung beenden**: höchstens eines pro CA wird ausgeliefert, in der Standardkette von TLS, PKCS#12, ACME, WSTEP, TSA und Deployments sowie über die AIA-URLs \`.cer\` und \`.pem\`. Ein widerrufenes, abgelaufenes oder noch nicht gültiges bleibt erhalten und exportierbar, wird aber nie ausgeliefert.
+- **Exportieren** und **Entfernen**.
+
+Exporte und Deploy-Bindungen können eine andere Kette festlegen (**Zu präsentierende Kette** / **Kettenvariante**). Der ACME-Server bietet die anderen Ketten als Alternativen an, die ein Client mit \`--preferred-chain\` auswählt. Änderungen erreichen Clients nach der nächsten Ausstellung oder dem nächsten Deployment und nach dem 24-Stunden-Cache der AIA-URLs.
+
+### Beschädigte Einträge reparieren
+
+Eine Leiste unter den CA-Statistiken listet Einträge, die ein älterer Import hinterlassen hat: einen doppelten Eintrag mit dem Cross-Zertifikat einer ebenfalls vorhandenen Root (**In Cross-Zertifikat umwandeln** verschiebt seine untergeordneten Elemente und Zertifikate zur Root und löscht das Duplikat) oder einen Schlüssel, den verschiedene Zertifikate ohne selbstsignierten Eintrag teilen (**Als primär wiederherstellen** übernimmt das selbstsignierte Zertifikat). Ohne Klick wird nichts geändert. Eine überschriebene oder gelöschte selbstsignierte Root kommt nur aus einer Sicherung oder über **Als primär wiederherstellen** zurück.
 
 ## Private Schlüssel
 

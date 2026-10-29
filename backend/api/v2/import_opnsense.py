@@ -10,6 +10,7 @@ import requests
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID
+from utils.cert_issuer import stored_private_key_matches
 from flask import Blueprint, request, g
 from auth.unified import require_auth, has_permission
 from models import db, CA, Certificate
@@ -20,6 +21,7 @@ from utils.safe_requests import create_session
 from utils.ssrf_protection import (
     pin_host, validate_url_not_cloud_metadata, validated_addresses)
 from services.audit_service import AuditService
+from services.ca import cross_certs
 
 # Setup logging
 logger = logging.getLogger(__name__)
@@ -63,6 +65,49 @@ def _encoded_private_key(row):
     if row.get('prv_payload'):
         return store_pem_bytes(row['prv_payload'].encode('utf-8'))
     return None
+
+
+def _keep_attached_key(ca, entry, stats):
+    """Store the key an OPNsense cross entry carries (the counterpart's own) under the guards of the key import.
+
+    Returns True when stored; the caller records the audit entry after its commit."""
+    key = _encoded_private_key(entry)
+    if not key:
+        return
+    label = f"Private key of cross-certificate '{entry.get('descr')}' not imported: CA '{ca.descr}'"
+    if ca.offline or ca.hsm_key_id or ca.is_pending:
+        stats['errors'].append(f"{label} is offline, HSM-bound or awaiting its certificate")
+        return
+    try:
+        from cryptography.hazmat.primitives import serialization
+        from cryptography.hazmat.primitives.asymmetric import ed448, ed25519
+        from utils.key_codec import load_pem_bytes
+        private_key = serialization.load_pem_private_key(load_pem_bytes(key), password=None)
+    except Exception:
+        stats['errors'].append(f"{label}: the key could not be read")
+        return
+    if isinstance(private_key, (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)):
+        stats['errors'].append(f"{label}: Ed25519 and Ed448 CA keys are not supported")
+        return
+    cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+    if ca.prv:
+        if stored_private_key_matches(ca.prv, cert) is not True or \
+                stored_private_key_matches(key, cert) is not True:
+            stats['errors'].append(f"{label} already has a different key")
+        return
+    if stored_private_key_matches(key, cert) is not True:
+        stats['errors'].append(f"{label}: the key does not match its certificate")
+        return
+    ca.prv = key
+    return True
+
+
+def _is_self_signed(encoded_crt):
+    try:
+        cert = x509.load_pem_x509_certificate(base64.b64decode(encoded_crt))
+        return cert.subject == cert.issuer
+    except Exception:
+        return False
 
 
 def _parse_cert(encoded_crt):
@@ -533,10 +578,13 @@ def import_items():
         if ca_selected and not has_permission('write:cas', g.permissions):
             return error_response('write:cas permission required to import CAs', 403)
 
-        # Import CAs first so certificate caref links can resolve in the same transaction.
-        for item_id in selected_ids:
-            if item_id not in all_cas:
-                continue
+        # Import CAs first so certificate caref links can resolve in the same transaction;
+        # self-signed ones before their cross-certificates, which attach to them.
+        attached_cross = []
+        keys_stored = []
+        attached_refids = {}
+        for item_id in sorted((i for i in selected_ids if i in all_cas),
+                              key=lambda i: not _is_self_signed(_encoded_cert(all_cas[i]))):
 
             ca_data = all_cas[item_id]
             ca_refid = _refid(ca_data)
@@ -553,6 +601,21 @@ def import_items():
                 stats['cas_skipped'] += 1
                 continue
             
+            # A cross-certificate of a CA already held is attached to it, not stored as a second CA
+            try:
+                attached = cross_certs.attach_to_counterpart(crt, 'import')
+            except cross_certs.CrossCertError as e:
+                stats['cas_skipped'] += 1
+                stats['errors'].append(f"CA '{ca_data.get('descr')}': {e.message}")
+                continue
+            if attached:
+                attached_cross.append(attached)
+                attached_refids[ca_refid] = attached[0].refid
+                stats['cas_cross_attached'] = stats.get('cas_cross_attached', 0) + 1
+                if _keep_attached_key(attached[0], ca_data, stats):
+                    keys_stored.append(attached[0])
+                continue
+
             # Check for duplicate by description (same CA, different refid from OPNsense)
             duplicate_by_name = CA.query.filter_by(
                 descr=ca_data.get('descr'),
@@ -623,6 +686,7 @@ def import_items():
                 
                 cert_info = _parse_cert(crt)
                 caref = cert_data.get('caref') or None
+                caref = attached_refids.get(caref, caref)
                 if caref and not CA.query.filter_by(refid=caref).first():
                     caref = None
                  
@@ -656,6 +720,12 @@ def import_items():
         ok, _err = safe_commit(logger, "Failed to import OPNsense data")
         if not ok:
             return _err
+        for ca, row in attached_cross:
+            cross_certs.announce(ca, 'attached', row, 'import')
+        for ca in keys_stored:
+            AuditService.log_action(action='ca_key_imported', resource_type='ca', resource_id=ca.id,
+                                    resource_name=ca.descr, details=f'Private key imported for CA: {ca.descr}',
+                                    success=True)
         
         AuditService.log_action(
             action='opnsense_import',
@@ -672,6 +742,7 @@ def import_items():
                 "cas": stats['cas_imported'],
                 "certificates": stats['certs_imported']
             },
+            "cross_certificates_attached": stats.get('cas_cross_attached', 0),
             "skipped": stats['cas_skipped'] + stats['certs_skipped'],
             "errors": stats['errors']
         })

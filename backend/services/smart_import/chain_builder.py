@@ -14,7 +14,7 @@ from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes
 from cryptography.exceptions import UnsupportedAlgorithm
-from utils.cert_issuer import UnsupportedIssuerKey, verify_certificate_signature
+from utils.cert_issuer import UnsupportedIssuerKey, find_ca_by_ski, verify_certificate_signature
 
 from .parser import ParsedObject, ObjectType
 
@@ -91,7 +91,8 @@ class ChainBuilder:
             if cert.subject not in subject_map:
                 subject_map[cert.subject] = []
             subject_map[cert.subject].append(cert)
-            if cert.ski:
+            # At equal SKI the self-signed certificate stands for the key, not its cross-certificates
+            if cert.ski and not (cert.ski in ski_map and ski_map[cert.ski].is_self_signed):
                 ski_map[cert.ski] = cert
         
         # Find root CAs (self-signed)
@@ -165,7 +166,8 @@ class ChainBuilder:
                 ]
                 if not issuer_certs:
                     break
-                issuer_cert = next((c for c in issuer_certs if c.is_ca), issuer_certs[0])
+                issuer_cert = next((c for c in issuer_certs if c.is_ca and c.is_self_signed),
+                                   next((c for c in issuer_certs if c.is_ca), issuer_certs[0]))
             
             visited.add(issuer_cert.serial_number)
             
@@ -246,7 +248,7 @@ class ChainBuilder:
         
         # AKI→SKI matching (reliable)
         if cert.aki:
-            ca = CA.query.filter_by(ski=cert.aki).first()
+            ca = find_ca_by_ski(cert.aki)
             if ca:
                 return ca.refid
         

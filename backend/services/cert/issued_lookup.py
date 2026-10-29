@@ -32,11 +32,13 @@ SUPERSEDED = 'superseded'
 
 
 def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
-    """Every row under ``ca`` holding exactly ``cert`` (normally one; a
-    duplicate left by an inconsistent restore still counts)."""
+    """Every row under ``ca``, or under another record of its subject and key,
+    holding exactly ``cert`` (normally one; a duplicate left by an inconsistent
+    restore still counts)."""
+    from utils.cert_issuer import same_key_refids
     presented = cert.public_bytes(Encoding.DER)
     candidates = Certificate.query.filter(
-        Certificate.caref == ca.refid,
+        Certificate.caref.in_(same_key_refids(ca)),
         Certificate.serial_number.in_(serial_variants(cert.serial_number)),
         Certificate.crt.isnot(None),
     ).all()
@@ -52,7 +54,7 @@ def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
 
 
 def find_issued_row(ca: CA, cert: x509.Certificate) -> Optional[Certificate]:
-    """The row under ``ca`` holding exactly ``cert``, or None."""
+    """The row under ``ca`` (or a record of its key) holding exactly ``cert``, or None."""
     rows = find_issued_rows(ca, cert)
     return rows[0] if rows else None
 
@@ -65,8 +67,9 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
     rows = find_issued_rows(ca, cert)
     row = rows[0] if rows else None
     variants = serial_variants(cert.serial_number)
+    from utils.cert_issuer import same_key_refids
     persistent = RevokedSerial.query.filter(
-        RevokedSerial.caref == ca.refid,
+        RevokedSerial.caref.in_(same_key_refids(ca)),
         RevokedSerial.serial_number.in_(variants),
     ).first()
     if row is None:

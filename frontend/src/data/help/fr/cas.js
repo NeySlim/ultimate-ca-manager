@@ -42,6 +42,19 @@ export default {
         ]
       },
       {
+        title: 'Certificats croisés',
+        content: 'Un certificat croisé porte le sujet et la clé d\'une CA sous un autre émetteur : les clients qui ne font confiance qu\'à cette autre racine peuvent ainsi construire un chemin. Il se place à côté du certificat propre de la CA et ne le remplace jamais.',
+        items: [
+          { label: 'Où', text: 'Détails de la CA › Certificats croisés ; une CA qui en porte un affiche un badge Signée en croisé' },
+          { label: 'Rattacher', text: 'Collez ou choisissez un certificat (PEM ou DER) émis par une autre CA pour la clé de cette CA ; les contraintes de noms ou de politique qu\'il porte sont signalées' },
+          { label: 'Signer en croisé', text: 'Signe la clé de cette CA avec une autre CA détenue dans UCM, avec une validité et une longueur de chemin' },
+          { label: 'Servir', text: 'Au plus un par CA est servi dans la chaîne par défaut (TLS, PKCS#12, ACME, WSTEP, TSA, déploiements, AIA .cer et .pem). Un certificat révoqué, expiré ou pas encore valide n\'est jamais servi' },
+          { label: 'Chaîne à présenter', text: 'Les exports et les liaisons de déploiement peuvent imposer la chaîne par défaut, la racine auto-signée ou un certificat croisé. ACME propose les autres chaînes comme alternatives (certbot --preferred-chain)' },
+          { label: 'Import', text: 'Un certificat sur la clé d\'une CA détenue est rattaché à une racine auto-signée ; sur une intermédiaire, le 409 propose Rattacher comme certificat croisé ou Remplacer. L\'import intelligent le rattache à côté d\'une racine détenue ou le signale comme écarté' },
+          { label: 'Réparation', text: 'La barre sous les statistiques liste les enregistrements qu\'un ancien import a abîmés : Convertir en certificat croisé (nécessite delete:cas) et Restaurer comme principal. Rien ne s\'exécute seul' },
+        ]
+      },
+      {
         title: 'CA adossées HSM',
         items: [
           { label: 'Stockage de la clé', text: 'Choisissez Local (chiffré en BD) ou HSM lors de la création de la CA' },
@@ -84,7 +97,8 @@ export default {
       'Supprimer une CA ne révoquera PAS les certificats qu\'elle a émis : révoquez-les d\'abord',
       'Les clés privées sont stockées chiffrées ; perdre la base de données signifie perdre les clés',
       'Les mots de passe du mode hors ligne ne sont PAS récupérables : stockez-les dans votre coffre-fort avant de confirmer',
-      'Un certificat croisé d\'une racine auto-signée (même sujet et même clé, autre émetteur) est refusé, à l\'importation et lors du téléversement après Renouveler via CSR : il remplacerait le certificat propre de la racine',
+      'Un certificat croisé ne remplace jamais le certificat propre d\'une CA : une intermédiaire qui serait re-certifiée sous un autre émetteur est refusée (409) sauf si vous la rattachez comme certificat croisé ou remplacez le certificat actuel ; un roulement de racine sous le même nom d\'émetteur le remplace',
+      'Une racine auto-signée écrasée ou supprimée n\'est pas récupérée par Convertir en certificat croisé : restaurez-la depuis une sauvegarde, ou fournissez son certificat à Restaurer comme principal',
     ],
   },
   helpGuides: {
@@ -159,7 +173,7 @@ Importez des certificats de CA existants via :
 
 Lors de l'importation sans clé privée, la CA peut vérifier les certificats mais ne peut pas en signer de nouveaux.
 
-Un certificat croisé d'une racine auto-signée déjà présente dans UCM (même sujet et même clé, autre émetteur) est refusé, à l'importation et lors du téléversement après **Renouveler via CSR** : l'installer remplacerait le certificat propre de la racine.
+Un certificat qui porte le sujet et la clé d'une CA déjà présente dans UCM, sous un autre émetteur, est un certificat croisé et ne remplace jamais le certificat propre de la CA. Sur une racine auto-signée, il est rattaché comme certificat croisé. Sur une intermédiaire, et lors du téléversement après **Renouveler via CSR**, l'import est refusé (409) et propose **Rattacher comme certificat croisé** ou **Remplacer** ; un roulement de racine (même nom d'émetteur, nouvelle clé) remplace le certificat comme un renouvellement. L'import intelligent rattache celui trouvé à côté d'une racine détenue et le liste dans le résultat ; celui qu'il ne peut pas rattacher est écarté et signalé.
 
 ## Exporter une CA
 
@@ -168,7 +182,25 @@ Formats d'exportation :
 - **DER** : Format binaire
 - **PKCS#12 (P12/PFX)** : Certificat + clé privée + chaîne, protégé par mot de passe
 
+Lorsqu'un certificat croisé offre un autre chemin, la fenêtre d'exportation affiche **Chaîne à présenter** : la chaîne par défaut servie par UCM, la racine auto-signée ou un certificat croisé.
+
 > 💡 L'exportation PKCS#12 inclut la chaîne de certificats complète et est idéale pour la sauvegarde.
+
+## Certificats croisés
+
+Un certificat croisé porte le sujet et la clé d'une CA sous la signature d'une autre CA. Les clients qui ne font confiance qu'à l'autre racine construisent par lui un chemin vers votre CA, ce qui permet de renouveler ou migrer une racine sans les casser. Il se place à côté du certificat propre de la CA, qui n'est jamais remplacé. Une CA qui en porte un affiche un badge **Signée en croisé**.
+
+Dans les détails de la CA, **Certificats croisés** les liste :
+- **Rattacher** : collez ou choisissez un certificat émis par une autre CA pour la clé de cette CA (PEM ou DER). Les contraintes de noms ou de politique qu'il porte sont signalées.
+- **Signer en croisé** : signe la clé de cette CA avec une autre CA détenue dans UCM ; choisissez la validité et la longueur de chemin.
+- **Servir / Ne plus servir** : au plus un par CA est servi, dans la chaîne par défaut de TLS, PKCS#12, ACME, WSTEP, TSA et des déploiements, et par les URL AIA \`.cer\` et \`.pem\`. Un certificat révoqué, expiré ou pas encore valide est conservé et exportable mais jamais servi.
+- **Exporter** et **Détacher**.
+
+Les exports et les liaisons de déploiement peuvent imposer une autre chaîne (**Chaîne à présenter** / **Variante de chaîne**). Le serveur ACME propose les autres chaînes comme alternatives, choisies par un client avec \`--preferred-chain\`. Les changements parviennent aux clients après la prochaine émission ou le prochain déploiement, et après les 24 heures de cache des URL AIA.
+
+### Réparer des enregistrements abîmés
+
+Une barre sous les statistiques des CA liste les enregistrements qu'un ancien import a laissés : un doublon qui détient le certificat croisé d'une racine également détenue (**Convertir en certificat croisé** déplace ses enfants et certificats vers la racine et supprime le doublon), ou une clé partagée par des certificats distincts sans enregistrement auto-signé (**Restaurer comme principal** reprend le certificat auto-signé). Rien n'est modifié sans un clic. Une racine auto-signée écrasée ou supprimée ne revient que depuis une sauvegarde ou par **Restaurer comme principal**.
 
 ## Clés privées
 

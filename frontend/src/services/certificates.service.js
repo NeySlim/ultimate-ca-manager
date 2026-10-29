@@ -45,6 +45,7 @@ export const certificatesService = {
       include_root: options.includeRoot ?? false,
       password: options.password,
       legacy: options.legacy ?? false,
+      ...(options.chainVariant ? { chain_variant: options.chainVariant } : {}),
     }, { responseType: 'blob' })
   },
 

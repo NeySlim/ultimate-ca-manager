@@ -855,6 +855,7 @@ export default function CertificatesPage() {
         hasPrivateKey={!!exportRowCert?.has_private_key}
         canExportKey={canExportKey}
         onExport={handleExportRow}
+        chainVariantsFor={exportRowCert ? { type: 'certificate', id: exportRowCert.id } : undefined}
       />
     </>
   )

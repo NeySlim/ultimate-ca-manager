@@ -87,5 +87,12 @@ def _emit_expiry_webhooks():
         ).all()
         for cert in just_expired:
             emit_cert_expired(cert.to_dict(), ca_refid=cert.caref)
+
+        from services.ca.cross_certs import expiring_alerts
+        soon, gone = expiring_alerts(days=30)
+        for ca_refid, payload in soon:
+            emit_cert_expiring(payload, days_left=payload['days_until_expiry'], ca_refid=ca_refid)
+        for ca_refid, payload in gone:
+            emit_cert_expired(payload, ca_refid=ca_refid)
     except Exception as e:
         logger.error(f"Expiry webhook pass failed: {e}")

@@ -93,6 +93,20 @@ export const helpContent = {
         ]
       },
       {
+        title: 'Cross certificates',
+        icon: Certificate,
+        content: 'A cross-certificate carries a CA\'s subject and key under another issuer, so clients that trust only that other root can still build a path. It sits beside the CA\'s own certificate and never replaces it.',
+        items: [
+          { label: 'Where', text: 'CA details › Cross certificates; a CA that carries one shows a Cross-signed badge' },
+          { label: 'Attach', text: 'Paste or pick a certificate (PEM or DER) issued by another CA for this CA\'s key; name or policy constraints it carries are reported' },
+          { label: 'Cross-sign', text: 'Sign this CA\'s key with another CA held in UCM, with a validity and a path length' },
+          { label: 'Serve', text: 'At most one per CA is served in the default chain (TLS, PKCS#12, ACME, WSTEP, TSA, deployments, AIA .cer and .pem). A revoked, expired or not yet valid one is never served' },
+          { label: 'Chain to present', text: 'Exports and deploy bindings can pin the default chain, the self-signed root or one cross-certificate. ACME offers the other chains as alternates (certbot --preferred-chain)' },
+          { label: 'Import', text: 'A certificate over a held CA\'s key is attached to a self-signed root; on an intermediate the 409 offers Attach as cross certificate or Replace. Smart Import attaches it next to a held root or reports it as skipped' },
+          { label: 'Repair', text: 'The bar under the statistics lists records an older import damaged: Convert to cross-certificate (needs delete:cas) and Restore as primary. Nothing runs by itself' },
+        ]
+      },
+      {
         title: 'HSM-backed CAs',
         icon: Key,
         items: [
@@ -138,7 +152,8 @@ export const helpContent = {
       'Deleting a CA will NOT revoke certificates it has issued: revoke them first',
       'Private keys are stored encrypted; losing the database means losing the keys',
       'Offline-mode passwords are NOT recoverable: store them in your password manager / vault before confirming',
-      'A cross-certificate of a self-signed root (same subject and key, another issuer) is refused, at import and when uploaded after Renew via CSR: it would replace the root\'s own certificate',
+      'A cross-certificate never replaces a CA\'s own certificate: an intermediate that would be re-certified under another issuer is refused (409) unless you attach it as a cross certificate or replace the current one; a root rollover under the same issuer name replaces it',
+      'A self-signed root that was overwritten or deleted is not recovered by Convert to cross-certificate: restore it from a backup, or give its certificate to Restore as primary',
     ],
     related: ['Certificates', 'Templates', 'CRL/OCSP']
   },

@@ -67,6 +67,13 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
             f'{len(mismatches)} {record} {carries} a private key that is not '
             f"their certificate's and cannot sign: {listing}")
 
+    fallbacks = (results or {}).get('chain_variant_fallbacks') or []
+    if fallbacks:
+        bindings, were = ('binding', 'was') if len(fallbacks) == 1 else ('bindings', 'were')
+        message += _clause(
+            f'{len(fallbacks)} deploy {bindings} pinned to a cross-certificate '
+            f'absent from this installation {were} reset to the automatic chain')
+
     if (results or {}).get('admin_allowlist_cleared'):
         message += _clause('The admin access allowlist from the archive would '
                            'have locked out this session and was cleared; set '

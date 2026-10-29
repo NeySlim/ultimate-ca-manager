@@ -1562,80 +1562,97 @@ def respond_to_challenge(challenge_id: str):
 
 # ==================== Certificate Download ====================
 
-@acme_bp.route('/cert/<order_id>', methods=['POST'])
-def download_certificate(order_id: str):
-    """Download a certificate chain via authenticated POST-as-GET."""
-    service = get_acme_service()
-
+def _order_certificate_for_post_as_get(service, order_id, expected_url):
+    """(Certificate, None) for an authenticated POST-as-GET on an order's certificate, else (None, error response)."""
     jws_data = request.get_json(force=True, silent=True)
     if not jws_data:
-        return acme_error('malformed', 'Request body must be JWS')
+        return None, acme_error('malformed', 'Request body must be JWS')
 
-    expected_url = f"{service.base_url}/acme/cert/{order_id}"
     is_valid, payload, jwk, error = verify_jws(jws_data, expected_url)
     if not is_valid:
-        return acme_error('malformed', f'Invalid JWS: {error}')
+        return None, acme_error('malformed', f'Invalid JWS: {error}')
     if payload or jws_data.get('payload') != '':
-        return acme_error('malformed', 'POST-as-GET must have empty payload')
+        return None, acme_error('malformed', 'POST-as-GET must have empty payload')
 
     request_account_id = _account_id_from_jws(jws_data)
     if not request_account_id:
-        return acme_error('unauthorized', 'Account kid required', 403)
+        return None, acme_error('unauthorized', 'Account kid required', 403)
 
-    # Get order
     order = service.get_order(order_id)
     if not order:
-        return acme_error('malformed', 'Order not found', 404)
-
+        return None, acme_error('malformed', 'Order not found', 404)
     if order.account_id != request_account_id:
-        return acme_error('unauthorized', 'Certificate does not belong to this account', 403)
-    
+        return None, acme_error('unauthorized', 'Certificate does not belong to this account', 403)
     if order.status != 'valid':
-        return acme_error('orderNotReady', f'Order status is {order.status}, certificate not available', 403)
-    
+        return None, acme_error('orderNotReady', f'Order status is {order.status}, certificate not available', 403)
     if not order.certificate_id:
-        return acme_error('serverInternal', 'Certificate not generated', 500)
-    
-    # Get certificate from database
+        return None, acme_error('serverInternal', 'Certificate not generated', 500)
+
     cert = db.session.get(Certificate, order.certificate_id)
     if not cert or not cert.crt:
-        return acme_error('serverInternal', 'Certificate not found in database', 500)
-    
-    # Build certificate chain (cert + intermediate CAs + root)
-    chain_pems = []
-    
-    # Add end-entity certificate
-    cert_pem = base64.b64decode(cert.crt).decode('utf-8')
-    if not cert_pem.strip().startswith('-----BEGIN CERTIFICATE-----'):
-        # Certificate might be raw DER, wrap it
-        cert_pem = f"-----BEGIN CERTIFICATE-----\n{cert_pem}\n-----END CERTIFICATE-----"
-    chain_pems.append(cert_pem.strip())
-    
-    # Add CA chain
-    from utils.ca_chain import walk_ca_chain
-    start_ca = CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
+        return None, acme_error('serverInternal', 'Certificate not found in database', 500)
+    return cert, None
 
-    for ca in walk_ca_chain(start_ca):
-        if not ca.crt:
-            break
 
-        ca_cert_pem = base64.b64decode(ca.crt).decode('utf-8')
-        if not ca_cert_pem.strip().startswith('-----BEGIN CERTIFICATE-----'):
-            # CA cert might be raw DER, wrap it
-            ca_cert_pem = f"-----BEGIN CERTIFICATE-----\n{ca_cert_pem}\n-----END CERTIFICATE-----"
-        chain_pems.append(ca_cert_pem.strip())
+def _issuing_ca(cert):
+    return CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
 
-    # Join with single newline (standard PEM chain format)
-    pem_chain = '\n'.join(chain_pems) + '\n'
-    
-    # Return PEM chain
-    response = make_response(pem_chain, 200)
+
+def _certificate_chain_response(service, cert, variant, alternates=()):
+    """The leaf and its issuing chain for *variant*; one Link rel="alternate" per other chain (RFC 8555 7.4.2)."""
+    from utils.ca_chain import issuer_chain
+
+    def wrapped(pem):
+        pem = pem.decode('utf-8') if isinstance(pem, bytes) else pem
+        if not pem.strip().startswith('-----BEGIN CERTIFICATE-----'):
+            pem = f"-----BEGIN CERTIFICATE-----\n{pem}\n-----END CERTIFICATE-----"
+        return pem.strip()
+
+    chain_pems = [wrapped(base64.b64decode(cert.crt))]
+    chain_pems += [wrapped(link.pem) for link in issuer_chain(_issuing_ca(cert), variant)]
+
+    response = make_response('\n'.join(chain_pems) + '\n', 200)
     response.headers['Content-Type'] = 'application/pem-certificate-chain'
     response.headers['Replay-Nonce'] = service.generate_nonce()
     response.headers['Cache-Control'] = 'no-store'
-    response.headers['Link'] = f'<{service.base_url}/acme/directory>;rel="index"'
-    
+    response.headers.add('Link', f'<{service.base_url}/acme/directory>;rel="index"')
+    for alternate in alternates:
+        response.headers.add('Link', f'<{alternate}>;rel="alternate"')
     return response
+
+
+@acme_bp.route('/cert/<order_id>', methods=['POST'])
+def download_certificate(order_id: str):
+    """Download a certificate chain via authenticated POST-as-GET; the other chains are offered as alternates."""
+    from utils.ca_chain import AUTO, chain_variants
+    service = get_acme_service()
+    cert, error = _order_certificate_for_post_as_get(service, order_id, f"{service.base_url}/acme/cert/{order_id}")
+    if error:
+        return error
+    # Variant ids (primary, cross:<id>) are stable: they never depend on which chain is the default
+    alternates = [f"{service.base_url}/acme/cert/{order_id}/alt/{v['id']}"
+                  for v in chain_variants(_issuing_ca(cert)) if v['servable'] and not v['default']]
+    return _certificate_chain_response(service, cert, AUTO, alternates)
+
+
+@acme_bp.route('/cert/<order_id>/alt/<variant>', methods=['POST'])
+def download_certificate_alternate(order_id: str, variant: str):
+    """An alternate chain of an order's certificate (RFC 8555 7.4.2), same checks as the main route."""
+    from utils.ca_chain import AUTO, ChainVariantError, chain_variants, parse_variant
+    service = get_acme_service()
+    cert, error = _order_certificate_for_post_as_get(
+        service, order_id, f"{service.base_url}/acme/cert/{order_id}/alt/{variant}")
+    if error:
+        return error
+    try:
+        if parse_variant(variant) == AUTO:
+            raise ChainVariantError('auto is not an alternate')
+        offered = {v['id'] for v in chain_variants(_issuing_ca(cert)) if v['servable']}
+        if variant not in offered:
+            raise ChainVariantError('Chain variant not offered')
+    except ChainVariantError:
+        return acme_error('malformed', 'No such alternate chain', 404)
+    return _certificate_chain_response(service, cert, variant)
 
 
 # ==================== Certificate Revocation ====================

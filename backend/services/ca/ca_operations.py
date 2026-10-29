@@ -8,7 +8,6 @@ import logging
 from typing import List
 
 from models import CA, db
-from .helpers import get_ca_cert_pem
 
 logger = logging.getLogger(__name__)
 
@@ -239,28 +238,14 @@ class CAOperationsMixin:
         return ca.serial
 
     @staticmethod
-    def get_ca_chain(ca_id: int) -> List[bytes]:
-        """
-        Get CA certificate chain from leaf to root.
+    def get_ca_chain(ca_id: int, variant: str = 'auto', include_root: bool = True) -> List[bytes]:
+        """Certificate PEMs of the chain from CA *ca_id* up, as ``issuer_chain`` builds it."""
+        from utils.ca_chain import issuer_chain
 
-        Args:
-            ca_id: CA ID
-
-        Returns:
-            List of certificate PEMs (leaf to root)
-        """
-        from utils.ca_chain import walk_ca_chain
-
-        chain = []
-        for ca in walk_ca_chain(db.session.get(CA, ca_id)):
-            cert_pem = get_ca_cert_pem(ca)
-            if cert_pem:
-                chain.append(cert_pem)
-
-        return chain
+        return [link.pem for link in issuer_chain(db.session.get(CA, ca_id), variant, include_root)]
 
     @staticmethod
-    def get_certificate_chain(refid: str) -> List[str]:
+    def get_certificate_chain(refid: str, variant: str = 'auto', include_root: bool = True) -> List[str]:
         """
         Get CA certificate chain by refid (wrapper returning strings).
 
@@ -277,6 +262,6 @@ class CAOperationsMixin:
         if not ca:
             raise ValueError(f"CA not found: {refid}")
 
-        chain_bytes = CAOperationsMixin.get_ca_chain(ca.id)
+        chain_bytes = CAOperationsMixin.get_ca_chain(ca.id, variant, include_root)
         return [pem.decode('utf-8') if isinstance(pem, bytes) else pem
                 for pem in chain_bytes]

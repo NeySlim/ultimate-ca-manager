@@ -226,6 +226,9 @@ def purge_ca_dependents(ca) -> str:
     from models.revoked_serial import RevokedSerial
     from models.scep import SCEPRequest
 
+    from models.ca_cross_certificate import CACrossCertificate
+
+    CACrossCertificate.query.filter_by(ca_id=ca.id).delete()
     crl_count = CRLMetadata.query.filter_by(ca_id=ca.id).delete()
     ocsp_count = OCSPResponse.query.filter_by(ca_id=ca.id).delete()
     rs_count = RevokedSerial.query.filter_by(caref=ca.refid).delete()

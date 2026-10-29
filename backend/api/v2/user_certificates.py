@@ -335,6 +335,12 @@ def export_user_certificate(cert_id):
                 400,
             )
 
+    from api.v2.certificates.export import requested_chain_variant
+    variant, variant_err = requested_chain_variant(
+        data if request.method == 'POST' and request.is_json else request.args, cert)
+    if variant_err:
+        return variant_err
+
     # Somebody else's key needs `read:private_keys`, as on the certificate
     # route, or the approval-gated Key Recovery flow is bypassable (#232).
     # Your own key stays: that is what the account page is for.
@@ -363,7 +369,7 @@ def export_user_certificate(cert_id):
 
             from api.v2.certificates.export import _build_ca_chain
             ca_certs = (
-                _build_ca_chain(cert, cert_pem, include_root=include_root)
+                _build_ca_chain(cert, cert_pem, include_root=include_root, variant=variant)
                 if include_chain else []
             )
 
@@ -416,7 +422,7 @@ def export_user_certificate(cert_id):
             if include_chain:
                 from api.v2.certificates.export import _build_ca_chain
                 for ca_cert_obj in _build_ca_chain(
-                    cert, cert_pem, include_root=include_root
+                    cert, cert_pem, include_root=include_root, variant=variant
                 ):
                     cert_chain.append((
                         "X.509", ca_cert_obj.public_bytes(serialization.Encoding.DER)
@@ -465,7 +471,7 @@ def export_user_certificate(cert_id):
             filename = f"{filename_base}.pem"
 
         if include_chain:
-            for ca_cert in _build_ca_chain(cert, cert_pem, include_root=include_root):
+            for ca_cert in _build_ca_chain(cert, cert_pem, include_root=include_root, variant=variant):
                 if not result.endswith(b'\n'):
                     result += b'\n'
                 result += ca_cert.public_bytes(serialization.Encoding.PEM)

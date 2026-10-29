@@ -155,7 +155,7 @@ class TestSelectAcmeCertificateChain:
         )
         assert result == default
 
-    def test_preference_keeps_default_when_alternate_root_differs(self):
+    def test_matching_default_is_kept_without_fetching_alternates(self):
         default = _chain_pem('leaf.example', 'ISRG Root X1')
         fetched = []
 
@@ -170,7 +170,7 @@ class TestSelectAcmeCertificateChain:
             fetch,
         )
         assert result == default
-        assert fetched == ['https://acme.example/alt']
+        assert fetched == []
 
     def test_preference_selects_alternate_chain(self):
         default = _chain_pem('leaf.example', 'ISRG Root X2')
@@ -258,7 +258,7 @@ class TestRebuildAcmeChain:
         )
         assert issuer_serials(rebuilt)[1:] == issuer_serials(issuer_only)
 
-    def test_prefers_alternate_when_same_root_different_intermediates(self):
+    def test_keeps_default_when_alternate_has_same_root_other_intermediates(self):
         default = _chain_pem_with_intermediate('leaf.example', 'Int-Old', 'ISRG Root X1')
         alternate = _chain_pem_with_intermediate('leaf.example', 'Int-New', 'ISRG Root X1')
 
@@ -266,11 +266,85 @@ class TestRebuildAcmeChain:
             default,
             '<https://acme.example/alt>;rel="alternate"',
             'ISRG Root X1',
-            lambda _url: alternate,
+            lambda _url: pytest.fail('the default already matches, nothing to fetch'),
         )
-        assert chain_root_common_name(result) == 'ISRG Root X1'
-        assert chain_issuer_serials(result) == chain_issuer_serials(alternate)
-        assert chain_issuer_serials(result) != chain_issuer_serials(default)
+        assert result == default
+
+
+class TestCrossSignedChains:
+    """A cross certificate has the subject of its root: only its issuer counts (certbot)."""
+
+    @staticmethod
+    def _chains(pki):
+        from tests.fixtures.cross_pki import pem
+        leaf, int_b = pem(pki.leaf), pem(pki.int_b)
+        return {
+            'self_signed': leaf + int_b + pem(pki.root_b),
+            'root_omitted': leaf + int_b,
+            'cross': leaf + int_b + pem(pki.cross_b),
+        }
+
+    def test_requesting_root_b_does_not_pick_the_cross_chain(self):
+        from tests.fixtures.cross_pki import build_cross_pki
+        pki = build_cross_pki()
+        chains = self._chains(pki)
+
+        result = select_acme_certificate_chain(
+            chains['root_omitted'],
+            '<https://acme.example/alt>;rel="alternate"',
+            pki.name_b,
+            lambda _url: chains['cross'],
+        )
+        assert result == chains['root_omitted']
+
+    def test_requesting_root_b_leaves_the_cross_chain_for_the_self_signed_one(self):
+        from tests.fixtures.cross_pki import build_cross_pki
+        pki = build_cross_pki()
+        chains = self._chains(pki)
+
+        result = select_acme_certificate_chain(
+            chains['cross'],
+            '<https://acme.example/alt>;rel="alternate"',
+            pki.name_b,
+            lambda _url: chains['self_signed'],
+        )
+        assert result == chains['self_signed']
+
+    def test_requesting_root_a_takes_the_cross_chain(self):
+        from tests.fixtures.cross_pki import build_cross_pki
+        pki = build_cross_pki()
+        chains = self._chains(pki)
+
+        result = select_acme_certificate_chain(
+            chains['self_signed'],
+            '<https://acme.example/alt>;rel="alternate"',
+            pki.name_a,
+            lambda _url: chains['cross'],
+        )
+        assert result == chains['cross']
+
+    def test_cross_chain_as_only_choice_is_kept(self):
+        from tests.fixtures.cross_pki import build_cross_pki
+        pki = build_cross_pki()
+        chains = self._chains(pki)
+
+        result = select_acme_certificate_chain(chains['cross'], None, pki.name_b, lambda _u: '')
+        assert result == chains['cross']
+
+    def test_lets_encrypt_2021_alternate_without_the_dst_cross(self):
+        """Default ends on ISRG Root X1 cross-signed by DST; the alternate ends on R3."""
+        from tests.fixtures.cross_pki import build_cross_pki, make_cert, new_key, pem
+        pki = build_cross_pki()
+        dst_key, isrg_key, r3_key, leaf_key = (new_key() for _ in range(4))
+        isrg_cross = make_cert('ISRG Root X1', isrg_key, 'DST Root CA X3', dst_key)
+        r3 = make_cert('R3', r3_key, 'ISRG Root X1', isrg_key, path_length=0)
+        leaf = make_cert('le.example', leaf_key, 'R3', r3_key, ca=False, san='le.example')
+        default = pem(leaf) + pem(r3) + pem(isrg_cross)
+        alternate = pem(leaf) + pem(r3)
+
+        result = select_acme_certificate_chain(
+            default, '<https://acme.example/alt>;rel="alternate"', 'ISRG Root X1', lambda _u: alternate)
+        assert result == alternate
 
 
 class TestPreferredChainApi:
