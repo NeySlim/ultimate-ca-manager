@@ -5711,11 +5711,14 @@
     "empty": "Nada en UCM depende ya de esta CA: ningún certificado, cadena predeterminada ni despliegue pasa por ella.",
     "issued": "Certificados emitidos por esta CA o por debajo de ella",
     "viaCross": "Cadena predeterminada mediante un certificado cruzado de esta CA",
-    "deployments": "Deploy bindings que envían una cadena así",
+    "deployments": "Vínculos de despliegue que envían una cadena así",
     "expires": "Caduca el {{date}}",
     "truncated": "Se muestran los primeros {{count}}",
     "crossRow": "Certificado cruzado #{{id}} en {{ca}}",
     "notServed": "No servido",
+    "error": "No se pudo cargar esta información.",
+    "offered": "Ahora mismo ninguna cadena pasa por esta CA, pero los certificados cruzados que emitió aún pueden servirse o fijarse ({{count}}).",
+    "notServable": "No se puede servir",
     "note": "UCM solo ve lo que emite y entrega: un cliente que guardó una cadena en caché, o la obtuvo en otro sitio, no se cuenta."
   },
   "crossCerts": {

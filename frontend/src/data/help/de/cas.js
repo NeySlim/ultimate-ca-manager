@@ -48,10 +48,10 @@ export default {
           { label: 'Wo', text: 'CA-Details › Cross-Zertifikate; eine CA mit Cross-Zertifikat zeigt ein Badge Cross-signiert' },
           { label: 'Anhängen', text: 'Ein Zertifikat (PEM oder DER) einfügen oder auswählen, das eine andere CA für den Schlüssel dieser CA ausgestellt hat; enthaltene Name- oder Policy-Constraints werden gemeldet' },
           { label: 'Cross-signieren', text: 'Den Schlüssel dieser CA mit einer anderen in UCM vorhandenen CA signieren, mit Gültigkeit und Pfadlänge' },
-          { label: 'Ausliefern', text: 'Höchstens eines pro CA wird in der Standardkette ausgeliefert (TLS, PKCS#12, ACME, WSTEP, TSA, Deployments, AIA .cer und .pem). Ein widerrufenes, abgelaufenes oder noch nicht gültiges wird nie ausgeliefert' },
-          { label: 'Zu präsentierende Kette', text: 'Exporte und Deploy-Bindungen können die Standardkette, die selbstsignierte Root oder ein Cross-Zertifikat festlegen. ACME bietet die anderen Ketten als Alternativen an (certbot --preferred-chain)' },
+          { label: 'Ausliefern', text: 'Höchstens eines pro CA wird in der Standardkette ausgeliefert (TLS, PKCS#12, ACME, WSTEP, TSA, Bereitstellungen, AIA .cer und .pem). Ein widerrufenes, abgelaufenes oder noch nicht gültiges wird nie ausgeliefert' },
+          { label: 'Zu präsentierende Kette', text: 'Exporte und Bereitstellungen können die Standardkette, die selbstsignierte Root oder ein Cross-Zertifikat festlegen. ACME bietet die anderen Ketten als Alternativen an (certbot --preferred-chain)' },
           { label: 'Import', text: 'Ein Zertifikat über dem Schlüssel einer vorhandenen CA wird an eine selbstsignierte Root angehängt; bei einer Intermediate bietet der Fehler 409 „Als Cross-Zertifikat anhängen“ oder „Ersetzen“ an. Smart Import hängt es neben einer vorhandenen Root an oder meldet es als übersprungen' },
-          { label: 'Weiterhin verkettet', text: 'CA-Details › Weiterhin mit dieser CA verkettet listet die Zertifikate und Deploy-Bindings auf, die direkt oder über ein Cross-Zertifikat noch mit der CA verkettet sind, um zu erkennen, wann eine alte Root außer Betrieb genommen werden kann; eine Chain im Cache eines Clients wird nicht gezählt' },
+          { label: 'Weiterhin verkettet', text: 'CA-Details › Weiterhin mit dieser CA verkettet listet die Zertifikate und Bereitstellungen auf, die direkt oder über ein Cross-Zertifikat noch mit der CA verkettet sind, um zu erkennen, wann eine alte Root außer Betrieb genommen werden kann; eine Kette im Cache eines Clients wird nicht gezählt' },
           { label: 'Reparatur', text: 'Die Leiste unter den Statistiken listet Einträge, die ein älterer Import beschädigt hat: In Cross-Zertifikat umwandeln (erfordert delete:cas) und Als primär wiederherstellen. Nichts läuft automatisch' },
         ]
       },
@@ -193,10 +193,10 @@ Ein Cross-Zertifikat trägt Subject und Schlüssel einer CA unter der Signatur e
 In den CA-Details listet **Cross-Zertifikate** sie auf:
 - **Anhängen**: ein Zertifikat einfügen oder auswählen, das eine andere CA für den Schlüssel dieser CA ausgestellt hat (PEM oder DER). Enthaltene Name- oder Policy-Constraints werden gemeldet.
 - **Cross-signieren**: den Schlüssel dieser CA mit einer anderen in UCM vorhandenen CA signieren; Gültigkeit und Pfadlänge wählen.
-- **Ausliefern / Auslieferung beenden**: höchstens eines pro CA wird ausgeliefert, in der Standardkette von TLS, PKCS#12, ACME, WSTEP, TSA und Deployments sowie über die AIA-URLs \`.cer\` und \`.pem\`. Ein widerrufenes, abgelaufenes oder noch nicht gültiges bleibt erhalten und exportierbar, wird aber nie ausgeliefert.
+- **Ausliefern / Auslieferung beenden**: höchstens eines pro CA wird ausgeliefert, in der Standardkette von TLS, PKCS#12, ACME, WSTEP, TSA und Bereitstellungen sowie über die AIA-URLs \`.cer\` und \`.pem\`. Ein widerrufenes, abgelaufenes oder noch nicht gültiges bleibt erhalten und exportierbar, wird aber nie ausgeliefert.
 - **Exportieren** und **Entfernen**.
 
-Exporte und Deploy-Bindungen können eine andere Kette festlegen (**Zu präsentierende Kette** / **Kettenvariante**). Der ACME-Server bietet die anderen Ketten als Alternativen an, die ein Client mit \`--preferred-chain\` auswählt. Änderungen erreichen Clients nach der nächsten Ausstellung oder dem nächsten Deployment und nach dem 24-Stunden-Cache der AIA-URLs.
+Exporte und Bereitstellungen können eine andere Kette festlegen (**Zu präsentierende Kette** / **Kettenvariante**). Der ACME-Server bietet die anderen Ketten als Alternativen an, die ein Client mit \`--preferred-chain\` auswählt. Änderungen erreichen Clients nach der nächsten Ausstellung oder der nächsten Bereitstellung und nach dem 24-Stunden-Cache der AIA-URLs.
 
 ### Beschädigte Einträge reparieren
 

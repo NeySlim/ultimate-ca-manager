@@ -5716,6 +5716,9 @@
     "truncated": "Mostrati i primi {{count}}",
     "crossRow": "Certificato incrociato #{{id}} su {{ca}}",
     "notServed": "Non servito",
+    "error": "Impossibile caricare queste informazioni.",
+    "offered": "Al momento nessuna catena passa da questa CA, ma i certificati incrociati da essa emessi possono ancora essere serviti o fissati ({{count}}).",
+    "notServable": "Non può essere servito",
     "note": "UCM vede solo ciò che emette e consegna: un client che ha memorizzato una catena in cache, o l'ha ottenuta altrove, non viene conteggiato."
   },
   "crossCerts": {

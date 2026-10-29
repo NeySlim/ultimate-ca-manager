@@ -5719,6 +5719,9 @@
     "truncated": "Showing the first {{count}}",
     "crossRow": "Cross-certificate #{{id}} on {{ca}}",
     "notServed": "Not served",
+    "error": "Could not load this information.",
+    "offered": "Nothing chains through this CA right now, but cross-certificates it issued can still be served or pinned ({{count}}).",
+    "notServable": "Cannot be served",
     "note": "UCM only sees what it issues and delivers: a client that cached a chain, or got it elsewhere, is not counted."
   },
   "crossCerts": {

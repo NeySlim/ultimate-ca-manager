@@ -5716,6 +5716,9 @@
     "truncated": "显示前 {{count}} 项",
     "crossRow": "{{ca}} 上的交叉证书 #{{id}}",
     "notServed": "未提供",
+    "error": "无法加载此信息。",
+    "offered": "目前没有链经过此 CA，但它签发的交叉证书仍可被提供或固定 ({{count}})。",
+    "notServable": "无法提供",
     "note": "UCM 只能看到自己签发和交付的内容：缓存了链或从其他途径获得链的客户端不会被计入。"
   },
   "crossCerts": {

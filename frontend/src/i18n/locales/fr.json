@@ -5719,6 +5719,9 @@
     "truncated": "Affichage des {{count}} premiers",
     "crossRow": "Certificat croisé n° {{id}} sur {{ca}}",
     "notServed": "Non servi",
+    "error": "Impossible de charger ces informations.",
+    "offered": "Plus rien ne passe par cette CA pour l'instant, mais des certificats croisés qu'elle a émis peuvent encore être servis ou épinglés ({{count}}).",
+    "notServable": "Ne peut pas être servi",
     "note": "UCM ne voit que ce qu'il émet et livre : un client qui a mis une chaîne en cache, ou l'a obtenue ailleurs, n'est pas compté."
   },
   "crossCerts": {
