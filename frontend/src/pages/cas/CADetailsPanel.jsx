@@ -15,6 +15,7 @@ import { RevokeCertificateModal } from '../../components/RevokeCertificateModal'
 import { ManageTemplatePinsModal } from '../../components/cas/ManageTemplatePinsModal'
 import { CACrlSection } from '../../components/cas/CACrlSection'
 import { CrossCertificatesSection } from '../../components/cas/CrossCertificatesSection'
+import { ChainUsageSection } from '../../components/cas/ChainUsageSection'
 import { SignatureSchemeField } from '../../components/cas/SignatureSchemeField'
 import { ComplianceProfileField } from '../../components/cas/ComplianceProfileField'
 import { UploadCACertModal } from './UploadCACertModal'
@@ -281,6 +282,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
 
       {/* Cross-certificates of this CA's key (#400) */}
       <CrossCertificatesSection ca={ca} canWrite={canWrite('cas')} />
+      <ChainUsageSection ca={ca} />
 
       {/* Subject Info */}
       <CompactSection title={t('common.subject')}>

@@ -51,6 +51,10 @@ export const casService = {
   },
 
   // Cross-certificates (#400)
+  async getChainUsage(id) {
+    return apiClient.get(`/cas/${id}/chain-usage`)
+  },
+
   async getCrossCertificates(id) {
     return apiClient.get(`/cas/${id}/cross-certificates`)
   },

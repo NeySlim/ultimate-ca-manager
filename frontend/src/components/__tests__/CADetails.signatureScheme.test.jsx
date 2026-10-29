@@ -17,6 +17,7 @@ vi.mock('../../contexts/NotificationContext', () => ({
 }))
 vi.mock('../../services', () => ({ casService: { update: mocks.update } }))
 vi.mock('../cas/CACrlSection', () => ({ CACrlSection: () => null }))
+vi.mock('../cas/ChainUsageSection', () => ({ ChainUsageSection: () => null }))
 
 const { CADetails } = await import('../CADetails')
 

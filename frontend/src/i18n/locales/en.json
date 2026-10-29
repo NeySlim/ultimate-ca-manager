@@ -5709,6 +5709,18 @@
     "filters": "Filters",
     "exclude": "Exclude"
   },
+  "chainUsage": {
+    "title": "Still chaining to this CA",
+    "empty": "Nothing in UCM depends on this CA any more: no certificate, default chain or deployment goes through it.",
+    "issued": "Certificates issued by this CA or below",
+    "viaCross": "Default chain through a cross-certificate of this CA",
+    "deployments": "Deploy bindings pushing such a chain",
+    "expires": "Expires {{date}}",
+    "truncated": "Showing the first {{count}}",
+    "crossRow": "Cross-certificate #{{id}} on {{ca}}",
+    "notServed": "Not served",
+    "note": "UCM only sees what it issues and delivers: a client that cached a chain, or got it elsewhere, is not counted."
+  },
   "crossCerts": {
     "title": "Cross certificates",
     "none": "No cross-certificate. Attach one issued by another CA for this key, or sign one from a CA held in UCM.",

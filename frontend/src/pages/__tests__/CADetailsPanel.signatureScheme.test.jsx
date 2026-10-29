@@ -29,6 +29,7 @@ vi.mock('../../services', () => ({
 }))
 
 vi.mock('../../components/cas/CACrlSection', () => ({ CACrlSection: () => null }))
+vi.mock('../../components/cas/ChainUsageSection', () => ({ ChainUsageSection: () => null }))
 
 import { CADetailsPanel } from '../cas/CADetailsPanel'
 

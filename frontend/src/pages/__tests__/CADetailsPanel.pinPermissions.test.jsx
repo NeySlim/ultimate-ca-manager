@@ -23,6 +23,7 @@ vi.mock('../../services', () => ({
   templatesService: { getForCA: vi.fn().mockResolvedValue({ data: [] }) },
 }))
 
+vi.mock('../../components/cas/ChainUsageSection', () => ({ ChainUsageSection: () => null }))
 import { CADetailsPanel } from '../cas/CADetailsPanel'
 
 const CA = {

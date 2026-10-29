@@ -36,6 +36,7 @@ import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { CertificateExtensions } from './CertificateExtensions'
 import { CACrlSection } from './cas/CACrlSection'
 import { CrossCertificatesSection } from './cas/CrossCertificatesSection'
+import { ChainUsageSection } from './cas/ChainUsageSection'
 import { SignatureSchemeField } from './cas/SignatureSchemeField'
 import { ComplianceProfileField } from './cas/ComplianceProfileField'
 import { cn } from '../lib/utils'
@@ -230,6 +231,7 @@ export function CADetails({
       )}
 
       <CrossCertificatesSection ca={ca} canWrite={canWriteCas} />
+      <ChainUsageSection ca={ca} />
 
       {/* Subject Information */}
       <CompactSection title={t('common.subject')} icon={Globe} iconClass="icon-bg-blue">
