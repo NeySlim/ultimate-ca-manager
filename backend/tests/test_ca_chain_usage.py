@@ -792,3 +792,38 @@ def test_orphans_without_aki_are_not_grouped_by_issuer_name():
         return SimpleNamespace(id=i, crt=b64.b64encode(cert.public_bytes(ser.Encoding.PEM)).decode())
 
     assert _group_key(leaf(1)) != _group_key(leaf(2))
+
+
+def _inline_orphans(app, pki, n):
+    from tests.fixtures.cross_pki import make_cert, new_key
+    with app.app_context():
+        for i in range(n):
+            leaf = make_cert(f'inline-{i}-{pki.tag}.example', new_key(), f'Cross Int B {pki.tag}', pki.key_int,
+                             ca=False, days=60)
+            crt = base64.b64encode((pem(leaf) + pem(pki.int_b)).encode()).decode()
+            db.session.add(Certificate(refid=uuid.uuid4().hex, descr=f'inline{i}', caref=None, source='imported',
+                                       crt=crt, subject_cn=f'inline{i}', valid_from=utc_now(),
+                                       valid_to=utc_now() + timedelta(days=30), revoked=False))
+        db.session.commit()
+
+
+def test_inline_orphans_sharing_their_chain_cost_one_resolution(app, auth_client, world):
+    """ACME client certificates and imported full chains: distinct leaves, one chain above them."""
+    _inline_orphans(app, world.pki, 3)
+    small = _queries(app, lambda: usage(auth_client, world.b_id))
+    _inline_orphans(app, world.pki, 30)
+    big = _queries(app, lambda: usage(auth_client, world.b_id))
+    assert counts(auth_client, world.b_id)[0] == 34
+    assert big <= small + 4, (small, big)
+
+
+def test_a_self_signed_orphan_is_not_grouped_with_the_certificates_of_its_name():
+    """A stored copy of a root shares its issuer name and AKI with what the root issued, not its chain."""
+    from types import SimpleNamespace
+    from services.ca.chain_usage import _group_key
+    from tests.fixtures.cross_pki import build_cross_pki, make_cert, new_key
+    pki = build_cross_pki()
+    direct = make_cert('direct.example', new_key(), pki.name_b, pki.key_b, ca=False, days=60)
+    root_copy = SimpleNamespace(id=1, crt=base64.b64encode(pem(pki.root_b).encode()).decode())
+    leaf = SimpleNamespace(id=2, crt=base64.b64encode(pem(direct).encode()).decode())
+    assert _group_key(root_copy) != _group_key(leaf)

@@ -1,8 +1,8 @@
 """What still depends on a CA in what UCM issues and delivers (#400).
 
 A chain depends on X when one of its links is a CA of X's subtree (records of X's key included), or a
-cross-certificate of such a CA or issued by one. Chains are resolved once per issuing CA, or once per
-issuer of the certificates that have none, never per certificate.
+cross-certificate of such a CA or issued by one. Chains are resolved once per issuing CA; certificates with
+no CA once per issuer and AKI, or per inline chain above the leaf, and alone without an AKI or self-signed.
 """
 import base64
 from collections import defaultdict
@@ -110,15 +110,16 @@ def _section(condition, names):
 
 
 def _group_key(cert):
-    """Certificates with the same key chain alike: inline ones by their bytes, the others by issuer and AKI.
-    Without an AKI, only the signature tells two keys of one issuer name apart: each is resolved alone."""
+    """Certificates with the same key chain alike: inline ones by the chain above their leaf, the others by
+    issuer and AKI. Without an AKI only the signature tells two keys of one name apart, and a self-signed
+    copy of a CA shares its name and AKI with what it issued: each of those is resolved alone."""
     try:
         raw = base64.b64decode(cert.crt)
         if raw.count(b'BEGIN CERTIFICATE') > 1:
-            return ('inline', cert.crt)
+            return ('inline', raw.split(b'-----END CERTIFICATE-----', 1)[1].strip())
         parsed = x509.load_pem_x509_certificate(raw)
         aki = authority_key_identifier_hex(parsed)
-        if aki:
+        if aki and parsed.issuer != parsed.subject:
             return ('issuer', parsed.issuer.rfc4514_string(), aki)
     except Exception:
         pass
@@ -159,7 +160,11 @@ def _binding_items(hits, concerned, orphan_cond, now, with_targets):
     for binding, target, cert in q.all():
         variant, include_root = binding.chain_variant or AUTO, bool(binding.include_root)
         inline = base64.b64decode(cert.crt).count(b'BEGIN CERTIFICATE') > 1
-        key = (_group_key(cert) if inline or cert.caref not in hits.known else cert.caref, variant, include_root)
+        # A pinned variant also depends on the caref, so an inline chain with a known one keeps it in the key
+        group = _group_key(cert) if inline or cert.caref not in hits.known else cert.caref
+        if inline and cert.caref in hits.known:
+            group = (group, cert.caref)
+        key = (group, variant, include_root)
         if key not in memo:
             try:
                 pem = DeployService._chain_pem(cert, base64.b64decode(cert.crt).decode(), include_root=include_root,
