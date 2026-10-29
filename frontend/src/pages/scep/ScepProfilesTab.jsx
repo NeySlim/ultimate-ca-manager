@@ -250,7 +250,7 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
             onChange={(val) => update('ca_id', val)}
             placeholder={t('certificates.selectCA')}
             options={scepPickerCas(cas, formData.ca_id).map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
-            helperText={unlistedScepPickerCas(cas, formData.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedScepPickerCas(cas, formData.ca_id) }) : undefined}
+            helperText={unlistedScepPickerCas(cas, formData.ca_id) > 0 ? t('cas.notListedForScep', { count: unlistedScepPickerCas(cas, formData.ca_id) }) : undefined}
           />
           <Select
             label={t('scep.profileTemplate')}

@@ -27,9 +27,9 @@ vi.doMock('../../hooks', async (orig) => ({
 // A native select exposes the options and the helper text that the real one hides in a portal.
 vi.doMock('../../components', async (orig) => ({
   ...(await orig()),
-  Select: ({ label, options = [], value, onChange, helperText }) => (
+  Select: ({ label, options = [], value, onChange, helperText, disabled }) => (
     <div data-testid={`field-${label}`}>
-      <select aria-label={label} value={value ?? ''} onChange={(e) => onChange?.(e.target.value)}>
+      <select aria-label={label} value={value ?? ''} disabled={disabled} onChange={(e) => onChange?.(e.target.value)}>
         {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
       </select>
       {helperText && <p>{helperText}</p>}
@@ -47,9 +47,9 @@ const CAS = [
 let SCEPPage
 beforeAll(async () => { SCEPPage = (await import('../SCEPPage')).default })
 
-async function openPicker(savedCaId) {
+async function openPicker(savedCaId, enabled = true) {
   Object.assign(scepService, {
-    getConfig: vi.fn().mockResolvedValue({ data: { enabled: true, ca_id: savedCaId, challenge_validity_range: [1, 720] } }),
+    getConfig: vi.fn().mockResolvedValue({ data: { enabled, ca_id: savedCaId, challenge_validity_range: [1, 720] } }),
     getRequests: vi.fn().mockResolvedValue({ data: [] }),
     getStats: vi.fn().mockResolvedValue({ data: {} }),
     getProfiles: vi.fn().mockResolvedValue({ data: [] }),
@@ -67,17 +67,18 @@ describe('SCEPPage default CA picker (#426)', () => {
   it('offers only the CA that can sign and counts the others', async () => {
     const box = await openPicker(undefined)
     expect(optionValues(box)).toEqual(['common.none', 'Signing CA'])
-    expect(await within(box).findByText('cas.notListedForSigning:3')).toBeInTheDocument()
+    expect(await within(box).findByText('cas.notListedForScep:3')).toBeInTheDocument()
   })
 
   it('keeps the saved CA without a key listed and counts one less', async () => {
     const box = await openPicker(2)
     expect(optionValues(box)).toEqual(['common.none', 'Signing CA', 'Keyless root'])
-    expect(await within(box).findByText('cas.notListedForSigning:2')).toBeInTheDocument()
+    expect(await within(box).findByText('cas.notListedForScep:2')).toBeInTheDocument()
   })
 
-  it('can clear the default CA, so the CA can then be deleted', async () => {
-    const box = await openPicker(1)
+  it('can clear the default CA, so the CA can then be deleted, even with SCEP off', async () => {
+    const box = await openPicker(1, false)
+    expect(within(box).getByRole('combobox')).not.toBeDisabled()
     scepService.updateConfig = vi.fn().mockResolvedValue({ data: {} })
     fireEvent.change(within(box).getByRole('combobox'), { target: { value: '__none__' } })
     fireEvent.click(screen.getByText('common.saveConfiguration'))

@@ -828,6 +828,8 @@
     "noPrivateKeyBanner": "UCM détient le certificat de cette CA mais pas sa clé privée : elle n'est donc pas proposée à l'émission ni à la signature. Importez sa clé privée pour émettre des certificats avec elle.",
     "notListedForSigning_one": "{{count}} CA n'est pas listée : elle ne peut pas signer actuellement (pas de clé privée, hors ligne, révoquée ou en attente).",
     "notListedForSigning_other": "{{count}} CA ne sont pas listées : elles ne peuvent pas signer actuellement (pas de clé privée, hors ligne, révoquées ou en attente).",
+    "notListedForScep_one": "{{count}} CA n'est pas listée : SCEP ne peut pas l'utiliser (pas de clé privée, clé sur HSM, hors ligne, révoquée ou en attente).",
+    "notListedForScep_other": "{{count}} CA ne sont pas listées : SCEP ne peut pas les utiliser (pas de clé privée, clé sur HSM, hors ligne, révoquées ou en attente).",
     "importPrivateKey": "Importer la clé privée",
     "parentCA": "AC parente",
     "hierarchy": "Hiérarchie",

@@ -522,8 +522,7 @@ export default function SCEPPage() {
                 ]}
                 value={config.ca_id?.toString() || '__none__'}
                 onChange={(val) => setConfig({ ...config, ca_id: val === '__none__' ? null : parseInt(val) })}
-                disabled={!config.enabled}
-                helperText={unlistedScepPickerCas(cas, config.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedScepPickerCas(cas, config.ca_id) }) : undefined}
+                helperText={unlistedScepPickerCas(cas, config.ca_id) > 0 ? t('cas.notListedForScep', { count: unlistedScepPickerCas(cas, config.ca_id) }) : undefined}
               />
             </Card>
 

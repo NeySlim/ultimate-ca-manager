@@ -121,3 +121,18 @@ def test_default_scep_ca_cannot_be_deleted(app, auth_client, cas, stored_as):
     assert 'default SCEP CA' in r.get_json()['message']
     with app.app_context():
         assert db.session.get(CA, signer['id']) is not None
+
+
+def test_scep_profile_keeps_its_ca_after_the_key_is_gone(app, auth_client, cas):
+    signer, keyless, _ = cas
+    r = auth_client.post('/api/v2/scep/profiles', json={'name': 'Settings profile', 'ca_id': signer['id']})
+    assert r.status_code == 200, r.data
+    pid = r.get_json()['data']['id']
+    try:
+        _drop_key(app, signer['id'])
+        r = auth_client.put(f'/api/v2/scep/profiles/{pid}', json={'name': 'Renamed', 'ca_id': signer['id']})
+        assert r.status_code == 200, r.data
+        r = auth_client.put(f'/api/v2/scep/profiles/{pid}', json={'ca_id': keyless['id']})
+        assert r.status_code == 400, r.data
+    finally:
+        assert auth_client.delete(f'/api/v2/scep/profiles/{pid}').status_code in (200, 204)

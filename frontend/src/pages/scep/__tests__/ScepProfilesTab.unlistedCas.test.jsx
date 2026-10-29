@@ -61,7 +61,7 @@ describe('ScepProfilesTab CA picker (#426)', () => {
     fireEvent.click(screen.getByText('scep.newProfile'))
     await screen.findByRole('dialog')
     expect(optionLabels()).toEqual(['Signing CA'])
-    expect(screen.getByTestId('field-common.certificateAuthority')).toHaveTextContent('cas.notListedForSigning:3')
+    expect(screen.getByTestId('field-common.certificateAuthority')).toHaveTextContent('cas.notListedForScep:3')
   })
 
   it('keeps the profile CA listed when it holds no key and counts one less', async () => {
@@ -69,6 +69,6 @@ describe('ScepProfilesTab CA picker (#426)', () => {
     fireEvent.click(screen.getByLabelText('common.edit'))
     await screen.findByRole('dialog')
     expect(optionLabels()).toEqual(['Signing CA', 'Keyless root'])
-    expect(screen.getByTestId('field-common.certificateAuthority')).toHaveTextContent('cas.notListedForSigning:2')
+    expect(screen.getByTestId('field-common.certificateAuthority')).toHaveTextContent('cas.notListedForScep:2')
   })
 })

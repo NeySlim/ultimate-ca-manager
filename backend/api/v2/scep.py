@@ -461,13 +461,15 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
         if not ca:
             return False, 'CA not found'
         saved = db.session.get(ScepProfile, profile_id) if profile_id else None
-        if not (saved is not None and saved.ca_refid == ca.refid) and signing_ca_problem(ca):
-            return False, f'Selected CA cannot sign: {signing_ca_problem(ca)}'
-        if not ca.has_private_key:
-            return False, 'Selected CA has no private key'
-        if ca.uses_hsm:
-            return False, ('Selected CA is HSM-backed: SCEP requires RSA '
-                           'envelope decryption, unavailable for HSM keys')
+        # The CA a profile is already bound to stays saveable, as for the default CA (#426)
+        if not (saved is not None and saved.ca_refid == ca.refid):
+            if signing_ca_problem(ca):
+                return False, f'Selected CA cannot sign: {signing_ca_problem(ca)}'
+            if not ca.has_private_key:
+                return False, 'Selected CA has no private key'
+            if ca.uses_hsm:
+                return False, ('Selected CA is HSM-backed: SCEP requires RSA '
+                               'envelope decryption, unavailable for HSM keys')
         data['ca_refid'] = ca.refid
 
     template_ref = data.get('template_id') if 'template_id' in data else None

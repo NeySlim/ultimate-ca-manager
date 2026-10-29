@@ -850,6 +850,8 @@
     "noPrivateKeyBanner": "UCM besitzt das Zertifikat dieser CA, aber nicht ihren privaten Schlüssel; sie wird daher beim Ausstellen oder Signieren nicht angeboten. Importieren Sie ihren privaten Schlüssel, um Zertifikate mit ihr auszustellen.",
     "notListedForSigning_one": "{{count}} CA wird nicht angezeigt: Sie kann derzeit nicht signieren (kein privater Schlüssel, offline, widerrufen oder ausstehend).",
     "notListedForSigning_other": "{{count}} CAs werden nicht angezeigt: Diese können derzeit nicht signieren (kein privater Schlüssel, offline, widerrufen oder ausstehend).",
+    "notListedForScep_one": "{{count}} CA wird nicht angezeigt: SCEP kann sie nicht verwenden (kein privater Schlüssel, HSM-gestützt, offline, widerrufen oder ausstehend).",
+    "notListedForScep_other": "{{count}} CAs werden nicht angezeigt: SCEP kann diese nicht verwenden (kein privater Schlüssel, HSM-gestützt, offline, widerrufen oder ausstehend).",
     "importPrivateKey": "Privaten Schlüssel importieren",
     "parentCA": "Übergeordnete CA",
     "hierarchy": "Hierarchie",
