@@ -177,7 +177,7 @@ class DesecDnsProvider(BaseDnsProvider):
         )
         
         if not success:
-            if '404' in str(result) or 'not found' in str(result).lower():
+            if self._last_status == 404 or 'not found' in str(result).lower():
                 return True, "Record not found (already deleted?)"
             return False, f"Failed to delete record: {result}"
         

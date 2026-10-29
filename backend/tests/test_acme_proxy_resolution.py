@@ -654,7 +654,7 @@ class TestDns01Thread:
         monkeypatch.setattr('api.v2.acme_domains.find_provider_for_domain',
                             lambda *_a, **_k: {'provider': provider_model})
         provider = MagicMock()
-        provider.get_acme_challenge_name.side_effect = lambda d: f'_acme-challenge.{d}'
+        provider.get_acme_challenge_name.side_effect = lambda d: f'_acme-challenge.{d.removeprefix("*.")}'
         monkeypatch.setattr('services.acme.dns_providers.create_provider',
                             lambda *_a, **_k: provider)
         monkeypatch.setattr(proxy_mod, 'wait_for_txt',
@@ -730,32 +730,67 @@ class TestDns01Thread:
                 assert state[chall]['status'] == 'submitted'
 
 
-    def test_apex_and_wildcard_threads_keep_both_txt_values(self, app, monkeypatch, stub_directory):
-        """Each thread reads the record set, then writes it back with its value added."""
-        provider = self._patch_dns(monkeypatch)
+    def test_txt_record_lock_serialises_read_merge_write(self, app):
+        """Two writers of one name, each reading then writing back with its value added."""
         published = []
 
-        def _merge(_zone, _name, value, *_a, **_k):
-            seen = list(published)
-            time.sleep(0.3)
-            published[:] = seen + [value]
-            return True, 'ok'
+        def _merge(value):
+            with app.app_context(), proxy_mod._txt_record_lock('_acme-challenge.example.com'):
+                seen = list(published)
+                time.sleep(0.3)
+                published[:] = seen + [value]
 
-        provider.create_txt_record.side_effect = _merge
-        monkeypatch.setattr(AcmeProxyService, '_post_with_account',
-                            lambda *_a: _Resp({'status': 'processing'}))
-        challenges = [f'{UPSTREAM}/acme/chall-v3/w{index}/x' for index in range(2)]
-        with app.app_context():
-            order_id = _order(order_url=f'{ORDER_URL}w', upstream_order_url=f'{ORDER_URL}w').id
-            svc = AcmeProxyService('https://ucm.example/acme/proxy')
-        threads = [threading.Thread(target=svc._bg_respond_challenge,
-                                    args=(app, chall, f'tok{index}.up', domain, order_id))
-                   for index, (chall, domain) in enumerate(zip(challenges, (DOMAIN, f'*.{DOMAIN}')))]
+        threads = [threading.Thread(target=_merge, args=(v,)) for v in ('apex', 'wildcard')]
         for thread in threads:
             thread.start()
         for thread in threads:
             thread.join(30)
-        assert len(published) == 2
+        assert sorted(published) == ['apex', 'wildcard']
+
+    def test_txt_values_are_written_under_the_name_lock(self, app, monkeypatch, stub_directory):
+        from contextlib import contextmanager
+        held = []
+
+        @contextmanager
+        def _recording(name):
+            held.append(name)
+            yield
+            held.remove(name)
+
+        provider = self._patch_dns(monkeypatch)
+        writes = []
+        provider.create_txt_record.side_effect = lambda *_a, **_k: writes.append(list(held)) or (True, 'ok')
+        monkeypatch.setattr(proxy_mod, '_txt_record_lock', _recording)
+        monkeypatch.setattr(AcmeProxyService, '_post_with_account',
+                            lambda *_a: _Resp({'status': 'processing'}))
+        with app.app_context():
+            order_id = _order(order_url=f'{ORDER_URL}lk', upstream_order_url=f'{ORDER_URL}lk').id
+            svc = AcmeProxyService('https://ucm.example/acme/proxy')
+        svc._bg_respond_challenge(app, f'{UPSTREAM}/acme/chall-v3/lk/x', 'tok.up', f'*.{DOMAIN}', order_id)
+        assert writes and all(h == [f'_acme-challenge.{DOMAIN}'] for h in writes)
+
+    def test_txt_published_even_when_the_name_stays_locked(self, app, monkeypatch, stub_directory):
+        """Past the wait, publishing unprotected beats abandoning the challenge."""
+        from contextlib import contextmanager
+        from utils.process_lock import LockBusyError
+
+        @contextmanager
+        def _busy(*_a, **_k):
+            raise LockBusyError('still held')
+            yield
+
+        provider = self._patch_dns(monkeypatch)
+        provider.create_txt_record.return_value = (True, 'ok')
+        monkeypatch.setattr(proxy_mod, 'process_lock', _busy)
+        monkeypatch.setattr(AcmeProxyService, '_post_with_account',
+                            lambda *_a: _Resp({'status': 'processing'}))
+        with app.app_context():
+            order_id = _order(order_url=f'{ORDER_URL}busy', upstream_order_url=f'{ORDER_URL}busy').id
+            svc = AcmeProxyService('https://ucm.example/acme/proxy')
+        svc._bg_respond_challenge(app, f'{UPSTREAM}/acme/chall-v3/busy/x', 'tok.up', DOMAIN, order_id)
+        assert provider.create_txt_record.called
+        with app.app_context():
+            assert json.loads(db.session.get(AcmeClientOrder, order_id).dns_records_created)
 
 
 class TestOrderUrlRewrite:

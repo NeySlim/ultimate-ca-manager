@@ -6,6 +6,14 @@ from services.acme.dns_providers.route53 import Route53DnsProvider
 NAME = '_acme-challenge.example.com.'
 
 
+class _ClientError(Exception):
+    """botocore ClientError: the code is in response['Error']['Code']."""
+
+    def __init__(self, code):
+        super().__init__(f'An error occurred ({code}) when calling ListResourceRecordSets')
+        self.response = {'Error': {'Code': code}}
+
+
 class FakeRoute53:
     """boto3 route53 client: list starts at the first name >= StartRecordName (not an exact lookup)."""
 
@@ -85,7 +93,7 @@ def test_value_already_present_is_not_rewritten(api):
 def test_read_failure_does_not_overwrite(api):
     provider, fake = api
     provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok1')
-    fake.list_error = RuntimeError('Throttling: Rate exceeded')
+    fake.list_error = _ClientError('Throttling')
     fake.calls.clear()
     ok, _ = provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok2')
     assert not ok
@@ -104,7 +112,7 @@ def test_cleanup_removes_the_set_and_second_call_succeeds(api):
 
 def test_key_without_list_permission_still_writes_its_value(api):
     provider, fake = api
-    fake.list_error = RuntimeError('An error occurred (AccessDenied) when calling ListResourceRecordSets')
+    fake.list_error = _ClientError('AccessDenied')
     ok, msg = provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok1')
     assert ok, msg
     assert fake.values() == ['"tok1"']

@@ -125,3 +125,16 @@ def test_value_stored_with_quotes_is_recognised(api):
     ok, msg = _provider().create_txt_record('example.com', NAME, 'tok1')
     assert ok, msg
     assert not [c for c in api.calls if c[0] == 'PUT']
+
+
+def test_delete_of_a_missing_record_is_a_success(api, monkeypatch):
+    real = api.__call__
+
+    def gone(method, url, **kwargs):
+        if method == 'DELETE':
+            return _Response(404, {'cause': 'Not Found', 'message': 'The resource could not be found.'})
+        return real(method, url, **kwargs)
+
+    monkeypatch.setattr(requests, 'request', gone)
+    ok, msg = _provider().delete_txt_record('example.com', NAME)
+    assert ok, msg

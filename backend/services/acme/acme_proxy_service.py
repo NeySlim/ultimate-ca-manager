@@ -4,12 +4,14 @@ Acts as a gateway between internal ACME clients and upstream ACME providers (Let
 """
 import base64
 import copy
+import hashlib
 import json
 import logging
 import re
 import secrets
 import threading
 import time
+from contextlib import ExitStack, contextmanager
 from datetime import datetime
 from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, Union
@@ -22,7 +24,7 @@ from sqlalchemy import and_, or_, inspect as sa_inspect
 from sqlalchemy.exc import NoInspectionAvailable
 from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
-from utils.process_lock import process_lock
+from utils.process_lock import LockBusyError, process_lock
 from config.settings import Config
 
 from cryptography.hazmat.primitives import serialization, hashes
@@ -251,6 +253,22 @@ def _link_values(header: str):
         yield url, params
         position = cursor + 1
 
+
+
+@contextmanager
+def _txt_record_lock(record_name):
+    """Serialise the read-merge-write of one TXT name across workers; past the wait,
+    publish unprotected rather than abandon the challenge."""
+    digest = hashlib.sha256(record_name.lower().encode()).hexdigest()[:16]
+    with ExitStack() as stack:
+        try:
+            stack.enter_context(process_lock(
+                Path(Config.DATA_DIR) / f'.acme_dns_txt-{digest}.lock', timeout=120,
+                purpose='publishing a dns-01 TXT record', subject='DNS TXT update'))
+        except LockBusyError:
+            logger.warning("[ACME Proxy BG] %s still locked after 120s, publishing without the lock",
+                           record_name)
+        yield
 
 class AcmeProxyService:
     # Default upstream (Let's Encrypt Staging for safety by default, user can change)
@@ -1634,9 +1652,10 @@ class AcmeProxyService:
         logger.info(f"[ACME Proxy BG] Creating DNS TXT record for {domain}: {full_record_name}")
         # Both authorizations of a domain and its wildcard merge into one record set,
         # possibly from two workers: read-merge-write must not interleave.
-        with process_lock(Path(Config.DATA_DIR) / '.acme_dns_txt.lock', timeout=120,
-                          purpose='publishing a dns-01 TXT record', subject='DNS TXT'):
+        db.session.commit()  # no transaction held while waiting for the lock
+        with _txt_record_lock(full_record_name):
             provider.create_txt_record(zone_name, full_record_name, txt_value)
+            published = [txt_value]
 
             # Client-side pre-check support (#306/#307): lego/Caddy compute
             # the expected TXT value from THEIR account key, not from the
@@ -1649,17 +1668,17 @@ class AcmeProxyService:
             ):
                 try:
                     provider.create_txt_record(zone_name, full_record_name, extra_value)
-                    records = json.loads(order.dns_records_created) if order.dns_records_created else []
-                    records.append({
-                        'domain': zone_name,
-                        'record_name': full_record_name,
-                        'value': extra_value,
-                        'provider_id': provider_model.id
-                    })
-                    order.dns_records_created = json.dumps(records)
-                    db.session.commit()
+                    published.append(extra_value)
                 except Exception as exc:
                     logger.warning(f"[ACME Proxy BG] Client TXT value not published: {exc}")
+
+            # Store record info for cleanup, re-read: another authorization of the order may have added its own
+            db.session.refresh(order)
+            records = json.loads(order.dns_records_created) if order.dns_records_created else []
+            records.extend({'domain': zone_name, 'record_name': full_record_name,
+                            'value': value, 'provider_id': provider_model.id} for value in published)
+            order.dns_records_created = json.dumps(records)
+            db.session.commit()
 
         # Active DNS self-check instead of fixed sleep.
         timeout = dns_propagation_timeout('acme.client.dns_propagation_timeout')
@@ -1684,17 +1703,6 @@ class AcmeProxyService:
             )
         else:
             logger.info("[ACME Proxy BG] DNS TXT confirmed after %ss for %s", check['waited'], domain)
-
-        # Store record info for cleanup
-        records = json.loads(order.dns_records_created) if order.dns_records_created else []
-        records.append({
-            'domain': zone_name,
-            'record_name': full_record_name,
-            'value': txt_value,
-            'provider_id': provider_model.id
-        })
-        order.dns_records_created = json.dumps(records)
-        db.session.commit()
 
         # Trigger upstream validation
         logger.info(f"[ACME Proxy BG] Triggering upstream validation for {domain}")

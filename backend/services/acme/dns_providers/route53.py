@@ -21,8 +21,7 @@ class Route53DnsProvider(BaseDnsProvider):
     
     Create credentials at: AWS Console > IAM > Users > Security credentials
     Required permissions: route53:ChangeResourceRecordSets, route53:ListResourceRecordSets,
-    route53:ListHostedZones, route53:GetHostedZone (without ListResourceRecordSets, a
-    domain and its wildcard cannot share one order)
+    route53:ListHostedZones, route53:GetHostedZone
     """
     
     PROVIDER_TYPE = "route53"
@@ -103,7 +102,7 @@ class Route53DnsProvider(BaseDnsProvider):
                 ).get('ResourceRecordSets', [])
             except Exception as e:
                 # A key without route53:ListResourceRecordSets keeps the single-value write it had
-                if 'AccessDenied' not in str(e):
+                if (getattr(e, 'response', None) or {}).get('Error', {}).get('Code') != 'AccessDenied':
                     raise
                 logger.warning(f"Route53: cannot read {record_name}, writing the new value alone: {self._failure(e)}")
                 existing = []
