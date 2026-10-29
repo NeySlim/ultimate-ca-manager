@@ -15,6 +15,7 @@ import {
   LoadingSpinner, ExportModal
 } from '../components'
 import { accountService, casService, userCertificatesService } from '../services'
+import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useClipboard, usePermission } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
@@ -1279,10 +1280,11 @@ export default function AccountPage() {
                       value={mtlsForm.ca_id}
                       onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
                       placeholder={t('account.mtlsDefaultCA')}
-                      options={cas.filter(ca => ca.has_private_key !== false).map(ca => ({
+                      options={pickerCas(cas, mtlsForm.ca_id).map(ca => ({
                         value: ca.refid || String(ca.id),
                         label: ca.descr || ca.subject || ca.refid,
                       }))}
+                      helperText={unlistedPickerCas(cas, mtlsForm.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, mtlsForm.ca_id) }) : undefined}
                     />
                   )}
                   <Input

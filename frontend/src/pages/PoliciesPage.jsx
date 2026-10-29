@@ -17,7 +17,7 @@ import { policiesService, casService, groupsService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
-import { pickerCas } from '../lib/caSelection'
+import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { useFipsMode } from '../lib/policyAlgorithms'
 import { KEY_ALGORITHMS, KEY_GROUPS, isBrainpool } from '../lib/keyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
@@ -679,6 +679,7 @@ export default function PoliciesPage() {
                   { value: '', label: t('policies.allCAs') },
                   ...pickerCas(cas, formData.ca_id).map(ca => ({ value: ca.id.toString(), label: ca.common_name })),
                 ]}
+                helperText={unlistedPickerCas(cas, formData.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, formData.ca_id) }) : undefined}
               />
               <Input
                 label={t('policies.priority')}

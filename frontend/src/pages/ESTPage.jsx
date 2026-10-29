@@ -19,7 +19,7 @@ import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import MappingEditor from './settings/MappingEditor'
-import { pickerCas } from '../lib/caSelection'
+import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
 
 export default function ESTPage() {
   const { t } = useTranslation()
@@ -192,6 +192,7 @@ export default function ESTPage() {
               value={config.ca_id?.toString() || ''}
               onChange={(val) => setConfig({ ...config, ca_id: parseInt(val) })}
               disabled={!config.enabled}
+              helperText={unlistedPickerCas(cas, config.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, config.ca_id) }) : undefined}
             />
 
             <Input

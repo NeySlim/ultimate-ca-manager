@@ -38,7 +38,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - UI: 17 badges asked for a size that does not exist and rendered without padding, and a few for a colour that does not exist (About, SSO tests, Smart Import, failed webhook deliveries, ACME order status). They now use defined ones, and a test refuses an unknown size or colour.
 - UI: a stat card clicked to filter a list (Certificates, SSH and user certificates, Policies, Discovery, Approvals) showed no active state on desktop, so nothing said which filters were on. Active cards are outlined again.
 - CSRs: the Pending and History tabs showed at most 20 requests and every count stopped at 20; both lists now page, search and sort on the server, and History also searches by signing CA (#424, thanks @clinde04).
-- CAs: a root imported without its private key showed as active but was silently left out of the issuing, signing and parent CA lists. It is now marked **No private key** with an **Import private key** action, and those lists say how many CAs they leave out (#426).
+- CAs: a root imported without its private key showed as active but was silently left out of every CA picker. It is now marked **No private key** with an **Import private key** action, and the pickers (issuing, signing, ACME, SCEP, EST, TSA, Windows enrollment, policies, mTLS enrollment) say how many CAs they leave out (#426).
 
 ## [2.246] - 2026-10-27
 
