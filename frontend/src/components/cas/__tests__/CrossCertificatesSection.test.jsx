@@ -17,7 +17,7 @@ const mocks = vi.hoisted(() => ({
 }))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key, vars) => (vars?.issuer ? `${key}:${vars.issuer}` : key) }),
+  useTranslation: () => ({ t: (key, vars) => (vars?.issuer ? `${key}:${vars.issuer}` : vars?.count !== undefined ? `${key}:${vars.count}` : key) }),
 }))
 vi.mock('../../../contexts', () => ({
   useNotification: () => ({
@@ -128,5 +128,19 @@ describe('CrossCertificatesSection', () => {
     fireEvent.submit(dialog.querySelector('form'))
     await waitFor(() => expect(mocks.crossSign).toHaveBeenCalledWith(
       1, { subjectCaId: 9, validityDays: 90, pathLength: undefined }))
+  })
+
+  it('says how many CAs cannot sign the cross-certificate, a CA under a revoked one included (#426)', async () => {
+    mocks.getAll.mockResolvedValue({ data: [
+      { id: 1, name: 'Root A', status: 'Active', has_private_key: true },
+      { id: 2, name: 'Keyless', status: 'Active', has_private_key: false, certificate_only: true },
+      { id: 3, name: 'Under revoked', status: 'Active', has_private_key: true, revoked_in_chain: true },
+      { id: 9, name: 'Root B', status: 'Active', has_private_key: true },
+    ] })
+    render(<CrossCertificatesSection ca={ca} canWrite />)
+    fireEvent.click(await screen.findByText('crossCerts.sign'))
+    const dialog = await screen.findByRole('dialog')
+    await waitFor(() => expect(dialog.textContent).toContain('cas.notListedForSigning:2'))
+    expect(dialog.textContent).not.toContain('Under revoked')
   })
 })

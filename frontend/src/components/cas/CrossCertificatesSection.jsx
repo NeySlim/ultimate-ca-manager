@@ -13,6 +13,7 @@ import { casService } from '../../services'
 import { useNotification } from '../../contexts'
 import { extractData, formatDate, downloadBlob } from '../../lib/utils'
 import { certificateFileToPem, commonNameOf, crossStateOf } from '../../lib/crossCertificates'
+import { signingCas } from '../../lib/caSelection'
 
 const STATE_VARIANT = { revoked: 'danger', expired: 'danger', notYetValid: 'warning' }
 const FIELD = 'w-full px-3 py-2 bg-bg-tertiary border border-border rounded-md text-sm text-text-primary focus:outline-none focus:border-accent-primary'
@@ -76,6 +77,7 @@ function CrossSignModal({ open, onClose, ca, onDone }) {
   const { t } = useTranslation()
   const { showSuccess, showError, showWarning } = useNotification()
   const [issuers, setIssuers] = useState([])
+  const [unlistedIssuers, setUnlistedIssuers] = useState(0)
   const [issuerId, setIssuerId] = useState('')
   const [validityDays, setValidityDays] = useState('')
   const [pathLength, setPathLength] = useState('')
@@ -86,9 +88,10 @@ function CrossSignModal({ open, onClose, ca, onDone }) {
     let cancelled = false
     casService.getAll().then((res) => {
       if (cancelled) return
-      const all = extractData(res) || []
-      setIssuers(all.filter(c => c.id !== ca.id && c.crt !== null && !c.pending && !c.offline && !c.revoked
-        && c.status === 'Active' && (c.has_private_key || c.uses_hsm)))
+      const others = (extractData(res) || []).filter(c => c.id !== ca.id)
+      const usable = signingCas(others).filter(c => c.status === 'Active')
+      setIssuers(usable)
+      setUnlistedIssuers(others.length - usable.length)
     }).catch(() => { if (!cancelled) setIssuers([]) })
     return () => { cancelled = true }
   }, [open, ca.id])
@@ -126,6 +129,9 @@ function CrossSignModal({ open, onClose, ca, onDone }) {
             <option value="" disabled>{t('crossCerts.selectIssuer')}</option>
             {issuers.map(c => <option key={c.id} value={c.id}>{c.name || c.common_name}</option>)}
           </select>
+          {unlistedIssuers > 0 && (
+            <p className="text-xs text-text-tertiary">{t('cas.notListedForSigning', { count: unlistedIssuers })}</p>
+          )}
         </div>
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">

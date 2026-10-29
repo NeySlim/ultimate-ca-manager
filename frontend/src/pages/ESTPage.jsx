@@ -228,10 +228,15 @@ export default function ESTPage() {
               keyLabel={t('est.labelName')}
               valueLabel={t('common.issuingCA')}
               keyPlaceholder={t('est.labelPlaceholder')}
-              valueOptions={cas
+              valueOptions={pickerCas(cas, ...Object.values(config.labels || {}))
                 .filter(ca => ca.refid)
                 .map(ca => ({ value: ca.refid, label: ca.name || ca.subject }))}
             />
+            {unlistedPickerCas(cas, ...Object.values(config.labels || {})) > 0 && (
+              <p className="text-xs text-text-tertiary">
+                {t('cas.notListedForSigning', { count: unlistedPickerCas(cas, ...Object.values(config.labels || {})) })}
+              </p>
+            )}
           </Card>
 
           <Card className="p-4 space-y-4">
