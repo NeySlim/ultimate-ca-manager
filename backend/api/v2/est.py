@@ -4,6 +4,7 @@ EST Management Routes v2.0
 """
 
 from utils.signing_ca import signing_ca_problem
+from api.est_protocol import _est_label_map
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
@@ -144,10 +145,7 @@ def update_est_config():
         if len(labels_in) > 50:
             return error_response('too many EST labels (max 50)', 400)
 
-        try:
-            saved_refids = set(json.loads(get_config('est_labels', '') or '{}').values())
-        except (TypeError, ValueError, AttributeError):
-            saved_refids = set()
+        saved_refids = set(_est_label_map().values())
         cleaned = {}
         for label, value in labels_in.items():
             if not isinstance(label, str) or not _EST_LABEL_RE.match(label):

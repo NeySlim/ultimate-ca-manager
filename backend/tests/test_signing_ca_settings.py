@@ -4,6 +4,7 @@ import json
 import pytest
 
 from models import CA, db
+from models.hsm import HsmKey, HsmProvider
 from models.system_config import SystemConfig
 
 
@@ -76,3 +77,45 @@ def test_est_label_already_saved_stays_saveable(app, auth_client, cas):
     assert r.status_code == 200, r.data
     with app.app_context():
         assert json.loads(_config('est_labels')) == labels
+
+
+def test_scep_default_ca_refuses_an_hsm_ca(app, auth_client, cas):
+    signer, _, _ = cas
+    with app.app_context():
+        provider = HsmProvider(name='settings-hsm', type='openbao')
+        provider.config = json.dumps({'url': 'http://bao.test', 'token': 't'})
+        db.session.add(provider)
+        db.session.commit()
+        key = HsmKey(provider_id=provider.id, key_identifier='settings-key', label='settings',
+                     algorithm='rsa', key_type='rsa', purpose='sign')
+        db.session.add(key)
+        db.session.commit()
+        db.session.get(CA, signer['id']).hsm_key_id = key.id
+        db.session.commit()
+    try:
+        r = auth_client.patch('/api/v2/scep/config', json={'ca_id': signer['id']})
+        assert r.status_code == 400, r.data
+        assert r.get_json()['message'].startswith('Selected CA is HSM-backed')
+    finally:
+        with app.app_context():
+            db.session.get(CA, signer['id']).hsm_key_id = None
+            db.session.commit()
+
+
+def test_scep_default_ca_saved_as_refid(app, auth_client, cas):
+    _, keyless, refids = cas
+    with app.app_context():
+        _restore('scep_ca_id', refids[keyless['id']])
+    assert auth_client.get('/api/v2/scep/config').get_json()['data']['ca_id'] == keyless['id']
+    r = auth_client.patch('/api/v2/scep/config', json={'ca_id': keyless['id']})
+    assert r.status_code == 200, r.data
+
+
+def test_default_scep_ca_cannot_be_deleted(app, auth_client, cas):
+    signer, _, _ = cas
+    assert auth_client.patch('/api/v2/scep/config', json={'ca_id': signer['id']}).status_code == 200
+    r = auth_client.delete(f"/api/v2/cas/{signer['id']}")
+    assert r.status_code == 409, r.data
+    assert 'default SCEP CA' in r.get_json()['message']
+    with app.app_context():
+        assert db.session.get(CA, signer['id']) is not None
