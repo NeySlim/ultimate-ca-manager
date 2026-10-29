@@ -459,7 +459,7 @@ export function DetailTabs({ tabs, activeTab, onChange, className }) {
  * @param {boolean} collapsible - Allow expand/collapse
  * @param {boolean} defaultOpen - Initial state if collapsible
  */
-export function CompactSection({ title, children, className, collapsible = false, defaultOpen = true, icon: Icon, iconClass }) {
+export function CompactSection({ title, children, className, collapsible = false, defaultOpen = true, icon: Icon, iconClass, onToggle }) {
   const [isOpen, setIsOpen] = useState(defaultOpen)
   
   return (
@@ -470,7 +470,7 @@ export function CompactSection({ title, children, className, collapsible = false
     )}>
       <button
         type="button"
-        onClick={() => collapsible && setIsOpen(!isOpen)}
+        onClick={() => { if (collapsible) { setIsOpen(!isOpen); onToggle?.(!isOpen) } }}
         className={cn(
           "w-full px-3 py-2 flex items-center justify-between text-left relative",
           "section-header-gradient",

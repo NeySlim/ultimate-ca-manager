@@ -56,15 +56,49 @@ describe('ChainUsageSection', () => {
     expect(await screen.findByText('chainUsage.truncated:1')).toBeInTheDocument()
   })
 
-  it('renders nothing when the usage cannot be read', async () => {
-    mocks.getChainUsage.mockRejectedValue(new Error('forbidden'))
-    const { container } = renderIt()
-    await waitFor(() => expect(mocks.getChainUsage).toHaveBeenCalled())
-    expect(container).toBeEmptyDOMElement()
+  it('asks for the usage only when the section is opened, once', async () => {
+    mocks.getChainUsage.mockResolvedValue(usage())
+    renderIt()
+    await screen.findByText('chainUsage.title')
+    expect(mocks.getChainUsage).not.toHaveBeenCalled()
+    fireEvent.click(screen.getByText('chainUsage.title'))
+    await screen.findByTestId('chain-usage-empty')
+    fireEvent.click(screen.getByText('chainUsage.title'))
+    fireEvent.click(screen.getByText('chainUsage.title'))
+    expect(mocks.getChainUsage).toHaveBeenCalledTimes(1)
   })
 
-  it('does not ask for a pending CA', () => {
-    renderIt({ id: 1, pending: true })
+  it('does not say nothing depends on the CA while a servable cross-certificate it issued is on offer', async () => {
+    mocks.getChainUsage.mockResolvedValue(usage({
+      via_cross: section({ cross_certificates: [{ id: 3, ca_id: 2, ca_name: 'Root B', served: false, servable: true }] }),
+    }))
+    renderIt()
+    await open()
+    expect(await screen.findByTestId('chain-usage-offered')).toBeInTheDocument()
+    expect(screen.queryByTestId('chain-usage-empty')).toBeNull()
+  })
+
+  it('still says nothing depends on the CA when the only cross-certificates cannot be served', async () => {
+    mocks.getChainUsage.mockResolvedValue(usage({
+      via_cross: section({ cross_certificates: [{ id: 3, ca_id: 2, ca_name: 'Root B', served: false, servable: false }] }),
+    }))
+    renderIt()
+    await open()
+    expect(await screen.findByTestId('chain-usage-empty')).toBeInTheDocument()
+    expect(screen.getByText(/chainUsage.notServable/)).toBeInTheDocument()
+  })
+
+  it('shows an error when the usage cannot be read', async () => {
+    mocks.getChainUsage.mockRejectedValue(new Error('forbidden'))
+    renderIt()
+    await open()
+    expect(await screen.findByTestId('chain-usage-error')).toBeInTheDocument()
+    expect(screen.queryByTestId('chain-usage-empty')).toBeNull()
+  })
+
+  it('renders nothing for a pending CA', () => {
+    const { container } = renderIt({ id: 1, pending: true })
+    expect(container).toBeEmptyDOMElement()
     expect(mocks.getChainUsage).not.toHaveBeenCalled()
   })
 })
