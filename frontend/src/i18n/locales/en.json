@@ -850,6 +850,8 @@
     "noPrivateKeyBanner": "UCM holds this CA's certificate but not its private key, so it is not offered when issuing or signing. Import its private key to issue certificates from it.",
     "notListedForSigning_one": "{{count}} CA is not listed: it cannot sign now (no private key, offline, revoked or pending).",
     "notListedForSigning_other": "{{count}} CAs are not listed: they cannot sign now (no private key, offline, revoked or pending).",
+    "notListedForScep_one": "{{count}} CA is not listed: SCEP cannot use it (no private key, HSM-backed, offline, revoked or pending).",
+    "notListedForScep_other": "{{count}} CAs are not listed: SCEP cannot use them (no private key, HSM-backed, offline, revoked or pending).",
     "importPrivateKey": "Import private key",
     "parentCA": "Parent CA",
     "hierarchy": "Hierarchy",

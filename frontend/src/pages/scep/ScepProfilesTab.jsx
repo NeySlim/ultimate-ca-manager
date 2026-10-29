@@ -6,7 +6,7 @@ import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { scepService } from '../../services'
 import { useNotification } from '../../contexts'
 import { useClipboard } from '../../hooks/useClipboard'
-import { pickerCas, unlistedPickerCas } from '../../lib/caSelection'
+import { scepPickerCas, unlistedScepPickerCas } from '../../lib/caSelection'
 import { extractData } from '../../lib/utils'
 
 const EMPTY_FORM = {
@@ -249,8 +249,8 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
             value={formData.ca_id}
             onChange={(val) => update('ca_id', val)}
             placeholder={t('certificates.selectCA')}
-            options={pickerCas(cas, formData.ca_id).map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
-            helperText={unlistedPickerCas(cas, formData.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, formData.ca_id) }) : undefined}
+            options={scepPickerCas(cas, formData.ca_id).map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
+            helperText={unlistedScepPickerCas(cas, formData.ca_id) > 0 ? t('cas.notListedForScep', { count: unlistedScepPickerCas(cas, formData.ca_id) }) : undefined}
           />
           <Select
             label={t('scep.profileTemplate')}

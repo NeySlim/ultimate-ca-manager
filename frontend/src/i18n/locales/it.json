@@ -850,6 +850,8 @@
     "noPrivateKeyBanner": "UCM possiede il certificato di questa CA ma non la sua chiave privata, quindi non viene proposta per l'emissione o la firma. Importa la sua chiave privata per emettere certificati da essa.",
     "notListedForSigning_one": "{{count}} CA non è elencata: al momento non può firmare (senza chiave privata, offline, revocata o in attesa).",
     "notListedForSigning_other": "{{count}} CA non sono elencate: al momento non possono firmare (senza chiave privata, offline, revocate o in attesa).",
+    "notListedForScep_one": "{{count}} CA non è elencata: SCEP non può utilizzarla (senza chiave privata, su HSM, offline, revocata o in attesa).",
+    "notListedForScep_other": "{{count}} CA non sono elencate: SCEP non può utilizzarle (senza chiave privata, su HSM, offline, revocate o in attesa).",
     "importPrivateKey": "Importa chiave privata",
     "parentCA": "CA padre",
     "hierarchy": "Gerarchia",

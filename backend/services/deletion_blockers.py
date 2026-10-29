@@ -118,6 +118,16 @@ def ca_deletion_blockers(ca) -> Iterator[DeletionBlocker]:
             'Rescope or delete them first.',
             f'{policies} issuance policy(ies) scoped to it',
         )
+    # Kept as a bare id: SQLite may hand it to the next CA created (#426)
+    from models.system_config import SystemConfig
+    scep_default = SystemConfig.query.filter_by(key='scep_ca_id').first()
+    if scep_default and scep_default.value in (str(ca.id), ca.refid):
+        yield DeletionBlocker(
+            409,
+            'Cannot delete CA: it is the default SCEP CA. '
+            'Clear it or choose another one in the SCEP settings first.',
+            'default SCEP CA',
+        )
     from models.deploy import CRLDeployBinding
     crl_bindings = CRLDeployBinding.query.filter_by(ca_id=ca.id).count()
     if crl_bindings > 0:

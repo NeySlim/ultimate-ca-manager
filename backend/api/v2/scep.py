@@ -41,13 +41,22 @@ def set_config(key, value):
 CHALLENGE_VALIDITY_HOURS = (1, 720)
 
 
+def _saved_scep_ca_id():
+    """The numeric id of the saved SCEP CA; older installs may hold its refid."""
+    value = get_config('scep_ca_id', '') or ''
+    if value.isdigit():
+        return int(value) or None
+    ca = CA.query.filter_by(refid=value).first() if value else None
+    return ca.id if ca else None
+
+
 @bp.route('/api/v2/scep/config', methods=['GET'])
 @require_auth(['read:scep'])
 def get_scep_config():
     """Get SCEP configuration from database"""
     return success_response(data={
         'enabled': get_config('scep_enabled', 'true') == 'true',
-        'ca_id': int(get_config('scep_ca_id', '0') or 0) or None,
+        'ca_id': _saved_scep_ca_id(),
         'auto_approve': get_config('scep_auto_approve', 'false') == 'true',
         'challenge_validity': int(get_config('scep_challenge_validity', '24')),
         'challenge_validity_range': list(CHALLENGE_VALIDITY_HOURS),
@@ -72,8 +81,18 @@ def update_scep_config():
                 ca_id_int = int(data['ca_id'])
             except (TypeError, ValueError):
                 return error_response('Invalid ca_id', 400)
-            if not db.session.get(CA, ca_id_int):
+            ca = db.session.get(CA, ca_id_int)
+            if not ca:
                 return error_response('CA not found', 404)
+            # The saved CA stays saveable so the other settings never hinge on it (#426)
+            if get_config('scep_ca_id', '') not in (str(ca_id_int), ca.refid):
+                problem = signing_ca_problem(ca)
+                if problem:
+                    return error_response(f'Selected CA cannot sign: {problem}', 400)
+                if ca.uses_hsm:
+                    return error_response(
+                        'Selected CA is HSM-backed: SCEP requires RSA envelope decryption, '
+                        'unavailable for HSM keys', 400)
             set_config('scep_ca_id', str(ca_id_int))
         else:
             set_config('scep_ca_id', '')
@@ -442,13 +461,15 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
         if not ca:
             return False, 'CA not found'
         saved = db.session.get(ScepProfile, profile_id) if profile_id else None
-        if not (saved is not None and saved.ca_refid == ca.refid) and signing_ca_problem(ca):
-            return False, f'Selected CA cannot sign: {signing_ca_problem(ca)}'
-        if not ca.has_private_key:
-            return False, 'Selected CA has no private key'
-        if ca.uses_hsm:
-            return False, ('Selected CA is HSM-backed: SCEP requires RSA '
-                           'envelope decryption, unavailable for HSM keys')
+        # The CA a profile is already bound to stays saveable, as for the default CA (#426)
+        if not (saved is not None and saved.ca_refid == ca.refid):
+            if signing_ca_problem(ca):
+                return False, f'Selected CA cannot sign: {signing_ca_problem(ca)}'
+            if not ca.has_private_key:
+                return False, 'Selected CA has no private key'
+            if ca.uses_hsm:
+                return False, ('Selected CA is HSM-backed: SCEP requires RSA '
+                               'envelope decryption, unavailable for HSM keys')
         data['ca_refid'] = ca.refid
 
     template_ref = data.get('template_id') if 'template_id' in data else None

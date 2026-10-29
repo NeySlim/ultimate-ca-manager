@@ -850,6 +850,8 @@
     "noPrivateKeyBanner": "O UCM possui o certificado desta CA, mas não a sua chave privada, por isso ela não é oferecida na emissão nem na assinatura. Importe a sua chave privada para emitir certificados a partir dela.",
     "notListedForSigning_one": "{{count}} CA não está listada: não pode assinar neste momento (sem chave privada, offline, revogada ou pendente).",
     "notListedForSigning_other": "{{count}} CAs não estão listadas: não podem assinar neste momento (sem chave privada, offline, revogadas ou pendentes).",
+    "notListedForScep_one": "{{count}} CA não está listada: o SCEP não pode utilizá-la (sem chave privada, em HSM, offline, revogada ou pendente).",
+    "notListedForScep_other": "{{count}} CAs não estão listadas: o SCEP não pode utilizá-las (sem chave privada, em HSM, offline, revogadas ou pendentes).",
     "importPrivateKey": "Importar chave privada",
     "parentCA": "CA pai",
     "hierarchy": "Hierarquia",

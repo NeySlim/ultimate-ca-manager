@@ -4,6 +4,7 @@ EST Management Routes v2.0
 """
 
 from utils.signing_ca import signing_ca_problem
+from api.est_protocol import _est_label_map
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
@@ -144,6 +145,7 @@ def update_est_config():
         if len(labels_in) > 50:
             return error_response('too many EST labels (max 50)', 400)
 
+        saved_refids = set(_est_label_map().values())
         cleaned = {}
         for label, value in labels_in.items():
             if not isinstance(label, str) or not _EST_LABEL_RE.match(label):
@@ -153,8 +155,12 @@ def update_est_config():
             refid = value.get('ca_refid') if isinstance(value, dict) else value
             if not isinstance(refid, str) or not refid:
                 return error_response(f"Label '{label}' has no CA", 400)
-            if not CA.query.filter_by(refid=refid).first():
+            ca = CA.query.filter_by(refid=refid).first()
+            if not ca:
                 return error_response(f"Label '{label}': CA not found", 404)
+            # A CA a label already points to stays saveable, as for the default CA (#426)
+            if refid not in saved_refids and signing_ca_problem(ca):
+                return error_response(f"Label '{label}': {signing_ca_problem(ca)}", 400)
             cleaned[label] = refid
         set_config('est_labels', json.dumps(cleaned))
 
