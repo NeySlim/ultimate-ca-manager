@@ -39,6 +39,7 @@ class AzureDnsProvider(BaseDnsProvider):
         super().__init__(credentials)
         self._zone_cache: Dict[str, Dict] = {}
         self._access_token: Optional[str] = None
+        self._last_status: Optional[int] = None
     
     def _get_access_token(self) -> Tuple[bool, str]:
         """Get OAuth2 access token from Azure AD"""
@@ -108,6 +109,7 @@ class AzureDnsProvider(BaseDnsProvider):
                 timeout=30,
             )
             
+            self._last_status = response.status_code
             if response.status_code >= 400:
                 try:
                     error = response.json()
@@ -175,12 +177,19 @@ class AzureDnsProvider(BaseDnsProvider):
             f"?api-version={self.API_VERSION}"
         )
         
-        data = {
-            "properties": {
-                "TTL": ttl,
-                "TXTRecords": [{"value": [record_value]}],
-            }
-        }
+        # PUT replaces the whole set: read it first and write back existing values plus the new one.
+        success, current = self._request("GET", path)
+        if not success and self._last_status != 404:
+            return False, f"Failed to read existing record: {current}"
+        props = (current or {}).get("properties", {}) if success else {}
+        records = list(props.get("TXTRecords", []))
+        if any(r.get("value") == [record_value] for r in records):
+            return True, "Record already present"
+        records.append({"value": [record_value]})
+        properties = {"TTL": props.get("TTL", ttl), "TXTRecords": records}
+        if props.get("metadata"):
+            properties["metadata"] = props["metadata"]
+        data = {"properties": properties}
         
         success, result = self._request("PUT", path, data)
         

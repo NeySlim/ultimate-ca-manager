@@ -32,6 +32,7 @@ class DesecDnsProvider(BaseDnsProvider):
     def __init__(self, credentials: Dict[str, Any]):
         super().__init__(credentials)
         self._domain_cache: Dict[str, str] = {}
+        self._last_status: Optional[int] = None
     
     def _get_headers(self) -> Dict[str, str]:
         return {
@@ -57,6 +58,7 @@ class DesecDnsProvider(BaseDnsProvider):
                 timeout=30
             )
             
+            self._last_status = response.status_code
             if response.status_code >= 400:
                 try:
                     error = response.json()
@@ -120,33 +122,34 @@ class DesecDnsProvider(BaseDnsProvider):
         
         subname = subname.rstrip('.')
         
-        # deSEC uses PATCH to create/update RRsets
-        data = {
-            'subname': subname,
-            'type': 'TXT',
-            'ttl': max(ttl, 60),  # deSEC minimum TTL is 60
-            'records': [f'"{record_value}"']
-        }
-        
-        # Try to create new RRset
-        success, result = self._request(
-            'POST', 
-            f'/domains/{domain_name}/rrsets/',
-            data
-        )
-        
-        if not success:
-            # If exists, try PATCH to update
-            if 'already exists' in str(result).lower():
-                success, result = self._request(
-                    'PATCH',
-                    f'/domains/{domain_name}/rrsets/{subname}/TXT/',
-                    {'records': [f'"{record_value}"'], 'ttl': max(ttl, 60)}
-                )
-                if not success:
-                    return False, f"Failed to update record: {result}"
-            else:
+        # An RRset holds all values of a name: merge into the existing one so a
+        # wildcard and its apex (same name) coexist. A failed read must not overwrite.
+        quoted = f'"{record_value}"'
+        rrset_path = f'/domains/{domain_name}/rrsets/{subname or "@"}/TXT/'
+        success, current = self._request('GET', rrset_path)
+        if success and isinstance(current, dict):
+            records = list(current.get('records') or [])
+            if quoted in records:
+                logger.info(f"deSEC: TXT value already present on {record_name}")
+                return True, "Record created successfully"
+            success, result = self._request(
+                'PATCH', rrset_path,
+                {'records': records + [quoted], 'ttl': current.get('ttl') or max(ttl, 60)}
+            )
+            if not success:
+                return False, f"Failed to update record: {result}"
+        elif self._last_status == 404:
+            data = {
+                'subname': subname,
+                'type': 'TXT',
+                'ttl': max(ttl, 60),  # deSEC minimum TTL is 60
+                'records': [quoted]
+            }
+            success, result = self._request('POST', f'/domains/{domain_name}/rrsets/', data)
+            if not success:
                 return False, f"Failed to create record: {result}"
+        else:
+            return False, f"Failed to read existing record: {current}"
         
         logger.info(f"deSEC: Created TXT record {record_name}")
         return True, "Record created successfully"

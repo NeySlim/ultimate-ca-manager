@@ -35,6 +35,7 @@ class GandiDnsProvider(BaseDnsProvider):
     def __init__(self, credentials: Dict[str, Any]):
         super().__init__(credentials)
         self._domain_cache: Dict[str, bool] = {}
+        self._last_status: Optional[int] = None
     
     def _get_headers(self) -> Dict[str, str]:
         return {
@@ -62,6 +63,7 @@ class GandiDnsProvider(BaseDnsProvider):
                 timeout=30
             )
             
+            self._last_status = response.status_code
             if response.status_code >= 400:
                 try:
                     error = response.json()
@@ -120,18 +122,29 @@ class GandiDnsProvider(BaseDnsProvider):
         else:
             relative_name = record_name
         
-        # Gandi API: PUT /domains/{domain}/records/{name}/{type}
-        data = {
-            'rrset_values': [record_value],
-            'rrset_ttl': ttl,
-        }
-        
         encoded_name = quote(relative_name, safe='')
-        success, result = self._request(
-            'PUT',
-            f'/domains/{gandi_domain}/records/{encoded_name}/TXT',
-            data,
-        )
+        path = f'/domains/{gandi_domain}/records/{encoded_name}/TXT'
+
+        # PUT replaces the whole RRset: read it first so a wildcard and its
+        # apex (same name, two values) coexist. A failed read must not overwrite.
+        existing: list = []
+        rrset_ttl = ttl
+        ok_get, current = self._request('GET', path)
+        if ok_get and isinstance(current, dict):
+            existing = list(current.get('rrset_values') or [])
+            rrset_ttl = current.get('rrset_ttl') or ttl
+        elif not ok_get and self._last_status != 404:
+            return False, f"Failed to read existing record: {current}"
+
+        if record_value in existing:
+            logger.info(f"Gandi: TXT value already present on {record_name}")
+            return True, "Record created successfully"
+
+        data = {
+            'rrset_values': existing + [record_value],
+            'rrset_ttl': rrset_ttl,
+        }
+        success, result = self._request('PUT', path, data)
 
         if not success:
             return False, f"Failed to create record: {result}"

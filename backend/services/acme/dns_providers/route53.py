@@ -92,7 +92,16 @@ class Route53DnsProvider(BaseDnsProvider):
         # Ensure record name ends with dot (FQDN)
         fqdn = record_name if record_name.endswith('.') else f"{record_name}."
         
+        quoted = f'"{record_value}"'
         try:
+            # UPSERT replaces the whole set: re-send the existing values with the new one.
+            existing = client.list_resource_record_sets(
+                HostedZoneId=zone['Id'], StartRecordName=fqdn, StartRecordType='TXT', MaxItems='1'
+            ).get('ResourceRecordSets', [])
+            current = next((r for r in existing if r['Name'] == fqdn and r['Type'] == 'TXT'), None)
+            values = [r['Value'] for r in (current or {}).get('ResourceRecords', [])]
+            if quoted in values:
+                return True, "Record already present"
             response = client.change_resource_record_sets(
                 HostedZoneId=zone['Id'],
                 ChangeBatch={
@@ -102,10 +111,8 @@ class Route53DnsProvider(BaseDnsProvider):
                         'ResourceRecordSet': {
                             'Name': fqdn,
                             'Type': 'TXT',
-                            'TTL': ttl,
-                            'ResourceRecords': [
-                                {'Value': f'"{record_value}"'}
-                            ]
+                            'TTL': current.get('TTL', ttl) if current else ttl,
+                            'ResourceRecords': [{'Value': v} for v in values + [quoted]]
                         }
                     }]
                 }

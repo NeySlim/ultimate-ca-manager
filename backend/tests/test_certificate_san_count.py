@@ -10,8 +10,9 @@ def _listed(auth_client, cn):
     return rows[0]
 
 
-def test_listing_counts_every_san(app, auth_client, create_cert):
-    cert = create_cert(cn='san-count.example.com')
+def test_listing_counts_every_san(app, auth_client, create_ca, create_cert):
+    # Its own CA: the session's default one may have been made unusable by an earlier file
+    cert = create_cert(cn='san-count.example.com', ca_id=create_ca(cn='SAN count CA')['id'])
     with app.app_context():
         from models import Certificate, db
         row = db.session.get(Certificate, cert['id'])
@@ -30,8 +31,8 @@ def test_listing_counts_every_san(app, auth_client, create_cert):
     )
 
 
-def test_listing_counts_zero_without_san(app, auth_client, create_cert):
-    cert = create_cert(cn='no-san.example.com')
+def test_listing_counts_zero_without_san(app, auth_client, create_ca, create_cert):
+    cert = create_cert(cn='no-san.example.com', ca_id=create_ca(cn='No SAN CA')['id'])
     with app.app_context():
         from models import Certificate, db
         row = db.session.get(Certificate, cert['id'])
