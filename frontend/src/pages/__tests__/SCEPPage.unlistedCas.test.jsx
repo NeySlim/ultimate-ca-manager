@@ -19,6 +19,11 @@ vi.doMock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
+vi.doMock('../../hooks', async (orig) => ({
+  ...(await orig()),
+  usePermission: () => ({ canWrite: () => true, canDelete: () => true, hasPermission: () => true, canRead: () => true }),
+}))
+
 // A native select exposes the options and the helper text that the real one hides in a portal.
 vi.doMock('../../components', async (orig) => ({
   ...(await orig()),
@@ -36,6 +41,7 @@ const CAS = [
   { id: 1, name: 'Signing CA', has_private_key: true },
   { id: 2, name: 'Keyless root', certificate_only: true, has_private_key: false },
   { id: 3, name: 'Offline CA', has_private_key: true, offline: true },
+  { id: 4, name: 'HSM CA', uses_hsm: true },
 ]
 
 let SCEPPage
@@ -60,13 +66,22 @@ const optionValues = (box) => within(box).getAllByRole('option').map((o) => o.te
 describe('SCEPPage default CA picker (#426)', () => {
   it('offers only the CA that can sign and counts the others', async () => {
     const box = await openPicker(undefined)
-    expect(optionValues(box)).toEqual(['Signing CA'])
-    expect(await within(box).findByText('cas.notListedForSigning:2')).toBeInTheDocument()
+    expect(optionValues(box)).toEqual(['common.none', 'Signing CA'])
+    expect(await within(box).findByText('cas.notListedForSigning:3')).toBeInTheDocument()
   })
 
   it('keeps the saved CA without a key listed and counts one less', async () => {
     const box = await openPicker(2)
-    expect(optionValues(box)).toEqual(['Signing CA', 'Keyless root'])
-    expect(await within(box).findByText('cas.notListedForSigning:1')).toBeInTheDocument()
+    expect(optionValues(box)).toEqual(['common.none', 'Signing CA', 'Keyless root'])
+    expect(await within(box).findByText('cas.notListedForSigning:2')).toBeInTheDocument()
+  })
+
+  it('can clear the default CA, so the CA can then be deleted', async () => {
+    const box = await openPicker(1)
+    scepService.updateConfig = vi.fn().mockResolvedValue({ data: {} })
+    fireEvent.change(within(box).getByRole('combobox'), { target: { value: '__none__' } })
+    fireEvent.click(screen.getByText('common.saveConfiguration'))
+    await vi.waitFor(() => expect(scepService.updateConfig).toHaveBeenCalled())
+    expect(scepService.updateConfig.mock.calls[0][0].ca_id).toBeNull()
   })
 })

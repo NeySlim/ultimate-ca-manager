@@ -111,9 +111,11 @@ def test_scep_default_ca_saved_as_refid(app, auth_client, cas):
     assert r.status_code == 200, r.data
 
 
-def test_default_scep_ca_cannot_be_deleted(app, auth_client, cas):
-    signer, _, _ = cas
-    assert auth_client.patch('/api/v2/scep/config', json={'ca_id': signer['id']}).status_code == 200
+@pytest.mark.parametrize('stored_as', ['id', 'refid'])
+def test_default_scep_ca_cannot_be_deleted(app, auth_client, cas, stored_as):
+    signer, _, refids = cas
+    with app.app_context():
+        _restore('scep_ca_id', str(signer['id']) if stored_as == 'id' else refids[signer['id']])
     r = auth_client.delete(f"/api/v2/cas/{signer['id']}")
     assert r.status_code == 409, r.data
     assert 'default SCEP CA' in r.get_json()['message']

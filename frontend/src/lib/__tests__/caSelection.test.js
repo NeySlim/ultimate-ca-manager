@@ -3,7 +3,7 @@
  * and its key import is offered whether its key was expected or not (#426).
  */
 import { describe, it, expect } from 'vitest'
-import { holdsNoKey, needsKeyImport, signingCas, unlistedPickerCas, unlistedSigningCas } from '../caSelection'
+import { holdsNoKey, needsKeyImport, scepPickerCas, signingCas, unlistedPickerCas, unlistedScepPickerCas, unlistedSigningCas } from '../caSelection'
 
 const keylessRoot = { id: 1, is_root: true, type: 'root', certificate_only: true, has_private_key: false }
 const keylessIntermediate = { id: 2, is_root: false, type: 'intermediate', certificate_only: true, has_private_key: false }
@@ -42,5 +42,23 @@ describe('CAs held without their key', () => {
     expect(unlistedPickerCas(cas)).toBe(2)
     expect(unlistedPickerCas(cas, '2')).toBe(1)
     expect(unlistedPickerCas(cas, 'abc', 2)).toBe(0)
+  })
+})
+
+describe('SCEP pickers', () => {
+  const cas = [
+    { id: 1, refid: 'r1', has_private_key: true },
+    { id: 2, refid: 'r2', uses_hsm: true },
+  ]
+
+  it('leave out an HSM-backed CA and count it', () => {
+    expect(scepPickerCas(cas).map(c => c.id)).toEqual([1])
+    expect(unlistedScepPickerCas(cas)).toBe(1)
+  })
+
+  it('keep a saved HSM-backed CA visible, by id or refid', () => {
+    expect(scepPickerCas(cas, 2).map(c => c.id)).toEqual([1, 2])
+    expect(scepPickerCas(cas, 'r2').map(c => c.id)).toEqual([1, 2])
+    expect(unlistedScepPickerCas(cas, 2)).toBe(0)
   })
 })

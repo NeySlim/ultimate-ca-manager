@@ -125,7 +125,7 @@ def ca_deletion_blockers(ca) -> Iterator[DeletionBlocker]:
         yield DeletionBlocker(
             409,
             'Cannot delete CA: it is the default SCEP CA. '
-            'Choose another one in the SCEP settings first.',
+            'Clear it or choose another one in the SCEP settings first.',
             'default SCEP CA',
         )
     from models.deploy import CRLDeployBinding

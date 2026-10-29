@@ -23,7 +23,7 @@ import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
-import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
+import { scepPickerCas, unlistedScepPickerCas } from '../lib/caSelection'
 
 export default function SCEPPage() {
   const { t } = useTranslation()
@@ -516,11 +516,14 @@ export default function SCEPPage() {
               <Select
                 label={t('common.issuingCA')}
                 placeholder={t('common.acmeSelectCA')}
-                options={pickerCas(cas, config.ca_id).map(ca => ({ value: ca.id.toString(), label: ca.name || ca.subject }))}
-                value={config.ca_id?.toString() || ''}
-                onChange={(val) => setConfig({ ...config, ca_id: parseInt(val) })}
+                options={[
+                  { value: '__none__', label: t('common.none') },
+                  ...scepPickerCas(cas, config.ca_id).map(ca => ({ value: ca.id.toString(), label: ca.name || ca.subject })),
+                ]}
+                value={config.ca_id?.toString() || '__none__'}
+                onChange={(val) => setConfig({ ...config, ca_id: val === '__none__' ? null : parseInt(val) })}
                 disabled={!config.enabled}
-                helperText={unlistedPickerCas(cas, config.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, config.ca_id) }) : undefined}
+                helperText={unlistedScepPickerCas(cas, config.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedScepPickerCas(cas, config.ca_id) }) : undefined}
               />
             </Card>
 

@@ -48,6 +48,7 @@ const CAS = [
   { id: 1, refid: 'ca-1', descr: 'Signing CA', has_private_key: true },
   { id: 2, refid: 'ca-2', descr: 'Keyless root', certificate_only: true, has_private_key: false },
   { id: 3, refid: 'ca-3', descr: 'Offline CA', has_private_key: true, offline: true },
+  { id: 4, refid: 'ca-4', descr: 'HSM CA', uses_hsm: true },
 ]
 const PROFILE = (ca_refid) => ({ id: 9, name: 'Devices', url_slug: 'devices', ca_refid, enabled: true, auto_approve: false })
 
@@ -60,7 +61,7 @@ describe('ScepProfilesTab CA picker (#426)', () => {
     fireEvent.click(screen.getByText('scep.newProfile'))
     await screen.findByRole('dialog')
     expect(optionLabels()).toEqual(['Signing CA'])
-    expect(screen.getByTestId('field-common.certificateAuthority')).toHaveTextContent('cas.notListedForSigning:2')
+    expect(screen.getByTestId('field-common.certificateAuthority')).toHaveTextContent('cas.notListedForSigning:3')
   })
 
   it('keeps the profile CA listed when it holds no key and counts one less', async () => {
@@ -68,6 +69,6 @@ describe('ScepProfilesTab CA picker (#426)', () => {
     fireEvent.click(screen.getByLabelText('common.edit'))
     await screen.findByRole('dialog')
     expect(optionLabels()).toEqual(['Signing CA', 'Keyless root'])
-    expect(screen.getByTestId('field-common.certificateAuthority')).toHaveTextContent('cas.notListedForSigning:1')
+    expect(screen.getByTestId('field-common.certificateAuthority')).toHaveTextContent('cas.notListedForSigning:2')
   })
 })
