@@ -5711,10 +5711,12 @@
   },
   "chainUsage": {
     "title": "Still chaining to this CA",
-    "empty": "Nothing in UCM depends on this CA any more: no certificate, default chain or deployment goes through it.",
+    "empty": "Nothing in UCM depends on this CA any more: no certificate, sub-CA, default chain or deployment goes through it.",
     "issued": "Certificates issued by this CA or below",
     "viaCross": "Default chain through a cross-certificate of this CA",
     "deployments": "Deploy bindings pushing such a chain",
+    "subordinate": "Active CAs below this CA",
+    "crlDeployments": "CRL deploy bindings on this CA or below",
     "expires": "Expires {{date}}",
     "truncated": "Showing the first {{count}}",
     "crossRow": "Cross-certificate #{{id}} on {{ca}}",

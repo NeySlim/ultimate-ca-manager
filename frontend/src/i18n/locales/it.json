@@ -5708,10 +5708,12 @@
   },
   "chainUsage": {
     "title": "Ancora concatenati a questa CA",
-    "empty": "Nulla in UCM dipende più da questa CA: nessun certificato, catena predefinita o distribuzione passa da essa.",
+    "empty": "Nulla in UCM dipende più da questa CA: nessun certificato, sub-CA, catena predefinita o distribuzione passa da essa.",
     "issued": "Certificati emessi da questa CA o sotto di essa",
     "viaCross": "Catena predefinita tramite un certificato incrociato di questa CA",
     "deployments": "Binding di distribuzione che inviano una tale catena",
+    "subordinate": "CA attive sotto questa CA",
+    "crlDeployments": "Binding di distribuzione CRL su questa CA o sotto di essa",
     "expires": "Scade il {{date}}",
     "truncated": "Mostrati i primi {{count}}",
     "crossRow": "Certificato incrociato #{{id}} su {{ca}}",

@@ -5708,10 +5708,12 @@
   },
   "chainUsage": {
     "title": "Ainda encadeia nesta CA",
-    "empty": "Nada no UCM depende mais desta CA: nenhum certificado, cadeia predefinida ou implantação passa por ela.",
+    "empty": "Nada no UCM depende mais desta CA: nenhum certificado, CA subordinada, cadeia predefinida ou implantação passa por ela.",
     "issued": "Certificados emitidos por esta CA ou abaixo dela",
     "viaCross": "Cadeia predefinida por um certificado cruzado desta CA",
     "deployments": "Vínculos de implantação que enviam essa cadeia",
+    "subordinate": "CAs ativas abaixo desta CA",
+    "crlDeployments": "Vínculos de implantação de CRL nesta CA ou abaixo",
     "expires": "Expira em {{date}}",
     "truncated": "Mostrando os primeiros {{count}}",
     "crossRow": "Certificado cruzado #{{id}} em {{ca}}",

@@ -103,7 +103,7 @@ export const helpContent = {
           { label: 'Serve', text: 'At most one per CA is served in the default chain (TLS, PKCS#12, ACME, WSTEP, TSA, deployments, AIA .cer and .pem). A revoked, expired or not yet valid one is never served' },
           { label: 'Chain to present', text: 'Exports and deploy bindings can pin the default chain, the self-signed root or one cross-certificate. ACME offers the other chains as alternates (certbot --preferred-chain)' },
           { label: 'Import', text: 'A certificate over a held CA\'s key is attached to a self-signed root; on an intermediate the 409 offers Attach as cross certificate or Replace. Smart Import attaches it next to a held root or reports it as skipped' },
-          { label: 'Still chaining', text: 'CA details › Still chaining to this CA lists the certificates and deploy bindings that still chain to the CA, directly or through a cross-certificate, to tell when an old root can be retired; a client that cached a chain is not counted' },
+          { label: 'Still chaining', text: 'CA details › Still chaining to this CA lists the certificates, active sub-CAs, deploy bindings and CRL pushes that still depend on the CA, directly or through a cross-certificate, to tell when an old root can be retired; a client that cached a chain is not counted' },
           { label: 'Repair', text: 'The bar under the statistics lists records an older import damaged: Convert to cross-certificate (needs delete:cas) and Restore as primary. Nothing runs by itself' },
         ]
       },
