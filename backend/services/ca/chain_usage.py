@@ -1,7 +1,8 @@
 """What still depends on a CA in what UCM issues and delivers (#400).
 
-A chain depends on X when one of its links is a CA of X's subtree (records of the same key included), or a
-cross-certificate of such a CA or issued by one. Chains are resolved once per issuing CA, never per certificate.
+A chain depends on X when one of its links is a CA of X's subtree (records of X's key included), or a
+cross-certificate of such a CA or issued by one. Chains are resolved once per issuing CA, or once per
+issuer of the certificates that have none, never per certificate.
 """
 import base64
 from collections import defaultdict
@@ -11,11 +12,11 @@ from cryptography import x509
 from cryptography.hazmat.primitives import serialization
 from sqlalchemy import and_, or_, select
 
-from models import CA, Certificate, DeployBinding, DeployTarget, db
+from models import CA, Certificate, CRLDeployBinding, DeployBinding, DeployTarget, db
 from models.ca_cross_certificate import CACrossCertificate
 from services.ca import cross_certs
 from utils.ca_chain import AUTO, issuer_chain
-from utils.cert_issuer import same_key_refids
+from utils.cert_issuer import authority_key_identifier_hex, same_key_refids
 from utils.datetime_utils import utc_isoformat, utc_now
 
 LIMIT = 100
@@ -36,21 +37,18 @@ def _der(b64_pem):
 
 
 def _scope(ca, all_cas):
-    """Refids of *ca*, every CA below it and every record of the same key as one of them."""
+    """``(scope, own)``: refids of *ca*, its records of the same key and every CA below them; *own* is the first two."""
     children = defaultdict(list)
     for c in all_cas.values():
         children[c.caref].append(c.refid)
-    scope, todo = set(), [ca.refid]
+    own = set(same_key_refids(ca)) | {ca.refid}
+    scope, todo = set(), list(own)
     while todo:
         refid = todo.pop()
-        if refid in scope:
-            continue
-        member = all_cas.get(refid)
-        new = [r for r in (same_key_refids(member) if member else []) + [refid] if r not in scope]
-        scope.update(new)
-        for r in new:
-            todo.extend(children.get(r, []))
-    return scope
+        if refid not in scope:
+            scope.add(refid)
+            todo.extend(children.get(refid, []))
+    return scope, own
 
 
 class _Hits:
@@ -62,16 +60,30 @@ class _Hits:
         self.ders = set(self.scope_ders)
         scope_ids = {all_cas[r].id for r in scope if r in all_cas}
         self.issued_crosses, self.hot_crosses = [], []
+        refid_of = {c.id: c.refid for c in all_cas.values()}
+        self.hot_served = set()
         for row in CACrossCertificate.query.order_by(CACrossCertificate.id).all():
-            issuer = cross_certs.issuer_of(row)
+            issuer = all_cas.get(row.issuer_caref) or cross_certs.issuer_of(row)
             by_scope = issuer is not None and issuer.refid in scope
             if by_scope:
                 self.issued_crosses.append(row)
             if by_scope or row.ca_id in scope_ids:
                 self.hot_crosses.append(row)
+                if row.served and row.servable and row.ca_id in refid_of:
+                    self.hot_served.add(refid_of[row.ca_id])
                 if der := _der(row.crt):
                     self.ders.add(der)
         self.hot_cross_ids = {r.id for r in self.hot_crosses}
+
+    def may_reach(self, caref, all_cas):
+        """Whether the default chain of *caref* can include a hot cross: an ancestor serves one."""
+        seen, ca = set(), all_cas.get(caref)
+        while ca is not None and ca.refid not in seen:
+            if ca.refid in self.hot_served:
+                return True
+            seen.add(ca.refid)
+            ca = all_cas.get(ca.caref)
+        return False
 
     def link(self, link):
         if link.cross is None:
@@ -97,20 +109,36 @@ def _section(condition, names):
     return {'count': total, 'items': [_cert_item(c, names) for c in rows], 'truncated': total > LIMIT}
 
 
+def _group_key(cert):
+    """Certificates with the same key chain alike: inline ones by their bytes, the others by issuer and AKI."""
+    try:
+        raw = base64.b64decode(cert.crt)
+        if raw.count(b'BEGIN CERTIFICATE') > 1:
+            return ('inline', cert.crt)
+        parsed = x509.load_pem_x509_certificate(raw)
+        return ('issuer', parsed.issuer.rfc4514_string(), authority_key_identifier_hex(parsed))
+    except Exception:
+        return ('cert', cert.id)
+
+
 def _orphans(hits, orphan_cond, now):
     """``(issued_ids, via_ids)`` of certificates with no usable caref, chained as the export chains them."""
     from api.v2.certificates.export import _build_ca_chain
-    issued, via = set(), set()
+    groups = defaultdict(list)
     for cert in Certificate.query.filter(orphan_cond, *_active(now)).all():
+        groups[_group_key(cert)].append(cert)
+    issued, via = set(), set()
+    for members in groups.values():
+        cert = members[0]
         try:
             chain = _build_ca_chain(cert, base64.b64decode(cert.crt), include_root=True)
             ders = [c.public_bytes(serialization.Encoding.DER) for c in chain]
         except Exception:
             continue
         if ders and ders[0] in hits.scope_ders:
-            issued.add(cert.id)
+            issued.update(m.id for m in members)
         elif any(d in hits.ders for d in ders):
-            via.add(cert.id)
+            via.update(m.id for m in members)
     return issued, via
 
 
@@ -127,7 +155,7 @@ def _binding_items(hits, concerned, orphan_cond, now, with_targets):
     for binding, target, cert in q.all():
         variant, include_root = binding.chain_variant or AUTO, bool(binding.include_root)
         inline = base64.b64decode(cert.crt).count(b'BEGIN CERTIFICATE') > 1
-        key = (cert.id if inline or cert.caref not in hits.known else cert.caref, variant, include_root)
+        key = (_group_key(cert) if inline or cert.caref not in hits.known else cert.caref, variant, include_root)
         if key not in memo:
             try:
                 pem = DeployService._chain_pem(cert, base64.b64decode(cert.crt).decode(), include_root=include_root,
@@ -144,19 +172,47 @@ def _binding_items(hits, concerned, orphan_cond, now, with_targets):
     return {'count': len(found), 'items': items, 'truncated': with_targets and len(found) > LIMIT}
 
 
+def _crl_items(scope_ids, with_targets):
+    q = (db.session.query(CRLDeployBinding, DeployTarget, CA)
+         .join(DeployTarget, CRLDeployBinding.target_id == DeployTarget.id)
+         .join(CA, CRLDeployBinding.ca_id == CA.id)
+         .filter(CRLDeployBinding.enabled.is_(True), DeployTarget.enabled.is_(True),
+                 CRLDeployBinding.ca_id.in_(scope_ids)))
+    total = q.count()
+    rows = q.order_by(CRLDeployBinding.id).limit(LIMIT).all() if with_targets else []
+    items = [{'id': b.id, 'target_id': t.id, 'target': t.name, 'ca_id': c.id, 'ca_name': c.descr,
+              'crl_path': b.crl_path} for b, t, c in rows]
+    return {'count': total, 'items': items, 'truncated': with_targets and total > LIMIT}
+
+
+def _subordinates(scope, own, all_cas, now):
+    """Active CAs below the CA, its records of the same key left out."""
+    live = [c for r in scope - own if (c := all_cas.get(r)) and c.crt and not c.revoked
+            and (c.valid_to is None or c.valid_to > now)]
+    live.sort(key=lambda c: (c.valid_to is None, c.valid_to or datetime.min, c.id))
+    return {'count': len(live), 'truncated': len(live) > LIMIT,
+            'items': [{'id': c.id, 'name': c.descr, 'valid_to': utc_isoformat(c.valid_to)} for c in live[:LIMIT]]}
+
+
 def chain_usage(ca, with_targets=True):
     """*with_targets* False counts the bindings but names none of them."""
+    with cross_certs.without_storing():
+        return _chain_usage(ca, with_targets)
+
+
+def _chain_usage(ca, with_targets):
     now = utc_now()
     all_cas = {c.refid: c for c in CA.query.all()}
     names = {r: c.descr for r, c in all_cas.items()}
-    hits = _Hits(_scope(ca, all_cas), all_cas)
+    scope, own = _scope(ca, all_cas)
+    hits = _Hits(scope, all_cas)
     active = _active(now)
-    orphan_cond = or_(Certificate.caref.is_(None), Certificate.caref == '',
-                      Certificate.caref.notin_(select(CA.refid)))
+    orphan_cond = or_(Certificate.caref.is_(None), Certificate.caref.notin_(select(CA.refid)))
 
     via_carefs = set()
     for (caref,) in db.session.query(Certificate.caref).filter(Certificate.caref.in_(list(all_cas)), *active).distinct():
-        if caref not in hits.scope and any(hits.link(l) for l in issuer_chain(all_cas[caref])):
+        if (caref not in scope and hits.may_reach(caref, all_cas)
+                and any(hits.link(l) for l in issuer_chain(all_cas[caref]))):
             via_carefs.add(caref)
 
     orphan_issued, orphan_via = _orphans(hits, orphan_cond, now)
@@ -167,4 +223,7 @@ def chain_usage(ca, with_targets=True):
          'servable': r.servable} for r in hits.issued_crosses]
     concerned = Certificate.caref.in_(list(hits.scope | via_carefs))
     return {'issued': issued, 'via_cross': via,
-            'deployments': _binding_items(hits, concerned, orphan_cond, now, with_targets), 'note': NOTE}
+            'subordinate_cas': _subordinates(scope, own, all_cas, now),
+            'deployments': _binding_items(hits, concerned, orphan_cond, now, with_targets),
+            'crl_deployments': _crl_items([all_cas[r].id for r in scope if r in all_cas], with_targets),
+            'note': NOTE}

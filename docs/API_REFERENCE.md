@@ -653,10 +653,14 @@ counted under `deployments` unless the root is pushed (`include_root`). `via_cro
 goes through a servable cross-certificate that depends on the CA. `via_cross.cross_certificates` always lists the cross-certificates
 issued by the CA, its subtree or a record of its key (`id`, `ca_id`, `ca_name`, `served`, `servable`), even when no certificate
 uses them: a servable one can still be served, pinned or offered as an ACME alternate chain. `deployments`: enabled bindings with a
-non-empty full chain path whose pushed chain depends on the CA. Without `read:deploy`, `deployments.count` is returned but
-`items` is empty. Each section has `count`, `items` (at most 100, soonest expiry first, no expiry last) and `truncated`; `note` says
-UCM only sees what it issues and delivers. Items are certificates (`id`, `name`, `cn`, `ca`, `ca_refid`, `valid_to`) or bindings
-(`id`, `target_id`, `target`, `certificate_id`, `certificate`, `variant`).
+non-empty full chain path whose pushed chain depends on the CA. `subordinate_cas`: the active (unrevoked, unexpired) CAs below the
+CA, its records of the same key left out; a CA that still has some is not ready to retire even with no certificate left.
+`crl_deployments`: enabled CRL bindings on the CA, its records of the same key or a CA below it. Without `read:deploy`, `deployments.count`
+and `crl_deployments.count` are returned but `items` is empty. Each section has `count`, `items` (at most 100, soonest expiry first,
+no expiry last) and `truncated`; `note` says UCM only sees what it issues and delivers. Items are certificates (`id`, `name`, `cn`,
+`ca`, `ca_refid`, `valid_to`), CAs (`id`, `name`, `valid_to`), bindings (`id`, `target_id`, `target`, `certificate_id`, `certificate`,
+`variant`) or CRL bindings (`id`, `target_id`, `target`, `ca_id`, `ca_name`, `crl_path`). An intermediate CA with no `caref` (not
+linked to its parent yet) is not seen below the parent, so its certificates can read as zero until the hourly backfill links it.
 
 **Cross-sign from UCM** (`POST /api/v2/cas/{issuer_id}/cross-sign`, `201`): signs the key of another
 CA held in UCM with this one and stores the result on the subject CA.

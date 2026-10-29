@@ -6,6 +6,8 @@ is served; a revoked, expired or not yet valid one is kept and exportable but ne
 """
 import base64
 import hashlib
+import contextlib
+import contextvars
 import logging
 from typing import List, Optional, Tuple
 
@@ -116,8 +118,21 @@ def _prefer_self_signed(ca: CA) -> CA:
     return self_signed_first(CA.query.filter(CA.refid.in_(refids)).order_by(CA.id).all())[0]
 
 
-def issuer_of(row: CACrossCertificate) -> Optional[CA]:
-    """The held CA that signed *row*; a missing or dangling link is resolved by signature and stored."""
+_read_only = contextvars.ContextVar('cross_certs_read_only', default=False)
+
+
+@contextlib.contextmanager
+def without_storing():
+    """Inside, ``issuer_of`` resolves without writing: a GET must not take the database write lock."""
+    token = _read_only.set(True)
+    try:
+        yield
+    finally:
+        _read_only.reset(token)
+
+
+def issuer_of(row: CACrossCertificate, store: Optional[bool] = None) -> Optional[CA]:
+    """The held CA that signed *row*; a missing or dangling link is resolved by signature and, unless *store* is False, stored."""
     if row.issuer_caref:
         linked = CA.query.filter_by(refid=row.issuer_caref).first()
         if linked is not None:
@@ -129,7 +144,7 @@ def issuer_of(row: CACrossCertificate) -> Optional[CA]:
         issuer, _ = _resolve_issuer(cert, row.ca)
     except CrossCertError:
         return None
-    if issuer is not None:
+    if issuer is not None and (not _read_only.get() if store is None else store):
         row.issuer_caref = issuer.refid
         db.session.flush()
     return issuer
