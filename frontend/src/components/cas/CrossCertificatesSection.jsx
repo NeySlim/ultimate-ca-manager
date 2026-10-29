@@ -91,8 +91,8 @@ function CrossSignModal({ open, onClose, ca, onDone }) {
       const others = (extractData(res) || []).filter(c => c.id !== ca.id)
       const usable = signingCas(others).filter(c => c.status === 'Active')
       setIssuers(usable)
-      setUnlistedIssuers(others.length - usable.length)
-    }).catch(() => { if (!cancelled) setIssuers([]) })
+      setUnlistedIssuers(others.length - signingCas(others).length)
+    }).catch(() => { if (!cancelled) { setIssuers([]); setUnlistedIssuers(0) } })
     return () => { cancelled = true }
   }, [open, ca.id])
 
