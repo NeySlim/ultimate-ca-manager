@@ -72,8 +72,16 @@ def update_scep_config():
                 ca_id_int = int(data['ca_id'])
             except (TypeError, ValueError):
                 return error_response('Invalid ca_id', 400)
-            if not db.session.get(CA, ca_id_int):
+            ca = db.session.get(CA, ca_id_int)
+            if not ca:
                 return error_response('CA not found', 404)
+            # The saved CA stays saveable so the other settings never hinge on it (#426)
+            if get_config('scep_ca_id', '') not in (str(ca_id_int), ca.refid):
+                problem = signing_ca_problem(ca) or (
+                    'CA is HSM-backed: SCEP requires RSA envelope decryption, unavailable for HSM keys'
+                    if ca.uses_hsm else None)
+                if problem:
+                    return error_response(f'Selected CA cannot sign: {problem}', 400)
             set_config('scep_ca_id', str(ca_id_int))
         else:
             set_config('scep_ca_id', '')
