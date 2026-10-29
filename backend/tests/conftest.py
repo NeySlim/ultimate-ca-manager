@@ -503,24 +503,27 @@ def create_cert(auth_client, create_ca):
     """Factory fixture to create a certificate. Returns cert dict.
 
     The default CA is remembered across the session, and one test resets the
-    database for real (`test_database_reset_records_itself`): every later
-    caller then asked for a CA id that no longer exists and got a 404. The
-    cache is rebuilt when the row behind it is gone, so a destructive test
-    costs its own file rather than every file after it in the run.
+    database for real (`test_database_reset_records_itself`). SQLite then hands
+    the cached id to the next CA created, possibly one that cannot sign, so the
+    cache is checked by refid and rebuilt when the row is gone or is another CA.
     """
     _ca_cache = {}
     _counter = [0]
 
     def _default_ca():
+        cached = _ca_cache.get('default')
+        if cached:
+            r = auth_client.get(f'/api/v2/cas/{cached[0]}')
+            if r.status_code == 200 and (json.loads(r.data).get('data') or {}).get('refid') == cached[1]:
+                return cached[0]
         ca = create_ca(cn='Default Test CA')
-        _ca_cache['default'] = ca.get('id', ca.get('ca_id', 1))
-        return _ca_cache['default']
+        _ca_cache['default'] = (ca.get('id', ca.get('ca_id', 1)), ca.get('refid'))
+        return _ca_cache['default'][0]
 
     def _create(cn=None, ca_id=None, **kwargs):
         _counter[0] += 1
-        from_cache = ca_id is None
-        if from_cache:
-            ca_id = _ca_cache.get('default') or _default_ca()
+        if ca_id is None:
+            ca_id = _default_ca()
 
         data = {
             'cn': cn or f'test-cert-{_counter[0]}.example.com',
@@ -535,9 +538,6 @@ def create_cert(auth_client, create_ca):
                                     content_type='application/json')
 
         r = _post()
-        if r.status_code == 404 and from_cache and 'ca_id' not in kwargs:
-            data['ca_id'] = _default_ca()
-            r = _post()
         assert r.status_code in (200, 201), f'Create cert failed ({r.status_code}): {r.data}'
         result = json.loads(r.data)
         return result.get('data', result)

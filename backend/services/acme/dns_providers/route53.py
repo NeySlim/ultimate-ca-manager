@@ -20,7 +20,9 @@ class Route53DnsProvider(BaseDnsProvider):
     - aws_region: AWS Region (default: us-east-1)
     
     Create credentials at: AWS Console > IAM > Users > Security credentials
-    Required permissions: route53:ChangeResourceRecordSets, route53:ListHostedZones, route53:GetHostedZone
+    Required permissions: route53:ChangeResourceRecordSets, route53:ListResourceRecordSets,
+    route53:ListHostedZones, route53:GetHostedZone (without ListResourceRecordSets, a
+    domain and its wildcard cannot share one order)
     """
     
     PROVIDER_TYPE = "route53"
@@ -95,9 +97,16 @@ class Route53DnsProvider(BaseDnsProvider):
         quoted = f'"{record_value}"'
         try:
             # UPSERT replaces the whole set: re-send the existing values with the new one.
-            existing = client.list_resource_record_sets(
-                HostedZoneId=zone['Id'], StartRecordName=fqdn, StartRecordType='TXT', MaxItems='1'
-            ).get('ResourceRecordSets', [])
+            try:
+                existing = client.list_resource_record_sets(
+                    HostedZoneId=zone['Id'], StartRecordName=fqdn, StartRecordType='TXT', MaxItems='1'
+                ).get('ResourceRecordSets', [])
+            except Exception as e:
+                # A key without route53:ListResourceRecordSets keeps the single-value write it had
+                if 'AccessDenied' not in str(e):
+                    raise
+                logger.warning(f"Route53: cannot read {record_name}, writing the new value alone: {self._failure(e)}")
+                existing = []
             current = next((r for r in existing if r['Name'] == fqdn and r['Type'] == 'TXT'), None)
             values = [r['Value'] for r in (current or {}).get('ResourceRecords', [])]
             if quoted in values:

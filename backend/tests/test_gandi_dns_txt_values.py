@@ -110,3 +110,18 @@ def test_cleanup_called_once_per_challenge_succeeds_twice(api):
         ok, msg = provider.delete_txt_record('example.com', NAME)
         assert ok, msg
     assert api.rrsets == {}
+
+
+def test_subdomain_and_its_wildcard_on_one_provider(api):
+    provider = _provider()
+    for token in ('apex-token', 'wildcard-token'):
+        ok, msg = provider.create_txt_record('www.example.com', '_acme-challenge.www.example.com', token)
+        assert ok, msg
+    assert api.rrsets['_acme-challenge.www']['rrset_values'] == ['apex-token', 'wildcard-token']
+
+
+def test_value_stored_with_quotes_is_recognised(api):
+    api.rrsets['_acme-challenge'] = {'rrset_values': ['"tok1"'], 'rrset_ttl': 300}
+    ok, msg = _provider().create_txt_record('example.com', NAME, 'tok1')
+    assert ok, msg
+    assert not [c for c in api.calls if c[0] == 'PUT']

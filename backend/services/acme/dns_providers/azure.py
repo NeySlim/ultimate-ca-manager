@@ -94,6 +94,7 @@ class AzureDnsProvider(BaseDnsProvider):
         data: Optional[Dict] = None,
     ) -> Tuple[bool, Any]:
         """Make Azure REST API request"""
+        self._last_status = None
         headers = self._get_headers()
         if not headers:
             return False, "Failed to obtain access token"

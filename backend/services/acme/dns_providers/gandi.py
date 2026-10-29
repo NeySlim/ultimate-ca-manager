@@ -34,7 +34,7 @@ class GandiDnsProvider(BaseDnsProvider):
     
     def __init__(self, credentials: Dict[str, Any]):
         super().__init__(credentials)
-        self._domain_cache: Dict[str, bool] = {}
+        self._domain_cache: Dict[str, Optional[str]] = {}
         self._last_status: Optional[int] = None
     
     def _get_headers(self) -> Dict[str, str]:
@@ -51,6 +51,7 @@ class GandiDnsProvider(BaseDnsProvider):
         params: Optional[Dict] = None
     ) -> Tuple[bool, Any]:
         """Make Gandi API request"""
+        self._last_status = None
         url = f"{self.BASE_URL}{path}"
         
         try:
@@ -88,7 +89,7 @@ class GandiDnsProvider(BaseDnsProvider):
         """Get the Gandi domain that manages this domain"""
         # Check cache
         if domain in self._domain_cache:
-            return domain if self._domain_cache[domain] else None
+            return self._domain_cache[domain]
         
         # Try to find the managing domain
         domain_parts = domain.split('.')
@@ -98,10 +99,10 @@ class GandiDnsProvider(BaseDnsProvider):
             # Check if domain exists
             success, result = self._request('GET', f'/domains/{test_domain}')
             if success:
-                self._domain_cache[test_domain] = True
+                self._domain_cache[domain] = test_domain
                 return test_domain
-            self._domain_cache[test_domain] = False
-        
+
+        self._domain_cache[domain] = None
         return None
     
     def create_txt_record(
@@ -136,7 +137,7 @@ class GandiDnsProvider(BaseDnsProvider):
         elif not ok_get and self._last_status != 404:
             return False, f"Failed to read existing record: {current}"
 
-        if record_value in existing:
+        if record_value in [v.strip('"') for v in existing]:
             logger.info(f"Gandi: TXT value already present on {record_name}")
             return True, "Record created successfully"
 
@@ -156,7 +157,7 @@ class GandiDnsProvider(BaseDnsProvider):
         )
         if ok_get and isinstance(current, dict):
             values = current.get('rrset_values') or []
-            if record_value in values:
+            if record_value in [v.strip('"') for v in values]:
                 logger.info(f"Gandi: Created TXT record {record_name} (verified via API)")
                 return True, "Record created successfully"
 
@@ -184,7 +185,7 @@ class GandiDnsProvider(BaseDnsProvider):
         
         if not success:
             # 404 means record doesn't exist, which is fine
-            if '404' in str(result) or 'not found' in str(result).lower():
+            if self._last_status == 404 or 'not found' in str(result).lower():
                 return True, "Record not found (already deleted?)"
             return False, f"Failed to delete record: {result}"
         

@@ -47,6 +47,7 @@ class DesecDnsProvider(BaseDnsProvider):
         data: Optional[Any] = None
     ) -> Tuple[bool, Any]:
         """Make deSEC API request"""
+        self._last_status = None
         url = f"{self.BASE_URL}{path}"
         
         try:

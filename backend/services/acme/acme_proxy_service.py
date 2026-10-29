@@ -11,6 +11,7 @@ import secrets
 import threading
 import time
 from datetime import datetime
+from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, Union
 from urllib.parse import urlsplit
 
@@ -21,6 +22,8 @@ from sqlalchemy import and_, or_, inspect as sa_inspect
 from sqlalchemy.exc import NoInspectionAvailable
 from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
+from utils.process_lock import process_lock
+from config.settings import Config
 
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding, utils as asym_utils
@@ -1629,30 +1632,34 @@ class AcmeProxyService:
         full_record_name = provider.get_acme_challenge_name(domain)
 
         logger.info(f"[ACME Proxy BG] Creating DNS TXT record for {domain}: {full_record_name}")
-        provider.create_txt_record(zone_name, full_record_name, txt_value)
+        # Both authorizations of a domain and its wildcard merge into one record set,
+        # possibly from two workers: read-merge-write must not interleave.
+        with process_lock(Path(Config.DATA_DIR) / '.acme_dns_txt.lock', timeout=120,
+                          purpose='publishing a dns-01 TXT record', subject='DNS TXT'):
+            provider.create_txt_record(zone_name, full_record_name, txt_value)
 
-        # Client-side pre-check support (#306/#307): lego/Caddy compute
-        # the expected TXT value from THEIR account key, not from the
-        # proxy's upstream account, so their propagation check could
-        # never see the value published above. The client thumbprints
-        # are known: publish their values too (extra TXT records on
-        # the same name are ignored by the upstream CA validator).
-        for extra_value in self._client_txt_values(
-            order, key_authz, txt_value, authz_url=authz_url
-        ):
-            try:
-                provider.create_txt_record(zone_name, full_record_name, extra_value)
-                records = json.loads(order.dns_records_created) if order.dns_records_created else []
-                records.append({
-                    'domain': zone_name,
-                    'record_name': full_record_name,
-                    'value': extra_value,
-                    'provider_id': provider_model.id
-                })
-                order.dns_records_created = json.dumps(records)
-                db.session.commit()
-            except Exception as exc:
-                logger.warning(f"[ACME Proxy BG] Client TXT value not published: {exc}")
+            # Client-side pre-check support (#306/#307): lego/Caddy compute
+            # the expected TXT value from THEIR account key, not from the
+            # proxy's upstream account, so their propagation check could
+            # never see the value published above. The client thumbprints
+            # are known: publish their values too (extra TXT records on
+            # the same name are ignored by the upstream CA validator).
+            for extra_value in self._client_txt_values(
+                order, key_authz, txt_value, authz_url=authz_url
+            ):
+                try:
+                    provider.create_txt_record(zone_name, full_record_name, extra_value)
+                    records = json.loads(order.dns_records_created) if order.dns_records_created else []
+                    records.append({
+                        'domain': zone_name,
+                        'record_name': full_record_name,
+                        'value': extra_value,
+                        'provider_id': provider_model.id
+                    })
+                    order.dns_records_created = json.dumps(records)
+                    db.session.commit()
+                except Exception as exc:
+                    logger.warning(f"[ACME Proxy BG] Client TXT value not published: {exc}")
 
         # Active DNS self-check instead of fixed sleep.
         timeout = dns_propagation_timeout('acme.client.dns_propagation_timeout')

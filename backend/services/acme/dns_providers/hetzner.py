@@ -47,6 +47,7 @@ class HetznerDnsProvider(BaseDnsProvider):
         data: Optional[Dict] = None,
     ) -> Tuple[bool, Any]:
         """Make Hetzner Cloud API request"""
+        self._last_status = None
         url = f"{self.BASE_URL}{path}"
         
         try:

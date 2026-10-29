@@ -5,6 +5,7 @@ import base64
 import json
 import logging
 import threading
+import time
 from types import SimpleNamespace
 
 import pytest
@@ -727,6 +728,34 @@ class TestDns01Thread:
             for chall, order_id in zip(challenges, ids):
                 state = db.session.get(AcmeClientOrder, order_id).challenges_dict
                 assert state[chall]['status'] == 'submitted'
+
+
+    def test_apex_and_wildcard_threads_keep_both_txt_values(self, app, monkeypatch, stub_directory):
+        """Each thread reads the record set, then writes it back with its value added."""
+        provider = self._patch_dns(monkeypatch)
+        published = []
+
+        def _merge(_zone, _name, value, *_a, **_k):
+            seen = list(published)
+            time.sleep(0.3)
+            published[:] = seen + [value]
+            return True, 'ok'
+
+        provider.create_txt_record.side_effect = _merge
+        monkeypatch.setattr(AcmeProxyService, '_post_with_account',
+                            lambda *_a: _Resp({'status': 'processing'}))
+        challenges = [f'{UPSTREAM}/acme/chall-v3/w{index}/x' for index in range(2)]
+        with app.app_context():
+            order_id = _order(order_url=f'{ORDER_URL}w', upstream_order_url=f'{ORDER_URL}w').id
+            svc = AcmeProxyService('https://ucm.example/acme/proxy')
+        threads = [threading.Thread(target=svc._bg_respond_challenge,
+                                    args=(app, chall, f'tok{index}.up', domain, order_id))
+                   for index, (chall, domain) in enumerate(zip(challenges, (DOMAIN, f'*.{DOMAIN}')))]
+        for thread in threads:
+            thread.start()
+        for thread in threads:
+            thread.join(30)
+        assert len(published) == 2
 
 
 class TestOrderUrlRewrite:

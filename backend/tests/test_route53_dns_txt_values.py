@@ -100,3 +100,11 @@ def test_cleanup_removes_the_set_and_second_call_succeeds(api):
     assert provider.delete_txt_record('example.com', NAME.rstrip('.'))[0]
     assert (NAME, 'TXT') not in fake.sets
     assert provider.delete_txt_record('example.com', NAME.rstrip('.'))[0]
+
+
+def test_key_without_list_permission_still_writes_its_value(api):
+    provider, fake = api
+    fake.list_error = RuntimeError('An error occurred (AccessDenied) when calling ListResourceRecordSets')
+    ok, msg = provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok1')
+    assert ok, msg
+    assert fake.values() == ['"tok1"']
