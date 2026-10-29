@@ -2502,7 +2502,7 @@ The industry standard HSM interface. Supported devices:
 - **SoftHSM** (software-based, for testing)
 - Any PKCS#11-compliant device
 
-> 💡 **Docker**: SoftHSM is pre-installed in the Docker image. On first start, a default token is auto-initialized and registered as the \`SoftHSM-Default\` provider, ready to use immediately.
+> 💡 **Docker**: SoftHSM is pre-installed in the Docker image. On first start, a default token is auto-initialized and registered as the \`SoftHSM-Default\` provider, ready to use immediately. In FIPS mode SoftHSM is not a validated module: the default provider is not created and a SoftHSM provider is refused, unless \`UCM_FIPS_ALLOW_SOFTHSM=1\` allows one for tests.
 
 Configuration:
 - **Library Path**: Path to the PKCS#11 shared library (.so/.dll)
@@ -2557,7 +2557,7 @@ Supported key types:
 5. Click **Save**
 
 ### Testing Connection
-Always test the connection after creating or modifying a provider. UCM verifies it can communicate with the HSM and authenticate.
+Always test the connection after creating or modifying a provider. UCM verifies it can communicate with the HSM and authenticate. For a PKCS#11 module, the test also records what the module reports (library, manufacturer, library and firmware versions), shown on the provider's page.
 
 ### Provider Status
 Each provider shows a connection status indicator:

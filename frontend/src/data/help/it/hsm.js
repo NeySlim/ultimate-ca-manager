@@ -18,7 +18,7 @@ export default {
         title: 'Azioni',
         items: [
           { label: 'Aggiungi provider', text: 'Configura la connessione a un HSM (percorso libreria, credenziali, slot)' },
-          { label: 'Testa connessione', text: 'Verifica che l\'HSM sia raggiungibile e le credenziali siano valide' },
+          { label: 'Testa connessione', text: 'Verifica che l\'HSM sia raggiungibile e le credenziali siano valide; per un modulo PKCS#11, registra anche ciò che il modulo riporta (libreria, produttore, versioni della libreria e del firmware), mostrato nella pagina del provider' },
           { label: 'Genera chiave', text: 'Crea una nuova coppia di chiavi direttamente sull\'HSM' },
           { label: 'Stato', text: 'Monitora lo stato della connessione del provider' },
           { label: 'Certificazione', text: 'Dichiara la certificazione dell\'HSM: Common Criteria EAL 4+, EUCC high, FIPS 140-3 livello 3, FIPS 140-2 livello 3 o altra. Se vuota, non è dichiarata. Il profilo di conformità eu-acm accetta solo Common Criteria EAL 4+, EUCC high e FIPS 140-3 livello 3 (fino al 31 dicembre 2030) per una CA basata su HSM' },
@@ -65,7 +65,7 @@ L'interfaccia HSM standard del settore. Dispositivi supportati:
 - **SoftHSM** (basato su software, per i test)
 - Qualsiasi dispositivo compatibile PKCS#11
 
-> 💡 **Docker**: SoftHSM è preinstallato nell'immagine Docker. Al primo avvio, un token predefinito viene inizializzato automaticamente e registrato come provider \`SoftHSM-Default\`: pronto all'uso immediatamente.
+> 💡 **Docker**: SoftHSM è preinstallato nell'immagine Docker. Al primo avvio, un token predefinito viene inizializzato automaticamente e registrato come provider \`SoftHSM-Default\`: pronto all'uso immediatamente. In modalità FIPS SoftHSM non è un modulo validato: il provider predefinito non viene creato e un provider SoftHSM viene rifiutato, a meno che \`UCM_FIPS_ALLOW_SOFTHSM=1\` non ne consenta uno per i test.
 
 Configurazione:
 - **Percorso libreria**: Percorso alla libreria condivisa PKCS#11 (.so/.dll)
@@ -118,7 +118,7 @@ Tipi di chiave supportati:
 5. Clicca **Salva**
 
 ### Test della connessione
-Testa sempre la connessione dopo aver creato o modificato un provider. UCM verifica che possa comunicare con l'HSM e autenticarsi.
+Testa sempre la connessione dopo aver creato o modificato un provider. UCM verifica che possa comunicare con l'HSM e autenticarsi. Per un modulo PKCS#11, il test registra anche ciò che il modulo riporta (libreria, produttore, versioni della libreria e del firmware), mostrato nella pagina del provider.
 
 ### Stato del provider
 Ogni provider mostra un indicatore di stato della connessione:

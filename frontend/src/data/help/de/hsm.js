@@ -18,7 +18,7 @@ export default {
         title: 'Aktionen',
         items: [
           { label: 'Anbieter hinzufügen', text: 'Verbindung zu einem HSM konfigurieren (Bibliothekspfad, Anmeldedaten, Slot)' },
-          { label: 'Verbindung testen', text: 'Überprüfen, ob das HSM erreichbar ist und die Anmeldedaten gültig sind' },
+          { label: 'Verbindung testen', text: 'Überprüfen, ob das HSM erreichbar ist und die Anmeldedaten gültig sind; bei einem PKCS#11-Modul werden zusätzlich die Angaben des Moduls erfasst (Bibliothek, Hersteller, Bibliotheks- und Firmware-Version) und auf der Anbieterseite angezeigt' },
           { label: 'Schlüssel generieren', text: 'Ein neues Schlüsselpaar direkt auf dem HSM erstellen' },
           { label: 'Status', text: 'Verbindungszustand des Anbieters überwachen' },
           { label: 'Zertifizierung', text: 'Die Zertifizierung des HSM angeben: Common Criteria EAL 4+, EUCC high, FIPS 140-3 Level 3, FIPS 140-2 Level 3 oder andere. Bleibt das Feld leer, ist sie nicht angegeben. Das Compliance-Profil eu-acm akzeptiert für eine HSM-gestützte CA nur Common Criteria EAL 4+, EUCC high und FIPS 140-3 Level 3 (bis 31. Dezember 2030)' },
@@ -65,7 +65,7 @@ Die Industriestandard-HSM-Schnittstelle. Unterstützte Geräte:
 - **SoftHSM** (softwarebasiert, zum Testen)
 - Jedes PKCS#11-kompatible Gerät
 
-> 💡 **Docker**: SoftHSM ist im Docker-Image vorinstalliert. Beim ersten Start wird automatisch ein Standard-Token initialisiert und als \`SoftHSM-Default\`-Anbieter registriert, sofort einsatzbereit.
+> 💡 **Docker**: SoftHSM ist im Docker-Image vorinstalliert. Beim ersten Start wird automatisch ein Standard-Token initialisiert und als \`SoftHSM-Default\`-Anbieter registriert, sofort einsatzbereit. Im FIPS-Modus ist SoftHSM kein validiertes Modul: Der Standardanbieter wird nicht angelegt und ein SoftHSM-Anbieter wird abgelehnt, es sei denn, \`UCM_FIPS_ALLOW_SOFTHSM=1\` erlaubt einen für Tests.
 
 Konfiguration:
 - **Bibliothekspfad**: Pfad zur PKCS#11-Shared-Library (.so/.dll)
@@ -118,7 +118,7 @@ Unterstützte Schlüsseltypen:
 5. Klicken Sie auf **Speichern**
 
 ### Verbindung testen
-Testen Sie die Verbindung immer nach dem Erstellen oder Ändern eines Anbieters. UCM überprüft, ob es mit dem HSM kommunizieren und sich authentifizieren kann.
+Testen Sie die Verbindung immer nach dem Erstellen oder Ändern eines Anbieters. UCM überprüft, ob es mit dem HSM kommunizieren und sich authentifizieren kann. Bei einem PKCS#11-Modul erfasst der Test zusätzlich die Angaben des Moduls (Bibliothek, Hersteller, Bibliotheks- und Firmware-Version), die auf der Seite des Anbieters angezeigt werden.
 
 ### Anbieterstatus
 Jeder Anbieter zeigt einen Verbindungsstatusindikator:

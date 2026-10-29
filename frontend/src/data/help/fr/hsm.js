@@ -18,7 +18,7 @@ export default {
         title: 'Actions',
         items: [
           { label: 'Ajouter un fournisseur', text: 'Configurer la connexion à un HSM (chemin de bibliothèque, identifiants, slot)' },
-          { label: 'Tester la connexion', text: 'Vérifier que le HSM est joignable et que les identifiants sont valides' },
+          { label: 'Tester la connexion', text: 'Vérifier que le HSM est joignable et que les identifiants sont valides ; pour un module PKCS#11, enregistre aussi ce qu\'il déclare (bibliothèque, fabricant, versions de la bibliothèque et du firmware), affiché sur la page du fournisseur' },
           { label: 'Générer une clé', text: 'Créer une nouvelle paire de clés directement sur le HSM' },
           { label: 'Statut', text: 'Surveiller la santé de la connexion du fournisseur' },
           { label: 'Certification', text: 'Déclarer la certification du HSM : Common Criteria EAL 4+, EUCC élevé, FIPS 140-3 niveau 3, FIPS 140-2 niveau 3 ou autre. Laissée vide, elle n\'est pas déclarée. Le profil de conformité eu-acm n\'accepte que Common Criteria EAL 4+, EUCC élevé et FIPS 140-3 niveau 3 (jusqu\'au 31 décembre 2030) pour une CA adossée à un HSM' },
@@ -65,7 +65,7 @@ L'interface HSM standard de l'industrie. Appareils pris en charge :
 - **SoftHSM** (logiciel, pour les tests)
 - Tout appareil compatible PKCS#11
 
-> 💡 **Docker** : SoftHSM est pré-installé dans l'image Docker. Au premier démarrage, un jeton par défaut est auto-initialisé et enregistré comme fournisseur \`SoftHSM-Default\` : prêt à l'emploi immédiatement.
+> 💡 **Docker** : SoftHSM est pré-installé dans l'image Docker. Au premier démarrage, un jeton par défaut est auto-initialisé et enregistré comme fournisseur \`SoftHSM-Default\` : prêt à l'emploi immédiatement. En mode FIPS, SoftHSM n'est pas un module validé : le fournisseur par défaut n'est pas créé et un fournisseur SoftHSM est refusé, sauf si \`UCM_FIPS_ALLOW_SOFTHSM=1\` en autorise un pour des tests.
 
 Configuration :
 - **Chemin de la bibliothèque** : Chemin vers la bibliothèque partagée PKCS#11 (.so/.dll)
@@ -120,7 +120,7 @@ Types de clés pris en charge :
 5. Cliquez sur **Enregistrer**
 
 ### Tester la connexion
-Testez toujours la connexion après avoir créé ou modifié un fournisseur. UCM vérifie qu'il peut communiquer avec le HSM et s'authentifier.
+Testez toujours la connexion après avoir créé ou modifié un fournisseur. UCM vérifie qu'il peut communiquer avec le HSM et s'authentifier. Pour un module PKCS#11, le test enregistre aussi ce que le module déclare (bibliothèque, fabricant, versions de la bibliothèque et du firmware), affiché sur la page du fournisseur.
 
 ### Statut du fournisseur
 Chaque fournisseur affiche un indicateur de statut de connexion :

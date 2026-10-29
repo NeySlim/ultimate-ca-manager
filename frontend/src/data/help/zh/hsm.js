@@ -18,7 +18,7 @@ export default {
         title: '操作',
         items: [
           { label: '添加提供商', text: '配置 HSM 连接（库路径、凭据、插槽）' },
-          { label: '测试连接', text: '验证 HSM 可达且凭据有效' },
+          { label: '测试连接', text: '验证 HSM 可达且凭据有效；对于 PKCS#11 模块，还会记录其上报的信息（库、制造商、库版本和固件版本），显示在提供商页面上' },
           { label: '生成密钥', text: '直接在 HSM 上创建新的密钥对' },
           { label: '状态', text: '监控提供商连接健康状况' },
           { label: '认证', text: '声明 HSM 的认证：Common Criteria EAL 4+、EUCC high、FIPS 140-3 级别 3、FIPS 140-2 级别 3 或其他。留空表示未声明。对于由 HSM 支持的 CA，eu-acm 合规配置仅接受 Common Criteria EAL 4+、EUCC high 以及 FIPS 140-3 级别 3（至 2030 年 12 月 31 日）' },
@@ -65,7 +65,7 @@ export default {
 - **SoftHSM**（基于软件，用于测试）
 - 任何兼容 PKCS#11 的设备
 
-> 💡 **Docker**：SoftHSM 已预装在 Docker 镜像中。首次启动时，会自动初始化默认令牌并注册为 \`SoftHSM-Default\` 提供商:, 开箱即用。
+> 💡 **Docker**：SoftHSM 已预装在 Docker 镜像中。首次启动时，会自动初始化默认令牌并注册为 \`SoftHSM-Default\` 提供商:, 开箱即用。在 FIPS 模式下，SoftHSM 不是经过验证的模块：不会创建默认提供商，并且会拒绝 SoftHSM 提供商，除非设置 \`UCM_FIPS_ALLOW_SOFTHSM=1\` 允许用于测试。
 
 配置：
 - **库路径**: PKCS#11 共享库路径（.so/.dll）
@@ -118,7 +118,7 @@ OpenBao 或 HashiCorp Vault Transit Secrets Engine。密钥通过 Transit API �
 5. 点击**保存**
 
 ### 测试连接
-创建或修改提供商后始终测试连接。UCM 验证能否与 HSM 通信和认证。
+创建或修改提供商后始终测试连接。UCM 验证能否与 HSM 通信和认证。对于 PKCS#11 模块，测试还会记录模块上报的信息（库、制造商、库版本和固件版本），显示在提供商页面上。
 
 ### 提供商状态
 每个提供商显示连接状态指示器：

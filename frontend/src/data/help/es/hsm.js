@@ -18,7 +18,7 @@ export default {
         title: 'Acciones',
         items: [
           { label: 'Agregar proveedor', text: 'Configurar la conexión a un HSM (ruta de biblioteca, credenciales, slot)' },
-          { label: 'Probar conexión', text: 'Verificar que el HSM es accesible y las credenciales son válidas' },
+          { label: 'Probar conexión', text: 'Verificar que el HSM es accesible y las credenciales son válidas; para un módulo PKCS#11, registra también lo que el módulo declara (biblioteca, fabricante, versiones de la biblioteca y del firmware), visible en la página del proveedor' },
           { label: 'Generar clave', text: 'Crear un nuevo par de claves directamente en el HSM' },
           { label: 'Estado', text: 'Monitorear el estado de conexión del proveedor' },
           { label: 'Certificación', text: 'Declarar la certificación del HSM: Common Criteria EAL 4+, EUCC high, FIPS 140-3 nivel 3, FIPS 140-2 nivel 3 u otra. Si se deja vacía, no se declara. El perfil de cumplimiento eu-acm solo acepta Common Criteria EAL 4+, EUCC high y FIPS 140-3 nivel 3 (hasta el 31 de diciembre de 2030) para una CA respaldada por HSM' },
@@ -65,7 +65,7 @@ La interfaz HSM estándar de la industria. Dispositivos compatibles:
 - **SoftHSM** (basado en software, para pruebas)
 - Cualquier dispositivo compatible con PKCS#11
 
-> 💡 **Docker**: SoftHSM viene preinstalado en la imagen Docker. Al primer inicio, se inicializa automáticamente un token predeterminado y se registra como el proveedor \`SoftHSM-Default\`: listo para usar de inmediato.
+> 💡 **Docker**: SoftHSM viene preinstalado en la imagen Docker. Al primer inicio, se inicializa automáticamente un token predeterminado y se registra como el proveedor \`SoftHSM-Default\`: listo para usar de inmediato. En modo FIPS, SoftHSM no es un módulo validado: el proveedor predeterminado no se crea y se rechaza un proveedor SoftHSM, salvo que \`UCM_FIPS_ALLOW_SOFTHSM=1\` permita uno para pruebas.
 
 Configuración:
 - **Ruta de biblioteca**: Ruta a la biblioteca compartida PKCS#11 (.so/.dll)
@@ -118,7 +118,7 @@ Tipos de claves soportados:
 5. Haga clic en **Guardar**
 
 ### Probar conexión
-Siempre pruebe la conexión después de crear o modificar un proveedor. UCM verifica que puede comunicarse con el HSM y autenticarse.
+Siempre pruebe la conexión después de crear o modificar un proveedor. UCM verifica que puede comunicarse con el HSM y autenticarse. Para un módulo PKCS#11, la prueba registra también lo que el módulo declara (biblioteca, fabricante, versiones de la biblioteca y del firmware), visible en la página del proveedor.
 
 ### Estado del proveedor
 Cada proveedor muestra un indicador de estado de conexión:
