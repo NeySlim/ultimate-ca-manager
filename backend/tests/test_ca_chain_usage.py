@@ -100,7 +100,7 @@ def test_a_served_cross_puts_the_certificates_via_cross_of_its_issuer(auth_clien
     assert d['via_cross']['count'] == 1
     assert d['via_cross']['items'][0]['id'] == world.leaf_id
     assert d['via_cross']['cross_certificates'] == [
-        {'id': world.xid, 'ca_id': world.b_id, 'ca_name': world.pki.name_b, 'served': True}]
+        {'id': world.xid, 'ca_id': world.b_id, 'ca_name': world.pki.name_b, 'served': True, 'servable': True}]
     assert counts(auth_client, world.b_id)[1] == 0  # B is not the cross's issuer
 
 
@@ -265,3 +265,281 @@ def test_both_read_permissions_are_required(app, auth_client, world, perms, stat
 
 def test_the_unauthenticated_are_refused(client, world):
     assert client.get(f'/api/v2/cas/{world.b_id}/chain-usage').status_code == 401
+
+
+# --- chains through an intermediate, orphans, unresolved issuers (review of #400) ---------------------------
+
+def _b64(cert):
+    return base64.b64encode(pem(cert).encode()).decode()
+
+
+def _leaf_row(app, cert, caref, **over):
+    with app.app_context():
+        row = Certificate(refid=uuid.uuid4().hex, descr=f'leaf {uuid.uuid4().hex[:6]}', caref=caref, source='imported',
+                          crt=_b64(cert), serial_number=str(cert.serial_number), subject=cert.subject.rfc4514_string(),
+                          issuer=cert.issuer.rfc4514_string(), subject_cn='leaf', valid_from=utc_now(),
+                          valid_to=utc_now() + timedelta(days=30), revoked=False)
+        for k, v in over.items():
+            setattr(row, k, v)
+        db.session.add(row)
+        db.session.commit()
+        return row.id
+
+
+class YWorld:
+    """Root A > Y; Root B > Int B > leaf; B cross-signed by Y (not by A)."""
+
+
+def build_y_world(app, auth_client, served=True, import_a=True, attach=True):
+    w = YWorld()
+    tag = uuid.uuid4().hex[:8]
+    w.tag = tag
+    ka, ky, kb, ki, kl = (new_key() for _ in range(5))
+    na, ny, nb, ni = (f'Y {n} {tag}' for n in ('Root A', 'Mid Y', 'Root B', 'Int B'))
+    w.root_a = make_cert(na, ka)
+    w.y = make_cert(ny, ky, na, ka, path_length=1)
+    w.root_b = make_cert(nb, kb)
+    w.cross = make_cert(nb, kb, ny, ky)
+    w.int_b = make_cert(ni, ki, nb, kb, path_length=0)
+    w.leaf = make_cert(f'leaf-{tag}.example', kl, ni, ki, ca=False, days=90, san=f'leaf-{tag}.example')
+    order = [w.root_b, w.int_b] + ([w.root_a, w.y] if import_a else [])
+    with app.app_context():
+        for c in order[:2]:
+            SmartImporter().execute(pem(c))
+    w.names = (na, ny, nb, ni)
+    if attach:
+        with app.app_context():
+            w.b_id = CA.query.filter_by(descr=nb).one().id
+        r = auth_client.post(f'/api/v2/cas/{w.b_id}/cross-certificates', json={'certificate': pem(w.cross), 'served': served})
+        assert r.status_code == 201, r.data
+        w.xid = r.get_json()['data']['id']
+    if import_a:
+        import_ay(app, w)
+    with app.app_context():
+        w.int_refid = CA.query.filter_by(descr=ni).one().refid
+        w.b_id = CA.query.filter_by(descr=nb).one().id
+    w.leaf_id = _leaf_row(app, w.leaf, w.int_refid)
+    return w
+
+
+def import_ay(app, w):
+    with app.app_context():
+        for c in (w.root_a, w.y):
+            SmartImporter().execute(pem(c))
+        w.a_id = CA.query.filter_by(descr=w.names[0]).one().id
+        w.y_id = CA.query.filter_by(descr=w.names[1]).one().id
+
+
+def test_p1_a_cross_signed_by_an_intermediate_counts_for_the_root_above(app, auth_client):
+    w = build_y_world(app, auth_client)
+    assert counts(auth_client, w.a_id)[1] == 1
+    assert counts(auth_client, w.y_id)[1] == 1
+    assert counts(auth_client, w.b_id)[:2] == (1, 0)
+    bind(app, w.leaf_id, 'auto')
+    assert counts(auth_client, w.a_id)[2] == 1
+    assert counts(auth_client, w.y_id)[2] == 1
+
+
+def test_p1_a_binding_pinned_to_a_cross_signed_by_an_intermediate(app, auth_client):
+    w = build_y_world(app, auth_client, served=False)
+    assert counts(auth_client, w.a_id) == (0, 0, 0)
+    bind(app, w.leaf_id, f'cross:{w.xid}')
+    assert counts(auth_client, w.a_id)[2] == 1
+
+
+def test_case1_pin_on_a_cross_attached_before_its_issuer_was_imported(app, auth_client):
+    w = build_y_world(app, auth_client, import_a=False)
+    with app.app_context():
+        assert db.session.get(CACrossCertificate, w.xid).issuer_caref is None
+    import_ay(app, w)
+    bind(app, w.leaf_id, f'cross:{w.xid}')
+    assert counts(auth_client, w.a_id)[2] == 1
+    assert counts(auth_client, w.a_id)[1] == 1
+
+
+def test_case1_pin_on_a_cross_whose_issuer_link_dangles(app, auth_client):
+    w = build_y_world(app, auth_client, served=False)
+    cross_row(app, w.xid, issuer_caref='gone-' + uuid.uuid4().hex[:8])
+    bind(app, w.leaf_id, f'cross:{w.xid}')
+    assert counts(auth_client, w.a_id)[2] == 1
+
+
+def test_a_certificate_without_caref_counts_with_the_ca_that_issued_it(app, auth_client, world):
+    cid = _leaf_row(app, world.pki.leaf, None)
+    assert counts(auth_client, world.b_id)[0] == 2
+    assert counts(auth_client, world.int_id)[0] == 2
+    ids = {i['id'] for i in usage(auth_client, world.int_id)['issued']['items']}
+    assert cid in ids
+    assert counts(auth_client, world.a_id)[0] == 0
+
+
+def test_orphan_bindings_are_evaluated(app, auth_client, world):
+    cid = _leaf_row(app, world.pki.leaf, None)
+    bind(app, cid, 'auto', include_root=True)
+    assert counts(auth_client, world.b_id)[2] == 1
+    assert counts(auth_client, world.a_id)[2] == 0
+
+
+def test_a_certificate_whose_caref_dangles_is_resolved_like_an_orphan(app, auth_client, world):
+    _leaf_row(app, world.pki.leaf, 'gone-' + uuid.uuid4().hex[:8])
+    assert counts(auth_client, world.b_id)[0] == 2
+
+
+def test_an_orphan_with_no_known_issuer_is_not_counted(app, auth_client, world):
+    other = build_y_world(app, auth_client, attach=False, import_a=False)
+    _leaf_row(app, other.leaf, None, revoked=False)
+    with app.app_context():
+        CA.query.filter(CA.descr.in_([other.names[2], other.names[3]])).update({'subject': 'CN=elsewhere'}, synchronize_session=False)
+        db.session.commit()
+    assert counts(auth_client, world.b_id)[0] == 1
+
+
+# --- cross-certificates that stay on offer ---------------------------------------------------------------
+
+def test_cross_certificates_of_the_issuer_are_always_listed(auth_client, world):
+    d = usage(auth_client, world.a_id)
+    assert counts(auth_client, world.a_id) == (0, 0, 0)
+    assert d['via_cross']['cross_certificates'] == [
+        {'id': world.xid, 'ca_id': world.b_id, 'ca_name': world.pki.name_b, 'served': False, 'servable': True}]
+
+
+def test_a_cross_that_cannot_be_served_is_listed_as_such(app, auth_client, world):
+    cross_row(app, world.xid, revoked=True)
+    row = usage(auth_client, world.a_id)['via_cross']['cross_certificates'][0]
+    assert row['servable'] is False
+
+
+def test_crosses_issued_by_a_ca_below_are_listed_for_the_root(app, auth_client):
+    w = build_y_world(app, auth_client, served=False)
+    rows = usage(auth_client, w.a_id)['via_cross']['cross_certificates']
+    assert [r['id'] for r in rows] == [w.xid]
+    assert usage(auth_client, w.b_id)['via_cross']['cross_certificates'] == []
+
+
+# --- cost ------------------------------------------------------------------------------------------------
+
+def _queries(app, fn):
+    from sqlalchemy import event
+    seen = []
+    def hook(conn, cursor, statement, *a):
+        seen.append(statement)
+    with app.app_context():
+        event.listen(db.engine, 'before_cursor_execute', hook)
+        try:
+            fn()
+        finally:
+            event.remove(db.engine, 'before_cursor_execute', hook)
+    return len(seen)
+
+
+def test_the_number_of_queries_does_not_grow_with_the_bindings(app, auth_client, world):
+    set_served(auth_client, world, True)
+    bind(app, world.leaf_id, 'auto')
+    bind(app, world.leaf_id, f'cross:{world.xid}', include_root=True)
+    small = _queries(app, lambda: usage(auth_client, world.a_id))
+    for _ in range(30):
+        bind(app, world.leaf_id, 'auto')
+        bind(app, world.leaf_id, f'cross:{world.xid}', include_root=True)
+    big = _queries(app, lambda: usage(auth_client, world.a_id))
+    assert counts(auth_client, world.a_id)[2] == 62
+    assert big <= small + 4, (small, big)
+
+
+def test_unrelated_bindings_cost_nothing(app, auth_client, world):
+    other = build_world(app, auth_client)
+    base = _queries(app, lambda: usage(auth_client, world.a_id))
+    for _ in range(25):
+        bind(app, other.leaf_id, 'primary', include_root=True)
+    assert _queries(app, lambda: usage(auth_client, world.a_id)) <= base + 3
+    assert counts(auth_client, world.a_id)[2] == 0
+    assert counts(auth_client, world.b_id)[2] == 0
+
+
+# --- information ------------------------------------------------------------------------------------------
+
+def test_without_read_deploy_the_bindings_are_counted_but_not_named(app, auth_client, world):
+    bind(app, world.leaf_id, f'cross:{world.xid}')
+    key = _key_with(auth_client, ['read:cas', 'read:certificates'])
+    r = app.test_client().get(f'/api/v2/cas/{world.a_id}/chain-usage', headers={'X-API-Key': key})
+    d = r.get_json()['data']['deployments']
+    assert r.status_code == 200 and d['count'] == 1 and d['items'] == [] and d['truncated'] is False
+    key = _key_with(auth_client, ['read:cas', 'read:certificates', 'read:deploy'])
+    r = app.test_client().get(f'/api/v2/cas/{world.a_id}/chain-usage', headers={'X-API-Key': key})
+    d = r.get_json()['data']['deployments']
+    assert d['count'] == 1 and d['items'][0]['target']
+
+
+# --- states the first tests left unpinned ---------------------------------------------------------------
+
+def test_archived_certificates_are_excluded(app, auth_client, world):
+    add_leaf(app, world.int_refid, archived=True)
+    assert counts(auth_client, world.b_id)[0] == 1
+
+
+def test_a_row_without_certificate_is_excluded(app, auth_client, world):
+    add_leaf(app, world.int_refid, crt=None)
+    assert counts(auth_client, world.b_id)[0] == 1
+
+
+def test_a_certificate_without_expiry_is_included_and_listed_last(app, auth_client, world):
+    nid = add_leaf(app, world.int_refid, valid_to=None)
+    items = usage(auth_client, world.b_id)['issued']['items']
+    assert [i['id'] for i in items] == [world.leaf_id, nid] and items[-1]['valid_to'] is None
+
+
+def test_an_empty_full_chain_path_is_ignored(app, auth_client, world):
+    bind(app, world.leaf_id, f'cross:{world.xid}', fullchain='')
+    assert counts(auth_client, world.a_id)[2] == 0
+
+
+def test_case3_only_bindings_of_the_ca_are_counted(app, auth_client, world):
+    other = build_world(app, auth_client)
+    bind(app, other.leaf_id, 'primary', include_root=True)
+    assert counts(auth_client, world.b_id)[2] == 0
+    assert counts(auth_client, other.b_id)[2] == 1
+
+
+def _drop_cas(app, ids):
+    with app.app_context():
+        db.session.rollback()
+        CA.query.filter(CA.id.in_(ids)).delete(synchronize_session=False)
+        db.session.commit()
+
+
+def test_certificates_below_a_record_of_the_same_key_count_for_the_ca(app, auth_client, world):
+    with app.app_context():
+        a = db.session.get(CA, world.a_id)
+        twin = CA(refid=uuid.uuid4().hex, descr='twin of A', crt=a.crt, subject=a.subject, issuer=a.issuer)
+        db.session.add(twin)
+        db.session.flush()
+        child = CA(refid=uuid.uuid4().hex, descr='below twin', caref=twin.refid, crt='')
+        db.session.add(child)
+        db.session.commit()
+        child_ref, made = child.refid, [twin.id, child.id]
+    try:
+        add_leaf(app, child_ref)
+        assert counts(auth_client, world.a_id)[0] == 1
+    finally:
+        _drop_cas(app, made)
+
+
+def test_a_cross_issued_by_a_ca_without_certificate_counts_for_it(app, auth_client, world):
+    set_served(auth_client, world, True)
+    with app.app_context():
+        pending = CA(refid=uuid.uuid4().hex, descr='pending issuer', crt='')
+        db.session.add(pending)
+        db.session.commit()
+        pid, pref = pending.id, pending.refid
+    cross_row(app, world.xid, issuer_caref=pref)
+    try:
+        assert counts(auth_client, pid)[1] == 1
+    finally:
+        _drop_cas(app, [pid])
+
+
+def test_reading_the_usage_logs_nothing_about_deployments(app, auth_client, world, caplog):
+    bind(app, world.leaf_id, f'cross:{world.xid}')
+    cross_row(app, world.xid, revoked=True)
+    with caplog.at_level('WARNING'):
+        usage(auth_client, world.a_id)
+    assert not [r for r in caplog.records if r.getMessage().startswith('Deploy:')]

@@ -645,11 +645,18 @@ cross-certificate on its path. Each entry has `id` (`primary` or `cross:<id>`), 
 `cross_certificate_id`, `issuer`, `valid_to`, `served`, `servable` and `default` (what a plain export of this CA returns).
 
 **Chain usage** (`GET .../chain-usage`, needs `read:cas` and `read:certificates`): what still chains to the CA, to tell when
-it can be retired. `issued`: unrevoked, unexpired certificates issued by the CA or a CA below it. `via_cross`: those whose
-default chain goes through a servable cross-certificate issued by the CA (or a record of its key), with the `cross_certificates`
-involved (`id`, `ca_id`, `ca_name`, `served`). `deployments`: enabled bindings with a full chain path that push such a chain.
-Each section has `count`, `items` (at most 100, soonest expiry first) and `truncated`; `note` says UCM only sees what it issues
-and delivers. Items are certificates (`id`, `name`, `cn`, `ca`, `valid_to`) or bindings (`id`, `target`, `certificate`, `variant`).
+it can be retired. A chain depends on the CA when one of its links is a CA of its subtree (records of the same key included), or a
+cross-certificate of such a CA or issued by one (the issuer is resolved by signature when `issuer_caref` is empty or dangling).
+`issued`: unrevoked, unexpired, unarchived certificates issued by the CA or a CA below it, those with no `caref` included
+(their issuer is found as an export does: AKI, then signature). A leaf issued directly by a root is counted there; its binding is not
+counted under `deployments` unless the root is pushed (`include_root`). `via_cross`: the others whose default chain
+goes through a servable cross-certificate that depends on the CA. `via_cross.cross_certificates` always lists the cross-certificates
+issued by the CA, its subtree or a record of its key (`id`, `ca_id`, `ca_name`, `served`, `servable`), even when no certificate
+uses them: a servable one can still be served, pinned or offered as an ACME alternate chain. `deployments`: enabled bindings with a
+non-empty full chain path whose pushed chain depends on the CA. Without `read:deploy`, `deployments.count` is returned but
+`items` is empty. Each section has `count`, `items` (at most 100, soonest expiry first, no expiry last) and `truncated`; `note` says
+UCM only sees what it issues and delivers. Items are certificates (`id`, `name`, `cn`, `ca`, `ca_refid`, `valid_to`) or bindings
+(`id`, `target_id`, `target`, `certificate_id`, `certificate`, `variant`).
 
 **Cross-sign from UCM** (`POST /api/v2/cas/{issuer_id}/cross-sign`, `201`): signs the key of another
 CA held in UCM with this one and stores the result on the subject CA.

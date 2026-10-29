@@ -120,7 +120,7 @@ ENFORCED_PERMISSIONS = set()
 # Scopes checked inline with has_permission() rather than by the decorator.
 INLINE_CHECKED_PERMISSIONS = frozenset({
     'admin:key_recovery', 'admin:settings', 'admin:system', 'read:audit',
-    'read:cas', 'read:certificates', 'read:private_keys', 'read:system',
+    'read:cas', 'read:certificates', 'read:deploy', 'read:private_keys', 'read:system',
     'read:users', 'write:approvals', 'write:cas',
 })
 

@@ -111,19 +111,20 @@ class DeployService:
 
     @staticmethod
     def _chain_pem(certificate: Certificate, cert_pem: str,
-                   include_root: bool = False, variant: str = 'auto') -> str:
-        """Issuing chain (excluding the leaf), reusing the export chain walker."""
+                   include_root: bool = False, variant: str = 'auto', quiet: bool = False) -> str:
+        """Issuing chain (excluding the leaf), reusing the export chain walker. ``quiet`` logs nothing."""
         from cryptography.hazmat.primitives import serialization
         from api.v2.certificates.export import _build_ca_chain
         from utils.ca_chain import ChainVariantError
-        variant = DeployService.push_chain_variant(certificate, variant)
+        variant = DeployService.push_chain_variant(certificate, variant, quiet=quiet)
         try:
             chain = _build_ca_chain(
                 certificate, cert_pem.encode(), include_root=include_root, variant=variant)
         except ChainVariantError:
             raise  # a binding naming a detached cross-certificate must fail, not push a short chain
         except Exception as e:
-            logger.warning(f"Deploy: chain build failed for cert {certificate.id}: {e}")
+            if not quiet:
+                logger.warning(f"Deploy: chain build failed for cert {certificate.id}: {e}")
             chain = []
         return ''.join(
             c.public_bytes(serialization.Encoding.PEM).decode() for c in chain)
@@ -643,7 +644,7 @@ class DeployService:
             raise ChainVariantError(f'Chain variant {variant} is revoked, expired or not yet valid')
 
     @staticmethod
-    def push_chain_variant(certificate: Certificate, variant: str) -> str:
+    def push_chain_variant(certificate: Certificate, variant: str, quiet: bool = False) -> str:
         """The variant a push uses: a revoked, expired or not yet valid cross-certificate falls back to auto."""
         from models import CA
         from models.ca_cross_certificate import CACrossCertificate
@@ -655,7 +656,8 @@ class DeployService:
         if isinstance(wanted, tuple):
             row = db.session.get(CACrossCertificate, wanted[1])
             if row is not None and (row.revoked or not row.servable):
-                logger.warning(f'Deploy: {variant} is revoked or outside its validity period, using the auto chain')
+                if not quiet:
+                    logger.warning(f'Deploy: {variant} is revoked or outside its validity period, using the auto chain')
                 return 'auto'
         return variant
 

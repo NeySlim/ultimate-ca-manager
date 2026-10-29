@@ -5,7 +5,7 @@ from datetime import datetime, timedelta
 from cryptography.hazmat.primitives import serialization
 from flask import Response, g, request
 
-from auth.unified import require_auth
+from auth.unified import has_permission, require_auth
 from models import CA, db
 from models.ca_cross_certificate import CACrossCertificate
 from services.audit_service import AuditService
@@ -59,11 +59,11 @@ def chain_variants_of_ca(ca_id):
 @bp.route('/api/v2/cas/<int:ca_id>/chain-usage', methods=['GET'])
 @require_auth(['read:cas', 'read:certificates'])
 def chain_usage_of_ca(ca_id):
-    """Certificates and deploy bindings that still chain to this CA (needs both permissions)."""
+    """Certificates and deploy bindings that still chain to this CA; bindings are only named with ``read:deploy``."""
     ca, _, err = _ca_and_row(ca_id)
     if err:
         return err
-    return success_response(data=chain_usage(ca))
+    return success_response(data=chain_usage(ca, with_targets=has_permission('read:deploy', g.permissions)))
 
 
 @bp.route('/api/v2/cas/<int:ca_id>/cross-certificates', methods=['POST'])

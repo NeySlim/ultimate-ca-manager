@@ -1,16 +1,20 @@
 """What still depends on a CA in what UCM issues and delivers (#400).
 
-The default chain is resolved once per issuing CA, not per certificate; certificates are counted in SQL.
+A chain depends on X when one of its links is a CA of X's subtree (records of the same key included), or a
+cross-certificate of such a CA or issued by one. Chains are resolved once per issuing CA, never per certificate.
 """
 import base64
+from collections import defaultdict
+from datetime import datetime
 
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
-from sqlalchemy import or_
+from sqlalchemy import and_, or_, select
 
 from models import CA, Certificate, DeployBinding, DeployTarget, db
 from models.ca_cross_certificate import CACrossCertificate
-from utils.ca_chain import AUTO, issuer_chain, parse_variant
+from services.ca import cross_certs
+from utils.ca_chain import AUTO, issuer_chain
 from utils.cert_issuer import same_key_refids
 from utils.datetime_utils import utc_isoformat, utc_now
 
@@ -24,26 +28,60 @@ def _active(now):
             or_(Certificate.valid_to.is_(None), Certificate.valid_to > now)]
 
 
-def _subtree(ca):
-    """Ids and refids of *ca* and every CA below it (by ``caref``)."""
-    rows = CA.query.with_entities(CA.id, CA.refid, CA.caref).all()
-    children = {}
-    for cid, refid, caref in rows:
-        children.setdefault(caref, []).append((cid, refid))
-    ids, refids, todo = {ca.id}, {ca.refid}, [ca.refid]
+def _der(b64_pem):
+    try:
+        return x509.load_pem_x509_certificate(base64.b64decode(b64_pem)).public_bytes(serialization.Encoding.DER)
+    except Exception:
+        return None
+
+
+def _scope(ca, all_cas):
+    """Refids of *ca*, every CA below it and every record of the same key as one of them."""
+    children = defaultdict(list)
+    for c in all_cas.values():
+        children[c.caref].append(c.refid)
+    scope, todo = set(), [ca.refid]
     while todo:
-        for cid, refid in children.get(todo.pop(), []):
-            if refid not in refids:
-                ids.add(cid)
-                refids.add(refid)
-                todo.append(refid)
-    return ids, refids
+        refid = todo.pop()
+        if refid in scope:
+            continue
+        member = all_cas.get(refid)
+        new = [r for r in (same_key_refids(member) if member else []) + [refid] if r not in scope]
+        scope.update(new)
+        for r in new:
+            todo.extend(children.get(r, []))
+    return scope
 
 
-def _default_cross(ca, issuer_refids):
-    """The cross-certificate in *ca*'s default chain when X issued it, else None."""
-    row = next((l.cross for l in issuer_chain(ca) if l.cross is not None), None)
-    return row if row is not None and row.issuer_caref in issuer_refids else None
+class _Hits:
+    """Which certificates of a chain belong to the dependency set of one CA."""
+
+    def __init__(self, scope, all_cas):
+        self.scope, self.known = scope, set(all_cas)
+        self.scope_ders = {d for r in scope if r in all_cas and all_cas[r].crt and (d := _der(all_cas[r].crt))}
+        self.ders = set(self.scope_ders)
+        scope_ids = {all_cas[r].id for r in scope if r in all_cas}
+        self.issued_crosses, self.hot_crosses = [], []
+        for row in CACrossCertificate.query.order_by(CACrossCertificate.id).all():
+            issuer = cross_certs.issuer_of(row)
+            by_scope = issuer is not None and issuer.refid in scope
+            if by_scope:
+                self.issued_crosses.append(row)
+            if by_scope or row.ca_id in scope_ids:
+                self.hot_crosses.append(row)
+                if der := _der(row.crt):
+                    self.ders.add(der)
+        self.hot_cross_ids = {r.id for r in self.hot_crosses}
+
+    def link(self, link):
+        if link.cross is None:
+            return link.ca is not None and link.ca.refid in self.scope
+        return link.cross.id in self.hot_cross_ids
+
+    def chain_pem(self, pem_text):
+        from services.deploy.service import DeployService
+        return [x509.load_pem_x509_certificate(b.encode()).public_bytes(serialization.Encoding.DER)
+                for b in DeployService._split_pem(pem_text)]
 
 
 def _cert_item(cert, names):
@@ -51,80 +89,82 @@ def _cert_item(cert, names):
             'ca': names.get(cert.caref), 'ca_refid': cert.caref, 'valid_to': utc_isoformat(cert.valid_to)}
 
 
-def _section(query, names):
+def _section(condition, names):
+    query = Certificate.query.filter(condition)
     total = query.count()
-    rows = query.order_by(Certificate.valid_to.asc(), Certificate.id.asc()).limit(LIMIT).all()
+    rows = (query.order_by(Certificate.valid_to.is_(None), Certificate.valid_to.asc(), Certificate.id.asc())
+            .limit(LIMIT).all())
     return {'count': total, 'items': [_cert_item(c, names) for c in rows], 'truncated': total > LIMIT}
 
 
-def _pushes_chain_of(binding, cert, subtree_ids):
-    """Whether the chain this binding pushes (as the push resolves it) holds a certificate of a CA in the subtree."""
-    from services.deploy.service import DeployService
-    pem = DeployService._chain_pem(cert, base64.b64decode(cert.crt).decode(), include_root=bool(binding.include_root),
-                                   variant=binding.chain_variant or AUTO)
-    der = {c.public_bytes(serialization.Encoding.DER) for c in
-           (x509.load_pem_x509_certificate(b.encode()) for b in DeployService._split_pem(pem))}
-    if not der:
-        return False
-    for ca in CA.query.filter(CA.id.in_(subtree_ids), CA.crt.isnot(None)).all():
+def _orphans(hits, orphan_cond, now):
+    """``(issued_ids, via_ids)`` of certificates with no usable caref, chained as the export chains them."""
+    from api.v2.certificates.export import _build_ca_chain
+    issued, via = set(), set()
+    for cert in Certificate.query.filter(orphan_cond, *_active(now)).all():
         try:
-            if x509.load_pem_x509_certificate(base64.b64decode(ca.crt)).public_bytes(serialization.Encoding.DER) in der:
-                return True
+            chain = _build_ca_chain(cert, base64.b64decode(cert.crt), include_root=True)
+            ders = [c.public_bytes(serialization.Encoding.DER) for c in chain]
         except Exception:
             continue
-    return False
+        if ders and ders[0] in hits.scope_ders:
+            issued.add(cert.id)
+        elif any(d in hits.ders for d in ders):
+            via.add(cert.id)
+    return issued, via
 
 
-def _deployments(issued_ids, via_ids, issuer_refids, subtree_ids, now):
+def _binding_items(hits, concerned, orphan_cond, now, with_targets):
     from services.deploy.service import DeployService
-    pinned = {r.id for r in CACrossCertificate.query.filter(
-        CACrossCertificate.issuer_caref.in_(issuer_refids)).all() if r.servable}
+    pins = [f'cross:{i}' for i in hits.hot_cross_ids]
     q = (db.session.query(DeployBinding, DeployTarget, Certificate)
          .join(DeployTarget, DeployBinding.target_id == DeployTarget.id)
          .join(Certificate, DeployBinding.certificate_id == Certificate.id)
          .filter(DeployBinding.enabled.is_(True), DeployTarget.enabled.is_(True),
-                 DeployBinding.fullchain_path.isnot(None), DeployBinding.fullchain_path != '', *_active(now)))
-    found = []
-    for binding, target, cert in q.order_by(Certificate.valid_to.asc(), DeployBinding.id.asc()).all():
-        try:
-            wanted = parse_variant(DeployService.push_chain_variant(cert, binding.chain_variant or AUTO))
-            if isinstance(wanted, tuple):
-                hit = wanted[1] in pinned
-            else:
-                hit = wanted == AUTO and cert.id in via_ids
-            if not hit and cert.id in issued_ids:
-                hit = _pushes_chain_of(binding, cert, subtree_ids)
-        except ValueError:  # the push itself would refuse this binding
-            continue
-        if hit:
-            found.append({'id': binding.id, 'target_id': target.id, 'target': target.name,
-                          'certificate_id': cert.id, 'certificate': cert.descr or cert.subject_cn,
-                          'variant': binding.chain_variant or AUTO})
-    return {'count': len(found), 'items': found[:LIMIT], 'truncated': len(found) > LIMIT}
+                 DeployBinding.fullchain_path.isnot(None), DeployBinding.fullchain_path != '', *_active(now),
+                 or_(concerned, orphan_cond, DeployBinding.chain_variant.in_(pins))))
+    memo, found = {}, []
+    for binding, target, cert in q.all():
+        variant, include_root = binding.chain_variant or AUTO, bool(binding.include_root)
+        inline = base64.b64decode(cert.crt).count(b'BEGIN CERTIFICATE') > 1
+        key = (cert.id if inline or cert.caref not in hits.known else cert.caref, variant, include_root)
+        if key not in memo:
+            try:
+                pem = DeployService._chain_pem(cert, base64.b64decode(cert.crt).decode(), include_root=include_root,
+                                               variant=variant, quiet=True)
+                memo[key] = any(d in hits.ders for d in hits.chain_pem(pem))
+            except ValueError:  # the push itself would refuse this binding
+                memo[key] = False
+        if memo[key]:
+            found.append((binding, target, cert))
+    found.sort(key=lambda r: (r[2].valid_to is None, r[2].valid_to or datetime.min, r[0].id))
+    items = [{'id': b.id, 'target_id': t.id, 'target': t.name, 'certificate_id': c.id,
+              'certificate': c.descr or c.subject_cn, 'variant': b.chain_variant or AUTO}
+             for b, t, c in found[:LIMIT]] if with_targets else []
+    return {'count': len(found), 'items': items, 'truncated': with_targets and len(found) > LIMIT}
 
 
-def chain_usage(ca):
+def chain_usage(ca, with_targets=True):
+    """*with_targets* False counts the bindings but names none of them."""
     now = utc_now()
-    names = dict(CA.query.with_entities(CA.refid, CA.descr).all())
-    sub_ids, sub_refids = _subtree(ca)
-    issuer_refids = set(same_key_refids(ca))
+    all_cas = {c.refid: c for c in CA.query.all()}
+    names = {r: c.descr for r, c in all_cas.items()}
+    hits = _Hits(_scope(ca, all_cas), all_cas)
     active = _active(now)
+    orphan_cond = or_(Certificate.caref.is_(None), Certificate.caref == '',
+                      Certificate.caref.notin_(select(CA.refid)))
 
-    issued_q = Certificate.query.filter(Certificate.caref.in_(sub_refids), *active)
+    via_carefs = set()
+    for (caref,) in db.session.query(Certificate.caref).filter(Certificate.caref.in_(list(all_cas)), *active).distinct():
+        if caref not in hits.scope and any(hits.link(l) for l in issuer_chain(all_cas[caref])):
+            via_carefs.add(caref)
 
-    chains = {}
-    for (caref,) in db.session.query(Certificate.caref).filter(Certificate.caref.isnot(None), *active).distinct():
-        start = CA.query.filter_by(refid=caref).first()
-        row = _default_cross(start, issuer_refids) if start is not None else None
-        if row is not None:
-            chains[caref] = row
-    via_q = Certificate.query.filter(Certificate.caref.in_(list(chains)), *active)
-    via = _section(via_q, names)
+    orphan_issued, orphan_via = _orphans(hits, orphan_cond, now)
+    issued = _section(and_(or_(Certificate.caref.in_(list(hits.scope)), Certificate.id.in_(orphan_issued)), *active), names)
+    via = _section(and_(or_(Certificate.caref.in_(list(via_carefs)), Certificate.id.in_(orphan_via)), *active), names)
     via['cross_certificates'] = [
-        {'id': r.id, 'ca_id': r.ca_id, 'ca_name': r.ca.descr if r.ca else None, 'served': bool(r.served)}
-        for r in sorted({r.id: r for r in chains.values()}.values(), key=lambda r: r.id)]
-
-    issued_ids = {i for (i,) in issued_q.with_entities(Certificate.id).all()}
-    via_ids = {i for (i,) in via_q.with_entities(Certificate.id).all()}
-    return {'issued': _section(issued_q, names), 'via_cross': via,
-            'deployments': _deployments(issued_ids, via_ids, issuer_refids, sub_ids, now), 'note': NOTE}
+        {'id': r.id, 'ca_id': r.ca_id, 'ca_name': r.ca.descr if r.ca else None, 'served': bool(r.served),
+         'servable': r.servable} for r in hits.issued_crosses]
+    concerned = Certificate.caref.in_(list(hits.scope | via_carefs))
+    return {'issued': issued, 'via_cross': via,
+            'deployments': _binding_items(hits, concerned, orphan_cond, now, with_targets), 'note': NOTE}
