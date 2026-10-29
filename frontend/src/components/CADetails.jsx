@@ -218,7 +218,7 @@ export function CADetails({
         </div>
       )}
 
-      {/* Certificate only: the key stayed where the request was made (#348) */}
+      {/* No key: a warning when it was expected (#348), a plain note for a root imported without it (#426) */}
       {holdsNoKey(ca) && (
         <div className={`rounded-lg px-3 py-2 border text-xs text-text-secondary flex items-start gap-2 flex-wrap ${
           needsKeyImport(ca) ? 'bg-status-warning-op15 border-status-warning-op40' : 'bg-tertiary-40 border-border'}`}>

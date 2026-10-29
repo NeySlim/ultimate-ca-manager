@@ -30,4 +30,10 @@ describe('CAs held without their key', () => {
     expect(unlistedSigningCas([signer])).toBe(0)
     expect(unlistedSigningCas(undefined)).toBe(0)
   })
+
+  it('counts every CA that cannot sign now, not only those without a key', () => {
+    const cas = [signer, { id: 5, has_private_key: true, revoked: true }, { id: 6, has_private_key: true, pending: true },
+      { id: 7, has_private_key: true, offline: true }, { id: 8, has_private_key: true, revoked_in_chain: true }]
+    expect(unlistedSigningCas(cas)).toBe(4)
+  })
 })
