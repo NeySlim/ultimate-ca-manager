@@ -13,6 +13,19 @@ from tests.fixtures.cross_world import build_world, set_served
 from utils.datetime_utils import utc_now
 
 
+@pytest.fixture(autouse=True)
+def _remove_what_the_test_added(app):
+    """Placeholder certificates and bindings must not outlive the test: other files score every certificate."""
+    with app.app_context():
+        floor = {m: (db.session.query(db.func.max(m.id)).scalar() or 0) for m in (Certificate, DeployBinding, DeployTarget)}
+    yield
+    with app.app_context():
+        db.session.rollback()
+        for model in (DeployBinding, DeployTarget, Certificate):
+            model.query.filter(model.id > floor[model]).delete()
+        db.session.commit()
+
+
 @pytest.fixture
 def world(app, auth_client):
     return build_world(app, auth_client)
