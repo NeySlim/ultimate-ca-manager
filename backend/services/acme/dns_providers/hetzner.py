@@ -32,6 +32,7 @@ class HetznerDnsProvider(BaseDnsProvider):
     def __init__(self, credentials: Dict[str, Any]):
         super().__init__(credentials)
         self._zone_cache: Dict[str, Dict] = {}
+        self._last_status: Optional[int] = None
     
     def _get_headers(self) -> Dict[str, str]:
         return {
@@ -57,6 +58,7 @@ class HetznerDnsProvider(BaseDnsProvider):
                 timeout=30
             )
             
+            self._last_status = response.status_code
             if response.status_code >= 400:
                 try:
                     error = response.json()
@@ -119,6 +121,8 @@ class HetznerDnsProvider(BaseDnsProvider):
         
         # add_records creates the RRset or appends to it; a TTL must match the existing one
         success, result = self._request('GET', f'/zones/{zone_id}/rrsets/{relative_name}/TXT')
+        if not success and self._last_status != 404:
+            return False, f"Failed to read existing record: {result}"
         existing = result.get('rrset') if success and result else None
         if existing and any(r.get('value') == quoted_value for r in existing.get('records', [])):
             return True, "Record already present"
@@ -129,6 +133,8 @@ class HetznerDnsProvider(BaseDnsProvider):
         success, result = self._request(
             'POST', f'/zones/{zone_id}/rrsets/{relative_name}/TXT/actions/add_records', data)
 
+        if success and ((result or {}).get('action') or {}).get('status') == 'error':
+            success, result = False, result['action'].get('error')
         if not success:
             return False, f"Failed to create record: {result}"
         

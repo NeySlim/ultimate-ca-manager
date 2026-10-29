@@ -22,11 +22,13 @@ class _Response:
 
 
 class FakeHetzner:
-    """Routes from the Cloud API spec only; anything else answers 405."""
+    """Routes from the Cloud API spec only: an unknown path answers 404, an unknown method 405."""
 
     def __init__(self, rrsets=None):
         self.rrsets = rrsets or {}
         self.calls = []
+        self.get_status = None
+        self.action_status = 'running'
 
     def __call__(self, method, url, headers=None, json=None, timeout=None):
         path = url.removeprefix(HetznerDnsProvider.BASE_URL)
@@ -43,6 +45,8 @@ class FakeHetzner:
             return _Response(404, {'error': {'message': 'not found'}})
         name, action = m.groups()
         if method == 'GET' and not action:
+            if self.get_status:
+                return _Response(self.get_status, {'error': {'message': 'rate limited'}})
             if name not in self.rrsets:
                 return _Response(404, {'error': {'message': 'rrset not found'}})
             return _Response(200, {'rrset': self.rrsets[name]})
@@ -55,7 +59,7 @@ class FakeHetzner:
                 if record['value'] in values:
                     return _Response(422, {'error': {'message': 'duplicate record'}})
                 rrset['records'].append(record)
-            return _Response(201, {'action': {'status': 'running'}})
+            return _Response(201, {'action': {'status': self.action_status, 'error': {'message': 'zone locked'}}})
         return _Response(405, {'error': {'message': 'method not allowed'}})
 
 
@@ -103,3 +107,17 @@ def test_value_already_present_is_not_sent_again(api):
     assert ok, msg
     assert _values(api) == ['"tok1"']
     assert not [c for c in api.calls if c[0] == 'POST']
+
+
+def test_unreadable_rrset_is_not_overwritten_with_a_guessed_ttl(api):
+    api.rrsets['_acme-challenge'] = {'ttl': 60, 'records': [{'value': '"other"'}]}
+    api.get_status = 429
+    ok, msg = _provider().create_txt_record('example.com', '_acme-challenge.example.com', 'tok1')
+    assert not ok and 'rate limited' in msg
+    assert not [c for c in api.calls if c[0] == 'POST']
+
+
+def test_failed_action_is_reported(api):
+    api.action_status = 'error'
+    ok, msg = _provider().create_txt_record('example.com', '_acme-challenge.example.com', 'tok1')
+    assert not ok and 'zone locked' in msg
