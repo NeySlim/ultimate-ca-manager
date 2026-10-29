@@ -109,3 +109,27 @@ def test_other_variants_are_restored_as_they_are(app, pinned):
         _service().restore_backup(blob, PASSWORD)
         db.session.expire_all()
         assert _binding(pinned).chain_variant == 'primary'
+
+
+def test_binding_absent_from_the_installation_is_created_with_its_cross_pin(app, pinned):
+    with app.app_context():
+        blob = _backup(app)
+        DeployBinding.query.filter_by(target_id=pinned['target']).delete()
+        db.session.commit()
+        _service().restore_backup(blob, PASSWORD)
+        db.session.expire_all()
+        restored = CACrossCertificate.query.filter_by(fingerprint_sha256=pinned['fingerprint']).one()
+        assert _binding(pinned).chain_variant == f'cross:{restored.id}'
+
+
+def test_fallback_to_auto_reaches_the_administrator(app, pinned):
+    from services.backup.restore_report import with_restore_warnings
+    with app.app_context():
+        blob = _service().create_backup(PASSWORD, include=_only(
+            'certificate_authorities', 'certificates', 'deploy_targets', 'deploy_bindings'))
+        CACrossCertificate.query.filter_by(id=pinned['cross_id']).delete()
+        DeployBinding.query.filter_by(target_id=pinned['target']).delete()
+        db.session.commit()
+        results = _service().restore_backup(blob, PASSWORD)
+        assert results['chain_variant_fallbacks']
+        assert 'cross-certificate' in with_restore_warnings('Restored.', results)

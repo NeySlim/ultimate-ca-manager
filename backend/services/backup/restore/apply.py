@@ -213,7 +213,7 @@ def _apply_row(section_name, section, instance, row, columns, attribute_of, plan
             continue
 
         if section_name == 'deploy_bindings' and name == 'chain_variant':
-            value = _restored_chain_variant(row, value)
+            value = _restored_chain_variant(row, value, plan)
 
         setattr(instance, attribute_of.get(name, name),
                 _coerce(value, column, f"{section_name}.{name}"))
@@ -221,16 +221,22 @@ def _apply_row(section_name, section, instance, row, columns, attribute_of, plan
         setattr(instance, attribute_of.get(column, column), value)
 
 
-def _restored_chain_variant(row, value):
+def _restored_chain_variant(row, value, plan):
     """`cross:<id>` names a row renumbered on restore: found again by fingerprint, else `auto`."""
     if not str(value or '').startswith('cross:'):
         return value
+    from models import db
     from models.ca_cross_certificate import CACrossCertificate
     fingerprint = row.get(CHAIN_VARIANT_FINGERPRINT)
-    target = CACrossCertificate.query.filter_by(fingerprint_sha256=fingerprint).first() if fingerprint else None
+    target = None
+    if fingerprint:
+        # The binding being built is not complete yet: it must not be flushed here.
+        with db.session.no_autoflush:
+            target = CACrossCertificate.query.filter_by(fingerprint_sha256=fingerprint).first()
     if target is None:
         logger.warning("Deploy binding chain_variant %s: its cross-certificate is not on this "
                        "installation, the binding falls back to 'auto'", value)
+        plan.chain_variant_fallbacks.append(str(value))
         return 'auto'
     return f'cross:{target.id}'
 

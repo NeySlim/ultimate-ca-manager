@@ -469,7 +469,7 @@ def _seed_source():
     # -- the rows that point at them ---------------------------------------
     add('role_permissions', role_id=roles[1].id, permission='read:certificates')
     add('ca_template_pins', ca_id=authorities[1].id, template_id=templates[1].id)
-    add('ca_cross_certificates', ca_id=authorities[1].id, crt='xinst-cross-crt',
+    cross = add('ca_cross_certificates', ca_id=authorities[1].id, crt='xinst-cross-crt',
         fingerprint_sha256='xinst-cross-fingerprint', issuer_caref='xinst-ca-a')
     add('group_members', group_id=groups[1].id, user_id=users[1].id, role='member')
     add('api_keys', user_id=users[1].id, key_hash='xinst-api-key-hash',
@@ -605,7 +605,7 @@ def _seed_source():
     db.session.flush()
 
     add('deploy_bindings', target_id=deploy_targets[1].id,
-        certificate_id=leaves[1].id)
+        certificate_id=leaves[1].id, chain_variant=f'cross:{cross.id}')
     add('crl_deploy_bindings', target_id=deploy_targets[1].id,
         ca_id=authorities[1].id, crl_path='/etc/ucm/xinst.crl',
         format='pem', include_parent_crls=True,
@@ -1013,6 +1013,15 @@ def _declared_references():
             for column in section.references}
 
 
+def _assert_binding_follows_its_cross_certificate(app, restored):
+    from models.ca_cross_certificate import CACrossCertificate
+    from models.deploy import DeployBinding
+    with restored.open(app):
+        landed = CACrossCertificate.query.filter_by(
+            fingerprint_sha256='xinst-cross-fingerprint').one()
+        assert DeployBinding.query.one().chain_variant == f'cross:{landed.id}'
+
+
 class TestEveryReferenceLandsOnTheRowTheArchiveNames:
     """The restore used to write the source's numbers into the target."""
 
@@ -1024,6 +1033,15 @@ class TestEveryReferenceLandsOnTheRowTheArchiveNames:
     def test_on_postgresql(self, app, restored_on_postgresql):
         with restored_on_postgresql.open(app):
             _assert_every_reference_landed(restored_on_postgresql)
+
+    def test_a_binding_pinned_to_a_cross_certificate_follows_it_on_sqlite(
+            self, app, restored_on_sqlite):
+        _assert_binding_follows_its_cross_certificate(app, restored_on_sqlite)
+
+    @_needs_pg
+    def test_a_binding_pinned_to_a_cross_certificate_follows_it_on_postgresql(
+            self, app, restored_on_postgresql):
+        _assert_binding_follows_its_cross_certificate(app, restored_on_postgresql)
 
     def test_the_target_numbered_its_own_rows(self, app, restored_on_sqlite):
         """Nothing here may carry a primary key from the source's range.

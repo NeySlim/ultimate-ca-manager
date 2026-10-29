@@ -325,6 +325,7 @@ class RestoreCoreMixin:
                 # row exists: this is where an authority finds the HSM key the
                 # same restore has just created.
                 results['relinked'] = relink_references(backup_data, plan)
+                results['chain_variant_fallbacks'] = list(plan.chain_variant_fallbacks)
 
                 if mode == 'replace':
                     results['removed'] = self._remove_what_the_archive_omits(
