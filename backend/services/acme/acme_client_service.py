@@ -1136,6 +1136,9 @@ class AcmeClientService:
                     domain = authz_identifier['value']
                     if authz_identifier.get('type') == 'ip':
                         domain = normalize_ip_for_identifier(domain) or domain
+                    # A wildcard authz names the base domain (RFC 8555 §7.1.4): keep it apart from the apex
+                    if authz.get('wildcard'):
+                        domain = f"*.{domain}"
 
                     for challenge in authz.get('challenges', []):
                         if challenge['type'] == challenge_type:
