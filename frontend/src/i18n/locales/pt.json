@@ -5708,7 +5708,7 @@
   },
   "chainUsage": {
     "title": "Ainda encadeia nesta CA",
-    "empty": "Nada no UCM depende mais desta CA: nenhum certificado, CA subordinada, cadeia predefinida ou implantação passa por ela.",
+    "empty": "Nenhum certificado, CA subordinada, cadeia predefinida ou implantação no UCM passa mais por esta CA. As configurações que a indicam (CA emissora de ACME, SCEP ou EST, políticas) não são verificadas aqui.",
     "issued": "Certificados emitidos por esta CA ou abaixo dela",
     "viaCross": "Cadeia predefinida por um certificado cruzado desta CA",
     "deployments": "Vínculos de implantação que enviam essa cadeia",

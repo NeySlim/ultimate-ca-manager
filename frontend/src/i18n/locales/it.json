@@ -5708,7 +5708,7 @@
   },
   "chainUsage": {
     "title": "Ancora concatenati a questa CA",
-    "empty": "Nulla in UCM dipende più da questa CA: nessun certificato, sub-CA, catena predefinita o distribuzione passa da essa.",
+    "empty": "Nessun certificato, sub-CA, catena predefinita o distribuzione in UCM passa più da questa CA. Le impostazioni che la indicano (CA emittente ACME, SCEP o EST, criteri) non vengono verificate qui.",
     "issued": "Certificati emessi da questa CA o sotto di essa",
     "viaCross": "Catena predefinita tramite un certificato incrociato di questa CA",
     "deployments": "Binding di distribuzione che inviano una tale catena",

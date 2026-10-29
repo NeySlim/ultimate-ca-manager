@@ -5711,7 +5711,7 @@
   },
   "chainUsage": {
     "title": "Still chaining to this CA",
-    "empty": "Nothing in UCM depends on this CA any more: no certificate, sub-CA, default chain or deployment goes through it.",
+    "empty": "No certificate, sub-CA, default chain or deployment in UCM goes through this CA any more. Settings that name it (ACME, SCEP or EST issuing CA, policies) are not checked here.",
     "issued": "Certificates issued by this CA or below",
     "viaCross": "Default chain through a cross-certificate of this CA",
     "deployments": "Deploy bindings pushing such a chain",

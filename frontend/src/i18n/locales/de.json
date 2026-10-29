@@ -5708,7 +5708,7 @@
   },
   "chainUsage": {
     "title": "Weiterhin mit dieser CA verkettet",
-    "empty": "In UCM hängt nichts mehr von dieser CA ab: kein Zertifikat, keine Sub-CA, keine Standardkette und keine Bereitstellung läuft über sie.",
+    "empty": "In UCM läuft kein Zertifikat, keine Sub-CA, keine Standardkette und keine Bereitstellung mehr über diese CA. Einstellungen, die sie nennen (ausstellende CA für ACME, SCEP oder EST, Richtlinien), werden hier nicht geprüft.",
     "issued": "Von dieser CA oder darunter ausgestellte Zertifikate",
     "viaCross": "Standardkette über ein Cross-Zertifikat dieser CA",
     "deployments": "Bereitstellungen, die eine solche Kette ausliefern",

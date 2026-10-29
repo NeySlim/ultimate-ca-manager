@@ -5708,7 +5708,7 @@
   },
   "chainUsage": {
     "title": "仍链接到此 CA",
-    "empty": "UCM 中已没有任何内容依赖此 CA：没有证书、下级 CA、默认链或部署经过它。",
+    "empty": "UCM 中已没有任何证书、下级 CA、默认链或部署经过此 CA。引用它的设置（ACME、SCEP 或 EST 签发 CA、策略）不在此处检查。",
     "issued": "由此 CA 或其下级签发的证书",
     "viaCross": "经由此 CA 的交叉证书的默认链",
     "deployments": "推送此类链的部署绑定",
