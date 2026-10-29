@@ -50,7 +50,7 @@ export default {
           { label: 'Firma incrociata', text: 'Firma la chiave di questa CA con un\'altra CA presente in UCM, con una validità e una lunghezza del percorso' },
           { label: 'Servi', text: 'Al massimo uno per CA è servito nella catena predefinita (TLS, PKCS#12, ACME, WSTEP, TSA, distribuzioni, AIA .cer e .pem). Uno revocato, scaduto o non ancora valido non viene mai servito' },
           { label: 'Catena da presentare', text: 'Esportazioni e binding di distribuzione possono fissare la catena predefinita, la root autofirmata o un certificato incrociato. ACME propone le altre catene come alternative (certbot --preferred-chain)' },
-          { label: 'Importazione', text: 'Un certificato sulla chiave di una CA presente viene associato a una root autofirmata; su una intermedia il 409 propone Associa come certificato incrociato. Smart Import lo associa accanto a una root presente oppure lo segnala come escluso' },
+          { label: 'Importazione', text: 'Un certificato sulla chiave di una CA presente viene associato a una root autofirmata; su una intermedia il 409 propone Associa come certificato incrociato o Sostituisci. Smart Import lo associa accanto a una root presente oppure lo segnala come escluso' },
           { label: 'Riparazione', text: 'La barra sotto le statistiche elenca i record danneggiati da un\'importazione precedente: Converti in certificato incrociato (richiede delete:cas) e Ripristina come principale. Nulla viene eseguito automaticamente' },
         ]
       },
@@ -97,7 +97,7 @@ export default {
       'L\'eliminazione di una CA NON revoca i certificati che ha emesso: revocali prima',
       'Le chiavi private sono memorizzate crittografate; la perdita del database significa la perdita delle chiavi',
       'Le password della modalità offline NON sono recuperabili: conservale nel tuo password manager / vault prima di confermare',
-      'Un certificato incrociato non sostituisce mai il certificato di una CA: una intermedia che verrebbe ricertificata sotto un altro emittente viene rifiutata (409) a meno che tu non la associ come certificato incrociato',
+      'Un certificato incrociato non sostituisce mai il certificato di una CA: una intermedia che verrebbe ricertificata sotto un altro emittente viene rifiutata (409) a meno che tu non la associ come certificato incrociato o sostituisca quello attuale; un cambio di root con lo stesso nome di emittente lo sostituisce',
       'Una root autofirmata sovrascritta o eliminata non viene recuperata da Converti in certificato incrociato: ripristinala da un backup, oppure fornisci il suo certificato a Ripristina come principale',
     ],
   },
@@ -172,7 +172,7 @@ Importa certificati CA esistenti tramite:
 
 Quando si importa senza chiave privata, la CA può verificare i certificati ma non può firmarne di nuovi.
 
-Un certificato che riporta soggetto e chiave di una CA già presente in UCM, sotto un altro emittente, è un certificato incrociato e non sostituisce mai il certificato della CA. Su una root autofirmata viene associato come certificato incrociato. Su una intermedia, e quando viene caricato dopo **Rinnova tramite CSR**, l'importazione viene rifiutata (409) e propone **Associa come certificato incrociato**. Smart Import associa quello trovato accanto a una root presente e lo elenca nel risultato; quello che non può associare viene escluso e segnalato come saltato.
+Un certificato che riporta soggetto e chiave di una CA già presente in UCM, sotto un altro emittente, è un certificato incrociato e non sostituisce mai il certificato della CA. Su una root autofirmata viene associato come certificato incrociato. Su una intermedia, e quando viene caricato dopo **Rinnova tramite CSR**, l'importazione viene rifiutata (409) e propone **Associa come certificato incrociato** o **Sostituisci**; un cambio di root (stesso nome di emittente, nuova chiave) sostituisce il certificato come un rinnovo. Smart Import associa quello trovato accanto a una root presente e lo elenca nel risultato; quello che non può associare viene escluso e segnalato come saltato.
 
 ## Esportazione di una CA
 

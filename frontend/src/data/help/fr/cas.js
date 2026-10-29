@@ -50,7 +50,7 @@ export default {
           { label: 'Signer en croisé', text: 'Signe la clé de cette CA avec une autre CA détenue dans UCM, avec une validité et une longueur de chemin' },
           { label: 'Servir', text: 'Au plus un par CA est servi dans la chaîne par défaut (TLS, PKCS#12, ACME, WSTEP, TSA, déploiements, AIA .cer et .pem). Un certificat révoqué, expiré ou pas encore valide n\'est jamais servi' },
           { label: 'Chaîne à présenter', text: 'Les exports et les liaisons de déploiement peuvent imposer la chaîne par défaut, la racine auto-signée ou un certificat croisé. ACME propose les autres chaînes comme alternatives (certbot --preferred-chain)' },
-          { label: 'Import', text: 'Un certificat sur la clé d\'une CA détenue est rattaché à une racine auto-signée ; sur une intermédiaire, le 409 propose Rattacher comme certificat croisé. L\'import intelligent le rattache à côté d\'une racine détenue ou le signale comme écarté' },
+          { label: 'Import', text: 'Un certificat sur la clé d\'une CA détenue est rattaché à une racine auto-signée ; sur une intermédiaire, le 409 propose Rattacher comme certificat croisé ou Remplacer. L\'import intelligent le rattache à côté d\'une racine détenue ou le signale comme écarté' },
           { label: 'Réparation', text: 'La barre sous les statistiques liste les enregistrements qu\'un ancien import a abîmés : Convertir en certificat croisé (nécessite delete:cas) et Restaurer comme principal. Rien ne s\'exécute seul' },
         ]
       },
@@ -97,7 +97,7 @@ export default {
       'Supprimer une CA ne révoquera PAS les certificats qu\'elle a émis : révoquez-les d\'abord',
       'Les clés privées sont stockées chiffrées ; perdre la base de données signifie perdre les clés',
       'Les mots de passe du mode hors ligne ne sont PAS récupérables : stockez-les dans votre coffre-fort avant de confirmer',
-      'Un certificat croisé ne remplace jamais le certificat propre d\'une CA : une intermédiaire qui serait re-certifiée sous un autre émetteur est refusée (409) sauf si vous la rattachez comme certificat croisé',
+      'Un certificat croisé ne remplace jamais le certificat propre d\'une CA : une intermédiaire qui serait re-certifiée sous un autre émetteur est refusée (409) sauf si vous la rattachez comme certificat croisé ou remplacez le certificat actuel ; un roulement de racine sous le même nom d\'émetteur le remplace',
       'Une racine auto-signée écrasée ou supprimée n\'est pas récupérée par Convertir en certificat croisé : restaurez-la depuis une sauvegarde, ou fournissez son certificat à Restaurer comme principal',
     ],
   },
@@ -173,7 +173,7 @@ Importez des certificats de CA existants via :
 
 Lors de l'importation sans clé privée, la CA peut vérifier les certificats mais ne peut pas en signer de nouveaux.
 
-Un certificat qui porte le sujet et la clé d'une CA déjà présente dans UCM, sous un autre émetteur, est un certificat croisé et ne remplace jamais le certificat propre de la CA. Sur une racine auto-signée, il est rattaché comme certificat croisé. Sur une intermédiaire, et lors du téléversement après **Renouveler via CSR**, l'import est refusé (409) et propose **Rattacher comme certificat croisé**. L'import intelligent rattache celui trouvé à côté d'une racine détenue et le liste dans le résultat ; celui qu'il ne peut pas rattacher est écarté et signalé.
+Un certificat qui porte le sujet et la clé d'une CA déjà présente dans UCM, sous un autre émetteur, est un certificat croisé et ne remplace jamais le certificat propre de la CA. Sur une racine auto-signée, il est rattaché comme certificat croisé. Sur une intermédiaire, et lors du téléversement après **Renouveler via CSR**, l'import est refusé (409) et propose **Rattacher comme certificat croisé** ou **Remplacer** ; un roulement de racine (même nom d'émetteur, nouvelle clé) remplace le certificat comme un renouvellement. L'import intelligent rattache celui trouvé à côté d'une racine détenue et le liste dans le résultat ; celui qu'il ne peut pas rattacher est écarté et signalé.
 
 ## Exporter une CA
 

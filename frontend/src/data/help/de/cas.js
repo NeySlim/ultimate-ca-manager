@@ -50,7 +50,7 @@ export default {
           { label: 'Cross-signieren', text: 'Den Schlüssel dieser CA mit einer anderen in UCM vorhandenen CA signieren, mit Gültigkeit und Pfadlänge' },
           { label: 'Ausliefern', text: 'Höchstens eines pro CA wird in der Standardkette ausgeliefert (TLS, PKCS#12, ACME, WSTEP, TSA, Deployments, AIA .cer und .pem). Ein widerrufenes, abgelaufenes oder noch nicht gültiges wird nie ausgeliefert' },
           { label: 'Zu präsentierende Kette', text: 'Exporte und Deploy-Bindungen können die Standardkette, die selbstsignierte Root oder ein Cross-Zertifikat festlegen. ACME bietet die anderen Ketten als Alternativen an (certbot --preferred-chain)' },
-          { label: 'Import', text: 'Ein Zertifikat über dem Schlüssel einer vorhandenen CA wird an eine selbstsignierte Root angehängt; bei einer Intermediate bietet der Fehler 409 „Als Cross-Zertifikat anhängen“ an. Smart Import hängt es neben einer vorhandenen Root an oder meldet es als übersprungen' },
+          { label: 'Import', text: 'Ein Zertifikat über dem Schlüssel einer vorhandenen CA wird an eine selbstsignierte Root angehängt; bei einer Intermediate bietet der Fehler 409 „Als Cross-Zertifikat anhängen“ oder „Ersetzen“ an. Smart Import hängt es neben einer vorhandenen Root an oder meldet es als übersprungen' },
           { label: 'Reparatur', text: 'Die Leiste unter den Statistiken listet Einträge, die ein älterer Import beschädigt hat: In Cross-Zertifikat umwandeln (erfordert delete:cas) und Als primär wiederherstellen. Nichts läuft automatisch' },
         ]
       },
@@ -97,7 +97,7 @@ export default {
       'Das Löschen einer CA widerruft NICHT die von ihr ausgestellten Zertifikate: widerrufen Sie diese zuerst',
       'Private Schlüssel werden verschlüsselt gespeichert; der Verlust der Datenbank bedeutet den Verlust der Schlüssel',
       'Offline-Modus-Passwörter sind NICHT wiederherstellbar: bewahren Sie sie vor der Bestätigung in Ihrem Passwortmanager / Vault auf',
-      'Ein Cross-Zertifikat ersetzt nie das eigene Zertifikat einer CA: Eine Intermediate, die unter einem anderen Aussteller neu zertifiziert würde, wird abgelehnt (409), es sei denn, Sie hängen sie als Cross-Zertifikat an',
+      'Ein Cross-Zertifikat ersetzt nie das eigene Zertifikat einer CA: Eine Intermediate, die unter einem anderen Aussteller neu zertifiziert würde, wird abgelehnt (409), es sei denn, Sie hängen sie als Cross-Zertifikat an oder ersetzen das aktuelle Zertifikat; eine Root-Ablösung unter demselben Ausstellernamen ersetzt es',
       'Eine überschriebene oder gelöschte selbstsignierte Root wird durch „In Cross-Zertifikat umwandeln“ nicht wiederhergestellt: Stellen Sie sie aus einer Sicherung wieder her oder übergeben Sie ihr Zertifikat an „Als primär wiederherstellen“',
     ],
   },
@@ -172,7 +172,7 @@ Importieren Sie vorhandene CA-Zertifikate über:
 
 Beim Import ohne privaten Schlüssel kann die CA Zertifikate verifizieren, aber keine neuen signieren.
 
-Ein Zertifikat, das Subject und Schlüssel einer bereits in UCM vorhandenen CA unter einem anderen Aussteller trägt, ist ein Cross-Zertifikat und ersetzt nie das eigene Zertifikat der CA. Bei einer selbstsignierten Root wird es als Cross-Zertifikat angehängt. Bei einer Intermediate und beim Hochladen nach **Über CSR erneuern** wird der Import abgelehnt (409) und bietet **Als Cross-Zertifikat anhängen** an. Smart Import hängt ein neben einer vorhandenen Root gefundenes an und listet es im Ergebnis auf; eines, das nicht angehängt werden kann, wird ausgelassen und als übersprungen gemeldet.
+Ein Zertifikat, das Subject und Schlüssel einer bereits in UCM vorhandenen CA unter einem anderen Aussteller trägt, ist ein Cross-Zertifikat und ersetzt nie das eigene Zertifikat der CA. Bei einer selbstsignierten Root wird es als Cross-Zertifikat angehängt. Bei einer Intermediate und beim Hochladen nach **Über CSR erneuern** wird der Import abgelehnt (409) und bietet **Als Cross-Zertifikat anhängen** oder **Ersetzen** an; eine Root-Ablösung (gleicher Ausstellername, neuer Schlüssel) ersetzt das Zertifikat wie eine Erneuerung. Smart Import hängt ein neben einer vorhandenen Root gefundenes an und listet es im Ergebnis auf; eines, das nicht angehängt werden kann, wird ausgelassen und als übersprungen gemeldet.
 
 ## Eine CA exportieren
 

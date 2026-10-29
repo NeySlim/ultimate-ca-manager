@@ -50,7 +50,7 @@ export default {
           { label: 'Assinar em cruz', text: 'Assine a chave desta CA com outra CA mantida no UCM, com uma validade e um comprimento de caminho' },
           { label: 'Servir', text: 'No máximo um por CA é servido na cadeia predefinida (TLS, PKCS#12, ACME, WSTEP, TSA, implantações, AIA .cer e .pem). Um revogado, expirado ou ainda não válido nunca é servido' },
           { label: 'Cadeia a apresentar', text: 'Exportações e vínculos de implantação podem fixar a cadeia predefinida, a raiz autoassinada ou um certificado cruzado. O ACME oferece as outras cadeias como alternativas (certbot --preferred-chain)' },
-          { label: 'Importar', text: 'Um certificado sobre a chave de uma CA mantida é anexado a uma raiz autoassinada; em uma intermediária, o 409 oferece Anexar como certificado cruzado. A Importação Inteligente o anexa ao lado de uma raiz mantida ou o informa como omitido' },
+          { label: 'Importar', text: 'Um certificado sobre a chave de uma CA mantida é anexado a uma raiz autoassinada; em uma intermediária, o 409 oferece Anexar como certificado cruzado ou Substituir. A Importação Inteligente o anexa ao lado de uma raiz mantida ou o informa como omitido' },
           { label: 'Reparo', text: 'A barra sob as estatísticas lista registros que uma importação antiga danificou: Converter em certificado cruzado (requer delete:cas) e Restaurar como principal. Nada é executado sozinho' },
         ]
       },
@@ -97,7 +97,7 @@ export default {
       'Excluir uma CA NÃO revogará os certificados que ela emitiu: revogue-os primeiro',
       'As chaves privadas são armazenadas criptografadas; perder o banco de dados significa perder as chaves',
       'Senhas do modo offline NÃO são recuperáveis: armazene-as em seu gerenciador de senhas / vault antes de confirmar',
-      'Um certificado cruzado nunca substitui o certificado próprio de uma CA: uma intermediária que seria recertificada sob outro emissor é recusada (409), a menos que você a anexe como certificado cruzado',
+      'Um certificado cruzado nunca substitui o certificado próprio de uma CA: uma intermediária que seria recertificada sob outro emissor é recusada (409), a menos que você a anexe como certificado cruzado ou substitua o atual; uma troca de raiz sob o mesmo nome de emissor o substitui',
       'Uma raiz autoassinada que foi sobrescrita ou excluída não é recuperada por Converter em certificado cruzado: restaure-a de um backup ou entregue seu certificado a Restaurar como principal',
     ],
   },
@@ -172,7 +172,7 @@ Importe certificados de CA existentes via:
 
 Ao importar sem chave privada, a CA pode verificar certificados mas não pode assinar novos.
 
-Um certificado que carrega o sujeito e a chave de uma CA já presente no UCM, sob outro emissor, é um certificado cruzado e nunca substitui o certificado próprio da CA. Em uma raiz autoassinada, ele é anexado como certificado cruzado. Em uma intermediária, e ao ser enviado após **Renovar via CSR**, a importação é recusada (409) e oferece **Anexar como certificado cruzado**. A Importação Inteligente anexa o que encontra ao lado de uma raiz mantida e o lista no resultado; o que não consegue anexar fica de fora e é informado como omitido.
+Um certificado que carrega o sujeito e a chave de uma CA já presente no UCM, sob outro emissor, é um certificado cruzado e nunca substitui o certificado próprio da CA. Em uma raiz autoassinada, ele é anexado como certificado cruzado. Em uma intermediária, e ao ser enviado após **Renovar via CSR**, a importação é recusada (409) e oferece **Anexar como certificado cruzado** ou **Substituir**; uma troca de raiz (mesmo nome de emissor, nova chave) substitui o certificado como uma renovação. A Importação Inteligente anexa o que encontra ao lado de uma raiz mantida e o lista no resultado; o que não consegue anexar fica de fora e é informado como omitido.
 
 ## Exportando uma CA
 
