@@ -133,3 +133,12 @@ def test_fallback_to_auto_reaches_the_administrator(app, pinned):
         results = _service().restore_backup(blob, PASSWORD)
         assert results['chain_variant_fallbacks']
         assert 'cross-certificate' in with_restore_warnings('Restored.', results)
+
+
+@pytest.mark.parametrize('count, phrase', [
+    (1, '1 deploy binding pinned to a cross-certificate absent from this installation was reset'),
+    (2, '2 deploy bindings pinned to a cross-certificate absent from this installation were reset'),
+])
+def test_the_fallback_warning_agrees_in_number(count, phrase):
+    from services.backup.restore_report import with_restore_warnings
+    assert phrase in with_restore_warnings('Restored', {'chain_variant_fallbacks': ['x'] * count})

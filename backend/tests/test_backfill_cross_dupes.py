@@ -258,3 +258,31 @@ def test_a_dupe_keeps_its_served_cross_when_the_keepers_is_no_longer_usable(app)
         assert row.ca_id == keeper_id and row.served is True
         # One served row per CA: the keeper's unusable one gives way
         assert db.session.get(CACrossCertificate, dead).served is False
+        CACrossCertificate.query.filter(CACrossCertificate.id.in_((dead, live))).delete()
+        db.session.commit()
+
+
+def test_two_unusable_served_rows_leave_one_served(app):
+    """Not yet valid on both sides: both become servable later, so only one may stay served."""
+    from datetime import timedelta as td
+    from models.ca_cross_certificate import CACrossCertificate
+    from utils.datetime_utils import utc_now
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Future Served Root')
+    with app.app_context():
+        keeper_id, dupe_id = _row(cert, key), _row(cert)
+        ids = []
+        for owner in (keeper_id, dupe_id):
+            row = CACrossCertificate(ca_id=owner, crt='x', fingerprint_sha256=uuid.uuid4().hex * 2, served=True,
+                                     valid_from=utc_now() + td(days=1), valid_to=utc_now() + td(days=30))
+            db.session.add(row)
+            db.session.commit()
+            ids.append(row.id)
+
+        backfill_ski_aki()
+
+        db.session.expire_all()
+        served = [r.id for r in CACrossCertificate.query.filter(CACrossCertificate.id.in_(ids)) if r.served]
+        assert served == [ids[0]]
+        CACrossCertificate.query.filter(CACrossCertificate.id.in_(ids)).delete()
+        db.session.commit()

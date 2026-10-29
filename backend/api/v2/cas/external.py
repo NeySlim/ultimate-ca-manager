@@ -78,8 +78,9 @@ def install_ca_certificate(ca_id):
     Accepts multipart 'file' (PEM or DER) or 'pem_content' (form or JSON).
     Serves the first activation of a pending CA and same-key renewals — the
     certificate's public key must match the CA's stored private key.
-    `cross_mode` is `auto` (default) or `replace`: a certificate from an issuer of
-    another name is refused with 409 unless `replace` is given.
+    `cross_mode` is `auto` (default) or `replace`: a cross-certificate (another issuer
+    name, or a homonymous root UCM does not hold) is refused with 409 unless `replace`
+    is given; over a self-signed root it is always refused, under a revoked chain accepted.
     """
     ca = db.session.get(CA, ca_id)
     if not ca:

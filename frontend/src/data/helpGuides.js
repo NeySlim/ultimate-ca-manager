@@ -146,7 +146,7 @@ Import existing CA certificates via:
 
 When importing without a private key, the CA can verify certificates but cannot sign new ones.
 
-A certificate that carries the subject and key of a CA already in UCM, under another issuer, is a cross-certificate and never replaces the CA's own certificate. On a self-signed root it is attached as a cross-certificate. On an intermediate, and when uploaded after **Renew via CSR**, the import is refused (409) and offers **Attach as cross certificate**. Smart Import attaches one found next to a held root and lists it in the result; one it cannot attach is left out and reported as skipped.
+A certificate that carries the subject and key of a CA already in UCM, under another issuer, is a cross-certificate and never replaces the CA's own certificate. On a self-signed root it is attached as a cross-certificate. On an intermediate, and when uploaded after **Renew via CSR**, the import is refused (409) and offers **Attach as cross certificate** or **Replace**; a root rollover (same issuer name, new key) replaces the certificate as a renewal does. Smart Import attaches one found next to a held root and lists it in the result; one it cannot attach is left out and reported as skipped.
 
 ## Exporting a CA
 

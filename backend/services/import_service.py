@@ -445,19 +445,36 @@ def _same_issuer(stored_cert, cert, parents_by_name):
     return stored_id[1] == new_id[1]
 
 
+def _signed_by_held_ca(cert):
+    """None when UCM holds no CA named as *cert*'s issuer, else whether one of them signed it."""
+    from models import CA
+    from utils.cert_issuer import certificate_signed_by
+    held = [ca for ca in CA.query.filter(CA.subject == cert.issuer.rfc4514_string()).all() if ca.crt]
+    if not held:
+        return None
+    for ca in held:
+        try:
+            if certificate_signed_by(cert, x509.load_pem_x509_certificate(base64.b64decode(ca.crt))):
+                return True
+        except Exception:
+            continue
+    return False
+
+
 def _would_replace_valid_certificate(stored, new, any_validity=False):
-    """Of one key (the caller checked): a self-signed certificate replaced by another, or two
-    unexpired certificates from issuers of different names (whatever their validity if
-    *any_validity*), is a cross-certificate. The same issuer name under a new key is a root
-    rollover: the new certificate replaces the old one."""
+    """Of one key (the caller checked): a self-signed certificate replaced by another is a
+    cross-certificate, and so is any other with *any_validity* (explicit attach or refuse).
+    Otherwise two unexpired certificates are one when their issuers' names differ, or when a
+    held CA of that name exists and none of them signed the new one (another hierarchy's
+    homonym); the same name with an unknown or held new key is a root rollover."""
     if is_self_signed(new):
         return False
     if is_self_signed(stored) or any_validity:
         return True
-    if stored.issuer == new.issuer:
-        return False
     now = datetime.now(timezone.utc)
-    return stored.not_valid_after_utc > now and new.not_valid_after_utc > now
+    if stored.not_valid_after_utc <= now or new.not_valid_after_utc <= now:
+        return False
+    return stored.issuer != new.issuer or _signed_by_held_ca(new) is False
 
 
 def refused_as_cross_certificate(record, stored, new, replace_cross=False, any_validity=False):

@@ -96,11 +96,13 @@ def _move_ca_dependents(db, dupe, keeper):
     """Point every row referencing *dupe* (by refid or id) at *keeper*, so none is orphaned."""
     crosses = db.metadata.tables['ca_cross_certificates']
     from services.ca.cross_certs import served_for
-    # At most one served row per CA after the move: the keeper's usable one wins, else the dupe's
-    if served_for(keeper) is not None:
-        db.session.execute(crosses.update().where(crosses.c.ca_id == dupe.id).values(served=False))
-    elif served_for(dupe) is not None:
+    # At most one served row per CA after the move: a usable one wins, the keeper's otherwise
+    keeper_serves = db.session.query(crosses.c.id).filter(
+        crosses.c.ca_id == keeper.id, crosses.c.served.is_(True)).first() is not None
+    if served_for(keeper) is None and served_for(dupe) is not None:
         db.session.execute(crosses.update().where(crosses.c.ca_id == keeper.id).values(served=False))
+    elif keeper_serves:
+        db.session.execute(crosses.update().where(crosses.c.ca_id == dupe.id).values(served=False))
     for table in db.metadata.sorted_tables:
         for fk in table.foreign_keys:
             if fk.column.table.name != 'certificate_authorities' or fk.column.name not in ('id', 'refid'):

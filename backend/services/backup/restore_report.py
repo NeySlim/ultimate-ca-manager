@@ -69,9 +69,10 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
 
     fallbacks = (results or {}).get('chain_variant_fallbacks') or []
     if fallbacks:
+        bindings, were = ('binding', 'was') if len(fallbacks) == 1 else ('bindings', 'were')
         message += _clause(
-            f'{len(fallbacks)} deploy binding(s) pinned to a cross-certificate '
-            'absent from this installation were reset to the automatic chain')
+            f'{len(fallbacks)} deploy {bindings} pinned to a cross-certificate '
+            f'absent from this installation {were} reset to the automatic chain')
 
     if (results or {}).get('admin_allowlist_cleared'):
         message += _clause('The admin access allowlist from the archive would '

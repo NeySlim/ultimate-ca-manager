@@ -27,7 +27,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- Import: a CA certificate re-issued by another CA over the same key overwrote the self-signed root and re-parented it. An intermediate in that case now answers 409 `cross_certificate_detected`, and so does installing it after **Renew via CSR** (#400).
+- Import: a CA certificate re-issued by another CA over the same key overwrote the self-signed root and re-parented it. An intermediate in that case now answers 409 `cross_certificate_detected`, and so does installing it after **Renew via CSR**, with **Attach as cross certificate** and **Replace** offered; a root rollover under the same issuer name still replaces the certificate (#400).
 - Smart Import: a cross-certificate in a bundle replaced the self-signed root or was dropped under a generic duplicate warning depending on file order. The root is kept and the result reports `cross_certificate_attached` or `cross_certificate_skipped` (#400).
 - CAs: the hourly chain repair deleted a self-signed root when a second record shared its key. It now merges only identical certificates and reports the rest (#400).
 - ACME client: `preferred_chain` matched the subject or issuer of the last certificate and preferred an alternate, so a cross-certificate could win a request for the other root. It now follows certbot: the issuer CN of the topmost certificate, default chain first (#400).

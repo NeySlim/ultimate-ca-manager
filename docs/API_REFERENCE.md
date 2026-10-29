@@ -2600,7 +2600,7 @@ intermediate be overwritten, `refuse` never attaches. The attached answer is `20
 `details.ca_id` and `details.options` (`["attach"]` for a self-signed root, `["attach", "replace"]`
 otherwise). Installing such a certificate on a CA that is not awaiting one, after **Renew via CSR**
 (`POST /api/v2/cas/{ca_id}/certificate`), answers the same `409`; that route accepts only `cross_mode=auto` or `replace` (`400` otherwise). The same options apply to `POST /api/v2/certificates/import`.
-Only an issuer of another name makes a certificate a cross-certificate: the same issuer name under a new key (a root rollover) replaces the certificate, as a renewal does.
+With `cross_mode=auto`, an intermediate's certificate is taken for a cross-certificate when its issuer has another name, or the same name while UCM holds CAs of that name and none of them signed it (a homonym from another hierarchy). The same issuer name under a key UCM does not hold, or under a held new root, is a root rollover and replaces the certificate as a renewal does. A self-signed root is never replaced by another issuer's certificate, `attach` and `refuse` treat any such certificate as a cross-certificate, and a real revocation in the CA's chain lets `auto` replace it.
 
 Smart Import (`POST /api/v2/import/execute`) attaches a cross-certificate found next to a held root and
 reports it in `warning_details` with `code` `cross_certificate_attached` or `cross_certificate_skipped`

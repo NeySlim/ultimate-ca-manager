@@ -102,7 +102,7 @@ export const helpContent = {
           { label: 'Cross-sign', text: 'Sign this CA\'s key with another CA held in UCM, with a validity and a path length' },
           { label: 'Serve', text: 'At most one per CA is served in the default chain (TLS, PKCS#12, ACME, WSTEP, TSA, deployments, AIA .cer and .pem). A revoked, expired or not yet valid one is never served' },
           { label: 'Chain to present', text: 'Exports and deploy bindings can pin the default chain, the self-signed root or one cross-certificate. ACME offers the other chains as alternates (certbot --preferred-chain)' },
-          { label: 'Import', text: 'A certificate over a held CA\'s key is attached to a self-signed root; on an intermediate the 409 offers Attach as cross certificate. Smart Import attaches it next to a held root or reports it as skipped' },
+          { label: 'Import', text: 'A certificate over a held CA\'s key is attached to a self-signed root; on an intermediate the 409 offers Attach as cross certificate or Replace. Smart Import attaches it next to a held root or reports it as skipped' },
           { label: 'Repair', text: 'The bar under the statistics lists records an older import damaged: Convert to cross-certificate (needs delete:cas) and Restore as primary. Nothing runs by itself' },
         ]
       },
@@ -152,7 +152,7 @@ export const helpContent = {
       'Deleting a CA will NOT revoke certificates it has issued: revoke them first',
       'Private keys are stored encrypted; losing the database means losing the keys',
       'Offline-mode passwords are NOT recoverable: store them in your password manager / vault before confirming',
-      'A cross-certificate never replaces a CA\'s own certificate: an intermediate that would be re-certified under another issuer is refused (409) unless you attach it as a cross certificate',
+      'A cross-certificate never replaces a CA\'s own certificate: an intermediate that would be re-certified under another issuer is refused (409) unless you attach it as a cross certificate or replace the current one; a root rollover under the same issuer name replaces it',
       'A self-signed root that was overwritten or deleted is not recovered by Convert to cross-certificate: restore it from a backup, or give its certificate to Restore as primary',
     ],
     related: ['Certificates', 'Templates', 'CRL/OCSP']

@@ -107,3 +107,32 @@ def test_the_certificate_route_takes_auto_or_replace_only(app, auth_client, inte
     r = _via_certificate(auth_client, ca_id, _sign_csr_as_external_root(csr, key_new, cert_new), cross_mode=mode)
     assert r.status_code == 400 and 'auto or replace' in json.loads(r.data)['message']
     assert _crt(app, ca_id) == before
+
+
+@ROUTES
+def test_a_homonymous_root_of_another_hierarchy_is_refused(app, auth_client, route):
+    """The old root is held and the new certificate's issuer, of the same name, is not one UCM holds."""
+    cn = _next_cn('RollTwin')
+    key_a, cert_a = _make_external_root(cn=cn)
+    _import_parent(auth_client, cert_a)
+    ca_id, csr, _ = _active_under(auth_client, key_a, cert_a)
+    key_twin, cert_twin = _make_external_root(cn=cn)
+    before = _crt(app, ca_id)
+    r = route(auth_client, ca_id, _sign_csr_as_external_root(csr, key_twin, cert_twin, days=200))
+    assert r.status_code == 409, r.data
+    assert json.loads(r.data)['details']['options'] == ['attach', 'replace']
+    assert _crt(app, ca_id) == before
+
+
+@ROUTES
+def test_a_rollover_onto_a_held_new_root_replaces_the_certificate(app, auth_client, route):
+    cn = _next_cn('RollHeld')
+    key_a, cert_a = _make_external_root(cn=cn)
+    _import_parent(auth_client, cert_a)
+    ca_id, csr, _ = _active_under(auth_client, key_a, cert_a)
+    key_new, cert_new = _make_external_root(cn=cn)
+    _import_parent(auth_client, cert_new)
+    resigned = _sign_csr_as_external_root(csr, key_new, cert_new, days=200)
+    r = route(auth_client, ca_id, resigned)
+    assert r.status_code in (200, 201), r.data
+    assert _stored_serial(app, ca_id) == _serial(resigned)
