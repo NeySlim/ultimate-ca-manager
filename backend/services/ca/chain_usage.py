@@ -110,15 +110,19 @@ def _section(condition, names):
 
 
 def _group_key(cert):
-    """Certificates with the same key chain alike: inline ones by their bytes, the others by issuer and AKI."""
+    """Certificates with the same key chain alike: inline ones by their bytes, the others by issuer and AKI.
+    Without an AKI, only the signature tells two keys of one issuer name apart: each is resolved alone."""
     try:
         raw = base64.b64decode(cert.crt)
         if raw.count(b'BEGIN CERTIFICATE') > 1:
             return ('inline', cert.crt)
         parsed = x509.load_pem_x509_certificate(raw)
-        return ('issuer', parsed.issuer.rfc4514_string(), authority_key_identifier_hex(parsed))
+        aki = authority_key_identifier_hex(parsed)
+        if aki:
+            return ('issuer', parsed.issuer.rfc4514_string(), aki)
     except Exception:
-        return ('cert', cert.id)
+        pass
+    return ('cert', cert.id)
 
 
 def _orphans(hits, orphan_cond, now):

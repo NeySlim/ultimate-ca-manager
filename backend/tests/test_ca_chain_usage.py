@@ -767,3 +767,28 @@ def test_a_twin_of_a_descendant_under_a_foreign_parent_does_not_widen_the_scope(
         assert counts(auth_client, world.b_id)[0] == 1
     finally:
         _drop_cas(app, [tid])
+
+
+def test_orphans_without_aki_are_not_grouped_by_issuer_name():
+    """Two keys of one issuer name sign different chains: without an AKI only the signature tells them apart."""
+    import base64 as b64
+    from datetime import datetime, timedelta, timezone
+    from types import SimpleNamespace
+    from cryptography import x509 as cx
+    from cryptography.hazmat.primitives import hashes, serialization as ser
+    from cryptography.hazmat.primitives.asymmetric import ec as cec
+    from cryptography.x509.oid import NameOID
+    from services.ca.chain_usage import _group_key
+    issuer = cx.Name([cx.NameAttribute(NameOID.COMMON_NAME, 'Same Name Issuer')])
+    now = datetime.now(timezone.utc)
+
+    def leaf(i):
+        key = cec.generate_private_key(cec.SECP256R1())
+        cert = (cx.CertificateBuilder()
+                .subject_name(cx.Name([cx.NameAttribute(NameOID.COMMON_NAME, f'leaf {i}')]))
+                .issuer_name(issuer).public_key(key.public_key()).serial_number(cx.random_serial_number())
+                .not_valid_before(now).not_valid_after(now + timedelta(days=30))
+                .sign(cec.generate_private_key(cec.SECP256R1()), hashes.SHA256()))
+        return SimpleNamespace(id=i, crt=b64.b64encode(cert.public_bytes(ser.Encoding.PEM)).decode())
+
+    assert _group_key(leaf(1)) != _group_key(leaf(2))
