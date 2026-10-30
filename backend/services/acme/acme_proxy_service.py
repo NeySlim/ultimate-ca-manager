@@ -4,16 +4,13 @@ Acts as a gateway between internal ACME clients and upstream ACME providers (Let
 """
 import base64
 import copy
-import hashlib
 import json
 import logging
 import re
 import secrets
 import threading
 import time
-from contextlib import ExitStack, contextmanager
 from datetime import datetime
-from pathlib import Path
 from typing import Dict, Any, Optional, Tuple, Union
 from urllib.parse import urlsplit
 
@@ -24,8 +21,7 @@ from sqlalchemy import and_, or_, inspect as sa_inspect
 from sqlalchemy.exc import NoInspectionAvailable
 from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
-from utils.process_lock import LockBusyError, process_lock
-from config.settings import Config
+from services.acme.dns_txt_lock import txt_record_lock as _txt_record_lock
 
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding, utils as asym_utils
@@ -252,22 +248,6 @@ def _link_values(header: str):
             params.setdefault(name, value)
         yield url, params
         position = cursor + 1
-
-
-@contextmanager
-def _txt_record_lock(record_name):
-    """Serialise the read-merge-write of one TXT name across workers; past the wait,
-    publish unprotected rather than abandon the challenge."""
-    digest = hashlib.sha256(record_name.lower().encode()).hexdigest()[:16]
-    with ExitStack() as stack:
-        try:
-            stack.enter_context(process_lock(
-                Path(Config.DATA_DIR) / f'.acme_dns_txt-{digest}.lock', timeout=120,
-                purpose='publishing a dns-01 TXT record', subject='DNS TXT update'))
-        except LockBusyError:
-            logger.warning("[ACME Proxy BG] %s still locked after 120s, publishing without the lock",
-                           record_name)
-        yield
 
 
 class AcmeProxyService:
@@ -1725,7 +1705,8 @@ class AcmeProxyService:
     def _delete_dns_record(provider, zone: str, record_name: str) -> None:
         """Best-effort TXT cleanup helper."""
         try:
-            provider.delete_txt_record(zone, record_name)
+            with _txt_record_lock(record_name):
+                provider.delete_txt_record(zone, record_name)
         except Exception as e:
             logger.warning("Failed to cleanup DNS record %s (%s): %s", record_name, zone, e)
 

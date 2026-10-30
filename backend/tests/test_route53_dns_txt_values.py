@@ -36,6 +36,7 @@ class FakeRoute53:
         self.calls.append('change')
         for change in ChangeBatch['Changes']:
             rs = change['ResourceRecordSet']
+            rs = {**rs, 'Name': rs['Name'].lower()}  # Route 53 stores names in lower case
             key = (rs['Name'], rs['Type'])
             if change['Action'] == 'UPSERT':
                 self.sets[key] = {**rs, 'ResourceRecords': list(rs['ResourceRecords'])}
@@ -123,4 +124,24 @@ def test_access_denied_only_by_text_is_not_a_permission_fallback(api):
     fake.list_error = RuntimeError('proxy said: AccessDenied')
     ok, _ = provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok1')
     assert not ok
+    assert 'change' not in fake.calls
+
+
+def test_name_is_matched_without_regard_to_case(api):
+    provider, fake = api
+    fake.sets[(NAME, 'TXT')] = {'Name': NAME, 'Type': 'TXT', 'TTL': 300,
+                                'ResourceRecords': [{'Value': '"apex"'}]}
+    assert provider.create_txt_record('example.com', '_acme-challenge.Example.com', 'wild')[0]
+    assert fake.values() == ['"apex"', '"wild"']
+
+
+@pytest.mark.parametrize('extra', [
+    {'AliasTarget': {'HostedZoneId': 'Z1', 'DNSName': 'other.example.com.', 'EvaluateTargetHealth': False}},
+    {'SetIdentifier': 'eu', 'Weight': 10, 'TTL': 60, 'ResourceRecords': [{'Value': '"x"'}]},
+])
+def test_alias_or_routing_policy_set_is_not_overwritten(api, extra):
+    provider, fake = api
+    fake.sets[(NAME, 'TXT')] = {'Name': NAME, 'Type': 'TXT', **extra}
+    ok, msg = provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok1')
+    assert not ok and 'alias or routing-policy' in msg
     assert 'change' not in fake.calls

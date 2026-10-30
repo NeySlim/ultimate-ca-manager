@@ -38,6 +38,9 @@ class FakePowerDns:
         if method == 'PATCH' and path == '/zones/example.com.':
             for rr in kw['json']['rrsets']:
                 assert rr['changetype'] == 'REPLACE'
+                contents = [r['content'] for r in rr['records']]
+                if len(contents) != len(set(contents)):
+                    return _Response(422, {'error': f"Duplicate record in RRset {rr['name']} IN TXT"})
                 self.rrsets[rr['name']] = {'name': rr['name'], 'type': 'TXT', 'ttl': rr['ttl'],
                                            'records': list(rr['records'])}
             return _Response(204)
@@ -96,3 +99,13 @@ def test_unreadable_rrset_is_not_overwritten(api):
     assert not ok and 'backend down' in msg
     assert not [c for c in api.calls if c[0] == 'PATCH']
     assert api.contents() == ['"other"']
+
+
+def test_disabled_copy_of_the_value_is_re_enabled_not_duplicated(api):
+    api.rrsets[NAME] = {'name': NAME, 'type': 'TXT', 'ttl': 300,
+                        'records': [{'content': '"tok1"', 'disabled': True},
+                                    {'content': '"other"', 'disabled': False}]}
+    ok, msg = _create('tok1')
+    assert ok, msg
+    assert api.rrsets[NAME]['records'] == [{'content': '"tok1"', 'disabled': False},
+                                           {'content': '"other"', 'disabled': False}]

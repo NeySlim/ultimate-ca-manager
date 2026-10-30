@@ -106,7 +106,10 @@ class Route53DnsProvider(BaseDnsProvider):
                     raise
                 logger.warning(f"Route53: cannot read {record_name}, writing the new value alone: {self._failure(e)}")
                 existing = []
-            current = next((r for r in existing if r['Name'] == fqdn and r['Type'] == 'TXT'), None)
+            current = next((r for r in existing
+                            if r['Name'].lower() == fqdn.lower() and r['Type'] == 'TXT'), None)
+            if current and ('AliasTarget' in current or 'SetIdentifier' in current):
+                return False, f"{record_name} is an alias or routing-policy TXT record; not overwriting it"
             values = [r['Value'] for r in (current or {}).get('ResourceRecords', [])]
             if quoted in values:
                 return True, "Record already present"

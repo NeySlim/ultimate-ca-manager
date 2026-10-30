@@ -15,6 +15,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - ACME DNS-01 with deSEC: a new TXT record used a 300 s TTL, below the 3600 s minimum deSEC sets on each domain, and was refused. The domain's minimum TTL is now applied, and apex records are cleaned up.
 
+- ACME DNS-01: the ACME client, renewals and every cleanup now take the per-name lock the proxy uses, so two writers of one `_acme-challenge` name no longer drop each other's value.
+
+- ACME DNS-01 with PowerDNS: a value already present but disabled was added a second time, which PowerDNS refuses; it is now re-enabled. With Route 53, an alias or routing-policy TXT record is no longer overwritten, and the existing set is found whatever the case of the name.
+
 ### Security
 
 - dnspython 2.9.1 (CVE-2026-114605): a DNS message with a long chain of compression pointers, sent to the RFC 2136 listener or returned by a resolver, could hold a CPU. The listener reads compressed names the same way under the new version.

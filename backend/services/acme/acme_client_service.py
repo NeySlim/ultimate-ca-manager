@@ -40,6 +40,7 @@ from utils import key_algorithms, ssrf_protection
 from utils.ca_profile import default_digest_for_key_type
 from utils.signing_hash import HASH_BY_NAME, signing_hash_for
 from utils.san_parse import strip_wildcard
+from services.acme.dns_txt_lock import txt_record_lock
 
 if TYPE_CHECKING:
     from models.acme_client_account import AcmeClientAccount
@@ -1219,12 +1220,13 @@ class AcmeClientService:
             record_name = challenge['dns_txt_name']
             record_value = challenge['dns_txt_value']
             
-            success, message = provider.create_txt_record(
-                domain=strip_wildcard(domain),
-                record_name=record_name,
-                record_value=record_value,
-                ttl=300
-            )
+            with txt_record_lock(record_name):
+                success, message = provider.create_txt_record(
+                    domain=strip_wildcard(domain),
+                    record_name=record_name,
+                    record_value=record_value,
+                    ttl=300
+                )
             
             results[domain] = {
                 'success': success,
@@ -1717,10 +1719,11 @@ class AcmeClientService:
             
             challenges = order.challenges_dict
             for domain, challenge in challenges.items():
-                provider.delete_txt_record(
-                    domain=strip_wildcard(domain),
-                    record_name=challenge['dns_txt_name']
-                )
+                with txt_record_lock(challenge['dns_txt_name']):
+                    provider.delete_txt_record(
+                        domain=strip_wildcard(domain),
+                        record_name=challenge['dns_txt_name']
+                    )
             
             return True, "DNS records cleaned up"
             

@@ -72,9 +72,14 @@ class PowerDnsDnsProvider(BaseDnsProvider):
         records = [{'content': r['content'], 'disabled': r.get('disabled', False)}
                    for rr in rrsets for r in rr.get('records', [])]
         content = f'"{record_value}"'
-        if any(r['content'] == content and not r['disabled'] for r in records):
+        same = [r for r in records if r['content'] == content]
+        if any(not r['disabled'] for r in same):
             return True, "Record already present"
-        records.append({'content': content, 'disabled': False})
+        # A disabled copy is re-enabled: PowerDNS refuses a duplicate record in an rrset
+        if same:
+            same[0]['disabled'] = False
+        else:
+            records.append({'content': content, 'disabled': False})
         data = {'rrsets': [{'name': fqdn, 'type': 'TXT', 'ttl': rrsets[0].get('ttl', ttl) if rrsets else ttl,
                             'changetype': 'REPLACE', 'records': records}]}
         success, result = self._request('PATCH', f'/zones/{zone}', data)

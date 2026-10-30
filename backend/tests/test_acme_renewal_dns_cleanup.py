@@ -173,3 +173,48 @@ def test_renewal_deletes_txt_when_create_fails_on_second_domain(app, renewal_ord
     assert create_calls == ['example.com', 'www.example.com']
     assert len(deleted) == 2
     assert {d['domain'] for d in deleted} == {'example.com', 'www.example.com'}
+
+
+def test_renewal_writes_and_cleans_up_txt_under_the_name_lock(app, renewal_order, monkeypatch):
+    from contextlib import contextmanager
+    from models import db
+    from models.acme_models import AcmeClientOrder
+    from services import acme_renewal_service as renew_mod
+
+    order_id, _provider_id = renewal_order
+    held = []
+
+    @contextmanager
+    def _recording(name):
+        held.append(name)
+        yield
+        held.remove(name)
+
+    calls = []
+    mock_provider = MagicMock()
+    mock_provider.create_txt_record.side_effect = lambda **kw: calls.append(('create', list(held))) or (True, 'ok')
+    mock_provider.delete_txt_record.side_effect = lambda **kw: calls.append(('delete', list(held))) or (True, 'ok')
+    monkeypatch.setattr(renew_mod, 'txt_record_lock', _recording)
+
+    with app.app_context():
+        new_order = AcmeClientOrder(
+            domains='["example.com"]', environment='production', challenge_type='dns-01',
+            status='pending', order_url='https://ca.example/order/lk',
+            finalize_url='https://ca.example/order/lk/finalize',
+        )
+        new_order.set_challenges_dict({'example.com': {'dns_txt_value': 'token-value'}})
+        db.session.add(new_order)
+        db.session.commit()
+        mock_client = MagicMock()
+        mock_client.create_order.return_value = (True, 'ok', new_order)
+        mock_client.verify_challenge.side_effect = RuntimeError('STOP')
+        order = db.session.get(AcmeClientOrder, order_id)
+        with patch('services.acme.dns_providers.create_provider', return_value=mock_provider), \
+             patch('services.acme.acme_client_service.AcmeClientService.for_order', return_value=mock_client), \
+             patch('time.sleep', return_value=None), \
+             patch.object(renew_mod, 'wait_for_challenges', return_value={'ok': True, 'missing': [], 'waited': 0}):
+            with pytest.raises(RuntimeError, match='STOP'):
+                renew_mod.renew_certificate(order)
+
+    name = '_acme-challenge.example.com'
+    assert calls == [('create', [name]), ('delete', [name])]

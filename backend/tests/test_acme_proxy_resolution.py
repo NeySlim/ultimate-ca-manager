@@ -11,6 +11,7 @@ from types import SimpleNamespace
 import pytest
 
 import services.acme.acme_proxy_service as proxy_mod
+import services.acme.dns_txt_lock as dns_txt_lock
 from api.acme import acme_proxy_api
 from models import db, SystemConfig, AcmeAccount, AcmeClientAccount, AcmeClientOrder
 from services.acme import outbound
@@ -803,7 +804,7 @@ class TestDns01Thread:
 
         provider = self._patch_dns(monkeypatch)
         provider.create_txt_record.return_value = (True, 'ok')
-        monkeypatch.setattr(proxy_mod, 'process_lock', _busy)
+        monkeypatch.setattr(dns_txt_lock, 'process_lock', _busy)
         monkeypatch.setattr(AcmeProxyService, '_post_with_account',
                             lambda *_a: _Resp({'status': 'processing'}))
         with app.app_context():
