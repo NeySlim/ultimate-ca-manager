@@ -9,8 +9,8 @@ STORAGES = ('software', 'softhsm', 'hsm')
 
 
 def scheme_for(public_key, signature_scheme=None):
-    """``rsa_pkcs1v15`` / ``rsa_pss`` / ``ecdsa`` / ``eddsa`` for a key and the
-    scheme ('pkcs1v15' or 'pss') its CA signs RSA with; None when unknown."""
+    """``rsa_pkcs1v15`` / ``rsa_pss`` / ``ecdsa`` / ``eddsa`` / ``ml_dsa`` for a key and
+    the scheme ('pkcs1v15' or 'pss') its CA signs RSA with; None when unknown."""
     family = key_algorithms.family_for_public_key(public_key)
     if family == 'RSA':
         return 'rsa_pss' if signature_scheme == 'pss' else 'rsa_pkcs1v15'
@@ -18,6 +18,8 @@ def scheme_for(public_key, signature_scheme=None):
         return 'ecdsa'
     if family in ('ED25519', 'ED448'):
         return 'eddsa'
+    if family == 'ML-DSA':
+        return 'ml_dsa'
     return None
 
 

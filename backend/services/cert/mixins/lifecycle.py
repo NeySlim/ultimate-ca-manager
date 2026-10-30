@@ -199,6 +199,10 @@ class LifecycleMixin:
             raise PolicyViolation('Policy violation: ' + '; '.join(violations))
         if sign_hash is not None:
             digest = sign_hash.name
+        elif template_overrides:
+            # A CA key that fixes its own hash ignored the digest: nothing diverged there
+            template_overrides = compute_template_overrides(
+                template, key_type=key_type, validity_days=validity_days)
 
         # Build subject
         subject = TrustStoreService.build_subject(dn)

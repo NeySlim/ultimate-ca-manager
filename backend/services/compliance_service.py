@@ -112,9 +112,13 @@ def _post_quantum(cert_dict, fields):
     return None
 
 
+# ML-DSA by NIST category: 44 like P-256, each level above it higher
+_ML_DSA_POINTS = {2: 25, 3: 28, 5: 30}
+
+
 def _pq_key_points(pq):
-    """SLH-DSA (hash-based) and ML-DSA from category 3 score full; ML-DSA-44 like P-256."""
-    return 30 if pq.family == 'SLH-DSA' or pq.security_level >= 3 else 25
+    """SLH-DSA (hash-based) scores full; ML-DSA rises with its security category."""
+    return 30 if pq.family == 'SLH-DSA' else _ML_DSA_POINTS.get(pq.security_level, 25)
 
 
 # Brainpool scores like the NIST curve of the same size (BSI TR-02102-1)

@@ -106,7 +106,7 @@ def test_certificate_api_serves_the_contract(app, auth_client):
         assert r.status_code == 200, r.data
         data = get_json(r)['data']
         assert _subset(data, MLDSA_CONTRACT) == MLDSA_CONTRACT
-        assert data['compliance']['breakdown']['key_strength']['score'] == 30
+        assert data['compliance']['breakdown']['key_strength']['score'] == 28
         assert data['compliance']['breakdown']['signature']['score'] == 25
     finally:
         with app.app_context():
@@ -190,7 +190,7 @@ def test_smart_import_spki_of_a_foreign_key():
 # --------------------------------------------------------- compliance
 
 @pytest.mark.parametrize('spelling,points', [
-    ('ML-DSA-44', 25), ('ML-DSA-65', 30), ('ML-DSA-87', 30), ('SLH-DSA-SHA2-128s', 30),
+    ('ML-DSA-44', 25), ('ML-DSA-65', 28), ('ML-DSA-87', 30), ('SLH-DSA-SHA2-128s', 30),
     ('SLH-DSA-SHAKE-256f', 30)])
 def test_post_quantum_key_strength(spelling, points):
     from services.compliance_service import _score_key_strength

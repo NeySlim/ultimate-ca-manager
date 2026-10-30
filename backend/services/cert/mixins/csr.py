@@ -373,7 +373,8 @@ class CSRMixin:
                 template,
                 key_type=key_label_for_public_key(csr_obj.public_key()),
                 validity_days=validity_days,
-                digest=digest,
+                # A CA key that fixes its own hash ignored the digest
+                digest=digest if cert.signature_hash_algorithm is not None else None,
             )
 
         # Store SANs

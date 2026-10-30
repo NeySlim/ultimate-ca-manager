@@ -12,8 +12,6 @@ from dataclasses import dataclass, field
 from datetime import date
 from typing import Any, Callable, Dict, Iterable, List, Optional, Tuple
 
-from cryptography.hazmat.primitives.asymmetric import rsa
-
 import compliance_profiles
 from models import (CA, Certificate, CertificatePolicy, CertificateTemplate, SystemConfig)
 from services import compliance_signer
@@ -31,7 +29,6 @@ from utils.datetime_utils import utc_now
 DETECTORS: List[Detector] = []
 
 REFUSE, ADVISE = 'refuse', 'advise'
-_SCHEME_BY_STORED = {'pkcs1v15': 'rsa_pkcs1v15', 'pss': 'rsa_pss'}
 
 
 # --- context ----------------------------------------------------------------
@@ -200,8 +197,7 @@ def _ca_scheme(ctx):
     for ca, cert, label in _signing_cas(ctx):
         if _is_edwards(label):
             continue
-        is_rsa = isinstance(cert.public_key(), rsa.RSAPublicKey)
-        scheme = _SCHEME_BY_STORED.get(ca.signature_scheme or 'pkcs1v15', 'rsa_pkcs1v15') if is_rsa else 'ecdsa'
+        scheme = compliance_signer.scheme_for(cert.public_key(), ca.signature_scheme) or 'unknown'
         found.append((ctx.set_grade('allowed_signature_schemes', scheme), _ca_name(ca, scheme)))
     return found
 
