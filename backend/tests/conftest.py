@@ -755,3 +755,7 @@ def pg_bench_exclusive():
             yield
         finally:
             fcntl.flock(handle, fcntl.LOCK_UN)
+
+
+# Post-quantum fixtures (mldsa_key, mldsa_csr), read from files made by OpenSSL 3.5
+from tests.pqc_fixtures import mldsa_csr, mldsa_key  # noqa: E402,F401

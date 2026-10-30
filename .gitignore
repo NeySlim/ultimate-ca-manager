@@ -64,6 +64,7 @@ backend/data/*.pem
 *.csr
 *.p12
 *.pfx
+!backend/tests/fixtures/pqc/*.p12
 
 # Build artifacts
 *.deb
