@@ -158,12 +158,14 @@ class Route53DnsProvider(BaseDnsProvider):
             records = response.get('ResourceRecordSets', [])
             txt_record = None
             for r in records:
-                if r['Name'] == fqdn and r['Type'] == 'TXT':
+                if r['Name'].lower() == fqdn.lower() and r['Type'] == 'TXT':
                     txt_record = r
                     break
             
             if not txt_record:
                 return True, "Record not found (already deleted?)"
+            if 'AliasTarget' in txt_record or 'SetIdentifier' in txt_record:
+                return False, f"{record_name} is an alias or routing-policy TXT record; not deleting it"
             
             # Delete the record
             client.change_resource_record_sets(

@@ -597,6 +597,16 @@ class TestSystemStatusScep:
         scep_config(scep_enabled='0', scep_ca_id=None)
         assert _status(auth_client, 'scep') == ('offline', 'Disabled')
 
+    def test_ec_ca_is_not_usable(self, app, auth_client, scep_config, create_ca):
+        """SCEP decrypts the request envelope with an RSA key only."""
+        from api.scep_protocol import get_scep_service
+        ca = create_ca(cn='SCEP status EC CA', keyType='EC', keySize='P-256')
+        scep_config(scep_enabled='true', scep_ca_id=str(ca['id']))
+        assert _status(auth_client, 'scep') == ('warning', 'Enabled, CA not usable')
+        with app.app_context():
+            service, error = get_scep_service()
+        assert service is None and 'RSA key' in error
+
     def test_offline_ca_is_not_usable(self, app, auth_client, scep_config, create_ca):
         from models import db, CA
         ca = create_ca(cn='SCEP offline CA')

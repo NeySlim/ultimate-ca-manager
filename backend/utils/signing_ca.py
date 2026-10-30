@@ -32,6 +32,6 @@ def scep_ca_problem(ca):
         return ('Selected CA is HSM-backed: SCEP requires RSA envelope decryption, '
                 'unavailable for HSM keys')
     if not str(ca.key_type).startswith('RSA'):
-        return (f'Selected CA has a {ca.key_type} key: SCEP clients encrypt their request '
+        return (f'Selected CA key is {ca.key_type}: SCEP clients encrypt their request '
                 'to an RSA key')
     return None

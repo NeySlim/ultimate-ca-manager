@@ -94,13 +94,14 @@ _UNDECLARED_CAREF = (('certificate_authorities', 'caref'), ('crls', 'caref'),
 
 
 def _move_ca_settings(dupe, keeper):
-    """Settings and the SCEP challenge naming *dupe* follow *keeper*, as on a cross conversion."""
+    """Settings, the SCEP challenge and publication flags of *dupe* follow *keeper*, as on a cross conversion."""
     from models import SystemConfig
-    from services.ca.cross_repair import _move_scep_challenge, _move_settings
+    from services.ca.cross_repair import _move_publication, _move_scep_challenge, _move_settings
     scep_cfg = SystemConfig.query.filter_by(key='scep_ca_id').first()
     was_scep_ca = bool(scep_cfg and scep_cfg.value in (str(dupe.id), dupe.refid))
     _move_settings(dupe, keeper)
     _move_scep_challenge(dupe, keeper, was_scep_ca)
+    _move_publication(dupe, keeper)
 
 
 def _move_ca_dependents(db, dupe, keeper):

@@ -203,12 +203,15 @@ def get_scep_service(profile_slug=None):
             intune_client=intune_client,
             profile_id=profile.id if profile is not None else None,
         )
-        return service, None
     except FipsRestricted as e:
         return _reject(str(e))
     except Exception as e:
         logger.error(f"SCEP service init failed: {e}")
         return None, "SCEP service initialization failed"
+    # After the FIPS refusal, which names the key more precisely
+    if not str(ca.key_type).startswith('RSA'):
+        return _reject(f"CA {ca.descr!r} key is {ca.key_type}: SCEP clients encrypt their request to an RSA key")
+    return service, None
 
 
 @bp.route('/scep/pkiclient.exe', methods=['GET', 'POST'])

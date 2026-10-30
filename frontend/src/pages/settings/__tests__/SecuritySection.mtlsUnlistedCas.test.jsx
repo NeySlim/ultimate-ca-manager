@@ -1,6 +1,7 @@
 /**
- * The mTLS trusted CA also signs the enrolled certificates: its picker lists the
- * CAs able to sign, keeps the saved one visible and counts the others (#426).
+ * The mTLS trusted CA is the trust anchor of client certificates: its picker lists
+ * every CA with a certificate that is not revoked, keyless or offline included,
+ * and keeps the saved one visible (#426).
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
@@ -28,6 +29,8 @@ const CAS = [
   { id: 1, refid: 'sign', descr: 'Signing CA', has_private_key: true },
   { id: 2, refid: 'keyless', descr: 'Keyless root', certificate_only: true, has_private_key: false },
   { id: 3, refid: 'revoked', descr: 'Revoked CA', has_private_key: true, revoked: true },
+  { id: 4, refid: 'offline', descr: 'Offline root', has_private_key: true, offline: true },
+  { id: 5, refid: 'pending', descr: 'Pending CA', pending: true },
 ]
 
 function renderPicker(trustedCaId) {
@@ -41,15 +44,13 @@ function renderPicker(trustedCaId) {
 }
 
 describe('SecuritySection mTLS trusted CA picker (#426)', () => {
-  it('offers only the CA that can sign and counts the others', () => {
-    const { field, labels } = renderPicker(undefined)
-    expect(labels).toEqual(['Signing CA'])
-    expect(field).toHaveTextContent('cas.notListedForSigning:2')
+  it('offers every CA usable as an anchor, keyless and offline included', () => {
+    const { labels } = renderPicker(undefined)
+    expect(labels).toEqual(['Signing CA', 'Keyless root', 'Offline root'])
   })
 
-  it('keeps the saved CA listed even when it can no longer sign', () => {
-    const { field, labels } = renderPicker('revoked')
-    expect(labels).toEqual(['Signing CA', 'Revoked CA'])
-    expect(field).toHaveTextContent('cas.notListedForSigning:1')
+  it('keeps the saved CA listed even when it is revoked', () => {
+    const { labels } = renderPicker('revoked')
+    expect(labels).toEqual(['Signing CA', 'Keyless root', 'Revoked CA', 'Offline root'])
   })
 })

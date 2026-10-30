@@ -82,11 +82,18 @@ def test_apex_and_wildcard_both_keep_their_value(api):
     assert [r['data'] for r in api.records['_acme-challenge']] == ['apex-token', 'wildcard-token']
 
 
-def test_existing_values_keep_their_ttl(api):
+def test_the_set_keeps_one_ttl_the_existing_one(api):
     api.records['_acme-challenge'] = [{'data': 'stale', 'ttl': 3600}]
     ok, msg = _provider().create_txt_record('example.com', NAME, 'fresh')
     assert ok, msg
-    assert api.records['_acme-challenge'] == [{'data': 'stale', 'ttl': 3600}, {'data': 'fresh', 'ttl': 600}]
+    assert api.records['_acme-challenge'] == [{'data': 'stale', 'ttl': 3600}, {'data': 'fresh', 'ttl': 3600}]
+
+
+def test_a_name_unknown_to_the_api_is_created(api):
+    api.get_status = 404
+    ok, msg = _provider().create_txt_record('example.com', NAME, 'tok1')
+    assert ok, msg
+    assert api.records['_acme-challenge'] == [{'data': 'tok1', 'ttl': 600}]
 
 
 def test_value_already_present_is_not_sent_again(api):

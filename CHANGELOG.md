@@ -17,13 +17,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - ACME DNS-01: the ACME client, renewals and every cleanup now take the per-name lock the proxy uses, so two writers of one `_acme-challenge` name no longer drop each other's value.
 
-- ACME DNS-01 with PowerDNS: a value already present but disabled was added a second time, which PowerDNS refuses; it is now re-enabled. With Route 53, an alias or routing-policy TXT record is no longer overwritten, and the existing set is found whatever the case of the name.
+- ACME DNS-01 with PowerDNS: a value already present but disabled was added a second time, which PowerDNS refuses; it is now re-enabled. With Route 53, an alias or routing-policy TXT record is no longer overwritten or deleted, and the existing set is found whatever the case of the name.
 
-- CAs: when the hourly check merged two records of one CA, the SCEP, EST, XCEP, WSTEP, TSA, mTLS and ACME settings that named the removed record kept pointing at it. They now follow the kept record, with the SCEP challenge, and the removed record's URLs resolve to it; EST labels also follow a duplicate converted into a cross-certificate.
+- CAs: when the hourly check merged two records of one CA, the SCEP, EST, XCEP, WSTEP, TSA, mTLS and ACME settings that named the removed record kept pointing at it. They now follow the kept record, with the SCEP challenge and the CRL and OCSP publication flags, and the removed record's URLs resolve to it; EST labels also follow a duplicate converted into a cross-certificate.
 
-- SCEP: an EC or other non-RSA CA was accepted as the default CA and on a profile, although SCEP clients encrypt their request to an RSA key, so every enrolment failed. It is now refused and left out of the pickers, except when already saved.
+- SCEP: an EC or other non-RSA CA was accepted as the default CA and on a profile, although SCEP clients encrypt their request to an RSA key, so every enrolment failed. It is now refused and left out of the pickers; one already saved is reported as not usable on the dashboard, and the SCEP endpoint says why.
 
-- Settings: the mTLS trusted CA picker hid CAs without a key in silence and dropped a saved CA that could no longer sign; it now lists the CAs able to sign, keeps the saved one and says how many are left out. The ACME domain form no longer puts a space between two Japanese or Chinese sentences.
+- Settings: the mTLS trusted CA picker hid CAs without a key, although the trusted CA is the anchor of client certificates; it now lists every CA whose certificate is not revoked, keyless or offline included, and keeps the saved one. The ACME domain form no longer puts a space between two Japanese or Chinese sentences.
 
 ### Security
 

@@ -39,8 +39,9 @@ TSA_SIGNER_WARN_DAYS = 30
 def _scep_ca_usable(ca):
     """Whether api/scep_protocol.get_scep_service would accept *ca*: it
     refuses a CA without private key or certificate, an offline CA, and an
-    HSM-backed CA (SCEP needs RSA envelope decryption)."""
-    return bool(ca.has_private_key and ca.crt and not ca.offline and not ca.revoked_in_chain and not ca.uses_hsm)
+    HSM-backed or non-RSA CA (SCEP needs RSA envelope decryption)."""
+    return bool(ca.has_private_key and ca.crt and not ca.offline and not ca.revoked_in_chain and not ca.uses_hsm
+                and str(ca.key_type).startswith('RSA'))
 
 
 def _scep_global_ca(value):

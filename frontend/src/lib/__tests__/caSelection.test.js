@@ -68,9 +68,10 @@ describe('SCEP pickers', () => {
       { id: 6, refid: 'r6', has_private_key: true, key_type: 'EC secp256r1' },
       { id: 7, has_private_key: true, key_type: 'Ed25519' },
       { id: 8, has_private_key: true },
+      { id: 9, has_private_key: true, key_type: 'N/A' },
     ]
     expect(scepPickerCas(keys).map(c => c.id)).toEqual([5, 8])
-    expect(unlistedScepPickerCas(keys)).toBe(2)
+    expect(unlistedScepPickerCas(keys)).toBe(3)
     expect(scepPickerCas(keys, 'r6').map(c => c.id)).toEqual([5, 6, 8])
   })
 })

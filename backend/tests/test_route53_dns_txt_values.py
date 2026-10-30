@@ -145,3 +145,21 @@ def test_alias_or_routing_policy_set_is_not_overwritten(api, extra):
     ok, msg = provider.create_txt_record('example.com', NAME.rstrip('.'), 'tok1')
     assert not ok and 'alias or routing-policy' in msg
     assert 'change' not in fake.calls
+
+
+def test_cleanup_finds_the_set_whatever_the_case_of_the_name(api):
+    provider, fake = api
+    fake.sets[(NAME, 'TXT')] = {'Name': NAME, 'Type': 'TXT', 'TTL': 300, 'ResourceRecords': [{'Value': '"x"'}]}
+    ok, msg = provider.delete_txt_record('example.com', '_acme-challenge.Example.com')
+    assert ok, msg
+    assert (NAME, 'TXT') not in fake.sets
+
+
+def test_cleanup_leaves_a_routing_policy_set_alone(api):
+    provider, fake = api
+    rs = {'Name': NAME, 'Type': 'TXT', 'SetIdentifier': 'eu', 'Weight': 10, 'TTL': 60,
+          'ResourceRecords': [{'Value': '"x"'}]}
+    fake.sets[(NAME, 'TXT')] = rs
+    ok, msg = provider.delete_txt_record('example.com', NAME.rstrip('.'))
+    assert not ok and 'routing-policy' in msg
+    assert fake.sets[(NAME, 'TXT')] == rs

@@ -302,6 +302,7 @@ def test_merge_repoints_settings_naming_the_duplicate(app):
             keeper_id = _row(cert, key)
             dupe_id = _row(cert)
             keeper, dupe = db.session.get(CA, keeper_id), db.session.get(CA, dupe_id)
+            keeper.cdp_enabled, dupe.cdp_enabled = False, True
             values = {'scep_ca_id': str(dupe.id), 'est_ca_refid': dupe.refid, 'tsa_ca_refid': 'unrelated',
                       'acme.issuing_ca_id': dupe.refid,
                       'est_labels': json.dumps({'a': dupe.refid, 'b': 'unrelated'})}
@@ -324,6 +325,7 @@ def test_merge_repoints_settings_naming_the_duplicate(app):
             assert got['tsa_ca_refid'] == 'unrelated'
             assert json.loads(got['est_labels']) == {'a': keeper_refid, 'b': 'unrelated'}
             assert SystemConfig.query.filter_by(key=f'scep_challenge_{keeper_id}').first().value == 'dupe-secret'
+            assert db.session.get(CA, keeper_id).cdp_enabled, 'publication of the duplicate dropped'
         finally:
             db.session.rollback()
             SystemConfig.query.filter(SystemConfig.key.like('scep_challenge_%')

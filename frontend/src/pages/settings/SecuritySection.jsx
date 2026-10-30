@@ -3,7 +3,7 @@ import { ShieldCheck, Lock, LockKey, Warning, Timer, Globe, Clock, CheckCircle, 
 import { Button, Input, Select, Textarea, Badge, LoadingSpinner, ExperimentalBadge, DetailHeader, DetailSection, DetailGrid, DetailContent } from '../../components'
 import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { formatDate } from '../../lib/utils'
-import { pickerCas, unlistedPickerCas } from '../../lib/caSelection'
+import { anchorPickerCas } from '../../lib/caSelection'
 import AdminLockLabel from './AdminLockLabel'
 
 // The API sends a list; the textarea edits one entry per line.
@@ -425,8 +425,7 @@ export default function SecuritySection({ settings, updateSetting, handleSave, s
                   value={mtlsSettings.trusted_ca_id || ''}
                   onChange={(val) => setMtlsSettings(prev => ({ ...prev, trusted_ca_id: val }))}
                   placeholder={t('settings.mtls.selectCA')}
-                  helperText={unlistedPickerCas(cas, mtlsSettings.trusted_ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, mtlsSettings.trusted_ca_id) }) : undefined}
-                  options={pickerCas(cas, mtlsSettings.trusted_ca_id).map(ca => ({
+                  options={anchorPickerCas(cas, mtlsSettings.trusted_ca_id).map(ca => ({
                     value: ca.refid,
                     label: ca.descr || ca.subject || ca.refid,
                   }))}

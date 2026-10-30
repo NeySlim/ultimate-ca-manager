@@ -131,8 +131,9 @@ class GoDaddyDnsProvider(BaseDnsProvider):
         if record_value in [r['data'] for r in existing]:
             logger.info(f"GoDaddy: TXT value already present on {record_name}")
             return True, "Record created successfully"
-        new_ttl = max(ttl, 600)  # GoDaddy minimum TTL is 600
-        data = [{'data': r['data'], 'ttl': max(int(r.get('ttl') or new_ttl), 600)} for r in existing]
+        # One TTL for the set (RFC 2181 §5.2): the existing one, else ours; GoDaddy's minimum is 600
+        new_ttl = max(int(existing[0].get('ttl') or ttl) if existing else ttl, 600)
+        data = [{'data': r['data'], 'ttl': new_ttl} for r in existing]
         data.append({'data': record_value, 'ttl': new_ttl})
 
         success, result = self._request('PUT', path, data)
