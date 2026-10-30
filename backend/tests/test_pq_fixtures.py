@@ -1,4 +1,5 @@
 """The OpenSSL-made post-quantum fixtures hold what their names say, read without openssl."""
+import base64
 import hashlib
 
 import pytest
@@ -67,3 +68,17 @@ def test_the_slh_dsa_certificate_is_read_but_its_key_is_not():
     assert cert.public_key_algorithm_oid.dotted_string == SLHDSA_SHA2_128S_OID
     with pytest.raises(UnsupportedAlgorithm):
         cert.public_key()
+
+
+def test_the_ca_row_signs_with_the_fixture_key(mldsa_ca, mldsa_key):
+    from models import CA
+    from services.crl.generation import _crl_signature_hash
+    from services.hsm.ca_key_loader import get_ca_signing_key
+    from utils.signing_hash import signing_hash_for
+    row = CA.query.filter_by(refid=mldsa_ca.refid).one()
+    assert row.has_private_key and row.is_root
+    key = get_ca_signing_key(row)
+    assert isinstance(key, mldsa.MLDSA65PrivateKey)
+    cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+    assert key.public_key() == mldsa_key.public_key() == cert.public_key()
+    assert signing_hash_for(key, _crl_signature_hash(row)) is None
