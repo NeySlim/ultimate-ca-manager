@@ -591,7 +591,7 @@ class CACreationMixin:
         descr: str,
         dn: Dict[str, str],
         key_type: str = '2048',
-        digest: str = 'sha256',
+        digest: Optional[str] = None,
         username: str = 'system',
         path_length: Optional[int] = None,
         key_usage: Optional[List[str]] = None,
@@ -609,6 +609,7 @@ class CACreationMixin:
         the externally signed certificate. The private key (or HSM binding)
         is created immediately so the CSR's public key is final. The issuance
         policies bind its key type; the certificate's hash is the signer's.
+        *digest* signs the CSR; None picks the key's own (none for ML-DSA).
         """
         from services.policy_service import PolicyEvaluationService, key_label_for_public_key
         policies, key_label = _ca_policies(None, dn, key_type, hsm_key_id, hsm_key_algorithm,
@@ -632,7 +633,8 @@ class CACreationMixin:
         from services.hsm.ca_key_loader import bind_signature_scheme
         subject = TrustStoreService.build_subject(dn)
         csr_pem = TrustStoreService.generate_ca_csr(
-            subject, bind_signature_scheme(private_key, signature_scheme), digest=digest,
+            subject, bind_signature_scheme(private_key, signature_scheme),
+            digest=digest or _key_default_digest(private_key),
             path_length=path_length, key_usage=key_usage,
         )
 

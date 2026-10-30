@@ -533,7 +533,7 @@ class CSROperationsMixin:
     def generate_ca_csr(
         subject: x509.Name,
         private_key,
-        digest: str = 'sha256',
+        digest: Optional[str] = 'sha256',
         path_length: Optional[int] = None,
         key_usage: Optional[List[str]] = None,
     ) -> bytes:
@@ -545,7 +545,8 @@ class CSROperationsMixin:
         from the public key, exactly as UCM's own sign_csr does. The key is
         passed in rather than generated here: HSM-backed keys
         (HsmRSAPrivateKey/HsmECPrivateKey are virtual rsa/ec subclasses) sign
-        the CSR like any local key.
+        the CSR like any local key. A key that takes no digest (ML-DSA)
+        ignores *digest*.
         """
         from utils.ca_profile import (
             DEFAULT_INTERMEDIATE_KEY_USAGE, build_key_usage_extension,
