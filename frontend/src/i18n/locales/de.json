@@ -194,7 +194,7 @@
     "keyAlgorithm": "Schlüsselalgorithmus",
     "keyAlgorithmLevel": "{{name}} (Stufe {{level}})",
     "postQuantum": "Post-Quanten",
-    "postQuantumHint": "Verwendet einen Post-Quanten-Schlüssel (ML-DSA, FIPS 204, oder SLH-DSA, FIPS 205). Ältere Clients unterstützen ihn möglicherweise nicht.",
+    "postQuantumHint": "Verwendet einen Post-Quanten-Schlüssel (ML-DSA, FIPS 204, oder SLH-DSA, FIPS 205). Ältere Clients können ihn möglicherweise nicht verifizieren.",
     "timeline": "Zeitachse",
     "signingDetails": "Signaturdetails",
     "fingerprints": "Fingerabdrücke",
