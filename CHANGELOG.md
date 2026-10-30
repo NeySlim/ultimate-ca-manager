@@ -27,7 +27,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - CA details and renewal with a new key: an algorithm without a size or curve no longer falls back to the first algorithm of its family.
 
-- Smart import: an encrypted private key was kept in its encrypted form and silently dropped on import; the decrypted key is now matched and stored. A key given with a password it does not need is now read instead of refused.
+- Smart import: an encrypted private key was kept in its encrypted form and silently dropped on import; the decrypted key is now matched and stored. A wrong key password now stops the import with its reason instead of importing the certificate alone, and a key given with a password it does not need is read.
 
 - Key uploads, the key matcher and the converter: a malformed key now answers 400 with its reason instead of a generic error, or of a 200 that returned the certificate alone.
 
