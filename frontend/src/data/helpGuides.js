@@ -808,7 +808,7 @@ View all SCEP enrollment requests:
 ### Configuration
 Configure the SCEP server:
 - **Enable/Disable**: Toggle the SCEP service
-- **Signing CA**: Select which CA signs SCEP-enrolled certificates
+- **Signing CA**: Select which CA signs SCEP-enrolled certificates. Devices encrypt their request to this CA, so it must hold an RSA key in software: EC, HSM-backed, keyless, offline and revoked CAs are not listed (v2.248)
 - **Auto-Approve**: Automatically approve requests with valid challenge passwords
 
 ### Profiles
@@ -2775,7 +2775,7 @@ Require all users to enable 2FA. Users who haven't set up 2FA will be prompted o
 
 Let users log in with a client certificate instead of a password:
 
-- **Trusted CA**: Select the CA that issues and validates mTLS client certificates
+- **Trusted CA**: The CA whose client certificates are accepted at login, and the default issuer when a user generates one. Any CA whose certificate is not revoked can be chosen, keyless or offline included: such a CA issues nothing, so its users upload certificates issued elsewhere (v2.248)
 - **Require client certificate**: Optionally make mTLS mandatory for the web UI
 - Changing mTLS settings requires a service restart
 

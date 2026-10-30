@@ -18,7 +18,7 @@ export default {
       {
         title: 'Konfiguration',
         items: [
-          { label: 'Signierende CA', text: 'Auswählen, welche CA SCEP-registrierte Zertifikate signiert' },
+          { label: 'Signierende CA', text: 'Auswählen, welche CA SCEP-registrierte Zertifikate signiert. Geräte verschlüsseln ihre Anfrage an diese CA, daher muss sie einen RSA-Schlüssel in Software besitzen: EC-, HSM-gestützte, schlüssellose, Offline- und widerrufene CAs werden nicht aufgelistet (v2.248)' },
           { label: 'Auto-Genehmigung', text: 'Anfragen mit gültigem Challenge-Passwort automatisch genehmigen' },
           { label: 'Challenge-Passwort', text: 'Gemeinsames Geheimnis, das Geräte zur Authentifizierung der Registrierung verwenden' },
         ]
@@ -64,7 +64,7 @@ Alle SCEP-Registrierungsanfragen anzeigen:
 ### Konfiguration
 Den SCEP-Server konfigurieren:
 - **Aktivieren/Deaktivieren**: Den SCEP-Dienst umschalten
-- **Signierende CA**: Auswählen, welche CA SCEP-registrierte Zertifikate signiert
+- **Signierende CA**: Auswählen, welche CA SCEP-registrierte Zertifikate signiert. Geräte verschlüsseln ihre Anfrage an diese CA, daher muss sie einen RSA-Schlüssel in Software besitzen: EC-, HSM-gestützte, schlüssellose, Offline- und widerrufene CAs werden nicht aufgelistet (v2.248)
 - **Auto-Genehmigung**: Anfragen mit gültigem Challenge-Passwort automatisch genehmigen
 
 ### Profile

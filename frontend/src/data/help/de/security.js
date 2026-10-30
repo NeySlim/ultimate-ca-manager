@@ -47,7 +47,7 @@ export default {
       {
         title: 'mTLS-Authentifizierung',
         items: [
-          { label: 'Vertrauenswürdige CA', text: 'Die CA auswählen, die mTLS-Client-Anmeldezertifikate ausstellt und validiert' },
+          { label: 'Vertrauenswürdige CA', text: 'Die CA, deren Client-Zertifikate bei der Anmeldung akzeptiert werden, und der Standardaussteller, wenn ein Benutzer eines erzeugt. Jede CA mit nicht widerrufenem Zertifikat kann gewählt werden, auch schlüssellose oder Offline-CAs: Eine solche CA stellt nichts aus, ihre Benutzer laden daher anderswo ausgestellte Zertifikate hoch (v2.248)' },
           { label: 'Client-Zertifikat erfordern', text: 'mTLS optional für die Web-UI verpflichtend machen, das Ändern der mTLS-Einstellungen erfordert einen Dienstneustart' },
         ]
       },
@@ -151,7 +151,7 @@ Verlangt von allen Benutzern, 2FA zu aktivieren. Benutzer, die 2FA nicht eingeri
 
 Benutzer können sich mit einem Client-Zertifikat statt mit einem Passwort anmelden:
 
-- **Vertrauenswürdige CA**: Die CA auswählen, die mTLS-Client-Zertifikate ausstellt und validiert
+- **Vertrauenswürdige CA**: Die CA, deren Client-Zertifikate bei der Anmeldung akzeptiert werden, und der Standardaussteller, wenn ein Benutzer eines erzeugt. Jede CA mit nicht widerrufenem Zertifikat kann gewählt werden, auch schlüssellose oder Offline-CAs: Eine solche CA stellt nichts aus, ihre Benutzer laden daher anderswo ausgestellte Zertifikate hoch (v2.248)
 - **Client-Zertifikat erfordern**: mTLS optional für die Web-UI verpflichtend machen
 - Das Ändern der mTLS-Einstellungen erfordert einen Dienstneustart
 

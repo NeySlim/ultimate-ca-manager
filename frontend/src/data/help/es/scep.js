@@ -18,7 +18,7 @@ export default {
       {
         title: 'Configuración',
         items: [
-          { label: 'CA firmante', text: 'Seleccionar qué CA firma los certificados inscritos por SCEP' },
+          { label: 'CA firmante', text: 'Seleccionar qué CA firma los certificados inscritos por SCEP. Los dispositivos cifran su solicitud para esta CA, por lo que debe tener una clave RSA en software: las CA EC, con HSM, sin clave, sin conexión y revocadas no aparecen en la lista (v2.248)' },
           { label: 'Aprobación automática', text: 'Aprobar automáticamente solicitudes con contraseñas de desafío válidas' },
           { label: 'Contraseña de desafío', text: 'Secreto compartido que los dispositivos usan para autenticar la inscripción' },
         ]
@@ -64,7 +64,7 @@ Ver todas las solicitudes de inscripción SCEP:
 ### Configuración
 Configurar el servidor SCEP:
 - **Activar/Desactivar**: Alternar el servicio SCEP
-- **CA firmante**: Seleccionar qué CA firma los certificados inscritos por SCEP
+- **CA firmante**: Seleccionar qué CA firma los certificados inscritos por SCEP. Los dispositivos cifran su solicitud para esta CA, por lo que debe tener una clave RSA en software: las CA EC, con HSM, sin clave, sin conexión y revocadas no aparecen en la lista (v2.248)
 - **Aprobación automática**: Aprobar automáticamente solicitudes con contraseñas de desafío válidas
 
 ### Perfiles

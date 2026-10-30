@@ -18,7 +18,7 @@ export default {
       {
         title: 'Configuration',
         items: [
-          { label: 'CA de signature', text: 'Sélectionner quelle CA signe les certificats inscrits via SCEP' },
+          { label: 'CA de signature', text: 'Sélectionner quelle CA signe les certificats inscrits via SCEP. Les appareils chiffrent leur requête pour cette CA, elle doit donc détenir une clé RSA logicielle : les CA EC, adossées à un HSM, sans clé, hors ligne ou révoquées ne sont pas listées (v2.248)' },
           { label: 'Approbation automatique', text: 'Approuver automatiquement les requêtes avec des mots de passe de défi valides' },
           { label: 'Mot de passe de défi', text: 'Secret partagé que les appareils utilisent pour authentifier l\'inscription' },
         ]
@@ -64,7 +64,7 @@ Voir toutes les requêtes d'inscription SCEP :
 ### Configuration
 Configurer le serveur SCEP :
 - **Activer/Désactiver** : Basculer le service SCEP
-- **CA de signature** : Sélectionner quelle CA signe les certificats inscrits via SCEP
+- **CA de signature** : Sélectionner quelle CA signe les certificats inscrits via SCEP. Les appareils chiffrent leur requête pour cette CA, elle doit donc détenir une clé RSA logicielle : les CA EC, adossées à un HSM, sans clé, hors ligne ou révoquées ne sont pas listées (v2.248)
 - **Approbation automatique** : Approuver automatiquement les requêtes avec des mots de passe de défi valides
 
 ### Profils

@@ -457,7 +457,7 @@ export const helpContent = {
         title: 'Configuration',
         icon: Gear,
         items: [
-          { label: 'Signing CA', text: 'Select which CA signs SCEP-enrolled certificates' },
+          { label: 'Signing CA', text: 'Select which CA signs SCEP-enrolled certificates. Devices encrypt their request to this CA, so it must hold an RSA key in software: EC, HSM-backed, keyless, offline and revoked CAs are not listed (v2.248)' },
           { label: 'Auto-Approve', text: 'Automatically approve requests with valid challenge passwords' },
           { label: 'Challenge Password', text: 'Shared secret that devices use to authenticate enrollment' },
         ]
@@ -1466,7 +1466,7 @@ export const helpContent = {
         title: 'mTLS Authentication',
         icon: ShieldCheck,
         items: [
-          { label: 'Trusted CA', text: 'Select the CA that issues and validates mTLS client login certificates' },
+          { label: 'Trusted CA', text: 'The CA whose client certificates are accepted at login, and the default issuer when a user generates one. Any CA whose certificate is not revoked can be chosen, keyless or offline included: such a CA issues nothing, so its users upload certificates issued elsewhere (v2.248)' },
           { label: 'Require client certificate', text: 'Optionally make mTLS mandatory for the web UI, changing mTLS settings requires a service restart' },
         ]
       },

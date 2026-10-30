@@ -18,7 +18,7 @@ export default {
       {
         title: 'Configuração',
         items: [
-          { label: 'CA Assinante', text: 'Selecionar qual CA assina certificados inscritos via SCEP' },
+          { label: 'CA Assinante', text: 'Selecione qual CA assina os certificados inscritos via SCEP. Os dispositivos cifram a solicitação para esta CA, que deve portanto ter uma chave RSA em software: CAs EC, com HSM, sem chave, offline e revogadas não são listadas (v2.248)' },
           { label: 'Auto-Aprovação', text: 'Aprovar automaticamente solicitações com senhas de desafio válidas' },
           { label: 'Senha de Desafio', text: 'Segredo compartilhado que dispositivos usam para autenticar a inscrição' },
         ]
@@ -64,7 +64,7 @@ Visualize todas as solicitações de inscrição SCEP:
 ### Configuração
 Configure o servidor SCEP:
 - **Ativar/Desativar**: Alternar o serviço SCEP
-- **CA Assinante**: Selecionar qual CA assina certificados inscritos via SCEP
+- **CA Assinante**: Selecione qual CA assina os certificados inscritos via SCEP. Os dispositivos cifram a solicitação para esta CA, que deve portanto ter uma chave RSA em software: CAs EC, com HSM, sem chave, offline e revogadas não são listadas (v2.248)
 - **Auto-Aprovação**: Aprovar automaticamente solicitações com senhas de desafio válidas
 
 ### Perfis

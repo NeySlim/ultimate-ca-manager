@@ -47,7 +47,7 @@ export default {
       {
         title: 'Autenticazione mTLS',
         items: [
-          { label: 'CA fidata', text: 'Seleziona la CA che emette e valida i certificati client di accesso mTLS' },
+          { label: 'CA fidata', text: 'La CA i cui certificati client sono accettati all\'accesso, e l\'emittente predefinito quando un utente ne genera uno. Si può scegliere qualsiasi CA il cui certificato non sia revocato, anche senza chiave o offline: una CA di questo tipo non emette nulla, quindi i suoi utenti caricano certificati emessi altrove (v2.248)' },
           { label: 'Richiedi certificato client', text: 'Facoltativamente rendi l\'mTLS obbligatorio per l\'interfaccia web, la modifica delle impostazioni mTLS richiede un riavvio del servizio' },
         ]
       },
@@ -151,7 +151,7 @@ Richiedi a tutti gli utenti di abilitare il 2FA. Gli utenti che non hanno config
 
 Consenti agli utenti di accedere con un certificato client invece di una password:
 
-- **CA fidata**: Seleziona la CA che emette e valida i certificati client mTLS
+- **CA fidata**: La CA i cui certificati client sono accettati all'accesso, e l'emittente predefinito quando un utente ne genera uno. Si può scegliere qualsiasi CA il cui certificato non sia revocato, anche senza chiave o offline: una CA di questo tipo non emette nulla, quindi i suoi utenti caricano certificati emessi altrove (v2.248)
 - **Richiedi certificato client**: Facoltativamente rendi l'mTLS obbligatorio per l'interfaccia web
 - La modifica delle impostazioni mTLS richiede un riavvio del servizio
 

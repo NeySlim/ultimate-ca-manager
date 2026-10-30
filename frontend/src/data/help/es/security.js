@@ -47,7 +47,7 @@ export default {
       {
         title: 'Autenticación mTLS',
         items: [
-          { label: 'CA de confianza', text: 'Seleccione la CA que emite y valida los certificados de cliente para el inicio de sesión mTLS' },
+          { label: 'CA de confianza', text: 'La CA cuyos certificados de cliente se aceptan al iniciar sesión, y el emisor por defecto cuando un usuario genera uno. Se puede elegir cualquier CA cuyo certificado no esté revocado, incluidas las sin clave o sin conexión: una CA así no emite nada, por lo que sus usuarios suben certificados emitidos en otro lugar (v2.248)' },
           { label: 'Requerir certificado de cliente', text: 'Opcionalmente, haga que mTLS sea obligatorio para la interfaz web, cambiar la configuración mTLS requiere un reinicio del servicio' },
         ]
       },
@@ -151,7 +151,7 @@ Requerir que todos los usuarios activen 2FA. Los usuarios que no hayan configura
 
 Permita a los usuarios iniciar sesión con un certificado de cliente en lugar de una contraseña:
 
-- **CA de confianza**: Seleccione la CA que emite y valida los certificados de cliente mTLS
+- **CA de confianza**: La CA cuyos certificados de cliente se aceptan al iniciar sesión, y el emisor por defecto cuando un usuario genera uno. Se puede elegir cualquier CA cuyo certificado no esté revocado, incluidas las sin clave o sin conexión: una CA así no emite nada, por lo que sus usuarios suben certificados emitidos en otro lugar (v2.248)
 - **Requerir certificado de cliente**: Opcionalmente, haga que mTLS sea obligatorio para la interfaz web
 - Cambiar la configuración mTLS requiere un reinicio del servicio
 

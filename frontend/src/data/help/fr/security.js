@@ -47,7 +47,7 @@ export default {
       {
         title: 'Authentification mTLS',
         items: [
-          { label: 'CA de confiance', text: 'Sélectionner la CA qui émet et valide les certificats client de connexion mTLS' },
+          { label: 'CA de confiance', text: 'La CA dont les certificats client sont acceptés à la connexion, et l\'émettrice par défaut lorsqu\'un utilisateur en génère un. Toute CA dont le certificat n\'est pas révoqué peut être choisie, y compris sans clé ou hors ligne : une telle CA n\'émet rien, ses utilisateurs importent donc des certificats émis ailleurs (v2.248)' },
           { label: 'Exiger un certificat client', text: 'Rendre optionnellement mTLS obligatoire pour l\'interface web, la modification des paramètres mTLS nécessite un redémarrage du service' },
         ]
       },
@@ -151,7 +151,7 @@ Exiger que tous les utilisateurs activent la 2FA. Les utilisateurs qui n'ont pas
 
 Permettre aux utilisateurs de se connecter avec un certificat client au lieu d'un mot de passe :
 
-- **CA de confiance** : Sélectionner la CA qui émet et valide les certificats client mTLS
+- **CA de confiance** : La CA dont les certificats client sont acceptés à la connexion, et l'émettrice par défaut lorsqu'un utilisateur en génère un. Toute CA dont le certificat n'est pas révoqué peut être choisie, y compris sans clé ou hors ligne : une telle CA n'émet rien, ses utilisateurs importent donc des certificats émis ailleurs (v2.248)
 - **Exiger un certificat client** : Rendre optionnellement mTLS obligatoire pour l'interface web
 - La modification des paramètres mTLS nécessite un redémarrage du service
 
