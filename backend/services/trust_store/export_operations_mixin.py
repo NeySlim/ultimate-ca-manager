@@ -9,6 +9,7 @@ from cryptography.hazmat.primitives.serialization import pkcs12
 from cryptography.hazmat.backends import default_backend
 
 from utils.pkcs12_export import pkcs12_encryption
+from utils.algorithm_refusal import refuse_unexportable_key
 
 
 class ExportOperationsMixin:
@@ -35,6 +36,7 @@ class ExportOperationsMixin:
         key = serialization.load_pem_private_key(
             key_pem, password=None, backend=default_backend()
         )
+        refuse_unexportable_key(key, 'pkcs12')
 
         p12 = pkcs12.serialize_key_and_certificates(
             friendly_name.encode(),

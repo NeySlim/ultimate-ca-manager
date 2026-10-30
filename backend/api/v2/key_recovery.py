@@ -19,6 +19,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+from utils.algorithm_refusal import refuse_unexportable_key
 import fips_mode
 from fips_mode import FipsRestricted
 
@@ -215,6 +216,7 @@ def recover_key(rid):
         cert_obj = x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend())
         key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
         private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+        refuse_unexportable_key(private_key, 'pkcs12')
         from utils.ca_chain import issuer_chain
         start = CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
         chain = [x509.load_pem_x509_certificate(link.pem, default_backend()) for link in issuer_chain(start)]

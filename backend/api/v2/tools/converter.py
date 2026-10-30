@@ -1,7 +1,5 @@
 """Certificate format conversion routes"""
 import base64
-import os
-import tempfile
 
 from flask import request
 from cryptography import x509
@@ -13,6 +11,8 @@ import fips_mode
 from fips_mode import FipsRestricted
 from utils.response import success_response, error_response
 from utils.export_password import validate_export_password
+from utils.algorithm_refusal import refuse_unexportable_key
+from cryptography.hazmat.primitives.serialization import pkcs7
 
 from . import tools_bp, logger
 
@@ -40,8 +40,6 @@ def convert_certificate():
         return error_response('Input data is required', 400)
 
     try:
-        import subprocess
-
         parser = SmartParser()
 
         # Decode binary input if BASE64: prefixed (from file upload)
@@ -179,6 +177,7 @@ def convert_certificate():
             # Use first cert and key
             cert = certs[0]
             key = keys[0]
+            refuse_unexportable_key(key, 'pkcs12')
 
             # Additional certs (rest of certs + chain)
             ca_certs = certs[1:] + chain_certs if len(certs) > 1 or chain_certs else None
@@ -203,28 +202,13 @@ def convert_certificate():
             if not certs:
                 return error_response('At least one certificate is required for PKCS7', 400)
 
-            # Build PEM with all certs
-            all_certs_pem = ''
-            for cert in certs + chain_certs:
-                all_certs_pem += cert.public_bytes(serialization.Encoding.PEM).decode()
-
-            # Use OpenSSL to create PKCS7
-            with tempfile.NamedTemporaryFile(mode='w', suffix='.pem', delete=False) as f:
-                f.write(all_certs_pem)
-                temp_pem = f.name
-
-            try:
-                p7_data = subprocess.check_output([
-                    'openssl', 'crl2pkcs7', '-nocrl', '-certfile', temp_pem
-                ], timeout=30)
-                result = {
-                    'format': 'pkcs7',
-                    'data': p7_data.decode(),
-                    'filename': 'certificates.p7b',
-                    'detected_format': detected_format
-                }
-            finally:
-                os.unlink(temp_pem)
+            p7_data = pkcs7.serialize_certificates(certs + chain_certs, serialization.Encoding.PEM)
+            result = {
+                'format': 'pkcs7',
+                'data': p7_data.decode(),
+                'filename': 'certificates.p7b',
+                'detected_format': detected_format
+            }
 
         elif output_format == 'jks':
             if not certs:
@@ -241,6 +225,7 @@ def convert_certificate():
 
             cert = certs[0]
             key = keys[0]
+            refuse_unexportable_key(key, 'jks')
             ts = int(_time.time() * 1000)
 
             cert_der = cert.public_bytes(serialization.Encoding.DER)

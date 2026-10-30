@@ -14,3 +14,20 @@ class UnsupportedForKeyAlgorithm(fips_mode.FipsRestricted):
     def __init__(self, message, *, key_algorithm=None, export_format=None):
         super().__init__(message)
         self.details = {'reason': REASON, 'key_algorithm': key_algorithm, 'format': export_format}
+
+
+_CONTAINER_NAMES = {'pkcs12': 'PKCS#12', 'p12': 'PKCS#12', 'pfx': 'PKCS#12', 'jks': 'JKS'}
+
+
+def refuse_unexportable_key(private_key, export_format: str) -> None:
+    """UnsupportedForKeyAlgorithm when *private_key* cannot go into *export_format*
+    ('pkcs12', 'pfx', 'jks'); called before the container is built."""
+    from utils import key_algorithms
+    fmt = 'pkcs12' if export_format == 'p12' else export_format
+    if fmt in key_algorithms.export_formats_for(private_key):
+        return
+    label = key_algorithms.label_for_private_key(private_key)
+    name = _CONTAINER_NAMES.get(export_format, export_format)
+    raise UnsupportedForKeyAlgorithm(
+        f'{label} keys cannot be exported as {name}: export the certificate and the private '
+        'key as PEM (PKCS#8) instead', key_algorithm=label, export_format=name)

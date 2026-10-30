@@ -420,6 +420,27 @@ def label_for_signature_oid(oid) -> str | None:
     return next((a.label for a in _KNOWN.algorithms if a.oid == dotted), None)
 
 
+EXPORT_FORMATS = ('pem', 'der', 'key', 'pkcs8', 'pkcs7', 'p7b', 'pkcs12', 'pfx', 'jks')
+_KEY_CONTAINERS = ('pkcs12', 'pfx', 'jks')  # pyca writes no ML-DSA key into PKCS#12
+
+
+def _family_of(key) -> str | None:
+    if isinstance(key, str):
+        alg = get(key)
+        return alg.family if alg else None
+    for alg in _REGISTRY.algorithms:
+        if isinstance(key, (alg.public_class, alg.private_class)):
+            return alg.family
+    return None
+
+
+def export_formats_for(key) -> tuple[str, ...]:
+    """Export formats open to a key (public, private or label): ML-DSA has no PKCS#12 nor JKS."""
+    if _family_of(key) == 'ML-DSA':
+        return tuple(f for f in EXPORT_FORMATS if f not in _KEY_CONTAINERS)
+    return EXPORT_FORMATS
+
+
 def fips_approved(label) -> bool:
     """Whether *label* is allowed by the FIPS policy; False when unknown."""
     alg = get(label)

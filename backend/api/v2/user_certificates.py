@@ -12,6 +12,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+from utils.algorithm_refusal import refuse_unexportable_key
 import fips_mode
 from fips_mode import FipsRestricted
 from flask import Blueprint, Response, g, request
@@ -366,6 +367,7 @@ def export_user_certificate(cert_id):
             x509_cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
             key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+            refuse_unexportable_key(private_key, export_format)
 
             from api.v2.certificates.export import _build_ca_chain
             ca_certs = (
@@ -410,6 +412,7 @@ def export_user_certificate(cert_id):
             x509_cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
             key_pem_data = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
             private_key = serialization.load_pem_private_key(key_pem_data, password=None, backend=default_backend())
+            refuse_unexportable_key(private_key, 'jks')
 
             cert_der = x509_cert.public_bytes(serialization.Encoding.DER)
             key_pkcs8 = private_key.private_bytes(

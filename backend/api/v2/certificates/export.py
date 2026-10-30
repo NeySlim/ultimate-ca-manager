@@ -6,9 +6,6 @@ Certificates Export Routes
 import base64
 import json
 import logging
-import os
-import subprocess
-import tempfile
 import zipfile
 from flask import Response, request, g
 from auth.unified import require_auth, has_permission
@@ -19,6 +16,8 @@ from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+from utils.algorithm_refusal import refuse_unexportable_key
+from utils.p7b import p7b_from_pems
 import fips_mode
 from fips_mode import FipsRestricted
 
@@ -245,28 +244,12 @@ def export_all_certificates():
             )
 
         elif export_format == 'pkcs7' or export_format == 'p7b':
-            # Create temp file with all PEM certs
-            with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
-                for cert in certificates:
-                    if cert.crt:
-                        f.write(base64.b64decode(cert.crt))
-                        f.write(b'\n')
-                pem_file = f.name
-
-            try:
-                p7b_output = subprocess.check_output([
-                    'openssl', 'crl2pkcs7', '-nocrl',
-                    '-certfile', pem_file,
-                    '-outform', 'DER'
-                ], stderr=subprocess.DEVNULL, timeout=30)
-
-                return Response(
-                    p7b_output,
-                    mimetype='application/x-pkcs7-certificates',
-                    headers={'Content-Disposition': 'attachment; filename="certificates.p7b"'}
-                )
-            finally:
-                os.unlink(pem_file)
+            p7b_output = p7b_from_pems(base64.b64decode(cert.crt) for cert in certificates if cert.crt)
+            return Response(
+                p7b_output,
+                mimetype='application/x-pkcs7-certificates',
+                headers={'Content-Disposition': 'attachment; filename="certificates.p7b"'}
+            )
 
         else:
             return error_response(f'Bulk export only supports PEM and P7B formats. Use individual export for DER/PKCS12/PFX', 400)
@@ -446,6 +429,7 @@ def export_certificate(cert_id):
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
             key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+            refuse_unexportable_key(private_key, export_format)
 
             # Build CA chain if requested (inline stored chain or managed CA)
             ca_certs = (
@@ -470,33 +454,15 @@ def export_certificate(cert_id):
             )
 
         elif export_format == 'pkcs7' or export_format == 'p7b':
-            # Create temporary PEM file
-            with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
-                f.write(leaf_pem)
-                # Include CA chain if requested
-                if include_chain:
-                    for ca_cert in _build_ca_chain(
-                        certificate, cert_pem, include_root=include_root, variant=variant
-                    ):
-                        f.write(b'\n')
-                        f.write(ca_cert.public_bytes(serialization.Encoding.PEM))
-                pem_file = f.name
-
-            try:
-                # Convert to PKCS7 using OpenSSL
-                p7b_output = subprocess.check_output([
-                    'openssl', 'crl2pkcs7', '-nocrl',
-                    '-certfile', pem_file,
-                    '-outform', 'DER'
-                ], stderr=subprocess.DEVNULL, timeout=30)
-
-                return Response(
-                    p7b_output,
-                    mimetype='application/x-pkcs7-certificates',
-                    headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.p7b"'}
-                )
-            finally:
-                os.unlink(pem_file)
+            pems = [leaf_pem]
+            if include_chain:
+                pems += [ca_cert.public_bytes(serialization.Encoding.PEM) for ca_cert in _build_ca_chain(
+                    certificate, cert_pem, include_root=include_root, variant=variant)]
+            return Response(
+                p7b_from_pems(pems),
+                mimetype='application/x-pkcs7-certificates',
+                headers={'Content-Disposition': f'attachment; filename="{sanitize_filename(certificate.descr or certificate.refid)}.p7b"'}
+            )
 
         elif export_format == 'pfx':
             # PFX is same as PKCS12
@@ -508,6 +474,7 @@ def export_certificate(cert_id):
             cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
             key_pem = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
             private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
+            refuse_unexportable_key(private_key, export_format)
 
             # Build CA chain if requested (inline stored chain or managed CA)
             ca_certs = (
@@ -544,6 +511,7 @@ def export_certificate(cert_id):
             cert_obj = x509.load_pem_x509_certificate(cert_pem, default_backend())
             key_pem_data = load_pem_bytes(certificate.prv, context=f"certificate {certificate.id}")
             private_key = serialization.load_pem_private_key(key_pem_data, password=None, backend=default_backend())
+            refuse_unexportable_key(private_key, 'jks')
 
             cert_der = cert_obj.public_bytes(serialization.Encoding.DER)
             key_pkcs8 = private_key.private_bytes(

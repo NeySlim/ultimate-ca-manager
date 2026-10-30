@@ -5,9 +5,6 @@ CAs Bulk Operations
 from . import bp
 from flask import request, g, Response
 import base64
-import subprocess
-import tempfile
-import os
 import logging
 
 from auth.unified import require_auth
@@ -19,6 +16,7 @@ from services.deletion_blockers import (
 )
 from models import CA, db
 from utils.cert_status import holds_certificate
+from utils.p7b import p7b_from_pems
 
 logger = logging.getLogger(__name__)
 
@@ -101,21 +99,10 @@ def bulk_export_cas():
             return Response(pem_data, mimetype='application/x-pem-file',
                 headers={'Content-Disposition': 'attachment; filename="ca-certificates.pem"'})
         elif export_format in ('pkcs7', 'p7b'):
-            with tempfile.NamedTemporaryFile(mode='wb', suffix='.pem', delete=False) as f:
-                for ca in cas:
-                    if not ca.crt:
-                        continue  # pending external-CSR CA — nothing to export
-                    f.write(base64.b64decode(ca.crt))
-                    f.write(b'\n')
-                pem_file = f.name
-            try:
-                p7b_output = subprocess.check_output(
-                    ['openssl', 'crl2pkcs7', '-nocrl', '-certfile', pem_file, '-outform', 'DER'],
-                    stderr=subprocess.DEVNULL, timeout=30)
-                return Response(p7b_output, mimetype='application/x-pkcs7-certificates',
-                    headers={'Content-Disposition': 'attachment; filename="ca-certificates.p7b"'})
-            finally:
-                os.unlink(pem_file)
+            # a pending external-CSR CA has nothing to export (#298)
+            p7b_output = p7b_from_pems(base64.b64decode(ca.crt) for ca in cas if ca.crt)
+            return Response(p7b_output, mimetype='application/x-pkcs7-certificates',
+                headers={'Content-Disposition': 'attachment; filename="ca-certificates.p7b"'})
         else:
             return error_response('Supported formats: pem, p7b', 400)
     except Exception as e:

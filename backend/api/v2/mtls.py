@@ -16,6 +16,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.serialization import pkcs12
 from utils.pkcs12_export import legacy_flag, pkcs12_encryption
+from utils.algorithm_refusal import refuse_unexportable_key
 
 from auth.unified import require_auth, has_permission
 from config.settings import is_docker, restart_ucm_service
@@ -423,6 +424,7 @@ def download_mtls_certificate(cert_id):
         except ValueError as e:
             logger.error(f"PKCS12 export: unusable private key for mTLS certificate {cert.id}: {e}")
             return error_response('Stored private key is unusable for PKCS12 export', 500)
+        refuse_unexportable_key(private_key, 'pkcs12')
         x509_cert = cx509.load_pem_x509_certificate(cert_pem, default_backend())
 
         from api.v2.certificates.export import _build_ca_chain
