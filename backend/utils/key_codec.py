@@ -300,7 +300,8 @@ def _pkcs8_der(data: bytes, password: Optional[bytes] = None) -> Optional[bytes]
         return _decrypt_pkcs8(base64.b64decode(b''.join(sealed[0].split())), password)
     if data[:1] != b'\x30':
         return None
-    return _decrypt_pkcs8(data, password) if password else data
+    # a password does not make DER encrypted: fall back to the DER itself
+    return (_decrypt_pkcs8(data, password) if password else None) or data
 
 
 def _mldsa_from_layout(der: bytes):
@@ -351,7 +352,9 @@ def load_private_key_any(data, password=None):
     load = serialization.load_pem_private_key if pem else serialization.load_der_private_key
     try:
         return load(data, password=password)
-    except ValueError:
+    except ValueError as e:
+        if 'Incorrect password' in str(e):  # pyca's verdict on the password stands
+            raise
         der = _pkcs8_der(data, password)
         key = _mldsa_from_layout(der) if der else None
         if key is None:

@@ -223,7 +223,12 @@ class SmartImporter:
         try:
             # Parse
             objects = self.parser.parse(content, password)
-            
+            unusable = [o.error for o in objects if o.type == ObjectType.PRIVATE_KEY and o.error]
+            if unusable:  # importing the certificates without their key would hide it
+                result.success = False
+                result.errors.extend(f"Private key cannot be used: {e}" for e in unusable)
+                return result
+
             # Build chains
             chains = self.chain_builder.build_chains(objects)
             

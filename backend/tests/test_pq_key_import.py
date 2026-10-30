@@ -107,6 +107,39 @@ def test_encrypted_seedless_key_is_refused_with_the_command():
         load_private_key_any(PRIV_ENC, P12_PASSWORD)
 
 
+@pytest.mark.parametrize('layout', ['both', 'seedless'])
+def test_unencrypted_der_key_given_a_password_is_still_read(layout):
+    from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
+    from utils.key_codec import load_private_key_any
+    if layout == 'both':
+        key = load_private_key_any(_der(BOTH), b'anything')
+        assert _raw_public(key) == _raw_public(load_mldsa_key())
+    else:
+        with pytest.raises(UnsupportedForKeyAlgorithm, match='output_formats=seed-only'):
+            load_private_key_any(_der(PRIV), b'anything')
+
+
+@pytest.mark.parametrize('kind', ['rsa', 'ml-dsa'])
+def test_wrong_password_is_not_tried_a_second_time(monkeypatch, kind):
+    from utils import key_codec
+    calls = []
+    monkeypatch.setattr(key_codec, '_decrypt_pkcs8', lambda *a: calls.append(a))
+    data = BOTH_ENC
+    if kind == 'rsa':
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        while True:  # a wrong key unpads by chance about once in 300 salts: pyca then says otherwise
+            data = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                     serialization.BestAvailableEncryption(b'secret'))
+            try:
+                serialization.load_pem_private_key(data, b'wrong')
+            except ValueError as e:
+                if 'Incorrect password' in str(e):
+                    break
+    with pytest.raises(ValueError, match='Incorrect password'):
+        key_codec.load_private_key_any(data, b'wrong')
+    assert calls == []
+
+
 def test_normalized_pem_is_the_seed_layout():
     from utils.key_codec import normalize_private_key_pem
     assert normalize_private_key_pem(SEED) == SEED
@@ -192,6 +225,39 @@ def test_smart_import_reports_a_key_whose_halves_disagree(auth_client):
     assert key['is_encrypted'] is False and key['key_algorithm'] != 'unknown (encrypted)'
     assert 'do not match' in key['error']
     assert any('do not match' in e for e in data['validation']['errors'])
+
+
+def test_smart_import_reads_an_unencrypted_der_key_given_a_password():
+    from services.smart_import.parser import SmartParser
+    keys = [o for o in SmartParser().parse(_der(BOTH), password='anything')
+            if o.type.value == 'private_key']
+    assert [k.key_algorithm for k in keys] == ['ML-DSA-65']
+
+
+@pytest.mark.parametrize('wrapping', ['raw', 'der-key-block'])
+def test_smart_import_reports_a_der_key_whose_halves_disagree(wrapping):
+    from services.smart_import.parser import SmartParser
+    data = _tampered_both_der()
+    if wrapping == 'der-key-block':
+        data = ('-----BEGIN DER KEY-----\n' + base64.encodebytes(data).decode()
+                + '-----END DER KEY-----\n')
+    [key] = [o for o in SmartParser().parse(data) if o.type.value == 'private_key']
+    assert 'do not match' in key.error
+
+
+def test_smart_import_execute_refuses_a_key_whose_halves_disagree(app, auth_client):
+    pem = (b'-----BEGIN PRIVATE KEY-----\n' + base64.encodebytes(_tampered_both_der())
+           + b'-----END PRIVATE KEY-----\n')
+    with app.app_context():
+        before = (CA.query.count(), Certificate.query.count())
+    r = auth_client.post('/api/v2/import/execute', data=json.dumps({'content': (CERT + pem).decode()}),
+                         content_type='application/json')
+    assert r.status_code == 200, r.data
+    data = get_json(r)['data']
+    assert data['success'] is False
+    assert any('do not match' in e for e in data['errors'])
+    with app.app_context():
+        assert (CA.query.count(), Certificate.query.count()) == before
 
 
 def test_smart_import_refuses_a_seedless_key():

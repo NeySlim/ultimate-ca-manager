@@ -296,6 +296,8 @@ class SmartParser:
             return [obj]
         except FipsRestricted:
             raise
+        except MalformedKey as e:
+            return [self._malformed_der_key(data, e)]
         except Exception:
             pass
         
@@ -558,8 +560,16 @@ class SmartParser:
             return obj
         except FipsRestricted:
             raise
+        except MalformedKey as e:
+            return self._malformed_der_key(data, e)
         except Exception:
             return None
+
+    @staticmethod
+    def _malformed_der_key(data: bytes, error: MalformedKey) -> ParsedObject:
+        """A DER key that was read but cannot be used, kept with its reason."""
+        return ParsedObject(type=ObjectType.PRIVATE_KEY, raw_der=data,
+                            key_algorithm="invalid", error=str(error))
     
     def _public_key_info(self, cert_or_csr) -> Tuple[str, Optional[int]]:
         """Algorithm and size of a certificate's or CSR's key; a key pyca cannot load keeps its name or OID."""
