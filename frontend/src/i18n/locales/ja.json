@@ -4777,7 +4777,7 @@
       "jks": "JKS (Java KeyStore)"
     },
     "formatJksDesc": "Java KeyStore、証明書 + 鍵",
-    "unavailableForKeyAlgorithm": "{{algorithm}} 鍵では使用できません。PKCS#12 と JKS はまだ耐量子鍵を格納できません。代わりに秘密鍵付きの PEM でエクスポートしてください。",
+    "unavailableForKeyAlgorithm": "{{algorithm}} 鍵では使用できません。UCM はまだ耐量子鍵を PKCS#12 や JKS に書き出せません。代わりに秘密鍵付きの PEM でエクスポートしてください。",
     "jksNote": "JKSには常に秘密鍵が含まれます",
     "pkcs12Title": "PKCS#12をエクスポート",
     "pkcs12PasswordPrompt": "PKCS#12 ファイルのパスワードを入力してください"

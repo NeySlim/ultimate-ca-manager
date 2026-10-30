@@ -29,7 +29,7 @@ export default {
       'O Verificador de Correspondência compara hashes de módulo para verificar pares correspondentes',
       'O Conversor preserva a cadeia completa de certificados ao criar PKCS#12',
       'Os decodificadores nomeiam uma chave pós-quântica com seu nível de segurança NIST, por ex. ML-DSA-65 (nível 3), sem tamanho em bits',
-      'PKCS#12 e JKS ainda não podem conter uma chave ML-DSA: exporte-a em PEM com a chave privada',
+      'O UCM ainda não consegue gravar uma chave ML-DSA em PKCS#12 ou JKS: exporte-a em PEM com a chave privada',
     ],
   },
   helpGuides: {
@@ -86,7 +86,7 @@ O UCM compara os hashes de módulo (RSA) ou chave pública (EC). Uma correspond�
 
 ## Chaves pós-quânticas
 
-Os decodificadores e o Verificador SSL nomeiam uma chave **ML-DSA** ou **SLH-DSA** com seu nível de segurança NIST, por ex. *ML-DSA-65 (nível 3)*. Essas chaves não têm tamanho em bits. PKCS#12 e JKS ainda não podem conter uma chave ML-DSA, por isso o diálogo de exportação os desativa: exporte em PEM com a chave privada.
+Os decodificadores e o Verificador SSL nomeiam uma chave **ML-DSA** ou **SLH-DSA** com seu nível de segurança NIST, por ex. *ML-DSA-65 (nível 3)*. Essas chaves não têm tamanho em bits. O UCM ainda não consegue gravar uma chave ML-DSA em PKCS#12 ou JKS, por isso o diálogo de exportação os desativa: exporte em PEM com a chave privada.
 
 ## Conversor
 

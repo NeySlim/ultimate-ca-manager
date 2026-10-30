@@ -9,7 +9,7 @@ export const GROUP_BRAINPOOL = 'brainpool'
 export const GROUP_EDDSA = 'eddsa'
 export const GROUP_PQ = 'pq'
 
-// Export formats (ExportModal keys) a post-quantum key cannot use: PKCS#12 and JKS have no ML-DSA encoding.
+// Export formats (ExportModal keys) UCM cannot yet write a post-quantum key into: PKCS#12 and JKS.
 // Stored as an exclusion so a format the dialog adds stays open to every other key.
 export const PQ_EXPORT_EXCLUDED = ['pkcs12', 'jks']
 

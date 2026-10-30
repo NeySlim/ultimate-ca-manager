@@ -4774,7 +4774,7 @@
       "jks": "JKS (Java KeyStore)"
     },
     "formatJksDesc": "Java KeyStore，证书 + 密钥",
-    "unavailableForKeyAlgorithm": "不适用于 {{algorithm}} 密钥：PKCS#12 和 JKS 尚无法承载后量子密钥。请改为导出带私钥的 PEM。",
+    "unavailableForKeyAlgorithm": "不适用于 {{algorithm}} 密钥：UCM 暂不支持将后量子密钥写入 PKCS#12 或 JKS。请改为导出带私钥的 PEM。",
     "jksNote": "JKS 始终包含私钥",
     "pkcs12Title": "导出 PKCS#12",
     "pkcs12PasswordPrompt": "请输入 PKCS#12 文件的密码"

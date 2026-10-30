@@ -4777,7 +4777,7 @@
       "jks": "JKS (Java KeyStore)"
     },
     "formatJksDesc": "Java KeyStore, certificate + key",
-    "unavailableForKeyAlgorithm": "Not available for {{algorithm}} keys: PKCS#12 and JKS cannot carry a post-quantum key yet. Export PEM with the private key instead.",
+    "unavailableForKeyAlgorithm": "Not available for {{algorithm}} keys: UCM cannot yet write a post-quantum key into PKCS#12 or JKS. Export PEM with the private key instead.",
     "jksNote": "JKS always includes the private key",
     "pkcs12Title": "Export PKCS#12",
     "pkcs12PasswordPrompt": "Enter password for PKCS#12 file"

@@ -4834,7 +4834,7 @@
       "jks": "JKS (Java KeyStore)"
     },
     "formatJksDesc": "Java KeyStore, сертифікат + ключ",
-    "unavailableForKeyAlgorithm": "Недоступно для ключів {{algorithm}}: PKCS#12 і JKS поки не можуть містити постквантовий ключ. Натомість експортуйте PEM із закритим ключем.",
+    "unavailableForKeyAlgorithm": "Недоступно для ключів {{algorithm}}: UCM поки не вміє записувати постквантовий ключ у PKCS#12 чи JKS. Натомість експортуйте PEM із закритим ключем.",
     "jksNote": "JKS завжди включає приватний ключ",
     "pkcs12Title": "Експорт PKCS#12",
     "pkcs12PasswordPrompt": "Введіть пароль для файла PKCS#12"

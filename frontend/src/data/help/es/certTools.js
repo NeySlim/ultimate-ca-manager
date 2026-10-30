@@ -29,7 +29,7 @@ export default {
       'Key Matcher compara hashes de módulo para verificar pares coincidentes',
       'Converter conserva la cadena completa de certificados al crear PKCS#12',
       'Los decodificadores nombran una clave poscuántica con su nivel de seguridad NIST, p. ej. ML-DSA-65 (nivel 3), sin tamaño en bits',
-      'PKCS#12 y JKS aún no pueden contener una clave ML-DSA: expórtela en PEM con la clave privada',
+      'UCM aún no puede escribir una clave ML-DSA en PKCS#12 ni en JKS: expórtela en PEM con la clave privada',
     ],
   },
   helpGuides: {
@@ -86,7 +86,7 @@ UCM compara los hashes del módulo (RSA) o la clave pública (EC). Una coinciden
 
 ## Claves poscuánticas
 
-Los decodificadores y el SSL Checker nombran una clave **ML-DSA** o **SLH-DSA** con su nivel de seguridad NIST, p. ej. *ML-DSA-65 (nivel 3)*. Estas claves no tienen tamaño en bits. PKCS#12 y JKS aún no pueden contener una clave ML-DSA, por lo que el diálogo de exportación los desactiva: exporte en PEM con la clave privada.
+Los decodificadores y el SSL Checker nombran una clave **ML-DSA** o **SLH-DSA** con su nivel de seguridad NIST, p. ej. *ML-DSA-65 (nivel 3)*. Estas claves no tienen tamaño en bits. UCM aún no puede escribir una clave ML-DSA en PKCS#12 ni en JKS, por lo que el diálogo de exportación los desactiva: exporte en PEM con la clave privada.
 
 ## Converter
 

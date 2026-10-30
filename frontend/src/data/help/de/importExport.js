@@ -31,7 +31,7 @@ export default {
       'Smart Import verarbeitet PEM-Bündel mit mehreren Zertifikaten in einer einzelnen Datei',
       'Testen Sie die OPNsense-Verbindung, bevor Sie einen vollständigen Import durchführen',
       'PKCS#12-Dateien erfordern das korrekte Passwort zum Import privater Schlüssel',
-      'Post-Quanten-Zertifikate (ML-DSA, SLH-DSA) werden als PEM oder DER importiert und tragen ein Post-Quanten-Badge; eine PKCS#12-Datei kann noch keinen ML-DSA-Schlüssel enthalten',
+      'Post-Quanten-Zertifikate (ML-DSA, SLH-DSA) und ML-DSA-Schlüssel werden als PEM oder DER importiert, die Zertifikate tragen ein Post-Quanten-Badge; UCM kann einen ML-DSA-Schlüssel noch nicht aus einer PKCS#12-Datei lesen',
     ],
   },
   helpGuides: {
@@ -60,7 +60,7 @@ Der Smart-Import-Assistent erkennt Dateitypen automatisch und verarbeitet sie:
 > 💡 Smart Import verarbeitet PEM-Bündel mit mehreren Zertifikaten in einer einzelnen Datei. Es unterscheidet automatisch zwischen CAs und Endentitätszertifikaten.
 
 ### Post-Quanten-Zertifikate
-Zertifikate und Schlüssel mit **ML-DSA** (FIPS 204) oder **SLH-DSA** (FIPS 205) werden als PEM oder DER importiert. Sie werden mit ihrer Sicherheitsstufe angezeigt, z. B. *ML-DSA-65 (Stufe 3)*, und tragen ein **Post-Quanten**-Badge. PKCS#12 kann noch keinen ML-DSA-Schlüssel enthalten: Importieren Sie Zertifikat und Schlüssel als PEM.
+**ML-DSA**- (FIPS 204) und **SLH-DSA**-Zertifikate (FIPS 205) werden als PEM oder DER importiert, ebenso private ML-DSA-Schlüssel. Sie werden mit ihrer Sicherheitsstufe angezeigt, z. B. *ML-DSA-65 (Stufe 3)*, und tragen ein **Post-Quanten**-Badge. UCM kann einen ML-DSA-Schlüssel noch nicht aus einer PKCS#12-Datei lesen: Importieren Sie Zertifikat und Schlüssel als PEM.
 
 ## OPNsense-Integration
 

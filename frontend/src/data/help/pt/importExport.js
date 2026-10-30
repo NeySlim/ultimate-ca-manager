@@ -31,7 +31,7 @@ export default {
       'A Importação Inteligente lida com pacotes PEM com múltiplos certificados em um único arquivo',
       'Teste a conexão OPNsense antes de executar uma importação completa',
       'Arquivos PKCS#12 requerem a senha correta para importar chaves privadas',
-      'Certificados pós-quânticos (ML-DSA, SLH-DSA) são importados em PEM ou DER e exibem um selo Pós-quântico; um arquivo PKCS#12 ainda não pode conter uma chave ML-DSA',
+      'Certificados pós-quânticos (ML-DSA, SLH-DSA) e chaves ML-DSA são importados em PEM ou DER, e os certificados exibem um selo Pós-quântico; o UCM ainda não consegue ler uma chave ML-DSA de um arquivo PKCS#12',
     ],
   },
   helpGuides: {
@@ -60,7 +60,7 @@ O assistente de Importação Inteligente detecta automaticamente os tipos de arq
 > 💡 A Importação Inteligente lida com pacotes PEM com múltiplos certificados em um único arquivo. Ela distingue automaticamente CAs de certificados de entidade final.
 
 ### Certificados pós-quânticos
-Certificados e chaves que usam **ML-DSA** (FIPS 204) ou **SLH-DSA** (FIPS 205) são importados em PEM ou DER. São exibidos com seu nível de segurança, por ex. *ML-DSA-65 (nível 3)*, e um selo **Pós-quântico**. PKCS#12 ainda não pode conter uma chave ML-DSA: importe o certificado e a chave em PEM.
+Certificados **ML-DSA** (FIPS 204) e **SLH-DSA** (FIPS 205) são importados em PEM ou DER, assim como chaves privadas ML-DSA. São exibidos com seu nível de segurança, por ex. *ML-DSA-65 (nível 3)*, e um selo **Pós-quântico**. O UCM ainda não consegue ler uma chave ML-DSA de um arquivo PKCS#12: importe o certificado e a chave em PEM.
 
 ## Integração OPNsense
 

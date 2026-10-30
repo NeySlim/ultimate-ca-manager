@@ -31,7 +31,7 @@ export default {
       'L\'importazione intelligente gestisce bundle PEM con più certificati in un singolo file',
       'Testa la connessione OPNsense prima di eseguire un\'importazione completa',
       'I file PKCS#12 richiedono la password corretta per importare le chiavi private',
-      'I certificati post-quantistici (ML-DSA, SLH-DSA) si importano in PEM o DER e mostrano un badge Post-quantistico; un file PKCS#12 non può ancora contenere una chiave ML-DSA',
+      'I certificati post-quantistici (ML-DSA, SLH-DSA) e le chiavi ML-DSA si importano in PEM o DER, e i certificati mostrano un badge Post-quantistico; UCM non sa ancora leggere una chiave ML-DSA da un file PKCS#12',
     ],
   },
   helpGuides: {
@@ -60,7 +60,7 @@ La procedura guidata di importazione intelligente rileva automaticamente i tipi 
 > 💡 L'importazione intelligente gestisce bundle PEM con più certificati in un singolo file. Distingue automaticamente le CA dai certificati di entità finale.
 
 ### Certificati post-quantistici
-I certificati e le chiavi che usano **ML-DSA** (FIPS 204) o **SLH-DSA** (FIPS 205) si importano in PEM o DER. Vengono mostrati con il loro livello di sicurezza, ad es. *ML-DSA-65 (livello 3)*, e un badge **Post-quantistico**. PKCS#12 non può ancora contenere una chiave ML-DSA: importa il certificato e la chiave in PEM.
+I certificati **ML-DSA** (FIPS 204) e **SLH-DSA** (FIPS 205) si importano in PEM o DER, così come le chiavi private ML-DSA. Vengono mostrati con il loro livello di sicurezza, ad es. *ML-DSA-65 (livello 3)*, e un badge **Post-quantistico**. UCM non sa ancora leggere una chiave ML-DSA da un file PKCS#12: importa il certificato e la chiave in PEM.
 
 ## Integrazione OPNsense
 

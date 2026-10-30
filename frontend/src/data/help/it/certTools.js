@@ -29,7 +29,7 @@ export default {
       'La Corrispondenza chiavi confronta gli hash del modulo per verificare le coppie corrispondenti',
       'Il Convertitore preserva la catena completa dei certificati quando crea file PKCS#12',
       'I decodificatori indicano una chiave post-quantistica con il suo livello di sicurezza NIST, ad es. ML-DSA-65 (livello 3), senza dimensione in bit',
-      'PKCS#12 e JKS non possono ancora contenere una chiave ML-DSA: esportala invece in PEM con la chiave privata',
+      'UCM non sa ancora scrivere una chiave ML-DSA in PKCS#12 o JKS: esportala invece in PEM con la chiave privata',
     ],
   },
   helpGuides: {
@@ -86,7 +86,7 @@ UCM confronta gli hash del modulo (RSA) o della chiave pubblica (EC). Una corris
 
 ## Chiavi post-quantistiche
 
-I decodificatori e la Verifica SSL indicano una chiave **ML-DSA** o **SLH-DSA** con il suo livello di sicurezza NIST, ad es. *ML-DSA-65 (livello 3)*. Queste chiavi non hanno una dimensione in bit. PKCS#12 e JKS non possono ancora contenere una chiave ML-DSA, quindi la finestra di esportazione li disattiva: esporta invece in PEM con la chiave privata.
+I decodificatori e la Verifica SSL indicano una chiave **ML-DSA** o **SLH-DSA** con il suo livello di sicurezza NIST, ad es. *ML-DSA-65 (livello 3)*. Queste chiavi non hanno una dimensione in bit. UCM non sa ancora scrivere una chiave ML-DSA in PKCS#12 o JKS, quindi la finestra di esportazione li disattiva: esporta invece in PEM con la chiave privata.
 
 ## Convertitore
 

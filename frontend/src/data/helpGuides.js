@@ -2309,7 +2309,7 @@ The Smart Import wizard auto-detects file types and processes them:
 > 💡 Smart Import handles PEM bundles with multiple certificates in a single file. It automatically distinguishes CAs from end-entity certificates.
 
 ### Post-quantum certificates
-Certificates and keys using **ML-DSA** (FIPS 204) or **SLH-DSA** (FIPS 205) import as PEM or DER. They are shown with their security level, e.g. *ML-DSA-65 (level 3)*, and a **Post-quantum** badge. PKCS#12 cannot carry an ML-DSA key yet: import the certificate and the key as PEM.
+**ML-DSA** (FIPS 204) and **SLH-DSA** (FIPS 205) certificates import as PEM or DER, and so do ML-DSA private keys. They are shown with their security level, e.g. *ML-DSA-65 (level 3)*, and a **Post-quantum** badge. UCM cannot read an ML-DSA key from a PKCS#12 file yet: import the certificate and the key as PEM.
 
 ## OPNsense Integration
 
@@ -2406,7 +2406,7 @@ UCM compares the modulus (RSA) or public key (EC) hashes. A match confirms they 
 
 ## Post-quantum keys
 
-The decoders and the SSL Checker name an **ML-DSA** or **SLH-DSA** key with its NIST security level, e.g. *ML-DSA-65 (level 3)*. These keys have no size in bits. PKCS#12 and JKS cannot carry an ML-DSA key yet, so the export dialog greys them out: export PEM with the private key instead.
+The decoders and the SSL Checker name an **ML-DSA** or **SLH-DSA** key with its NIST security level, e.g. *ML-DSA-65 (level 3)*. These keys have no size in bits. UCM cannot yet write an ML-DSA key into PKCS#12 or JKS, so the export dialog greys them out: export PEM with the private key instead.
 
 ## Converter
 

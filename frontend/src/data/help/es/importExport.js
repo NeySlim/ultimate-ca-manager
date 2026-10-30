@@ -31,7 +31,7 @@ export default {
       'La importación inteligente maneja paquetes PEM con múltiples certificados en un solo archivo',
       'Pruebe la conexión de OPNsense antes de ejecutar una importación completa',
       'Los archivos PKCS#12 requieren la contraseña correcta para importar claves privadas',
-      'Los certificados poscuánticos (ML-DSA, SLH-DSA) se importan en PEM o DER y llevan una insignia Poscuántico; un archivo PKCS#12 aún no puede contener una clave ML-DSA',
+      'Los certificados poscuánticos (ML-DSA, SLH-DSA) y las claves ML-DSA se importan en PEM o DER, y los certificados llevan una insignia Poscuántico; UCM aún no puede leer una clave ML-DSA de un archivo PKCS#12',
     ],
   },
   helpGuides: {
@@ -60,7 +60,7 @@ El asistente de importación inteligente detecta automáticamente los tipos de a
 > 💡 La importación inteligente maneja paquetes PEM con múltiples certificados en un solo archivo. Distingue automáticamente las CAs de los certificados de entidad final.
 
 ### Certificados poscuánticos
-Los certificados y claves que usan **ML-DSA** (FIPS 204) o **SLH-DSA** (FIPS 205) se importan en PEM o DER. Se muestran con su nivel de seguridad, p. ej. *ML-DSA-65 (nivel 3)*, y una insignia **Poscuántico**. PKCS#12 aún no puede contener una clave ML-DSA: importe el certificado y la clave en PEM.
+Los certificados **ML-DSA** (FIPS 204) y **SLH-DSA** (FIPS 205) se importan en PEM o DER, al igual que las claves privadas ML-DSA. Se muestran con su nivel de seguridad, p. ej. *ML-DSA-65 (nivel 3)*, y una insignia **Poscuántico**. UCM aún no puede leer una clave ML-DSA de un archivo PKCS#12: importe el certificado y la clave en PEM.
 
 ## Integración OPNsense
 

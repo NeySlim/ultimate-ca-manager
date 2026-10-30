@@ -29,7 +29,7 @@ export default {
       'Der Schlüsselabgleich vergleicht Modulus-Hashes, um übereinstimmende Paare zu verifizieren',
       'Der Konverter bewahrt die vollständige Zertifikatskette beim Erstellen von PKCS#12',
       'Die Decoder benennen einen Post-Quanten-Schlüssel mit seiner NIST-Sicherheitsstufe, z. B. ML-DSA-65 (Stufe 3), ohne Größe in Bit',
-      'PKCS#12 und JKS können noch keinen ML-DSA-Schlüssel enthalten: Exportieren Sie ihn stattdessen als PEM mit dem privaten Schlüssel',
+      'UCM kann noch keinen ML-DSA-Schlüssel in PKCS#12 oder JKS schreiben: Exportieren Sie ihn stattdessen als PEM mit dem privaten Schlüssel',
     ],
   },
   helpGuides: {
@@ -86,7 +86,7 @@ UCM vergleicht die Modulus- (RSA) oder Public-Key-Hashes (EC). Eine Übereinstim
 
 ## Post-Quanten-Schlüssel
 
-Die Decoder und der SSL-Checker benennen einen **ML-DSA**- oder **SLH-DSA**-Schlüssel mit seiner NIST-Sicherheitsstufe, z. B. *ML-DSA-65 (Stufe 3)*. Diese Schlüssel haben keine Größe in Bit. PKCS#12 und JKS können noch keinen ML-DSA-Schlüssel enthalten, daher graut der Exportdialog sie aus: Exportieren Sie stattdessen PEM mit dem privaten Schlüssel.
+Die Decoder und der SSL-Checker benennen einen **ML-DSA**- oder **SLH-DSA**-Schlüssel mit seiner NIST-Sicherheitsstufe, z. B. *ML-DSA-65 (Stufe 3)*. Diese Schlüssel haben keine Größe in Bit. UCM kann noch keinen ML-DSA-Schlüssel in PKCS#12 oder JKS schreiben, daher graut der Exportdialog sie aus: Exportieren Sie stattdessen PEM mit dem privaten Schlüssel.
 
 ## Konverter
 

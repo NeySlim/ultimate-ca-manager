@@ -31,7 +31,7 @@ export default {
       '智能导入可处理单个文件中包含多个证书的 PEM 捆绑包',
       '在运行完整导入前先测试 OPNsense 连接',
       'PKCS#12 文件需要正确的密码才能导入私钥',
-      '后量子证书（ML-DSA、SLH-DSA）以 PEM 或 DER 格式导入，并带有后量子徽章；PKCS#12 文件尚无法容纳 ML-DSA 密钥',
+      '后量子证书（ML-DSA、SLH-DSA）和 ML-DSA 密钥以 PEM 或 DER 格式导入，证书带有后量子徽章；UCM 暂不支持从 PKCS#12 文件读取 ML-DSA 密钥',
     ],
   },
   helpGuides: {
@@ -60,7 +60,7 @@ export default {
 > 💡 智能导入可处理单个文件中包含多个证书的 PEM 捆绑包。它会自动区分 CA 和终端实体证书。
 
 ### 后量子证书
-使用 **ML-DSA**（FIPS 204）或 **SLH-DSA**（FIPS 205）的证书和密钥以 PEM 或 DER 格式导入。它们会显示安全级别，例如 *ML-DSA-65（级别 3）*，并带有 **后量子** 徽章。PKCS#12 尚无法容纳 ML-DSA 密钥：请以 PEM 格式导入证书和密钥。
+**ML-DSA**（FIPS 204）和 **SLH-DSA**（FIPS 205）证书以及 ML-DSA 私钥以 PEM 或 DER 格式导入。它们会显示安全级别，例如 *ML-DSA-65（级别 3）*，并带有 **后量子** 徽章。UCM 暂不支持从 PKCS#12 文件读取 ML-DSA 密钥：请以 PEM 格式导入证书和密钥。
 
 ## OPNsense 集成
 

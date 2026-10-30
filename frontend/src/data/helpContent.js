@@ -1210,7 +1210,7 @@ export const helpContent = {
       'Smart Import handles PEM bundles with multiple certificates in a single file',
       'Test the OPNsense connection before running a full import',
       'PKCS#12 files require the correct password to import private keys',
-      'Post-quantum certificates (ML-DSA, SLH-DSA) import as PEM or DER and carry a Post-quantum badge; a PKCS#12 file cannot hold an ML-DSA key yet',
+      'Post-quantum certificates (ML-DSA, SLH-DSA) and ML-DSA keys import as PEM or DER, and the certificates carry a Post-quantum badge; UCM cannot read an ML-DSA key from a PKCS#12 file yet',
     ],
     related: ['Certificates', 'CAs', 'Operations']
   },
@@ -1248,7 +1248,7 @@ export const helpContent = {
       'Key Matcher compares modulus hashes to verify matching pairs',
       'Converter preserves the full certificate chain when creating PKCS#12',
       'Decoders name a post-quantum key with its NIST security level, e.g. ML-DSA-65 (level 3), without a size in bits',
-      'PKCS#12 and JKS cannot carry an ML-DSA key yet: export it as PEM with the private key instead',
+      'UCM cannot yet write an ML-DSA key into PKCS#12 or JKS: export it as PEM with the private key instead',
     ],
     related: ['Certificates', 'CSRs', 'Import/Export']
   },
