@@ -11,7 +11,7 @@ from cryptography.x509.oid import NameOID
 from auth.unified import require_auth
 from utils import key_algorithms
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
-from utils.key_codec import load_private_key_any
+from utils.key_codec import MalformedKey, load_private_key_any
 from utils.response import success_response, error_response
 
 from . import tools_bp, get_public_key_bytes, logger, _csr_signature_valid
@@ -114,7 +114,7 @@ def match_keys():
                     'key_type': key_info,
                     'valid': True
                 })
-            except UnsupportedForKeyAlgorithm as e:
+            except (UnsupportedForKeyAlgorithm, MalformedKey) as e:
                 results['items'].append({'type': 'private_key', 'valid': False, 'error': str(e)})
             except Exception as e:
                 logger.warning(f"Invalid private key data during PEM validation: {e}")

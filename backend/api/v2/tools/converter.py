@@ -72,6 +72,11 @@ def convert_certificate():
             key_objects = parser.parse(key_input, password=password)
             objects.extend([o for o in key_objects if o.type == ObjectType.PRIVATE_KEY])
 
+        # A key that was read but cannot be used is refused, not dropped from the output
+        unusable = next((o.error for o in objects if o.type == ObjectType.PRIVATE_KEY and o.error), None)
+        if unusable:
+            return error_response(f'Private key cannot be used: {unusable}', 400)
+
         # Load crypto objects from parsed PEM/DER
         certs = []
         keys = []

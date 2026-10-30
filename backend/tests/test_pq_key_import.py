@@ -500,3 +500,38 @@ def test_both_layout_rebuilt_unchanged_still_loads():
     from utils.key_codec import load_private_key_any
     assert _raw_public(load_private_key_any(_both_with_expanded(lambda e: e))) == _raw_public(load_mldsa_key())
 
+
+# ------------------------------------------- tampered keys are named, not "invalid"
+
+def _tampered_both_pem():
+    return (b'-----BEGIN PRIVATE KEY-----\n' + base64.encodebytes(_tampered_both_der())
+            + b'-----END PRIVATE KEY-----\n')
+
+
+@pytest.mark.parametrize('target', ['certificate', 'ca', 'csr'])
+def test_key_upload_names_a_key_whose_halves_disagree(app, auth_client, target):
+    with _keyless_rows(app) as rows:
+        _, url, _ = rows[target]
+        r = _post(auth_client, url, _tampered_both_pem())
+        assert r.status_code == 400, r.data
+        assert 'do not match' in get_json(r)['message']
+
+
+def test_key_matcher_names_a_key_whose_halves_disagree(auth_client):
+    r = auth_client.post('/api/v2/tools/match-keys', data=json.dumps(
+        {'certificate': CERT.decode(), 'private_key': _tampered_both_pem().decode()}),
+        content_type='application/json')
+    assert r.status_code == 200, r.data
+    [item] = [i for i in get_json(r)['data']['items'] if i['type'] == 'private_key']
+    assert item['valid'] is False and 'do not match' in item['error']
+
+
+@pytest.mark.parametrize('field', ['pem', 'private_key'])
+def test_converter_refuses_a_key_whose_halves_disagree(auth_client, field):
+    body = ({'pem': (CERT + _tampered_both_pem()).decode()} if field == 'pem'
+            else {'pem': CERT.decode(), 'private_key': _tampered_both_pem().decode()})
+    r = auth_client.post('/api/v2/tools/convert', data=json.dumps({**body, 'output_format': 'pem'}),
+                         content_type='application/json')
+    assert r.status_code == 400, r.data
+    message = get_json(r)['message']
+    assert message.startswith('Private key cannot be used') and 'do not match' in message
