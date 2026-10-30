@@ -2,6 +2,7 @@
 key type is a 400, never an RSA-2048, and SLH-DSA is refused at issuance."""
 import base64
 import json
+import logging
 
 import pytest
 from cryptography import x509
@@ -148,6 +149,23 @@ def test_upload_refuses_slh_dsa_with_a_400(app, auth_client):
         assert Certificate.query.count() == before
 
 
+def test_smart_import_refuses_slh_dsa_like_the_upload(app, auth_client):
+    pem = fixture_bytes('slhdsa-sha2-128s-csr.pem').decode()
+    r = _post(auth_client, '/api/v2/import/analyze', {'content': pem})
+    assert r.status_code == 200, r.get_json()
+    errors = r.get_json()['data']['validation']['errors']
+    assert any('not signable by this instance' in e for e in errors), errors
+    with app.app_context():
+        before = Certificate.query.count()
+    r = _post(auth_client, '/api/v2/import/execute', {'content': pem})
+    assert r.status_code == 200, r.get_json()
+    data = r.get_json()['data']
+    assert data['csrs_imported'] == 0 and data['success'] is False, data
+    assert any('not signable by this instance' in e for e in data['errors']), data
+    with app.app_context():
+        assert Certificate.query.count() == before
+
+
 def test_sign_route_refuses_a_stored_slh_dsa_csr(app, auth_client, create_ca):
     from services.cert_service import CertificateService
     ca = create_ca(cn='PQ SLH sign route issuer')
@@ -178,6 +196,50 @@ def test_protocol_csr_checks_refuse_slh_dsa_by_name():
     assert not ok and response.status_code == 400
     assert b'not signable by this instance' in response.get_data()
     assert 'not signable by this instance' in _validate_csr(csr)
+
+
+def test_scep_refuses_slh_dsa_by_name(app, create_ca, caplog):
+    from cryptography.hazmat.primitives import serialization
+    from services.scep.scep_service import SCEPService
+    from tests.test_scep_rfc8894_operations import (
+        FAIL_INFO_OID, PKI_STATUS_OID, _build_request, _client_identity, _load_ca_material,
+        _response_attributes)
+    csr_der = x509.load_pem_x509_csr(fixture_bytes('slhdsa-sha2-128s-csr.pem')).public_bytes(
+        serialization.Encoding.DER)
+    ca_data = create_ca(cn='PQ SLH SCEP issuer')
+    with app.app_context():
+        ca, ca_cert, _ = _load_ca_material(ca_data['id'])
+        signer_cert, signer_key = _client_identity('slh-scep.example.test')
+        request = _build_request(ca_cert, signer_cert, signer_key, 19, csr_der, b'slh-scep-nonce16')
+        with caplog.at_level(logging.WARNING, logger='services.scep'):
+            response, status = SCEPService(ca.refid, auto_approve=True).process_pkcs_req(
+                request, '127.0.0.1')
+    attrs = _response_attributes(response)
+    assert status == 200 and attrs[PKI_STATUS_OID] == '2' and attrs[FAIL_INFO_OID] == '2'
+    # badRequest either way on the wire: the reason is only in the log
+    assert any('not signable by this instance' in rec.getMessage() for rec in caplog.records), \
+        [rec.getMessage() for rec in caplog.records]
+
+
+def test_msca_sign_refuses_slh_dsa_by_name(app, auth_client):
+    from models.msca import MicrosoftCA
+    with app.app_context():
+        conn = MicrosoftCA(name='pq-slh-msca-sign', server='ca.example.test', ca_name='Example Issuing CA',
+                           auth_method='basic', username='svc', enabled=True)
+        row = Certificate(refid='slh-dsa-msca-csr', descr='slh msca', source='manual',
+                          csr=base64.b64encode(fixture_bytes('slhdsa-sha2-128s-csr.pem')).decode())
+        db.session.add_all([conn, row])
+        db.session.commit()
+        conn_id, csr_id = conn.id, row.id
+    try:
+        r = _post(auth_client, f'/api/v2/microsoft-cas/{conn_id}/sign/{csr_id}', {'template': 'WebServer'})
+        assert r.status_code == 400, r.get_json()
+        assert 'not signable by this instance' in r.get_json()['detail']
+    finally:
+        with app.app_context():
+            db.session.delete(db.session.get(Certificate, csr_id))
+            db.session.delete(db.session.get(MicrosoftCA, conn_id))
+            db.session.commit()
 
 
 # ---- digests ----------------------------------------------------------------

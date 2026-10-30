@@ -35,6 +35,7 @@ from .matcher import KeyMatcher
 from utils.foreign_algorithms import spki_der
 from .validator import ImportValidator, ValidationResult
 from utils.datetime_utils import utc_now
+from utils.key_type import unsignable_csr_key
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +229,14 @@ class SmartImporter:
                 result.success = False
                 result.errors.extend(f"Private key cannot be used: {e}" for e in unusable)
                 return result
+            if import_csrs:  # refused as the upload refuses it, before anything is imported
+                refused = [f"CSR '{self._get_cn(o.subject)}' refused: {reason}" for o in objects
+                           if o.type == ObjectType.CSR
+                           and (reason := unsignable_csr_key(x509.load_pem_x509_csr(o.raw_pem.encode())))]
+                if refused:
+                    result.success = False
+                    result.errors.extend(refused)
+                    return result
 
             # Build chains
             chains = self.chain_builder.build_chains(objects)

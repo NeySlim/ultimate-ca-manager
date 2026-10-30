@@ -17,6 +17,7 @@ from cryptography.hazmat.backends import default_backend
 
 from .parser import ParsedObject, ObjectType
 from .chain_builder import ChainInfo, find_ca_by_ski
+from utils.key_type import unsignable_csr_key
 
 
 def _compute_cert_fingerprint(pem_or_b64: Optional[str]) -> Optional[str]:
@@ -232,7 +233,10 @@ class ImportValidator:
         # Verify CSR signature
         try:
             csr = x509.load_pem_x509_csr(obj.raw_pem.encode(), default_backend())
-            if not csr.is_signature_valid:
+            unsignable = unsignable_csr_key(csr)
+            if unsignable:
+                result.add_error(f"CSR '{self._get_cn(obj.subject)}' refused: {unsignable}")
+            elif not csr.is_signature_valid:
                 result.add_error(
                     f"CSR '{self._get_cn(obj.subject)}' has invalid signature"
                 )
