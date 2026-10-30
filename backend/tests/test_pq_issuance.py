@@ -49,6 +49,12 @@ def test_parse_issue_key_type_names_ml_dsa(key_type, key_size, expected):
     assert parse_issue_key_type(key_type, key_size) == expected
 
 
+@pytest.mark.parametrize('key_type,key_size', [('ML-DSA-65', None), ('ml-dsa', '65')])
+def test_parse_issue_key_type_ignores_a_curve_on_ml_dsa(key_type, key_size):
+    from utils.key_type import parse_issue_key_type
+    assert parse_issue_key_type(key_type, key_size, curve='P-256') == 'ml-dsa-65'
+
+
 @pytest.mark.parametrize('key_type,key_size', [('ml-dsa', '99'), ('ml-dsa', '2048'), ('foo', '2048'),
                                                ('ML-DSA-65', 'P256'), ('ML-DSA-65', 'ML-DSA-87')])
 def test_parse_issue_key_type_refuses_what_it_cannot_name(key_type, key_size):

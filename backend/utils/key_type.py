@@ -113,10 +113,10 @@ def parse_issue_key_type(
     raw_type = str(key_type or 'rsa').strip()
     raw_size = str(key_size if key_size is not None else '2048').strip()
 
-    if not curve:
-        registry_id = _registry_key_type(raw_type, raw_size)
-        if registry_id is not None:
-            return registry_id
+    # A curve only applies to EC: a key named outside RSA and EC ignores it
+    registry_id = _registry_key_type(raw_type, raw_size)
+    if registry_id is not None:
+        return registry_id
 
     if ' ' in raw_type and not curve:
         return parse_csr_key_type(raw_type)
@@ -145,7 +145,8 @@ def fill_key_params_from_template(key_type, key_size, template_key_type):
 
     ``key_size`` is only inherited when the request's family still matches the
     template's, so an explicit ``key_type=rsa`` never picks up an EC curve (#318).
-    A label the registry does not know is passed on for the parser to refuse.
+    A label the registry does not know becomes the key type for the parser to
+    refuse only when the request names none; otherwise the template is ignored.
     """
     if not template_key_type:
         return key_type, key_size
