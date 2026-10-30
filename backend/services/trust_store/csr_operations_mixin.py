@@ -520,7 +520,7 @@ class CSROperationsMixin:
             )
 
         # Sign CSR
-        hash_algo = hash_algorithm(digest)
+        hash_algo = signing_hash_for(private_key, hash_algorithm(digest))
         csr = builder.sign(private_key, hash_algo, default_backend())
 
         # Serialize
