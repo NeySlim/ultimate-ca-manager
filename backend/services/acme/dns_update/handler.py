@@ -251,15 +251,15 @@ def _update_rrs(wire: bytes) -> List[Tuple[dns.name.Name, int, int, int, int]]:
     p = dns.wire.Parser(wire)
     _id, _flags, zocount, prcount, upcount, _ar = _HEADER.unpack(p.get_bytes(12))
     for _ in range(zocount):
-        p.get_name()
+        dns.name.from_wire_parser(p)
         p.get_bytes(4)
     for _ in range(prcount):
-        p.get_name()
+        dns.name.from_wire_parser(p)
         _t, _c, _ttl, rdlen = p.get_struct("!HHIH")
         p.get_bytes(rdlen)
     out = []
     for _ in range(upcount):
-        name = p.get_name()
+        name = dns.name.from_wire_parser(p)
         rtype, rclass, ttl, rdlen = p.get_struct("!HHIH")
         p.get_bytes(rdlen)
         out.append((name, rtype, rclass, ttl, rdlen))

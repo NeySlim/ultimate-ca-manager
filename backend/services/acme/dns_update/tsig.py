@@ -130,14 +130,14 @@ def _last_rr_header(wire: bytes) -> Tuple[int, int, int]:
     p = dns.wire.Parser(wire)
     _id, _flags, qd, an, ns, ar = _HEADER.unpack(p.get_bytes(12))
     for _ in range(qd):
-        p.get_name()
+        dns.name.from_wire_parser(p)
         p.get_bytes(4)
     last = -1
     last_type = -1
     last_ttl = -1
     for _ in range(an + ns + ar):
         last = p.current
-        p.get_name()
+        dns.name.from_wire_parser(p)
         last_type, _cls, last_ttl, rdlen = struct.unpack("!HHIH", p.get_bytes(10))
         p.get_bytes(rdlen)
     if last < 0:

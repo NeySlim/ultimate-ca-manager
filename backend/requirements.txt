@@ -34,7 +34,7 @@ pyasn1-modules==0.4.2
 
 # ACME Support
 josepy>=2.2.0
-dnspython==2.8.0
+dnspython==2.9.1
 
 # Deploy hooks (#299) — SSH/SFTP push of issued certificates to remote hosts
 paramiko==5.0.0

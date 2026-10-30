@@ -901,7 +901,7 @@ def _with_tsig_ttl(wire, ttl):
     """Set the TTL of the TSIG RR (the MAC does not cover it)."""
     start = tsig_start_offset(wire)
     p = dns.wire.Parser(wire, start)
-    p.get_name()
+    dns.name.from_wire_parser(p)
     off = p.current + 4  # after TYPE and CLASS
     return wire[:off] + struct.pack("!I", ttl) + wire[off + 4:]
 
