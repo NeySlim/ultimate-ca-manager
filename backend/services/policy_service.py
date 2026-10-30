@@ -449,7 +449,7 @@ class PolicyEvaluationService:
                              tsa_signer=False, notices=None, ca_id=None):
         """``(hash for builder.sign(), violations)``. An implicit *digest* yields
         to the weakest one the policies allow; the hash the key really signs
-        with (HSM-bound, None for Ed25519/Ed448) is then checked with *key_type*,
+        with (HSM-bound, None for Ed25519, Ed448 and ML-DSA) is then checked with *key_type*,
         and *ca_key* (its scheme and storage) against the signature rules."""
         from cryptography.hazmat.primitives import hashes
         from services.trust_store.constants import hash_algorithm

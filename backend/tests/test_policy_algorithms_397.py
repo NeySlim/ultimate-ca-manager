@@ -105,11 +105,18 @@ class TestRuleHelpers:
         assert sign_hash.name == 'sha384' and v == []
 
     @pytest.mark.parametrize('make_key', [ed25519.Ed25519PrivateKey.generate, mldsa.MLDSA65PrivateKey.generate])
-    @pytest.mark.parametrize('explicit', [True, False])
-    def test_a_key_without_digest_signs_with_none_when_none_is_asked(self, make_key, explicit):
+    def test_a_key_without_digest_signs_with_none_when_none_is_asked(self, make_key):
         pol = _pol({'allowed_digests': ['sha384']})
         assert PolicyEvaluationService.checked_signing_hash(
-            [pol], make_key(), None, explicit=explicit) == (None, [])
+            [pol], make_key(), None) == (None, [])
+
+    @pytest.mark.parametrize('make_key', [ed25519.Ed25519PrivateKey.generate, mldsa.MLDSA65PrivateKey.generate])
+    def test_an_implicit_request_for_a_key_without_digest_stays_none(self, make_key):
+        # Non-regression only: signing_hash_for drops any digest for these keys,
+        # so this passes with or without the no-digest guard in checked_signing_hash.
+        pol = _pol({'allowed_digests': ['sha384']})
+        assert PolicyEvaluationService.checked_signing_hash(
+            [pol], make_key(), None, explicit=False) == (None, [])
 
     def test_every_key_gets_a_label(self):
         assert key_label_for_public_key(
