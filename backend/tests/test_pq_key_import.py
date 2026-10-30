@@ -440,3 +440,63 @@ def test_import_routes_name_a_key_whose_halves_disagree(auth_client, path):
                                      'name': f'pq-bad-{uuid.uuid4().hex[:8]}'})
     assert r.status_code == 400, r.data
     assert 'do not match' in get_json(r)['message']
+
+
+# ------------------------------------------- a password for a key that has none
+
+def _rsa_key():
+    return rsa.generate_private_key(public_exponent=65537, key_size=2048)
+
+
+@pytest.mark.parametrize('encoding', ['pem', 'der'])
+def test_unencrypted_rsa_key_given_a_password_is_still_read(encoding):
+    from utils.key_codec import load_private_key_any
+    key = _rsa_key()
+    enc = serialization.Encoding.PEM if encoding == 'pem' else serialization.Encoding.DER
+    data = key.private_bytes(enc, serialization.PrivateFormat.PKCS8, serialization.NoEncryption())
+    loaded = load_private_key_any(data, password=b'not-needed')
+    assert loaded.public_key().public_numbers() == key.public_key().public_numbers()
+
+
+@pytest.mark.parametrize('encoding', ['pem', 'der'])
+def test_seed_only_ml_dsa_key_given_a_password_is_still_read(encoding):
+    from utils.key_codec import load_private_key_any
+    data = SEED if encoding == 'pem' else _der(SEED)
+    assert _raw_public(load_private_key_any(data, password=b'not-needed')) == _raw_public(load_mldsa_key())
+
+
+def test_encrypted_key_without_a_password_still_asks_for_one():
+    from utils.key_codec import load_private_key_any
+    sealed = _rsa_key().private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                      serialization.BestAvailableEncryption(b'secret'))
+    with pytest.raises(TypeError):
+        load_private_key_any(sealed, password=None)
+
+
+# ------------------------------------------- the "both" check: rho, tr and length
+
+def _both_with_expanded(transform):
+    """The "both" fixture with its expanded key passed through *transform*, re-encoded."""
+    from pyasn1.codec.der import decoder, encoder
+    from pyasn1.type import univ
+    from pyasn1_modules import rfc5958
+    info, _ = decoder.decode(_der(BOTH), asn1Spec=rfc5958.OneAsymmetricKey())
+    both, _ = decoder.decode(bytes(info['privateKey']))
+    inner = univ.Sequence()
+    inner.setComponentByPosition(0, univ.OctetString(bytes(both[0])))
+    inner.setComponentByPosition(1, univ.OctetString(transform(bytes(both[1]))))
+    info['privateKey'] = encoder.encode(inner)
+    return encoder.encode(info)
+
+
+@pytest.mark.parametrize('transform', [lambda e: e + b'\x00', lambda e: e[:-1]], ids=['longer', 'shorter'])
+def test_both_layout_with_an_expanded_key_of_the_wrong_length_is_refused(transform):
+    from utils.key_codec import MalformedKey, load_private_key_any
+    with pytest.raises(MalformedKey, match='4032'):
+        load_private_key_any(_both_with_expanded(transform))
+
+
+def test_both_layout_rebuilt_unchanged_still_loads():
+    from utils.key_codec import load_private_key_any
+    assert _raw_public(load_private_key_any(_both_with_expanded(lambda e: e))) == _raw_public(load_mldsa_key())
+

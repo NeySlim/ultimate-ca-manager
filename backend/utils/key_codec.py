@@ -239,6 +239,10 @@ SEEDLESS_MLDSA = (
     'holds it: openssl pkey -in key.pem -provparam ml-dsa.output_formats=seed-only -out key-seed.pem')
 
 
+# Size of the expanded private key (skEncode) of each ML-DSA parameter set, FIPS 204 table 2
+_MLDSA_SK_BYTES = {'ML-DSA-44': 2560, 'ML-DSA-65': 4032, 'ML-DSA-87': 4896}
+
+
 class MalformedKey(ValueError):
     """A key whose encoding UCM reads but whose content is inconsistent; the message says why."""
 
@@ -305,8 +309,9 @@ def _pkcs8_der(data: bytes, password: Optional[bytes] = None) -> Optional[bytes]
 
 
 def _mldsa_from_layout(der: bytes):
-    """The ML-DSA key of a PKCS#8 in OpenSSL's "both" layout, its expanded key checked
-    against the seed; None when *der* is not an ML-DSA PKCS#8 that needs this."""
+    """The ML-DSA key of a PKCS#8 in OpenSSL's "both" layout, read from its seed; the expanded
+    key is checked for its length and for the rho and tr the seed's public key gives, its secret
+    parts are not. None when *der* is not an ML-DSA PKCS#8 that needs this."""
     from pyasn1.codec.der import decoder
     from pyasn1.error import PyAsn1Error
     from pyasn1_modules import rfc5958
@@ -332,18 +337,25 @@ def _mldsa_from_layout(der: bytes):
         raise MalformedKey(f'Malformed {label} private key') from None
     if rest or len(seed) != 32:
         raise MalformedKey(f'Malformed {label} private key')
+    size = _MLDSA_SK_BYTES.get(label)
+    if size is not None and len(expanded) != size:
+        raise MalformedKey(f'Malformed {label} private key: its expanded key is {len(expanded)} bytes, '
+                           f'not {size}')
     key = alg.private_class.from_seed_bytes(seed)
     public = key.public_key().public_bytes_raw()
     # FIPS 204 skEncode starts with rho (from pk) then K, then tr = SHAKE256(pk, 64)
     if expanded[:32] != public[:32] or expanded[64:128] != hashlib.shake_256(public).digest(64):
-        raise MalformedKey(f'The seed and the expanded key of this {label} private key do not match')
+        raise MalformedKey(f'The seed and the public part of the expanded key of this {label} '
+                           'private key do not match')
     return key
 
 
 def load_private_key_any(data, password=None):
     """Private key from PEM or DER, as pyca reads it; an ML-DSA key in OpenSSL's "both"
     layout, encrypted or not, is read from its seed, a seedless one refused
-    (UnsupportedForKeyAlgorithm), one whose halves disagree raises MalformedKey."""
+    (UnsupportedForKeyAlgorithm), one whose expanded key fails the checks of
+    _mldsa_from_layout raises MalformedKey. A password given for a key that is
+    not encrypted is ignored."""
     from cryptography.hazmat.primitives import serialization
     if isinstance(data, str):
         data = data.encode('utf-8')
@@ -352,6 +364,10 @@ def load_private_key_any(data, password=None):
     load = serialization.load_pem_private_key if pem else serialization.load_der_private_key
     try:
         return load(data, password=password)
+    except TypeError as e:
+        if password is None or 'not encrypted' not in str(e):
+            raise
+        return load_private_key_any(data, password=None)
     except ValueError as e:
         if 'Incorrect password' in str(e):  # pyca's verdict on the password stands
             raise

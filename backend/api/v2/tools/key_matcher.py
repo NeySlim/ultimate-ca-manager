@@ -54,10 +54,7 @@ def match_keys():
             raw = base64.b64decode(data[7:])
         else:
             raw = data if '-----BEGIN' in data else f"-----BEGIN PRIVATE KEY-----\n{data}\n-----END PRIVATE KEY-----"
-        try:
-            return load_private_key_any(raw, password=pwd_bytes)
-        except TypeError:
-            return load_private_key_any(raw, password=None)
+        return load_private_key_any(raw, password=pwd_bytes)
 
     def load_csr_any_format(data):
         """Load CSR from PEM or DER"""
