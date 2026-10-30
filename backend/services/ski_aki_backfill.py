@@ -72,6 +72,7 @@ def _merge_ca_group(db, cas_with_ski, stats):
         try:
             with db.session.begin_nested():
                 _move_ca_dependents(db, c, keeper)
+                _move_ca_settings(c, keeper)
                 # Raw SQL to avoid ORM cascade issues with incomplete schemas
                 db.session.execute(db.text("DELETE FROM certificate_authorities WHERE id = :id"), {'id': c.id})
         except Exception as exc:
@@ -90,6 +91,16 @@ _UNIQUE_PER_CA = {'ca_template_pins': 'template_id', 'crl_deploy_bindings': 'tar
 # Parent references declared without a foreign key
 _UNDECLARED_CAREF = (('certificate_authorities', 'caref'), ('crls', 'caref'),
                      ('ca_cross_certificates', 'issuer_caref'))
+
+
+def _move_ca_settings(dupe, keeper):
+    """Settings and the SCEP challenge naming *dupe* follow *keeper*, as on a cross conversion."""
+    from models import SystemConfig
+    from services.ca.cross_repair import _move_scep_challenge, _move_settings
+    scep_cfg = SystemConfig.query.filter_by(key='scep_ca_id').first()
+    was_scep_ca = bool(scep_cfg and scep_cfg.value in (str(dupe.id), dupe.refid))
+    _move_settings(dupe, keeper)
+    _move_scep_challenge(dupe, keeper, was_scep_ca)
 
 
 def _move_ca_dependents(db, dupe, keeper):

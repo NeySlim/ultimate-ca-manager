@@ -286,3 +286,53 @@ def test_two_unusable_served_rows_leave_one_served(app):
         assert served == [ids[0]]
         CACrossCertificate.query.filter(CACrossCertificate.id.in_(ids)).delete()
         db.session.commit()
+
+
+def test_merge_repoints_settings_naming_the_duplicate(app):
+    """Protocol defaults and EST labels hold a CA id or refid without a foreign key."""
+    import json
+    from models.system_config import SystemConfig
+
+    keys = ('scep_ca_id', 'est_ca_refid', 'tsa_ca_refid', 'acme.issuing_ca_id', 'est_labels')
+    key = ec.generate_private_key(ec.SECP256R1())
+    cert = _cert(key, 'Settings Duplicate Root')
+    with app.app_context():
+        saved = {k: (r.value if (r := SystemConfig.query.filter_by(key=k).first()) else None) for k in keys}
+        try:
+            keeper_id = _row(cert, key)
+            dupe_id = _row(cert)
+            keeper, dupe = db.session.get(CA, keeper_id), db.session.get(CA, dupe_id)
+            values = {'scep_ca_id': str(dupe.id), 'est_ca_refid': dupe.refid, 'tsa_ca_refid': 'unrelated',
+                      'acme.issuing_ca_id': dupe.refid,
+                      'est_labels': json.dumps({'a': dupe.refid, 'b': 'unrelated'})}
+            values[f'scep_challenge_{dupe.id}'] = 'dupe-secret'
+            for k, v in values.items():
+                row = SystemConfig.query.filter_by(key=k).first() or SystemConfig(key=k)
+                row.value = v
+                db.session.add(row)
+            db.session.commit()
+            keeper_refid = keeper.refid
+
+            backfill_ski_aki()
+
+            db.session.expire_all()
+            assert db.session.get(CA, dupe_id) is None
+            got = {k: SystemConfig.query.filter_by(key=k).first().value for k in keys}
+            assert got['scep_ca_id'] == str(keeper_id)
+            assert got['est_ca_refid'] == keeper_refid
+            assert got['acme.issuing_ca_id'] == keeper_refid
+            assert got['tsa_ca_refid'] == 'unrelated'
+            assert json.loads(got['est_labels']) == {'a': keeper_refid, 'b': 'unrelated'}
+            assert SystemConfig.query.filter_by(key=f'scep_challenge_{keeper_id}').first().value == 'dupe-secret'
+        finally:
+            db.session.rollback()
+            SystemConfig.query.filter(SystemConfig.key.like('scep_challenge_%')
+                                      | SystemConfig.key.like('ca_url_alias_%')).delete(synchronize_session=False)
+            for k, v in saved.items():
+                row = SystemConfig.query.filter_by(key=k).first()
+                if v is None:
+                    if row:
+                        db.session.delete(row)
+                else:
+                    row.value = v
+            db.session.commit()

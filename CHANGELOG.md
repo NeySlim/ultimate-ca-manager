@@ -19,6 +19,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - ACME DNS-01 with PowerDNS: a value already present but disabled was added a second time, which PowerDNS refuses; it is now re-enabled. With Route 53, an alias or routing-policy TXT record is no longer overwritten, and the existing set is found whatever the case of the name.
 
+- CAs: when the hourly check merged two records of one CA, the SCEP, EST, XCEP, WSTEP, TSA, mTLS and ACME settings that named the removed record kept pointing at it. They now follow the kept record, with the SCEP challenge, and the removed record's URLs resolve to it; EST labels also follow a duplicate converted into a cross-certificate.
+
 ### Security
 
 - dnspython 2.9.1 (CVE-2026-114605): a DNS message with a long chain of compression pointers, sent to the RFC 2136 listener or returned by a resolver, could hold a CPU. The listener reads compressed names the same way under the new version.

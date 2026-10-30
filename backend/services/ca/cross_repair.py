@@ -4,6 +4,7 @@ Nothing here runs by itself: a self-signed root that was overwritten or deleted 
 comes back from a backup or through restore-primary.
 """
 import base64
+import json
 import logging
 from datetime import datetime, timezone
 from typing import List, Optional
@@ -110,6 +111,13 @@ def _move_settings(record, root, cross=None):
             cfg.value = root.refid
         elif cfg.value == str(record.id):
             cfg.value = str(root.id)
+    labels_cfg = SystemConfig.query.filter_by(key='est_labels').first()
+    try:
+        labels = json.loads(labels_cfg.value or '{}') if labels_cfg else {}
+    except ValueError:
+        labels = {}
+    if isinstance(labels, dict) and record.refid in labels.values():
+        labels_cfg.value = json.dumps({k: root.refid if v == record.refid else v for k, v in labels.items()})
     responder = SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{record.id}').first()
     if responder is not None:
         if SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{root.id}').first() is None:
