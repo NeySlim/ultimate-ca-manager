@@ -535,3 +535,49 @@ def test_converter_refuses_a_key_whose_halves_disagree(auth_client, field):
     assert r.status_code == 400, r.data
     message = get_json(r)['message']
     assert message.startswith('Private key cannot be used') and 'do not match' in message
+
+
+@pytest.mark.parametrize('kind', ['ml-dsa-both', 'rsa'])
+def test_smart_import_execute_refuses_a_wrong_key_password(app, auth_client, kind):
+    from services.smart_import.parser import WRONG_PASSWORD
+    cert, sealed = ((CERT, BOTH_ENC) if kind == 'ml-dsa-both'
+                    else _rsa_leaf_and_encrypted_key(P12_PASSWORD.decode())[:2])
+    with app.app_context():
+        before = (CA.query.count(), Certificate.query.count())
+    r = auth_client.post('/api/v2/import/execute', data=json.dumps({
+        'content': (cert + sealed).decode(), 'password': 'not-the-password',
+        'options': {'skip_duplicates': False}}), content_type='application/json')
+    assert r.status_code == 200, r.data
+    data = get_json(r)['data']
+    assert data['success'] is False, data
+    assert any(WRONG_PASSWORD in e for e in data['errors']), data
+    with app.app_context():
+        assert (CA.query.count(), Certificate.query.count()) == before
+
+
+def test_smart_import_names_a_wrong_password_on_a_der_key():
+    from services.smart_import.parser import WRONG_PASSWORD, SmartParser
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    der = key.private_bytes(serialization.Encoding.DER, serialization.PrivateFormat.PKCS8,
+                            serialization.BestAvailableEncryption(b'right-pass'))
+    [obj] = SmartParser().parse(der, password='wrong-pass')
+    assert obj.type.value == 'private_key' and obj.error == WRONG_PASSWORD
+    assert SmartParser()._parse_der_key(der, 'wrong-pass').error == WRONG_PASSWORD
+
+
+def test_converter_refuses_a_wrong_key_password(auth_client):
+    r = auth_client.post('/api/v2/tools/convert', data=json.dumps({
+        'pem': (CERT + BOTH_ENC).decode(), 'password': 'not-the-password', 'output_format': 'pem'}),
+        content_type='application/json')
+    assert r.status_code == 400, r.data
+    assert 'could not be decrypted' in get_json(r)['message']
+
+
+@pytest.mark.parametrize('encoding', ['PEM', 'DER'])
+def test_the_retry_without_password_never_hides_a_wrong_one(encoding):
+    from utils.key_codec import load_private_key_any
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    sealed = key.private_bytes(getattr(serialization.Encoding, encoding), serialization.PrivateFormat.PKCS8,
+                               serialization.BestAvailableEncryption(b'right-pass'))
+    with pytest.raises(ValueError, match='(?i)incorrect password'):
+        load_private_key_any(sealed, b'wrong-pass')

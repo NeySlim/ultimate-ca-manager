@@ -25,6 +25,13 @@ from utils.csr_extensions import csr_extensions
 from utils.key_codec import MalformedKey, load_private_key_any, normalize_private_key_pem
 from utils.pkcs12_import import load_key_and_certificates, refuse_pkcs12_import
 
+WRONG_PASSWORD = 'Private key could not be decrypted with the password given'
+
+
+def _is_wrong_password(exc: Exception) -> bool:
+    """pyca's ValueError for an encrypted key the password does not open."""
+    return 'password' in str(exc).lower()
+
 
 class ObjectType(Enum):
     CERTIFICATE = "certificate"
@@ -298,6 +305,9 @@ class SmartParser:
             raise
         except MalformedKey as e:
             return [self._malformed_der_key(data, e)]
+        except ValueError as e:
+            if password and _is_wrong_password(e):
+                return [self._wrong_password_der_key(data)]
         except Exception:
             pass
         
@@ -363,13 +373,14 @@ class SmartParser:
                         type=ObjectType.PRIVATE_KEY, raw_pem=pem_block, index=match.start(),
                         is_encrypted=is_encrypted, key_algorithm="invalid", error=str(e)))
                 except Exception:
-                    # Key might be encrypted without password
+                    # Encrypted without a password, or with the wrong one: the latter is an error
                     obj = ParsedObject(
                         type=ObjectType.PRIVATE_KEY,
                         raw_pem=pem_block,
                         index=match.start(),
                         is_encrypted=True,
-                        key_algorithm="unknown (encrypted)"
+                        key_algorithm="unknown (encrypted)",
+                        error=WRONG_PASSWORD if pwd and is_encrypted else None,
                     )
                     objects.append(obj)
                     
@@ -563,8 +574,15 @@ class SmartParser:
             raise
         except MalformedKey as e:
             return self._malformed_der_key(data, e)
+        except ValueError as e:
+            return self._wrong_password_der_key(data) if pwd and _is_wrong_password(e) else None
         except Exception:
             return None
+
+    @staticmethod
+    def _wrong_password_der_key(data: bytes) -> ParsedObject:
+        return ParsedObject(type=ObjectType.PRIVATE_KEY, raw_der=data, is_encrypted=True,
+                            key_algorithm="unknown (encrypted)", error=WRONG_PASSWORD)
 
     @staticmethod
     def _malformed_der_key(data: bytes, error: MalformedKey) -> ParsedObject:
