@@ -82,3 +82,15 @@ def test_the_ca_row_signs_with_the_fixture_key(mldsa_ca, mldsa_key):
     cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
     assert key.public_key() == mldsa_key.public_key() == cert.public_key()
     assert signing_hash_for(key, _crl_signature_hash(row)) is None
+
+
+def test_the_fixture_ca_takes_its_crls_with_it(app):
+    from models import CRLMetadata
+    from services.crl import CRLService
+    from tests.pqc_fixtures import mldsa_ca_row
+    with mldsa_ca_row(app) as ca:
+        ca_id = ca.id
+        CRLService.generate_crl(ca_id)
+        assert CRLMetadata.query.filter_by(ca_id=ca_id).count() == 1
+    with app.app_context():
+        assert CRLMetadata.query.filter_by(ca_id=ca_id).count() == 0

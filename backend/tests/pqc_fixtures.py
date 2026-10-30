@@ -2,6 +2,7 @@
 and only read here: no test runs openssl."""
 import base64
 import uuid
+from contextlib import contextmanager
 from pathlib import Path
 
 import pytest
@@ -36,6 +37,13 @@ def mldsa_csr():
 def mldsa_ca(app):
     """CA row inserted directly with the self-signed ``mldsa65-cert.pem`` and ``mldsa_key``,
     since UCM cannot create an ML-DSA CA yet; runs inside an app context."""
+    with mldsa_ca_row(app) as ca:
+        yield ca
+
+
+@contextmanager
+def mldsa_ca_row(app):
+    """Body of ``mldsa_ca``; its CRLs and certificates go with it."""
     from models import CA, db
     pem = fixture_bytes('mldsa65-cert.pem')
     cert = x509.load_pem_x509_certificate(pem)
@@ -52,9 +60,14 @@ def mldsa_ca(app):
                 imported_from='manual')
         db.session.add(ca)
         db.session.commit()
+        ca_id = ca.id
         try:
             yield ca
         finally:
+            from models import Certificate, CRLMetadata
             db.session.rollback()
+            # Children first: a reused id would inherit them, and PostgreSQL refuses the delete.
+            CRLMetadata.query.filter_by(ca_id=ca_id).delete()
+            Certificate.query.filter_by(caref=refid).delete()
             CA.query.filter_by(refid=refid).delete()
             db.session.commit()

@@ -348,7 +348,7 @@ class PolicyEvaluationService:
         *ca_id* when given) apply whatever the list.
         Key types compare in the template label form (RSA-2048,
         EC-P256), whatever spelling the request used; *digest* is the hash the
-        signature is computed with (None for Ed25519/Ed448 signers).
+        signature is computed with (None for Ed25519, Ed448 and ML-DSA signers).
 
         *signer* (a CA row or its loaded signing key) gives the signature scheme
         and key storage the rules read; *signer_scheme* and *signer_storage*
