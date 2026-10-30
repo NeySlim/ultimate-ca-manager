@@ -77,20 +77,34 @@ def _converter(fmt):
     return call
 
 
-def _key_recovery(client, app, ids, **extra):
+def _set_dual_control(app, value):
+    """Set the dual-control setting, return its previous value (None when absent)."""
     from models import SystemConfig
     with app.app_context():
         row = SystemConfig.query.filter_by(key='key_recovery_dual_control').first()
-        if not row:
-            row = SystemConfig(key='key_recovery_dual_control', value='')
-            db.session.add(row)
-        row.value = 'false'
+        previous = row.value if row else None
+        if value is None:
+            if row:
+                db.session.delete(row)
+        else:
+            if not row:
+                row = SystemConfig(key='key_recovery_dual_control', value='')
+                db.session.add(row)
+            row.value = value
         db.session.commit()
-    r = _post(client, f"/api/v2/certificates/{ids['cert']}/key-recovery", {'reason': 'pq test'})
-    assert r.status_code == 201, r.data
-    rid = r.get_json()['data']['id']
-    assert _post(client, f'/api/v2/key-recovery/{rid}/approve', {}).status_code == 200
-    return _post(client, f'/api/v2/key-recovery/{rid}/recover', {'password': PASSWORD, **extra})
+        return previous
+
+
+def _key_recovery(client, app, ids, **extra):
+    previous = _set_dual_control(app, 'false')
+    try:
+        r = _post(client, f"/api/v2/certificates/{ids['cert']}/key-recovery", {'reason': 'pq test'})
+        assert r.status_code == 201, r.data
+        rid = r.get_json()['data']['id']
+        assert _post(client, f'/api/v2/key-recovery/{rid}/approve', {}).status_code == 200
+        return _post(client, f'/api/v2/key-recovery/{rid}/recover', {'password': PASSWORD, **extra})
+    finally:
+        _set_dual_control(app, previous)  # later files read the default
 
 
 CONTAINER_SITES = {
