@@ -37,7 +37,7 @@ const TYPE_CONFIG = {
 }
 
 // Object card component
-function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
+export function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
   const { t } = useTranslation()
   const config = obj.is_ca ? TYPE_CONFIG.ca_certificate : TYPE_CONFIG[obj.type] || TYPE_CONFIG.certificate
   const Icon = config.icon
@@ -69,6 +69,7 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
             {obj.chain_position === 'root' && <Badge variant="amber" size="sm">{t('common.root')}</Badge>}
             {obj.chain_position === 'intermediate' && <Badge variant="blue" size="sm">{t('common.intermediate')}</Badge>}
           </div>
+          {obj.error && <div className="text-xs text-status-danger break-words">{obj.error}</div>}
         </div>
         
         {expanded ? <CaretDown size={16} className="text-text-secondary" /> : <CaretRight size={16} className="text-text-secondary" />}
@@ -103,7 +104,7 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
           {obj.key_algorithm && (
             <div className="flex gap-2">
               <span className="text-text-secondary w-20 shrink-0">{t('common.algorithm')}:</span>
-              <span className="text-xs">{keyAlgorithmLabel(obj.key_algorithm, t, obj.security_level)}{obj.key_size ? ` (${obj.key_size} bits)` : ''}</span>
+              <span className="text-xs">{keyAlgorithmLabel(obj.key_algorithm, t, obj.security_level)}{obj.key_size > 0 ? ` (${obj.key_size} bits)` : ''}</span>
             </div>
           )}
         </div>

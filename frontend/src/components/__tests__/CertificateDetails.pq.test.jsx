@@ -61,6 +61,11 @@ describe('CertificateDetails with a post-quantum key', () => {
     expect(screen.getByText('Key Type').nextSibling).toHaveTextContent(levelLabel(a))
   })
 
+  it('names in Technical details a key the API sends without key_type', () => {
+    render(<CertificateDetails certificate={{ ...base, key_algorithm: 'ML-DSA-65', key_size: null, post_quantum: true }} />)
+    expect(screen.getByText('Key Type').nextSibling).toHaveTextContent('ML-DSA-65 (level 3)')
+  })
+
   it('keeps the RSA key type in Technical details as the API sends it', () => {
     render(<CertificateDetails certificate={rsa} />)
     expect(screen.getByText('Key Type').nextSibling).toHaveTextContent(/^RSA 2048$/)
