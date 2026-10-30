@@ -11,7 +11,6 @@ from typing import Optional, Tuple
 
 from asn1crypto import core as asn1_core
 from asn1crypto import ocsp as asn1_ocsp
-from asn1crypto import x509 as asn1_x509
 from cryptography import x509
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.x509 import ocsp
@@ -49,6 +48,28 @@ _HASH_ALGORITHMS = {
 
 
 from utils.signing_hash import pss_algorithm_identifier, pss_padding, signing_hash_for, signs_pss
+
+
+class _SubjectPublicKeyInfo(asn1_core.Sequence):
+    """SPKI whose algorithm stays uninterpreted: asn1crypto cannot parse an ML-DSA key."""
+    _fields = [('algorithm', asn1_core.Any), ('public_key', asn1_core.BitString)]
+
+
+class _OpaqueCertificates(asn1_core.SequenceOf):
+    _child_spec = asn1_core.Any
+
+
+class _BasicOCSPResponse(asn1_ocsp.BasicOCSPResponse):
+    """BasicOCSPResponse whose certificates are copied as DER, never parsed (ML-DSA keys)."""
+    _fields = [*asn1_ocsp.BasicOCSPResponse._fields[:3],
+               ('certs', _OpaqueCertificates, {'explicit': 0, 'optional': True})]
+
+
+def _subject_public_key_bits(cert: x509.Certificate) -> bytes:
+    """Contents of the subjectPublicKey BIT STRING, which RFC 6960 KeyHash covers."""
+    spki = cert.public_key().public_bytes(
+        serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+    return _SubjectPublicKeyInfo.load(spki)['public_key'].contents[1:]
 
 
 @dataclass(frozen=True)
@@ -707,6 +728,10 @@ class OCSPService:
             # sign the multi-CertID answer too (#347 review)
             signature = signing_key.sign(response_data_der, hashes.SHA256())
             return signature, {'algorithm': 'sha256_dsa'}
+        alg = key_algorithms.get(key_algorithms.label_for_public_key(public_key))
+        if alg is not None and alg.family == 'ML-DSA':
+            # RFC 9881: pure ML-DSA over the DER, under the parameter set's OID, parameters absent
+            return signing_key.sign(response_data_der), {'algorithm': alg.oid}
         raise ValueError('Unsupported OCSP response signing key type')
 
     @staticmethod
@@ -763,15 +788,9 @@ class OCSPService:
                 }))
                 statuses.append(status)
 
-            signing_cert_asn1 = asn1_x509.Certificate.load(
-                signing_cert.public_bytes(serialization.Encoding.DER)
-            )
-            subject_public_key = signing_cert_asn1[
-                'tbs_certificate'
-            ]['subject_public_key_info']['public_key'].contents[1:]
             response_data_fields = {
                 'responder_id': {
-                    'by_key': hashlib.sha1(subject_public_key).digest()
+                    'by_key': hashlib.sha1(_subject_public_key_bits(signing_cert)).digest()
                 },
                 'produced_at': self._asn1_time(this_update),
                 'responses': single_responses,
@@ -794,8 +813,9 @@ class OCSPService:
                 'signature': signature,
             }
             if use_delegated:
-                basic_response_fields['certs'] = [signing_cert_asn1]
-            basic_response = asn1_ocsp.BasicOCSPResponse(basic_response_fields)
+                basic_response_fields['certs'] = [
+                    asn1_core.Any.load(signing_cert.public_bytes(serialization.Encoding.DER))]
+            basic_response = _BasicOCSPResponse(basic_response_fields)
             response = asn1_ocsp.OCSPResponse({
                 'response_status': 'successful',
                 'response_bytes': {

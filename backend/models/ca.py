@@ -529,18 +529,18 @@ class CA(db.Model):
         self.name_constraints_excluded = json.dumps(constraints) if constraints else None
     
     def effective_crl_digest(self):
-        """The CRL signature digest: the configured one, else the registry default of the CA key."""
-        if self.crl_digest:
-            return self.crl_digest
+        """The CRL signature digest: the configured one, else the registry default of the CA key;
+        None when the CA key signs without a separate digest (Ed25519, Ed448, ML-DSA)."""
         try:
             import base64
             from cryptography import x509
-            from utils.key_algorithms import default_digest_for_key
-            cert = x509.load_pem_x509_certificate(base64.b64decode(self.crt))
-            # A key that takes no digest still reports sha256, which its signer ignores
-            return default_digest_for_key(cert.public_key()) or 'sha256'
+            from utils.key_algorithms import default_digest_for_key, needs_digest
+            key = x509.load_pem_x509_certificate(base64.b64decode(self.crt)).public_key()
         except Exception:
-            return 'sha256'
+            return self.crl_digest or 'sha256'
+        if not needs_digest(key):
+            return None
+        return self.crl_digest or default_digest_for_key(key) or 'sha256'
 
     def to_dict(self, include_private=False):
         """Convert to dictionary"""

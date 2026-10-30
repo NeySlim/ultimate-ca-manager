@@ -316,11 +316,19 @@ def configure_crl(ca_id):
                 ca.crl_publish_interval_hours = interval
 
         if 'digest' in data:
-            digest = str(data['digest']).lower().strip()
-            if digest not in CRL_ALLOWED_DIGESTS:
+            digest = str(data['digest'] or '').lower().strip()
+            if ca.effective_crl_digest() is None:
+                # A key that fixes its own hash (ML-DSA, EdDSA) takes no digest, empty clears one
+                if digest:
+                    db.session.rollback()
+                    return error_response(
+                        f'{ca.key_type} signs without a separate digest: leave the CRL digest empty', 400)
+                ca.crl_digest = None
+            elif digest not in CRL_ALLOWED_DIGESTS:
                 return error_response(
                     f"digest must be one of {', '.join(CRL_ALLOWED_DIGESTS)}", 400)
-            ca.crl_digest = digest
+            else:
+                ca.crl_digest = digest
 
         effective_validity = ca.crl_validity_days or 7
         if (ca.crl_publish_interval_hours

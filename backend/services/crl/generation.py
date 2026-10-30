@@ -11,6 +11,7 @@ from cryptography.hazmat.backends import default_backend
 from models import db, CA, Certificate
 from models.crl import CRLMetadata
 from utils.cert_issuer import same_key_refids
+from utils import notices
 from utils.datetime_utils import utc_now
 from services.cert.serial_resolution import resolve_record_serial
 from utils.x509_aki import authority_key_identifier_from_issuer
@@ -170,9 +171,15 @@ CRL_DIGESTS = {
 }
 
 
-def _crl_signature_hash(ca: CA) -> hashes.HashAlgorithm:
-    """Signature digest for this CA's CRLs (#207): the configured one, else its key's registry default."""
-    name = ca.effective_crl_digest().lower().strip()
+def _crl_signature_hash(ca: CA) -> Optional[hashes.HashAlgorithm]:
+    """Signature digest for this CA's CRLs (#207): the configured one, else its key's registry
+    default; None when the CA key signs without a separate digest, a configured one being ignored."""
+    name = ca.effective_crl_digest()
+    if name is None:
+        if ca.crl_digest:
+            logger.info(f"CRL: CA {ca.id}: {notices.digest_ignored(ca.crl_digest, ca.key_type)}")
+        return None
+    name = name.lower().strip()
     if name not in CRL_DIGESTS:
         # The API only stores allowed digests: an older row must not stop CRL publication
         logger.warning(f"CRL: CA {ca.id} has unsupported crl_digest {name!r}, signing with SHA-256")
