@@ -13,11 +13,25 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Keys: ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) are recognised by policies, CSR parsing and key labels when the linked OpenSSL provides them (3.5 or later). They are refused in FIPS mode and not generated yet.
 
+- Post-quantum certificates, CAs and CSRs (ML-DSA, SLH-DSA) are shown under their own name with their security level and a Post-quantum badge, in the API, the trust store, the mTLS list and compliance grading. A key the API does not name is no longer displayed as RSA.
+
+- Certificate chains, issuer lookups, smart import and delegated OCSP responders verify ML-DSA signatures. An unverifiable self-issued certificate whose key identifiers point at another key is no longer taken for a root.
+
+- ML-DSA private keys written by OpenSSL in its default seed-and-expanded layout import, read from their seed after a consistency check. A key without its seed, or one whose two halves disagree, is refused with a message that says what to do.
+
+- PKCS#12, PFX and JKS exports of an ML-DSA key answer 400 with the reason `unsupported_for_key_algorithm` instead of a 500, and the export dialog greys these formats out. P7B bundles are built in-process instead of by the openssl command.
+
 ### Fixed
 
 - Generated CSRs: an Ed25519 or Ed448 key was signed with the requested SHA-2 digest and failed; keys whose scheme takes no digest are now signed without one.
 
 - CA details and renewal with a new key: an algorithm without a size or curve no longer falls back to the first algorithm of its family.
+
+- Smart import: an encrypted private key was kept in its encrypted form and silently dropped on import; the decrypted key is now matched and stored. A key given with a password it does not need is now read instead of refused.
+
+- Key uploads, the key matcher and the converter: a malformed key now answers 400 with its reason instead of a generic error, or of a 200 that returned the certificate alone.
+
+- Template preview: an RSA-2048 template was shown as "RSA-2048 256-bit"; it now shows the key's name.
 
 - ACME DNS-01 with GoDaddy: TXT records were written with a PATCH the API does not offer, and removed with an empty PUT it refuses. The values of a name are now read, merged and written back with PUT, and cleanup uses DELETE.
 
