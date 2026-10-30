@@ -6,6 +6,7 @@ import datetime
 import uuid
 from contextlib import contextmanager
 
+import asn1crypto.core
 import asn1crypto.x509
 import pytest
 from cryptography import x509
@@ -75,6 +76,27 @@ def test_self_issued_ml_dsa_certificate_signed_by_another_key_is_no_root(chain):
     from utils.cert_issuer import is_self_signed
     other = _cert(mldsa.MLDSA65PrivateKey.generate(), 'PQ root', chain['root_key'], 'PQ root')
     assert is_self_signed(other) is False
+
+
+def _relabel_outer_signature(cert, oid_from, oid_to):
+    """*cert* with its outer signatureAlgorithm OID swapped for one of the same encoded length."""
+    der = cert.public_bytes(serialization.Encoding.DER)
+    old, new = (asn1crypto.core.ObjectIdentifier(o).dump() for o in (oid_from, oid_to))
+    assert len(old) == len(new) and der.rfind(old) > len(cert.tbs_certificate_bytes)
+    at = der.rfind(old)
+    return x509.load_der_x509_certificate(der[:at] + new + der[at + len(old):])
+
+
+@pytest.mark.parametrize('oid_to', ['1.2.840.113549.1.1.11', '2.16.840.1.101.3.4.3.17'])
+def test_ml_dsa_signature_under_another_algorithm_oid_is_refused(oid_to):
+    """sha256WithRSAEncryption and ML-DSA-44 in place of the ML-DSA-65 OID the key needs."""
+    from utils.cert_issuer import certificate_signed_by, is_self_signed
+    cert = x509.load_pem_x509_certificate(fixture_bytes('mldsa65-cert.pem'))
+    assert certificate_signed_by(cert, cert) is True
+    forged = _relabel_outer_signature(cert, '2.16.840.1.101.3.4.3.18', oid_to)
+    assert forged.signature_algorithm_oid.dotted_string == oid_to
+    assert certificate_signed_by(forged, cert) is False
+    assert is_self_signed(forged) is False
 
 
 def test_slh_dsa_is_never_verified():

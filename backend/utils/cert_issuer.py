@@ -9,7 +9,7 @@ import base64
 import logging
 
 from cryptography import x509
-from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, padding, rsa
 
@@ -52,7 +52,10 @@ def verify_certificate_signature(cert: x509.Certificate, public_key) -> None:
     elif isinstance(public_key, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)):
         public_key.verify(cert.signature, cert.tbs_certificate_bytes)
     elif key_algorithms.family_for_public_key(public_key) == 'ML-DSA':
-        # RFC 9881: pure ML-DSA over the TBS, empty context, no separate digest
+        # RFC 9881: pure ML-DSA over the TBS, under the OID of the key's own parameter set
+        if key_algorithms.label_for_signature_oid(cert.signature_algorithm_oid) != \
+                key_algorithms.label_for_public_key(public_key):
+            raise InvalidSignature('signature algorithm does not match the ML-DSA key')
         public_key.verify(cert.signature, cert.tbs_certificate_bytes)
     else:
         raise UnsupportedIssuerKey(f"unsupported issuer key type {type(public_key).__name__}")
