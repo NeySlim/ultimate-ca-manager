@@ -37,7 +37,8 @@ from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
 from utils.cert_status import (
     awaits_certificate, pending_requests, signed_requests)
-from utils.key_codec import private_key_to_pem
+from utils.key_codec import load_private_key_any, private_key_to_pem
+from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
 
 bp = Blueprint('csrs_v2', __name__)
 logger = logging.getLogger(__name__)
@@ -859,11 +860,9 @@ def upload_csr_private_key(csr_id):
         password = passphrase.encode('utf-8') if passphrase else None
         
         try:
-            private_key = serialization.load_pem_private_key(
-                key_bytes,
-                password=password,
-                backend=default_backend()
-            )
+            private_key = load_private_key_any(key_bytes, password=password)
+        except UnsupportedForKeyAlgorithm:
+            raise
         except Exception as e:
             if 'password' in str(e).lower() or 'decrypt' in str(e).lower():
                 return error_response('Private key is encrypted - please provide passphrase', 400)
@@ -914,6 +913,8 @@ def upload_csr_private_key(csr_id):
             message='Private key uploaded successfully'
         )
 
+    except UnsupportedForKeyAlgorithm:
+        raise  # the app handler answers 400 with the algorithm problem type
     except Exception as e:
         logger.error(f"Failed to upload private key: {e}")
         return error_response('Failed to upload private key', 500)

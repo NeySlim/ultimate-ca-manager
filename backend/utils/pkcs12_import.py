@@ -22,6 +22,25 @@ def looks_like_pkcs12(data) -> bool:
         return False
 
 
+UNREADABLE_KEY = ('The private key in this PKCS#12 cannot be read: PKCS#12 import does not '
+                  'support post-quantum keys such as ML-DSA. Import the certificate and the '
+                  'private key as PEM files instead')
+
+
+def load_key_and_certificates(data, password):
+    """pyca's PKCS#12 reader; a key it cannot decode once the password is accepted
+    (ML-DSA, which pyca has no PKCS#12 support for) raises UnsupportedForKeyAlgorithm."""
+    from cryptography.hazmat.primitives.serialization import pkcs12
+    from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
+    try:
+        return pkcs12.load_key_and_certificates(data, password)
+    except ValueError as exc:
+        # pyca says "Invalid password or PKCS12 data" before it reaches the key
+        if 'deserialize key data' not in str(exc):
+            raise
+        raise UnsupportedForKeyAlgorithm(UNREADABLE_KEY, export_format='PKCS#12') from exc
+
+
 def refuse_pkcs12_import(data=None) -> None:
     """Raise FipsRestricted in FIPS mode, for ``data`` that is a PKCS#12
     (or unconditionally when the caller already knows it is one)."""

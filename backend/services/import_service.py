@@ -9,8 +9,9 @@ import base64
 from datetime import datetime, timezone
 from utils.cert_issuer import cas_by_ski, is_self_signed
 from utils.foreign_algorithms import describe_public_key, spki_der
-from utils.key_codec import private_key_to_pem, refuse_eddsa_key
-from utils.pkcs12_import import refuse_pkcs12_import
+from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
+from utils.key_codec import load_private_key_any, private_key_to_pem, refuse_eddsa_key
+from utils.pkcs12_import import load_key_and_certificates, refuse_pkcs12_import
 
 
 def parse_certificate_file(file_data, filename, password=None, import_key=True):
@@ -61,11 +62,10 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
             key_match = re.search(b'-----BEGIN.*?PRIVATE KEY-----.+?-----END.*?PRIVATE KEY-----', file_data, re.DOTALL)
             if key_match:
                 try:
-                    private_key = serialization.load_pem_private_key(
-                        key_match.group(0), 
-                        password=password.encode() if password else None, 
-                        backend=default_backend()
-                    )
+                    private_key = load_private_key_any(
+                        key_match.group(0), password=password.encode() if password else None)
+                except UnsupportedForKeyAlgorithm:
+                    raise
                 except Exception:
                     pass
                 
@@ -83,12 +83,12 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
                 raise der_err
         
     elif format_type == 'pkcs12':
-        from cryptography.hazmat.primitives.serialization import pkcs12
         refuse_pkcs12_import()
         try:
-            private_key, cert, chain = pkcs12.load_key_and_certificates(
-                file_data, password.encode() if password else None, default_backend()
-            )
+            private_key, cert, chain = load_key_and_certificates(
+                file_data, password.encode() if password else None)
+        except UnsupportedForKeyAlgorithm:
+            raise
         except Exception as e:
             if 'password' in str(e).lower() or 'mac' in str(e).lower():
                 raise ValueError('Invalid password for PKCS12 file')

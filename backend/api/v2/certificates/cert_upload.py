@@ -12,7 +12,8 @@ from cryptography.x509 import load_pem_x509_certificate
 from services.audit_service import AuditService
 from security.encryption import encrypt_private_key
 from . import bp
-from utils.key_codec import private_key_to_pem
+from utils.key_codec import load_private_key_any, private_key_to_pem
+from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
 from utils.foreign_algorithms import describe_public_key, spki_der
 
 logger = logging.getLogger(__name__)
@@ -60,11 +61,9 @@ def upload_private_key(cert_id):
         password = passphrase.encode('utf-8') if passphrase else None
 
         try:
-            private_key = serialization.load_pem_private_key(
-                key_bytes,
-                password=password,
-                backend=default_backend()
-            )
+            private_key = load_private_key_any(key_bytes, password=password)
+        except UnsupportedForKeyAlgorithm:
+            raise
         except Exception as e:
             if 'password' in str(e).lower() or 'decrypt' in str(e).lower():
                 return error_response('Private key is encrypted - please provide passphrase', 400)
@@ -128,6 +127,9 @@ def upload_private_key(cert_id):
             message='Private key uploaded successfully'
         )
 
+    except UnsupportedForKeyAlgorithm:
+        db.session.rollback()
+        raise  # the app handler answers 400 with the algorithm problem type
     except Exception as e:
         db.session.rollback()
         logger.error(f"Failed to upload private key: {e}")

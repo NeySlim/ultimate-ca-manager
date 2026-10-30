@@ -1133,7 +1133,14 @@ def create_app(config_name=None):
         from fips_mode import FipsRestricted, PROBLEM_TYPE as FIPS_PROBLEM
         if isinstance(e, FipsRestricted):
             from compliance_profiles import ProfileRestricted, PROBLEM_TYPE as PROFILE_PROBLEM
+            from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
             from utils.response import build_problem, PROBLEM_CONTENT_TYPE
+            if isinstance(e, UnsupportedForKeyAlgorithm):
+                from utils.algorithm_refusal import PROBLEM_TYPE as ALGORITHM_PROBLEM
+                response = flask_jsonify(build_problem(
+                    str(e), 400, details=e.details, problem_type=ALGORITHM_PROBLEM))
+                response.mimetype = PROBLEM_CONTENT_TYPE
+                return response, 400
             response = flask_jsonify(build_problem(
                 str(e), 400, problem_type=PROFILE_PROBLEM if isinstance(e, ProfileRestricted)
                 else FIPS_PROBLEM))

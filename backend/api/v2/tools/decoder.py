@@ -94,12 +94,14 @@ def decode_cert():
             if not certs:
                 refuse_pkcs12_import(raw_bytes)
                 try:
-                    from cryptography.hazmat.primitives.serialization import pkcs12 as p12mod
-                    _, cert, chain = p12mod.load_key_and_certificates(raw_bytes, None)
+                    from utils.pkcs12_import import load_key_and_certificates
+                    _, cert, chain = load_key_and_certificates(raw_bytes, None)
                     if cert:
                         certs = [cert]
                     if chain:
                         certs.extend(chain)
+                except FipsRestricted:
+                    raise
                 except Exception:
                     pass
         else:

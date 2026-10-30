@@ -16,13 +16,14 @@ from dataclasses import dataclass, field
 from enum import Enum
 from cryptography import x509
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.serialization import pkcs12, pkcs7
+from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import ExtensionOID
 
 from fips_mode import FipsRestricted
 from utils.csr_extensions import csr_extensions
-from utils.pkcs12_import import refuse_pkcs12_import
+from utils.key_codec import load_private_key_any, normalize_private_key_pem
+from utils.pkcs12_import import load_key_and_certificates, refuse_pkcs12_import
 
 
 class ObjectType(Enum):
@@ -247,7 +248,7 @@ class SmartParser:
         refuse_pkcs12_import(data)
         try:
             pwd = password.encode() if password else None
-            private_key, cert, additional_certs = pkcs12.load_key_and_certificates(data, pwd)
+            private_key, cert, additional_certs = load_key_and_certificates(data, pwd)
             
             idx = 0
             if cert:
@@ -271,6 +272,8 @@ class SmartParser:
                     
             if objects:
                 return objects
+        except FipsRestricted:
+            raise
         except Exception:
             pass
         
@@ -285,10 +288,12 @@ class SmartParser:
         
         # Try DER private key
         try:
-            key = serialization.load_der_private_key(data, password=password.encode() if password else None)
+            key = load_private_key_any(data, password=password.encode() if password else None)
             obj = self._parse_private_key(key)
             obj.raw_der = data
             return [obj]
+        except FipsRestricted:
+            raise
         except Exception:
             pass
         
@@ -338,6 +343,7 @@ class SmartParser:
                 is_encrypted = 'ENCRYPTED' in pem_block
                 
                 try:
+                    pem_block = normalize_private_key_pem(pem_block)  # ML-DSA "both" -> seed
                     key = serialization.load_pem_private_key(
                         pem_block.encode(),
                         password=pwd,
@@ -348,6 +354,8 @@ class SmartParser:
                     obj.index = match.start()
                     obj.is_encrypted = is_encrypted
                     objects.append(obj)
+                except FipsRestricted:
+                    raise
                 except Exception:
                     # Key might be encrypted without password
                     obj = ParsedObject(
@@ -500,7 +508,7 @@ class SmartParser:
         refuse_pkcs12_import()
         try:
             pwd = password.encode() if password else None
-            private_key, cert, additional_certs = pkcs12.load_key_and_certificates(data, pwd)
+            private_key, cert, additional_certs = load_key_and_certificates(data, pwd)
             
             idx = 0
             if cert:
@@ -521,6 +529,8 @@ class SmartParser:
                     obj.index = idx
                     objects.append(obj)
                     idx += 1
+        except FipsRestricted:
+            raise
         except Exception:
             pass
         return objects
@@ -539,10 +549,12 @@ class SmartParser:
         """Parse DER private key"""
         try:
             pwd = password.encode() if password else None
-            key = serialization.load_der_private_key(data, password=pwd, backend=default_backend())
+            key = load_private_key_any(data, password=pwd)
             obj = self._parse_private_key(key)
             obj.raw_der = data
             return obj
+        except FipsRestricted:
+            raise
         except Exception:
             return None
     

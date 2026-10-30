@@ -3,12 +3,15 @@ import base64
 
 from flask import request
 from cryptography import x509
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, ec
 from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import NameOID
 
 from auth.unified import require_auth
+from utils import key_algorithms
+from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
+from utils.key_codec import load_private_key_any
 from utils.response import success_response, error_response
 
 from . import tools_bp, get_public_key_bytes, logger, _csr_signature_valid
@@ -49,16 +52,12 @@ def match_keys():
         pwd_bytes = pwd.encode() if pwd else None
         if data.startswith('BASE64:'):
             raw = base64.b64decode(data[7:])
-            try:
-                return serialization.load_der_private_key(raw, password=pwd_bytes, backend=default_backend())
-            except TypeError:
-                return serialization.load_der_private_key(raw, password=None, backend=default_backend())
-        if '-----BEGIN' not in data:
-            data = f"-----BEGIN PRIVATE KEY-----\n{data}\n-----END PRIVATE KEY-----"
+        else:
+            raw = data if '-----BEGIN' in data else f"-----BEGIN PRIVATE KEY-----\n{data}\n-----END PRIVATE KEY-----"
         try:
-            return serialization.load_pem_private_key(data.encode(), password=pwd_bytes, backend=default_backend())
+            return load_private_key_any(raw, password=pwd_bytes)
         except TypeError:
-            return serialization.load_pem_private_key(data.encode(), password=None, backend=default_backend())
+            return load_private_key_any(raw, password=None)
 
     def load_csr_any_format(data):
         """Load CSR from PEM or DER"""
@@ -111,13 +110,15 @@ def match_keys():
                 elif isinstance(key, ec.EllipticCurvePrivateKey):
                     key_info = f'ECDSA {key.curve.name}'
                 else:
-                    key_info = type(key).__name__
+                    key_info = key_algorithms.label_for_private_key(key) or type(key).__name__
 
                 results['items'].append({
                     'type': 'private_key',
                     'key_type': key_info,
                     'valid': True
                 })
+            except UnsupportedForKeyAlgorithm as e:
+                results['items'].append({'type': 'private_key', 'valid': False, 'error': str(e)})
             except Exception as e:
                 logger.warning(f"Invalid private key data during PEM validation: {e}")
                 results['items'].append({

@@ -11,7 +11,6 @@ from flask import request, g
 import base64
 import logging
 
-from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed25519, ed448
 from cryptography import x509
 
@@ -19,7 +18,8 @@ from auth.unified import require_auth
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
 from utils.cert_issuer import private_key_matches
-from utils.key_codec import private_key_to_pem
+from utils.key_codec import load_private_key_any, private_key_to_pem
+from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
 from services.audit_service import AuditService
 from models import CA, db
 from security.encryption import encrypt_private_key
@@ -65,8 +65,10 @@ def import_ca_private_key(ca_id):
     if 'PRIVATE KEY' not in key_data:
         return error_response('Invalid private key format', 400)
     try:
-        private_key = serialization.load_pem_private_key(
+        private_key = load_private_key_any(
             key_data.encode('utf-8'), password=passphrase.encode('utf-8') if passphrase else None)
+    except UnsupportedForKeyAlgorithm:
+        raise
     except Exception as e:
         if 'password' in str(e).lower() or 'decrypt' in str(e).lower():
             return error_response('Private key is encrypted - please provide passphrase', 400)
