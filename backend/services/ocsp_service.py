@@ -13,6 +13,7 @@ from asn1crypto import core as asn1_core
 from asn1crypto import ocsp as asn1_ocsp
 from asn1crypto import x509 as asn1_x509
 from cryptography import x509
+from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.x509 import ocsp
 from cryptography.x509.oid import NameOID
 from cryptography.hazmat.primitives import hashes, serialization
@@ -525,36 +526,11 @@ class OCSPService:
     def _verify_certificate_signature(
         certificate: x509.Certificate, issuer: x509.Certificate
     ) -> None:
-        public_key = issuer.public_key()
-        signature_hash = certificate.signature_hash_algorithm
-        if isinstance(public_key, rsa.RSAPublicKey):
-            signature_padding = getattr(
-                certificate, 'signature_algorithm_parameters', None
-            ) or padding.PKCS1v15()
-            public_key.verify(
-                certificate.signature,
-                certificate.tbs_certificate_bytes,
-                signature_padding,
-                signature_hash,
-            )
-        elif isinstance(public_key, ec.EllipticCurvePublicKey):
-            public_key.verify(
-                certificate.signature,
-                certificate.tbs_certificate_bytes,
-                ec.ECDSA(signature_hash),
-            )
-        elif isinstance(public_key, dsa.DSAPublicKey):
-            public_key.verify(
-                certificate.signature,
-                certificate.tbs_certificate_bytes,
-                signature_hash,
-            )
-        elif isinstance(public_key, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)):
-            public_key.verify(
-                certificate.signature, certificate.tbs_certificate_bytes
-            )
-        else:
-            raise ValueError('Unsupported delegated responder issuer key type')
+        from utils.cert_issuer import UnsupportedIssuerKey, verify_certificate_signature
+        try:
+            verify_certificate_signature(certificate, issuer.public_key())
+        except (UnsupportedIssuerKey, UnsupportedAlgorithm) as e:
+            raise ValueError('Unsupported delegated responder issuer key type') from e
 
     @staticmethod
     def _response_validity_hours() -> int:

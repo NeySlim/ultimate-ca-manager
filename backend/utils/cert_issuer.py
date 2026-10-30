@@ -13,6 +13,8 @@ from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, padding, rsa
 
+from utils import key_algorithms
+
 
 logger = logging.getLogger(__name__)
 
@@ -49,6 +51,9 @@ def verify_certificate_signature(cert: x509.Certificate, public_key) -> None:
         )
     elif isinstance(public_key, (ed25519.Ed25519PublicKey, ed448.Ed448PublicKey)):
         public_key.verify(cert.signature, cert.tbs_certificate_bytes)
+    elif key_algorithms.family_for_public_key(public_key) == 'ML-DSA':
+        # RFC 9881: pure ML-DSA over the TBS, empty context, no separate digest
+        public_key.verify(cert.signature, cert.tbs_certificate_bytes)
     else:
         raise UnsupportedIssuerKey(f"unsupported issuer key type {type(public_key).__name__}")
 
@@ -84,8 +89,18 @@ def is_self_signed(cert: x509.Certificate) -> bool:
     try:
         return certificate_signed_by(cert, cert)
     except UnsupportedIssuerKey:
-        # Cannot tell: treat the DN match as authoritative, as before
-        return True
+        # Unverifiable key (SLH-DSA, GOST): the DN match stands unless the key
+        # identifiers say another key signed it
+        aki, ski = authority_key_identifier_hex(cert), _subject_key_identifier_hex(cert)
+        return aki is None or ski is None or aki == ski
+
+
+def _subject_key_identifier_hex(cert: x509.Certificate):
+    try:
+        ski = cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value
+    except x509.ExtensionNotFound:
+        return None
+    return ski.key_identifier.hex(':').upper()
 
 
 def authority_key_identifier_hex(cert: x509.Certificate):
