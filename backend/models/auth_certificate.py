@@ -38,8 +38,23 @@ class AuthCertificate(db.Model):
     # Relationship
     user = db.relationship('User', backref=db.backref('auth_certificates', lazy='dynamic'))
     
+    @property
+    def key_facts(self) -> dict:
+        """Key facts of the enrolled certificate, from its stored PEM, else from its certificate row."""
+        from cryptography import x509
+        from utils.key_facts import UNREADABLE, key_facts
+        try:
+            if self.cert_pem:
+                return key_facts(x509.load_pem_x509_certificate(bytes(self.cert_pem)))
+            from services.mtls_enrollment import certificate_row_for
+            row = certificate_row_for(self)
+            return row.key_facts if row is not None else dict(UNREADABLE)
+        except Exception:
+            return dict(UNREADABLE)
+
     def to_dict(self):
         """Convert to dictionary"""
+        facts = self.key_facts
         return {
             'id': self.id,
             'user_id': self.user_id,
@@ -53,4 +68,9 @@ class AuthCertificate(db.Model):
             'valid_until': utc_isoformat(self.valid_until),
             'created_at': utc_isoformat(self.created_at),
             'last_used_at': utc_isoformat(self.last_used_at),
+            'key_type': facts['key_type'],
+            'key_algorithm': facts['key_algorithm'],
+            'key_size': facts['key_size'],
+            'security_level': facts['security_level'],
+            'post_quantum': facts['post_quantum'],
         }

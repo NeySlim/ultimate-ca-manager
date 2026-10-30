@@ -190,12 +190,20 @@ describe('AccountPage mTLS modal — backend authorization gates', () => {
 describe('AccountPage mTLS export of a post-quantum certificate', () => {
   beforeEach(() => { authState.permissions = ['*'] })
 
+  // Key fields as GET /mtls/certificates sends them (AuthCertificate.to_dict)
+  const KEYS = {
+    'ML-DSA-65': { key_type: 'ML-DSA-65', key_algorithm: 'ML-DSA-65', key_size: null, security_level: 3, post_quantum: true },
+    RSA: { key_type: 'RSA 2048', key_algorithm: 'RSA', key_size: 2048, security_level: null, post_quantum: false },
+  }
   it.each([
     ['ML-DSA-65', false],
     ['RSA', true],
   ])('a %s certificate is offered PKCS#12 and JKS: %s', async (keyAlgorithm, offered) => {
     accountMocks.getMTLSCertificates.mockResolvedValue({
-      data: [{ id: 43, name: 'Account mTLS certificate', enabled: true, key_algorithm: keyAlgorithm }],
+      data: [{
+        id: 43, name: 'Account mTLS certificate', enabled: true, cert_serial: '2b', cert_subject: 'CN=admin',
+        valid_until: '2030-01-01T00:00:00Z', ...KEYS[keyAlgorithm],
+      }],
     })
     render(<MemoryRouter><AccountPage /></MemoryRouter>)
     fireEvent.click((await screen.findAllByText('common.security'))[0])

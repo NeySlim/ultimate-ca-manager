@@ -228,3 +228,88 @@ def test_registry_rates_post_quantum_names():
     assert ka.post_quantum_info('slh-dsa-sha2-256s').security_level == 5
     assert ka.post_quantum_info('mldsa44').security_level == 2
     assert ka.post_quantum_info('RSA-2048') is None
+
+
+# ------------------------------------------- mTLS enrolments, trust store
+
+RSA_CONTRACT = {'key_type': 'RSA 2048', 'key_algorithm': 'RSA', 'key_size': 2048,
+                'security_level': None, 'post_quantum': False}
+_ROUTE_CASES = [('rsa', RSA_CONTRACT, 'SHA256-RSA'), ('mldsa', MLDSA_CONTRACT, 'ML-DSA-65'),
+                ('slhdsa', {k: v for k, v in SLHDSA_CONTRACT.items() if k != 'verifiable'},
+                 'SLH-DSA-SHA2-128s')]
+
+
+def _route_pem(kind):
+    return {'rsa': _rsa_pem, 'mldsa': lambda: MLDSA_PEM, 'slhdsa': lambda: SLHDSA_PEM}[kind]()
+
+
+@pytest.mark.parametrize('kind,contract,_sig', _ROUTE_CASES, ids=[c[0] for c in _ROUTE_CASES])
+def test_mtls_listing_names_the_key(app, auth_client, kind, contract, _sig):
+    from models import User
+    from models.auth_certificate import AuthCertificate
+    pem = _route_pem(kind)
+    serial = uuid.uuid4().hex
+    with app.app_context():
+        admin = User.query.filter_by(username='admin').first()
+        db.session.add(AuthCertificate(user_id=admin.id, cert_pem=pem, cert_serial=serial,
+                                       cert_subject='CN=classic', name=f'pq-{serial}'))
+        db.session.commit()
+    try:
+        r = auth_client.get('/api/v2/mtls/certificates')
+        assert r.status_code == 200, r.data
+        [row] = [c for c in get_json(r)['data'] if c['cert_serial'] == serial]
+        assert _subset(row, contract) == contract
+    finally:
+        with app.app_context():
+            AuthCertificate.query.filter_by(cert_serial=serial).delete()
+            db.session.commit()
+
+
+def test_mtls_listing_names_the_key_of_an_enrolment_without_its_pem(app, auth_client):
+    from models import User
+    from models.auth_certificate import AuthCertificate
+    cert = x509.load_pem_x509_certificate(MLDSA_PEM)
+    serial, refid = str(cert.serial_number), f'pq-mtls-{uuid.uuid4().hex[:8]}'
+    issuer = cert.issuer.rfc4514_string()
+    with app.app_context():
+        admin = User.query.filter_by(username='admin').first()
+        db.session.add(Certificate(refid=refid, descr=refid, crt=_b64(MLDSA_PEM),
+                                   serial_number=serial, subject=issuer, issuer=issuer))
+        db.session.add(AuthCertificate(user_id=admin.id, cert_serial=serial, cert_subject=issuer,
+                                       cert_issuer=issuer, name=refid))
+        db.session.commit()
+    try:
+        r = auth_client.get('/api/v2/mtls/certificates')
+        assert r.status_code == 200, r.data
+        [row] = [c for c in get_json(r)['data'] if c['name'] == refid]
+        assert _subset(row, MLDSA_CONTRACT) == MLDSA_CONTRACT
+    finally:
+        with app.app_context():
+            AuthCertificate.query.filter_by(name=refid).delete()
+            Certificate.query.filter_by(refid=refid).delete()
+            db.session.commit()
+
+
+@pytest.mark.parametrize('kind,contract,sig', _ROUTE_CASES, ids=[c[0] for c in _ROUTE_CASES])
+def test_trust_store_names_the_key(app, auth_client, kind, contract, sig):
+    from models.truststore import TrustedCertificate
+    pem = _route_pem(kind)
+    fingerprint = uuid.uuid4().hex + uuid.uuid4().hex
+    with app.app_context():
+        row = TrustedCertificate(name=f'pq-{fingerprint[:8]}', certificate_pem=pem.decode(),
+                                 fingerprint_sha256=fingerprint, purpose='root_ca')
+        db.session.add(row)
+        db.session.commit()
+        row_id = row.id
+    try:
+        for url in ('/api/v2/truststore', f'/api/v2/truststore/{row_id}'):
+            r = auth_client.get(url)
+            assert r.status_code == 200, r.data
+            data = get_json(r)['data']
+            item = next(c for c in data if c['id'] == row_id) if isinstance(data, list) else data
+            assert _subset(item, contract) == contract, url
+            assert item['signature_algorithm'] == sig, url
+    finally:
+        with app.app_context():
+            TrustedCertificate.query.filter_by(id=row_id).delete()
+            db.session.commit()

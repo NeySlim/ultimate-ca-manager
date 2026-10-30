@@ -35,8 +35,21 @@ class TrustedCertificate(db.Model):
     added_at = db.Column(db.DateTime, default=utc_now)
     notes = db.Column(db.Text)
     
+    @property
+    def key_facts(self) -> dict:
+        """Key facts and signature algorithm of the stored certificate, as Certificate and CA send them."""
+        from cryptography import x509
+        from utils.key_facts import UNREADABLE, key_facts
+        from utils.signature_label import signature_display_name
+        try:
+            cert = x509.load_pem_x509_certificate(self.certificate_pem.encode())
+            return {**key_facts(cert), 'signature_algorithm': signature_display_name(cert)}
+        except Exception:
+            return {**UNREADABLE, 'signature_algorithm': 'N/A'}
+
     def to_dict(self):
         """Convert to dictionary"""
+        facts = self.key_facts
         return {
             "id": self.id,
             "name": self.name,
@@ -53,4 +66,10 @@ class TrustedCertificate(db.Model):
             "added_by": self.added_by,
             "added_at": utc_isoformat(self.added_at),
             "notes": self.notes,
+            "key_type": facts['key_type'],
+            "key_algorithm": facts['key_algorithm'],
+            "key_size": facts['key_size'],
+            "security_level": facts['security_level'],
+            "post_quantum": facts['post_quantum'],
+            "signature_algorithm": facts['signature_algorithm'],
         }

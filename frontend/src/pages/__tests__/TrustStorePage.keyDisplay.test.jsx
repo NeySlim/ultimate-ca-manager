@@ -1,8 +1,7 @@
 /**
- * TrustStorePage detail: a post-quantum key is named with its level, and a
- * certificate whose key type the API does not send is never shown as RSA.
- * The trust store API sends no key fields yet: the ML-DSA case pins the display
- * for when it does, only the unnamed-key case reflects today's payload.
+ * TrustStorePage detail: a post-quantum key is named with its level, a classical
+ * one with its size, and a key the API could not read is never shown as RSA.
+ * Records carry the key fields TrustedCertificate.to_dict sends.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
@@ -76,16 +75,36 @@ const openDetail = async (cert) => {
   await screen.findAllByText(en.common.keyType)
 }
 
+const MLDSA = {
+  key_type: 'ML-DSA-65', key_algorithm: 'ML-DSA-65', key_size: null, security_level: 3,
+  post_quantum: true, signature_algorithm: 'ML-DSA-65',
+}
+const RSA = {
+  key_type: 'RSA 2048', key_algorithm: 'RSA', key_size: 2048, security_level: null,
+  post_quantum: false, signature_algorithm: 'SHA256-RSA',
+}
+const UNREADABLE = {
+  key_type: 'N/A', key_algorithm: 'Unknown', key_size: 0, security_level: null,
+  post_quantum: false, signature_algorithm: 'N/A',
+}
+
 describe('TrustStorePage key display', () => {
   it('names an ML-DSA key with its level', async () => {
-    await openDetail({ key_type: 'ML-DSA-65', security_level: 3 })
+    await openDetail(MLDSA)
     // Quick stats and key section
     expect(screen.getAllByText('ML-DSA-65 (level 3)')).toHaveLength(2)
-    expect(screen.queryByText('ML-DSA-65')).toBeNull()
+    // The bare name is the signature algorithm's only
+    expect(screen.getAllByText('ML-DSA-65')).toHaveLength(1)
   })
 
-  it('shows a key type the API does not send as a dash, never RSA', async () => {
-    await openDetail({ key_type: undefined })
+  it('names an RSA key with its size and its signature algorithm', async () => {
+    await openDetail(RSA)
+    expect(screen.getAllByText('RSA 2048')).toHaveLength(2)
+    expect(screen.getAllByText('SHA256-RSA').length).toBeGreaterThan(0)
+  })
+
+  it('never shows a key the API could not read as RSA', async () => {
+    await openDetail(UNREADABLE)
     expect(screen.queryByText(/\bRSA\b/)).toBeNull()
   })
 })
