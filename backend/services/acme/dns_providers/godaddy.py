@@ -34,6 +34,7 @@ class GoDaddyDnsProvider(BaseDnsProvider):
     def __init__(self, credentials: Dict[str, Any]):
         super().__init__(credentials)
         self._domain_cache: Dict[str, str] = {}
+        self._last_status: Optional[int] = None
     
     def _get_headers(self) -> Dict[str, str]:
         return {
@@ -48,6 +49,7 @@ class GoDaddyDnsProvider(BaseDnsProvider):
         data: Optional[Any] = None
     ) -> Tuple[bool, Any]:
         """Make GoDaddy API request"""
+        self._last_status = None
         url = f"{self.BASE_URL}{path}"
         
         try:
@@ -59,6 +61,7 @@ class GoDaddyDnsProvider(BaseDnsProvider):
                 timeout=30
             )
             
+            self._last_status = response.status_code
             if response.status_code >= 400:
                 try:
                     error = response.json()
@@ -117,18 +120,23 @@ class GoDaddyDnsProvider(BaseDnsProvider):
         else:
             name = record_name
         
-        # GoDaddy uses PATCH to add records (keeps existing)
-        data = [{
-            'data': record_value,
-            'ttl': max(ttl, 600),  # GoDaddy minimum TTL is 600
-        }]
-        
-        success, result = self._request(
-            'PATCH',
-            f'/domains/{domain_name}/records/TXT/{name}',
-            data
-        )
-        
+        # PUT replaces every TXT value of the name: re-send the existing ones so a
+        # wildcard and its apex (same name) coexist. A failed read must not overwrite.
+        path = f'/domains/{domain_name}/records/TXT/{name}'
+        ok_get, current = self._request('GET', path)
+        if not ok_get and self._last_status != 404:
+            return False, f"Failed to read existing record: {current}"
+        existing = [r for r in (current if ok_get and isinstance(current, list) else [])
+                    if isinstance(r, dict) and 'data' in r]
+        if record_value in [r['data'] for r in existing]:
+            logger.info(f"GoDaddy: TXT value already present on {record_name}")
+            return True, "Record created successfully"
+        new_ttl = max(ttl, 600)  # GoDaddy minimum TTL is 600
+        data = [{'data': r['data'], 'ttl': max(int(r.get('ttl') or new_ttl), 600)} for r in existing]
+        data.append({'data': record_value, 'ttl': new_ttl})
+
+        success, result = self._request('PUT', path, data)
+
         if not success:
             return False, f"Failed to create record: {result}"
         
@@ -149,16 +157,13 @@ class GoDaddyDnsProvider(BaseDnsProvider):
         else:
             name = record_name
         
-        # GoDaddy doesn't have a direct delete - we need to PUT empty array
-        # or PUT all records except the one to delete
         success, result = self._request(
-            'PUT',
+            'DELETE',
             f'/domains/{domain_name}/records/TXT/{name}',
-            []  # Empty array removes all TXT records for this name
         )
-        
+
         if not success:
-            if 'not found' in str(result).lower():
+            if self._last_status == 404 or 'not found' in str(result).lower():
                 return True, "Record not found (already deleted?)"
             return False, f"Failed to delete record: {result}"
         

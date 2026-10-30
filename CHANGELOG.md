@@ -9,6 +9,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Fixed
+
+- ACME DNS-01 with GoDaddy: TXT records were written with a PATCH the API does not offer, and removed with an empty PUT it refuses. The values of a name are now read, merged and written back with PUT, and cleanup uses DELETE.
+
+- ACME DNS-01 with deSEC: a new TXT record used a 300 s TTL, below the 3600 s minimum deSEC sets on each domain, and was refused. The domain's minimum TTL is now applied, and apex records are cleaned up.
+
 ### Security
 
 - dnspython 2.9.1 (CVE-2026-114605): a DNS message with a long chain of compression pointers, sent to the RFC 2136 listener or returned by a resolver, could hold a CPU. The listener reads compressed names the same way under the new version.

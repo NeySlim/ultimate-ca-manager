@@ -32,6 +32,7 @@ class DesecDnsProvider(BaseDnsProvider):
     def __init__(self, credentials: Dict[str, Any]):
         super().__init__(credentials)
         self._domain_cache: Dict[str, str] = {}
+        self._min_ttl: Dict[str, int] = {}
         self._last_status: Optional[int] = None
     
     def _get_headers(self) -> Dict[str, str]:
@@ -97,6 +98,7 @@ class DesecDnsProvider(BaseDnsProvider):
             for d in domains:
                 if d.get('name') == domain_name:
                     self._domain_cache[domain] = domain_name
+                    self._min_ttl[domain_name] = int(d.get('minimum_ttl') or 60)
                     return domain_name
         
         return None
@@ -126,6 +128,8 @@ class DesecDnsProvider(BaseDnsProvider):
         # An RRset holds all values of a name: merge into the existing one so a
         # wildcard and its apex (same name) coexist. A failed read must not overwrite.
         quoted = f'"{record_value}"'
+        # Each domain has a server-set minimum TTL (3600 unless support lowered it)
+        ttl = max(ttl, self._min_ttl.get(domain_name, 60))
         rrset_path = f'/domains/{domain_name}/rrsets/{subname or "@"}/TXT/'
         success, current = self._request('GET', rrset_path)
         if success and isinstance(current, dict):
@@ -135,7 +139,7 @@ class DesecDnsProvider(BaseDnsProvider):
                 return True, "Record created successfully"
             success, result = self._request(
                 'PATCH', rrset_path,
-                {'records': records + [quoted], 'ttl': current.get('ttl') or max(ttl, 60)}
+                {'records': records + [quoted], 'ttl': current.get('ttl') or ttl}
             )
             if not success:
                 return False, f"Failed to update record: {result}"
@@ -143,7 +147,7 @@ class DesecDnsProvider(BaseDnsProvider):
             data = {
                 'subname': subname,
                 'type': 'TXT',
-                'ttl': max(ttl, 60),  # deSEC minimum TTL is 60
+                'ttl': ttl,
                 'records': [quoted]
             }
             success, result = self._request('POST', f'/domains/{domain_name}/rrsets/', data)
@@ -173,7 +177,7 @@ class DesecDnsProvider(BaseDnsProvider):
         
         success, result = self._request(
             'DELETE',
-            f'/domains/{domain_name}/rrsets/{subname}/TXT/'
+            f'/domains/{domain_name}/rrsets/{subname or "@"}/TXT/'
         )
         
         if not success:

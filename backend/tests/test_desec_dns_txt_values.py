@@ -23,23 +23,25 @@ class _Response:
 
 class FakeDesec:
     """Routes from the deSEC docs: single-RRset GET is an object (404 if absent), POST on an
-    existing RRset is 400, PATCH 200, DELETE 204 even when absent. TXT values keep their quotes."""
+    existing RRset is 400, PATCH 200, DELETE 204 even when absent. TXT values keep their quotes,
+    a TTL below the domain's server-set minimum_ttl (3600 by default) is refused."""
 
     def __init__(self):
         self.rrsets = {}
         self.calls = []
         self.get_status = None
+        self.minimum_ttl = 3600
 
     def __call__(self, method, url, headers=None, json=None, timeout=None, params=None):
         path = url.removeprefix(DesecDnsProvider.BASE_URL)
         self.calls.append((method, path, json))
         if method == 'GET' and path == '/domains/':
-            return _Response(200, [{'name': 'example.com'}])
+            return _Response(200, [{'name': 'example.com', 'minimum_ttl': self.minimum_ttl}])
         if method == 'POST' and path == '/domains/example.com/rrsets/':
             if json['subname'] in self.rrsets:
                 return _Response(400, {'non_field_errors': ['Another RRset with the same subdomain and type exists']})
-            if json['ttl'] < 60:
-                return _Response(400, {'ttl': ['Ensure this value is greater than or equal to 60.']})
+            if json['ttl'] < self.minimum_ttl:
+                return _Response(400, {'ttl': [f'Ensure this value is greater than or equal to {self.minimum_ttl}.']})
             if not all(r.startswith('"') and r.endswith('"') for r in json['records']):
                 return _Response(400, {'records': ['Invalid TXT value']})
             self.rrsets[json['subname']] = {'ttl': json['ttl'], 'records': list(json['records'])}
@@ -57,6 +59,8 @@ class FakeDesec:
         if method == 'PATCH':
             if sub not in self.rrsets:
                 return _Response(404, {'detail': 'Not found.'})
+            if json.get('ttl', self.minimum_ttl) < self.minimum_ttl:
+                return _Response(400, {'ttl': [f'Ensure this value is greater than or equal to {self.minimum_ttl}.']})
             self.rrsets[sub].update(json)
             return _Response(200, {'subname': sub, 'type': 'TXT', **self.rrsets[sub]})
         if method == 'DELETE':
@@ -76,7 +80,14 @@ def _provider():
     return DesecDnsProvider({'api_token': 't'})
 
 
-def test_first_value_creates_the_rrset_quoted_with_minimum_ttl(api):
+def test_first_value_creates_the_rrset_with_the_domain_minimum_ttl(api):
+    ok, msg = _provider().create_txt_record('example.com', NAME, 'tok1')
+    assert ok, msg
+    assert api.rrsets['_acme-challenge'] == {'ttl': 3600, 'records': ['"tok1"']}
+
+
+def test_a_lowered_minimum_ttl_is_used_as_the_floor(api):
+    api.minimum_ttl = 60
     ok, msg = _provider().create_txt_record('example.com', NAME, 'tok1', ttl=10)
     assert ok, msg
     assert api.rrsets['_acme-challenge'] == {'ttl': 60, 'records': ['"tok1"']}
@@ -135,3 +146,11 @@ def test_delete_answered_404_without_text_is_a_success(api, monkeypatch):
     monkeypatch.setattr(requests, 'request', gone)
     ok, msg = _provider().delete_txt_record('example.com', '_acme-challenge.example.com')
     assert ok, msg
+
+
+def test_apex_rrset_is_deleted_through_the_at_placeholder(api):
+    api.rrsets['@'] = {'ttl': 3600, 'records': ['"x"']}
+    ok, msg = _provider().delete_txt_record('example.com', 'example.com')
+    assert ok, msg
+    assert ('DELETE', '/domains/example.com/rrsets/@/TXT/', None) in api.calls
+    assert api.rrsets == {}
