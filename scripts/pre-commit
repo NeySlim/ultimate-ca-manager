@@ -59,7 +59,7 @@ fi
 echo -n "  Backend tests... "
 BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -rfE -n "${UCM_PYTEST_WORKERS:-auto}" --dist loadfile 2>&1) || true
 BACK_RESULT=$(echo "$BACK_OUT" | tail -1)
-if echo "$BACK_RESULT" | grep -q "passed" && ! echo "$BACK_RESULT" | grep -qE "failed|error"; then
+if echo "$BACK_RESULT" | grep -q "passed" && ! echo "$BACK_RESULT" | grep -qE "[0-9]+ (failed|errors?)\b"; then
     echo -e "${GREEN}✅${NC} $BACK_RESULT"
 else
     echo -e "${RED}❌${NC} $BACK_RESULT"
