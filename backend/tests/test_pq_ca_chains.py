@@ -1,6 +1,7 @@
 """ML-DSA CA chains: pure and mixed hierarchies, external-CSR CAs whose CSR
 OpenSSL 3.5 verifies, and a renewal that keeps the key."""
 import base64
+import datetime
 import json
 import re
 import shutil
@@ -8,8 +9,9 @@ import subprocess
 
 import pytest
 from cryptography import x509
-from cryptography.hazmat.primitives import serialization
+from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, mldsa, rsa
+from cryptography.x509.oid import NameOID
 
 from models import CA, Certificate, db
 from services.ca.ca_service import CAService
@@ -135,6 +137,44 @@ def test_digest_of_an_intermediate_follows_the_signing_parent(app, auth_client):
         sub = _row_cert(db.session.get(CA, r.get_json()['data']['id']))
     assert sub.signature_hash_algorithm is None
     sub.verify_directly_issued_by(mldsa_root)
+
+
+def _import_rsa_1024_root(auth_client):
+    """A root whose RSA-1024 key is outside the registry, imported with its key."""
+    key = rsa.generate_private_key(public_exponent=65537, key_size=1024)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'Imported RSA-1024 root')])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+            .serial_number(x509.random_serial_number())
+            .not_valid_before(now - datetime.timedelta(days=1))
+            .not_valid_after(now + datetime.timedelta(days=3650))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .add_extension(x509.KeyUsage(digital_signature=False, content_commitment=False,
+                                         key_encipherment=False, data_encipherment=False,
+                                         key_agreement=False, key_cert_sign=True, crl_sign=True,
+                                         encipher_only=False, decipher_only=False), critical=True)
+            .sign(key, hashes.SHA256()))
+    key_pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                serialization.NoEncryption())
+    r = auth_client.post('/api/v2/cas/import', content_type='multipart/form-data',
+                         data={'pem_content': (_pem(cert) + key_pem).decode()})
+    assert r.status_code in (200, 201), r.get_json()
+    return r.get_json()['data']['id'], cert
+
+
+def test_digest_of_an_intermediate_under_an_unregistered_parent_key(app, auth_client):
+    # RSA-1024 is outside the registry but takes a digest: the requested one applies
+    root_id, root = _import_rsa_1024_root(auth_client)
+    r = _post(auth_client, '/api/v2/cas', {'type': 'intermediate', 'parentCAId': root_id,
+                                           'commonName': 'ML-DSA sub under RSA-1024',
+                                           'keyAlgo': 'ML-DSA', 'keySize': '65',
+                                           'digest': 'sha512', 'validityYears': 2})
+    assert r.status_code == 201, r.get_json()
+    assert not any('ignored' in n for n in _notices(r)), _notices(r)
+    with app.app_context():
+        sub = _row_cert(db.session.get(CA, r.get_json()['data']['id']))
+    assert sub.signature_hash_algorithm.name == 'sha512'
+    sub.verify_directly_issued_by(root)
 
 
 # ---- external-CSR CA ------------------------------------------------------------

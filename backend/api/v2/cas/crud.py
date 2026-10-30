@@ -566,12 +566,22 @@ def create_ca():
         # The parent signs an intermediate: its key decides whether a digest applies,
         # and 'auto' follows the child key only when both keys take one.
         signer_key_type = digest_key_type
+        signer_default = None
         if caref and data.get('type') != 'external':
-            parent_alg = key_algorithms.get(key_algorithms.label_for_public_key(parent_cert.public_key()))
-            if parent_alg is not None and (not parent_alg.needs_digest
-                                           or default_digest_for_key_type(digest_key_type) is None):
-                signer_key_type = parent_alg.trust_store_id or parent_alg.label
-        digest, digest_err = resolve_digest(raw_digest, signer_key_type)
+            parent_pub = parent_cert.public_key()
+            if (not key_algorithms.needs_digest(parent_pub)
+                    or default_digest_for_key_type(digest_key_type) is None):
+                parent_alg = key_algorithms.get(key_algorithms.label_for_public_key(parent_pub))
+                if parent_alg is not None:
+                    signer_key_type = parent_alg.trust_store_id or parent_alg.label
+                else:
+                    # Outside the registry (RSA-8192, DSA): takes a digest, its own by default
+                    signer_key_type = None
+                    signer_default = key_algorithms.default_digest_for_key(parent_pub)
+        if signer_key_type is None and str(raw_digest or 'auto').strip().lower() == 'auto':
+            digest, digest_err = signer_default, None
+        else:
+            digest, digest_err = resolve_digest(raw_digest, signer_key_type)
         if digest_err:
             return error_response(digest_err, 400)
         digest_explicit = digest is not None and str(raw_digest or 'auto').strip().lower() != 'auto'
