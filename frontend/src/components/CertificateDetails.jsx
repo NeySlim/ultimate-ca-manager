@@ -335,7 +335,7 @@ export function CertificateDetails({
           {serialHex && (
             <CompactField icon={Hash} label={t('common.serialHex')} value={serialHex} mono copyable />
           )}
-          <CompactField autoIcon="keyType" label={t('common.keyType')} value={cert.key_type} />
+          <CompactField autoIcon="keyType" label={t('common.keyType')} value={keyAlgorithmLabel(cert.key_type, t, cert.security_level)} />
           <CompactField
             autoIcon="issuerSignatureAlgorithm"
             label={t('common.issuerSignatureAlgorithm')}

@@ -56,6 +56,16 @@ describe('CertificateDetails with a post-quantum key', () => {
     expect(screen.queryByText(/bits/)).toBeNull()
   })
 
+  it.each(PQ_ROWS.map(a => [a.label, a]))('names %s with its level in Technical details too', (_label, a) => {
+    render(<CertificateDetails certificate={mldsa(a)} />)
+    expect(screen.getByText('Key Type').nextSibling).toHaveTextContent(levelLabel(a))
+  })
+
+  it('keeps the RSA key type in Technical details as the API sends it', () => {
+    render(<CertificateDetails certificate={rsa} />)
+    expect(screen.getByText('Key Type').nextSibling).toHaveTextContent(/^RSA 2048$/)
+  })
+
   it('shows the whole ML-DSA signature name in the summary chip', () => {
     const a = PQ_ROWS.find(r => r.label === 'ML-DSA-65')
     render(<CertificateDetails certificate={mldsa(a)} />)

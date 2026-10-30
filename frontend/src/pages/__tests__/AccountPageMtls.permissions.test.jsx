@@ -186,3 +186,23 @@ describe('AccountPage mTLS modal — backend authorization gates', () => {
     ))
   })
 })
+
+describe('AccountPage mTLS export of a post-quantum certificate', () => {
+  beforeEach(() => { authState.permissions = ['*'] })
+
+  it.each([
+    ['ML-DSA-65', false],
+    ['RSA', true],
+  ])('a %s certificate is offered PKCS#12 and JKS: %s', async (keyAlgorithm, offered) => {
+    accountMocks.getMTLSCertificates.mockResolvedValue({
+      data: [{ id: 43, name: 'Account mTLS certificate', enabled: true, key_algorithm: keyAlgorithm }],
+    })
+    render(<MemoryRouter><AccountPage /></MemoryRouter>)
+    fireEvent.click((await screen.findAllByText('common.security'))[0])
+    await screen.findByText('Account mTLS certificate')
+    fireEvent.click(screen.getByLabelText('common.export'))
+    expect(screen.getByText('P12 / PKCS#12').closest('button').disabled).toBe(!offered)
+    expect(screen.getByText('JKS').closest('button').disabled).toBe(!offered)
+    expect(screen.getByText('PEM').closest('button')).toBeEnabled()
+  })
+})

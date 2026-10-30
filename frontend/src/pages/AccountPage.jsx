@@ -69,7 +69,7 @@ export default function AccountPage() {
   const [mtlsForm, setMtlsForm] = useState({ name: '', validity_days: 365, ca_id: '' })
   const [mtlsTab, setMtlsTab] = useState('generate')
   const [mtlsImportForm, setMtlsImportForm] = useState({ name: '', pem: '' })
-  const [exportCert, setExportCert] = useState(null) // { id, name, hasPrivateKey }
+  const [exportCert, setExportCert] = useState(null) // { id, name, hasPrivateKey, keyAlgorithm }
   const [availableCerts, setAvailableCerts] = useState([])
   const [availableCertsLoading, setAvailableCertsLoading] = useState(false)
   const [selectedAssignCert, setSelectedAssignCert] = useState(null)
@@ -750,7 +750,7 @@ export default function AccountPage() {
                   <Badge variant={cert.enabled ? 'success' : 'warning'} size="sm">
                     {cert.enabled ? t('common.active') : t('common.disabled')}
                   </Badge>
-                  <Button type="button" size="sm" variant="ghost" aria-label={t('common.export')} onClick={() => setExportCert({ id: cert.id, name: cert.name || cert.cert_subject, hasPrivateKey: true })}>
+                  <Button type="button" size="sm" variant="ghost" aria-label={t('common.export')} onClick={() => setExportCert({ id: cert.id, name: cert.name || cert.cert_subject, hasPrivateKey: true, keyAlgorithm: cert.key_algorithm })}>
                     <Download size={16} className="text-accent-primary" />
                   </Button>
                   <Button type="button" size="sm" variant="ghost" onClick={() => handleDeleteMTLS(cert.id)} aria-label={t('common.delete')}>
@@ -1406,6 +1406,7 @@ export default function AccountPage() {
         entityName={exportCert?.name || ''}
         hasPrivateKey={exportCert?.hasPrivateKey || false}
         canExportKey={canExportPrivateKey('user_certificate', { hasPermission })}
+        keyAlgorithm={exportCert?.keyAlgorithm}
         defaultFormat="pem"
         onExport={handleExportCert}
       />

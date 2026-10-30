@@ -1,6 +1,8 @@
 /**
  * TrustStorePage detail: a post-quantum key is named with its level, and a
  * certificate whose key type the API does not send is never shown as RSA.
+ * The trust store API sends no key fields yet: the ML-DSA case pins the display
+ * for when it does, only the unnamed-key case reflects today's payload.
  */
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent } from '@testing-library/react'
