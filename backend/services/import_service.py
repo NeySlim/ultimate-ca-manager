@@ -10,7 +10,7 @@ from datetime import datetime, timezone
 from utils.cert_issuer import cas_by_ski, is_self_signed
 from utils.foreign_algorithms import describe_public_key, spki_der
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
-from utils.key_codec import load_private_key_any, private_key_to_pem, refuse_eddsa_key
+from utils.key_codec import MalformedKey, load_private_key_any, private_key_to_pem, refuse_eddsa_key
 from utils.pkcs12_import import load_key_and_certificates, refuse_pkcs12_import
 
 
@@ -64,7 +64,7 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
                 try:
                     private_key = load_private_key_any(
                         key_match.group(0), password=password.encode() if password else None)
-                except UnsupportedForKeyAlgorithm:
+                except (UnsupportedForKeyAlgorithm, MalformedKey):
                     raise
                 except Exception:
                     pass

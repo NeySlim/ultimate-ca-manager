@@ -13,6 +13,7 @@ import uuid
 from auth.unified import require_auth
 from fips_mode import FipsRestricted
 from utils.db_transaction import safe_commit
+from utils.key_codec import MalformedKey
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.cert_issuer import private_key_matches
@@ -227,6 +228,9 @@ def import_ca():
     except FipsRestricted:
         db.session.rollback()
         raise  # the app handler answers 400 with the FIPS problem type
+    except MalformedKey as e:
+        db.session.rollback()
+        return error_response(str(e), 400)
     except ValueError as e:
         db.session.rollback()
         logger.warning(f"CA import validation error: {e}")

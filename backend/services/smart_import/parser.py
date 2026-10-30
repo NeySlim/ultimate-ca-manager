@@ -22,7 +22,7 @@ from cryptography.x509.oid import ExtensionOID
 
 from fips_mode import FipsRestricted
 from utils.csr_extensions import csr_extensions
-from utils.key_codec import load_private_key_any, normalize_private_key_pem
+from utils.key_codec import MalformedKey, load_private_key_any, normalize_private_key_pem
 from utils.pkcs12_import import load_key_and_certificates, refuse_pkcs12_import
 
 
@@ -62,6 +62,7 @@ class ParsedObject:
     key_algorithm: str = ""
     key_size: Optional[int] = 0  # None for a post-quantum key
     is_encrypted: bool = False
+    error: Optional[str] = None  # why a key that was read cannot be used
     
     # Matching info (filled by matcher)
     matched_cert_index: Optional[int] = None
@@ -90,6 +91,7 @@ class ParsedObject:
             "key_algorithm": self.key_algorithm,
             "key_size": self.key_size,
             "is_encrypted": self.is_encrypted,
+            "error": self.error,
             "matched_cert_index": self.matched_cert_index,
             "matched_key_index": self.matched_key_index,
             "chain_position": self.chain_position,
@@ -343,12 +345,9 @@ class SmartParser:
                 is_encrypted = 'ENCRYPTED' in pem_block
                 
                 try:
-                    pem_block = normalize_private_key_pem(pem_block)  # ML-DSA "both" -> seed
-                    key = serialization.load_pem_private_key(
-                        pem_block.encode(),
-                        password=pwd,
-                        backend=default_backend()
-                    )
+                    key = load_private_key_any(pem_block, password=pwd)
+                    if not is_encrypted:
+                        pem_block = normalize_private_key_pem(pem_block)  # ML-DSA "both" -> seed
                     obj = self._parse_private_key(key)
                     obj.raw_pem = pem_block
                     obj.index = match.start()
@@ -356,6 +355,10 @@ class SmartParser:
                     objects.append(obj)
                 except FipsRestricted:
                     raise
+                except MalformedKey as e:
+                    objects.append(ParsedObject(
+                        type=ObjectType.PRIVATE_KEY, raw_pem=pem_block, index=match.start(),
+                        is_encrypted=is_encrypted, key_algorithm="invalid", error=str(e)))
                 except Exception:
                     # Key might be encrypted without password
                     obj = ParsedObject(

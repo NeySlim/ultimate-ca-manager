@@ -9,6 +9,7 @@ from flask import request, g
 from auth.unified import has_permission, require_auth
 from fips_mode import FipsRestricted
 from utils.db_transaction import safe_commit
+from utils.key_codec import MalformedKey
 from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from models import Certificate, CA, db
@@ -391,6 +392,9 @@ def import_certificate():
     except FipsRestricted:
         db.session.rollback()
         raise  # the app handler answers 400 with the FIPS problem type
+    except MalformedKey as e:
+        db.session.rollback()
+        return error_response(str(e), 400)
     except ValueError as e:
         db.session.rollback()
         logger.error(f"Certificate import validation error: {e}")

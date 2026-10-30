@@ -109,7 +109,7 @@ def store_pem_bytes(pem_bytes: Union[str, bytes]) -> str:
 
 __all__ = ['load_pem_bytes', 'store_pem_bytes', 'private_key_to_pem',
            'load_private_key_any', 'normalize_private_key_pem',
-           'eddsa_key_name', 'refuse_eddsa_key']
+           'eddsa_key_name', 'refuse_eddsa_key', 'MalformedKey']
 
 
 def private_key_to_pem(private_key) -> bytes:
@@ -239,13 +239,68 @@ SEEDLESS_MLDSA = (
     'holds it: openssl pkey -in key.pem -provparam ml-dsa.output_formats=seed-only -out key-seed.pem')
 
 
-def _pkcs8_der(data: bytes) -> Optional[bytes]:
-    """DER of an unencrypted PKCS#8 given as PEM or DER, None for anything else."""
+class MalformedKey(ValueError):
+    """A key whose encoding UCM reads but whose content is inconsistent; the message says why."""
+
+
+def _decrypt_pkcs8(der: bytes, password: bytes) -> Optional[bytes]:
+    """Inner PKCS#8 of an EncryptedPrivateKeyInfo under PBES2 with PBKDF2 and AES-CBC (OpenSSL's
+    default) or DES-EDE3-CBC; None for any other scheme or a wrong password."""
+    from cryptography.hazmat.primitives import hashes, padding
+    from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
+    from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
+    from pyasn1.codec.der import decoder
+    from pyasn1_modules import rfc5958, rfc8018
+    prfs = {rfc8018.id_hmacWithSHA1: hashes.SHA1, rfc8018.id_hmacWithSHA224: hashes.SHA224,
+            rfc8018.id_hmacWithSHA256: hashes.SHA256, rfc8018.id_hmacWithSHA384: hashes.SHA384,
+            rfc8018.id_hmacWithSHA512: hashes.SHA512}
+    ciphers = {rfc8018.aes128_CBC_PAD: (algorithms.AES, 16), rfc8018.aes192_CBC_PAD: (algorithms.AES, 24),
+               rfc8018.aes256_CBC_PAD: (algorithms.AES, 32)}
+    try:
+        from cryptography.hazmat.decrepit.ciphers.algorithms import TripleDES
+        ciphers[rfc8018.des_EDE3_CBC] = (TripleDES, 24)
+    except ImportError:
+        pass
+    try:
+        info, rest = decoder.decode(der, asn1Spec=rfc5958.EncryptedPrivateKeyInfo())
+        scheme = info['encryptionAlgorithm']
+        if rest or scheme['algorithm'] != rfc8018.id_PBES2:
+            return None
+        pbes2, _ = decoder.decode(scheme['parameters'], asn1Spec=rfc8018.PBES2_params())
+        kdf, enc = pbes2['keyDerivationFunc'], pbes2['encryptionScheme']
+        if kdf['algorithm'] != rfc8018.id_PBKDF2 or enc['algorithm'] not in ciphers:
+            return None
+        params, _ = decoder.decode(kdf['parameters'], asn1Spec=rfc8018.PBKDF2_params())
+        prf = params['prf']['algorithm'] if params['prf'].isValue else rfc8018.id_hmacWithSHA1
+        cipher, size = ciphers[enc['algorithm']]
+        if prf not in prfs or (params['keyLength'].isValue and int(params['keyLength']) != size):
+            return None
+        iv, _ = decoder.decode(enc['parameters'])
+        key = PBKDF2HMAC(prfs[prf](), size, bytes(params['salt']['specified']),
+                         int(params['iterationCount'])).derive(password)
+        decryptor = Cipher(cipher(key), modes.CBC(bytes(iv))).decryptor()
+        unpadder = padding.PKCS7(cipher.block_size).unpadder()
+        padded = decryptor.update(bytes(info['encryptedData'])) + decryptor.finalize()
+        return unpadder.update(padded) + unpadder.finalize()
+    except Exception:  # pyca's own error stands for whatever cannot be opened here
+        return None
+
+
+def _pkcs8_der(data: bytes, password: Optional[bytes] = None) -> Optional[bytes]:
+    """DER of a PKCS#8 given as PEM or DER, an encrypted one opened with *password*;
+    None for anything else."""
     blocks = _PEM_BLOCK.findall(data)
     if blocks:
         bodies = [body for label, body in blocks if label == b'PRIVATE KEY']
-        return base64.b64decode(b''.join(bodies[0].split())) if len(bodies) == 1 else None
-    return data if data[:1] == b'\x30' else None
+        if bodies:
+            return base64.b64decode(b''.join(bodies[0].split())) if len(bodies) == 1 else None
+        sealed = [body for label, body in blocks if label == b'ENCRYPTED PRIVATE KEY']
+        if len(sealed) != 1 or not password:
+            return None
+        return _decrypt_pkcs8(base64.b64decode(b''.join(sealed[0].split())), password)
+    if data[:1] != b'\x30':
+        return None
+    return _decrypt_pkcs8(data, password) if password else data
 
 
 def _mldsa_from_layout(der: bytes):
@@ -273,20 +328,21 @@ def _mldsa_from_layout(der: bytes):
         both, rest = decoder.decode(inner)
         seed, expanded = bytes(both[0]), bytes(both[1])
     except (PyAsn1Error, IndexError, TypeError):
-        raise ValueError(f'Malformed {label} private key') from None
+        raise MalformedKey(f'Malformed {label} private key') from None
     if rest or len(seed) != 32:
-        raise ValueError(f'Malformed {label} private key')
+        raise MalformedKey(f'Malformed {label} private key')
     key = alg.private_class.from_seed_bytes(seed)
     public = key.public_key().public_bytes_raw()
     # FIPS 204 skEncode starts with rho (from pk) then K, then tr = SHAKE256(pk, 64)
     if expanded[:32] != public[:32] or expanded[64:128] != hashlib.shake_256(public).digest(64):
-        raise ValueError(f'The seed and the expanded key of this {label} private key do not match')
+        raise MalformedKey(f'The seed and the expanded key of this {label} private key do not match')
     return key
 
 
 def load_private_key_any(data, password=None):
     """Private key from PEM or DER, as pyca reads it; an ML-DSA key in OpenSSL's "both"
-    layout is read from its seed, a seedless one refused (UnsupportedForKeyAlgorithm)."""
+    layout, encrypted or not, is read from its seed, a seedless one refused
+    (UnsupportedForKeyAlgorithm), one whose halves disagree raises MalformedKey."""
     from cryptography.hazmat.primitives import serialization
     if isinstance(data, str):
         data = data.encode('utf-8')
@@ -296,7 +352,7 @@ def load_private_key_any(data, password=None):
     try:
         return load(data, password=password)
     except ValueError:
-        der = _pkcs8_der(data)
+        der = _pkcs8_der(data, password)
         key = _mldsa_from_layout(der) if der else None
         if key is None:
             raise

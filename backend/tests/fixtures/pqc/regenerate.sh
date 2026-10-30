@@ -19,6 +19,15 @@ openssl genpkey -algorithm ML-DSA-65 -provparam ml-dsa.output_formats=seed-only 
 openssl pkey -in mldsa65-seed.pem -provparam ml-dsa.output_formats=seed-priv -out mldsa65-both.pem
 openssl pkey -in mldsa65-seed.pem -provparam ml-dsa.output_formats=priv-only -out mldsa65-priv.pem
 
+# The same keys encrypted with the PKCS#12 password: OpenSSL's default (PBES2, PBKDF2
+# with HMAC-SHA256, AES-256-CBC), HMAC-SHA1 with AES-128-CBC, and 3DES in DER.
+openssl pkey -in mldsa65-both.pem -aes256 -passout "pass:$PASS" -out mldsa65-both-enc.pem
+openssl pkey -in mldsa65-priv.pem -aes256 -passout "pass:$PASS" -out mldsa65-priv-enc.pem
+openssl pkcs8 -topk8 -in mldsa65-both.pem -v2 aes-128-cbc -v2prf hmacWithSHA1 -passout "pass:$PASS" \
+    -out mldsa65-both-aes128-sha1.pem
+openssl pkcs8 -topk8 -in mldsa65-both.pem -v2 des3 -passout "pass:$PASS" -outform DER \
+    -out mldsa65-both-des3.der
+
 openssl req -new -key mldsa65-seed.pem -subj "/CN=UCM PQC fixture ML-DSA-65" -out mldsa65-csr.pem
 openssl req -x509 -key mldsa65-seed.pem -subj "/CN=UCM PQC fixture ML-DSA-65" -days "$DAYS" \
     -addext "keyUsage=critical,digitalSignature,keyCertSign,cRLSign" -out mldsa65-cert.pem

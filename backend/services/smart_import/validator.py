@@ -207,7 +207,9 @@ class ImportValidator:
     def _validate_key(self, obj: ParsedObject, result: ValidationResult):
         """Validate a private key"""
         
-        if obj.is_encrypted and obj.key_algorithm == "unknown (encrypted)":
+        if obj.error:
+            result.add_error(f"Private key cannot be used: {obj.error}")
+        elif obj.is_encrypted and obj.key_algorithm == "unknown (encrypted)":
             result.add_error(
                 f"Private key is encrypted and no password was provided"
             )
