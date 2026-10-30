@@ -105,7 +105,7 @@ class KeyAlgorithm:
     default_digest: str | None      # what UCM signs with when no digest is requested
     display: str
     legacy_key_algo: str            # spelling written to certificates.key_algo
-    trust_store_id: str | None      # TrustStore KEY_TYPES id (ML-DSA: reserved, not yet there), None when it has none
+    trust_store_id: str | None      # TrustStore KEY_TYPES id ('2048', 'prime256v1', 'ml-dsa-65'), None when it has none
     fips_approved: bool
     key_size: int | None = None     # RSA modulus or EC field size, in bits
     curve_names: tuple[str, ...] = ()   # pyca / OpenSSL curve names, EC only

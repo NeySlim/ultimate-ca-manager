@@ -558,6 +558,10 @@ def _validate_est_csr(csr):
         credential can't mint a wildcard / catch-all certificate by
         submitting an empty CSR.
     """
+    from utils.key_type import unsignable_csr_key
+    unsignable = unsignable_csr_key(csr)
+    if unsignable:
+        return False, Response(unsignable, status=400)
     try:
         signature_valid = csr.is_signature_valid
     except Exception as e:

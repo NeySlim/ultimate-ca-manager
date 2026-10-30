@@ -434,6 +434,13 @@ class SCEPService:
                 ), 200
 
             # ---- 5. Verify CSR self-signature (proof of possession) ----
+            from utils.key_type import unsignable_csr_key
+            unsignable = unsignable_csr_key(csr)
+            if unsignable:
+                return self._create_error_response(
+                    self.FAIL_BAD_REQUEST, unsignable,
+                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
+                ), 200
             if not csr.is_signature_valid:
                 logger.warning(
                     f"SCEP: CSR self-signature invalid "

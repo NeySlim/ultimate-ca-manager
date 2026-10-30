@@ -1039,19 +1039,16 @@ class CSROperationsMixin:
             new_builder = add_ocsp_nocheck_if_responder(new_builder, merged)
             builder = new_builder
 
-        if not issuing_ca:
-            # RFC 5480 §3: a non-RSA key cannot honour keyEncipherment /
-            # dataEncipherment, whether the CSR asked for them or the
-            # cert_type default above did (#327). Applied once the EKU is
-            # settled, because an S/MIME leaf on an EC key keeps its
-            # encryption intent as keyAgreement instead of losing it.
-            asked_ku = builder_key_usage(builder)
-            builder = constrain_builder_key_usage(builder)
-            # A bit the template or CSR asked for is dropped out loud; the default's silently
-            if notices is not None and has_key_usage and asked_ku is not None:
-                notice = key_usage_notice(builder._public_key, asked_ku, builder_key_usage(builder))
-                if notice:
-                    notices.append(notice)
+        # RFC 5480 §3, RFC 9881 §5: a non-RSA key cannot honour keyEncipherment /
+        # dataEncipherment, on a leaf or a sub-CA (#327). Applied once the EKU is
+        # settled: an S/MIME leaf on an EC key keeps that intent as keyAgreement.
+        asked_ku = builder_key_usage(builder)
+        builder = constrain_builder_key_usage(builder)
+        # A bit the template or CSR asked for is dropped out loud; the default's silently
+        if notices is not None and has_key_usage and asked_ku is not None:
+            notice = key_usage_notice(builder._public_key, asked_ku, builder_key_usage(builder))
+            if notice:
+                notices.append(notice)
 
         def _sub_ca_csr_supplied(oid) -> bool:
             # A leaf never gets these from its CSR (dropped by the allow-list

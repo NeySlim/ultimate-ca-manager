@@ -239,6 +239,10 @@ class CSRMixin:
         # tampered/forged CSR (POP failure) would otherwise be silently signed.
         try:
             csr_obj = x509.load_pem_x509_csr(csr_pem, default_backend())
+            from utils.key_type import unsignable_csr_key
+            unsignable = unsignable_csr_key(csr_obj)
+            if unsignable:
+                raise ValueError(f"CSR public key rejected: {unsignable}")
             if not csr_obj.is_signature_valid:
                 raise ValueError("CSR signature is invalid (proof-of-possession failed)")
         except ValueError:

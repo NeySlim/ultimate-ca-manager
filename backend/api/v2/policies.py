@@ -17,7 +17,7 @@ import base64
 import uuid
 import fips_mode
 from utils.datetime_utils import cert_not_before, utc_now
-from utils.leaf_key_usage import key_usage_for_key
+from utils.leaf_key_usage import key_usage_for_key, key_usage_notice
 from services.audit_service import AuditService
 from services.policy_notifications import validated_emails
 from security.encryption import encrypt_private_key
@@ -650,10 +650,12 @@ def _issue_approved_certificate(approval):
 
     # Same key-type clamp as the direct issue path (#327): no keyEncipherment
     # on an EC key, keyAgreement instead for an S/MIME one.
-    builder = builder.add_extension(
-        key_usage_for_key(new_key.public_key(), x509.KeyUsage(**ku_flags), base_ekus),
-        critical=True,
-    )
+    asked_ku = x509.KeyUsage(**ku_flags)
+    granted_ku = key_usage_for_key(new_key.public_key(), asked_ku, base_ekus)
+    builder = builder.add_extension(granted_ku, critical=True)
+    # The template asked for these bits: dropping one is said, the profile's is not
+    if ku_flags is not profile['ku']:
+        _notices = notices_mod.collect(_notices, key_usage_notice(new_key.public_key(), asked_ku, granted_ku))
     if base_ekus:
         builder = builder.add_extension(x509.ExtendedKeyUsage(base_ekus), critical=False)
         builder = add_ocsp_nocheck_if_responder(builder, base_ekus)

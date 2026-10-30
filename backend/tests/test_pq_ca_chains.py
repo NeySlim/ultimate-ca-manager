@@ -108,6 +108,35 @@ def test_ml_dsa_intermediate_under_rsa_root(app, auth_client, tmp_path):
     _openssl_verify(tmp_path, leaf, root, sub)
 
 
+def _notices(r):
+    return (r.get_json().get('meta') or {}).get('notices') or []
+
+
+def test_digest_of_an_intermediate_follows_the_signing_parent(app, auth_client):
+    # An RSA parent signs the ML-DSA child: the requested digest applies, no notice
+    root_id, _root = _ca(app, auth_client, 'RSA-3072')
+    r = _post(auth_client, '/api/v2/cas', {'type': 'intermediate', 'parentCAId': root_id,
+                                           'commonName': 'ML-DSA sub sha384', 'keyAlgo': 'ML-DSA-65',
+                                           'digest': 'sha384', 'validityYears': 2})
+    assert r.status_code == 201, r.get_json()
+    assert not any('ignored' in n for n in _notices(r)), _notices(r)
+    with app.app_context():
+        sub = _row_cert(db.session.get(CA, r.get_json()['data']['id']))
+    assert sub.signature_hash_algorithm.name == 'sha384'
+
+    # An ML-DSA parent signs the RSA child: the digest is ignored and the notice names the parent key
+    mldsa_root_id, mldsa_root = _ca(app, auth_client, 'ML-DSA-65')
+    r = _post(auth_client, '/api/v2/cas', {'type': 'intermediate', 'parentCAId': mldsa_root_id,
+                                           'commonName': 'RSA sub sha384', 'keyAlgo': 'RSA-3072',
+                                           'digest': 'sha384', 'validityYears': 2})
+    assert r.status_code == 201, r.get_json()
+    assert any('sha384 ignored' in n and 'ML-DSA-65' in n for n in _notices(r)), _notices(r)
+    with app.app_context():
+        sub = _row_cert(db.session.get(CA, r.get_json()['data']['id']))
+    assert sub.signature_hash_algorithm is None
+    sub.verify_directly_issued_by(mldsa_root)
+
+
 # ---- external-CSR CA ------------------------------------------------------------
 
 def _external_ca(auth_client, **extra):

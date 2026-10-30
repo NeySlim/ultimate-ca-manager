@@ -23,7 +23,7 @@ from services.policy_service import PolicyViolation
 from utils.csr_extensions import extensions_of
 from utils.datetime_utils import utc_now
 from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
-from utils.key_type import validate_enrollment_public_key
+from utils.key_type import unsignable_csr_key, validate_enrollment_public_key
 from utils.san_parse import is_valid_san_email
 from utils.serial_format import serial_variants
 from utils.upn_san import build_upn_other_name
@@ -136,6 +136,9 @@ def _validate_csr(csr, require_pop=True, allow_naked_subject=False):
 
     Returns an error string, or None if the CSR is acceptable.
     """
+    unsignable = unsignable_csr_key(csr)
+    if unsignable:
+        return unsignable
     if require_pop:
         try:
             signature_valid = csr.is_signature_valid

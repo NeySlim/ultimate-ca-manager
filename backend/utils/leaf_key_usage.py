@@ -54,8 +54,11 @@ def key_usage_for_key(
     if key_agreement and usage.key_agreement:
         encipher_only, decipher_only = usage.encipher_only, usage.decipher_only
 
+    # RFC 5280 §4.2.1.3: at least one bit; a usage that only asked to encrypt signs instead
+    digital_signature = usage.digital_signature or not (
+        usage.content_commitment or key_agreement or usage.key_cert_sign or usage.crl_sign)
     return x509.KeyUsage(
-        digital_signature=usage.digital_signature,
+        digital_signature=digital_signature,
         content_commitment=usage.content_commitment,
         key_encipherment=False,
         data_encipherment=False,
@@ -72,14 +75,19 @@ _ENCRYPTION_BITS = (('key_encipherment', 'keyEncipherment'), ('data_encipherment
 
 
 def key_usage_notice(public_key, asked: x509.KeyUsage, granted: x509.KeyUsage) -> Optional[str]:
-    """Notice naming the encryption bits *asked* had and *granted* lost, None when none was lost."""
+    """Notice naming the encryption bits *asked* had and *granted* lost, None when none was lost.
+    An encryption intent kept as keyAgreement (S/MIME on EC) is not a loss."""
     from utils import key_algorithms, notices
+    kept_as_agreement = granted.key_agreement and not asked.key_agreement
     dropped = [name for attr, name in _ENCRYPTION_BITS
-               if getattr(asked, attr) and not getattr(granted, attr)]
+               if getattr(asked, attr) and not getattr(granted, attr)
+               and not (kept_as_agreement and attr != 'key_agreement')]
     if not dropped:
         return None
     label = key_algorithms.label_for_public_key(public_key) or type(public_key).__name__
-    return notices.key_usage_dropped(dropped, label)
+    return notices.key_usage_dropped(
+        dropped, label, key_algorithms.family_for_public_key(public_key),
+        signature_added=granted.digital_signature and not asked.digital_signature)
 
 
 def builder_key_usage(builder: x509.CertificateBuilder) -> Optional[x509.KeyUsage]:

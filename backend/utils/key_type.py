@@ -96,8 +96,8 @@ def _registry_key_type(raw_type: str, raw_size) -> str | None:
             raise ValueError(f'{family} key size must be one of {", ".join(choices)}')
     if alg.family in ('RSA', 'EC') or alg.trust_store_id is None:
         return None
-    # A full label wins over a default size, never over another level of its family
-    other = key_algorithms.get(f'{alg.family}-{size}') if size.isdigit() else None
+    # A full label wins over a numeric default size, never over another key named by level or label
+    other = key_algorithms.get(f'{alg.family}-{size}') if size.isdigit() else key_algorithms.get(size)
     if other is not None and other is not alg:
         raise ValueError(f'key type {alg.label} and key size {size} name different keys')
     return alg.trust_store_id
@@ -154,7 +154,9 @@ def fill_key_params_from_template(key_type, key_size, template_key_type):
         return key_type or template_key_type, key_size
     if not key_type:
         key_type = alg.family
-    if not key_size and alg.param and _request_family(key_type) == alg.family:
+    # A request that names a full label ('ML-DSA-87') already has its parameter
+    if (not key_size and alg.param and key_algorithms.get(key_type) is None
+            and _request_family(key_type) == alg.family):
         key_size = alg.param
     return key_type, key_size
 
@@ -259,13 +261,19 @@ def validate_enrollment_public_key(public_key) -> str | None:
     return f'Unsupported public key type: {type(public_key).__name__}'
 
 
-def validate_enrollment_csr(csr) -> str | None:
-    """:func:`validate_enrollment_public_key` for a CSR, whose key this build may
-    not load at all (SLH-DSA): such a key is refused, never signed."""
+def unsignable_csr_key(csr) -> str | None:
+    """Refusal for a CSR whose key this build cannot load (SLH-DSA), None otherwise.
+    Checked before ``is_signature_valid``, which raises on such a key."""
     try:
-        public_key = csr.public_key()
+        csr.public_key()
     except UnsupportedAlgorithm:
         oid = csr.public_key_algorithm_oid
         info = key_algorithms.post_quantum_info(oid)
         return f'{info.label if info else oid.dotted_string} keys are not signable by this instance'
-    return validate_enrollment_public_key(public_key)
+    return None
+
+
+def validate_enrollment_csr(csr) -> str | None:
+    """:func:`validate_enrollment_public_key` for a CSR, whose key this build may
+    not load at all (SLH-DSA): such a key is refused, never signed."""
+    return unsignable_csr_key(csr) or validate_enrollment_public_key(csr.public_key())

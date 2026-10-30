@@ -19,6 +19,7 @@ from utils.protocol_url import get_protocol_base_url
 from utils.decorators import require_json_body
 from utils.validity import coerce_validity_days
 from utils.db_transaction import safe_commit
+import fips_mode
 from fips_mode import FipsRestricted
 from services.ca_service import CAService
 from services.audit_service import AuditService
@@ -27,6 +28,7 @@ from services.ca.signature_scheme import ca_pss_refusal, normalize_signature_sch
 from services.deletion_blockers import ca_deletion_blockers, first_blocker
 from services.notification_service import NotificationService
 from utils.ca_profile import (
+    default_digest_for_key_type,
     resolve_digest,
     validate_ca_key_usage,
     normalize_ca_eku,
@@ -83,7 +85,8 @@ def _size_names(alg, size) -> bool:
     if isinstance(size, bool):
         return False
     text = str(size).strip()
-    return key_algorithms.get(text) is alg or text in (str(alg.key_size), alg.param)
+    return (key_algorithms.get(text) is alg or text == alg.param
+            or (alg.key_size is not None and text == str(alg.key_size)))
 
 
 def _blank(value):
@@ -100,10 +103,10 @@ def _resolve_local_key_type(data):
     if _blank(algo) and _blank(alias):
         if _blank(size):
             return '2048', None
-        return None, 'keySize requires keyAlgo (RSA or ECDSA)'
+        return None, 'keySize requires keyAlgo (RSA, ECDSA or ML-DSA)'
     names = [v for v in (algo, alias) if not _blank(v)]
     if not all(isinstance(v, str) for v in names):
-        return None, 'keyAlgo must be a string (RSA or ECDSA)'
+        return None, 'keyAlgo must be a string (RSA, ECDSA or ML-DSA)'
     # A full label ('RSA-4096', 'EC-P384', '2048') names size and curve at once
     labels = {key_algorithms.get(v) for v in names}
     if len(labels) == 1 and None not in labels:
@@ -413,6 +416,10 @@ def create_ca():
                 'hsm_provider_id+hsm_key_label+hsm_key_algorithm (new), not both',
                 400,
             )
+        # A locally generated key FIPS mode excludes is refused as such, as on the issue path
+        local_alg = None if modes else key_algorithms.get(key_type)
+        if local_alg is not None and not local_alg.fips_approved:
+            fips_mode.refuse(f'{local_alg.display} keys')
 
         # Resolve parent CA for intermediate CAs
         caref = None
@@ -556,14 +563,22 @@ def create_ca():
                                  if chosen_provider else None)
             if brainpool_refusal:
                 return error_response(brainpool_refusal, 400)
-        digest, digest_err = resolve_digest(raw_digest, digest_key_type)
+        # The parent signs an intermediate: its key decides whether a digest applies,
+        # and 'auto' follows the child key only when both keys take one.
+        signer_key_type = digest_key_type
+        if caref and data.get('type') != 'external':
+            parent_alg = key_algorithms.get(key_algorithms.label_for_public_key(parent_cert.public_key()))
+            if parent_alg is not None and (not parent_alg.needs_digest
+                                           or default_digest_for_key_type(digest_key_type) is None):
+                signer_key_type = parent_alg.trust_store_id or parent_alg.label
+        digest, digest_err = resolve_digest(raw_digest, signer_key_type)
         if digest_err:
             return error_response(digest_err, 400)
         digest_explicit = digest is not None and str(raw_digest or 'auto').strip().lower() != 'auto'
         notices = []
         if digest is None and str(raw_digest or 'auto').strip().lower() != 'auto':
             notices.append(notices_mod.digest_ignored(
-                raw_digest, key_algorithms.normalize_label(digest_key_type) or digest_key_type))
+                raw_digest, key_algorithms.normalize_label(signer_key_type) or signer_key_type))
 
         signature_scheme, scheme_err = normalize_signature_scheme(data.get('signatureScheme'))
         if scheme_err:

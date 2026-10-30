@@ -70,6 +70,11 @@ def _generate_key(key_type, key_size, curve):
                                           curve=curve)
     except ValueError as exc:
         raise TsaSignerIssueError(str(exc), 400)
+    # The timestamp CMS is signed in RSA or ECDSA only (tsa_service._build_signed_response)
+    alg = key_algorithms.get(normalized)
+    if alg is None or alg.family not in ('RSA', 'EC'):
+        raise TsaSignerIssueError(
+            f'A TSA signer key must be RSA or ECDSA, not {alg.label if alg else normalized}', 400)
     return key_algorithms.generate(normalized)
 
 

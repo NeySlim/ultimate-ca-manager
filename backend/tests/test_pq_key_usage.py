@@ -84,6 +84,31 @@ def test_sign_csr_drops_template_key_encipherment_with_a_notice():
     assert len(notices) == 1 and 'keyEncipherment' in notices[0] and 'ML-DSA-44' in notices[0], notices
 
 
+def test_sign_csr_encryption_only_csr_gets_digital_signature():
+    ca_cert, ca_key = _rsa_ca()
+    notices = []
+    pem = TrustStoreService.sign_csr(
+        _ml_dsa_csr('enc-only.example.test', [_usage('key_encipherment')]), ca_cert, ca_key,
+        validity_days=30, notices=notices)
+    ku = x509.load_pem_x509_certificate(pem).extensions.get_extension_for_class(x509.KeyUsage)
+    assert _bits(ku.value) == {'digital_signature'} and ku.critical
+    assert len(notices) == 1 and 'only sign' in notices[0] and 'digitalSignature' in notices[0], notices
+
+
+def test_key_usage_notice_wording_follows_the_family():
+    from cryptography.hazmat.primitives.asymmetric import ec
+    from utils.leaf_key_usage import key_usage_notice
+    pub = ec.generate_private_key(ec.SECP256R1()).public_key()
+    asked = _usage('digital_signature', 'key_encipherment')
+    # S/MIME on EC: the encryption intent survives as keyAgreement, nothing to report
+    smime = key_usage_for_key(pub, asked, [ExtendedKeyUsageOID.EMAIL_PROTECTION])
+    assert smime.key_agreement and key_usage_notice(pub, asked, smime) is None
+    tls = key_usage_notice(pub, asked, key_usage_for_key(pub, asked, [ExtendedKeyUsageOID.SERVER_AUTH]))
+    assert tls == 'keyEncipherment removed from the key usage: EC-P256 keys encrypt only through keyAgreement.'
+    pq = mldsa.MLDSA65PrivateKey.generate().public_key()
+    assert 'ML-DSA-65 keys only sign' in key_usage_notice(pq, asked, key_usage_for_key(pq, asked))
+
+
 def test_sign_csr_says_nothing_about_its_own_default():
     ca_cert, ca_key = _rsa_ca()
     notices = []
@@ -126,7 +151,68 @@ def test_issue_form_reports_a_dropped_template_bit(app, auth_client, create_ca):
     assert _bits(cert) == {'digital_signature'}
 
 
+def _ku_template(auth_client, name):
+    r = _post(auth_client, '/api/v2/templates', {
+        'name': name, 'template_type': 'custom', 'key_type': 'ML-DSA-65', 'validity_days': 90,
+        'extensions_template': {'key_usage': ['digitalSignature', 'keyEncipherment'],
+                                'extended_key_usage': ['serverAuth']}})
+    assert r.status_code in (200, 201), r.get_json()
+    return r.get_json()['data']['id']
+
+
+def test_approval_reports_a_dropped_template_bit(app, auth_client, create_ca):
+    from api.v2.policies import _issue_approved_certificate
+    from models import User
+    from models.policy import ApprovalRequest, CertificatePolicy
+    from services.policy_service import PolicyEvaluationService
+    ca = create_ca(cn='KU approval CA')
+    tpl_id = _ku_template(auth_client, 'pq-ku-approval-template')
+    with app.app_context():
+        # Inactive: an active policy would hold every later issuance of the session
+        pol = CertificatePolicy(name='pq-ku-approval-policy', policy_type='issuance',
+                                requires_approval=True, min_approvers=1, is_active=False)
+        db.session.add(pol)
+        db.session.commit()
+        requester = User.query.filter_by(role='admin').first() or User.query.first()
+        approval = PolicyEvaluationService.create_approval_request(
+            policy=pol, requester_id=requester.id, request_data={
+                'cn': 'approval-mldsa.example.test', 'ca_id': ca['id'], 'cert_type': 'server',
+                'template_id': tpl_id})
+        result = _issue_approved_certificate(db.session.get(ApprovalRequest, approval.id))
+        cert = _row_cert(db.session.get(Certificate, result['id']))
+    assert isinstance(cert.public_key(), mldsa.MLDSA65PublicKey)
+    assert _bits(cert) == {'digital_signature'}
+    assert any('keyEncipherment' in n and 'ML-DSA-65' in n for n in result['notices']), result['notices']
+
+
+def test_bulk_sign_reports_a_dropped_csr_bit(app, auth_client, create_ca):
+    ca = create_ca(cn='KU bulk sign CA')
+    csr_pem = _ml_dsa_csr('bulk-ku.example.test', [_usage('digital_signature', 'key_encipherment')])
+    r = _post(auth_client, '/api/v2/csrs/upload', {'pem': csr_pem.decode(), 'name': 'bulk-ku'})
+    assert r.status_code in (200, 201), r.get_json()
+    csr_id = r.get_json()['data']['id']
+    r = _post(auth_client, '/api/v2/csrs/bulk/sign', {'ids': [csr_id], 'ca_id': ca['id'], 'validity_days': 30})
+    assert r.status_code == 200, r.get_json()
+    assert r.get_json()['data']['success'] == [csr_id], r.get_json()
+    notices = (r.get_json().get('meta') or {}).get('notices') or []
+    assert any(n.startswith(f'CSR {csr_id}:') and 'keyEncipherment' in n for n in notices), notices
+    with app.app_context():
+        assert _bits(_row_cert(db.session.get(Certificate, csr_id))) == {'digital_signature'}
+
+
 # ---- CAs ------------------------------------------------------------------------
+
+def test_sign_csr_sub_ca_drops_the_csr_encryption_bits():
+    ca_cert, ca_key = _rsa_ca()
+    asked = _usage('digital_signature', 'key_encipherment', 'data_encipherment', 'key_agreement',
+                   'key_cert_sign', 'crl_sign')
+    notices = []
+    pem = TrustStoreService.sign_csr(
+        _ml_dsa_csr('sub-ca-ku', [asked, x509.BasicConstraints(ca=True, path_length=0)]),
+        ca_cert, ca_key, validity_days=30, cert_type='intermediate_ca', notices=notices)
+    assert _bits(x509.load_pem_x509_certificate(pem)) == CA_BITS
+    assert len(notices) == 1 and 'keyEncipherment' in notices[0], notices
+
 
 def test_ml_dsa_ca_certificate_default_bits():
     key = mldsa.MLDSA65PrivateKey.generate()

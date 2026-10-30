@@ -873,6 +873,10 @@ def sign_csr(msca_id, csr_id):
     try:
         from cryptography import x509 as _x509
         _csr_obj = _x509.load_pem_x509_csr(csr_pem.encode('utf-8'))
+        from utils.key_type import unsignable_csr_key
+        _unsignable = unsignable_csr_key(_csr_obj)
+        if _unsignable:
+            return error_response(_unsignable, 400)
         if not _csr_obj.is_signature_valid:
             return error_response("CSR signature is invalid", 400)
     except ValueError as e:

@@ -38,10 +38,13 @@ def digest_ignored(requested: str, key_label: str) -> str:
             f'separate digest.')
 
 
-def key_usage_dropped(bits, key_label: str) -> str:
+def key_usage_dropped(bits, key_label: str, family=None, signature_added=False) -> str:
     """KeyUsage bits that were asked for and that the certified key cannot honour."""
-    return (f'{", ".join(bits)} removed from the key usage: a {key_label} key '
-            f'cannot encrypt.')
+    reason = 'encrypt only through keyAgreement' if family == 'EC' else 'only sign'
+    text = f'{", ".join(bits)} removed from the key usage: {key_label} keys {reason}.'
+    if signature_added:
+        text += ' digitalSignature is set instead, since a key usage cannot be empty.'
+    return text
 
 
 def collect(*notices) -> List[str]:

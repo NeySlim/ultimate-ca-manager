@@ -24,6 +24,7 @@ from services.deletion_blockers import parse_bulk_ids
 from services.policy_service import PolicyViolation
 from utils.csr_extensions import csr_extensions
 from fips_mode import FipsRestricted
+from utils.key_type import unsignable_csr_key
 from utils.san_parse import (general_names_from_buckets, parse_extra_san_payload,
                              san_buckets_from_general_names)
 from services.audit_service import AuditService
@@ -157,6 +158,9 @@ def _csr_identity(cert):
     from cryptography import x509 as _x509
     from cryptography.x509.oid import ExtensionOID as _ExtOID, NameOID as _NameOID
     csr_obj = _x509.load_pem_x509_csr(base64.b64decode(cert.csr))
+    unsignable = unsignable_csr_key(csr_obj)
+    if unsignable:
+        raise ValueError(unsignable)
     cn_attrs = csr_obj.subject.get_attributes_for_oid(_NameOID.COMMON_NAME)
     csr_cn = cn_attrs[0].value if cn_attrs else None
     try:
@@ -340,6 +344,8 @@ def create_csr():
         from utils.key_type import parse_csr_key_type
         try:
             key_type = parse_csr_key_type(data.get('key_type', 'RSA 2048'))
+        except FipsRestricted:
+            raise
         except ValueError as exc:
             return error_response(str(exc), 400)
 
@@ -381,6 +387,8 @@ def create_csr():
             data=cert_dict,
             message='CSR created successfully'
         )
+    except FipsRestricted:
+        raise
     except Exception as e:
         logger.error(f"Failed to create CSR: {e}")
         return error_response('Failed to create CSR', 500)
@@ -417,6 +425,9 @@ def upload_csr():
         except (ValueError, TypeError) as e:
             return error_response(f'Invalid CSR PEM: {e}', 400)
 
+        unsignable = unsignable_csr_key(csr)
+        if unsignable:
+            return error_response(unsignable, 400)
         # RFC 2986 §2.2: verify CSR signature
         if not csr.is_signature_valid:
             return error_response('CSR has invalid signature', 400)
@@ -543,6 +554,9 @@ def import_csr():
         except (ValueError, TypeError) as e:
             return error_response(f'Invalid CSR PEM: {e}', 400)
 
+        unsignable = unsignable_csr_key(csr)
+        if unsignable:
+            return error_response(unsignable, 400)
         # RFC 2986 §2.2: verify CSR signature
         if not csr.is_signature_valid:
             return error_response('CSR has invalid signature', 400)
@@ -1175,6 +1189,7 @@ def bulk_sign_csrs():
         logger.warning(f"Could not clamp validity to CA expiration: {e}")
 
     results = {'success': [], 'failed': []}
+    signed_notices = []
 
     for csr_id in ids:
         try:
@@ -1214,12 +1229,14 @@ def bulk_sign_csrs():
                      'notice': ' '.join(_item_notice) or None})
                 continue
 
+            item_notices = []
             signed_cert = CertificateService.sign_csr(
                 cert_id=csr_id, caref=ca.refid, validity_days=item_validity,
                 allow_sensitive_ekus=True,
                 username=getattr(g.current_user, 'username', 'system'),
-                policy_template_id=data.get('template_id'))
+                policy_template_id=data.get('template_id'), notices=item_notices)
             results['success'].append(csr_id)
+            signed_notices += [f'CSR {csr_id}: {n}' for n in item_notices if n]
         except PolicyViolation as e:
             results['failed'].append({'id': csr_id, 'error': f'Policy violation: {e}'})
         except FipsRestricted as e:
@@ -1239,7 +1256,7 @@ def bulk_sign_csrs():
     return success_response(
         data=results, message=f'{len(results["success"])} CSRs signed',
         meta=notices_mod.meta_with_notices(
-            notices_mod.collect(bulk_clamp_notice)))
+            notices_mod.collect(bulk_clamp_notice, signed_notices)))
 
 
 @bp.route('/api/v2/csrs/bulk/delete', methods=['POST'])
