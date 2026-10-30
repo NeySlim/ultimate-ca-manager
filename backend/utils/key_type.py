@@ -3,6 +3,8 @@ from __future__ import annotations
 
 import re
 
+from cryptography.exceptions import UnsupportedAlgorithm
+
 import fips_mode
 from utils import key_algorithms
 
@@ -64,6 +66,43 @@ def _lookup_ec_curve(value: str) -> str:
     raise ValueError(_EC_ERROR_HINT)
 
 
+# Families a request names alone, with the parameter in key_size ('ml-dsa' + '65')
+_REQUEST_FAMILIES = {'rsa': 'RSA', 'ec': 'EC', 'ecdsa': 'EC', 'mldsa': 'ML-DSA'}
+
+
+def _request_family(key_type) -> str | None:
+    token = str(key_type or 'rsa').strip()
+    family = _REQUEST_FAMILIES.get(_ec_alias_key(token))
+    if family is None:
+        alg = key_algorithms.get(token)
+        family = alg.family if alg else None
+    return family
+
+
+def _registry_key_type(raw_type: str, raw_size) -> str | None:
+    """KEY_TYPES id of a key outside RSA and EC, named by its label ('ML-DSA-65') or
+    by family and parameter ('ml-dsa' + '65'); None when *raw_type* names no such key."""
+    alg = key_algorithms.get(raw_type)
+    size = str(raw_size or '').strip()
+    if alg is None:
+        family = _REQUEST_FAMILIES.get(_ec_alias_key(raw_type))
+        if family in (None, 'RSA', 'EC'):
+            return None
+        choices = [a.param for a in key_algorithms.algorithms(family)]
+        if not choices:
+            raise ValueError(f'{family} keys are not available on this build: they need OpenSSL 3.5 or later')
+        alg = key_algorithms.get(f'{family}-{size}') if size.isdigit() else key_algorithms.get(size)
+        if alg is None or alg.family != family:
+            raise ValueError(f'{family} key size must be one of {", ".join(choices)}')
+    if alg.family in ('RSA', 'EC') or alg.trust_store_id is None:
+        return None
+    # A full label wins over a default size, never over another level of its family
+    other = key_algorithms.get(f'{alg.family}-{size}') if size.isdigit() else None
+    if other is not None and other is not alg:
+        raise ValueError(f'key type {alg.label} and key size {size} name different keys')
+    return alg.trust_store_id
+
+
 def parse_issue_key_type(
     key_type: str | None = None,
     key_size: str | int | None = None,
@@ -73,6 +112,11 @@ def parse_issue_key_type(
     """Normalize Issue Certificate ``key_type``/``key_size`` to TrustStore KEY_TYPES id."""
     raw_type = str(key_type or 'rsa').strip()
     raw_size = str(key_size if key_size is not None else '2048').strip()
+
+    if not curve:
+        registry_id = _registry_key_type(raw_type, raw_size)
+        if registry_id is not None:
+            return registry_id
 
     if ' ' in raw_type and not curve:
         return parse_csr_key_type(raw_type)
@@ -95,23 +139,23 @@ def parse_issue_key_type(
 
 
 def fill_key_params_from_template(key_type, key_size, template_key_type):
-    """Default unset ``key_type``/``key_size`` from a template's ``"RSA-2048"`` /
-    ``"EC-P384"`` string, for the API paths that mirror the UI's template prefill.
+    """Default unset ``key_type``/``key_size`` from a template's registry label
+    (``"RSA-2048"``, ``"EC-P384"``, ``"ML-DSA-65"``), for the API paths that
+    mirror the UI's template prefill.
 
-    ``key_size`` is only inherited when the request's algorithm still matches the
+    ``key_size`` is only inherited when the request's family still matches the
     template's, so an explicit ``key_type=rsa`` never picks up an EC curve (#318).
-    Returns the (possibly filled) ``(key_type, key_size)`` pair unchanged in type.
+    A label the registry does not know is passed on for the parser to refuse.
     """
     if not template_key_type:
         return key_type, key_size
-    tpl_algo, _, tpl_size = template_key_type.partition('-')
+    alg = key_algorithms.get(template_key_type)
+    if alg is None:
+        return key_type or template_key_type, key_size
     if not key_type:
-        key_type = tpl_algo
-    if not key_size and tpl_size:
-        tpl_is_ec = tpl_algo.strip().lower() in ('ec', 'ecdsa')
-        req_is_ec = str(key_type or 'rsa').strip().lower() in ('ec', 'ecdsa')
-        if tpl_is_ec == req_is_ec:
-            key_size = tpl_size
+        key_type = alg.family
+    if not key_size and alg.param and _request_family(key_type) == alg.family:
+        key_size = alg.param
     return key_type, key_size
 
 
@@ -135,6 +179,9 @@ def issue_key_type_from_template(template_key_type) -> str | None:
 def parse_csr_key_type(key_algo_full: str) -> str:
     """Parse frontend key_type (e.g. ``RSA 2048``, ``EC P-256``) for CSR generation."""
     raw = (key_algo_full or 'RSA 2048').strip()
+    registry_id = _registry_key_type(raw, None)
+    if registry_id is not None:
+        return registry_id
     upper = raw.upper()
 
     if upper.startswith('RSA') or re.fullmatch(r'\d{4}', raw):
@@ -179,7 +226,7 @@ def validate_enrollment_public_key(public_key) -> str | None:
     """Return an error string if *public_key* is too weak to certify, else None.
 
     Accepts a cryptography public-key object (from a parsed CSR). Ed25519 /
-    Ed448 are accepted (fixed, strong). Unknown key types are rejected — an
+    Ed448 and, outside FIPS mode, ML-DSA are accepted. Unknown key types are rejected — an
     enrollment endpoint should not sign a key it cannot assess.
     """
     family = key_algorithms.family_for_public_key(public_key)
@@ -204,4 +251,21 @@ def validate_enrollment_public_key(public_key) -> str | None:
     if family in ('ED25519', 'ED448'):
         return None
 
+    if family == 'ML-DSA':
+        if fips_mode.enabled():
+            return f'{key_algorithms.label_for_public_key(public_key)} keys are not available in FIPS mode'
+        return None
+
     return f'Unsupported public key type: {type(public_key).__name__}'
+
+
+def validate_enrollment_csr(csr) -> str | None:
+    """:func:`validate_enrollment_public_key` for a CSR, whose key this build may
+    not load at all (SLH-DSA): such a key is refused, never signed."""
+    try:
+        public_key = csr.public_key()
+    except UnsupportedAlgorithm:
+        oid = csr.public_key_algorithm_oid
+        info = key_algorithms.post_quantum_info(oid)
+        return f'{info.label if info else oid.dotted_string} keys are not signable by this instance'
+    return validate_enrollment_public_key(public_key)

@@ -38,7 +38,7 @@ from services.hsm import HsmService
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives.asymmetric import dsa
-from utils import key_algorithms
+from utils import key_algorithms, notices as notices_mod
 from websocket.emitters import on_ca_created, on_ca_updated, on_ca_deleted
 
 logger = logging.getLogger(__name__)
@@ -75,7 +75,15 @@ _MAX_PATH_LENGTH = 32
 _OID_RE = re.compile(r'^[0-2](\.\d+)+$')
 
 
-_CA_KEY_FAMILIES = {'rsa': 'RSA', 'ecdsa': 'EC', 'ec': 'EC'}
+_CA_KEY_FAMILIES = {'rsa': 'RSA', 'ecdsa': 'EC', 'ec': 'EC', 'ml-dsa': 'ML-DSA', 'mldsa': 'ML-DSA'}
+
+
+def _size_names(alg, size) -> bool:
+    """Whether keySize *size* (bits, curve or level, int or text) names *alg*."""
+    if isinstance(size, bool):
+        return False
+    text = str(size).strip()
+    return key_algorithms.get(text) is alg or text in (str(alg.key_size), alg.param)
 
 
 def _blank(value):
@@ -100,32 +108,29 @@ def _resolve_local_key_type(data):
     labels = {key_algorithms.get(v) for v in names}
     if len(labels) == 1 and None not in labels:
         alg = labels.pop()
-        if alg.family in ('RSA', 'EC') and alg.trust_store_id:
-            if not _blank(size) and key_algorithms.get(str(size).strip()) is not alg \
-                    and str(size).strip() != str(alg.key_size):
+        if alg.trust_store_id:
+            if not _blank(size) and not _size_names(alg, size):
                 return None, 'keyAlgo and keySize name different keys'
             return alg.trust_store_id, None
     families = {_CA_KEY_FAMILIES.get(v.strip().lower()) for v in names}
     if None in families:
-        return None, f'Unsupported keyAlgo {names[0]!r}: a CA key is RSA or ECDSA (EC)'
+        return None, f'Unsupported keyAlgo {names[0]!r}: a CA key is RSA, ECDSA (EC) or ML-DSA'
     if len(families) > 1:
         return None, 'keyAlgo and keyType name different algorithms'
     family = families.pop()
     choices = [a for a in key_algorithms.algorithms(family) if a.trust_store_id]
-    if _blank(size):
+    if not choices:
+        return None, f'{family} keys are not available on this build: they need OpenSSL 3.5 or later'
+    if _blank(size) and family != 'ML-DSA':
         return choices[0].trust_store_id, None
     alg = None
-    if isinstance(size, int) and not isinstance(size, bool):
-        alg = next((a for a in choices if a.key_size == size), None)
-    elif isinstance(size, str):
-        text = size.strip()
-        if text.isdigit():
-            alg = next((a for a in choices if a.key_size == int(text)), None)
-        else:
-            alg = key_algorithms.get(text)
-    if alg is None or alg not in choices:
+    if isinstance(size, (int, str)) and not _blank(size):
+        alg = next((a for a in choices if _size_names(a, size)), None)
+    if alg is None:
         if family == 'RSA':
             return None, f'RSA key size must be one of {[a.key_size for a in choices]}'
+        if family == 'ML-DSA':
+            return None, f'ML-DSA key size must be one of {[int(a.param) for a in choices]}'
         return None, f'ECDSA curve must be one of {[a.trust_store_id for a in choices]}'
     return alg.trust_store_id, None
 
@@ -554,6 +559,11 @@ def create_ca():
         digest, digest_err = resolve_digest(raw_digest, digest_key_type)
         if digest_err:
             return error_response(digest_err, 400)
+        digest_explicit = digest is not None and str(raw_digest or 'auto').strip().lower() != 'auto'
+        notices = []
+        if digest is None and str(raw_digest or 'auto').strip().lower() != 'auto':
+            notices.append(notices_mod.digest_ignored(
+                raw_digest, key_algorithms.normalize_label(digest_key_type) or digest_key_type))
 
         signature_scheme, scheme_err = normalize_signature_scheme(data.get('signatureScheme'))
         if scheme_err:
@@ -615,7 +625,8 @@ def create_ca():
             emit_ca_created(ca_dict, actor=username)
             return created_response(
                 data=ca_dict,
-                message='CA created, awaiting certificate from external CA'
+                message='CA created, awaiting certificate from external CA',
+                meta=notices_mod.meta_with_notices(notices),
             )
 
         raw_eku = data.get('extendedKeyUsage')
@@ -651,7 +662,7 @@ def create_ca():
             hsm_key_algorithm=hsm_key_algorithm,
             named_urls=bool(data.get('namedUrls')),
             # 'auto' (or nothing) is no choice: it yields to the policies
-            digest_explicit=str(raw_digest or 'auto').strip().lower() != 'auto',
+            digest_explicit=digest_explicit,
             signature_scheme=signature_scheme,
             compliance_profile=compliance_profile,
         )
@@ -664,7 +675,8 @@ def create_ca():
 
         return created_response(
             data=ca_dict,
-            message='CA created successfully'
+            message='CA created successfully',
+            meta=notices_mod.meta_with_notices(notices),
         )
     except FipsRestricted:
         raise

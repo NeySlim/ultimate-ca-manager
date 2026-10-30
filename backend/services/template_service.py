@@ -14,9 +14,8 @@ import logging
 
 logger = logging.getLogger(__name__)
 
-# Key types a template may ask for: X.509 issuance cannot generate an Edwards key.
-TEMPLATE_KEY_TYPES = tuple(
-    a.label for a in key_algorithms.algorithms() if a.family in ('RSA', 'EC'))
+# Key types a template may ask for: those issuance generates (TrustStore id), no Edwards key.
+TEMPLATE_KEY_TYPES = tuple(a.label for a in key_algorithms.algorithms() if a.trust_store_id)
 
 
 def template_key_type_label(value) -> Optional[str]:

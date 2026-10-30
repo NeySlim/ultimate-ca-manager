@@ -27,13 +27,17 @@ from .helpers import save_ca_files, save_ca_key_file
 logger = logging.getLogger(__name__)
 
 
-def _key_default_digest(private_key) -> str:
-    """The digest 'auto' picks for this key: its curve's for EC, SHA-256 otherwise (#366)."""
+def _key_default_digest(private_key) -> Optional[str]:
+    """The digest 'auto' picks for this key: its curve's for EC, None for a key
+    that takes none (ML-DSA), SHA-256 otherwise (#366)."""
     from cryptography.hazmat.primitives.asymmetric import ec
+    from utils import key_algorithms
     from utils.ca_profile import default_digest_for_key_type
     public_key = private_key.public_key()
     if isinstance(public_key, ec.EllipticCurvePublicKey):
         return default_digest_for_key_type(public_key.curve.name)
+    if not key_algorithms.needs_digest(public_key):
+        return None
     return 'sha256'
 
 

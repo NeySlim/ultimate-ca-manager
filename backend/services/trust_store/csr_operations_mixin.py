@@ -653,16 +653,17 @@ class CSROperationsMixin:
         # Load CSR
         csr = x509.load_pem_x509_csr(csr_pem, default_backend())
         csr_exts = csr_extensions(csr)
-        if require_pop and not csr.is_signature_valid:
-            raise ValueError("CSR has invalid signature")
 
         # Key-strength floor. Enforced here rather than at each caller so every
         # issuance path (admin sign-CSR, ACME finalize, EST/SCEP, renewal)
         # inherits it from the one place that actually applies a CA signature.
-        from utils.key_type import validate_enrollment_public_key
-        key_err = validate_enrollment_public_key(csr.public_key())
+        # Before the signature check: a key pyca cannot load cannot be verified either.
+        from utils.key_type import validate_enrollment_csr
+        key_err = validate_enrollment_csr(csr)
         if key_err:
             raise ValueError(f"CSR public key rejected: {key_err}")
+        if require_pop and not csr.is_signature_valid:
+            raise ValueError("CSR has invalid signature")
 
         # Effective subject: an override (if any) wins outright; otherwise
         # fall back to populating CN from the CSR's own first SAN DNS name

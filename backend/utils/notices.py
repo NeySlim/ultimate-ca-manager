@@ -32,6 +32,12 @@ def issuer_expiry_reason(not_after) -> str:
             f'{not_after.strftime("%Y-%m-%d")} and no certificate may outlive it')
 
 
+def digest_ignored(requested: str, key_label: str) -> str:
+    """A digest was asked for a key whose signature scheme fixes its own hash."""
+    return (f'Digest {requested} ignored: {key_label} signs without a '
+            f'separate digest.')
+
+
 def collect(*notices) -> List[str]:
     """The notices that are actually there, in order, without blanks; a list
     among them (policy advisories) is spread."""
@@ -55,6 +61,7 @@ __all__ = [
     'validity_shortened',
     'policy_validity_reason',
     'issuer_expiry_reason',
+    'digest_ignored',
     'collect',
     'meta_with_notices',
 ]

@@ -9,6 +9,7 @@ from typing import List, Optional, Tuple
 
 from cryptography import x509
 
+from utils import key_algorithms
 from utils.eku_validation import normalize_extra_ekus, to_object_identifiers
 
 # Short names accepted in API/UI (aligned with cert_extensions.py labels)
@@ -48,24 +49,35 @@ _CURVE_DIGESTS = {
 }
 
 
-def default_digest_for_key_type(key_type: str) -> str:
+def _signs_without_digest(key_type) -> bool:
+    alg = key_algorithms.get(key_type)
+    return alg is not None and not alg.needs_digest
+
+
+def default_digest_for_key_type(key_type: str) -> Optional[str]:
     """
     Map key type to a hash of matching strength by curve size (NIST SP 800-57,
-    BSI TR-02102-1). RSA defaults to SHA-256 unless the caller overrides.
+    BSI TR-02102-1). RSA defaults to SHA-256 unless the caller overrides;
+    None for a key whose scheme takes no digest (ML-DSA).
     """
+    if _signs_without_digest(key_type):
+        return None
     return _CURVE_DIGESTS.get(str(key_type).lower(), 'sha256')
 
 
-def resolve_digest(digest: Optional[str], key_type: str) -> Tuple[str, Optional[str]]:
+def resolve_digest(digest: Optional[str], key_type: str) -> Tuple[Optional[str], Optional[str]]:
     """
     Resolve digest from API input ('auto', explicit, or None).
-    Returns (digest, error_message).
+    Returns (digest, error_message); the digest is None for a key that takes
+    none, a valid requested one being ignored rather than refused.
     """
     if digest is None or digest == '' or digest == 'auto':
         return default_digest_for_key_type(key_type), None
     normalized = digest.lower().strip()
     if normalized not in ALLOWED_DIGESTS:
         return '', f'digest must be one of auto, {", ".join(sorted(ALLOWED_DIGESTS))}'
+    if _signs_without_digest(key_type):
+        return None, None
     return normalized, None
 
 

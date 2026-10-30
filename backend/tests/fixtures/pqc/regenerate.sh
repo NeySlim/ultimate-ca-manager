@@ -43,3 +43,5 @@ openssl cms -sign -binary -nodetach -md sha512 -signer mldsa65-cert.pem -inkey m
 # SLH-DSA-SHA2-128s self-signed certificate (read-only in UCM: pyca cannot sign it)
 openssl req -x509 -newkey SLH-DSA-SHA2-128s -nodes -keyout /dev/null \
     -subj "/CN=UCM PQC fixture SLH-DSA-SHA2-128s" -days "$DAYS" -out slhdsa-sha2-128s-cert.pem
+openssl req -new -newkey SLH-DSA-SHA2-128s -nodes -keyout /dev/null \
+    -subj "/CN=UCM PQC fixture SLH-DSA-SHA2-128s" -out slhdsa-sha2-128s-csr.pem

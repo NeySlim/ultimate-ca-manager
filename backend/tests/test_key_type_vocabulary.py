@@ -31,7 +31,8 @@ REGISTRY = os.path.join(_REPO, 'frontend', 'src', 'lib', 'keyAlgorithms.js')
 # The labels a template stores; legacy spellings (`rsa:2048`, `ec:p256`) are
 # accepted on input and stored as these.
 CANONICAL = set(TEMPLATE_KEY_TYPES)
-SCREEN_SET = CANONICAL
+# The API takes ML-DSA already; the forms offer it once they send its contract
+SCREEN_SET = {label for label in CANONICAL if key_algorithms.get(label).family != 'ML-DSA'}
 
 
 @pytest.fixture(scope='module')
@@ -53,10 +54,11 @@ def _generated(rows):
 
 
 class TestTheScreensOfferWhatTheApiAccepts:
-    def test_the_canonical_set_is_the_six_plus_brainpool(self):
+    def test_the_canonical_set_is_the_six_plus_brainpool_and_mldsa(self):
         assert CANONICAL == {'RSA-2048', 'RSA-3072', 'RSA-4096',
                              'EC-P256', 'EC-P384', 'EC-P521',
-                             'EC-BP256', 'EC-BP384', 'EC-BP512'}
+                             'EC-BP256', 'EC-BP384', 'EC-BP512',
+                             *key_algorithms.labels('ML-DSA')}
 
     def test_the_registry_the_screens_read_offers_all_of_them(self, js_registry):
         offered = {r['label'] for r in _generated(js_registry)}

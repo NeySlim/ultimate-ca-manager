@@ -21,5 +21,7 @@ class KeyOperationsMixin:
             return key_algorithms.generate_rsa(param)
         elif algo == 'ec':
             return key_algorithms.generate_ec(param)
+        elif algo == 'registry':
+            return key_algorithms.generate(param)
 
         raise ValueError(f"Unknown algorithm: {algo}")
