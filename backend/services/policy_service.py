@@ -454,16 +454,18 @@ class PolicyEvaluationService:
         from cryptography.hazmat.primitives import hashes
         from services.trust_store.constants import hash_algorithm
         from utils.signing_hash import signing_hash_for
-        key_default = key_algorithms.default_digest_for_key(ca_key)
-        name = str(digest or key_default).strip().lower()
-        if not explicit:
-            # SHA-256 is the callers' placeholder default: the key's registry digest stands in
-            name = PolicyEvaluationService.choose_digest(
-                policies, key_default if name == 'sha256' else name)
-        try:
-            requested = hash_algorithm(name)
-        except ValueError as e:
-            return hashes.SHA256(), [str(e)]
+        key_default = key_algorithms.default_digest_for_key(ca_key)  # None: the key takes no digest
+        requested = None
+        if digest or key_default:
+            name = str(digest or key_default).strip().lower()
+            if not explicit:
+                # SHA-256 is the callers' placeholder default: the key's registry digest stands in
+                name = PolicyEvaluationService.choose_digest(
+                    policies, (key_default or name) if name == 'sha256' else name)
+            try:
+                requested = hash_algorithm(name)
+            except ValueError as e:
+                return hashes.SHA256(), [str(e)]
         sign_hash = signing_hash_for(ca_key, requested)
         violations, _, _ = PolicyEvaluationService.enforce_rules(
             policies, key_type=key_type,

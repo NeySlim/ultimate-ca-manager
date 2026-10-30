@@ -529,7 +529,8 @@ class CA(db.Model):
             from cryptography import x509
             from utils.key_algorithms import default_digest_for_key
             cert = x509.load_pem_x509_certificate(base64.b64decode(self.crt))
-            return default_digest_for_key(cert.public_key())
+            # A key that takes no digest still reports sha256, which its signer ignores
+            return default_digest_for_key(cert.public_key()) or 'sha256'
         except Exception:
             return 'sha256'
 

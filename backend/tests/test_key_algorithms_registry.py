@@ -159,6 +159,17 @@ class TestRegistry:
         digest = getattr(hashes, alg.default_digest.upper())() if alg.default_digest else None
         x509.CertificateSigningRequestBuilder().subject_name(name).sign(sk, digest)
 
+    @pytest.mark.parametrize('label', REGISTERED)
+    def test_default_digest_for_key_is_the_row_digest(self, label):
+        sk = ka.generate(label)
+        expected = ka.get(label).default_digest   # None for Ed25519, Ed448, ML-DSA
+        assert ka.default_digest_for_key(sk) == expected
+        assert ka.default_digest_for_key(sk.public_key()) == expected
+
+    def test_default_digest_for_an_unregistered_key_is_sha256(self):
+        for spec in ('dsa:2048', 'rsa:1024', 'ec:secp256k1'):
+            assert ka.default_digest_for_key(build_key(spec)) == 'sha256', spec
+
     def test_every_mldsa_alias_adds_a_spelling(self):
         # case, spaces, '-', '_' and ':' are already free; EC aliases also feed utils.key_type
         for alg in ka._KNOWN.algorithms:

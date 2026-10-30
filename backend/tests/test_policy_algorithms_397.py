@@ -13,7 +13,7 @@ import pytest
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, mldsa, rsa
 from cryptography.x509.oid import NameOID
 
 from models import CA, Certificate, db
@@ -103,6 +103,13 @@ class TestRuleHelpers:
         sign_hash, v = PolicyEvaluationService.checked_signing_hash(
             [pol], key, 'sha256', explicit=False)
         assert sign_hash.name == 'sha384' and v == []
+
+    @pytest.mark.parametrize('make_key', [ed25519.Ed25519PrivateKey.generate, mldsa.MLDSA65PrivateKey.generate])
+    @pytest.mark.parametrize('explicit', [True, False])
+    def test_a_key_without_digest_signs_with_none_when_none_is_asked(self, make_key, explicit):
+        pol = _pol({'allowed_digests': ['sha384']})
+        assert PolicyEvaluationService.checked_signing_hash(
+            [pol], make_key(), None, explicit=explicit) == (None, [])
 
     def test_every_key_gets_a_label(self):
         assert key_label_for_public_key(

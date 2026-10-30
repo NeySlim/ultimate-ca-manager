@@ -310,10 +310,11 @@ def label_for_public_key(public_key) -> str | None:
     return None
 
 
-def default_digest_for_key(key) -> str:
-    """Digest name UCM signs with when none is requested, for a public or private key; sha256 if unregistered."""
+def default_digest_for_key(key) -> str | None:
+    """Digest name UCM signs with when none is requested, for a public or private key;
+    None when its scheme takes no digest (Ed25519, Ed448, ML-DSA), sha256 if unregistered."""
     for alg in _REGISTRY.algorithms:
-        if alg.default_digest and alg.matches_key(key):
+        if alg.matches_key(key):
             return alg.default_digest
     return 'sha256'
 
