@@ -1167,16 +1167,16 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
 
 
 def _rekey_key_type(public_key):
-    """TrustStore key type reproducing *public_key* (registry RSA sizes and
-    EC curves, plus the larger RSA sizes UCM generates); ValueError otherwise."""
+    """TrustStore key type reproducing *public_key* (every registry key TrustStore
+    generates, same size, curve or level, plus the larger RSA sizes); ValueError otherwise."""
     label = key_algorithms.label_for_public_key(public_key)
     alg = key_algorithms.get(label) if label else None
     if (alg is None and isinstance(public_key, rsa.RSAPublicKey)
             and public_key.key_size >= MIN_RSA_BITS and str(public_key.key_size) in KEY_TYPES):
         return str(public_key.key_size)
-    if alg is None or alg.family not in ('RSA', 'EC') or not alg.trust_store_id:
+    if alg is None or alg.trust_store_id not in KEY_TYPES:
         supported = ', '.join(a.display for a in key_algorithms.algorithms()
-                              if a.family in ('RSA', 'EC'))
+                              if a.trust_store_id in KEY_TYPES)
         raise ValueError(
             f'Cannot rekey for renewal: the original key is not one UCM can reproduce '
             f'(supported: {supported})')
