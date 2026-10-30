@@ -53,9 +53,23 @@ class Ns1DnsProvider(BaseDnsProvider):
         zone = self._find_zone(domain)
         if not zone:
             return False, f"Could not find zone for {domain}"
-        data = {'zone': zone, 'domain': record_name, 'type': 'TXT', 'ttl': ttl,
-                'answers': [{'answer': [record_value]}]}
-        success, result = self._request('PUT', f'/zones/{zone}/{record_name}/TXT', data)
+        path = f'/zones/{zone}/{record_name}/TXT'
+        success, existing = self._request('GET', path)
+        if success:
+            answers = list((existing or {}).get('answers') or [])
+            if any(a.get('answer') == [record_value] for a in answers):
+                return True, "Record already present"
+            # PUT fails on an existing record and POST replaces its answers, so send the union.
+            data = {'zone': zone, 'domain': record_name, 'type': 'TXT',
+                    'ttl': (existing or {}).get('ttl', ttl),
+                    'answers': answers + [{'answer': [record_value]}]}
+            success, result = self._request('POST', path, data)
+        elif 'not found' in str(existing).lower():
+            data = {'zone': zone, 'domain': record_name, 'type': 'TXT', 'ttl': ttl,
+                    'answers': [{'answer': [record_value]}]}
+            success, result = self._request('PUT', path, data)
+        else:
+            return False, f"Failed to read existing records: {existing}"
         if not success:
             return False, f"Failed to create record: {result}"
         return True, "Record created successfully"

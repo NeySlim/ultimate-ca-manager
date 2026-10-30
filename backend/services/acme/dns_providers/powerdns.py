@@ -4,6 +4,7 @@ Uses PowerDNS HTTP API for DNS record management
 https://doc.powerdns.com/authoritative/http-api/
 """
 import requests
+from urllib.parse import quote
 from typing import Tuple, Dict, Any, Optional
 import logging
 
@@ -62,8 +63,20 @@ class PowerDnsDnsProvider(BaseDnsProvider):
         if not zone:
             return False, f"Could not find zone for {domain}"
         fqdn = record_name if record_name.endswith('.') else record_name + '.'
-        data = {'rrsets': [{'name': fqdn, 'type': 'TXT', 'ttl': ttl, 'changetype': 'REPLACE',
-                            'records': [{'content': f'"{record_value}"', 'disabled': False}]}]}
+        # REPLACE rewrites the whole rrset, so send the existing values plus the new one.
+        success, result = self._request('GET', f'/zones/{zone}?rrset_name={quote(fqdn)}&rrset_type=TXT')
+        if not success:
+            return False, f"Failed to read existing records: {result}"
+        rrsets = [r for r in (result or {}).get('rrsets', [])
+                  if r.get('type') == 'TXT' and r.get('name', '').lower() == fqdn.lower()]
+        records = [{'content': r['content'], 'disabled': r.get('disabled', False)}
+                   for rr in rrsets for r in rr.get('records', [])]
+        content = f'"{record_value}"'
+        if any(r['content'] == content and not r['disabled'] for r in records):
+            return True, "Record already present"
+        records.append({'content': content, 'disabled': False})
+        data = {'rrsets': [{'name': fqdn, 'type': 'TXT', 'ttl': rrsets[0].get('ttl', ttl) if rrsets else ttl,
+                            'changetype': 'REPLACE', 'records': records}]}
         success, result = self._request('PATCH', f'/zones/{zone}', data)
         if not success:
             return False, f"Failed to create record: {result}"
