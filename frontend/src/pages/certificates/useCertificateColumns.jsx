@@ -4,6 +4,7 @@ import {
 } from '@phosphor-icons/react'
 import { Badge, KeyIndicator } from '../../components'
 import { formatDate, extractCN, cn, joinCertificateName } from '../../lib/utils'
+import { keyAlgorithmLabel } from '../../lib/keyAlgorithms'
 
 export function useCertificateColumns(t) {
   const getStatusBadge = (row) => {
@@ -193,7 +194,7 @@ export function useCertificateColumns(t) {
       mono: true,
       render: (val, row) => (
         <span className="text-xs text-text-secondary">
-          {row.key_algorithm || row.key_algo || val || 'RSA'}
+          {keyAlgorithmLabel(row.key_algorithm || row.key_algo || val, t, row.security_level) || '—'}
         </span>
       )
     }

@@ -31,6 +31,7 @@ export default {
       'Smart Import verarbeitet PEM-Bündel mit mehreren Zertifikaten in einer einzelnen Datei',
       'Testen Sie die OPNsense-Verbindung, bevor Sie einen vollständigen Import durchführen',
       'PKCS#12-Dateien erfordern das korrekte Passwort zum Import privater Schlüssel',
+      'Post-Quanten-Zertifikate (ML-DSA, SLH-DSA) werden als PEM oder DER importiert und tragen ein Post-Quanten-Badge; eine PKCS#12-Datei kann noch keinen ML-DSA-Schlüssel enthalten',
     ],
   },
   helpGuides: {
@@ -57,6 +58,9 @@ Der Smart-Import-Assistent erkennt Dateitypen automatisch und verarbeitet sie:
 4. Klicken Sie auf **Importieren**, um sie zu UCM hinzuzufügen
 
 > 💡 Smart Import verarbeitet PEM-Bündel mit mehreren Zertifikaten in einer einzelnen Datei. Es unterscheidet automatisch zwischen CAs und Endentitätszertifikaten.
+
+### Post-Quanten-Zertifikate
+Zertifikate und Schlüssel mit **ML-DSA** (FIPS 204) oder **SLH-DSA** (FIPS 205) werden als PEM oder DER importiert. Sie werden mit ihrer Sicherheitsstufe angezeigt, z. B. *ML-DSA-65 (Stufe 3)*, und tragen ein **Post-Quanten**-Badge. PKCS#12 kann noch keinen ML-DSA-Schlüssel enthalten: Importieren Sie Zertifikat und Schlüssel als PEM.
 
 ## OPNsense-Integration
 

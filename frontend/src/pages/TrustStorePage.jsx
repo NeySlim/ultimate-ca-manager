@@ -26,6 +26,7 @@ import { formatDate, cn, daysRemaining, downloadBlob } from '../lib/utils'
 import { soleImported } from '../lib/importResult'
 import { runInBatches } from '../lib/bulkChunks'
 import { useOpenEntity } from '../hooks/useOpenEntity'
+import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
 export default function TrustStorePage() {
   const { t } = useTranslation()
   const { id: urlCertId } = useParams()
@@ -494,12 +495,12 @@ export default function TrustStorePage() {
         <div className="grid grid-cols-3 gap-2">
           <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
             <Key size={16} className="mx-auto text-text-tertiary mb-1" />
-            <div className="text-xs font-medium text-text-primary">{selectedCert.key_type || 'RSA'}</div>
+            <div className="text-xs font-medium text-text-primary">{keyAlgorithmLabel(selectedCert.key_type, t, selectedCert.security_level) || '—'}</div>
             <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
           </div>
           <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
             <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
-            <div className="text-xs font-medium text-text-primary truncate">{selectedCert.signature_algorithm || 'SHA256'}</div>
+            <div className="text-xs font-medium text-text-primary truncate">{selectedCert.signature_algorithm || '—'}</div>
             <div className="text-2xs text-text-tertiary" title={t('common.issuerSignatureAlgorithmHint')}>{t('common.issuerSignatureShort')}</div>
           </div>
           <div className="bg-tertiary-op50 rounded-lg p-2.5 text-center">
@@ -545,7 +546,7 @@ export default function TrustStorePage() {
         <CompactSection title={t('common.technicalDetails')} icon={Info}>
           <CompactGrid>
             <CompactField icon={Hash} label={t('common.serial')} value={selectedCert.serial_number} mono copyable />
-            <CompactField icon={Key} label={t('common.keyType')} value={selectedCert.key_type} />
+            <CompactField icon={Key} label={t('common.keyType')} value={keyAlgorithmLabel(selectedCert.key_type, t, selectedCert.security_level)} />
           </CompactGrid>
         </CompactSection>
 

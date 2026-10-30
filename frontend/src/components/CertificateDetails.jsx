@@ -55,6 +55,8 @@ import { CertDeploySection } from './deploy/CertDeploySection'
 import { cn } from '../lib/utils'
 import { useClipboard } from '../hooks/useClipboard'
 import { signatureShortName } from '../lib/signatureName'
+import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
+import { PostQuantumBadge } from './PostQuantumBadge'
 
 // Maps a template_override field name to the i18n key of its label (#258).
 const OVERRIDE_FIELD_LABEL_KEYS = {
@@ -157,6 +159,7 @@ export function CertificateDetails({
   
   const cert = certificate
   const serialHex = formatSerialNumberHex(cert.serial_number)
+  const keyName = keyAlgorithmLabel(cert.key_algorithm || cert.key_type, t, cert.security_level)
   const status = cert.revoked ? 'revoked' : (cert.status || 'valid')
   
   // Status badge config
@@ -200,6 +203,7 @@ export function CertificateDetails({
             <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
             {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
             {!cert.has_private_key && <Badge variant="warning" size="sm">{t('details.noKey')}</Badge>}
+            <PostQuantumBadge postQuantum={cert.post_quantum} algorithm={cert.key_algorithm || cert.key_type} />
             {cert.template_name && (
               <Badge
                 variant={cert.template_overrides?.length ? 'warning' : 'info'}
@@ -230,7 +234,7 @@ export function CertificateDetails({
       <div className="grid grid-cols-3 sm:grid-cols-3 gap-2">
         <div className="bg-tertiary-op50 rounded-lg p-2 sm:p-2.5 text-center">
           <Key size={14} className="mx-auto text-text-tertiary mb-0.5 sm:mb-1 sm:w-4 sm:h-4" />
-          <div className="text-2xs sm:text-xs font-medium text-text-primary">{cert.key_algorithm || 'RSA'}</div>
+          <div className="text-2xs sm:text-xs font-medium text-text-primary">{keyName || '—'}</div>
           <div className="text-3xs sm:text-2xs text-text-tertiary hidden sm:block">{cert.key_size ? `${cert.key_size} bits` : '—'}</div>
         </div>
         <div className="bg-tertiary-op50 rounded-lg p-2 sm:p-2.5 text-center">
@@ -295,7 +299,7 @@ export function CertificateDetails({
             </span>
           )}
           <span className="text-2xs text-text-tertiary">•</span>
-          <span className="text-2xs text-text-secondary">{cert.key_algorithm || 'RSA'}{cert.key_size ? ` ${cert.key_size}` : ''}</span>
+          <span className="text-2xs text-text-secondary">{keyName || '—'}{cert.key_size ? ` ${cert.key_size}` : ''}</span>
           <span className="text-2xs text-text-tertiary">•</span>
           <span className={cn("text-2xs", cert.has_private_key ? "text-status-success" : "text-text-tertiary")}>
             {cert.has_private_key ? '🔑' : '—'} {t('common.privateKey')}
@@ -589,6 +593,7 @@ export function CertificateDetails({
       entityName={cert.common_name || cert.subject}
       hasPrivateKey={!!cert.has_private_key}
       canExportKey={canExportKey}
+      keyAlgorithm={cert.key_algorithm || cert.key_type}
       onExport={onExport}
       chainVariantsFor={{ type: 'certificate', id: cert.id }}
     />

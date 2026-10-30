@@ -192,6 +192,9 @@
     "extKeyUsage": "Розширене використання",
     "validityPeriod": "Період дії",
     "keyAlgorithm": "Алгоритм ключа",
+    "keyAlgorithmLevel": "{{name}} (рівень {{level}})",
+    "postQuantum": "Постквантовий",
+    "postQuantumHint": "Використовує постквантовий ключ (ML-DSA, FIPS 204, або SLH-DSA, FIPS 205). Старіші клієнти можуть його не підтримувати.",
     "timeline": "Хронологія",
     "signingDetails": "Деталі підпису",
     "fingerprints": "Відбитки",
@@ -4831,6 +4834,7 @@
       "jks": "JKS (Java KeyStore)"
     },
     "formatJksDesc": "Java KeyStore, сертифікат + ключ",
+    "unavailableForKeyAlgorithm": "Недоступно для ключів {{algorithm}}: PKCS#12 і JKS поки не можуть містити постквантовий ключ. Натомість експортуйте PEM із закритим ключем.",
     "jksNote": "JKS завжди включає приватний ключ",
     "pkcs12Title": "Експорт PKCS#12",
     "pkcs12PasswordPrompt": "Введіть пароль для файла PKCS#12"

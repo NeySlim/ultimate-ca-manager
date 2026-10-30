@@ -9,11 +9,11 @@ import { Button } from '../Button'
 import { casService } from '../../services'
 import { useNotification } from '../../contexts/NotificationContext'
 import { PSS_HSM_TYPES } from '../../lib/signatureName'
+import { caKeyParts } from '../../lib/keyAlgorithms'
 
 export function SignatureSchemeField({ ca, canWrite = false, onChanged }) {
   const { t } = useTranslation()
-  // key_type is 'RSA 3072' or 'EC secp384r1'
-  if ((ca.key_type || '').split(' ')[0] !== 'RSA') return null
+  if (caKeyParts(ca.key_type).family !== 'RSA') return null
   const isPss = ca.signature_scheme === 'pss'
   // Back to v1.5 is always possible; PSS needs a key that can sign it
   const pssPossible = ca.has_private_key && (!ca.uses_hsm || PSS_HSM_TYPES.includes(ca.hsm_provider_type))

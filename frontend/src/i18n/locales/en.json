@@ -193,6 +193,9 @@
     "extKeyUsage": "Extended Key Usage",
     "validityPeriod": "Validity Period",
     "keyAlgorithm": "Key Algorithm",
+    "keyAlgorithmLevel": "{{name}} (level {{level}})",
+    "postQuantum": "Post-quantum",
+    "postQuantumHint": "Uses a post-quantum key (ML-DSA, FIPS 204, or SLH-DSA, FIPS 205). Older clients may not support it.",
     "timeline": "Timeline",
     "signingDetails": "Signing Details",
     "fingerprints": "Fingerprints",
@@ -4774,6 +4777,7 @@
       "jks": "JKS (Java KeyStore)"
     },
     "formatJksDesc": "Java KeyStore, certificate + key",
+    "unavailableForKeyAlgorithm": "Not available for {{algorithm}} keys: PKCS#12 and JKS cannot carry a post-quantum key yet. Export PEM with the private key instead.",
     "jksNote": "JKS always includes the private key",
     "pkcs12Title": "Export PKCS#12",
     "pkcs12PasswordPrompt": "Enter password for PKCS#12 file"

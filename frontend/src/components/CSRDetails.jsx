@@ -30,6 +30,8 @@ import { Button } from './Button'
 import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { cn } from '../lib/utils'
 import { useClipboard } from '../hooks/useClipboard'
+import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
+import { PostQuantumBadge } from './PostQuantumBadge'
 
 // Format date helper — delegates to shared util
 function formatDate(dateStr) {
@@ -79,6 +81,7 @@ export function CSRDetails({
             <Badge variant={statusConfig[status]?.variant || 'default'}>
               {statusConfig[status]?.label || status}
             </Badge>
+            <PostQuantumBadge postQuantum={csr.post_quantum} algorithm={csr.key_algorithm || csr.key_type} />
           </div>
           {csr.organization && (
             <p className="text-xs text-text-secondary mt-1">{csr.organization}</p>
@@ -91,7 +94,7 @@ export function CSRDetails({
         <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
           <Key size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
-          <div className="text-xs font-medium text-text-primary">{csr.key_type || csr.key_algorithm || t('common.na')}</div>
+          <div className="text-xs font-medium text-text-primary">{keyAlgorithmLabel(csr.key_type || csr.key_algorithm, t, csr.security_level) || t('common.na')}</div>
         </div>
         <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
           <Hash size={16} className="mx-auto text-text-tertiary mb-1" />
@@ -175,7 +178,7 @@ export function CSRDetails({
       {/* Technical Details */}
       <CompactSection title={t('common.technicalDetails')}>
         <CompactGrid>
-          <CompactField icon={Key} label={t('common.keyAlgorithm')} value={csr.key_algorithm || csr.key_type} />
+          <CompactField icon={Key} label={t('common.keyAlgorithm')} value={keyAlgorithmLabel(csr.key_algorithm || csr.key_type, t, csr.security_level)} />
           <CompactField autoIcon="keySize" label={t('common.keySize')} value={csr.key_size} />
           <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={csr.signature_algorithm} />
           <CompactField autoIcon="subjectDN" label={t('details.subjectDN')} value={csr.subject} mono colSpan={2} />

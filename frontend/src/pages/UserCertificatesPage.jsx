@@ -22,6 +22,7 @@ import { usePermission, usePersistedState } from '../hooks'
 import { formatDate, extractCN } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
+import { isExportFormatAllowed } from '../lib/keyAlgorithms'
 
 export default function UserCertificatesPage() {
   const { t } = useTranslation()
@@ -325,7 +326,7 @@ export default function UserCertificatesPage() {
         <Button type="button" size="sm" onClick={() => { setExportFormat('pem'); setExportCert(selectedCert) }}>
           <Download size={14} /> {t('userCertificates.actions.exportPEM')}
         </Button>
-        {selectedCert.has_private_key && (
+        {selectedCert.has_private_key && isExportFormatAllowed(selectedCert.key_algorithm, 'pkcs12') && (
           <Button type="button" size="sm" variant="secondary" onClick={() => { setExportFormat('pkcs12'); setExportCert(selectedCert) }}>
             <Certificate size={14} /> {t('userCertificates.actions.exportPKCS12')}
           </Button>
@@ -414,6 +415,7 @@ export default function UserCertificatesPage() {
         entityName={exportCert?.name || exportCert?.cert_subject || ''}
         hasPrivateKey={!!exportCert?.has_private_key}
         canExportKey={canExportPrivateKey('user_certificate', { hasPermission, canWrite })}
+        keyAlgorithm={exportCert?.key_algorithm}
         defaultFormat={exportFormat}
         onExport={handleExport}
       />

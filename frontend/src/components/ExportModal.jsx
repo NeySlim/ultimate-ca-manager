@@ -12,6 +12,7 @@
  *     entityName="my-cert.example.com"
  *     hasPrivateKey={true}
  *     canExportKey={canWrite('certificates')}
+ *     keyAlgorithm="ML-DSA-65"   // greys out the formats that key cannot use
  *     onExport={(format, options) => handleExport(format, options)}
  *   />
  */
@@ -24,6 +25,7 @@ import { ChainVariantSelect } from './ChainVariantSelect'
 import { cn } from '../lib/utils'
 import { fetchChainVariants } from '../lib/crossCertificates'
 import { exportPasswordPolicy, isExportPasswordValid, loadExportPasswordPolicy } from '../lib/exportPassword'
+import { isExportFormatAllowed } from '../lib/keyAlgorithms'
 
 const FORMATS = [
   { key: 'pem', label: 'PEM', description: 'export.formatPemDesc', ext: '.pem' },
@@ -42,6 +44,7 @@ export function ExportModal({
   hasPrivateKey = false,
   canExportKey = false,
   isHsmBacked = false,
+  keyAlgorithm = null,
   defaultFormat = 'pem',
   onExport,
   chainVariantsFor,
@@ -60,10 +63,12 @@ export function ExportModal({
   const [chainVariants, setChainVariants] = useState([])
   const [chainVariant, setChainVariant] = useState('auto')
 
+  const isAllowed = (key) => isExportFormatAllowed(keyAlgorithm, key)
+
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
-      setFormat(defaultFormat)
+      setFormat(isAllowed(defaultFormat) ? defaultFormat : 'pem')
       setIncludeChain(true)
       setIncludeRoot(false)
       setIncludeKey(false)
@@ -72,7 +77,7 @@ export function ExportModal({
       setExporting(false)
       setChainVariant('auto')
     }
-  }, [open, defaultFormat])
+  }, [open, defaultFormat, keyAlgorithm])
 
   useEffect(() => {
     setChainVariants([])
@@ -109,6 +114,8 @@ export function ExportModal({
     if (f.requiresKey) return hasPrivateKey && canExportKey
     return true
   })
+  const unavailableReason = t('export.unavailableForKeyAlgorithm', { algorithm: keyAlgorithm })
+  const hasUnavailable = availableFormats.some(f => !isAllowed(f.key))
 
   const handleExport = async () => {
     if (needsPassword && !isExportPasswordValid(password, passwordPolicy)) return
@@ -160,9 +167,12 @@ export function ExportModal({
                 type="button"
                 key={f.key}
                 onClick={() => setFormat(f.key)}
+                disabled={!isAllowed(f.key)}
+                title={isAllowed(f.key) ? undefined : unavailableReason}
                 className={cn(
                   'flex flex-col items-start px-3 py-2 rounded-lg border text-left transition-all',
-                  format === f.key
+                  !isAllowed(f.key) ? 'border-border opacity-50 cursor-not-allowed'
+                  : format === f.key
                     ? 'border-accent-primary bg-accent-primary-op10 ring-1 ring-accent-primary-op30'
                     : 'border-border hover:border-border-hover hover:bg-bg-secondary'
                 )}
@@ -179,6 +189,12 @@ export function ExportModal({
               </button>
             ))}
           </div>
+          {hasUnavailable && (
+            <div className="flex items-start gap-2 px-1 text-xs text-text-tertiary">
+              <Lock size={14} className="shrink-0 mt-0.5" />
+              {unavailableReason}
+            </div>
+          )}
         </div>
 
         {/* Options — hidden for key-only export */}

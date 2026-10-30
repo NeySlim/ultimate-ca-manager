@@ -42,6 +42,8 @@ import { ComplianceProfileField } from './cas/ComplianceProfileField'
 import { cn } from '../lib/utils'
 import { useClipboard } from '../hooks/useClipboard'
 import { holdsNoKey, needsKeyImport } from '../lib/caSelection'
+import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
+import { PostQuantumBadge } from './PostQuantumBadge'
 
 // Format date helper - delegates to shared util
 function formatDate(dateStr) {
@@ -110,6 +112,7 @@ export function CADetails({
             <Badge variant={statusConfig[status].variant}>
               {statusConfig[status].label}
             </Badge>
+            <PostQuantumBadge postQuantum={ca.post_quantum} algorithm={ca.key_type} />
           </div>
           {ca.organization && (
             <p className="text-xs text-text-secondary mt-1 pl-9">{ca.organization}</p>
@@ -122,7 +125,7 @@ export function CADetails({
         <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
           <Key size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
-          <div className="text-xs font-medium text-text-primary">{ca.key_type || t('common.na')}</div>
+          <div className="text-xs font-medium text-text-primary">{keyAlgorithmLabel(ca.key_type, t, ca.security_level) || t('common.na')}</div>
         </div>
         <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
           <Lock size={16} className="mx-auto text-text-tertiary mb-1" />
@@ -195,7 +198,7 @@ export function CADetails({
             {statusConfig[status].label}
           </Badge>
           <span className="text-2xs text-text-tertiary">•</span>
-          <span className="text-2xs text-text-secondary">{ca.key_type || t('common.na')}</span>
+          <span className="text-2xs text-text-secondary">{keyAlgorithmLabel(ca.key_type, t, ca.security_level) || t('common.na')}</span>
           <span className="text-2xs text-text-tertiary">•</span>
           <span className="text-2xs text-text-secondary">{ca.certs || 0} {t('common.certificatesShort')}</span>
         </div>
@@ -268,7 +271,7 @@ export function CADetails({
       <CompactSection title={t('common.technicalDetails')} icon={Key} iconClass="icon-bg-purple">
         <CompactGrid>
           <CompactField icon={Hash} label={t('common.serial')} value={ca.serial_number} mono copyable />
-          <CompactField autoIcon="keyType" label={t('common.keyType')} value={ca.key_type} />
+          <CompactField autoIcon="keyType" label={t('common.keyType')} value={keyAlgorithmLabel(ca.key_type, t, ca.security_level)} />
           <CompactField autoIcon="signatureAlgorithm" label={t('common.signatureAlgorithm')} value={ca.signature_algorithm || ca.hash_algorithm} />
           <SignatureSchemeField ca={ca} canWrite={canWriteCas} onChanged={onCaChanged} />
           <ComplianceProfileField ca={ca} canWrite={canWriteCas} canAttach={canAttachProfile} onChanged={onCaChanged} />

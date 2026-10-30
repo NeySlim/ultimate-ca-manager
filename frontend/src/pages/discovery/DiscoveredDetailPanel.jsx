@@ -10,6 +10,7 @@ import {
 } from '../../components'
 import { discoveryService } from '../../services'
 import { formatDate, extractCN } from '../../lib/utils'
+import { keyAlgorithmLabel } from '../../lib/keyAlgorithms'
 
 // OID-to-i18n-key mapping for DN fields
 const DN_LABEL_KEYS = {
@@ -183,7 +184,7 @@ export default function DiscoveredDetailPanel({ item, t }) {
         <CompactSection title={t('common.keyInformation')}>
           <CompactGrid>
             {cert.key_algorithm && (
-              <CompactField label={t('common.keyAlgorithm')} value={`${cert.key_algorithm}${cert.key_size ? ` ${cert.key_size}` : ''}${cert.curve ? ` (${cert.curve})` : ''}`} />
+              <CompactField label={t('common.keyAlgorithm')} value={`${keyAlgorithmLabel(cert.key_algorithm, t, cert.security_level)}${cert.key_size ? ` ${cert.key_size}` : ''}${cert.curve ? ` (${cert.curve})` : ''}`} />
             )}
             {cert.signature_algorithm && (
               <CompactField

@@ -192,6 +192,9 @@
     "extKeyUsage": "Uso extendido de clave",
     "validityPeriod": "Período de validez",
     "keyAlgorithm": "Algoritmo de clave",
+    "keyAlgorithmLevel": "{{name}} (nivel {{level}})",
+    "postQuantum": "Poscuántico",
+    "postQuantumHint": "Usa una clave poscuántica (ML-DSA, FIPS 204, o SLH-DSA, FIPS 205). Es posible que los clientes antiguos no la admitan.",
     "timeline": "Línea de tiempo",
     "signingDetails": "Detalles de firma",
     "fingerprints": "Huellas digitales",
@@ -4771,6 +4774,7 @@
       "jks": "JKS (Java KeyStore)"
     },
     "formatJksDesc": "Java KeyStore, certificado + clave",
+    "unavailableForKeyAlgorithm": "No disponible para claves {{algorithm}}: PKCS#12 y JKS aún no pueden contener una clave poscuántica. Exporte en PEM con la clave privada.",
     "jksNote": "JKS siempre incluye la clave privada",
     "pkcs12Title": "Exportar PKCS#12",
     "pkcs12PasswordPrompt": "Ingrese la contraseña para el archivo PKCS#12"

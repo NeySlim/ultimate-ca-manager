@@ -28,6 +28,8 @@ export default {
       'SSL Checker admite puertos personalizados: úselo para verificar cualquier servicio TLS',
       'Key Matcher compara hashes de módulo para verificar pares coincidentes',
       'Converter conserva la cadena completa de certificados al crear PKCS#12',
+      'Los decodificadores nombran una clave poscuántica con su nivel de seguridad NIST, p. ej. ML-DSA-65 (nivel 3), sin tamaño en bits',
+      'PKCS#12 y JKS aún no pueden contener una clave ML-DSA: expórtela en PEM con la clave privada',
     ],
   },
   helpGuides: {
@@ -81,6 +83,10 @@ Verificar que un certificado, CSR y clave privada pertenecen al mismo conjunto:
 4. Haga clic en **Verificar correspondencia**
 
 UCM compara los hashes del módulo (RSA) o la clave pública (EC). Una coincidencia confirma que forman un par válido.
+
+## Claves poscuánticas
+
+Los decodificadores y el SSL Checker nombran una clave **ML-DSA** o **SLH-DSA** con su nivel de seguridad NIST, p. ej. *ML-DSA-65 (nivel 3)*. Estas claves no tienen tamaño en bits. PKCS#12 y JKS aún no pueden contener una clave ML-DSA, por lo que el diálogo de exportación los desactiva: exporte en PEM con la clave privada.
 
 ## Converter
 

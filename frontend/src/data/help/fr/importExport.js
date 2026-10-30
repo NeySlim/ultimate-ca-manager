@@ -31,6 +31,7 @@ export default {
       'L\'importation intelligente gère les bundles PEM avec plusieurs certificats dans un seul fichier',
       'Testez la connexion OPNsense avant d\'exécuter une importation complète',
       'Les fichiers PKCS#12 nécessitent le mot de passe correct pour importer les clés privées',
+      'Les certificats post-quantiques (ML-DSA, SLH-DSA) s\'importent en PEM ou DER et portent un badge Post-quantique ; un fichier PKCS#12 ne peut pas encore contenir une clé ML-DSA',
     ],
   },
   helpGuides: {
@@ -57,6 +58,9 @@ L'assistant d'importation intelligente détecte automatiquement les types de fic
 4. Cliquez sur **Importer** pour les ajouter à UCM
 
 > 💡 L'importation intelligente gère les bundles PEM avec plusieurs certificats dans un seul fichier. Elle distingue automatiquement les CA des certificats d'entité finale.
+
+### Certificats post-quantiques
+Les certificats et clés utilisant **ML-DSA** (FIPS 204) ou **SLH-DSA** (FIPS 205) s'importent en PEM ou DER. Ils sont affichés avec leur niveau de sécurité, par ex. *ML-DSA-65 (niveau 3)*, et un badge **Post-quantique**. PKCS#12 ne peut pas encore contenir une clé ML-DSA : importez le certificat et la clé en PEM.
 
 ## Intégration OPNsense
 

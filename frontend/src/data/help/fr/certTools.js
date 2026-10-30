@@ -28,6 +28,8 @@ export default {
       'Le vérificateur SSL prend en charge les ports personnalisés : utilisez-le pour vérifier tout service TLS',
       'Le vérificateur de correspondance de clé compare les hachages de modules pour vérifier les paires correspondantes',
       'Le convertisseur préserve la chaîne de certificats complète lors de la création de PKCS#12',
+      'Les décodeurs nomment une clé post-quantique avec son niveau de sécurité NIST, par ex. ML-DSA-65 (niveau 3), sans taille en bits',
+      'PKCS#12 et JKS ne peuvent pas encore contenir une clé ML-DSA : exportez-la plutôt en PEM avec la clé privée',
     ],
   },
   helpGuides: {
@@ -81,6 +83,10 @@ Vérifier qu'un certificat, une CSR et une clé privée correspondent :
 4. Cliquez sur **Vérifier**
 
 UCM compare les hachages de module (RSA) ou de clé publique (EC). Une correspondance confirme qu'ils forment une paire valide.
+
+## Clés post-quantiques
+
+Les décodeurs et le vérificateur SSL nomment une clé **ML-DSA** ou **SLH-DSA** avec son niveau de sécurité NIST, par ex. *ML-DSA-65 (niveau 3)*. Ces clés n'ont pas de taille en bits. PKCS#12 et JKS ne peuvent pas encore contenir une clé ML-DSA, la boîte de dialogue d'export les grise donc : exportez plutôt en PEM avec la clé privée.
 
 ## Convertisseur
 

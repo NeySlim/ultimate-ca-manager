@@ -12,4 +12,8 @@ describe('signatureShortName', () => {
   it('shows a dash when unknown', () => {
     expect(signatureShortName(undefined)).toBe('—')
   })
+  it('names a post-quantum signature whole', () => {
+    expect(signatureShortName('ML-DSA-65')).toBe('ML-DSA-65')
+    expect(signatureShortName('SLH-DSA-SHA2-128s')).toBe('SLH-DSA-SHA2-128s')
+  })
 })

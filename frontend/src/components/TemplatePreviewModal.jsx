@@ -7,6 +7,7 @@ import { Modal } from './Modal'
 import { Badge } from './Badge'
 import { cn } from '../lib/utils'
 import { VALIDITY } from '../constants/config'
+import { findAlgorithm, keyAlgorithmLabel } from '../lib/keyAlgorithms'
 
 // Preview field component
 function PreviewField({ label, value, icon: Icon, mono = false, badge = false }) {
@@ -70,8 +71,10 @@ export function TemplatePreviewModal({ open, onClose, template }) {
   const validTo = new Date(now.getTime() + validityDays * 24 * 60 * 60 * 1000).toISOString().split('T')[0]
   
   // Determine key info
-  const keyType = template.key_type || 'RSA'
-  const keySize = template.key_size || (keyType === 'RSA' ? 2048 : 256)
+  // A template stores a registry label ('RSA-2048', 'EC-P384', 'ML-DSA-65')
+  const keyRow = findAlgorithm(template.key_type)
+  const keyDisplay = !keyRow ? (template.key_type || '—')
+    : keyRow.securityLevel ? keyAlgorithmLabel(keyRow.label, t) : keyRow.display
 
   return (
     <Modal open={open} onClose={onClose} size="lg">
@@ -128,7 +131,7 @@ export function TemplatePreviewModal({ open, onClose, template }) {
             <PreviewField 
               icon={Key}
               label="Key Algorithm" 
-              value={`${keyType} ${keySize}${keyType === 'EC' ? ' curve' : '-bit'}`}
+              value={keyDisplay}
             />
             
             <PreviewField 

@@ -8,6 +8,7 @@ import { Modal } from './Modal'
 import { Badge } from './Badge'
 import { Select } from './ui/Select'
 import { cn, formatDate, certificateLabel } from '../lib/utils'
+import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
 
 // Field comparison helper
 function CompareField({ label, value1, value2, mono = false }) {
@@ -51,7 +52,7 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
     { value: '', label: t('compare.selectCertificate') },
     ...certificates.map(c => ({
       value: String(c.id),
-      label: `${certificateLabel(c) || c.subject || `${t('common.certificate')} #${c.id}`}${c.key_type ? ` (${c.key_type})` : ''}`
+      label: `${certificateLabel(c) || c.subject || `${t('common.certificate')} #${c.id}`}${c.key_type ? ` (${keyAlgorithmLabel(c.key_type, t, c.security_level)})` : ''}`
     }))
   ], [certificates, t])
   
@@ -165,7 +166,7 @@ export function CertificateCompareModal({ open, onClose, certificates = [], init
               <CompareField label={t('common.commonName')} value1={cert1.common_name} value2={cert2.common_name} />
               <CompareField label={t('common.status')} value1={cert1.status} value2={cert2.status} />
               <CompareField label={t('common.issuer')} value1={cert1.issuer} value2={cert2.issuer} />
-              <CompareField label={t('common.keyType')} value1={cert1.key_type} value2={cert2.key_type} />
+              <CompareField label={t('common.keyType')} value1={keyAlgorithmLabel(cert1.key_type, t, cert1.security_level)} value2={keyAlgorithmLabel(cert2.key_type, t, cert2.security_level)} />
               <CompareField label={t('common.keySize')} value1={cert1.key_size} value2={cert2.key_size} />
               <CompareField label={t('common.validFrom')} value1={formatDate(cert1.valid_from)} value2={formatDate(cert2.valid_from)} />
               <CompareField label={t('common.validUntil')} value1={formatDate(cert1.valid_to)} value2={formatDate(cert2.valid_to)} />

@@ -28,7 +28,8 @@ import { daysSinceExpiry, expiryVariant, hasExpiry } from '../lib/expiry'
 import { VALIDITY } from '../constants/config'
 import { signingCas, unlistedSigningCas } from '../lib/caSelection'
 import { soleImported } from '../lib/importResult'
-import { CSR_LABELS, KEY_ALGORITHMS, groupedOptions, listAlgorithms } from '../lib/keyAlgorithms'
+import { PostQuantumBadge } from '../components/PostQuantumBadge'
+import { CSR_LABELS, KEY_ALGORITHMS, groupedOptions, keyAlgorithmLabel, listAlgorithms } from '../lib/keyAlgorithms'
 import { useFipsMode } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { useOpenEntity } from '../hooks/useOpenEntity'
@@ -671,7 +672,7 @@ export default function CSRsPage() {
       hideOnMobile: true,
       render: (val, row) => (
         <span className="text-xs font-mono text-text-secondary">
-          {row.key_algorithm || 'RSA'} {row.key_size ? `(${row.key_size})` : ''}
+          {keyAlgorithmLabel(row.key_algorithm, t, row.security_level) || '—'} {row.key_size ? `(${row.key_size})` : ''}
         </span>
       )
     }
@@ -1483,6 +1484,7 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDownl
           <div className="flex gap-1">
             <Badge variant="warning" size="sm" icon={Clock}>{t('common.pending')}</Badge>
             {csr.has_private_key && <Badge variant="success" size="sm" icon={Key}>{t('common.hasKey')}</Badge>}
+            <PostQuantumBadge postQuantum={csr.post_quantum} algorithm={csr.key_algorithm} />
           </div>
         }
       />
@@ -1490,7 +1492,7 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDownl
       {/* Stats */}
       <CompactStats stats={[
         { icon: Clock, value: csr.created_at ? formatDate(csr.created_at, 'short') : '—' },
-        { icon: Key, value: `${csr.key_algorithm || 'RSA'} ${csr.key_size || ''}` },
+        { icon: Key, value: [keyAlgorithmLabel(csr.key_algorithm, t, csr.security_level) || '—', csr.key_size].filter(Boolean).join(' ') },
       ]} />
 
       {/* Actions */}
@@ -1541,7 +1543,7 @@ function CSRDetailsPanel({ csr, canWrite, canDelete, onSign, onDownload, onDownl
       {/* Key Information */}
       <CompactSection title={t('common.keyInformation')}>
         <CompactGrid>
-          <CompactField autoIcon="algorithm" label={t('common.algorithm')} value={csr.key_algorithm || 'RSA'} />
+          <CompactField autoIcon="algorithm" label={t('common.algorithm')} value={keyAlgorithmLabel(csr.key_algorithm, t, csr.security_level) || '—'} />
           <CompactField autoIcon="keySize" label={t('common.keySize')} value={csr.key_size} />
           <CompactField autoIcon="signature" label={t('common.signature')} value={csr.signature_algorithm} />
         </CompactGrid>
@@ -1674,7 +1676,7 @@ function SignedCSRDetailsPanel({ cert, onDownload, onDownloadCSR, onSignAgain, o
       {/* Key Information */}
       <CompactSection title={t('common.keyInformation')}>
         <CompactGrid>
-          <CompactField autoIcon="algorithm" label={t('common.algorithm')} value={cert.key_algorithm || 'RSA'} />
+          <CompactField autoIcon="algorithm" label={t('common.algorithm')} value={keyAlgorithmLabel(cert.key_algorithm, t, cert.security_level) || '—'} />
           <CompactField autoIcon="keySize" label={t('common.keySize')} value={cert.key_size} />
           <CompactField autoIcon="serial" label={t('common.serial')} value={cert.serial_number} copyable mono className="col-span-2" />
         </CompactGrid>

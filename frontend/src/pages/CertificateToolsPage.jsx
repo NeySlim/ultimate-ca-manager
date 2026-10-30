@@ -19,8 +19,15 @@ import { toolsService } from '../services'
 import { useNotification } from '../contexts'
 import { useClipboard } from '../hooks'
 import { cn, formatDate , downloadBlob} from '../lib/utils'
+import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
 
 // Tool definitions with tab-compatible format for sidebar layout
+// 'RSA 2048-bit', 'EC secp384r1', 'ML-DSA-65 (level 3)': no size for a key that has none
+function publicKeyText(pk, t, bitSuffix = '') {
+  const size = pk?.size ? `${pk.size}${bitSuffix}` : pk?.curve
+  return [keyAlgorithmLabel(pk?.type, t, pk?.security_level), size].filter(Boolean).join(' ') || null
+}
+
 const TOOLS = [
   {
     id: 'ssl-checker',
@@ -722,7 +729,7 @@ export default function CertificateToolsPage() {
         <CompactGrid cols={2}>
           <CompactField autoIcon="tlsVersion" label={t('tools.tlsVersion')} value={data.tls_version} />
           <CompactField autoIcon="cipher" label={t('tools.cipher')} value={data.cipher?.name} />
-          <CompactField autoIcon="keyType" label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size}-bit`} />
+          <CompactField autoIcon="keyType" label={t('common.keyType')} value={publicKeyText(data.public_key, t, '-bit')} />
           <CompactField autoIcon="signature" label={t('common.issuerSignatureShort')} hint={t('common.issuerSignatureAlgorithmHint')} value={data.signature_algorithm} />
         </CompactGrid>
 
@@ -757,7 +764,7 @@ export default function CertificateToolsPage() {
           <CompactField autoIcon="organization" label={t('common.organization')} value={data.subject?.organizationName} />
           <CompactField autoIcon="country" label={t('common.country')} value={data.subject?.countryName} />
           <CompactField autoIcon="state" label={t('common.state')} value={data.subject?.stateOrProvinceName} />
-          <CompactField autoIcon="keyType" label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
+          <CompactField autoIcon="keyType" label={t('common.keyType')} value={publicKeyText(data.public_key, t)} />
           <CompactField autoIcon="signatureValid" label={t('tools.signatureValid')} value={
             <Badge variant={data.is_signature_valid ? 'success' : 'danger'}>
               {data.is_signature_valid ? t('common.yes') : t('common.no')}
@@ -824,7 +831,7 @@ export default function CertificateToolsPage() {
         <CompactGrid cols={2}>
           <CompactField autoIcon="serialNumber" label={t('common.serialNumber')} value={data.serial_number} copyable mono />
           <CompactField autoIcon="version" label={t('tools.version')} value={data.version} />
-          <CompactField autoIcon="keyType" label={t('common.keyType')} value={`${data.public_key?.type} ${data.public_key?.size || data.public_key?.curve}`} />
+          <CompactField autoIcon="keyType" label={t('common.keyType')} value={publicKeyText(data.public_key, t)} />
           <CompactField autoIcon="issuerSignatureAlgorithm" label={t('common.issuerSignatureAlgorithm')} hint={t('common.issuerSignatureAlgorithmHint')} value={data.signature_algorithm} />
         </CompactGrid>
 

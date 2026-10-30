@@ -326,6 +326,7 @@ export function FloatingDetailWindow({ windowInfo }) {
   const actionBarProps = data ? {
     onExport: handleExport,
     hasPrivateKey,
+    keyAlgorithm: data?.key_algorithm || data?.key_type,
     // Each entity type has its own server-side key gate (lib/exportPermissions);
     // write access to the resource was never one of them for a certificate.
     canExportKey: canExportPrivateKey(windowInfo.type, {
@@ -516,7 +517,7 @@ function DetailContent({ type, data, canWrite, canDelete, hasPermission, onExpor
 /**
  * ActionBar — Toolbar under the window header with labeled action buttons
  */
-function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityName, onLint, onRequestKeyRecovery, onRenew, onRevoke, onUnhold, onOffline, onRestore, onManagePins, onDelete, canExport = true, onDownloadCsr, onUploadCertificate, onRenewCsr, chainVariantsFor, t }) {
+function ActionBar({ onExport, hasPrivateKey, keyAlgorithm, canExportKey, entityType, entityName, onLint, onRequestKeyRecovery, onRenew, onRevoke, onUnhold, onOffline, onRestore, onManagePins, onDelete, canExport = true, onDownloadCsr, onUploadCertificate, onRenewCsr, chainVariantsFor, t }) {
   const [showExportModal, setShowExportModal] = useState(false)
   const btnBase = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150'
 
@@ -636,6 +637,7 @@ function ActionBar({ onExport, hasPrivateKey, canExportKey, entityType, entityNa
       entityType={entityType}
       entityName={entityName}
       hasPrivateKey={hasPrivateKey}
+      keyAlgorithm={keyAlgorithm}
       canExportKey={canExportKey}
       onExport={onExport}
       chainVariantsFor={chainVariantsFor}

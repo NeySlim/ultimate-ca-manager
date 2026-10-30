@@ -853,6 +853,7 @@ export default function CertificatesPage() {
         entityType="certificate"
         entityName={exportRowCert?.common_name || exportRowCert?.subject || ''}
         hasPrivateKey={!!exportRowCert?.has_private_key}
+        keyAlgorithm={exportRowCert?.key_algorithm || exportRowCert?.key_type}
         canExportKey={canExportKey}
         onExport={handleExportRow}
         chainVariantsFor={exportRowCert ? { type: 'certificate', id: exportRowCert.id } : undefined}

@@ -25,6 +25,8 @@ import { formatDate, downloadBlob } from '../../lib/utils'
 import { useNotification } from '../../contexts/NotificationContext'
 import { holdsNoKey, needsKeyImport } from '../../lib/caSelection'
 import { canExportPrivateKey } from '../../lib/exportPermissions'
+import { caKeyParts, keyAlgorithmLabel } from '../../lib/keyAlgorithms'
+import { PostQuantumBadge } from '../../components/PostQuantumBadge'
 
 // =============================================================================
 // CA DETAILS PANEL
@@ -72,8 +74,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
     }
   }
 
-  // key_type is 'RSA 2048' or 'EC secp384r1'
-  const [keyFamily, keySpec] = (ca.key_type || '').split(' ')
+  const { family: keyFamily, spec: keySpec } = caKeyParts(ca.key_type)
 
   const handleDownloadCsr = async () => {
     try {
@@ -126,6 +127,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
                 {t('cas.detail.hsmBacked')}
               </Badge>
             )}
+            <PostQuantumBadge postQuantum={ca.post_quantum} algorithm={ca.key_type} />
           </div>
           {ca.subject && (
             <p className="text-xs text-text-secondary truncate">{ca.subject}</p>
@@ -314,7 +316,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
       {/* Key Info */}
       <CompactSection title={t('common.keyInformation')}>
         <CompactGrid>
-          <CompactField autoIcon="algorithm" label={t('common.algorithm')} value={keyFamily || '—'} />
+          <CompactField autoIcon="algorithm" label={t('common.algorithm')} value={keyAlgorithmLabel(keyFamily, t, ca.security_level) || '—'} />
           <CompactField autoIcon="keySize" label={t('common.keySize')} value={keySpec || '—'} />
           <CompactField autoIcon="signature" label={t('common.signature')} value={ca.signature_algorithm} />
           <SignatureSchemeField ca={ca} canWrite={canWrite('cas')} onChanged={onChanged} />
@@ -360,6 +362,7 @@ export function CADetailsPanel({ ca, canWrite, canDelete, hasPermission, onExpor
       hasPrivateKey={!!ca.has_private_key && !ca.uses_hsm}
       canExportKey={canExportPrivateKey('ca', { canWrite, hasPermission, usesHsm: !!ca.uses_hsm })}
       isHsmBacked={!!ca.uses_hsm}
+      keyAlgorithm={ca.key_algorithm || ca.key_type}
       onExport={onExport}
       chainVariantsFor={{ type: 'ca', id: ca.id }}
     />

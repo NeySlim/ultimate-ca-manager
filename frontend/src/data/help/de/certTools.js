@@ -28,6 +28,8 @@ export default {
       'Der SSL-Checker unterstützt benutzerdefinierte Ports: verwenden Sie ihn, um jeden TLS-Dienst zu prüfen',
       'Der Schlüsselabgleich vergleicht Modulus-Hashes, um übereinstimmende Paare zu verifizieren',
       'Der Konverter bewahrt die vollständige Zertifikatskette beim Erstellen von PKCS#12',
+      'Die Decoder benennen einen Post-Quanten-Schlüssel mit seiner NIST-Sicherheitsstufe, z. B. ML-DSA-65 (Stufe 3), ohne Größe in Bit',
+      'PKCS#12 und JKS können noch keinen ML-DSA-Schlüssel enthalten: Exportieren Sie ihn stattdessen als PEM mit dem privaten Schlüssel',
     ],
   },
   helpGuides: {
@@ -81,6 +83,10 @@ Zeigt: Betreff, Aussteller, SANs, Gültigkeit, Seriennummer, Key Usage, Erweiter
 4. Klicken Sie auf **Abgleichen**
 
 UCM vergleicht die Modulus- (RSA) oder Public-Key-Hashes (EC). Eine Übereinstimmung bestätigt ein gültiges Paar.
+
+## Post-Quanten-Schlüssel
+
+Die Decoder und der SSL-Checker benennen einen **ML-DSA**- oder **SLH-DSA**-Schlüssel mit seiner NIST-Sicherheitsstufe, z. B. *ML-DSA-65 (Stufe 3)*. Diese Schlüssel haben keine Größe in Bit. PKCS#12 und JKS können noch keinen ML-DSA-Schlüssel enthalten, daher graut der Exportdialog sie aus: Exportieren Sie stattdessen PEM mit dem privaten Schlüssel.
 
 ## Konverter
 

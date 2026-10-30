@@ -17,6 +17,7 @@ import { Modal } from './Modal'
 import { apiClient as api } from '../services'
 import { useNotification } from '../contexts/NotificationContext'
 import { formatDate } from '../lib/utils'
+import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
 import { crossSummary } from '../lib/importResult'
 
 // Supported file formats
@@ -102,7 +103,7 @@ function ObjectCard({ obj, expanded, onToggle, selected, onSelect }) {
           {obj.key_algorithm && (
             <div className="flex gap-2">
               <span className="text-text-secondary w-20 shrink-0">{t('common.algorithm')}:</span>
-              <span className="text-xs">{obj.key_algorithm} ({obj.key_size} bits)</span>
+              <span className="text-xs">{keyAlgorithmLabel(obj.key_algorithm, t, obj.security_level)}{obj.key_size ? ` (${obj.key_size} bits)` : ''}</span>
             </div>
           )}
         </div>

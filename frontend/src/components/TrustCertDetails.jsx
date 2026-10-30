@@ -30,6 +30,8 @@ import { Button } from './Button'
 import { CompactSection, CompactGrid, CompactField } from './DetailCard'
 import { cn, daysRemaining as computeDaysRemaining } from '../lib/utils'
 import { useClipboard } from '../hooks/useClipboard'
+import { keyAlgorithmLabel } from '../lib/keyAlgorithms'
+import { PostQuantumBadge } from './PostQuantumBadge'
 import { getAppTimezone } from '../stores/timezoneStore'
 import { formatDate as formatDateUtil } from '../lib/utils'
 
@@ -107,6 +109,7 @@ export function TrustCertDetails({
             <Badge variant={statusConfig[status].variant}>
               {statusConfig[status].label}
             </Badge>
+            <PostQuantumBadge postQuantum={cert.post_quantum} algorithm={cert.key_type} />
           </div>
           {cert.organization && (
             <p className="text-xs text-text-secondary mt-1">{cert.organization}</p>
@@ -134,7 +137,7 @@ export function TrustCertDetails({
         <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
           <Key size={16} className="mx-auto text-text-tertiary mb-1" />
           <div className="text-2xs text-text-tertiary">{t('common.keyType')}</div>
-          <div className="text-xs font-medium text-text-primary">{cert.key_type || t('common.na')}</div>
+          <div className="text-xs font-medium text-text-primary">{keyAlgorithmLabel(cert.key_type, t, cert.security_level) || t('common.na')}</div>
         </div>
         <div className="bg-tertiary-op50 rounded-lg p-2 text-center">
           <ShieldCheck size={16} className="mx-auto text-text-tertiary mb-1" />
@@ -194,7 +197,7 @@ export function TrustCertDetails({
             return <Badge key={idx} variant={config.variant} size="sm">{config.label}</Badge>
           })}
           <span className="text-2xs text-text-tertiary">•</span>
-          <span className="text-2xs text-text-secondary">{cert.key_type || t('common.na')}</span>
+          <span className="text-2xs text-text-secondary">{keyAlgorithmLabel(cert.key_type, t, cert.security_level) || t('common.na')}</span>
         </div>
       )}
       
@@ -229,7 +232,7 @@ export function TrustCertDetails({
       <CompactSection title={t('common.technicalDetails')} icon={Info}>
         <CompactGrid>
           <CompactField label={t('common.serialNumber')} value={cert.serial || cert.serial_number} icon={Hash} mono />
-          <CompactField label={t('common.keyType')} value={cert.key_type} icon={Key} />
+          <CompactField label={t('common.keyType')} value={keyAlgorithmLabel(cert.key_type, t, cert.security_level)} icon={Key} />
           <CompactField
             label={t('common.issuerSignatureAlgorithm')}
             hint={t('common.issuerSignatureAlgorithmHint')}
