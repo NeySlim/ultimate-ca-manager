@@ -159,6 +159,16 @@ class TestRegistry:
         digest = getattr(hashes, alg.default_digest.upper())() if alg.default_digest else None
         x509.CertificateSigningRequestBuilder().subject_name(name).sign(sk, digest)
 
+    def test_every_mldsa_alias_adds_a_spelling(self):
+        # case, spaces, '-', '_' and ':' are already free; EC aliases also feed utils.key_type
+        for alg in ka._KNOWN.algorithms:
+            if alg.family != 'ML-DSA':
+                continue
+            covered = {ka._collapse(s) for s in (alg.label, alg.display, alg.legacy_key_algo,
+                                                  alg.trust_store_id, *alg.curve_names) if s}
+            for alias in alg.aliases:
+                assert ka._collapse(alias) not in covered, (alg.label, alias)
+
     def test_fips_approved(self):
         assert ka.fips_approved_labels() == (
             'RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521')
@@ -231,6 +241,7 @@ class TestMLDSA:
 
     @pytest.mark.parametrize('label', MLDSA)
     def test_spellings(self, label):
+        # all of them collapse to the label: no alias is needed
         param = MLDSA[label][0]
         for spelling in (label, f'mldsa{param}', f'ml_dsa_{param}', f'ML_DSA {param}', f'ml-dsa-{param}'):
             assert ka.normalize_label(spelling) == label, spelling

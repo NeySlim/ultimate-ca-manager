@@ -111,7 +111,7 @@ class KeyAlgorithm:
     curve_names: tuple[str, ...] = ()   # pyca / OpenSSL curve names, EC only
     aliases: tuple[str, ...] = ()       # extra spellings accepted by normalize_label
     security_level: int | None = None   # NIST post-quantum security category, None for classical keys
-    oid: str | None = None              # OID of the key and of its signatures, when one names both
+    oid: str | None = None              # OID of a post-quantum key and of its signatures (one names both)
 
     def generate(self):
         return self.generator()
@@ -185,7 +185,6 @@ def _mldsa(param: str, level: int, oid_arc: int, private_class: type, public_cla
         needs_digest=False, default_digest=None,
         display=label, legacy_key_algo=label, trust_store_id=label.lower(),
         fips_approved=False, key_size=None,
-        aliases=(f'mldsa{param}', f'ml_dsa_{param}'),
         security_level=level, oid=f'2.16.840.1.101.3.4.3.{oid_arc}',
     )
 
