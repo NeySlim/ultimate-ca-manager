@@ -12,6 +12,22 @@ from cryptography.x509.oid import SignatureAlgorithmOID
 from utils.foreign_algorithms import signature_label
 
 
+_SHORT_NAMES = {
+    '1.2.840.113549.1.1.11': 'SHA256-RSA',
+    '1.2.840.113549.1.1.12': 'SHA384-RSA',
+    '1.2.840.113549.1.1.13': 'SHA512-RSA',
+    '1.2.840.113549.1.1.5': 'SHA1-RSA',
+    '1.2.840.10045.4.3.2': 'ECDSA-SHA256',
+    '1.2.840.10045.4.3.3': 'ECDSA-SHA384',
+    '1.2.840.10045.4.3.4': 'ECDSA-SHA512',
+}
+
+
+def signature_display_name(obj) -> str:
+    """The certificate list's spelling: 'SHA256-RSA', 'ECDSA-SHA384', else the readable label."""
+    return _SHORT_NAMES.get(obj.signature_algorithm_oid.dotted_string) or signature_algorithm_label(obj)
+
+
 def signature_algorithm_label(obj) -> str:
     """'RSASSA-PSS SHA-256 (salt 32)' for PSS, the OID name (or dotted string) otherwise."""
     oid = obj.signature_algorithm_oid

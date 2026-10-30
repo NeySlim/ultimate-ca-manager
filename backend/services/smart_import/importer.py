@@ -17,7 +17,6 @@ from dataclasses import dataclass, field
 from datetime import datetime
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
-from cryptography.hazmat.primitives import serialization
 
 from flask import has_request_context, request
 from fips_mode import FipsRestricted
@@ -33,6 +32,7 @@ def _encrypt_prv(raw_pem: str) -> str:
     like every other import path."""
     return encrypt_private_key(base64.b64encode(raw_pem.encode()).decode())
 from .matcher import KeyMatcher
+from utils.foreign_algorithms import spki_der
 from .validator import ImportValidator, ValidationResult
 from utils.datetime_utils import utc_now
 
@@ -47,8 +47,8 @@ def _stored_cert(ca):
 
 
 def _spki_der(cert):
-    return cert.public_key().public_bytes(serialization.Encoding.DER,
-                                          serialization.PublicFormat.SubjectPublicKeyInfo)
+    """DER SubjectPublicKeyInfo, read from the certificate itself so any key type fits."""
+    return spki_der(cert)
 
 
 def _is_ca_import_target(obj: ParsedObject) -> bool:

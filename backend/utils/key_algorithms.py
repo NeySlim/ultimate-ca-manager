@@ -363,12 +363,52 @@ def generate(label):
     return alg.generate()
 
 
+@dataclass(frozen=True)
+class PostQuantumName:
+    """A post-quantum algorithm as UCM names and rates it, usable here or not."""
+    label: str
+    family: str             # 'ML-DSA' or 'SLH-DSA'
+    security_level: int     # NIST category
+    oid: str                # names the key and its signatures alike
+
+
+# FIPS 205 / RFC 9909: named and rated for display only, pyca cannot load these keys
+_SLH_DSA = tuple(
+    PostQuantumName(f'SLH-DSA-{h}-{n}{v}', 'SLH-DSA', {128: 1, 192: 3, 256: 5}[n],
+                    f'2.16.840.1.101.3.4.3.{20 + i}')
+    for i, (h, n, v) in enumerate((h, n, v) for h in ('SHA2', 'SHAKE')
+                                  for n in (128, 192, 256) for v in ('s', 'f')))
+
+
+def _post_quantum_index():
+    names = [PostQuantumName(a.label, a.family, a.security_level, a.oid) for a in _ML_DSA]
+    by_label = {n.label: n for n in names}
+    index = {key: by_label[alg.label] for key, alg in _KNOWN.by_spelling.items() if alg.security_level}
+    index.update({_collapse(n.label): n for n in _SLH_DSA})
+    index.update({n.oid: n for n in (*names, *_SLH_DSA)})
+    return index
+
+
+_POST_QUANTUM = _post_quantum_index()
+
+
+def post_quantum_info(value) -> PostQuantumName | None:
+    """The post-quantum algorithm a label, spelling or OID (dotted or ``ObjectIdentifier``)
+    names, whether or not this build can use it; None otherwise."""
+    value = getattr(value, 'dotted_string', value)
+    if value is None or isinstance(value, bool):
+        return None
+    text = str(value).strip()
+    return _POST_QUANTUM.get(text) or _POST_QUANTUM.get(_collapse(text))
+
+
+def slh_dsa_names() -> tuple[PostQuantumName, ...]:
+    return _SLH_DSA
+
+
 def is_post_quantum(label) -> bool:
     """Whether *label* names a post-quantum algorithm, whether or not this build can use it."""
-    if label is None or isinstance(label, bool):
-        return False
-    alg = _KNOWN.by_spelling.get(_collapse(label))
-    return bool(alg and alg.security_level)
+    return post_quantum_info(label) is not None
 
 
 def label_for_signature_oid(oid) -> str | None:

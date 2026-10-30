@@ -20,6 +20,7 @@ import logging
 
 from utils.datetime_utils import utc_isoformat
 from utils.foreign_algorithms import describe_public_key, spki_der
+from utils.key_facts import key_facts
 from utils.signature_label import signature_algorithm_label
 
 logger = logging.getLogger(__name__)
@@ -74,7 +75,12 @@ def cert_to_dict(cert):
     # Public key info
     foreign = describe_public_key(cert)
     pub_key = None if foreign else cert.public_key()
-    if foreign:
+    facts = key_facts(cert)
+    if facts['post_quantum']:
+        result['public_key'] = {'type': facts['key_algorithm'], 'size': None}
+        if foreign:
+            result['public_key']['oid'] = foreign['oid']
+    elif foreign:
         result['public_key'] = _foreign_key_dict(foreign)
     elif isinstance(pub_key, rsa.RSAPublicKey):
         result['public_key'] = {
@@ -90,6 +96,7 @@ def cert_to_dict(cert):
         }
     else:
         result['public_key'] = {'type': type(pub_key).__name__}
+    result['public_key'].update(security_level=facts['security_level'], post_quantum=facts['post_quantum'])
 
     # Fingerprints
     result['fingerprints'] = {
@@ -166,7 +173,12 @@ def csr_to_dict(csr):
     # Public key info
     foreign = describe_public_key(csr)
     pub_key = None if foreign else csr.public_key()
-    if foreign:
+    facts = key_facts(csr)
+    if facts['post_quantum']:
+        result['public_key'] = {'type': facts['key_algorithm'], 'size': None}
+        if foreign:
+            result['public_key']['oid'] = foreign['oid']
+    elif foreign:
         result['public_key'] = _foreign_key_dict(foreign)
     elif isinstance(pub_key, rsa.RSAPublicKey):
         result['public_key'] = {
@@ -182,6 +194,7 @@ def csr_to_dict(csr):
         }
     else:
         result['public_key'] = {'type': type(pub_key).__name__}
+    result['public_key'].update(security_level=facts['security_level'], post_quantum=facts['post_quantum'])
 
     # Extensions from CSR attributes
     result['extensions'] = {}

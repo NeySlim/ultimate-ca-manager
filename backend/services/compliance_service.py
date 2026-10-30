@@ -79,6 +79,9 @@ def _score_key_strength(cert_dict):
     if not key_algo and key_type:
         key_algo = key_type
 
+    pq = _post_quantum(cert_dict, ('key_algorithm', 'key_algo', 'key_type'))
+    if pq:
+        return {'score': _pq_key_points(pq), 'max': max_points, 'reason': pq.label}
     if 'EC' in key_algo or 'ECDSA' in key_algo or 'P-' in key_algo or 'PRIME' in key_type:
         score, reason = _score_ec_key(cert_dict, key_size)
     elif 'ED25519' in key_algo or 'ED448' in key_algo:
@@ -101,6 +104,19 @@ def _score_key_strength(cert_dict):
     return {'score': score, 'max': max_points, 'reason': reason}
 
 
+def _post_quantum(cert_dict, fields):
+    for field in fields:
+        pq = key_algorithms.post_quantum_info(cert_dict.get(field))
+        if pq:
+            return pq
+    return None
+
+
+def _pq_key_points(pq):
+    """SLH-DSA (hash-based) and ML-DSA from category 3 score full; ML-DSA-44 like P-256."""
+    return 30 if pq.family == 'SLH-DSA' or pq.security_level >= 3 else 25
+
+
 # Brainpool scores like the NIST curve of the same size (BSI TR-02102-1)
 _EC_POINTS = {'EC-P256': (25, 'ECDSA P-256'), 'EC-P384': (30, 'ECDSA P-384'),
               'EC-P521': (30, 'ECDSA P-521'), 'EC-BP256': (25, 'ECDSA brainpoolP256r1'),
@@ -113,6 +129,7 @@ def key_algo_sort_points():
     and 1024, scored by ``_score_key_strength`` itself for the SQL sort."""
     spellings = [(a.legacy_key_algo, a.key_size) for a in key_algorithms.ALGORITHMS]
     spellings += [('RSA 8192', 8192), ('RSA 1024', 1024)]
+    spellings += [(n.label, None) for n in key_algorithms.slh_dsa_names()]
     return [(s, _score_key_strength({'key_algo': s, 'key_size': n})['score']) for s, n in spellings]
 
 
@@ -145,6 +162,10 @@ def _score_signature(cert_dict):
 
     if not sig_algo:
         return {'score': 10, 'max': max_points, 'reason': 'Unknown'}
+
+    pq = _post_quantum(cert_dict, ('signature_algorithm',))
+    if pq:  # the scheme fixes its own hash (SHAKE256 or SHA-2 inside it)
+        return {'score': max_points, 'max': max_points, 'reason': pq.label}
 
     if 'SHA512' in sig_algo or 'SHA-512' in sig_algo:
         score, reason = max_points, 'SHA-512'

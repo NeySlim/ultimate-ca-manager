@@ -59,7 +59,7 @@ class ParsedObject:
     
     # Key-specific
     key_algorithm: str = ""
-    key_size: int = 0
+    key_size: Optional[int] = 0  # None for a post-quantum key
     is_encrypted: bool = False
     
     # Matching info (filled by matcher)
@@ -546,7 +546,7 @@ class SmartParser:
         except Exception:
             return None
     
-    def _public_key_info(self, cert_or_csr) -> Tuple[str, int]:
+    def _public_key_info(self, cert_or_csr) -> Tuple[str, Optional[int]]:
         """Algorithm and size of a certificate's or CSR's key; a key pyca cannot load keeps its name or OID."""
         from utils.foreign_algorithms import describe_public_key
         foreign = describe_public_key(cert_or_csr)
@@ -554,10 +554,14 @@ class SmartParser:
             return foreign['label'], foreign['key_size']
         return self._get_key_info(cert_or_csr.public_key())
 
-    def _get_key_info(self, key) -> Tuple[str, int]:
-        """Extract algorithm and size from any key type"""
+    def _get_key_info(self, key) -> Tuple[str, Optional[int]]:
+        """Algorithm and size of any key type; a post-quantum key has no size (None)"""
         from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519, ed448
-        
+        from utils import key_algorithms
+
+        label = key_algorithms.label_for_public_key(key) or key_algorithms.label_for_private_key(key)
+        if key_algorithms.is_post_quantum(label):
+            return label, None
         if isinstance(key, (rsa.RSAPublicKey, rsa.RSAPrivateKey)):
             return "RSA", key.key_size
         elif isinstance(key, (ec.EllipticCurvePublicKey, ec.EllipticCurvePrivateKey)):

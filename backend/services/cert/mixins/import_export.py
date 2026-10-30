@@ -50,8 +50,8 @@ class ImportExportMixin:
         )
 
         # Extract key algorithm info
-        from utils.key_algorithms import key_algo_for_public_key
-        key_algo = key_algo_for_public_key(cert.public_key())
+        from models.certificate import key_algo_for_certificate
+        key_algo = key_algo_for_certificate(cert)
 
         # Extract SANs from certificate. The shared reader also decodes the
         # otherName UPN: the four-branch cascade this used to inline dropped

@@ -9,6 +9,7 @@ from typing import Dict
 
 from utils.datetime_utils import utc_isoformat
 from utils.foreign_algorithms import describe_public_key
+from utils.key_facts import key_facts
 from utils.signature_label import signature_algorithm_label
 from utils.qc_statements import QC_STATEMENTS_OID, describe_qc_extension
 
@@ -63,7 +64,12 @@ class ParsingMixin:
         # Parse public key info
         foreign = describe_public_key(cert)
         public_key = None if foreign else cert.public_key()
-        if foreign:
+        facts = key_facts(cert)
+        if facts['post_quantum']:
+            details['public_key'] = {'algorithm': facts['key_algorithm'], 'key_size': None}
+            if foreign:
+                details['public_key']['oid'] = foreign['oid']
+        elif foreign:
             details['public_key'] = {
                 'algorithm': foreign['label'],
                 'oid': foreign['oid'],
@@ -80,6 +86,10 @@ class ParsingMixin:
                 'algorithm': 'EC',
                 'curve': public_key.curve.name
             }
+
+        if details['public_key']:
+            details['public_key'].update(security_level=facts['security_level'],
+                                         post_quantum=facts['post_quantum'])
 
         # Parse extensions
         for ext in cert.extensions:

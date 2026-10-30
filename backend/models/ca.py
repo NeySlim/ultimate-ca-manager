@@ -380,33 +380,41 @@ class CA(db.Model):
             ca = ca.issuing_ca()
         return None
 
+    def _crt_or_csr(self):
+        """The certificate, else the CSR while pending, parsed; None with neither."""
+        import base64
+        from cryptography import x509
+        if self.crt:
+            return x509.load_pem_x509_certificate(base64.b64decode(self.crt))
+        if self.csr:
+            return x509.load_pem_x509_csr(base64.b64decode(self.csr))
+        return None
+
+    @property
+    def key_facts(self) -> dict:
+        """key_type, key_algorithm, key_size, security_level, post_quantum, verifiable."""
+        from utils.key_facts import UNREADABLE, key_facts
+        try:
+            obj = self._crt_or_csr()
+            return key_facts(obj) if obj is not None else dict(UNREADABLE)
+        except Exception:
+            return dict(UNREADABLE)
+
     @property
     def key_type(self) -> str:
-        """Parse key type from certificate (or from the CSR while pending)"""
-        if not self.crt and not self.csr:
-            return "N/A"
+        """Key type of the certificate (or of the CSR while pending): 'RSA 2048', 'ML-DSA-65'."""
+        return self.key_facts['key_type']
+
+    @property
+    def signature_algorithm(self) -> str:
+        """Signature algorithm of the CA certificate, in the certificate list's spelling."""
         try:
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
-            import base64
-
-            if self.crt:
-                cert_pem = base64.b64decode(self.crt).decode('utf-8')
-                obj = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
-            else:
-                csr_pem = base64.b64decode(self.csr).decode('utf-8')
-                obj = x509.load_pem_x509_csr(csr_pem.encode(), default_backend())
-
-            from utils.foreign_algorithms import key_type_label
-            foreign = key_type_label(obj)
-            if foreign:
-                return foreign
-            public_key = obj.public_key()
-            from utils.key_algorithms import key_algo_for_public_key
-            return key_algo_for_public_key(public_key)
+            from utils.signature_label import signature_display_name
+            obj = self._crt_or_csr()
+            return signature_display_name(obj) if obj is not None else "N/A"
         except Exception:
             return "N/A"
-    
+
     @property
     def hash_algorithm(self) -> str:
         """Parse hash algorithm from certificate"""
@@ -538,6 +546,7 @@ class CA(db.Model):
         """Convert to dictionary"""
         # Determine CA type (lowercase for frontend)
         ca_type = "root" if self.is_root else "intermediate"
+        key_facts = self.key_facts
         
         # Determine status: pending (awaiting external certificate) wins,
         # otherwise derived from expiry
@@ -629,7 +638,13 @@ class CA(db.Model):
             "certs": self.certificates.count() if self.certificates else 0,  # Count of issued certificates
             "cross_certificate_count": cross_total,
             "cross_certificate_served": bool(cross_served),
-            "key_type": self.key_type,
+            "key_type": key_facts['key_type'],
+            "key_algorithm": key_facts['key_algorithm'],
+            "key_size": key_facts['key_size'],
+            "security_level": key_facts['security_level'],
+            "post_quantum": key_facts['post_quantum'],
+            "verifiable": key_facts['verifiable'],
+            "signature_algorithm": self.signature_algorithm,
             "hash_algorithm": self.hash_algorithm,
             "signature_scheme": self.signature_scheme or 'pkcs1v15',
             "compliance_profile": self.compliance_profile,

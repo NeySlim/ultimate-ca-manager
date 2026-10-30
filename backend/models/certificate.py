@@ -162,35 +162,31 @@ class Certificate(db.Model):
         except Exception:
             return []
             
+    def _crt_or_csr(self):
+        """The certificate, else the request, parsed; None when the row has neither."""
+        import base64
+        from cryptography import x509
+        if self.crt:
+            return x509.load_pem_x509_certificate(base64.b64decode(self.crt))
+        if self.csr:
+            return x509.load_pem_x509_csr(base64.b64decode(self.csr))
+        return None
+
+    @property
+    def key_facts(self) -> dict:
+        """key_type, key_algorithm, key_size, security_level, post_quantum, verifiable."""
+        from utils.key_facts import UNREADABLE, key_facts
+        try:
+            obj = self._crt_or_csr()
+            return key_facts(obj) if obj is not None else dict(UNREADABLE)
+        except Exception:
+            return dict(UNREADABLE)
+
     @property
     def key_type(self) -> str:
-        """Parse key type from certificate or CSR"""
-        try:
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
-            import base64
-            
-            # Try parsing CRT first
-            if self.crt:
-                pem_data = base64.b64decode(self.crt).decode('utf-8')
-                obj = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
-            # Then try parsing CSR
-            elif self.csr:
-                pem_data = base64.b64decode(self.csr).decode('utf-8')
-                obj = x509.load_pem_x509_csr(pem_data.encode(), default_backend())
-            else:
-                return "N/A"
+        """Key type of the certificate or CSR: 'RSA 2048', 'ML-DSA-65', 'N/A'."""
+        return self.key_facts['key_type']
 
-            from utils.foreign_algorithms import key_type_label
-            foreign = key_type_label(obj)
-            if foreign:
-                return foreign
-            public_key = obj.public_key()
-            from utils.key_algorithms import key_algo_for_public_key
-            return key_algo_for_public_key(public_key)
-        except Exception:
-            return "N/A"
-    
     @property
     def common_name(self) -> str:
         """Extract Common Name from subject, or fallback to first SAN DNS"""
@@ -285,60 +281,24 @@ class Certificate(db.Model):
     
     @property
     def key_algorithm(self) -> str:
-        """Get key algorithm name (RSA, EC, etc.)"""
-        key_info = self.key_type
-        if key_info and key_info != "N/A":
-            return key_info.split()[0]  # "RSA 2048" -> "RSA"
-        return "Unknown"
-    
+        """Key algorithm: 'RSA', 'EC', 'ML-DSA-65' (a post-quantum label is whole)."""
+        return self.key_facts['key_algorithm']
+
     @property
-    def key_size(self) -> int:
-        """Get key size in bits"""
-        key_info = self.key_type
-        if key_info and key_info != "N/A":
-            parts = key_info.split()
-            if len(parts) >= 2:
-                try:
-                    return int(parts[1])
-                except ValueError:
-                    pass
-        return 0
-    
+    def key_size(self):
+        """Key size in bits, 0 when unknown, None for a post-quantum key."""
+        return self.key_facts['key_size']
+
     @property
     def signature_algorithm(self) -> str:
-        """Get signature algorithm from certificate"""
+        """Signature algorithm of the certificate, else of the request."""
         try:
-            from cryptography import x509
-            from cryptography.hazmat.backends import default_backend
-            from cryptography.x509.oid import SignatureAlgorithmOID
-            import base64
-            
-            if not self.crt:
-                return "N/A"
-            
-            pem_data = base64.b64decode(self.crt).decode('utf-8')
-            cert = x509.load_pem_x509_certificate(pem_data.encode(), default_backend())
-            
-            # Get signature algorithm
-            sig_oid = cert.signature_algorithm_oid
-            if sig_oid == SignatureAlgorithmOID.RSASSA_PSS:
-                from utils.signature_label import signature_algorithm_label
-                return signature_algorithm_label(cert)
-            # Map common OIDs to friendly names
-            sig_map = {
-                '1.2.840.113549.1.1.11': 'SHA256-RSA',
-                '1.2.840.113549.1.1.12': 'SHA384-RSA',
-                '1.2.840.113549.1.1.13': 'SHA512-RSA',
-                '1.2.840.113549.1.1.5': 'SHA1-RSA',
-                '1.2.840.10045.4.3.2': 'ECDSA-SHA256',
-                '1.2.840.10045.4.3.3': 'ECDSA-SHA384',
-                '1.2.840.10045.4.3.4': 'ECDSA-SHA512',
-            }
-            from utils.foreign_algorithms import signature_label
-            return sig_map.get(sig_oid.dotted_string) or signature_label(sig_oid)
+            from utils.signature_label import signature_display_name
+            obj = self._crt_or_csr()
+            return signature_display_name(obj) if obj is not None else "N/A"
         except Exception:
             return "N/A"
-    
+
     @property
     def thumbprint_sha1(self) -> str:
         """Get SHA1 thumbprint/fingerprint"""
@@ -432,6 +392,7 @@ class Certificate(db.Model):
                 status = "expiring"
         
         san_entries = self.san_entries
+        key_facts = self.key_facts
         data = {
             "id": self.id,
             "refid": self.refid,
@@ -481,10 +442,13 @@ class Certificate(db.Model):
             "not_valid_after": self.not_valid_after,
             "status": status,
             # Key and signature info
-            "key_type": self.key_type,
+            "key_type": key_facts['key_type'],
             "key_algo": self.key_algo,  # Stored value for sorting
-            "key_algorithm": self.key_algorithm,
-            "key_size": self.key_size,
+            "key_algorithm": key_facts['key_algorithm'],
+            "key_size": key_facts['key_size'],
+            "security_level": key_facts['security_level'],
+            "post_quantum": key_facts['post_quantum'],
+            "verifiable": key_facts['verifiable'],
             "signature_algorithm": self.signature_algorithm,
             # Thumbprints
             "thumbprint_sha1": self.thumbprint_sha1,
@@ -519,18 +483,22 @@ class Certificate(db.Model):
             return None
 
 
+def key_algo_for_certificate(cert):
+    """The ``key_algo`` spelling of a parsed certificate, whatever pyca can load of its key."""
+    from utils.key_algorithms import key_algo_for_public_key
+    from utils.foreign_algorithms import describe_public_key
+    foreign = describe_public_key(cert)
+    if foreign:
+        return foreign['label'][:50]
+    return key_algo_for_public_key(cert.public_key())
+
+
 def key_algo_from_crt(crt):
     """The ``key_algo`` spelling for a stored certificate (base64 of PEM), None if unreadable."""
     import base64
     from cryptography import x509
-    from utils.key_algorithms import key_algo_for_public_key
-    from utils.foreign_algorithms import describe_public_key
     try:
-        cert = x509.load_pem_x509_certificate(base64.b64decode(crt))
-        foreign = describe_public_key(cert)
-        if foreign:
-            return foreign['label'][:50]
-        return key_algo_for_public_key(cert.public_key())
+        return key_algo_for_certificate(x509.load_pem_x509_certificate(base64.b64decode(crt)))
     except Exception:
         return None
 

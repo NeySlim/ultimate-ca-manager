@@ -1,4 +1,4 @@
-"""Reading certificates whose algorithms pyca cannot load (SM2, GOST, FRP256v1).
+"""Reading certificates whose algorithms pyca cannot load (SM2, GOST, FRP256v1, SLH-DSA).
 
 Such a certificate is displayed by its OID and, when UCM knows it, a name.
 Nothing here issues, signs or verifies anything.
@@ -11,6 +11,8 @@ from asn1crypto import core, parser
 from cryptography import x509
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.hazmat.primitives import serialization
+
+from utils import key_algorithms
 
 logger = logging.getLogger(__name__)
 
@@ -33,7 +35,8 @@ _SIGNATURES = {
 
 def signature_name(dotted):
     """Known name of a signature algorithm OID pyca does not name, else None."""
-    return _SIGNATURES.get(dotted)
+    pq = key_algorithms.post_quantum_info(dotted) if dotted else None
+    return _SIGNATURES.get(dotted) or (pq.label if pq else None)
 
 
 def _spki(obj):
@@ -98,10 +101,15 @@ def describe_public_key(obj):
                     size = (len(point) - 1) // 2 * 8
         else:
             name, size = _KEY_ALGORITHMS.get(algorithm, (None, 0))
-        return {'oid': oid, 'name': name, 'label': name or oid, 'key_size': size}
+        pq = None if name else key_algorithms.post_quantum_info(algorithm)
+        if pq:  # SLH-DSA, or ML-DSA on a build without it: a post-quantum key has no size
+            name, size = pq.label, None
+        return {'oid': oid, 'name': name, 'label': name or oid, 'key_size': size,
+                'security_level': pq.security_level if pq else None, 'post_quantum': bool(pq)}
     except Exception as e:
         logger.debug("Cannot describe public key: %s", e)
-        return {'oid': None, 'name': None, 'label': 'unknown', 'key_size': 0}
+        return {'oid': None, 'name': None, 'label': 'unknown', 'key_size': 0,
+                'security_level': None, 'post_quantum': False}
 
 
 def key_type_label(obj):

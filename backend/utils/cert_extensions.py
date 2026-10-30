@@ -12,6 +12,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, ed25519, ed448, dsa
 from utils.foreign_algorithms import describe_public_key
+from utils.key_facts import key_facts
 from utils.signature_label import signature_algorithm_label
 from utils.qc_statements import QC_STATEMENTS_OID, describe_qc_extension
 
@@ -243,7 +244,13 @@ def parse_certificate_info(pem_data):
     # Key algorithm and size
     foreign = describe_public_key(cert)
     pub_key = None if foreign else cert.public_key()
-    if foreign:
+    facts = key_facts(cert)
+    info['security_level'], info['post_quantum'] = facts['security_level'], facts['post_quantum']
+    if facts['post_quantum']:
+        info['key_algorithm'], info['key_size'] = facts['key_algorithm'], None
+        if foreign:
+            info['key_oid'] = foreign['oid']
+    elif foreign:
         info['key_algorithm'] = foreign['label']
         info['key_size'] = foreign['key_size']
         info['key_oid'] = foreign['oid']
