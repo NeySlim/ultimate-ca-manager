@@ -171,6 +171,7 @@ class TestRegistry:
             assert ka.default_digest_for_key(build_key(spec)) == 'sha256', spec
 
     def test_every_mldsa_alias_adds_a_spelling(self):
+        # Guard for future aliases: ML-DSA rows have none today, so this checks nothing yet.
         # case, spaces, '-', '_' and ':' are already free; EC aliases also feed utils.key_type
         for alg in ka._KNOWN.algorithms:
             if alg.family != 'ML-DSA':

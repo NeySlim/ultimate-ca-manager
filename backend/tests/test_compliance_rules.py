@@ -219,6 +219,8 @@ class TestHsmAndTsa:
         rules = {'pq_standalone': True}
         v, _ = _enforce(rules, key_type='ML-DSA-65')
         assert len(v) == 1 and 'ML-DSA-65' in v[0]
+        for spelling in ('mldsa65', 'ml_dsa_65', 'ML DSA 65'):
+            assert len(_enforce(rules, key_type=spelling)[0]) == 1, spelling
         assert len(_enforce(rules, signer_scheme='ml_dsa')[0]) == 1
         assert _enforce(rules, key_type='ML-DSA-65', pq_hybrid=True)[0] == []
         assert _enforce({'pq_standalone': False}, key_type='ML-DSA-65')[0] == []

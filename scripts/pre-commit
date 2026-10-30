@@ -53,8 +53,8 @@ fi
 
 # ── 3. Backend tests ──────────────────────────────────────────
 # Single parallel run (pytest-xdist; --dist loadfile is mandatory, tests
-# share state within a file). Strict: any "failed"/"error" in the summary
-# fails the hook — "1 failed, N passed" used to be accepted.
+# share state within a file). Strict: any "N failed" / "N error(s)" in the
+# summary fails the hook; "xfailed" does not.
 # UCM_PYTEST_WORKERS caps the workers when several commits run at once.
 echo -n "  Backend tests... "
 BACK_OUT=$(cd "$ROOT/backend" && "$PYTEST_PY" -m pytest tests/ -q --tb=no -rfE -n "${UCM_PYTEST_WORKERS:-auto}" --dist loadfile 2>&1) || true

@@ -176,7 +176,8 @@ def _rule_messages(rules, name, req, advisory=False):
         out.append(f'Signature scheme {scheme} {verb} policy "{name}" '
                    f'(allowed: {", ".join(schemes)}){hint}')
 
-    pq = key_type if _is_pq_label(key_type) else (scheme if scheme in ('ml_dsa', 'slh_dsa') else None)
+    # The registry reads every spelling; the prefix still catches SLH-DSA, which it lacks
+    pq = key_type if (key_algorithms.is_post_quantum(key_type) or _is_pq_label(key_type)) else (scheme if scheme in ('ml_dsa', 'slh_dsa') else None)
     if rules.get('pq_standalone') is True and pq and not advisory and not req.get('pq_hybrid'):
         out.append(f'A post-quantum key or signature ({pq}) alone {verb} policy "{name}": '
                    f'pair it with a classical certificate')

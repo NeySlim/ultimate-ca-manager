@@ -211,7 +211,8 @@ _ML_DSA: tuple[KeyAlgorithm, ...] = (
 
 
 def mldsa_supported() -> bool:
-    """Whether the libcrypto pyca runs on has ML-DSA (OpenSSL 3.5+; not el9 -fips builds)."""
+    """Whether pyca was built against a libcrypto with ML-DSA (OpenSSL 3.5+, AWS-LC, BoringSSL);
+    a FIPS provider loaded at run time may still lack it."""
     return bool(_openssl_backend.mldsa_supported())
 
 
