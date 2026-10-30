@@ -11,7 +11,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Added
 
-- Keys: ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) are recognised by policies, CSR parsing and key labels when the linked OpenSSL provides them (3.5 or later). They are refused in FIPS mode and not generated yet.
+- Keys: ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) are recognised by policies, CSR parsing and key labels when the linked OpenSSL provides them (3.5 or later). They are refused in FIPS mode.
+
+- ML-DSA keys can be generated for CAs, certificates, CSRs and templates, and a renewed ML-DSA key keeps its level. Their certificates carry signature-only key usage (RFC 9881): a bit a template or CSR asked for is removed with a notice, and a digest asked for an ML-DSA signer is ignored with a notice.
 
 - Post-quantum certificates, CAs and CSRs (ML-DSA, SLH-DSA) are shown under their own name with their security level and a Post-quantum badge, in the API, the trust store, the mTLS list and compliance grading. A key the API does not name is no longer displayed as RSA.
 
@@ -20,6 +22,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ML-DSA private keys written by OpenSSL in its default seed-and-expanded layout import, read from their seed after a consistency check. A key without its seed, or one whose two halves disagree, is refused with a message that says what to do.
 
 - PKCS#12, PFX and JKS exports of an ML-DSA key answer 400 with the reason `unsupported_for_key_algorithm` instead of a 500, and the export dialog greys these formats out. P7B bundles are built in-process instead of by the openssl command.
+
+### Changed
+
+- Issuance: an unknown `keyAlgo` on `POST /api/v2/cas`, or an unknown key type on a certificate, CSR or template, now answers 400 instead of falling back to RSA-2048. SLH-DSA CSRs are refused as not signable by this instance.
 
 ### Fixed
 
