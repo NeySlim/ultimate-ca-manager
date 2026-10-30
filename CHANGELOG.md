@@ -9,7 +9,15 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- Keys: ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) are recognised by policies, CSR parsing and key labels when the linked OpenSSL provides them (3.5 or later). They are refused in FIPS mode and not generated yet.
+
 ### Fixed
+
+- Generated CSRs: an Ed25519 or Ed448 key was signed with the requested SHA-2 digest and failed; keys whose scheme takes no digest are now signed without one.
+
+- CA details and renewal with a new key: an algorithm without a size or curve no longer falls back to the first algorithm of its family.
 
 - ACME DNS-01 with GoDaddy: TXT records were written with a PATCH the API does not offer, and removed with an empty PUT it refuses. The values of a name are now read, merged and written back with PUT, and cleanup uses DELETE.
 
