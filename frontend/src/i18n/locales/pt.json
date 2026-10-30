@@ -194,7 +194,7 @@
     "keyAlgorithm": "Algoritmo de chave",
     "keyAlgorithmLevel": "{{name}} (nível {{level}})",
     "postQuantum": "Pós-quântico",
-    "postQuantumHint": "Usa uma chave pós-quântica (ML-DSA, FIPS 204, ou SLH-DSA, FIPS 205). Clientes mais antigos podem não conseguir verificá-la.",
+    "postQuantumHint": "Usa uma chave pós-quântica (ML-DSA, FIPS 204, ou SLH-DSA, FIPS 205). Clientes mais antigos podem não conseguir verificar um certificado que a utilize.",
     "timeline": "Cronologia",
     "signingDetails": "Detalhes de assinatura",
     "fingerprints": "Impressões digitais",

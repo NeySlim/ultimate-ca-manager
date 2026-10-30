@@ -1401,7 +1401,7 @@
     "keyAlgorithm": "Algorithme de clé",
     "keyAlgorithmLevel": "{{name}} (niveau {{level}})",
     "postQuantum": "Post-quantique",
-    "postQuantumHint": "Utilise une clé post-quantique (ML-DSA, FIPS 204, ou SLH-DSA, FIPS 205). Les clients anciens peuvent ne pas savoir la vérifier.",
+    "postQuantumHint": "Utilise une clé post-quantique (ML-DSA, FIPS 204, ou SLH-DSA, FIPS 205). Les anciens clients risquent de ne pas pouvoir vérifier un certificat qui l'utilise.",
     "timeline": "Chronologie",
     "signingDetails": "Détails de signature",
     "fingerprints": "Empreintes",

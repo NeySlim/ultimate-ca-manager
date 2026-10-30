@@ -194,7 +194,7 @@
     "keyAlgorithm": "キーアルゴリズム",
     "keyAlgorithmLevel": "{{name}}（レベル {{level}}）",
     "postQuantum": "耐量子",
-    "postQuantumHint": "耐量子鍵（ML-DSA、FIPS 204、または SLH-DSA、FIPS 205）を使用しています。古いクライアントでは検証できない場合があります。",
+    "postQuantumHint": "耐量子鍵（ML-DSA、FIPS 204、または SLH-DSA、FIPS 205）を使用します。古いクライアントでは、これを使用した証明書を検証できない場合があります。",
     "timeline": "タイムライン",
     "signingDetails": "署名詳細",
     "fingerprints": "フィンガープリント",

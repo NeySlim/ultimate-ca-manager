@@ -194,7 +194,7 @@
     "keyAlgorithm": "Алгоритм ключа",
     "keyAlgorithmLevel": "{{name}} (рівень {{level}})",
     "postQuantum": "Постквантовий",
-    "postQuantumHint": "Використовує постквантовий ключ (ML-DSA, FIPS 204, або SLH-DSA, FIPS 205). Старіші клієнти можуть не змогти його перевірити.",
+    "postQuantumHint": "Використовує постквантовий ключ (ML-DSA, FIPS 204, або SLH-DSA, FIPS 205). Старіші клієнти можуть не змогти перевірити сертифікат, який його використовує.",
     "timeline": "Хронологія",
     "signingDetails": "Деталі підпису",
     "fingerprints": "Відбитки",

@@ -194,7 +194,7 @@
     "keyAlgorithm": "密钥算法",
     "keyAlgorithmLevel": "{{name}}（级别 {{level}}）",
     "postQuantum": "后量子",
-    "postQuantumHint": "使用后量子密钥（ML-DSA，FIPS 204，或 SLH-DSA，FIPS 205）。较旧的客户端可能无法验证。",
+    "postQuantumHint": "使用后量子密钥（ML-DSA，FIPS 204，或 SLH-DSA，FIPS 205）。较旧的客户端可能无法验证使用该密钥的证书。",
     "timeline": "时间线",
     "signingDetails": "签名详情",
     "fingerprints": "指纹",
