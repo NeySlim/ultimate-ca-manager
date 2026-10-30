@@ -6,7 +6,7 @@ import { Input, Select, Button } from '../../components'
 import { pickerCas, unlistedPickerCas } from '../../lib/caSelection'
 
 export default function DomainForm({ domain, dnsProviders, cas, onSubmit, onCancel }) {
-  const { t } = useTranslation()
+  const { t, i18n } = useTranslation()
   const [formData, setFormData] = useState({
     domain: domain?.domain || '',
     dns_provider_id: (domain?.dns_provider_id?.toString?.() ?? dnsProviders[0]?.id?.toString() ?? ''),
@@ -64,7 +64,7 @@ export default function DomainForm({ domain, dnsProviders, cas, onSubmit, onCanc
             label: ca.common_name || ca.descr || `CA #${ca.id}`
           }))
         ]}
-        helperText={[t('acme.issuingCAProxyHelper'), unlisted > 0 && t('cas.notListedForSigning', { count: unlisted })].filter(Boolean).join(' ')}
+        helperText={[t('acme.issuingCAProxyHelper'), unlisted > 0 && t('cas.notListedForSigning', { count: unlisted })].filter(Boolean).join(/^(ja|zh)/.test(i18n?.language || '') ? '' : ' ')}
       />
 
       <ToggleSwitch

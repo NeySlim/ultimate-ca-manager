@@ -5,8 +5,9 @@
 import { describe, it, expect, vi } from 'vitest'
 import { render, screen, within } from '@testing-library/react'
 
+const i18n = vi.hoisted(() => ({ language: 'en' }))
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key, opts) => (opts?.count !== undefined ? `${key}:${opts.count}` : key) }),
+  useTranslation: () => ({ t: (key, opts) => (opts?.count !== undefined ? `${key}:${opts.count}` : key), i18n }),
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 // A native select exposes the options and the helper text that the real one hides in a portal.
@@ -48,5 +49,13 @@ describe('DomainForm issuing CA picker (#426)', () => {
     const { field, labels } = renderForm({ domain: 'x.example', issuing_ca_id: 2 })
     expect(labels).toEqual(['Signing CA', 'Keyless root'])
     expect(field).toHaveTextContent('cas.notListedForSigning:1')
+  })
+
+  it.each([['en', ' '], ['fr', ' '], ['ja', ''], ['zh', '']])('joins the two sentences for %s with %j', (lang, sep) => {
+    i18n.language = lang
+    const { field } = renderForm(undefined)
+    expect(within(field).getByText(/cas\.notListedForSigning/).textContent)
+      .toBe(`acme.issuingCAProxyHelper${sep}cas.notListedForSigning:2`)
+    i18n.language = 'en'
   })
 })

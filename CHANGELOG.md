@@ -21,6 +21,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - CAs: when the hourly check merged two records of one CA, the SCEP, EST, XCEP, WSTEP, TSA, mTLS and ACME settings that named the removed record kept pointing at it. They now follow the kept record, with the SCEP challenge, and the removed record's URLs resolve to it; EST labels also follow a duplicate converted into a cross-certificate.
 
+- SCEP: an EC or other non-RSA CA was accepted as the default CA and on a profile, although SCEP clients encrypt their request to an RSA key, so every enrolment failed. It is now refused and left out of the pickers, except when already saved.
+
+- Settings: the mTLS trusted CA picker hid CAs without a key in silence and dropped a saved CA that could no longer sign; it now lists the CAs able to sign, keeps the saved one and says how many are left out. The ACME domain form no longer puts a space between two Japanese or Chinese sentences.
+
 ### Security
 
 - dnspython 2.9.1 (CVE-2026-114605): a DNS message with a long chain of compression pointers, sent to the RFC 2136 listener or returned by a resolver, could hold a CPU. The listener reads compressed names the same way under the new version.

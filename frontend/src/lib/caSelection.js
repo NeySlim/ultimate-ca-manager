@@ -33,11 +33,14 @@ export const pickerCas = (cas, ...selected) => {
 /** How many CAs a picker built with pickerCas leaves out (#426). */
 export const unlistedPickerCas = (cas, ...selected) => (cas || []).length - pickerCas(cas, ...selected).length
 
-/** pickerCas for SCEP, which also refuses an HSM-backed CA: it cannot decrypt the request envelope. */
+/** A CA whose key SCEP can decrypt with: RSA, held in software (an unknown key type is not ruled out). */
+const scepCanDecrypt = (ca) => !ca.uses_hsm && (!ca.key_type || ca.key_type === 'N/A' || /^RSA\b/.test(ca.key_type))
+
+/** pickerCas for SCEP, which also refuses a CA it cannot decrypt the request envelope with. */
 export const scepPickerCas = (cas, ...selected) => {
   const wanted = new Set(selected.filter(Boolean).map(String))
   return pickerCas(cas, ...selected).filter(ca =>
-    !ca.uses_hsm || wanted.has(String(ca.id)) || (ca.refid && wanted.has(String(ca.refid))))
+    scepCanDecrypt(ca) || wanted.has(String(ca.id)) || (ca.refid && wanted.has(String(ca.refid))))
 }
 
 export const unlistedScepPickerCas = (cas, ...selected) => (cas || []).length - scepPickerCas(cas, ...selected).length

@@ -136,3 +136,16 @@ def test_scep_profile_keeps_its_ca_after_the_key_is_gone(app, auth_client, cas):
         assert r.status_code == 400, r.data
     finally:
         assert auth_client.delete(f'/api/v2/scep/profiles/{pid}').status_code in (200, 204)
+
+
+def test_scep_refuses_an_ec_ca_as_default_and_on_a_profile(app, auth_client, create_ca, cas):
+    """SCEP clients encrypt their request to an RSA key: an EC CA could never decrypt one."""
+    signer, _, _ = cas
+    ec_ca = create_ca(cn='Settings EC CA', keyType='EC', keySize='P-256')
+    r = auth_client.patch('/api/v2/scep/config', json={'ca_id': ec_ca['id']})
+    assert r.status_code == 400, r.data
+    assert 'RSA key' in r.get_json()['message']
+    r = auth_client.post('/api/v2/scep/profiles', json={'name': 'EC profile', 'ca_id': ec_ca['id']})
+    assert r.status_code == 400, r.data
+    assert 'RSA key' in r.get_json()['message']
+    assert auth_client.patch('/api/v2/scep/config', json={'ca_id': signer['id']}).status_code == 200

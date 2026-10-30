@@ -3,7 +3,7 @@ SCEP Management Routes v2.0
 /api/scep/* - SCEP configuration and requests
 """
 
-from utils.signing_ca import signing_ca_problem
+from utils.signing_ca import scep_ca_problem
 from flask import Blueprint, request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
@@ -86,13 +86,9 @@ def update_scep_config():
                 return error_response('CA not found', 404)
             # The saved CA stays saveable so the other settings never hinge on it (#426)
             if get_config('scep_ca_id', '') not in (str(ca_id_int), ca.refid):
-                problem = signing_ca_problem(ca)
+                problem = scep_ca_problem(ca)
                 if problem:
-                    return error_response(f'Selected CA cannot sign: {problem}', 400)
-                if ca.uses_hsm:
-                    return error_response(
-                        'Selected CA is HSM-backed: SCEP requires RSA envelope decryption, '
-                        'unavailable for HSM keys', 400)
+                    return error_response(problem, 400)
             set_config('scep_ca_id', str(ca_id_int))
         else:
             set_config('scep_ca_id', '')
@@ -463,13 +459,9 @@ def _validate_profile_payload(data, *, partial=False, profile_id=None):
         saved = db.session.get(ScepProfile, profile_id) if profile_id else None
         # The CA a profile is already bound to stays saveable, as for the default CA (#426)
         if not (saved is not None and saved.ca_refid == ca.refid):
-            if signing_ca_problem(ca):
-                return False, f'Selected CA cannot sign: {signing_ca_problem(ca)}'
-            if not ca.has_private_key:
-                return False, 'Selected CA has no private key'
-            if ca.uses_hsm:
-                return False, ('Selected CA is HSM-backed: SCEP requires RSA '
-                               'envelope decryption, unavailable for HSM keys')
+            problem = scep_ca_problem(ca)
+            if problem:
+                return False, problem
         data['ca_refid'] = ca.refid
 
     template_ref = data.get('template_id') if 'template_id' in data else None

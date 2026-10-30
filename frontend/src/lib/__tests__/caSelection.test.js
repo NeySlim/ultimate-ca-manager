@@ -61,4 +61,16 @@ describe('SCEP pickers', () => {
     expect(scepPickerCas(cas, 'r2').map(c => c.id)).toEqual([1, 2])
     expect(unlistedScepPickerCas(cas, 2)).toBe(0)
   })
+
+  it('leave out a CA with a key SCEP cannot decrypt with, unless it is the saved one', () => {
+    const keys = [
+      { id: 5, has_private_key: true, key_type: 'RSA 2048' },
+      { id: 6, refid: 'r6', has_private_key: true, key_type: 'EC secp256r1' },
+      { id: 7, has_private_key: true, key_type: 'Ed25519' },
+      { id: 8, has_private_key: true },
+    ]
+    expect(scepPickerCas(keys).map(c => c.id)).toEqual([5, 8])
+    expect(unlistedScepPickerCas(keys)).toBe(2)
+    expect(scepPickerCas(keys, 'r6').map(c => c.id)).toEqual([5, 6, 8])
+  })
 })

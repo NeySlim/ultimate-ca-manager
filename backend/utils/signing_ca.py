@@ -21,3 +21,17 @@ def signing_ca_problem(ca):
     if not ca.has_private_key:
         return 'CA has no private key'
     return None
+
+
+def scep_ca_problem(ca):
+    """Why *ca* cannot serve SCEP, or None: clients encrypt their request to the CA's RSA key."""
+    problem = signing_ca_problem(ca)
+    if problem:
+        return f'Selected CA cannot sign: {problem}'
+    if ca.uses_hsm:
+        return ('Selected CA is HSM-backed: SCEP requires RSA envelope decryption, '
+                'unavailable for HSM keys')
+    if not str(ca.key_type).startswith('RSA'):
+        return (f'Selected CA has a {ca.key_type} key: SCEP clients encrypt their request '
+                'to an RSA key')
+    return None
