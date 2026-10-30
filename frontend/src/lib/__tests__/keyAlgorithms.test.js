@@ -1,6 +1,6 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ACME_CLIENT_LABELS, KEY_ALGORITHMS, defaultDigestFor, findAlgorithm, groupedOptions,
+  ACME_CLIENT_LABELS, GROUP_PQ, KEY_ALGORITHMS, defaultDigestFor, findAlgorithm, groupedOptions,
   isBrainpool, listAlgorithms, signerKeyParams,
 } from '../keyAlgorithms'
 
@@ -8,12 +8,23 @@ const t = (key) => key
 const labels = (rows) => rows.map(r => r.label)
 
 describe('key algorithm registry', () => {
-  it('lists the nine generated keys and the two EdDSA keys it only reads', () => {
+  it('lists the nine generated keys, then the EdDSA and ML-DSA keys it only reads', () => {
     expect(labels(listAlgorithms({ generate: true }))).toEqual([
       'RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521',
       'EC-BP256', 'EC-BP384', 'EC-BP512',
     ])
-    expect(labels(KEY_ALGORITHMS).slice(-2)).toEqual(['ED25519', 'ED448'])
+    expect(labels(KEY_ALGORITHMS).slice(-5)).toEqual(['ED25519', 'ED448', 'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87'])
+  })
+
+  it('names ML-DSA by security category, without a digest, outside FIPS', () => {
+    expect(KEY_ALGORITHMS.filter(a => a.group === GROUP_PQ).map(a => [a.label, a.securityLevel]))
+      .toEqual([['ML-DSA-44', 2], ['ML-DSA-65', 3], ['ML-DSA-87', 5]])
+    expect(findAlgorithm('ML-DSA-65')).toMatchObject({
+      family: 'ML-DSA', bits: null, digest: null, fips: false, generate: false, issue: null, ca: null, csr: null,
+    })
+    expect(listAlgorithms({ fips: true }).some(a => a.group === GROUP_PQ)).toBe(false)
+    expect(groupedOptions(listAlgorithms({ labels: ['EC-P256', 'ML-DSA-65'] }), t).map(o => o.group))
+      .toEqual(['common.keyGroups.nist', 'common.keyGroups.pq'])
   })
 
   it('hides what FIPS mode does not approve', () => {

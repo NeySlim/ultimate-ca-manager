@@ -1595,6 +1595,7 @@
       "nist": "Courbes NIST",
       "brainpool": "Brainpool (RFC 5639)",
       "eddsa": "EdDSA",
+      "pq": "ML-DSA (FIPS 204)",
       "brainpoolWarning": "Les chaînes et signatures Brainpool sont lues par OpenSSL et Windows. Comme clé de serveur TLS, elle est refusée par Chrome et Chromium, Firefox, Go, rustls, GnuTLS et Java sans Bouncy Castle, et Windows Schannel n'active pas ces courbes par défaut."
     },
     "keyTypes": {

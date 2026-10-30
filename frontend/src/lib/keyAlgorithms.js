@@ -7,6 +7,7 @@ export const GROUP_RSA = 'rsa'
 export const GROUP_NIST = 'nist'
 export const GROUP_BRAINPOOL = 'brainpool'
 export const GROUP_EDDSA = 'eddsa'
+export const GROUP_PQ = 'pq'
 
 // Heading of each group, as an i18n key
 export const KEY_GROUPS = [
@@ -14,11 +15,12 @@ export const KEY_GROUPS = [
   { id: GROUP_NIST, labelKey: 'common.keyGroups.nist' },
   { id: GROUP_BRAINPOOL, labelKey: 'common.keyGroups.brainpool' },
   { id: GROUP_EDDSA, labelKey: 'common.keyGroups.eddsa' },
+  { id: GROUP_PQ, labelKey: 'common.keyGroups.pq' },
 ]
 
 const rsa = (bits) => ({
   label: `RSA-${bits}`, bits, family: 'RSA', group: GROUP_RSA, display: `RSA ${bits}`,
-  digest: 'sha256', fips: true, generate: true, providers: null,
+  securityLevel: null, digest: 'sha256', fips: true, generate: true, providers: null,
   issue: ['rsa', String(bits)], ca: ['RSA', String(bits)], csr: `RSA ${bits}`,
   curveParam: null, i18nKey: `common.keyTypes.rsa${bits}`,
   sizeKey: `certificates.keySizeRsa${bits}`, csrKey: `csrs.keyRsa${bits}`,
@@ -26,7 +28,7 @@ const rsa = (bits) => ({
 
 const nist = (bits, curve, digest) => ({
   label: `EC-P${bits}`, bits, family: 'EC', group: GROUP_NIST, display: `ECDSA P-${bits}`,
-  digest, fips: true, generate: true, providers: null,
+  securityLevel: null, digest, fips: true, generate: true, providers: null,
   issue: ['ecdsa', String(bits)], ca: ['ECDSA', curve], csr: `EC P-${bits}`,
   curveParam: `P-${bits}`, i18nKey: `common.keyTypes.ecdsaP${bits}`,
   sizeKey: `certificates.keyCurveNistP${bits}`, csrKey: `csrs.keyCurveNistP${bits}`,
@@ -35,7 +37,7 @@ const nist = (bits, curve, digest) => ({
 // Brainpool: provider-side generation is PKCS#11 only
 const brainpool = (bits) => ({
   label: `EC-BP${bits}`, bits, family: 'EC', group: GROUP_BRAINPOOL, display: `Brainpool P${bits}r1`,
-  digest: `sha${bits}`, fips: false, generate: true, providers: ['pkcs11'],
+  securityLevel: null, digest: `sha${bits}`, fips: false, generate: true, providers: ['pkcs11'],
   issue: ['ecdsa', `brainpoolP${bits}r1`], ca: ['ECDSA', `brainpoolP${bits}r1`], csr: `EC-BP${bits}`,
   curveParam: `brainpoolP${bits}r1`, i18nKey: null, sizeKey: null, csrKey: null,
 })
@@ -43,8 +45,15 @@ const brainpool = (bits) => ({
 // EdDSA keys only arrive through CSRs and enrollment protocols (generate: false)
 const eddsa = (label, i18nKey) => ({
   label, bits: null, family: 'EDDSA', group: GROUP_EDDSA, display: label === 'ED25519' ? 'Ed25519' : 'Ed448',
-  digest: null, fips: false, generate: false, providers: null,
+  securityLevel: null, digest: null, fips: false, generate: false, providers: null,
   issue: null, ca: null, csr: null, curveParam: null, i18nKey, sizeKey: null, csrKey: null,
+})
+
+// ML-DSA (FIPS 204): read and named in policies, not generated yet (generate: false)
+const mldsa = (param, securityLevel) => ({
+  label: `ML-DSA-${param}`, bits: null, family: 'ML-DSA', group: GROUP_PQ, display: `ML-DSA-${param}`,
+  securityLevel, digest: null, fips: false, generate: false, providers: null,
+  issue: null, ca: null, csr: null, curveParam: null, i18nKey: null, sizeKey: null, csrKey: null,
 })
 
 export const KEY_ALGORITHMS = [
@@ -52,6 +61,7 @@ export const KEY_ALGORITHMS = [
   nist(256, 'prime256v1', 'sha256'), nist(384, 'secp384r1', 'sha384'), nist(521, 'secp521r1', 'sha512'),
   brainpool(256), brainpool(384), brainpool(512),
   eddsa('ED25519', 'common.keyTypes.ed25519'), eddsa('ED448', 'common.keyTypes.ed448'),
+  mldsa('44', 2), mldsa('65', 3), mldsa('87', 5),
 ]
 
 export const ACME_CLIENT_LABELS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384']

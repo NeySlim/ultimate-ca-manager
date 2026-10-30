@@ -21,11 +21,11 @@ from services.file_regen_service import mirror_private_key
 from utils.key_codec import eddsa_key_name, load_pem_bytes, private_key_to_pem
 from utils import key_algorithms
 from utils.key_algorithms import (
-    algorithms as registered_algorithms,
     family_for_public_key,
     generate_ec,
     generate_rsa,
     key_algo_for_public_key,
+    label_for_public_key,
 )
 from utils.key_type import validate_enrollment_public_key
 import fips_mode
@@ -436,7 +436,10 @@ def _generate_like(public_key):
         return generate_rsa(public_key.key_size)
     if family == 'EC':
         return generate_ec(public_key.curve)
-    return registered_algorithms(family)[0].generate()
+    label = label_for_public_key(public_key)
+    if label is None:
+        raise ValueError(f'No generator reproduces a {type(public_key).__name__} key')
+    return key_algorithms.generate(label)
 
 
 def _template_policy_oids(template_id):

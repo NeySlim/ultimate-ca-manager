@@ -30,7 +30,11 @@ with open(_TRUTH_PATH, encoding='utf-8') as _fh:
 LABELS = ['RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521', 'ED25519', 'ED448']
 BRAINPOOL = {'EC-BP256': ('brainpoolP256r1', 'sha256'), 'EC-BP384': ('brainpoolP384r1', 'sha384'),
              'EC-BP512': ('brainpoolP512r1', 'sha512')}
-REGISTERED = LABELS[:6] + list(BRAINPOOL) + LABELS[6:]
+# label: (param, NIST security category, OID of the key and of its signatures)
+MLDSA = {'ML-DSA-44': ('44', 2, '2.16.840.1.101.3.4.3.17'),
+         'ML-DSA-65': ('65', 3, '2.16.840.1.101.3.4.3.18'),
+         'ML-DSA-87': ('87', 5, '2.16.840.1.101.3.4.3.19')}
+REGISTERED = LABELS[:6] + list(BRAINPOOL) + LABELS[6:] + list(MLDSA)
 
 
 @lru_cache(maxsize=None)
@@ -100,7 +104,7 @@ class TestFacadesUnchanged:
 
 
 class TestRegistry:
-    def test_table_is_classical_plus_brainpool(self):
+    def test_table_is_classical_brainpool_and_mldsa(self):
         assert list(ka.labels()) == REGISTERED
 
     @pytest.mark.parametrize('label', REGISTERED)
@@ -130,6 +134,10 @@ class TestRegistry:
         if alg.trust_store_id is None:
             assert alg.family in ('ED25519', 'ED448')
             return
+        if alg.family == 'ML-DSA':
+            # reserved for TrustStore generation, which does not take it yet
+            assert alg.trust_store_id == label.lower() and alg.trust_store_id not in KEY_TYPES
+            return
         algo, param = KEY_TYPES[alg.trust_store_id]
         if algo == 'rsa':
             assert alg.family == 'RSA' and param == alg.key_size
@@ -157,10 +165,11 @@ class TestRegistry:
         assert ka.fips_approved('rsa:2048') and ka.fips_approved('prime256v1')
         assert not ka.fips_approved('ED25519')
         assert not ka.fips_approved('Ed448')
+        assert not ka.fips_approved('ML-DSA-65')
         assert not ka.fips_approved('RSA-1024')
         assert not ka.fips_approved(None)
 
-    @pytest.mark.parametrize('value', [None, '', '  ', 'RSA-1024', 'secp256k1', 'EdDSA', 'ML-DSA-65', True, 1024])
+    @pytest.mark.parametrize('value', [None, '', '  ', 'RSA-1024', 'secp256k1', 'EdDSA', 'ML-DSA-66', 'SLH-DSA-SHA2-128s', True, 1024])
     def test_unknown_is_none(self, value):
         assert ka.get(value) is None
         assert ka.normalize_label(value) is None
@@ -171,7 +180,7 @@ class TestRegistry:
         with pytest.raises(ValueError):
             ka.generate('RSA-1024')
 
-    @pytest.mark.parametrize('spec', ['rsa:1024', 'ec:secp256k1', 'x25519', 'dsa:1024', 'mldsa65', 'none'])
+    @pytest.mark.parametrize('spec', ['rsa:1024', 'ec:secp256k1', 'x25519', 'dsa:1024', 'none'])
     def test_unregistered_keys_have_no_label(self, spec):
         assert ka.label_for_public_key(build_key(spec)) is None
 
@@ -195,32 +204,93 @@ class TestRegistry:
             ka._Registry(ka.ALGORITHMS + (twin,))
 
 
-class TestRoomForNewFamilies:
-    """A hyphenated family slots in as one more row, with no lookup cut at '-'."""
+class TestMLDSA:
+    """ML-DSA-44/65/87 (FIPS 204): a hyphenated family, never cut at '-'."""
 
     @pytest.fixture
-    def with_mldsa65(self, monkeypatch):
-        entry = ka.KeyAlgorithm(
-            label='ML-DSA-65', family='ML-DSA', param='65',
-            private_class=mldsa.MLDSA65PrivateKey, public_class=mldsa.MLDSA65PublicKey,
-            generator=mldsa.MLDSA65PrivateKey.generate, needs_digest=False, default_digest=None,
-            display='ML-DSA-65', legacy_key_algo='ML-DSA-65', trust_store_id=None,
-            fips_approved=False)
-        monkeypatch.setattr(ka, '_REGISTRY', ka._Registry(ka.ALGORITHMS + (entry,)))
+    def fips(self, monkeypatch):
+        import fips_mode
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
 
-    def test_lookups(self, with_mldsa65):
-        for spelling in ('ML-DSA-65', 'mldsa65', 'ml-dsa-65', 'ML_DSA 65'):
-            assert ka.normalize_label(spelling) == 'ML-DSA-65'
-        assert ka.parse_label('ML-DSA-65') == ('ML-DSA', '65')
-        sk = ka.generate('ML-DSA-65')
-        assert ka.label_for_private_key(sk) == 'ML-DSA-65'
-        assert ka.label_for_public_key(sk.public_key()) == 'ML-DSA-65'
-        assert ka.label_for_public_key(build_key('mldsa44')) is None
-        assert ka.normalize_label('RSA-2048') == 'RSA-2048'
+    @pytest.fixture
+    def without_mldsa(self, monkeypatch):
+        """The tables a build whose libcrypto has no ML-DSA (OpenSSL < 3.5) loads."""
+        monkeypatch.setattr(ka, 'mldsa_supported', lambda: False)
+        ka._load()
+        yield
+        monkeypatch.undo()
+        ka._load()
 
-    def test_facades_pick_it_up(self, with_mldsa65):
+    @pytest.mark.parametrize('label', MLDSA)
+    def test_row_shape(self, label):
+        alg = ka.get(label)
+        param, level, oid = MLDSA[label]
+        assert (alg.family, alg.param, alg.security_level, alg.oid) == ('ML-DSA', param, level, oid)
+        assert (alg.needs_digest, alg.default_digest, alg.key_size, alg.fips_approved) == (False, None, None, False)
+        assert (alg.display, alg.legacy_key_algo, alg.trust_store_id) == (label, label, label.lower())
+
+    @pytest.mark.parametrize('label', MLDSA)
+    def test_spellings(self, label):
+        param = MLDSA[label][0]
+        for spelling in (label, f'mldsa{param}', f'ml_dsa_{param}', f'ML_DSA {param}', f'ml-dsa-{param}'):
+            assert ka.normalize_label(spelling) == label, spelling
+        assert ka.parse_label(label) == ('ML-DSA', param)
+
+    @pytest.mark.parametrize('label', MLDSA)
+    def test_keys_of_each_size_are_told_apart(self, label):
+        sk = build_key(f"priv:mldsa{MLDSA[label][0]}")
+        assert ka.label_for_private_key(sk) == label
+        assert ka.label_for_public_key(sk.public_key()) == label
+        assert ka.key_algo_for_public_key(sk.public_key()) == label
+        assert ka.family_for_public_key(sk.public_key()) == 'ML-DSA'
+
+    @pytest.mark.parametrize('label', MLDSA)
+    def test_signature_oid_names_the_label(self, label):
+        oid = MLDSA[label][2]
+        assert ka.label_for_signature_oid(oid) == label
+        assert ka.label_for_signature_oid(x509.ObjectIdentifier(oid)) == label
+        sk = ka.generate(label)
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'k')])
+        csr = x509.CertificateSigningRequestBuilder().subject_name(name).sign(sk, None)
+        assert ka.label_for_signature_oid(csr.signature_algorithm_oid) == label
+
+    def test_other_signature_oids_name_nothing(self):
+        for oid in ('1.2.840.113549.1.1.11', '1.3.101.112', '2.16.840.1.101.3.4.3.20', '', None, 'x'):
+            assert ka.label_for_signature_oid(oid) is None, oid
+
+    def test_is_post_quantum(self):
+        assert all(ka.is_post_quantum(label) for label in MLDSA)
+        assert ka.is_post_quantum('mldsa65')
+        for label in (*LABELS, *BRAINPOOL, 'ML-DSA-66', None, ''):
+            assert not ka.is_post_quantum(label), label
+
+    def test_facades_pick_it_up(self):
         assert key_label_for_public_key(build_key('mldsa65')) == 'ML-DSA-65'
+        assert key_label_for_public_key(build_key('mldsa87')) == 'ML-DSA-87'
         assert _normalize_key_type_label('ml-dsa-65') == 'ML-DSA-65'
+
+    @pytest.mark.parametrize('label', MLDSA)
+    def test_refused_in_fips_mode(self, label, fips):
+        import fips_mode
+        with pytest.raises(fips_mode.FipsRestricted):
+            ka.generate(label)
+
+    def test_absent_when_the_libcrypto_lacks_it(self, without_mldsa):
+        assert list(ka.labels()) == REGISTERED[:-3]
+        assert ka.get('ML-DSA-65') is None
+        assert ka.label_for_public_key(build_key('mldsa65')) is None
+        with pytest.raises(ValueError, match='not available on this build'):
+            ka.generate('ML-DSA-65')
+        with pytest.raises(ValueError, match='Unsupported key algorithm'):
+            ka.generate('RSA-1024')
+        # still named, for what reads certificates without using the key
+        assert ka.is_post_quantum('ML-DSA-65')
+        assert ka.label_for_signature_oid(MLDSA['ML-DSA-65'][2]) == 'ML-DSA-65'
+
+    def test_present_when_the_libcrypto_has_it(self):
+        from cryptography.hazmat.backends.openssl.backend import backend
+        assert ka.mldsa_supported() is backend.mldsa_supported() is True
+        assert set(MLDSA) <= set(ka.labels())
 
 
 @pytest.mark.parametrize('make_key,expected', [
@@ -343,3 +413,26 @@ class TestBrainpool:
 def ka_curve(label):
     return {'EC-BP256': ec.BrainpoolP256R1, 'EC-BP384': ec.BrainpoolP384R1,
             'EC-BP512': ec.BrainpoolP512R1}[label]()
+
+
+@pytest.mark.parametrize('spec,expected', [
+    ('mldsa44', ('ML-DSA-44', None)), ('mldsa87', ('ML-DSA-87', None)),
+    ('ed448', ('Ed448', 448)), ('rsa:3072', ('RSA', 3072)), ('x25519', ('Unknown', None)),
+])
+def test_ca_detail_names_the_exact_algorithm(spec, expected):
+    from api.v2.cas.crud import _public_key_summary
+    assert _public_key_summary(build_key(spec)) == expected
+
+
+@pytest.mark.parametrize('spec', ['priv:mldsa87', 'priv:mldsa44', 'priv:ed448', 'priv:ec:secp384r1', 'priv:rsa:3072'])
+def test_renewal_rekey_keeps_the_exact_algorithm(spec):
+    from services.cert.renewal import _generate_like
+    public_key = build_key(spec).public_key()
+    new = _generate_like(public_key)
+    assert ka.key_algo_for_public_key(new.public_key()) == ka.key_algo_for_public_key(public_key)
+
+
+def test_renewal_rekey_refuses_an_unregistered_family():
+    from services.cert.renewal import _generate_like
+    with pytest.raises(ValueError):
+        _generate_like(build_key('x25519'))

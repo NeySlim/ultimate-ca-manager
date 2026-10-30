@@ -389,6 +389,7 @@
       "nist": "NIST curves",
       "brainpool": "Brainpool (RFC 5639)",
       "eddsa": "EdDSA",
+      "pq": "ML-DSA (FIPS 204)",
       "brainpoolWarning": "Brainpool chains and signatures are read by OpenSSL and Windows. As a TLS server key it is refused by Chrome and Chromium, Firefox, Go, rustls, GnuTLS and Java without Bouncy Castle, and Windows Schannel does not enable these curves by default."
     },
     "keyTypes": {

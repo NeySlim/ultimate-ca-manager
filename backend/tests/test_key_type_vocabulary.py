@@ -75,6 +75,17 @@ class TestTheScreensOfferWhatTheApiAccepts:
             else:
                 assert row['digest'] is None, row['label']
             assert row['fips'] == backend.fips_approved, row['label']
+            assert row['securityLevel'] == backend.security_level, row['label']
+
+    def test_both_registries_list_the_same_keys_in_the_same_order(self, js_registry):
+        assert [r['label'] for r in js_registry] == list(key_algorithms.labels())
+
+    def test_mldsa_is_read_and_policed_but_not_yet_generated(self, js_registry):
+        pq = [r for r in js_registry if r['family'] == 'ML-DSA']
+        assert [r['label'] for r in pq] == ['ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']
+        for row in pq:
+            assert (row['group'], row['bits'], row['digest'], row['generate']) == ('pq', None, None, False)
+            assert row['issue'] is row['ca'] is row['csr'] is row['providers'] is None
 
     def test_each_form_value_parses_to_the_same_key(self, js_registry):
         for row in _generated(js_registry):

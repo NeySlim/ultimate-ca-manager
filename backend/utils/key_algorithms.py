@@ -14,8 +14,9 @@ from dataclasses import dataclass
 from typing import Callable
 
 from cryptography.exceptions import UnsupportedAlgorithm
+from cryptography.hazmat.backends.openssl.backend import backend as _openssl_backend
 from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, rsa
+from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, mldsa, rsa
 
 import fips_mode
 
@@ -84,7 +85,8 @@ def generate_ec(curve: ec.EllipticCurve):
     return key
 
 
-def _edwards_generator(name: str, private_class: type) -> Callable[[], object]:
+def _non_fips_generator(name: str, private_class: type) -> Callable[[], object]:
+    """Generator of a key the FIPS module does not approve: refused in FIPS mode."""
     def generate():
         fips_mode.refuse(f'{name} keys')
         return private_class.generate()
@@ -93,8 +95,8 @@ def _edwards_generator(name: str, private_class: type) -> Callable[[], object]:
 
 @dataclass(frozen=True)
 class KeyAlgorithm:
-    label: str                      # canonical policy/template label: 'RSA-2048', 'EC-P256', 'ED25519'
-    family: str                     # 'RSA', 'EC', 'ED25519', 'ED448'
+    label: str                      # canonical policy/template label: 'RSA-2048', 'EC-P256', 'ML-DSA-65'
+    family: str                     # 'RSA', 'EC', 'ED25519', 'ED448', 'ML-DSA'
     param: str | None               # the label's parameter ('2048', 'P256'), None when it has none
     private_class: type
     public_class: type
@@ -103,11 +105,13 @@ class KeyAlgorithm:
     default_digest: str | None      # what UCM signs with when no digest is requested
     display: str
     legacy_key_algo: str            # spelling written to certificates.key_algo
-    trust_store_id: str | None      # TrustStore KEY_TYPES id, None when it cannot generate it
+    trust_store_id: str | None      # TrustStore KEY_TYPES id (ML-DSA: reserved, not yet there), None when it has none
     fips_approved: bool
     key_size: int | None = None     # RSA modulus or EC field size, in bits
     curve_names: tuple[str, ...] = ()   # pyca / OpenSSL curve names, EC only
     aliases: tuple[str, ...] = ()       # extra spellings accepted by normalize_label
+    security_level: int | None = None   # NIST post-quantum security category, None for classical keys
+    oid: str | None = None              # OID of the key and of its signatures, when one names both
 
     def generate(self):
         return self.generator()
@@ -164,14 +168,29 @@ def _edwards(name: str, private_class: type, public_class: type, bits: int) -> K
     return KeyAlgorithm(
         label=name.upper(), family=name.upper(), param=None,
         private_class=private_class, public_class=public_class,
-        generator=_edwards_generator(name, private_class),
+        generator=_non_fips_generator(name, private_class),
         needs_digest=False, default_digest=None,
         display=name, legacy_key_algo=name, trust_store_id=None,
         fips_approved=False, key_size=bits,
     )
 
 
-ALGORITHMS: tuple[KeyAlgorithm, ...] = (
+def _mldsa(param: str, level: int, oid_arc: int, private_class: type, public_class: type) -> KeyAlgorithm:
+    """FIPS 204 key: signs without a separate digest, outside the FIPS module UCM ships."""
+    label = f'ML-DSA-{param}'
+    return KeyAlgorithm(
+        label=label, family='ML-DSA', param=param,
+        private_class=private_class, public_class=public_class,
+        generator=_non_fips_generator(label, private_class),
+        needs_digest=False, default_digest=None,
+        display=label, legacy_key_algo=label, trust_store_id=label.lower(),
+        fips_approved=False, key_size=None,
+        aliases=(f'mldsa{param}', f'ml_dsa_{param}'),
+        security_level=level, oid=f'2.16.840.1.101.3.4.3.{oid_arc}',
+    )
+
+
+_CLASSICAL: tuple[KeyAlgorithm, ...] = (
     _rsa(2048),
     _rsa(3072),
     _rsa(4096),
@@ -184,6 +203,17 @@ ALGORITHMS: tuple[KeyAlgorithm, ...] = (
     _edwards('Ed25519', ed25519.Ed25519PrivateKey, ed25519.Ed25519PublicKey, 256),
     _edwards('Ed448', ed448.Ed448PrivateKey, ed448.Ed448PublicKey, 448),
 )
+
+_ML_DSA: tuple[KeyAlgorithm, ...] = (
+    _mldsa('44', 2, 17, mldsa.MLDSA44PrivateKey, mldsa.MLDSA44PublicKey),
+    _mldsa('65', 3, 18, mldsa.MLDSA65PrivateKey, mldsa.MLDSA65PublicKey),
+    _mldsa('87', 5, 19, mldsa.MLDSA87PrivateKey, mldsa.MLDSA87PublicKey),
+)
+
+
+def mldsa_supported() -> bool:
+    """Whether the libcrypto pyca runs on has ML-DSA (OpenSSL 3.5+; not el9 -fips builds)."""
+    return bool(_openssl_backend.mldsa_supported())
 
 
 def _collapse(value) -> str:
@@ -215,7 +245,19 @@ class _Registry:
                 self.by_curve[curve.lower()] = alg
 
 
-_REGISTRY = _Registry(ALGORITHMS)
+def _load() -> None:
+    """Build the tables: ML-DSA rows only when this build can use them; the others are
+    kept apart so a request for one is told why, and its OID is still named."""
+    global ALGORITHMS, _REGISTRY, _UNAVAILABLE, _KNOWN
+    usable = _ML_DSA if mldsa_supported() else ()
+    ALGORITHMS = _CLASSICAL + usable
+    _REGISTRY = _Registry(ALGORITHMS)
+    _UNAVAILABLE = _Registry(a for a in _ML_DSA if a not in usable)
+    _KNOWN = _Registry(_CLASSICAL + _ML_DSA)
+
+
+ALGORITHMS: tuple[KeyAlgorithm, ...]
+_load()
 
 
 def algorithms(family: str | None = None) -> tuple[KeyAlgorithm, ...]:
@@ -277,6 +319,14 @@ def default_digest_for_key(key) -> str:
     return 'sha256'
 
 
+def needs_digest(key) -> bool:
+    """Whether signing with *key* (public or private) takes a separate digest; True if unregistered."""
+    for alg in _REGISTRY.algorithms:
+        if alg.matches_key(key):
+            return alg.needs_digest
+    return True
+
+
 def key_algo_for_public_key(public_key) -> str:
     """Spelling stored in ``certificates.key_algo``; sizes and curves outside
     the registry keep the "RSA <bits>" / "EC <curve>" form, DSA "DSA <bits>"."""
@@ -301,11 +351,32 @@ def label_for_private_key(private_key) -> str | None:
 
 
 def generate(label):
-    """A new private key for *label*; ValueError when the label is unknown."""
+    """A new private key for *label*; ValueError when the label is unknown or this build lacks it."""
     alg = get(label)
     if alg is None:
+        missing = _UNAVAILABLE.by_spelling.get(_collapse(label)) if label else None
+        if missing is not None:
+            raise ValueError(f'{missing.label} keys are not available on this build: '
+                             'they need OpenSSL 3.5 or later')
         raise ValueError(f'Unsupported key algorithm: {label}')
     return alg.generate()
+
+
+def is_post_quantum(label) -> bool:
+    """Whether *label* names a post-quantum algorithm, whether or not this build can use it."""
+    if label is None or isinstance(label, bool):
+        return False
+    alg = _KNOWN.by_spelling.get(_collapse(label))
+    return bool(alg and alg.security_level)
+
+
+def label_for_signature_oid(oid) -> str | None:
+    """Label of the algorithm a signature OID names on its own (ML-DSA), dotted string or
+    ``ObjectIdentifier``; None for hash-qualified OIDs (sha256WithRSA...) and unknown ones."""
+    dotted = getattr(oid, 'dotted_string', oid)
+    if not dotted or not isinstance(dotted, str):
+        return None
+    return next((a.label for a in _KNOWN.algorithms if a.oid == dotted), None)
 
 
 def fips_approved(label) -> bool:

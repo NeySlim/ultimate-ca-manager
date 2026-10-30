@@ -7,7 +7,7 @@ digest to the key (a curve-matched ECDSA, a KMS key version). The builders
 ask here instead of assuming SHA-256 (self-review of #347).
 """
 from cryptography.hazmat.primitives import hashes
-from cryptography.hazmat.primitives.asymmetric import ed448, ed25519, padding, rsa
+from cryptography.hazmat.primitives.asymmetric import padding, rsa
 
 from utils import key_algorithms
 
@@ -17,12 +17,12 @@ HASH_BY_NAME = {'sha256': hashes.SHA256, 'sha384': hashes.SHA384, 'sha512': hash
 def signing_hash_for(key, requested=None):
     """The digest to hand ``builder.sign()`` for *key*.
 
-    None for Ed25519/Ed448 keys, which take none. For an HSM-resident key,
-    the digest its provider will sign with when *requested* is asked for.
-    Otherwise *requested*, else the registry digest of the key (SHA-256 for
-    RSA and NIST curves, the curve's own for Brainpool).
+    None when the registry says the key's scheme takes none (Ed25519, Ed448,
+    ML-DSA). For an HSM-resident key, the digest its provider will sign with
+    when *requested* is asked for. Otherwise *requested*, else the registry
+    digest of the key (SHA-256 for RSA and NIST curves, the curve's own for Brainpool).
     """
-    if isinstance(key, (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)):
+    if not key_algorithms.needs_digest(key):
         return None
     requested = requested or HASH_BY_NAME[key_algorithms.default_digest_for_key(key)]()
     chooser = getattr(key, 'signing_hash', None)

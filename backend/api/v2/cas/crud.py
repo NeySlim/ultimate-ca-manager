@@ -135,8 +135,8 @@ def _public_key_summary(public_key):
     family = key_algorithms.family_for_public_key(public_key)
     if family in ('RSA', 'EC'):
         return family, public_key.key_size
-    if family:
-        alg = key_algorithms.algorithms(family)[0]
+    alg = key_algorithms.get(key_algorithms.label_for_public_key(public_key))
+    if alg is not None:
         return alg.display, alg.key_size
     if isinstance(public_key, dsa.DSAPublicKey):
         return 'DSA', public_key.key_size
