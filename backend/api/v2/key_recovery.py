@@ -216,7 +216,9 @@ def recover_key(rid):
         cert_obj = x509.load_pem_x509_certificate(base64.b64decode(cert.crt), default_backend())
         key_pem = load_pem_bytes(cert.prv, context=f"certificate {cert.id}")
         private_key = serialization.load_pem_private_key(key_pem, password=None, backend=default_backend())
-        refuse_unexportable_key(private_key, 'pkcs12')
+        refuse_unexportable_key(private_key, 'pkcs12', hint=(
+            'an administrator allowed to read private keys can export it as PEM (PKCS#8) '
+            'from the certificate'))
         from utils.ca_chain import issuer_chain
         start = CA.query.filter_by(refid=cert.caref).first() if cert.caref else None
         chain = [x509.load_pem_x509_certificate(link.pem, default_backend()) for link in issuer_chain(start)]
@@ -226,6 +228,7 @@ def recover_key(rid):
             encryption_algorithm=pkcs12_encryption(password, legacy, caref=cert.caref),
         )
     except FipsRestricted:
+        _audit('key_recovery.recover_failed', req, success=False)
         raise  # the app handler answers 400 with the FIPS problem type
     except Exception as e:
         logger.error(f"Key recovery {rid} failed to build PKCS12: {e}")

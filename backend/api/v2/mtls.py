@@ -424,7 +424,7 @@ def download_mtls_certificate(cert_id):
         except ValueError as e:
             logger.error(f"PKCS12 export: unusable private key for mTLS certificate {cert.id}: {e}")
             return error_response('Stored private key is unusable for PKCS12 export', 500)
-        refuse_unexportable_key(private_key, 'pkcs12')
+        refuse_unexportable_key(private_key, 'pkcs12', hint=None)  # PEM serves the certificate only
         x509_cert = cx509.load_pem_x509_certificate(cert_pem, default_backend())
 
         from api.v2.certificates.export import _build_ca_chain

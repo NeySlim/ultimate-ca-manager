@@ -121,6 +121,11 @@ CONTAINER_SITES = {
     'converter-jks': (_converter('jks'), 'JKS'),
     'key-recovery': (_key_recovery, 'PKCS#12'),
 }
+# The way out each route offers: key recovery's requester cannot read private keys, and the
+# mTLS download serves no key in PEM
+ADVICE = {'key-recovery': 'an administrator allowed to read private keys can export it as PEM',
+          'mtls-download': None}
+PEM_INSTEAD = 'export the certificate and the private key as PEM (PKCS#8) instead'
 
 
 @pytest.mark.parametrize('site', CONTAINER_SITES)
@@ -132,7 +137,25 @@ def test_key_containers_refuse_ml_dsa_with_a_stable_reason(site, auth_client, ap
     assert body['type'] == PROBLEM, body
     assert body['details'] == {'reason': 'unsupported_for_key_algorithm',
                                'key_algorithm': 'ML-DSA-65', 'format': name}
-    assert 'PEM' in body['message']
+    advice, refusal = ADVICE.get(site, PEM_INSTEAD), f'ML-DSA-65 keys cannot be exported as {name}'
+    if advice:
+        assert body['message'].startswith(f'{refusal}: ') and advice in body['message']
+    else:
+        assert body['message'] == refusal
+    assert (PEM_INSTEAD in body['message']) is (site not in ADVICE)
+
+
+def test_refused_key_recovery_is_audited(auth_client, app, material):
+    from models.audit_log import AuditLog
+    with app.app_context():
+        before = AuditLog.query.filter_by(action='key_recovery.recover_failed').count()
+    assert _key_recovery(auth_client, app, material).status_code == 400
+    with app.app_context():
+        failed = AuditLog.query.filter_by(action='key_recovery.recover_failed') \
+            .order_by(AuditLog.id.desc()).all()
+        assert len(failed) == before + 1
+        assert failed[0].success is False
+        assert json.loads(failed[0].details)['cert_id'] == material['cert']
 
 
 def test_trust_store_service_refuses_ml_dsa_pkcs12():
