@@ -192,6 +192,7 @@ export function TrustCertDetails({
           <Badge variant={statusConfig[status].variant} size="sm">
             {statusConfig[status].label}
           </Badge>
+          <PostQuantumBadge postQuantum={cert.post_quantum} algorithm={cert.key_type} />
           {purposes.length > 0 && purposes.slice(0, 2).map((purpose, idx) => {
             const config = purposeConfig[purpose.toLowerCase()] || { variant: 'default', label: purpose }
             return <Badge key={idx} variant={config.variant} size="sm">{config.label}</Badge>

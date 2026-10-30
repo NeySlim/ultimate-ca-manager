@@ -83,6 +83,11 @@ describe('CertificateDetails with a post-quantum key', () => {
     expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
   })
 
+  it('shows the badge in the compact bar of the detail window too', () => {
+    render(<CertificateDetails certificate={slhdsa} embedded />)
+    expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
+  })
+
   it('keeps an RSA certificate as it was, without the badge', () => {
     render(<CertificateDetails certificate={rsa} />)
     expect(screen.getByText('RSA')).toBeInTheDocument()

@@ -27,6 +27,7 @@ vi.mock('../cas/ChainUsageSection', () => ({ ChainUsageSection: () => null }))
 
 const { CADetails } = await import('../CADetails')
 const { TemplatePreviewModal } = await import('../TemplatePreviewModal')
+const { TrustCertDetails } = await import('../TrustCertDetails')
 const { useCertificateColumns } = await import('../../pages/certificates/useCertificateColumns')
 
 const ML_DSA_65 = KEY_ALGORITHMS.find(a => a.group === GROUP_PQ && a.label === 'ML-DSA-65')
@@ -47,6 +48,17 @@ describe('key display outside the certificate panel', () => {
     expect(screen.queryByText(ML_DSA_65.label)).toBeNull()
     expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
     expect(screen.queryByText(en.cas.signatureSchemePkcs1v15)).toBeNull()
+  })
+
+  it('shows the badge in the compact bar of the CA detail window', () => {
+    render(<CADetails ca={{ id: 9, descr: 'PQ root', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true }} embedded />)
+    expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
+    expect(screen.getAllByText(LEVEL_LABEL).length).toBeGreaterThan(0)
+  })
+
+  it('shows the badge in the compact bar of a trusted certificate window', () => {
+    render(<TrustCertDetails cert={{ id: 3, name: 'PQ root', key_type: 'ML-DSA-65', security_level: 3, post_quantum: true }} embedded />)
+    expect(screen.getByTestId('post-quantum-badge')).toBeInTheDocument()
   })
 
   it('explains the badge by the key, never by the signature', () => {

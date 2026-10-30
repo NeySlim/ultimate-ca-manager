@@ -197,6 +197,7 @@ export function CADetails({
           <Badge variant={statusConfig[status].variant} size="sm">
             {statusConfig[status].label}
           </Badge>
+          <PostQuantumBadge postQuantum={ca.post_quantum} algorithm={ca.key_type} />
           <span className="text-2xs text-text-tertiary">•</span>
           <span className="text-2xs text-text-secondary">{keyAlgorithmLabel(ca.key_type, t, ca.security_level) || t('common.na')}</span>
           <span className="text-2xs text-text-tertiary">•</span>

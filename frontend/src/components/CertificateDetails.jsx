@@ -289,6 +289,7 @@ export function CertificateDetails({
         <div className="flex items-center gap-2 flex-wrap px-3 py-2 rounded-lg border border-border bg-tertiary-op30">
           <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
           {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
+          <PostQuantumBadge postQuantum={cert.post_quantum} algorithm={cert.key_algorithm || cert.key_type} />
           {hasExpiry(cert.days_remaining) && !cert.revoked && (
             <span className={cn(
               "text-2xs font-medium",
