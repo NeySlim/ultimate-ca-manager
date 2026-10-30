@@ -348,10 +348,11 @@ class SmartParser:
                 
                 try:
                     key = load_private_key_any(pem_block, password=pwd)
+                    obj = self._parse_private_key(key)
+                    # an encrypted block keeps the decrypted PKCS#8: matcher and importer read it without a password
                     if not is_encrypted:
                         pem_block = normalize_private_key_pem(pem_block)  # ML-DSA "both" -> seed
-                    obj = self._parse_private_key(key)
-                    obj.raw_pem = pem_block
+                        obj.raw_pem = pem_block
                     obj.index = match.start()
                     obj.is_encrypted = is_encrypted
                     objects.append(obj)

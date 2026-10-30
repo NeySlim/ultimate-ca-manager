@@ -260,6 +260,54 @@ def test_smart_import_execute_refuses_a_key_whose_halves_disagree(app, auth_clie
         assert (CA.query.count(), Certificate.query.count()) == before
 
 
+def _rsa_leaf_and_encrypted_key(password):
+    import datetime
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.x509.oid import NameOID
+    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'enc-rsa-{uuid.uuid4().hex[:8]}')])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+            .serial_number(x509.random_serial_number()).not_valid_before(now)
+            .not_valid_after(now + datetime.timedelta(days=30))
+            .add_extension(x509.BasicConstraints(ca=False, path_length=None), critical=True)
+            .sign(key, hashes.SHA256()))
+    sealed = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                               serialization.BestAvailableEncryption(password.encode()))
+    return cert.public_bytes(serialization.Encoding.PEM), sealed, key
+
+
+@pytest.mark.parametrize('kind', ['ml-dsa-both', 'rsa'])
+def test_smart_import_execute_keeps_an_encrypted_key(app, auth_client, kind):
+    if kind == 'rsa':
+        cert, sealed, key = _rsa_leaf_and_encrypted_key(P12_PASSWORD.decode())
+        expected = key.public_key().public_numbers()
+    else:
+        cert, sealed, expected = CERT, BOTH_ENC, _raw_public(load_mldsa_key())
+    r = auth_client.post('/api/v2/import/execute', data=json.dumps({
+        'content': (cert + sealed).decode(), 'password': P12_PASSWORD.decode(),
+        'options': {'skip_duplicates': False}}), content_type='application/json')
+    assert r.status_code == 200, r.data
+    data = get_json(r)['data']
+    ids = data['imported_ids']
+    with app.app_context():
+        from utils.key_codec import load_pem_bytes
+        rows = ([db.session.get(CA, i) for i in ids.get('cas', [])]
+                + [db.session.get(Certificate, i) for i in ids.get('certificates', [])])
+        try:
+            assert data['success'] is True, data
+            assert data['keys_matched'] == 1, data
+            [row] = rows
+            assert row.prv, 'the key was dropped'
+            stored = serialization.load_pem_private_key(load_pem_bytes(row.prv), None)
+            got = (stored.public_key().public_numbers() if kind == 'rsa' else _raw_public(stored))
+            assert got == expected
+        finally:
+            for row in rows:
+                db.session.delete(row)
+            db.session.commit()
+
+
 def test_smart_import_refuses_a_seedless_key():
     from services.smart_import.parser import SmartParser
     from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
