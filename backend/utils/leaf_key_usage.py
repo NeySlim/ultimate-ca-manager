@@ -1,11 +1,11 @@
-"""Key-algorithm-aware KeyUsage for end-entity certificates (#327).
+"""Key-algorithm-aware KeyUsage for certificates, leaf and sub-CA (#327).
 
 keyEncipherment and dataEncipherment describe RSA key transport: the
 certified public key encrypts a symmetric key (or data) directly. No other
 key type UCM issues for can do that. RFC 5480 §3 restricts an id-ecPublicKey
 end-entity certificate to digitalSignature, nonRepudiation and keyAgreement
-(encipherOnly/decipherOnly only under keyAgreement); RFC 8410 §5 restricts
-Ed25519/Ed448 to the signature bits.
+(encipherOnly/decipherOnly only under keyAgreement); RFC 8410 §5 and
+RFC 9881 §5 restrict Ed25519/Ed448 and ML-DSA to the signature bits.
 
 UCM's leaf profiles were written with RSA in mind and asserted
 keyEncipherment on every server-class certificate whatever the key, so an
@@ -35,7 +35,8 @@ def key_usage_for_key(
     in *ekus*) that encryption intent is kept as keyAgreement instead, which
     is how an EC key encrypts in CMS (ECDH, RFC 5753 §3.1) and the bit
     S/MIME clients such as NSS require on an EC recipient certificate.
-    Any other key type (Ed25519, Ed448) keeps only the signature bits.
+    Any other key type (Ed25519, Ed448, ML-DSA) keeps only the signature bits.
+    digitalSignature is set when no other bit is left (RFC 5280 §4.2.1.3).
     """
     if isinstance(public_key, rsa.RSAPublicKey):
         return usage

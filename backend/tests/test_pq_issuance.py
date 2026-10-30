@@ -335,3 +335,24 @@ def test_tsa_signer_issue_refuses_ml_dsa(app, auth_client, create_ca):
     with app.app_context():
         assert Certificate.query.count() == before
         assert selected() == signer
+
+
+def test_tsa_refuses_an_ml_dsa_ca_as_signer(app, auth_client):
+    # Without a dedicated signer the CA signs the timestamps itself, in RSA or ECDSA only
+    from models import SystemConfig
+    r = _ml_dsa_ca(auth_client, '65', commonName='PQ TSA CA-as-signer')
+    assert r.status_code == 201, r.get_json()
+    with app.app_context():
+        refid = db.session.get(CA, r.get_json()['data']['id']).refid
+
+    def stored():
+        return {row.key: row.value for row in SystemConfig.query.filter(
+            SystemConfig.key.in_(('tsa_ca_refid', 'tsa_signer_cert_refid')))}
+    with app.app_context():
+        before = stored()
+    r = auth_client.patch('/api/v2/tsa/config', content_type='application/json',
+                          data=json.dumps({'ca_refid': refid, 'signer_cert_refid': ''}))
+    assert r.status_code == 400, r.get_json()
+    assert 'RSA or ECDSA' in r.get_json()['detail'] and 'ML-DSA-65' in r.get_json()['detail']
+    with app.app_context():
+        assert stored() == before

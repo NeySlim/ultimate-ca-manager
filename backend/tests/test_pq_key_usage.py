@@ -185,6 +185,36 @@ def test_approval_reports_a_dropped_template_bit(app, auth_client, create_ca):
     assert any('keyEncipherment' in n and 'ML-DSA-65' in n for n in result['notices']), result['notices']
 
 
+def test_approved_csr_reports_a_dropped_csr_bit(app, auth_client, create_ca):
+    from api.v2.policies import _issue_approved_certificate
+    from models import User
+    from models.policy import ApprovalRequest, CertificatePolicy
+    from services.policy_service import PolicyEvaluationService
+    ca = create_ca(cn='KU approved CSR CA')
+    csr_pem = _ml_dsa_csr('approved-csr-ku.example.test', [_usage('digital_signature', 'key_encipherment')])
+    r = _post(auth_client, '/api/v2/csrs/upload', {'pem': csr_pem.decode(), 'name': 'approved-csr-ku'})
+    assert r.status_code in (200, 201), r.get_json()
+    csr_id = r.get_json()['data']['id']
+    with app.app_context():
+        pol = CertificatePolicy(name='pq-ku-approved-csr-policy', policy_type='issuance',
+                                requires_approval=True, min_approvers=1, is_active=False)
+        db.session.add(pol)
+        db.session.commit()
+        requester = User.query.filter_by(role='admin').first() or User.query.first()
+        approval = PolicyEvaluationService.create_approval_request(
+            policy=pol, requester_id=requester.id, request_type='csr', request_data={
+                'cn': 'approved-csr-ku.example.test', 'csr_id': csr_id, 'ca_id': ca['id'],
+                'validity_days': 30})
+        # Approved first, as the approve route does: signing closes the still-pending ones
+        approval = db.session.get(ApprovalRequest, approval.id)
+        approval.status = 'approved'
+        db.session.commit()
+        result = _issue_approved_certificate(approval)
+        assert _bits(_row_cert(db.session.get(Certificate, csr_id))) == {'digital_signature'}
+    assert result['id'] == csr_id
+    assert any('keyEncipherment' in n and 'ML-DSA-44' in n for n in result['notices']), result['notices']
+
+
 def test_bulk_sign_reports_a_dropped_csr_bit(app, auth_client, create_ca):
     ca = create_ca(cn='KU bulk sign CA')
     csr_pem = _ml_dsa_csr('bulk-ku.example.test', [_usage('digital_signature', 'key_encipherment')])

@@ -227,6 +227,7 @@ def _issue_approved_csr(approval, data):
     if ca is None:
         raise ValueError('The signing CA no longer exists')
     duplicate_ids = _close_duplicate_requests(approval, 'csr_id', cert.id)
+    sign_notices = []
     signed = CertificateService.sign_csr(
         cert_id=cert.id, caref=ca.refid,
         validity_days=int(data.get('validity_days') or 365),
@@ -236,6 +237,7 @@ def _issue_approved_csr(approval, data):
         username=approval.requester.username if approval.requester else 'system',
         extra_san=general_names_from_buckets(data['extra_san']) if data.get('extra_san') else None,
         policy_template_id=data.get('template_id'),
+        notices=sign_notices,
     )
     if isinstance(signed, CA):
         # An intermediate CA request: the result lives in the CA table, the
@@ -243,7 +245,7 @@ def _issue_approved_csr(approval, data):
         logger.info(f"CSR {cert.id} signed as CA {signed.id} via approval #{approval.id}")
         return {'id': None, 'ca_id': signed.id, 'cn': data.get('cn'),
                 'serial_number': signed.serial_number if hasattr(signed, 'serial_number') else None,
-                'notices': notices_mod.collect(data.get('validity_notice'))}
+                'notices': notices_mod.collect(data.get('validity_notice'), sign_notices)}
     _link_duplicates(duplicate_ids, signed.id)
     _link_approval(approval, signed.id)
     logger.info(f"CSR {cert.id} signed via approval #{approval.id}")
@@ -253,7 +255,7 @@ def _issue_approved_csr(approval, data):
         'serial_number': signed.serial_number,
         'valid_from': utc_isoformat(signed.valid_from),
         'valid_to': utc_isoformat(signed.valid_to),
-        'notices': notices_mod.collect(data.get('validity_notice')),
+        'notices': notices_mod.collect(data.get('validity_notice'), sign_notices),
     }
 
 

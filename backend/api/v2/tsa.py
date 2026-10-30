@@ -14,6 +14,10 @@ from services.tsa_service import describe_configured_signer
 import logging
 import re
 
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
+
+from utils import key_algorithms
+
 logger = logging.getLogger(__name__)
 
 bp = Blueprint('tsa_v2', __name__)
@@ -102,7 +106,13 @@ def _ca_signer_refusal(ca):
         public = ca_public_key(ca)
     except Exception:
         return None
-    return _tsa_policy_refusal(ca, public) if public is not None else None
+    if public is None:
+        return None
+    # The timestamp CMS is signed in RSA or ECDSA only (tsa_service._build_signed_response)
+    if not isinstance(public, (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)):
+        label = key_algorithms.label_for_public_key(public) or type(public).__name__
+        return f'A TSA signer key must be RSA or ECDSA, not {label}'
+    return _tsa_policy_refusal(ca, public)
 
 
 def _validate_signer_refid(refid):
