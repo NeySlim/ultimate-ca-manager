@@ -20,6 +20,7 @@ from utils.response import success_response, error_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.sanitize import sanitize_filename
 from services.ca_service import CAService
+from services.ca.signature_scheme import ca_public_key
 from services.import_service import CrossCertificateImport, cross_mode_from
 from services.crl import CRLService, ExternalCRLConflict
 from models import CA, db
@@ -225,7 +226,10 @@ def renew_ca_csr(ca_id):
     if digest is not None and digest not in ('sha256', 'sha384', 'sha512'):
         return error_response('digest must be one of sha256, sha384, sha512', 400)
     notices = []
-    public_key = _ca_public_key(ca)
+    try:
+        public_key = ca_public_key(ca)
+    except Exception:  # an unreadable key leaves the digest as requested
+        public_key = None
     if digest is not None and public_key is not None and not key_algorithms.needs_digest(public_key):
         notices.append(notices_mod.digest_ignored(digest, key_algorithms.label_for_public_key(public_key)))
         digest = None
@@ -251,15 +255,3 @@ def renew_ca_csr(ca_id):
         message='CSR generated: download and submit it to the external CA',
         meta=notices_mod.meta_with_notices(notices),
     )
-
-
-def _ca_public_key(ca):
-    """The CA's public key, from its certificate or its outstanding CSR; None if unreadable."""
-    try:
-        if ca.crt:
-            return x509.load_pem_x509_certificate(base64.b64decode(ca.crt)).public_key()
-        if ca.csr:
-            return x509.load_pem_x509_csr(base64.b64decode(ca.csr)).public_key()
-    except Exception:
-        return None
-    return None
