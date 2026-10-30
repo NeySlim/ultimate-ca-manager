@@ -38,6 +38,12 @@ def digest_ignored(requested: str, key_label: str) -> str:
             f'separate digest.')
 
 
+def key_usage_dropped(bits, key_label: str) -> str:
+    """KeyUsage bits that were asked for and that the certified key cannot honour."""
+    return (f'{", ".join(bits)} removed from the key usage: a {key_label} key '
+            f'cannot encrypt.')
+
+
 def collect(*notices) -> List[str]:
     """The notices that are actually there, in order, without blanks; a list
     among them (policy advisories) is spread."""
@@ -62,6 +68,7 @@ __all__ = [
     'policy_validity_reason',
     'issuer_expiry_reason',
     'digest_ignored',
+    'key_usage_dropped',
     'collect',
     'meta_with_notices',
 ]

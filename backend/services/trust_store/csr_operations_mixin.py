@@ -17,7 +17,7 @@ from cryptography.hazmat.backends import default_backend
 from utils.datetime_utils import utc_now, cert_not_before
 from utils.ca_signing_window import check_issuer_window, clamp_not_after
 from utils.x509_aki import authority_key_identifier_from_issuer
-from utils.leaf_key_usage import constrain_builder_key_usage
+from utils.leaf_key_usage import builder_key_usage, constrain_builder_key_usage, key_usage_notice
 from .constants import hash_algorithm
 from .key_operations_mixin import KeyOperationsMixin
 from .constraints_mixin import ConstraintsMixin
@@ -600,6 +600,7 @@ class CSROperationsMixin:
         policy_scope: Optional[dict] = None,
         san_template=None,
         qualification_template=None,
+        notices: Optional[list] = None,
     ) -> bytes:
         """Sign a CSR with a CA. ``renewal_of``: existing certificate this
         signing renews — its names are graced by NameConstraints validation.
@@ -647,7 +648,8 @@ class CSROperationsMixin:
         ``san_template``: template whose SAN types bind the request's names;
         names implied by the subject alone are dropped instead of refused.
         ``qualification_template``: template whose qcStatements and policy OIDs
-        land on a leaf (EST, WSTEP and mTLS pass none)."""
+        land on a leaf (EST, WSTEP and mTLS pass none).
+        ``notices``: list that receives what was granted otherwise than asked."""
         from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 
         # Load CSR
@@ -1042,7 +1044,13 @@ class CSROperationsMixin:
             # cert_type default above did (#327). Applied once the EKU is
             # settled, because an S/MIME leaf on an EC key keeps its
             # encryption intent as keyAgreement instead of losing it.
+            asked_ku = builder_key_usage(builder)
             builder = constrain_builder_key_usage(builder)
+            # A bit the template or CSR asked for is dropped out loud; the default's silently
+            if notices is not None and has_key_usage and asked_ku is not None:
+                notice = key_usage_notice(builder._public_key, asked_ku, builder_key_usage(builder))
+                if notice:
+                    notices.append(notice)
 
         def _sub_ca_csr_supplied(oid) -> bool:
             # A leaf never gets these from its CSR (dropped by the allow-list

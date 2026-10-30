@@ -110,7 +110,7 @@ class CACertificateCreationMixin:
         self_signed = issuer == subject and (issuer_cert is None or _spki_der(issuer_cert.public_key()) == _spki_der(public_key))
         is_root = self_signed
         copied = list(copied_extensions or [])
-        ku_names = key_usage if key_usage is not None else default_key_usage_for_ca(is_root)
+        ku_names = key_usage if key_usage is not None else default_key_usage_for_ca(is_root, public_key)
         builder = builder.add_extension(
             build_key_usage_extension(ku_names),
             critical=True,

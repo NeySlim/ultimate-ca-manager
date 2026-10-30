@@ -15,7 +15,7 @@ from utils.dn_validation import validate_dn_field
 from utils.eku_validation import normalize_extra_ekus, to_object_identifiers, merge_eku_lists
 from utils.eku_validation import add_ocsp_nocheck_if_responder
 from utils.cert_profiles import profile_for
-from utils.leaf_key_usage import key_usage_for_key
+from utils.leaf_key_usage import key_usage_for_key, key_usage_notice
 from utils.signing_hash import rsa_padding_for
 from models import Certificate, CertificateTemplate, CA, db
 from services.trust_store.constraints_mixin import validate_name_constraints
@@ -371,10 +371,14 @@ def create_certificate():
         # The profile / template KU is written for RSA; bits the generated
         # key cannot honour (keyEncipherment on EC) are cleared (#327). Added
         # after the EKU is known because an S/MIME EC leaf keeps keyAgreement.
-        builder = builder.add_extension(
-            key_usage_for_key(new_key.public_key(), x509.KeyUsage(**ku_flags), eku_oids),
-            critical=True,
-        )
+        asked_ku = x509.KeyUsage(**ku_flags)
+        granted_ku = key_usage_for_key(new_key.public_key(), asked_ku, eku_oids)
+        builder = builder.add_extension(granted_ku, critical=True)
+        # The template asked for these bits: dropping one is said, the profile's is not
+        ku_notice = (key_usage_notice(new_key.public_key(), asked_ku, granted_ku)
+                     if ku_flags is not profile['ku'] else None)
+        if ku_notice:
+            notices.append(ku_notice)
         # EKU is SEQUENCE SIZE (1..MAX) — omit the extension entirely when empty
         if eku_oids:
             builder = builder.add_extension(x509.ExtendedKeyUsage(eku_oids), critical=False)

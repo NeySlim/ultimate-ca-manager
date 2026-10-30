@@ -166,6 +166,7 @@ class CSRMixin:
         extra_san: list = None,
         digest_explicit: bool = False,
         policy_template_id: int = None,
+        notices: list = None,
     ) -> Certificate:
         """
         Sign a CSR with a CA
@@ -186,6 +187,7 @@ class CSRMixin:
                 yields to the digests the issuance policies allow
             policy_template_id: template that scopes the policies when it is
                 not bound to the issuance (Sign CSR form), else *template_id*
+            notices: list that receives what was granted otherwise than asked
 
         Returns:
             Updated Certificate with signed cert (or new CA record for intermediate_ca)
@@ -297,6 +299,7 @@ class CSRMixin:
                 'template_id': policy_template_id if policy_template_id is not None else template_id,
                 'digest_explicit': digest_explicit,
             },
+            notices=notices,
         )
 
         # Parse signed certificate

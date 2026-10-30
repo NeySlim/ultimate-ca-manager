@@ -81,11 +81,22 @@ def resolve_digest(digest: Optional[str], key_type: str) -> Tuple[Optional[str],
     return normalized, None
 
 
-def default_key_usage_for_ca(is_root: bool) -> List[str]:
-    """RFC-aligned default Key Usage for root vs subordinate CA."""
-    if is_root:
+def default_key_usage_for_ca(is_root: bool, key=None) -> List[str]:
+    """RFC-aligned default Key Usage for root vs subordinate CA. *key* (label,
+    TrustStore id or key object): an ML-DSA CA asserts its three signature bits (RFC 9881)."""
+    if is_root and _key_family(key) != 'ML-DSA':
         return list(DEFAULT_ROOT_KEY_USAGE)
     return list(DEFAULT_INTERMEDIATE_KEY_USAGE)
+
+
+def _key_family(key) -> Optional[str]:
+    if key is None:
+        return None
+    if isinstance(key, str):
+        alg = key_algorithms.get(key)
+        return alg.family if alg else None
+    public = key.public_key() if hasattr(key, 'public_key') else key
+    return key_algorithms.family_for_public_key(public)
 
 
 def default_eku_for_ca(is_root: bool) -> List[str]:

@@ -67,6 +67,25 @@ def key_usage_for_key(
     )
 
 
+_ENCRYPTION_BITS = (('key_encipherment', 'keyEncipherment'), ('data_encipherment', 'dataEncipherment'),
+                    ('key_agreement', 'keyAgreement'))
+
+
+def key_usage_notice(public_key, asked: x509.KeyUsage, granted: x509.KeyUsage) -> Optional[str]:
+    """Notice naming the encryption bits *asked* had and *granted* lost, None when none was lost."""
+    from utils import key_algorithms, notices
+    dropped = [name for attr, name in _ENCRYPTION_BITS
+               if getattr(asked, attr) and not getattr(granted, attr)]
+    if not dropped:
+        return None
+    label = key_algorithms.label_for_public_key(public_key) or type(public_key).__name__
+    return notices.key_usage_dropped(dropped, label)
+
+
+def builder_key_usage(builder: x509.CertificateBuilder) -> Optional[x509.KeyUsage]:
+    return next((e.value for e in builder._extensions if e.oid == ExtensionOID.KEY_USAGE), None)
+
+
 def constrain_builder_key_usage(
     builder: x509.CertificateBuilder,
 ) -> x509.CertificateBuilder:

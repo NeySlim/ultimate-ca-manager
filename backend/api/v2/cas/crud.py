@@ -592,7 +592,7 @@ def create_ca():
         if raw_ku is None and data.get('key_usage') is not None:
             raw_ku = data.get('key_usage')
         if raw_ku is None:
-            key_usage = default_key_usage_for_ca(is_root)
+            key_usage = default_key_usage_for_ca(is_root, digest_key_type)
         else:
             ku_err = validate_ca_key_usage(raw_ku)
             if ku_err:

@@ -1070,6 +1070,7 @@ def sign_csr(csr_id):
 
     try:
         # Sign the CSR - use CA refid
+        sign_notices = []
         signed_result = CertificateService.sign_csr(
             cert_id=csr_id,
             caref=ca.refid,
@@ -1083,6 +1084,7 @@ def sign_csr(csr_id):
             username=getattr(g.current_user, 'username', 'system'),
             extra_san=general_names_from_buckets(extra_san) if extra_san else None,
             policy_template_id=data.get('template_id'),
+            notices=sign_notices,
         )
         
         # Determine if result is a CA or Certificate
@@ -1106,7 +1108,7 @@ def sign_csr(csr_id):
             data=signed_result.to_dict(),
             message=msg,
             meta=notices_mod.meta_with_notices(
-                notices_mod.collect(validity_notice, ca_clamp_notice)),
+                notices_mod.collect(validity_notice, ca_clamp_notice, sign_notices)),
         )
     except FipsRestricted:
         raise
