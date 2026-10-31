@@ -3551,6 +3551,7 @@
     "generateHsmKey": "生成 HSM 密钥",
     "keyLabel": "密钥标签",
     "keyLabelPlaceholder": "my-signing-key",
+    "mldsaUntestedGoogleKms": "Google Cloud KMS 上的 ML-DSA 遵循 KMS API，但尚未针对该服务进行测试。",
     "purposes": {
       "general": "通用目的",
       "caSigning": "CA 签名"

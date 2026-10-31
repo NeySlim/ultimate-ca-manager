@@ -2198,6 +2198,7 @@
     "generateHsmKey": "Générer une clé HSM",
     "keyLabel": "Étiquette de clé",
     "keyLabelPlaceholder": "ma-clé-signature",
+    "mldsaUntestedGoogleKms": "ML-DSA sur Google Cloud KMS suit l'API KMS mais n'a pas encore été testé avec le service.",
     "purposes": {
       "general": "Usage général",
       "caSigning": "Signature CA"

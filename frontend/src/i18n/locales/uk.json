@@ -3595,6 +3595,7 @@
     "generateHsmKey": "Generate HSM Ключ",
     "keyLabel": "Ключ Label",
     "keyLabelPlaceholder": "мій-ключ-підпису",
+    "mldsaUntestedGoogleKms": "ML-DSA у Google Cloud KMS відповідає API KMS, але ще не перевірявся з цим сервісом.",
     "purposes": {
       "general": "Загальне призначення",
       "caSigning": "Підписання CA"

@@ -3551,6 +3551,7 @@
     "generateHsmKey": "Gerar HSM Chave",
     "keyLabel": "Chave Etiqueta",
     "keyLabelPlaceholder": "a-minha-chave-de-assinatura",
+    "mldsaUntestedGoogleKms": "O ML-DSA no Google Cloud KMS segue a API do KMS, mas ainda não foi testado com o serviço.",
     "purposes": {
       "general": "Geral Finalidade",
       "caSigning": "AC Signing"

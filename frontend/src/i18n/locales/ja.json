@@ -3553,6 +3553,7 @@
     "generateHsmKey": "HSMキーの生成",
     "keyLabel": "キーラベル",
     "keyLabelPlaceholder": "my-signing-key",
+    "mldsaUntestedGoogleKms": "Google Cloud KMS 上の ML-DSA は KMS API に準拠していますが、まだこのサービスでテストされていません。",
     "purposes": {
       "general": "一般用途",
       "caSigning": "CA署名"

@@ -3551,6 +3551,7 @@
     "generateHsmKey": "Genera Chiave HSM",
     "keyLabel": "Etichetta Chiave",
     "keyLabelPlaceholder": "mia-chiave-firma",
+    "mldsaUntestedGoogleKms": "ML-DSA su Google Cloud KMS segue l'API KMS, ma non è ancora stato testato con il servizio.",
     "purposes": {
       "general": "Scopo Generale",
       "caSigning": "Firma CA"
