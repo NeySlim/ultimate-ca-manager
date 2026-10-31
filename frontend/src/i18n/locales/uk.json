@@ -1250,7 +1250,7 @@
     "country": "Країна (C)",
     "state": "Штат/Область (ST)",
     "organization": "Організація (O)",
-    "commonName": "Common Назва (CN)",
+    "commonName": "Загальна назва (CN)",
     "new": "New",
     "namePlaceholder": "напр. Сертифікат веб-сервера",
     "descriptionPlaceholder": "Короткий опис цього шаблону",

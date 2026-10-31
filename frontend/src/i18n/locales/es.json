@@ -1234,7 +1234,7 @@
     "country": "País (C)",
     "state": "Estado/Provincia (ST)",
     "organization": "Organización (O)",
-    "commonName": "Common Nombre (CN)",
+    "commonName": "Nombre común (CN)",
     "new": "New",
     "namePlaceholder": "ej. Certificado de servidor web",
     "descriptionPlaceholder": "Breve descripción de esta plantilla",
