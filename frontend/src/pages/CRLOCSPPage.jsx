@@ -24,6 +24,7 @@ import { casService, crlService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
 import { formatDate, cn , downloadBlob} from '../lib/utils'
+import { findAlgorithm } from '../lib/keyAlgorithms'
 export default function CRLOCSPPage() {
   const { t } = useTranslation()
   const { showSuccess, showError, showInfo, showConfirm } = useNotification()
@@ -1099,8 +1100,8 @@ export default function CRLOCSPPage() {
                 <option value="72">72h</option>
               </select>
             </div>
-            {/* crl_digest is null when the CA key fixes its own hash (ML-DSA, EdDSA) */}
-            {selectedCA?.crl_digest && (
+            {/* A CA key that fixes its own hash (ML-DSA, EdDSA) takes no digest, whatever crl_digest says */}
+            {selectedCA?.crl_digest && findAlgorithm(selectedCA.key_type)?.digest !== null && (
             <div className="flex items-center gap-2">
               <label htmlFor="crl-digest" className="text-xs text-text-secondary">{t('crlOcsp.crlDigest')}</label>
               <select
