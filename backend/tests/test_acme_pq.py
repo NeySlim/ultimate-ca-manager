@@ -638,3 +638,56 @@ def test_an_upstream_refusal_is_reported_as_is(app):
         svc._post = lambda url, payload: _Refusal()
         ok, msg, _ = AcmeClientService.finalize_order(svc, order)
     assert not ok and msg == f'Finalization failed: {detail}'
+
+
+class TestFinalizeUnderAComplianceProfile:
+    """The BSI profile's allowed_key_types refuse an RSA-2048 or ML-DSA request at finalize."""
+
+    @pytest.fixture
+    def bsi_ca(self, app, create_ca):
+        ca = create_ca(cn=f'ACME BSI root {uuid.uuid4().hex[:6]}', keyAlgo='EC', keySize='P-256')
+        with app.app_context():
+            db.session.get(CA, ca['id']).compliance_profile = 'bsi'
+            db.session.commit()
+        yield ca
+        with app.app_context():
+            db.session.get(CA, ca['id']).compliance_profile = None
+            db.session.commit()
+
+    @staticmethod
+    def _finalize_with(app, client, account, key, domain):
+        from cryptography.hazmat.primitives.asymmetric import ec
+        order_id = _ready_order(app, account, domain)
+        digest = hashes.SHA256() if isinstance(key, (rsa.RSAPrivateKey, ec.EllipticCurvePrivateKey)) else None
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, domain)]))
+               .add_extension(x509.SubjectAlternativeName([x509.DNSName(domain)]), critical=False)
+               .sign(key, digest))
+        r = _jws(client, f'/acme/order/{order_id}/finalize',
+                 {'csr': _b64u(csr.public_bytes(serialization.Encoding.DER))},
+                 account['key'], kid=account['kid'])
+        with app.app_context():
+            order = AcmeOrder.query.filter_by(order_id=order_id).first()
+            return r, order.status, order.certificate_id
+
+    @pytest.mark.parametrize('label', ['RSA-2048', 'ML-DSA-44'])
+    def test_a_key_type_the_profile_leaves_out_is_a_bad_csr(self, app, client, rsa_account,
+                                                            signing_ca, bsi_ca, label):
+        from cryptography.hazmat.primitives.asymmetric import mldsa
+        signing_ca(bsi_ca)
+        key = (rsa.generate_private_key(public_exponent=65537, key_size=2048) if label == 'RSA-2048'
+               else mldsa.MLDSA44PrivateKey.generate())
+        r, status, cert_id = self._finalize_with(app, client, rsa_account, key,
+                                                 f'{label.lower()}.bsi.example.com')
+        body = r.get_json()
+        assert r.status_code == 400 and body['type'] == 'urn:ietf:params:acme:error:badCSR', body
+        assert f'Key type {label} is not allowed by policy' in body['detail'], body
+        assert status == 'invalid' and cert_id is None
+
+    def test_a_key_type_the_profile_lists_is_issued(self, app, client, rsa_account, signing_ca, bsi_ca):
+        from cryptography.hazmat.primitives.asymmetric import ec
+        signing_ca(bsi_ca)
+        r, status, cert_id = self._finalize_with(app, client, rsa_account,
+                                                 ec.generate_private_key(ec.SECP256R1()),
+                                                 'ec-p256.bsi.example.com')
+        assert r.status_code == 200 and status == 'valid' and cert_id is not None, r.get_json()
