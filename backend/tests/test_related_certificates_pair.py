@@ -557,6 +557,55 @@ def test_the_partner_policy_holds_a_user_certificate_and_an_acme_revocation(
             db.session.commit()
 
 
+def test_acme_says_the_related_certificate_policy_holds_the_revocation(app, client, auth_client, create_ca):
+    from models import AuditLog
+    from tests.test_acme_security_paths import _build_jws, _int_to_b64, _nonce, _post_jws
+    from utils.key_codec import load_pem_bytes
+    a, b = _pair(auth_client, create_ca, 'pair-partner-acme.example.com',
+                 hybrid={'classical': 'RSA-2048', 'pq': PQ})
+    pid = _approval_policy(app, _move_to_new_ca(app, create_ca, b['id'], 'Pair CA2 acme'), ['revocation'])
+    try:
+        with app.app_context():
+            key = serialization.load_pem_private_key(
+                load_pem_bytes(db.session.get(Certificate, a['id']).prv, context='test'), None)
+        pub = key.public_key().public_numbers()
+        der = _x509(a).public_bytes(serialization.Encoding.DER)
+        path = '/acme/revoke-cert'
+        jws = _build_jws(f'http://localhost{path}',
+                         {'certificate': base64.urlsafe_b64encode(der).rstrip(b'=').decode(), 'reason': 1},
+                         key, jwk={'kty': 'RSA', 'n': _int_to_b64(pub.n), 'e': _int_to_b64(pub.e)},
+                         nonce=_nonce(client))
+        r = _post_jws(client, path, jws)
+        assert r.status_code == 403, r.data
+        assert 'also revokes its related certificate, which requires approval' in r.get_json()['detail'], r.data
+        assert _revoked(app, a['id'], b['id']) == [False, False]
+        with app.app_context():
+            entry = AuditLog.query.filter_by(action='acme.cert.revoke', resource_id=str(a['id'])).order_by(
+                AuditLog.id.desc()).first()
+            assert 'related certificate' in entry.details, entry.details
+    finally:
+        _drop_policy(app, pid)
+
+
+@pytest.mark.parametrize('operation', ['revocation', 'renewal'])
+def test_a_bulk_listing_both_members_queues_one_request(app, auth_client, create_ca, create_user, operation):
+    a, b = _pair(auth_client, create_ca, f'pair-bulk-one-{operation}.example.com')
+    pid = _approval_policy(app, _move_to_new_ca(app, create_ca, b['id'], f'Pair CA2 bulk {operation}'),
+                           [operation])
+    try:
+        operator = _login(app, create_user)
+        path = '/api/v2/certificates/bulk/' + ('revoke' if operation == 'revocation' else 'renew')
+        r = operator.post(path, json={'ids': [a['id'], b['id']]})
+        assert r.status_code == 200, r.data
+        pending = json.loads(r.data)['data']['pending_approval']
+        assert [p['id'] for p in pending] == [a['id'], b['id']], pending
+        assert len({p['approval_id'] for p in pending}) == 1, pending
+        assert _pending(app, pid) == 1
+        assert _revoked(app, a['id'], b['id']) == [False, False]
+    finally:
+        _drop_policy(app, pid)
+
+
 def test_two_policies_on_a_pair_refuse_the_operator(app, auth_client, create_ca, create_user):
     a, b = _pair(auth_client, create_ca, 'pair-two-policies.example.com')
     p1 = _approval_policy(app, _ca_id_of(app, a['id']), ['revocation', 'renewal'])

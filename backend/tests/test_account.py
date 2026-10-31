@@ -13,6 +13,8 @@ Uses shared conftest fixtures: app, client, auth_client, create_user.
 """
 import pytest
 import json
+import time
+
 import pyotp
 from tests.conftest import get_json, assert_success, assert_error
 
@@ -20,6 +22,15 @@ CONTENT_JSON = 'application/json'
 
 def post_json(client, url, data):
     return client.post(url, data=json.dumps(data), content_type=CONTENT_JSON)
+
+
+def _totp_code(secret):
+    """The current code, taken at least 2 s before its 30 s window ends: the
+    server verifies without a tolerance window, so one taken later may be refused."""
+    left = 30 - time.time() % 30
+    if left < 2:
+        time.sleep(left + 0.05)
+    return pyotp.TOTP(secret).now()
 
 
 def patch_json(client, url, data):
@@ -516,7 +527,7 @@ class TestConfirm2FA:
         secret = data['secret']
 
         totp = pyotp.TOTP(secret)
-        code = totp.now()
+        code = _totp_code(totp.secret)
 
         r = post_json(auth_client, '/api/v2/account/2fa/confirm',
                       {'code': code})
@@ -525,7 +536,7 @@ class TestConfirm2FA:
         assert isinstance(data['backup_codes'], list)
         assert len(data['backup_codes']) == 8
         # Leave the shared admin as found: enabling again is refused while confirmed
-        assert_success(post_json(auth_client, '/api/v2/account/2fa/disable', {'code': totp.now()}))
+        assert_success(post_json(auth_client, '/api/v2/account/2fa/disable', {'code': _totp_code(totp.secret)}))
 
 
 class TestDisable2FA:
@@ -551,12 +562,12 @@ class TestDisable2FA:
         secret = assert_success(r)['secret']
 
         # Confirm
-        code = pyotp.TOTP(secret).now()
+        code = _totp_code(secret)
         r = post_json(auth_client, '/api/v2/account/2fa/confirm', {'code': code})
         assert_success(r)
 
         # Disable with TOTP code
-        code = pyotp.TOTP(secret).now()
+        code = _totp_code(secret)
         r = post_json(auth_client, '/api/v2/account/2fa/disable', {'code': code})
         assert_success(r)
 
@@ -582,7 +593,7 @@ class TestRecoveryCodes:
         """Enable 2FA, then fetch recovery codes."""
         r = auth_client.post('/api/v2/account/2fa/enable')
         secret = assert_success(r)['secret']
-        code = pyotp.TOTP(secret).now()
+        code = _totp_code(secret)
         post_json(auth_client, '/api/v2/account/2fa/confirm', {'code': code})
 
         r = auth_client.get('/api/v2/account/2fa/recovery-codes')
@@ -592,7 +603,7 @@ class TestRecoveryCodes:
         assert data['count'] > 0
 
         # Cleanup: disable 2FA
-        code = pyotp.TOTP(secret).now()
+        code = _totp_code(secret)
         post_json(auth_client, '/api/v2/account/2fa/disable', {'code': code})
 
 
@@ -620,12 +631,12 @@ class TestRegenerateRecoveryCodes:
         # Enable + confirm
         r = auth_client.post('/api/v2/account/2fa/enable')
         secret = assert_success(r)['secret']
-        code = pyotp.TOTP(secret).now()
+        code = _totp_code(secret)
         r = post_json(auth_client, '/api/v2/account/2fa/confirm', {'code': code})
         old_codes = assert_success(r)['backup_codes']
 
         # Regenerate
-        code = pyotp.TOTP(secret).now()
+        code = _totp_code(secret)
         r = post_json(auth_client,
                       '/api/v2/account/2fa/recovery-codes/regenerate',
                       {'code': code})
@@ -637,7 +648,7 @@ class TestRegenerateRecoveryCodes:
         assert data['backup_codes'] != old_codes
 
         # Cleanup
-        code = pyotp.TOTP(secret).now()
+        code = _totp_code(secret)
         post_json(auth_client, '/api/v2/account/2fa/disable', {'code': code})
 
 
@@ -770,7 +781,7 @@ class TestTwoFactorLifecycle:
         # Confirm with valid TOTP
         totp = pyotp.TOTP(secret)
         r = post_json(auth_client, '/api/v2/account/2fa/confirm',
-                      {'code': totp.now()})
+                      {'code': _totp_code(totp.secret)})
         data = assert_success(r)
         backup_codes = data['backup_codes']
         assert len(backup_codes) == 8
@@ -783,7 +794,7 @@ class TestTwoFactorLifecycle:
         # Regenerate recovery codes
         r = post_json(auth_client,
                       '/api/v2/account/2fa/recovery-codes/regenerate',
-                      {'code': totp.now()})
+                      {'code': _totp_code(totp.secret)})
         data = assert_success(r)
         new_codes = data['backup_codes']
         assert len(new_codes) == 8

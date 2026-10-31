@@ -1791,8 +1791,10 @@ def revoke_cert():
             from services.approval_gate import revocation_policy_for
             from services.cert.related_pair import mutual_partner
             partner = mutual_partner(cert)
-            held_by = revocation_policy_for(
-                cert, partner if partner is not None and not partner.revoked else None)
+            held_by = revocation_policy_for(cert)
+            held_by_partner = None
+            if held_by is None and partner is not None and not partner.revoked:
+                held_by = held_by_partner = revocation_policy_for(partner)
         except Exception as e:
             logger.error(f"ACME revocation policy evaluation failed: {e}", exc_info=True)
             return acme_error('serverInternal', 'Revocation policy could not be evaluated', 500)
@@ -1801,10 +1803,13 @@ def revoke_cert():
                 'acme.cert.revoke',
                 resource_type='certificate',
                 resource_id=cert.id,
-                details=f"held serial={serial_hex_lower}: approval required by policy {held_by.name}",
+                details=f"held serial={serial_hex_lower}: approval required by policy {held_by.name}"
+                        + (f" of related certificate {partner.id}" if held_by_partner else ''),
                 success=False)
+            what = ('also revokes its related certificate, which requires' if held_by_partner
+                    else 'requires')
             return acme_error('unauthorized',
-                              f'Revoking this certificate requires approval per policy "{held_by.name}"; '
+                              f'Revoking this certificate {what} approval per policy "{held_by.name}"; '
                               'ask the certificate authority operators to revoke it', 403)
 
         # Revoke certificate

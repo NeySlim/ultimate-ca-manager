@@ -209,7 +209,7 @@ def verify_with(public_key, signature: bytes, data: bytes) -> bool:
 
 
 def data_url_for(certificates) -> str:
-    """A data URL holding a degenerate PKCS#7 of *certificates*, A first (RFC 9763 §3.1, RFC 2397)."""
+    """A data URL holding a degenerate PKCS#7 of *certificates*, in DER SET OF order (RFC 9763 §3.1, RFC 2397)."""
     import base64
     from cryptography.hazmat.primitives.serialization import pkcs7
     der = pkcs7.serialize_certificates(list(certificates), Encoding.DER)
@@ -224,7 +224,7 @@ def location_uris(req: RequesterCertificate) -> list:
 
 def data_url_certificates(uri: str) -> list:
     """The certificates a data URL holds (a degenerate PKCS#7 or one certificate,
-    DER or PEM), first one first; RelatedCertError when it holds none."""
+    DER or PEM), in encoded order; RelatedCertError when it holds none."""
     import base64
     import binascii
     from urllib.parse import unquote_to_bytes

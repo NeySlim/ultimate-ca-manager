@@ -495,6 +495,14 @@ class LifecycleMixin:
                     # The member asked for stays revoked; the other one is said, not hidden
                     logger.error("Certificate %s revoked, its related certificate %s was not",
                                  cert_id, partner_id, exc_info=True)
+        else:
+            from services.cert.related_pair import hand_over_link
+            try:
+                if hand_over_link(db.session.get(Certificate, cert_id)) is not None:
+                    db.session.commit()
+            except Exception:
+                db.session.rollback()
+                logger.error("Related link of revoked certificate %s not handed over", cert_id, exc_info=True)
 
         return db.session.get(Certificate, cert_id)
 

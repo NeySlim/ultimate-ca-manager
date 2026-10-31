@@ -119,7 +119,7 @@ def verify_request(req, now=None):
 
 
 def _check_location(req, cert_a):
-    """RFC 9763 §3.2: a certificate carried in locationInfo must be A. Any other
+    """RFC 9763 §3.2: a data: locationInfo must hold A, in any position. Any other
     URI is not fetched: the copy held here, found by issuer and serial, stands in for it."""
     for uri in related_cert.location_uris(req):
         if uri[:5].lower() != 'data:':
@@ -128,7 +128,7 @@ def _check_location(req, cert_a):
             located = related_cert.data_url_certificates(uri)
         except related_cert.RelatedCertError as e:
             raise RelatedCertificateRefused(str(e)) from e
-        if located[0] != cert_a:
+        if cert_a not in located:
             raise RelatedCertificateRefused(
                 'The certificate in the relatedCertRequest locationInfo is not the related certificate')
 
@@ -224,3 +224,23 @@ def link_issued(b_row, cert_b, csr_der, replaces=None):
         a_row.related_certificate_id = b_row.id
         a_row.hybrid_role = role_for_public_key(cert_a.public_key())
     return a_row
+
+
+def hand_over_link(revoked_row):
+    """When *revoked_row* was the B of a valid A, A's link moves to the newest
+    unrevoked B naming A (a superseded B revoked alone); the moved-to row or None."""
+    a_row = mutual_partner(revoked_row)
+    if a_row is None or a_row.revoked:
+        return None
+    cert_a = row_certificate(a_row)
+    if not related_cert.references(row_certificate(revoked_row), cert_a):
+        return None
+    for b_row in (Certificate.query.filter(Certificate.related_certificate_id == a_row.id,
+                                           Certificate.id != revoked_row.id,
+                                           Certificate.revoked.isnot(True),
+                                           Certificate.crt.isnot(None))
+                  .order_by(Certificate.id.desc()).all()):
+        if related_cert.references(row_certificate(b_row), cert_a):
+            a_row.related_certificate_id = b_row.id
+            return b_row
+    return None

@@ -280,6 +280,42 @@ def test_generate_csr_signs_the_attribute_with_the_stored_key_of_a(app, auth_cli
         assert (a_row.related_certificate_id, a_row.hybrid_role) == (signed['id'], 'classical')
 
 
+def _sign_b(app, auth_client, row_id):
+    csr_id = _generate_b(app, row_id)
+    with app.app_context():
+        ca_id = _signing_ca(row_id)[0].id
+    r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={'ca_id': ca_id, 'validity_days': 30})
+    assert r.status_code == 200, r.data
+    return json.loads(r.data)['data']['id']
+
+
+def test_revoking_the_partner_alone_hands_the_link_to_the_newer_b(app, auth_client, cert_a):
+    """What an ACME re-enrolment does: B2 names A, then the superseded B1 is revoked alone."""
+    from services.cert.related_pair import mutual_partner
+    row_id = cert_a[0]
+    b1, b2 = _sign_b(app, auth_client, row_id), _sign_b(app, auth_client, row_id)
+    with app.app_context():
+        assert db.session.get(Certificate, row_id).related_certificate_id == b1
+    r = auth_client.post(f'/api/v2/certificates/{b1}/revoke',
+                         json={'reason': 'superseded', 'revoke_related': False})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert mutual_partner(db.session.get(Certificate, row_id)).id == b2
+    r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'keyCompromise'})
+    assert json.loads(r.data)['data']['related_revoked'] == b2, r.data
+
+
+def test_revoking_a_alone_moves_no_link(app, auth_client, cert_a):
+    row_id = cert_a[0]
+    b1, b2 = _sign_b(app, auth_client, row_id), _sign_b(app, auth_client, row_id)
+    r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke',
+                         json={'reason': 'superseded', 'revoke_related': False})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert db.session.get(Certificate, row_id).related_certificate_id == b1
+        assert db.session.get(Certificate, b2).related_certificate_id == row_id
+
+
 def test_the_sign_route_answers_400_when_a_was_revoked_meanwhile(app, auth_client, cert_a):
     row_id, _cert, _key = cert_a
     csr_id = _generate_b(app, row_id)
@@ -325,6 +361,20 @@ def test_a_data_url_holding_a_alone_in_der_is_accepted(app, cert_a):
         cert.public_bytes(serialization.Encoding.DER)).decode()
     with app.app_context():
         assert related_cert.references(_sign(row_id, _csr_b_located(cert, key, location)), cert)
+
+
+def test_a_data_url_holding_a_and_its_ca_is_accepted_whatever_the_order(app, create_cert):
+    """The PKCS#7 certificates field is a SET OF, sorted by DER: A need not come first."""
+    from utils.key_codec import load_pem_bytes
+    data = create_cert(key_type='ec', key_size='256', cert_type='server',
+                       san_dns=[f'host-{i}.large-a.example.com' for i in range(40)])
+    with app.app_context():
+        row = db.session.get(Certificate, data['id'])
+        cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+        key = serialization.load_pem_private_key(load_pem_bytes(row.prv, context='test'), None)
+        location = related_cert.data_url_for([cert, _signing_ca(row.id)[1]])
+        assert related_cert.data_url_certificates(location)[0] != cert
+        assert related_cert.references(_sign(row.id, _csr_b_located(cert, key, location)), cert)
 
 
 def test_a_uri_that_is_not_a_data_url_is_not_fetched(app, cert_a, monkeypatch):
