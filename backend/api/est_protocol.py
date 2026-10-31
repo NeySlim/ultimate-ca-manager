@@ -932,6 +932,19 @@ def server_keygen(label=None):
         csr = x509.load_der_x509_csr(
             _decode_est_csr(csr_data), default_backend()
         )
+        # Generated keys are RSA-2048: a request carrying a post-quantum key is told so
+        requested_pq = key_algorithms.post_quantum_info(csr.public_key_algorithm_oid)
+        if requested_pq is not None:
+            AuditService.log_action(
+                action='est_serverkeygen_denied',
+                resource_type='est',
+                details=(f'EST /serverkeygen refused a {requested_pq.label} request '
+                         f'(auth={auth_method}, user={username}, ip={remote_ip})'),
+                success=False,
+            )
+            return Response(
+                f'Server-side key generation makes RSA-2048 keys only, not {requested_pq.label}; '
+                'generate the key on the device and use /simpleenroll', status=400)
         key_identifiers = _server_keygen_identifiers(csr)
         mtls_cert_obj = None
         if auth_method == 'mtls':
