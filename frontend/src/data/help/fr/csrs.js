@@ -7,7 +7,7 @@ export default {
       {
         title: 'Flux de travail',
         items: [
-          { label: 'Générer une CSR', text: 'Créer une nouvelle CSR avec paire de clés directement dans UCM' },
+          { label: 'Générer une CSR', text: 'Créer une nouvelle CSR avec paire de clés directement dans UCM : RSA, EC, Brainpool ou ML-DSA-44/65/87' },
           { label: 'Téléverser une CSR', text: 'Accepter des fichiers CSR encodés en PEM ou coller du texte PEM' },
           { label: 'Examiner', text: 'Inspecter le sujet, les SAN, le type de clé et la signature avant de signer' },
           { label: 'Signer', text: 'Sélectionner une CA, le type de certificat, définir la période de validité et émettre le certificat' },
@@ -30,6 +30,7 @@ export default {
       'Vous pouvez ajouter une clé privée à une CSR après la signature si nécessaire pour l\'exportation PKCS#12',
       'Un certificat importé pour une CSR générée dans UCM complète cette CSR : l\'enregistrement conserve sa clé privée, le certificat s\'exporte donc avec elle',
       'Utilisez le mode Microsoft CA pour signer les CSR via AD CS lorsque vous êtes connecté à une PKI Windows',
+      'Un certificat pour une clé ML-DSA ne garde que les bits de signature : keyEncipherment, dataEncipherment et keyAgreement demandés par le template sont retirés, et le résultat l\'indique',
       'À la signature, utilisez « EKU supplémentaires » pour ajouter Microsoft RDP, smartcard logon, IPsec ou tout OID : l\'EKU existante du CSR est reconstruite avec le jeu fusionné',
       'Quand une politique ou l\'expiration de la CA émettrice raccourcit la validité demandée, le résultat l\'indique : "Issued for N day(s) instead of the M requested", avec la raison',
     ],
@@ -56,12 +57,14 @@ UCM peut générer une CSR et une paire de clés directement :
 1. Cliquez sur **Générer une CSR**
 2. Remplissez les champs du sujet (CN obligatoire)
 3. Ajoutez des noms alternatifs du sujet si nécessaire
-4. Sélectionnez le type et la taille de la clé (RSA 2048/4096, ECDSA P-256/P-384)
+4. Sélectionnez le type et la taille de la clé (RSA 2048/4096, ECDSA P-256/P-384/P-521, Brainpool, ML-DSA-44/65/87)
 5. Cliquez sur **Générer**
 
 La CSR et la clé privée sont créées et stockées dans UCM. La CSR apparaît dans l'onglet En attente prête à être signée.
 
 > 💡 C'est pratique lorsque vous souhaitez qu'UCM gère l'ensemble du cycle de vie. CSR, signature et stockage des clés.
+
+Un certificat signé pour une clé **ML-DSA** ne garde que les bits de signature : keyEncipherment, dataEncipherment et keyAgreement demandés par le template sont retirés, et le résultat nomme ce qui a été retiré.
 
 ## Téléverser une CSR
 

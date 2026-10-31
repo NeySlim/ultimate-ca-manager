@@ -26,7 +26,7 @@ export default {
     ],
     tips: [
       'O Verificador SSL suporta portas personalizadas: use-o para verificar qualquer serviço TLS',
-      'O Verificador de Correspondência compara hashes de módulo para verificar pares correspondentes',
+      'O Verificador de Correspondência compara chaves públicas, ML-DSA incluído: uma chave privada ML-DSA deve conter a sua semente, um ficheiro de chave com apenas a forma expandida é recusado',
       'O Conversor preserva a cadeia completa de certificados ao criar PKCS#12',
       'Os decodificadores nomeiam uma chave pós-quântica com seu nível de segurança NIST, por ex. ML-DSA-65 (nível 3), sem tamanho em bits',
       'O UCM ainda não consegue gravar uma chave ML-DSA em PKCS#12 ou JKS: exporte-a em PEM com a chave privada',
@@ -82,7 +82,7 @@ Verifique se um certificado, CSR e chave privada pertencem ao mesmo conjunto:
 3. Opcionalmente cole um **CSR** PEM
 4. Clique em **Verificar**
 
-O UCM compara os hashes de módulo (RSA) ou chave pública (EC). Uma correspondência confirma que formam um par válido.
+O UCM compara as chaves públicas (RSA, EC, EdDSA, ML-DSA). Uma correspondência confirma que formam um par válido. Uma chave privada ML-DSA deve conter a sua semente: um ficheiro de chave com apenas a forma expandida é recusado.
 
 ## Chaves pós-quânticas
 

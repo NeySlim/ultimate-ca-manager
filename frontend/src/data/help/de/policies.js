@@ -17,7 +17,8 @@ export default {
         title: 'Regeln',
         items: [
           { label: 'Maximale Gültigkeit', text: 'Maximale Zertifikatslaufzeit in Tagen' },
-          { label: 'Erlaubte Schlüsseltypen', text: 'Einschränken, welche Schlüsselalgorithmen und -größen verwendet werden können' },
+          { label: 'Erlaubte Schlüsseltypen', text: 'Einschränken, welche Schlüsselalgorithmen und -größen verwendet werden können, einschließlich ML-DSA-44, ML-DSA-65 und ML-DSA-87; der FIPS-Modus entfernt ML-DSA' },
+          { label: 'Erlaubte Signaturverfahren', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA oder SLH-DSA, abgeglichen mit dem Schlüssel der signierenden CA. Erlaubte Signatur-Hashes binden eine ML-DSA-CA nicht, da sie ohne separaten Digest signiert' },
           { label: 'SAN-Einschränkungen', text: 'Anzahl der SANs begrenzen und DNS-Namensmuster durchsetzen' },
           { label: 'Erlaubte Signatur-Hashes', text: 'SHA-256, SHA-384 oder SHA-512; keine Auswahl erlaubt jeden. Hat niemand den Hash gewählt, gilt der Standard, falls erlaubt, sonst der schwächste erlaubte. Das Ausstellungsformular bietet nur die erlaubten Schlüsseltypen an, die CA-Erstellung nur die erlaubten Schlüsseltypen und Hashes' },
         ]
@@ -76,6 +77,9 @@ Einschränken, welche Schlüsselalgorithmen und -größen verwendet werden könn
 - **EC-P256**: Modern, schnell, empfohlen
 - **EC-P384**: Höhere Sicherheit mit elliptischer Kurve
 - **EC-P521**: Maximale Sicherheit (selten erforderlich)
+- **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: Post-Quanten (FIPS 204), NIST-Level 2, 3 und 5; im FIPS-Modus entfernt
+
+**Erlaubte Signaturverfahren** schränkt ein, wie die signierende CA signiert (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Erlaubte Signatur-Hashes binden eine ML-DSA-CA nicht, da sie ohne separaten Digest signiert.
 
 **Erlaubte Signatur-Hashes** schränkt den Signatur-Hash auf dieselbe Weise ein (SHA-256, SHA-384, SHA-512); keine Auswahl erlaubt jeden. Hat niemand den Hash gewählt, gilt der Standard, falls erlaubt, sonst der schwächste erlaubte. Das Ausstellungsformular bietet nur die erlaubten Schlüsseltypen an, die CA-Erstellung nur die erlaubten Schlüsseltypen und Hashes.
 

@@ -24,6 +24,7 @@ export default {
           { label: 'Reparo de Cadeia', text: 'Corrigir relações pai-filho quebradas automaticamente' },
           { label: 'Importar chave privada', text: 'Anexar a chave privada de uma CA que possui apenas o seu certificado, para que possa assinar' },
           { label: 'Chave e validade', text: 'RSA-3072 por padrão, local ou HSM. Validade de 1, 2, 3, 5, 10, 15 ou 20 anos, ou Personalizada (dias) até 50 anos. Uma CA RSA-2048 que sobreviveria a 2030 é sinalizada: a ANSSI aceita RSA-2048 até o fim de 2030, a ETSI TS 119 312 até o fim de 2026' },
+          { label: 'Pós-quântica (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 ou ML-DSA-87 (FIPS 204, níveis NIST 2, 3 e 5), gerado apenas em software, nunca num HSM, e oculto no modo FIPS. Uma chave ML-DSA assina sem um digest separado, pelo que a CA, as suas CRLs e as suas respostas OCSP não têm digest a escolher. Uma CA ML-DSA pode assinar certificados RSA ou EC, e uma CA RSA ou EC pode assinar uma intermédia ML-DSA. A renovação mantém o mesmo nível' },
           { label: 'Restrições de nomes', text: 'Restrições avançadas (RFC 5280): subárvores permitidas e excluídas (DNS, faixa de IP, e-mail) limitam os nomes que a CA pode certificar. Para uma CA assinada externamente, elas são definidas pela CA assinante' },
           { label: 'Esquema de assinatura RSA', text: 'PKCS#1 v1.5 por padrão, ou RSA-PSS (sal tão longo quanto o hash) para uma CA RSA com chave local, PKCS#11 ou OpenBao. Aplica-se aos certificados, CRLs, respostas OCSP e respostas SCEP que a CA assina; os carimbos de data/hora permanecem em PKCS#1 v1.5, o esquema que openssl ts -verify confere. "Assinar com RSA-PSS" nos detalhes da CA altera uma CA existente em ambos os sentidos: os certificados já emitidos mantêm a sua assinatura' },
           { label: 'Perfil de conformidade', text: 'ANSSI, BSI ou EU ACM: regras alinhadas com um texto de referência limitam o que a CA emite (tipos de chave, digests, esquema RSA, datas-limite e, para EU ACM, uma chave da CA guardada num HSM). Escolha um na criação (a uma CA intermédia é proposto o perfil da CA superior, caso contrário o predefinido definido em Definições, Sobre). Numa CA existente, o campo nos detalhes associa, altera ou remove o perfil: a verificação do perfil corre primeiro nessa CA, as constatações são listadas e confirma-se que as regras se aplicam apenas às emissões futuras, nada do que já foi emitido é reassinado. Requer write:cas, e admin:system para associar ou alterar' },
@@ -95,6 +96,7 @@ export default {
       'A exportação PKCS#12 inclui a cadeia completa e é ideal para backup',
     ],
     warnings: [
+      'Uma CA ML-DSA ainda não pode ser exportada como PKCS#12 ou JKS: exporte o certificado e a chave privada em PEM. Clientes sem suporte a ML-DSA (OpenSSL anterior à 3.5, a maioria dos navegadores atuais) não conseguem verificar o que ela assina',
       'Excluir uma CA NÃO revogará os certificados que ela emitiu: revogue-os primeiro',
       'As chaves privadas são armazenadas criptografadas; perder o banco de dados significa perder as chaves',
       'Senhas do modo offline NÃO são recuperáveis: armazene-as em seu gerenciador de senhas / vault antes de confirmar',
@@ -136,7 +138,7 @@ Agrupa CAs pelo campo Organização (O). Útil para configurações multi-tenant
 ### Criar CA Raiz
 1. Clique em **Criar** → **CA Raiz**
 2. Preencha os campos do Sujeito (CN, O, OU, C, ST, L)
-3. Selecione o algoritmo de chave (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521): RSA-3072 por padrão
+3. Selecione o algoritmo de chave (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87): RSA-3072 por padrão
 4. Defina o período de validade: 1, 2, 3, 5, 10, 15 ou 20 anos, ou **Personalizada (dias)** até 50 anos (tipicamente 10-20 anos para CAs Raiz)
 5. Opcionalmente selecione um modelo de certificado
 6. Clique em **Criar**
@@ -151,6 +153,14 @@ Agrupa CAs pelo campo Organização (O). Útil para configurações multi-tenant
 > ⚠ A validade da CA Intermediária não pode exceder a validade da sua CA pai.
 
 O formulário sinaliza uma CA RSA-2048 que sobreviveria a 2030: a ANSSI aceita RSA-2048 até o fim de 2030, a ETSI TS 119 312 até o fim de 2026. Escolha RSA-3072 ou maior. Em **Restrições avançadas (RFC 5280)**, subárvores permitidas e excluídas (DNS, faixa de IP, e-mail) limitam os nomes que a CA pode certificar.
+
+### CAs pós-quânticas (ML-DSA)
+**ML-DSA-44**, **ML-DSA-65** e **ML-DSA-87** (FIPS 204) são listados com o seu nível de segurança NIST (2, 3 e 5). A chave é gerada em software, nunca num HSM, e o algoritmo fica oculto no modo FIPS.
+
+- Uma chave ML-DSA assina sem um digest separado: o campo de digest desaparece, e um digest enviado pela API é ignorado com um aviso. As CRLs e as respostas OCSP da CA seguem a mesma regra.
+- As hierarquias podem ser mistas: uma raiz ML-DSA pode assinar uma intermédia RSA ou EC, e uma CA RSA ou EC pode assinar uma intermédia ML-DSA, que usa então o digest da CA superior.
+- A renovação mantém a chave e o seu nível.
+- Uma CA ML-DSA exporta-se em PEM ou DER, não em PKCS#12 ou JKS. Clientes sem suporte a ML-DSA (OpenSSL anterior à 3.5, a maioria dos navegadores atuais) não conseguem verificar o que ela assina.
 
 ### Criar uma CA assinada externamente (modo CSR, v2.214)
 Para o padrão de raiz offline: a chave da CA emissora vive no UCM, seu certificado é assinado em outro lugar:

@@ -25,7 +25,7 @@ export default {
           { label: 'Import/Export', text: 'Templates als JSON-Dateien zwischen UCM-Instanzen teilen, ein Template oder mehrere in einer Datei' },
           { label: 'qcStatements', text: 'Optionale ETSI-EN-319-412-5-Angaben, die jedem aus dem Template ausgestellten Zertifikat hinzugefügt werden: QcCompliance, QcType (Signatur, Siegel oder Website), QcSSCD, QcPDS (HTTPS-URL und zweistelliger Sprachcode), QcRetentionPeriod, QcLimitValue, QcCClegislation (für ein nach einem Rechtsrahmen außerhalb der EU qualifiziertes Zertifikat) und der Semantics Identifier. Gilt nicht für die Ausstellung über EST, WSTEP oder mTLS, und eine qcStatements-Erweiterung in einem CSR wird ignoriert. QcIdentMethod, QcQSCDlegislation und PSD2-Angaben werden nicht unterstützt' },
           { label: 'Policy-OIDs', text: 'Zusätzliche Zertifikatsrichtlinien-OIDs (zum Beispiel die ETSI-Richtlinien QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd und QCP-w), die nach der Richtlinie der CA selbst hinzugefügt werden' },
-          { label: 'Schlüsseltyp', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 oder EC-P521, mit einem Digest SHA-256, SHA-384 oder SHA-512' },
+          { label: 'Schlüsseltyp', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 oder EC-P521, mit einem Digest SHA-256, SHA-384 oder SHA-512, oder ML-DSA-44, ML-DSA-65 oder ML-DSA-87. Der Digest ist der Signatur-Hash der ausstellenden CA, nicht der des Leaf-Schlüssels: Er gilt weiterhin für ein ML-DSA-Leaf unter einer RSA- oder EC-CA, und eine ML-DSA-CA ignoriert ihn' },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 und EC-BP512 (RFC 5639, in Schlüsseltyp-Listen unter Brainpool aufgeführt, im FIPS-Modus ausgeblendet). OpenSSL und Windows lesen ihre Ketten und Signaturen, aber Chrome, Firefox, Go, rustls, GnuTLS und Java ohne Bouncy Castle lehnen sie für TLS ab, und Windows Schannel aktiviert sie standardmäßig nicht. Auf einem HSM halten nur PKCS#11-Provider sie vor' },
         ]
       },
@@ -74,7 +74,7 @@ Zertifizierungsstellen werden nicht aus Templates erstellt: legen Sie sie auf de
 4. Konfigurieren Sie **Betreffsstandards** (O, OU, C, ST, L, CN, E-Mail). Bei „E-Mail"- und „Server + Client (Kombiniert)"-Zertifikaten wird die E-Mail zusätzlich zu einem E-Mail-SAN
 5. Wählen Sie **Key Usage**-Flags
 6. Wählen Sie **Extended Key Usage**-Werte aus den dem Server bekannten Zwecken (Smartcard Logon, Time Stamping, Microsoft RDP und weitere)
-7. Legen Sie den **Schlüsseltyp** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 oder EC-P521), den Digest und die **Standard-Gültigkeitsdauer** in Tagen fest
+7. Legen Sie den **Schlüsseltyp** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384, EC-P521 oder ML-DSA-44/65/87), den Digest und die **Standard-Gültigkeitsdauer** in Tagen fest. Der Digest ist der Signatur-Hash der ausstellenden CA und gilt daher weiterhin für einen ML-DSA-Schlüssel unter einer RSA- oder EC-CA; eine ML-DSA-CA ignoriert ihn
 8. Klicken Sie auf **Erstellen**
 
 ## Templates verwenden

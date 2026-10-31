@@ -26,7 +26,7 @@ export default {
     ],
     tips: [
       'Der SSL-Checker unterstützt benutzerdefinierte Ports: verwenden Sie ihn, um jeden TLS-Dienst zu prüfen',
-      'Der Schlüsselabgleich vergleicht Modulus-Hashes, um übereinstimmende Paare zu verifizieren',
+      'Der Schlüsselabgleich vergleicht öffentliche Schlüssel, einschließlich ML-DSA: Ein privater ML-DSA-Schlüssel muss seinen Seed enthalten, eine Schlüsseldatei mit nur der expandierten Form wird abgelehnt',
       'Der Konverter bewahrt die vollständige Zertifikatskette beim Erstellen von PKCS#12',
       'Die Decoder benennen einen Post-Quanten-Schlüssel mit seiner NIST-Sicherheitsstufe, z. B. ML-DSA-65 (Stufe 3), ohne Größe in Bit',
       'UCM kann noch keinen ML-DSA-Schlüssel in PKCS#12 oder JKS schreiben: Exportieren Sie ihn stattdessen als PEM mit dem privaten Schlüssel',
@@ -82,7 +82,7 @@ Zeigt: Betreff, Aussteller, SANs, Gültigkeit, Seriennummer, Key Usage, Erweiter
 3. Fügen Sie optional einen **CSR**-PEM ein
 4. Klicken Sie auf **Abgleichen**
 
-UCM vergleicht die Modulus- (RSA) oder Public-Key-Hashes (EC). Eine Übereinstimmung bestätigt ein gültiges Paar.
+UCM vergleicht die öffentlichen Schlüssel (RSA, EC, EdDSA, ML-DSA). Eine Übereinstimmung bestätigt ein gültiges Paar. Ein privater ML-DSA-Schlüssel muss seinen Seed enthalten: Eine Schlüsseldatei mit nur der expandierten Form wird abgelehnt.
 
 ## Post-Quanten-Schlüssel
 

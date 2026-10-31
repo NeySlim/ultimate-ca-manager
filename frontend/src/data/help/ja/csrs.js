@@ -7,7 +7,7 @@ export default {
       {
         title: 'ワークフロー',
         items: [
-          { label: 'CSRの生成', text: 'UCM内で直接キーペア付きの新しいCSRを作成' },
+          { label: 'CSRの生成', text: 'UCM内で直接キーペア付きの新しいCSRを作成：RSA、EC、Brainpool、ML-DSA-44/65/87' },
           { label: 'CSRのアップロード', text: 'PEMエンコードされたCSRファイルの受け入れまたはPEMテキストの貼り付け' },
           { label: 'レビュー', text: '署名前にサブジェクト、SAN、キータイプ、署名を検査' },
           { label: '署名', text: 'CAを選択し、証明書タイプを選択し、有効期間を設定して証明書を発行' },
@@ -29,6 +29,7 @@ export default {
       'CSRは要求者の秘密鍵を保持します: 鍵がシステムを離れることはありません',
       '署名後、必要に応じてPKCS#12エクスポートのためにCSRに秘密鍵を追加できます',
       'UCMで生成したCSRに対して証明書をインポートすると、そのCSRが完了します：レコードは秘密鍵を保持するため、証明書は鍵とともにエクスポートされます',
+      'ML-DSA 鍵向けの証明書には署名ビットのみが残ります。テンプレートが要求した keyEncipherment、dataEncipherment、keyAgreement は削除され、結果にその旨が表示されます',
       'Windows PKIに接続している場合、Microsoft CAモードを使用してAD CS経由でCSRに署名できます',
       '署名時には「追加 EKU」を使って Microsoft RDP、スマートカードログオン、IPsec、または任意の OID を追加できます: CSR の既存 EKU はマージされたセットで再構築されます',
       'ポリシーまたは発行CAの有効期限により要求された有効期間が短縮された場合、結果にその旨が表示されます："Issued for N day(s) instead of the M requested" と理由（サーバーが英語で返すメッセージです）',
@@ -56,12 +57,14 @@ UCMは直接CSRとキーペアを生成できます：
 1. **CSRを生成**をクリック
 2. サブジェクトフィールドを入力（CNは必須）
 3. 必要に応じてSubject Alternative Namesを追加
-4. キータイプとサイズを選択（RSA 2048/4096、ECDSA P-256/P-384）
+4. キータイプとサイズを選択（RSA 2048/4096、ECDSA P-256/P-384/P-521、Brainpool、ML-DSA-44/65/87）
 5. **生成**をクリック
 
 CSRと秘密鍵が作成され、UCMに保存されます。CSRは署名準備完了として保留中タブに表示されます。
 
 > 💡 CSR、署名、鍵の保管までUCMで完全なライフサイクルを管理したい場合に便利です。
+
+**ML-DSA** 鍵向けに署名された証明書には署名ビットのみが残ります。テンプレートが要求した keyEncipherment、dataEncipherment、keyAgreement は削除され、結果に削除されたものが表示されます。
 
 ## CSRのアップロード
 

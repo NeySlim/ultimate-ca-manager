@@ -463,6 +463,13 @@ GET /api/v2/cas?page=1&per_page=20
 }
 ```
 
+**Key fields** (CAs, certificates and CSRs): `key_type` (`"RSA 4096"`, `"EC secp384r1"`,
+`"ML-DSA-65"`), `key_algorithm` (`"RSA"`, `"EC"`, `"ML-DSA-65"`), `key_size` (bits, `null`
+for a post-quantum key), `security_level` (NIST level `2`, `3` or `5` for ML-DSA-44/65/87,
+`null` otherwise), `post_quantum` (boolean) and `verifiable` (`false` for an SLH-DSA
+signature, which UCM reads but cannot check). An ML-DSA CA reports `signature_algorithm`
+as its parameter set, e.g. `"ML-DSA-65"`.
+
 ### Get CA Hierarchy (Tree View)
 ```http
 GET /api/v2/cas/tree
@@ -512,6 +519,16 @@ Content-Type: application/json
 duration that is not a whole number of years and takes precedence when both
 are sent. An intermediate CA never outlives its parent. A CA of type
 `external` takes neither: its signer decides.
+
+`keyAlgo` is `RSA` (`keySize` 2048, 3072 or 4096), `ECDSA` or `EC` (`keySize` a curve:
+`prime256v1`, `secp384r1`, `secp521r1`, or a Brainpool curve) or `ML-DSA` (`keySize` 44, 65
+or 87, required). A full label such as `RSA-3072`, `EC-P384` or `ML-DSA-65` is also accepted,
+and `keyType` is an alias of `keyAlgo`. An unknown `keyAlgo`, or a `keySize` that does not
+belong to it, answers `400`; only a request without any key field gets RSA-2048. ML-DSA needs
+OpenSSL 3.5 or later, is generated in software only (no HSM), and is refused in FIPS mode.
+An ML-DSA key signs without a separate digest: a `digest` sent for it is ignored and named
+in `meta.notices`. An intermediate under an ML-DSA parent likewise takes no digest; an
+ML-DSA intermediate under an RSA or EC parent uses its parent's digest.
 
 Optional `namedUrls: true` gives the CA an immutable unique slug derived from
 its name, used instead of the random id in CDP/AIA URL paths (both forms keep
@@ -719,6 +736,14 @@ Content-Type: application/json
   "extended_key_usage": ["serverAuth", "clientAuth"]
 }
 ```
+
+`key_type` is `rsa` (default; `key_size` 2048, 3072 or 4096), `ec` (`key_size` 256, 384 or
+521, or `curve`) or `ml-dsa` (`key_size` 44, 65 or 87); a label such as `ML-DSA-65` names
+both at once. Without them, the template's key type applies. An unknown key type answers
+`400`. A certificate for an ML-DSA key keeps only signature bits: `keyEncipherment`,
+`dataEncipherment` and `keyAgreement` are removed from the key usage and named in
+`meta.notices`. ML-DSA private keys cannot be exported as PKCS#12 or JKS: those exports
+answer `400` with the reason `unsupported_for_key_algorithm`; PEM and DER work.
 
 **Response:**
 ```json
@@ -1049,16 +1074,24 @@ GET /api/v2/csrs
 GET /api/v2/csrs?status=pending&page=1&per_page=50
 ```
 
-### Upload CSR
+### Generate CSR
 ```http
 POST /api/v2/csrs
 Content-Type: application/json
 
 {
-  "csr": "-----BEGIN CERTIFICATE REQUEST-----\n...",
-  "name": "My Server CSR"
+  "cn": "server.example.com",
+  "organization": "My Company",
+  "country": "US",
+  "key_type": "EC P-256",
+  "sans": ["DNS:server.example.com", "IP:192.168.1.10"]
 }
 ```
+
+UCM generates the key pair and keeps the private key. `key_type` is `RSA 2048`, `RSA 3072`,
+`RSA 4096`, an EC curve (`EC P-256`, `EC P-384`, `EC P-521`, Brainpool), or `ML-DSA-44`,
+`ML-DSA-65` or `ML-DSA-87`; an unknown value answers `400`. To submit an existing CSR, use
+`POST /api/v2/csrs/upload` below.
 
 ### Get CSR Details
 ```http
@@ -1195,6 +1228,11 @@ Content-Type: application/json
   }
 }
 ```
+
+`key_type` is a registry label (`RSA-2048`, `RSA-3072`, `RSA-4096`, `EC-P256`, `EC-P384`,
+`EC-P521`, `EC-BP256`, `EC-BP384`, `EC-BP512`, `ML-DSA-44`, `ML-DSA-65`, `ML-DSA-87`); any
+other value answers `400`. `digest` is the issuing CA's signing hash, so it still applies to an
+ML-DSA key under an RSA or EC CA, and an ML-DSA CA ignores it.
 
 **qcStatements and policy OIDs (ETSI EN 319 412-5).** `extensions_template` accepts two optional keys, validated on create, update and import:
 
@@ -3503,6 +3541,13 @@ Content-Type: application/json
   "notification_emails": ["security@example.com"]
 }
 ```
+
+`rules.allowed_key_types` takes registry labels: `RSA-2048`, `RSA-3072`, `RSA-4096`,
+`EC-P256`, `EC-P384`, `EC-P521`, `EC-BP256`, `EC-BP384`, `EC-BP512`, `ML-DSA-44`,
+`ML-DSA-65` and `ML-DSA-87`. In FIPS mode a rule allowing ML-DSA is refused, and
+`GET /api/v2/policies/effective` leaves it out. `allowed_digests` does not bind an ML-DSA CA,
+which signs without a separate digest; use
+`allowed_signature_schemes` (`ml_dsa`) for that.
 
 `operations` lists what the policy governs: `issuance` (issue form, Sign CSR, bulk signing and the renewals an operator performs), `renewal` (operator renewals and the renewal scheduler) and `revocation` (certificate, bulk, user certificate and intermediate CA revocations). Without it, the legacy `policy_type` names a single operation; with neither, the policy governs `issuance`.
 

@@ -7,7 +7,7 @@ export default {
       {
         title: 'Flujo de trabajo',
         items: [
-          { label: 'Generar CSR', text: 'Crear un nuevo CSR con par de claves directamente en UCM' },
+          { label: 'Generar CSR', text: 'Crear un nuevo CSR con par de claves directamente en UCM: RSA, EC, Brainpool o ML-DSA-44/65/87' },
           { label: 'Cargar CSR', text: 'Aceptar archivos CSR codificados en PEM o pegar texto PEM' },
           { label: 'Revisar', text: 'Inspeccionar el sujeto, SAN, tipo de clave y firma antes de firmar' },
           { label: 'Firmar', text: 'Seleccionar una CA, tipo de certificado, establecer el período de validez y emitir el certificado' },
@@ -30,6 +30,7 @@ export default {
       'Puede añadir una clave privada a un CSR después de firmarlo si es necesario para la exportación PKCS#12',
       'Un certificado importado para un CSR generado en UCM completa ese CSR: el registro conserva su clave privada, por lo que el certificado se exporta con ella',
       'Utilice el modo Microsoft CA para firmar CSR a través de AD CS cuando esté conectado a una PKI Windows',
+      'Un certificado para una clave ML-DSA conserva solo los bits de firma: keyEncipherment, dataEncipherment y keyAgreement pedidos por la plantilla se eliminan, y el resultado lo indica',
       'Al firmar, use "EKU adicionales" para añadir Microsoft RDP, smartcard logon, IPsec o cualquier OID: el EKU existente del CSR se reconstruye con el conjunto fusionado',
       'Cuando una política o la expiración de la CA emisora acorta la validez solicitada, el resultado lo indica: "Issued for N day(s) instead of the M requested", con el motivo',
     ],
@@ -56,12 +57,14 @@ UCM puede generar un CSR y un par de claves directamente:
 1. Haga clic en **Generar CSR**
 2. Complete los campos del sujeto (CN obligatorio)
 3. Añada nombres alternativos del sujeto si es necesario
-4. Seleccione el tipo y tamaño de clave (RSA 2048/4096, ECDSA P-256/P-384)
+4. Seleccione el tipo y tamaño de clave (RSA 2048/4096, ECDSA P-256/P-384/P-521, Brainpool, ML-DSA-44/65/87)
 5. Haga clic en **Generar**
 
 El CSR y la clave privada se crean y almacenan en UCM. El CSR aparece en la pestaña Pendientes listo para firmar.
 
 > 💡 Esto es conveniente cuando desea que UCM gestione todo el ciclo de vida. CSR, firma y almacenamiento de claves.
+
+Un certificado firmado para una clave **ML-DSA** conserva solo los bits de firma: keyEncipherment, dataEncipherment y keyAgreement pedidos por la plantilla se eliminan, y el resultado indica lo que se eliminó.
 
 ## Cargar un CSR
 

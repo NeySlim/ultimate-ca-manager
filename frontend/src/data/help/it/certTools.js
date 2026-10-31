@@ -26,7 +26,7 @@ export default {
     ],
     tips: [
       'La Verifica SSL supporta porte personalizzate: usala per controllare qualsiasi servizio TLS',
-      'La Corrispondenza chiavi confronta gli hash del modulo per verificare le coppie corrispondenti',
+      'La Corrispondenza chiavi confronta le chiavi pubbliche, ML-DSA incluso: una chiave privata ML-DSA deve contenere il proprio seed, un file chiave con la sola forma espansa viene rifiutato',
       'Il Convertitore preserva la catena completa dei certificati quando crea file PKCS#12',
       'I decodificatori indicano una chiave post-quantistica con il suo livello di sicurezza NIST, ad es. ML-DSA-65 (livello 3), senza dimensione in bit',
       'UCM non sa ancora scrivere una chiave ML-DSA in PKCS#12 o JKS: esportala invece in PEM con la chiave privata',
@@ -82,7 +82,7 @@ Verifica che un certificato, un CSR e una chiave privata appartengano allo stess
 3. Facoltativamente incolla un **CSR** PEM
 4. Clicca **Verifica corrispondenza**
 
-UCM confronta gli hash del modulo (RSA) o della chiave pubblica (EC). Una corrispondenza conferma che formano una coppia valida.
+UCM confronta le chiavi pubbliche (RSA, EC, EdDSA, ML-DSA). Una corrispondenza conferma che formano una coppia valida. Una chiave privata ML-DSA deve contenere il proprio seed: un file chiave con la sola forma espansa viene rifiutato.
 
 ## Chiavi post-quantistiche
 

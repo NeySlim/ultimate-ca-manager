@@ -3206,7 +3206,7 @@
           "remedy": "Crie uma autoridade RSA ou ECDSA (P-256/P-384/P-521) e passe a emissão para ela antes da mudança; a chave de uma autoridade não pode ser convertida."
         },
         "ca_weak_key": {
-          "title": "Autoridades de certificação com uma chave DSA, RSA abaixo de 2048 bits ou uma curva diferente de P-256/384/521",
+          "title": "Autoridades de certificação com uma chave DSA ou ML-DSA, RSA abaixo de 2048 bits ou uma curva diferente de P-256/384/521",
           "remedy": "Crie uma autoridade com RSA 2048+ ou ECDSA P-256/P-384/P-521 e passe a emissão para ela."
         },
         "ssh_ca_eddsa_key": {
@@ -3226,15 +3226,15 @@
           "remedy": "Certifique-se de que cada host tem também uma chave de host ECDSA ou RSA e reponha a chave de host fixada do destino: a ligação seguinte fixa essa chave."
         },
         "ocsp_responder_unapproved_key": {
-          "title": "Respondedores OCSP delegados com chave Ed25519/Ed448 ou fraca: a CA assina no seu lugar",
+          "title": "Respondedores OCSP delegados com chave Ed25519/Ed448, ML-DSA ou fraca: a CA assina no seu lugar",
           "remedy": "Emita um novo certificado de respondedor RSA ou ECDSA e selecione-o nas definições da CA."
         },
         "tsa_signer_unapproved_key": {
-          "title": "O certificado de carimbo de data/hora tem chave Ed25519/Ed448 ou fraca: os carimbos falham no modo FIPS",
+          "title": "O certificado de carimbo de data/hora tem chave Ed25519/Ed448, ML-DSA ou fraca: os carimbos falham no modo FIPS",
           "remedy": "Emita um novo certificado de carimbo de data/hora RSA ou ECDSA e selecione-o nas definições da TSA."
         },
         "certificates_unapproved_key": {
-          "title": "Certificados ativos com chave Ed25519/Ed448, RSA abaixo de 2048 bits ou outra curva",
+          "title": "Certificados ativos com chave Ed25519/Ed448 ou ML-DSA, RSA abaixo de 2048 bits ou outra curva",
           "remedy": "Continuam válidos; renove-os com uma nova chave RSA 2048+ ou ECDSA P-256/P-384/P-521, pois a renovação com a mesma chave é recusada no modo FIPS."
         },
         "templates_unapproved_key_type": {
@@ -3242,7 +3242,7 @@
           "remedy": "Altere o tipo de chave destes modelos para RSA 2048+ ou ECDSA P-256/P-384/P-521."
         },
         "policies_unapproved_key_type": {
-          "title": "Políticas ativas que permitem tipos de chave que o modo FIPS remove (Ed25519, Ed448, RSA curto...)",
+          "title": "Políticas ativas que permitem tipos de chave que o modo FIPS remove (Ed25519, Ed448, ML-DSA, RSA curto...)",
           "remedy": "Remova esses tipos de chave das políticas; uma política que fique sem nenhum não permite qualquer emissão."
         },
         "acme_client_unapproved_key_type": {
@@ -3290,7 +3290,7 @@
           "remedy": "Ative a cifragem das chaves privadas em Definições > Segurança, ou forneça /etc/ucm/master.key ou KEY_ENCRYPTION_KEY; com UCM_REQUIRE_KEY_ENCRYPTION=true, o UCM recusa-se então a iniciar sem uma."
         },
         "https_unapproved_key": {
-          "title": "O certificado HTTPS tem chave Ed25519/Ed448 ou fraca: o servidor web não pode usá-lo no modo FIPS",
+          "title": "O certificado HTTPS tem chave Ed25519/Ed448, ML-DSA ou fraca: o servidor web não pode usá-lo no modo FIPS",
           "remedy": "Instale um certificado RSA 2048+ ou ECDSA P-256/P-384/P-521 nas definições HTTPS."
         }
       }

@@ -25,7 +25,7 @@ export default {
           { label: 'Importar/Exportar', text: 'Compartir plantillas como archivos JSON entre instancias de UCM, una plantilla o varias en un solo archivo' },
           { label: 'qcStatements', text: 'Declaraciones opcionales ETSI EN 319 412-5 añadidas a cada certificado emitido con la plantilla: QcCompliance, QcType (firma, sello o sitio web), QcSSCD, QcPDS (URL HTTPS e idioma de dos letras), QcRetentionPeriod, QcLimitValue, QcCClegislation (para un certificado cualificado según un marco jurídico fuera de la UE) y el identificador de semántica. No se aplican a la emisión por EST, WSTEP ni mTLS, y una extensión qcStatements en un CSR se ignora. QcIdentMethod, QcQSCDlegislation y las declaraciones PSD2 no son compatibles' },
           { label: 'OID de política', text: 'OID de política de certificado adicionales (por ejemplo las políticas ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd y QCP-w), añadidos después de la política propia de la CA' },
-          { label: 'Tipo de clave', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 o EC-P521, con un resumen SHA-256, SHA-384 o SHA-512' },
+          { label: 'Tipo de clave', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 o EC-P521, con un resumen SHA-256, SHA-384 o SHA-512, o ML-DSA-44, ML-DSA-65 o ML-DSA-87. El resumen es el hash de firma de la CA emisora, no el de la clave final: sigue aplicándose a una clave final ML-DSA bajo una CA RSA o EC, y una CA ML-DSA lo ignora' },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 y EC-BP512 (RFC 5639, listadas en Brainpool en las listas de tipos de clave, ocultas en modo FIPS). OpenSSL y Windows leen sus cadenas y firmas, pero Chrome, Firefox, Go, rustls, GnuTLS y Java sin Bouncy Castle las rechazan para TLS, y Windows Schannel no las habilita de forma predeterminada. En un HSM, solo los proveedores PKCS#11 las admiten' },
         ]
       },
@@ -74,7 +74,7 @@ Las autoridades de certificación no se crean a partir de plantillas: créelas e
 4. Configure los **valores predeterminados del sujeto** (O, OU, C, ST, L, CN, Email). En los certificados de Correo electrónico y Servidor + Cliente (Combinado), el Email también se convierte en un SAN de email
 5. Seleccione las opciones de **uso de clave**
 6. Seleccione los valores de **uso extendido de clave** entre los propósitos que el servidor conoce (Smartcard Logon, Time Stamping, Microsoft RDP y otros)
-7. Establezca el **Tipo de clave** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 o EC-P521), el resumen y el **período de validez predeterminado** en días
+7. Establezca el **Tipo de clave** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384, EC-P521 o ML-DSA-44/65/87), el resumen y el **período de validez predeterminado** en días. El resumen es el hash de firma de la CA emisora, por lo que sigue aplicándose a una clave ML-DSA bajo una CA RSA o EC; una CA ML-DSA lo ignora
 8. Haga clic en **Crear**
 
 ## Usar plantillas

@@ -26,7 +26,7 @@ export default {
     ],
     tips: [
       'Le vérificateur SSL prend en charge les ports personnalisés : utilisez-le pour vérifier tout service TLS',
-      'Le vérificateur de correspondance de clé compare les hachages de modules pour vérifier les paires correspondantes',
+      'Le vérificateur de correspondance de clé compare les clés publiques, ML-DSA compris : une clé privée ML-DSA doit contenir sa graine, un fichier de clé ne contenant que la forme étendue est refusé',
       'Le convertisseur préserve la chaîne de certificats complète lors de la création de PKCS#12',
       'Les décodeurs nomment une clé post-quantique avec son niveau de sécurité NIST, par ex. ML-DSA-65 (niveau 3), sans taille en bits',
       'UCM ne sait pas encore écrire une clé ML-DSA dans un PKCS#12 ou un JKS : exportez-la plutôt en PEM avec la clé privée',
@@ -82,7 +82,7 @@ Vérifier qu'un certificat, une CSR et une clé privée correspondent :
 3. Collez optionnellement le PEM de la **CSR**
 4. Cliquez sur **Vérifier**
 
-UCM compare les hachages de module (RSA) ou de clé publique (EC). Une correspondance confirme qu'ils forment une paire valide.
+UCM compare les clés publiques (RSA, EC, EdDSA, ML-DSA). Une correspondance confirme qu'ils forment une paire valide. Une clé privée ML-DSA doit contenir sa graine : un fichier de clé ne contenant que la forme étendue est refusé.
 
 ## Clés post-quantiques
 

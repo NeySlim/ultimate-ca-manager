@@ -3331,7 +3331,7 @@
           "remedy": "Créez une CA RSA ou ECDSA (P-256/P-384/P-521) et déplacez-y l'émission avant la bascule ; la clé d'une CA ne peut pas être convertie."
         },
         "ca_weak_key": {
-          "title": "CA avec une clé DSA, une clé RSA de moins de 2048 bits ou une courbe autre que P-256/384/521",
+          "title": "CA avec une clé DSA ou ML-DSA, une clé RSA de moins de 2048 bits ou une courbe autre que P-256/384/521",
           "remedy": "Créez une CA en RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission."
         },
         "ssh_ca_eddsa_key": {
@@ -3351,15 +3351,15 @@
           "remedy": "Vérifiez que chaque hôte dispose aussi d'une clé d'hôte ECDSA ou RSA, puis réinitialisez la clé d'hôte épinglée de la cible : la prochaine connexion épinglera cette clé."
         },
         "ocsp_responder_unapproved_key": {
-          "title": "Répondeurs OCSP délégués avec une clé Ed25519/Ed448 ou faible : la CA signe à leur place",
+          "title": "Répondeurs OCSP délégués avec une clé Ed25519/Ed448, ML-DSA ou faible : la CA signe à leur place",
           "remedy": "Émettez un nouveau certificat de répondeur RSA ou ECDSA et sélectionnez-le dans les paramètres de la CA."
         },
         "tsa_signer_unapproved_key": {
-          "title": "Le certificat d'horodatage a une clé Ed25519/Ed448 ou faible : les horodatages échouent en mode FIPS",
+          "title": "Le certificat d'horodatage a une clé Ed25519/Ed448, ML-DSA ou faible : les horodatages échouent en mode FIPS",
           "remedy": "Émettez un nouveau certificat d'horodatage RSA ou ECDSA et sélectionnez-le dans les paramètres TSA."
         },
         "certificates_unapproved_key": {
-          "title": "Certificats actifs avec une clé Ed25519/Ed448, RSA de moins de 2048 bits ou une autre courbe",
+          "title": "Certificats actifs avec une clé Ed25519/Ed448 ou ML-DSA, RSA de moins de 2048 bits ou une autre courbe",
           "remedy": "Ils restent valides ; renouvelez-les avec une nouvelle clé RSA 2048+ ou ECDSA P-256/P-384/P-521, car le renouvellement avec la même clé est refusé en mode FIPS."
         },
         "templates_unapproved_key_type": {
@@ -3367,7 +3367,7 @@
           "remedy": "Changez le type de clé de ces templates en RSA 2048+ ou ECDSA P-256/P-384/P-521."
         },
         "policies_unapproved_key_type": {
-          "title": "Politiques actives qui autorisent des types de clé que le mode FIPS retire (Ed25519, Ed448, RSA court...)",
+          "title": "Politiques actives qui autorisent des types de clé que le mode FIPS retire (Ed25519, Ed448, ML-DSA, RSA court...)",
           "remedy": "Retirez ces types de clé des politiques ; une politique qui n'en garde aucun n'autorise aucune émission."
         },
         "acme_client_unapproved_key_type": {
@@ -3415,7 +3415,7 @@
           "remedy": "Activez le chiffrement des clés privées dans Paramètres > Sécurité, ou fournissez /etc/ucm/master.key ou KEY_ENCRYPTION_KEY ; avec UCM_REQUIRE_KEY_ENCRYPTION=true, UCM refuse alors de démarrer sans clé."
         },
         "https_unapproved_key": {
-          "title": "Le certificat HTTPS a une clé Ed25519/Ed448 ou faible : le serveur web ne peut pas l'utiliser en mode FIPS",
+          "title": "Le certificat HTTPS a une clé Ed25519/Ed448, ML-DSA ou faible : le serveur web ne peut pas l'utiliser en mode FIPS",
           "remedy": "Installez un certificat RSA 2048+ ou ECDSA P-256/P-384/P-521 dans les paramètres HTTPS."
         }
       }

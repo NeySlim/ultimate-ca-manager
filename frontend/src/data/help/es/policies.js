@@ -17,7 +17,8 @@ export default {
         title: 'Reglas',
         items: [
           { label: 'Validez máxima', text: 'Duración máxima del certificado en días' },
-          { label: 'Tipos de clave permitidos', text: 'Restringir qué algoritmos y tamaños de clave se pueden utilizar' },
+          { label: 'Tipos de clave permitidos', text: 'Restringir qué algoritmos y tamaños de clave se pueden utilizar, incluidos ML-DSA-44, ML-DSA-65 y ML-DSA-87; el modo FIPS elimina ML-DSA' },
+          { label: 'Esquemas de firma permitidos', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA o SLH-DSA, comparados con la clave de la CA firmante. Los hashes de firma permitidos no restringen a una CA ML-DSA, que firma sin un hash aparte' },
           { label: 'Restricciones de SAN', text: 'Limitar el número de SAN y aplicar patrones de nombres DNS' },
           { label: 'Hashes de firma permitidos', text: 'SHA-256, SHA-384 o SHA-512; si no se selecciona ninguno, se permite cualquiera. Cuando nadie ha elegido el hash, se aplica el predeterminado si está permitido y, si no, el más débil de los permitidos. El formulario de emisión ofrece solo los tipos de clave permitidos, y Crear CA solo los tipos de clave y hashes permitidos' },
         ]
@@ -76,6 +77,9 @@ Restringir qué algoritmos y tamaños de clave se pueden utilizar:
 - **EC-P256**: Moderno, rápido, recomendado
 - **EC-P384**: Curva elíptica de mayor seguridad
 - **EC-P521**: Máxima seguridad (raramente necesario)
+- **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: Poscuántico (FIPS 204), niveles NIST 2, 3 y 5; eliminados en modo FIPS
+
+**Esquemas de firma permitidos** restringe cómo firma la CA firmante (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Los hashes de firma permitidos no restringen a una CA ML-DSA, que firma sin un hash aparte.
 
 **Hashes de firma permitidos** restringe el hash de firma del mismo modo (SHA-256, SHA-384, SHA-512); si no se selecciona ninguno, se permite cualquiera. Cuando nadie ha elegido el hash, se aplica el predeterminado si está permitido y, si no, el más débil de los permitidos. El formulario de emisión ofrece solo los tipos de clave permitidos, y Crear CA solo los tipos de clave y hashes permitidos.
 

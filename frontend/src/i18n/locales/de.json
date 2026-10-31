@@ -3206,7 +3206,7 @@
           "remedy": "Vor dem Umschalten eine RSA- oder ECDSA-Zertifizierungsstelle (P-256/P-384/P-521) erstellen und die Ausstellung dorthin verlagern; ein CA-Schlüssel lässt sich nicht umwandeln."
         },
         "ca_weak_key": {
-          "title": "Zertifizierungsstellen mit einem DSA-Schlüssel, RSA unter 2048 Bit oder einer anderen Kurve als P-256/384/521",
+          "title": "Zertifizierungsstellen mit einem DSA- oder ML-DSA-Schlüssel, RSA unter 2048 Bit oder einer anderen Kurve als P-256/384/521",
           "remedy": "Eine Zertifizierungsstelle mit RSA 2048+ oder ECDSA P-256/P-384/P-521 erstellen und die Ausstellung dorthin verlagern."
         },
         "ssh_ca_eddsa_key": {
@@ -3226,15 +3226,15 @@
           "remedy": "Sicherstellen, dass jeder Host auch einen ECDSA- oder RSA-Host-Schlüssel hat, und dann den festgelegten Host-Schlüssel des Ziels zurücksetzen: Bei der nächsten Verbindung wird dieser Schlüssel festgelegt."
         },
         "ocsp_responder_unapproved_key": {
-          "title": "Delegierte OCSP-Responder mit Ed25519/Ed448- oder schwachem Schlüssel: Stattdessen signiert die CA",
+          "title": "Delegierte OCSP-Responder mit Ed25519/Ed448-, ML-DSA- oder schwachem Schlüssel: Stattdessen signiert die CA",
           "remedy": "Ein neues RSA- oder ECDSA-Responder-Zertifikat ausstellen und in den CA-Einstellungen auswählen."
         },
         "tsa_signer_unapproved_key": {
-          "title": "Das Zeitstempelzertifikat hat einen Ed25519/Ed448- oder schwachen Schlüssel: Zeitstempel schlagen im FIPS-Modus fehl",
+          "title": "Das Zeitstempelzertifikat hat einen Ed25519/Ed448-, ML-DSA- oder schwachen Schlüssel: Zeitstempel schlagen im FIPS-Modus fehl",
           "remedy": "Ein neues RSA- oder ECDSA-Zeitstempelzertifikat ausstellen und in den TSA-Einstellungen auswählen."
         },
         "certificates_unapproved_key": {
-          "title": "Aktive Zertifikate mit Ed25519/Ed448-Schlüssel, RSA unter 2048 Bit oder einer anderen Kurve",
+          "title": "Aktive Zertifikate mit Ed25519/Ed448- oder ML-DSA-Schlüssel, RSA unter 2048 Bit oder einer anderen Kurve",
           "remedy": "Sie bleiben gültig; mit einem neuen RSA-2048+- oder ECDSA-P-256/P-384/P-521-Schlüssel erneuern, da eine Erneuerung mit demselben Schlüssel im FIPS-Modus abgelehnt wird."
         },
         "templates_unapproved_key_type": {
@@ -3242,7 +3242,7 @@
           "remedy": "Den Schlüsseltyp dieser Vorlagen auf RSA 2048+ oder ECDSA P-256/P-384/P-521 ändern."
         },
         "policies_unapproved_key_type": {
-          "title": "Aktive Richtlinien, die Schlüsseltypen erlauben, die der FIPS-Modus entfernt (Ed25519, Ed448, kurzes RSA...)",
+          "title": "Aktive Richtlinien, die Schlüsseltypen erlauben, die der FIPS-Modus entfernt (Ed25519, Ed448, ML-DSA, kurzes RSA...)",
           "remedy": "Diese Schlüsseltypen aus den Richtlinien entfernen; eine Richtlinie ohne verbleibenden Typ erlaubt keine Ausstellung."
         },
         "acme_client_unapproved_key_type": {
@@ -3290,7 +3290,7 @@
           "remedy": "Die Verschlüsselung privater Schlüssel unter Einstellungen > Sicherheit aktivieren oder /etc/ucm/master.key bzw. KEY_ENCRYPTION_KEY bereitstellen; mit UCM_REQUIRE_KEY_ENCRYPTION=true startet UCM ohne einen solchen Schlüssel nicht."
         },
         "https_unapproved_key": {
-          "title": "Das HTTPS-Zertifikat hat einen Ed25519/Ed448- oder schwachen Schlüssel: Der Webserver kann es im FIPS-Modus nicht verwenden",
+          "title": "Das HTTPS-Zertifikat hat einen Ed25519/Ed448-, ML-DSA- oder schwachen Schlüssel: Der Webserver kann es im FIPS-Modus nicht verwenden",
           "remedy": "Ein RSA-2048+- oder ECDSA-P-256/P-384/P-521-Zertifikat in den HTTPS-Einstellungen installieren."
         }
       }

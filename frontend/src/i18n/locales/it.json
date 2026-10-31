@@ -3206,7 +3206,7 @@
           "remedy": "Crea un'autorità RSA o ECDSA (P-256/P-384/P-521) e sposta l'emissione su di essa prima del passaggio; la chiave di un'autorità non può essere convertita."
         },
         "ca_weak_key": {
-          "title": "Autorità di certificazione con una chiave DSA, RSA inferiore a 2048 bit o con una curva diversa da P-256/384/521",
+          "title": "Autorità di certificazione con una chiave DSA o ML-DSA, RSA inferiore a 2048 bit o con una curva diversa da P-256/384/521",
           "remedy": "Crea un'autorità con RSA 2048+ o ECDSA P-256/P-384/P-521 e sposta l'emissione su di essa."
         },
         "ssh_ca_eddsa_key": {
@@ -3226,15 +3226,15 @@
           "remedy": "Verifica che ogni host abbia anche una chiave host ECDSA o RSA, poi reimposta la chiave host fissata della destinazione: alla connessione successiva verrà fissata quella chiave."
         },
         "ocsp_responder_unapproved_key": {
-          "title": "Responder OCSP delegati con chiave Ed25519/Ed448 o debole: firma la CA al loro posto",
+          "title": "Responder OCSP delegati con chiave Ed25519/Ed448, ML-DSA o debole: firma la CA al loro posto",
           "remedy": "Emetti un nuovo certificato responder RSA o ECDSA e selezionalo nelle impostazioni della CA."
         },
         "tsa_signer_unapproved_key": {
-          "title": "Il certificato di marcatura temporale ha una chiave Ed25519/Ed448 o debole: le marche temporali falliscono in modalità FIPS",
+          "title": "Il certificato di marcatura temporale ha una chiave Ed25519/Ed448, ML-DSA o debole: le marche temporali falliscono in modalità FIPS",
           "remedy": "Emetti un nuovo certificato di marcatura temporale RSA o ECDSA e selezionalo nelle impostazioni TSA."
         },
         "certificates_unapproved_key": {
-          "title": "Certificati attivi con chiave Ed25519/Ed448, RSA inferiore a 2048 bit o un'altra curva",
+          "title": "Certificati attivi con chiave Ed25519/Ed448 o ML-DSA, RSA inferiore a 2048 bit o un'altra curva",
           "remedy": "Restano validi; rinnovali con una nuova chiave RSA 2048+ o ECDSA P-256/P-384/P-521, perché il rinnovo con la stessa chiave è rifiutato in modalità FIPS."
         },
         "templates_unapproved_key_type": {
@@ -3242,7 +3242,7 @@
           "remedy": "Cambia il tipo di chiave di questi template in RSA 2048+ o ECDSA P-256/P-384/P-521."
         },
         "policies_unapproved_key_type": {
-          "title": "Policy attive che consentono tipi di chiave rimossi dalla modalità FIPS (Ed25519, Ed448, RSA corto...)",
+          "title": "Policy attive che consentono tipi di chiave rimossi dalla modalità FIPS (Ed25519, Ed448, ML-DSA, RSA corto...)",
           "remedy": "Rimuovi questi tipi di chiave dalle policy; una policy rimasta senza tipi non consente alcuna emissione."
         },
         "acme_client_unapproved_key_type": {
@@ -3290,7 +3290,7 @@
           "remedy": "Abilita la cifratura delle chiavi private in Impostazioni > Sicurezza, oppure fornisci /etc/ucm/master.key o KEY_ENCRYPTION_KEY; con UCM_REQUIRE_KEY_ENCRYPTION=true, UCM rifiuta di avviarsi senza una chiave."
         },
         "https_unapproved_key": {
-          "title": "Il certificato HTTPS ha una chiave Ed25519/Ed448 o debole: il server web non può usarlo in modalità FIPS",
+          "title": "Il certificato HTTPS ha una chiave Ed25519/Ed448, ML-DSA o debole: il server web non può usarlo in modalità FIPS",
           "remedy": "Installa un certificato RSA 2048+ o ECDSA P-256/P-384/P-521 nelle impostazioni HTTPS."
         }
       }

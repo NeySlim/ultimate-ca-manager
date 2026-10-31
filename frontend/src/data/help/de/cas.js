@@ -24,6 +24,7 @@ export default {
           { label: 'Kettenreparatur', text: 'Unterbrochene Eltern-Kind-Beziehungen automatisch reparieren' },
           { label: 'Privaten Schlüssel importieren', text: 'Den privaten Schlüssel einer CA anhängen, die nur ihr Zertifikat besitzt, damit sie signieren kann' },
           { label: 'Schlüssel und Gültigkeit', text: 'Standardmäßig RSA-3072, lokal oder HSM. Gültigkeit von 1, 2, 3, 5, 10, 15 oder 20 Jahren oder Benutzerdefiniert (Tage) bis zu 50 Jahren. Eine RSA-2048-CA, die 2030 überdauern würde, wird markiert: Die ANSSI akzeptiert RSA-2048 bis Ende 2030, ETSI TS 119 312 bis Ende 2026' },
+          { label: 'Post-Quanten (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 oder ML-DSA-87 (FIPS 204, NIST-Level 2, 3 und 5), nur in Software erzeugt, nie auf einem HSM, und im FIPS-Modus ausgeblendet. Ein ML-DSA-Schlüssel signiert ohne separaten Digest, daher gibt es für die CA, ihre CRLs und ihre OCSP-Antworten keinen Digest zu wählen. Eine ML-DSA-CA kann RSA- oder EC-Zertifikate signieren, und eine RSA- oder EC-CA kann eine ML-DSA-Intermediate signieren. Die Erneuerung behält dieselbe Stufe' },
           { label: 'Name Constraints', text: 'Erweiterte Einschränkungen (RFC 5280): erlaubte und ausgeschlossene Teilbäume (DNS, IP-Bereich, E-Mail) begrenzen die Namen, die die CA zertifizieren darf. Bei einer extern signierten CA legt die signierende CA sie fest' },
           { label: 'RSA-Signaturverfahren', text: 'Standardmäßig PKCS#1 v1.5, oder RSA-PSS (Salt so lang wie der Hash) für eine RSA-CA mit lokalem, PKCS#11- oder OpenBao-Schlüssel. Es gilt für die Zertifikate, CRLs, OCSP-Antworten und SCEP-Antworten, die die CA signiert; Zeitstempel bleiben bei PKCS#1 v1.5, dem Verfahren, das openssl ts -verify prüft. „Mit RSA-PSS signieren" in den CA-Details stellt eine bestehende CA in beide Richtungen um: Bereits ausgestellte Zertifikate behalten ihre Signatur' },
           { label: 'Compliance-Profil', text: 'ANSSI, BSI oder EU ACM: Regeln, die sich an einem Referenztext orientieren, binden, was die CA ausstellt (Schlüsseltypen, Digests, RSA-Verfahren, Datumshorizonte und für EU ACM ein im HSM gehaltener CA-Schlüssel). Wählen Sie eines bei der Erstellung (einer Zwischen-CA wird das Profil der übergeordneten CA vorgeschlagen, sonst das in Einstellungen, Info festgelegte Standardprofil). Bei einer bestehenden CA weist das Feld in den Details es zu, ändert oder entfernt es: Zuerst läuft die Profilprüfung für diese CA, ihre Feststellungen werden aufgelistet, und Sie bestätigen, dass die Regeln nur für künftige Ausstellungen gelten; nichts bereits Ausgestelltes wird neu signiert. Erfordert write:cas, zum Zuweisen oder Ändern zusätzlich admin:system' },
@@ -95,6 +96,7 @@ export default {
       'PKCS#12-Export enthält die vollständige Kette und ist ideal für Sicherungen',
     ],
     warnings: [
+      'Eine ML-DSA-CA lässt sich noch nicht als PKCS#12 oder JKS exportieren: exportieren Sie Zertifikat und privaten Schlüssel als PEM. Clients ohne ML-DSA-Unterstützung (OpenSSL vor 3.5, die meisten Browser heute) können nicht verifizieren, was sie signiert',
       'Das Löschen einer CA widerruft NICHT die von ihr ausgestellten Zertifikate: widerrufen Sie diese zuerst',
       'Private Schlüssel werden verschlüsselt gespeichert; der Verlust der Datenbank bedeutet den Verlust der Schlüssel',
       'Offline-Modus-Passwörter sind NICHT wiederherstellbar: bewahren Sie sie vor der Bestätigung in Ihrem Passwortmanager / Vault auf',
@@ -136,7 +138,7 @@ Gruppiert CAs nach ihrem Organisation-Feld (O). Nützlich für Multi-Mandanten-S
 ### Root-CA erstellen
 1. Klicken Sie auf **Erstellen** → **Root-CA**
 2. Füllen Sie die Betreffsfelder aus (CN, O, OU, C, ST, L)
-3. Wählen Sie den Schlüsselalgorithmus (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521): standardmäßig RSA-3072
+3. Wählen Sie den Schlüsselalgorithmus (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87): standardmäßig RSA-3072
 4. Legen Sie die Gültigkeitsdauer fest: 1, 2, 3, 5, 10, 15 oder 20 Jahre oder **Benutzerdefiniert (Tage)** bis zu 50 Jahren (typischerweise 10-20 Jahre für Root-CAs)
 5. Wählen Sie optional ein Zertifikatstemplate
 6. Klicken Sie auf **Erstellen**
@@ -151,6 +153,14 @@ Gruppiert CAs nach ihrem Organisation-Feld (O). Nützlich für Multi-Mandanten-S
 > ⚠ Die Gültigkeit der Intermediate-CA kann die Gültigkeit der übergeordneten CA nicht überschreiten.
 
 Das Formular markiert eine RSA-2048-CA, die 2030 überdauern würde: Die ANSSI akzeptiert RSA-2048 bis Ende 2030, ETSI TS 119 312 bis Ende 2026. Wählen Sie RSA-3072 oder größer. Unter **Erweiterte Einschränkungen (RFC 5280)** begrenzen erlaubte und ausgeschlossene Teilbäume (DNS, IP-Bereich, E-Mail) die Namen, die die CA zertifizieren darf.
+
+### Post-Quanten-CAs (ML-DSA)
+**ML-DSA-44**, **ML-DSA-65** und **ML-DSA-87** (FIPS 204) werden mit ihrer NIST-Sicherheitsstufe (2, 3 und 5) aufgeführt. Der Schlüssel wird in Software erzeugt, nie auf einem HSM, und der Algorithmus ist im FIPS-Modus ausgeblendet.
+
+- Ein ML-DSA-Schlüssel signiert ohne separaten Digest: Das Digest-Feld entfällt, und ein über die API gesendeter Digest wird mit einem Hinweis ignoriert. CRLs und OCSP-Antworten der CA folgen derselben Regel.
+- Hierarchien können gemischt sein: Eine ML-DSA-Root kann eine RSA- oder EC-Intermediate signieren, und eine RSA- oder EC-CA kann eine ML-DSA-Intermediate signieren, die dann den Digest ihrer übergeordneten CA verwendet.
+- Die Erneuerung behält den Schlüssel und seine Stufe.
+- Eine ML-DSA-CA wird als PEM oder DER exportiert, nicht als PKCS#12 oder JKS. Clients ohne ML-DSA-Unterstützung (OpenSSL vor 3.5, die meisten Browser heute) können nicht verifizieren, was sie signiert.
 
 ### Eine extern signierte CA erstellen (CSR-Modus, v2.214)
 Für das Offline-Root-Muster: der Schlüssel der ausstellenden CA liegt in UCM, ihr Zertifikat wird extern signiert:

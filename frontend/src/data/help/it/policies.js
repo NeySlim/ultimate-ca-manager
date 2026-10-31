@@ -17,7 +17,8 @@ export default {
         title: 'Regole',
         items: [
           { label: 'Validità massima', text: 'Durata massima del certificato in giorni' },
-          { label: 'Tipi di chiave consentiti', text: 'Limita gli algoritmi e le dimensioni delle chiavi utilizzabili' },
+          { label: 'Tipi di chiave consentiti', text: 'Limita gli algoritmi e le dimensioni delle chiavi utilizzabili, inclusi ML-DSA-44, ML-DSA-65 e ML-DSA-87; la modalità FIPS rimuove ML-DSA' },
+          { label: 'Schemi di firma consentiti', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA o SLH-DSA, confrontati con la chiave della CA firmataria. Gli hash di firma consentiti non vincolano una CA ML-DSA, che firma senza un digest separato' },
           { label: 'Restrizioni SAN', text: 'Limita il numero di SAN e imponi pattern di nomi DNS' },
           { label: 'Hash di firma consentiti', text: 'SHA-256, SHA-384 o SHA-512; se nessuno è selezionato, tutti sono consentiti. Quando nessuno ha scelto l\'hash, si applica quello predefinito se consentito, altrimenti il più debole tra quelli consentiti. Il modulo di emissione propone solo i tipi di chiave consentiti, Crea CA solo i tipi di chiave e gli hash consentiti' },
         ]
@@ -76,6 +77,9 @@ Limita gli algoritmi e le dimensioni delle chiavi utilizzabili:
 - **EC-P256**: Moderno, veloce, raccomandato
 - **EC-P384**: Curva ellittica a sicurezza superiore
 - **EC-P521**: Sicurezza massima (raramente necessario)
+- **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: Post-quantistico (FIPS 204), livelli NIST 2, 3 e 5; rimossi in modalità FIPS
+
+**Schemi di firma consentiti** limita il modo in cui la CA firmataria firma (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Gli hash di firma consentiti non vincolano una CA ML-DSA, che firma senza un digest separato.
 
 **Hash di firma consentiti** limita l'hash di firma allo stesso modo (SHA-256, SHA-384, SHA-512); se nessuno è selezionato, tutti sono consentiti. Quando nessuno ha scelto l'hash, si applica quello predefinito se consentito, altrimenti il più debole tra quelli consentiti. Il modulo di emissione propone solo i tipi di chiave consentiti, Crea CA solo i tipi di chiave e gli hash consentiti.
 

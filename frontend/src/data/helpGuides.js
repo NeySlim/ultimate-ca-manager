@@ -109,7 +109,7 @@ Groups CAs by their Organization (O) field. Useful for multi-tenant setups where
 ### Create Root CA
 1. Click **Create** → **Root CA**
 2. Fill in the Subject fields (CN, O, OU, C, ST, L)
-3. Select the key algorithm (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521): RSA-3072 by default
+3. Select the key algorithm (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87): RSA-3072 by default
 4. Set the validity period: 1, 2, 3, 5, 10, 15 or 20 years, or **Custom (days)** up to 50 years (typically 10-20 years for Root CAs)
 5. Optionally select a certificate template
 6. Click **Create**
@@ -124,6 +124,14 @@ Groups CAs by their Organization (O) field. Useful for multi-tenant setups where
 > ⚠ The Intermediate CA validity cannot exceed its parent CA's validity.
 
 The form flags an RSA-2048 CA that would outlive 2030: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026. Choose RSA-3072 or larger. Under **Advanced Constraints (RFC 5280)**, permitted and excluded subtrees (DNS, IP range, email) limit the names the CA may certify.
+
+### Post-quantum CAs (ML-DSA)
+**ML-DSA-44**, **ML-DSA-65** and **ML-DSA-87** (FIPS 204) are listed with their NIST security level (2, 3 and 5). The key is generated in software, never on an HSM, and the algorithm is hidden in FIPS mode.
+
+- An ML-DSA key signs without a separate digest: the digest field disappears, and a digest sent through the API is ignored with a notice. CRLs and OCSP responses of the CA follow the same rule.
+- Hierarchies can mix: an ML-DSA root can sign an RSA or EC intermediate, and an RSA or EC CA can sign an ML-DSA intermediate, which then uses its parent's digest.
+- Renewal keeps the key and its level.
+- An ML-DSA CA exports as PEM or DER, not as PKCS#12 or JKS. Clients without ML-DSA support (OpenSSL before 3.5, most browsers today) cannot verify what it signs.
 
 ### Create an externally-signed CA (CSR mode, v2.214)
 For the offline-root pattern: the issuing CA's key lives in UCM, its certificate is signed elsewhere:
@@ -501,12 +509,14 @@ UCM can generate a CSR and key pair directly:
 1. Click **Generate CSR**
 2. Fill in the Subject fields (CN required)
 3. Add Subject Alternative Names if needed
-4. Select key type and size (RSA 2048/4096, ECDSA P-256/P-384)
+4. Select key type and size (RSA 2048/4096, ECDSA P-256/P-384/P-521, Brainpool, ML-DSA-44/65/87)
 5. Click **Generate**
 
 The CSR and private key are created and stored in UCM. The CSR appears in the Pending tab ready for signing.
 
 > 💡 This is convenient when you want UCM to manage the entire lifecycle. CSR, signing, and key storage.
+
+A certificate signed for an **ML-DSA** key keeps only signature bits: keyEncipherment, dataEncipherment and keyAgreement asked by the template are removed, and the result names what was removed.
 
 ## Uploading a CSR
 
@@ -623,7 +633,7 @@ Certificate authorities are not made from templates: create them on the **CAs** 
 4. Configure **Subject defaults** (O, OU, C, ST, L, CN, Email). On Email and combined certificates, the Email also becomes an email SAN
 5. Select **Key Usage** flags
 6. Select **Extended Key Usage** values from the purposes the server knows (Smartcard Logon, Time Stamping, Microsoft RDP and others)
-7. Set the **Key Type** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 or EC-P521), the digest and the **default validity** period in days
+7. Set the **Key Type** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384, EC-P521 or ML-DSA-44/65/87), the digest and the **default validity** period in days. The digest is the issuing CA's signing hash, so it still applies to an ML-DSA key under an RSA or EC CA; an ML-DSA CA ignores it
 8. Click **Create**
 
 ## Using Templates
@@ -2402,7 +2412,7 @@ Verify that a certificate, CSR, and private key belong together:
 3. Optionally paste a **CSR** PEM
 4. Click **Match**
 
-UCM compares the modulus (RSA) or public key (EC) hashes. A match confirms they form a valid pair.
+UCM compares the public keys (RSA, EC, EdDSA, ML-DSA). A match confirms they form a valid pair. An ML-DSA private key must carry its seed: a key file holding only the expanded form is refused.
 
 ## Post-quantum keys
 
@@ -2833,6 +2843,9 @@ Restrict which key algorithms and sizes can be used:
 - **EC-P256**: Modern, fast, recommended
 - **EC-P384**: Higher security elliptic curve
 - **EC-P521**: Maximum security (rarely needed)
+- **ML-DSA-44 / ML-DSA-65 / ML-DSA-87**: Post-quantum (FIPS 204), NIST levels 2, 3 and 5; removed in FIPS mode
+
+**Allowed Signature Schemes** restricts how the signing CA signs (PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA, SLH-DSA). Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest.
 
 **Allowed Signature Hashes** restricts the signature hash the same way (SHA-256, SHA-384, SHA-512); none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes.
 

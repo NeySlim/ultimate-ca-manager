@@ -74,6 +74,7 @@ export const helpContent = {
           { label: 'Chain Repair', text: 'Fix broken parent-child relationships automatically' },
           { label: 'Import private key', text: 'Attach the private key of a CA that holds only its certificate, so it can sign' },
           { label: 'Key and validity', text: 'RSA-3072 by default, local or HSM. Validity of 1, 2, 3, 5, 10, 15 or 20 years, or Custom (days) up to 50 years. An RSA-2048 CA that would outlive 2030 is flagged: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026' },
+          { label: 'Post-quantum (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 or ML-DSA-87 (FIPS 204, NIST levels 2, 3 and 5), generated in software only, never on an HSM, and hidden in FIPS mode. An ML-DSA key signs without a separate digest, so the CA, its CRLs and its OCSP responses have no digest to choose. An ML-DSA CA can sign RSA or EC certificates, and an RSA or EC CA can sign an ML-DSA intermediate. Renewal keeps the same level' },
           { label: 'Name constraints', text: 'Advanced Constraints (RFC 5280): permitted and excluded subtrees (DNS, IP range, email) limit the names the CA may certify. For an externally-signed CA they are set by the signing CA' },
           { label: 'RSA signature scheme', text: 'PKCS#1 v1.5 by default, or RSA-PSS (salt as long as the hash) for an RSA CA with a local, PKCS#11 or OpenBao key. It applies to the certificates, CRLs, OCSP responses and SCEP replies the CA signs; timestamps stay PKCS#1 v1.5, the scheme openssl ts -verify checks. "Sign with RSA-PSS" in the CA details switches an existing CA either way: certificates already issued keep their signature' },
           { label: 'Compliance profile', text: 'ANSSI, BSI or EU ACM: rules aligned with a reference text bind what the CA issues (key types, digests, RSA scheme, date horizons, and for EU ACM an HSM-held CA key). Pick one at creation (an intermediate CA is offered its parent profile, otherwise the default set in Settings, About). On an existing CA, the field in the details attaches, changes or removes it: the profile check runs on that CA first, its findings are listed, and you confirm that the rules apply to future issuance only, nothing already issued is re-signed. Needs write:cas, and admin:system to attach or change' },
@@ -150,6 +151,7 @@ export const helpContent = {
       'PKCS#12 export includes the full chain and is ideal for backup',
     ],
     warnings: [
+      'An ML-DSA CA cannot be exported as PKCS#12 or JKS yet: export the certificate and the private key as PEM. Clients without ML-DSA support (OpenSSL before 3.5, most browsers today) cannot verify what it signs',
       'Deleting a CA will NOT revoke certificates it has issued: revoke them first',
       'Private keys are stored encrypted; losing the database means losing the keys',
       'Offline-mode passwords are NOT recoverable: store them in your password manager / vault before confirming',
@@ -313,7 +315,7 @@ export const helpContent = {
         title: 'Workflow',
         icon: FileText,
         items: [
-          { label: 'Generate CSR', text: 'Create a new CSR with key pair directly in UCM' },
+          { label: 'Generate CSR', text: 'Create a new CSR with key pair directly in UCM: RSA, EC, Brainpool or ML-DSA-44/65/87' },
           { label: 'Upload CSR', text: 'Accept PEM-encoded CSR files or paste PEM text' },
           { label: 'Review', text: 'Inspect subject, SANs, key type, and signature before signing' },
           { label: 'Sign', text: 'Select a CA, certificate type, set validity period, and issue the certificate' },
@@ -337,6 +339,7 @@ export const helpContent = {
       'You can add a private key to a CSR after signing if needed for PKCS#12 export',
       'A certificate imported for a CSR generated in UCM completes that CSR: the record keeps its private key, so the certificate exports with it',
       'Use Microsoft CA mode to sign CSRs via AD CS when connected to a Windows PKI',
+      'A certificate for an ML-DSA key keeps only signature bits: keyEncipherment, dataEncipherment and keyAgreement asked by the template are removed, and the result says so',
       'When signing, use "Extra EKUs" to add Microsoft RDP, smartcard logon, IPsec or any other dotted OID: the CSR\'s existing EKU is rebuilt with the merged set',
       'When a policy or the issuing CA\'s expiry shortens the requested validity, the result says so: "Issued for N day(s) instead of the M requested", with the reason',
     ],
@@ -372,7 +375,7 @@ export const helpContent = {
           { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances, one template or several in one file' },
           { label: 'qcStatements', text: 'Optional ETSI EN 319 412-5 statements added to every certificate issued from the template: QcCompliance, QcType (signature, seal or website), QcSSCD, QcPDS (HTTPS URL and two-letter language), QcRetentionPeriod, QcLimitValue, QcCClegislation (for a certificate qualified under a non-EU legal framework) and the semantics identifier. Not applied to EST, WSTEP or mTLS issuance, and a qcStatements extension in a CSR is ignored. QcIdentMethod, QcQSCDlegislation and PSD2 statements are not supported' },
           { label: 'Policy OIDs', text: 'Extra certificate policy OIDs (for example the ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd and QCP-w policies), added after the CA\'s own policy' },
-          { label: 'Key Type', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 or EC-P521, with a SHA-256, SHA-384 or SHA-512 digest' },
+          { label: 'Key Type', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 or EC-P521, with a SHA-256, SHA-384 or SHA-512 digest, or ML-DSA-44, ML-DSA-65 or ML-DSA-87. The digest is the issuing CA\'s signing hash, not the leaf key\'s: it still applies to an ML-DSA leaf under an RSA or EC CA, and an ML-DSA CA ignores it' },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 and EC-BP512 (RFC 5639, listed under Brainpool in key type lists, hidden in FIPS mode). OpenSSL and Windows read their chains and signatures, but Chrome, Firefox, Go, rustls, GnuTLS and Java without Bouncy Castle refuse them for TLS, and Windows Schannel does not enable them by default. On an HSM, only PKCS#11 providers hold them' },
         ]
       },
@@ -1245,7 +1248,7 @@ export const helpContent = {
     ],
     tips: [
       'SSL Checker supports custom ports: use it to check any TLS service',
-      'Key Matcher compares modulus hashes to verify matching pairs',
+      'Key Matcher compares public keys, ML-DSA included: an ML-DSA private key must carry its seed, a key file holding only the expanded form is refused',
       'Converter preserves the full certificate chain when creating PKCS#12',
       'Decoders name a post-quantum key with its NIST security level, e.g. ML-DSA-65 (level 3), without a size in bits',
       'UCM cannot yet write an ML-DSA key into PKCS#12 or JKS: export it as PEM with the private key instead',
@@ -1507,7 +1510,8 @@ export const helpContent = {
         icon: ShieldCheck,
         items: [
           { label: 'Max Validity', text: 'Maximum certificate lifetime in days' },
-          { label: 'Allowed Key Types', text: 'Restrict which key algorithms and sizes can be used' },
+          { label: 'Allowed Key Types', text: 'Restrict which key algorithms and sizes can be used, ML-DSA-44, ML-DSA-65 and ML-DSA-87 included; FIPS mode removes ML-DSA' },
+          { label: 'Allowed Signature Schemes', text: 'PKCS#1 v1.5, RSA-PSS, ECDSA, EdDSA, ML-DSA or SLH-DSA, matched against the signing CA\'s key. Allowed Signature Hashes do not bind an ML-DSA CA, which signs without a separate digest' },
           { label: 'SAN Restrictions', text: 'Limit the number of SANs and enforce DNS name patterns' },
           { label: 'Allowed Signature Hashes', text: 'SHA-256, SHA-384 or SHA-512; none selected allows any. When nobody chose the hash, the default applies if allowed, else the weakest allowed one. The issue form offers only the allowed key types, Create CA only the allowed key types and hashes' },
         ]

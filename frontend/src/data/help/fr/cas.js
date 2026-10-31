@@ -24,6 +24,7 @@ export default {
           { label: 'Réparation de chaîne', text: 'Corriger automatiquement les relations parent-enfant rompues' },
           { label: 'Importer la clé privée', text: 'Rattacher la clé privée d\'une CA qui ne détient que son certificat, pour qu\'elle puisse signer' },
           { label: 'Clé et validité', text: 'RSA-3072 par défaut, locale ou HSM. Validité de 1, 2, 3, 5, 10, 15 ou 20 ans, ou Personnalisée (jours) jusqu\'à 50 ans. Une CA RSA-2048 qui dépasserait 2030 est signalée : l\'ANSSI accepte RSA-2048 jusqu\'à fin 2030, l\'ETSI TS 119 312 jusqu\'à fin 2026' },
+          { label: 'Post-quantique (ML-DSA)', text: "ML-DSA-44, ML-DSA-65 ou ML-DSA-87 (FIPS 204, niveaux NIST 2, 3 et 5), générées uniquement en logiciel, jamais sur un HSM, et masquées en mode FIPS. Une clé ML-DSA signe sans digest séparé : la CA, ses CRL et ses réponses OCSP n'ont donc aucun digest à choisir. Une CA ML-DSA peut signer des certificats RSA ou EC, et une CA RSA ou EC peut signer une intermédiaire ML-DSA. Le renouvellement conserve le même niveau" },
           { label: 'Contraintes de noms', text: 'Contraintes avancées (RFC 5280) : les sous-arbres permis et exclus (DNS, plage IP, e-mail) limitent les noms que la CA peut certifier. Pour une CA signée en externe, ils sont fixés par la CA signataire' },
           { label: 'Schéma de signature RSA', text: "PKCS#1 v1.5 par défaut, ou RSA-PSS (sel aussi long que le hachage) pour une CA RSA avec une clé locale, PKCS#11 ou OpenBao. Il s'applique aux certificats, CRL, réponses OCSP et réponses SCEP signés par la CA ; les horodatages restent en PKCS#1 v1.5, le schéma que vérifie openssl ts -verify. « Signer avec RSA-PSS » dans les détails de la CA fait basculer une CA existante dans un sens ou dans l'autre : les certificats déjà émis conservent leur signature" },
           { label: 'Profil de conformité', text: "ANSSI, BSI ou EU ACM : des règles alignées sur un texte de référence encadrent ce que la CA émet (types de clé, hachages, schéma RSA, horizons de dates et, pour EU ACM, une clé de CA conservée sur HSM). À choisir à la création (une CA intermédiaire se voit proposer le profil de sa parente, sinon le profil par défaut défini dans Réglages, À propos). Sur une CA existante, le champ des détails permet de rattacher, changer ou retirer le profil : la vérification du profil s'exécute d'abord sur cette CA, ses constats sont listés, puis vous confirmez que les règles ne valent que pour les émissions futures, rien de ce qui est déjà émis n'est re-signé. Nécessite write:cas, et admin:system pour rattacher ou changer" },
@@ -95,6 +96,7 @@ export default {
       'L\'exportation PKCS#12 inclut la chaîne complète et est idéale pour la sauvegarde',
     ],
     warnings: [
+      "Une CA ML-DSA ne peut pas encore être exportée en PKCS#12 ni en JKS : exportez le certificat et la clé privée en PEM. Les clients sans prise en charge de ML-DSA (OpenSSL avant 3.5, la plupart des navigateurs aujourd'hui) ne peuvent pas vérifier ce qu'elle signe",
       'Supprimer une CA ne révoquera PAS les certificats qu\'elle a émis : révoquez-les d\'abord',
       'Les clés privées sont stockées chiffrées ; perdre la base de données signifie perdre les clés',
       'Les mots de passe du mode hors ligne ne sont PAS récupérables : stockez-les dans votre coffre-fort avant de confirmer',
@@ -136,7 +138,7 @@ Regroupe les CA par leur champ Organisation (O). Utile pour les configurations m
 ### Créer une CA racine
 1. Cliquez sur **Créer** → **CA racine**
 2. Remplissez les champs du sujet (CN, O, OU, C, ST, L)
-3. Sélectionnez l'algorithme de clé (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521) : RSA-3072 par défaut
+3. Sélectionnez l'algorithme de clé (RSA 2048/3072/4096, ECDSA P-256/P-384/P-521, ML-DSA 44/65/87) : RSA-3072 par défaut
 4. Choisissez l'algorithme de signature (Auto, SHA-256/384/512. Auto aligne P-384 sur SHA-384)
 5. Définissez la période de validité : 1, 2, 3, 5, 10, 15 ou 20 ans, ou **Personnalisée (jours)** jusqu'à 50 ans (typiquement 10-20 ans pour les CA racines)
 6. Optionnel : ouvrez **Profil certificat (RFC 5280)** pour ajuster Key Usage / EKU
@@ -152,6 +154,14 @@ Regroupe les CA par leur champ Organisation (O). Utile pour les configurations m
 > ⚠ La validité de la CA intermédiaire ne peut pas dépasser celle de sa CA parente.
 
 Le formulaire signale une CA RSA-2048 qui dépasserait 2030 : l'ANSSI accepte RSA-2048 jusqu'à fin 2030, l'ETSI TS 119 312 jusqu'à fin 2026. Choisissez RSA-3072 ou plus. Sous **Contraintes avancées (RFC 5280)**, les sous-arbres permis et exclus (DNS, plage IP, e-mail) limitent les noms que la CA peut certifier.
+
+### CA post-quantiques (ML-DSA)
+**ML-DSA-44**, **ML-DSA-65** et **ML-DSA-87** (FIPS 204) sont listées avec leur niveau de sécurité NIST (2, 3 et 5). La clé est générée en logiciel, jamais sur un HSM, et l'algorithme est masqué en mode FIPS.
+
+- Une clé ML-DSA signe sans digest séparé : le champ digest disparaît, et un digest envoyé par l'API est ignoré avec un avertissement. Les CRL et les réponses OCSP de la CA suivent la même règle.
+- Les hiérarchies peuvent se mélanger : une racine ML-DSA peut signer une intermédiaire RSA ou EC, et une CA RSA ou EC peut signer une intermédiaire ML-DSA, qui utilise alors le digest de sa parente.
+- Le renouvellement conserve la clé et son niveau.
+- Une CA ML-DSA s'exporte en PEM ou DER, pas en PKCS#12 ni en JKS. Les clients sans prise en charge de ML-DSA (OpenSSL avant 3.5, la plupart des navigateurs aujourd'hui) ne peuvent pas vérifier ce qu'elle signe.
 
 ### Créer une CA signée en externe (mode CSR, v2.214)
 Pour le schéma de racine hors ligne : la clé de la CA émettrice vit dans UCM, son certificat est signé ailleurs :

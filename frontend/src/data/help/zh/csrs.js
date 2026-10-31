@@ -7,7 +7,7 @@ export default {
       {
         title: '工作流',
         items: [
-          { label: '生成 CSR', text: '直接在 UCM 中创建包含密钥对的新 CSR' },
+          { label: '生成 CSR', text: '直接在 UCM 中创建包含密钥对的新 CSR：RSA、EC、Brainpool 或 ML-DSA-44/65/87' },
           { label: '上传 CSR', text: '接受 PEM 编码的 CSR 文件或粘贴 PEM 文本' },
           { label: '审查', text: '签名前检查主题、SAN、密钥类型和签名' },
           { label: '签署', text: '选择 CA、证书类型、设置有效期并签发证书' },
@@ -31,6 +31,7 @@ export default {
       '为在 UCM 中生成的 CSR 导入证书会完成该 CSR：记录保留其私钥，因此证书可连同私钥一起导出',
       '使用 Microsoft CA 模式可在连接到 Windows PKI 时通过 AD CS 签署 CSR',
       '签署时使用"额外 EKU"添加 Microsoft RDP、智能卡登录、IPsec 或任何 OID: CSR 现有的 EKU 将以合并集重建',
+      'ML-DSA 密钥的证书只保留签名位：模板要求的 keyEncipherment、dataEncipherment 和 keyAgreement 会被移除，结果中会说明',
       '当策略或签发 CA 的到期日缩短了请求的有效期时，结果会说明原因：“Issued for N day(s) instead of the M requested”',
     ],
   },
@@ -56,12 +57,14 @@ UCM 可以直接生成 CSR 和密钥对：
 1. 点击**生成 CSR**
 2. 填写主题字段（CN 为必填）
 3. 按需添加主题备用名称
-4. 选择密钥类型和大小（RSA 2048/4096、ECDSA P-256/P-384）
+4. 选择密钥类型和大小（RSA 2048/4096、ECDSA P-256/P-384/P-521、Brainpool、ML-DSA-44/65/87）
 5. 点击**生成**
 
 CSR 和私钥将在 UCM 中创建和存储。CSR 出现在待处理选项卡中，可以进行签署。
 
 > 💡 当您希望 UCM 管理整个生命周期（CSR、签署和密钥存储）时，这非常方便。
+
+为 **ML-DSA** 密钥签发的证书只保留签名位：模板要求的 keyEncipherment、dataEncipherment 和 keyAgreement 会被移除，结果中会指出被移除的内容。
 
 ## 上传 CSR
 

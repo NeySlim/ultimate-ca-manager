@@ -3206,7 +3206,7 @@
           "remedy": "请在切换前创建 RSA 或 ECDSA（P-256/P-384/P-521）颁发机构并将签发迁移过去；颁发机构密钥无法转换。"
         },
         "ca_weak_key": {
-          "title": "使用 DSA 密钥、2048 位以下 RSA 或 P-256/384/521 以外曲线的证书颁发机构",
+          "title": "使用 DSA 或 ML-DSA 密钥、2048 位以下 RSA 或 P-256/384/521 以外曲线的证书颁发机构",
           "remedy": "请创建使用 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521 的颁发机构，并将签发迁移过去。"
         },
         "ssh_ca_eddsa_key": {
@@ -3226,15 +3226,15 @@
           "remedy": "请确保每台主机同时具有 ECDSA 或 RSA 主机密钥，然后重置该目标已固定的主机密钥：下次连接时将固定该密钥。"
         },
         "ocsp_responder_unapproved_key": {
-          "title": "使用 Ed25519/Ed448 或弱密钥的委派 OCSP 响应器：将改由 CA 签名",
+          "title": "使用 Ed25519/Ed448、ML-DSA 或弱密钥的委派 OCSP 响应器：将改由 CA 签名",
           "remedy": "请签发新的 RSA 或 ECDSA 响应器证书，并在 CA 设置中选择它。"
         },
         "tsa_signer_unapproved_key": {
-          "title": "时间戳证书使用 Ed25519/Ed448 或弱密钥：FIPS 模式下时间戳将失败",
+          "title": "时间戳证书使用 Ed25519/Ed448、ML-DSA 或弱密钥：FIPS 模式下时间戳将失败",
           "remedy": "请签发新的 RSA 或 ECDSA 时间戳证书，并在 TSA 设置中选择它。"
         },
         "certificates_unapproved_key": {
-          "title": "使用 Ed25519/Ed448 密钥、2048 位以下 RSA 或其他曲线的有效证书",
+          "title": "使用 Ed25519/Ed448 或 ML-DSA 密钥、2048 位以下 RSA 或其他曲线的有效证书",
           "remedy": "它们仍然有效；请使用新的 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521 密钥续期，因为 FIPS 模式下拒绝使用相同密钥续期。"
         },
         "templates_unapproved_key_type": {
@@ -3242,7 +3242,7 @@
           "remedy": "请将这些模板的密钥类型改为 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521。"
         },
         "policies_unapproved_key_type": {
-          "title": "允许 FIPS 模式所移除密钥类型（Ed25519、Ed448、短 RSA 等）的有效策略",
+          "title": "允许 FIPS 模式所移除密钥类型（Ed25519、Ed448、ML-DSA、短 RSA 等）的有效策略",
           "remedy": "请从策略中移除这些密钥类型；若策略中不剩任何类型，则不允许任何签发。"
         },
         "acme_client_unapproved_key_type": {
@@ -3290,7 +3290,7 @@
           "remedy": "请在 设置 > 安全 中启用私钥加密，或提供 /etc/ucm/master.key 或 KEY_ENCRYPTION_KEY；若设置 UCM_REQUIRE_KEY_ENCRYPTION=true，则没有主密钥时 UCM 将拒绝启动。"
         },
         "https_unapproved_key": {
-          "title": "HTTPS 证书使用 Ed25519/Ed448 或弱密钥：Web 服务器在 FIPS 模式下无法使用它",
+          "title": "HTTPS 证书使用 Ed25519/Ed448、ML-DSA 或弱密钥：Web 服务器在 FIPS 模式下无法使用它",
           "remedy": "请在 HTTPS 设置中安装 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521 证书。"
         }
       }

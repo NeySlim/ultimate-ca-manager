@@ -25,7 +25,7 @@ export default {
           { label: 'Importa/Esporta', text: 'Condividi modelli come file JSON tra istanze UCM, un modello o più in un file' },
           { label: 'qcStatements', text: 'Dichiarazioni ETSI EN 319 412-5 facoltative aggiunte a ogni certificato emesso dal modello: QcCompliance, QcType (firma, sigillo o sito web), QcSSCD, QcPDS (URL HTTPS e lingua di due lettere), QcRetentionPeriod, QcLimitValue, QcCClegislation (per un certificato qualificato secondo un quadro giuridico extra UE) e l\'identificatore di semantica. Non si applicano all\'emissione EST, WSTEP o mTLS, e un\'estensione qcStatements in un CSR viene ignorata. QcIdentMethod, QcQSCDlegislation e le dichiarazioni PSD2 non sono supportati' },
           { label: 'OID di policy', text: 'OID di policy del certificato aggiuntivi (ad esempio le policy ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd e QCP-w), aggiunti dopo la policy della CA stessa' },
-          { label: 'Tipo di chiave', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 o EC-P521, con digest SHA-256, SHA-384 o SHA-512' },
+          { label: 'Tipo di chiave', text: 'RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 o EC-P521, con digest SHA-256, SHA-384 o SHA-512, oppure ML-DSA-44, ML-DSA-65 o ML-DSA-87. Il digest è l\'hash di firma della CA emittente, non quello della chiave foglia: si applica ancora a una foglia ML-DSA sotto una CA RSA o EC, mentre una CA ML-DSA lo ignora' },
           { label: 'Brainpool', text: 'EC-BP256, EC-BP384 e EC-BP512 (RFC 5639, elencati sotto Brainpool negli elenchi dei tipi di chiave, nascosti in modalità FIPS). OpenSSL e Windows leggono le loro catene e firme, ma Chrome, Firefox, Go, rustls, GnuTLS e Java senza Bouncy Castle li rifiutano per TLS, e Windows Schannel non li abilita per impostazione predefinita. Su un HSM, solo i provider PKCS#11 li gestiscono' },
         ]
       },
@@ -74,7 +74,7 @@ Le autorità di certificazione non si creano dai modelli: creale nella pagina **
 4. Configura i **valori predefiniti del soggetto** (O, OU, C, ST, L, CN, Email). Sui certificati Email (S/MIME) e Server + Client (Combinato), l'Email diventa anche un SAN email
 5. Seleziona i flag **Key Usage**
 6. Seleziona i valori **Extended Key Usage** tra gli scopi noti al server (Smartcard Logon, Time Stamping, Microsoft RDP e altri)
-7. Imposta il **Tipo di chiave** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384 o EC-P521), il digest e il **periodo di validità predefinito** in giorni
+7. Imposta il **Tipo di chiave** (RSA-2048, RSA-3072, RSA-4096, EC-P256, EC-P384, EC-P521 o ML-DSA-44/65/87), il digest e il **periodo di validità predefinito** in giorni. Il digest è l'hash di firma della CA emittente, quindi si applica ancora a una chiave ML-DSA sotto una CA RSA o EC; una CA ML-DSA lo ignora
 8. Clicca **Crea**
 
 ## Utilizzo dei modelli

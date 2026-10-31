@@ -7,7 +7,7 @@ export default {
       {
         title: 'Workflow',
         items: [
-          { label: 'CSR generieren', text: 'Einen neuen CSR mit Schlüsselpaar direkt in UCM erstellen' },
+          { label: 'CSR generieren', text: 'Einen neuen CSR mit Schlüsselpaar direkt in UCM erstellen: RSA, EC, Brainpool oder ML-DSA-44/65/87' },
           { label: 'CSR hochladen', text: 'PEM-kodierte CSR-Dateien akzeptieren oder PEM-Text einfügen' },
           { label: 'Prüfen', text: 'Betreff, SANs, Schlüsseltyp und Signatur vor dem Signieren überprüfen' },
           { label: 'Signieren', text: 'Eine CA auswählen, Zertifikatstyp festlegen, Gültigkeitsdauer einstellen und Zertifikat ausstellen' },
@@ -30,6 +30,7 @@ export default {
       'Sie können nach dem Signieren einen privaten Schlüssel zu einem CSR hinzufügen, wenn er für den PKCS#12-Export benötigt wird',
       'Ein für einen in UCM generierten CSR importiertes Zertifikat vervollständigt diesen CSR: Der Eintrag behält seinen privaten Schlüssel, sodass das Zertifikat zusammen mit ihm exportiert wird',
       'Verwenden Sie den Microsoft CA-Modus, um CSRs über AD CS zu signieren, wenn eine Verbindung zu einer Windows-PKI besteht',
+      'Ein Zertifikat für einen ML-DSA-Schlüssel behält nur Signaturbits: Vom Template angeforderte keyEncipherment, dataEncipherment und keyAgreement werden entfernt, und das Ergebnis weist darauf hin',
       'Beim Signieren über "Extra EKUs" Microsoft RDP, Smartcard-Logon, IPsec oder beliebige OIDs hinzufügen: die vorhandene EKU des CSR wird mit der zusammengeführten Menge neu aufgebaut',
       'Verkürzt eine Richtlinie oder das Ablaufdatum der ausstellenden CA die angeforderte Gültigkeit, nennt das Ergebnis dies samt Grund: "Issued for N day(s) instead of the M requested"',
     ],
@@ -56,12 +57,14 @@ UCM kann einen CSR und ein Schlüsselpaar direkt generieren:
 1. Klicken Sie auf **CSR generieren**
 2. Füllen Sie die Betreffsfelder aus (CN erforderlich)
 3. Fügen Sie bei Bedarf Subject Alternative Names hinzu
-4. Wählen Sie Schlüsseltyp und -größe (RSA 2048/4096, ECDSA P-256/P-384)
+4. Wählen Sie Schlüsseltyp und -größe (RSA 2048/4096, ECDSA P-256/P-384/P-521, Brainpool, ML-DSA-44/65/87)
 5. Klicken Sie auf **Generieren**
 
 CSR und privater Schlüssel werden erstellt und in UCM gespeichert. Der CSR erscheint im Tab „Ausstehend" bereit zum Signieren.
 
 > 💡 Dies ist praktisch, wenn UCM den gesamten Lebenszyklus verwalten soll. CSR, Signierung und Schlüsselspeicherung.
+
+Ein für einen **ML-DSA**-Schlüssel signiertes Zertifikat behält nur Signaturbits: Vom Template angeforderte keyEncipherment, dataEncipherment und keyAgreement werden entfernt, und das Ergebnis nennt, was entfernt wurde.
 
 ## CSR hochladen
 

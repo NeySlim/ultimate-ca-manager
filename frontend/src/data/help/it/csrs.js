@@ -7,7 +7,7 @@ export default {
       {
         title: 'Flusso di lavoro',
         items: [
-          { label: 'Genera CSR', text: 'Crea un nuovo CSR con coppia di chiavi direttamente in UCM' },
+          { label: 'Genera CSR', text: 'Crea un nuovo CSR con coppia di chiavi direttamente in UCM: RSA, EC, Brainpool o ML-DSA-44/65/87' },
           { label: 'Carica CSR', text: 'Accetta file CSR codificati in PEM o incolla il testo PEM' },
           { label: 'Esamina', text: 'Ispeziona soggetto, SAN, tipo di chiave e firma prima della firma' },
           { label: 'Firma', text: 'Seleziona una CA, il tipo di certificato, imposta il periodo di validità ed emetti il certificato' },
@@ -30,6 +30,7 @@ export default {
       'Puoi aggiungere una chiave privata a un CSR dopo la firma se necessario per l\'esportazione PKCS#12',
       'Un certificato importato per un CSR generato in UCM completa quel CSR: il record conserva la sua chiave privata, quindi il certificato viene esportato insieme a essa',
       'Usa la modalità Microsoft CA per firmare i CSR tramite AD CS quando sei connesso a una PKI Windows',
+      'Un certificato per una chiave ML-DSA conserva solo i bit di firma: keyEncipherment, dataEncipherment e keyAgreement richiesti dal modello vengono rimossi, e il risultato lo indica',
       'In firma, usa "EKU extra" per aggiungere Microsoft RDP, smartcard logon, IPsec o qualsiasi OID: l\'EKU esistente del CSR viene ricostruito con l\'insieme unito',
       'Quando una policy o la scadenza della CA emittente accorcia la validità richiesta, il risultato lo indica: "Issued for N day(s) instead of the M requested", con il motivo',
     ],
@@ -56,12 +57,14 @@ UCM può generare un CSR e una coppia di chiavi direttamente:
 1. Clicca **Genera CSR**
 2. Compila i campi del Soggetto (CN obbligatorio)
 3. Aggiungi Subject Alternative Names se necessario
-4. Seleziona il tipo e la dimensione della chiave (RSA 2048/4096, ECDSA P-256/P-384)
+4. Seleziona il tipo e la dimensione della chiave (RSA 2048/4096, ECDSA P-256/P-384/P-521, Brainpool, ML-DSA-44/65/87)
 5. Clicca **Genera**
 
 Il CSR e la chiave privata vengono creati e memorizzati in UCM. Il CSR appare nella scheda In attesa pronto per la firma.
 
 > 💡 Questo è comodo quando vuoi che UCM gestisca l'intero ciclo di vita. CSR, firma e archiviazione della chiave.
+
+Un certificato firmato per una chiave **ML-DSA** conserva solo i bit di firma: keyEncipherment, dataEncipherment e keyAgreement richiesti dal modello vengono rimossi, e il risultato indica cosa è stato rimosso.
 
 ## Caricamento di un CSR
 

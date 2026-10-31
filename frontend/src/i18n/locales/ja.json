@@ -3206,7 +3206,7 @@
           "remedy": "切り替え前に RSA または ECDSA（P-256/P-384/P-521）の認証局を作成し、発行をそちらへ移行してください。認証局の鍵は変換できません。"
         },
         "ca_weak_key": {
-          "title": "DSA 鍵、2048 ビット未満の RSA、または P-256/384/521 以外の曲線を使う認証局",
+          "title": "DSA または ML-DSA 鍵、2048 ビット未満の RSA、または P-256/384/521 以外の曲線を使う認証局",
           "remedy": "RSA 2048 以上または ECDSA P-256/P-384/P-521 の認証局を作成し、発行をそちらへ移行してください。"
         },
         "ssh_ca_eddsa_key": {
@@ -3226,15 +3226,15 @@
           "remedy": "各ホストに ECDSA または RSA のホスト鍵もあることを確認してから、デプロイ先の固定済みホスト鍵をリセットしてください。次回の接続でその鍵が固定されます。"
         },
         "ocsp_responder_unapproved_key": {
-          "title": "Ed25519/Ed448 または脆弱な鍵を持つ委任 OCSP レスポンダー：代わりに CA が署名します",
+          "title": "Ed25519/Ed448、ML-DSA または脆弱な鍵を持つ委任 OCSP レスポンダー：代わりに CA が署名します",
           "remedy": "新しい RSA または ECDSA のレスポンダー証明書を発行し、CA 設定で選択してください。"
         },
         "tsa_signer_unapproved_key": {
-          "title": "タイムスタンプ証明書が Ed25519/Ed448 または脆弱な鍵です：FIPS モードではタイムスタンプが失敗します",
+          "title": "タイムスタンプ証明書が Ed25519/Ed448、ML-DSA または脆弱な鍵です：FIPS モードではタイムスタンプが失敗します",
           "remedy": "新しい RSA または ECDSA のタイムスタンプ証明書を発行し、TSA 設定で選択してください。"
         },
         "certificates_unapproved_key": {
-          "title": "Ed25519/Ed448 鍵、2048 ビット未満の RSA、または他の曲線を使う有効な証明書",
+          "title": "Ed25519/Ed448 または ML-DSA 鍵、2048 ビット未満の RSA、または他の曲線を使う有効な証明書",
           "remedy": "有効なままですが、FIPS モードでは同じ鍵での更新が拒否されるため、新しい RSA 2048 以上または ECDSA P-256/P-384/P-521 の鍵で更新してください。"
         },
         "templates_unapproved_key_type": {
@@ -3242,7 +3242,7 @@
           "remedy": "これらのテンプレートの鍵タイプを RSA 2048 以上または ECDSA P-256/P-384/P-521 に変更してください。"
         },
         "policies_unapproved_key_type": {
-          "title": "FIPS モードが除外する鍵タイプ（Ed25519、Ed448、短い RSA など）を許可している有効なポリシー",
+          "title": "FIPS モードが除外する鍵タイプ（Ed25519、Ed448、ML-DSA、短い RSA など）を許可している有効なポリシー",
           "remedy": "ポリシーからこれらの鍵タイプを削除してください。許可する鍵タイプが残らないポリシーでは発行できません。"
         },
         "acme_client_unapproved_key_type": {
@@ -3290,7 +3290,7 @@
           "remedy": "設定 > セキュリティで秘密鍵の暗号化を有効にするか、/etc/ucm/master.key または KEY_ENCRYPTION_KEY を指定してください。UCM_REQUIRE_KEY_ENCRYPTION=true の場合、マスターキーがないと UCM は起動しません。"
         },
         "https_unapproved_key": {
-          "title": "HTTPS 証明書が Ed25519/Ed448 または脆弱な鍵です：FIPS モードではウェブサーバーが使用できません",
+          "title": "HTTPS 証明書が Ed25519/Ed448、ML-DSA または脆弱な鍵です：FIPS モードではウェブサーバーが使用できません",
           "remedy": "HTTPS 設定で RSA 2048 以上または ECDSA P-256/P-384/P-521 の証明書をインストールしてください。"
         }
       }
