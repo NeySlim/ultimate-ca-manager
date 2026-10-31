@@ -104,10 +104,10 @@ export function defaultKeyChoice(field, family, defaults) {
 // pyca names P-256 'secp256r1' where the registry keeps OpenSSL's 'prime256v1'
 const CURVE_ALIASES = { secp256r1: 'prime256v1' }
 
-/** Row of a stored key spelling ('RSA 2048', 'EC secp384r1', 'ML-DSA-65'); null when unknown. */
+/** Row of a stored key spelling ('RSA 2048', 'EC secp384r1', 'Ed25519', 'ML-DSA-65'); null when unknown. */
 export function algorithmForKeyType(keyType) {
   if (!keyType) return null
-  const row = findAlgorithm(keyType) || KEY_ALGORITHMS.find(a => a.csr === keyType)
+  const row = findAlgorithm(keyType) || KEY_ALGORITHMS.find(a => a.csr === keyType || a.display === keyType)
   if (row) return row
   const { family, spec } = caKeyParts(keyType)
   if (family !== 'EC' && family !== 'ECDSA') return null

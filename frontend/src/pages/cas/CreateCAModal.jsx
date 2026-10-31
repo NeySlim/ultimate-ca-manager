@@ -152,14 +152,6 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     return () => { cancelled = true }
   }, [open])
 
-  // Apply RFC 5280 defaults when CA type changes. No EKU on any CA unless
-  // asked for: a serverAuth-only issuing CA invalidates every clientAuth
-  // leaf beneath it for OpenSSL-based validators (the v2.196 API default).
-  useEffect(() => {
-    setCreateFormKeyUsage(createFormType === 'root' ? ROOT_KEY_USAGE : INTERMEDIATE_KEY_USAGE)
-    setCreateFormEkuServerAuth(false)
-  }, [createFormType])
-
   // Reset form when modal closes
   useEffect(() => {
     if (open) return
@@ -211,6 +203,16 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     useMemo(() => limitsWithProfile(policyLimits, profile), [policyLimits, profile])
   // eu-acm: the CA key lives on an HSM
   const keyStorage = requireHsm ? 'hsm' : createFormKeyStorage
+
+  // Apply RFC 5280 defaults when CA type changes. No EKU on any CA unless
+  // asked for: a serverAuth-only issuing CA invalidates every clientAuth
+  // leaf beneath it for OpenSSL-based validators (the v2.196 API default).
+  // An ML-DSA root keeps digitalSignature, as the API gives it by default (RFC 9881).
+  const mldsaKey = keyStorage === 'local' && createFormKeyAlgo === 'ML-DSA'
+  useEffect(() => {
+    setCreateFormKeyUsage(createFormType === 'root' && !mldsaKey ? ROOT_KEY_USAGE : INTERMEDIATE_KEY_USAGE)
+    setCreateFormEkuServerAuth(false)
+  }, [createFormType, mldsaKey])
   const fips = policyLimits.fips
   const allowedLocalKeys = useMemo(
     () => CA_KEY_CHOICES.filter(([algo, size]) => isAllowed(allowedKeyTypes, caKeyLabel(algo, size))
@@ -268,7 +270,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const hsmAlgorithmOptions = useMemo(() => hsmAlgorithms.map(a => a.label), [hsmAlgorithms])
   const keyLabel = keyStorage === 'local' || createFormHsmKeyMode === 'generate'
     ? horizonLabel : hsmKeys.find(k => String(k.id) === createFormHsmKeyId)?.algorithm
-  const keyIsRsa = findAlgorithm(keyLabel)?.family === 'RSA'
+  // An HSM key synced from the token may be an RSA size the registry does not list ('RSA-8192')
+  const keyIsRsa = findAlgorithm(keyLabel)?.family === 'RSA' || /^RSA-\d+$/.test(keyLabel ?? '')
   const pssAvailable = keyIsRsa && (keyStorage === 'local' || PSS_HSM_TYPES.includes(hsmProviderType))
   // The schemes the profile leaves: PSS imposed under bsi
   const schemeChoices = [

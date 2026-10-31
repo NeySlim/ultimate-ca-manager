@@ -141,6 +141,8 @@ describe('post-quantum keys', () => {
   it('finds the row of a stored key spelling, ML-DSA included', () => {
     for (const a of PQ_ROWS) expect(algorithmForKeyType(a.label)).toBe(a)
     expect(algorithmForKeyType('RSA 3072')?.label).toBe('RSA-3072')
+    expect(algorithmForKeyType('Ed25519')?.digest).toBeNull()
+    expect(algorithmForKeyType('Ed448')?.label).toBe('ED448')
     expect(algorithmForKeyType('EC secp256r1')?.label).toBe('EC-P256')
     expect(algorithmForKeyType('EC secp384r1')?.label).toBe('EC-P384')
     expect(algorithmForKeyType('EC brainpoolP256r1')?.label).toBe('EC-BP256')

@@ -10,6 +10,7 @@ const mocks = vi.hoisted(() => ({
   create: vi.fn(),
   getProviders: vi.fn(),
   getEffective: vi.fn(),
+  getSigningKeys: vi.fn(),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -18,7 +19,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../../services', () => ({
   casService: { create: mocks.create },
-  hsmService: { getProviders: mocks.getProviders, getSigningKeys: vi.fn() },
+  hsmService: { getProviders: mocks.getProviders, getSigningKeys: mocks.getSigningKeys },
   policiesService: { getEffective: mocks.getEffective },
 }))
 
@@ -70,6 +71,7 @@ const PARENTS = [
   { id: 8, name: 'PQ root', has_private_key: true, key_type: 'ML-DSA-65' },
   { id: 9, name: 'P-384 root', has_private_key: true, key_type: 'EC secp384r1' },
   { id: 10, name: 'RSA-8192 root', has_private_key: true, key_type: 'RSA 8192' },
+  { id: 11, name: 'Ed25519 root', has_private_key: true, key_type: 'Ed25519' },
 ]
 
 async function intermediateUnder(parentId, keyAlgo, effective = { allowed_key_types: null, allowed_digests: null }) {
@@ -169,6 +171,39 @@ describe('CreateCAModal ML-DSA', () => {
     await intermediateUnder(8, 'RSA')
     expect(screen.queryByLabelText('common.signatureAlgorithm')).toBeNull()
     expect(await submit()).not.toHaveProperty('hashAlgorithm')
+  })
+
+  it('hides the digest of an intermediate under an Ed25519 parent', async () => {
+    await intermediateUnder(11, 'ML-DSA')
+    expect(screen.queryByLabelText('common.signatureAlgorithm')).toBeNull()
+    expect(await submit()).not.toHaveProperty('hashAlgorithm')
+  })
+
+  it('gives an ML-DSA root digitalSignature, as the API does by default', async () => {
+    renderModal({ allowed_key_types: null, allowed_digests: null })
+    await waitFor(() => expect(optionValues('common.keyAlgorithm')).toContain('ML-DSA'))
+    fireEvent.change(screen.getByLabelText('common.keyAlgorithm'), { target: { value: 'ML-DSA' } })
+    expect((await submit()).keyUsage).toEqual(['digitalSignature', 'keyCertSign', 'cRLSign'])
+  })
+
+  it('keeps an RSA root to keyCertSign and cRLSign', async () => {
+    renderModal({ allowed_key_types: null, allowed_digests: null })
+    await waitFor(() => expect(optionValues('common.keyAlgorithm')).toContain('ML-DSA'))
+    expect((await submit()).keyUsage).toEqual(['keyCertSign', 'cRLSign'])
+  })
+
+  it('offers PSS for an existing HSM RSA key the registry does not list', async () => {
+    mocks.getSigningKeys.mockResolvedValue({ data: [{ id: 5, label: 'big', algorithm: 'RSA-8192' }] })
+    renderModal({ allowed_key_types: null, allowed_digests: null },
+      [{ id: 1, name: 'tokens', provider_type: 'pkcs11', enabled: true }])
+    fireEvent.click(await screen.findByLabelText('cas.create.keyStorageHsm'))
+    const provider = await screen.findByLabelText('cas.create.hsmProvider')
+    await waitFor(() => expect(within(provider).getAllByRole('option').length).toBe(1))
+    fireEvent.change(provider, { target: { value: '1' } })
+    fireEvent.click(screen.getByLabelText('cas.create.hsmKeyModeExisting'))
+    const key = await screen.findByLabelText('cas.create.hsmExistingKey')
+    fireEvent.change(key, { target: { value: '5' } })
+    expect(screen.getByLabelText('cas.signatureScheme')).toBeTruthy()
   })
 
   it('lets an RSA intermediate under an ML-DSA parent through a policy allowing no digest', async () => {

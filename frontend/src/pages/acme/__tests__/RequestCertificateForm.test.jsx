@@ -27,7 +27,6 @@ vi.mock('../../../components', () => ({
 }))
 
 import RequestCertificateForm from '../RequestCertificateForm'
-import { ACME_CLIENT_LABELS } from '../../../lib/keyAlgorithms'
 
 const renderForm = (props = {}) => {
   const onSubmit = vi.fn()
@@ -104,7 +103,7 @@ describe('RequestCertificateForm Brainpool', () => {
   it('offers EC-BP256 and EC-BP384 only, with the compatibility notice once picked', () => {
     renderForm()
     const values = Array.from(screen.getByLabelText('acme.keyType').options).map((o) => o.value).filter(Boolean)
-    expect(values).toEqual(ACME_CLIENT_LABELS)
+    expect(values).toEqual(['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384'])
     expect(screen.queryByRole('note')).toBeNull()
     fireEvent.change(screen.getByLabelText('acme.keyType'), { target: { value: 'EC-BP384' } })
     expect(screen.getByRole('note').textContent).toContain('common.keyGroups.brainpoolWarning')
