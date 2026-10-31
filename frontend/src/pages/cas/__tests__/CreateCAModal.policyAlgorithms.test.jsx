@@ -4,6 +4,7 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
+import { keyFamilyOptions } from '../../../lib/keyAlgorithms'
 
 const mocks = vi.hoisted(() => ({
   create: vi.fn(),
@@ -68,7 +69,7 @@ describe('CreateCAModal policy algorithms (#397)', () => {
     renderModal({ allowed_key_types: null, allowed_digests: null })
     await waitFor(() => {
       expect(mocks.getEffective).toHaveBeenCalled()
-      expect(optionValues('common.keyAlgorithm')).toEqual(['RSA', 'ECDSA'])
+      expect(optionValues('common.keyAlgorithm')).toEqual(keyFamilyOptions('ca').map(o => o.value))
       expect(optionValues('common.signatureAlgorithm')).toEqual(['auto', 'sha256', 'sha384', 'sha512'])
     })
   })

@@ -54,11 +54,13 @@ const eddsa = (label, i18nKey) => ({
   exportExcluded: [],
 })
 
-// ML-DSA (FIPS 204): read and named in policies, not generated yet (generate: false)
+// ML-DSA (FIPS 204): generated in software only (providers: []), no digest; named by
+// algorithmName ('ML-DSA-65 (level 3)'), so no i18n keys of its own
 const mldsa = (param, securityLevel) => ({
   label: `ML-DSA-${param}`, bits: null, family: 'ML-DSA', group: GROUP_PQ, display: `ML-DSA-${param}`,
-  securityLevel, digest: null, fips: false, generate: false, providers: null,
-  issue: null, ca: null, csr: null, curveParam: null, i18nKey: null, sizeKey: null, csrKey: null,
+  securityLevel, digest: null, fips: false, generate: true, providers: [],
+  issue: ['ml-dsa', param], ca: ['ML-DSA', param], csr: `ML-DSA-${param}`,
+  curveParam: null, i18nKey: null, sizeKey: null, csrKey: null,
   exportExcluded: PQ_EXPORT_EXCLUDED,
 })
 
@@ -71,11 +73,52 @@ export const KEY_ALGORITHMS = [
 ]
 
 export const ACME_CLIENT_LABELS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384']
-export const CSR_LABELS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521', 'EC-BP256', 'EC-BP384', 'EC-BP512']
+export const CSR_LABELS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521', 'EC-BP256', 'EC-BP384', 'EC-BP512',
+  'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']
 export const TSA_LABELS = ['RSA-3072', 'RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384']
+
+// Key each family starts on, per form; the first entry is the form's default key
+export const CA_DEFAULT_LABELS = ['RSA-3072', 'EC-P256', 'ML-DSA-65']
+export const ISSUE_DEFAULT_LABELS = ['RSA-2048', 'EC-P256', 'ML-DSA-65']
 
 export function findAlgorithm(label) {
   return KEY_ALGORITHMS.find(a => a.label === label) || null
+}
+
+/** Families a form field ('issue' or 'ca') generates, in registry order, as Select options. */
+export function keyFamilyOptions(field) {
+  const families = new Map()
+  for (const a of KEY_ALGORITHMS) {
+    if (a.generate && a[field] && !families.has(a[field][0])) {
+      families.set(a[field][0], { value: a[field][0], label: a.ca?.[0] ?? a.family })
+    }
+  }
+  return [...families.values()]
+}
+
+/** [family, size] a form field starts on for *family*, from a *_DEFAULT_LABELS list. */
+export function defaultKeyChoice(field, family, defaults) {
+  return defaults.map(findAlgorithm).find(a => a?.[field]?.[0] === family)?.[field] ?? null
+}
+
+// pyca names P-256 'secp256r1' where the registry keeps OpenSSL's 'prime256v1'
+const CURVE_ALIASES = { secp256r1: 'prime256v1' }
+
+/** Row of a stored key spelling ('RSA 2048', 'EC secp384r1', 'ML-DSA-65'); null when unknown. */
+export function algorithmForKeyType(keyType) {
+  if (!keyType) return null
+  const row = findAlgorithm(keyType) || KEY_ALGORITHMS.find(a => a.csr === keyType)
+  if (row) return row
+  const { family, spec } = caKeyParts(keyType)
+  if (family !== 'EC' && family !== 'ECDSA') return null
+  const curve = CURVE_ALIASES[spec] ?? spec
+  return KEY_ALGORITHMS.find(a => a.family === 'EC' && (a.ca?.[1] === curve || a.curveParam === curve)) || null
+}
+
+/** Name of a row in a form: its i18n key, else 'ML-DSA-65 (level 3)' for a post-quantum key, else its display. */
+export function algorithmName(row, t, key = 'i18nKey') {
+  if (row[key]) return t(row[key])
+  return row.securityLevel ? keyAlgorithmLabel(row.label, t, row.securityLevel) : row.display
 }
 
 /** `key_type` / `key_size` / `curve` of a TSA signer request, as its API names them. */

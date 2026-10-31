@@ -18,16 +18,20 @@ import { extractData, cn, downloadBlob } from '../../lib/utils'
 import { signingCas, unlistedSigningCas } from '../../lib/caSelection'
 import { CA_KEY_CHOICES, POLICY_DIGESTS, caKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 import { PSS_HSM_TYPES } from '../../lib/signatureName'
-import { KEY_ALGORITHMS, defaultDigestFor, groupedOptions, listAlgorithms } from '../../lib/keyAlgorithms'
+import {
+  CA_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmName, defaultDigestFor, defaultKeyChoice, findAlgorithm,
+  groupedOptions, keyFamilyOptions, listAlgorithms,
+} from '../../lib/keyAlgorithms'
 import { BrainpoolNotice } from '../../components/BrainpoolNotice'
 import { COMPLIANCE_PROFILE_NAMES, limitsWithProfile, useComplianceDefault, useComplianceProfiles } from '../../lib/complianceProfiles'
 
-const EC_CA_ALGORITHMS = KEY_ALGORITHMS.filter(k => k.ca && k.ca[0] === 'ECDSA')
+const CA_FAMILY_OPTIONS = keyFamilyOptions('ca')
+const [DEFAULT_KEY_ALGO, DEFAULT_KEY_SIZE] = findAlgorithm(CA_DEFAULT_LABELS[0]).ca
 const VALIDITY_YEAR_PRESETS = [1, 2, 3, 5, 10, 15, 20]
 const CUSTOM_VALIDITY = 'custom'
-const DEFAULT_KEY_SIZE = { RSA: '3072', ECDSA: 'prime256v1' }
-// ANSSI PG-083 accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026
-const RSA_2048_HORIZON = Date.UTC(2031, 0, 1)
+// ANSSI PG-083 accepts RSA below 3072 bits until the end of 2030, ETSI TS 119 312 until the end of 2026
+const SHORT_RSA_BITS = 3072
+const SHORT_RSA_HORIZON = Date.UTC(2031, 0, 1)
 // The API ceiling: 50 years
 const MAX_CA_VALIDITY_DAYS = 18250
 
@@ -99,8 +103,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
 
   const [createFormType, setCreateFormType] = useState('root')
   const [createFormParentCAId, setCreateFormParentCAId] = useState(null)
-  const [createFormKeyAlgo, setCreateFormKeyAlgo] = useState('RSA')
-  const [createFormKeySize, setCreateFormKeySize] = useState(DEFAULT_KEY_SIZE.RSA)
+  const [createFormKeyAlgo, setCreateFormKeyAlgo] = useState(DEFAULT_KEY_ALGO)
+  const [createFormKeySize, setCreateFormKeySize] = useState(DEFAULT_KEY_SIZE)
   const [createFormValidity, setCreateFormValidity] = useState('10')
   const [createFormValidityDays, setCreateFormValidityDays] = useState('')
   const [showAdvanced, setShowAdvanced] = useState(false)
@@ -160,8 +164,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   useEffect(() => {
     if (open) return
     setCreateFormType('root')
-    setCreateFormKeyAlgo('RSA')
-    setCreateFormKeySize(DEFAULT_KEY_SIZE.RSA)
+    setCreateFormKeyAlgo(DEFAULT_KEY_ALGO)
+    setCreateFormKeySize(DEFAULT_KEY_SIZE)
     setCreateFormDigest('auto')
     setCreateFormSignatureScheme('pkcs1v15')
     setCreateFormProfile(null)
@@ -216,7 +220,10 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const allowedDigestChoices = useMemo(
     () => POLICY_DIGESTS.filter(d => isAllowed(allowedDigests, d)), [allowedDigests])
   const noKeyAllowed = allowedLocalKeys.length === 0
-  const noDigestAllowed = allowedDigestChoices.length === 0
+  const localKeyRow = findAlgorithm(caKeyLabel(createFormKeyAlgo, createFormKeySize))
+  // A key that signs without a separate hash (ML-DSA) has no digest to pick
+  const keyHasDigest = keyStorage !== 'local' || localKeyRow?.digest !== null
+  const noDigestAllowed = keyHasDigest && allowedDigestChoices.length === 0
   // 'auto' resolves like the server: the key's own digest when allowed, else the weakest allowed
   const suggested = defaultDigestFor(createFormKeyAlgo, createFormKeySize)
   const autoDigest = allowedDigestChoices.includes(suggested) ? suggested : allowedDigestChoices[0]
@@ -238,11 +245,13 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     return () => { cancelled = true }
   }, [keyStorage, createFormHsmKeyMode, createFormHsmProviderId])
 
-  const usesRsa2048 = keyStorage === 'local'
-    ? createFormKeyAlgo === 'RSA' && createFormKeySize === '2048'
-    : createFormHsmKeyMode === 'generate' && createFormHsmKeyAlgorithm === 'RSA-2048'
-  const rsa2048PastHorizon = createFormType !== 'external' && usesRsa2048
-    && Number.isFinite(validityDaysValue) && Date.now() + validityDaysValue * 86400000 >= RSA_2048_HORIZON
+  const horizonLabel = keyStorage === 'local'
+    ? caKeyLabel(createFormKeyAlgo, createFormKeySize)
+    : createFormHsmKeyMode === 'generate' ? createFormHsmKeyAlgorithm : null
+  const horizonRow = findAlgorithm(horizonLabel)
+  const usesShortRsa = horizonRow?.family === 'RSA' && horizonRow.bits < SHORT_RSA_BITS
+  const rsa2048PastHorizon = createFormType !== 'external' && usesShortRsa
+    && Number.isFinite(validityDaysValue) && Date.now() + validityDaysValue * 86400000 >= SHORT_RSA_HORIZON
   const hsmProviderType = hsmProviders.find(p => String(p.id) === createFormHsmProviderId)?.provider_type
   // Brainpool only on a PKCS#11 provider; none shown until a provider is chosen
   const hsmAlgorithms = useMemo(
@@ -250,11 +259,9 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
       .filter(a => isAllowed(allowedKeyTypes, a.label)),
     [allowedKeyTypes, hsmProviderType, fips])
   const hsmAlgorithmOptions = useMemo(() => hsmAlgorithms.map(a => a.label), [hsmAlgorithms])
-  const keyIsRsa = keyStorage === 'local'
-    ? createFormKeyAlgo === 'RSA'
-    : createFormHsmKeyMode === 'generate'
-      ? createFormHsmKeyAlgorithm.startsWith('RSA')
-      : Boolean(hsmKeys.find(k => String(k.id) === createFormHsmKeyId)?.algorithm?.startsWith('RSA'))
+  const keyLabel = keyStorage === 'local' || createFormHsmKeyMode === 'generate'
+    ? horizonLabel : hsmKeys.find(k => String(k.id) === createFormHsmKeyId)?.algorithm
+  const keyIsRsa = findAlgorithm(keyLabel)?.family === 'RSA'
   const pssAvailable = keyIsRsa && (keyStorage === 'local' || PSS_HSM_TYPES.includes(hsmProviderType))
   // The schemes the profile leaves: PSS imposed under bsi
   const schemeChoices = [
@@ -262,9 +269,6 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     ...(pssAvailable && isAllowed(allowedSchemes, 'rsa_pss') ? ['pss'] : []),
   ]
   const noSchemeAllowed = keyIsRsa && schemeChoices.length === 0
-  const horizonLabel = keyStorage === 'local'
-    ? caKeyLabel(createFormKeyAlgo, createFormKeySize)
-    : createFormHsmKeyMode === 'generate' ? createFormHsmKeyAlgorithm : null
   const profileHorizon = createFormType !== 'external' ? horizons[horizonLabel] : null
   const pastProfileHorizon = Boolean(profileHorizon) && Number.isFinite(validityDaysValue)
     && Date.now() + validityDaysValue * 86400000 > Date.parse(profileHorizon) + 86400000
@@ -320,7 +324,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         locality: formData.get('locality'),
         description: formData.get('description'),
         keyAlgo: createFormKeyAlgo,
-        keySize: createFormKeyAlgo === 'ECDSA' ? createFormKeySize : parseInt(createFormKeySize),
+        // RSA bits and ML-DSA levels are numbers, curves are names
+        keySize: /^\d+$/.test(createFormKeySize) ? parseInt(createFormKeySize, 10) : createFormKeySize,
         type: createFormType,
         // Validity and parent are decided by the external signer in external mode
         ...(createFormType !== 'external' && {
@@ -331,7 +336,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
         }),
         ...(createFormPathLength !== '' && { pathLength: parseInt(createFormPathLength) }),
         namedUrls: createFormNamedUrls,
-        hashAlgorithm: createFormDigest,
+        ...(keyHasDigest && { hashAlgorithm: createFormDigest }),
         ...(pssAvailable && { signatureScheme: createFormSignatureScheme }),
         ...(profileName ? { complianceProfile: profileName } : createFormProfile !== null && { complianceProfile: null }),
         keyUsage: createFormKeyUsage,
@@ -486,30 +491,26 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
           <div className="grid grid-cols-2 gap-4">
             <Select
               label={t('common.keyAlgorithm')}
-              options={[
-                { value: 'RSA', label: 'RSA' },
-                { value: 'ECDSA', label: 'ECDSA' }
-              ].filter(o => noKeyAllowed || allowedLocalKeys.some(([a]) => a === o.value))}
+              options={CA_FAMILY_OPTIONS
+                .filter(o => noKeyAllowed || allowedLocalKeys.some(([a]) => a === o.value))}
               value={createFormKeyAlgo}
               onChange={(value) => {
                 setCreateFormKeyAlgo(value)
                 const sizes = allowedLocalKeys.filter(([a]) => a === value).map(([, sz]) => sz)
-                setCreateFormKeySize(sizes.includes(DEFAULT_KEY_SIZE[value])
-                  ? DEFAULT_KEY_SIZE[value] : sizes[0] || DEFAULT_KEY_SIZE[value])
+                const preferred = defaultKeyChoice('ca', value, CA_DEFAULT_LABELS)?.[1]
+                setCreateFormKeySize(sizes.includes(preferred) ? preferred : sizes[0] || preferred)
               }}
             />
             <Select
               label={t('common.keySize')}
-              options={(createFormKeyAlgo === 'ECDSA'
-                ? groupedOptions(EC_CA_ALGORITHMS, t, k => k.display, k => k.ca[1])
-                : [
-                  { value: '2048', label: '2048 bits' },
-                  { value: '3072', label: '3072 bits' },
-                  { value: '4096', label: '4096 bits' }
-                ]).filter(o => noKeyAllowed || allowedLocalKeys.some(([a, sz]) => a === createFormKeyAlgo && sz === o.value))}
+              options={groupedOptions(
+                KEY_ALGORITHMS.filter(k => k.generate && k.ca && k.ca[0] === createFormKeyAlgo), t,
+                k => algorithmName(k, t, 'sizeKey'), k => k.ca[1],
+              ).filter(o => noKeyAllowed || allowedLocalKeys.some(([a, sz]) => a === createFormKeyAlgo && sz === o.value))}
               value={createFormKeySize}
               onChange={(value) => setCreateFormKeySize(value)}
             />
+            {keyHasDigest && (
             <Select
               label={t('common.signatureAlgorithm')}
               options={[
@@ -524,6 +525,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
                   : undefined
               }
             />
+            )}
           </div>
           {noKeyAllowed && (
             <p className="text-xs text-status-danger" role="alert">{t('cas.create.noKeyTypeAllowedByPolicy')}</p>

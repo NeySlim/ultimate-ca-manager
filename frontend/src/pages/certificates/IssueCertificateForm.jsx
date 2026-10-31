@@ -7,8 +7,14 @@ import { useNotification } from '../../contexts'
 import { signingCas, unlistedSigningCas } from '../../lib/caSelection'
 import { daysRemaining } from '../../lib/utils'
 import { ISSUE_KEY_CHOICES, issueKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
-import { KEY_ALGORITHMS, findAlgorithm, groupedOptions, isFipsApproved } from '../../lib/keyAlgorithms'
+import {
+  ISSUE_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmName, defaultKeyChoice, findAlgorithm, groupedOptions,
+  isFipsApproved, keyFamilyOptions,
+} from '../../lib/keyAlgorithms'
 import { BrainpoolNotice } from '../../components/BrainpoolNotice'
+
+const ISSUE_FAMILY_OPTIONS = keyFamilyOptions('issue')
+const [DEFAULT_KEY_TYPE, DEFAULT_KEY_SIZE] = findAlgorithm(ISSUE_DEFAULT_LABELS[0]).issue
 
 // Issue Certificate Form — full-featured with template, cert type, structured SANs, date picker
 export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }) {
@@ -35,8 +41,8 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     state: '',
     locality: '',
     email: '',
-    key_type: 'rsa',
-    key_size: '2048',
+    key_type: DEFAULT_KEY_TYPE,
+    key_size: DEFAULT_KEY_SIZE,
     validity_days: '365',
     expiry_date: '',
     ocsp_must_staple: false,
@@ -116,8 +122,8 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
         state: initialData.state || '',
         locality: initialData.locality || '',
         email: initialData.email || '',
-        key_type: initialData.key_type || 'rsa',
-        key_size: initialData.key_size || '2048',
+        key_type: initialData.key_type || DEFAULT_KEY_TYPE,
+        key_size: initialData.key_size || DEFAULT_KEY_SIZE,
       }))
       if (initialData.sans?.length > 0) {
         setSans(initialData.sans.filter(s => s && typeof s.type === 'string' && typeof s.value === 'string'))
@@ -136,7 +142,12 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     [allowedKeyTypes, fips],
   )
   const noKeyAllowed = allowedKeys.length === 0
-  const firstAllowedSize = (type) => allowedKeys.find(([k]) => k === type)?.[1]
+  // The family's default key when allowed, else its first allowed one
+  const sizeForType = (type) => {
+    const preferred = defaultKeyChoice('issue', type, ISSUE_DEFAULT_LABELS)?.[1]
+    if (noKeyAllowed || allowedKeys.some(([k, sz]) => k === type && sz === preferred)) return preferred
+    return allowedKeys.find(([k]) => k === type)?.[1] ?? preferred
+  }
 
   // A key the policies forbid (template default, previous CA) switches to the first allowed one
   useEffect(() => {
@@ -580,20 +591,17 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
           value={formData.key_type}
           onChange={(val) => {
             update('key_type', val)
-            update('key_size', firstAllowedSize(val) || (val === 'rsa' ? '2048' : '256'))
+            update('key_size', sizeForType(val))
           }}
-          options={[
-            { value: 'rsa', label: 'RSA' },
-            { value: 'ecdsa', label: 'ECDSA' },
-          ].filter(o => noKeyAllowed || allowedKeys.some(([k]) => k === o.value))}
+          options={ISSUE_FAMILY_OPTIONS.filter(o => noKeyAllowed || allowedKeys.some(([k]) => k === o.value))}
         />
         <Select
           label={t('common.keySize')}
           value={formData.key_size}
           onChange={(val) => update('key_size', val)}
           options={groupedOptions(
-            KEY_ALGORITHMS.filter(k => k.issue && k.issue[0] === formData.key_type), t,
-            k => (k.sizeKey ? t(k.sizeKey) : k.display), k => k.issue[1],
+            KEY_ALGORITHMS.filter(k => k.generate && k.issue && k.issue[0] === formData.key_type), t,
+            k => algorithmName(k, t, 'sizeKey'), k => k.issue[1],
           ).filter(o => noKeyAllowed || allowedKeys.some(([k, sz]) => k === formData.key_type && sz === o.value))}
         />
       </div>

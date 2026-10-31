@@ -29,10 +29,20 @@ import { VALIDITY } from '../constants/config'
 import { signingCas, unlistedSigningCas } from '../lib/caSelection'
 import { soleImported } from '../lib/importResult'
 import { PostQuantumBadge } from '../components/PostQuantumBadge'
-import { CSR_LABELS, KEY_ALGORITHMS, groupedOptions, keyAlgorithmLabel, listAlgorithms } from '../lib/keyAlgorithms'
+import {
+  CSR_LABELS, ISSUE_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, findAlgorithm,
+  groupedOptions, keyAlgorithmLabel, listAlgorithms,
+} from '../lib/keyAlgorithms'
 import { useFipsMode } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { useOpenEntity } from '../hooks/useOpenEntity'
+
+const DEFAULT_CSR_KEY_TYPE = findAlgorithm(CSR_LABELS[0]).csr
+
+// Registry row of a listed CSR's key: its stored spelling, else '<algorithm> <size>'
+const csrKeyRow = (csr) => algorithmForKeyType(csr.key_type)
+  || algorithmForKeyType([csr.key_algorithm, csr.key_size].filter(Boolean).join(' '))
+
 export default function CSRsPage() {
   const { t } = useTranslation()
   const { isMobile } = useMobile()
@@ -112,7 +122,7 @@ export default function CSRsPage() {
   const [genCountry, setGenCountry] = useState('')
   const [genState, setGenState] = useState('')
   const [genLocality, setGenLocality] = useState('')
-  const [genKeyType, setGenKeyType] = useState('RSA 2048')
+  const [genKeyType, setGenKeyType] = useState(DEFAULT_CSR_KEY_TYPE)
   const fips = useFipsMode()
   const [genSans, setGenSans] = useState([{ type: 'DNS', value: '' }])
   const [generating, setGenerating] = useState(false)
@@ -464,7 +474,7 @@ export default function CSRsPage() {
 
   const resetGenerateForm = () => {
     setGenCN(''); setGenOrg(''); setGenOU(''); setGenCountry('')
-    setGenState(''); setGenLocality(''); setGenKeyType('RSA 2048')
+    setGenState(''); setGenLocality(''); setGenKeyType(DEFAULT_CSR_KEY_TYPE)
     setGenSans([{ type: 'DNS', value: '' }])
   }
 
@@ -564,12 +574,7 @@ export default function CSRsPage() {
     return sans.length > 0 ? sans : [{ type: 'DNS', value: '' }]
   }
 
-  const mapKeyType = (csr) => {
-    const algo = (csr.key_algorithm || '').toUpperCase()
-    const size = csr.key_size
-    if (algo === 'EC' || algo === 'ECDSA') return `EC P-${size || 256}`
-    return `RSA ${size || 2048}`
-  }
+  const mapKeyType = (csr) => csrKeyRow(csr)?.csr || DEFAULT_CSR_KEY_TYPE
 
   const handleRekeyAsCSR = (csr) => {
     setGenCN(csr.common_name || csr.cn || '')
@@ -585,8 +590,7 @@ export default function CSRsPage() {
   }
 
   const handleRekeyAsCert = (csr) => {
-    const algo = (csr.key_algorithm || '').toUpperCase()
-    const size = csr.key_size
+    const [keyType, keySize] = csrKeyRow(csr)?.issue || findAlgorithm(ISSUE_DEFAULT_LABELS[0]).issue
     const prefill = {
       cn: csr.common_name || csr.cn || '',
       organization: csr.organization || '',
@@ -595,8 +599,8 @@ export default function CSRsPage() {
       state: csr.state || '',
       locality: csr.locality || '',
       email: csr.email || '',
-      key_type: (algo === 'EC' || algo === 'ECDSA') ? 'ecdsa' : 'rsa',
-      key_size: String(size || 2048),
+      key_type: keyType,
+      key_size: keySize,
       sans: parseSansFromCSR(csr).filter(s => s.value).map(s => ({ type: s.type.toLowerCase(), value: s.value })),
     }
     setShowRekeyChoice(false)
@@ -1250,7 +1254,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
           <Select
             label={t('common.keyType')}
             options={groupedOptions(listAlgorithms({ labels: CSR_LABELS, fips }), t,
-              k => (k.csrKey ? t(k.csrKey) : k.display), k => k.csr)}
+              k => algorithmName(k, t, 'csrKey'), k => k.csr)}
             value={genKeyType}
             onChange={setGenKeyType}
           />

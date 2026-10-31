@@ -1,6 +1,7 @@
 import { describe, it, expect } from 'vitest'
 import {
-  ACME_CLIENT_LABELS, GROUP_PQ, KEY_ALGORITHMS, caKeyParts, defaultDigestFor,
+  ACME_CLIENT_LABELS, CA_DEFAULT_LABELS, GROUP_PQ, ISSUE_DEFAULT_LABELS, KEY_ALGORITHMS,
+  algorithmForKeyType, algorithmName, caKeyParts, defaultDigestFor, defaultKeyChoice, keyFamilyOptions,
   exportExcludedFor, findAlgorithm, isExportFormatAllowed, groupedOptions, isBrainpool, isPostQuantum, keyAlgorithmLabel,
   listAlgorithms, signerKeyParams,
 } from '../keyAlgorithms'
@@ -9,20 +10,24 @@ const t = (key) => key
 const labels = (rows) => rows.map(r => r.label)
 
 describe('key algorithm registry', () => {
-  it('lists the nine generated keys, then the EdDSA and ML-DSA keys it only reads', () => {
+  it('lists the twelve generated keys, then the EdDSA keys it only reads', () => {
     expect(labels(listAlgorithms({ generate: true }))).toEqual([
       'RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521',
-      'EC-BP256', 'EC-BP384', 'EC-BP512',
+      'EC-BP256', 'EC-BP384', 'EC-BP512', 'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87',
     ])
     expect(labels(KEY_ALGORITHMS).slice(-5)).toEqual(['ED25519', 'ED448', 'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87'])
   })
 
-  it('names ML-DSA by security category, without a digest, outside FIPS', () => {
+  it('names ML-DSA by security category, without a digest, outside FIPS, generated in software', () => {
     expect(KEY_ALGORITHMS.filter(a => a.group === GROUP_PQ).map(a => [a.label, a.securityLevel]))
       .toEqual([['ML-DSA-44', 2], ['ML-DSA-65', 3], ['ML-DSA-87', 5]])
     expect(findAlgorithm('ML-DSA-65')).toMatchObject({
-      family: 'ML-DSA', bits: null, digest: null, fips: false, generate: false, issue: null, ca: null, csr: null,
+      family: 'ML-DSA', bits: null, digest: null, fips: false, generate: true,
+      issue: ['ml-dsa', '65'], ca: ['ML-DSA', '65'], csr: 'ML-DSA-65',
     })
+    for (const provider of ['pkcs11', 'openbao', 'azure', 'google', '']) {
+      expect(listAlgorithms({ generate: true, provider }).some(a => a.group === GROUP_PQ)).toBe(false)
+    }
     expect(listAlgorithms({ fips: true }).some(a => a.group === GROUP_PQ)).toBe(false)
     expect(groupedOptions(listAlgorithms({ labels: ['EC-P256', 'ML-DSA-65'] }), t).map(o => o.group))
       .toEqual(['common.keyGroups.nist', 'common.keyGroups.pq'])
@@ -127,5 +132,39 @@ describe('post-quantum keys', () => {
     expect(caKeyParts('EC secp384r1')).toEqual({ family: 'EC', spec: 'secp384r1' })
     for (const a of PQ_ROWS) expect(caKeyParts(a.label)).toEqual({ family: a.label, spec: null })
     expect(caKeyParts('')).toEqual({ family: null, spec: null })
+  })
+
+  it('offers RSA, ECDSA and ML-DSA as families of the CA and issue forms', () => {
+    expect(keyFamilyOptions('ca')).toEqual([
+      { value: 'RSA', label: 'RSA' }, { value: 'ECDSA', label: 'ECDSA' }, { value: 'ML-DSA', label: 'ML-DSA' },
+    ])
+    expect(keyFamilyOptions('issue')).toEqual([
+      { value: 'rsa', label: 'RSA' }, { value: 'ecdsa', label: 'ECDSA' }, { value: 'ml-dsa', label: 'ML-DSA' },
+    ])
+  })
+
+  it('starts each family on its default key, ML-DSA on level 65', () => {
+    expect(defaultKeyChoice('ca', 'ML-DSA', CA_DEFAULT_LABELS)).toEqual(['ML-DSA', '65'])
+    expect(defaultKeyChoice('issue', 'ml-dsa', ISSUE_DEFAULT_LABELS)).toEqual(['ml-dsa', '65'])
+    expect(defaultKeyChoice('ca', 'RSA', CA_DEFAULT_LABELS)).toEqual(['RSA', '3072'])
+    expect(defaultKeyChoice('issue', 'nope', ISSUE_DEFAULT_LABELS)).toBeNull()
+  })
+
+  it('finds the row of a stored key spelling, ML-DSA included', () => {
+    for (const a of PQ_ROWS) expect(algorithmForKeyType(a.label)).toBe(a)
+    expect(algorithmForKeyType('RSA 3072')?.label).toBe('RSA-3072')
+    expect(algorithmForKeyType('EC secp256r1')?.label).toBe('EC-P256')
+    expect(algorithmForKeyType('EC secp384r1')?.label).toBe('EC-P384')
+    expect(algorithmForKeyType('EC brainpoolP256r1')?.label).toBe('EC-BP256')
+    expect(algorithmForKeyType('ED25519')?.label).toBe('ED25519')
+    expect(algorithmForKeyType('DSA 1024')).toBeNull()
+    expect(algorithmForKeyType(null)).toBeNull()
+  })
+
+  it('names a post-quantum row with its level in a form', () => {
+    const tl = (key, opts) => (opts ? `${key}:${opts.name}:${opts.level}` : key)
+    expect(algorithmName(findAlgorithm('ML-DSA-87'), tl, 'sizeKey')).toBe('common.keyAlgorithmLevel:ML-DSA-87:5')
+    expect(algorithmName(findAlgorithm('RSA-2048'), tl, 'sizeKey')).toBe('certificates.keySizeRsa2048')
+    expect(algorithmName(findAlgorithm('EC-BP256'), tl, 'sizeKey')).toBe('Brainpool P256r1')
   })
 })

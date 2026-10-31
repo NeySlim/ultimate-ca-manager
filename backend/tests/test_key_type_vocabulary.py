@@ -24,6 +24,7 @@ from services.template_service import TEMPLATE_KEY_TYPES
 from utils import key_algorithms
 from utils.ca_profile import default_digest_for_key_type
 from utils.key_type import parse_csr_key_type, parse_issue_key_type
+from api.v2.cas.crud import _resolve_local_key_type
 
 _REPO = os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
 REGISTRY = os.path.join(_REPO, 'frontend', 'src', 'lib', 'keyAlgorithms.js')
@@ -31,8 +32,7 @@ REGISTRY = os.path.join(_REPO, 'frontend', 'src', 'lib', 'keyAlgorithms.js')
 # The labels a template stores; legacy spellings (`rsa:2048`, `ec:p256`) are
 # accepted on input and stored as these.
 CANONICAL = set(TEMPLATE_KEY_TYPES)
-# The API takes ML-DSA already; the forms offer it once they send its contract
-SCREEN_SET = {label for label in CANONICAL if key_algorithms.get(label).family != 'ML-DSA'}
+SCREEN_SET = CANONICAL
 
 
 @pytest.fixture(scope='module')
@@ -82,22 +82,24 @@ class TestTheScreensOfferWhatTheApiAccepts:
     def test_both_registries_list_the_same_keys_in_the_same_order(self, js_registry):
         assert [r['label'] for r in js_registry] == list(key_algorithms.labels())
 
-    def test_mldsa_is_read_and_policed_but_not_yet_generated(self, js_registry):
+    def test_mldsa_is_generated_in_software_with_the_api_contract(self, js_registry):
         pq = [r for r in js_registry if r['family'] == 'ML-DSA']
         assert [r['label'] for r in pq] == ['ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']
         for row in pq:
-            assert (row['group'], row['bits'], row['digest'], row['generate']) == ('pq', None, None, False)
-            assert row['issue'] is row['ca'] is row['csr'] is row['providers'] is None
+            param = row['label'].rsplit('-', 1)[1]
+            assert (row['group'], row['bits'], row['digest'], row['generate']) == ('pq', None, None, True)
+            assert (row['issue'], row['ca'], row['csr']) == (['ml-dsa', param], ['ML-DSA', param], row['label'])
+            # No HSM provider generates ML-DSA yet
+            assert row['providers'] == []
 
     def test_each_form_value_parses_to_the_same_key(self, js_registry):
         for row in _generated(js_registry):
             expected = key_algorithms.get(row['label']).trust_store_id
             assert parse_issue_key_type(*row['issue']) == expected, row['label']
             assert parse_csr_key_type(row['csr']) == expected, row['label']
-            if row['ca'][0] == 'ECDSA':
-                assert parse_issue_key_type('ecdsa', row['ca'][1]) == expected, row['label']
-            else:
-                assert row['ca'][1] == expected, row['label']
+            # keySize as the CA form sends it: a number for bits and levels, a curve name as is
+            size = int(row['ca'][1]) if row['ca'][1].isdigit() else row['ca'][1]
+            assert _resolve_local_key_type({'keyAlgo': row['ca'][0], 'keySize': size}) == (expected, None), row['label']
 
 
 class TestTheOtherVocabulariesAreLeftAlone:
