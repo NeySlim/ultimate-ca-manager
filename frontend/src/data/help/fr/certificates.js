@@ -53,13 +53,14 @@ export default {
       },
       {
         title: 'Paires de certificats hybrides (RFC 9763)',
-        content: 'Un certificat classique (A) et un certificat post-quantique (B) pour le même sujet, liés : B porte l\'extension relatedCertificate qui désigne A par son empreinte.',
+        content: 'Un certificat classique (A) et un certificat ML-DSA (B) pour le même sujet, liés : B porte l\'extension relatedCertificate qui désigne A par son empreinte. Les clients qui connaissent ML-DSA vérifient les deux ; les autres continuent d\'utiliser A.',
         items: [
-          { label: 'Émission', text: 'Une seule requête API émet les deux depuis la même CA, avec le même sujet, les mêmes noms et la même validité ; B n\'affirme aucun key usage ni EKU absent de A. Une politique qui exige une approbation refuse la paire pour l\'instant' },
+          { label: 'Émission', text: 'Cochez « Émettre une paire hybride » dans le formulaire d\'émission et choisissez la clé classique et le niveau ML-DSA ; les deux viennent de la même CA, avec le même sujet, les mêmes noms et la même validité, et B n\'affirme aucun key usage ni EKU absent de A. Proposé seulement quand les politiques de la CA autorisent les deux, jamais en mode FIPS. Une politique qui exige une approbation refuse la paire pour l\'instant' },
           { label: 'Lien par requête', text: 'Une CSR portant une relatedCertRequest signée par la clé de A (Signer une CSR, ACME, EST, WSTEP) émet un B lié à A. A doit être détenu ici, valide, non révoqué et être un certificat d\'entité finale' },
-          { label: 'Révocation', text: 'Révoquer l\'un des membres révoque l\'autre, sauf si la requête le conserve ; sous une politique qui exige une approbation, les deux partent ensemble' },
+          { label: 'Lié', text: 'Chaque membre porte un badge Lié dans la liste et dans ses détails, avec un lien qui ouvre l\'autre membre' },
+          { label: 'Révocation', text: 'Révoquer un membre, seul ou en masse, révoque aussi l\'autre, sauf si vous décochez « Révoquer aussi le certificat lié », par ex. pour garder A quand seule la clé ML-DSA est compromise ; sous une politique qui exige une approbation, les deux partent ensemble' },
           { label: 'Renouvellement', text: 'Renouveler l\'un des membres renouvelle les deux, manuellement, en masse ou automatiquement, et le nouveau B désigne le nouveau A' },
-          { label: 'Export', text: 'L\'export hybrid-bundle est un ZIP des deux certificats, et des deux clés sur demande' },
+          { label: 'Export', text: 'Le format Lot hybride télécharge un ZIP des deux certificats, et des deux clés quand vous incluez la clé et pouvez exporter les clés' },
         ]
       },
       {
@@ -185,9 +186,9 @@ Formats d'exportation :
 
 Une paire hybride lie un certificat classique (**A**, RSA ou EC) et un certificat post-quantique (**B**, ML-DSA) pour le même sujet. B porte l'extension non critique **relatedCertificate**, qui désigne A par son empreinte, afin qu'une partie utilisatrice puisse exiger les deux.
 
-- **Émission** : une seule requête API (\`hybrid\` dans \`POST /api/v2/certificates\`) émet les deux depuis la même CA, avec le même sujet, les mêmes noms et la même validité. B copie les extensions de A avec son propre identifiant de clé et son propre key usage, et n'affirme aucun key usage ni EKU absent de A
+- **Émission** : cochez **Émettre une paire hybride** dans le formulaire d'émission (ou envoyez \`hybrid\` dans \`POST /api/v2/certificates\`) pour émettre les deux depuis la même CA, avec le même sujet, les mêmes noms et la même validité. B copie les extensions de A avec son propre identifiant de clé et son propre key usage, et n'affirme aucun key usage ni EKU absent de A
 - **Lien par requête** : une CSR portant une **relatedCertRequest** signée par la clé de A émet un B lié à A, via Signer une CSR, ACME, EST ou WSTEP. A doit être détenu par UCM, valide, non révoqué, être un certificat d'entité finale émis par une CA de cette instance, et la requête doit être récente. Un certificat fourni en ligne à l'emplacement indiqué par la requête doit être A ; les autres emplacements ne sont pas récupérés
-- **Révoquer** l'un des membres révoque l'autre, sauf si la requête le conserve. Sous une politique qui exige une approbation, la paire part ensemble, et deux politiques d'approbation différentes sur les deux membres laissent la révocation à un administrateur
+- **Révoquer** l'un des membres, seul ou en masse, révoque l'autre, sauf si **Révoquer aussi le certificat lié** est décoché. Sous une politique qui exige une approbation, la paire part ensemble, et deux politiques d'approbation différentes sur les deux membres laissent la révocation à un administrateur
 - **Renouveler** l'un des membres, à la main, en masse ou automatiquement, renouvelle les deux, et le nouveau B désigne le nouveau A
 - **Exporter** : le format **hybrid-bundle** est un ZIP des deux certificats, et des deux clés privées quand la clé est incluse
 

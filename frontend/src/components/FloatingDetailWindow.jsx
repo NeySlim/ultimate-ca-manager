@@ -81,7 +81,7 @@ const ENTITY_RESOURCE = {
 
 export function FloatingDetailWindow({ windowInfo }) {
   const { t } = useTranslation()
-  const { closeWindow, focusWindow, sameWindow } = useWindowManager()
+  const { closeWindow, focusWindow, sameWindow, openWindow } = useWindowManager()
   const { showSuccess, showError, showConfirm, showPrompt, showWarning } = useNotification()
   const { canWrite, canDelete, hasPermission } = usePermission()
   const resource = ENTITY_RESOURCE[windowInfo.type] || 'certificates'
@@ -139,7 +139,7 @@ export function FloatingDetailWindow({ windowInfo }) {
   }
 
   const handleRevoke = () => setRevokeOpen(true)
-  const handleRevokeConfirm = async (reason) => {
+  const handleRevokeConfirm = async (reason, options) => {
     setRevokeOpen(false)
     try {
       let queued = null
@@ -160,9 +160,15 @@ export function FloatingDetailWindow({ windowInfo }) {
         if (res?.data?.approval_required) queued = t('certificates.revocationApprovalRequired', { policy: res.data.policy_name })
         else showSuccess(t('certificates.revoked', 'Certificate revoked'))
       } else {
-        const res = await certificatesService.revoke(windowInfo.entityId, reason)
+        const res = await certificatesService.revoke(windowInfo.entityId, reason, options)
+        const relatedRevoked = res?.data?.related_revoked
         if (res?.data?.approval_required) queued = t('certificates.revocationApprovalRequired', { policy: res.data.policy_name })
-        else showSuccess(t('certificates.revoked', 'Certificate revoked'))
+        else {
+          showSuccess(relatedRevoked != null
+            ? t('revocation.revokedWithRelated', { id: relatedRevoked })
+            : t('certificates.revoked', 'Certificate revoked'))
+          if (options?.revokeRelated && relatedRevoked == null) showWarning(t('revocation.relatedNotRevoked'))
+        }
       }
       if (queued) {
         // Held by a revocation policy: nothing was revoked, so nothing is deleted
@@ -212,7 +218,10 @@ export function FloatingDetailWindow({ windowInfo }) {
       if (res?.data?.approval_required) {
         showWarning(t('certificates.approvalRequired', { policy: res.data.policy_name }))
       } else {
-        showSuccess(t('certificates.renewed', 'Certificate renewed'))
+        const relatedRenewed = res?.data?.related_renewed
+        showSuccess(relatedRenewed?.length
+          ? t('certificates.hybrid.renewedWithRelated', { id: relatedRenewed.join(', #') })
+          : t('certificates.renewed', 'Certificate renewed'))
         showNotices(res, showWarning)
       }
       window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
@@ -334,6 +343,7 @@ export function FloatingDetailWindow({ windowInfo }) {
     }),
     entityType: isCA ? 'ca' : 'certificate',
     chainVariantsFor: isCA || isCert ? { type: isCA ? 'ca' : 'certificate', id: windowInfo.entityId } : undefined,
+    relatedCertificateId: isCert ? (data?.related_certificate_id ?? null) : null,
     entityName: title,
     onLint: (isCert || isUserCert) ? () => setLintOpen(true) : null,
     onRequestKeyRecovery: (isCert || isUserCert) && hasPrivateKey && hasPermission('write:key_recovery') ? () => setKeyRecoveryOpen(true) : null,
@@ -393,6 +403,7 @@ export function FloatingDetailWindow({ windowInfo }) {
               onDelete={handleDelete}
               onImportKey={isCA && canWrite('cas') && holdsNoKey(data) ? () => setImportKeyOpen(true) : null}
               onCaChanged={(updated) => setData(updated)}
+              onOpenRelated={isCert ? (id) => openWindow('certificate', id) : undefined}
             />
           </div>
         </>
@@ -468,11 +479,12 @@ export function FloatingDetailWindow({ windowInfo }) {
 /**
  * DetailContent — Renders the appropriate detail view based on entity type
  */
-function DetailContent({ type, data, canWrite, canDelete, hasPermission, onExport, onDelete, onImportKey, onCaChanged }) {
+function DetailContent({ type, data, canWrite, canDelete, hasPermission, onExport, onDelete, onImportKey, onCaChanged, onOpenRelated }) {
   if (type === 'certificate' || type === 'user_certificate') {
     return (
       <CertificateDetails
         certificate={data}
+        onOpenRelated={onOpenRelated}
         compact={false}
         showActions={false}
         showPem={true}
@@ -517,7 +529,7 @@ function DetailContent({ type, data, canWrite, canDelete, hasPermission, onExpor
 /**
  * ActionBar — Toolbar under the window header with labeled action buttons
  */
-function ActionBar({ onExport, hasPrivateKey, keyAlgorithm, canExportKey, entityType, entityName, onLint, onRequestKeyRecovery, onRenew, onRevoke, onUnhold, onOffline, onRestore, onManagePins, onDelete, canExport = true, onDownloadCsr, onUploadCertificate, onRenewCsr, chainVariantsFor, t }) {
+function ActionBar({ onExport, hasPrivateKey, keyAlgorithm, canExportKey, entityType, entityName, onLint, onRequestKeyRecovery, onRenew, onRevoke, onUnhold, onOffline, onRestore, onManagePins, onDelete, canExport = true, onDownloadCsr, onUploadCertificate, onRenewCsr, chainVariantsFor, relatedCertificateId, t }) {
   const [showExportModal, setShowExportModal] = useState(false)
   const btnBase = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150'
 
@@ -641,6 +653,7 @@ function ActionBar({ onExport, hasPrivateKey, keyAlgorithm, canExportKey, entity
       canExportKey={canExportKey}
       onExport={onExport}
       chainVariantsFor={chainVariantsFor}
+      relatedCertificateId={relatedCertificateId}
     />
     </>
   )

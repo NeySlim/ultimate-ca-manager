@@ -29,6 +29,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - The Create CA, Issue Certificate, Generate CSR and template forms offer ML-DSA-44, ML-DSA-65 and ML-DSA-87, and Create CA hides the signature hash when the key that signs takes none. These keys are not offered in FIPS mode or on an HSM.
 
+- Hybrid certificate pairs (RFC 9763): the Issue Certificate form and `POST /api/v2/certificates` with `hybrid: {classical, pq}` issue a classical certificate and an ML-DSA one whose relatedCertificate extension names it. The pair is shown linked, revokes and renews together unless the operator unticks the box, and exports as one `hybrid-bundle` ZIP.
+
+- A CSR carrying a relatedCertRequest (RFC 9763) signed by the key of a certificate held here is checked before signing on Sign CSR, ACME, EST and WSTEP, and the new certificate is linked to it; `POST /api/v2/csrs` builds one with `related_to`. Such a pair satisfies the `pq_standalone` rule of compliance profiles.
+
 ### Changed
 
 - CRL settings: the CRL digest of an Ed25519, Ed448 or ML-DSA authority is reported as empty, setting one answers 400, and the CRL page no longer offers it.

@@ -13,6 +13,7 @@
  *     hasPrivateKey={true}
  *     canExportKey={canWrite('certificates')}
  *     keyAlgorithm="ML-DSA-65"   // greys out the formats that key cannot use
+ *     relatedCertificateId={12}  // member of a hybrid pair: adds the 'hybrid-bundle' ZIP
  *     onExport={(format, options) => handleExport(format, options)}
  *   />
  */
@@ -34,6 +35,8 @@ const FORMATS = [
   { key: 'pkcs12', label: 'P12 / PKCS#12', description: 'export.formatP12Desc', ext: '.p12', requiresKey: true },
   { key: 'jks', label: 'JKS', description: 'export.formatJksDesc', ext: '.jks', requiresKey: true },
   { key: 'key', labelKey: 'export.formats.privateKey', description: 'export.formatKeyDesc', ext: '.key', requiresKey: true, keyOnly: true },
+  // Both certificates of a hybrid pair (RFC 9763), and both keys when included
+  { key: 'hybrid-bundle', labelKey: 'export.formats.hybridBundle', description: 'export.formatHybridBundleDesc', ext: '.zip', requiresRelated: true },
 ]
 
 export function ExportModal({
@@ -46,6 +49,7 @@ export function ExportModal({
   isHsmBacked = false,
   keyAlgorithm = null,
   defaultFormat = 'pem',
+  relatedCertificateId = null,
   onExport,
   chainVariantsFor,
 }) {
@@ -93,6 +97,7 @@ export function ExportModal({
   const isPkcs12 = format === 'pkcs12'
   const isJks = format === 'jks'
   const isKeyOnly = format === 'key'
+  const isBundle = format === 'hybrid-bundle'
   const effectiveIncludeKey = (isPkcs12 || isJks || isKeyOnly) ? true : includeKey
   const needsPassword = isPkcs12 || isJks
   const showPasswordField = isPkcs12 || isJks
@@ -111,6 +116,7 @@ export function ExportModal({
 
   // Available formats: hide PKCS12 if no key or no permission
   const availableFormats = FORMATS.filter(f => {
+    if (f.requiresRelated) return relatedCertificateId != null
     if (f.requiresKey) return hasPrivateKey && canExportKey
     return true
   })
@@ -122,8 +128,8 @@ export function ExportModal({
     setExporting(true)
     try {
       await onExport(format, {
-        includeChain,
-        includeRoot,
+        includeChain: includeChain && !isBundle,
+        includeRoot: includeRoot && !isBundle,
         includeKey: effectiveIncludeKey,
         password: (isPkcs12 || isJks) ? password : undefined,
         legacy: isPkcs12 ? legacy : undefined,
@@ -204,7 +210,8 @@ export function ExportModal({
             {t('export.options', 'Options')}
           </label>
 
-          {/* Include chain */}
+          {/* Include chain; the hybrid bundle holds the pair only */}
+          {!isBundle && (<>
           <label className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-secondary transition-colors cursor-pointer">
             <input
               type="checkbox"
@@ -249,6 +256,8 @@ export function ExportModal({
               </div>
             </label>
           )}
+
+          </>)}
 
           {/* Include private key — only if key exists AND user has permission */}
           {hasPrivateKey && canExportKey && !isPkcs12 && !isJks && (

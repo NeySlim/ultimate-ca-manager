@@ -20,6 +20,7 @@ export const EXPORT_EXTENSIONS = {
   pfx: 'pfx',
   jks: 'jks',
   key: 'key',
+  'hybrid-bundle': 'zip',
 }
 
 // Long enough for any CN (RFC 5280 caps it at 64) or ACME domain, short

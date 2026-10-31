@@ -840,7 +840,22 @@
     "deleteNeedsRevoke": "Este certificado sigue siendo válido, por lo que no puede eliminarse por sí solo: se retiraría de UCM mientras sigue siendo de confianza para cualquier cliente que no compruebe la revocación. Revóquelo primero, para que la CRL y el respondedor OCSP reflejen la retirada, y luego se eliminará.",
     "revokeThenDelete": "Revocar y luego eliminar",
     "noKeyTypeAllowedByPolicy": "Ningún tipo de clave está permitido por las políticas de esta CA y de esta plantilla.",
-    "revocationApprovalRequired": "Revocación enviada para aprobación (política: {{policy}})"
+    "revocationApprovalRequired": "Revocación enviada para aprobación (política: {{policy}})",
+    "hybrid": {
+      "toggle": "Emitir un par híbrido (RFC 9763)",
+      "toggleHint": "Dos certificados vinculados para el mismo sujeto: uno con clave clásica y otro con clave ML-DSA que hace referencia al primero.",
+      "classical": "Clave clásica",
+      "pq": "Clave poscuántica",
+      "column": "Vinculado",
+      "linked": "Vinculado",
+      "roleClassical": "Miembro clásico de un par híbrido",
+      "rolePq": "Miembro poscuántico de un par híbrido",
+      "relatedCertificate": "Certificado vinculado",
+      "openRelated": "Abrir el certificado vinculado n.º {{id}}",
+      "pairIssued": "Par híbrido emitido: certificados n.º {{classical}} y n.º {{pq}}",
+      "renewedWithRelated": "Certificado renovado, junto con su certificado vinculado n.º {{id}}",
+      "bulkRelatedRenewed": "{{count}} certificados vinculados renovados con la selección"
+    }
   },
   "cas": {
     "chainRevoked": "Revocada aguas arriba",
@@ -3886,7 +3901,14 @@
       "certificateHold": "Suspensión temporal que puede levantarse después con Quitar suspensión.",
       "privilegeWithdrawn": "Se retiró un privilegio otorgado por el certificado.",
       "aACompromise": "La clave de una autoridad de atributos fue comprometida."
-    }
+    },
+    "revokeRelated": "Revocar también el certificado vinculado",
+    "revokeRelatedHint": "Desmarque para mantener válido el otro miembro del par híbrido.",
+    "revokedWithRelated": "Certificado revocado, junto con su certificado vinculado n.º {{id}}",
+    "relatedNotRevoked": "El certificado vinculado no se revocó: no nombra a este certificado como su pareja, o ya estaba revocado.",
+    "revokeRelatedBulk": "Revocar también los certificados vinculados",
+    "revokeRelatedBulkHint": "Los miembros seleccionados de un par híbrido arrastran al otro miembro. Desmarque para mantener válidos los demás miembros.",
+    "bulkRelatedRevoked": "{{count}} certificados vinculados revocados con la selección"
   },
   "details": {
     "pemCertificate": "PEM Certificado",
@@ -4763,7 +4785,8 @@
     "legacyPkcs12Desc": "Para Android 15 y anteriores, macOS 14 y anteriores, Windows Server 2016 y anteriores, Java anterior a 8u301 / 11.0.1: rechazan el archivo AES-256 por defecto como contraseña incorrecta. Protege menos el archivo; elíjalo en cada exportación.",
     "formatKeyDesc": "Solo la clave privada en formato PEM",
     "formats": {
-      "privateKey": "Clave privada"
+      "privateKey": "Clave privada",
+      "hybridBundle": "Paquete híbrido"
     },
     "formatOptions": {
       "pemOnly": "PEM (Solo certificado)",
@@ -4778,7 +4801,8 @@
     "unavailableForKeyAlgorithm": "No disponible para claves {{algorithm}}: UCM aún no puede escribir una clave poscuántica en PKCS#12 ni en JKS. Exporte en PEM con la clave privada.",
     "jksNote": "JKS siempre incluye la clave privada",
     "pkcs12Title": "Exportar PKCS#12",
-    "pkcs12PasswordPrompt": "Ingrese la contraseña para el archivo PKCS#12"
+    "pkcs12PasswordPrompt": "Ingrese la contraseña para el archivo PKCS#12",
+    "formatHybridBundleDesc": "ZIP con los dos certificados del par"
   },
   "userCertificates": {
     "title": "Certificados de Usuario",

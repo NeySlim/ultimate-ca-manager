@@ -53,13 +53,14 @@ export default {
       },
       {
         title: 'Hybride Zertifikatspaare (RFC 9763)',
-        content: 'Ein klassisches Zertifikat (A) und ein Post-Quanten-Zertifikat (B) für denselben Inhaber, miteinander verknüpft: B trägt die Erweiterung relatedCertificate, die A über seinen Hash benennt.',
+        content: 'Ein klassisches Zertifikat (A) und ein ML-DSA-Zertifikat (B) für denselben Inhaber, miteinander verknüpft: B trägt die Erweiterung relatedCertificate, die A über seinen Hash benennt. Clients, die ML-DSA kennen, prüfen beide; die übrigen verwenden weiter A.',
         items: [
-          { label: 'Ausstellen', text: 'Eine API-Anfrage stellt beide von derselben CA aus, mit gleichem Subject, gleichen Namen und gleicher Gültigkeit; B weist keine Schlüsselverwendung und keine EKU aus, die A fehlt. Eine Richtlinie, die eine Genehmigung verlangt, lehnt das Paar vorerst ab' },
+          { label: 'Ausstellen', text: 'Aktivieren Sie „Hybrides Paar ausstellen (RFC 9763)“ im Formular Zertifikat ausstellen und wählen Sie den klassischen Schlüssel und die ML-DSA-Stufe; beide stammen von derselben CA, mit gleichem Subject, gleichen Namen und gleicher Gültigkeit, und B weist keine Schlüsselverwendung und keine EKU aus, die A fehlt. Nur verfügbar, wenn die Richtlinien der CA beides zulassen, nie im FIPS-Modus. Eine Richtlinie, die eine Genehmigung verlangt, lehnt das Paar vorerst ab' },
           { label: 'Per Anfrage verknüpft', text: 'Ein CSR mit einer relatedCertRequest, signiert vom Schlüssel von A (CSR signieren, ACME, EST, WSTEP), stellt ein mit A verknüpftes B aus. A muss hier vorliegen, gültig, nicht widerrufen und ein Endentitätszertifikat sein' },
-          { label: 'Widerrufen', text: 'Der Widerruf eines Mitglieds widerruft auch das andere, sofern die Anfrage es nicht beibehält; unter einer Richtlinie mit Genehmigungspflicht gehen beide zusammen' },
+          { label: 'Verknüpft', text: 'Jedes Mitglied trägt in der Liste und in seinen Details ein Badge Verknüpft mit einem Link, der das andere Mitglied öffnet' },
+          { label: 'Widerrufen', text: 'Der Widerruf eines Mitglieds, einzeln oder per Sammelaktion, widerruft auch das andere, sofern Sie „Auch das verknüpfte Zertifikat widerrufen“ nicht deaktivieren, z. B. um A zu behalten, wenn nur der ML-DSA-Schlüssel kompromittiert ist; unter einer Richtlinie mit Genehmigungspflicht gehen beide zusammen' },
           { label: 'Erneuern', text: 'Die Erneuerung eines Mitglieds erneuert beide, manuell, per Sammelaktion oder automatisch, und das neue B benennt das neue A' },
-          { label: 'Export', text: 'Der Export als Hybrid-Bundle ist eine ZIP-Datei mit beiden Zertifikaten und, auf Wunsch, beiden Schlüsseln' },
+          { label: 'Export', text: 'Das Format Hybrid-Bundle lädt eine ZIP-Datei mit beiden Zertifikaten herunter, und mit beiden Schlüsseln, wenn Sie den Schlüssel einbeziehen und Schlüssel exportieren dürfen' },
         ]
       },
       {
@@ -185,9 +186,9 @@ Exportformate:
 
 Ein hybrides Paar verknüpft ein klassisches Zertifikat (**A**, RSA oder EC) mit einem Post-Quanten-Zertifikat (**B**, ML-DSA) für denselben Inhaber. B trägt die nicht kritische Erweiterung **relatedCertificate**, die A über seinen Hash benennt, sodass eine vertrauende Partei beide verlangen kann.
 
-- **Ausstellen**: Eine API-Anfrage (\`hybrid\` in \`POST /api/v2/certificates\`) stellt beide von derselben CA aus, mit gleichem Subject, gleichen Namen und gleicher Gültigkeit. B übernimmt die Erweiterungen von A mit eigenem Schlüsselbezeichner und eigener Schlüsselverwendung und weist keine Schlüsselverwendung und keine EKU aus, die A fehlt
+- **Ausstellen**: Aktivieren Sie **Hybrides Paar ausstellen (RFC 9763)** im Formular Zertifikat ausstellen (oder senden Sie \`hybrid\` in \`POST /api/v2/certificates\`), um beide von derselben CA auszustellen, mit gleichem Subject, gleichen Namen und gleicher Gültigkeit. B übernimmt die Erweiterungen von A mit eigenem Schlüsselbezeichner und eigener Schlüsselverwendung und weist keine Schlüsselverwendung und keine EKU aus, die A fehlt
 - **Per Anfrage verknüpfen**: Ein CSR mit einer **relatedCertRequest**, signiert vom Schlüssel von A, stellt ein mit A verknüpftes B aus, über CSR signieren, ACME, EST oder WSTEP. A muss UCM vorliegen, gültig und nicht widerrufen sein, ein Endentitätszertifikat einer CA dieser Instanz, und die Anfrage muss aktuell sein. Ein im Standort der Anfrage inline mitgegebenes Zertifikat muss A sein; andere Standorte werden nicht abgerufen
-- **Widerruf** eines Mitglieds widerruft auch das andere, sofern die Anfrage es nicht beibehält. Unter einer Richtlinie mit Genehmigungspflicht geht das Paar zusammen, und zwei verschiedene Genehmigungsrichtlinien an den beiden Mitgliedern überlassen den Widerruf einem Administrator
+- **Widerruf** eines Mitglieds, einzeln oder per Sammelaktion, widerruft auch das andere, sofern **Auch das verknüpfte Zertifikat widerrufen** nicht deaktiviert ist. Unter einer Richtlinie mit Genehmigungspflicht geht das Paar zusammen, und zwei verschiedene Genehmigungsrichtlinien an den beiden Mitgliedern überlassen den Widerruf einem Administrator
 - **Erneuerung** eines Mitglieds, von Hand, per Sammelaktion oder automatisch, erneuert beide, und das neue B benennt das neue A
 - **Export**: Das Format **Hybrid-Bundle** ist eine ZIP-Datei mit beiden Zertifikaten und, wenn der Schlüssel enthalten ist, auch mit beiden privaten Schlüsseln
 

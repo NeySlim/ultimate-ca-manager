@@ -25,8 +25,12 @@ export const certificatesService = {
     return apiClient.patch(`/certificates/${id}`, { descr })
   },
 
-  async revoke(id, reason) {
-    return apiClient.post(`/certificates/${id}/revoke`, { reason })
+  // revokeRelated: also revoke the other member of a hybrid pair (server default: true)
+  async revoke(id, reason, { revokeRelated } = {}) {
+    return apiClient.post(`/certificates/${id}/revoke`, {
+      reason,
+      ...(revokeRelated !== undefined && { revoke_related: !!revokeRelated }),
+    })
   },
 
   async unhold(id) {
@@ -73,14 +77,19 @@ export const certificatesService = {
     })
   },
 
-  // Bulk operations, split at the server's cap of 100 ids per request
-  async bulkRevoke(ids, reason = 'unspecified') {
+  // Bulk operations, split at the server's cap of 100 ids per request; relatedOf(id)
+  // names the other member of a hybrid pair so both land in the same request
+  async bulkRevoke(ids, reason = 'unspecified', { revokeRelated, relatedOf } = {}) {
     return runInBatches(ids, (batch) =>
-      apiClient.post('/certificates/bulk/revoke', { ids: batch, reason }))
+      apiClient.post('/certificates/bulk/revoke', {
+        ids: batch,
+        reason,
+        ...(revokeRelated !== undefined && { revoke_related: !!revokeRelated }),
+      }), { relatedOf })
   },
-  async bulkRenew(ids) {
+  async bulkRenew(ids, { relatedOf } = {}) {
     return runInBatches(ids, (batch) =>
-      apiClient.post('/certificates/bulk/renew', { ids: batch }))
+      apiClient.post('/certificates/bulk/renew', { ids: batch }), { relatedOf })
   },
   async bulkDelete(ids) {
     return runInBatches(ids, (batch) =>

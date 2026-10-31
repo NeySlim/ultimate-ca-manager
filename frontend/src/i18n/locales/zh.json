@@ -840,7 +840,22 @@
     "deleteNeedsRevoke": "此证书仍然有效，因此无法单独删除：删除后它会从 UCM 中消失，但对任何不检查吊销状态的客户端而言仍受信任。请先吊销，使 CRL 和 OCSP 响应程序反映该撤回，然后再删除。",
     "revokeThenDelete": "先吊销，再删除",
     "noKeyTypeAllowedByPolicy": "此 CA 和模板的策略不允许任何密钥类型。",
-    "revocationApprovalRequired": "吊销已提交审批（策略：{{policy}}）"
+    "revocationApprovalRequired": "吊销已提交审批（策略：{{policy}}）",
+    "hybrid": {
+      "toggle": "签发混合证书对（RFC 9763）",
+      "toggleHint": "为同一主体签发两张相互关联的证书：一张使用经典密钥，另一张使用引用前者的 ML-DSA 密钥。",
+      "classical": "经典密钥",
+      "pq": "后量子密钥",
+      "column": "关联",
+      "linked": "关联",
+      "roleClassical": "混合证书对中的经典成员",
+      "rolePq": "混合证书对中的后量子成员",
+      "relatedCertificate": "关联证书",
+      "openRelated": "打开关联证书 #{{id}}",
+      "pairIssued": "已签发混合证书对：证书 #{{classical}} 和 #{{pq}}",
+      "renewedWithRelated": "证书已续期，其关联证书 #{{id}} 一并续期",
+      "bulkRelatedRenewed": "已随所选项一并续期 {{count}} 张关联证书"
+    }
   },
   "cas": {
     "chainRevoked": "上游已吊销",
@@ -3886,7 +3901,14 @@
       "certificateHold": "临时挂起，之后可通过“解除挂起”恢复。",
       "privilegeWithdrawn": "证书授予的某项权限已被撤回。",
       "aACompromise": "某个属性机构的密钥已泄露。"
-    }
+    },
+    "revokeRelated": "同时吊销关联证书",
+    "revokeRelatedHint": "取消勾选可使混合证书对中的另一成员保持有效。",
+    "revokedWithRelated": "证书已吊销，其关联证书 #{{id}} 一并吊销",
+    "relatedNotRevoked": "关联证书未被吊销：它没有将本证书指明为其配对证书，或已被吊销。",
+    "revokeRelatedBulk": "同时吊销关联证书",
+    "revokeRelatedBulkHint": "所选的混合证书对成员会连同另一成员一起吊销。取消勾选可使其他成员保持有效。",
+    "bulkRelatedRevoked": "已随所选项一并吊销 {{count}} 张关联证书"
   },
   "details": {
     "pemCertificate": "PEM 证书",
@@ -4763,7 +4785,8 @@
     "legacyPkcs12Desc": "适用于 Android 15 及更早版本、macOS 14 及更早版本、Windows Server 2016 及更早版本、8u301 / 11.0.1 之前的 Java：它们会把默认的 AES-256 归档当作密码错误而拒绝。对文件的保护较弱，请按需在每次导出时选择。",
     "formatKeyDesc": "仅PEM编码的私钥",
     "formats": {
-      "privateKey": "私钥"
+      "privateKey": "私钥",
+      "hybridBundle": "混合包"
     },
     "formatOptions": {
       "pemOnly": "PEM（仅证书）",
@@ -4778,7 +4801,8 @@
     "unavailableForKeyAlgorithm": "不适用于 {{algorithm}} 密钥：UCM 暂不支持将后量子密钥写入 PKCS#12 或 JKS。请改为导出带私钥的 PEM。",
     "jksNote": "JKS 始终包含私钥",
     "pkcs12Title": "导出 PKCS#12",
-    "pkcs12PasswordPrompt": "请输入 PKCS#12 文件的密码"
+    "pkcs12PasswordPrompt": "请输入 PKCS#12 文件的密码",
+    "formatHybridBundleDesc": "包含该证书对中两张证书的 ZIP"
   },
   "userCertificates": {
     "title": "用户证书",

@@ -840,7 +840,22 @@
     "deleteNeedsRevoke": "This certificate is still valid, so it cannot be deleted on its own: deleting it would remove it from UCM while it stays trusted by every client that does not check revocation. Revoke it first, so the CRL and the OCSP responder carry the withdrawal, and it is then deleted.",
     "revokeThenDelete": "Revoke, then delete",
     "noKeyTypeAllowedByPolicy": "No key type is allowed by the policies of this CA and template.",
-    "revocationApprovalRequired": "Revocation submitted for approval (policy: {{policy}})"
+    "revocationApprovalRequired": "Revocation submitted for approval (policy: {{policy}})",
+    "hybrid": {
+      "toggle": "Issue a hybrid pair (RFC 9763)",
+      "toggleHint": "Two linked certificates for the same subject: one with a classical key, one with an ML-DSA key that references the first.",
+      "classical": "Classical key",
+      "pq": "Post-quantum key",
+      "column": "Linked",
+      "linked": "Linked",
+      "roleClassical": "Classical member of a hybrid pair",
+      "rolePq": "Post-quantum member of a hybrid pair",
+      "relatedCertificate": "Linked certificate",
+      "openRelated": "Open linked certificate #{{id}}",
+      "pairIssued": "Hybrid pair issued: certificates #{{classical}} and #{{pq}}",
+      "renewedWithRelated": "Certificate renewed, with its linked certificate #{{id}}",
+      "bulkRelatedRenewed": "{{count}} linked certificates renewed with the selection"
+    }
   },
   "cas": {
     "chainRevoked": "Revoked upstream",
@@ -3889,7 +3904,14 @@
       "certificateHold": "Temporary suspension that can be lifted later with Remove hold.",
       "privilegeWithdrawn": "A privilege granted by the certificate was withdrawn.",
       "aACompromise": "An attribute authority's key was compromised."
-    }
+    },
+    "revokeRelated": "Also revoke the linked certificate",
+    "revokeRelatedHint": "Untick to keep the other member of the hybrid pair valid.",
+    "revokedWithRelated": "Certificate revoked, with its linked certificate #{{id}}",
+    "relatedNotRevoked": "The linked certificate was not revoked: it does not name this certificate as its pair, or it was already revoked.",
+    "revokeRelatedBulk": "Also revoke the linked certificates",
+    "revokeRelatedBulkHint": "Selected members of a hybrid pair take the other member with them. Untick to keep the other members valid.",
+    "bulkRelatedRevoked": "{{count}} linked certificates revoked with the selection"
   },
   "details": {
     "pemCertificate": "PEM Certificate",
@@ -4766,7 +4788,8 @@
     "legacyPkcs12Desc": "For Android 15 and earlier, macOS 14 and earlier, Windows Server 2016 and earlier, Java before 8u301 / 11.0.1: they reject the default AES-256 archive as a wrong password. Protects the file less well; choose it per export.",
     "formatKeyDesc": "PEM-encoded private key only",
     "formats": {
-      "privateKey": "Private Key"
+      "privateKey": "Private Key",
+      "hybridBundle": "Hybrid bundle"
     },
     "formatOptions": {
       "pemOnly": "PEM (Certificate only)",
@@ -4781,7 +4804,8 @@
     "unavailableForKeyAlgorithm": "Not available for {{algorithm}} keys: UCM cannot yet write a post-quantum key into PKCS#12 or JKS. Export PEM with the private key instead.",
     "jksNote": "JKS always includes the private key",
     "pkcs12Title": "Export PKCS#12",
-    "pkcs12PasswordPrompt": "Enter password for PKCS#12 file"
+    "pkcs12PasswordPrompt": "Enter password for PKCS#12 file",
+    "formatHybridBundleDesc": "ZIP with both certificates of the pair"
   },
   "userCertificates": {
     "title": "User Certificates",

@@ -840,7 +840,22 @@
     "deleteNeedsRevoke": "Dieses Zertifikat ist noch gültig und kann daher nicht allein gelöscht werden: Es würde aus UCM verschwinden, während jeder Client, der den Sperrstatus nicht prüft, ihm weiter vertraut. Widerrufen Sie es zuerst, damit CRL und OCSP-Responder den Widerruf tragen, danach wird es gelöscht.",
     "revokeThenDelete": "Widerrufen, dann löschen",
     "noKeyTypeAllowedByPolicy": "Die Richtlinien dieser CA und dieser Vorlage erlauben keinen Schlüsseltyp.",
-    "revocationApprovalRequired": "Widerruf zur Genehmigung eingereicht (Richtlinie: {{policy}})"
+    "revocationApprovalRequired": "Widerruf zur Genehmigung eingereicht (Richtlinie: {{policy}})",
+    "hybrid": {
+      "toggle": "Hybrides Paar ausstellen (RFC 9763)",
+      "toggleHint": "Zwei verknüpfte Zertifikate für denselben Inhaber: eines mit klassischem Schlüssel, eines mit einem ML-DSA-Schlüssel, der auf das erste verweist.",
+      "classical": "Klassischer Schlüssel",
+      "pq": "Post-Quanten-Schlüssel",
+      "column": "Verknüpft",
+      "linked": "Verknüpft",
+      "roleClassical": "Klassisches Mitglied eines hybriden Paars",
+      "rolePq": "Post-Quanten-Mitglied eines hybriden Paars",
+      "relatedCertificate": "Verknüpftes Zertifikat",
+      "openRelated": "Verknüpftes Zertifikat #{{id}} öffnen",
+      "pairIssued": "Hybrides Paar ausgestellt: Zertifikate #{{classical}} und #{{pq}}",
+      "renewedWithRelated": "Zertifikat erneuert, zusammen mit seinem verknüpften Zertifikat #{{id}}",
+      "bulkRelatedRenewed": "{{count}} verknüpfte Zertifikate zusammen mit der Auswahl erneuert"
+    }
   },
   "cas": {
     "chainRevoked": "Übergeordnet gesperrt",
@@ -3886,7 +3901,14 @@
       "certificateHold": "Vorübergehende Sperre, die später mit „Sperre aufheben“ aufgehoben werden kann.",
       "privilegeWithdrawn": "Eine durch das Zertifikat gewährte Berechtigung wurde entzogen.",
       "aACompromise": "Der Schlüssel einer Attributautorität wurde kompromittiert."
-    }
+    },
+    "revokeRelated": "Auch das verknüpfte Zertifikat widerrufen",
+    "revokeRelatedHint": "Deaktivieren, damit das andere Mitglied des hybriden Paars gültig bleibt.",
+    "revokedWithRelated": "Zertifikat widerrufen, zusammen mit seinem verknüpften Zertifikat #{{id}}",
+    "relatedNotRevoked": "Das verknüpfte Zertifikat wurde nicht widerrufen: Es nennt dieses Zertifikat nicht als sein Paar oder wurde bereits widerrufen.",
+    "revokeRelatedBulk": "Auch die verknüpften Zertifikate widerrufen",
+    "revokeRelatedBulkHint": "Ausgewählte Mitglieder eines hybriden Paars ziehen das andere Mitglied mit. Deaktivieren, damit die anderen Mitglieder gültig bleiben.",
+    "bulkRelatedRevoked": "{{count}} verknüpfte Zertifikate zusammen mit der Auswahl widerrufen"
   },
   "details": {
     "pemCertificate": "PEM-Zertifikat",
@@ -4763,7 +4785,8 @@
     "legacyPkcs12Desc": "Für Android 15 und älter, macOS 14 und älter, Windows Server 2016 und älter, Java vor 8u301 / 11.0.1: sie lehnen das AES-256-Standardarchiv als falsches Passwort ab. Schützt die Datei schwächer; pro Export wählen.",
     "formatKeyDesc": "Nur der private Schlüssel im PEM-Format",
     "formats": {
-      "privateKey": "Privater Schlüssel"
+      "privateKey": "Privater Schlüssel",
+      "hybridBundle": "Hybrid-Bundle"
     },
     "formatOptions": {
       "pemOnly": "PEM (Nur Zertifikat)",
@@ -4778,7 +4801,8 @@
     "unavailableForKeyAlgorithm": "Für {{algorithm}}-Schlüssel nicht verfügbar: UCM kann noch keinen Post-Quanten-Schlüssel in PKCS#12 oder JKS schreiben. Exportieren Sie stattdessen PEM mit dem privaten Schlüssel.",
     "jksNote": "JKS enthält immer den privaten Schlüssel",
     "pkcs12Title": "PKCS#12 exportieren",
-    "pkcs12PasswordPrompt": "Passwort für PKCS#12-Datei eingeben"
+    "pkcs12PasswordPrompt": "Passwort für PKCS#12-Datei eingeben",
+    "formatHybridBundleDesc": "ZIP mit beiden Zertifikaten des Paars"
   },
   "userCertificates": {
     "title": "Benutzerzertifikate",

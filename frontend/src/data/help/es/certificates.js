@@ -53,13 +53,14 @@ export default {
       },
       {
         title: 'Pares de certificados híbridos (RFC 9763)',
-        content: 'Un certificado clásico (A) y uno poscuántico (B) para el mismo sujeto, vinculados: B incluye la extensión relatedCertificate que nombra a A por su hash.',
+        content: 'Un certificado clásico (A) y uno ML-DSA (B) para el mismo sujeto, vinculados: B incluye la extensión relatedCertificate que nombra a A por su hash. Los clientes que conocen ML-DSA comprueban ambos; los demás siguen usando A.',
         items: [
-          { label: 'Emisión', text: 'Una sola petición API emite ambos desde la misma CA, con el mismo sujeto, nombres y validez; B no declara ningún key usage ni EKU que A no tenga. Una política que exige aprobación rechaza el par por ahora' },
+          { label: 'Emisión', text: 'Marque "Emitir un par híbrido (RFC 9763)" en el formulario de emisión de certificados y elija la clave clásica y el nivel ML-DSA; ambos salen de la misma CA, con el mismo sujeto, nombres y validez, y B no declara ningún key usage ni EKU que A no tenga. Solo se ofrece cuando las políticas de la CA permiten ambos, nunca en modo FIPS. Una política que exige aprobación rechaza el par por ahora' },
           { label: 'Vinculado por solicitud', text: 'Un CSR con una relatedCertRequest firmada por la clave de A (Firmar CSR, ACME, EST, WSTEP) emite un B vinculado a A. A debe estar en UCM, ser válido, no revocado y de entidad final' },
-          { label: 'Revocación', text: 'Revocar uno de los miembros revoca el otro, salvo que la solicitud lo conserve; con una política que exige aprobación, ambos van juntos' },
+          { label: 'Vinculado', text: 'Cada miembro muestra una insignia Vinculado en la lista y en sus detalles, con un enlace que abre el otro miembro' },
+          { label: 'Revocación', text: 'Revocar un miembro, solo o en lote, revoca también el otro salvo que desmarque "Revocar también el certificado vinculado", p. ej. para conservar A cuando solo la clave ML-DSA está comprometida; con una política que exige aprobación, ambos van juntos' },
           { label: 'Renovación', text: 'Renovar uno de los miembros renueva ambos, manualmente, en lote o automáticamente, y el nuevo B nombra al nuevo A' },
-          { label: 'Exportación', text: 'La exportación hybrid-bundle es un ZIP con ambos certificados y, si se pide, ambas claves' },
+          { label: 'Exportación', text: 'El formato Paquete híbrido descarga un ZIP con ambos certificados y, si incluye la clave y puede exportar claves, ambas claves' },
         ]
       },
       {
@@ -185,9 +186,9 @@ Formatos de exportación:
 
 Un par híbrido vincula un certificado clásico (**A**, RSA o EC) y uno poscuántico (**B**, ML-DSA) para el mismo sujeto. B incluye la extensión no crítica **relatedCertificate**, que nombra a A por su hash, de modo que una parte confiante pueda exigir ambos.
 
-- **Emisión**: una sola petición API (\`hybrid\` en \`POST /api/v2/certificates\`) emite ambos desde la misma CA, con el mismo sujeto, nombres y validez. B copia las extensiones de A con su propio identificador de clave y key usage, y no declara ningún key usage ni EKU que A no tenga
+- **Emisión**: marque **Emitir un par híbrido (RFC 9763)** en el formulario de emisión de certificados (o envíe \`hybrid\` en \`POST /api/v2/certificates\`) para emitir ambos desde la misma CA, con el mismo sujeto, nombres y validez. B copia las extensiones de A con su propio identificador de clave y key usage, y no declara ningún key usage ni EKU que A no tenga
 - **Vinculación por solicitud**: un CSR con una **relatedCertRequest** firmada por la clave de A emite un B vinculado a A, mediante Firmar CSR, ACME, EST o WSTEP. A debe estar en UCM, ser válido, no revocado, de entidad final y emitido por una CA de esta instancia, y la solicitud debe ser reciente. Un certificado indicado en línea en la ubicación de la solicitud debe ser A; otras ubicaciones no se descargan
-- **Revocación** de uno de los miembros revoca el otro, salvo que la solicitud lo conserve. Con una política que exige aprobación, el par va junto, y dos políticas de aprobación distintas en los dos miembros dejan la revocación a un administrador
+- **Revocación** de uno de los miembros, solo o en lote, revoca el otro salvo que se desmarque **Revocar también el certificado vinculado**. Con una política que exige aprobación, el par va junto, y dos políticas de aprobación distintas en los dos miembros dejan la revocación a un administrador
 - **Renovación** de uno de los miembros, manual, en lote o automática, renueva ambos, y el nuevo B nombra al nuevo A
 - **Exportación**: el formato **hybrid-bundle** es un ZIP con ambos certificados y, si se incluye la clave, ambas claves privadas
 

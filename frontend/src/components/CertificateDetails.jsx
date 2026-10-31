@@ -138,6 +138,8 @@ export function CertificateDetails({
   onRenew,
   onUploadKey,
   onAddToTrustStore,
+  // Opens the other member of a hybrid pair; without it the link navigates
+  onOpenRelated,
   canWrite = false,
   canDelete = false,
   // Private-key export is its own scope (read:private_keys), not write access —
@@ -161,6 +163,17 @@ export function CertificateDetails({
   const serialHex = formatSerialNumberHex(cert.serial_number)
   const keyName = keyAlgorithmLabel(cert.key_algorithm || cert.key_type, t, cert.security_level)
   const status = cert.revoked ? 'revoked' : (cert.status || 'valid')
+  // Hybrid pair (RFC 9763): the other member's id and this one's role
+  const relatedId = cert.related_certificate_id ?? null
+  const HYBRID_ROLE_KEYS = { classical: 'certificates.hybrid.roleClassical', pq: 'certificates.hybrid.rolePq' }
+  const hybridRoleKey = HYBRID_ROLE_KEYS[cert.hybrid_role]
+  const otherRoleKey = HYBRID_ROLE_KEYS[{ classical: 'pq', pq: 'classical' }[cert.hybrid_role]]
+  const linkedBadge = relatedId != null && (
+    <Badge variant="info" size="sm" icon={LinkSimple} data-testid="hybrid-linked-badge"
+      title={hybridRoleKey ? t(hybridRoleKey) : t('certificates.hybrid.relatedCertificate')}>
+      {t('certificates.hybrid.linked')}
+    </Badge>
+  )
   
   // Status badge config
   const statusConfig = {
@@ -204,6 +217,7 @@ export function CertificateDetails({
             {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
             {!cert.has_private_key && <Badge variant="warning" size="sm">{t('details.noKey')}</Badge>}
             <PostQuantumBadge postQuantum={cert.post_quantum} algorithm={cert.key_algorithm || cert.key_type} />
+            {linkedBadge}
             {cert.template_name && (
               <Badge
                 variant={cert.template_overrides?.length ? 'warning' : 'info'}
@@ -290,6 +304,7 @@ export function CertificateDetails({
           <Badge variant={statusBadge.variant} size="sm">{statusBadge.label}</Badge>
           {sourceBadge && <Badge variant={sourceBadge.variant} size="sm">{sourceBadge.label}</Badge>}
           <PostQuantumBadge postQuantum={cert.post_quantum} algorithm={cert.key_algorithm || cert.key_type} />
+          {linkedBadge}
           {hasExpiry(cert.days_remaining) && !cert.revoked && (
             <span className={cn(
               "text-2xs font-medium",
@@ -344,6 +359,18 @@ export function CertificateDetails({
             value={cert.signature_algorithm}
           />
           <CompactField autoIcon="certType" label={t('details.certType')} value={formatCertType(cert.cert_type, t)} />
+          {relatedId != null && (
+            <CompactField icon={LinkSimple} label={t('certificates.hybrid.relatedCertificate')}>
+              <a
+                href={`/certificates/${relatedId}`}
+                aria-label={t('certificates.hybrid.openRelated', { id: relatedId })}
+                onClick={onOpenRelated ? (e) => { e.preventDefault(); onOpenRelated(relatedId) } : undefined}
+                className="text-accent-primary hover:underline"
+              >
+                #{relatedId}{otherRoleKey ? ` (${t(otherRoleKey)})` : ''}
+              </a>
+            </CompactField>
+          )}
           {cert.template_name && (
             <CompactField
               icon={Stack}
@@ -595,6 +622,7 @@ export function CertificateDetails({
       hasPrivateKey={!!cert.has_private_key}
       canExportKey={canExportKey}
       keyAlgorithm={cert.key_algorithm || cert.key_type}
+      relatedCertificateId={relatedId}
       onExport={onExport}
       chainVariantsFor={{ type: 'certificate', id: cert.id }}
     />

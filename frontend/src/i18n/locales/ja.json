@@ -840,7 +840,22 @@
     "deleteNeedsRevoke": "この証明書はまだ有効なため、単独では削除できません。削除すると UCM からは消えますが、失効を確認しないクライアントからは引き続き信頼されます。まず失効させて CRL と OCSP レスポンダに反映させ、そのうえで削除します。",
     "revokeThenDelete": "失効させてから削除",
     "noKeyTypeAllowedByPolicy": "この CA とテンプレートのポリシーで許可されている鍵タイプはありません。",
-    "revocationApprovalRequired": "失効を承認に提出しました（ポリシー: {{policy}}）"
+    "revocationApprovalRequired": "失効を承認に提出しました（ポリシー: {{policy}}）",
+    "hybrid": {
+      "toggle": "ハイブリッドペアを発行（RFC 9763）",
+      "toggleHint": "同一サブジェクトに対するリンクされた 2 つの証明書：従来型の鍵のものと、最初の証明書を参照する ML-DSA 鍵のものです。",
+      "classical": "従来型の鍵",
+      "pq": "ポスト量子鍵",
+      "column": "リンク",
+      "linked": "リンク",
+      "roleClassical": "ハイブリッドペアの従来型メンバー",
+      "rolePq": "ハイブリッドペアのポスト量子メンバー",
+      "relatedCertificate": "リンクされた証明書",
+      "openRelated": "リンクされた証明書 #{{id}} を開く",
+      "pairIssued": "ハイブリッドペアを発行しました：証明書 #{{classical}} と #{{pq}}",
+      "renewedWithRelated": "証明書を更新しました（リンクされた証明書 #{{id}} も更新）",
+      "bulkRelatedRenewed": "選択した証明書と共に、リンクされた証明書 {{count}} 件を更新しました"
+    }
   },
   "cas": {
     "chainRevoked": "上位で失効",
@@ -3889,7 +3904,14 @@
       "certificateHold": "一時的な停止で、後で「停止解除」により解除できます。",
       "privilegeWithdrawn": "証明書で付与された権限が取り消されました。",
       "aACompromise": "属性認証局の鍵が危殆化しました。"
-    }
+    },
+    "revokeRelated": "リンクされた証明書も失効させる",
+    "revokeRelatedHint": "チェックを外すと、ハイブリッドペアのもう一方は有効なまま残ります。",
+    "revokedWithRelated": "証明書を失効させました（リンクされた証明書 #{{id}} も失効）",
+    "relatedNotRevoked": "リンクされた証明書は失効しませんでした：この証明書をペアとして指していないか、すでに失効済みです。",
+    "revokeRelatedBulk": "リンクされた証明書も失効させる",
+    "revokeRelatedBulkHint": "選択したハイブリッドペアのメンバーは、もう一方も一緒に失効します。チェックを外すと、他のメンバーは有効なまま残ります。",
+    "bulkRelatedRevoked": "選択した証明書と共に、リンクされた証明書 {{count}} 件を失効させました"
   },
   "details": {
     "pemCertificate": "PEM証明書",
@@ -4766,7 +4788,8 @@
     "legacyPkcs12Desc": "Android 15 以前、macOS 14 以前、Windows Server 2016 以前、8u301 / 11.0.1 より前の Java 向け。これらは既定の AES-256 アーカイブを「パスワードが違う」として拒否します。ファイルの保護は弱くなるため、エクスポートごとに選択してください。",
     "formatKeyDesc": "PEM形式の秘密鍵のみ",
     "formats": {
-      "privateKey": "秘密鍵"
+      "privateKey": "秘密鍵",
+      "hybridBundle": "ハイブリッドバンドル"
     },
     "formatOptions": {
       "pemOnly": "PEM（証明書のみ）",
@@ -4781,7 +4804,8 @@
     "unavailableForKeyAlgorithm": "{{algorithm}} 鍵では使用できません。UCM はまだ耐量子鍵を PKCS#12 や JKS に書き出せません。代わりに秘密鍵付きの PEM でエクスポートしてください。",
     "jksNote": "JKSには常に秘密鍵が含まれます",
     "pkcs12Title": "PKCS#12をエクスポート",
-    "pkcs12PasswordPrompt": "PKCS#12 ファイルのパスワードを入力してください"
+    "pkcs12PasswordPrompt": "PKCS#12 ファイルのパスワードを入力してください",
+    "formatHybridBundleDesc": "ペアの両方の証明書を含む ZIP"
   },
   "userCertificates": {
     "title": "ユーザー証明書",
