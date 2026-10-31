@@ -7,14 +7,18 @@ import asn1crypto.cms
 import asn1crypto.core
 import pytest
 from cryptography import x509
-from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import serialization
-from cryptography.hazmat.primitives.asymmetric import ed448, mldsa
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
+from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives.asymmetric import ed448, mldsa, rsa
 from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.x509.oid import AttributeOID, NameOID
 
+import fips_mode
+from fips_mode import FipsRestricted
 from models import CA, SystemConfig, db
-from services.scep.crypto_helpers import create_signed_pkcs7, encrypt_for_client
+from services.scep.crypto_helpers import (
+    DEFAULT_KEY_TRANSPORT, RSAES_OAEP, create_signed_pkcs7, encrypt_for_client,
+)
 from services.scep.message_parser import extract_signer_certificate, verify_cms_signature
 from services.scep.scep_service import SCEPService
 from tests.pqc_fixtures import fixture_bytes, load_mldsa_key, scep_wstep_mldsa_signed_cms
@@ -122,6 +126,37 @@ class TestRfc9882SignerInfo:
             verify_cms_signature(sd, ed448.Ed448PrivateKey.generate().public_key())
 
 
+@pytest.fixture
+def fips_on(monkeypatch):
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+
+
+class TestFipsMode:
+    def test_mldsa_signature_is_refused(self, fips_on):
+        sd = _signed_data(fixture_bytes('mldsa65-signed.cms'))
+        with pytest.raises(FipsRestricted, match='ML-DSA-65 CMS signatures'):
+            verify_cms_signature(sd, extract_signer_certificate(sd))
+
+    def test_bare_mldsa_key_is_refused(self, fips_on):
+        key = load_mldsa_key()
+        sd = _signed_data(scep_pq_signed_cms(b'payload', key, _self_signed(key), []))
+        with pytest.raises(FipsRestricted):
+            verify_cms_signature(sd, key.public_key())
+
+    def test_signer_key_the_provider_cannot_load_is_a_value_error(self):
+        """A FIPS provider without ML-DSA cannot load the signer key: badAlg, not an internal error."""
+        sd = _signed_data(fixture_bytes('mldsa65-signed.cms'))
+        der = extract_signer_certificate(sd).public_bytes(serialization.Encoding.DER)
+        mldsa65_oid = bytes.fromhex('0609608648016503040312')
+        assert mldsa65_oid in der
+        # Same-length OID no provider knows: 2.16.840.1.101.3.4.3.99
+        unloadable = x509.load_der_x509_certificate(der.replace(mldsa65_oid, mldsa65_oid[:-1] + b'\x63'))
+        with pytest.raises(UnsupportedAlgorithm):
+            unloadable.public_key()
+        with pytest.raises(ValueError, match='Unsupported CMS signer public key type'):
+            verify_cms_signature(sd, unloadable)
+
+
 def test_reply_signer_names_an_unsupported_key():
     """CertRep is signed by the RSA CA; any other signer is named in the refusal."""
     key = load_mldsa_key()
@@ -130,16 +165,18 @@ def test_reply_signer_names_an_unsupported_key():
 
 
 class TestMldsaClientEnrollment:
-    def _enroll(self, app, create_ca, csr_key, signer_key, signer_cert=None):
+    def _enroll(self, app, create_ca, csr_key, signer_key, signer_cert=None,
+                key_transport=DEFAULT_KEY_TRANSPORT):
         ca_data = create_ca(cn='SCEP RSA CA for ML-DSA client')
         signer_cert = signer_cert or _self_signed(signer_key)
         csr = (x509.CertificateSigningRequestBuilder()
                .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'pq-scep.example')]))
                .add_attribute(AttributeOID.CHALLENGE_PASSWORD, CHALLENGE.encode())
-               .sign(csr_key, None))
+               .sign(csr_key, hashes.SHA256() if isinstance(csr_key, rsa.RSAPrivateKey) else None))
         with app.app_context():
             ca, ca_cert, _ = _load_ca_material(ca_data['id'])
-            envelope = encrypt_for_client(csr.public_bytes(serialization.Encoding.DER), ca_cert)
+            envelope = encrypt_for_client(csr.public_bytes(serialization.Encoding.DER), ca_cert,
+                                          key_transport=key_transport)
             request = scep_pq_signed_cms(envelope, signer_key, signer_cert,
                                          _scep_attrs(19, b'pq-scep-nonce-01'))
             response, status = SCEPService(ca.refid, challenge_password=CHALLENGE,
@@ -171,6 +208,21 @@ class TestMldsaClientEnrollment:
         attrs = _response_attributes(response)
         assert attrs[PKI_STATUS_OID] == '2'
         assert attrs['2.16.840.1.113733.1.9.4'] == '1'   # badMessageCheck
+
+
+    @pytest.mark.parametrize('fips', [False, True])
+    def test_mldsa_signer_around_an_rsa_csr(self, app, create_ca, monkeypatch, fips):
+        """The signer key is not bound to the CSR key: FIPS mode refuses the ML-DSA signer itself."""
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: fips)
+        response, status, _ = self._enroll(app, create_ca, rsa.generate_private_key(65537, 2048),
+                                           load_mldsa_key(), key_transport=(RSAES_OAEP, 'sha256'))
+        attrs = _response_attributes(response)
+        assert status == 200
+        if fips:
+            assert attrs[PKI_STATUS_OID] == '2', attrs
+            assert attrs['2.16.840.1.113733.1.9.4'] == '0'   # badAlg
+        else:
+            assert attrs[PKI_STATUS_OID] == '0', attrs
 
 
 # --- an ML-DSA CA cannot serve SCEP ---------------------------------------------------

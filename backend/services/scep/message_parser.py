@@ -11,7 +11,7 @@ import asn1crypto.x509
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.decrepit.ciphers.algorithms import TripleDES
 from cryptography import x509
-from cryptography.exceptions import InvalidSignature
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, rsa
@@ -232,11 +232,14 @@ def verify_cms_signature(signed_data, signer_cert) -> None:
     else:
         signed_bytes = b"\x31" + raw[1:]
 
-    public_key = (
-        signer_cert.public_key()
-        if isinstance(signer_cert, x509.Certificate)
-        else signer_cert
-    )
+    try:
+        public_key = (
+            signer_cert.public_key()
+            if isinstance(signer_cert, x509.Certificate)
+            else signer_cert
+        )
+    except UnsupportedAlgorithm as exc:  # a key this provider cannot load, e.g. ML-DSA on a FIPS build
+        raise ValueError(f"Unsupported CMS signer public key type: {exc}") from exc
     if isinstance(public_key, rsa.RSAPublicKey) and sig_alg == "rsassa_pss":
         public_key.verify(
             bytes(signature), signed_bytes,
@@ -267,6 +270,8 @@ def verify_cms_signature(signed_data, signer_cert) -> None:
     elif isinstance(public_key, ed448.Ed448PublicKey):
         raise ValueError("Ed448 CMS signatures are not supported")
     elif key_algorithms.family_for_public_key(public_key) == "ML-DSA":
+        # ML-DSA is not FIPS-approved; the signer key is not bound to the CSR key
+        fips_mode.refuse(f"{key_algorithms.label_for_public_key(public_key)} CMS signatures")
         _check_mldsa_signer_info(signer_info, public_key, digest_name)
         public_key.verify(bytes(signature), signed_bytes)
     else:
