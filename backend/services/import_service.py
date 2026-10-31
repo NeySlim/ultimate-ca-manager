@@ -14,6 +14,10 @@ from utils.key_codec import MalformedKey, load_private_key_any, private_key_to_p
 from utils.pkcs12_import import load_key_and_certificates, refuse_pkcs12_import
 
 
+class KeyPasswordError(ValueError):
+    """The private key in the file is encrypted and the password given does not open it."""
+
+
 def parse_certificate_file(file_data, filename, password=None, import_key=True):
     """
     Parse certificate from various formats.
@@ -66,6 +70,11 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
                         key_match.group(0), password=password.encode() if password else None)
                 except (UnsupportedForKeyAlgorithm, MalformedKey):
                     raise
+                except (TypeError, ValueError) as e:
+                    # A wrong password can also unpad by chance: a decoding failure on an encrypted key is the password's
+                    if b'ENCRYPTED' in key_match.group(0):
+                        raise KeyPasswordError('Invalid password for the private key' if password
+                                               else 'The private key is encrypted: give its password') from e
                 except Exception:
                     pass
                 
@@ -91,7 +100,7 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
             raise
         except Exception as e:
             if 'password' in str(e).lower() or 'mac' in str(e).lower():
-                raise ValueError('Invalid password for PKCS12 file')
+                raise KeyPasswordError('Invalid password for PKCS12 file')
             raise
     
     elif format_type == 'pkcs7':

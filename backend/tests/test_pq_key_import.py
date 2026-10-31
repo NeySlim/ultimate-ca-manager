@@ -199,6 +199,34 @@ def test_import_service_still_reports_a_wrong_pkcs12_password():
         parse_certificate_file(fixture_bytes('mldsa65.p12'), 'k.p12', 'wrong')
 
 
+@pytest.mark.parametrize('password', ['wrong', None], ids=['wrong', 'missing'])
+def test_import_service_says_the_key_password_is_wrong(password):
+    from services.import_service import KeyPasswordError, parse_certificate_file
+    with pytest.raises(KeyPasswordError, match='password'):
+        parse_certificate_file(CERT + BOTH_ENC, 'bundle.pem', password)
+
+
+def test_import_service_skips_an_encrypted_key_it_was_not_asked_for():
+    from services.import_service import parse_certificate_file
+    _, key, _ = parse_certificate_file(CERT + BOTH_ENC, 'bundle.pem', 'wrong', import_key=False)
+    assert key is None
+
+
+@pytest.mark.parametrize('url', ['/api/v2/certificates/import', '/api/v2/cas/import'])
+def test_import_routes_answer_a_wrong_key_password(app, auth_client, url):
+    cert, sealed, _ = _rsa_leaf_and_encrypted_key(P12_PASSWORD.decode())
+    subject = x509.load_pem_x509_certificate(cert).subject.rfc4514_string()
+    try:
+        r = auth_client.post(url, data={'pem_content': (cert + sealed).decode(), 'password': 'wrong'})
+        assert r.status_code == 400, r.data
+        assert 'password' in get_json(r)['message'], r.data
+    finally:
+        with app.app_context():
+            Certificate.query.filter_by(subject=subject).delete()
+            CA.query.filter_by(subject=subject).delete()
+            db.session.commit()
+
+
 def test_smart_import_keeps_the_repaired_key():
     from services.smart_import.parser import SmartParser
     keys = [o for o in SmartParser().parse(BOTH.decode()) if o.type.value == 'private_key']
