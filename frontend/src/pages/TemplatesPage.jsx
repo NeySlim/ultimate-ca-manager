@@ -796,9 +796,11 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
   const [loading, setLoading] = useState(false)
   const [ekuOptions, setEkuOptions] = useState(EXT_KEY_USAGE_FALLBACK)
   const fips = useFipsMode()
-  // The key already on the template stays listed, so FIPS mode never blanks the field
+  // The key already on the template stays listed, so FIPS mode never blanks the field.
+  // No key without a digest (ML-DSA) while this form always sends one.
   const keyTypeOptions = useMemo(() => groupedOptions(
-    listAlgorithms({ generate: true }).filter(a => !fips || a.fips || a.label === formData.key_type),
+    listAlgorithms({ generate: true })
+      .filter(a => a.label === formData.key_type || ((!fips || a.fips) && a.digest !== null)),
     t, a => a.label), [fips, t, formData.key_type])
 
   useEffect(() => {
