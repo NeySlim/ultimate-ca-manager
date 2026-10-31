@@ -85,6 +85,10 @@ class Certificate(db.Model):
     # No access control reads it; kept for older databases and backups
     owner_group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
     owner_group = db.relationship('Group', backref='owned_certificates')
+
+    # RFC 9763: on B, the A its id-pe-relatedCert names; on A, B once the pair is mutual
+    related_certificate_id = db.Column(db.Integer, nullable=True, index=True)
+    hybrid_role = db.Column(db.String(16), nullable=True)  # 'classical' or 'pq'
     
     # Relationships
     ca = db.relationship("CA", back_populates="certificates")
@@ -463,6 +467,9 @@ class Certificate(db.Model):
             "template_id": self.template_id,
             "template_name": self.template.name if self.template_id and self.template else None,
             "template_overrides": self.template_overrides_list,
+            # Related certificate pair (RFC 9763)
+            "related_certificate_id": self.related_certificate_id,
+            "hybrid_role": self.hybrid_role,
             # PEM for display/copy
             "pem": self._decode_pem(self.crt),
         }
