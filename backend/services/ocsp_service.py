@@ -947,22 +947,7 @@ class OCSPService:
                     h_name.update(ca_cert.subject.public_bytes(
                         serialization.Encoding.DER))
                     issuer_name_hash = h_name.finalize()
-                    pubkey = ca_cert.public_key()
-                    if isinstance(pubkey, rsa.RSAPublicKey):
-                        spki_value = pubkey.public_bytes(
-                            encoding=serialization.Encoding.DER,
-                            format=serialization.PublicFormat.PKCS1,
-                        )
-                    elif isinstance(pubkey, ec.EllipticCurvePublicKey):
-                        spki_value = pubkey.public_bytes(
-                            encoding=serialization.Encoding.X962,
-                            format=serialization.PublicFormat.UncompressedPoint,
-                        )
-                    else:
-                        spki_value = pubkey.public_bytes(
-                            encoding=serialization.Encoding.Raw,
-                            format=serialization.PublicFormat.Raw,
-                        )
+                    spki_value = _subject_public_key_bits(ca_cert)
                     h_key = hashes.Hash(algo)
                     h_key.update(spki_value)
                     issuer_key_hash = h_key.finalize()

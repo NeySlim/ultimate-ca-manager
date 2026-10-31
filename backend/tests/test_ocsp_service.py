@@ -875,6 +875,33 @@ class TestResponderIdRfc6960:
         assert _subject_public_key_bits(v1) == key.public_key().public_bytes(
             serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
 
+    def _compressed_point_ca(self, create_ca):
+        """An EC CA whose stored certificate carries its point compressed."""
+        from services.hsm.ca_key_loader import get_ca_signing_key
+        ca_obj = _ca_model(create_ca(cn='IssuerKeyHash Compressed CA', keyType='EC', keySize='P-256'))
+        ca_cert, point = self._with_compressed_point(_load_x509(ca_obj), get_ca_signing_key(ca_obj))
+        assert len(point) == 33
+        ca_obj.crt = base64.b64encode(ca_cert.public_bytes(serialization.Encoding.PEM)).decode()
+        db.session.commit()
+        return ca_obj, ca_cert, point
+
+    def test_issuer_lookup_of_a_compressed_point_ca(self, app, create_ca):
+        """issuerKeyHash covers the BIT STRING of the CA certificate (RFC 6960 4.1.1)."""
+        with app.app_context():
+            ca_obj, ca_cert, point = self._compressed_point_ca(create_ca)
+            name_hash = hashlib.sha1(ca_cert.subject.public_bytes(serialization.Encoding.DER)).digest()
+            found = _find_ca_by_issuer_hash(name_hash, hashlib.sha1(point).digest(), hashes.SHA1())
+            assert found is not None and found.id == ca_obj.id
+
+    def test_unknown_serial_cert_id_of_a_compressed_point_ca(self, app, create_ca):
+        with app.app_context():
+            ca_obj, _, point = self._compressed_point_ca(create_ca)
+            der, status = OCSPService().generate_response(ca_obj, 0x7E57AB1E, hash_algorithm=hashes.SHA1())
+            assert status == 'unknown'
+            rdata = asn1_ocsp.OCSPResponse.load(der)['response_bytes']['response'].parsed['tbs_response_data']
+            cert_id = rdata['responses'][0]['cert_id']
+            assert cert_id['issuer_key_hash'].native == hashlib.sha1(point).digest()
+
 
 class TestDelegatedResponderIssuance:
     """A certificate issued for the responder role must be usable as one.

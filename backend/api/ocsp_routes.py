@@ -11,10 +11,9 @@ from flask import Blueprint, request, Response
 from cryptography import x509
 from cryptography.x509 import ocsp
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, rsa
 
 from models import CA
-from services.ocsp_service import OCSPService
+from services.ocsp_service import OCSPService, _subject_public_key_bits
 from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
@@ -216,28 +215,8 @@ def _find_ca_by_issuer_hash(issuer_name_hash, issuer_key_hash, hash_algorithm):
                 if computed_name_hash != issuer_name_hash:
                     continue
 
-                # Issuer key hash — RFC 6960 §4.1.1: SHA hash of the
-                # subjectPublicKey BIT STRING value (i.e. the contents of
-                # the BIT STRING, *not* the full SubjectPublicKeyInfo).
-                pubkey = ca_cert.public_key()
-                if isinstance(pubkey, rsa.RSAPublicKey):
-                    spki_value = pubkey.public_bytes(
-                        encoding=serialization.Encoding.DER,
-                        format=serialization.PublicFormat.PKCS1,
-                    )
-                elif isinstance(pubkey, ec.EllipticCurvePublicKey):
-                    # X9.62 uncompressed point — the BIT STRING contents
-                    # for an EC SubjectPublicKey.
-                    spki_value = pubkey.public_bytes(
-                        encoding=serialization.Encoding.X962,
-                        format=serialization.PublicFormat.UncompressedPoint,
-                    )
-                else:
-                    # Ed25519/Ed448: BIT STRING contents are the raw key
-                    spki_value = pubkey.public_bytes(
-                        encoding=serialization.Encoding.Raw,
-                        format=serialization.PublicFormat.Raw,
-                    )
+                # RFC 6960 §4.1.1: hash of the subjectPublicKey BIT STRING as the certificate carries it
+                spki_value = _subject_public_key_bits(ca_cert)
                 d2 = hashes.Hash(algo)
                 d2.update(spki_value)
                 computed_key_hash = d2.finalize()
