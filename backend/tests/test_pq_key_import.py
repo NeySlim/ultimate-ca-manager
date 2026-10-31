@@ -7,6 +7,7 @@ import base64
 import json
 import uuid
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 from cryptography import x509
@@ -583,11 +584,27 @@ def test_smart_import_execute_refuses_a_wrong_key_password(app, auth_client, kin
         assert (CA.query.count(), Certificate.query.count()) == before
 
 
+# An RSA-2048 PKCS#8 sealed once with b'right-pass' (AES-256-CBC), picked so that
+# b'wrong-pass' fails the CBC padding check: a fresh salt unpads by chance once in ~250.
+SEALED_RSA_DER = (Path(__file__).parent / 'fixtures' / 'rsa2048-pkcs8-aes256.der').read_bytes()
+
+
+def _sealed_rsa(encoding):
+    if encoding == 'DER':
+        return SEALED_RSA_DER
+    return (b'-----BEGIN ENCRYPTED PRIVATE KEY-----\n' + base64.encodebytes(SEALED_RSA_DER)
+            + b'-----END ENCRYPTED PRIVATE KEY-----\n')
+
+
+@pytest.mark.parametrize('encoding', ['PEM', 'DER'])
+def test_the_sealed_rsa_fixture_opens_with_its_password(encoding):
+    from utils.key_codec import load_private_key_any
+    assert isinstance(load_private_key_any(_sealed_rsa(encoding), b'right-pass'), rsa.RSAPrivateKey)
+
+
 def test_smart_import_names_a_wrong_password_on_a_der_key():
     from services.smart_import.parser import WRONG_PASSWORD, SmartParser
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    der = key.private_bytes(serialization.Encoding.DER, serialization.PrivateFormat.PKCS8,
-                            serialization.BestAvailableEncryption(b'right-pass'))
+    der = SEALED_RSA_DER
     [obj] = SmartParser().parse(der, password='wrong-pass')
     assert obj.type.value == 'private_key' and obj.error == WRONG_PASSWORD
     assert SmartParser()._parse_der_key(der, 'wrong-pass').error == WRONG_PASSWORD
@@ -604,8 +621,5 @@ def test_converter_refuses_a_wrong_key_password(auth_client):
 @pytest.mark.parametrize('encoding', ['PEM', 'DER'])
 def test_the_retry_without_password_never_hides_a_wrong_one(encoding):
     from utils.key_codec import load_private_key_any
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    sealed = key.private_bytes(getattr(serialization.Encoding, encoding), serialization.PrivateFormat.PKCS8,
-                               serialization.BestAvailableEncryption(b'right-pass'))
     with pytest.raises(ValueError, match='(?i)incorrect password'):
-        load_private_key_any(sealed, b'wrong-pass')
+        load_private_key_any(_sealed_rsa(encoding), b'wrong-pass')
