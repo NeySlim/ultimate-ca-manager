@@ -203,6 +203,8 @@ class SmartImporter:
                 - import_cas: bool (default True)
                 - import_certs: bool (default True)
                 - import_csrs: bool (default True)
+                - import_keys: bool (default True)
+                - selected_indices: positions in the analysis object list (default all)
                 - skip_duplicates: bool (default True)
                 - description_prefix: str (default "Imported: ")
             username: User performing import
@@ -224,6 +226,18 @@ class SmartImporter:
         try:
             # Parse
             objects = self.parser.parse(content, password)
+            # The same parse as the analysis: its positions name the objects the preview kept
+            selected = options.get("selected_indices")
+            if selected is not None:
+                if not isinstance(selected, list) or not all(
+                        type(i) is int and 0 <= i < len(objects) for i in selected):
+                    result.success = False
+                    result.errors.append("selected_indices must list positions of the analysed objects")
+                    return result
+                keep = set(selected)
+                objects = [o for i, o in enumerate(objects) if i in keep]
+            if not options.get("import_keys", True):
+                objects = [o for o in objects if o.type != ObjectType.PRIVATE_KEY]
             unusable = [o.error for o in objects if o.type == ObjectType.PRIVATE_KEY and o.error]
             if unusable:  # importing the certificates without their key would hide it
                 result.success = False

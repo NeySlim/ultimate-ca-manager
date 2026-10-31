@@ -84,8 +84,9 @@ def execute_import():
     Execute the smart import.
 
     Request body: `content`, an optional `password`, and `options` with
-    `import_cas`, `import_certs`, `import_csrs`, `skip_duplicates` and
-    `description_prefix`.
+    `import_cas`, `import_certs`, `import_csrs`, `import_keys`, `skip_duplicates`,
+    `description_prefix` and `selected_indices` (positions in the analysis
+    `objects` list; all of them when absent).
 
     Response `data` carries the counts (`certificates_imported`,
     `cas_imported`, `keys_matched`, `csrs_imported`), plus `errors`,

@@ -4069,6 +4069,7 @@
     "importCAs": "Import CAs",
     "importCertificates": "Import certificates",
     "importKeys": "Import keys",
+    "importCSRs": "Import CSRs",
     "importObjects": "Import {{count}} Object(s)",
     "importingObjects": "Importing objects...",
     "importComplete": "Import Complete",

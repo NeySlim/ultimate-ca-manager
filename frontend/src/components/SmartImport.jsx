@@ -709,6 +709,10 @@ export function SmartImportWidget({ onImportComplete, onCancel, compact = false 
               <input type="checkbox" checked={importOptions.import_keys} onChange={(e) => setImportOptions(prev => ({ ...prev, import_keys: e.target.checked }))} className="w-4 h-4 rounded" />
               {t('import.importKeys')}
             </label>
+            <label className="flex items-center gap-2">
+              <input type="checkbox" checked={importOptions.import_csrs} onChange={(e) => setImportOptions(prev => ({ ...prev, import_csrs: e.target.checked }))} className="w-4 h-4 rounded" />
+              {t('import.importCSRs')}
+            </label>
           </div>
         </div>
         

@@ -2925,6 +2925,10 @@ Content-Type: application/json
 }
 ```
 
+`options`: `import_cas`, `import_certs`, `import_csrs`, `import_keys` (each `true` by default),
+`skip_duplicates`, `description_prefix`, and `selected_indices`, the positions in the analysis
+`objects` list to import (all of them when absent; a position outside the list is refused).
+
 ### List Supported Formats
 ```http
 GET /api/v2/import/formats

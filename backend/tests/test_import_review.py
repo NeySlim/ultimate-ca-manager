@@ -145,6 +145,63 @@ class TestSmartImportKeysEncrypted:
             assert base64.b64decode(decrypt_private_key(row.prv)).decode().strip() == _kpem(key).strip()
 
 
+class TestSmartImportSelection:
+    """The preview's choices reach execute: only the selected objects, keys only when asked."""
+
+    @staticmethod
+    def _execute(auth_client, content, **options):
+        r = auth_client.post('/api/v2/import/execute', data=json.dumps({
+            'content': content, 'options': {'skip_duplicates': False, **options}}),
+            content_type='application/json')
+        assert r.status_code == 200, r.data
+        return r.get_json()['data']
+
+    @staticmethod
+    def _imported(app, cert):
+        with app.app_context():
+            from models import Certificate
+            return Certificate.query.filter_by(subject=_info(cert)['subject']).all()
+
+    @staticmethod
+    def _drop(app, *certs):
+        with app.app_context():
+            from models import db, Certificate
+            for cert in certs:
+                Certificate.query.filter_by(subject=_info(cert)['subject']).delete()
+            db.session.commit()
+
+    def test_only_the_selected_objects_are_imported(self, app, auth_client):
+        tag = uuid.uuid4().hex[:6]
+        kept, left = _cert(f'selected-{tag}', _gen()), _cert(f'left-out-{tag}', _gen())
+        try:
+            data = self._execute(auth_client, _pem(kept) + _pem(left), selected_indices=[0])
+            assert data['certificates_imported'] == 1, data
+            assert len(self._imported(app, kept)) == 1 and self._imported(app, left) == []
+        finally:
+            self._drop(app, kept, left)
+
+    def test_a_key_left_out_is_not_stored(self, app, auth_client):
+        key = _gen()
+        cert = _cert(f'keyless-{uuid.uuid4().hex[:6]}', key)
+        try:
+            data = self._execute(auth_client, _pem(cert) + _kpem(key), import_keys=False)
+            assert data['certificates_imported'] == 1 and data['keys_matched'] == 0, data
+            [row] = self._imported(app, cert)
+            assert not row.prv
+        finally:
+            self._drop(app, cert)
+
+    @pytest.mark.parametrize('selected', ['0', [True], [-1], [5]])
+    def test_a_selection_naming_no_object_is_refused(self, app, auth_client, selected):
+        cert = _cert(f'bad-selection-{uuid.uuid4().hex[:6]}', _gen())
+        try:
+            data = self._execute(auth_client, _pem(cert), selected_indices=selected)
+            assert data['success'] is False and any('selected_indices' in e for e in data['errors']), data
+            assert self._imported(app, cert) == []
+        finally:
+            self._drop(app, cert)
+
+
 class TestRevocationFollowsTheCertificate:
     def test_renewed_certificate_on_a_revoked_record_is_not_revoked(self, app, auth_client, create_ca):
         from models import Certificate
