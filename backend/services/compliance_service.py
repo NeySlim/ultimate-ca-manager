@@ -112,12 +112,12 @@ def _post_quantum(cert_dict, fields):
     return None
 
 
-# ML-DSA by NIST category: 44 like P-256, each level above it higher
-_ML_DSA_POINTS = {2: 25, 3: 28, 5: 30}
+# ML-DSA scores like the NIST curve of its category: 44 as P-256, 65 as P-384, 87 as P-521
+_ML_DSA_POINTS = {2: 25, 3: 30, 5: 30}
 
 
 def _pq_key_points(pq):
-    """SLH-DSA (hash-based) scores full; ML-DSA rises with its security category."""
+    """SLH-DSA (hash-based) scores full; ML-DSA as the classical curve of its category."""
     return 30 if pq.family == 'SLH-DSA' else _ML_DSA_POINTS.get(pq.security_level, 25)
 
 
@@ -135,6 +135,13 @@ def key_algo_sort_points():
     spellings += [('RSA 8192', 8192), ('RSA 1024', 1024)]
     spellings += [(n.label, None) for n in key_algorithms.slh_dsa_names()]
     return [(s, _score_key_strength({'key_algo': s, 'key_size': n})['score']) for s, n in spellings]
+
+
+def key_algo_sort_levels():
+    """``(key_algo spelling, NIST category)`` of every post-quantum key, which
+    breaks ties between equal key strength points in the SQL sort."""
+    levels = [(a.legacy_key_algo, a.security_level) for a in key_algorithms.ALGORITHMS if a.security_level]
+    return levels + [(n.label, n.security_level) for n in key_algorithms.slh_dsa_names()]
 
 
 def _score_ec_key(cert_dict, key_size):

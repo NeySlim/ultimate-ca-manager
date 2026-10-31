@@ -436,19 +436,20 @@ def test_compliance_preflight_grades_ml_dsa_templates_policies_responders(app, a
 
 # ---------------------------------------------------------------------- scores
 
-def test_ml_dsa_key_strength_rises_with_the_level():
+def test_ml_dsa_key_strength_matches_the_classical_curve_of_its_category():
     from services.compliance_service import _score_key_strength
-    p256 = _score_key_strength({'key_algo': 'EC-P256', 'key_size': 256})['score']
-    scores = [_score_key_strength({'key_algo': f'ML-DSA-{n}'})['score'] for n in (44, 65, 87)]
-    assert p256 <= scores[0] < scores[1] < scores[2] <= 30, scores
+    for level, curve in ((44, 'EC-P256'), (65, 'EC-P384'), (87, 'EC-P521')):
+        assert (_score_key_strength({'key_algo': f'ML-DSA-{level}'})['score']
+                == _score_key_strength({'key_algo': curve})['score']), level
 
 
-def test_sort_points_follow_the_score():
-    from services.compliance_service import _score_key_strength, key_algo_sort_points
-    points = dict(key_algo_sort_points())
+def test_sort_points_follow_the_score_and_levels_break_ties():
+    from services.compliance_service import _score_key_strength, key_algo_sort_levels, key_algo_sort_points
+    points, levels = dict(key_algo_sort_points()), dict(key_algo_sort_levels())
     for n in (44, 65, 87):
         assert points[f'ML-DSA-{n}'] == _score_key_strength({'key_algo': f'ML-DSA-{n}'})['score']
-    assert points['ML-DSA-44'] < points['ML-DSA-65'] < points['ML-DSA-87']
+    assert levels['ML-DSA-44'] < levels['ML-DSA-65'] < levels['ML-DSA-87']
+    assert levels['SLH-DSA-SHA2-128s'] < levels['SLH-DSA-SHAKE-256f']
 
 
 def test_certificate_list_sorts_ml_dsa_by_level(app, auth_client, create_ca):
@@ -458,6 +459,7 @@ def test_certificate_list_sorts_ml_dsa_by_level(app, auth_client, create_ca):
     for name, level in (('a', 44), ('b', 65), ('c', 87)):
         r = _issue(auth_client, ca['id'], 'ml-dsa', level, f'pqsort{tag}-{name}-{level}.example.test')
         assert r.status_code == 201, r.get_json()
-    r = auth_client.get(f'/api/v2/certificates?search=pqsort{tag}&sort_by=compliance_grade&sort_order=desc')
-    names = [c.get('common_name') or c.get('cn') or c.get('subject') for c in get_json(r)['data']]
-    assert [n.split('-')[2].split('.')[0] for n in names] == ['87', '65', '44'], names
+    for order, expected in (('desc', ['87', '65', '44']), ('asc', ['44', '65', '87'])):
+        r = auth_client.get(f'/api/v2/certificates?search=pqsort{tag}&sort_by=compliance_grade&sort_order={order}')
+        names = [c.get('common_name') or c.get('cn') or c.get('subject') for c in get_json(r)['data']]
+        assert [n.split('-')[2].split('.')[0] for n in names] == expected, (order, names)

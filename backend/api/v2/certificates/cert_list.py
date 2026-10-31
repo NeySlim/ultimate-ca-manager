@@ -14,7 +14,7 @@ from utils.cert_status import (
     revoked_condition, unknown_status_message, valid_condition,
 )
 from utils.response import error_response
-from services.compliance_service import calculate_compliance_score, key_algo_sort_points
+from services.compliance_service import calculate_compliance_score, key_algo_sort_levels, key_algo_sort_points
 from utils.datetime_utils import utc_now
 from . import bp
 
@@ -26,6 +26,11 @@ def key_strength_order(column):
     compliance_service._score_key_strength; another EC curve 15, the rest 10."""
     return case(*[(column.ilike(spelling), points) for spelling, points in key_algo_sort_points()],
                 (column.ilike('EC %'), 15), else_=10)
+
+
+def key_level_order(column):
+    """SQL NIST category of a post-quantum ``key_algo`` *column*, 0 for a classical key."""
+    return case(*[(column.ilike(spelling), level) for spelling, level in key_algo_sort_levels()], else_=0)
 
 
 @bp.route('/api/v2/certificates', methods=['GET'])
@@ -184,10 +189,11 @@ def list_certificates():
             )
         )
 
+        level_order = key_level_order(Certificate.key_algo)
         if sort_order == 'desc':
-            query = query.order_by(compliance_order.desc(), _cn_sort.asc())
+            query = query.order_by(compliance_order.desc(), level_order.desc(), _cn_sort.asc())
         else:
-            query = query.order_by(compliance_order.asc(), _cn_sort.asc())
+            query = query.order_by(compliance_order.asc(), level_order.asc(), _cn_sort.asc())
     elif sort_column not in ('special', 'special_compliance'):
         # Tie-break on the primary key. Every sortable column here has
         # duplicates — `revoked` has two distinct values for the whole table —
