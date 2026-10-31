@@ -24,3 +24,4 @@ not counted as a signature.
 | ziller-hqs | 2026-10-19 | I have read and agree to the UCM CLA v1.1 |
 | avargasn | 2026-10-21 | I have read and agree to the UCM CLA v1.1 |
 | WMP | 2026-10-23 | I have read and agree to the UCM CLA v1.1 |
+| danielrona | 2026-10-31 | I have read and agree to the UCM CLA v1.1 |
