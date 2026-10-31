@@ -69,6 +69,7 @@ const PARENTS = [
   { id: 7, name: 'RSA root', has_private_key: true, key_type: 'RSA 3072' },
   { id: 8, name: 'PQ root', has_private_key: true, key_type: 'ML-DSA-65' },
   { id: 9, name: 'P-384 root', has_private_key: true, key_type: 'EC secp384r1' },
+  { id: 10, name: 'RSA-8192 root', has_private_key: true, key_type: 'RSA 8192' },
 ]
 
 async function intermediateUnder(parentId, keyAlgo, effective = { allowed_key_types: null, allowed_digests: null }) {
@@ -154,6 +155,14 @@ describe('CreateCAModal ML-DSA', () => {
   it("proposes the parent's digest for 'auto' when the child takes none", async () => {
     await intermediateUnder(9, 'ML-DSA')
     expect(screen.getByText('cas.create.digestAutoHint:SHA384')).toBeTruthy()
+  })
+
+  it('offers a digest for an ML-DSA intermediate under a parent key outside the registry', async () => {
+    expect(findAlgorithm('RSA-8192')).toBeFalsy()
+    await intermediateUnder(10, 'ML-DSA')
+    expect(screen.getByLabelText('common.signatureAlgorithm')).toBeTruthy()
+    expect(screen.getByText('cas.create.digestAutoHint:SHA256')).toBeTruthy()
+    expect(await submit()).toHaveProperty('hashAlgorithm')
   })
 
   it('hides the digest of an RSA intermediate under an ML-DSA parent', async () => {
