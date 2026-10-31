@@ -1,0 +1,24 @@
+{
+  "_comment": [
+    "Certificate key types the ACME client accepts (CERT_KEY_TYPES in",
+    "backend/services/acme/acme_client_service.py) and its forms offer",
+    "(ACME_CLIENT_LABELS in frontend/src/lib/keyAlgorithms.js), in form order.",
+    "",
+    "`ml_dsa` rows exist only on a build with ML-DSA; `fips` says whether FIPS",
+    "mode keeps the key type.",
+    "",
+    "Read by backend/tests/test_acme_client_key_types_contract.py and",
+    "frontend/src/lib/__tests__/acmeClientKeyTypes.test.js."
+  ],
+  "cert_key_types": [
+    { "label": "RSA-2048", "fips": true, "ml_dsa": false },
+    { "label": "RSA-4096", "fips": true, "ml_dsa": false },
+    { "label": "EC-P256", "fips": true, "ml_dsa": false },
+    { "label": "EC-P384", "fips": true, "ml_dsa": false },
+    { "label": "EC-BP256", "fips": false, "ml_dsa": false },
+    { "label": "EC-BP384", "fips": false, "ml_dsa": false },
+    { "label": "ML-DSA-44", "fips": false, "ml_dsa": true },
+    { "label": "ML-DSA-65", "fips": false, "ml_dsa": true },
+    { "label": "ML-DSA-87", "fips": false, "ml_dsa": true }
+  ]
+}

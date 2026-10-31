@@ -3,6 +3,7 @@ import { describe, it, expect, vi } from 'vitest'
 import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import './pageRenderingSetup.jsx'
 import { GROUP_PQ, KEY_ALGORITHMS, listAlgorithms } from '../../lib/keyAlgorithms'
+import { apiClient } from '../../services/apiClient'
 
 vi.mock('../../components', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -96,4 +97,17 @@ describe('HSM key generation, from the registry', () => {
     renderModal(type)
     expect(offered(screen.getByLabelText('common.keyType'))).not.toContain(GROUP_PQ)
   })
+
+  it.each([['on a build without it', { ml_dsa: false }], ['in FIPS mode', { fips: true }]])(
+    'offers no ML-DSA key %s', async (_name, effective) => {
+      apiClient.get.mockImplementation((url) => Promise.resolve(
+        { data: String(url).startsWith('/policies/effective') ? effective : [] }))
+      try {
+        renderModal('pkcs11')
+        await waitFor(() => expect(offered(screen.getByLabelText('common.keyType'))).not.toContain(GROUP_PQ))
+        expect(offered(screen.getByLabelText('common.keyType'))).toContain('rsa')
+      } finally {
+        apiClient.get.mockReset(); apiClient.get.mockResolvedValue({ data: [] })
+      }
+    })
 })

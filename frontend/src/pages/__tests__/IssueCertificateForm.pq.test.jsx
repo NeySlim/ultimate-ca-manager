@@ -99,4 +99,11 @@ describe('IssueCertificateForm ML-DSA', () => {
     await waitFor(() => expect(optionValues('common.keyType')).not.toContain('ml-dsa'))
     expect(optionValues('common.keyType').length).toBeGreaterThan(0)
   })
+
+  it('offers no ML-DSA on a build without it', async () => {
+    renderForm({ allowed_key_types: null, allowed_digests: null, ml_dsa: false })
+    await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
+    await waitFor(() => expect(optionValues('common.keyType')).not.toContain('ml-dsa'))
+    expect(optionValues('common.keyType')).toEqual(['rsa', 'ecdsa'])
+  })
 })

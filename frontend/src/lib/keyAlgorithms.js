@@ -77,7 +77,9 @@ export const KEY_ALGORITHMS = [
   mldsa('44', 2), mldsa('65', 3), mldsa('87', 5),
 ]
 
-export const ACME_CLIENT_LABELS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384']
+// Mirror of the ACME client's CERT_KEY_TYPES (contracts/acme_client_key_types.json)
+export const ACME_CLIENT_LABELS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384',
+  'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']
 export const CSR_LABELS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521', 'EC-BP256', 'EC-BP384', 'EC-BP512',
   'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']
 export const TSA_LABELS = ['RSA-3072', 'RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384',
@@ -129,6 +131,11 @@ export function algorithmName(row, t, key = 'i18nKey') {
 
 export const isFipsApproved = (label) => findAlgorithm(label)?.fips === true
 
+/** Whether this server can use a row: FIPS mode drops what the module does not approve,
+ *  a build without ML-DSA (`mldsa: false`, the effective policy's `ml_dsa`) drops ML-DSA. */
+export const isUsable = (row, { fips = false, mldsa = true } = {}) =>
+  !!row && (!fips || row.fips) && (mldsa || row.family !== 'ML-DSA')
+
 export const isBrainpool = (label) => findAlgorithm(label)?.group === GROUP_BRAINPOOL
 
 /** Whether *label* on HSM type *provider* is mapped but not yet tested against the service. */
@@ -166,13 +173,13 @@ export function caKeyParts(keyType) {
 /**
  * Algorithms a form may offer. `labels` restricts and orders the list, `generate`
  * keeps keys the product creates, `provider` keeps what that HSM type can hold,
- * and FIPS mode hides what the module does not approve.
+ * and `fips` / `mldsa` drop what this server cannot use (see isUsable).
  */
-export function listAlgorithms({ labels, generate = false, provider, fips = false } = {}) {
+export function listAlgorithms({ labels, generate = false, provider, fips = false, mldsa = true } = {}) {
   const rows = labels ? labels.map(findAlgorithm).filter(Boolean) : KEY_ALGORITHMS
   return rows.filter(a =>
     (!generate || a.generate)
-    && (!fips || a.fips)
+    && isUsable(a, { fips, mldsa })
     && (provider === undefined || a.providers == null || a.providers.includes(provider)))
 }
 

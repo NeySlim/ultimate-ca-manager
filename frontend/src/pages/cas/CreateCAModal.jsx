@@ -20,7 +20,7 @@ import { CA_KEY_CHOICES, POLICY_DIGESTS, caKeyLabel, isAllowed, useEffectiveAlgo
 import { PSS_HSM_TYPES } from '../../lib/signatureName'
 import {
   CA_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, defaultDigestFor, defaultKeyChoice, findAlgorithm,
-  groupedOptions, keyFamilyOptions, listAlgorithms,
+  groupedOptions, isUsable, keyFamilyOptions, listAlgorithms,
 } from '../../lib/keyAlgorithms'
 import { BrainpoolNotice, UntestedKeyNotice } from '../../components/BrainpoolNotice'
 import { COMPLIANCE_PROFILE_NAMES, limitsWithProfile, useComplianceDefault, useComplianceProfiles } from '../../lib/complianceProfiles'
@@ -220,11 +220,11 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     setCreateFormKeyUsage(createFormType === 'root' && !mldsaKey ? ROOT_KEY_USAGE : INTERMEDIATE_KEY_USAGE)
     setCreateFormEkuServerAuth(false)
   }, [createFormType, mldsaKey])
-  const fips = policyLimits.fips
+  const { fips, mldsa } = policyLimits
   const allowedLocalKeys = useMemo(
     () => CA_KEY_CHOICES.filter(([algo, size]) => isAllowed(allowedKeyTypes, caKeyLabel(algo, size))
-      && (!fips || listAlgorithms({ labels: [caKeyLabel(algo, size)], fips: true }).length > 0)),
-    [allowedKeyTypes, fips],
+      && isUsable(findAlgorithm(caKeyLabel(algo, size)), { fips, mldsa })),
+    [allowedKeyTypes, fips, mldsa],
   )
   const allowedDigestChoices = useMemo(
     () => POLICY_DIGESTS.filter(d => isAllowed(allowedDigests, d)), [allowedDigests])
@@ -271,9 +271,9 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const hsmProviderType = hsmProviders.find(p => String(p.id) === createFormHsmProviderId)?.provider_type
   // Brainpool only on a PKCS#11 provider; none shown until a provider is chosen
   const hsmAlgorithms = useMemo(
-    () => listAlgorithms({ generate: true, provider: hsmProviderType ?? '', fips })
+    () => listAlgorithms({ generate: true, provider: hsmProviderType ?? '', fips, mldsa })
       .filter(a => isAllowed(allowedKeyTypes, a.label)),
-    [allowedKeyTypes, hsmProviderType, fips])
+    [allowedKeyTypes, hsmProviderType, fips, mldsa])
   const hsmAlgorithmOptions = useMemo(() => hsmAlgorithms.map(a => a.label), [hsmAlgorithms])
   // An HSM key synced from the token may be an RSA size the registry does not list ('RSA-8192')
   const keyIsRsa = keyRow?.family === 'RSA' || /^RSA-\d+$/.test(keyLabel ?? '')

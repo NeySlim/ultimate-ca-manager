@@ -44,6 +44,12 @@ describe('key algorithm registry', () => {
     ])
   })
 
+  it('hides ML-DSA, and only ML-DSA, on a build without it', () => {
+    expect(labels(listAlgorithms({ generate: true, mldsa: false }))).toEqual(
+      labels(listAlgorithms({ generate: true })).filter(l => !l.startsWith('ML-DSA-')))
+    expect(labels(listAlgorithms({ generate: true })).filter(l => l.startsWith('ML-DSA-'))).toHaveLength(3)
+  })
+
   it('holds Brainpool on a PKCS#11 provider only', () => {
     const bp = (provider) => labels(listAlgorithms({ generate: true, provider })).filter(isBrainpool)
     expect(bp('pkcs11')).toEqual(['EC-BP256', 'EC-BP384', 'EC-BP512'])
@@ -52,7 +58,8 @@ describe('key algorithm registry', () => {
 
   it('restricts and orders by the labels a surface passes', () => {
     expect(labels(listAlgorithms({ labels: ACME_CLIENT_LABELS }))).toEqual(
-      ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384'])
+      ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384', 'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87'])
+    expect(labels(listAlgorithms({ labels: ['EC-P384', 'RSA-2048'] }))).toEqual(['EC-P384', 'RSA-2048'])
   })
 
   it('picks the digest of matching strength for a CA key', () => {

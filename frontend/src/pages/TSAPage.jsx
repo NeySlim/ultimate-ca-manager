@@ -21,7 +21,7 @@ import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { certificateLabel } from '../lib/utils'
 import { TSA_LABELS, findAlgorithm, groupedOptions, listAlgorithms } from '../lib/keyAlgorithms'
-import { useFipsMode } from '../lib/policyAlgorithms'
+import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 
 // The signer request names its key as the issue API does: the registry row's `issue` pair
@@ -46,7 +46,7 @@ export default function TSAPage() {
   const [generateOpen, setGenerateOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genForm, setGenForm] = useState(null)
-  const fips = useFipsMode()
+  const platform = useKeyPlatform()
 
   useEffect(() => {
     loadData()
@@ -395,7 +395,7 @@ export default function TSAPage() {
               />
               <Select
                 label={t('tsa.signerGenerateKeyType')}
-                options={groupedOptions(listAlgorithms({ labels: TSA_LABELS, generate: true, fips }), t, k => k.display)}
+                options={groupedOptions(listAlgorithms({ labels: TSA_LABELS, generate: true, ...platform }), t, k => k.display)}
                 value={genForm.key_type}
                 onChange={(val) => setGenForm({ ...genForm, key_type: val })}
               />

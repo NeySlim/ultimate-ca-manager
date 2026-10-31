@@ -2,6 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen, waitFor } from '@testing-library/react'
 
 const getClientSettings = vi.fn()
+const getEffective = vi.fn(() => Promise.resolve({ data: {} }))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({ t: (key) => key }),
@@ -13,6 +14,7 @@ vi.mock('../../../contexts', () => ({
 
 vi.mock('../../../services', () => ({
   acmeService: { getClientSettings: (...args) => getClientSettings(...args) },
+  policiesService: { getEffective: (...args) => getEffective(...args) },
 }))
 
 vi.mock('../../../components', () => ({
@@ -103,7 +105,7 @@ describe('RequestCertificateForm Brainpool', () => {
   it('offers EC-BP256 and EC-BP384 only, with the compatibility notice once picked', () => {
     renderForm()
     const values = Array.from(screen.getByLabelText('acme.keyType').options).map((o) => o.value).filter(Boolean)
-    expect(values).toEqual(['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384'])
+    expect(values.filter(v => v.startsWith('EC-BP'))).toEqual(['EC-BP256', 'EC-BP384'])
     expect(screen.queryByRole('note')).toBeNull()
     fireEvent.change(screen.getByLabelText('acme.keyType'), { target: { value: 'EC-BP384' } })
     expect(screen.getByRole('note').textContent).toContain('common.keyGroups.brainpoolWarning')
@@ -114,4 +116,35 @@ describe('RequestCertificateForm Brainpool', () => {
     submit()
     expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ key_type: 'EC-BP256' }))
   })
+})
+
+describe('RequestCertificateForm ML-DSA', () => {
+  const offered = () => Array.from(screen.getByLabelText('acme.keyType').options).map((o) => o.value).filter(Boolean)
+  const PQ = ['ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']
+
+  beforeEach(() => {
+    getClientSettings.mockReset()
+    getClientSettings.mockResolvedValue({ data: {} })
+    getEffective.mockReset()
+  })
+
+  it('offers the three ML-DSA levels and sends the one picked', () => {
+    getEffective.mockResolvedValue({ data: {} })
+    const onSubmit = renderForm()
+    expect(offered()).toEqual(expect.arrayContaining(PQ))
+    fireEvent.change(screen.getByLabelText('acme.keyType'), { target: { value: 'ML-DSA-65' } })
+    submit()
+    expect(onSubmit).toHaveBeenCalledWith(expect.objectContaining({ key_type: 'ML-DSA-65' }))
+  })
+
+  it.each([['in FIPS mode', { fips: true }], ['on a build without it', { ml_dsa: false }]])(
+    'offers no ML-DSA %s, and drops a configured one', async (_name, effective) => {
+      getEffective.mockResolvedValue({ data: effective })
+      const onSubmit = renderForm({ defaultKeyType: 'ML-DSA-87' })
+      await waitFor(() => expect(offered().filter(v => PQ.includes(v))).toEqual([]))
+      expect(offered()).toContain('EC-P256')
+      await waitFor(() => expect(screen.getByLabelText('acme.keyType').value).toBe(''))
+      submit()
+      expect(onSubmit.mock.calls[0][0]).not.toHaveProperty('key_type')
+    })
 })

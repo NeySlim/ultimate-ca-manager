@@ -21,7 +21,7 @@ import { hsmService } from '../services'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { secretInputProps } from '../lib/secretTarget'
 import { KEY_GROUPS, listAlgorithms } from '../lib/keyAlgorithms'
-import { useFipsMode } from '../lib/policyAlgorithms'
+import { useFipsMode, useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice, UntestedKeyNotice } from '../components/BrainpoolNotice'
 
 const PROVIDER_TYPES = [
@@ -875,9 +875,9 @@ const AES_GROUP = 'aes'
 
 export function KeyModal({ provider, onSave, onClose }) {
   const { t } = useTranslation()
-  const fips = useFipsMode()
+  const platform = useKeyPlatform()
   const providerType = provider?.provider_type ?? ''
-  const asymmetric = listAlgorithms({ generate: true, provider: providerType, fips })
+  const asymmetric = listAlgorithms({ generate: true, provider: providerType, ...platform })
   const groupOptions = [
     ...KEY_GROUPS.filter(g => asymmetric.some(a => a.group === g.id)).map(g => ({ value: g.id, label: t(g.labelKey) })),
     { value: AES_GROUP, label: t('common.keyGroups.aes') },

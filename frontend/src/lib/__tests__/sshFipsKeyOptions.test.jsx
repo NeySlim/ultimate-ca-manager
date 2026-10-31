@@ -8,7 +8,7 @@ import { renderHook, waitFor } from '@testing-library/react'
 const getEffective = vi.fn()
 vi.mock('../../services', () => ({ policiesService: { getEffective: (...a) => getEffective(...a) } }))
 
-import { sshKeyOptions, useFipsMode } from '../policyAlgorithms'
+import { sshKeyOptions, useEffectiveAlgorithms, useFipsMode, useKeyPlatform } from '../policyAlgorithms'
 
 const OPTIONS = [
   { value: 'ed25519', label: 'Ed25519' },
@@ -44,5 +44,29 @@ describe('useFipsMode', () => {
     const { result } = renderHook(() => useFipsMode())
     await waitFor(() => expect(getEffective).toHaveBeenCalled())
     expect(result.current).toBe(false)
+  })
+})
+
+describe('ML-DSA on this build', () => {
+  beforeEach(() => { getEffective.mockReset() })
+
+  it.each([
+    ['useKeyPlatform', () => useKeyPlatform()],
+    ['useEffectiveAlgorithms', () => useEffectiveAlgorithms({ caId: 1 })],
+  ])('%s reads ml_dsa: false as no ML-DSA', async (_name, hook) => {
+    getEffective.mockResolvedValue({ data: { ml_dsa: false } })
+    const { result } = renderHook(hook)
+    await waitFor(() => expect(result.current.mldsa).toBe(false))
+  })
+
+  it.each([
+    ['useKeyPlatform', () => useKeyPlatform()],
+    ['useEffectiveAlgorithms', () => useEffectiveAlgorithms({ caId: 1 })],
+  ])('%s offers ML-DSA when a server does not say', async (_name, hook) => {
+    getEffective.mockResolvedValue({ data: { allowed_key_types: null } })
+    const { result } = renderHook(hook)
+    await waitFor(() => expect(getEffective).toHaveBeenCalled())
+    await waitFor(() => expect(result.current.allowedKeyTypes ?? null).toBe(null))
+    expect(result.current.mldsa).toBe(true)
   })
 })

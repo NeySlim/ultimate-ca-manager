@@ -3,7 +3,7 @@
  * heading, stores their labels as the API names them, and hides them in FIPS mode.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 import { GROUP_PQ, KEY_ALGORITHMS } from '../../lib/keyAlgorithms'
 
 const mocks = vi.hoisted(() => ({ list: vi.fn(), create: vi.fn(), update: vi.fn(), getEffective: vi.fn() }))
@@ -32,7 +32,9 @@ vi.mock('../../hooks', async () => {
 
 vi.mock('../../components', () => ({
   ResponsiveLayout: ({ children, actions, slideOverContent }) => <div>{actions}{children}{slideOverContent}</div>,
-  ResponsiveDataTable: () => null,
+  ResponsiveDataTable: ({ data, onRowClick }) => data.map(row => (
+    <button key={row.id} type="button" onClick={() => onRowClick(row)}>{row.name}</button>
+  )),
   Card: ({ children }) => <div>{children}</div>,
   Badge: ({ children }) => <span>{children}</span>,
   LoadingSpinner: () => null,
@@ -50,6 +52,15 @@ async function openCreate(effective) {
   mocks.getEffective.mockResolvedValue({ data: effective })
   render(<PoliciesPage />)
   fireEvent.click(await screen.findByText('policies.createPolicy'))
+  await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
+}
+
+async function openEdit(policy, effective) {
+  mocks.list.mockResolvedValue({ data: [policy] })
+  mocks.getEffective.mockResolvedValue({ data: effective })
+  render(<PoliciesPage />)
+  fireEvent.click(await screen.findByText(policy.name))
+  fireEvent.click(await screen.findByText('common.edit'))
   await waitFor(() => expect(mocks.getEffective).toHaveBeenCalled())
 }
 
@@ -78,6 +89,23 @@ describe('PoliciesPage ML-DSA key types', () => {
 
   it('hides ML-DSA in FIPS mode', async () => {
     await openCreate({ allowed_key_types: ['RSA-2048'], allowed_digests: null, fips: true })
+    await waitFor(() => expect(screen.queryByText('common.keyGroups.pq')).toBeNull())
+    expect(screen.getByText('common.keyTypes.rsa2048')).toBeTruthy()
+    for (const a of PQ) expect(screen.queryByText(nameOf(a))).toBeNull()
+  })
+
+  it('keeps a ticked ML-DSA key in FIPS mode, so it can be removed', async () => {
+    const policy = { id: 3, name: 'Legacy PQ', operations: ['issuance'], is_active: true, priority: 100,
+      rules: { allowed_key_types: ['RSA-2048', 'ML-DSA-65'] } }
+    await openEdit(policy, { allowed_key_types: null, allowed_digests: null, fips: true })
+    const form = within(screen.getByLabelText('policies.policyName').closest('form'))
+    await waitFor(() => expect(form.queryByText(nameOf(PQ[0]))).toBeNull())
+    expect(form.getByRole('button', { name: nameOf(PQ[1]) })).toBeTruthy()
+    expect(form.queryByText(nameOf(PQ[2]))).toBeNull()
+  })
+
+  it('hides ML-DSA on a build without it', async () => {
+    await openCreate({ allowed_key_types: null, allowed_digests: null, ml_dsa: false })
     await waitFor(() => expect(screen.queryByText('common.keyGroups.pq')).toBeNull())
     expect(screen.getByText('common.keyTypes.rsa2048')).toBeTruthy()
     for (const a of PQ) expect(screen.queryByText(nameOf(a))).toBeNull()

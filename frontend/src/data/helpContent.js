@@ -628,7 +628,7 @@ export const helpContent = {
           { label: 'External CA Accounts', text: 'One or more accounts per CA, several accounts can share the same CA directory URL (e.g. two Let\'s Encrypt accounts for administrative separation); an empty Directory URL defaults to Let\'s Encrypt Production' },
           { label: 'Custom Server', text: 'Set a custom ACME directory URL to use any RFC 8555-compliant CA' },
           { label: 'EAB', text: 'External Account Binding support for CAs that require pre-registration (ZeroSSL, HARICA, etc.)' },
-          { label: 'Key Types', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384 for certificate keys; ML-DSA-44, ML-DSA-65 and ML-DSA-87 through the API only, never in FIPS mode. A configured default this instance cannot generate fails the order instead of falling back to RSA-2048 (v2.248)' },
+          { label: 'Key Types', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384, ML-DSA-44, ML-DSA-65 or ML-DSA-87 for certificate keys; ML-DSA is not offered in FIPS mode or on a build without it. A configured default this instance cannot generate fails the order instead of falling back to RSA-2048 (v2.248)' },
           { label: 'Reused key in FIPS mode', text: 'Reusing the key of a source certificate is refused when FIPS mode does not approve that key, ML-DSA included (v2.248)' },
           { label: 'Account Keys', text: 'ES256 (P-256), ES384 (P-384), or RS256 algorithms for ACME account keys' },
           { label: 'DNS Providers', text: 'Configure DNS-01 challenge providers (Cloudflare, Route53, Tencent DNSPod, Plesk, etc.). Plesk goes through its XML API; Verify TLS Certificate can be turned off for a self-signed panel and a DNS propagation delay added' },

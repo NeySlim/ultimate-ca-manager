@@ -130,8 +130,19 @@ describe('CreateCAModal ML-DSA', () => {
     await waitFor(() => expect(optionValues('common.keyAlgorithm')).toEqual(['RSA', 'ECDSA']))
   })
 
-  async function onHsm(providers) {
-    renderModal({ allowed_key_types: null, allowed_digests: null }, providers)
+  it('offers no ML-DSA on a build without it, locally or on an HSM', async () => {
+    const provider = await onHsm([{ id: 1, name: 'tokens', provider_type: 'pkcs11', enabled: true }],
+      { allowed_key_types: null, allowed_digests: null, ml_dsa: false })
+    fireEvent.change(provider, { target: { value: '1' } })
+    const hsmOffered = optionValues('cas.create.hsmKeyAlgorithm')
+    expect(hsmOffered).toContain('EC-BP256')
+    expect(hsmOffered.filter(l => PQ_ROWS.some(a => a.label === l))).toEqual([])
+    fireEvent.click(screen.getByLabelText('cas.create.keyStorageLocal'))
+    expect(optionValues('common.keyAlgorithm')).toEqual(['RSA', 'ECDSA'])
+  })
+
+  async function onHsm(providers, effective = { allowed_key_types: null, allowed_digests: null }) {
+    renderModal(effective, providers)
     fireEvent.click(await screen.findByLabelText('cas.create.keyStorageHsm'))
     const provider = await screen.findByLabelText('cas.create.hsmProvider')
     await waitFor(() => expect(within(provider).getAllByRole('option').length).toBe(providers.length))

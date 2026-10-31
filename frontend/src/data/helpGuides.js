@@ -937,7 +937,7 @@ Manage your ACME client configuration:
 - **Environment**: Staging (testing) or Production (live certificates)
 - **Contact Email**: Required for account registration
 - **Auto-Renewal**: Automatically renew certificates before expiry
-- **Certificate Key Type**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384. ML-DSA-44, ML-DSA-65 and ML-DSA-87 are accepted through the API (\`key_type\` on the request or in the settings), never in FIPS mode. A configured type this instance cannot generate fails the order instead of falling back to RSA-2048
+- **Certificate Key Type**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384, ML-DSA-44, ML-DSA-65 or ML-DSA-87. ML-DSA is not offered in FIPS mode or on a build without it. A configured type this instance cannot generate fails the order instead of falling back to RSA-2048
 - **Account Key Algorithm**: ES256, ES384, or RS256 for ACME account signing
 
 ### Custom ACME Server

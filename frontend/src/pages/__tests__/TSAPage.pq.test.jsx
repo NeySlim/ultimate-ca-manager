@@ -15,9 +15,10 @@ vi.mock('../../lib/keyAlgorithms', async (importOriginal) => {
 const { GROUP_PQ, KEY_ALGORITHMS, TSA_LABELS, findAlgorithm } = await vi.importActual('../../lib/keyAlgorithms')
 
 let fipsMode = false
+let mldsaBuild = true
 vi.mock('../../lib/policyAlgorithms', async (importOriginal) => ({
   ...(await importOriginal()),
-  useFipsMode: () => fipsMode,
+  useKeyPlatform: () => ({ fips: fipsMode, mldsa: mldsaBuild }),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -100,6 +101,7 @@ describe('TSAPage signer key, from the registry', () => {
   beforeEach(() => {
     vi.clearAllMocks()
     fipsMode = false
+    mldsaBuild = true
     tsaService.getConfig.mockResolvedValue({
       data: { enabled: true, ca_refid: 'ca-tsa', signer_cert_refid: '', signer: { configured: false } },
     })
@@ -155,5 +157,13 @@ describe('TSAPage signer key, from the registry', () => {
     expect(offered.length).toBeGreaterThan(0)
     expect(offered.filter(l => findAlgorithm(l)?.group === GROUP_PQ)).toEqual([])
     expect(offered).toEqual(TSA_LABELS.filter(l => findAlgorithm(l)?.fips))
+  })
+
+  it('hides ML-DSA on a build without it', async () => {
+    mldsaBuild = false
+    const select = await openGenerateModal()
+    const offered = Array.from(select.options).map(o => o.value)
+    expect(offered).toEqual(TSA_LABELS.filter(l => findAlgorithm(l)?.group !== GROUP_PQ && findAlgorithm(l)?.generate))
+    expect(offered).toContain('EC-BP256')
   })
 })

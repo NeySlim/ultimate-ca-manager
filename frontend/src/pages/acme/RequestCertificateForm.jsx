@@ -1,11 +1,11 @@
-import { useEffect, useState } from 'react'
+import { useEffect, useMemo, useState } from 'react'
 import { useTranslation } from 'react-i18next'
 import { Warning, CloudArrowUp, MagnifyingGlass } from '@phosphor-icons/react'
 import { Input, Select, Button } from '../../components'
 import { useNotification } from '../../contexts'
 import { acmeService } from '../../services'
 import { ACME_CLIENT_LABELS, groupedOptions, listAlgorithms } from '../../lib/keyAlgorithms'
-import { useFipsMode } from '../../lib/policyAlgorithms'
+import { useKeyPlatform } from '../../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../../components/BrainpoolNotice'
 
 const KEY_TYPES = ACME_CLIENT_LABELS
@@ -23,7 +23,8 @@ export default function RequestCertificateForm({
 }) {
   const { t } = useTranslation()
   const { showWarning } = useNotification()
-  const fips = useFipsMode()
+  const platform = useKeyPlatform()
+  const keyOptions = useMemo(() => listAlgorithms({ labels: ACME_CLIENT_LABELS, ...platform }), [platform])
   const defaultCaAccountId = caAccounts.find(a => a.is_default)?.id ?? null
   const [formData, setFormData] = useState({
     domains: '',
@@ -53,6 +54,13 @@ export default function RequestCertificateForm({
       .catch(() => {})
     return () => { active = false }
   }, [defaultKeyType])
+
+  // A key type this server cannot use (FIPS mode, no ML-DSA) leaves the choice to the server default
+  useEffect(() => {
+    if (formData.key_type && !keyOptions.some(a => a.label === formData.key_type)) {
+      setFormData(prev => ({ ...prev, key_type: null }))
+    }
+  }, [keyOptions, formData.key_type])
 
   const buildPayload = () => {
     const domainList = formData.domains
@@ -260,7 +268,7 @@ export default function RequestCertificateForm({
           label={t('acme.keyType')}
           value={formData.key_type || ''}
           onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
-          options={groupedOptions(listAlgorithms({ labels: ACME_CLIENT_LABELS, fips }), t)}
+          options={groupedOptions(keyOptions, t)}
           helperText={t('acme.keyTypeHelper')}
         />
       )}

@@ -9,7 +9,7 @@ import { daysRemaining } from '../../lib/utils'
 import { ISSUE_KEY_CHOICES, issueKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 import {
   ISSUE_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmName, defaultKeyChoice, findAlgorithm, groupedOptions,
-  isFipsApproved, isPostQuantum, keyFamilyOptions,
+  isPostQuantum, isUsable, keyFamilyOptions,
 } from '../../lib/keyAlgorithms'
 import { BrainpoolNotice } from '../../components/BrainpoolNotice'
 
@@ -137,13 +137,13 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   }, [initialData])
 
   // Key types the policies of this CA/template allow (#397); the server enforces them regardless
-  const { allowedKeyTypes, fips } = useEffectiveAlgorithms({
+  const { allowedKeyTypes, fips, mldsa } = useEffectiveAlgorithms({
     caId: formData.ca_id, templateId: selectedTemplate, enabled: !!formData.ca_id,
   })
   const allowedKeys = useMemo(
     () => ISSUE_KEY_CHOICES.filter(([type, size]) => isAllowed(allowedKeyTypes, issueKeyLabel(type, size))
-      && (!fips || isFipsApproved(issueKeyLabel(type, size)))),
-    [allowedKeyTypes, fips],
+      && isUsable(findAlgorithm(issueKeyLabel(type, size)), { fips, mldsa })),
+    [allowedKeyTypes, fips, mldsa],
   )
   const noKeyAllowed = allowedKeys.length === 0
   const allowedLabels = useMemo(() => allowedKeys.map(([k, sz]) => issueKeyLabel(k, sz)), [allowedKeys])

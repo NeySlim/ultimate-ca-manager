@@ -32,7 +32,7 @@ export function caKeyLabel(keyAlgo, keySize) {
  * A failed lookup leaves the form unrestricted: the server enforces the rules anyway.
  */
 export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
-  const [state, setState] = useState({ allowedKeyTypes: null, allowedDigests: null, fips: false })
+  const [state, setState] = useState({ allowedKeyTypes: null, allowedDigests: null, fips: false, mldsa: true })
   useEffect(() => {
     if (!enabled) return undefined
     let cancelled = false
@@ -45,10 +45,11 @@ export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
           allowedKeyTypes: Array.isArray(data.allowed_key_types) ? data.allowed_key_types : null,
           allowedDigests: Array.isArray(data.allowed_digests) ? data.allowed_digests : null,
           fips: data.fips === true,
+          mldsa: data.ml_dsa !== false,
         })
       })
       .catch(() => {
-        if (!cancelled) setState({ allowedKeyTypes: null, allowedDigests: null, fips: false })
+        if (!cancelled) setState({ allowedKeyTypes: null, allowedDigests: null, fips: false, mldsa: true })
       })
     return () => { cancelled = true }
   }, [caId, templateId, enabled])
@@ -56,21 +57,27 @@ export function useEffectiveAlgorithms({ caId, templateId, enabled = true }) {
 }
 
 /**
- * Whether the server runs in FIPS mode (#399), read from the effective policy.
- * A failed lookup reads as false: the server refuses what FIPS mode forbids anyway.
+ * What the server can use, from the effective policy: `fips` (FIPS mode, #399) and
+ * `mldsa` (this build has ML-DSA). A failed lookup offers everything: the server refuses anyway.
  */
-export function useFipsMode() {
-  const [fips, setFips] = useState(false)
+export function useKeyPlatform() {
+  const [platform, setPlatform] = useState({ fips: false, mldsa: true })
   useEffect(() => {
     let cancelled = false
     Promise.resolve()
       .then(() => policiesService.getEffective())
-      .then((res) => { if (!cancelled) setFips((extractData(res) || {}).fips === true) })
+      .then((res) => {
+        if (cancelled) return
+        const data = extractData(res) || {}
+        setPlatform({ fips: data.fips === true, mldsa: data.ml_dsa !== false })
+      })
       .catch(() => {})
     return () => { cancelled = true }
   }, [])
-  return fips
+  return platform
 }
+
+export const useFipsMode = () => useKeyPlatform().fips
 
 // SSH key types outside the FIPS module, and the default FIPS mode takes instead
 export const SSH_EDDSA_KEY_TYPES = ['ed25519']
