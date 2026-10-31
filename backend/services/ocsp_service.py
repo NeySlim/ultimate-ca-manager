@@ -11,6 +11,7 @@ from typing import Optional, Tuple
 
 from asn1crypto import core as asn1_core
 from asn1crypto import ocsp as asn1_ocsp
+from asn1crypto import x509 as asn1_x509
 from cryptography import x509
 from cryptography.exceptions import UnsupportedAlgorithm
 from cryptography.x509 import ocsp
@@ -55,6 +56,12 @@ class _SubjectPublicKeyInfo(asn1_core.Sequence):
     _fields = [('algorithm', asn1_core.Any), ('public_key', asn1_core.BitString)]
 
 
+class _TbsCertificate(asn1_x509.TbsCertificate):
+    """TBSCertificate whose SPKI stays as the certificate carries it (v1 or v3)."""
+    _fields = [(name, _SubjectPublicKeyInfo) if name == 'subject_public_key_info' else (name, *rest)
+               for name, *rest in asn1_x509.TbsCertificate._fields]
+
+
 class _OpaqueCertificates(asn1_core.SequenceOf):
     _child_spec = asn1_core.Any
 
@@ -66,10 +73,10 @@ class _BasicOCSPResponse(asn1_ocsp.BasicOCSPResponse):
 
 
 def _subject_public_key_bits(cert: x509.Certificate) -> bytes:
-    """Contents of the subjectPublicKey BIT STRING, which RFC 6960 KeyHash covers."""
-    spki = cert.public_key().public_bytes(
-        serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
-    return _SubjectPublicKeyInfo.load(spki)['public_key'].contents[1:]
+    """Contents of the subjectPublicKey BIT STRING, which RFC 6960 KeyHash covers,
+    read from the certificate: re-encoding the key would decompress an EC point."""
+    tbs = _TbsCertificate.load(cert.tbs_certificate_bytes)
+    return tbs['subject_public_key_info']['public_key'].contents[1:]
 
 
 @dataclass(frozen=True)

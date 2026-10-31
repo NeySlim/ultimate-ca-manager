@@ -804,6 +804,77 @@ class TestResponderIdRfc6960:
             assert responder_id == self._key_hash(responder_cert)
             assert responder_id != self._key_hash(ca_cert)
 
+    @staticmethod
+    def _with_compressed_point(cert, signer_key):
+        """*cert* re-signed with its EC point in compressed form (33 bytes for P-256)."""
+        from asn1crypto import keys as asn1_keys, x509 as asn1_x509
+        from cryptography.hazmat.primitives.asymmetric import ec, padding
+        loaded = asn1_x509.Certificate.load(cert.public_bytes(serialization.Encoding.DER))
+        tbs = loaded['tbs_certificate']
+        point = cert.public_key().public_bytes(
+            serialization.Encoding.X962, serialization.PublicFormat.CompressedPoint)
+        tbs['subject_public_key_info']['public_key'] = asn1_keys.ECPointBitString(point)
+        tbs_der = tbs.dump(force=True)
+        if isinstance(signer_key, ec.EllipticCurvePrivateKey):
+            signature = signer_key.sign(tbs_der, ec.ECDSA(hashes.SHA256()))
+        else:
+            signature = signer_key.sign(tbs_der, padding.PKCS1v15(), hashes.SHA256())
+        der = asn1_x509.Certificate({
+            'tbs_certificate': asn1_x509.TbsCertificate.load(tbs_der),
+            'signature_algorithm': loaded['signature_algorithm'],
+            'signature_value': signature,
+        }).dump()
+        return x509.load_der_x509_certificate(der), point
+
+    def test_compressed_point_responder_hashes_the_certificate_bits(self, app, create_ca, create_cert):
+        """byKey covers the BIT STRING as the certificate carries it, not a re-encoding of the key."""
+        from cryptography.hazmat.primitives.asymmetric import ec
+        with app.app_context():
+            ca = create_ca(cn='ResponderID Compressed CA')
+            first = create_cert(cn='compressed-a.example.com', ca_id=ca['id'])
+            second = create_cert(cn='compressed-b.example.com', ca_id=ca['id'])
+            ca_obj = _ca_model(ca)
+            ca_cert = _load_x509(ca_obj)
+            from services.hsm.ca_key_loader import get_ca_signing_key
+            ca_key = get_ca_signing_key(ca_obj)
+            responder_key = ec.generate_private_key(ec.SECP256R1())
+            responder_cert, point = self._with_compressed_point(
+                _delegated_certificate(ca_cert, ca_key, responder_key), ca_key)
+            assert len(point) == 33
+            _configure_delegated_responder(ca_obj, _cert_model(first), responder_cert, responder_key)
+            expected = hashlib.sha1(point).digest()
+
+            single, _ = OCSPService().generate_response(ca_obj, int(_cert_model(first).serial_number, 16))
+            assert self._responder_id_by_key(single) == expected
+            ids = [_cert_id(_load_x509(_cert_model(c)), ca_cert, hashes.SHA1()) for c in (first, second)]
+            parsed = OCSPService().parse_request_details(_build_asn1_request(ids))
+            multi, _ = OCSPService().generate_multi_response(ca=ca_obj, request_items=parsed.requests)
+            assert self._responder_id_by_key(multi) == expected
+
+    def test_key_bits_of_a_v1_certificate(self):
+        """A v1 certificate (no version field) shifts the SPKI one place left in the TBS."""
+        from asn1crypto import x509 as asn1_x509
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from services.ocsp_service import _subject_public_key_bits
+        key = ec.generate_private_key(ec.SECP256R1())
+        name = x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, 'v1 root')])
+        now = datetime.now(timezone.utc)
+        v3 = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+              .public_key(key.public_key()).serial_number(1)
+              .not_valid_before(now).not_valid_after(now + timedelta(days=1))
+              .sign(key, hashes.SHA256()))
+        loaded = asn1_x509.Certificate.load(v3.public_bytes(serialization.Encoding.DER))
+        loaded['tbs_certificate']['version'] = 'v1'
+        tbs_der = loaded['tbs_certificate'].dump(force=True)
+        v1 = x509.load_der_x509_certificate(asn1_x509.Certificate({
+            'tbs_certificate': asn1_x509.TbsCertificate.load(tbs_der),
+            'signature_algorithm': loaded['signature_algorithm'],
+            'signature_value': key.sign(tbs_der, ec.ECDSA(hashes.SHA256())),
+        }).dump())
+        assert v1.version == x509.Version.v1
+        assert _subject_public_key_bits(v1) == key.public_key().public_bytes(
+            serialization.Encoding.X962, serialization.PublicFormat.UncompressedPoint)
+
 
 class TestDelegatedResponderIssuance:
     """A certificate issued for the responder role must be usable as one.
