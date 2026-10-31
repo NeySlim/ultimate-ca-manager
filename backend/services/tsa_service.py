@@ -11,7 +11,7 @@ from typing import Optional, Tuple
 
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, padding
 from cryptography.x509.oid import ExtendedKeyUsageOID, ExtensionOID
 
 from asn1crypto import tsp, cms, core, x509 as asn1_x509
@@ -45,7 +45,21 @@ HASH_CLASSES = {
 }
 
 
+from utils import key_algorithms
 from utils.signing_hash import signing_hash_for
+
+# EdDSA stays out: UCM signs no RFC 8419 SignerInfo (Ed448 would need SHAKE256)
+TSA_SIGNER_FAMILIES = ('RSA', 'EC', 'ML-DSA')
+
+
+def tsa_signer_key_problem(public_key) -> Optional[str]:
+    """Why *public_key* cannot sign timestamps, None when it can."""
+    family = key_algorithms.family_for_public_key(public_key)
+    if family in TSA_SIGNER_FAMILIES:
+        return None
+    label = key_algorithms.label_for_public_key(public_key) or type(public_key).__name__
+    reason = ' (EdDSA timestamps are not signed)' if family in ('ED25519', 'ED448') else ''
+    return f'A TSA signer key must be RSA, ECDSA or ML-DSA, not {label}{reason}'
 
 
 class TSAConfigurationError(ValueError):
@@ -263,16 +277,23 @@ class TSAService:
         message_imprint_hash: str,
     ) -> bytes:
         """Build TimeStampResp wrapping a CMS SignedData."""
-        if not isinstance(self.tsa_key.public_key(), (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)):
-            raise ValueError('The TSA signer key must be RSA or ECDSA')
-        signature_hash_name = (
-            message_imprint_hash if message_imprint_hash in HASH_CLASSES else 'sha256'
-        )
-        signature_hash = HASH_CLASSES[signature_hash_name]()
-        # An HSM-resident signer may bind the digest to its key: the CMS digest
-        # algorithm and the signature then follow it (self-review of #347)
-        signature_hash = signing_hash_for(self.tsa_key, signature_hash)
-        signature_hash_name = signature_hash.name
+        public_key = self.tsa_key.public_key()
+        problem = tsa_signer_key_problem(public_key)
+        if problem:
+            raise ValueError(problem)
+        pq_alg = key_algorithms.get(key_algorithms.label_for_public_key(public_key))
+        if pq_alg is not None and pq_alg.family == 'ML-DSA':
+            # RFC 9882 §3.3: SHA-512 digests the content; ML-DSA signs without one
+            signature_hash_name = 'sha512'
+        else:
+            pq_alg = None
+            signature_hash_name = (
+                message_imprint_hash if message_imprint_hash in HASH_CLASSES else 'sha256'
+            )
+            # An HSM-resident signer may bind the digest to its key: the CMS digest
+            # algorithm and the signature then follow it (self-review of #347)
+            signature_hash = signing_hash_for(self.tsa_key, HASH_CLASSES[signature_hash_name]())
+            signature_hash_name = signature_hash.name
 
         # Compute digest of TSTInfo content with the CMS signature digest.
         content_digest = hashlib.new(signature_hash_name, tst_info_der).digest()
@@ -318,7 +339,11 @@ class TSAService:
         # PKCS#1 v1.5 even under an RSA-PSS CA: `openssl ts -verify` goes
         # through OpenSSL's PKCS7 code, which verifies v1.5 only
         tsa_key = self.tsa_key
-        if isinstance(tsa_key.public_key(), ec.EllipticCurvePublicKey):
+        if pq_alg is not None:
+            # Pure ML-DSA, empty context, under the parameter set's OID with no parameters
+            raw_sig = tsa_key.sign(signed_attrs_der)
+            sig_alg = pq_alg.oid
+        elif isinstance(public_key, ec.EllipticCurvePublicKey):
             raw_sig = tsa_key.sign(signed_attrs_der, ec.ECDSA(signature_hash))
             sig_alg = f'{signature_hash_name}_ecdsa'
         else:
@@ -394,7 +419,8 @@ class TSAService:
         if status not in ('granted', 'granted_with_mods'):
             return None
         token = response['time_stamp_token']
-        if token.native is None:
+        # Never .native on the token: asn1crypto cannot parse an ML-DSA key in its certificates
+        if isinstance(token, core.Void):
             return None
         tst_info = token['content']['encap_content_info']['content'].parsed
         return {

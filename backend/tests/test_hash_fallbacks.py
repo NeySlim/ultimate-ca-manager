@@ -59,7 +59,7 @@ def test_tsa_refuses_an_eddsa_signer_instead_of_signing_v15():
             .add_extension(x509.ExtendedKeyUsage([x509.oid.ExtendedKeyUsageOID.TIME_STAMPING]), critical=True)
             .sign(key, None))
     tsa = TSAService(cert, key)
-    with pytest.raises(ValueError, match='RSA or ECDSA'):
+    with pytest.raises(ValueError, match='RSA, ECDSA or ML-DSA'):
         tsa._build_signed_response(b'\x30\x00', False, 'sha256')
 
 
@@ -87,4 +87,4 @@ def test_tsa_does_not_offer_an_eddsa_signer(app):
                                                                 serialization.NoEncryption())))
         db.session.add(row); db.session.commit()
         error, _ = _validate_signer_refid(row.refid)
-    assert error and 'RSA or ECDSA' in error
+    assert error and 'RSA, ECDSA or ML-DSA' in error
