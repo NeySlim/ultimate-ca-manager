@@ -59,11 +59,15 @@ def stored_label_approved(text) -> bool:
     return bool(match) and int(match.group(1)) >= 2048
 
 
-def certificate_key(cert: x509.Certificate) -> Tuple[str, bool]:
-    """(display, approved) of a certificate's key; EdDSA is told by its OID, unloaded."""
+def certificate_key(cert) -> Tuple[str, bool]:
+    """(display, approved) of a certificate's or CSR's key; EdDSA and post-quantum
+    keys are told by their OID, unloaded."""
     oid = cert.public_key_algorithm_oid.dotted_string
     if oid in _EDDSA_OIDS:
         return _EDDSA_OIDS[oid], False
+    post_quantum = key_algorithms.post_quantum_info(oid)
+    if post_quantum is not None:
+        return post_quantum.label, False
     try:
         public_key = cert.public_key()
     except Exception:
@@ -334,12 +338,13 @@ def _policies():
     return found
 
 
-def _csr_eddsa(csr_pem) -> Optional[str]:
+def _csr_unapproved_key(csr_pem) -> Optional[str]:
     try:
         csr = x509.load_pem_x509_csr(csr_pem.encode() if isinstance(csr_pem, str) else csr_pem)
-        return _EDDSA_OIDS.get(csr.public_key_algorithm_oid.dotted_string)
     except Exception:
         return None
+    name, approved = certificate_key(csr)
+    return None if approved else name
 
 
 @detector('acme_client.unapproved_key_type', WARNING,
@@ -360,7 +365,7 @@ def _acme_client():
                 display, approved = _stored_cert_key(cert.key_algo, cert.crt)
                 name = None if approved else display
         elif order.key_source == 'csr' and order.csr_pem:
-            name = _csr_eddsa(order.csr_pem)
+            name = _csr_unapproved_key(order.csr_pem)
         elif order.key_type and not stored_label_approved(order.key_type):
             name = order.key_type
         if name:

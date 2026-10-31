@@ -550,6 +550,46 @@ class TestFipsReusedKey:
                 assert csr is None, field
 
 
+class TestFipsExternalCsr:
+    """FIPS mode refuses an external CSR's ML-DSA key at the request, before its signature."""
+
+    @pytest.mark.parametrize('label, tampered, refused', [
+        ('ML-DSA-65', False, True), ('ML-DSA-65', True, True), ('RSA-2048', False, False)])
+    def test_the_request_is_refused_before_any_upstream_order(self, auth_client, monkeypatch,
+                                                              label, tampered, refused):
+        import fips_mode
+        from cryptography.x509.oid import NameOID
+        from services.acme.acme_client_service import AcmeClientService
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        started = []
+
+        def for_issuance(cls, **_k):
+            started.append(True)
+            raise RuntimeError('upstream not reachable in tests')
+        monkeypatch.setattr(AcmeClientService, 'for_issuance', classmethod(for_issuance))
+        key = key_algorithms.get(label).private_class.generate() if label.startswith('ML-DSA') \
+            else key_algorithms.generate(label)
+        domain = 'csr.pq.example.com'
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, domain)]))
+               .add_extension(x509.SubjectAlternativeName([x509.DNSName(domain)]), critical=False)
+               .sign(key, None if label.startswith('ML-DSA') else hashes.SHA256()))
+        der = bytearray(csr.public_bytes(serialization.Encoding.DER))
+        if tampered:
+            der[-1] ^= 0x01
+        pem = x509.load_der_x509_csr(bytes(der)).public_bytes(serialization.Encoding.PEM).decode()
+        r = auth_client.post('/api/v2/acme/client/request', json={
+            'domains': [domain], 'email': 'admin@example.com', 'challenge_type': 'http-01',
+            'environment': 'staging', 'key_source': 'csr', 'csr_pem': pem})
+        message = r.get_json().get('message', '')
+        if refused:
+            assert r.status_code == 400 and message == f'{label} keys not available in FIPS mode', \
+                r.get_json()
+            assert not started
+        else:
+            assert started and 'FIPS' not in message, r.get_json()
+
+
 class _LoopResponse:
     """A Flask test response under the requests.Response names the ACME client reads."""
 

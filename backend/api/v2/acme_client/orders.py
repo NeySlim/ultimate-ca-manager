@@ -26,6 +26,7 @@ from services.acme.acme_client_service import (
     AUTHZ_INVALID_USER_MSG,
     CERT_KEY_TYPES,
     csr_identifiers_match_order,
+    fips_csr_refusal,
     fips_key_type_refusal,
     fips_private_key_refusal,
 )
@@ -242,6 +243,10 @@ def request_certificate():
             csr = load_pem_csr(csr_pem)
         except ValueError as exc:
             return error_response(str(exc), 400)
+        # Before the signature: a FIPS provider cannot verify the keys it refuses
+        refusal = fips_csr_refusal(csr)
+        if refusal:
+            return error_response(refusal, 400)
         if not csr.is_signature_valid:
             return error_response('CSR signature is invalid', 400)
         match_ok, match_msg = csr_identifiers_match_order(csr, domains)

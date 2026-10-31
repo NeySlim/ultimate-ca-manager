@@ -85,6 +85,15 @@ def fips_private_key_refusal(private_key):
     return fips_key_type_refusal(key_algorithms.label_for_private_key(private_key))
 
 
+def fips_csr_refusal(csr):
+    """Why FIPS mode refuses an external CSR's key, or None; read without loading the key."""
+    if not fips_mode.enabled():
+        return None
+    from services.fips_preflight import certificate_key
+    name, approved = certificate_key(csr)
+    return None if approved else f'{name} keys not available in FIPS mode'
+
+
 def csr_identifiers_match_order(
     csr: x509.CertificateSigningRequest,
     order_identifiers: List[str],

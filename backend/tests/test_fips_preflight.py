@@ -362,6 +362,28 @@ def test_acme_client_unapproved_key_type(session):
     _assert_found('acme_client.unapproved_key_type', 2, 'acme.client.key_type', 'reuse.example')
 
 
+def _csr_pem(key):
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'csr.example')]))
+           .sign(key, None if isinstance(key, (ed25519.Ed25519PrivateKey, mldsa.MLDSA65PrivateKey))
+                 else hashes.SHA256()))
+    return csr.public_bytes(serialization.Encoding.PEM).decode()
+
+
+@pytest.mark.skipif(not mldsa_supported(), reason='this build has no ML-DSA')
+def test_acme_client_external_csr_keys(session):
+    for domain, key in (('ed-csr.example', _ed25519()),
+                        ('mldsa-csr.example', mldsa.MLDSA65PrivateKey.generate()),
+                        ('rsa-csr.example', _rsa(2048))):
+        session.add(AcmeClientOrder(domains=json.dumps([domain]), key_source='csr',
+                                    csr_pem=_csr_pem(key)))
+    session.flush()
+    finding = _assert_found('acme_client.unapproved_key_type', 2,
+                            'ed-csr.example', 'mldsa-csr.example (#')
+    assert any(e.endswith(': ML-DSA-65') for e in finding['examples']), finding['examples']
+    assert not any('rsa-csr.example' in e for e in finding['examples'])
+
+
 def test_hsm_softhsm(session):
     session.add(HsmProvider(name='Soft', type='pkcs11',
                             config=json.dumps({'module_path': '/usr/lib/softhsm/libsofthsm2.so'})))
