@@ -473,6 +473,21 @@ def _synthesize_san_from_subject(subject):
     return san_names
 
 
+def _verified_related_certificate(csr, cert_type):
+    """Certificate A a CSR's relatedCertRequest names, once verified (RFC 9763 §3.2); None without one."""
+    from utils import related_cert
+    from services.cert.related_pair import RelatedCertificateRefused, verify_request
+    try:
+        req = related_cert.request_from_csr_der(csr.public_bytes(serialization.Encoding.DER))
+    except related_cert.RelatedCertError as e:
+        raise RelatedCertificateRefused(str(e)) from e
+    if req is None:
+        return None
+    if cert_type == 'intermediate_ca':
+        raise RelatedCertificateRefused('Only an end-entity certificate may name a related certificate')
+    return verify_request(req)[1]
+
+
 class CSROperationsMixin:
     """CSR generation and signing operations mixin"""
 
@@ -486,8 +501,11 @@ class CSROperationsMixin:
         san_email: Optional[List[str]] = None,
         san_uri: Optional[List[str]] = None,
         san_upn: Optional[List[str]] = None,
+        related_certificate: Optional[x509.Certificate] = None,
+        related_private_key=None,
     ) -> Tuple[bytes, bytes]:
-        """Generate a Certificate Signing Request."""
+        """Generate a Certificate Signing Request. With *related_certificate* (A) and
+        its *related_private_key*, the request carries an RFC 9763 relatedCertRequest."""
         # Generate private key
         private_key = KeyOperationsMixin.generate_private_key(key_type)
 
@@ -522,6 +540,12 @@ class CSROperationsMixin:
         # Sign CSR
         hash_algo = signing_hash_for(private_key, hash_algorithm(digest))
         csr = builder.sign(private_key, hash_algo, default_backend())
+        if related_certificate is not None:
+            from utils import related_cert
+            request = related_cert.build_request(
+                related_certificate, related_private_key,
+                related_cert.data_url_for([related_certificate]))
+            csr = related_cert.csr_with_request(csr, private_key, request)
 
         # Serialize
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)
@@ -667,6 +691,7 @@ class CSROperationsMixin:
             raise ValueError(f"CSR public key rejected: {key_err}")
         if require_pop and not csr.is_signature_valid:
             raise ValueError("CSR has invalid signature")
+        related_a = _verified_related_certificate(csr, cert_type)
 
         # Effective subject: an override (if any) wins outright; otherwise
         # fall back to populating CN from the CSR's own first SAN DNS name
@@ -747,14 +772,15 @@ class CSROperationsMixin:
         sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
             policies, ca_private_key, digest,
             explicit=bool((policy_scope or {}).get('digest_explicit', policy_scope is None)),
-            key_type=key_label_for_public_key(csr.public_key()), context=policy_context)
+            key_type=key_label_for_public_key(csr.public_key()), context=policy_context,
+            pq_hybrid=related_a is not None)
         if policy_scope is not None:
             # Name count, validity ceiling and key horizons, for the protocols as for the form
             dns_count = sum(isinstance(n, x509.DNSName) for n in (effective_sans or []))
             limit_violations, capped, capped_by = PolicyEvaluationService.enforce_rules(
                 policies, key_type=key_label_for_public_key(csr.public_key()),
                 dns_name_count=dns_count, validity_days=validity_days,
-                context=policy_context)
+                context=policy_context, pq_hybrid=related_a is not None)
             violations = list(dict.fromkeys(list(violations) + limit_violations))
             if capped_by:
                 logger.info(f"Validity capped to {capped} days by policy '{capped_by}'")
@@ -1136,6 +1162,11 @@ class CSROperationsMixin:
                 x509.TLSFeature([x509.TLSFeatureType.status_request]),
                 critical=False,
             )
+
+        # RFC 9763 §4.1: B asserts nothing A does not carry, and names A by its hash
+        if related_a is not None:
+            from services.cert.related_pair import linked_builder
+            builder = linked_builder(builder, related_a)
 
         # Microsoft Certificate Template extension (szOID_CERTIFICATE_TEMPLATE,
         # 1.3.6.1.4.1.311.21.7) — only WSTEP passes this. Real Windows clients

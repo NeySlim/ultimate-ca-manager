@@ -7,6 +7,7 @@ from typing import Dict, List, Optional
 
 from cryptography import x509
 from cryptography.hazmat.backends import default_backend
+from cryptography.hazmat.primitives import serialization
 
 from models import db, CA, Certificate
 from services.file_regen_service import mirror_private_key
@@ -50,6 +51,21 @@ def _csr_pem_bytes(stored: str) -> bytes:
 from security.encryption import decrypt_private_key, encrypt_private_key
 from utils.key_codec import load_pem_bytes
 
+
+def _related_signer(cert_id):
+    """``(certificate, private key)`` of the certificate A a relatedCertRequest names."""
+    row = db.session.get(Certificate, cert_id)
+    if row is None or not row.crt:
+        raise ValueError('Related certificate not found')
+    if row.revoked:
+        raise ValueError('The related certificate is revoked')
+    if not row.prv:
+        raise ValueError('The server does not hold the key of the related certificate')
+    cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+    key = serialization.load_pem_private_key(
+        load_pem_bytes(row.prv, context=f'certificate {row.id}'), password=None)
+    return cert, key
+
 class CSRMixin:
 
     @staticmethod
@@ -63,7 +79,8 @@ class CSRMixin:
         san_email: Optional[List[str]] = None,
         san_uri: Optional[List[str]] = None,
         san_upn: Optional[List[str]] = None,
-        username: str = 'system'
+        username: str = 'system',
+        related_to: Optional[int] = None,
     ) -> Certificate:
         """
         Generate a Certificate Signing Request
@@ -79,12 +96,16 @@ class CSRMixin:
             san_uri: URI SANs
             san_upn: UPN SANs (Microsoft User Principal Name, OID 1.3.6.1.4.1.311.20.2.3)
             username: User generating CSR
+            related_to: id of a certificate A whose stored key signs an RFC 9763
+                relatedCertRequest in the CSR
 
         Returns:
             Certificate record with CSR
         """
         # Build subject
         subject = TrustStoreService.build_subject(dn)
+        related_certificate, related_key = (
+            _related_signer(related_to) if related_to is not None else (None, None))
 
         # Generate CSR
         csr_pem, key_pem = TrustStoreService.generate_csr(
@@ -95,7 +116,9 @@ class CSRMixin:
             san_ip=san_ip,
             san_email=san_email,
             san_uri=san_uri,
-            san_upn=san_upn
+            san_upn=san_upn,
+            related_certificate=related_certificate,
+            related_private_key=related_key,
         )
 
         # Parse CSR
@@ -376,6 +399,10 @@ class CSRMixin:
                 # A CA key that fixes its own hash ignored the digest
                 digest=digest if cert.signature_hash_algorithm is not None else None,
             )
+
+        # RFC 9763: the A the request named and the certificate now names
+        from services.cert.related_pair import link_issued
+        link_issued(certificate, cert, csr_obj.public_bytes(serialization.Encoding.DER))
 
         # Store SANs
         if san_dns_list:

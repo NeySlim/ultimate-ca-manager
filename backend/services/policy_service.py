@@ -447,7 +447,7 @@ class PolicyEvaluationService:
     @staticmethod
     def checked_signing_hash(policies: list, ca_key, digest=None, *, explicit=True,
                              key_type=None, context=None, validity_days=None, not_after=None,
-                             tsa_signer=False, notices=None, ca_id=None):
+                             tsa_signer=False, notices=None, ca_id=None, pq_hybrid=False):
         """``(hash for builder.sign(), violations)``. An implicit *digest* yields
         to the weakest one the policies allow; the hash the key really signs
         with (HSM-bound, None for Ed25519, Ed448 and ML-DSA) is then checked with *key_type*,
@@ -472,7 +472,7 @@ class PolicyEvaluationService:
             policies, key_type=key_type,
             digest=sign_hash.name if sign_hash is not None else None, context=context,
             signer=ca_key, validity_days=validity_days, not_after=not_after,
-            tsa_signer=tsa_signer, notices=notices, ca_id=ca_id)
+            tsa_signer=tsa_signer, notices=notices, ca_id=ca_id, pq_hybrid=pq_hybrid)
         return sign_hash, violations
 
     @staticmethod
