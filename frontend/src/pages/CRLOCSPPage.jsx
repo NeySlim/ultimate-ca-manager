@@ -1099,12 +1099,14 @@ export default function CRLOCSPPage() {
                 <option value="72">72h</option>
               </select>
             </div>
+            {/* crl_digest is null when the CA key fixes its own hash (ML-DSA, EdDSA) */}
+            {selectedCA?.crl_digest && (
             <div className="flex items-center gap-2">
               <label htmlFor="crl-digest" className="text-xs text-text-secondary">{t('crlOcsp.crlDigest')}</label>
               <select
                 id="crl-digest"
                 className="text-xs bg-bg-tertiary border border-border rounded px-2 py-1 text-text-primary"
-                value={selectedCA?.crl_digest || 'sha256'}
+                value={selectedCA.crl_digest}
                 onChange={(e) => handleCrlScheduleChange(selectedCA, 'digest', e.target.value)}
                 disabled={!canWrite('crl')}
               >
@@ -1113,6 +1115,7 @@ export default function CRLOCSPPage() {
                 <option value="sha512">SHA-512</option>
               </select>
             </div>
+            )}
           </div>
           <p className="text-xs text-text-tertiary">{t('crlOcsp.crlScheduleNote')}</p>
         </div>
