@@ -1320,7 +1320,7 @@ class TestResponderKeyOwnership:
             row = self._stored(ca_obj, cert, key, 'keyown-right')
             assert OCSPService().check_delegated_responder(ca_obj, row) is None
 
-    @pytest.mark.parametrize('bits, refused', [(1024, True), (2048, False)])
+    @pytest.mark.parametrize('bits, refused', [(1024, True), (2048, False), (2560, False)])
     def test_fips_mode_refuses_a_weak_responder_key(self, app, create_ca, monkeypatch, bits, refused):
         import fips_mode
         monkeypatch.setattr(fips_mode, 'enabled', lambda: True)

@@ -245,8 +245,15 @@ def test_fips_mode_refuses_an_mldsa_signer_key(monkeypatch):
     from services.tsa_service import tsa_signer_key_problem
     mldsa = key_algorithms.generate('ML-DSA-65').public_key()
     monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
-    assert 'FIPS' in tsa_signer_key_problem(mldsa)
+    assert tsa_signer_key_problem(mldsa) == 'ML-DSA-65 keys are not approved for the TSA signer in FIPS mode'
     assert tsa_signer_key_problem(rsa.generate_private_key(65537, 2048).public_key()) is None
+
+
+@pytest.mark.parametrize('bits, approved', [(1024, False), (2560, True)])
+def test_fips_mode_judges_off_registry_rsa_by_size(fips_on, bits, approved):
+    from services.tsa_service import tsa_signer_key_problem
+    problem = tsa_signer_key_problem(rsa.generate_private_key(65537, bits).public_key())
+    assert (problem is None) == approved
 
 
 def test_fips_mode_refuses_to_select_an_mldsa_signer(

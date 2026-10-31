@@ -61,8 +61,8 @@ def tsa_signer_key_problem(public_key) -> Optional[str]:
         reason = ' (EdDSA timestamps are not signed)' if family in ('ED25519', 'ED448') else ''
         return f'A TSA signer key must be RSA, ECDSA or ML-DSA, not {label or type(public_key).__name__}{reason}'
     # Same rule as the OCSP responder: FIPS mode signs with approved keys only
-    if fips_mode.enabled() and not key_algorithms.fips_approved(label):
-        return f'A {label or family} TSA signer key is not approved in FIPS mode'
+    if fips_mode.enabled() and not key_algorithms.fips_approved_for_key(public_key):
+        return f'{label or family} keys are not approved for the TSA signer in FIPS mode'
     return None
 
 

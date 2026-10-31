@@ -487,7 +487,7 @@ class OCSPService:
         from utils.cert_issuer import private_key_matches
         if not private_key_matches(key, resp_cert):
             return 'private key does not match the certificate'
-        if fips_mode.enabled() and not key_algorithms.fips_approved(key_algorithms.label_for_private_key(key)):
+        if fips_mode.enabled() and not key_algorithms.fips_approved_for_key(key):
             return 'key is not approved in FIPS mode'
         return None
 
