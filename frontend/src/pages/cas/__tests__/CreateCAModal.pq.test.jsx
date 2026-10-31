@@ -58,11 +58,25 @@ const ML_DSA_65 = findAlgorithm('ML-DSA-65')
 const optionValues = (label) =>
   within(screen.getByLabelText(label)).getAllByRole('option').map((o) => o.value)
 
-function renderModal(effective, providers = []) {
+function renderModal(effective, providers = [], cas = []) {
   mocks.getProviders.mockResolvedValue({ data: providers })
   mocks.create.mockResolvedValue({ data: { id: 1 } })
   mocks.getEffective.mockResolvedValue({ data: effective })
-  render(<CreateCAModal open onClose={vi.fn()} cas={[]} onSuccess={vi.fn()} />)
+  render(<CreateCAModal open onClose={vi.fn()} cas={cas} onSuccess={vi.fn()} />)
+}
+
+const PARENTS = [
+  { id: 7, name: 'RSA root', has_private_key: true, key_type: 'RSA 3072' },
+  { id: 8, name: 'PQ root', has_private_key: true, key_type: 'ML-DSA-65' },
+  { id: 9, name: 'P-384 root', has_private_key: true, key_type: 'EC secp384r1' },
+]
+
+async function intermediateUnder(parentId, keyAlgo, effective = { allowed_key_types: null, allowed_digests: null }) {
+  renderModal(effective, [], PARENTS)
+  await waitFor(() => expect(optionValues('common.keyAlgorithm')).toContain('ML-DSA'))
+  fireEvent.change(screen.getByLabelText('common.type'), { target: { value: 'intermediate' } })
+  fireEvent.change(screen.getByLabelText('cas.parentCA'), { target: { value: String(parentId) } })
+  fireEvent.change(screen.getByLabelText('common.keyAlgorithm'), { target: { value: keyAlgo } })
 }
 
 async function submit() {
@@ -128,5 +142,29 @@ describe('CreateCAModal ML-DSA', () => {
       expect(offered.length).toBeGreaterThan(0)
       expect(offered.filter(l => PQ_ROWS.some(a => a.label === l))).toEqual([])
     }
+  })
+
+  // The parent signs an intermediate: its key, not the child's, decides whether a digest applies
+  it('offers and sends a digest for an ML-DSA intermediate under an RSA parent', async () => {
+    await intermediateUnder(7, 'ML-DSA')
+    fireEvent.change(screen.getByLabelText('common.signatureAlgorithm'), { target: { value: 'sha512' } })
+    expect(await submit()).toMatchObject({ keyAlgo: 'ML-DSA', hashAlgorithm: 'sha512' })
+  })
+
+  it("proposes the parent's digest for 'auto' when the child takes none", async () => {
+    await intermediateUnder(9, 'ML-DSA')
+    expect(screen.getByText('cas.create.digestAutoHint:SHA384')).toBeTruthy()
+  })
+
+  it('hides the digest of an RSA intermediate under an ML-DSA parent', async () => {
+    await intermediateUnder(8, 'RSA')
+    expect(screen.queryByLabelText('common.signatureAlgorithm')).toBeNull()
+    expect(await submit()).not.toHaveProperty('hashAlgorithm')
+  })
+
+  it('lets an RSA intermediate under an ML-DSA parent through a policy allowing no digest', async () => {
+    await intermediateUnder(8, 'RSA', { allowed_key_types: null, allowed_digests: [] })
+    expect(screen.queryByText('cas.create.noDigestAllowedByPolicy')).toBeNull()
+    expect(screen.getByText('common.createCA').closest('button').disabled).toBe(false)
   })
 })

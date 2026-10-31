@@ -19,7 +19,7 @@ import { signingCas, unlistedSigningCas } from '../../lib/caSelection'
 import { CA_KEY_CHOICES, POLICY_DIGESTS, caKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 import { PSS_HSM_TYPES } from '../../lib/signatureName'
 import {
-  CA_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmName, defaultDigestFor, defaultKeyChoice, findAlgorithm,
+  CA_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, defaultDigestFor, defaultKeyChoice, findAlgorithm,
   groupedOptions, keyFamilyOptions, listAlgorithms,
 } from '../../lib/keyAlgorithms'
 import { BrainpoolNotice } from '../../components/BrainpoolNotice'
@@ -221,11 +221,18 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     () => POLICY_DIGESTS.filter(d => isAllowed(allowedDigests, d)), [allowedDigests])
   const noKeyAllowed = allowedLocalKeys.length === 0
   const localKeyRow = findAlgorithm(caKeyLabel(createFormKeyAlgo, createFormKeySize))
-  // A key that signs without a separate hash (ML-DSA) has no digest to pick
-  const keyHasDigest = keyStorage !== 'local' || localKeyRow?.digest !== null
+  // The parent signs an intermediate: its key decides whether a digest applies (ML-DSA takes none)
+  const parentKeyType = createFormType === 'intermediate'
+    ? (cas || []).find(c => String(c.id) === String(createFormParentCAId))?.key_type
+    : null
+  const parentKeyRow = algorithmForKeyType(parentKeyType)
+  const childHasDigest = keyStorage !== 'local' || localKeyRow?.digest !== null
+  // A parent key outside the registry (RSA-8192) takes a digest, as on the server
+  const keyHasDigest = parentKeyType ? parentKeyRow?.digest !== null : childHasDigest
   const noDigestAllowed = keyHasDigest && allowedDigestChoices.length === 0
-  // 'auto' resolves like the server: the key's own digest when allowed, else the weakest allowed
-  const suggested = defaultDigestFor(createFormKeyAlgo, createFormKeySize)
+  // 'auto' resolves like the server: the child key's digest, the parent's when the child takes none
+  const suggested = (childHasDigest ? null : parentKeyRow?.digest)
+    || defaultDigestFor(createFormKeyAlgo, createFormKeySize)
   const autoDigest = allowedDigestChoices.includes(suggested) ? suggested : allowedDigestChoices[0]
   const validityDaysValue = createFormValidity === CUSTOM_VALIDITY
     ? parseInt(createFormValidityDays) : parseInt(createFormValidity) * 365
