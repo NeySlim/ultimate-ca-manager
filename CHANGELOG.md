@@ -67,6 +67,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Settings: the mTLS trusted CA picker hid CAs without a key, although the trusted CA is the anchor of client certificates; it now lists every CA whose certificate is not revoked, keyless or offline included, and keeps the saved one. The ACME domain form no longer puts a space between two Japanese or Chinese sentences.
 
+- API: an HTTP error without a dedicated handler, such as a request whose body is not JSON, answered 500 with a stack trace in the log; it now keeps its own status (415, 401, 403...). A bare POST to `/api/v2/auth/methods` answers like the GET.
+
 ### Security
 
 - dnspython 2.9.1 (CVE-2026-114605): a DNS message with a long chain of compression pointers, sent to the RFC 2136 listener or returned by a resolver, could hold a CPU. The listener reads compressed names the same way under the new version.

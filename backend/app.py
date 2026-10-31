@@ -14,6 +14,7 @@ from flask_caching import Cache
 from flask_session import Session
 from flask_limiter import Limiter
 from flask_limiter.util import get_remote_address
+from werkzeug.exceptions import HTTPException
 from werkzeug.middleware.proxy_fix import ProxyFix
 from flasgger import Swagger
 
@@ -1130,6 +1131,11 @@ def create_app(config_name=None):
     
     @app.errorhandler(Exception)
     def handle_exception(e):
+        # An HTTP error without its own handler (401, 403, 415, 429...) keeps its status
+        if isinstance(e, HTTPException):
+            if e.code is None or not request.path.startswith('/api/'):
+                return e
+            return _json_error(e.code, e.description or e.name)
         from fips_mode import FipsRestricted, PROBLEM_TYPE as FIPS_PROBLEM
         if isinstance(e, FipsRestricted):
             from compliance_profiles import ProfileRestricted, PROBLEM_TYPE as PROFILE_PROBLEM

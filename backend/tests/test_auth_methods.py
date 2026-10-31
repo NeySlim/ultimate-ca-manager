@@ -72,6 +72,18 @@ class TestDetectAuthMethods:
         r = _post(client, '/api/v2/auth/methods', {})
         assert r.status_code == 200
 
+    def test_post_methods_without_json_detects_like_get(self, client):
+        """A bare POST (curl -X POST) answers like the GET, not 415 or 500."""
+        r = client.post('/api/v2/auth/methods')
+        assert r.status_code == 200
+        assert get_json(r)['data']['password'] is True
+
+    def test_an_http_error_keeps_its_status(self, client):
+        """An API route rejecting a non-JSON body answers 415, not 500."""
+        r = client.post('/api/v2/auth/login/password', data='x', content_type='text/plain')
+        assert r.status_code == 415
+        assert get_json(r)['status'] == 415
+
     def test_auth_methods_ignores_spoofed_proxy_headers(
         self, client, app, monkeypatch,
     ):

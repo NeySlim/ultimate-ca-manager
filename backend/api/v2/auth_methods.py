@@ -122,8 +122,9 @@ def detect_auth_methods():
 
     # Check for username in POST body
     username = None
-    if request.method == 'POST' and request.json:
-        username = request.json.get('username')
+    if request.method == 'POST':
+        # A POST without a JSON body detects like a GET instead of failing
+        username = (request.get_json(silent=True) or {}).get('username')
 
     # Pre-authentication: never expose per-user credential counts (username oracle).
 
