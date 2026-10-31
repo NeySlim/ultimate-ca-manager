@@ -124,7 +124,7 @@ def test_the_service_says_which_providers_hold_ml_dsa():
 
 
 @pytest.mark.parametrize('provider_type, library', [
-    ('google-kms', 'google-cloud-kms 3.11.0'), ('pkcs11', 'python-pkcs11 0.10.0')])
+    ('google-kms', 'google-cloud-kms 3.11.0'), ('pkcs11', 'python-pkcs11 0.9.5')])
 def test_a_client_library_too_old_is_named_not_the_type(monkeypatch, provider_type, library):
     import services.hsm  # noqa: F401
     from services.hsm import HsmService
@@ -136,6 +136,19 @@ def test_a_client_library_too_old_is_named_not_the_type(monkeypatch, provider_ty
                     _refusal_of(object.__new__(provider_class), 'ML-DSA-65')):
         assert 'ML-DSA keys are not available' in message and library in message
         assert 'needs a PKCS#11 3.2 token' not in message
+
+
+@pytest.mark.parametrize('provider_type', ['google-kms', 'pkcs11'])
+def test_the_library_named_is_the_floor_requirements_install(provider_type):
+    import pathlib
+    import services.hsm  # noqa: F401
+    from services.hsm import HsmService
+    provider_class = HsmService._provider_registry.get(provider_type)
+    if provider_class is None:
+        pytest.skip(f'{provider_type} not registered')
+    package, version = provider_class.ML_DSA_LIBRARY.split()
+    requirements = (pathlib.Path(__file__).parents[1] / 'requirements.txt').read_text().split()
+    assert f'{package}>={version}' in requirements
 
 
 def _refusal_of(provider, algorithm):

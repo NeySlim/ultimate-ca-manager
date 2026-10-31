@@ -55,8 +55,9 @@ class _Object:
 class _Session:
     """Holds ML-DSA key pairs the way a PKCS#11 3.2 token does."""
 
-    def __init__(self):
+    def __init__(self, reports_parameter_set=True):
         self.objects, self.generated, self.sign_calls = [], [], []
+        self.reports_parameter_set = reports_parameter_set
 
     def add_pair(self, label, key_id=b'\x01', on_private=True, on_public=True):
         pset, cls = LEVELS[label]
@@ -80,7 +81,8 @@ class _Session:
         self.generated.append((key_type, kwargs.get('mechanism'), kwargs.get('public_template')))
         pset = (kwargs.get('public_template') or {}).get(Attribute.PARAMETER_SET)
         label = next(name for name, (value, _cls) in LEVELS.items() if value == pset)
-        pub, priv, _key = self.add_pair(label, key_id=kwargs['id'])
+        shown = self.reports_parameter_set
+        pub, priv, _key = self.add_pair(label, key_id=kwargs['id'], on_private=shown, on_public=shown)
         return pub, priv
 
 
@@ -130,6 +132,21 @@ def test_an_unreadable_parameter_set_is_a_listing_error_not_unknown(parameter_se
         priv.attrs[Attribute.PARAMETER_SET] = parameter_set
     assert provider.list_keys() == []
     assert len(provider.list_errors) == 1 and 'parameter set' in provider.list_errors[0]
+
+
+def test_generation_on_a_token_silent_on_the_parameter_set_uses_the_requested_one():
+    provider = _provider()
+    provider._session.reports_parameter_set = False
+    info = provider.generate_key('gen', 'ML-DSA-65')
+    assert info.algorithm == 'ML-DSA-65'
+    assert key_algorithms.label_for_public_key(_spki(info.public_key_pem)) == 'ML-DSA-65'
+
+
+def test_exporting_a_key_silent_on_the_parameter_set_is_an_hsm_error():
+    provider = _provider()
+    provider._session.add_pair('ML-DSA-65', on_private=False, on_public=False)
+    with pytest.raises(HsmOperationError, match='parameter set'):
+        provider.get_public_key('01')
 
 
 def test_sign_is_pure_ml_dsa_over_the_data():

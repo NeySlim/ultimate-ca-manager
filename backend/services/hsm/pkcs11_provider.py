@@ -25,7 +25,7 @@ logger = logging.getLogger(__name__)
 PKCS11_AVAILABLE = False
 ALGORITHM_TO_PKCS11 = {}
 SIGN_MECHANISMS = {}
-ML_DSA_PARAMETER_SETS = {}  # label -> CKP_ML_DSA_* (PKCS#11 3.2), empty on python-pkcs11 < 0.9
+ML_DSA_PARAMETER_SETS = {}  # label -> CKP_ML_DSA_* (PKCS#11 3.2), empty on python-pkcs11 < 0.9.5
 _ML_DSA_KEY_TYPE = None
 
 try:
@@ -109,7 +109,7 @@ class Pkcs11Provider(BaseHsmProvider):
     SIGNS_PSS = True
     SIGNS_BRAINPOOL = True
     SIGNS_ML_DSA = bool(ML_DSA_PARAMETER_SETS)
-    ML_DSA_LIBRARY = 'python-pkcs11 0.10.0'
+    ML_DSA_LIBRARY = 'python-pkcs11 0.9.5'
     
     def __init__(self, config: Dict[str, Any]):
         if not PKCS11_AVAILABLE:
@@ -508,8 +508,12 @@ class Pkcs11Provider(BaseHsmProvider):
     
     def _export_mldsa_public_key(self, pub_key, algorithm: Optional[str] = None) -> str:
         """RFC 9881 SubjectPublicKeyInfo PEM from CKA_VALUE, the raw FIPS 204 public key."""
-        label = self._mldsa_algorithm(pub_key, None)
-        if label == 'UNKNOWN':
+        try:
+            label = self._mldsa_algorithm(pub_key, None)
+        except ValueError as e:
+            # A freshly generated pair holds the set it was asked for, read back or not
+            if not algorithm:
+                raise HsmOperationError(str(e)) from e
             label = algorithm
         registered = key_algorithms.get(label) if label else None
         if registered is None or registered.family != 'ML-DSA':
