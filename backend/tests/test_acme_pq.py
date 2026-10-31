@@ -413,6 +413,22 @@ class TestUnknownConfiguredKeyType:
             with pytest.raises(ValueError, match='ML-DSA-99'):
                 AcmeClientService._get_default_key_type()
 
+    def test_fips_mode_refuses_a_configured_mldsa_default(self, app, auth_client,
+                                                          client_key_type, monkeypatch):
+        import fips_mode
+        from services.acme.acme_client_service import AcmeClientService
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        monkeypatch.setattr(AcmeClientService, 'for_issuance', classmethod(
+            lambda cls, **_k: pytest.fail('an upstream order was started')))
+        client_key_type('ML-DSA-44')
+        with app.app_context():
+            with pytest.raises(ValueError, match='FIPS'):
+                AcmeClientService._get_default_key_type()
+        r = auth_client.post('/api/v2/acme/client/request', json={
+            'domains': ['fips-default.pq.example.com'], 'email': 'admin@example.com',
+            'challenge_type': 'http-01', 'environment': 'staging'})
+        assert r.status_code == 400 and 'FIPS' in r.get_json()['message']
+
     def test_finalize_reports_it_instead_of_signing_rsa(self, app, client_key_type):
         from models.acme_models import AcmeClientOrder
         from tests.test_acme_client_key_type import _finalize as client_finalize

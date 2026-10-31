@@ -267,8 +267,6 @@ def request_certificate():
             key_type = AcmeClientService._get_default_key_type()
         except ValueError as exc:
             return error_response(str(exc), 400)
-        if fips_key_type_refusal(key_type):
-            return error_response(fips_key_type_refusal(key_type), 400)
 
     # Create order
     try:

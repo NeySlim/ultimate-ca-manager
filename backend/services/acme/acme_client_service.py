@@ -1658,7 +1658,8 @@ class AcmeClientService:
     @staticmethod
     def _get_default_key_type() -> str:
         """The certificate key type setting, RSA-2048 when unset; ValueError when this
-        instance cannot generate the configured type (never another type in its place)."""
+        instance cannot generate the configured type, FIPS mode included (never another
+        type in its place)."""
         cfg = SystemConfig.query.filter_by(key='acme.client.key_type').first()
         kt = (cfg.value or '').strip() if cfg else ''
         if not kt:
@@ -1666,6 +1667,9 @@ class AcmeClientService:
         if kt not in CERT_KEY_TYPES:
             raise ValueError(f'Configured ACME certificate key type {kt} is not supported here '
                              f'(one of {", ".join(CERT_KEY_TYPES)})')
+        refusal = fips_key_type_refusal(kt)
+        if refusal:
+            raise ValueError(refusal)
         return kt
 
     def _generate_cert_key(self, order):
