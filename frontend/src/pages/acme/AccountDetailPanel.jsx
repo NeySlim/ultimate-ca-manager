@@ -49,7 +49,7 @@ export default function AccountDetailPanel({ account, orders, challenges, detail
       />
 
       <CompactStats stats={[
-        // The account list does not return the key type: no guess when it is absent
+        // key_type is read from the stored JWK and null when unreadable: never a guess
         ...(account.key_type ? [{ icon: Key, value: account.key_type }] : []),
         { icon: Globe, value: `${orders.length} ${t('acme.orders').toLowerCase()}` },
         { icon: ShieldCheck, value: `${challenges.length} ${t('common.challenges').toLowerCase()}` },

@@ -130,10 +130,9 @@ describe('AccountDetailPanel key type', () => {
     expect(screen.getAllByText(account.key_type).length).toBeGreaterThanOrEqual(1)
   })
 
-  // The account list does not return the key: a client may have registered any of them
+  // The API sends key_type null for a JWK it cannot read: no label is guessed
   it('names no key type for an account that carries none', () => {
-    const { key_type: _omitted, ...withoutKey } = account
-    renderPanel({ account: withoutKey })
+    renderPanel({ account: { ...account, key_type: null } })
     expect(KEY_ALGORITHMS.filter(row => screen.queryAllByText(row.label).length)).toEqual([])
   })
 })

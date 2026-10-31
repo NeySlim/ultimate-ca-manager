@@ -53,6 +53,21 @@ def _public_jwk(private_key) -> dict:
     raise ValueError(f'Unsupported ACME account key: {type(public_key).__name__}')
 
 
+def _jwk_key_label(jwk_text):
+    """Registry label of the key a stored JWK holds ('RSA-2048', 'EC-P256'), None if unreadable."""
+    try:
+        jwk = json.loads(jwk_text) if isinstance(jwk_text, str) else jwk_text
+        if jwk.get('kty') == 'RSA':
+            n = base64.urlsafe_b64decode(jwk['n'] + '=' * (-len(jwk['n']) % 4))
+            bits = int.from_bytes(n, 'big').bit_length()
+            return f'RSA-{bits}' if bits else None
+        if jwk.get('kty') in ('EC', 'OKP'):
+            return key_algorithms.normalize_label(jwk.get('crv'))
+    except (AttributeError, KeyError, TypeError, ValueError):
+        pass
+    return None
+
+
 @bp.route('/api/v2/acme/accounts', methods=['GET'])
 @require_auth(['read:acme'])
 def list_acme_accounts():
@@ -75,6 +90,7 @@ def list_acme_accounts():
             'contact': acc.contact_list,
             'terms_of_service_agreed': acc.terms_of_service_agreed,
             'jwk_thumbprint': acc.jwk_thumbprint,
+            'key_type': _jwk_key_label(acc.jwk),
             'orders_count': order_counts.get(acc.account_id, 0),
             'created_at': utc_isoformat(acc.created_at)
         })
@@ -216,6 +232,7 @@ def get_acme_account(account_id):
         'contact': acc.contact_list,
         'terms_of_service_agreed': acc.terms_of_service_agreed,
         'jwk_thumbprint': acc.jwk_thumbprint,
+        'key_type': _jwk_key_label(acc.jwk),
         'created_at': utc_isoformat(acc.created_at)
     })
 
