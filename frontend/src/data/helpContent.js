@@ -477,6 +477,7 @@ export const helpContent = {
           { label: 'Signing CA', text: 'Select which CA signs SCEP-enrolled certificates. Devices encrypt their request to this CA, so it must hold an RSA key in software: EC, HSM-backed, keyless, offline and revoked CAs are not listed (v2.248)' },
           { label: 'Auto-Approve', text: 'Automatically approve requests with valid challenge passwords' },
           { label: 'Challenge Password', text: 'Shared secret that devices use to authenticate enrollment' },
+          { label: 'Device keys (v2.248)', text: 'A device signs its request with an RSA, ECDSA, Ed25519 or ML-DSA key; an ML-DSA signature follows RFC 9882 (SHA-512 digest). Ed448 is refused, and ML-DSA too in FIPS mode' },
         ]
       },
       {
@@ -536,7 +537,7 @@ export const helpContent = {
           { label: '/simpleenroll', text: 'Submit a CSR and receive a signed certificate' },
           { label: '/simplereenroll', text: 'Renew an existing certificate (requires mTLS)' },
           { label: '/csrattrs', text: 'Get CSR attributes recommended by the server' },
-          { label: '/serverkeygen', text: 'Server generates the key pair and returns certificate + key' },
+          { label: '/serverkeygen', text: 'Server generates an RSA-2048 key pair and returns certificate + key; a request carrying a post-quantum key is refused with 400: generate an ML-DSA key on the device and use /simpleenroll (v2.248)' },
         ]
       },
     ],
@@ -626,7 +627,8 @@ export const helpContent = {
           { label: 'External CA Accounts', text: 'One or more accounts per CA, several accounts can share the same CA directory URL (e.g. two Let\'s Encrypt accounts for administrative separation); an empty Directory URL defaults to Let\'s Encrypt Production' },
           { label: 'Custom Server', text: 'Set a custom ACME directory URL to use any RFC 8555-compliant CA' },
           { label: 'EAB', text: 'External Account Binding support for CAs that require pre-registration (ZeroSSL, HARICA, etc.)' },
-          { label: 'Key Types', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384 for certificate keys' },
+          { label: 'Key Types', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384 for certificate keys; ML-DSA-44, ML-DSA-65 and ML-DSA-87 through the API only, never in FIPS mode. A configured default this instance cannot generate fails the order instead of falling back to RSA-2048 (v2.248)' },
+          { label: 'Reused key in FIPS mode', text: 'Reusing the key of a source certificate is refused when FIPS mode does not approve that key, ML-DSA included (v2.248)' },
           { label: 'Account Keys', text: 'ES256 (P-256), ES384 (P-384), or RS256 algorithms for ACME account keys' },
           { label: 'DNS Providers', text: 'Configure DNS-01 challenge providers (Cloudflare, Route53, Tencent DNSPod, Plesk, etc.). Plesk goes through its XML API; Verify TLS Certificate can be turned off for a self-signed panel and a DNS propagation delay added' },
           { label: 'Custom Command', text: 'DNS provider type running admin-configured local commands for TXT create/delete, record details passed via DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION environment variables. Absolute binary path required, no shell, configurable timeout' },
@@ -646,6 +648,7 @@ export const helpContent = {
                   { label: 'Local orders (v2.217)', text: 'The Local orders tab lists the built-in server orders with a status filter, per-order delete and a purge action; expired non-issued orders are purged automatically every 6 hours, and a default signing digest applies to orders without a profile. Since v2.218 the purge also removes leftover pending sibling challenges of already-validated authorizations' },
                   { label: 'Profiles and templates (v2.221)', text: 'Certificate profiles (draft-ietf-acme-profiles) are advertised in the directory and selected by the client per order. Each profile sets validity and digest and can bind a certificate template, whose key usage and extended key usage then govern the issued certificate' },
                   { label: 'Default profile', text: 'Most clients request no profile. The default profile, chosen under the profiles, applies to their orders; without one they get 90 days and the default digest' },
+                  { label: 'Revocation (v2.248)', text: 'The certificate a client sends to revoke must match the stored one byte for byte. Only an RSA or EC P-256, P-384 or P-521 certificate key can sign the request itself: revoke an ML-DSA, EdDSA or Brainpool certificate with the account that ordered it' },
         ]
       },
       {
@@ -1106,6 +1109,7 @@ export const helpContent = {
           { label: 'Kerberos/SPNEGO', text: 'Binds the Kerberos-authenticated endpoints used for silent GPO autoenrollment (requires an SPN and a keytab from the domain controller)' },
           { label: 'Setup checklist', text: 'The tab shows a live checklist of what is configured versus still needed, for both manual and unattended enrollment' },
           { label: 'AD-derived subjects', text: 'Templates can opt into deriving their subject/SAN from Active Directory (via the AD Connector) for unattended enrollment' },
+          { label: 'ML-DSA templates (v2.248)', text: 'Announced by their key algorithm OID with the Microsoft Software Key Storage Provider, not yet tested with a real Windows client, and hidden in FIPS mode. Certificate-based renewal cannot use an ML-DSA certificate (XML-DSig has no ML-DSA signature): enroll a new one' },
         ]
       },
       {

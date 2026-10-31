@@ -871,6 +871,9 @@ Displays the SCEP endpoint URL and integration instructions.
 5. If auto-approve is on, UCM signs and returns the certificate
 6. If auto-approve is off, an admin reviews and approves/rejects
 
+### Device keys
+The device signs its PKCSReq with its own key: RSA, ECDSA, Ed25519 or ML-DSA. An ML-DSA signature is checked per RFC 9882 (SHA-512 digest, the key's own algorithm identifier, no parameters). Ed448 signatures are refused, and ML-DSA ones too in FIPS mode. The request is still encrypted to the RSA signing CA.
+
 ## SCEP URLs
 
 \`\`\`
@@ -934,7 +937,7 @@ Manage your ACME client configuration:
 - **Environment**: Staging (testing) or Production (live certificates)
 - **Contact Email**: Required for account registration
 - **Auto-Renewal**: Automatically renew certificates before expiry
-- **Certificate Key Type**: RSA-2048, RSA-4096, ECDSA P-256, or ECDSA P-384
+- **Certificate Key Type**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384. ML-DSA-44, ML-DSA-65 and ML-DSA-87 are accepted through the API (\`key_type\` on the request or in the settings), never in FIPS mode. A configured type this instance cannot generate fails the order instead of falling back to RSA-2048
 - **Account Key Algorithm**: ES256, ES384, or RS256 for ACME account signing
 
 ### Custom ACME Server
@@ -984,6 +987,8 @@ When requesting a certificate, choose where the private key comes from:
 - **Generate new key** *(default)*: UCM creates a fresh key pair for each order
 - **Reuse key on renewal**: keep the same private key across renewals (needed for DANE/TLSA records and key pinning); the first issuance generates the key, renewals reload it
 - **Provide external CSR**: paste a PEM CSR generated elsewhere; UCM submits it at finalize and the private key never enters UCM. CSR domains must exactly match the order identifiers
+
+In FIPS mode, reusing the key of a source certificate is refused when FIPS does not approve that key (ML-DSA included).
 
 ### Preflight (dry run)
 **Run Preflight** on the request form validates the whole request against the Let's Encrypt **staging** directory, without consuming production rate limits:
@@ -1210,6 +1215,9 @@ Browse all certificate issuance orders:
 - Signing CA used
 - Issuance timestamp
 
+### Revocation
+A client revokes with its account key or with the certificate's own key, and the certificate it sends must match the stored one byte for byte: a serial number alone is never enough. Only an RSA or EC P-256, P-384 or P-521 key can sign an ACME request, so an ML-DSA, EdDSA or Brainpool certificate is revoked with the account that ordered it; UCM says so in the refusal.
+
 ## IP Address Certificates (RFC 8738)
 
 The local ACME server can issue certificates for **IP addresses** (IPv4 and IPv6), not only DNS names. This is useful for internal services, appliances, and hosts addressed directly by IP.
@@ -1387,6 +1395,8 @@ Get the CSR attributes (OIDs) recommended by the server.
 
 ### POST /serverkeygen
 Server generates a key pair and returns the certificate along with the private key. Useful when the client cannot generate keys locally.
+
+Generated keys are RSA-2048. A request whose CSR carries a post-quantum key is refused with \`400\` and a message: generate the ML-DSA key on the device and use \`/simpleenroll\`.
 
 ## Information Tab
 
@@ -2193,6 +2203,8 @@ The tab tracks what's configured versus what's still needed, for both manual and
 - **Certificate Authority**: The CA whose templates are advertised and that issues certificates through this configuration
 - **Validity (days)**: Validity of certificates issued via WSTEP when the request matches no template; a matched template's own validity applies otherwise
 
+A template with an **ML-DSA** key type is announced by its key algorithm OID, with the Microsoft Software Key Storage Provider and a signature-only key spec. It is hidden in FIPS mode, and enrollment from a real Windows client has not been tested yet.
+
 ### Kerberos / SPNEGO
 
 Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoenrollment, so machines and users are authenticated by their Kerberos ticket instead of a credential prompt:
@@ -2209,6 +2221,8 @@ Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoen
 ### Certificate Renewal Binding
 
 Besides Username/Password and Kerberos, WSTEP supports **client-certificate renewal**, mirroring real ADCS CES endpoints: the renewal request (RST) must be XML-DSig-signed with the private key of a certificate **UCM itself issued**. The presented certificate is matched **byte-for-byte** against the stored certificate for the configured CA, serial number or subject alone are never enough. This lets Windows clients renew unattended using their current certificate, without credentials or a Kerberos ticket.
+
+XML-DSig has no ML-DSA signature method, so an **ML-DSA** certificate cannot renew this way: UCM names the key in its refusal, and the client enrolls a new certificate instead.
 
 ### SID Security Extension (KB5014754)
 

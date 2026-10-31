@@ -3053,6 +3053,13 @@ Content-Type: application/json
 }
 ```
 
+`key_type` sets the certificate key UCM generates: `RSA-2048`, `RSA-4096`, `EC-P256`,
+`EC-P384`, `EC-BP256`, `EC-BP384`, or `ML-DSA-44`, `ML-DSA-65`, `ML-DSA-87` when this build
+has ML-DSA. Without it the `key_type` client setting applies (RSA-2048 when unset); a value
+this instance cannot generate answers `400` and is never replaced by another type. FIPS mode
+refuses ML-DSA and Brainpool with `400`, both as `key_type` and as the key of
+`source_certificate_id` (`key_source: "reuse"`).
+
 ### Verify Challenge
 ```http
 POST /api/v2/acme/client/orders/{order_id}/verify
