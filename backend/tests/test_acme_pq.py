@@ -223,7 +223,8 @@ class TestRevokeMldsaCertificate:
     @pytest.mark.parametrize('by', ['jwk', 'other_account'])
     def test_a_stranger_is_told_why(self, app, client, rsa_account, signing_ca, rsa_ca,
                                     tmp_path, by):
-        """An ML-DSA key cannot sign an ACME request: the refusal names that, not a bare 403."""
+        """An ML-DSA key cannot sign an ACME request: a jwk requester is told so; another
+        account, which never tried the key, gets the plain refusal."""
         leaf, cert_id, _ = self._issue(app, client, rsa_account, signing_ca, rsa_ca,
                                        tmp_path, f'stranger-{by}.pq.example.com')
         payload = {'certificate': _b64u(leaf.public_bytes(serialization.Encoding.DER))}
@@ -242,9 +243,86 @@ class TestRevokeMldsaCertificate:
         assert r.status_code == 403
         body = r.get_json()
         assert body['type'] == 'urn:ietf:params:acme:error:unauthorized'
-        assert 'ML-DSA-44' in body['detail'] and 'account that ordered it' in body['detail'], body
+        if by == 'jwk':
+            assert 'ML-DSA-44' in body['detail'] and 'account that ordered it' in body['detail'], body
+        else:
+            assert body['detail'] == 'Not authorized to revoke this certificate', body
         with app.app_context():
             assert not db.session.get(Certificate, cert_id).revoked
+
+
+FIXTURES = Path(__file__).resolve().parent / 'fixtures' / 'pqc'
+
+
+def _brainpool_cert():
+    from datetime import datetime, timedelta, timezone
+    from cryptography.hazmat.primitives.asymmetric import ec
+    key = ec.generate_private_key(ec.BrainpoolP256R1())
+    name = x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, 'bp.pq.example.com')])
+    now = datetime.now(timezone.utc)
+    return (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
+            .sign(key, hashes.SHA256()))
+
+
+@pytest.fixture
+def stored_cert(app, rsa_ca):
+    """Stores a certificate (PEM bytes) under the RSA CA, optionally on an ACME order."""
+    with app.app_context():
+        caref = db.session.get(CA, rsa_ca['id']).refid
+    made = []
+
+    def _store(pem, account=None):
+        cert = x509.load_pem_x509_certificate(pem)
+        with app.app_context():
+            row = Certificate(refid=uuid.uuid4().hex[:13], descr='revoke.pq.example.com',
+                              caref=caref, serial_number=format(cert.serial_number, 'X'),
+                              crt=b64.b64encode(pem).decode())
+            db.session.add(row)
+            db.session.flush()
+            if account is not None:
+                db.session.add(AcmeOrder(account_id=account['id'], status='valid',
+                                         certificate_id=row.id,
+                                         identifiers=json.dumps([{'type': 'dns', 'value': 'x'}])))
+            db.session.commit()
+            made.append(row.id)
+        return cert, row.id
+    yield _store
+    with app.app_context():
+        AcmeOrder.query.filter(AcmeOrder.certificate_id.in_(made)).delete(synchronize_session=False)
+        Certificate.query.filter(Certificate.id.in_(made)).delete(synchronize_session=False)
+        db.session.commit()
+
+
+class TestRevokeByAKeyThatCannotSign:
+    """A stranger's jwk request for a certificate whose key cannot sign a JWS."""
+
+    @staticmethod
+    def _stranger_revokes(client, cert):
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        payload = {'certificate': _b64u(cert.public_bytes(serialization.Encoding.DER))}
+        return _jws(client, '/acme/revoke-cert', payload, key, jwk=_rsa_jwk(key))
+
+    def test_a_key_this_build_cannot_load_is_refused_not_crashed(self, client, stored_cert,
+                                                                 rsa_account):
+        cert, _ = stored_cert((FIXTURES / 'slhdsa-sha2-128s-cert.pem').read_bytes(), rsa_account)
+        r = self._stranger_revokes(client, cert)
+        assert r.status_code == 403, r.get_json()
+        assert 'SLH-DSA-SHA2-128s' in r.get_json()['detail']
+
+    def test_outside_acme_the_refusal_names_no_ordering_account(self, client, stored_cert):
+        cert, _ = stored_cert((FIXTURES / 'mldsa65-cert.pem').read_bytes())
+        r = self._stranger_revokes(client, cert)
+        assert r.status_code == 403
+        assert r.get_json()['detail'] == 'Not authorized to revoke this certificate'
+
+    def test_a_brainpool_key_is_named_too(self, client, stored_cert, rsa_account):
+        cert, _ = stored_cert(_brainpool_cert().public_bytes(serialization.Encoding.PEM),
+                              rsa_account)
+        r = self._stranger_revokes(client, cert)
+        assert r.status_code == 403
+        assert 'EC-BP256' in r.get_json()['detail'], r.get_json()
 
 
 # ---------------------------------------------------------------------------

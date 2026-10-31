@@ -1657,6 +1657,27 @@ def download_certificate_alternate(order_id: str, variant: str):
 
 # ==================== Certificate Revocation ====================
 
+_JWS_CURVES = frozenset({'secp256r1', 'secp384r1', 'secp521r1'})
+
+
+def _jws_incapable_key_label(cert_obj) -> Optional[str]:
+    """Name of the certificate's key when it cannot sign an ACME JWS, None when it can."""
+    from cryptography.hazmat.primitives.asymmetric import ec, rsa
+    from utils import key_algorithms
+    try:
+        key = cert_obj.public_key()
+    except Exception:
+        # A key type this build cannot load (SLH-DSA, ML-DSA without OpenSSL 3.5)
+        oid = cert_obj.public_key_algorithm_oid
+        info = key_algorithms.post_quantum_info(oid)
+        return info.label if info is not None else oid.dotted_string
+    if isinstance(key, rsa.RSAPublicKey):
+        return None
+    if isinstance(key, ec.EllipticCurvePublicKey) and key.curve.name in _JWS_CURVES:
+        return None
+    return key_algorithms.label_for_public_key(key) or type(key).__name__
+
+
 @acme_bp.route('/revoke-cert', methods=['POST'])
 def revoke_cert():
     """Revoke certificate (RFC 8555 Section 7.6).
@@ -1716,21 +1737,14 @@ def revoke_cert():
         except Exception:
             return acme_error('malformed', 'Invalid certificate DER')
         
-        # Find certificate in database by serial number — DB stores serial in
-        # multiple formats (hex upper, hex lower, decimal) depending on the
-        # issuance path, so match against all three.
-        from models import Certificate
-        serial_int = cert_obj.serial_number
-        serial_hex_lower = format(serial_int, 'x')
-        serial_hex_upper = serial_hex_lower.upper()
-        serial_dec = str(serial_int)
-        
-        cert = Certificate.query.filter(
-            Certificate.serial_number.in_([serial_hex_lower, serial_hex_upper, serial_dec])
-        ).first()
-        
-        if not cert:
+        # The row must hold this very certificate: a serial is public, and a
+        # forged certificate reusing it would otherwise speak for the stored one
+        from services.cert.issued_lookup import find_stored_rows
+        serial_hex_lower = format(cert_obj.serial_number, 'x')
+        rows = find_stored_rows(cert_obj)
+        if not rows:
             return acme_error('malformed', 'Certificate not found', 404)
+        cert = rows[0]
         
         if cert.revoked:
             return acme_error('alreadyRevoked', 'Certificate already revoked', 400)
@@ -1783,15 +1797,16 @@ def revoke_cert():
                 details=f"unauthorized serial={serial_hex_lower} requester_account={request_account_id or '(jwk)'}",
                 success=False,
             )
-            # Only RSA and EC keys sign a JWS here: say so rather than a bare refusal
-            from utils import key_algorithms
-            cert_key = cert_obj.public_key()
-            if key_algorithms.family_for_public_key(cert_key) not in ('RSA', 'EC'):
-                label = key_algorithms.label_for_public_key(cert_key) or type(cert_key).__name__
-                return acme_error(
-                    'unauthorized',
-                    f'This certificate has a {label} key, which cannot sign an ACME request '
-                    '(RSA and EC only); revoke it with the account that ordered it', 403)
+            # A key that cannot sign a JWS, on an ACME-ordered certificate: say who can revoke it
+            label = None if request_account_id else _jws_incapable_key_label(cert_obj)
+            if label is not None:
+                from models.acme_models import AcmeOrder
+                if AcmeOrder.query.filter_by(certificate_id=cert.id).first() is not None:
+                    return acme_error(
+                        'unauthorized',
+                        f'This certificate has a {label} key, which cannot sign an ACME request '
+                        '(RSA, EC P-256, P-384 and P-521 only); revoke it with the account '
+                        'that ordered it', 403)
             return acme_error('unauthorized', 'Not authorized to revoke this certificate', 403)
 
         # A client cannot wait for a human decision: a revocation a policy
