@@ -16,6 +16,9 @@ from services.cert_service import CertificateService
 from services.cert.renewal import RenewalError, check_renewable, renew_certificate_in_place
 from services.msca.propagation import propagate_revocation, PROPAGATED
 from services.approval_gate import queue_revocation
+from services.cert.related_pair import mutual_partner
+from api.v2.certificates.cert_lifecycle import _related_choice_refusal
+from utils.export_options import json_boolean
 from services.audit_service import AuditService
 from services.deletion_blockers import (
     certificate_deletion_blockers, first_blocker, parse_bulk_ids,
@@ -40,9 +43,15 @@ def bulk_revoke_certificates():
     reason = normalize_revocation_reason(data.get('reason', 'unspecified'))
     if reason is None:
         return error_response(invalid_reason_message(data.get('reason')), 400)
+    try:
+        revoke_related = json_boolean(data, 'revoke_related', True)
+    except ValueError as e:
+        return error_response(str(e), 400)
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
 
     results = {'success': [], 'failed': []}
+    # Members of a related pair revoked with the other one earlier in the batch
+    revoked_with_pair = set()
     # A certificate issued through a Microsoft CA connection has no caref, so
     # UCM publishes neither a CRL entry nor an OCSP answer for it: the
     # Windows CA is the only place its revocation can become visible. The
@@ -56,7 +65,16 @@ def bulk_revoke_certificates():
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
                 continue
             if cert.revoked:
-                results['failed'].append({'id': cert_id, 'error': 'Already revoked'})
+                if cert_id in revoked_with_pair:
+                    results['success'].append(cert_id)
+                else:
+                    results['failed'].append({'id': cert_id, 'error': 'Already revoked'})
+                continue
+            partner = mutual_partner(cert)
+            partner_id = partner.id if partner is not None and not partner.revoked else None
+            refusal = _related_choice_refusal(cert, partner_id, revoke_related)
+            if refusal is not None:
+                results['failed'].append({'id': cert_id, 'error': refusal[0]})
                 continue
             try:
                 policy, approval = queue_revocation(g.current_user, cert, reason=reason)
@@ -70,7 +88,9 @@ def bulk_revoke_certificates():
                     {'id': cert_id, 'approval_id': approval.id, 'policy_name': policy.name})
                 continue
             cert = CertificateService.revoke_certificate(
-                cert_id=cert_id, reason=reason, username=username)
+                cert_id=cert_id, reason=reason, username=username, revoke_related=revoke_related)
+            if revoke_related and partner_id:
+                revoked_with_pair.add(partner_id)
             if cert is not None and cert.source == 'msca':
                 outcome, _detail = propagate_revocation(cert, reason)
                 if outcome != PROPAGATED:
@@ -115,9 +135,14 @@ def bulk_renew_certificates():
     username, actor_user_id = _actor()
     # CAs that renewed at least one certificate: one CRL each, after the loop
     renewed_ca_ids = []
+    # Members of a related pair renewed with the other one earlier in the batch
+    renewed_with_pair = set()
 
     for cert_id in ids:
         try:
+            if cert_id in renewed_with_pair:
+                results['success'].append(cert_id)
+                continue
             cert = db.session.get(Certificate, cert_id)
             if not cert:
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
@@ -138,8 +163,10 @@ def bulk_renew_certificates():
                 cert, username=username, actor_user_id=actor_user_id, rekey=True,
                 regenerate_crl=False, trigger='bulk')
             results['success'].append(cert_id)
-            if outcome.get('ca_id') is not None and outcome['ca_id'] not in renewed_ca_ids:
-                renewed_ca_ids.append(outcome['ca_id'])
+            for done in [outcome] + list(outcome.get('related') or []):
+                renewed_with_pair.add(done['cert_id'])
+                if done.get('ca_id') is not None and done['ca_id'] not in renewed_ca_ids:
+                    renewed_ca_ids.append(done['ca_id'])
         except RenewalError as refusal:
             db.session.rollback()
             logger.info("Bulk renewal of certificate %s refused: %s", cert_id, refusal.message)

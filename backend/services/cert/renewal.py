@@ -43,6 +43,7 @@ from utils.file_naming import cert_cert_path, cert_key_path
 from utils.upn_san import extract_upns_from_san_list
 from utils import notices as notices_mod
 from utils.signing_hash import rsa_padding_for
+from utils.related_cert import RELATED_CERT_EXTENSION_OID
 
 logger = logging.getLogger(__name__)
 
@@ -55,6 +56,7 @@ _ISSUER_OWNED_EXTENSION_OIDS = frozenset({
     ExtensionOID.AUTHORITY_INFORMATION_ACCESS,
     ExtensionOID.CERTIFICATE_POLICIES,
     _SCT_LIST_OID,
+    RELATED_CERT_EXTENSION_OID,  # recomputed: A's hash changes when A is renewed
 })
 
 # How long the CRL keeps a superseded serial whose expiry is unknown
@@ -208,18 +210,39 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
                                validity_days=None) -> dict:
     """Renew ``cert`` in place and commit; raise :class:`RenewalError` with
     the session rolled back when it cannot be. ``known_serial`` is the serial
-    the caller decided on (default: the one ``cert`` carries)."""
+    the caller decided on (default: the one ``cert`` carries). The other member
+    of a related pair is renewed with it, A first, in the same commit."""
     try:
-        staged = _stage_renewal(cert, ca, rekey=rekey, trigger=trigger,
-                                known_serial=known_serial, validity_days=validity_days)
+        members = _renewal_members(cert)
+        pair = len(members) == 2
+        staged_all, renewed_a = [], None
+        for index, member in enumerate(members):
+            is_cert = member is cert
+            # B names A as renewed a moment ago; a lone certificate names its A as it is
+            related_to = renewed_a if pair and index == 1 else _current_related(member)
+            try:
+                staged_member = _stage_renewal(
+                    member, ca if is_cert else None, rekey=rekey, trigger=trigger,
+                    known_serial=known_serial if is_cert else SERIAL_UNSET,
+                    validity_days=validity_days, related_to=related_to)
+            except RenewalError as e:
+                if is_cert:
+                    raise
+                raise RenewalError(f'Related certificate {member.id}: {e.message}', e.status,
+                                   e.problem_type) from e
+            if pair and index == 0:
+                renewed_a = x509.load_pem_x509_certificate(staged_member['cert_pem'])
+            staged_all.append(staged_member)
     except Exception:
         db.session.rollback()
         raise
+    staged = staged_all[members.index(cert)]
     cert, ca = staged['cert'], staged['ca']
     cert_id = staged['cert_id']
     if not commit_or_rollback(logger, f'Failed to renew certificate {cert_id}'):
         raise RenewalError('Failed to renew certificate', 500)
 
+    others = [s for s in staged_all if s is not staged]
     outcome = {
         'cert_id': cert_id,
         'old_serial': staged['old_serial'],
@@ -230,14 +253,56 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
         'ca_refid': ca.refid,
         'rekeyed': bool(rekey),
         'notices': staged['notices'],
+        'related': [{'cert_id': s['cert_id'], 'ca_id': s['ca'].id, 'new_serial': s['new_serial']}
+                    for s in others],
     }
-    _after_commit(cert, ca, staged, username=username, actor_user_id=actor_user_id,
-                  rekey=rekey, regenerate_crl=regenerate_crl, trigger=trigger)
+    crl_done = set()
+    for s in [staged] + others:
+        _after_commit(s['cert'], s['ca'], s, username=username, actor_user_id=actor_user_id,
+                      rekey=rekey, regenerate_crl=regenerate_crl and s['ca'].id not in crl_done,
+                      trigger=trigger)
+        crl_done.add(s['ca'].id)
     return outcome
 
 
-def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days) -> dict:
-    """Every check, the signature and the writes, left uncommitted."""
+def _renewal_members(cert):
+    """``[cert]``, or both members of its related pair with A first."""
+    from services.cert.related_pair import anchor_first, mutual_partner
+    try:
+        partner = mutual_partner(cert)
+    except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
+        return [cert]
+    if partner is None or partner.revoked or not cert.crt or not partner.crt:
+        return [cert]
+    return list(anchor_first(cert, partner))
+
+
+def _current_related(row):
+    """The certificate A that *row*'s certificate names, while A is held, valid and
+    unrevoked; None otherwise (the renewed certificate then names nothing)."""
+    from services.cert.related_pair import row_certificate
+    try:
+        if not row.related_certificate_id or not row.crt:
+            return None
+    except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
+        return None
+    original = x509.load_pem_x509_certificate(b64decode(row.crt))
+    try:
+        original.extensions.get_extension_for_oid(RELATED_CERT_EXTENSION_OID)
+    except x509.ExtensionNotFound:
+        return None
+    a_row = db.session.get(Certificate, row.related_certificate_id)
+    if a_row is None or a_row.revoked or not a_row.crt:
+        return None
+    cert_a = row_certificate(a_row)
+    if cert_a.not_valid_after_utc.replace(tzinfo=None) < utc_now():
+        return None
+    return cert_a
+
+
+def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, related_to=None) -> dict:
+    """Every check, the signature and the writes, left uncommitted; *related_to*
+    is the certificate A the renewed one names (RFC 9763)."""
     cert = _reread(cert, known_serial, trigger)
     check_renewable(cert)
     ca, ca_cert, ca_key = _signing_ca(cert, ca)
@@ -247,7 +312,8 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days) -> 
     _check_key(public_key, rekey)
 
     days = _requested_days(original, validity_days)
-    sign_hash, granted, notices = _apply_policies(cert, ca, ca_key, original, days)
+    sign_hash, granted, notices = _apply_policies(cert, ca, ca_key, original, days,
+                                                  pq_hybrid=related_to is not None)
     now = utc_now()
     wanted = now + timedelta(days=granted)
     not_after = clamp_not_after(wanted, ca_cert)
@@ -265,7 +331,7 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days) -> 
         public_key = new_key.public_key()
 
     builder = _builder(original, ca, ca_cert, public_key, not_after,
-                       _template_policy_oids(getattr(cert, 'template_id', None)))
+                       _template_policy_oids(getattr(cert, 'template_id', None)), related_to)
     renewed = builder.sign(private_key=ca_key, algorithm=sign_hash,
                            rsa_padding=rsa_padding_for(ca_key, sign_hash))
     renewed, scts = _apply_ct(renewed, ca_cert, ca_key)
@@ -391,7 +457,7 @@ def _has_time_stamping(certificate):
     return x509.ExtendedKeyUsageOID.TIME_STAMPING in eku
 
 
-def _apply_policies(cert, ca, ca_key, original, days):
+def _apply_policies(cert, ca, ca_key, original, days, pq_hybrid=False):
     """``(signing hash, granted days, notices)``; every violation in one 400."""
     from services.policy_service import (
         PolicyEvaluationService, RENEWAL_OPERATIONS, key_label_for_public_key)
@@ -405,10 +471,11 @@ def _apply_policies(cert, ca, ca_key, original, days):
     tsa_signer = _has_time_stamping(original)
     sign_hash, violations = PolicyEvaluationService.checked_signing_hash(
         policies, ca_key, _signature_hash_name(original), explicit=False,
-        key_type=key_label, context=context, tsa_signer=tsa_signer, notices=advisories)
+        key_type=key_label, context=context, tsa_signer=tsa_signer, notices=advisories,
+        pq_hybrid=pq_hybrid)
     rule_violations, granted, capped_by = PolicyEvaluationService.enforce_rules(
         policies, key_type=key_label, dns_name_count=len(dns), validity_days=days,
-        context=context, tsa_signer=tsa_signer, notices=advisories)
+        context=context, tsa_signer=tsa_signer, notices=advisories, pq_hybrid=pq_hybrid)
     violations = list(dict.fromkeys(list(violations) + list(rule_violations)))
     if violations:
         raise RenewalError('Policy violation: ' + '; '.join(violations), 400)
@@ -452,8 +519,10 @@ def _template_policy_oids(template_id):
     return template_policy_oids(template_extensions(template)) if template is not None else []
 
 
-def _builder(original, ca, ca_cert, public_key, not_after, template_oids=()) -> x509.CertificateBuilder:
-    """The original's subject and extensions; the issuer's own rebuilt from the CA."""
+def _builder(original, ca, ca_cert, public_key, not_after, template_oids=(),
+             related_to=None) -> x509.CertificateBuilder:
+    """The original's subject and extensions; the issuer's own rebuilt from the CA,
+    and the link to *related_to* (A) from A as it is now."""
     builder = (
         x509.CertificateBuilder()
         .subject_name(original.subject)
@@ -481,7 +550,14 @@ def _builder(original, ca, ca_cert, public_key, not_after, template_oids=()) -> 
         x509.SubjectKeyIdentifier.from_public_key(public_key), critical=False)
     builder = builder.add_extension(authority_key_identifier_from_issuer(ca_cert), critical=False)
     builder = constrain_builder_key_usage(builder)
-    return add_ocsp_nocheck_if_responder(builder, ekus)
+    builder = add_ocsp_nocheck_if_responder(builder, ekus)
+    if related_to is not None:
+        from services.cert.related_pair import RelatedCertificateRefused, linked_builder
+        try:
+            builder = linked_builder(builder, related_to)
+        except RelatedCertificateRefused as e:
+            raise RenewalError(f'Cannot renew: {e}', 400) from e
+    return builder
 
 
 def _apply_ct(renewed, ca_cert, ca_key):

@@ -179,8 +179,13 @@ def mutual_partner(row):
 
 
 def anchor_first(row, partner):
-    """``(A, B)``: B is the one whose certificate names the other."""
-    if related_cert.references(row_certificate(row), row_certificate(partner)):
+    """``(A, B)``: B is the one whose certificate names the other, else the one carrying the link."""
+    cert, other = row_certificate(row), row_certificate(partner)
+    if related_cert.references(cert, other):
+        return partner, row
+    if related_cert.references(other, cert):
+        return row, partner
+    if related_cert.read_related_certificate(cert) is not None:
         return partner, row
     return row, partner
 

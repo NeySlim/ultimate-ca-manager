@@ -39,6 +39,22 @@ from utils.x509_aki import authority_key_identifier_from_issuer
 logger = logging.getLogger(__name__)
 
 
+def _hybrid_labels(hybrid):
+    """``((classical label, post-quantum label), error)`` of a ``hybrid`` request member."""
+    if not isinstance(hybrid, dict):
+        return None, 'hybrid must be an object {classical, pq}'
+    labels = []
+    for role, post_quantum in (('classical', False), ('pq', True)):
+        alg = key_algorithms.get(hybrid.get(role)) if isinstance(hybrid.get(role), str) else None
+        if alg is None:
+            return None, f'hybrid.{role} names no key type this instance can generate'
+        if key_algorithms.is_post_quantum(alg.label) != post_quantum:
+            kind = 'a post-quantum' if post_quantum else 'a classical'
+            return None, f'hybrid.{role} must name {kind} key type, not {alg.label}'
+        labels.append(alg.label)
+    return tuple(labels), None
+
+
 @bp.route('/api/v2/certificates', methods=['POST'])
 @require_auth(['write:certificates'])
 def create_certificate():
@@ -74,6 +90,13 @@ def create_certificate():
     for key, values in san_buckets.items():
         if values:
             data[key] = values
+
+    # RFC 9763 pair: A with the classical key, B with the post-quantum one naming A
+    pair = None
+    if data.get('hybrid') is not None:
+        pair, pair_err = _hybrid_labels(data['hybrid'])
+        if pair_err:
+            return error_response(pair_err, 400)
 
     # Get the CA
     ca_ref = data['ca_id']
@@ -146,6 +169,11 @@ def create_certificate():
                 cn=data.get('cn'),
                 san_list=san_list
             )
+            if policy and pair:
+                # The approval replay issues one certificate: refused before anything is queued
+                return error_response(
+                    f'Policy "{policy.name}" requires approval, and a hybrid pair cannot be '
+                    'issued through the approval workflow yet', 400)
             if policy:
                 user_id = g.current_user.id if hasattr(g, 'current_user') else None
                 if not user_id:
@@ -185,13 +213,14 @@ def create_certificate():
         # request leaves them unset, for API parity with the UI prefill (issue
         # #226 follow-up); key_size only inherits when the algorithm still
         # matches (#318).
-        if template:
+        if template and not pair:
             key_type_in, key_size_in = fill_key_params_from_template(
                 key_type_in, key_size_in, template.key_type)
         key_type_in = key_type_in or 'rsa'
         key_size_in = key_size_in or '2048'
         try:
-            normalized_key = parse_issue_key_type(
+            # A pair names its two keys; key_type and key_size do not apply to it
+            normalized_key = pair[0] if pair else parse_issue_key_type(
                 key_type_in,
                 key_size_in,
                 curve=data.get('curve'),
@@ -200,6 +229,7 @@ def create_certificate():
             return error_response(str(exc), 400)
 
         new_key = key_algorithms.generate(normalized_key)
+        pq_key = key_algorithms.generate(pair[1]) if pair else None
 
         # Build subject
         subject_attrs = [x509.NameAttribute(NameOID.COMMON_NAME, data['cn'])]
@@ -258,6 +288,16 @@ def create_certificate():
             dns_name_count=len(set(requested_dns) | set(implicit_dns)),
             validity_days=validity_days, context=rule_context, notices=advisories,
         )
+        if pair:
+            # B is the post-quantum half of a pair: pq_standalone does not refuse it
+            pq_violations, validity_days, pq_capped_by = PolicyEvaluationService.enforce_rules(
+                policies, key_type=pair[1],
+                dns_name_count=len(set(requested_dns) | set(implicit_dns)),
+                validity_days=validity_days, context=rule_context, notices=advisories,
+                pq_hybrid=True,
+            )
+            violations = list(dict.fromkeys(list(violations) + list(pq_violations)))
+            capped_by = pq_capped_by or capped_by
         # The template's digest is a choice, checked; without one the default yields
         template_digest = template.digest if template and template.digest else None
         sign_hash, digest_violations = PolicyEvaluationService.checked_signing_hash(
@@ -366,6 +406,9 @@ def create_certificate():
         if x509.ExtendedKeyUsageOID.TIME_STAMPING in eku_oids:
             tsa_violations = PolicyEvaluationService.tsa_signer_violations(
                 ca.id, new_key.public_key())
+            if pq_key is not None:
+                tsa_violations += PolicyEvaluationService.tsa_signer_violations(
+                    ca.id, pq_key.public_key())
             if tsa_violations:
                 return error_response('Policy violation: ' + '; '.join(tsa_violations), 400)
         # The profile / template KU is written for RSA; bits the generated
@@ -538,74 +581,101 @@ def create_certificate():
         except ValueError as e:
             return error_response(str(e), 400)
 
-        # Serialize
-        cert_pem = new_cert.public_bytes(serialization.Encoding.PEM).decode('utf-8')
-        key_pem = private_key_to_pem(new_key).decode('utf-8')
+        # B is built from A once A exists: its extension holds A's hash
+        pq_cert = None
+        if pair:
+            from services.cert.related_pair import RelatedCertificateRefused, pq_builder_from
+            try:
+                pq_builder = pq_builder_from(new_cert, pq_key.public_key())
+            except RelatedCertificateRefused as e:
+                return error_response(str(e), 400)
+            pq_cert = pq_builder.sign(ca_key, sign_hash, default_backend(),
+                                      rsa_padding=rsa_padding_for(ca_key, sign_hash))
+            try:
+                pq_cert, _ = apply_ct_policy(pq_cert, ca_cert, ca_key)
+            except ValueError as e:
+                return error_response(str(e), 400)
 
-        # Save to database
-        # Extract SKI/AKI from issued cert
-        cert_ski = None
-        cert_aki = None
-        try:
-            ext = new_cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
-            cert_ski = ext.value.key_identifier.hex(':').upper()
-        except Exception:
-            pass
-        try:
-            ext = new_cert.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
-            if ext.value.key_identifier:
-                cert_aki = ext.value.key_identifier.hex(':').upper()
-        except Exception:
-            pass
+        def _row(issued, private_key, descr, overrides):
+            cert_pem = issued.public_bytes(serialization.Encoding.PEM).decode('utf-8')
+            key_pem = private_key_to_pem(private_key).decode('utf-8')
+            # Extract SKI/AKI from issued cert
+            cert_ski = None
+            cert_aki = None
+            try:
+                ext = issued.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
+                cert_ski = ext.value.key_identifier.hex(':').upper()
+            except Exception:
+                pass
+            try:
+                ext = issued.extensions.get_extension_for_oid(ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
+                if ext.value.key_identifier:
+                    cert_aki = ext.value.key_identifier.hex(':').upper()
+            except Exception:
+                pass
+            return Certificate(
+                refid=str(uuid.uuid4())[:8],
+                descr=descr,
+                caref=ca.refid,
+                crt=base64.b64encode(cert_pem.encode()).decode(),
+                prv=encrypt_private_key(base64.b64encode(key_pem.encode()).decode()),
+                cert_type=cert_type,
+                subject=issued.subject.rfc4514_string(),
+                issuer=issued.issuer.rfc4514_string(),
+                serial_number=format(issued.serial_number, 'x'),
+                aki=cert_aki,
+                ski=cert_ski,
+                valid_from=not_before,
+                valid_to=not_after,
+                san_dns=json.dumps(final_san_dns),
+                san_ip=json.dumps(final_san_ip),
+                san_email=json.dumps(final_san_email),
+                san_uri=json.dumps(final_san_uri),
+                san_upn=json.dumps(final_san_upn) if final_san_upn else None,
+                ocsp_must_staple=bool(data.get('ocsp_must_staple')),
+                template_id=template.id if template else None,
+                template_overrides=overrides,
+                created_by=g.current_user.username if hasattr(g, 'current_user') else None
+            )
 
-        db_cert = Certificate(
-            refid=str(uuid.uuid4())[:8],
-            descr=data.get('description') or data['cn'] or (final_san_dns[0] if final_san_dns else ''),
-            caref=ca.refid,
-            crt=base64.b64encode(cert_pem.encode()).decode(),
-            prv=encrypt_private_key(base64.b64encode(key_pem.encode()).decode()),
-            cert_type=cert_type,
-            subject=new_cert.subject.rfc4514_string(),
-            issuer=new_cert.issuer.rfc4514_string(),
-            serial_number=format(new_cert.serial_number, 'x'),
-            aki=cert_aki,
-            ski=cert_ski,
-            valid_from=not_before,
-            valid_to=not_after,
-            san_dns=json.dumps(final_san_dns),
-            san_ip=json.dumps(final_san_ip),
-            san_email=json.dumps(final_san_email),
-            san_uri=json.dumps(final_san_uri),
-            san_upn=json.dumps(final_san_upn) if final_san_upn else None,
-            ocsp_must_staple=bool(data.get('ocsp_must_staple')),
-            template_id=template.id if template else None,
-            template_overrides=template_overrides,
-            created_by=g.current_user.username if hasattr(g, 'current_user') else None
-        )
-
+        descr = data.get('description') or data['cn'] or (final_san_dns[0] if final_san_dns else '')
+        db_cert = _row(new_cert, new_key, descr, template_overrides)
         db.session.add(db_cert)
+        db_pq = None
+        if pair:
+            # A takes its id first: B names it, then A names B back, in one commit
+            db.session.flush()
+            db_pq = _row(pq_cert, pq_key, f'{descr} ({pair[1]})', compute_template_overrides(
+                template, key_type=pair[1], validity_days=validity_days))
+            db_pq.related_certificate_id, db_pq.hybrid_role = db_cert.id, 'pq'
+            db.session.add(db_pq)
+            db.session.flush()
+            db_cert.related_certificate_id, db_cert.hybrid_role = db_pq.id, 'classical'
         ok, err = safe_commit(logger, "Failed to create certificate")
         if not ok:
             return err
 
         # Audit log
-        try:
-            AuditService.log_action(
-                action='certificate_created',
-                resource_type='certificate',
-                resource_id=str(db_cert.id),
-                resource_name=data['cn'],
-                details=f"CA: {ca.id}, CN: {data['cn']}",
-                user_id=g.current_user.id if hasattr(g, 'current_user') else None
-            )
-        except Exception:
-            pass
+        for row in [db_cert] + ([db_pq] if db_pq is not None else []):
+            try:
+                AuditService.log_action(
+                    action='certificate_created',
+                    resource_type='certificate',
+                    resource_id=str(row.id),
+                    resource_name=data['cn'],
+                    details=f"CA: {ca.id}, CN: {data['cn']}"
+                            + (f", hybrid pair ({row.hybrid_role})" if row.hybrid_role else ''),
+                    user_id=g.current_user.id if hasattr(g, 'current_user') else None
+                )
+            except Exception:
+                pass
 
         # Serialize once, before emitting. The bus fans out to webhook (async),
         # email and WebSocket subscribers, some of which commit the session and
         # thus expire ORM instances — re-reading db_cert afterwards could raise
         # ObjectDeletedError. Reuse this snapshot for the response.
         cert_dict = db_cert.to_dict()
+        pq_dict = db_pq.to_dict() if db_pq is not None else None
         ca_refid = ca.refid
 
         # Single lifecycle event — the bus fans out to webhook (async),
@@ -613,6 +683,13 @@ def create_certificate():
         username = g.current_user.username if hasattr(g, 'current_user') else 'system'
         from services.webhook_service import emit_cert_issued
         emit_cert_issued(cert_dict, ca_refid=ca_refid, actor=username)
+        if pq_dict is not None:
+            emit_cert_issued(pq_dict, ca_refid=ca_refid, actor=username)
+            return created_response(
+                data={'certificate': cert_dict, 'related': pq_dict},
+                message='Hybrid certificate pair created successfully',
+                meta=notices_mod.meta_with_notices(notices),
+            )
 
         return created_response(
             data=cert_dict,

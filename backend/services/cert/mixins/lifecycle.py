@@ -368,9 +368,11 @@ class LifecycleMixin:
         reason: str = 'unspecified',
         username: str = 'system',
         invalidity_at=None,
+        revoke_related: bool = True,
     ) -> Certificate:
         """
-        Revoke a certificate
+        Revoke a certificate, and the other member of its related pair unless
+        *revoke_related* is False
 
         Args:
             cert_id: Certificate ID
@@ -481,6 +483,19 @@ class LifecycleMixin:
         emit_cert_revoked(cert_dict, reason=reason, ca_refid=cert_dict.get('caref'), actor=username)
         notify_rejected(rejected_snapshots, reason='Certificate revoked', actor=username)
 
+        if revoke_related:
+            from services.cert.related_pair import mutual_partner
+            partner = mutual_partner(db.session.get(Certificate, cert_id))
+            if partner is not None and not partner.revoked:
+                partner_id = partner.id
+                try:
+                    LifecycleMixin.revoke_certificate(partner_id, reason=reason, username=username,
+                                                      invalidity_at=invalidity_at, revoke_related=False)
+                except Exception:
+                    # The member asked for stays revoked; the other one is said, not hidden
+                    logger.error("Certificate %s revoked, its related certificate %s was not",
+                                 cert_id, partner_id, exc_info=True)
+
         return db.session.get(Certificate, cert_id)
 
     @staticmethod
@@ -567,6 +582,13 @@ class LifecycleMixin:
                 {MSCARequest.csr_id: None}, synchronize_session='fetch')
         except Exception as e:
             logger.error(f"Certificate {cert_id}: Microsoft CA request references not cleared: {e}")
+
+        # A related pair loses its link with the row (SQLite may hand the id out again)
+        try:
+            Certificate.query.filter(Certificate.related_certificate_id == cert_id).update(
+                {Certificate.related_certificate_id: None}, synchronize_session='fetch')
+        except Exception as e:
+            logger.error(f"Certificate {cert_id}: related certificate links not cleared: {e}")
 
         # The disk is touched only once the row is gone: a failed commit keeps both
         file_paths = (cert_cert_path(certificate), cert_csr_path(certificate),

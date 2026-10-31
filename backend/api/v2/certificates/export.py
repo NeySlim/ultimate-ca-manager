@@ -4,6 +4,7 @@ Certificates Export Routes
 """
 
 import base64
+import io
 import json
 import logging
 import zipfile
@@ -52,6 +53,40 @@ def _split_pem_certs(pem_bytes):
         except Exception:
             continue
     return certs
+
+
+def _hybrid_bundle(certificate, include_key, password):
+    """Zip of both members of a related pair: each certificate, and each key when asked."""
+    partner = (db.session.get(Certificate, certificate.related_certificate_id)
+               if certificate.related_certificate_id else None)
+    if partner is None or not partner.crt:
+        return error_response('This certificate has no related certificate to bundle with', 400)
+    members = [certificate, partner]
+    if include_key:
+        missing = [row.id for row in members if not row.prv]
+        if missing:
+            return error_response(
+                f'Certificate {missing[0]} has no private key; export the bundle without keys', 400)
+    buffer = io.BytesIO()
+    with zipfile.ZipFile(buffer, 'w', zipfile.ZIP_DEFLATED) as bundle:
+        for row in members:
+            name = f'{row.hybrid_role or "certificate"}-{row.id}'
+            stored = _split_pem_certs(base64.b64decode(row.crt))
+            bundle.writestr(f'{name}.crt', stored[0].public_bytes(serialization.Encoding.PEM)
+                            if stored else base64.b64decode(row.crt))
+            if include_key:
+                key_pem = load_pem_bytes(row.prv, context=f"certificate {row.id}")
+                if password:
+                    key_pem = serialization.load_pem_private_key(key_pem, password=None).private_bytes(
+                        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                        serialization.BestAvailableEncryption(password.encode()))
+                bundle.writestr(f'{name}.key', key_pem)
+    if include_key:
+        for row in members:
+            audit_key_export('certificate', row.id, row.descr or row.refid, 'hybrid-bundle', password)
+    filename = f"{sanitize_filename(certificate.descr or certificate.refid)}_hybrid.zip"
+    return Response(buffer.getvalue(), mimetype='application/zip',
+                    headers={'Content-Disposition': f'attachment; filename="{filename}"'})
 
 
 def _normalized_key_identifier(value):
@@ -266,8 +301,8 @@ def export_certificate(cert_id):
     Export certificate in various formats
 
     Query params:
-        format: pem (default), der, pkcs12, jks
-        include_key: bool - Include private key (PEM only)
+        format: pem (default), der, pkcs12, jks, hybrid-bundle (zip of a related pair)
+        include_key: bool - Include private key (PEM and hybrid-bundle)
         include_chain: bool - Include CA chain (PEM only)
         include_root: bool - Include self-signed Root CA (default: false)
         password: string - Required for PKCS12 and JKS
@@ -352,6 +387,9 @@ def export_certificate(cert_id):
             stored_certs[0].public_bytes(serialization.Encoding.PEM)
             if stored_certs else cert_pem
         )
+
+        if export_format == 'hybrid-bundle':
+            return _hybrid_bundle(certificate, include_key, password)
 
         # Private key only export
         if export_format == 'key':

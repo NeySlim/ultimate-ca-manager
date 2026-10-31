@@ -88,8 +88,10 @@ def renew_certificate(cert_id):
         logger.error(f"Failed to renew certificate {cert_id}: {e}", exc_info=True)
         return error_response('Failed to renew certificate', 500)
 
-    renewed = db.session.get(Certificate, outcome['cert_id'])
-    return success_response(data=renewed.to_dict(), message='Certificate renewed successfully',
+    renewed = db.session.get(Certificate, outcome['cert_id']).to_dict()
+    if outcome.get('related'):
+        renewed['related_renewed'] = [r['cert_id'] for r in outcome['related']]
+    return success_response(data=renewed, message='Certificate renewed successfully',
                             meta=notices_mod.meta_with_notices(outcome.get('notices')))
 
 
