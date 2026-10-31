@@ -393,7 +393,8 @@
       "brainpool": "Brainpool (RFC 5639)",
       "eddsa": "EdDSA",
       "pq": "ML-DSA (FIPS 204)",
-      "brainpoolWarning": "As cadeias e assinaturas Brainpool são lidas pelo OpenSSL e pelo Windows. Como chave de servidor TLS, são recusadas pelo Chrome e Chromium, Firefox, Go, rustls, GnuTLS e Java sem Bouncy Castle, e o Windows Schannel não ativa estas curvas por padrão."
+      "brainpoolWarning": "As cadeias e assinaturas Brainpool são lidas pelo OpenSSL e pelo Windows. Como chave de servidor TLS, são recusadas pelo Chrome e Chromium, Firefox, Go, rustls, GnuTLS e Java sem Bouncy Castle, e o Windows Schannel não ativa estas curvas por padrão.",
+      "aes": "AES"
     },
     "keyTypes": {
       "rsa2048": "RSA 2048 bits",

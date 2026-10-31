@@ -68,6 +68,12 @@ describe('HSM key generation, from the registry', () => {
     expect((await save(onSave)).algorithm).toBe('AES-256')
   })
 
+  it('names the AES group through i18n', () => {
+    renderModal('pkcs11')
+    const aes = Array.from(screen.getByLabelText('common.keyType').options).find(o => o.value === 'aes')
+    expect(aes.textContent).toBe('common.keyGroups.aes')
+  })
+
   it.each(PROVIDERS.filter(p => p !== 'pkcs11'))('offers no ML-DSA key on %s, which no row names', (type) => {
     expect(KEY_ALGORITHMS.find(a => a.label === 'ML-DSA-65')).toMatchObject({ generate: true, providers: null })
     renderModal(type)

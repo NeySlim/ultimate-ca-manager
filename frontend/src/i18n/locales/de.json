@@ -393,7 +393,8 @@
       "brainpool": "Brainpool (RFC 5639)",
       "eddsa": "EdDSA",
       "pq": "ML-DSA (FIPS 204)",
-      "brainpoolWarning": "Brainpool-Ketten und -Signaturen werden von OpenSSL und Windows gelesen. Als TLS-Serverschlüssel wird Brainpool von Chrome und Chromium, Firefox, Go, rustls, GnuTLS und Java ohne Bouncy Castle abgelehnt, und Windows Schannel aktiviert diese Kurven standardmäßig nicht."
+      "brainpoolWarning": "Brainpool-Ketten und -Signaturen werden von OpenSSL und Windows gelesen. Als TLS-Serverschlüssel wird Brainpool von Chrome und Chromium, Firefox, Go, rustls, GnuTLS und Java ohne Bouncy Castle abgelehnt, und Windows Schannel aktiviert diese Kurven standardmäßig nicht.",
+      "aes": "AES"
     },
     "keyTypes": {
       "rsa2048": "RSA 2048-Bit",

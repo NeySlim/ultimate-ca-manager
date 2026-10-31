@@ -882,7 +882,7 @@ export function KeyModal({ provider, onSave, onClose }) {
     .filter(a => !isPostQuantum(a.label) || a.providers?.includes(providerType))
   const groupOptions = [
     ...KEY_GROUPS.filter(g => asymmetric.some(a => a.group === g.id)).map(g => ({ value: g.id, label: t(g.labelKey) })),
-    { value: AES_GROUP, label: 'AES' },
+    { value: AES_GROUP, label: t('common.keyGroups.aes') },
   ]
   const algorithmsOf = (group) => (group === AES_GROUP
     ? AES_ALGORITHMS

@@ -121,15 +121,6 @@ export function algorithmName(row, t, key = 'i18nKey') {
   return row.securityLevel ? keyAlgorithmLabel(row.label, t, row.securityLevel) : row.display
 }
 
-/** `key_type` / `key_size` / `curve` of a TSA signer request, as its API names them. */
-export function signerKeyParams(label) {
-  const a = findAlgorithm(label)
-  if (!a) return { key_type: '', key_size: undefined, curve: undefined }
-  if (a.family === 'RSA') return { key_type: 'RSA', key_size: String(a.bits), curve: undefined }
-  if (a.family === 'EC') return { key_type: 'EC', key_size: undefined, curve: a.curveParam }
-  return { key_type: '', key_size: undefined, curve: undefined }
-}
-
 export const isFipsApproved = (label) => findAlgorithm(label)?.fips === true
 
 export const isBrainpool = (label) => findAlgorithm(label)?.group === GROUP_BRAINPOOL

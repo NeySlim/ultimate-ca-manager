@@ -3,7 +3,7 @@ import {
   ACME_CLIENT_LABELS, CA_DEFAULT_LABELS, GROUP_PQ, ISSUE_DEFAULT_LABELS, KEY_ALGORITHMS,
   algorithmForKeyType, algorithmName, caKeyParts, defaultDigestFor, defaultKeyChoice, keyFamilyOptions,
   exportExcludedFor, findAlgorithm, isExportFormatAllowed, groupedOptions, isBrainpool, isPostQuantum, keyAlgorithmLabel,
-  listAlgorithms, signerKeyParams,
+  listAlgorithms,
 } from '../keyAlgorithms'
 
 const t = (key) => key
@@ -69,18 +69,6 @@ describe('key algorithm registry', () => {
     expect(mixed.map(o => o.group)).toEqual(['common.keyGroups.nist', 'common.keyGroups.brainpool'])
     const single = groupedOptions(listAlgorithms({ labels: ['EC-P256', 'EC-P384'] }), t)
     expect(single.every(o => !('group' in o))).toBe(true)
-  })
-
-  it('maps a TSA signer key to the API parameters', () => {
-    expect(signerKeyParams('RSA-3072')).toEqual({ key_type: 'RSA', key_size: '3072', curve: undefined })
-    expect(signerKeyParams('EC-P384')).toEqual({ key_type: 'EC', key_size: undefined, curve: 'P-384' })
-    expect(signerKeyParams('EC-BP256')).toEqual({ key_type: 'EC', key_size: undefined, curve: 'brainpoolP256r1' })
-  })
-
-  it('does not hand an ML-DSA key to the TSA as an EC curve', () => {
-    for (const a of KEY_ALGORITHMS.filter(r => r.group === GROUP_PQ)) {
-      expect(signerKeyParams(a.label).key_type).not.toBe('EC')
-    }
   })
 })
 
