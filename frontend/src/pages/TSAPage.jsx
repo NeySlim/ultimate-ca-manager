@@ -400,6 +400,9 @@ export default function TSAPage() {
                 onChange={(val) => setGenForm({ ...genForm, key_type: val })}
               />
               <BrainpoolNotice label={genForm.key_type} />
+              {findAlgorithm(genForm.key_type)?.family === 'ML-DSA' && (
+                <p className="text-xs text-text-secondary" role="note">{t('tsa.signerMldsaVerifyNote')}</p>
+              )}
               <p className="text-xs text-text-tertiary">{t('tsa.signerGenerateRenewalNote')}</p>
             </FormModal>
           )}

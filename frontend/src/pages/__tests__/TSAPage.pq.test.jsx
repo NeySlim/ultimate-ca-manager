@@ -140,6 +140,14 @@ describe('TSAPage signer key, from the registry', () => {
     expect(offered).not.toContain('ML-DSA-44')
   })
 
+  it('says how ML-DSA tokens verify while an ML-DSA key is picked', async () => {
+    const select = await openGenerateModal()
+    fireEvent.change(select, { target: { value: 'RSA-2048' } })
+    expect(screen.queryByText('tsa.signerMldsaVerifyNote')).toBeNull()
+    fireEvent.change(select, { target: { value: 'ML-DSA-87' } })
+    expect(screen.getByText('tsa.signerMldsaVerifyNote')).toBeTruthy()
+  })
+
   it('hides ML-DSA in FIPS mode', async () => {
     fipsMode = true
     const select = await openGenerateModal()

@@ -1520,6 +1520,8 @@ openssl ts -verify -data file.txt -in response.tsr \\
   -CAfile ca-chain.pem
 \`\`\`
 
+\`openssl ts -verify\` checks RSA and ECDSA tokens only. An ML-DSA token verifies with \`openssl cms -verify\` (OpenSSL 3.5 or later); then compare its message imprint with the hash of the file.
+
 ### Code Signing with Timestamps
 
 When signing code, add the TSA URL to ensure signatures remain valid after certificate expiry:

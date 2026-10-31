@@ -5412,6 +5412,7 @@
     "signerGenerateCn": "Common name",
     "signerGenerateValidity": "Validity (days)",
     "signerGenerateKeyType": "Key type",
+    "signerMldsaVerifyNote": "ML-DSA timestamps verify with openssl cms -verify (OpenSSL 3.5 or later), not with openssl ts -verify; check the message imprint separately.",
     "signerGenerated": "TSA signing certificate issued.",
     "signerGeneratedSelected": "TSA signing certificate issued and selected as the dedicated signer.",
     "signerGenerateFailed": "Failed to generate the TSA signing certificate.",
