@@ -381,6 +381,7 @@ class Pkcs11Provider(BaseHsmProvider):
         extractable: bool = False
     ) -> HsmKeyInfo:
         """Generate a new key in the HSM"""
+        self.refuse_unsupported_algorithm(algorithm)
         if not self._session:
             raise HsmOperationError("Not connected")
         
@@ -671,6 +672,14 @@ class Pkcs11Provider(BaseHsmProvider):
             
         except pkcs11.PKCS11Error as e:
             raise HsmOperationError(f"Signing failed: {str(e)}")
+
+
+class AwsCloudHsmProvider(Pkcs11Provider):
+    """AWS CloudHSM through its PKCS#11 library, which has no Brainpool curve and no ML-DSA."""
+
+    SIGNS_BRAINPOOL = False
+    SIGNS_ML_DSA = False
+    ML_DSA_LIBRARY = None
 
 
 # Export availability flag

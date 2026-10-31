@@ -222,7 +222,7 @@ def brainpool_refusal(provider: str, algorithm: Optional[str], supported: bool =
     if supported or algorithm not in BRAINPOOL_ALGORITHMS:
         return None
     return (f"Brainpool key {algorithm} is not supported by {provider}: "
-            f"only PKCS#11 HSMs generate and sign with Brainpool curves")
+            f"only PKCS#11 HSMs of provider type 'pkcs11' generate and sign with Brainpool curves")
 
 
 def mldsa_refusal(provider: str, algorithm: Optional[str], supported: bool = False,
