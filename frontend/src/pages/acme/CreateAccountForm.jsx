@@ -3,13 +3,20 @@ import { useTranslation } from 'react-i18next'
 import { Plus } from '@phosphor-icons/react'
 import { Input, Select, Button } from '../../components'
 import { useNotification } from '../../contexts'
+import { ACME_CLIENT_LABELS, GROUP_NIST, GROUP_RSA, groupedOptions, listAlgorithms } from '../../lib/keyAlgorithms'
+import { useFipsMode } from '../../lib/policyAlgorithms'
+
+// An account key signs JWS (RFC 7518): RSA or a NIST curve, never Brainpool
+const accountKeys = (fips) => listAlgorithms({ labels: ACME_CLIENT_LABELS, generate: true, fips })
+  .filter(a => a.group === GROUP_RSA || a.group === GROUP_NIST)
 
 export default function CreateAccountForm({ onSubmit, onCancel }) {
   const { t } = useTranslation()
   const { showWarning } = useNotification()
+  const fips = useFipsMode()
   const [formData, setFormData] = useState({
     email: '',
-    key_type: 'RSA-2048',
+    key_type: accountKeys(false)[0]?.label,
     agree_tos: false,
   })
 
@@ -37,12 +44,7 @@ export default function CreateAccountForm({ onSubmit, onCancel }) {
         label={t('common.keyType')}
         value={formData.key_type}
         onChange={(val) => setFormData(prev => ({ ...prev, key_type: val }))}
-        options={[
-          { value: 'RSA-2048', label: 'RSA 2048-bit' },
-          { value: 'RSA-4096', label: 'RSA 4096-bit' },
-          { value: 'EC-P256', label: 'ECDSA P-256' },
-          { value: 'EC-P384', label: 'ECDSA P-384' },
-        ]}
+        options={groupedOptions(accountKeys(fips), t)}
       />
       
       <label className="flex items-start gap-2 cursor-pointer">

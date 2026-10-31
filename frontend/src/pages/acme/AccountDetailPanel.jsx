@@ -49,7 +49,8 @@ export default function AccountDetailPanel({ account, orders, challenges, detail
       />
 
       <CompactStats stats={[
-        { icon: Key, value: account.key_type || 'RSA-2048' },
+        // The account list does not return the key type: no guess when it is absent
+        ...(account.key_type ? [{ icon: Key, value: account.key_type }] : []),
         { icon: Globe, value: `${orders.length} ${t('acme.orders').toLowerCase()}` },
         { icon: ShieldCheck, value: `${challenges.length} ${t('common.challenges').toLowerCase()}` },
       ]} />
@@ -123,7 +124,7 @@ export default function AccountDetailPanel({ account, orders, challenges, detail
                   {account.status}
                 </StatusIndicator>
               </CompactField>
-              <CompactField autoIcon="keyType" label={t('common.keyType')} value={account.key_type || 'RSA-2048'} />
+              <CompactField autoIcon="keyType" label={t('common.keyType')} value={account.key_type} />
               <CompactField autoIcon="created" label={t('common.created')} value={formatDate(account.created_at)} />
             </CompactGrid>
             {canEditEmail && editingEmail && (

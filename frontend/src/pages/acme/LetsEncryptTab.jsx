@@ -225,7 +225,7 @@ export default function LetsEncryptTab({
 
           <Select
             label={t('acme.keyType')}
-            value={clientSettings.key_type || 'RSA-2048'}
+            value={clientSettings.key_type || ACME_CLIENT_LABELS[0]}
             onChange={(val) => onUpdateClientSetting('key_type', val)}
             disabled={!canWrite}
             options={groupedOptions(listAlgorithms({ labels: ACME_CLIENT_LABELS, fips }), t)}

@@ -48,6 +48,7 @@ vi.mock('../../../components', async () => {
 })
 
 import AccountDetailPanel from '../AccountDetailPanel'
+import { KEY_ALGORITHMS } from '../../../lib/keyAlgorithms'
 
 const account = {
   id: 7,
@@ -118,5 +119,21 @@ describe('AccountDetailPanel email edit', () => {
     renderPanel()
     fireEvent.click(screen.getByRole('button', { name: 'acme.editEmail' }))
     expect(screen.getByText('acme.editEmailCaveat')).toBeInTheDocument()
+  })
+})
+
+describe('AccountDetailPanel key type', () => {
+  beforeEach(() => mocks.hasPermission.mockReturnValue(true))
+
+  it('shows the key type the account carries', () => {
+    renderPanel()
+    expect(screen.getAllByText(account.key_type).length).toBeGreaterThanOrEqual(1)
+  })
+
+  // The account list does not return the key: a client may have registered any of them
+  it('names no key type for an account that carries none', () => {
+    const { key_type: _omitted, ...withoutKey } = account
+    renderPanel({ account: withoutKey })
+    expect(KEY_ALGORITHMS.filter(row => screen.queryAllByText(row.label).length)).toEqual([])
   })
 })
