@@ -1100,7 +1100,7 @@ export default function CRLOCSPPage() {
                 <option value="72">72h</option>
               </select>
             </div>
-            {/* A CA key that fixes its own hash (ML-DSA, EdDSA) takes no digest, whatever crl_digest says */}
+            {/* Backstop for an ML-DSA CA: the registry says its key takes no digest, whatever crl_digest says */}
             {selectedCA?.crl_digest && findAlgorithm(selectedCA.key_type)?.digest !== null && (
             <div className="flex items-center gap-2">
               <label htmlFor="crl-digest" className="text-xs text-text-secondary">{t('crlOcsp.crlDigest')}</label>

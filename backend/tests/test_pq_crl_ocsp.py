@@ -7,6 +7,7 @@ import logging
 import re
 import shutil
 import subprocess
+import uuid
 
 import pytest
 from asn1crypto import core as asn1_core, ocsp as asn1_ocsp
@@ -115,6 +116,39 @@ def test_crl_config_refuses_to_impose_a_digest_on_an_ml_dsa_ca(app, auth_client,
 def test_crl_config_still_refuses_an_empty_digest_for_an_rsa_ca(auth_client, rsa_ca):
     r = _post(auth_client, f"/api/v2/crl/{rsa_ca['id']}/config", {'digest': ''})
     assert r.status_code == 400
+
+
+@pytest.fixture
+def pending_mldsa_ca(app):
+    """A CA still awaiting its certificate: the key is only in the ML-DSA-65 CSR."""
+    from tests.pqc_fixtures import fixture_bytes
+    with app.app_context():
+        ca = CA(refid=f'pending-mldsa-{uuid.uuid4().hex[:12]}', descr='Pending ML-DSA CA', serial=0,
+                crt='', csr=base64.b64encode(fixture_bytes('mldsa65-csr.pem')).decode(),
+                imported_from='external_csr')
+        db.session.add(ca)
+        db.session.commit()
+        ca_id = ca.id
+    yield ca_id
+    with app.app_context():
+        CA.query.filter_by(id=ca_id).delete()
+        db.session.commit()
+
+
+def test_pending_ml_dsa_ca_names_no_crl_digest(app, auth_client, pending_mldsa_ca):
+    with app.app_context():
+        ca = db.session.get(CA, pending_mldsa_ca)
+        assert ca.is_pending and ca.key_type == 'ML-DSA-65'
+        assert ca.effective_crl_digest() is None
+    r = auth_client.get(f"/api/v2/crl/{pending_mldsa_ca}/config")
+    assert r.get_json()['data']['crl_digest'] is None
+
+
+def test_crl_config_refuses_a_digest_on_a_pending_ml_dsa_ca(app, auth_client, pending_mldsa_ca):
+    r = _post(auth_client, f"/api/v2/crl/{pending_mldsa_ca}/config", {'digest': 'sha384'})
+    assert r.status_code == 400
+    with app.app_context():
+        assert db.session.get(CA, pending_mldsa_ca).crl_digest is None
 
 
 @needs_openssl_35
