@@ -287,6 +287,7 @@ class HsmKey(db.Model if db else object):
         'RSA-2048', 'RSA-3072', 'RSA-4096',
         'EC-P256', 'EC-P384', 'EC-P521',
         'EC-BP256', 'EC-BP384', 'EC-BP512',
+        'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87',
         'AES-128', 'AES-256'
     ]
     

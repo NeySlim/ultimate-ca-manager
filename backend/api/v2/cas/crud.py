@@ -63,12 +63,15 @@ _MAX_DESCR_LEN = 255
 _MAX_DESCRIPTION_LEN = 1024
 # Same ceiling as validityYears (50 years)
 _MAX_CA_VALIDITY_DAYS = 50 * 365
-# HSM key algorithm -> the key_type resolve_digest picks 'auto' from
-_HSM_ALGORITHM_KEY_TYPE = {
-    'RSA-2048': '2048', 'RSA-3072': '3072', 'RSA-4096': '4096',
-    'EC-P256': 'prime256v1', 'EC-P384': 'secp384r1', 'EC-P521': 'secp521r1',
-    'EC-BP256': 'brainpoolP256r1', 'EC-BP384': 'brainpoolP384r1', 'EC-BP512': 'brainpoolP512r1',
-}
+
+
+def _hsm_digest_key_type(hsm_algorithm, key_type):
+    """The key_type resolve_digest picks 'auto' from for an HSM key algorithm: the
+    registry's, so an ML-DSA key takes no digest; *key_type* when unregistered."""
+    alg = key_algorithms.get(hsm_algorithm) if hsm_algorithm else None
+    return alg.trust_store_id if alg is not None and alg.trust_store_id else key_type
+
+
 _MAX_OID_LEN = 100
 _MAX_NAME_CONSTRAINTS = 32
 _MAX_NAME_CONSTRAINT_LEN = 255
@@ -552,7 +555,7 @@ def create_ca():
             hsm_key_algorithm_for_digest = hsm_key.algorithm if hsm_key else None
         else:
             hsm_key_algorithm_for_digest = hsm_key_algorithm
-        digest_key_type = _HSM_ALGORITHM_KEY_TYPE.get(hsm_key_algorithm_for_digest, key_type)
+        digest_key_type = _hsm_digest_key_type(hsm_key_algorithm_for_digest, key_type)
         if hsm_key_id or hsm_provider_id:
             if hsm_key_id:
                 chosen_provider = hsm_key.provider if hsm_key else None

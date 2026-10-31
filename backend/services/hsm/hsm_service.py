@@ -399,6 +399,9 @@ class HsmService:
         if refusal:
             raise HsmOperationError(refusal)
         registered = key_algorithms.get(algorithm)
+        if registered is None and key_algorithms.is_post_quantum(algorithm):
+            raise ValueError(f'{algorithm} keys are not available on this build: '
+                             'they need OpenSSL 3.5 or later')
         if registered is not None and not registered.fips_approved:
             fips_mode.refuse(f'{registered.display} keys')
         
@@ -581,6 +584,10 @@ class HsmService:
         
         if key.purpose not in ('signing', 'all'):
             raise ValueError(f"Key {key.label} is not for signing")
+        registered = key_algorithms.get(key.algorithm)
+        pure = registered is not None and not registered.needs_digest
+        if pure and (hash_algorithm or padding):
+            raise ValueError(f"{key.algorithm} signs the data itself: no digest or padding applies")
         
         provider = key.provider
         try:
@@ -595,8 +602,9 @@ class HsmService:
                                      hash_algorithm=hash_algorithm, **extra)
 
             # PKCS#11 and Azure return ECDSA as raw r || s; X.509 needs DER (#366).
-            signature = ecdsa_to_der(
-                signature, coordinate_bytes(key.algorithm, key.public_key_pem))
+            if not pure:
+                signature = ecdsa_to_der(
+                    signature, coordinate_bytes(key.algorithm, key.public_key_pem))
 
             logger.debug(f"Signed data with HSM key: {key.label}")
             return signature
