@@ -105,6 +105,17 @@ def _ca_signer_refusal(ca):
     return tsa_signer_key_problem(public) or _tsa_policy_refusal(ca, public)
 
 
+def _stored_key_problem(cert):
+    """Why the key of stored *cert* cannot sign timestamps, None when it can or is unreadable."""
+    try:
+        import base64
+        from cryptography import x509
+        public_key = x509.load_pem_x509_certificate(base64.b64decode(cert.crt)).public_key()
+    except Exception:
+        return None
+    return tsa_signer_key_problem(public_key)
+
+
 def _validate_signer_refid(refid):
     """Return (error_message, None) or (None, cert). Empty refid is invalid here."""
     cert = Certificate.query.filter_by(refid=refid).first()
@@ -113,6 +124,7 @@ def _validate_signer_refid(refid):
     view = _signer_candidate_view(cert)
     if view is None:
         return (
+            _stored_key_problem(cert) or
             'The selected certificate cannot be a TSA signer: it must be a '
             'non-revoked, unexpired certificate with an RSA, ECDSA or ML-DSA key that UCM '
             'holds and that carries the timeStamping EKU', None

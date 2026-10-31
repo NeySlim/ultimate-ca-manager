@@ -53,7 +53,7 @@ def timestamp_request():
         from cryptography.hazmat.primitives.serialization import load_pem_private_key
         from services.tsa_service import (
             TSAConfigurationError, TSAService, load_configured_signer,
-            tsa_is_enabled,
+            tsa_is_enabled, tsa_signer_key_problem,
         )
         from models import SystemConfig
 
@@ -134,6 +134,12 @@ def timestamp_request():
             signer_cert = x509.load_pem_x509_certificate(
                 base64.b64decode(ca.crt), default_backend()
             )
+            key_problem = tsa_signer_key_problem(signer_cert.public_key())
+            if key_problem:
+                logger.error("TSA request refused: CA '%s': %s", ca.descr, key_problem)
+                response = make_response('TSA configuration invalid', 503)
+                response.headers['Content-Type'] = 'text/plain'
+                return response
 
             # Decrypt private key (may be stored encrypted)
             try:

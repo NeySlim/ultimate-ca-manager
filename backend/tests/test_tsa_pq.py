@@ -224,3 +224,67 @@ def test_mldsa_ca_signs_timestamps_itself(app, client, auth_client, mldsa_ca, ts
 def test_eddsa_signer_issuance_is_refused(auth_client, rsa_ca, key_type):
     r = _issue(auth_client, rsa_ca, key_type=key_type, key_size='')
     assert r.status_code == 400
+
+
+# ---- FIPS mode: ML-DSA is not approved, on every TSA path -------------------------
+
+@pytest.fixture
+def fips_on(monkeypatch):
+    import fips_mode
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+
+
+def _tsa_config(app):
+    with app.app_context():
+        return {k: getattr(SystemConfig.query.filter_by(key=k).first(), 'value', None)
+                for k in ('tsa_signer_cert_refid', 'tsa_ca_refid')}
+
+
+def test_fips_mode_refuses_an_mldsa_signer_key(monkeypatch):
+    import fips_mode
+    from services.tsa_service import tsa_signer_key_problem
+    mldsa = key_algorithms.generate('ML-DSA-65').public_key()
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+    assert 'FIPS' in tsa_signer_key_problem(mldsa)
+    assert tsa_signer_key_problem(rsa.generate_private_key(65537, 2048).public_key()) is None
+
+
+def test_fips_mode_refuses_to_select_an_mldsa_signer(
+        app, client, auth_client, rsa_ca, tsa_settings, monkeypatch):
+    issued = _issue(auth_client, rsa_ca, cn='pq-tsa-fips', key_type='ml-dsa', key_size='65',
+                    select=False).get_json()['data']['certificate']
+    _enable(app, tsa_signer_cert_refid='')
+    import fips_mode
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+    before = _tsa_config(app)
+    candidates = auth_client.get('/api/v2/tsa/signer-candidates').get_json()['data']
+    assert issued['refid'] not in {c['refid'] for c in candidates}
+    r = auth_client.patch('/api/v2/tsa/config', content_type='application/json',
+                          data=json.dumps({'signer_cert_refid': issued['refid']}))
+    assert r.status_code == 400 and 'FIPS' in r.get_json()['message']
+    assert _tsa_config(app) == before
+
+    # Selected before FIPS mode was on: /tsa refuses instead of signing
+    _enable(app, tsa_signer_cert_refid=issued['refid'])
+    resp = client.post('/tsa', data=_tsq(b'fips'), content_type='application/timestamp-query')
+    assert resp.status_code == 503
+
+
+def test_fips_mode_refuses_an_mldsa_ca_as_signer(
+        app, client, auth_client, mldsa_ca, tsa_settings, fips_on, monkeypatch):
+    _enable(app, tsa_signer_cert_refid='')
+    before = _tsa_config(app)
+    r = auth_client.patch('/api/v2/tsa/config', content_type='application/json',
+                          data=json.dumps({'ca_refid': mldsa_ca['refid']}))
+    assert r.status_code == 400 and 'FIPS' in r.get_json()['message']
+    assert _tsa_config(app) == before
+
+    # Chosen before FIPS mode was on: /tsa refuses before a FIPS provider would fail the key load
+    _enable(app, tsa_signer_cert_refid='', tsa_ca_refid=mldsa_ca['refid'])
+    from cryptography.hazmat.primitives import serialization as ser
+
+    def no_key_load(*args, **kwargs):
+        raise AssertionError('the CA key must not be loaded')
+    monkeypatch.setattr(ser, 'load_pem_private_key', no_key_load)
+    resp = client.post('/tsa', data=_tsq(b'fips ca'), content_type='application/timestamp-query')
+    assert resp.status_code == 503

@@ -45,6 +45,7 @@ HASH_CLASSES = {
 }
 
 
+import fips_mode
 from utils import key_algorithms
 from utils.signing_hash import signing_hash_for
 
@@ -55,11 +56,14 @@ TSA_SIGNER_FAMILIES = ('RSA', 'EC', 'ML-DSA')
 def tsa_signer_key_problem(public_key) -> Optional[str]:
     """Why *public_key* cannot sign timestamps, None when it can."""
     family = key_algorithms.family_for_public_key(public_key)
-    if family in TSA_SIGNER_FAMILIES:
-        return None
-    label = key_algorithms.label_for_public_key(public_key) or type(public_key).__name__
-    reason = ' (EdDSA timestamps are not signed)' if family in ('ED25519', 'ED448') else ''
-    return f'A TSA signer key must be RSA, ECDSA or ML-DSA, not {label}{reason}'
+    label = key_algorithms.label_for_public_key(public_key)
+    if family not in TSA_SIGNER_FAMILIES:
+        reason = ' (EdDSA timestamps are not signed)' if family in ('ED25519', 'ED448') else ''
+        return f'A TSA signer key must be RSA, ECDSA or ML-DSA, not {label or type(public_key).__name__}{reason}'
+    # Same rule as the OCSP responder: FIPS mode signs with approved keys only
+    if fips_mode.enabled() and not key_algorithms.fips_approved(label):
+        return f'A {label or family} TSA signer key is not approved in FIPS mode'
+    return None
 
 
 class TSAConfigurationError(ValueError):
@@ -560,6 +564,12 @@ def _load_signer_certificate(refid: str):
             f'configured TSA signer certificate {refid!r} could not be parsed: {exc}',
             reason='invalid',
         )
+
+    # Before the key load, which a FIPS provider fails for an unapproved key
+    key_problem = tsa_signer_key_problem(cert.public_key())
+    if key_problem:
+        raise TSAConfigurationError(
+            f'configured TSA signer certificate {refid!r}: {key_problem}', reason='invalid')
 
     now = datetime.now(timezone.utc)
     if now < cert.not_valid_before_utc:
