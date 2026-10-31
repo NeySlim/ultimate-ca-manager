@@ -7,6 +7,7 @@ Uses shared fixtures from conftest.py:
 """
 import pytest
 import json
+from werkzeug.exceptions import RequestedRangeNotSatisfiable, TooManyRequests
 from tests.conftest import get_json
 
 def _post(client, url, data=None):
@@ -78,11 +79,29 @@ class TestDetectAuthMethods:
         assert r.status_code == 200
         assert get_json(r)['data']['password'] is True
 
+    @pytest.mark.parametrize('body', ['[1]', '"abc"', '{"username": "admin"}'])
+    def test_post_methods_answers_like_get_whatever_the_body(self, client, body):
+        r = client.post('/api/v2/auth/methods', data=body, content_type='application/json')
+        assert r.status_code == 200
+        assert get_json(r)['data'] == get_json(client.get('/api/v2/auth/methods'))['data']
+
     def test_an_http_error_keeps_its_status(self, client):
         """An API route rejecting a non-JSON body answers 415, not 500."""
         r = client.post('/api/v2/auth/login/password', data='x', content_type='text/plain')
         assert r.status_code == 415
         assert get_json(r)['status'] == 415
+
+    @pytest.mark.parametrize('exc, header', [
+        (TooManyRequests('5 per 1 minute', retry_after=30), ('Retry-After', '30')),
+        (RequestedRangeNotSatisfiable(length=10), ('Content-Range', 'bytes */10')),
+    ])
+    def test_an_http_error_keeps_its_headers_under_a_fixed_label(self, app, exc, header):
+        """The rate limit's own text ('5 per 1 minute') is not what the login page shows."""
+        with app.test_request_context('/api/v2/auth/login/password', method='POST'):
+            response = app.make_response(app.handle_user_exception(exc))
+        assert response.status_code == exc.code
+        assert response.headers.get(header[0]) == header[1]
+        assert response.get_json()['message'] == exc.name
 
     def test_auth_methods_ignores_spoofed_proxy_headers(
         self, client, app, monkeypatch,

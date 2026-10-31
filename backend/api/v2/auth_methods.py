@@ -96,8 +96,7 @@ def detect_auth_methods():
     """
     Detect available authentication methods.
 
-    GET: Global methods + mTLS cert status (no username needed)
-    POST with {"username": "xxx"}: User-specific (WebAuthn credential count, etc.)
+    GET and POST answer the same, whatever the body: no per-user detail before login.
 
     If the mTLS middleware already auto-logged the user in (session exists),
     returns mtls_status='auto_logged_in' so the frontend can skip the login form.
@@ -119,12 +118,6 @@ def detect_auth_methods():
         methods['mtls_status'] = 'auto_logged_in'
         methods['mtls_user'] = session.get('username')
         return success_response(data=methods)
-
-    # Check for username in POST body
-    username = None
-    if request.method == 'POST':
-        # A POST without a JSON body detects like a GET instead of failing
-        username = (request.get_json(silent=True) or {}).get('username')
 
     # Pre-authentication: never expose per-user credential counts (username oracle).
 
