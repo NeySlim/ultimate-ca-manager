@@ -2616,6 +2616,7 @@ GET /api/v2/policies/effective?ca_id=3&template_id=1
     "require_hsm_ca_key": false,
     "hsm_certifications": null,  # {"eucc-high": null, ...} when a policy sets the rule
     "tsa_signer_key_types": ["EC-P256", "EC-P384", "EC-P521"],
+    "ml_dsa": true,              # false when this build's OpenSSL has no ML-DSA
     "fips": true                 # only present in FIPS mode
   }
 }

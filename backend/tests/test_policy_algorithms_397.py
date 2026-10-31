@@ -178,6 +178,13 @@ class TestPolicyApi:
         finally:
             _drop(app, CertificatePolicy, a, b, c)
 
+    @pytest.mark.parametrize('supported', [True, False])
+    def test_effective_says_whether_this_build_has_ml_dsa(self, auth_client, monkeypatch, supported):
+        from utils import key_algorithms
+        monkeypatch.setattr(key_algorithms, 'mldsa_supported', lambda: supported)
+        data = get_json(auth_client.get('/api/v2/policies/effective'))['data']
+        assert data['ml_dsa'] is supported
+
 
 class TestOperatorPaths:
 

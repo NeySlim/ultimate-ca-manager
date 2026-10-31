@@ -980,7 +980,8 @@ def effective_policy_algorithms():
     template_id = request.args.get('template_id', type=int)
     key_types, digests = PolicyEvaluationService.effective_algorithms(ca_id, template_id)
     data = {'allowed_key_types': key_types, 'allowed_digests': digests,
-            **PolicyEvaluationService.effective_signature_rules(ca_id, template_id)}
+            **PolicyEvaluationService.effective_signature_rules(ca_id, template_id),
+            'ml_dsa': key_algorithms.mldsa_supported()}  # whether this build can use ML-DSA keys
     if fips_mode.enabled():
         data['fips'] = True  # the FIPS system policy is part of the result
     return success_response(data=data)
