@@ -99,6 +99,24 @@ def test_a_tampered_mldsa_request_fails_proof_of_possession(client, est_ca, tmp_
     assert b'proof of possession failed' in r.data
 
 
+@needs_openssl_35
+@pytest.mark.parametrize('which', ['mldsa', 'rsa'])
+@pytest.mark.parametrize('tampered', [False, True])
+def test_fips_mode_refuses_an_mldsa_request_before_its_signature(client, est_ca, tmp_path,
+                                                                 monkeypatch, which, tampered):
+    """A FIPS provider without ML-DSA cannot verify the request: the refusal names FIPS, not PoP."""
+    import fips_mode
+    est_ca(which)
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+    csr, _ = openssl_mldsa_csr(tmp_path, f'fips-{which}.pq.example.test')
+    der = bytearray(csr.public_bytes(serialization.Encoding.DER))
+    if tampered:
+        der[-1] ^= 0x01
+    r = _post(client, 'simpleenroll', bytes(der))
+    assert r.status_code == 400, r.data
+    assert r.data == b'ML-DSA-44 keys are not available in FIPS mode'
+
+
 def test_weak_hash_diagnosis_is_none_for_mldsa(mldsa_csr):
     from utils.csr_diagnostics import weak_csr_hash_algorithm
     assert mldsa_csr.signature_hash_algorithm is None

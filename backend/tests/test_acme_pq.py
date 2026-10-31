@@ -160,6 +160,21 @@ class TestFinalizeMldsaRequest:
                 serialization.Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
         leaf.verify_directly_issued_by(ca_cert)
 
+    @pytest.mark.parametrize('issuer', ['rsa_ca', 'mldsa_issuing_ca'])
+    def test_fips_mode_refuses_the_mldsa_request(self, app, client, rsa_account, signing_ca,
+                                                 tmp_path, monkeypatch, request, issuer):
+        import fips_mode
+        signing_ca(request.getfixturevalue(issuer))
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        r, order_id, _ = _finalize(app, client, rsa_account, tmp_path,
+                                   f'fips-{issuer.replace("_", "-")}.pq.example.com')
+        body = r.get_json()
+        assert r.status_code == 400, body
+        assert body['type'] == 'urn:ietf:params:acme:error:badCSR', body
+        assert 'ML-DSA-44 keys are not available in FIPS mode' in body['detail'], body
+        with app.app_context():
+            assert AcmeOrder.query.filter_by(order_id=order_id).first().certificate_id is None
+
     def test_profile_digest_yields_to_an_mldsa_issuer(self, app, client, rsa_account,
                                                        signing_ca, mldsa_issuing_ca, tmp_path):
         """A profile that names sha384 still issues under an ML-DSA CA, which signs without one."""

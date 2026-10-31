@@ -550,6 +550,7 @@ def _validate_est_csr(csr):
     """Common EST CSR validation.
 
     Returns ``(ok, response_or_None)``. Enforces:
+      * Key policy (strength, FIPS) — checked first.
       * Proof of Possession — the CSR's self-signature MUST verify.
         Without this an attacker who stole a Basic-Auth credential could
         submit a CSR built around a public key they don't control and
@@ -558,10 +559,13 @@ def _validate_est_csr(csr):
         credential can't mint a wildcard / catch-all certificate by
         submitting an empty CSR.
     """
-    from utils.key_type import unsignable_csr_key
-    unsignable = unsignable_csr_key(csr)
-    if unsignable:
-        return False, Response(unsignable, status=400)
+    # Key policy before proof of possession: a FIPS provider without ML-DSA
+    # cannot verify such a request, whose refusal must name FIPS, not PoP.
+    from utils.key_type import validate_enrollment_csr
+    key_err = validate_enrollment_csr(csr)
+    if key_err:
+        logger.warning("EST: rejecting enrollment key: %s", key_err)
+        return False, Response(key_err, status=400)
     try:
         signature_valid = csr.is_signature_valid
     except Exception as e:
@@ -593,13 +597,6 @@ def _validate_est_csr(csr):
     cn_attrs = csr.subject.get_attributes_for_oid(NameOID.COMMON_NAME)
     if not cn_attrs or not str(cn_attrs[0].value).strip():
         return False, Response('CSR subject must include a non-empty CN', status=400)
-
-    # Key-strength policy — never certify a weak/exotic key (e.g. 512-bit RSA).
-    from utils.key_type import validate_enrollment_public_key
-    key_err = validate_enrollment_public_key(csr.public_key())
-    if key_err:
-        logger.warning("EST: rejecting weak enrollment key: %s", key_err)
-        return False, Response(key_err, status=400)
 
     return True, None
 
