@@ -63,6 +63,7 @@ const OPERATOR_PERMISSIONS = [
   'read:scep', 'read:est', 'read:xcep', 'read:wstep',
   'read:kerberos', 'read:ad_connector', 'read:hsm',
   'read:ssh', 'write:ssh', 'delete:ssh',
+  'read:ssh_cas', 'write:ssh_cas', 'delete:ssh_cas',
   'read:policies', 'read:approvals', 'write:approvals',
   'read:key_recovery', 'write:key_recovery',
   'read:audit',

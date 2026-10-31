@@ -25,6 +25,7 @@ ROLE_PERMISSIONS = {
         'read:ad_connector',
         'read:hsm',
         'read:ssh', 'write:ssh', 'delete:ssh',
+        'read:ssh_cas', 'write:ssh_cas', 'delete:ssh_cas',
         'read:policies', 'read:approvals', 'write:approvals',
         'read:key_recovery', 'write:key_recovery',
         'read:audit',
@@ -47,7 +48,7 @@ ROLE_PERMISSIONS = {
         'read:kerberos',
         'read:ad_connector',
         'read:hsm',
-        'read:ssh',
+        'read:ssh', 'read:ssh_cas',
         'read:policies', 'read:approvals',
         'read:audit',
         'read:groups',
@@ -59,7 +60,7 @@ ROLE_PERMISSIONS = {
         'read:csrs',
         'read:templates',
         'read:truststore',
-        'read:ssh',
+        'read:ssh', 'read:ssh_cas',
     ]
 }
 
@@ -168,6 +169,7 @@ CUSTOM_ROLE_GRANTABLE_PERMISSIONS = sorted({
     'read:scep', 'write:scep',
     'read:settings', 'write:settings', 'delete:settings',
     'read:ssh', 'write:ssh', 'delete:ssh',
+    'read:ssh_cas', 'write:ssh_cas', 'delete:ssh_cas',
     'read:templates', 'write:templates', 'delete:templates',
     'read:truststore', 'write:truststore', 'delete:truststore',
     'read:user_certificates', 'write:user_certificates', 'delete:user_certificates',
@@ -175,6 +177,25 @@ CUSTOM_ROLE_GRANTABLE_PERMISSIONS = sorted({
     'read:wstep', 'write:wstep',
     'read:xcep', 'write:xcep',
 })
+
+# Written in every backup. An archive below 1 predates the ssh_cas scopes and
+# is restored through with_ssh_ca_scopes, as migration 116 did to the database.
+PERMISSIONS_REVISION = 1
+
+_SSH_CA_SCOPES = {f'{action}:ssh': f'{action}:ssh_cas' for action in ('read', 'write', 'delete')}
+
+
+def with_ssh_ca_scopes(perms) -> list:
+    """``perms`` with ``X:ssh_cas`` added right after each ``X:ssh`` it holds."""
+    out = []
+    for perm in perms:
+        if perm not in out:
+            out.append(perm)
+        added = _SSH_CA_SCOPES.get(perm) if isinstance(perm, str) else None
+        if added and added not in perms and added not in out:
+            out.append(added)
+    return out
+
 
 # Resource names the role editor used to store, read as the enforced ones.
 _LEGACY_RESOURCE_ALIASES = {'certs': 'certificates'}

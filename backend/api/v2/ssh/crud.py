@@ -35,7 +35,7 @@ def _allow_any_principal(data):
 
 
 @bp.route('/api/v2/ssh/cas', methods=['GET'])
-@require_auth(['read:ssh'])
+@require_auth(['read:ssh_cas'])
 def list_ssh_cas():
     """List all SSH CAs with optional filtering."""
     page, per_page = parse_request_pagination(default_per_page=20)
@@ -70,7 +70,7 @@ def list_ssh_cas():
 
 
 @bp.route('/api/v2/ssh/cas/<int:ca_id>', methods=['GET'])
-@require_auth(['read:ssh'])
+@require_auth(['read:ssh_cas'])
 def get_ssh_ca(ca_id):
     """Get SSH CA details."""
     ca = db.session.get(SSHCertificateAuthority, ca_id)
@@ -81,7 +81,7 @@ def get_ssh_ca(ca_id):
 
 
 @bp.route('/api/v2/ssh/cas/import', methods=['POST'])
-@require_auth(['write:ssh'])
+@require_auth(['write:ssh_cas'])
 def import_ssh_ca():
     """Import an existing SSH CA from a private key."""
     try:
@@ -159,7 +159,7 @@ def import_ssh_ca():
 
 
 @bp.route('/api/v2/ssh/cas', methods=['POST'])
-@require_auth(['write:ssh'])
+@require_auth(['write:ssh_cas'])
 def create_ssh_ca():
     """Create a new SSH CA."""
     try:
@@ -218,7 +218,7 @@ def create_ssh_ca():
 
 
 @bp.route('/api/v2/ssh/cas/<int:ca_id>', methods=['PUT'])
-@require_auth(['write:ssh'])
+@require_auth(['write:ssh_cas'])
 def update_ssh_ca(ca_id):
     """Update SSH CA metadata."""
     try:
@@ -274,7 +274,7 @@ def update_ssh_ca(ca_id):
 
 
 @bp.route('/api/v2/ssh/cas/<int:ca_id>', methods=['DELETE'])
-@require_auth(['delete:ssh'])
+@require_auth(['delete:ssh_cas'])
 def delete_ssh_ca(ca_id):
     """Delete an SSH CA."""
     ca = db.session.get(SSHCertificateAuthority, ca_id)

@@ -97,7 +97,7 @@ import AccountPage from '../AccountPage'
 // The viewer role's scopes, verbatim from backend/auth/permissions.py.
 const VIEWER_PERMISSIONS = [
   'read:certificates', 'read:user_certificates', 'read:cas',
-  'read:csrs', 'read:templates', 'read:truststore', 'read:ssh',
+  'read:csrs', 'read:templates', 'read:truststore', 'read:ssh', 'read:ssh_cas',
 ]
 
 async function openMtlsModal() {

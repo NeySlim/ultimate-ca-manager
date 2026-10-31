@@ -3499,7 +3499,8 @@
       "trustStore": "Trust Store",
       "hsmManagement": "HSM Management",
       "singleSignOn": "Single Sign-On",
-      "ssh": "SSH Certificates"
+      "ssh": "SSH Certificates",
+      "sshCas": "SSH Certificate Authorities"
     },
     "stats": {},
     "subtitle_one": "{{count}} role",
@@ -3517,12 +3518,18 @@
     "noDescription": "No description",
     "roleDetails": "Role Details",
     "permissions": {
-      "readSsh": "View SSH CAs & certificates",
-      "writeSsh": "Create & manage SSH CAs & certificates",
-      "deleteSsh": "Delete SSH CAs & certificates",
-      "read:ssh": "View SSH CAs and certificates",
-      "write:ssh": "Create and sign SSH certificates",
-      "delete:ssh": "Delete SSH CAs and certificates"
+      "readSsh": "View SSH certificates",
+      "writeSsh": "Sign, import & revoke SSH certificates",
+      "deleteSsh": "Delete SSH certificates",
+      "read:ssh": "View SSH certificates",
+      "write:ssh": "Sign, import and revoke SSH certificates",
+      "delete:ssh": "Delete SSH certificates",
+      "readSshCas": "View SSH CAs",
+      "writeSshCas": "Create, import & edit SSH CAs",
+      "deleteSshCas": "Delete SSH CAs",
+      "read:ssh_cas": "View SSH CAs, their public keys, KRLs and setup scripts",
+      "write:ssh_cas": "Create, import and edit SSH CAs",
+      "delete:ssh_cas": "Delete SSH CAs"
     },
     "ignoredPermissions": "Ignored permissions",
     "ignoredPermissionsHint": "Stored on this role but not applied: reserved for administrators or unknown. They are kept as they are."

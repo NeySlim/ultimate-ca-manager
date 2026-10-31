@@ -20,6 +20,13 @@ describe('custom role matrix follows the server list', () => {
     expect(group.labelKey).toBe('rbac.categories.userManagement')
   })
 
+  it('labels SSH CAs apart from SSH certificates, right after them', () => {
+    const groups = groupPermissions(['read:ssh_cas', 'write:ssh', 'read:ssh'])
+    expect(groups.map(g => [g.key, g.labelKey])).toEqual([
+      ['ssh', 'rbac.categories.ssh'], ['ssh_cas', 'rbac.categories.sshCas'],
+    ])
+  })
+
   it('labels an unknown resource by its name rather than dropping it', () => {
     const [group] = groupPermissions(['read:widgets'])
     expect(group).toMatchObject({ key: 'widgets', labelKey: null, label: 'widgets' })

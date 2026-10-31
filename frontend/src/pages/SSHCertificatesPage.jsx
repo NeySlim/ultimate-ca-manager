@@ -70,7 +70,7 @@ export default function SSHCertificatesPage() {
   const navigate = useNavigate()
   const { id: urlCertId } = useParams()
   const { showSuccess, showError, showConfirm } = useNotification()
-  const { canWrite, canDelete } = usePermission()
+  const { canRead, canWrite, canDelete } = usePermission()
   const { copy: clipboardCopy } = useClipboard()
   const { muteToasts } = useWebSocket()
 
@@ -125,7 +125,8 @@ export default function SSHCertificatesPage() {
 
       const [certsRes, casRes, statsRes] = await Promise.all([
         sshCertificatesService.getAll(params),
-        sshCasService.getAll(),
+        // The CA list is behind read:ssh_cas; without it, only the CA filter and picker are empty
+        canRead('ssh_cas') ? sshCasService.getAll() : Promise.resolve({ data: [] }),
         sshCertificatesService.getStats(),
       ])
 

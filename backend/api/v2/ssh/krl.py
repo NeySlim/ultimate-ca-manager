@@ -16,7 +16,7 @@ from models import db
 
 
 @bp.route('/api/v2/ssh/cas/<int:ca_id>/krl', methods=['GET'])
-@require_auth(['read:ssh'])
+@require_auth(['read:ssh_cas'])
 def get_ssh_ca_krl(ca_id):
     """Download the KRL (Key Revocation List) for this CA."""
     try:

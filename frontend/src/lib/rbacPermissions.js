@@ -22,6 +22,7 @@ const CATEGORY_LABELS = [
   ['ad_connector', 'adConnector.title'],
   ['hsm', 'rbac.categories.hsmManagement'],
   ['ssh', 'rbac.categories.ssh'],
+  ['ssh_cas', 'rbac.categories.sshCas'],
   ['policies', 'policies.title'],
   ['approvals', 'common.approvals'],
   ['key_recovery', 'common.keyRecovery'],

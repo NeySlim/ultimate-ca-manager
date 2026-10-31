@@ -171,7 +171,7 @@ export function AppRoutes() {
           <Route path="/reports" element={<PermissionRoute permission="read:audit"><ReportsPage /></PermissionRoute>} />
           <Route path="/discovery" element={<PermissionRoute permission="read:certificates"><DiscoveryPage /></PermissionRoute>} />
           {/* SSH */}
-          <Route path="/ssh/cas" element={<PermissionRoute permission="read:ssh"><SSHCAsPage /></PermissionRoute>} />
+          <Route path="/ssh/cas" element={<PermissionRoute permission="read:ssh_cas"><SSHCAsPage /></PermissionRoute>} />
           <Route path="/ssh/certificates" element={<PermissionRoute permission="read:ssh"><SSHCertificatesPage /></PermissionRoute>} />
           {/* Component showcase — accessible by URL only, not in sidebar */}
           <Route path="/dev/components" element={<ProtectedRoute><DevShowcasePage /></ProtectedRoute>} />

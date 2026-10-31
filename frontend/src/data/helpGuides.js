@@ -2313,7 +2313,7 @@ X-API-Key: <your-api-key>
 Or send it as a bearer token: \`Authorization: Bearer <your-api-key>\`.
 
 ### Permissions
-Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. A key can create or regenerate only a key whose permissions it holds itself.
+Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. **Certificates Only** issues X.509 and SSH certificates and reads the CAs, SSH CAs and CRLs, but cannot create or change a CA. A key can create or regenerate only a key whose permissions it holds itself.
 
 API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: these need an interactive session.
 

@@ -43,7 +43,7 @@ const navGroups = [
     icon: Terminal,
     labelKey: 'common.navSsh',
     children: [
-      { id: 'ssh-cas', icon: Key, labelKey: 'common.sshCas', path: '/ssh/cas', permission: 'read:ssh' },
+      { id: 'ssh-cas', icon: Key, labelKey: 'common.sshCas', path: '/ssh/cas', permission: 'read:ssh_cas' },
       { id: 'ssh-certificates', icon: Certificate, labelKey: 'common.sshCertificates', path: '/ssh/certificates', permission: 'read:ssh' },
     ]
   },

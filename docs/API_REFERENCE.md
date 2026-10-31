@@ -3985,6 +3985,12 @@ Returns 200 if the application process is alive, regardless of dependency status
 | `read:cas` | Read CAs |
 | `write:cas` | Create/update CAs |
 | `delete:cas` | Delete CAs |
+| `read:ssh` | Read SSH certificates |
+| `write:ssh` | Sign, import and revoke SSH certificates |
+| `delete:ssh` | Delete SSH certificates |
+| `read:ssh_cas` | Read SSH CAs, their public keys, KRLs and setup scripts |
+| `write:ssh_cas` | Create, import and update SSH CAs |
+| `delete:ssh_cas` | Delete SSH CAs |
 | `read:users` | Read users |
 | `write:users` | Create/update users |
 | `delete:users` | Delete users |

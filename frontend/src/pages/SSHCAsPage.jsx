@@ -346,11 +346,11 @@ export default function SSHCAsPage() {
   // ============= ROW ACTIONS =============
 
   const rowActions = useCallback((row) => [
-    ...(canWrite('ssh') ? [
+    ...(canWrite('ssh_cas') ? [
       { label: t('common.edit'), icon: PencilSimple, onClick: () => { setEditingCA(row); setShowModal(true) } }
     ] : []),
     { label: t('sshCas.downloadPublicKey'), icon: Download, onClick: () => handleDownloadPublicKey(row) },
-    ...(canDelete('ssh') ? [
+    ...(canDelete('ssh_cas') ? [
       { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row) }
     ] : [])
   ], [canWrite, canDelete, t])
@@ -389,12 +389,12 @@ export default function SSHCAsPage() {
         <Button type="button" size="sm" variant="primary" onClick={() => handleDownloadSetupScript(selectedCA, 'windows')}>
           <WindowsLogo size={14} /> {t('sshCas.downloadSetupScriptWindows')}
         </Button>
-        {canWrite('ssh') && (
+        {canWrite('ssh_cas') && (
           <Button type="button" size="sm" variant="secondary" onClick={() => { setEditingCA(selectedCA); setShowModal(true) }}>
             <PencilSimple size={14} /> {t('common.edit')}
           </Button>
         )}
-        {canDelete('ssh') && (
+        {canDelete('ssh_cas') && (
           <Button type="button" size="sm" variant="danger" onClick={() => handleDelete(selectedCA)}>
             <Trash size={14} /> {t('common.delete')}
           </Button>
@@ -583,7 +583,7 @@ export default function SSHCAsPage() {
           filterPresetsKey="ucm-ssh-cas-presets"
           densityStorageKey="ucm-ssh-cas-density"
           onApplyFilterPreset={handleApplyFilterPreset}
-          toolbarActions={canWrite('ssh') && (
+          toolbarActions={canWrite('ssh_cas') && (
             isMobile ? (
               <div className="flex gap-2">
                 <Button type="button" size="lg" onClick={() => setShowImportModal(true)} className="w-11 h-11 p-0" variant="secondary">
@@ -613,7 +613,7 @@ export default function SSHCAsPage() {
           emptyIcon={Key}
           emptyTitle={t('sshCas.noData')}
           emptyDescription={t('sshCas.noDataDescription')}
-          emptyAction={canWrite('ssh') && (
+          emptyAction={canWrite('ssh_cas') && (
             <Button type="button" onClick={() => { setEditingCA(null); setShowModal(true) }}>
               <Plus size={16} /> {t('sshCas.createCA')}
             </Button>
