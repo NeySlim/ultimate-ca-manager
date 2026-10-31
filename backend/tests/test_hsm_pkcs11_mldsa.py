@@ -122,6 +122,16 @@ def test_listing_reads_the_parameter_set_off_the_public_half():
     assert [k.algorithm for k in provider.list_keys()] == ['ML-DSA-87']
 
 
+@pytest.mark.parametrize('parameter_set', [None, 0x99])
+def test_an_unreadable_parameter_set_is_a_listing_error_not_unknown(parameter_set):
+    provider = _provider()
+    _pub, priv, _key = provider._session.add_pair('ML-DSA-65', on_private=False, on_public=False)
+    if parameter_set is not None:
+        priv.attrs[Attribute.PARAMETER_SET] = parameter_set
+    assert provider.list_keys() == []
+    assert len(provider.list_errors) == 1 and 'parameter set' in provider.list_errors[0]
+
+
 def test_sign_is_pure_ml_dsa_over_the_data():
     provider = _provider()
     _pub, _priv, key = provider._session.add_pair('ML-DSA-65')

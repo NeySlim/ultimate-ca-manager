@@ -35,12 +35,14 @@ class BaseHsmProvider(ABC):
 
     # True when the provider generates and signs ML-DSA keys (FIPS 204)
     SIGNS_ML_DSA = False
+    # Client library release that brings ML-DSA, for a type whose installed one lacks it
+    ML_DSA_LIBRARY: Optional[str] = None
 
     def refuse_unsupported_algorithm(self, algorithm: str) -> None:
         """Raise HsmOperationError for a Brainpool or ML-DSA label this provider cannot handle."""
         name = f"provider type '{getattr(type(self), 'PROVIDER_TYPE', None) or type(self).__name__}'"
         message = (brainpool_refusal(name, algorithm, self.SIGNS_BRAINPOOL)
-                   or mldsa_refusal(name, algorithm, self.SIGNS_ML_DSA))
+                   or mldsa_refusal(name, algorithm, self.SIGNS_ML_DSA, self.ML_DSA_LIBRARY))
         if message:
             raise HsmOperationError(message)
     
@@ -223,12 +225,16 @@ def brainpool_refusal(provider: str, algorithm: Optional[str], supported: bool =
             f"only PKCS#11 HSMs generate and sign with Brainpool curves")
 
 
-def mldsa_refusal(provider: str, algorithm: Optional[str], supported: bool = False) -> Optional[str]:
-    """Why *provider* cannot take the ML-DSA *algorithm*, or None."""
+def mldsa_refusal(provider: str, algorithm: Optional[str], supported: bool = False,
+                  library: Optional[str] = None) -> Optional[str]:
+    """Why *provider* cannot take the ML-DSA *algorithm*, or None; *library* names the
+    client release a type that holds ML-DSA needs when the installed one lacks it."""
     from utils.key_algorithms import post_quantum_info
     info = post_quantum_info(algorithm) if algorithm else None
     if supported or info is None or info.family != 'ML-DSA':
         return None
+    if library:
+        return f"ML-DSA keys are not available with {provider}: {algorithm} needs {library} or later"
     return (f"ML-DSA keys are not available with {provider}: {algorithm} needs a "
             f"PKCS#11 3.2 token, OpenBao Transit or Google Cloud KMS")
 

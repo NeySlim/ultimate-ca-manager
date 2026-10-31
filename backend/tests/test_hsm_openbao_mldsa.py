@@ -89,7 +89,7 @@ def test_listing_names_the_level_and_gives_spki(label):
     assert key_algorithms.label_for_public_key(_spki(info.public_key_pem)) == label
 
 
-@pytest.mark.parametrize('algorithm', ['ML-DSA-65', None, 'whatever'])
+@pytest.mark.parametrize('algorithm', ['ML-DSA-65', None])
 def test_sign_sends_no_hash_algorithm(algorithm):
     provider, transit = _provider()
     key = mldsa.MLDSA65PrivateKey.generate()
@@ -107,6 +107,15 @@ def test_sign_refuses_a_digest_or_padding(extra):
     with pytest.raises(HsmOperationError, match='ML-DSA'):
         provider.sign('k', b'tbs', 'ML-DSA-65', **extra)
     assert not [r for r in transit.requests if r[1].startswith('sign/')]
+
+
+@pytest.mark.parametrize('algorithm', ['whatever', 'EC-BP256', 'SLH-DSA-SHA2-128s'])
+def test_a_named_algorithm_it_does_not_know_is_refused_before_any_call(algorithm):
+    provider, transit = _provider()
+    transit.add('k', 'mldsa-65', mldsa.MLDSA65PrivateKey.generate())
+    with pytest.raises(HsmOperationError, match='Unsupported algorithm'):
+        provider.sign('k', b'tbs', algorithm)
+    assert transit.requests == []
 
 
 @pytest.mark.parametrize('transit_type', ['slh-dsa-sha2-128s', 'aes256-gcm96', ''])

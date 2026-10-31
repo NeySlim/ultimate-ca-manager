@@ -123,6 +123,27 @@ def test_the_service_says_which_providers_hold_ml_dsa():
     assert HsmService.mldsa_refusal('openbao', 'ML-DSA-87') is None
 
 
+@pytest.mark.parametrize('provider_type, library', [
+    ('google-kms', 'google-cloud-kms 3.11.0'), ('pkcs11', 'python-pkcs11 0.10.0')])
+def test_a_client_library_too_old_is_named_not_the_type(monkeypatch, provider_type, library):
+    import services.hsm  # noqa: F401
+    from services.hsm import HsmService
+    provider_class = HsmService._provider_registry.get(provider_type)
+    if provider_class is None:
+        pytest.skip(f'{provider_type} not registered')
+    monkeypatch.setattr(provider_class, 'SIGNS_ML_DSA', False)
+    for message in (HsmService.mldsa_refusal(provider_type, 'ML-DSA-65'),
+                    _refusal_of(object.__new__(provider_class), 'ML-DSA-65')):
+        assert 'ML-DSA keys are not available' in message and library in message
+        assert 'needs a PKCS#11 3.2 token' not in message
+
+
+def _refusal_of(provider, algorithm):
+    with pytest.raises(HsmOperationError) as raised:
+        provider.refuse_unsupported_algorithm(algorithm)
+    return str(raised.value)
+
+
 def test_the_azure_provider_itself_refuses_with_the_same_words():
     try:
         from services.hsm.azure_provider import AzureKeyVaultProvider
@@ -161,6 +182,25 @@ def test_key_generation_api_refuses_ml_dsa_on_azure(app, auth_client):
         assert resp.status_code == 400, resp.get_json()
         assert 'ML-DSA keys are not available' in resp.get_data(as_text=True)
     finally:
+        _drop(app, pid)
+
+
+def test_key_generation_api_says_the_build_lacks_ml_dsa(app, auth_client, monkeypatch):
+    import services.hsm  # noqa: F401
+    from services.hsm import HsmService
+    if 'pkcs11' not in HsmService._provider_registry:
+        pytest.skip('python-pkcs11 not installed')
+    pid = _provider_row(app, 'pkcs11')
+    monkeypatch.setattr(key_algorithms, 'mldsa_supported', lambda: False)
+    key_algorithms._load()
+    try:
+        resp = auth_client.post(f'/api/v2/hsm/providers/{pid}/keys', json={
+            'label': 'pq', 'algorithm': 'ML-DSA-65', 'purpose': 'signing'})
+        assert resp.status_code == 400, resp.get_json()
+        assert 'not available on this build' in resp.get_data(as_text=True)
+    finally:
+        monkeypatch.undo()
+        key_algorithms._load()
         _drop(app, pid)
 
 

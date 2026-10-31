@@ -161,6 +161,19 @@ def test_service_sign_passes_no_digest_and_keeps_the_signature(app):
     assert fake.calls == [('ML-DSA-65', None, None)]
 
 
+def test_service_sign_reads_the_family_off_the_public_key_not_the_row_label(app):
+    from models import db
+    from services.hsm import HsmService
+    with _hsm_mldsa_key(app) as (key_id, key, fake), app.app_context():
+        db.session.get(HsmKey, key_id).algorithm = 'UNKNOWN'
+        db.session.commit()
+        with pytest.raises(ValueError, match='digest'):
+            HsmService.sign(key_id, b'payload', 'ML-DSA-65', hash_algorithm='sha256')
+        with patch('services.hsm.hsm_service.ecdsa_to_der', side_effect=AssertionError('DER')):
+            key.public_key().verify(HsmService.sign(key_id, b'payload', 'ML-DSA-65'), b'payload')
+    assert fake.calls == [('ML-DSA-65', None, None)]
+
+
 def test_storage_and_scheme_of_an_hsm_ml_dsa_signer(app):
     from services import compliance_signer
     from services.hsm.hsm_private_key import load_hsm_private_key

@@ -389,7 +389,9 @@ class OpenBaoProvider(BaseHsmProvider):
         hash_algorithm: Optional[str] = None,
         padding: Optional[str] = None
     ) -> bytes:
-        # The key type decides how Transit is asked: read it unless the caller named it
+        # A named algorithm must be one Transit knows; the key type decides how it is asked
+        if algorithm and algorithm not in ALGORITHM_TO_TRANSIT and algorithm not in TRANSIT_TO_ALGORITHM.values():
+            raise HsmOperationError(f'Unsupported algorithm: {algorithm}')
         transit_type = ALGORITHM_TO_TRANSIT.get(algorithm, (None, None))[0] if algorithm else None
         if transit_type is None or transit_type in _SYMMETRIC_TRANSIT:
             detail = self._api('GET', f'keys/{key_identifier}')

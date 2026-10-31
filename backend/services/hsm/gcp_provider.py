@@ -85,6 +85,7 @@ class GcpKmsProvider(BaseHsmProvider):
     """
     
     SIGNS_ML_DSA = bool(ML_DSA_VERSIONS)
+    ML_DSA_LIBRARY = 'google-cloud-kms 3.11.0'
 
     def __init__(self, config: Dict[str, Any]):
         if not GCP_AVAILABLE:

@@ -109,6 +109,7 @@ class Pkcs11Provider(BaseHsmProvider):
     SIGNS_PSS = True
     SIGNS_BRAINPOOL = True
     SIGNS_ML_DSA = bool(ML_DSA_PARAMETER_SETS)
+    ML_DSA_LIBRARY = 'python-pkcs11 0.10.0'
     
     def __init__(self, config: Dict[str, Any]):
         if not PKCS11_AVAILABLE:
@@ -304,13 +305,17 @@ class Pkcs11Provider(BaseHsmProvider):
         return None
 
     def _mldsa_algorithm(self, obj, key_id: Optional[bytes]) -> str:
-        """Label of the key's CKA_PARAMETER_SET, read on the key or its public half."""
+        """Label of the key's CKA_PARAMETER_SET, read on the key or its public half;
+        a missing or unknown set raises, so the key lands in list_errors."""
         by_value = {int(v): label for label, v in ML_DSA_PARAMETER_SETS.items()}
         value = self._attr(obj, Attribute.PARAMETER_SET)
         if value is None:
             pub = self._public_half(key_id)
             value = self._attr(pub, Attribute.PARAMETER_SET) if pub is not None else None
-        return by_value.get(int(value), 'UNKNOWN') if value is not None else 'UNKNOWN'
+        label = by_value.get(int(value)) if value is not None else None
+        if label is None:
+            raise ValueError(f'ML-DSA key with unknown parameter set {value!r}')
+        return label
 
     def _object_to_key_info(self, obj, key_type: str) -> Optional[HsmKeyInfo]:
         """Convert PKCS#11 object to HsmKeyInfo"""
