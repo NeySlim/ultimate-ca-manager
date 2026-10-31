@@ -21,7 +21,7 @@ import { useNotification, useMobile } from '../contexts'
 import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { VALIDITY } from '../constants/config'
-import { listAlgorithms, groupedOptions } from '../lib/keyAlgorithms'
+import { KEY_ALGORITHMS, listAlgorithms, groupedOptions, findAlgorithm } from '../lib/keyAlgorithms'
 import { useFipsMode } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { ekuService } from '../services/eku.service'
@@ -439,7 +439,9 @@ export default function TemplatesPage() {
       <CompactSection title={t('templates.keySettings')} icon={Key}>
         <CompactGrid columns={2}>
           <CompactField autoIcon="keyType" label={t('common.keyType')} value={selectedTemplate.key_type || '—'} />
-          <CompactField autoIcon="signature" label={t('common.digest')} value={selectedTemplate.digest || '—'} />
+          {takesDigest(selectedTemplate.key_type) && (
+            <CompactField autoIcon="signature" label={t('common.digest')} value={selectedTemplate.digest || '—'} />
+          )}
         </CompactGrid>
       </CompactSection>
 
@@ -701,6 +703,9 @@ const TEMPLATE_TYPE_OPTIONS = [
   'code_signing', 'client_auth', 'ocsp_signing', 'smartcard_logon', 'custom'
 ]
 const DIGEST_OPTIONS = ['sha256', 'sha384', 'sha512']
+// A new template takes the registry's first generated key; ML-DSA and EdDSA keys take no digest
+const DEFAULT_KEY = listAlgorithms({ generate: true })[0]
+const takesDigest = (keyType) => findAlgorithm(keyType)?.digest !== null
 const KEY_USAGE_OPTIONS = [
   'digitalSignature', 'keyEncipherment', 'contentCommitment',
   'dataEncipherment', 'keyAgreement'
@@ -743,7 +748,7 @@ function buildInitialState(template) {
   if (!template) {
     return {
       name: '', description: '', template_type: 'web_server',
-      key_type: 'RSA-2048', digest: 'sha256',
+      key_type: DEFAULT_KEY.label, digest: DEFAULT_KEY.digest,
       validity_days: VALIDITY.TEMPLATE_DEFAULT_DAYS,
       subject: { C: '', ST: '', L: '', O: '', OU: '', CN: '', emailAddress: '' },
       key_usage: ['digitalSignature', 'keyEncipherment'],
@@ -765,8 +770,8 @@ function buildInitialState(template) {
     name: template.name || '',
     description: template.description || '',
     template_type: template.template_type || 'web_server',
-    key_type: template.key_type || 'RSA-2048',
-    digest: template.digest || 'sha256',
+    key_type: template.key_type || DEFAULT_KEY.label,
+    digest: template.digest || DEFAULT_KEY.digest,
     validity_days: template.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS,
     subject: {
       C: dn.C || '', ST: dn.ST || '', L: dn.L || '',
@@ -796,12 +801,12 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
   const [loading, setLoading] = useState(false)
   const [ekuOptions, setEkuOptions] = useState(EXT_KEY_USAGE_FALLBACK)
   const fips = useFipsMode()
-  // The key already on the template stays listed, so FIPS mode never blanks the field.
-  // No key without a digest (ML-DSA) while this form always sends one.
+  // The key already on the template stays listed, so FIPS mode or a key not generated yet never blanks the field.
+  // ML-DSA is offered because the form sends no digest for a key that takes none.
   const keyTypeOptions = useMemo(() => groupedOptions(
-    listAlgorithms({ generate: true })
-      .filter(a => a.label === formData.key_type || ((!fips || a.fips) && a.digest !== null)),
+    KEY_ALGORITHMS.filter(a => (a.generate && (!fips || a.fips)) || a.label === formData.key_type),
     t, a => a.label), [fips, t, formData.key_type])
+  const showDigest = takesDigest(formData.key_type)
 
   useEffect(() => {
     let cancelled = false
@@ -851,7 +856,7 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
         description: formData.description,
         template_type: formData.template_type,
         key_type: formData.key_type,
-        digest: formData.digest,
+        ...(showDigest ? { digest: formData.digest } : {}),
         validity_days: formData.validity_days,
         dn_template: { ...formData.subject },
         extensions_template: buildExtensionsTemplate(template?.extensions_template, formData),
@@ -910,12 +915,14 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
             onChange={(val) => set('key_type', val)}
             options={keyTypeOptions}
           />
-          <Select
-            label="Digest"
-            value={formData.digest}
-            onChange={(val) => set('digest', val)}
-            options={DIGEST_OPTIONS.map(v => ({ value: v, label: v.toUpperCase() }))}
-          />
+          {showDigest && (
+            <Select
+              label={t('common.digest')}
+              value={formData.digest}
+              onChange={(val) => set('digest', val)}
+              options={DIGEST_OPTIONS.map(v => ({ value: v, label: v.toUpperCase() }))}
+            />
+          )}
         </div>
         <div className="mt-2"><BrainpoolNotice label={formData.key_type} /></div>
       </div>
