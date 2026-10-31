@@ -14,7 +14,7 @@ from datetime import datetime, timedelta, timezone
 import pytest
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import ec, ed25519, rsa
+from cryptography.hazmat.primitives.asymmetric import ec, ed25519, mldsa, rsa
 from cryptography.x509.oid import NameOID
 from sqlalchemy import create_engine, text
 
@@ -26,6 +26,7 @@ from services import fips_preflight
 from tests.test_backup_cross_installation import _bound_to
 from utils.datetime_utils import utc_now
 from utils.db_url import postgres_gssenc_problem, postgres_tls_problem
+from utils.key_algorithms import mldsa_supported
 from utils.password_hash import hash_password
 
 _PG_URL = os.environ.get('UCM_TEST_PG_URL')
@@ -105,7 +106,7 @@ def _certificate(key, cn='preflight.test', days=365):
     builder = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
                .public_key(key.public_key()).serial_number(x509.random_serial_number())
                .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=days)))
-    digest = None if isinstance(key, ed25519.Ed25519PrivateKey) else hashes.SHA256()
+    digest = None if isinstance(key, (ed25519.Ed25519PrivateKey, mldsa.MLDSA65PrivateKey)) else hashes.SHA256()
     return builder.sign(key, digest)
 
 
@@ -206,6 +207,25 @@ def test_ca_weak_key(session):
     _ca(ec.generate_private_key(ec.BrainpoolP256R1()), 'Brainpool Root')
     _ca(rsa.generate_private_key(public_exponent=65537, key_size=3072), 'RSA Root')
     _assert_found('ca.weak_key', 2, 'Short RSA Root (#', 'RSA 1024', 'EC brainpoolP256r1')
+
+
+needs_mldsa = pytest.mark.skipif(not mldsa_supported(), reason='this build has no ML-DSA')
+
+
+@needs_mldsa
+def test_ca_mldsa_key_is_named_by_the_weak_key_check(session):
+    _ca(mldsa.MLDSA65PrivateKey.generate(), 'PQ Root')
+    finding = _assert_found('ca.weak_key', 1, 'PQ Root (#', 'ML-DSA-65')
+    assert 'ML-DSA' in finding['title']
+
+
+@needs_mldsa
+def test_policies_allowing_mldsa_are_named(session):
+    session.add(CertificatePolicy(name='pq', rules=json.dumps(
+        {'allowed_key_types': ['RSA-2048', 'ML-DSA-65']})))
+    session.flush()
+    finding = _assert_found('policies.unapproved_key_type', 1, 'pq (#', 'ML-DSA-65')
+    assert 'ML-DSA' in finding['title']
 
 
 def test_eddsa_is_told_without_loading_the_key(session, monkeypatch):

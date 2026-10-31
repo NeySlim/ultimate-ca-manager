@@ -167,7 +167,7 @@ def _ca_eddsa():
 
 
 @detector('ca.weak_key', BLOCKER,
-          'Certificate authorities with a DSA key, RSA under 2048 bits or a curve other than P-256/384/521',
+          'Certificate authorities with a DSA or ML-DSA key, RSA under 2048 bits or a curve other than P-256/384/521',
           'Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it.')
 def _ca_weak():
     return [_named(ca.descr, ca.id, name) for ca, (name, approved) in _ca_keys()
@@ -273,7 +273,7 @@ def _tsa_signer():
 
 
 @detector('certificates.unapproved_key', INFO,
-          'Active certificates with an Ed25519/Ed448 key, RSA under 2048 bits or another curve',
+          'Active certificates with an Ed25519/Ed448 or ML-DSA key, RSA under 2048 bits or another curve',
           'They stay valid; renew them with a new RSA 2048+ or ECDSA P-256/P-384/P-521 key, '
           'since renewing with the same key is refused in FIPS mode.')
 def _certificates():
@@ -305,7 +305,7 @@ def _templates():
 
 
 @detector('policies.unapproved_key_type', WARNING,
-          'Active policies that allow key types FIPS mode removes (Ed25519, Ed448, short RSA...)',
+          'Active policies that allow key types FIPS mode removes (Ed25519, Ed448, ML-DSA, short RSA...)',
           'Remove those key types from the policies; a policy left with none allows no issuance.')
 def _policies():
     found = []
