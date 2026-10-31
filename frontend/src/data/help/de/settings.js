@@ -137,6 +137,7 @@ export default {
           { label: 'Kerberos/SPNEGO', text: 'Bindet die Kerberos-authentifizierten Endpunkte für die stille GPO-Autoregistrierung (erfordert einen SPN und ein Keytab vom Domänencontroller)' },
           { label: 'Einrichtungs-Checkliste', text: 'Der Tab zeigt eine Live-Checkliste dessen, was konfiguriert ist bzw. noch fehlt, sowohl für die manuelle als auch die unbeaufsichtigte Registrierung' },
           { label: 'AD-abgeleitete Betreffe', text: 'Vorlagen können sich für die Ableitung ihres Betreffs/SAN aus Active Directory (über den AD-Connector) für die unbeaufsichtigte Registrierung entscheiden' },
+          { label: 'ML-DSA-Vorlagen (v2.248)', text: 'Werden über ihre Schlüsselalgorithmus-OID mit dem Microsoft Software Key Storage Provider angekündigt, sind noch nicht mit einem echten Windows-Client getestet und im FIPS-Modus ausgeblendet. Die zertifikatsbasierte Erneuerung kann kein ML-DSA-Zertifikat verwenden (XML-DSig kennt keine ML-DSA-Signatur): ein neues Zertifikat registrieren' },
         ]
       },
       {
@@ -446,6 +447,8 @@ Der Tab verfolgt, was konfiguriert ist und was noch benötigt wird, sowohl für 
 - **Zertifizierungsstelle**: Die CA, deren Vorlagen angekündigt werden und die über diese Konfiguration Zertifikate ausstellt
 - **Gültigkeit (Tage)**: Gültigkeit der über WSTEP ausgestellten Zertifikate, wenn die Anfrage zu keiner Vorlage passt; sonst gilt die Gültigkeit der passenden Vorlage
 
+Eine Vorlage mit dem Schlüsseltyp **ML-DSA** wird über ihre Schlüsselalgorithmus-OID angekündigt, mit dem Microsoft Software Key Storage Provider und einer reinen Signatur-Schlüsselspezifikation. Sie ist im FIPS-Modus ausgeblendet, und die Registrierung durch einen echten Windows-Client wurde noch nicht getestet.
+
 ### Kerberos / SPNEGO
 
 Bindet die Kerberos-authentifizierten XCEP/WSTEP-Endpunkte für die stille GPO-Autoregistrierung, sodass Maschinen und Benutzer über ihr Kerberos-Ticket statt per Anmeldeaufforderung authentifiziert werden:
@@ -462,6 +465,8 @@ Bindet die Kerberos-authentifizierten XCEP/WSTEP-Endpunkte für die stille GPO-A
 ### Zertifikatserneuerungs-Bindung
 
 Neben Benutzername/Passwort und Kerberos unterstützt WSTEP die **Erneuerung per Client-Zertifikat**, analog zu echten ADCS-CES-Endpunkten: Die Erneuerungsanfrage (RST) muss mit dem privaten Schlüssel eines Zertifikats XML-DSig-signiert sein, das **UCM selbst ausgestellt hat**. Das vorgelegte Zertifikat wird **Byte für Byte** mit dem gespeicherten Zertifikat der konfigurierten CA abgeglichen, Seriennummer oder Betreff allein genügen nie. So können Windows-Clients unbeaufsichtigt mit ihrem aktuellen Zertifikat erneuern, ohne Anmeldedaten oder Kerberos-Ticket.
+
+XML-DSig kennt keine ML-DSA-Signaturmethode, daher kann ein **ML-DSA**-Zertifikat auf diesem Weg nicht erneuern: UCM nennt den Schlüssel in der Ablehnung, und der Client registriert stattdessen ein neues Zertifikat.
 
 ### SID-Sicherheitserweiterung (KB5014754)
 

@@ -5469,6 +5469,7 @@
     "signerGenerateCn": "Загальна назва",
     "signerGenerateValidity": "Термін дії (дні)",
     "signerGenerateKeyType": "Тип ключа",
+    "signerMldsaVerifyNote": "Позначки часу ML-DSA перевіряються командою openssl cms -verify (OpenSSL 3.5 або новіший), а не openssl ts -verify; відбиток повідомлення перевіряйте окремо.",
     "signerGenerated": "Сертифікат підпису TSA видано.",
     "signerGeneratedSelected": "Сертифікат підпису TSA видано та вибрано як виділений підписувач.",
     "signerGenerateFailed": "Не вдалося створити сертифікат підпису TSA.",

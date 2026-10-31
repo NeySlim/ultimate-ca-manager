@@ -21,6 +21,7 @@ export default {
           { label: '签名 CA', text: '选择签署 SCEP 注册证书的 CA。设备会用此 CA 加密其请求，因此它必须在软件中持有 RSA 密钥：EC、HSM 支持、无密钥、离线和已吊销的 CA 不会列出 (v2.248)' },
           { label: '自动批准', text: '自动批准带有有效质询密码的请求' },
           { label: '质询密码', text: '设备用于认证注册的共享密钥' },
+          { label: '设备密钥 (v2.248)', text: '设备使用 RSA、ECDSA、Ed25519 或 ML-DSA 密钥签署其请求；ML-DSA 签名遵循 RFC 9882（SHA-512 摘要）。Ed448 会被拒绝，FIPS 模式下 ML-DSA 也会被拒绝' },
         ]
       },
       {
@@ -99,6 +100,9 @@ https://your-server:8443/scep/<profile>/pkiclient.exe
 4. 设备将 CSR 和质询密码发送到 UCM
 5. UCM 验证质询密码并签署证书（如果启用自动批准）
 6. 设备接收并安装证书
+
+### 设备密钥
+设备使用自己的密钥（RSA、ECDSA、Ed25519 或 ML-DSA）签署 PKCSReq。ML-DSA 签名按 RFC 9882 校验（SHA-512 摘要、密钥自身的算法标识符、无参数）。Ed448 签名会被拒绝，FIPS 模式下 ML-DSA 签名也会被拒绝。请求仍会加密到 RSA 签名 CA。
 
 ## SCEP URL
 

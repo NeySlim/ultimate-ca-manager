@@ -5409,6 +5409,7 @@
     "signerGenerateCn": "Common Name",
     "signerGenerateValidity": "Gültigkeit (Tage)",
     "signerGenerateKeyType": "Schlüsseltyp",
+    "signerMldsaVerifyNote": "ML-DSA-Zeitstempel werden mit openssl cms -verify (OpenSSL 3.5 oder neuer) geprüft, nicht mit openssl ts -verify; den Message Imprint separat prüfen.",
     "signerGenerated": "TSA-Signaturzertifikat ausgestellt.",
     "signerGeneratedSelected": "TSA-Signaturzertifikat ausgestellt und als dedizierter Signierer ausgewählt.",
     "signerGenerateFailed": "TSA-Signaturzertifikat konnte nicht erzeugt werden.",

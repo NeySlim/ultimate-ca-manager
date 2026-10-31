@@ -137,6 +137,7 @@ export default {
           { label: 'Kerberos/SPNEGO', text: '绑定用于静默 GPO 自动注册的 Kerberos 身份验证端点（需要来自域控制器的 SPN 和 keytab）' },
           { label: '设置清单', text: '该标签页会实时显示手动和无人值守注册所需的已配置项与待配置项' },
           { label: 'AD 派生主题', text: '模板可以选择通过 AD 连接器从 Active Directory 派生其主题/SAN，用于无人值守注册' },
+          { label: 'ML-DSA 模板 (v2.248)', text: '通过其密钥算法 OID 配合 Microsoft Software Key Storage Provider 公布，尚未使用真实 Windows 客户端测试，FIPS 模式下隐藏。基于证书的续订无法使用 ML-DSA 证书（XML-DSig 没有 ML-DSA 签名）：请注册新证书' },
         ]
       },
       {
@@ -446,6 +447,8 @@ UCM 自身与 Active Directory 的 LDAP 连接，独立于在 SSO 下配置的�
 - **证书颁发机构**: 公布其模板并通过此配置签发证书的 CA
 - **有效期（天）**: 请求未匹配任何模板时，通过 WSTEP 签发的证书的有效期；匹配到模板时，使用该模板自身的有效期
 
+密钥类型为 **ML-DSA** 的模板通过其密钥算法 OID 公布，配合 Microsoft Software Key Storage Provider 和仅签名的密钥规格。它在 FIPS 模式下隐藏，尚未使用真实 Windows 客户端测试注册。
+
 ### Kerberos / SPNEGO
 
 绑定用于静默 GPO 自动注册的、经 Kerberos 身份验证的 XCEP/WSTEP 端点，使计算机和用户通过其 Kerberos 票证进行身份验证，而不是弹出凭据提示：
@@ -462,6 +465,8 @@ UCM 自身与 Active Directory 的 LDAP 连接，独立于在 SSO 下配置的�
 ### 证书续订绑定
 
 除用户名/密码和 Kerberos 外，WSTEP 还支持**客户端证书续订**，与真实 ADCS CES 端点一致：续订请求 (RST) 必须使用 **UCM 自身签发**的证书的私钥进行 XML-DSig 签名。出示的证书会与所配置 CA 存储的证书进行**逐字节**比对:, 仅凭序列号或主题永远不够。这使 Windows 客户端可以使用其当前证书无人值守地续订，无需凭据或 Kerberos 票证。
+
+XML-DSig 没有 ML-DSA 签名方法，因此 **ML-DSA** 证书无法通过此方式续订：UCM 会在拒绝信息中指明该密钥，客户端需改为注册新证书。
 
 ### SID 安全扩展 (KB5014754)
 

@@ -21,7 +21,8 @@ export default {
           { label: 'Account CA esterni', text: 'Uno o più account per CA, più account possono condividere lo stesso URL di directory (es. due account Let\'s Encrypt per separazione amministrativa); un URL di directory vuoto equivale a Let\'s Encrypt Production' },
           { label: 'Server personalizzato', text: 'Imposta un URL directory ACME personalizzato per utilizzare qualsiasi CA conforme a RFC 8555' },
           { label: 'EAB', text: 'Supporto External Account Binding per CA che richiedono la pre-registrazione (ZeroSSL, HARICA, ecc.)' },
-          { label: 'Tipi di chiave', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384 per le chiavi dei certificati' },
+          { label: 'Tipi di chiave', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 o P-384 per le chiavi dei certificati; ML-DSA-44, ML-DSA-65 e ML-DSA-87 solo tramite API, mai in modalità FIPS. Un default configurato che questa istanza non può generare fa fallire l\'ordine invece di ripiegare su RSA-2048 (v2.248)' },
+          { label: 'Chiave riusata in modalità FIPS', text: 'Il riuso della chiave di un certificato sorgente è rifiutato quando la modalità FIPS non approva quella chiave, ML-DSA compreso (v2.248)' },
           { label: 'Chiavi account', text: 'Algoritmi ES256 (P-256), ES384 (P-384) o RS256 per le chiavi dell\'account ACME' },
           { label: 'Provider DNS', text: 'Configura i provider di sfida DNS-01 (Cloudflare, Route53, Tencent DNSPod, Plesk, ecc.). Plesk usa la sua API XML; Verify TLS Certificate può essere disattivato per un pannello autofirmato e si può aggiungere un ritardo di propagazione DNS' },
           { label: 'Comando personalizzato', text: 'Tipo di provider DNS che esegue comandi locali configurati dall\'amministratore per creare/eliminare record TXT, i dettagli del record sono passati tramite le variabili d\'ambiente DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Percorso binario assoluto obbligatorio, nessuna shell, timeout configurabile' },
@@ -40,6 +41,7 @@ export default {
                   { label: 'Ordini locali (v2.217)', text: 'La scheda Local orders elenca gli ordini del server integrato con filtro di stato, eliminazione singola e pulizia; gli ordini scaduti non emessi vengono eliminati automaticamente ogni 6 ore, e un digest di firma predefinito si applica agli ordini senza profilo. Dalla v2.218 la pulizia rimuove anche le sfide sorelle rimaste in attesa delle autorizzazioni già convalidate' },
                   { label: 'Profili e modelli (v2.221)', text: 'I profili di certificato (draft-ietf-acme-profiles) sono pubblicati nella directory e scelti dal client per ogni ordine. Ogni profilo fissa validità e digest e può associare un modello di certificato, i cui KU/EKU governano quindi il certificato emesso' },
                   { label: 'Profilo predefinito', text: 'La maggior parte dei client non richiede alcun profilo. Il profilo predefinito, scelto sotto i profili, si applica ai loro ordini; senza di esso ricevono 90 giorni e il digest predefinito' },
+                  { label: 'Revoca (v2.248)', text: 'Il certificato inviato da un client per la revoca deve corrispondere byte per byte a quello memorizzato. Solo una chiave di certificato RSA o EC P-256, P-384 o P-521 può firmare la richiesta stessa: un certificato ML-DSA, EdDSA o Brainpool si revoca con l\'account che lo ha ordinato' },
         ]
       },
       {
@@ -165,7 +167,7 @@ Gestisci la configurazione del tuo client ACME:
 - **Ambiente**: Staging (test) o Produzione (certificati reali)
 - **Email di contatto**: Obbligatoria per la registrazione dell'account
 - **Rinnovo automatico**: Rinnova automaticamente i certificati prima della scadenza
-- **Tipo chiave certificato**: RSA-2048, RSA-4096, ECDSA P-256 o ECDSA P-384
+- **Tipo chiave certificato**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 o P-384. ML-DSA-44, ML-DSA-65 e ML-DSA-87 sono accettati tramite API (\`key_type\` nella richiesta o nelle impostazioni), mai in modalità FIPS. Un tipo configurato che questa istanza non può generare fa fallire l'ordine invece di ripiegare su RSA-2048
 - **Algoritmo chiave account**: ES256, ES384 o RS256 per la firma dell'account ACME
 
 ### Server ACME personalizzato
@@ -215,6 +217,8 @@ Quando richiedi un certificato, scegli da dove proviene la chiave privata:
 - **Genera nuova chiave** *(predefinito)*: UCM crea una nuova coppia di chiavi per ogni ordine
 - **Riusa la chiave al rinnovo**: mantiene la stessa chiave privata tra i rinnovi (necessario per DANE/TLSA e key pinning); la prima emissione genera la chiave, i rinnovi la ricaricano
 - **Fornisci CSR esterno**: incolla un CSR PEM generato altrove; UCM lo invia al finalize e la chiave privata non entra mai in UCM. I domini del CSR devono corrispondere esattamente agli identificatori dell'ordine
+
+In modalità FIPS, il riuso della chiave di un certificato sorgente è rifiutato quando FIPS non approva quella chiave (ML-DSA compreso).
 
 ### Preflight (prova a vuoto)
 **Esegui preflight** nel modulo di richiesta valida l'intera richiesta contro la directory **staging** di Let's Encrypt, senza consumare i limiti di produzione:
@@ -441,6 +445,9 @@ Sfoglia tutti gli ordini di emissione certificati:
 - Nomi di dominio richiesti
 - CA firmataria utilizzata
 - Timestamp di emissione
+
+### Revoca
+Un client revoca con la chiave del proprio account o con la chiave del certificato stesso, e il certificato inviato deve corrispondere byte per byte a quello memorizzato: un numero di serie da solo non basta mai. Solo una chiave RSA o EC P-256, P-384 o P-521 può firmare una richiesta ACME, quindi un certificato ML-DSA, EdDSA o Brainpool si revoca con l'account che lo ha ordinato; UCM lo indica nel rifiuto.
 
 ## Certificati per indirizzi IP (RFC 8738)
 

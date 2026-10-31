@@ -18,7 +18,7 @@ export default {
           { label: 'OID da Política', text: 'Object Identifier para a política TSA (ex.: 1.2.3.4.1): incluído em cada resposta de carimbo de tempo' },
           { label: 'Ativar/Desativar', text: 'Alternar o endpoint TSA sem perder a configuração' },
           { label: 'Exigir certificado dedicado', text: 'Opcional: recusa assinar carimbos de tempo com o próprio certificado da CA, requer um certificado de assinatura de entidade final dedicado com o EKU timeStamping crítico (RFC 3161)' },
-                  { label: 'Certificado de assinatura (v2.217)', text: 'Assine os tokens com um certificado final dedicado escolhido entre os certificados emitidos (EKU timeStamping, chave RSA ou ECDSA detida pelo UCM; certificados Ed25519 e Ed448 não são oferecidos). As renovações são seguidas automaticamente; um assinante expirado ou revogado faz falhar os pedidos com 503 e nunca recai no certificado da CA' },
+                  { label: 'Certificado de assinatura (v2.217)', text: 'Assine os tokens com um certificado final dedicado escolhido entre os certificados emitidos (EKU timeStamping, chave RSA, ECDSA ou ML-DSA detida pelo UCM; certificados Ed25519 e Ed448 não são oferecidos, nem ML-DSA em modo FIPS). As renovações são seguidas automaticamente; um assinante expirado ou revogado faz falhar os pedidos com 503 e nunca recai no certificado da CA' },
                   { label: 'Gerar um certificado de assinatura (v2.218)', text: 'Emissão com um clique de um assinante RFC 3161 feito sob medida: CA:FALSE, KeyUsage apenas digitalSignature e um EKU timeStamping crítico e exclusivo, o formato que os verificadores estritos (openssl ts -verify) exigem. Emitido a partir da CA TSA configurada e selecionado automaticamente quando nenhum assinante utilizável está definido. O certificado tem origem "manual": adicione "manual" às origens de renovação automática ou renove-o você mesmo antes da expiração' },
         ]
       },
@@ -27,7 +27,7 @@ export default {
         items: [
           { label: 'Criar Requisição', text: 'openssl ts -query -data arquivo.txt -sha256 -no_nonce -out requisicao.tsq' },
           { label: 'Enviar para TSA', text: 'curl -H "Content-Type: application/timestamp-query" --data-binary @requisicao.tsq https://seu-servidor/tsa -o resposta.tsr' },
-          { label: 'Verificar', text: 'openssl ts -verify -data arquivo.txt -in resposta.tsr -CAfile cadeia-ca.pem' },
+          { label: 'Verificar', text: 'openssl ts -verify -data arquivo.txt -in resposta.tsr -CAfile cadeia-ca.pem (assinantes RSA e ECDSA). Um token ML-DSA falha em openssl ts -verify: verifique a sua assinatura com openssl cms -verify (OpenSSL 3.5 ou posterior) e compare depois o message imprint com o hash do arquivo' },
         ]
       },
     ],
@@ -113,6 +113,8 @@ curl -s -H "Content-Type: application/timestamp-query" \\
 openssl ts -verify -data arquivo.txt -in resposta.tsr \\
   -CAfile cadeia-ca.pem
 \`\`\`
+
+\`openssl ts -verify\` verifica apenas tokens RSA e ECDSA. Um token ML-DSA é verificado com \`openssl cms -verify\` (OpenSSL 3.5 ou posterior); compare depois o message imprint com o hash do arquivo.
 
 ### Assinatura de Código com Carimbos de Tempo
 

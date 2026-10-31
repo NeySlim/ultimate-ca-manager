@@ -5409,6 +5409,7 @@
     "signerGenerateCn": "Nome comune",
     "signerGenerateValidity": "Validità (giorni)",
     "signerGenerateKeyType": "Tipo di chiave",
+    "signerMldsaVerifyNote": "I timestamp ML-DSA si verificano con openssl cms -verify (OpenSSL 3.5 o successivo), non con openssl ts -verify; controlla separatamente il message imprint.",
     "signerGenerated": "Certificato di firma TSA emesso.",
     "signerGeneratedSelected": "Certificato di firma TSA emesso e selezionato come firmatario dedicato.",
     "signerGenerateFailed": "Impossibile generare il certificato di firma TSA.",

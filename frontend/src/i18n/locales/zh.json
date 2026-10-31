@@ -5409,6 +5409,7 @@
     "signerGenerateCn": "通用名称",
     "signerGenerateValidity": "有效期（天）",
     "signerGenerateKeyType": "密钥类型",
+    "signerMldsaVerifyNote": "ML-DSA 时间戳请使用 openssl cms -verify（OpenSSL 3.5 或更高版本）验证，而不是 openssl ts -verify；消息摘要需另行核对。",
     "signerGenerated": "已签发 TSA 签名证书。",
     "signerGeneratedSelected": "已签发 TSA 签名证书并选为专用签名者。",
     "signerGenerateFailed": "生成 TSA 签名证书失败。",

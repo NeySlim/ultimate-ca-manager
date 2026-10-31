@@ -18,7 +18,7 @@ export default {
           { label: 'OID політики', text: 'Ідентифікатор об\'єкта для політики TSA (наприклад, 1.2.3.4.1): включається в кожну відповідь із позначкою часу' },
           { label: 'Увімкнути/Вимкнути', text: 'Перемикайте точку доступу TSA без втрати конфігурації' },
           { label: 'Вимагати виділений сертифікат', text: 'Опційно: відмовлятися підписувати позначки часу самим сертифікатом CA, вимагає виділеного кінцевого сертифіката підпису з критичним EKU timeStamping (RFC 3161)' },
-                  { label: 'Сертифікат підпису (v2.217)', text: 'Підписуйте токени виділеним кінцевим сертифікатом, вибраним серед виданих (EKU timeStamping, ключ RSA або ECDSA зберігає UCM; сертифікати Ed25519 та Ed448 не пропонуються). Поновлення відстежуються автоматично; прострочений або відкликаний підписувач завершує запити з 503 і ніколи не відкочується на сертифікат CA' },
+                  { label: 'Сертифікат підпису (v2.217)', text: 'Підписуйте токени виділеним кінцевим сертифікатом, вибраним серед виданих (EKU timeStamping, ключ RSA, ECDSA або ML-DSA зберігає UCM; сертифікати Ed25519 та Ed448 не пропонуються, як і ML-DSA у режимі FIPS). Поновлення відстежуються автоматично; прострочений або відкликаний підписувач завершує запити з 503 і ніколи не відкочується на сертифікат CA' },
                   { label: 'Згенерувати сертифікат підпису (v2.218)', text: 'Випуск в один клік спеціалізованого підписувача RFC 3161: CA:FALSE, KeyUsage лише digitalSignature та критичний ексклюзивний EKU timeStamping, саме та форма, якої вимагають строгі верифікатори (openssl ts -verify). Видається з налаштованого CA для TSA й вибирається автоматично, коли не задано придатного підписувача. Сертифікат має джерело "manual": додайте "manual" до джерел автоматичного поновлення або поновіть його самостійно до закінчення терміну дії' },
         ]
       },
@@ -27,7 +27,7 @@ export default {
         items: [
           { label: 'Створити запит', text: 'openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq' },
           { label: 'Надіслати до TSA', text: 'curl -H "Content-Type: application/timestamp-query" --data-binary @request.tsq https://your-server/tsa -o response.tsr' },
-          { label: 'Перевірити', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem' },
+          { label: 'Перевірити', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem (підписувачі RSA та ECDSA). Токен ML-DSA не проходить openssl ts -verify: перевірте його підпис командою openssl cms -verify (OpenSSL 3.5 або новіший), потім порівняйте відбиток повідомлення з хешем файлу' },
         ]
       },
     ],
@@ -113,6 +113,8 @@ curl -s -H "Content-Type: application/timestamp-query" \\
 openssl ts -verify -data file.txt -in response.tsr \\
   -CAfile ca-chain.pem
 \`\`\`
+
+\`openssl ts -verify\` перевіряє лише токени RSA та ECDSA. Токен ML-DSA перевіряється командою \`openssl cms -verify\` (OpenSSL 3.5 або новіший); потім порівняйте його відбиток повідомлення з хешем файлу.
 
 ### Підпис коду з позначками часу
 

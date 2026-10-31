@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'CSRを送信して署名済み証明書を受け取る' },
           { label: '/simplereenroll', text: '既存の証明書を更新（mTLSが必要）' },
           { label: '/csrattrs', text: 'サーバーが推奨するCSR属性を取得' },
-          { label: '/serverkeygen', text: 'サーバーがキーペアを生成し、証明書と鍵を返す' },
+          { label: '/serverkeygen', text: 'サーバーが RSA-2048 のキーペアを生成し、証明書と鍵を返します。耐量子鍵を含むリクエストは 400 で拒否されます：デバイス上で ML-DSA 鍵を生成し、/simpleenroll を使用してください (v2.248)' },
         ]
       },
     ],
@@ -124,6 +124,8 @@ curl -k --cert client.pem --key client.key \\
 
 ### POST /serverkeygen
 サーバーがキーペアを生成し、証明書と秘密鍵を返します。クライアントがローカルで鍵を生成できない場合に便利です。
+
+生成される鍵は RSA-2048 です。CSR に耐量子鍵を含むリクエストは \`400\` とメッセージで拒否されます：デバイス上で ML-DSA 鍵を生成し、\`/simpleenroll\` を使用してください。
 
 ## 情報タブ
 

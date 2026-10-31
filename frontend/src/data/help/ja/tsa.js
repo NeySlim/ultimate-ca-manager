@@ -18,7 +18,7 @@ export default {
           { label: 'ポリシーOID', text: 'TSAポリシーのオブジェクト識別子（例：1.2.3.4.1）, すべてのタイムスタンプレスポンスに含まれます' },
           { label: '有効化/無効化', text: '設定を失うことなくTSAエンドポイントのオン/オフを切り替え' },
           { label: '専用証明書を必須にする', text: 'オプトイン：CA証明書自体でのタイムスタンプ署名を拒否します, クリティカルな timeStamping EKU（RFC 3161）を持つ専用のエンドエンティティ署名証明書が必要です' },
-                  { label: '署名証明書 (v2.217)', text: '発行済み証明書から選んだ専用のエンドエンティティ証明書（timeStamping EKU、UCM が保持する RSA または ECDSA 鍵。Ed25519 と Ed448 の証明書は選択肢に表示されません）でトークンに署名します。更新は自動的に追従されます。期限切れまたは失効した署名者は 503 で失敗し、CA 証明書へのフォールバックは行われません' },
+                  { label: '署名証明書 (v2.217)', text: '発行済み証明書から選んだ専用のエンドエンティティ証明書（timeStamping EKU、UCM が保持する RSA、ECDSA または ML-DSA 鍵。Ed25519 と Ed448 の証明書は選択肢に表示されず、FIPS モードでは ML-DSA も表示されません）でトークンに署名します。更新は自動的に追従されます。期限切れまたは失効した署名者は 503 で失敗し、CA 証明書へのフォールバックは行われません' },
           { label: '署名証明書の生成 (v2.218)', text: 'RFC 3161 署名専用の証明書をワンクリックで発行します：CA:FALSE、KeyUsage は digitalSignature のみ、クリティカルかつ排他的な timeStamping EKU という、厳格な検証ツール（openssl ts -verify）が要求する形式です。設定済みの TSA CA から発行され、利用可能な署名者が設定されていない場合は自動的に選択されます。この証明書のソースは "manual" です：自動更新のソースに "manual" を追加するか、有効期限前に手動で更新してください' },
         ]
       },
@@ -27,7 +27,7 @@ export default {
         items: [
           { label: 'リクエスト作成', text: 'openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq' },
           { label: 'TSAに送信', text: 'curl -H "Content-Type: application/timestamp-query" --data-binary @request.tsq https://your-server/tsa -o response.tsr' },
-          { label: '検証', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem' },
+          { label: '検証', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem（RSA と ECDSA の署名者向け）。ML-DSA のトークンは openssl ts -verify で失敗します。openssl cms -verify（OpenSSL 3.5 以降）で署名を検証し、続けてメッセージインプリントをファイルのハッシュと比較してください' },
         ]
       },
     ],
@@ -113,6 +113,8 @@ curl -s -H "Content-Type: application/timestamp-query" \\
 openssl ts -verify -data file.txt -in response.tsr \\
   -CAfile ca-chain.pem
 \`\`\`
+
+\`openssl ts -verify\` が検証できるのは RSA と ECDSA のトークンだけです。ML-DSA のトークンは \`openssl cms -verify\`（OpenSSL 3.5 以降）で検証し、続けてそのメッセージインプリントをファイルのハッシュと比較してください。
 
 ### タイムスタンプ付きコード署名
 

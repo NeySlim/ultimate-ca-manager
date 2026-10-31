@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'Einen CSR einreichen und ein signiertes Zertifikat erhalten' },
           { label: '/simplereenroll', text: 'Ein bestehendes Zertifikat erneuern (erfordert mTLS)' },
           { label: '/csrattrs', text: 'Vom Server empfohlene CSR-Attribute abrufen' },
-          { label: '/serverkeygen', text: 'Server generiert das Schlüsselpaar und gibt Zertifikat + Schlüssel zurück' },
+          { label: '/serverkeygen', text: 'Server generiert ein RSA-2048-Schlüsselpaar und gibt Zertifikat + Schlüssel zurück; eine Anfrage mit Post-Quanten-Schlüssel wird mit 400 abgelehnt: ML-DSA-Schlüssel auf dem Gerät erzeugen und /simpleenroll verwenden (v2.248)' },
         ]
       },
     ],
@@ -124,6 +124,8 @@ Vom Server empfohlene CSR-Attribute (OIDs) abrufen.
 
 ### POST /serverkeygen
 Server generiert ein Schlüsselpaar und gibt das Zertifikat zusammen mit dem privaten Schlüssel zurück. Nützlich, wenn der Client keine Schlüssel lokal generieren kann.
+
+Die erzeugten Schlüssel sind RSA-2048. Eine Anfrage, deren CSR einen Post-Quanten-Schlüssel enthält, wird mit \`400\` und einer Meldung abgelehnt: den ML-DSA-Schlüssel auf dem Gerät erzeugen und \`/simpleenroll\` verwenden.
 
 ## Informations-Tab
 

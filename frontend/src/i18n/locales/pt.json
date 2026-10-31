@@ -5409,6 +5409,7 @@
     "signerGenerateCn": "Nome comum",
     "signerGenerateValidity": "Validade (dias)",
     "signerGenerateKeyType": "Tipo de chave",
+    "signerMldsaVerifyNote": "Os carimbos de tempo ML-DSA são verificados com openssl cms -verify (OpenSSL 3.5 ou posterior), não com openssl ts -verify; verifique o message imprint separadamente.",
     "signerGenerated": "Certificado de assinatura TSA emitido.",
     "signerGeneratedSelected": "Certificado de assinatura TSA emitido e selecionado como assinador dedicado.",
     "signerGenerateFailed": "Falha ao gerar o certificado de assinatura TSA.",

@@ -5412,6 +5412,7 @@
     "signerGenerateCn": "Nom commun",
     "signerGenerateValidity": "Validité (jours)",
     "signerGenerateKeyType": "Type de clé",
+    "signerMldsaVerifyNote": "Les horodatages ML-DSA se vérifient avec openssl cms -verify (OpenSSL 3.5 ou ultérieur), pas avec openssl ts -verify ; vérifiez l'empreinte du message séparément.",
     "signerGenerated": "Certificat de signature TSA émis.",
     "signerGeneratedSelected": "Certificat de signature TSA émis et sélectionné comme signataire dédié.",
     "signerGenerateFailed": "Échec de la génération du certificat de signature TSA.",

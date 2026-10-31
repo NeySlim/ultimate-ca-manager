@@ -21,6 +21,7 @@ export default {
           { label: 'CA Assinante', text: 'Selecione qual CA assina os certificados inscritos via SCEP. Os dispositivos cifram a solicitação para esta CA, que deve portanto ter uma chave RSA em software: CAs EC, com HSM, sem chave, offline e revogadas não são listadas (v2.248)' },
           { label: 'Auto-Aprovação', text: 'Aprovar automaticamente solicitações com senhas de desafio válidas' },
           { label: 'Senha de Desafio', text: 'Segredo compartilhado que dispositivos usam para autenticar a inscrição' },
+          { label: 'Chaves do dispositivo (v2.248)', text: 'Um dispositivo assina o seu pedido com uma chave RSA, ECDSA, Ed25519 ou ML-DSA; uma assinatura ML-DSA segue a RFC 9882 (resumo SHA-512). Ed448 é recusado, e ML-DSA também em modo FIPS' },
         ]
       },
       {
@@ -100,6 +101,9 @@ Exibe a URL do endpoint SCEP e instruções de integração.
 4. O UCM valida a senha de desafio
 5. Se auto-aprovação estiver ativada, o UCM assina e retorna o certificado
 6. Se auto-aprovação estiver desativada, um administrador revisa e aprova/rejeita
+
+### Chaves do dispositivo
+O dispositivo assina o seu PKCSReq com a sua própria chave: RSA, ECDSA, Ed25519 ou ML-DSA. Uma assinatura ML-DSA é verificada conforme a RFC 9882 (resumo SHA-512, o identificador de algoritmo da própria chave, sem parâmetros). As assinaturas Ed448 são recusadas, e as ML-DSA também em modo FIPS. O pedido continua cifrado para a CA assinante RSA.
 
 ## URLs SCEP
 

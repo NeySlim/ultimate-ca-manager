@@ -5412,6 +5412,7 @@
     "signerGenerateCn": "共通名 (CN)",
     "signerGenerateValidity": "有効期間（日）",
     "signerGenerateKeyType": "鍵タイプ",
+    "signerMldsaVerifyNote": "ML-DSA のタイムスタンプは openssl ts -verify ではなく openssl cms -verify（OpenSSL 3.5 以降）で検証します。メッセージインプリントは別途確認してください。",
     "signerGenerated": "TSA 署名証明書を発行しました。",
     "signerGeneratedSelected": "TSA 署名証明書を発行し、専用署名者として選択しました。",
     "signerGenerateFailed": "TSA 署名証明書の生成に失敗しました。",

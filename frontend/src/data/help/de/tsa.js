@@ -18,7 +18,7 @@ export default {
           { label: 'Richtlinien-OID', text: 'Object Identifier für die TSA-Richtlinie (z.B. 1.2.3.4.1): in jeder Zeitstempel-Antwort enthalten' },
           { label: 'Aktivieren/Deaktivieren', text: 'Den TSA-Endpunkt ein- oder ausschalten, ohne die Konfiguration zu verlieren' },
           { label: 'Dediziertes Zertifikat erforderlich', text: 'Opt-in: Zeitstempel nicht mit dem CA-Zertifikat selbst signieren, erfordert ein dediziertes End-Entity-Signaturzertifikat mit kritischer timeStamping-EKU (RFC 3161)' },
-                  { label: 'Signaturzertifikat (v2.217)', text: 'Signieren Sie Token mit einem dedizierten End-Entity-Zertifikat aus den ausgestellten Zertifikaten (timeStamping-EKU, RSA- oder ECDSA-Schlüssel bei UCM; Ed25519- und Ed448-Zertifikate werden nicht angeboten). Erneuerungen werden automatisch übernommen; ein abgelaufener oder widerrufener Signierer lässt Anfragen mit 503 fehlschlagen und fällt nie auf das CA-Zertifikat zurück' },
+                  { label: 'Signaturzertifikat (v2.217)', text: 'Signieren Sie Token mit einem dedizierten End-Entity-Zertifikat aus den ausgestellten Zertifikaten (timeStamping-EKU, RSA-, ECDSA- oder ML-DSA-Schlüssel bei UCM; Ed25519- und Ed448-Zertifikate werden nicht angeboten, ML-DSA im FIPS-Modus ebenfalls). Erneuerungen werden automatisch übernommen; ein abgelaufener oder widerrufener Signierer lässt Anfragen mit 503 fehlschlagen und fällt nie auf das CA-Zertifikat zurück' },
           { label: 'Signaturzertifikat erzeugen (v2.218)', text: 'Ausstellung eines speziell zugeschnittenen RFC 3161-Signierers mit einem Klick: CA:FALSE, KeyUsage nur digitalSignature und eine kritische, exklusive timeStamping-EKU, genau die Form, die strenge Prüfprogramme (openssl ts -verify) verlangen. Wird von der konfigurierten TSA-CA ausgestellt und automatisch ausgewählt, wenn kein verwendbarer Signierer gesetzt ist. Das Zertifikat hat die Quelle "manual": Fügen Sie "manual" zu den Auto-Erneuerungsquellen hinzu oder erneuern Sie es selbst vor Ablauf' },
         ]
       },
@@ -27,7 +27,7 @@ export default {
         items: [
           { label: 'Anfrage erstellen', text: 'openssl ts -query -data datei.txt -sha256 -no_nonce -out request.tsq' },
           { label: 'An TSA senden', text: 'curl -H "Content-Type: application/timestamp-query" --data-binary @request.tsq https://ihr-server/tsa -o response.tsr' },
-          { label: 'Verifizieren', text: 'openssl ts -verify -data datei.txt -in response.tsr -CAfile ca-chain.pem' },
+          { label: 'Verifizieren', text: 'openssl ts -verify -data datei.txt -in response.tsr -CAfile ca-chain.pem (RSA- und ECDSA-Signierer). Ein ML-DSA-Token besteht openssl ts -verify nicht: die Signatur mit openssl cms -verify (OpenSSL 3.5 oder neuer) prüfen und dann den Message Imprint mit dem Hash der Datei vergleichen' },
         ]
       },
     ],
@@ -113,6 +113,8 @@ curl -s -H "Content-Type: application/timestamp-query" \\
 openssl ts -verify -data datei.txt -in response.tsr \\
   -CAfile ca-chain.pem
 \`\`\`
+
+\`openssl ts -verify\` prüft nur RSA- und ECDSA-Token. Ein ML-DSA-Token wird mit \`openssl cms -verify\` (OpenSSL 3.5 oder neuer) verifiziert; anschließend den Message Imprint mit dem Hash der Datei vergleichen.
 
 ### Code-Signierung mit Zeitstempeln
 
