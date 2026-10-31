@@ -4,7 +4,6 @@
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
-import { keyFamilyOptions } from '../../lib/keyAlgorithms'
 
 const mocks = vi.hoisted(() => ({ getEffective: vi.fn() }))
 
@@ -57,7 +56,7 @@ describe('IssueCertificateForm policy key types (#397)', () => {
   it('keeps every key type when the policies do not restrict them', async () => {
     renderForm({ allowed_key_types: null, allowed_digests: null })
     await waitFor(() => expect(mocks.getEffective).toHaveBeenCalledWith({ ca_id: '3', template_id: undefined }))
-    expect(optionValues('common.keyType')).toEqual(keyFamilyOptions('issue').map(o => o.value))
+    expect(optionValues('common.keyType')).toEqual(['rsa', 'ecdsa', 'ml-dsa'])
     expect(optionValues('common.keySize')).toEqual(['2048', '3072', '4096'])
   })
 
