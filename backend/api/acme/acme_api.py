@@ -1783,6 +1783,15 @@ def revoke_cert():
                 details=f"unauthorized serial={serial_hex_lower} requester_account={request_account_id or '(jwk)'}",
                 success=False,
             )
+            # Only RSA and EC keys sign a JWS here: say so rather than a bare refusal
+            from utils import key_algorithms
+            cert_key = cert_obj.public_key()
+            if key_algorithms.family_for_public_key(cert_key) not in ('RSA', 'EC'):
+                label = key_algorithms.label_for_public_key(cert_key) or type(cert_key).__name__
+                return acme_error(
+                    'unauthorized',
+                    f'This certificate has a {label} key, which cannot sign an ACME request '
+                    '(RSA and EC only); revoke it with the account that ordered it', 403)
             return acme_error('unauthorized', 'Not authorized to revoke this certificate', 403)
 
         # A client cannot wait for a human decision: a revocation a policy
