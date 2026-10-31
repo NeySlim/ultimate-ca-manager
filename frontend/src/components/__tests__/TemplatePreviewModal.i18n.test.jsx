@@ -24,4 +24,13 @@ describe('TemplatePreviewModal labels', () => {
       expect(screen.queryByText(literal)).toBeNull()
     }
   })
+
+  it("names the key algorithm through the row's i18n key, as the other forms do", () => {
+    const { unmount } = render(<TemplatePreviewModal open onClose={() => {}} template={{ name: 'T', key_type: 'RSA-2048' }} />)
+    expect(screen.getByText('common.keyTypes.rsa2048')).toBeInTheDocument()
+    expect(screen.queryByText('RSA 2048')).toBeNull()
+    unmount()
+    render(<TemplatePreviewModal open onClose={() => {}} template={{ name: 'T', key_type: 'ML-DSA-65' }} />)
+    expect(screen.getByText('common.keyAlgorithmLevel')).toBeInTheDocument()
+  })
 })
