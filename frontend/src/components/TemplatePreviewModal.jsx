@@ -118,32 +118,32 @@ export function TemplatePreviewModal({ open, onClose, template }) {
           <div className="p-4 space-y-1">
             <PreviewField 
               icon={Certificate}
-              label="Common Name (CN)" 
-              value={template.default_cn || template.allow_any_cn ? 'your-common-name.domain.com' : 'Fixed by template'} 
+              label={t('templates.commonName')}
+              value={template.default_cn || template.allow_any_cn ? 'your-common-name.domain.com' : t('templates.fixedCN')}
             />
             
             <PreviewField 
               icon={ShieldCheck}
-              label="Template" 
+              label={t('templates.template')}
               value={template.name} 
             />
             
             <PreviewField 
               icon={Key}
-              label="Key Algorithm" 
+              label={t('common.keyAlgorithm')}
               value={keyDisplay}
             />
             
             <PreviewField 
               icon={Clock}
-              label="Validity Period" 
-              value={`${validityDays} days (${validFrom} → ${validTo})`}
+              label={t('common.validityPeriod')}
+              value={`${t('templates.validityDays', { count: validityDays })} (${validFrom} → ${validTo})`}
             />
             
             {template.key_usage && (
               <PreviewField 
                 icon={ListBullets}
-                label="Key Usage" 
+                label={t('common.keyUsage')}
                 value={Array.isArray(template.key_usage) ? template.key_usage.join(', ') : template.key_usage} 
               />
             )}
@@ -151,14 +151,14 @@ export function TemplatePreviewModal({ open, onClose, template }) {
             {template.extended_key_usage && (
               <PreviewField 
                 icon={ListBullets}
-                label="Extended Key Usage" 
+                label={t('common.extKeyUsage')}
                 value={Array.isArray(template.extended_key_usage) ? template.extended_key_usage.join(', ') : template.extended_key_usage} 
               />
             )}
             
             <PreviewField 
               icon={Globe}
-              label="Subject Alternative Names (SANs)" 
+              label={t('common.subjectAltNames')}
               value={SANPreview({ template, t })}
               mono
             />
