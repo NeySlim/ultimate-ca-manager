@@ -428,6 +428,7 @@ export const helpContent = {
           { label: 'CRL deployment', text: 'Attach an SSH/SFTP target to push every regenerated CRL automatically. Each binding selects PEM or DER, its destination path, optional parent CRLs and its own reload command' },
           { label: 'CDP URL', text: 'CRL Distribution Point URL to embed in certificates' },
           { label: 'Validity', text: 'Per-CA CRL validity from 1 day up to 5 years (90d/180d/1y/3y/5y for offline CAs that cannot re-sign on schedule). A warning appears past one year, relying parties may keep stale revocation data for the whole window' },
+          { label: 'Signature digest', text: 'SHA-256, SHA-384 or SHA-512 for an RSA or EC CA. An Ed25519, Ed448 or ML-DSA CA signs without one: a digest stored for it earlier is shown as ignored, with a Clear button' },
           { label: 'External CRL', text: 'Key-less/offline CAs cannot self-sign a CRL, upload one generated next to the offline key from the CA detail view; it is validated (signature, issuer, monotonicity) and served at the same CDP URL (v2.215)' },
         ]
       },

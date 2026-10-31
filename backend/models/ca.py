@@ -655,6 +655,8 @@ class CA(db.Model):
             "crl_validity_days": self.crl_validity_days or 7,
             "crl_publish_interval_hours": self.crl_publish_interval_hours,
             "crl_digest": self.effective_crl_digest(),
+            # Stored before the key was known to take none: ignored, shown so it can be cleared
+            "crl_digest_ignored": self.crl_digest if self.effective_crl_digest() is None else None,
             # OCSP configuration
             "ocsp_enabled": self.ocsp_enabled,
             "ocsp_url": self.get_primary_ocsp_url(),

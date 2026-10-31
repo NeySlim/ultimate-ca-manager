@@ -2177,6 +2177,8 @@
     "crlPublishInterval": "Publish every",
     "crlPublishAuto": "Auto (near expiry)",
     "crlDigest": "Signature digest",
+    "crlDigestIgnored": "Stored digest {{digest}} is ignored: this key signs without a separate digest",
+    "crlDigestClear": "Clear",
     "crlScheduleNote": "Publishing more often than the validity window gives relying parties a grace period if a publication is missed.",
     "nextPublish": "Next Publish",
     "namedUrlsTitle": "Named URLs",
