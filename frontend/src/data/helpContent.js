@@ -218,6 +218,18 @@ export const helpContent = {
         ]
       },
       {
+        title: 'Hybrid certificate pairs (RFC 9763)',
+        icon: Stack,
+        content: 'A classical certificate (A) and a post-quantum one (B) for the same subject, linked: B carries the relatedCertificate extension naming A by its hash.',
+        items: [
+          { label: 'Issue', text: 'One API request issues both from the same CA, with the same subject, names and validity; B asserts no key usage or EKU that A lacks. A policy that requires approval refuses the pair for now' },
+          { label: 'Linked by request', text: 'A CSR carrying a relatedCertRequest signed by A\'s key (Sign CSR, ACME, EST, WSTEP) issues a B linked to A. A must be held here, valid, unrevoked and an end-entity certificate' },
+          { label: 'Revoke', text: 'Revoking either member revokes the other unless the request keeps it; under a policy that requires approval both go together' },
+          { label: 'Renew', text: 'Renewing either member renews both, manually, in bulk or automatically, and the new B names the new A' },
+          { label: 'Export', text: 'The hybrid-bundle export is a ZIP of both certificates, and of both keys when asked' },
+        ]
+      },
+      {
         title: 'On-disk certificate files (v2.140)',
         icon: HardDrive,
         items: [
@@ -340,6 +352,7 @@ export const helpContent = {
       'A certificate imported for a CSR generated in UCM completes that CSR: the record keeps its private key, so the certificate exports with it',
       'Use Microsoft CA mode to sign CSRs via AD CS when connected to a Windows PKI',
       'A certificate for an ML-DSA key keeps only signature bits: keyEncipherment, dataEncipherment and keyAgreement asked by the template are removed, and the result says so',
+      'A CSR generated with related_to (API) names an existing certificate A: signing it issues a certificate linked to A (RFC 9763), refused if it asserts a key usage or EKU A lacks',
       'When signing, use "Extra EKUs" to add Microsoft RDP, smartcard logon, IPsec or any other dotted OID: the CSR\'s existing EKU is rebuilt with the merged set',
       'When a policy or the issuing CA\'s expiry shortens the requested validity, the result says so: "Issued for N day(s) instead of the M requested", with the reason',
     ],

@@ -384,6 +384,18 @@ Export formats:
 
 > ⚠ Exporting the **private key** (PKCS#12/PFX, JKS, or key file) requires the admin-only **read:private_keys** permission. Roles without it, including the built-in Operator role, must retrieve archived keys through the approval-gated **Key Recovery** workflow instead.
 
+## Hybrid Certificate Pairs (RFC 9763)
+
+A hybrid pair links a classical certificate (**A**, RSA or EC) and a post-quantum one (**B**, ML-DSA) for the same subject. B carries the non-critical **relatedCertificate** extension, which names A by its hash, so a relying party can require both.
+
+- **Issuing**: one API request (\`hybrid\` in \`POST /api/v2/certificates\`) issues both from the same CA, with the same subject, names and validity. B copies A's extensions with its own key identifier and key usage, and asserts no key usage or EKU that A lacks
+- **Linking by request**: a CSR carrying a **relatedCertRequest** signed by A's key issues a B linked to A, through Sign CSR, ACME, EST or WSTEP. A must be held by UCM, valid, unrevoked, an end-entity certificate issued by a CA of this instance, and the request must be recent. A certificate given inline in the request's location must be A; other locations are not fetched
+- **Revoking** either member revokes the other unless the request keeps it. Under a policy that requires approval, the pair goes together, and two different approval policies on the two members leave the revocation to an administrator
+- **Renewing** either member, by hand, in bulk or automatically, renews both, and the new B names the new A
+- **Exporting**: the **hybrid-bundle** format is a ZIP of both certificates, and of both private keys when the key is included
+
+> ⚠ A policy that requires approval refuses to issue a hybrid pair for now: issue it under a policy without approval.
+
 ## Favorites
 
 Star ⭐ important certificates to bookmark them. Favorites appear first in filtered views and are accessible from the favorites filter.
@@ -517,6 +529,10 @@ The CSR and private key are created and stored in UCM. The CSR appears in the Pe
 > 💡 This is convenient when you want UCM to manage the entire lifecycle. CSR, signing, and key storage.
 
 A certificate signed for an **ML-DSA** key keeps only signature bits: keyEncipherment, dataEncipherment and keyAgreement asked by the template are removed, and the result names what was removed.
+
+### Related certificate requests (RFC 9763)
+
+Through the API, \`related_to\` names an existing certificate **A** whose private key UCM holds: the generated CSR then carries a **relatedCertRequest** signed by A's key. Signing it issues a certificate linked to A, the second member of a hybrid pair, which revokes and renews with A. Signing is refused when A is revoked, expired or not an end-entity certificate, or when the new certificate asserts a key usage or EKU that A lacks.
 
 ## Uploading a CSR
 

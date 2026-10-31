@@ -468,7 +468,9 @@ GET /api/v2/cas?page=1&per_page=20
 for EC and `null` for a post-quantum key), `security_level` (NIST level `2`, `3` or `5` for ML-DSA-44/65/87,
 `null` otherwise), `post_quantum` (boolean) and `verifiable` (`false` for an SLH-DSA
 signature, which UCM reads but cannot check). An ML-DSA CA reports `signature_algorithm`
-as its parameter set, e.g. `"ML-DSA-65"`.
+as its parameter set, e.g. `"ML-DSA-65"`. A certificate in a hybrid pair (RFC 9763) also
+reports `related_certificate_id` (the other member) and `hybrid_role` (`"classical"` or `"pq"`);
+both are `null` otherwise.
 
 ### Get CA Hierarchy (Tree View)
 ```http
@@ -746,6 +748,14 @@ both at once. Without them, the template's key type applies. An unknown key type
 `meta.notices`. ML-DSA private keys cannot be exported as PKCS#12 or JKS: those exports
 answer `400` with the reason `unsupported_for_key_algorithm`; PEM and DER work.
 
+**Hybrid pair (RFC 9763).** `"hybrid": {"classical": "EC P-256", "pq": "ML-DSA-65"}` issues two
+certificates from the same CA, with the same subject, names and validity: A for the classical key
+and B for the post-quantum key. B carries the non-critical relatedCertificate extension naming A,
+and the two rows name each other through `related_certificate_id`. `key_type` and `key_size`
+are ignored; a `classical` member that is post-quantum, a `pq` member that is not, or an unknown
+key type answers `400`, and so does a policy that requires approval. The response is
+`201` with `data.certificate` (A) and `data.related` (B).
+
 **Response:**
 ```json
 {
@@ -807,6 +817,11 @@ possible; it is read from the JSON body or the query string. The variants of a c
 `chain_status.variants` of `GET /api/v2/certificates/{cert_id}`. An unknown value, or one that is not part of
 the chain, answers 400.
 
+`format=hybrid-bundle` returns a ZIP holding both members of a hybrid pair, named
+`<hybrid_role>-<id>.crt`, plus `<hybrid_role>-<id>.key` with `include_key` (encrypted with
+`password` when one is given). A certificate without a related one answers `400`, and so does
+`include_key` when either member has no private key.
+
 ### Renew Certificate
 ```http
 POST /api/v2/certificates/{cert_id}/renew
@@ -816,6 +831,10 @@ Content-Type: application/json
   "validity_days": 365
 }
 ```
+
+Renewing a member of a hybrid pair renews both, and the new B names the new A; the response
+lists the other member in `related_renewed`. When the two members require approval under
+different policies, the renewal answers `409` and only an administrator can perform it.
 
 ### Revoke Certificate
 ```http
@@ -830,6 +849,11 @@ Content-Type: application/json
 ```
 
 Optional **`invalidity_date`** / **`invalidity_at`** (ISO 8601): RFC 5280 §5.3.2 date on which the certificate became invalid (may precede revocation). Emitted as CRL entry `invalidityDate` when set.
+
+**`revoke_related`** (JSON boolean, default `true`): revoking a member of a hybrid pair revokes the
+other one too, reported as `related_revoked` (its id). `false` keeps it, except under a policy that
+requires approval, which revokes both: such a request answers `400` for a non-administrator. Two
+different approval policies on the two members answer `409`.
 
 **Revocation Reasons** (RFC 5280 §5.3.1; an unknown value is rejected with `400`, snake_case spellings such as `key_compromise` are accepted and stored in the canonical form):
 - `unspecified` (default when omitted)
@@ -893,9 +917,13 @@ Content-Type: application/json
 
 {
   "ids": [1, 2, 3],
-  "reason": "keyCompromise"
+  "reason": "keyCompromise",
+  "revoke_related": true
 }
 ```
+
+`revoke_related` applies as for a single revocation. Bulk renewal also renews the other member of
+each hybrid pair; a member already renewed or revoked with its pair counts as a success.
 
 **Response:**
 ```json
@@ -1094,6 +1122,9 @@ UCM generates the key pair and keeps the private key. `key_type` is `RSA 2048`, 
 `ML-DSA-65` or `ML-DSA-87`; an unknown value answers `400`. To submit an existing CSR, use
 `POST /api/v2/csrs/upload` below.
 
+`related_to` (certificate id) adds an RFC 9763 relatedCertRequest signed by the key of that
+certificate A, which UCM must hold; a revoked or unknown A, or one without its key, answers `400`.
+
 ### Get CSR Details
 ```http
 GET /api/v2/csrs/{csr_id}
@@ -1110,6 +1141,11 @@ Content-Type: application/json
   "template_id": 1
 }
 ```
+
+A CSR carrying a relatedCertRequest (RFC 9763), here or through ACME, EST or WSTEP, issues a
+certificate linked to the A it names. A must be held here, valid, unrevoked and an end-entity
+certificate issued by a CA of this instance, the request must be recent and verify with A's key,
+and the new certificate may assert no key usage or EKU that A lacks; otherwise `400`.
 
 ### Delete CSR
 ```http
