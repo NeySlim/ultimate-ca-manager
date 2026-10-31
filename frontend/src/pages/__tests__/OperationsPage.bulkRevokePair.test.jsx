@@ -145,6 +145,14 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
     await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('revocation.bulkRelatedRevoked:1'))
   })
 
+  it('says which other members could not be revoked', async () => {
+    mocks.bulkRevoke.mockResolvedValue({ data: { success: [1], failed: [], related_not_revoked: [2] } })
+    const dialog = await openBulk('common.revoke')
+    confirm(dialog)
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('revocation.bulkRelatedRevokeFailed:1'))
+    expect(mocks.showWarning).not.toHaveBeenCalledWith(expect.stringMatching(/bulkRelatedRevoked/))
+  })
+
   it('reports nothing more when the box is unticked', async () => {
     const dialog = await openBulk('common.revoke')
     fireEvent.click(within(dialog).getByLabelText('revocation.revokeRelatedBulk'))

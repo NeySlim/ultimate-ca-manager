@@ -589,9 +589,13 @@ export default function OperationsPage() {
         }))
       }
       // Other members of pairs revoked or renewed outside the selection, which the answer omits
+      const notRevoked = data?.related_not_revoked || []
       const pairedOutside = new Set((data?.success || [])
         .map(id => partnerBefore.get(id))
-        .filter(other => other != null && !selectedIds.has(other)))
+        .filter(other => other != null && !selectedIds.has(other) && !notRevoked.includes(other)))
+      if (notRevoked.length > 0) {
+        showWarning(t('revocation.bulkRelatedRevokeFailed', { count: notRevoked.length, ids: notRevoked.join(', ') }))
+      }
       if (pairedOutside.size > 0 && bulkAction === 'revoke' && !(selectionHasPairs && !bulkRevokeRelated)) {
         showWarning(t('revocation.bulkRelatedRevoked', { count: pairedOutside.size }))
       }

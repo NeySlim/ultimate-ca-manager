@@ -3923,9 +3923,11 @@
     "revokeRelatedHint": "Untick to keep the other member of the hybrid pair valid.",
     "revokedWithRelated": "Certificate revoked, with its linked certificate #{{id}}",
     "relatedNotRevoked": "The linked certificate was not revoked: it does not name this certificate as its pair, or it was already revoked.",
+    "relatedRevokeFailed": "Certificate revoked, but its linked certificate #{{id}} could not be revoked: revoke it separately.",
     "revokeRelatedBulk": "Also revoke the linked certificates",
     "revokeRelatedBulkHint": "Selected members of a hybrid pair take the other member with them. Untick to keep the other members valid.",
-    "bulkRelatedRevoked": "{{count}} linked certificates revoked with the selection"
+    "bulkRelatedRevoked": "{{count}} linked certificates revoked with the selection",
+    "bulkRelatedRevokeFailed": "{{count}} linked certificates could not be revoked with the selection (#{{ids}}): revoke them separately"
   },
   "details": {
     "pemCertificate": "PEM Certificate",

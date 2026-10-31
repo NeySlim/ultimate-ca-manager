@@ -168,7 +168,9 @@ export function FloatingDetailWindow({ windowInfo }) {
           showSuccess(relatedRevoked != null
             ? t('revocation.revokedWithRelated', { id: relatedRevoked })
             : t('certificates.revoked', 'Certificate revoked'))
-          if (options?.revokeRelated && relatedRevoked == null) showWarning(t('revocation.relatedNotRevoked'))
+          if (res?.data?.related_not_revoked != null) {
+            showWarning(t('revocation.relatedRevokeFailed', { id: res.data.related_not_revoked }))
+          } else if (options?.revokeRelated && relatedRevoked == null) showWarning(t('revocation.relatedNotRevoked'))
         }
       }
       if (queued) {

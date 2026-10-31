@@ -302,7 +302,9 @@ export default function CertificatesPage() {
       showSuccess(relatedRevoked != null
         ? t('revocation.revokedWithRelated', { id: relatedRevoked })
         : t('messages.success.other.revoked'))
-      if (options?.revokeRelated && relatedRevoked == null) showWarning(t('revocation.relatedNotRevoked'))
+      if (res?.data?.related_not_revoked != null) {
+        showWarning(t('revocation.relatedRevokeFailed', { id: res.data.related_not_revoked }))
+      } else if (options?.revokeRelated && relatedRevoked == null) showWarning(t('revocation.relatedNotRevoked'))
       setRevokingCert(null)
       setDeleteAfterRevoke(false)
       if (alsoDelete) {

@@ -106,6 +106,16 @@ describe('FloatingDetailWindow of a hybrid pair member', () => {
     await waitFor(() => expect(mocks.notify.showSuccess).toHaveBeenCalledWith(toast))
   })
 
+  it('says the linked certificate could not be revoked', async () => {
+    mocks.certificatesService.revoke.mockResolvedValue({ data: { id: 4, revoked: true, related_not_revoked: 5 } })
+    await open()
+    fireEvent.click(screen.getByText('Revoke'))
+    await screen.findByLabelText('revocation.revokeRelated')
+    fireEvent.submit(screen.getByTestId('revoke-form'))
+    await waitFor(() => expect(mocks.notify.showWarning).toHaveBeenCalledWith('revocation.relatedRevokeFailed'))
+    expect(mocks.notify.showWarning).not.toHaveBeenCalledWith('revocation.relatedNotRevoked')
+  })
+
   it('warns when the linked certificate was not revoked', async () => {
     await open()
     fireEvent.click(screen.getByText('Revoke'))

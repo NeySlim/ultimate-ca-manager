@@ -149,6 +149,16 @@ describe('CertificatesPage and a hybrid pair', () => {
     expect(mocks.showWarning).not.toHaveBeenCalledWith('revocation.relatedNotRevoked')
   })
 
+  it('says the linked certificate could not be revoked', async () => {
+    mocks.revokeOptions = { revokeRelated: true }
+    mocks.revoke.mockResolvedValue({ data: { id: 11, revoked: true, related_not_revoked: 12 } })
+    await openMemberOnMobile()
+    fireEvent.click(screen.getByText('details-revoke'))
+    fireEvent.click(await screen.findByText('confirm-revoke'))
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('revocation.relatedRevokeFailed'))
+    expect(mocks.showWarning).not.toHaveBeenCalledWith('revocation.relatedNotRevoked')
+  })
+
   it('warns when the linked certificate asked for was not revoked', async () => {
     mocks.revokeOptions = { revokeRelated: true }
     mocks.revoke.mockResolvedValue({ data: { id: 11, revoked: true } })
