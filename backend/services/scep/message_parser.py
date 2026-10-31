@@ -270,7 +270,7 @@ def verify_cms_signature(signed_data, signer_cert) -> None:
     elif isinstance(public_key, ed448.Ed448PublicKey):
         raise ValueError("Ed448 CMS signatures are not supported")
     elif key_algorithms.family_for_public_key(public_key) == "ML-DSA":
-        # ML-DSA is not FIPS-approved; the signer key is not bound to the CSR key
+        # Outside the FIPS module UCM ships; refused whatever key the CSR carries
         fips_mode.refuse(f"{key_algorithms.label_for_public_key(public_key)} CMS signatures")
         _check_mldsa_signer_info(signer_info, public_key, digest_name)
         public_key.verify(bytes(signature), signed_bytes)
