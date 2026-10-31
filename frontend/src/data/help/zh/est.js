@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: '提交 CSR 并接收签名证书' },
           { label: '/simplereenroll', text: '续期已有证书（需要 mTLS）' },
           { label: '/csrattrs', text: '获取服务器推荐的 CSR 属性' },
-          { label: '/serverkeygen', text: '服务器生成 RSA-2048 密钥对并返回证书 + 密钥；携带后量子密钥的请求会被 400 拒绝：请在设备上生成 ML-DSA 密钥并使用 /simpleenroll (v2.248)' },
+          { label: '/serverkeygen', text: '服务器生成 RSA-2048 密钥对并返回证书 + 密钥；请求中的密钥（包括 ML-DSA）会被忽略 (RFC 7030)' },
         ]
       },
     ],

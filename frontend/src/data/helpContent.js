@@ -537,7 +537,7 @@ export const helpContent = {
           { label: '/simpleenroll', text: 'Submit a CSR and receive a signed certificate' },
           { label: '/simplereenroll', text: 'Renew an existing certificate (requires mTLS)' },
           { label: '/csrattrs', text: 'Get CSR attributes recommended by the server' },
-          { label: '/serverkeygen', text: 'Server generates an RSA-2048 key pair and returns certificate + key; a request carrying a post-quantum key is refused with 400: generate an ML-DSA key on the device and use /simpleenroll (v2.248)' },
+          { label: '/serverkeygen', text: 'Server generates an RSA-2048 key pair and returns certificate + key; the key in the request, ML-DSA included, is ignored (RFC 7030)' },
         ]
       },
     ],

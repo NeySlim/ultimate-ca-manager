@@ -1,5 +1,5 @@
-"""EST and ML-DSA: simpleenroll under an ML-DSA and an RSA CA, serverkeygen that stays
-RSA-2048 and says so, cacerts read by OpenSSL, and the weak-hash diagnosis of an ML-DSA CSR."""
+"""EST and ML-DSA: simpleenroll under an ML-DSA and an RSA CA, serverkeygen that makes
+RSA-2048 whatever the request key, cacerts read by OpenSSL, and the weak-hash diagnosis of an ML-DSA CSR."""
 import base64
 import subprocess
 
@@ -105,15 +105,24 @@ def test_weak_hash_diagnosis_is_none_for_mldsa(mldsa_csr):
     assert weak_csr_hash_algorithm(mldsa_csr) is None
 
 
+def _serverkeygen_leaf(response):
+    p7 = response.data.split(b'\r\n\r\n', 1)[1].split(b'\r\n--', 1)[0]
+    (leaf,) = pkcs7.load_der_pkcs7_certificates(base64.b64decode(p7))
+    return leaf
+
+
 @needs_openssl_35
 @pytest.mark.parametrize('which', ['mldsa', 'rsa'])
-def test_serverkeygen_refuses_an_mldsa_request(client, est_ca, tmp_path, which):
-    """The server only makes RSA-2048 keys: a request whose key is ML-DSA is told so."""
+def test_serverkeygen_ignores_an_mldsa_request_key(client, est_ca, tmp_path, which):
+    """RFC 7030 §4.4.1: the request key is ignored, an ML-DSA one included."""
     est_ca(which)
-    csr, _ = openssl_mldsa_csr(tmp_path, f'keygen-{which}.pq.example.test')
+    cn = f'keygen-{which}.pq.example.test'
+    csr, _ = openssl_mldsa_csr(tmp_path, cn)
     r = _post(client, 'serverkeygen', csr.public_bytes(serialization.Encoding.DER))
-    assert r.status_code == 400
-    assert b'ML-DSA-44' in r.data and b'RSA-2048' in r.data and b'/simpleenroll' in r.data, r.data
+    assert r.status_code == 200, r.data
+    leaf = _serverkeygen_leaf(r)
+    assert key_algorithms.label_for_public_key(leaf.public_key()) == 'RSA-2048'
+    assert leaf.subject.rfc4514_string() == f'CN={cn}'
 
 
 def test_serverkeygen_stays_rsa_2048_under_an_mldsa_ca(client, est_ca):
@@ -127,8 +136,7 @@ def test_serverkeygen_stays_rsa_2048_under_an_mldsa_ca(client, est_ca):
            .sign(key, hashes.SHA256()))
     r = _post(client, 'serverkeygen', csr.public_bytes(serialization.Encoding.DER))
     assert r.status_code == 200, r.data
-    p7 = r.data.split(b'\r\n\r\n', 1)[1].split(b'\r\n--', 1)[0]
-    (leaf,) = pkcs7.load_der_pkcs7_certificates(base64.b64decode(p7))
+    leaf = _serverkeygen_leaf(r)
     assert key_algorithms.label_for_public_key(leaf.public_key()) == 'RSA-2048'
     leaf.verify_directly_issued_by(ca_cert)
 

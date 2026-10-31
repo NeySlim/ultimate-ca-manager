@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'Invia un CSR e ricevi un certificato firmato' },
           { label: '/simplereenroll', text: 'Rinnova un certificato esistente (richiede mTLS)' },
           { label: '/csrattrs', text: 'Ottieni gli attributi CSR raccomandati dal server' },
-          { label: '/serverkeygen', text: 'Il server genera una coppia di chiavi RSA-2048 e restituisce certificato + chiave; una richiesta con una chiave post-quantistica viene rifiutata con 400: genera una chiave ML-DSA sul dispositivo e usa /simpleenroll (v2.248)' },
+          { label: '/serverkeygen', text: 'Il server genera una coppia di chiavi RSA-2048 e restituisce certificato + chiave; la chiave della richiesta, ML-DSA compresa, viene ignorata (RFC 7030)' },
         ]
       },
     ],

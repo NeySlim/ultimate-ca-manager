@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'Einen CSR einreichen und ein signiertes Zertifikat erhalten' },
           { label: '/simplereenroll', text: 'Ein bestehendes Zertifikat erneuern (erfordert mTLS)' },
           { label: '/csrattrs', text: 'Vom Server empfohlene CSR-Attribute abrufen' },
-          { label: '/serverkeygen', text: 'Server generiert ein RSA-2048-Schlüsselpaar und gibt Zertifikat + Schlüssel zurück; eine Anfrage mit Post-Quanten-Schlüssel wird mit 400 abgelehnt: ML-DSA-Schlüssel auf dem Gerät erzeugen und /simpleenroll verwenden (v2.248)' },
+          { label: '/serverkeygen', text: 'Server generiert ein RSA-2048-Schlüsselpaar und gibt Zertifikat + Schlüssel zurück; der Schlüssel der Anfrage, auch ML-DSA, wird ignoriert (RFC 7030)' },
         ]
       },
     ],

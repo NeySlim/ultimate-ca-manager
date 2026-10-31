@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'CSRを送信して署名済み証明書を受け取る' },
           { label: '/simplereenroll', text: '既存の証明書を更新（mTLSが必要）' },
           { label: '/csrattrs', text: 'サーバーが推奨するCSR属性を取得' },
-          { label: '/serverkeygen', text: 'サーバーが RSA-2048 のキーペアを生成し、証明書と鍵を返します。耐量子鍵を含むリクエストは 400 で拒否されます：デバイス上で ML-DSA 鍵を生成し、/simpleenroll を使用してください (v2.248)' },
+          { label: '/serverkeygen', text: 'サーバーが RSA-2048 のキーペアを生成し、証明書と鍵を返します。リクエストの鍵は ML-DSA を含めて無視されます (RFC 7030)' },
         ]
       },
     ],
