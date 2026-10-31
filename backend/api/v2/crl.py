@@ -357,7 +357,7 @@ def configure_crl(ca_id):
             details=(
                 f"CRL schedule: validity={ca.crl_validity_days or 7}d, "
                 f"publish={ca.crl_publish_interval_hours}h, "
-                f"digest={ca.effective_crl_digest()}"
+                f"digest={ca.effective_crl_digest() or 'none (the key signs without one)'}"
             ),
             success=True
         )

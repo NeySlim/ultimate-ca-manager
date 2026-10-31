@@ -190,7 +190,7 @@ def _ca_eddsa(ctx):
 
 @graded('ca.signature_scheme',
         'Certificate authorities whose signature scheme the profile does not allow',
-        'Switch the authority to RSA-PSS in its settings, or create an authority with an allowed scheme.',
+        'Create an authority with an allowed scheme and move issuance to it; an RSA authority can instead switch to RSA-PSS in its settings.',
         'Certificate authorities whose signature scheme the profile does not recommend')
 def _ca_scheme(ctx):
     found = []

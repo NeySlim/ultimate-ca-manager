@@ -13,7 +13,7 @@ from asn1crypto import core as asn1_core, ocsp as asn1_ocsp
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes, serialization
 
-from models import CA, Certificate, SystemConfig, db
+from models import AuditLog, CA, Certificate, SystemConfig, db
 from models.crl import CRLMetadata
 from utils import key_algorithms
 
@@ -92,6 +92,15 @@ def test_crl_config_accepts_an_empty_digest_for_an_ml_dsa_ca(auth_client, mldsa6
     assert r.status_code == 200, r.get_json()
     assert r.get_json()['data']['crl_digest'] is None
     assert r.get_json()['data']['crl_validity_days'] == 3
+
+
+def test_crl_config_audit_names_no_digest_for_an_ml_dsa_ca(app, auth_client, mldsa65_ca):
+    r = _post(auth_client, f"/api/v2/crl/{mldsa65_ca['id']}/config", {'digest': None, 'validity_days': 4})
+    assert r.status_code == 200, r.get_json()
+    with app.app_context():
+        entry = AuditLog.query.filter_by(action='crl_config', resource_id=str(mldsa65_ca['id'])) \
+            .order_by(AuditLog.id.desc()).first()
+        assert 'digest=none (the key signs without one)' in entry.details
 
 
 def test_crl_config_refuses_to_impose_a_digest_on_an_ml_dsa_ca(app, auth_client, mldsa65_ca):
