@@ -8,6 +8,8 @@ const appVersion = fs.readFileSync(path.resolve(__dirname, '../VERSION'), 'utf-8
 
 export default defineConfig({
   plugins: [react()],
+  // Per checkout: node_modules may be a link shared by several checkouts
+  cacheDir: path.resolve(__dirname, '.vite'),
   define: {
     __APP_VERSION__: JSON.stringify(appVersion),
   },
