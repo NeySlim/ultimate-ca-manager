@@ -67,6 +67,7 @@ vi.mock('../../services/tsa.service', () => ({
 }))
 
 import TSAPage from '../TSAPage'
+import { TSA_LABELS, findAlgorithm } from '../../lib/keyAlgorithms'
 import { tsaService } from '../../services/tsa.service'
 
 function setConfig(overrides = {}) {
@@ -119,8 +120,8 @@ describe('TSAPage — one-click signer issuance (#312)', () => {
     expect(payload).toMatchObject({
       ca_refid: 'ca-tsa',
       cn: 'UCM Timestamping Authority',
-      key_type: 'RSA',
-      key_size: '3072',
+      key_type: findAlgorithm(TSA_LABELS[0]).issue[0],
+      key_size: findAlgorithm(TSA_LABELS[0]).issue[1],
     })
     // reloaded config + candidates after issuance
     await waitFor(() => expect(tsaService.getConfig).toHaveBeenCalledTimes(2))

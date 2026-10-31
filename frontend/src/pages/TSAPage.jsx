@@ -20,9 +20,15 @@ import { usePermission, useClipboard } from '../hooks'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
 import { certificateLabel } from '../lib/utils'
-import { TSA_LABELS, groupedOptions, listAlgorithms, signerKeyParams } from '../lib/keyAlgorithms'
+import { TSA_LABELS, findAlgorithm, groupedOptions, listAlgorithms } from '../lib/keyAlgorithms'
 import { useFipsMode } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
+
+// The signer request names its key as the issue API does: the registry row's `issue` pair
+function signerKey(label) {
+  const [key_type, key_size] = findAlgorithm(label)?.issue || [label]
+  return { key_type, key_size }
+}
 
 export default function TSAPage() {
   const { t } = useTranslation()
@@ -87,7 +93,7 @@ export default function TSAPage() {
       ca_refid: config.ca_refid || (cas[0]?.refid ?? ''),
       cn: 'UCM Timestamping Authority',
       validity_days: 397,
-      key_type: 'RSA-3072',
+      key_type: TSA_LABELS[0],
     })
     setGenerateOpen(true)
   }
@@ -96,7 +102,7 @@ export default function TSAPage() {
     if (!genForm) return
     setGenerating(true)
     try {
-      const key = signerKeyParams(genForm.key_type || 'RSA-3072')
+      const key = signerKey(genForm.key_type || TSA_LABELS[0])
       const res = await tsaService.issueSignerCertificate({
         ca_refid: genForm.ca_refid || undefined,
         cn: genForm.cn || undefined,
@@ -389,7 +395,7 @@ export default function TSAPage() {
               />
               <Select
                 label={t('tsa.signerGenerateKeyType')}
-                options={groupedOptions(listAlgorithms({ labels: TSA_LABELS, fips }), t, k => k.display)}
+                options={groupedOptions(listAlgorithms({ labels: TSA_LABELS, generate: true, fips }), t, k => k.display)}
                 value={genForm.key_type}
                 onChange={(val) => setGenForm({ ...genForm, key_type: val })}
               />
