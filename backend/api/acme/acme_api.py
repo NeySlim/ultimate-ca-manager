@@ -1789,7 +1789,10 @@ def revoke_cert():
         # holds for approval is refused, and left to the CA operators
         try:
             from services.approval_gate import revocation_policy_for
-            held_by = revocation_policy_for(cert)
+            from services.cert.related_pair import mutual_partner
+            partner = mutual_partner(cert)
+            held_by = revocation_policy_for(
+                cert, partner if partner is not None and not partner.revoked else None)
         except Exception as e:
             logger.error(f"ACME revocation policy evaluation failed: {e}", exc_info=True)
             return acme_error('serverInternal', 'Revocation policy could not be evaluated', 500)

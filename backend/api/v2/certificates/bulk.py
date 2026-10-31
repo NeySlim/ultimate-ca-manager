@@ -15,7 +15,7 @@ from utils.p7b import p7b_from_pems
 from services.cert_service import CertificateService
 from services.cert.renewal import RenewalError, check_renewable, renew_certificate_in_place
 from services.msca.propagation import propagate_revocation, PROPAGATED
-from services.approval_gate import queue_revocation
+from services.approval_gate import PairApprovalConflict, queue_revocation
 from services.cert.related_pair import mutual_partner
 from api.v2.certificates.cert_lifecycle import _related_choice_refusal
 from utils.export_options import json_boolean
@@ -77,7 +77,12 @@ def bulk_revoke_certificates():
                 results['failed'].append({'id': cert_id, 'error': refusal[0]})
                 continue
             try:
-                policy, approval = queue_revocation(g.current_user, cert, reason=reason)
+                policy, approval = queue_revocation(
+                    g.current_user, cert, reason=reason,
+                    partner=partner if revoke_related and partner_id else None)
+            except PairApprovalConflict as e:
+                results['failed'].append({'id': cert_id, 'error': str(e)})
+                continue
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Policy evaluation failed for revocation of {cert_id}: {e}", exc_info=True)
@@ -150,6 +155,9 @@ def bulk_renew_certificates():
             check_renewable(cert)  # RenewalError → reported per item below
             try:
                 policy, approval = _approval_for_renewal(g.current_user, cert, data)
+            except PairApprovalConflict as e:
+                results['failed'].append({'id': cert_id, 'error': str(e)})
+                continue
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Policy evaluation failed for renewal of {cert_id}: {e}", exc_info=True)

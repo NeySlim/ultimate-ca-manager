@@ -264,6 +264,7 @@ def test_upstream_revoke_failure_does_not_undo_local_revoke(
             cert_id=certificate.id,
             reason='superseded',
             username='system',
+            revoke_related=False,
         )
         client.revoke_certificate.assert_called_once_with(certificate, reason=4)
 

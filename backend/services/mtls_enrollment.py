@@ -188,8 +188,10 @@ def remove_enrolment(auth_cert, username: str = 'system', actor=None):
                 'request its revocation, then remove the enrolment once it is revoked', 409)
     if needs_revoking:
         try:
+            # The enrolled certificate only: its pair partner is not part of the enrolment
             CertificateService.revoke_certificate(
-                cert_id=certificate_id, reason=REMOVAL_REASON, username=username)
+                cert_id=certificate_id, reason=REMOVAL_REASON, username=username,
+                revoke_related=False)
         except Exception as error:
             # An authority that cannot sign right now is not a reason to make
             # the certificate disappear without a trace; say so instead.

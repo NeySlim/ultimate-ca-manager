@@ -8,7 +8,8 @@ from utils.response import success_response, error_response, no_content_response
 from models import Certificate, CA, db
 from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
 from services.cert_service import CertificateService
-from services.approval_gate import approval_payload, queue_revocation, revocation_policy_for
+from services.approval_gate import (PairApprovalConflict, approval_payload, queue_revocation,
+                                    revocation_policy_for)
 from services.cert.related_pair import mutual_partner
 from utils.export_options import json_boolean
 from services.deletion_blockers import certificate_deletion_blockers, first_blocker
@@ -96,12 +97,15 @@ def revoke_certificate(cert_id):
     if refusal:
         return error_response(*refusal)
 
-    # A policy that requires approval for revocations queues the request
-    # (administrators bypass); fail closed on any evaluation error
+    # A policy that requires approval for revoking either member queues the
+    # request (administrators bypass); fail closed on any evaluation error
     try:
         policy, approval = queue_revocation(
             g.current_user, cert, reason=reason, invalidity_at=invalidity_at,
-            comment=(data or {}).get('approval_comment'))
+            comment=(data or {}).get('approval_comment'),
+            partner=partner if revoke_related and partner_id else None)
+    except PairApprovalConflict as e:
+        return error_response(str(e), 409)
     except Exception as e:
         logger.error(f"Policy evaluation failed for revocation of {cert_id}: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the certificate was not revoked', 500)

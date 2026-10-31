@@ -11,6 +11,7 @@ from cryptography.hazmat.primitives import serialization
 
 from models import CA, Certificate, db
 from utils import key_algorithms, related_cert
+from utils.datetime_utils import utc_now
 
 pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
                                 reason='this build has no ML-DSA')
@@ -394,3 +395,237 @@ def test_deleting_a_member_unlinks_the_other(app, auth_client, create_ca):
     r = auth_client.delete(f"/api/v2/certificates/{a['id']}")
     assert r.status_code == 204, r.data
     assert _row(app, b['id'])['related_certificate_id'] is None
+
+
+# ---- automatic callers revoke the replaced member only ----------------------------
+
+def _set_config(app, key, value):
+    from models import SystemConfig
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key=key).first()
+        previous = row.value if row is not None else None
+        if row is None:
+            db.session.add(SystemConfig(key=key, value=value))
+        else:
+            row.value = value
+        db.session.commit()
+        return previous
+
+
+def _restore_config(app, key, previous):
+    from models import SystemConfig
+    with app.app_context():
+        row = SystemConfig.query.filter_by(key=key).first()
+        if previous is None and row is not None:
+            db.session.delete(row)
+        elif previous is not None:
+            row.value = previous
+        db.session.commit()
+
+
+@pytest.mark.parametrize('caller', ['finalize', 'settings sweep'])
+def test_acme_supersede_leaves_the_new_partner_valid(app, auth_client, create_ca, caller):
+    from datetime import timedelta
+    from models.acme_models import AcmeAccount, AcmeOrder
+    from services.acme.acme_service import AcmeService
+    from api.v2.acme.settings import _revoke_superseded_certificates
+    cn = f"pair-supersede-{caller.replace(' ', '-')}.example.com"
+    a, b = _pair(auth_client, create_ca, cn)
+    previous = _set_config(app, 'acme.revoke_on_renewal', 'true')
+    try:
+        with app.app_context():
+            account = AcmeAccount(jwk='{}', jwk_thumbprint=cn)
+            db.session.add(account)
+            db.session.flush()
+            idents = json.dumps([{'type': 'dns', 'value': cn}])
+            now = utc_now()
+            old = AcmeOrder(account_id=account.account_id, status='valid', identifiers=idents,
+                            certificate_id=a['id'], created_at=now - timedelta(days=1))
+            new = AcmeOrder(account_id=account.account_id, status='valid', identifiers=idents,
+                            certificate_id=b['id'], created_at=now)
+            db.session.add_all([old, new])
+            db.session.commit()
+            if caller == 'finalize':
+                AcmeService(base_url='http://localhost')._auto_supersede(new, b['id'])
+            else:
+                assert _revoke_superseded_certificates() >= 1
+        assert _revoked(app, a['id'], b['id']) == [True, False]
+    finally:
+        _restore_config(app, 'acme.revoke_on_renewal', previous)
+        with app.app_context():
+            AcmeOrder.query.filter(AcmeOrder.certificate_id.in_([a['id'], b['id']])).delete(
+                synchronize_session=False)
+            AcmeAccount.query.filter_by(jwk_thumbprint=cn).delete()
+            db.session.commit()
+
+
+def test_acme_client_renewal_revokes_the_replaced_member_only(app, auth_client, create_ca):
+    from unittest import mock
+    from services.acme_renewal_service import _revoke_replaced_certificate
+    a, b = _pair(auth_client, create_ca, 'pair-client-renew.example.com')
+    previous = _set_config(app, 'acme.revoke_on_renewal', 'true')
+    try:
+        client = mock.Mock()
+        client.revoke_certificate.return_value = mock.Mock(status_code=200)
+        with app.app_context():
+            _revoke_replaced_certificate(client, db.session.get(Certificate, a['id']))
+        assert _revoked(app, a['id'], b['id']) == [True, False]
+    finally:
+        _restore_config(app, 'acme.revoke_on_renewal', previous)
+
+
+def test_removing_an_enrolment_revokes_its_certificate_only(app, auth_client, create_ca, create_user):
+    from models import AuthCertificate
+    from services.mtls_enrollment import remove_enrolment
+    a, b = _pair(auth_client, create_ca, 'pair-enrolment.example.com')
+    user = create_user()
+    with app.app_context():
+        cert = _x509(a)
+        enrolment = AuthCertificate(user_id=user['id'], cert_pem=a['pem'].encode(),
+                                    cert_serial=str(cert.serial_number),
+                                    cert_subject=cert.subject.rfc4514_string())
+        db.session.add(enrolment)
+        db.session.commit()
+        ok, response = remove_enrolment(enrolment, username='test')
+        assert ok, response
+    with app.app_context():
+        assert db.session.get(Certificate, a['id']) is None  # revoked, then deleted with the enrolment
+    assert _revoked(app, b['id']) == [False]
+
+
+# ---- the partner's approval policy holds the pair -----------------------------------
+
+def _move_to_new_ca(app, create_ca, cert_id, cn):
+    """Point *cert_id* at a CA of its own (as a pair whose B another CA signed)."""
+    ca = create_ca(cn=cn)
+    with app.app_context():
+        row = db.session.get(Certificate, cert_id)
+        row.caref = db.session.get(CA, ca['id']).refid
+        db.session.commit()
+    return ca['id']
+
+
+def test_the_partner_policy_holds_the_revocation_of_the_pair(app, auth_client, create_ca, create_user):
+    a, b = _pair(auth_client, create_ca, 'pair-partner-policy.example.com')
+    pid = _approval_policy(app, _move_to_new_ca(app, create_ca, b['id'], 'Pair CA2 revoke'), ['revocation'])
+    try:
+        operator = _login(app, create_user)
+        r = operator.post(f"/api/v2/certificates/{a['id']}/revoke", json={'reason': 'keyCompromise'})
+        assert r.status_code == 200, r.data
+        body = json.loads(r.data)['data']
+        assert body['approval_required'], r.data
+        assert _revoked(app, a['id'], b['id']) == [False, False]
+        r = operator.post('/api/v2/certificates/bulk/revoke', json={'ids': [a['id']]})
+        assert json.loads(r.data)['data']['pending_approval'][0]['id'] == a['id']
+        assert _revoked(app, a['id'], b['id']) == [False, False]
+        r = auth_client.post(f"/api/v2/approvals/{body['approval_id']}/approve", json={'comment': 'ok'})
+        assert r.status_code == 200, r.data
+        assert _revoked(app, a['id'], b['id']) == [True, True]
+    finally:
+        _drop_policy(app, pid)
+
+
+def test_the_partner_policy_holds_a_user_certificate_and_an_acme_revocation(
+        app, auth_client, create_ca, create_user):
+    from models import AuthCertificate
+    from services.approval_gate import revocation_policy_for
+    a, b = _pair(auth_client, create_ca, 'pair-partner-user.example.com')
+    pid = _approval_policy(app, _move_to_new_ca(app, create_ca, b['id'], 'Pair CA2 user'), ['revocation'])
+    try:
+        user = create_user()
+        with app.app_context():
+            cert = _x509(a)
+            enrolment = AuthCertificate(user_id=user['id'], cert_pem=a['pem'].encode(),
+                                        cert_serial=str(cert.serial_number),
+                                        cert_subject=cert.subject.rfc4514_string())
+            db.session.add(enrolment)
+            db.session.commit()
+            enrolment_id = enrolment.id
+            # What the ACME revokeCert route asks before revoking A (and B with it)
+            row_a, row_b = db.session.get(Certificate, a['id']), db.session.get(Certificate, b['id'])
+            assert revocation_policy_for(row_a) is None
+            assert revocation_policy_for(row_a, row_b).id == pid
+        operator = _login(app, create_user)
+        r = operator.post(f'/api/v2/user-certificates/{enrolment_id}/revoke', json={'reason': 'keyCompromise'})
+        assert r.status_code == 200, r.data
+        assert json.loads(r.data)['data']['approval_required'], r.data
+        assert _revoked(app, a['id'], b['id']) == [False, False]
+    finally:
+        _drop_policy(app, pid)
+        with app.app_context():
+            AuthCertificate.query.filter_by(cert_serial=str(_x509(a).serial_number)).delete()
+            db.session.commit()
+
+
+def test_two_policies_on_a_pair_refuse_the_operator(app, auth_client, create_ca, create_user):
+    a, b = _pair(auth_client, create_ca, 'pair-two-policies.example.com')
+    p1 = _approval_policy(app, _ca_id_of(app, a['id']), ['revocation', 'renewal'])
+    p2 = _approval_policy(app, _move_to_new_ca(app, create_ca, b['id'], 'Pair CA2 two'), ['revocation', 'renewal'])
+    try:
+        operator = _login(app, create_user)
+        r = operator.post(f"/api/v2/certificates/{a['id']}/revoke", json={'reason': 'keyCompromise'})
+        assert r.status_code == 409 and b'different policies' in r.data, r.data
+        r = operator.post(f"/api/v2/certificates/{a['id']}/renew", json={})
+        assert r.status_code == 409 and b'different policies' in r.data, r.data
+        assert (_pending(app, p1), _pending(app, p2)) == (0, 0)
+        assert _revoked(app, a['id'], b['id']) == [False, False]
+    finally:
+        _drop_policy(app, p1)
+        _drop_policy(app, p2)
+
+
+def test_the_partner_policy_holds_the_renewal_of_the_pair(app, auth_client, create_ca, create_user):
+    a, b = _pair(auth_client, create_ca, 'pair-partner-renewal.example.com')
+    pid = _approval_policy(app, _move_to_new_ca(app, create_ca, b['id'], 'Pair CA2 renew'), ['renewal'])
+    try:
+        operator = _login(app, create_user)
+        r = operator.post(f"/api/v2/certificates/{a['id']}/renew", json={})
+        assert r.status_code == 200, r.data
+        assert json.loads(r.data)['data']['approval_required'], r.data
+        r = operator.post('/api/v2/certificates/bulk/renew', json={'ids': [a['id']]})
+        assert json.loads(r.data)['data']['pending_approval'][0]['id'] == a['id']
+        assert [s[1] for s in _state(app, a['id'], b['id'])] == [0, 0]
+    finally:
+        _drop_policy(app, pid)
+
+
+# ---- the scheduler renews a pair once ---------------------------------------------
+
+@pytest.mark.parametrize('order', ['ab', 'ba'])
+def test_the_scheduler_renews_a_listed_pair_once(app, auth_client, create_ca, monkeypatch, order):
+    from services.auto_renewal_service import AutoRenewalService
+    a, b = _pair(auth_client, create_ca, f'pair-scheduler-{order}.example.com')
+    ids = [a['id'], b['id']] if order == 'ab' else [b['id'], a['id']]
+    monkeypatch.setattr(AutoRenewalService, 'get_renewal_config', staticmethod(
+        lambda: {'enabled': True, 'notify_on_renewal': False, 'notify_on_failure': False}))
+    monkeypatch.setattr(AutoRenewalService, 'waiting_certificates', staticmethod(lambda config: {}))
+    monkeypatch.setattr(AutoRenewalService, 'get_certificates_for_renewal', staticmethod(
+        lambda: [db.session.get(Certificate, i) for i in ids]))
+    with app.app_context():
+        stats = AutoRenewalService.run_auto_renewal()
+    assert (stats['renewed'], stats['failed'], stats['errors']) == (2, 0, []), stats
+    (_sa, times_a, new_a), (_sb, times_b, new_b) = _state(app, a['id'], b['id'])
+    assert (times_a, times_b) == (1, 1)
+    assert related_cert.references(new_b, new_a)
+
+
+def test_the_scheduler_queues_a_pair_held_by_the_partner_policy_once(app, auth_client, create_ca, monkeypatch):
+    from services.auto_renewal_service import AutoRenewalService
+    a, b = _pair(auth_client, create_ca, 'pair-scheduler-held.example.com')
+    pid = _approval_policy(app, _move_to_new_ca(app, create_ca, b['id'], 'Pair CA2 scheduler'), ['renewal'])
+    monkeypatch.setattr(AutoRenewalService, 'get_renewal_config', staticmethod(
+        lambda: {'enabled': True, 'notify_on_renewal': False, 'notify_on_failure': False}))
+    monkeypatch.setattr(AutoRenewalService, 'waiting_certificates', staticmethod(lambda config: {}))
+    monkeypatch.setattr(AutoRenewalService, 'get_certificates_for_renewal', staticmethod(
+        lambda: [db.session.get(Certificate, i) for i in (a['id'], b['id'])]))
+    try:
+        with app.app_context():
+            stats = AutoRenewalService.run_auto_renewal()
+        assert (stats['renewed'], stats['queued'], stats['failed']) == (0, 2, 0), stats
+        assert _pending(app, pid) == 1
+        assert [s[1] for s in _state(app, a['id'], b['id'])] == [0, 0]
+        with app.app_context():
+            stats = AutoRenewalService.run_auto_renewal()  # the request waits: nothing more
+        assert (stats['renewed'], stats['failed']) == (0, 0) and _pending(app, pid) == 1, stats
+    finally:
+        _drop_policy(app, pid)

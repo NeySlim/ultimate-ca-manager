@@ -277,6 +277,11 @@ def _renewal_members(cert):
     return list(anchor_first(cert, partner))
 
 
+def renewal_partner(cert):
+    """The other member of the pair renewed with ``cert``, None when it renews alone."""
+    return next((m for m in _renewal_members(cert) if m is not cert), None)
+
+
 def _current_related(row):
     """The certificate A that *row*'s certificate names, while A is held, valid and
     unrevoked; None otherwise (the renewed certificate then names nothing)."""

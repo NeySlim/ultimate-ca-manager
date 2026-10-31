@@ -42,21 +42,44 @@ def certificate_identity(pem_b64: str) -> Tuple[Optional[str], list]:
     return cn, dns
 
 
+class PairApprovalConflict(Exception):
+    """Both members of a related pair require approval, under different policies:
+    one request cannot carry both decisions."""
+
+    def __init__(self, policy, other):
+        super().__init__(
+            f'The two certificates of this related pair require approval under different '
+            f'policies ("{policy.name}" and "{other.name}"): an administrator must perform it')
+
+
+def pair_policy(policy, other):
+    """The policy governing an operation on a related pair: the asked member's,
+    else its partner's; :class:`PairApprovalConflict` when both differ."""
+    if other is None or (policy is not None and policy.id == other.id):
+        return policy
+    if policy is None:
+        return other
+    raise PairApprovalConflict(policy, other)
+
+
 def queue_if_approval_required(user, *, ca_id, template_id, cn, san_list,
                                request_type: str, request_data: dict,
                                comment: Optional[str] = None,
-                               operation='issuance',
+                               operation='issuance', partner_policy=None,
                                ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
     """``(policy, approval)`` when a policy governing *operation* (a name or
     a tuple of them) requires approval for this request (queued), else
     ``(None, None)``. Administrators bypass, as on the issue form; ``user``
-    None is the renewal scheduler, which never does. Any evaluation error propagates: the caller must fail
-    closed (never act on a policy it could not evaluate)."""
+    None is the renewal scheduler, which never does. ``partner_policy`` returns
+    the policy of the other member of a pair the operation also acts on. Any
+    evaluation error propagates: the caller must fail closed (never act on a policy it could not evaluate)."""
     if getattr(user, 'role', None) == 'admin':
         return None, None
     policy = PolicyEvaluationService.check_approval_required(
         ca_id=ca_id, template_id=template_id, cn=cn, san_list=list(san_list or []),
         operation=operation)
+    if partner_policy is not None:
+        policy = pair_policy(policy, partner_policy())
     if policy is None:
         return None, None
     approval = PolicyEvaluationService.create_approval_request(
@@ -86,22 +109,30 @@ def issuer_scope(ca):
     return ids or (ca.id,)
 
 
+def renewal_policy_for(cert, operation=RENEWAL_OPERATIONS) -> Optional[CertificatePolicy]:
+    """The policy that requires approval to renew ``cert``, whoever asks."""
+    ca_id, template_id, cn, dns = certificate_scope(cert)
+    return PolicyEvaluationService.check_approval_required(
+        ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns, operation=operation)
+
+
 def queue_renewal(user, cert, *, validity_days=None, comment: Optional[str] = None,
-                  scheduled_by: Optional[str] = None
+                  scheduled_by: Optional[str] = None, partner=None
                   ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
-    """Queue the renewal of ``cert`` when a policy requires approval for it:
-    ``(policy, approval)``, else ``(None, None)``. ``scheduled_by`` names the
-    scheduler for the requests it queues (no user, the held key re-signed),
-    which only renewal policies hold."""
+    """Queue the renewal of ``cert`` when a policy requires approval for it, or
+    for its *partner* renewed with it: ``(policy, approval)``, else ``(None, None)``.
+    ``scheduled_by`` names the scheduler for the requests it queues (no user,
+    the held key re-signed), which only renewal policies hold."""
     ca_id, template_id, cn, dns = certificate_scope(cert)
     data = {'certificate_id': cert.id, 'ca_id': ca_id, 'cn': cn,
             'cert_type': cert.cert_type, 'validity_days': validity_days}
     if scheduled_by:
         data.update(trigger='auto', requested_by=scheduled_by, serial_number=cert.serial_number)
+    operation = 'renewal' if scheduled_by else RENEWAL_OPERATIONS
     return queue_if_approval_required(
         user, ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns,
-        request_type='renewal', request_data=data, comment=comment,
-        operation='renewal' if scheduled_by else RENEWAL_OPERATIONS)
+        request_type='renewal', request_data=data, comment=comment, operation=operation,
+        partner_policy=(lambda: renewal_policy_for(partner, operation)) if partner is not None else None)
 
 
 def _revocation_scope(ca_id):
@@ -110,26 +141,29 @@ def _revocation_scope(ca_id):
     return (issuer_scope(db.session.get(CA, ca_id)) if ca_id else None) or ca_id
 
 
-def revocation_policy_for(cert) -> Optional[CertificatePolicy]:
-    """The policy that requires approval to revoke ``cert``, whoever asks
-    (for the callers that cannot queue a request: ACME, enrolment removal)."""
+def revocation_policy_for(cert, partner=None) -> Optional[CertificatePolicy]:
+    """The policy that requires approval to revoke ``cert``, or the *partner*
+    revoked with it, whoever asks (for the callers that cannot queue a request:
+    ACME, enrolment removal)."""
     ca_id, template_id, cn, dns = certificate_scope(cert)
-    return PolicyEvaluationService.check_approval_required(
+    policy = PolicyEvaluationService.check_approval_required(
         ca_id=_revocation_scope(ca_id), template_id=template_id, cn=cn, san_list=dns, operation='revocation')
+    return policy or (revocation_policy_for(partner) if partner is not None else None)
 
 
 def queue_revocation(user, cert, *, reason: str, invalidity_at=None,
-                     comment: Optional[str] = None, auth_certificate_id=None
+                     comment: Optional[str] = None, auth_certificate_id=None, partner=None
                      ) -> Tuple[Optional[CertificatePolicy], Optional[ApprovalRequest]]:
     """Queue the revocation of ``cert`` when a policy requires approval for
-    it: ``(policy, approval)``, else ``(None, None)``. The serial is kept so
-    the approval revokes the certificate that was asked about, never one
-    renewed in its place."""
+    it, or for the *partner* revoked with it: ``(policy, approval)``, else
+    ``(None, None)``. The serial is kept so the approval revokes the
+    certificate that was asked about, never one renewed in its place."""
     from utils.datetime_utils import utc_isoformat
     ca_id, template_id, cn, dns = certificate_scope(cert)
     return queue_if_approval_required(
         user, ca_id=_revocation_scope(ca_id), template_id=template_id, cn=cn, san_list=dns,
         request_type='revocation', operation='revocation', comment=comment,
+        partner_policy=(lambda: revocation_policy_for(partner)) if partner is not None else None,
         request_data={'certificate_id': cert.id, 'serial_number': cert.serial_number,
                       'ca_id': ca_id, 'cn': cn or cert.common_name, 'reason': reason,
                       'invalidity_at': utc_isoformat(invalidity_at) if invalidity_at else None,
