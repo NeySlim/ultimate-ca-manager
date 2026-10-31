@@ -82,15 +82,21 @@ class TestTheScreensOfferWhatTheApiAccepts:
     def test_both_registries_list_the_same_keys_in_the_same_order(self, js_registry):
         assert [r['label'] for r in js_registry] == list(key_algorithms.labels())
 
-    def test_mldsa_is_generated_in_software_with_the_api_contract(self, js_registry):
+    def test_mldsa_is_generated_in_software_and_on_hsms_with_the_api_contract(self, js_registry):
         pq = [r for r in js_registry if r['family'] == 'ML-DSA']
         assert [r['label'] for r in pq] == ['ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']
         for row in pq:
             param = row['label'].rsplit('-', 1)[1]
             assert (row['group'], row['bits'], row['digest'], row['generate']) == ('pq', None, None, True)
             assert (row['issue'], row['ca'], row['csr']) == (['ml-dsa', param], ['ML-DSA', param], row['label'])
-            # No HSM provider generates ML-DSA yet
-            assert row['providers'] == []
+            # The HSM types whose provider signs ML-DSA; Azure Key Vault has none
+            assert row['providers'] == ['pkcs11', 'openbao', 'google-kms']
+        from services.hsm import HsmService
+        for provider_type, provider_class in HsmService._provider_registry.items():
+            if provider_type in pq[0]['providers']:
+                assert provider_class.SIGNS_ML_DSA, provider_type
+            elif provider_type == 'azure-keyvault':
+                assert not provider_class.SIGNS_ML_DSA
 
     def test_each_form_value_parses_to_the_same_key(self, js_registry):
         for row in _generated(js_registry):

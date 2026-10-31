@@ -18,14 +18,19 @@ describe('key algorithm registry', () => {
     expect(labels(KEY_ALGORITHMS).slice(-5)).toEqual(['ED25519', 'ED448', 'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87'])
   })
 
-  it('names ML-DSA by security category, without a digest, outside FIPS, generated in software', () => {
+  it('names ML-DSA by security category, without a digest, outside FIPS, generated in software and on HSMs', () => {
     expect(KEY_ALGORITHMS.filter(a => a.group === GROUP_PQ).map(a => [a.label, a.securityLevel]))
       .toEqual([['ML-DSA-44', 2], ['ML-DSA-65', 3], ['ML-DSA-87', 5]])
     expect(findAlgorithm('ML-DSA-65')).toMatchObject({
       family: 'ML-DSA', bits: null, digest: null, fips: false, generate: true,
       issue: ['ml-dsa', '65'], ca: ['ML-DSA', '65'], csr: 'ML-DSA-65',
     })
-    for (const provider of ['pkcs11', 'openbao', 'azure', 'google', '']) {
+    // Held by the HSM types whose provider signs ML-DSA, none on Azure Key Vault
+    for (const provider of ['pkcs11', 'openbao', 'google-kms']) {
+      expect(listAlgorithms({ generate: true, provider }).filter(a => a.group === GROUP_PQ).map(a => a.label))
+        .toEqual(['ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87'])
+    }
+    for (const provider of ['azure-keyvault', 'aws-cloudhsm', '']) {
       expect(listAlgorithms({ generate: true, provider }).some(a => a.group === GROUP_PQ)).toBe(false)
     }
     expect(listAlgorithms({ fips: true }).some(a => a.group === GROUP_PQ)).toBe(false)

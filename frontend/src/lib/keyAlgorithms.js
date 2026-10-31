@@ -54,11 +54,16 @@ const eddsa = (label, i18nKey) => ({
   exportExcluded: [],
 })
 
-// ML-DSA (FIPS 204): generated in software only (providers: []), no digest; named by
-// algorithmName ('ML-DSA-65 (level 3)'), so no i18n keys of its own
+// ML-DSA (FIPS 204): software and the HSM types whose provider signs it (not Azure Key
+// Vault), no digest; named by algorithmName ('ML-DSA-65 (level 3)'), no i18n keys of its own
+export const ML_DSA_PROVIDERS = ['pkcs11', 'openbao', 'google-kms']
+// Mapped from the provider's API but not yet run against the real service
+export const ML_DSA_UNTESTED_PROVIDERS = ['google-kms']
+
 const mldsa = (param, securityLevel) => ({
   label: `ML-DSA-${param}`, bits: null, family: 'ML-DSA', group: GROUP_PQ, display: `ML-DSA-${param}`,
-  securityLevel, digest: null, fips: false, generate: true, providers: [],
+  securityLevel, digest: null, fips: false, generate: true, providers: ML_DSA_PROVIDERS,
+  untestedProviders: ML_DSA_UNTESTED_PROVIDERS,
   issue: ['ml-dsa', param], ca: ['ML-DSA', param], csr: `ML-DSA-${param}`,
   curveParam: null, i18nKey: null, sizeKey: null, csrKey: null,
   exportExcluded: PQ_EXPORT_EXCLUDED,
@@ -125,6 +130,10 @@ export function algorithmName(row, t, key = 'i18nKey') {
 export const isFipsApproved = (label) => findAlgorithm(label)?.fips === true
 
 export const isBrainpool = (label) => findAlgorithm(label)?.group === GROUP_BRAINPOOL
+
+/** Whether *label* on HSM type *provider* is mapped but not yet tested against the service. */
+export const isUntestedOn = (label, provider) =>
+  !!provider && !!findAlgorithm(label)?.untestedProviders?.includes(provider)
 
 // SLH-DSA is read by OID only (no registry row): its API name starts 'SLH-DSA-'
 export const isPostQuantum = (label) =>
