@@ -259,6 +259,17 @@ def request_certificate():
         if not src_cert or not src_cert.prv:
             return error_response('source_certificate_id must reference a certificate with a stored private key', 400)
 
+    # Only a key UCM generates has a type to record; the setting is the default.
+    generates_key = key_source == 'generate' or (
+        key_source == 'reuse' and not data.get('source_certificate_id'))
+    if generates_key and not key_type:
+        try:
+            key_type = AcmeClientService._get_default_key_type()
+        except ValueError as exc:
+            return error_response(str(exc), 400)
+        if fips_key_type_refusal(key_type):
+            return error_response(fips_key_type_refusal(key_type), 400)
+
     # Create order
     try:
         client = AcmeClientService.for_issuance(
@@ -276,10 +287,7 @@ def request_certificate():
 
         # Persist key options on order
         order.key_source = key_source
-        # Only a key UCM generates has a type to record; the setting is the default.
-        generates_key = key_source == 'generate' or (
-            key_source == 'reuse' and not data.get('source_certificate_id'))
-        order.key_type = (key_type or client._get_default_key_type()) if generates_key else None
+        order.key_type = key_type if generates_key else None
         if key_source == 'csr':
             order.csr_pem = csr_pem.strip() + '\n'
         if key_source == 'reuse' and data.get('source_certificate_id'):

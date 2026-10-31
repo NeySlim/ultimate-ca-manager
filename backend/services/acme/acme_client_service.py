@@ -66,6 +66,9 @@ CERT_KEY_TYPES = {
     # Certificate keys only: an ACME account key has no Brainpool JWS algorithm
     'EC-BP256': lambda: key_algorithms.generate('EC-BP256'),
     'EC-BP384': lambda: key_algorithms.generate('EC-BP384'),
+    # Certificate keys only, registered when this build has ML-DSA; FIPS mode refuses them
+    **{label: (lambda label=label: key_algorithms.generate(label))
+       for label in key_algorithms.labels('ML-DSA')},
 }
 
 
@@ -1652,15 +1655,25 @@ class AcmeClientService:
     # Configuration Helpers
     # =========================================================================
     
-    def _get_default_key_type(self) -> str:
-        """Get the default certificate key type from settings"""
+    @staticmethod
+    def _get_default_key_type() -> str:
+        """The certificate key type setting, RSA-2048 when unset; ValueError when this
+        instance cannot generate the configured type (never another type in its place)."""
         cfg = SystemConfig.query.filter_by(key='acme.client.key_type').first()
-        kt = cfg.value if cfg else 'RSA-2048'
-        return kt if kt in CERT_KEY_TYPES else 'RSA-2048'
+        kt = (cfg.value or '').strip() if cfg else ''
+        if not kt:
+            return 'RSA-2048'
+        if kt not in CERT_KEY_TYPES:
+            raise ValueError(f'Configured ACME certificate key type {kt} is not supported here '
+                             f'(one of {", ".join(CERT_KEY_TYPES)})')
+        return kt
 
     def _generate_cert_key(self, order):
         """A new key of the order's type: ``(key, None)``, or ``(None, error)`` when unsupported."""
-        key_type = getattr(order, 'key_type', None) or self._get_default_key_type()
+        try:
+            key_type = getattr(order, 'key_type', None) or self._get_default_key_type()
+        except ValueError as exc:
+            return None, str(exc)
         generator = CERT_KEY_TYPES.get(key_type)
         if generator is None:
             return None, f'Unsupported certificate key type on order: {key_type}'

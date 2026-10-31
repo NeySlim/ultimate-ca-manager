@@ -6,6 +6,7 @@ import re
 import shutil
 import subprocess
 import uuid
+from pathlib import Path
 
 import pytest
 from cryptography import x509
@@ -244,3 +245,221 @@ class TestRevokeMldsaCertificate:
         assert 'ML-DSA-44' in body['detail'] and 'account that ordered it' in body['detail'], body
         with app.app_context():
             assert not db.session.get(Certificate, cert_id).revoked
+
+
+# ---------------------------------------------------------------------------
+# ACME client
+# ---------------------------------------------------------------------------
+
+REGISTRY_JS = Path(__file__).resolve().parents[2] / 'frontend' / 'src' / 'lib' / 'keyAlgorithms.js'
+
+
+@pytest.fixture(scope='module')
+def js_key_lists():
+    """KEY_ALGORITHMS and ACME_CLIENT_LABELS as the screens read them, evaluated by node."""
+    node = shutil.which('node')
+    if node is None:
+        pytest.skip('node is not installed')
+    out = subprocess.run(
+        [node, '--input-type=module', '-e',
+         f'import {{ KEY_ALGORITHMS, ACME_CLIENT_LABELS }} from {json.dumps("file://" + str(REGISTRY_JS))};'
+         'console.log(JSON.stringify({rows: KEY_ALGORITHMS, acme: ACME_CLIENT_LABELS}))'],
+        capture_output=True, text=True, timeout=60, check=True)
+    return json.loads(out.stdout)
+
+
+def _js_mldsa_labels(js):
+    labels = [r['label'] for r in js['rows'] if r['family'] == 'ML-DSA' and r['generate']]
+    assert labels, 'the frontend registry lists no ML-DSA key'
+    return labels
+
+
+class TestClientKeyTypes:
+    def test_the_client_generates_every_mldsa_key_of_the_registry(self, js_key_lists):
+        from services.acme.acme_client_service import CERT_KEY_TYPES
+        assert set(_js_mldsa_labels(js_key_lists)) <= set(CERT_KEY_TYPES)
+        assert set(js_key_lists['acme']) <= set(CERT_KEY_TYPES)
+        for label in _js_mldsa_labels(js_key_lists):
+            assert key_algorithms.label_for_private_key(CERT_KEY_TYPES[label]()) == label
+
+    def test_an_mldsa_csr_is_signed_without_a_digest(self, js_key_lists):
+        from services.acme.acme_client_service import AcmeClientService
+        for label in _js_mldsa_labels(js_key_lists):
+            key = key_algorithms.generate(label)
+            der = b64.urlsafe_b64decode(
+                AcmeClientService._build_csr_b64(key, ['pq.example.com'], 'pq.example.com') + '==')
+            csr = x509.load_der_x509_csr(der)
+            assert csr.is_signature_valid and csr.signature_hash_algorithm is None, label
+            assert key_algorithms.label_for_public_key(csr.public_key()) == label
+
+    def test_fips_mode_refuses_them_at_both_doors(self, auth_client, monkeypatch, js_key_lists):
+        import fips_mode
+        from services.acme.acme_client_service import fips_key_type_refusal
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        for label in _js_mldsa_labels(js_key_lists):
+            assert 'FIPS' in fips_key_type_refusal(label)
+            r = auth_client.patch('/api/v2/acme/client/settings', content_type='application/json',
+                                  data=json.dumps({'key_type': label}))
+            assert r.status_code == 400 and 'FIPS' in r.get_json()['message'], label
+            r = auth_client.post('/api/v2/acme/client/request', json={
+                'domains': ['fips.pq.example.com'], 'email': 'admin@example.com',
+                'challenge_type': 'http-01', 'environment': 'staging', 'key_type': label})
+            assert r.status_code == 400 and 'FIPS' in r.get_json()['message'], label
+
+
+@pytest.fixture
+def client_key_type(app):
+    with app.app_context():
+        previous = getattr(SystemConfig.query.filter_by(key='acme.client.key_type').first(), 'value', None)
+
+    def _set(value):
+        with app.app_context():
+            SystemConfig.query.filter_by(key='acme.client.key_type').delete()
+            db.session.add(SystemConfig(key='acme.client.key_type', value=value))
+            db.session.commit()
+    yield _set
+    with app.app_context():
+        SystemConfig.query.filter_by(key='acme.client.key_type').delete()
+        if previous is not None:
+            db.session.add(SystemConfig(key='acme.client.key_type', value=previous))
+        db.session.commit()
+
+
+class TestUnknownConfiguredKeyType:
+    """A setting this instance cannot generate is refused, never replaced by RSA-2048."""
+
+    def test_the_default_raises(self, app, client_key_type):
+        from services.acme.acme_client_service import AcmeClientService
+        client_key_type('ML-DSA-99')
+        with app.app_context():
+            with pytest.raises(ValueError, match='ML-DSA-99'):
+                AcmeClientService._get_default_key_type()
+
+    def test_finalize_reports_it_instead_of_signing_rsa(self, app, client_key_type):
+        from models.acme_models import AcmeClientOrder
+        from tests.test_acme_client_key_type import _finalize as client_finalize
+        client_key_type('ML-DSA-99')
+        with app.app_context():
+            order = AcmeClientOrder(
+                domains=json.dumps(['legacy.pq.example.com']), challenge_type='http-01',
+                environment='staging', status='ready', key_source='generate', key_type=None,
+                order_url='https://ca.example/order/pq', finalize_url='https://ca.example/order/pq/finalize')
+            (ok, msg, _), csr = client_finalize(order)
+        assert not ok and 'ML-DSA-99' in msg
+        assert csr is None
+
+    def test_a_request_is_refused_before_any_upstream_order(self, app, auth_client, client_key_type,
+                                                            monkeypatch):
+        from services.acme.acme_client_service import AcmeClientService
+        client_key_type('ML-DSA-99')
+        monkeypatch.setattr(AcmeClientService, 'for_issuance', classmethod(
+            lambda cls, **_k: pytest.fail('an upstream order was started')))
+        r = auth_client.post('/api/v2/acme/client/request', json={
+            'domains': ['unknown.pq.example.com'], 'email': 'admin@example.com',
+            'challenge_type': 'http-01', 'environment': 'staging'})
+        assert r.status_code == 400 and 'ML-DSA-99' in r.get_json()['message']
+
+
+class _LoopResponse:
+    """A Flask test response under the requests.Response names the ACME client reads."""
+
+    def __init__(self, resp):
+        self.status_code, self.headers, self.content = resp.status_code, resp.headers, resp.data
+        self.text = resp.get_data(as_text=True)
+
+    def json(self):
+        return json.loads(self.content)
+
+    def raise_for_status(self):
+        if self.status_code >= 400:
+            raise RuntimeError(f'HTTP {self.status_code}')
+
+
+@pytest.fixture
+def acme_loop(app, monkeypatch):
+    """The ACME client's HTTP routed to UCM's own ACME server through the test client."""
+    from services.acme import outbound
+    from utils import ssrf_protection
+    web = app.test_client()
+
+    def _path(url):
+        assert url.startswith('http://localhost/'), url
+        return url[len('http://localhost'):]
+
+    def _post(url, json=None, **_kw):
+        return _LoopResponse(web.post(_path(url), data=_dumps(json), content_type='application/jose+json'))
+
+    _dumps = json.dumps
+    monkeypatch.setattr(outbound, 'validate_outbound_acme_url', lambda url: None)
+    monkeypatch.setattr(ssrf_protection, 'safe_request_get', lambda url, **_kw: _LoopResponse(web.get(_path(url))))
+    monkeypatch.setattr(ssrf_protection, 'safe_request_head', lambda url, **_kw: _LoopResponse(web.head(_path(url))))
+    monkeypatch.setattr(ssrf_protection, 'safe_request_post', _post)
+    return web
+
+
+@pytest.mark.parametrize('label', ['ML-DSA-44', 'ML-DSA-65'])
+def test_client_orders_an_mldsa_certificate_from_ucm_itself(app, acme_loop, signing_ca, mldsa_issuing_ca,
+                                                             monkeypatch, label):
+    from models.acme_models import AcmeClientOrder
+    from services.acme.acme_client_service import AcmeClientService
+    signing_ca(mldsa_issuing_ca)
+    imported = {}
+
+    def _keep(self, cert_pem, key_pem, domains, source='acme_client'):
+        imported.update(cert=cert_pem, key=key_pem)
+        return 4242
+    monkeypatch.setattr(AcmeClientService, '_import_certificate', _keep)
+    domain = f'loop-{label.lower()}.pq.example.com'
+    from models.acme_client_account import AcmeClientAccount
+    with app.app_context():
+        account = AcmeClientAccount(directory_url='http://localhost/acme/directory', label='UCM loop',
+                                    email='loop@example.com', account_key_algorithm='RS256',
+                                    is_default=False)
+        db.session.add(account)
+        db.session.commit()
+        account_id = account.id
+        svc = AcmeClientService(account=account)
+        ok, msg, order = svc.create_order([domain], 'loop@example.com', challenge_type='http-01')
+        assert ok, msg
+        # The challenge is not the point here: the server marks its authorization valid
+        server_order = AcmeOrder.query.filter_by(order_id=order.order_url.rstrip('/').rsplit('/', 1)[1]).first()
+        for authz in server_order.authorizations:
+            authz.status = 'valid'
+        server_order.status = 'ready'
+        order.key_source, order.key_type = 'generate', label
+        db.session.commit()
+        ok, msg, cert_id = svc.finalize_order(order)
+        assert ok, msg
+        assert cert_id == 4242
+        leaf = x509.load_pem_x509_certificate(imported['cert'].encode())
+        key = serialization.load_pem_private_key(imported['key'].encode(), None)
+        assert key_algorithms.label_for_public_key(leaf.public_key()) == label
+        assert leaf.public_key() == key.public_key()
+        AcmeClientOrder.query.filter_by(acme_client_account_id=account_id).delete()
+        AcmeClientAccount.query.filter_by(id=account_id).delete()
+        db.session.commit()
+
+
+def test_an_upstream_refusal_is_reported_as_is(app):
+    """Against another CA, its refusal of an ML-DSA request reaches the operator unchanged."""
+    from models.acme_models import AcmeClientOrder
+    from services.acme.acme_client_service import AcmeClientService
+    detail = 'Error finalizing order :: key type ML-DSA-65 is not supported'
+
+    class _Refusal:
+        status_code = 400
+        headers = {}
+
+        def json(self):
+            return {'type': 'urn:ietf:params:acme:error:badPublicKey', 'detail': detail}
+
+    with app.app_context():
+        order = AcmeClientOrder(
+            domains=json.dumps(['upstream.pq.example.com']), challenge_type='http-01',
+            environment='staging', status='ready', key_source='generate', key_type='ML-DSA-65',
+            order_url='https://ca.example/order/up', finalize_url='https://ca.example/order/up/finalize')
+        svc = object.__new__(AcmeClientService)
+        svc.check_order_status = lambda o: ('ready', {})
+        svc._post = lambda url, payload: _Refusal()
+        ok, msg, _ = AcmeClientService.finalize_order(svc, order)
+    assert not ok and msg == f'Finalization failed: {detail}'
