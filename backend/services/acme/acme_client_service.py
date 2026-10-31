@@ -80,6 +80,11 @@ def fips_key_type_refusal(label):
     return None
 
 
+def fips_private_key_refusal(private_key):
+    """Why FIPS mode refuses signing with *private_key* (a reused key), or None."""
+    return fips_key_type_refusal(key_algorithms.label_for_private_key(private_key))
+
+
 def csr_identifiers_match_order(
     csr: x509.CertificateSigningRequest,
     order_identifiers: List[str],
@@ -1506,6 +1511,9 @@ class AcmeClientService:
                         cert_key = load_private_key_from_certificate(src_cert)
                     except ValueError as exc:
                         return False, str(exc), None
+                    refusal = fips_private_key_refusal(cert_key)
+                    if refusal:
+                        return False, refusal, None
                     csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
             else:
                 cert_key, key_error = self._generate_cert_key(order)

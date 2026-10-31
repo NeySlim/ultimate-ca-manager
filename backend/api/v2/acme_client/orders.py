@@ -27,6 +27,7 @@ from services.acme.acme_client_service import (
     CERT_KEY_TYPES,
     csr_identifiers_match_order,
     fips_key_type_refusal,
+    fips_private_key_refusal,
 )
 from services.audit_service import AuditService
 from services.acme.http01 import wait_for_http01
@@ -258,6 +259,14 @@ def request_certificate():
         src_cert = db.session.get(Certificate, src_id)
         if not src_cert or not src_cert.prv:
             return error_response('source_certificate_id must reference a certificate with a stored private key', 400)
+        from cryptography.exceptions import UnsupportedAlgorithm
+        from utils.acme_csr import load_private_key_from_certificate
+        try:
+            refusal = fips_private_key_refusal(load_private_key_from_certificate(src_cert))
+        except (ValueError, UnsupportedAlgorithm) as exc:
+            return error_response(str(exc), 400)
+        if refusal:
+            return error_response(refusal, 400)
 
     # Only a key UCM generates has a type to record; the setting is the default.
     generates_key = key_source == 'generate' or (

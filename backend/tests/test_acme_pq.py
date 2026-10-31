@@ -454,6 +454,74 @@ class TestUnknownConfiguredKeyType:
         assert r.status_code == 400 and 'ML-DSA-99' in r.get_json()['message']
 
 
+@pytest.fixture
+def key_holder(app):
+    """Stores a certificate row holding a private key of the given label, made before FIPS mode."""
+    made = []
+
+    def _store(label):
+        alg = key_algorithms.get(label)
+        key = alg.private_class.generate() if alg.family == 'ML-DSA' else alg.generate()
+        pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                                serialization.NoEncryption())
+        with app.app_context():
+            row = Certificate(refid=uuid.uuid4().hex[:13], descr=f'reuse {label}',
+                              prv=b64.b64encode(pem).decode())
+            db.session.add(row)
+            db.session.commit()
+            made.append(row.id)
+            return row.id
+    yield _store
+    with app.app_context():
+        Certificate.query.filter(Certificate.id.in_(made)).delete(synchronize_session=False)
+        db.session.commit()
+
+
+class TestFipsReusedKey:
+    """FIPS mode refuses a reused ML-DSA key as it refuses generating one."""
+
+    @pytest.fixture(autouse=True)
+    def _fips(self, monkeypatch):
+        import fips_mode
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+
+    @pytest.mark.parametrize('label, refused', [('ML-DSA-65', True), ('RSA-2048', False)])
+    def test_the_request_is_refused_before_any_upstream_order(self, auth_client, monkeypatch,
+                                                              key_holder, label, refused):
+        from services.acme.acme_client_service import AcmeClientService
+        started = []
+
+        def for_issuance(cls, **_k):
+            started.append(True)
+            raise RuntimeError('upstream not reachable in tests')
+        monkeypatch.setattr(AcmeClientService, 'for_issuance', classmethod(for_issuance))
+        r = auth_client.post('/api/v2/acme/client/request', json={
+            'domains': ['reuse.pq.example.com'], 'email': 'admin@example.com',
+            'challenge_type': 'http-01', 'environment': 'staging',
+            'key_source': 'reuse', 'source_certificate_id': key_holder(label)})
+        message = r.get_json().get('message', '')
+        if refused:
+            assert r.status_code == 400 and 'FIPS' in message, r.get_json()
+            assert not started
+        else:
+            assert started and 'FIPS' not in message, r.get_json()
+
+    def test_finalize_and_renewal_do_not_sign_with_it(self, app, key_holder):
+        from models.acme_models import AcmeClientOrder
+        from tests.test_acme_client_key_type import _finalize as client_finalize
+        src_id = key_holder('ML-DSA-65')
+        with app.app_context():
+            for field in ('source_certificate_id', 'certificate_id'):
+                order = AcmeClientOrder(
+                    domains=json.dumps(['reuse.pq.example.com']), challenge_type='http-01',
+                    environment='staging', status='ready', key_source='reuse',
+                    order_url='https://ca.example/order/r', finalize_url='https://ca.example/order/r/finalize',
+                    **{field: src_id})
+                (ok, msg, _), csr = client_finalize(order)
+                assert not ok and 'FIPS' in msg, (field, msg)
+                assert csr is None, field
+
+
 class _LoopResponse:
     """A Flask test response under the requests.Response names the ACME client reads."""
 
