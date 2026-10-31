@@ -231,6 +231,11 @@ class CASigningMixin:
         # Increment CA serial
         ca.serial = (ca.serial or 0) + 1
         try:
+            # RFC 9763: the A a verified request named, as the Sign CSR path records it
+            from services.cert.related_pair import link_issued
+            db.session.flush()
+            link_issued(new_cert, cert_obj, csr.public_bytes(serialization.Encoding.DER),
+                        replaces=supersedes)
             db.session.commit()
         except Exception as _commit_err:
             db.session.rollback()

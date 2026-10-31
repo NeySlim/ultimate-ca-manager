@@ -1,8 +1,9 @@
 """Certificates bound by RFC 9763: B carries id-pe-relatedCert naming A.
 
 ``related_certificate_id`` on B names A; on A it names B once the pair is
-mutual (the hybrid issue form, or the first B a request ties to A). The pair
-revokes and renews together only when the link is mutual.
+mutual (the hybrid issue form, or the first B a request ties to A through Sign
+CSR, ACME, EST or WSTEP). The pair revokes and renews together only when the
+link is mutual.
 """
 import base64
 import logging
@@ -110,10 +111,26 @@ def verify_request(req, now=None):
         raise RelatedCertificateRefused('The related certificate was not issued by a CA of this instance')
     if ca.revoked_in_chain:
         raise RelatedCertificateRefused('The CA of the related certificate is revoked')
+    _check_location(req, cert_a)
     if not related_cert.request_signature_valid(req, cert_a.public_key()):
         raise RelatedCertificateRefused(
             'The relatedCertRequest signature does not verify with the related certificate key')
     return row, cert_a
+
+
+def _check_location(req, cert_a):
+    """RFC 9763 §3.2: a certificate carried in locationInfo must be A. Any other
+    URI is not fetched: the copy held here, found by issuer and serial, stands in for it."""
+    for uri in related_cert.location_uris(req):
+        if uri[:5].lower() != 'data:':
+            continue
+        try:
+            located = related_cert.data_url_certificates(uri)
+        except related_cert.RelatedCertError as e:
+            raise RelatedCertificateRefused(str(e)) from e
+        if located[0] != cert_a:
+            raise RelatedCertificateRefused(
+                'The certificate in the relatedCertRequest locationInfo is not the related certificate')
 
 
 def builder_purposes(builder):
@@ -190,9 +207,10 @@ def anchor_first(row, partner):
     return row, partner
 
 
-def link_issued(b_row, cert_b, csr_der):
+def link_issued(b_row, cert_b, csr_der, replaces=None):
     """Record on *b_row* the A its request named and its certificate carries,
-    and on A the way back when A names no other; nothing without the link."""
+    and on A the way back when A names no other (or names *replaces*, the row
+    *b_row* supersedes); nothing without the link."""
     req = related_cert.request_from_csr_der(csr_der)
     if req is None or related_cert.read_related_certificate(cert_b) is None:
         return None
@@ -201,7 +219,8 @@ def link_issued(b_row, cert_b, csr_der):
         return None
     b_row.related_certificate_id = a_row.id
     b_row.hybrid_role = role_for_public_key(cert_b.public_key())
-    if not a_row.related_certificate_id:
+    if not a_row.related_certificate_id or (
+            replaces is not None and a_row.related_certificate_id == replaces.id):
         a_row.related_certificate_id = b_row.id
         a_row.hybrid_role = role_for_public_key(cert_a.public_key())
     return a_row

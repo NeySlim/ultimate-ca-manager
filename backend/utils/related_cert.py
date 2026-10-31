@@ -216,6 +216,39 @@ def data_url_for(certificates) -> str:
     return 'data:application/pkcs7-mime;base64,' + base64.b64encode(der).decode('ascii')
 
 
+def location_uris(req: RequesterCertificate) -> list:
+    """The URIs of a request's locationInfo, one or several."""
+    native = req['location_info'].native
+    return [native] if isinstance(native, str) else list(native)
+
+
+def data_url_certificates(uri: str) -> list:
+    """The certificates a data URL holds (a degenerate PKCS#7 or one certificate,
+    DER or PEM), first one first; RelatedCertError when it holds none."""
+    import base64
+    import binascii
+    from urllib.parse import unquote_to_bytes
+    from cryptography.hazmat.primitives.serialization import pkcs7
+    header, comma, payload = uri[len('data:'):].partition(',')
+    try:
+        if not comma:
+            raise ValueError('no comma')
+        raw = (base64.b64decode(unquote_to_bytes(payload), validate=True)
+               if header.lower().endswith(';base64') else unquote_to_bytes(payload))
+    except (ValueError, binascii.Error) as e:
+        raise RelatedCertError(f'relatedCertRequest locationInfo is not a readable data URL: {e}') from e
+    for load in (pkcs7.load_der_pkcs7_certificates, pkcs7.load_pem_pkcs7_certificates,
+                 lambda b: [x509.load_der_x509_certificate(b)],
+                 lambda b: x509.load_pem_x509_certificates(b)):
+        try:
+            found = load(raw)
+        except Exception:
+            continue
+        if found:
+            return list(found)
+    raise RelatedCertError('relatedCertRequest locationInfo data URL holds no certificate')
+
+
 def build_request(cert_a: x509.Certificate, key_a, location: str, request_time=None) -> bytes:
     """DER of a RequesterCertificate naming *cert_a*, signed by its private key *key_a*."""
     moment = binary_time(request_time or datetime.now(timezone.utc))

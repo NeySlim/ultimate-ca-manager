@@ -20,6 +20,7 @@ from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.sanitize import sanitize_filename
 from models import db, Certificate, CA
 from services.cert_service import CertificateService
+from services.cert.mixins.csr import RelatedSignerError
 from services.deletion_blockers import parse_bulk_ids
 from services.policy_service import PolicyViolation
 from utils.csr_extensions import csr_extensions
@@ -349,6 +350,12 @@ def create_csr():
         except ValueError as exc:
             return error_response(str(exc), 400)
 
+        # RFC 9763: the id of a certificate A whose stored key signs a relatedCertRequest
+        related_to = data.get('related_to')
+        if related_to is not None and (isinstance(related_to, bool) or not isinstance(related_to, int)
+                                       or related_to < 1):
+            return error_response('related_to must be a certificate id', 400)
+
         # Parse SANs - frontend sends ["DNS:example.com", "IP:1.2.3.4", ...]
         from utils.san_parse import parse_csr_san_entries
         san_buckets, san_error = parse_csr_san_entries(data.get('sans', []))
@@ -367,7 +374,8 @@ def create_csr():
             san_email=san_buckets['san_email'] or None,
             san_uri=san_buckets['san_uri'] or None,
             san_upn=san_buckets['san_upn'] or None,
-            username=getattr(g, 'current_user', None) and g.current_user.username or 'system'
+            username=getattr(g, 'current_user', None) and g.current_user.username or 'system',
+            related_to=related_to,
         )
         
         AuditService.log_action(
@@ -389,6 +397,8 @@ def create_csr():
         )
     except FipsRestricted:
         raise
+    except RelatedSignerError as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f"Failed to create CSR: {e}")
         return error_response('Failed to create CSR', 500)

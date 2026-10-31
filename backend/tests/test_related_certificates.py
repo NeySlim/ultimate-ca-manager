@@ -290,3 +290,92 @@ def test_the_sign_route_answers_400_when_a_was_revoked_meanwhile(app, auth_clien
     r = auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={'ca_id': ca_id, 'validity_days': 30})
     assert r.status_code == 400, r.data
     assert 'related certificate is revoked' in json.loads(r.data)['message']
+
+
+# ---- locationInfo (RFC 9763 §3.2) -------------------------------------------------
+
+def _csr_b_located(cert_a, signer_key, location):
+    key_b = key_algorithms.generate(PQ_LABEL)
+    csr = x509.CertificateSigningRequestBuilder().subject_name(cert_a.subject).sign(key_b, None)
+    request = related_cert.build_request(cert_a, signer_key, location)
+    return related_cert.csr_with_request(csr, key_b, request).public_bytes(serialization.Encoding.PEM)
+
+
+def test_a_data_url_naming_another_certificate_is_refused(app, cert_a, create_cert):
+    row_id, cert, key = cert_a
+    with app.app_context():
+        other = x509.load_pem_x509_certificate(base64.b64decode(
+            db.session.get(Certificate, create_cert(cn='not-a.example.com')['id']).crt))
+        with pytest.raises(RelatedCertificateRefused, match='locationInfo is not the related'):
+            _sign(row_id, _csr_b_located(cert, key, related_cert.data_url_for([other])))
+
+
+@pytest.mark.parametrize('location', ['data:application/pkcs7-mime;base64,!!!',
+                                      'data:application/pkix-cert;base64,AAAA', 'data:nocomma'])
+def test_an_unreadable_data_url_is_refused(app, cert_a, location):
+    row_id, cert, key = cert_a
+    with app.app_context():
+        with pytest.raises(RelatedCertificateRefused, match='locationInfo'):
+            _sign(row_id, _csr_b_located(cert, key, location))
+
+
+def test_a_data_url_holding_a_alone_in_der_is_accepted(app, cert_a):
+    row_id, cert, key = cert_a
+    location = 'data:application/pkix-cert;base64,' + base64.b64encode(
+        cert.public_bytes(serialization.Encoding.DER)).decode()
+    with app.app_context():
+        assert related_cert.references(_sign(row_id, _csr_b_located(cert, key, location)), cert)
+
+
+def test_a_uri_that_is_not_a_data_url_is_not_fetched(app, cert_a, monkeypatch):
+    import urllib.request
+    monkeypatch.setattr(urllib.request, 'urlopen', lambda *a, **k: pytest.fail('fetched'))
+    row_id, cert, key = cert_a
+    with app.app_context():
+        assert related_cert.references(
+            _sign(row_id, _csr_b_located(cert, key, 'https://pki.example.com/a.crt')), cert)
+
+
+# ---- EST and WSTEP record the pair --------------------------------------------------
+
+def test_the_est_path_links_b_to_a(app, cert_a):
+    from services.ca_service import CAService
+    row_id, cert, key = cert_a
+    csr = x509.load_pem_x509_csr(_csr_b(cert, key))
+    with app.app_context():
+        ca = _signing_ca(row_id)[0]
+        pem, serial = CAService.sign_csr_from_crypto(ca, csr, validity_days=30, source='est')
+        b_row = Certificate.query.filter_by(serial_number=str(int(serial, 16))).one()
+        a_row = db.session.get(Certificate, row_id)
+        assert (b_row.related_certificate_id, b_row.hybrid_role) == (row_id, 'pq')
+        assert (a_row.related_certificate_id, a_row.hybrid_role) == (b_row.id, 'classical')
+
+        # A re-enrolment of B (the old row superseded) moves A's link to the new B
+        again, serial2 = CAService.sign_csr_from_crypto(ca, x509.load_pem_x509_csr(_csr_b(cert, key)),
+                                                        validity_days=30, source='est', supersedes=b_row)
+        b2 = Certificate.query.filter_by(serial_number=str(int(serial2, 16))).one()
+        assert db.session.get(Certificate, row_id).related_certificate_id == b2.id
+
+
+# ---- the CSR route takes related_to ------------------------------------------------
+
+def test_the_csr_route_signs_the_attribute_with_a(app, auth_client, cert_a):
+    row_id, cert, _key = cert_a
+    cn = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+    r = auth_client.post('/api/v2/csrs', json={'cn': cn, 'key_type': PQ_LABEL, 'related_to': row_id})
+    assert r.status_code == 201, r.data
+    with app.app_context():
+        csr_row = db.session.get(Certificate, json.loads(r.data)['data']['id'])
+        csr = x509.load_pem_x509_csr(base64.b64decode(csr_row.csr))
+        req = related_cert.request_from_csr_der(csr.public_bytes(serialization.Encoding.DER))
+    assert related_cert.requested_serial(req) == cert.serial_number
+    assert related_cert.request_signature_valid(req, cert.public_key())
+
+
+@pytest.mark.parametrize('related_to,message', [('7', b'related_to must be'), (True, b'related_to must be'),
+                                                (0, b'related_to must be'),
+                                                (10 ** 9, b'Related certificate not found')])
+def test_the_csr_route_refuses_a_bad_related_to(auth_client, related_to, message):
+    r = auth_client.post('/api/v2/csrs', json={'cn': 'bad-related.example.com', 'key_type': 'EC P-256',
+                                               'related_to': related_to})
+    assert r.status_code == 400 and message in r.data, r.data

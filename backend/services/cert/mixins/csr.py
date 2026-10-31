@@ -52,15 +52,19 @@ from security.encryption import decrypt_private_key, encrypt_private_key
 from utils.key_codec import load_pem_bytes
 
 
+class RelatedSignerError(ValueError):
+    """The certificate A named by ``related_to`` cannot sign a relatedCertRequest."""
+
+
 def _related_signer(cert_id):
     """``(certificate, private key)`` of the certificate A a relatedCertRequest names."""
     row = db.session.get(Certificate, cert_id)
     if row is None or not row.crt:
-        raise ValueError('Related certificate not found')
+        raise RelatedSignerError('Related certificate not found')
     if row.revoked:
-        raise ValueError('The related certificate is revoked')
+        raise RelatedSignerError('The related certificate is revoked')
     if not row.prv:
-        raise ValueError('The server does not hold the key of the related certificate')
+        raise RelatedSignerError('The server does not hold the key of the related certificate')
     cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
     key = serialization.load_pem_private_key(
         load_pem_bytes(row.prv, context=f'certificate {row.id}'), password=None)
