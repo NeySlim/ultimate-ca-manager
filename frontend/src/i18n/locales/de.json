@@ -3498,7 +3498,8 @@
       "trustStore": "Vertrauensspeicher",
       "hsmManagement": "HSM-Verwaltung",
       "singleSignOn": "Single Sign-On",
-      "ssh": "SSH-Zertifikate"
+      "ssh": "SSH-Zertifikate",
+      "sshCas": "SSH-Zertifizierungsstellen"
     },
     "subtitle_one": "{{count}} Rolle",
     "subtitle_other": "{{count}} Rollen",
@@ -3515,12 +3516,18 @@
     "noDescription": "Keine Beschreibung",
     "roleDetails": "Rollendetails",
     "permissions": {
-      "readSsh": "SSH-CAs und Zertifikate anzeigen",
-      "writeSsh": "SSH-CAs und Zertifikate erstellen und verwalten",
-      "deleteSsh": "SSH-CAs und Zertifikate löschen",
-      "read:ssh": "SSH-CAs und Zertifikate anzeigen",
-      "write:ssh": "SSH-Zertifikate erstellen und signieren",
-      "delete:ssh": "SSH-CAs und Zertifikate löschen"
+      "readSsh": "SSH-Zertifikate anzeigen",
+      "writeSsh": "SSH-Zertifikate signieren, importieren und widerrufen",
+      "deleteSsh": "SSH-Zertifikate löschen",
+      "read:ssh": "SSH-Zertifikate anzeigen",
+      "write:ssh": "SSH-Zertifikate signieren, importieren und widerrufen",
+      "delete:ssh": "SSH-Zertifikate löschen",
+      "readSshCas": "SSH-CAs anzeigen",
+      "writeSshCas": "SSH-CAs erstellen, importieren und bearbeiten",
+      "deleteSshCas": "SSH-CAs löschen",
+      "read:ssh_cas": "SSH-CAs, ihre öffentlichen Schlüssel, KRLs und Einrichtungsskripte anzeigen",
+      "write:ssh_cas": "SSH-CAs erstellen, importieren und bearbeiten",
+      "delete:ssh_cas": "SSH-CAs löschen"
     },
     "ignoredPermissions": "Ignorierte Berechtigungen",
     "ignoredPermissionsHint": "In dieser Rolle gespeichert, aber nicht angewendet: Administratoren vorbehalten oder unbekannt. Sie bleiben unverändert erhalten."

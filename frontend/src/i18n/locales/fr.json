@@ -2525,7 +2525,8 @@
       "trustStore": "Magasin de confiance",
       "hsmManagement": "Gestion HSM",
       "singleSignOn": "Authentification unique",
-      "ssh": "Certificats SSH"
+      "ssh": "Certificats SSH",
+      "sshCas": "Autorités de certification SSH"
     },
     "stats": {},
     "subtitle_one": "{{count}} rôle",
@@ -2543,12 +2544,18 @@
     "noDescription": "Aucune description",
     "roleDetails": "Détails du rôle",
     "permissions": {
-      "readSsh": "Voir les CA et certificats SSH",
-      "writeSsh": "Créer et gérer les CA et certificats SSH",
-      "deleteSsh": "Supprimer les CA et certificats SSH",
-      "read:ssh": "Voir les CA et certificats SSH",
-      "write:ssh": "Créer et signer des certificats SSH",
-      "delete:ssh": "Supprimer les CA et certificats SSH"
+      "readSsh": "Voir les certificats SSH",
+      "writeSsh": "Signer, importer et révoquer les certificats SSH",
+      "deleteSsh": "Supprimer les certificats SSH",
+      "read:ssh": "Voir les certificats SSH",
+      "write:ssh": "Signer, importer et révoquer des certificats SSH",
+      "delete:ssh": "Supprimer les certificats SSH",
+      "readSshCas": "Voir les CA SSH",
+      "writeSshCas": "Créer, importer et modifier les CA SSH",
+      "deleteSshCas": "Supprimer les CA SSH",
+      "read:ssh_cas": "Voir les CA SSH, leurs clés publiques, KRL et scripts d'installation",
+      "write:ssh_cas": "Créer, importer et modifier des CA SSH",
+      "delete:ssh_cas": "Supprimer des CA SSH"
     },
     "ignoredPermissions": "Permissions ignorées",
     "ignoredPermissionsHint": "Enregistrées sur ce rôle mais non appliquées : réservées aux administrateurs ou inconnues. Elles sont conservées telles quelles."

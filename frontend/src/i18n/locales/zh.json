@@ -3498,7 +3498,8 @@
       "trustStore": "信任存储",
       "hsmManagement": "HSM管理",
       "singleSignOn": "单点登录",
-      "ssh": "SSH证书"
+      "ssh": "SSH证书",
+      "sshCas": "SSH证书颁发机构"
     },
     "subtitle_one": "{{count}} 个角色",
     "subtitle_other": "{{count}} 个角色",
@@ -3515,12 +3516,18 @@
     "noDescription": "无描述",
     "roleDetails": "角色详情",
     "permissions": {
-      "readSsh": "查看 SSH CA与证书",
-      "writeSsh": "创建并管理 SSH CA与证书",
-      "deleteSsh": "删除 SSH CA与证书",
-      "read:ssh": "查看SSH CA和证书",
-      "write:ssh": "创建和签署SSH证书",
-      "delete:ssh": "删除SSH CA和证书"
+      "readSsh": "查看 SSH 证书",
+      "writeSsh": "签署、导入并吊销 SSH 证书",
+      "deleteSsh": "删除 SSH 证书",
+      "read:ssh": "查看SSH证书",
+      "write:ssh": "签署、导入和吊销SSH证书",
+      "delete:ssh": "删除SSH证书",
+      "readSshCas": "查看 SSH CA",
+      "writeSshCas": "创建、导入并编辑 SSH CA",
+      "deleteSshCas": "删除 SSH CA",
+      "read:ssh_cas": "查看SSH CA、其公钥、KRL和设置脚本",
+      "write:ssh_cas": "创建、导入和编辑SSH CA",
+      "delete:ssh_cas": "删除SSH CA"
     },
     "ignoredPermissions": "已忽略的权限",
     "ignoredPermissionsHint": "已保存在此角色中但不生效：仅限管理员或未知的权限。它们会按原样保留。"

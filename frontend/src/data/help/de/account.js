@@ -123,7 +123,7 @@ X-API-Key: <ihr-api-schlüssel>
 Oder senden Sie ihn als Bearer-Token: \`Authorization: Bearer <ihr-api-schlüssel>\`.
 
 ### Berechtigungen
-Jeder Schlüssel trägt den bei der Erstellung gewählten Geltungsbereich (**Vollzugriff**, **Nur Lesen**, **Lesen & Schreiben**, **Nur Zertifikate**) und nie mehr Zugriff als Ihr Konto. Ein Schlüssel kann nur einen Schlüssel erstellen oder neu erzeugen, dessen Berechtigungen er selbst besitzt.
+Jeder Schlüssel trägt den bei der Erstellung gewählten Geltungsbereich (**Vollzugriff**, **Nur Lesen**, **Lesen & Schreiben**, **Nur Zertifikate**) und nie mehr Zugriff als Ihr Konto. **Nur Zertifikate** stellt X.509- und SSH-Zertifikate aus und liest die CAs, SSH-CAs und CRLs, kann aber keine CA erstellen oder ändern. Ein Schlüssel kann nur einen Schlüssel erstellen oder neu erzeugen, dessen Berechtigungen er selbst besitzt.
 
 API-Schlüssel, auch mit Vollzugriff, können weder Ihr Profil, Passwort, 2FA, Sicherheitsschlüssel, mTLS-Zertifikate oder Sitzungen ändern noch über die Benutzerverwaltungsaktionen auf Ihr eigenes Konto zugreifen: dafür ist eine interaktive Sitzung nötig.
 

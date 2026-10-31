@@ -123,7 +123,7 @@ X-API-Key: <la-tua-chiave-api>
 Oppure inviala come token bearer: \`Authorization: Bearer <la-tua-chiave-api>\`.
 
 ### Permessi
-Ogni chiave porta l'ambito scelto alla creazione (**Accesso completo**, **Solo lettura**, **Lettura e scrittura**, **Solo certificati**) e mai più accesso del tuo account. Una chiave può creare o rigenerare solo una chiave i cui permessi possiede essa stessa.
+Ogni chiave porta l'ambito scelto alla creazione (**Accesso completo**, **Solo lettura**, **Lettura e scrittura**, **Solo certificati**) e mai più accesso del tuo account. **Solo certificati** emette certificati X.509 e SSH e legge le CA, le CA SSH e le CRL, ma non può creare né modificare una CA. Una chiave può creare o rigenerare solo una chiave i cui permessi possiede essa stessa.
 
 Le chiavi API, anche quelle ad accesso completo, non possono modificare il tuo profilo, la password, il 2FA, le chiavi di sicurezza, i certificati mTLS o le sessioni, né raggiungere il tuo account tramite le azioni di amministrazione utenti: questi richiedono una sessione interattiva.
 

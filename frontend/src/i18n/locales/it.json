@@ -3498,7 +3498,8 @@
       "trustStore": "Archivio di fiducia",
       "hsmManagement": "Gestione HSM",
       "singleSignOn": "Single Sign-On",
-      "ssh": "Certificati SSH"
+      "ssh": "Certificati SSH",
+      "sshCas": "Autorità di certificazione SSH"
     },
     "subtitle_one": "{{count}} ruolo",
     "subtitle_other": "{{count}} ruoli",
@@ -3515,12 +3516,18 @@
     "noDescription": "Nessuna descrizione",
     "roleDetails": "Dettagli del ruolo",
     "permissions": {
-      "readSsh": "Visualizza CA e certificati SSH",
-      "writeSsh": "Crea e gestisci CA e certificati SSH",
-      "deleteSsh": "Elimina CA e certificati SSH",
-      "read:ssh": "Visualizza CA e certificati SSH",
-      "write:ssh": "Crea e firma certificati SSH",
-      "delete:ssh": "Elimina CA e certificati SSH"
+      "readSsh": "Visualizza certificati SSH",
+      "writeSsh": "Firma, importa e revoca certificati SSH",
+      "deleteSsh": "Elimina certificati SSH",
+      "read:ssh": "Visualizza certificati SSH",
+      "write:ssh": "Firma, importa e revoca certificati SSH",
+      "delete:ssh": "Elimina certificati SSH",
+      "readSshCas": "Visualizza CA SSH",
+      "writeSshCas": "Crea, importa e modifica CA SSH",
+      "deleteSshCas": "Elimina CA SSH",
+      "read:ssh_cas": "Visualizza CA SSH, le loro chiavi pubbliche, KRL e script di configurazione",
+      "write:ssh_cas": "Crea, importa e modifica CA SSH",
+      "delete:ssh_cas": "Elimina CA SSH"
     },
     "ignoredPermissions": "Permessi ignorati",
     "ignoredPermissionsHint": "Salvati in questo ruolo ma non applicati: riservati agli amministratori o sconosciuti. Vengono conservati così come sono."

@@ -123,7 +123,7 @@ X-API-Key: <tu-clave-api>
 O envíala como token bearer: \`Authorization: Bearer <tu-clave-api>\`.
 
 ### Permisos
-Cada clave lleva el alcance elegido al crearla (**Acceso completo**, **Solo lectura**, **Lectura y escritura**, **Solo certificados**) y nunca más acceso que tu cuenta. Una clave solo puede crear o regenerar una clave cuyos permisos ella misma posee.
+Cada clave lleva el alcance elegido al crearla (**Acceso completo**, **Solo lectura**, **Lectura y escritura**, **Solo certificados**) y nunca más acceso que tu cuenta. **Solo certificados** emite certificados X.509 y SSH y lee las CAs, las CAs SSH y las CRL, pero no puede crear ni modificar una CA. Una clave solo puede crear o regenerar una clave cuyos permisos ella misma posee.
 
 Las claves API, incluso las de acceso completo, no pueden cambiar tu perfil, contraseña, 2FA, claves de seguridad, certificados mTLS ni sesiones, ni alcanzar tu propia cuenta mediante las acciones de administración de usuarios: esto requiere una sesión interactiva.
 

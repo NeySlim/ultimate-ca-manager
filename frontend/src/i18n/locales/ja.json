@@ -3499,7 +3499,8 @@
       "trustStore": "トラストストア",
       "hsmManagement": "HSM管理",
       "singleSignOn": "シングルサインオン",
-      "ssh": "SSH証明書"
+      "ssh": "SSH証明書",
+      "sshCas": "SSH認証局"
     },
     "stats": {},
     "subtitle_one": "{{count}} 件のロール",
@@ -3517,12 +3518,18 @@
     "noDescription": "説明なし",
     "roleDetails": "ロール詳細",
     "permissions": {
-      "readSsh": "SSH CAと証明書を表示",
-      "writeSsh": "SSH CAと証明書を作成・管理",
-      "deleteSsh": "SSH CAと証明書を削除",
-      "read:ssh": "SSH CAと証明書を表示",
-      "write:ssh": "SSH証明書を作成・署名",
-      "delete:ssh": "SSH CAと証明書を削除"
+      "readSsh": "SSH証明書を表示",
+      "writeSsh": "SSH証明書の署名・インポート・失効",
+      "deleteSsh": "SSH証明書を削除",
+      "read:ssh": "SSH証明書を表示",
+      "write:ssh": "SSH証明書の署名、インポート、失効",
+      "delete:ssh": "SSH証明書を削除",
+      "readSshCas": "SSH CAを表示",
+      "writeSshCas": "SSH CAの作成・インポート・編集",
+      "deleteSshCas": "SSH CAを削除",
+      "read:ssh_cas": "SSH CA、その公開鍵、KRL、セットアップスクリプトを表示",
+      "write:ssh_cas": "SSH CAの作成、インポート、編集",
+      "delete:ssh_cas": "SSH CAを削除"
     },
     "ignoredPermissions": "無視される権限",
     "ignoredPermissionsHint": "このロールに保存されていますが適用されません（管理者専用または不明な権限）。そのまま保持されます。"
