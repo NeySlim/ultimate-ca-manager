@@ -75,7 +75,8 @@ export const KEY_ALGORITHMS = [
 export const ACME_CLIENT_LABELS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384']
 export const CSR_LABELS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521', 'EC-BP256', 'EC-BP384', 'EC-BP512',
   'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']
-export const TSA_LABELS = ['RSA-3072', 'RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384']
+export const TSA_LABELS = ['RSA-3072', 'RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384',
+  'ML-DSA-65', 'ML-DSA-87']
 
 // Key each family starts on, per form; the first entry is the form's default key
 export const CA_DEFAULT_LABELS = ['RSA-3072', 'EC-P256', 'ML-DSA-65']
