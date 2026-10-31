@@ -290,6 +290,33 @@ def test_tsa_signer_unapproved_key(session):
     _assert_found('tsa.signer_unapproved_key', 1, 'tsa-signer')
 
 
+@needs_mldsa
+def test_ocsp_responder_mldsa_key_is_named(session):
+    responder = _leaf('pq-responder', mldsa.MLDSA65PrivateKey.generate())
+    _config('ocsp_responder_cert_1', str(responder.id))
+    finding = _assert_found('ocsp.responder_unapproved_key', 1, 'pq-responder', 'ML-DSA-65')
+    assert 'ML-DSA' in finding['title']
+
+
+@needs_mldsa
+def test_tsa_signer_mldsa_key_is_named(session):
+    signer = _leaf('pq-tsa', mldsa.MLDSA65PrivateKey.generate())
+    _config('tsa_signer_cert_refid', signer.refid)
+    _config('tsa_enabled', 'true')
+    finding = _assert_found('tsa.signer_unapproved_key', 1, 'pq-tsa', 'ML-DSA-65')
+    assert 'ML-DSA' in finding['title']
+
+
+@needs_mldsa
+def test_https_mldsa_key_is_named(session, app, tmp_path, monkeypatch):
+    path = tmp_path / 'https_cert.pem'
+    path.write_bytes(_certificate(mldsa.MLDSA65PrivateKey.generate()).public_bytes(
+        serialization.Encoding.PEM))
+    monkeypatch.setitem(app.config, 'HTTPS_CERT_PATH', path)
+    finding = _assert_found('https.unapproved_key', 1, 'https_cert.pem: ML-DSA-65')
+    assert 'ML-DSA' in finding['title']
+
+
 def test_certificates_unapproved_key(session):
     _leaf('ed-leaf', _ed25519())
     _leaf('short-leaf', _rsa(1024))

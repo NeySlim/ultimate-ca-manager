@@ -3227,11 +3227,11 @@
           "remedy": "Make sure each host also has an ECDSA or RSA host key, then reset the pinned host key of the target: the next connection pins that key."
         },
         "ocsp_responder_unapproved_key": {
-          "title": "Delegated OCSP responders with an Ed25519/Ed448 or weak key: the CA signs instead",
+          "title": "Delegated OCSP responders with an Ed25519/Ed448, ML-DSA or weak key: the CA signs instead",
           "remedy": "Issue a new RSA or ECDSA responder certificate and select it in the CA settings."
         },
         "tsa_signer_unapproved_key": {
-          "title": "The timestamping certificate has an Ed25519/Ed448 or weak key: timestamps fail in FIPS mode",
+          "title": "The timestamping certificate has an Ed25519/Ed448, ML-DSA or weak key: timestamps fail in FIPS mode",
           "remedy": "Issue a new RSA or ECDSA timestamping certificate and select it in the TSA settings."
         },
         "certificates_unapproved_key": {
@@ -3291,7 +3291,7 @@
           "remedy": "Enable private key encryption in Settings > Security, or provide /etc/ucm/master.key or KEY_ENCRYPTION_KEY; with UCM_REQUIRE_KEY_ENCRYPTION=true, UCM then refuses to start without one."
         },
         "https_unapproved_key": {
-          "title": "The HTTPS certificate has an Ed25519/Ed448 or weak key: the web server cannot use it in FIPS mode",
+          "title": "The HTTPS certificate has an Ed25519/Ed448, ML-DSA or weak key: the web server cannot use it in FIPS mode",
           "remedy": "Install an RSA 2048+ or ECDSA P-256/P-384/P-521 certificate in the HTTPS settings."
         }
       }

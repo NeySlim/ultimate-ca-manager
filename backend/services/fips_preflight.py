@@ -247,7 +247,7 @@ def _configured_certificate(key: str, by: str):
 
 
 @detector('ocsp.responder_unapproved_key', WARNING,
-          'Delegated OCSP responders with an Ed25519/Ed448 or weak key: the CA signs instead',
+          'Delegated OCSP responders with an Ed25519/Ed448, ML-DSA or weak key: the CA signs instead',
           'Issue a new RSA or ECDSA responder certificate and select it in the CA settings.')
 def _ocsp_responders():
     found = []
@@ -259,7 +259,7 @@ def _ocsp_responders():
 
 
 @detector('tsa.signer_unapproved_key', BLOCKER,
-          'The timestamping certificate has an Ed25519/Ed448 or weak key: timestamps fail in FIPS mode',
+          'The timestamping certificate has an Ed25519/Ed448, ML-DSA or weak key: timestamps fail in FIPS mode',
           'Issue a new RSA or ECDSA timestamping certificate and select it in the TSA settings.')
 def _tsa_signer():
     if not tsa_is_enabled():
@@ -477,7 +477,7 @@ def _no_master_key():
 
 
 @detector('https.unapproved_key', BLOCKER,
-          'The HTTPS certificate has an Ed25519/Ed448 or weak key: the web server cannot use it in FIPS mode',
+          'The HTTPS certificate has an Ed25519/Ed448, ML-DSA or weak key: the web server cannot use it in FIPS mode',
           'Install an RSA 2048+ or ECDSA P-256/P-384/P-521 certificate in the HTTPS settings.')
 def _https():
     path = current_app.config.get('HTTPS_CERT_PATH')
