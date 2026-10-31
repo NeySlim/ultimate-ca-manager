@@ -32,7 +32,9 @@ import base64
 from dataclasses import dataclass, field
 
 import xmlsec
+from cryptography import x509
 
+from utils import key_algorithms
 from .soap_envelope import DS_NS, WSSE_NS, WSU_NS
 
 # The only legitimate reason a ds:Reference has no "#<id>" fragment is a
@@ -105,6 +107,19 @@ def _check_algorithms(signature_node):
             raise WSSecurityError(f'Digest algorithm not allowed: {algorithm or "(none)"}')
 
 
+def _refuse_post_quantum_signer(cert_der):
+    """XML-DSig has no ML-DSA SignatureMethod: name the key rather than fail on its URI."""
+    try:
+        public_key = x509.load_der_x509_certificate(cert_der).public_key()
+    except Exception:
+        return  # xmlsec reports an unreadable certificate below
+    if key_algorithms.family_for_public_key(public_key) == 'ML-DSA':
+        label = key_algorithms.label_for_public_key(public_key)
+        raise WSSecurityError(
+            f'Certificate-bound renewal is not supported for {label} certificates: '
+            'XML-DSig has no ML-DSA signature method; enroll a new certificate instead')
+
+
 def verify_signed_request(security_header):
     """Verify a ``wsse:Security`` header's ``ds:Signature``.
 
@@ -138,6 +153,7 @@ def verify_signed_request(security_header):
     if signature_node is None:
         raise WSSecurityError('wsse:Security is missing ds:Signature')
 
+    _refuse_post_quantum_signer(cert_der)
     _check_algorithms(signature_node)
 
     try:

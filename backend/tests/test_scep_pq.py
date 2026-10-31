@@ -5,11 +5,10 @@ from datetime import datetime, timedelta, timezone
 
 import asn1crypto.cms
 import asn1crypto.core
-import asn1crypto.x509
 import pytest
 from cryptography import x509
 from cryptography.exceptions import InvalidSignature
-from cryptography.hazmat.primitives import hashes, serialization
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ed448, mldsa
 from cryptography.hazmat.primitives.serialization import pkcs7
 from cryptography.x509.oid import AttributeOID, NameOID
@@ -18,7 +17,7 @@ from models import CA, SystemConfig, db
 from services.scep.crypto_helpers import create_signed_pkcs7, encrypt_for_client
 from services.scep.message_parser import extract_signer_certificate, verify_cms_signature
 from services.scep.scep_service import SCEPService
-from tests.pqc_fixtures import fixture_bytes, load_mldsa_key
+from tests.pqc_fixtures import fixture_bytes, load_mldsa_key, scep_wstep_mldsa_signed_cms
 from tests.test_scep_rfc8894_operations import (
     MESSAGE_TYPE_OID, PKI_STATUS_OID, SENDER_NONCE_OID, TRANSACTION_ID_OID,
     _decrypt_password_response, _load_ca_material, _response_attributes,
@@ -40,37 +39,8 @@ def _self_signed(key, cn='SCEP ML-DSA client'):
             .sign(key, None))
 
 
-def _signer_oid(key):
-    return next(a.oid for a in key_algorithms.algorithms('ML-DSA') if a.matches_key(key))
-
-
 def scep_pq_signed_cms(data, key, cert, attrs, digest='sha512'):
-    """CMS SignedData signed the RFC 9882 way: SHA-512 messageDigest, pure ML-DSA over
-    the DER SignedAttrs, the key's OID as signatureAlgorithm with no parameters."""
-    h = hashes.Hash(hashes.SHA512() if digest == 'sha512' else hashes.SHA256())
-    h.update(data)
-    signed_attrs = asn1crypto.cms.CMSAttributes([
-        *attrs,
-        {'type': 'content_type', 'values': ['data']},
-        {'type': 'message_digest', 'values': [asn1crypto.core.OctetString(h.finalize())]},
-    ])
-    signature = key.sign(b'\x31' + signed_attrs.dump()[1:])
-    cert_asn1 = asn1crypto.x509.Certificate.load(cert.public_bytes(serialization.Encoding.DER))
-    signer_info = asn1crypto.cms.SignerInfo({
-        'version': 'v1',
-        'sid': {'issuer_and_serial_number': {'issuer': cert_asn1.issuer,
-                                             'serial_number': cert_asn1.serial_number}},
-        'digest_algorithm': {'algorithm': digest},
-        'signed_attrs': signed_attrs,
-        'signature_algorithm': {'algorithm': _signer_oid(key)},
-        'signature': asn1crypto.core.OctetString(signature),
-    })
-    return asn1crypto.cms.ContentInfo({'content_type': 'signed_data', 'content': {
-        'version': 'v1', 'digest_algorithms': [{'algorithm': digest}],
-        'encap_content_info': {'content_type': 'data',
-                               'content': asn1crypto.core.OctetString(data)},
-        'certificates': [cert_asn1], 'signer_infos': [signer_info],
-    }}).dump()
+    return scep_wstep_mldsa_signed_cms(data, key, cert, attrs, digest=digest)
 
 
 def _signed_data(der):
