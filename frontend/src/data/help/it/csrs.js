@@ -31,6 +31,7 @@ export default {
       'Un certificato importato per un CSR generato in UCM completa quel CSR: il record conserva la sua chiave privata, quindi il certificato viene esportato insieme a essa',
       'Usa la modalità Microsoft CA per firmare i CSR tramite AD CS quando sei connesso a una PKI Windows',
       'Un certificato per una chiave ML-DSA conserva solo i bit di firma: keyEncipherment, dataEncipherment e keyAgreement richiesti dal modello vengono rimossi, e il risultato lo indica',
+      'Un CSR generato con related_to (API) indica un certificato A esistente: firmarlo emette un certificato collegato ad A (RFC 9763), rifiutato se dichiara un key usage o EKU assente in A',
       'In firma, usa "EKU extra" per aggiungere Microsoft RDP, smartcard logon, IPsec o qualsiasi OID: l\'EKU esistente del CSR viene ricostruito con l\'insieme unito',
       'Quando una policy o la scadenza della CA emittente accorcia la validità richiesta, il risultato lo indica: "Issued for N day(s) instead of the M requested", con il motivo',
     ],
@@ -65,6 +66,10 @@ Il CSR e la chiave privata vengono creati e memorizzati in UCM. Il CSR appare ne
 > 💡 Questo è comodo quando vuoi che UCM gestisca l'intero ciclo di vita. CSR, firma e archiviazione della chiave.
 
 Un certificato firmato per una chiave **ML-DSA** conserva solo i bit di firma: keyEncipherment, dataEncipherment e keyAgreement richiesti dal modello vengono rimossi, e il risultato indica cosa è stato rimosso.
+
+### Richieste di certificato correlato (RFC 9763)
+
+Tramite l'API, \`related_to\` indica un certificato **A** esistente di cui UCM possiede la chiave privata: il CSR generato contiene allora una **relatedCertRequest** firmata dalla chiave di A. Firmarlo emette un certificato collegato ad A, secondo membro di una coppia ibrida, che si revoca e si rinnova con A. La firma viene rifiutata se A è revocato, scaduto o non è un certificato end-entity, o se il nuovo certificato dichiara un key usage o EKU assente in A.
 
 ## Caricamento di un CSR
 

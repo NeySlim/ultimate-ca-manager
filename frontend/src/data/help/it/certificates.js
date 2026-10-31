@@ -52,6 +52,17 @@ export default {
         ]
       },
       {
+        title: 'Coppie di certificati ibridi (RFC 9763)',
+        content: 'Un certificato classico (A) e uno post-quantistico (B) per lo stesso soggetto, collegati: B contiene l\'estensione relatedCertificate che indica A tramite il suo hash.',
+        items: [
+          { label: 'Emissione', text: 'Una sola richiesta API emette entrambi dalla stessa CA, con lo stesso soggetto, gli stessi nomi e la stessa validità; B non dichiara alcun key usage o EKU assente in A. Una policy che richiede approvazione rifiuta per ora la coppia' },
+          { label: 'Collegamento tramite richiesta', text: 'Un CSR con una relatedCertRequest firmata dalla chiave di A (Firma CSR, ACME, EST, WSTEP) emette un B collegato ad A. A deve essere conservato qui, valido, non revocato e un certificato end-entity' },
+          { label: 'Revoca', text: 'Revocare uno dei due membri revoca anche l\'altro, a meno che la richiesta non lo mantenga; con una policy che richiede approvazione, i due vanno insieme' },
+          { label: 'Rinnovo', text: 'Rinnovare uno dei due membri rinnova entrambi, manualmente, in blocco o automaticamente, e il nuovo B indica il nuovo A' },
+          { label: 'Esportazione', text: 'L\'esportazione hybrid-bundle è un file ZIP con entrambi i certificati, e con entrambe le chiavi se richiesto' },
+        ]
+      },
+      {
         title: 'File certificato su disco (v2.140)',
         items: [
           { label: 'Auto-materializzati', text: 'I file .crt / .key vengono scritti sotto data/certs/ per ogni percorso di creazione (UI, firma CSR, ACME, SCEP, import)' },
@@ -169,6 +180,18 @@ Formati di esportazione:
 - **PEM + Catena**: Certificato con le sue CA emittenti (**Includi catena CA**); la CA root viene aggiunta solo se **Includi CA radice** è selezionato
 - **DER**: Formato binario
 - **PKCS#12**: Certificato + chiave + catena, protetto da password
+
+## Coppie di certificati ibridi (RFC 9763)
+
+Una coppia ibrida collega un certificato classico (**A**, RSA o EC) e uno post-quantistico (**B**, ML-DSA) per lo stesso soggetto. B contiene l'estensione non critica **relatedCertificate**, che indica A tramite il suo hash, così una parte fidata può richiederli entrambi.
+
+- **Emissione**: una sola richiesta API (\`hybrid\` in \`POST /api/v2/certificates\`) emette entrambi dalla stessa CA, con lo stesso soggetto, gli stessi nomi e la stessa validità. B copia le estensioni di A con un proprio key identifier e key usage, e non dichiara alcun key usage o EKU assente in A
+- **Collegamento tramite richiesta**: un CSR con una **relatedCertRequest** firmata dalla chiave di A emette un B collegato ad A, tramite Firma CSR, ACME, EST o WSTEP. A deve essere conservato da UCM, valido, non revocato, un certificato end-entity emesso da una CA di questa istanza, e la richiesta deve essere recente. Un certificato fornito inline nella posizione della richiesta deve essere A; le altre posizioni non vengono scaricate
+- **Revoca** di uno dei due membri revoca anche l'altro, a meno che la richiesta non lo mantenga. Con una policy che richiede approvazione, la coppia va insieme, e due policy di approvazione diverse sui due membri lasciano la revoca a un amministratore
+- **Rinnovo** di uno dei due membri, manuale, in blocco o automatico, rinnova entrambi, e il nuovo B indica il nuovo A
+- **Esportazione**: il formato **hybrid-bundle** è un file ZIP con entrambi i certificati, e con entrambe le chiavi private quando la chiave è inclusa
+
+> ⚠ Una policy che richiede approvazione rifiuta per ora di emettere una coppia ibrida: emettila con una policy senza approvazione.
 
 ## Preferiti
 
