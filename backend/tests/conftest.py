@@ -367,6 +367,7 @@ def app():
 
     if os.path.exists(temp_db):
         os.unlink(temp_db)
+    shutil.rmtree(_sandbox, ignore_errors=True)
 
 
 @pytest.fixture
