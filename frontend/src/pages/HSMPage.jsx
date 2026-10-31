@@ -20,7 +20,7 @@ import { usePermission, useClipboard, usePersistedState } from '../hooks'
 import { hsmService } from '../services'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { secretInputProps } from '../lib/secretTarget'
-import { groupedOptions, listAlgorithms } from '../lib/keyAlgorithms'
+import { KEY_GROUPS, isPostQuantum, listAlgorithms } from '../lib/keyAlgorithms'
 import { useFipsMode } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 
@@ -869,35 +869,37 @@ export function ProviderModal({ provider, hsmStatus, onSave, onClose }) {
   )
 }
 
-function KeyModal({ provider, onSave, onClose }) {
+// Symmetric keys are not in the key registry
+const AES_ALGORITHMS = ['AES-128', 'AES-256']
+const AES_GROUP = 'aes'
+
+export function KeyModal({ provider, onSave, onClose }) {
   const { t } = useTranslation()
   const fips = useFipsMode()
-  const [formData, setFormData] = useState({
+  const providerType = provider?.provider_type ?? ''
+  // A post-quantum row is held only by the providers it names: providers null means none here
+  const asymmetric = listAlgorithms({ generate: true, provider: providerType, fips })
+    .filter(a => !isPostQuantum(a.label) || a.providers?.includes(providerType))
+  const groupOptions = [
+    ...KEY_GROUPS.filter(g => asymmetric.some(a => a.group === g.id)).map(g => ({ value: g.id, label: t(g.labelKey) })),
+    { value: AES_GROUP, label: 'AES' },
+  ]
+  const algorithmsOf = (group) => (group === AES_GROUP
+    ? AES_ALGORITHMS
+    : asymmetric.filter(a => a.group === group).map(a => a.label))
+
+  const [formData, setFormData] = useState(() => ({
     label: '',
-    key_type: 'rsa',
-    key_size: '2048',
+    group: groupOptions[0].value,
+    algorithm: algorithmsOf(groupOptions[0].value)[0],
     purpose: 'signing',
     extractable: false,
-  })
-
-  const algorithmOptions = {
-    rsa: [{ value: '2048', label: 'RSA-2048' }, { value: '3072', label: 'RSA-3072' }, { value: '4096', label: 'RSA-4096' }],
-    // Brainpool only on a PKCS#11 provider; the value is the algorithm label itself
-    ec: groupedOptions(
-      listAlgorithms({ generate: true, provider: provider?.provider_type ?? '', fips }).filter(a => a.family === 'EC'),
-      t, a => a.label),
-    aes: [{ value: '128', label: 'AES-128' }, { value: '256', label: 'AES-256' }],
-  }
-
-  const buildAlgorithm = () => {
-    if (formData.key_type === 'ec') return formData.key_size
-    return `${formData.key_type === 'rsa' ? 'RSA' : 'AES'}-${formData.key_size}`
-  }
+  }))
 
   const handleSubmit = () => {
     onSave({
       label: formData.label,
-      algorithm: buildAlgorithm(),
+      algorithm: formData.algorithm,
       purpose: formData.purpose,
       extractable: formData.extractable,
     })
@@ -914,15 +916,20 @@ function KeyModal({ provider, onSave, onClose }) {
     >
       <Input label={t('hsm.keyLabel')} value={formData.label} onChange={e => setFormData({...formData, label: e.target.value})} required placeholder={t('hsm.keyLabelPlaceholder')} />
       <div className="grid grid-cols-2 gap-4">
-        <Select label={t('common.keyType')} value={formData.key_type} onChange={value => setFormData({...formData, key_type: value, key_size: value === 'rsa' ? '2048' : value === 'ec' ? 'EC-P256' : '128'})} options={[{ value: 'rsa', label: 'RSA' }, { value: 'ec', label: 'ECDSA' }, { value: 'aes', label: 'AES' }]} />
+        <Select
+          label={t('common.keyType')}
+          value={formData.group}
+          onChange={value => setFormData({ ...formData, group: value, algorithm: algorithmsOf(value)[0] })}
+          options={groupOptions}
+        />
         <Select
           label={t('common.keySize')}
-          value={formData.key_size}
-          onChange={value => setFormData({...formData, key_size: value})}
-          options={algorithmOptions[formData.key_type] || algorithmOptions.rsa}
+          value={formData.algorithm}
+          onChange={value => setFormData({ ...formData, algorithm: value })}
+          options={algorithmsOf(formData.group).map(label => ({ value: label, label }))}
         />
       </div>
-      {formData.key_type === 'ec' && <BrainpoolNotice label={formData.key_size} />}
+      <BrainpoolNotice label={formData.algorithm} />
       <Select label={t('common.purpose')} value={formData.purpose} onChange={value => setFormData({...formData, purpose: value})} options={[{ value: 'signing', label: t('hsm.purposes.caSigning') }, { value: 'encryption', label: t('common.smtpEncryption') }, { value: 'wrapping', label: t('hsm.purposes.general') }, { value: 'all', label: t('common.all') }]} />
     </FormModal>
   )
