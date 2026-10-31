@@ -6,7 +6,13 @@
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { GROUP_PQ, KEY_ALGORITHMS, TSA_LABELS, findAlgorithm } from '../../lib/keyAlgorithms'
+
+// The page sees one more TSA label, a key the product reads but does not generate
+vi.mock('../../lib/keyAlgorithms', async (importOriginal) => {
+  const actual = await importOriginal()
+  return { ...actual, TSA_LABELS: [...actual.TSA_LABELS, 'ED25519'] }
+})
+const { GROUP_PQ, KEY_ALGORITHMS, TSA_LABELS, findAlgorithm } = await vi.importActual('../../lib/keyAlgorithms')
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -111,11 +117,16 @@ describe('TSAPage signer key, from the registry', () => {
     expect(payload.curve).toBeUndefined()
   })
 
-  it('offers no ML-DSA key while the timestamp is signed in RSA or ECDSA only', async () => {
-    const pq = KEY_ALGORITHMS.filter(a => a.group === GROUP_PQ).map(a => a.label)
-    expect(pq).toEqual(expect.arrayContaining(['ML-DSA-65', 'ML-DSA-87']))
+  it('offers only keys the product generates', async () => {
+    expect(findAlgorithm('ED25519').generate).toBe(false)
     const select = await openGenerateModal()
     const offered = Array.from(select.options).map(o => o.value)
-    expect(offered.filter(v => pq.includes(v))).toEqual([])
+    expect(offered).toEqual(TSA_LABELS)
+  })
+
+  it('TSA_LABELS holds no ML-DSA key while the timestamp is signed in RSA or ECDSA only', () => {
+    const pq = KEY_ALGORITHMS.filter(a => a.group === GROUP_PQ).map(a => a.label)
+    expect(pq).toEqual(expect.arrayContaining(['ML-DSA-65', 'ML-DSA-87']))
+    expect(TSA_LABELS.filter(l => pq.includes(l))).toEqual([])
   })
 })

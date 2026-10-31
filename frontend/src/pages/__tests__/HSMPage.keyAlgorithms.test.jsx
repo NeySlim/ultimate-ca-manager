@@ -4,6 +4,15 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import './pageRenderingSetup.jsx'
 import { GROUP_PQ, KEY_ALGORITHMS, listAlgorithms } from '../../lib/keyAlgorithms'
 
+// ML-DSA rows made generable, one held by PKCS#11: the modal alone must keep the others out
+vi.mock('../../lib/keyAlgorithms', async (importOriginal) => {
+  const actual = await importOriginal()
+  for (const row of actual.KEY_ALGORITHMS.filter(a => a.group === actual.GROUP_PQ)) {
+    Object.assign(row, { generate: true, providers: row.label === 'ML-DSA-87' ? ['pkcs11'] : null })
+  }
+  return actual
+})
+
 vi.mock('../../components', async (importOriginal) => ({
   ...(await importOriginal()),
   Input: ({ label, helperText, ...props }) => <input aria-label={label} {...props} />,
@@ -59,11 +68,15 @@ describe('HSM key generation, from the registry', () => {
     expect((await save(onSave)).algorithm).toBe('AES-256')
   })
 
-  it.each(PROVIDERS)('offers no ML-DSA key on %s while no registry row names that provider', (type) => {
-    const pq = KEY_ALGORITHMS.filter(a => a.group === GROUP_PQ)
-    expect(pq.map(a => a.label)).toContain('ML-DSA-65')
+  it.each(PROVIDERS.filter(p => p !== 'pkcs11'))('offers no ML-DSA key on %s, which no row names', (type) => {
+    expect(KEY_ALGORITHMS.find(a => a.label === 'ML-DSA-65')).toMatchObject({ generate: true, providers: null })
     renderModal(type)
-    const groups = offered(screen.getByLabelText('common.keyType'))
-    expect(groups.includes(GROUP_PQ)).toBe(pq.some(a => a.generate && a.providers?.includes(type)))
+    expect(offered(screen.getByLabelText('common.keyType'))).not.toContain(GROUP_PQ)
+  })
+
+  it('offers on PKCS#11 only the ML-DSA row that names it', () => {
+    renderModal('pkcs11')
+    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: GROUP_PQ } })
+    expect(offered(screen.getByLabelText('common.keySize'))).toEqual(['ML-DSA-87'])
   })
 })
