@@ -213,10 +213,14 @@ needs_mldsa = pytest.mark.skipif(not mldsa_supported(), reason='this build has n
 
 
 @needs_mldsa
-def test_ca_mldsa_key_is_named_by_the_weak_key_check(session):
+def test_ca_mldsa_key_is_an_unapproved_algorithm_not_a_weak_key(session):
     _ca(mldsa.MLDSA65PrivateKey.generate(), 'PQ Root')
-    finding = _assert_found('ca.weak_key', 1, 'PQ Root (#', 'ML-DSA-65')
-    assert 'ML-DSA' in finding['title']
+    _ca(rsa.generate_private_key(public_exponent=65537, key_size=1024), 'Short RSA Root')
+    finding = _assert_found('ca.unapproved_algorithm', 1, 'PQ Root (#', 'ML-DSA-65')
+    assert 'ML-DSA' in finding['title'] and 'weak' not in finding['title'].lower()
+    weak = _assert_found('ca.weak_key', 1, 'Short RSA Root (#')
+    assert not any('ML-DSA' in example for example in weak['examples'])
+    assert 'ML-DSA' not in weak['title']
 
 
 @needs_mldsa

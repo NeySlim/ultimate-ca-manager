@@ -377,7 +377,7 @@ def test_fips_preflight_names_ml_dsa_ca_template_and_policy(app, auth_client, cr
         tid, tname = tpl.id, tpl.name
     try:
         with app.app_context():
-            unapproved_cas = fips_preflight._ca_weak()
+            unapproved_cas = fips_preflight._ca_unapproved_algorithm()
             templates = fips_preflight._templates()
             policies = fips_preflight._policies()
         assert any(f"(#{ca['id']}): ML-DSA-65" in n for n in unapproved_cas), unapproved_cas

@@ -166,12 +166,26 @@ def _ca_eddsa():
             if name in _EDDSA_OIDS.values()]
 
 
+def _is_mldsa(name) -> bool:
+    alg = key_algorithms.get(name)
+    return alg is not None and alg.family == 'ML-DSA'
+
+
 @detector('ca.weak_key', BLOCKER,
-          'Certificate authorities with a DSA or ML-DSA key, RSA under 2048 bits or a curve other than P-256/384/521',
+          'Certificate authorities with a DSA key, RSA under 2048 bits or a curve other than P-256/384/521',
           'Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it.')
 def _ca_weak():
     return [_named(ca.descr, ca.id, name) for ca, (name, approved) in _ca_keys()
-            if not approved and name not in _EDDSA_OIDS.values()]
+            if not approved and name not in _EDDSA_OIDS.values() and not _is_mldsa(name)]
+
+
+@detector('ca.unapproved_algorithm', BLOCKER,
+          'Certificate authorities with an ML-DSA key: the FIPS module UCM ships does not provide '
+          'ML-DSA, so they cannot sign in FIPS mode',
+          'Create an RSA 2048+ or ECDSA P-256/P-384/P-521 authority and move issuance to it '
+          'before the switch, or keep FIPS mode off while ML-DSA issuance is needed.')
+def _ca_unapproved_algorithm():
+    return [_named(ca.descr, ca.id, name) for ca, (name, _) in _ca_keys() if _is_mldsa(name)]
 
 
 def _ssh_eddsa(key_type, public_key) -> Optional[str]:
