@@ -285,6 +285,8 @@ class TSAService:
         if pq_alg is not None and pq_alg.family == 'ML-DSA':
             # RFC 9882 §3.3: SHA-512 digests the content; ML-DSA signs without one
             signature_hash_name = 'sha512'
+            # Parsed from DER: asn1crypto would add the NULL parameters §3.3 says MUST be omitted
+            digest_algorithm = cms.DigestAlgorithm.load(bytes.fromhex('300b0609608648016503040203'))
         else:
             pq_alg = None
             signature_hash_name = (
@@ -294,6 +296,7 @@ class TSAService:
             # algorithm and the signature then follow it (self-review of #347)
             signature_hash = signing_hash_for(self.tsa_key, HASH_CLASSES[signature_hash_name]())
             signature_hash_name = signature_hash.name
+            digest_algorithm = {'algorithm': signature_hash_name}
 
         # Compute digest of TSTInfo content with the CMS signature digest.
         content_digest = hashlib.new(signature_hash_name, tst_info_der).digest()
@@ -359,7 +362,7 @@ class TSAService:
         signer_info = cms.SignerInfo({
             'version': 'v1',
             'sid': cms.SignerIdentifier({'issuer_and_serial_number': issuer_and_serial}),
-            'digest_algorithm': {'algorithm': signature_hash_name},
+            'digest_algorithm': digest_algorithm,
             'signed_attrs': signed_attrs,
             'signature_algorithm': {'algorithm': sig_alg},
             'signature': raw_sig,
@@ -370,7 +373,7 @@ class TSAService:
         # EXPLICIT [0] tag handling for EncapsulatedContentInfo.
         signed_data_value = cms.SignedData({
             'version': 'v3',
-            'digest_algorithms': [{'algorithm': signature_hash_name}],
+            'digest_algorithms': [digest_algorithm],
             'encap_content_info': {
                 'content_type': TST_INFO_OID,
                 'content': core.ParsableOctetString(tst_info_der),

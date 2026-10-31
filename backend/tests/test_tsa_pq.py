@@ -73,8 +73,9 @@ def _assert_rfc9882(response_der, cert, label):
     a pure signature over the DER SignedAttrs, and the ESSCertIDv2 still SHA-256."""
     signed_data, signer_info = _signer_info(response_der)
     tst_info_der = signed_data['encap_content_info']['content'].contents
-    assert signer_info['digest_algorithm']['algorithm'].native == 'sha512'
-    assert [a['algorithm'].native for a in signed_data['digest_algorithms']] == ['sha512']
+    sha512 = core.ObjectIdentifier('2.16.840.1.101.3.4.2.3').dump()
+    assert signer_info['digest_algorithm'].dump() == b'\x30' + bytes([len(sha512)]) + sha512
+    assert [a.dump() for a in signed_data['digest_algorithms']] == [b'\x30' + bytes([len(sha512)]) + sha512]
     algorithm = signer_info['signature_algorithm']
     assert algorithm['algorithm'].dotted == key_algorithms.get(label).oid
     oid = core.ObjectIdentifier(key_algorithms.get(label).oid).dump()
