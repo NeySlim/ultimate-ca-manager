@@ -15,6 +15,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - ML-DSA keys can be generated for CAs, certificates, CSRs and templates, and a renewed ML-DSA key keeps its level. Their certificates carry signature-only key usage (RFC 9881): a bit a template or CSR asked for is removed with a notice, and a digest asked for an ML-DSA signer is ignored with a notice.
 
+- ML-DSA authorities sign their CRLs and OCSP responses without a digest, under the OID of their own level, and OpenSSL 3.5 verifies them, delegated responders across RSA and ML-DSA included.
+
+- Policies, compliance profiles and both preflights recognise an ML-DSA signer as the `ml_dsa` scheme, so `allowed_signature_schemes` and `pq_standalone` apply to what an ML-DSA authority signs. An ML-DSA key scores like the classical curve of its NIST category.
+
 - Post-quantum certificates, CAs and CSRs (ML-DSA, SLH-DSA) are shown under their own name with their security level and a Post-quantum badge, in the API, the trust store, the mTLS list and compliance grading. A key the API does not name is no longer displayed as RSA.
 
 - Certificate chains, issuer lookups, smart import and delegated OCSP responders verify ML-DSA signatures. An unverifiable self-issued certificate whose key identifiers point at another key is no longer taken for a root.
@@ -25,9 +29,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Changed
 
+- CRL settings: the CRL digest of an Ed25519, Ed448 or ML-DSA authority is reported as empty, setting one answers 400, and the CRL page no longer offers it.
+
 - Issuance: an unknown `keyAlgo` on `POST /api/v2/cas`, or an unknown key type on a certificate, CSR or template, now answers 400 instead of falling back to RSA-2048. SLH-DSA CSRs are refused as not signable by this instance.
 
 ### Fixed
+
+- OCSP: a CA whose certificate carries a compressed EC point is found by its issuerKeyHash instead of answering unauthorized, and the responder ID hashes the key as the certificate encodes it. A multi-certificate request signed by an ML-DSA responder no longer fails.
 
 - Generated CSRs: an Ed25519 or Ed448 key was signed with the requested SHA-2 digest and failed; keys whose scheme takes no digest are now signed without one.
 
