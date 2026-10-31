@@ -27,7 +27,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - PKCS#12, PFX and JKS exports of an ML-DSA key answer 400 with the reason `unsupported_for_key_algorithm` instead of a 500, and the export dialog greys these formats out. P7B bundles are built in-process instead of by the openssl command.
 
-- The Create CA, Issue Certificate, Generate CSR and template forms offer ML-DSA-44, ML-DSA-65 and ML-DSA-87, and hide the signature hash when the key that signs takes none. These keys are not offered in FIPS mode or on an HSM.
+- The Create CA, Issue Certificate, Generate CSR and template forms offer ML-DSA-44, ML-DSA-65 and ML-DSA-87, and Create CA hides the signature hash when the key that signs takes none. These keys are not offered in FIPS mode or on an HSM.
 
 ### Changed
 
@@ -41,7 +41,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - CSRs: re-keying or cloning a CSR turned an EC P-384 or ML-DSA request into RSA-2048 or P-256; the request now keeps its key type.
 
-- ACME accounts: the list and detail named every account key RSA-2048 when the type was not stored; they now name the key the account's JWK holds.
+- ACME accounts: the account detail named every key RSA-2048; the list and detail now return the key the account's JWK holds.
 
 - Generated CSRs: an Ed25519 or Ed448 key was signed with the requested SHA-2 digest and failed; keys whose scheme takes no digest are now signed without one.
 
