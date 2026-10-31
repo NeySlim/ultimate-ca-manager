@@ -61,8 +61,10 @@ def _jwk_key_label(jwk_text):
             n = base64.urlsafe_b64decode(jwk['n'] + '=' * (-len(jwk['n']) % 4))
             bits = int.from_bytes(n, 'big').bit_length()
             return f'RSA-{bits}' if bits else None
-        if jwk.get('kty') in ('EC', 'OKP'):
-            return key_algorithms.normalize_label(jwk.get('crv'))
+        # A crv names a key only under the kty that allows it (RFC 7518 6.2, RFC 8037)
+        families = {'EC': ('EC',), 'OKP': ('ED25519', 'ED448')}.get(jwk.get('kty'))
+        alg = key_algorithms.get(jwk.get('crv')) if families else None
+        return alg.label if alg and alg.family in families else None
     except (AttributeError, KeyError, TypeError, ValueError):
         pass
     return None

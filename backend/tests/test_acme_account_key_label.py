@@ -51,7 +51,10 @@ def test_detail_and_list_name_the_stored_key(auth_client, make_account, jwk, lab
 
 
 @pytest.mark.parametrize('jwk', ['{}', 'not json', {'kty': 'EC', 'crv': 'P-999'},
-                                 {'kty': 'RSA', 'n': '!!'}, {'kty': 'oct', 'k': 'AA'}])
+                                 {'kty': 'RSA', 'n': '!!'}, {'kty': 'oct', 'k': 'AA'},
+                                 {'kty': 'EC', 'crv': 'Ed25519', 'x': 'AA'},
+                                 {'kty': 'OKP', 'crv': 'P-256', 'x': 'AA'},
+                                 {'kty': 'EC', 'crv': 'RSA-2048'}, {'kty': 'OKP', 'crv': 'ML-DSA-65'}])
 def test_unreadable_key_has_no_label(auth_client, make_account, jwk):
     account_id = make_account(jwk)
 
