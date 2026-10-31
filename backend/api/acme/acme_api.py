@@ -1675,7 +1675,8 @@ def _jws_incapable_key_label(cert_obj) -> Optional[str]:
         return None
     if isinstance(key, ec.EllipticCurvePublicKey) and key.curve.name in _JWS_CURVES:
         return None
-    return key_algorithms.label_for_public_key(key) or type(key).__name__
+    label = key_algorithms.label_for_public_key(key) or key_algorithms.key_algo_for_public_key(key)
+    return label if label != 'Unknown' else type(key).__name__
 
 
 @acme_bp.route('/revoke-cert', methods=['POST'])
@@ -1804,7 +1805,7 @@ def revoke_cert():
                 if AcmeOrder.query.filter_by(certificate_id=cert.id).first() is not None:
                     return acme_error(
                         'unauthorized',
-                        f'This certificate has a {label} key, which cannot sign an ACME request '
+                        f"This certificate's key ({label}) cannot sign an ACME request "
                         '(RSA, EC P-256, P-384 and P-521 only); revoke it with the account '
                         'that ordered it', 403)
             return acme_error('unauthorized', 'Not authorized to revoke this certificate', 403)

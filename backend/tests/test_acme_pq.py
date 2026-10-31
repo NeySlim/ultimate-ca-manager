@@ -255,9 +255,12 @@ FIXTURES = Path(__file__).resolve().parent / 'fixtures' / 'pqc'
 
 
 def _brainpool_cert():
-    from datetime import datetime, timedelta, timezone
     from cryptography.hazmat.primitives.asymmetric import ec
-    key = ec.generate_private_key(ec.BrainpoolP256R1())
+    return _self_signed(ec.generate_private_key(ec.BrainpoolP256R1()))
+
+
+def _self_signed(key):
+    from datetime import datetime, timedelta, timezone
     name = x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, 'bp.pq.example.com')])
     now = datetime.now(timezone.utc)
     return (x509.CertificateBuilder().subject_name(name).issuer_name(name)
@@ -322,7 +325,17 @@ class TestRevokeByAKeyThatCannotSign:
                               rsa_account)
         r = self._stranger_revokes(client, cert)
         assert r.status_code == 403
-        assert 'EC-BP256' in r.get_json()['detail'], r.get_json()
+        assert r.get_json()['detail'].startswith(
+            "This certificate's key (EC-BP256) cannot sign an ACME request"), r.get_json()
+
+    def test_an_unregistered_curve_is_named_by_its_curve(self, client, stored_cert, rsa_account):
+        from cryptography.hazmat.primitives.asymmetric import ec
+        cert, _ = stored_cert(_self_signed(ec.generate_private_key(ec.SECP256K1()))
+                              .public_bytes(serialization.Encoding.PEM), rsa_account)
+        r = self._stranger_revokes(client, cert)
+        assert r.status_code == 403
+        detail = r.get_json()['detail']
+        assert 'secp256k1' in detail and 'ECPublicKey' not in detail, detail
 
 
 # ---------------------------------------------------------------------------
