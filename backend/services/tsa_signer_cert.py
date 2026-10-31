@@ -33,7 +33,7 @@ from services.tsa_service import TSA_SIGNER_FAMILIES
 from utils.datetime_utils import cert_not_before, utc_now
 from utils.db_transaction import safe_commit
 from utils import key_algorithms
-from utils.key_type import parse_issue_key_type
+from utils.key_type import issue_key_size, parse_issue_key_type
 from utils.key_codec import private_key_to_pem
 
 logger = logging.getLogger(__name__)
@@ -67,7 +67,7 @@ def _generate_key(key_type, key_size, curve):
             'brainpoolP256r1, brainpoolP384r1 or brainpoolP512r1)', 400)
     try:
         normalized = parse_issue_key_type(key_type or DEFAULT_KEY_TYPE,
-                                          key_size or DEFAULT_KEY_SIZE,
+                                          issue_key_size(key_type, key_size, DEFAULT_KEY_SIZE),
                                           curve=curve)
     except ValueError as exc:
         raise TsaSignerIssueError(str(exc), 400)

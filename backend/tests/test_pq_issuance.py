@@ -63,6 +63,27 @@ def test_parse_issue_key_type_refuses_what_it_cannot_name(key_type, key_size):
         parse_issue_key_type(key_type, key_size)
 
 
+@pytest.mark.parametrize('key_size', ['2048', 2048, '44'])
+def test_a_full_label_refuses_a_key_size_naming_another_key(key_size):
+    from utils.key_type import parse_issue_key_type
+    with pytest.raises(ValueError, match='ML-DSA-65'):
+        parse_issue_key_type('ML-DSA-65', key_size)
+    assert parse_issue_key_type('ML-DSA-65', '65') == 'ml-dsa-65'
+
+
+@pytest.mark.parametrize('key_size, status', [(None, 201), (2048, 400)])
+def test_issuing_a_full_label_needs_no_key_size(app, auth_client, create_ca, key_size, status):
+    ca = create_ca(cn=f'PQ label issuer {key_size}')
+    body = {'cn': f'label-{key_size}.pq.example.test', 'ca_id': ca['id'], 'key_type': 'ML-DSA-65',
+            'validity_days': 30, **({'key_size': key_size} if key_size else {})}
+    r = _post(auth_client, '/api/v2/certificates', body)
+    assert r.status_code == status, r.get_json()
+    if status == 201:
+        with app.app_context():
+            leaf = _row_cert(db.session.get(Certificate, r.get_json()['data']['id']))
+        assert isinstance(leaf.public_key(), mldsa.MLDSA65PublicKey)
+
+
 def test_parse_csr_key_type_names_ml_dsa():
     from utils.key_type import parse_csr_key_type
     assert parse_csr_key_type('ML-DSA-65') == 'ml-dsa-65'
@@ -259,6 +280,12 @@ def test_ca_profile_digest_is_none_without_a_digest():
     # Classical keys keep their curve digest
     assert resolve_digest('auto', 'secp384r1') == ('sha384', None)
     assert resolve_digest(None, '2048') == ('sha256', None)
+
+
+@pytest.mark.parametrize('key_type', ['2048', 'secp384r1', 'ml-dsa-65'])
+def test_auto_is_read_like_an_explicit_digest(key_type):
+    from utils.ca_profile import resolve_digest
+    assert resolve_digest(' AUTO ', key_type) == resolve_digest('auto', key_type)
 
 
 def test_key_default_digest_is_none_for_ml_dsa():

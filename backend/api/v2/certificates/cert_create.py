@@ -205,7 +205,7 @@ def create_certificate():
         from services.hsm.ca_key_loader import get_ca_signing_key
         ca_key = get_ca_signing_key(ca)
 
-        from utils.key_type import parse_issue_key_type, fill_key_params_from_template
+        from utils.key_type import parse_issue_key_type, fill_key_params_from_template, issue_key_size
 
         key_type_in = data.get('key_type') or data.get('keyType')
         key_size_in = data.get('key_size') or data.get('keySize')
@@ -217,7 +217,7 @@ def create_certificate():
             key_type_in, key_size_in = fill_key_params_from_template(
                 key_type_in, key_size_in, template.key_type)
         key_type_in = key_type_in or 'rsa'
-        key_size_in = key_size_in or '2048'
+        key_size_in = issue_key_size(key_type_in, key_size_in, '2048')
         try:
             # A pair names its two keys; key_type and key_size do not apply to it
             normalized_key = pair[0] if pair else parse_issue_key_type(

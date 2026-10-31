@@ -96,9 +96,9 @@ def _registry_key_type(raw_type: str, raw_size) -> str | None:
             raise ValueError(f'{family} key size must be one of {", ".join(choices)}')
     if alg.family in ('RSA', 'EC') or alg.trust_store_id is None:
         return None
-    # A full label wins over a numeric default size, never over another key named by level or label
+    # A full label takes no size, or one naming the same key ('65', 'ML-DSA-65')
     other = key_algorithms.get(f'{alg.family}-{size}') if size.isdigit() else key_algorithms.get(size)
-    if other is not None and other is not alg:
+    if size and other is not alg:
         raise ValueError(f'key type {alg.label} and key size {size} name different keys')
     return alg.trust_store_id
 
@@ -114,7 +114,7 @@ def parse_issue_key_type(
     raw_size = str(key_size if key_size is not None else '2048').strip()
 
     # A curve only applies to EC: a key named outside RSA and EC ignores it
-    registry_id = _registry_key_type(raw_type, raw_size)
+    registry_id = _registry_key_type(raw_type, str(key_size if key_size is not None else '').strip())
     if registry_id is not None:
         return registry_id
 
@@ -136,6 +136,14 @@ def parse_issue_key_type(
         return size
 
     raise ValueError(f'Unsupported key type: {raw_type}')
+
+
+def issue_key_size(key_type, key_size, default):
+    """*key_size*, else *default*; None for a label that names its own parameter ('ML-DSA-65')."""
+    if key_size not in (None, ''):
+        return key_size
+    alg = key_algorithms.get(str(key_type or '').strip())
+    return None if alg is not None and alg.family not in ('RSA', 'EC') else default
 
 
 def fill_key_params_from_template(key_type, key_size, template_key_type):

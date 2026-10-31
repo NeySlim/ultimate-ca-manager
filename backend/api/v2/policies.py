@@ -509,7 +509,7 @@ def _issue_approved_certificate(approval):
     # same template fill and key parse the direct route does. Without it an EC
     # template with a blank key_size silently fell back to SECP256R1 via the old
     # curve_map default (#226, #318).
-    from utils.key_type import parse_issue_key_type, fill_key_params_from_template
+    from utils.key_type import parse_issue_key_type, fill_key_params_from_template, issue_key_size
 
     key_type = data.get('key_type') or data.get('keyType')
     key_size = data.get('key_size') or data.get('keySize')
@@ -517,7 +517,7 @@ def _issue_approved_certificate(approval):
         key_type, key_size = fill_key_params_from_template(
             key_type, key_size, template.key_type)
     key_type = key_type or 'RSA'
-    key_size = key_size or '2048'
+    key_size = issue_key_size(key_type, key_size, '2048')
 
     normalized_key = parse_issue_key_type(key_type, key_size, curve=data.get('curve'))
 
