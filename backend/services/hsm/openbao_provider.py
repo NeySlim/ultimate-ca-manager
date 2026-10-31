@@ -111,6 +111,7 @@ class OpenBaoProvider(BaseHsmProvider):
     """
 
     SIGNS_PSS = True
+    SIGNS_ML_DSA = True
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
@@ -307,7 +308,7 @@ class OpenBaoProvider(BaseHsmProvider):
         purpose: str = 'signing',
         extractable: bool = False
     ) -> HsmKeyInfo:
-        self.refuse_unsupported_curve(algorithm)
+        self.refuse_unsupported_algorithm(algorithm)
         if algorithm not in ALGORITHM_TO_TRANSIT:
             raise HsmOperationError(
                 f'Unsupported algorithm: {algorithm}. '

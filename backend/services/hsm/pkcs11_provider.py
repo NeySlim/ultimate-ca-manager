@@ -108,6 +108,7 @@ class Pkcs11Provider(BaseHsmProvider):
 
     SIGNS_PSS = True
     SIGNS_BRAINPOOL = True
+    SIGNS_ML_DSA = bool(ML_DSA_PARAMETER_SETS)
     
     def __init__(self, config: Dict[str, Any]):
         if not PKCS11_AVAILABLE:

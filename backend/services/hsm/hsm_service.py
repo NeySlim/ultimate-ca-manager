@@ -14,7 +14,7 @@ from models.hsm import HsmProvider, HsmKey
 from services import compliance_signer
 from services.hsm.ecdsa_signature import coordinate_bytes, ecdsa_to_der
 from services.hsm.base_provider import (
-    BaseHsmProvider, HsmKeyInfo, brainpool_refusal,
+    BaseHsmProvider, HsmKeyInfo, brainpool_refusal, mldsa_refusal,
     HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
 )
 from utils import key_algorithms
@@ -77,6 +77,18 @@ class HsmService:
         provider_class = cls._provider_registry.get(provider_type)
         supported = bool(provider_class and provider_class.SIGNS_BRAINPOOL)
         return brainpool_refusal(f"provider type '{provider_type}'", algorithm, supported)
+
+    @classmethod
+    def mldsa_refusal(cls, provider_type: str, algorithm: Optional[str]) -> Optional[str]:
+        """Why this provider type cannot hold an ML-DSA *algorithm* key, or None."""
+        provider_class = cls._provider_registry.get(provider_type)
+        supported = bool(provider_class and provider_class.SIGNS_ML_DSA)
+        return mldsa_refusal(f"provider type '{provider_type}'", algorithm, supported)
+
+    @classmethod
+    def algorithm_refusal(cls, provider_type: str, algorithm: Optional[str]) -> Optional[str]:
+        """Why this provider type cannot hold an *algorithm* key (Brainpool, ML-DSA), or None."""
+        return cls.brainpool_refusal(provider_type, algorithm) or cls.mldsa_refusal(provider_type, algorithm)
 
     @classmethod
     def get_available_providers(cls) -> List[str]:
@@ -395,7 +407,7 @@ class HsmService:
         # Validate algorithm
         if algorithm not in HsmKey.VALID_ALGORITHMS:
             raise ValueError(f"Invalid algorithm: {algorithm}")
-        refusal = cls.brainpool_refusal(provider.type, algorithm)
+        refusal = cls.algorithm_refusal(provider.type, algorithm)
         if refusal:
             raise HsmOperationError(refusal)
         registered = key_algorithms.get(algorithm)

@@ -496,7 +496,7 @@ def generate_key(provider_id):
             400
         )
     
-    refusal = HsmService.brainpool_refusal(provider.type, algorithm)
+    refusal = HsmService.algorithm_refusal(provider.type, algorithm)
     if refusal:
         return error_response(refusal, 400)
 

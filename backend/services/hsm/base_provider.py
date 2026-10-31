@@ -33,10 +33,14 @@ class BaseHsmProvider(ABC):
     # True when the provider generates and signs with Brainpool curves (RFC 5639)
     SIGNS_BRAINPOOL = False
 
-    def refuse_unsupported_curve(self, algorithm: str) -> None:
-        """Raise HsmOperationError for a Brainpool label this provider cannot handle."""
-        name = getattr(type(self), 'PROVIDER_TYPE', None) or type(self).__name__
-        message = brainpool_refusal(f"provider type '{name}'", algorithm, self.SIGNS_BRAINPOOL)
+    # True when the provider generates and signs ML-DSA keys (FIPS 204)
+    SIGNS_ML_DSA = False
+
+    def refuse_unsupported_algorithm(self, algorithm: str) -> None:
+        """Raise HsmOperationError for a Brainpool or ML-DSA label this provider cannot handle."""
+        name = f"provider type '{getattr(type(self), 'PROVIDER_TYPE', None) or type(self).__name__}'"
+        message = (brainpool_refusal(name, algorithm, self.SIGNS_BRAINPOOL)
+                   or mldsa_refusal(name, algorithm, self.SIGNS_ML_DSA))
         if message:
             raise HsmOperationError(message)
     
@@ -217,6 +221,16 @@ def brainpool_refusal(provider: str, algorithm: Optional[str], supported: bool =
         return None
     return (f"Brainpool key {algorithm} is not supported by {provider}: "
             f"only PKCS#11 HSMs generate and sign with Brainpool curves")
+
+
+def mldsa_refusal(provider: str, algorithm: Optional[str], supported: bool = False) -> Optional[str]:
+    """Why *provider* cannot take the ML-DSA *algorithm*, or None."""
+    from utils.key_algorithms import post_quantum_info
+    info = post_quantum_info(algorithm) if algorithm else None
+    if supported or info is None or info.family != 'ML-DSA':
+        return None
+    return (f"ML-DSA keys are not available with {provider}: {algorithm} needs a "
+            f"PKCS#11 3.2 token, OpenBao Transit or Google Cloud KMS")
 
 
 class HsmOperationError(HsmError):

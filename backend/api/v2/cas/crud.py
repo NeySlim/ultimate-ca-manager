@@ -562,10 +562,10 @@ def create_ca():
             else:
                 chosen_provider = (db.session.get(HsmProvider, int(hsm_provider_id))
                                    if str(hsm_provider_id).isdigit() else None)
-            brainpool_refusal = (HsmService.brainpool_refusal(chosen_provider.type, hsm_key_algorithm_for_digest)
+            algorithm_refusal = (HsmService.algorithm_refusal(chosen_provider.type, hsm_key_algorithm_for_digest)
                                  if chosen_provider else None)
-            if brainpool_refusal:
-                return error_response(brainpool_refusal, 400)
+            if algorithm_refusal:
+                return error_response(algorithm_refusal, 400)
         # The parent signs an intermediate: its key decides whether a digest applies,
         # and 'auto' follows the child key only when both keys take one.
         signer_key_type = digest_key_type
