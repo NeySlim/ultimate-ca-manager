@@ -297,7 +297,7 @@ export default function AccountPage() {
     full: ['*'],
     read: ['read:*'],
     readwrite: ['read:*', 'write:*'],
-    certificates: ['read:certificates', 'write:certificates', 'read:cas', 'read:crl'],
+    certificates: ['read:certificates', 'write:certificates', 'read:cas', 'read:crl', 'read:ssh', 'write:ssh'],
   }
 
   const handleCreateApiKey = async (e) => {
