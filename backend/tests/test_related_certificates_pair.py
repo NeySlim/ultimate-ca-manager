@@ -225,6 +225,39 @@ def test_bulk_revocation_may_keep_the_other_member(app, auth_client, create_ca):
     assert _revoked(app, a['id'], b['id']) == [True, False]
 
 
+def _partner_revocation_fails(monkeypatch, partner_id):
+    from services.cert.mixins.lifecycle import LifecycleMixin
+    real = LifecycleMixin.revoke_certificate
+
+    def refusing(cert_id, *args, **kwargs):
+        if cert_id == partner_id:
+            raise RuntimeError('storage refused')
+        return real(cert_id, *args, **kwargs)
+    monkeypatch.setattr(LifecycleMixin, 'revoke_certificate', staticmethod(refusing))
+
+
+def test_a_partner_left_unrevoked_is_said(app, auth_client, create_ca, monkeypatch):
+    a, b = _pair(auth_client, create_ca, 'pair-revoke-partial.example.com')
+    _partner_revocation_fails(monkeypatch, b['id'])
+    r = auth_client.post(f"/api/v2/certificates/{a['id']}/revoke", json={'reason': 'keyCompromise'})
+    assert _revoked(app, a['id'], b['id']) == [True, False]
+    body = json.loads(r.data)
+    assert body['data']['related_not_revoked'] == b['id'], r.data
+    assert 'related_revoked' not in body['data']
+    assert f"#{b['id']} was not revoked" in body['message']
+
+
+def test_bulk_says_a_partner_left_unrevoked(app, auth_client, create_ca, monkeypatch):
+    a, b = _pair(auth_client, create_ca, 'pair-bulk-partial.example.com')
+    _partner_revocation_fails(monkeypatch, b['id'])
+    r = auth_client.post('/api/v2/certificates/bulk/revoke', json={'ids': [a['id']]})
+    assert r.status_code == 200, r.data
+    results = json.loads(r.data)['data']
+    assert results['success'] == [a['id']]
+    assert results['related_not_revoked'] == [b['id']], r.data
+    assert _revoked(app, a['id'], b['id']) == [True, False]
+
+
 def test_an_approved_revocation_takes_the_pair(app, auth_client, create_ca, create_user):
     a, b = _pair(auth_client, create_ca, 'pair-approval.example.com')
     pid = _approval_policy(app, _ca_id_of(app, a['id']), ['revocation'])

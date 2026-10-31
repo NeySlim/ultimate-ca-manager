@@ -135,12 +135,15 @@ def revoke_certificate(cert_id):
 
         cert_dict = cert.to_dict()
         partner = db.session.get(Certificate, partner_id) if revoke_related and partner_id else None
+        message = 'Certificate revoked successfully'
         if partner is not None and partner.revoked:
             cert_dict['related_revoked'] = partner_id
-        return success_response(
-            data=cert_dict,
-            message='Certificate revoked successfully'
-        )
+        elif partner is not None:
+            # This one stays revoked; the other member's failure is said, not hidden
+            cert_dict['related_not_revoked'] = partner_id
+            message = (f'Certificate revoked; its related certificate #{partner_id} was not '
+                       'revoked, revoke it separately')
+        return success_response(data=cert_dict, message=message)
     except ValueError as e:
         logger.error(f"Certificate revocation validation error: {e}")
         return error_response('Validation failed', 400)
