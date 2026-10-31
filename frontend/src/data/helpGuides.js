@@ -126,7 +126,7 @@ Groups CAs by their Organization (O) field. Useful for multi-tenant setups where
 The form flags an RSA-2048 CA that would outlive 2030: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026. Choose RSA-3072 or larger. Under **Advanced Constraints (RFC 5280)**, permitted and excluded subtrees (DNS, IP range, email) limit the names the CA may certify.
 
 ### Post-quantum CAs (ML-DSA)
-**ML-DSA-44**, **ML-DSA-65** and **ML-DSA-87** (FIPS 204) are listed with their NIST security level (2, 3 and 5). The key is generated in software, never on an HSM, and the algorithm is hidden in FIPS mode.
+**ML-DSA-44**, **ML-DSA-65** and **ML-DSA-87** (FIPS 204) are listed with their NIST security level (2, 3 and 5). The key is generated in software, or on an HSM provider that holds ML-DSA (see HSM-backed CAs), and the algorithm is hidden in FIPS mode.
 
 - An ML-DSA key signs without a separate digest: the digest field disappears, and a digest sent through the API is ignored with a notice. CRLs and OCSP responses of the CA follow the same rule.
 - Hierarchies can mix: an ML-DSA root can sign an RSA or EC intermediate, and an RSA or EC CA can sign an ML-DSA intermediate, which then uses its parent's digest.
@@ -244,7 +244,7 @@ UCM can store a CA's signing key on an external Hardware Security Module instead
 3. In **Key Storage**, switch from *Local* to **HSM**
 4. Pick the HSM provider
 5. Choose a key mode:
-   - **Generate new key**: provide a label (letters/digits/_/-) and pick the algorithm (RSA-2048/3072/4096 or EC-P256/P384/P521, RSA-3072 by default)
+   - **Generate new key**: provide a label (letters/digits/_/-) and pick the algorithm (RSA-2048/3072/4096 or EC-P256/P384/P521, RSA-3072 by default; Brainpool on PKCS#11, ML-DSA on the providers listed under HSM Management)
    - **Use existing key**: pick an unused signing key already present on the HSM
 6. Submit. UCM creates the CA certificate and binds it to the HSM key.
 
@@ -2590,6 +2590,7 @@ Configuration:
 Supported key types:
 - RSA 2048, 3072, 4096
 - ECDSA P-256, P-384, P-521
+- ML-DSA-44, ML-DSA-65, ML-DSA-87 (Transit \`mldsa-*\` keys, on an OpenBao release that has them)
 - AES-256-GCM (symmetric)
 
 > 💡 OpenBao is a community-maintained fork of HashiCorp Vault. UCM works with both OpenBao and Vault.
@@ -2624,6 +2625,14 @@ Each provider shows a connection status indicator:
 5. Click **Generate**
 
 The key is created directly on the HSM. UCM stores only a reference.
+
+### ML-DSA keys
+ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) are offered only on providers that sign with them:
+- **PKCS#11**: a token implementing PKCS#11 3.2 with the ML-DSA mechanisms
+- **OpenBao / Vault Transit**: key types \`mldsa-44\`, \`mldsa-65\` and \`mldsa-87\`
+- **Google Cloud KMS**: \`PQ_SIGN_ML_DSA_*\` key versions, mapped from the KMS API but not yet tested against the service. KMS signs at most 64 KiB of data, so a CRL larger than that cannot be signed
+
+Azure Key Vault and AWS CloudHSM providers hold no ML-DSA key, and FIPS mode refuses ML-DSA on every provider. An ML-DSA key signs the data itself, so no digest is chosen.
 
 ### Using HSM Keys
 When creating a CA, select an HSM provider and key instead of generating a software key. The CA's signing operations are performed on the HSM.

@@ -1355,6 +1355,17 @@ export const helpContent = {
           { label: 'Migration', text: 'Existing local CAs cannot be moved to an HSM after creation, choose at creation time' },
         ]
       },
+      {
+        title: 'ML-DSA keys',
+        icon: Key,
+        content: 'ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) keys are offered only on providers that sign with them. They sign the data itself, so no digest is chosen.',
+        items: [
+          { label: 'PKCS#11', text: 'A token implementing PKCS#11 3.2 with the ML-DSA mechanisms' },
+          { label: 'OpenBao / Vault Transit', text: 'Transit key types mldsa-44, mldsa-65 and mldsa-87' },
+          { label: 'Google Cloud KMS', text: 'PQ_SIGN_ML_DSA key versions, mapped from the KMS API but not yet tested against the service. KMS signs at most 64 KiB of data, so a CRL larger than that cannot be signed' },
+          { label: 'Not available', text: 'Azure Key Vault and AWS CloudHSM providers hold no ML-DSA key, and FIPS mode refuses ML-DSA on every provider' },
+        ]
+      },
     ],
     tips: [
       'Use SoftHSM for testing before deploying with a physical HSM',

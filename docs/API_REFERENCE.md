@@ -528,7 +528,8 @@ or 87, required). A full label such as `RSA-3072`, `EC-P384` or `ML-DSA-65` is a
 and `keyType` is an alias of `keyAlgo`. An unknown `keyAlgo`, or a `keySize` that does not
 belong to it, answers `400`. Without `keySize`, `RSA` gives RSA-2048 and `ECDSA` P-256; a request
 without any key field gets RSA-2048. ML-DSA needs
-OpenSSL 3.5 or later, is generated in software only (no HSM), and is refused in FIPS mode.
+OpenSSL 3.5 or later and is refused in FIPS mode; `keyAlgo` generates it in software, and
+an HSM-held ML-DSA key is chosen with `hsm_key_algorithm` on a provider that has it (see [HSM](#hsm)).
 An ML-DSA key signs without a separate digest: a `digest` sent for it is ignored and named
 in `meta.notices`. An intermediate under an ML-DSA parent likewise takes no digest; an
 ML-DSA intermediate under an RSA or EC parent uses its parent's digest.
@@ -3395,6 +3396,15 @@ Content-Type: application/json
   "extractable": false
 }
 ```
+
+`algorithm` also takes `EC-BP256`, `EC-BP384` and `EC-BP512` on a `pkcs11` provider, and
+`ML-DSA-44`, `ML-DSA-65` and `ML-DSA-87` on a provider that signs with them: `pkcs11` (a
+PKCS#11 3.2 token with the ML-DSA mechanisms), `openbao` (Transit `mldsa-*` keys) and
+`google-kms` (`PQ_SIGN_ML_DSA_*` versions, mapped from the KMS API but not tested against the
+service). `azure-keyvault` and `aws-cloudhsm` answer `400` for both families, and FIPS mode
+refuses ML-DSA on every provider. An ML-DSA key signs the data itself: no digest applies.
+Google Cloud KMS signs at most 64 KiB of data with it, so a larger CRL fails with a message
+that says so.
 
 ### Get HSM Key
 ```http
