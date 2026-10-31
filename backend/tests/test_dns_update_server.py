@@ -333,6 +333,61 @@ def test_N3_free_port_listens_and_stop_clears_pos(app):
         socket.create_connection(('127.0.0.1', r.port), timeout=1)
 
 
+# -- F12: port 0 and a UDP twin held by another socket ---------------------------------------------
+
+def _udp_twin_taken(monkeypatch, times):
+    """The first `times` UDP binds find their port already held by another socket.
+    Returns (held sockets, ports tried)."""
+    real = srv_mod._udp_server_class()
+    held, tried = [], []
+
+    class TwinTaken(real):
+        def __init__(self, listener, *a, **k):
+            tried.append(listener[1])
+            if len(tried) <= times:
+                b = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                try:
+                    b.bind(listener)
+                    held.append(b)
+                except OSError:
+                    b.close()  # already held by some other socket: just as taken
+            super().__init__(listener, *a, **k)
+
+    monkeypatch.setattr(srv_mod, '_udp_server_class', lambda: TwinTaken)
+    return held, tried
+
+
+def test_F12_port_zero_draws_again_when_the_udp_twin_is_taken_pos(app, monkeypatch):
+    held, tried = _udp_twin_taken(monkeypatch, 1)
+    r = Running(app, FakeHandler(), ServerLimits(**OPEN))
+    try:
+        assert r.ok is True
+        assert len(tried) >= 2 and r.port != tried[0]
+        assert udp_ask(r, b'u', wait=5.0) == b'Ru'
+        s = tcp(r)
+        s.sendall(frame(b't'))
+        assert read_frame(s) == b'Rt'
+        s.close()
+    finally:
+        r.stop()
+        for b in held:
+            b.close()
+
+
+def test_F12_port_zero_gives_up_after_the_bounded_tries_neg(app, monkeypatch):
+    status.set_listening(False)
+    held, tried = _udp_twin_taken(monkeypatch, srv_mod.ANY_PORT_TRIES)
+    try:
+        r = Running(app, FakeHandler(), ServerLimits(**OPEN))
+        assert r.ok is False
+        assert r.server.bind_errno == errno.EADDRINUSE
+        assert len(tried) == srv_mod.ANY_PORT_TRIES
+        assert status.is_listening() is False
+    finally:
+        for b in held:
+            b.close()
+
+
 # -- N1: start and bind host -----------------------------------------------------------------------
 
 def test_N1_port_zero_disables_the_listener_neg(app, monkeypatch):
