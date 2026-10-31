@@ -111,6 +111,22 @@ def test_gcp_ml_dsa_refuses_a_digest():
     assert provider._client.calls == []
 
 
+def test_gcp_ml_dsa_signs_data_up_to_the_kms_cap():
+    gcp_provider, _types = _gcp()
+    provider = _gcp_provider('ML-DSA-65')
+    data = b'\x30' * gcp_provider.KMS_SIGN_DATA_MAX
+    provider._client.key.public_key().verify(provider.sign('k', data, 'ML-DSA-65'), data)
+
+
+def test_gcp_ml_dsa_refuses_data_over_the_kms_cap_before_the_call():
+    gcp_provider, _types = _gcp()
+    assert gcp_provider.KMS_SIGN_DATA_MAX == 64 * 1024
+    provider = _gcp_provider('ML-DSA-65')
+    with pytest.raises(HsmOperationError, match='64 KiB'):
+        provider.sign('k', b'\x30' * (gcp_provider.KMS_SIGN_DATA_MAX + 1), 'ML-DSA-65')
+    assert [call for call in provider._client.calls if call[0] == 'asymmetric_sign'] == []
+
+
 # ---- Azure Key Vault --------------------------------------------------------------
 
 def test_the_service_says_which_providers_hold_ml_dsa():

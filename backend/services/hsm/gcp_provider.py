@@ -23,6 +23,9 @@ PURPOSE_TO_GCP = {}
 GCP_ALGORITHM_NAMES = {}
 # Mapped from the KMS API, not run against the service (google-cloud-kms 3.4+ names them)
 UNTESTED_ALGORITHMS = frozenset({'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87'})
+# AsymmetricSignRequest.data is capped at 64 KiB (the gcloud CLI enforces 65536 bytes):
+# an ML-DSA version signs the data itself, so a CRL past that size cannot be signed.
+KMS_SIGN_DATA_MAX = 64 * 1024
 ML_DSA_VERSIONS = {}  # KMS algorithm -> label, versions that sign the data itself
 
 try:
@@ -440,6 +443,11 @@ class GcpKmsProvider(BaseHsmProvider):
                 # ML-DSA: KMS signs the data itself, pure with an empty context
                 if hash_algorithm:
                     raise HsmOperationError("ML-DSA signs the data itself: no digest applies")
+                if len(data) > KMS_SIGN_DATA_MAX:
+                    raise HsmOperationError(
+                        f"Google Cloud KMS signs at most 64 KiB with ML-DSA, which signs the data "
+                        f"itself; this request carries {len(data)} bytes (a CRL this large needs "
+                        f"another provider)")
                 response = self._client.asymmetric_sign(name=version_name, data=data)
             else:
                 # Hash the data with the digest the key version is bound to
