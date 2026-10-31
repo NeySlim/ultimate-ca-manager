@@ -20,6 +20,19 @@ PQ = next(label for label in key_algorithms.labels('ML-DSA') if label.endswith('
 HYBRID = {'classical': CLASSICAL, 'pq': PQ}
 
 
+@pytest.fixture(scope='module', autouse=True)
+def _certificates_made_here_go(app):
+    """A sequential run shares one database, and listings read one page: the
+    revoked pairs made here are deleted when the module ends."""
+    with app.app_context():
+        first = db.session.query(db.func.max(Certificate.id)).scalar() or 0
+    yield
+    from services.cert_service import CertificateService
+    with app.app_context():
+        for row_id in [r.id for r in Certificate.query.filter(Certificate.id > first).all()]:
+            CertificateService.delete_certificate(row_id, username='test')
+
+
 def _issue(auth_client, create_ca, cn, **extra):
     ca = create_ca(cn=f'Pair CA {cn}')
     body = {'cn': cn, 'ca_id': ca['id'], 'validity_days': 90, 'hybrid': HYBRID}

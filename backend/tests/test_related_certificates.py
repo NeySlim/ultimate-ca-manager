@@ -26,6 +26,19 @@ pytestmark = pytest.mark.skipif(not key_algorithms.mldsa_supported(),
 PQ_LABEL = next(label for label in key_algorithms.labels('ML-DSA') if label.endswith('65'))
 
 
+@pytest.fixture(scope='module', autouse=True)
+def _certificates_made_here_go(app):
+    """A sequential run shares one database, and listings read one page: the
+    certificates made here are deleted when the module ends."""
+    with app.app_context():
+        first = db.session.query(db.func.max(Certificate.id)).scalar() or 0
+    yield
+    from services.cert_service import CertificateService
+    with app.app_context():
+        for row_id in [r.id for r in Certificate.query.filter(Certificate.id > first).all()]:
+            CertificateService.delete_certificate(row_id, username='test')
+
+
 # ---- encodings ----------------------------------------------------------------
 
 NAME_CN_A = bytes.fromhex('300c310a300806035504030c0161')        # CN=a, UTF8String
