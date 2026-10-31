@@ -108,6 +108,53 @@ class TestSerialInterpretation:
                 db.session.commit()
 
 
+    def test_the_hexadecimal_reading_costs_no_second_query(self, app):
+        """Serial '10' with only the 0x10 row stored: one SELECT on the
+        certificates table resolves it, not one per reading."""
+        from sqlalchemy import event
+        ca_key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        ca_name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'Single query CA')])
+        now = datetime.now(timezone.utc)
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        cert = (
+            x509.CertificateBuilder()
+            .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'leaf-0x10')]))
+            .issuer_name(ca_name).public_key(key.public_key()).serial_number(16)
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=30))
+            .sign(ca_key, hashes.SHA256())
+        )
+        statements = []
+
+        def hook(conn, cursor, statement, *args):
+            if 'FROM certificates' in statement:
+                statements.append(statement)
+
+        with app.app_context():
+            row = Certificate(
+                refid='single-query-16', descr='leaf-0x10',
+                crt=base64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode(),
+                cert_type='usr_cert', subject=cert.subject.rfc4514_string(),
+                issuer=ca_name.rfc4514_string(), serial_number='16',
+                valid_from=now.replace(tzinfo=None), valid_to=(now + timedelta(days=30)).replace(tzinfo=None),
+            )
+            legacy = AuthCertificate(
+                user_id=1, cert_serial='10', cert_subject='CN=leaf-0x10',
+                cert_issuer=ca_name.rfc4514_string(), cert_fingerprint='', name='legacy-0x10', enabled=True,
+            )
+            db.session.add_all([row, legacy])
+            db.session.commit()
+            event.listen(db.engine, 'before_cursor_execute', hook)
+            try:
+                resolved = certificate_row_for(legacy)
+            finally:
+                event.remove(db.engine, 'before_cursor_execute', hook)
+                db.session.delete(legacy)
+                db.session.delete(row)
+                db.session.commit()
+            assert resolved is not None and resolved.refid == 'single-query-16'
+            assert len(statements) == 1, statements
+
+
 class TestEnrolmentCannotSquatASerial:
 
     def test_self_signed_certificate_is_refused(self, auth_client):
