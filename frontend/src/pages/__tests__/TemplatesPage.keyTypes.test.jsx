@@ -1,11 +1,11 @@
 /**
- * Template form key types come from the key algorithm registry: an ML-DSA
- * template keeps its key, shows no digest, and submits the registry label.
+ * Template form key types come from the key algorithm registry. The digest is the
+ * issuing CA's hash, so an ML-DSA template still shows and submits it.
  */
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import './pageRenderingSetup.jsx'
-import { GROUP_PQ, KEY_ALGORITHMS, findAlgorithm, listAlgorithms } from '../../lib/keyAlgorithms'
+import { GROUP_PQ, KEY_ALGORITHMS, listAlgorithms } from '../../lib/keyAlgorithms'
 
 vi.mock('../../services/eku.service', () => ({
   ekuService: { getKnown: vi.fn().mockResolvedValue({ data: { ekus: [] } }) },
@@ -53,7 +53,7 @@ describe('TemplateForm key types', () => {
     expect(PQ_ROWS.map(a => a.label)).toContain(PQ_LABEL)
   })
 
-  it('defaults a new template to the first generated key and its digest', async () => {
+  it('defaults a new template to the first generated key and SHA-256', async () => {
     const onSubmit = vi.fn()
     render(<TemplateForm template={null} onSubmit={onSubmit} onCancel={() => {}} />)
     const first = listAlgorithms({ generate: true })[0]
@@ -61,20 +61,20 @@ describe('TemplateForm key types', () => {
     fireEvent.change(screen.getByPlaceholderText('templates.namePlaceholder'), { target: { value: 'New' } })
     const body = await submit(onSubmit, 'common.create')
     expect(body.key_type).toBe(first.label)
-    expect(body.digest).toBe(first.digest)
+    expect(body.digest).toBe('sha256')
   })
 
-  it('keeps an ML-DSA template on its key and hides the digest', async () => {
+  it('keeps an ML-DSA template on its key and lets its CA digest be changed', async () => {
     const onSubmit = vi.fn()
     render(<TemplateForm template={template(PQ_LABEL)} onSubmit={onSubmit} onCancel={() => {}} />)
     expect(screen.getByLabelText('common.keyType')).toHaveValue(PQ_LABEL)
-    expect(screen.queryByLabelText('common.digest')).toBeNull()
+    fireEvent.change(screen.getByLabelText('common.digest'), { target: { value: 'sha384' } })
     const body = await submit(onSubmit, 'common.update')
     expect(body.key_type).toBe(PQ_LABEL)
-    expect(body).not.toHaveProperty('digest')
+    expect(body.digest).toBe('sha384')
   })
 
-  it('offers every ML-DSA level once generated, and switching to one drops the digest', async () => {
+  it('offers every ML-DSA level once generated, and switching to one keeps the digest', async () => {
     restore = generatePq()
     const onSubmit = vi.fn()
     render(<TemplateForm template={template('RSA-2048')} onSubmit={onSubmit} onCancel={() => {}} />)
@@ -82,16 +82,9 @@ describe('TemplateForm key types', () => {
     expect(screen.getByLabelText('common.digest')).toHaveValue('sha256')
     fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: PQ_LABEL } })
     expect(screen.getByLabelText('common.keyType')).toHaveValue(PQ_LABEL)
-    expect(screen.queryByLabelText('common.digest')).toBeNull()
+    expect(screen.getByLabelText('common.digest')).toHaveValue('sha256')
     const body = await submit(onSubmit, 'common.update')
     expect(body.key_type).toBe(PQ_LABEL)
-    expect(body).not.toHaveProperty('digest')
-  })
-
-  it('shows the digest again for a key that takes one', async () => {
-    render(<TemplateForm template={template(PQ_LABEL)} onSubmit={() => {}} onCancel={() => {}} />)
-    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'EC-P384' } })
-    expect(findAlgorithm('EC-P384').digest).toBeTruthy()
-    expect(screen.getByLabelText('common.digest')).toBeTruthy()
+    expect(body.digest).toBe('sha256')
   })
 })

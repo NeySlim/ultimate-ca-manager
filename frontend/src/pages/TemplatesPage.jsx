@@ -21,7 +21,7 @@ import { useNotification, useMobile } from '../contexts'
 import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { VALIDITY } from '../constants/config'
-import { KEY_ALGORITHMS, listAlgorithms, groupedOptions, findAlgorithm } from '../lib/keyAlgorithms'
+import { KEY_ALGORITHMS, listAlgorithms, groupedOptions } from '../lib/keyAlgorithms'
 import { useFipsMode } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { ekuService } from '../services/eku.service'
@@ -439,9 +439,7 @@ export default function TemplatesPage() {
       <CompactSection title={t('templates.keySettings')} icon={Key}>
         <CompactGrid columns={2}>
           <CompactField autoIcon="keyType" label={t('common.keyType')} value={selectedTemplate.key_type || '—'} />
-          {takesDigest(selectedTemplate.key_type) && (
-            <CompactField autoIcon="signature" label={t('common.digest')} value={selectedTemplate.digest || '—'} />
-          )}
+          <CompactField autoIcon="signature" label={t('common.digest')} value={selectedTemplate.digest || '—'} />
         </CompactGrid>
       </CompactSection>
 
@@ -703,9 +701,10 @@ const TEMPLATE_TYPE_OPTIONS = [
   'code_signing', 'client_auth', 'ocsp_signing', 'smartcard_logon', 'custom'
 ]
 const DIGEST_OPTIONS = ['sha256', 'sha384', 'sha512']
-// A new template takes the registry's first generated key; ML-DSA and EdDSA keys take no digest
+// A new template takes the registry's first generated key. The digest is the issuing CA's
+// signing hash, whatever the leaf key: it stays editable even for an ML-DSA or EdDSA leaf.
 const DEFAULT_KEY = listAlgorithms({ generate: true })[0]
-const takesDigest = (keyType) => findAlgorithm(keyType)?.digest !== null
+const DEFAULT_DIGEST = 'sha256'
 const KEY_USAGE_OPTIONS = [
   'digitalSignature', 'keyEncipherment', 'contentCommitment',
   'dataEncipherment', 'keyAgreement'
@@ -748,7 +747,7 @@ function buildInitialState(template) {
   if (!template) {
     return {
       name: '', description: '', template_type: 'web_server',
-      key_type: DEFAULT_KEY.label, digest: DEFAULT_KEY.digest,
+      key_type: DEFAULT_KEY.label, digest: DEFAULT_DIGEST,
       validity_days: VALIDITY.TEMPLATE_DEFAULT_DAYS,
       subject: { C: '', ST: '', L: '', O: '', OU: '', CN: '', emailAddress: '' },
       key_usage: ['digitalSignature', 'keyEncipherment'],
@@ -771,7 +770,7 @@ function buildInitialState(template) {
     description: template.description || '',
     template_type: template.template_type || 'web_server',
     key_type: template.key_type || DEFAULT_KEY.label,
-    digest: template.digest || DEFAULT_KEY.digest,
+    digest: template.digest || DEFAULT_DIGEST,
     validity_days: template.validity_days || VALIDITY.TEMPLATE_DEFAULT_DAYS,
     subject: {
       C: dn.C || '', ST: dn.ST || '', L: dn.L || '',
@@ -806,7 +805,6 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
   const keyTypeOptions = useMemo(() => groupedOptions(
     KEY_ALGORITHMS.filter(a => (a.generate && (!fips || a.fips)) || a.label === formData.key_type),
     t, a => a.label), [fips, t, formData.key_type])
-  const showDigest = takesDigest(formData.key_type)
 
   useEffect(() => {
     let cancelled = false
@@ -856,7 +854,7 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
         description: formData.description,
         template_type: formData.template_type,
         key_type: formData.key_type,
-        ...(showDigest ? { digest: formData.digest } : {}),
+        digest: formData.digest,
         validity_days: formData.validity_days,
         dn_template: { ...formData.subject },
         extensions_template: buildExtensionsTemplate(template?.extensions_template, formData),
@@ -915,14 +913,12 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
             onChange={(val) => set('key_type', val)}
             options={keyTypeOptions}
           />
-          {showDigest && (
-            <Select
-              label={t('common.digest')}
-              value={formData.digest}
-              onChange={(val) => set('digest', val)}
-              options={DIGEST_OPTIONS.map(v => ({ value: v, label: v.toUpperCase() }))}
-            />
-          )}
+          <Select
+            label={t('common.digest')}
+            value={formData.digest}
+            onChange={(val) => set('digest', val)}
+            options={DIGEST_OPTIONS.map(v => ({ value: v, label: v.toUpperCase() }))}
+          />
         </div>
         <div className="mt-2"><BrainpoolNotice label={formData.key_type} /></div>
       </div>
