@@ -283,6 +283,10 @@ class CSRMixin:
         except Exception as e:
             raise ValueError(f"Failed to verify CSR signature: {e}")
 
+        # RFC 9763: A is found before signing, so linking after it cannot fail
+        from services.cert.related_pair import link_issued, requested_by_csr
+        related_a = requested_by_csr(csr_obj.public_bytes(serialization.Encoding.DER))
+
         # Sign CSR
         cdp_urls = [url.replace('{ca_refid}', ca.url_ref) for url in ca.get_cdp_urls()] if ca.cdp_enabled else None
         ocsp_urls = ca.get_ocsp_urls() if ca.ocsp_enabled else None
@@ -411,8 +415,7 @@ class CSRMixin:
             )
 
         # RFC 9763: the A the request named and the certificate now names
-        from services.cert.related_pair import link_issued
-        link_issued(certificate, cert, csr_obj.public_bytes(serialization.Encoding.DER))
+        link_issued(certificate, cert, related_a)
 
         # Store SANs
         if san_dns_list:

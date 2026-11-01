@@ -1,9 +1,9 @@
 """Certificates bound by RFC 9763: B carries id-pe-relatedCert naming A.
 
 ``related_certificate_id`` on B names A; on A it names B once the pair is
-mutual (the hybrid issue form, or the first B a request ties to A through Sign
-CSR, ACME, EST or WSTEP). The pair revokes and renews together only when the
-link is mutual.
+mutual (the hybrid issue form, or the newest B a request ties to A through
+Sign CSR, ACME, EST or WSTEP). The pair revokes and renews together only when
+the link is mutual.
 """
 import base64
 import logging
@@ -222,20 +222,34 @@ def anchor_first(row, partner):
     return row, partner
 
 
-def link_issued(b_row, cert_b, csr_der, replaces=None):
-    """Record on *b_row* the A its request named and its certificate carries,
-    and on A the way back when A names no other (or names *replaces*, the row
-    *b_row* supersedes); nothing without the link."""
-    req = related_cert.request_from_csr_der(csr_der)
-    if req is None or related_cert.read_related_certificate(cert_b) is None:
+def requested_by_csr(csr_der):
+    """``(row, certificate)`` of the A a CSR's relatedCertRequest names, None without one."""
+    try:
+        req = related_cert.request_from_csr_der(csr_der)
+    except related_cert.RelatedCertError as e:
+        raise RelatedCertificateRefused(str(e)) from e
+    return find_requested(req) if req is not None else None
+
+
+def _names_its_link(row, cert):
+    """True when *row*'s certificate names the row it links to: it is that row's B."""
+    linked = db.session.get(Certificate, row.related_certificate_id) if row.related_certificate_id else None
+    other = _readable(linked) if linked is not None else None
+    return other is not None and related_cert.references(cert, other)
+
+
+def link_issued(b_row, cert_b, requested):
+    """Record on *b_row* the A (*requested*, from ``requested_by_csr``) its
+    certificate names, and on A the way back: the newest B takes A from the
+    previous one, unless A is itself the B of the row it links to."""
+    if requested is None or related_cert.read_related_certificate(cert_b) is None:
         return None
-    a_row, cert_a = find_requested(req)
+    a_row, cert_a = requested
     if not related_cert.references(cert_b, cert_a):
         return None
     b_row.related_certificate_id = a_row.id
     b_row.hybrid_role = role_for_public_key(cert_b.public_key())
-    if not a_row.related_certificate_id or (
-            replaces is not None and a_row.related_certificate_id == replaces.id):
+    if not _names_its_link(a_row, cert_a):
         a_row.related_certificate_id = b_row.id
         a_row.hybrid_role = role_for_public_key(cert_a.public_key())
     return a_row

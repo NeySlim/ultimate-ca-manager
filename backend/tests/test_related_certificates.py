@@ -285,20 +285,44 @@ def _sign_b(app, auth_client, row_id):
     return json.loads(r.data)['data']['id']
 
 
-def test_revoking_the_partner_alone_hands_the_link_to_the_newer_b(app, auth_client, cert_a):
-    """What an ACME re-enrolment does: B2 names A, then the superseded B1 is revoked alone."""
+def test_a_newer_b_takes_a_from_the_previous_one(app, auth_client, cert_a):
+    """A re-enrolment: B2 names A, so A pairs with B2 and B1 no longer revokes A."""
     from services.cert.related_pair import mutual_partner
     row_id = cert_a[0]
     b1, b2 = _sign_b(app, auth_client, row_id), _sign_b(app, auth_client, row_id)
     with app.app_context():
-        assert db.session.get(Certificate, row_id).related_certificate_id == b1
-    r = auth_client.post(f'/api/v2/certificates/{b1}/revoke',
+        assert mutual_partner(db.session.get(Certificate, row_id)).id == b2
+        assert db.session.get(Certificate, b1).related_certificate_id == row_id
+    r = auth_client.post(f'/api/v2/certificates/{b1}/revoke', json={'reason': 'superseded'})
+    assert r.status_code == 200, r.data
+    data = json.loads(r.data)['data']
+    assert 'related_revoked' not in data and 'related_not_revoked' not in data, r.data
+    with app.app_context():
+        assert not db.session.get(Certificate, row_id).revoked
+    r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'keyCompromise'})
+    assert json.loads(r.data)['data']['related_revoked'] == b2, r.data
+    with app.app_context():
+        assert db.session.get(Certificate, b2).revoked
+
+
+def test_revoking_a_takes_the_newest_b_and_leaves_the_previous_one(app, auth_client, cert_a):
+    row_id = cert_a[0]
+    b1, b2 = _sign_b(app, auth_client, row_id), _sign_b(app, auth_client, row_id)
+    r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'superseded'})
+    assert json.loads(r.data)['data']['related_revoked'] == b2, r.data
+    with app.app_context():
+        assert not db.session.get(Certificate, b1).revoked
+
+
+def test_revoking_the_newest_b_alone_hands_the_link_to_the_previous_one(app, auth_client, cert_a):
+    from services.cert.related_pair import mutual_partner
+    row_id = cert_a[0]
+    b1, b2 = _sign_b(app, auth_client, row_id), _sign_b(app, auth_client, row_id)
+    r = auth_client.post(f'/api/v2/certificates/{b2}/revoke',
                          json={'reason': 'superseded', 'revoke_related': False})
     assert r.status_code == 200, r.data
     with app.app_context():
-        assert mutual_partner(db.session.get(Certificate, row_id)).id == b2
-    r = auth_client.post(f'/api/v2/certificates/{row_id}/revoke', json={'reason': 'keyCompromise'})
-    assert json.loads(r.data)['data']['related_revoked'] == b2, r.data
+        assert mutual_partner(db.session.get(Certificate, row_id)).id == b1
 
 
 def test_revoking_a_alone_moves_no_link(app, auth_client, cert_a):
@@ -308,7 +332,8 @@ def test_revoking_a_alone_moves_no_link(app, auth_client, cert_a):
                          json={'reason': 'superseded', 'revoke_related': False})
     assert r.status_code == 200, r.data
     with app.app_context():
-        assert db.session.get(Certificate, row_id).related_certificate_id == b1
+        assert db.session.get(Certificate, row_id).related_certificate_id == b2
+        assert db.session.get(Certificate, b1).related_certificate_id == row_id
         assert db.session.get(Certificate, b2).related_certificate_id == row_id
 
 
@@ -403,6 +428,66 @@ def test_the_est_path_links_b_to_a(app, cert_a):
         assert db.session.get(Certificate, row_id).related_certificate_id == b2.id
 
 
+def _csr_naming(cert_a, signer_key, key_b):
+    """A CSR for *key_b* whose relatedCertRequest names *cert_a*, signed by *signer_key*."""
+    digest = None if key_algorithms.is_post_quantum(
+        key_algorithms.label_for_public_key(key_b.public_key())) else hashes.SHA256()
+    csr = (x509.CertificateSigningRequestBuilder().subject_name(cert_a.subject)
+           .add_extension(cert_a.extensions.get_extension_for_class(x509.SubjectAlternativeName).value,
+                          critical=False)
+           .sign(key_b, digest))
+    request = related_cert.build_request(cert_a, signer_key, related_cert.data_url_for([cert_a]))
+    return related_cert.csr_with_request(csr, key_b, request)
+
+
+def _est_sign(ca, csr):
+    from services.ca_service import CAService
+    _pem, serial = CAService.sign_csr_from_crypto(ca, csr, validity_days=30, source='est')
+    return Certificate.query.filter_by(serial_number=str(int(serial, 16))).one()
+
+
+def test_an_a_that_is_itself_a_b_keeps_its_own_link(app, cert_a):
+    """C <- A <- B: B names A, but A's single link stays on the C its certificate names."""
+    c_id, cert_c, key_c = cert_a
+    key_a = ec.generate_private_key(ec.SECP256R1())
+    with app.app_context():
+        ca = _signing_ca(c_id)[0]
+        a_row = _est_sign(ca, _csr_naming(cert_c, key_c, key_a))
+        a_id, cert_a2 = a_row.id, x509.load_pem_x509_certificate(base64.b64decode(a_row.crt))
+        assert a_row.related_certificate_id == c_id
+        b_row = _est_sign(ca, _csr_naming(cert_a2, key_a, key_algorithms.generate(PQ_LABEL)))
+        assert b_row.related_certificate_id == a_id
+        assert db.session.get(Certificate, a_id).related_certificate_id == c_id
+
+
+@pytest.mark.parametrize('path', ['est', 'sign_route'])
+def test_b_is_stored_and_linked_when_a_changes_after_signing(app, auth_client, cert_a, monkeypatch, path):
+    """A is found before signing: a lookup after it could lose a signed certificate."""
+    row_id, cert, key = cert_a
+    real_sign = TrustStoreService.sign_csr
+
+    def sign_then_move_a(*args, **kwargs):
+        pem = real_sign(*args, **kwargs)
+        db.session.get(Certificate, row_id).serial_number = '0'  # A no longer found by serial
+        return pem
+
+    monkeypatch.setattr(TrustStoreService, 'sign_csr', staticmethod(sign_then_move_a))
+    try:
+        if path == 'est':
+            with app.app_context():
+                b_id = _est_sign(_signing_ca(row_id)[0], x509.load_pem_x509_csr(_csr_b(cert, key))).id
+        else:
+            b_id = _sign_b(app, auth_client, row_id)
+        with app.app_context():
+            assert db.session.get(Certificate, b_id).related_certificate_id == row_id
+            assert db.session.get(Certificate, row_id).related_certificate_id == b_id
+    finally:
+        monkeypatch.undo()
+        with app.app_context():
+            db.session.get(Certificate, row_id).serial_number = str(cert.serial_number)
+            db.session.commit()
+
+
 def test_a_related_certificate_under_an_expired_ca_certificate_is_refused(app, create_ca, create_cert):
     """RFC 9763 §3.2 asks for RFC 5280 path validation of A: its CA must be valid now."""
     from services.hsm.ca_key_loader import get_ca_signing_key
@@ -433,6 +518,37 @@ def test_a_related_certificate_under_an_expired_ca_certificate_is_refused(app, c
             ca = db.session.get(CA, ca_id)
             ca.crt = previous
             db.session.commit()
+
+
+@pytest.mark.parametrize('member', ['a', 'b'])
+def test_acme_revocation_revokes_the_presented_member_only(app, client, create_cert, member):
+    """RFC 8555 §7.6: revoking A or B through ACME leaves the other one valid."""
+    from cryptography.hazmat.primitives.asymmetric import rsa
+    from tests.test_acme_security_paths import _build_jws, _int_to_b64, _nonce, _post_jws
+    from utils.key_codec import load_pem_bytes
+    data = create_cert(cert_type='server', key_type='rsa', key_size='2048')
+    key_b = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+    with app.app_context():
+        a_row = db.session.get(Certificate, data['id'])
+        a_id = a_row.id
+        cert_a2 = x509.load_pem_x509_certificate(base64.b64decode(a_row.crt))
+        key_a = serialization.load_pem_private_key(load_pem_bytes(a_row.prv, context='test'), None)
+        b_row = _est_sign(_signing_ca(a_id)[0], _csr_naming(cert_a2, key_a, key_b))
+        b_id, cert_b = b_row.id, x509.load_pem_x509_certificate(base64.b64decode(b_row.crt))
+        assert db.session.get(Certificate, a_id).related_certificate_id == b_id
+    presented, key = (cert_a2, key_a) if member == 'a' else (cert_b, key_b)
+    pub = key.public_key().public_numbers()
+    der = presented.public_bytes(serialization.Encoding.DER)
+    jws = _build_jws('http://localhost/acme/revoke-cert',
+                     {'certificate': base64.urlsafe_b64encode(der).rstrip(b'=').decode(), 'reason': 1},
+                     key, jwk={'kty': 'RSA', 'n': _int_to_b64(pub.n), 'e': _int_to_b64(pub.e)},
+                     nonce=_nonce(client))
+    r = _post_jws(client, '/acme/revoke-cert', jws)
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        db.session.expire_all()
+        revoked = [bool(db.session.get(Certificate, i).revoked) for i in (a_id, b_id)]
+    assert revoked == ([True, False] if member == 'a' else [False, True])
 
 
 # ---- the CSR route takes related_to ------------------------------------------------

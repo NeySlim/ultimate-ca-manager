@@ -588,7 +588,7 @@ def test_the_partner_policy_holds_the_revocation_of_the_pair(app, auth_client, c
         _drop_policy(app, pid)
 
 
-def test_the_partner_policy_holds_a_user_certificate_and_an_acme_revocation(
+def test_the_partner_policy_holds_a_user_certificate_revocation(
         app, auth_client, create_ca, create_user):
     from models import AuthCertificate
     from services.approval_gate import revocation_policy_for
@@ -604,7 +604,7 @@ def test_the_partner_policy_holds_a_user_certificate_and_an_acme_revocation(
             db.session.add(enrolment)
             db.session.commit()
             enrolment_id = enrolment.id
-            # What the ACME revokeCert route asks before revoking A (and B with it)
+            # What the user-certificate route asks before revoking A (and B with it)
             row_a, row_b = db.session.get(Certificate, a['id']), db.session.get(Certificate, b['id'])
             assert revocation_policy_for(row_a) is None
             assert revocation_policy_for(row_a, row_b).id == pid
@@ -620,8 +620,9 @@ def test_the_partner_policy_holds_a_user_certificate_and_an_acme_revocation(
             db.session.commit()
 
 
-def test_acme_says_the_related_certificate_policy_holds_the_revocation(app, client, auth_client, create_ca):
-    from models import AuditLog
+def test_acme_revokes_the_presented_certificate_only_whatever_the_partner_policy(
+        app, client, auth_client, create_ca):
+    """RFC 8555 §7.6 revokes the certificate presented: B and its CA's policy are not involved."""
     from tests.test_acme_security_paths import _build_jws, _int_to_b64, _nonce, _post_jws
     from utils.key_codec import load_pem_bytes
     a, b = _pair(auth_client, create_ca, 'pair-partner-acme.example.com',
@@ -639,13 +640,9 @@ def test_acme_says_the_related_certificate_policy_holds_the_revocation(app, clie
                          key, jwk={'kty': 'RSA', 'n': _int_to_b64(pub.n), 'e': _int_to_b64(pub.e)},
                          nonce=_nonce(client))
         r = _post_jws(client, path, jws)
-        assert r.status_code == 403, r.data
-        assert 'also revokes its related certificate, which requires approval' in r.get_json()['detail'], r.data
-        assert _revoked(app, a['id'], b['id']) == [False, False]
-        with app.app_context():
-            entry = AuditLog.query.filter_by(action='acme.cert.revoke', resource_id=str(a['id'])).order_by(
-                AuditLog.id.desc()).first()
-            assert 'related certificate' in entry.details, entry.details
+        assert r.status_code == 200, r.data
+        assert _revoked(app, a['id'], b['id']) == [True, False]
+        assert _pending(app, pid) == 0
     finally:
         _drop_policy(app, pid)
 

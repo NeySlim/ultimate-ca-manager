@@ -1149,7 +1149,8 @@ A CSR carrying a relatedCertRequest (RFC 9763), here or through ACME, EST or WST
 certificate linked to the A it names. A must be held here, valid, unrevoked and an end-entity
 certificate issued by a CA of this instance whose chain is valid now, the request must be at most
 7 days old and verify with A's key, and the new certificate may assert no key usage or EKU that A
-lacks; otherwise `400`.
+lacks; otherwise `400`. A's own link moves to the newest such certificate; the previous one keeps
+naming A but no longer revokes or renews with it.
 
 ### Delete CSR
 ```http
@@ -3616,7 +3617,7 @@ which signs without a separate digest; use
 
 With `notify_on_violation`, a refusal by the policy's rules or a request held for approval is e-mailed to `notification_emails` (mailbox addresses, checked: `400` otherwise), or when empty to the policy's approvers; the same refusal is reported once per hour.
 
-When a policy requires approval, `POST /certificates/{id}/revoke`, `POST /certificates/bulk/revoke` (under `pending_approval`), `POST /user-certificates/{id}/revoke` and `POST /cas/{id}/revoke` (held by the policies of the parent CA and of the CA itself) answer `approval_required: true` with the `approval_id` and the `request_type` (`revocation` or `ca_revocation`) instead of revoking; the approval revokes with the stored reason and invalidity date. ACME `revokeCert` answers `403 unauthorized` for such a certificate, and removing an mTLS enrolment `409` until its certificate is revoked (administrators bypass). A pending request whose requester performs the action directly, or approves a duplicate, is closed as `cancelled`.
+When a policy requires approval, `POST /certificates/{id}/revoke`, `POST /certificates/bulk/revoke` (under `pending_approval`), `POST /user-certificates/{id}/revoke` and `POST /cas/{id}/revoke` (held by the policies of the parent CA and of the CA itself) answer `approval_required: true` with the `approval_id` and the `request_type` (`revocation` or `ca_revocation`) instead of revoking; the approval revokes with the stored reason and invalidity date. ACME `revokeCert` answers `403 unauthorized` for such a certificate (it revokes the certificate presented and never its related one), and removing an mTLS enrolment `409` until its certificate is revoked (administrators bypass). A pending request whose requester performs the action directly, or approves a duplicate, is closed as `cancelled`.
 
 ### Update Policy
 ```http
