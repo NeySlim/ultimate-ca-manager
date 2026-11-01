@@ -143,7 +143,7 @@ export default function TemplatesPage() {
       const updated = res?.data || res
       showSuccess(t(active ? 'templates.activated' : 'templates.deactivated'))
       loadData()
-      if (updated?.id) setSelectedTemplate(updated)
+      if (updated?.id) setSelectedTemplate({ ...template, ...updated })
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.template'))
     }
@@ -287,6 +287,11 @@ export default function TemplatesPage() {
               <span className="font-medium truncate">{val || t('common.unnamed')}</span>
             </div>
             <div className="flex items-center gap-1.5 shrink-0">
+              {row.is_active === false && (
+                <Badge variant="secondary" size="sm" title={t('templates.deactivateTooltip')}>
+                  {t('common.inactive')}
+                </Badge>
+              )}
               {row.ad_derived_subject && (
                 <Badge variant="violet" size="sm" title={t('templates.adDerivedBadgeTooltip')}>
                   {t('templates.adDerivedBadge')}

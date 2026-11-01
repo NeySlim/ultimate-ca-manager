@@ -4,7 +4,7 @@
  */
 import { useState, useEffect } from 'react'
 import { PushPin, PushPinSlash, Check, X } from '@phosphor-icons/react'
-import { Button, Modal, LoadingSpinner } from '../index'
+import { Badge, Button, Modal, LoadingSpinner } from '../index'
 import { templatesService } from '../../services'
 import { useNotification } from '../../contexts'
 
@@ -23,7 +23,7 @@ export function ManageTemplatePinsModal({ open, onOpenChange, ca, t }) {
   const loadTemplates = async () => {
     setLoading(true)
     try {
-      const res = await templatesService.getForCA(ca.id)
+      const res = await templatesService.getAllForCA(ca.id)
       const list = res?.data || res || []
       setTemplates(Array.isArray(list) ? list : [])
     } catch (err) {
@@ -90,6 +90,11 @@ export function ManageTemplatePinsModal({ open, onOpenChange, ca, t }) {
                     </span>
                     {template.is_pinned && (
                       <PushPin size={16} className="text-accent-primary shrink-0" weight="fill" />
+                    )}
+                    {template.is_active === false && (
+                      <Badge variant="secondary" size="sm" title={t('templates.deactivateTooltip')}>
+                        {t('common.inactive')}
+                      </Badge>
                     )}
                   </div>
                   {template.description && (

@@ -453,7 +453,9 @@ def update_template(template_id):
         template.extensions_template = json.dumps(data['extensions_template'])
     
     if 'is_active' in data:
-        template.is_active = bool(data['is_active'])
+        if not isinstance(data['is_active'], bool):
+            return error_response('is_active must be true or false', 400)
+        template.is_active = data['is_active']
 
     if 'enforce_san_types' in data:
         template.enforce_san_types = bool(data['enforce_san_types'])
@@ -608,7 +610,8 @@ def duplicate_template(template_id):
         dn_template=template.dn_template,
         extensions_template=template.extensions_template,
         is_system=False,
-        is_active=template.is_active,
+        # A copy is made to be edited and used, whatever the original's state
+        is_active=True,
         enforce_san_types=template.enforce_san_types,
         ad_derived_subject=template.ad_derived_subject,
         autoenroll_enabled=template.autoenroll_enabled,

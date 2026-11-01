@@ -227,12 +227,11 @@ def _nil_element(parent, local_name):
 
 
 def _resolve_templates_for_ca(ca, all_active_templates):
-    """Templates pinned to this CA, or every active template when none are
-    pinned — mirrors the fallback the Templates UI already uses so XCEP
-    doesn't expose an empty policy set to a CA nobody has curated yet."""
-    pinned = [pin.template for pin in (ca.template_pins or []) if pin.template and pin.template.is_active]
-    if pinned:
-        return pinned
+    """The active templates pinned to this CA, or every active template when it has
+    no pin at all. Deactivating its pinned templates never widens what a CA offers."""
+    pins = [pin for pin in (ca.template_pins or []) if pin.template]
+    if pins:
+        return [pin.template for pin in pins if pin.template.is_active]
     return list(all_active_templates)
 
 

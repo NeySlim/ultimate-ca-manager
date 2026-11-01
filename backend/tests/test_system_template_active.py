@@ -58,3 +58,49 @@ def test_a_viewer_cannot_deactivate_one(app, viewer_client, system_template):
     assert r.status_code == 403
     with app.app_context():
         assert db.session.get(CertificateTemplate, system_template['id']).is_active is True
+
+
+def _custom_template(auth_client, name, **extra):
+    body = {'name': name, 'template_type': 'web_server', 'key_type': 'RSA-2048', 'validity_days': 30,
+            'digest': 'sha256', **extra}
+    r = auth_client.post('/api/v2/templates', data=json.dumps(body), content_type='application/json')
+    assert r.status_code in (200, 201), r.get_json()
+    return r.get_json()['data']
+
+
+def test_deactivating_the_only_pinned_template_does_not_widen_a_ca(app, auth_client, create_ca):
+    """A CA pinned to one template offers nothing over XCEP/WSTEP once it is off, not every template."""
+    from models import CA, CATemplatePin
+    from services.wstep import wstep_service
+    ca = create_ca(cn='Pinned deactivation CA')
+    tpl = _custom_template(auth_client, 'Pinned only template')
+    with app.app_context():
+        db.session.add(CATemplatePin(ca_id=ca['id'], template_id=tpl['id']))
+        db.session.commit()
+        assert [t.id for t in wstep_service._ca_templates(db.session.get(CA, ca['id']))] == [tpl['id']]
+    assert _put(auth_client, tpl['id'], {'is_active': False}).status_code == 200
+    try:
+        with app.app_context():
+            assert wstep_service._ca_templates(db.session.get(CA, ca['id'])) == []
+    finally:
+        with app.app_context():
+            CATemplatePin.query.filter_by(ca_id=ca['id']).delete()
+            db.session.commit()
+
+
+def test_a_custom_template_takes_a_boolean_only(app, auth_client):
+    tpl = _custom_template(auth_client, 'Strict active template')
+    r = _put(auth_client, tpl['id'], {'is_active': 'false'})
+    assert r.status_code == 400
+    assert r.get_json()['message'] == 'is_active must be true or false'
+    with app.app_context():
+        assert db.session.get(CertificateTemplate, tpl['id']).is_active is True
+
+
+def test_a_copy_of_a_deactivated_template_is_active(app, auth_client, system_template):
+    assert _put(auth_client, system_template['id'], {'is_active': False}).status_code == 200
+    r = auth_client.post(f"/api/v2/templates/{system_template['id']}/duplicate")
+    assert r.status_code in (200, 201), r.get_json()
+    copy = r.get_json()['data']
+    assert (copy['is_system'], copy['is_active']) == (False, True)
+    auth_client.delete(f"/api/v2/templates/{copy['id']}")

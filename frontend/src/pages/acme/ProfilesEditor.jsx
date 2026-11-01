@@ -64,7 +64,9 @@ export default function ProfilesEditor({ value, onChange, disabled, templates = 
 
   const templateOptions = [
     { value: '', label: t('acme.noTemplate') },
-    ...templates.map(tpl => ({ value: String(tpl.id), label: tpl.name })),
+    // A deactivated template is refused on binding: only one a profile already binds stays listed
+    ...templates.filter(tpl => tpl.is_active !== false || rows.some(r => String(r.template_id) === String(tpl.id)))
+      .map(tpl => ({ value: String(tpl.id), label: tpl.name })),
   ]
 
   return (

@@ -35,6 +35,11 @@ export const templatesService = {
     return apiClient.get(`/templates?ca_id=${caId}`)
   },
 
+  /** Every template with its pin status, inactive ones included, so a pin can still be removed. */
+  async getAllForCA(caId) {
+    return apiClient.get(`/templates?ca_id=${caId}&active=false`)
+  },
+
   async pinToCA(caId, templateId) {
     return apiClient.post(`/cas/${caId}/templates/${templateId}/pin`)
   },
