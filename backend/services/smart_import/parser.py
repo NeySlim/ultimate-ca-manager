@@ -33,6 +33,59 @@ def _is_wrong_password(exc: Exception) -> bool:
     return 'password' in str(exc).lower()
 
 
+def _is_encrypted_pkcs8(der: bytes) -> bool:
+    """Whether *der* is an EncryptedPrivateKeyInfo (RFC 5958), as 'ENCRYPTED' tells a PEM block."""
+    from pyasn1.codec.der import decoder
+    from pyasn1_modules import rfc5958
+    try:
+        _, rest = decoder.decode(der, asn1Spec=rfc5958.EncryptedPrivateKeyInfo())
+    except Exception:
+        return False
+    return not rest
+
+
+def _password_failed(exc: Exception, data: bytes) -> bool:
+    """A wrong password can also unpad by chance: a decoding failure on an encrypted key is the password's."""
+    return _is_wrong_password(exc) or _is_encrypted_pkcs8(data)
+
+
+def _candidates(password) -> List[Optional[bytes]]:
+    """The passwords to try in turn: one, or several (the import form's per-file ones); [None] for none."""
+    values = [password] if password is None or isinstance(password, (str, bytes)) else list(password)
+    out: List[Optional[bytes]] = []
+    for value in values:
+        raw = value.encode() if isinstance(value, str) else value
+        if raw and raw not in out:
+            out.append(raw)
+    return out or [None]
+
+
+def _load_key(data, password):
+    """load_private_key_any with each candidate password; the last failure when none opens the key."""
+    failure = None
+    for pwd in _candidates(password):
+        try:
+            return load_private_key_any(data, password=pwd)
+        except (FipsRestricted, MalformedKey):
+            raise
+        except (TypeError, ValueError) as e:
+            failure = e
+    raise failure
+
+
+def _load_pkcs12(data: bytes, password):
+    """load_key_and_certificates with each candidate password; the last failure when none opens it."""
+    failure = None
+    for pwd in _candidates(password):
+        try:
+            return load_key_and_certificates(data, pwd)
+        except FipsRestricted:
+            raise
+        except Exception as e:  # noqa: BLE001: the next password may open it
+            failure = e
+    raise failure
+
+
 class ObjectType(Enum):
     CERTIFICATE = "certificate"
     PRIVATE_KEY = "private_key"
@@ -137,13 +190,13 @@ class SmartParser:
         re.MULTILINE
     )
     
-    def parse(self, content: str | bytes, password: Optional[str] = None) -> List[ParsedObject]:
+    def parse(self, content: str | bytes, password=None) -> List[ParsedObject]:
         """
         Parse any input and return list of detected objects.
         
         Args:
             content: PEM string, DER bytes, or base64-encoded data
-            password: Optional password for encrypted keys/PKCS12
+            password: Optional password for encrypted keys/PKCS12, or a list of them tried in turn
             
         Returns:
             List of ParsedObject instances
@@ -187,7 +240,7 @@ class SmartParser:
             
         return objects
     
-    def _parse_pseudo_pem_binary(self, content: str, password: Optional[str] = None) -> List[ParsedObject]:
+    def _parse_pseudo_pem_binary(self, content: str, password=None) -> List[ParsedObject]:
         """Parse pseudo-PEM wrapped binary data (PKCS12, DER) from frontend uploads"""
         objects: List[ParsedObject] = []
         
@@ -249,15 +302,14 @@ class SmartParser:
             return len(clean) % 4 == 0
         return False
     
-    def _parse_binary(self, data: bytes, password: Optional[str] = None) -> List[ParsedObject]:
+    def _parse_binary(self, data: bytes, password=None) -> List[ParsedObject]:
         """Parse binary data (DER, PKCS12, PKCS7)"""
         objects: List[ParsedObject] = []
         
         # Try PKCS12 first (most common binary format)
         refuse_pkcs12_import(data)
         try:
-            pwd = password.encode() if password else None
-            private_key, cert, additional_certs = load_key_and_certificates(data, pwd)
+            private_key, cert, additional_certs = _load_pkcs12(data, password)
             
             idx = 0
             if cert:
@@ -297,7 +349,7 @@ class SmartParser:
         
         # Try DER private key
         try:
-            key = load_private_key_any(data, password=password.encode() if password else None)
+            key = _load_key(data, password)
             obj = self._parse_private_key(key)
             obj.raw_der = data
             return [obj]
@@ -306,7 +358,7 @@ class SmartParser:
         except MalformedKey as e:
             return [self._malformed_der_key(data, e)]
         except ValueError as e:
-            if password and _is_wrong_password(e):
+            if _candidates(password)[0] and _password_failed(e, data):
                 return [self._wrong_password_der_key(data)]
         except Exception:
             pass
@@ -340,11 +392,11 @@ class SmartParser:
                 continue
         return objects
     
-    def _parse_pem_keys(self, content: str, password: Optional[str] = None) -> List[ParsedObject]:
+    def _parse_pem_keys(self, content: str, password=None) -> List[ParsedObject]:
         """Extract all PEM private keys"""
         objects = []
         seen_positions = set()  # Deduplicate by position
-        pwd = password.encode() if password else None
+        pwd = _candidates(password)[0]  # whether any password was given
         
         for pattern in self.PEM_KEY_PATTERNS:
             for match in pattern.finditer(content):
@@ -357,7 +409,7 @@ class SmartParser:
                 is_encrypted = 'ENCRYPTED' in pem_block
                 
                 try:
-                    key = load_private_key_any(pem_block, password=pwd)
+                    key = _load_key(pem_block, password)
                     obj = self._parse_private_key(key)
                     # an encrypted block keeps the decrypted PKCS#8: matcher and importer read it without a password
                     if not is_encrypted:
@@ -519,13 +571,12 @@ class SmartParser:
         
         return obj
     
-    def _parse_pkcs12(self, data: bytes, password: Optional[str] = None) -> List[ParsedObject]:
+    def _parse_pkcs12(self, data: bytes, password=None) -> List[ParsedObject]:
         """Parse PKCS12 binary data"""
         objects = []
         refuse_pkcs12_import()
         try:
-            pwd = password.encode() if password else None
-            private_key, cert, additional_certs = load_key_and_certificates(data, pwd)
+            private_key, cert, additional_certs = _load_pkcs12(data, password)
             
             idx = 0
             if cert:
@@ -562,11 +613,11 @@ class SmartParser:
         except Exception:
             return None
     
-    def _parse_der_key(self, data: bytes, password: Optional[str] = None) -> Optional[ParsedObject]:
+    def _parse_der_key(self, data: bytes, password=None) -> Optional[ParsedObject]:
         """Parse DER private key"""
         try:
-            pwd = password.encode() if password else None
-            key = load_private_key_any(data, password=pwd)
+            pwd = _candidates(password)[0]  # whether any password was given
+            key = _load_key(data, password)
             obj = self._parse_private_key(key)
             obj.raw_der = data
             return obj
@@ -575,7 +626,7 @@ class SmartParser:
         except MalformedKey as e:
             return self._malformed_der_key(data, e)
         except ValueError as e:
-            return self._wrong_password_der_key(data) if pwd and _is_wrong_password(e) else None
+            return self._wrong_password_der_key(data) if pwd and _password_failed(e, data) else None
         except Exception:
             return None
 

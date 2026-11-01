@@ -176,16 +176,9 @@ class TestSmartImport:
 
     def test_execute_ca_import_requires_write_cas(self, auth_client, app, monkeypatch):
         """write:certificates alone must not import CAs present in the content."""
-        from services.smart_import.importer import AnalysisResult
-
-        def fake_analyze(_self, _content, password=None):
-            result = AnalysisResult()
-            result.summary = {'cas': 1}
-            return result
-
         monkeypatch.setattr(
-            'services.smart_import.importer.SmartImporter.analyze',
-            fake_analyze,
+            'services.smart_import.importer.SmartImporter.imports_cas',
+            lambda _self, _content, password=None, options=None: True,
         )
 
         r = post_json(auth_client, '/api/v2/account/apikeys', {
@@ -210,16 +203,9 @@ class TestSmartImport:
 
     def test_execute_cert_only_import_allowed_without_write_cas(self, auth_client, app, monkeypatch):
         """Cert-only smart import must not require write:cas when content has no CAs."""
-        from services.smart_import.importer import AnalysisResult
-
-        def fake_analyze(_self, _content, password=None):
-            result = AnalysisResult()
-            result.summary = {'cas': 0}
-            return result
-
         monkeypatch.setattr(
-            'services.smart_import.importer.SmartImporter.analyze',
-            fake_analyze,
+            'services.smart_import.importer.SmartImporter.imports_cas',
+            lambda _self, _content, password=None, options=None: False,
         )
 
         r = post_json(auth_client, '/api/v2/account/apikeys', {
@@ -242,16 +228,9 @@ class TestSmartImport:
 
     def test_execute_ca_import_passes_permission_with_write_cas(self, auth_client, app, monkeypatch):
         """write:cas + write:certificates must pass the CA import permission gate."""
-        from services.smart_import.importer import AnalysisResult
-
-        def fake_analyze(_self, _content, password=None):
-            result = AnalysisResult()
-            result.summary = {'cas': 1}
-            return result
-
         monkeypatch.setattr(
-            'services.smart_import.importer.SmartImporter.analyze',
-            fake_analyze,
+            'services.smart_import.importer.SmartImporter.imports_cas',
+            lambda _self, _content, password=None, options=None: True,
         )
 
         r = post_json(auth_client, '/api/v2/account/apikeys', {

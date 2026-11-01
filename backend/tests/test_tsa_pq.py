@@ -182,6 +182,18 @@ def _enable(app, **values):
         db.session.commit()
 
 
+@pytest.mark.parametrize('key_size, status', [(None, 200), ('3072', 400)])
+def test_a_full_label_signer_needs_no_key_size(auth_client, tsa_settings, rsa_ca, key_size, status):
+    r = _issue(auth_client, rsa_ca, cn=f'pq-tsa-label-{key_size}', key_type='ML-DSA-65',
+               **({'key_size': key_size} if key_size else {}))
+    assert r.status_code == status, r.get_json()
+    if status == 200:
+        cert = x509.load_pem_x509_certificate(r.get_json()['data']['certificate']['pem'].encode())
+        assert key_algorithms.label_for_public_key(cert.public_key()) == 'ML-DSA-65'
+    else:
+        assert 'name different keys' in r.get_json()['message']
+
+
 @pytest.mark.parametrize('ca_fixture,key_size', [('rsa_ca', '65'), ('mldsa_ca', '87')])
 def test_issued_mldsa_signer_is_offered_selected_and_signs(
         request, app, client, auth_client, tsa_settings, tmp_path, ca_fixture, key_size):

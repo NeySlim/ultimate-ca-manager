@@ -52,6 +52,19 @@ def _spki_der(cert):
     return spki_der(cert)
 
 
+def _selected(objects: List[ParsedObject], options: Dict) -> Optional[List[ParsedObject]]:
+    """The objects ``selected_indices`` keeps (all without it), None for an invalid list.
+    Same parse as the analysis: its positions name the objects the preview kept."""
+    selected = options.get("selected_indices")
+    if selected is None:
+        return objects
+    if not isinstance(selected, list) or not all(
+            type(i) is int and 0 <= i < len(objects) for i in selected):
+        return None
+    keep = set(selected)
+    return [o for i, o in enumerate(objects) if i in keep]
+
+
 def _is_ca_import_target(obj: ParsedObject) -> bool:
     """True when a certificate belongs in the CA import path (permission-sensitive).
 
@@ -134,13 +147,13 @@ class SmartImporter:
         self._pending_audit = []
         self._attached_cross = []
     
-    def analyze(self, content: str | bytes, password: Optional[str] = None) -> AnalysisResult:
+    def analyze(self, content: str | bytes, password=None) -> AnalysisResult:
         """
         Analyze content without importing.
         
         Args:
             content: PEM/DER/PKCS12 content
-            password: Optional password for encrypted content
+            password: Optional password for encrypted content, or a list tried in turn
             
         Returns:
             AnalysisResult with detected objects and validation info
@@ -186,10 +199,18 @@ class SmartImporter:
         
         return result
     
+    def imports_cas(self, content: str | bytes, password=None, options: Optional[Dict] = None) -> bool:
+        """Whether ``execute`` with these options would import a CA certificate."""
+        options = options or {}
+        if not options.get("import_cas", True):
+            return False
+        objects = _selected(self.parser.parse(content, password), options) or []
+        return any(o.type == ObjectType.CERTIFICATE and _is_ca_import_target(o) for o in objects)
+
     def execute(
         self,
         content: str | bytes,
-        password: Optional[str] = None,
+        password=None,
         options: Optional[Dict] = None,
         username: str = "system"
     ) -> ImportResult:
@@ -198,7 +219,7 @@ class SmartImporter:
         
         Args:
             content: PEM/DER/PKCS12 content
-            password: Optional password
+            password: Optional password, or a list tried in turn
             options: Import options:
                 - import_cas: bool (default True)
                 - import_certs: bool (default True)
@@ -226,16 +247,11 @@ class SmartImporter:
         try:
             # Parse
             objects = self.parser.parse(content, password)
-            # The same parse as the analysis: its positions name the objects the preview kept
-            selected = options.get("selected_indices")
-            if selected is not None:
-                if not isinstance(selected, list) or not all(
-                        type(i) is int and 0 <= i < len(objects) for i in selected):
-                    result.success = False
-                    result.errors.append("selected_indices must list positions of the analysed objects")
-                    return result
-                keep = set(selected)
-                objects = [o for i, o in enumerate(objects) if i in keep]
+            objects = _selected(objects, options)
+            if objects is None:
+                result.success = False
+                result.errors.append("selected_indices must list positions of the analysed objects")
+                return result
             if not options.get("import_keys", True):
                 objects = [o for o in objects if o.type != ObjectType.PRIVATE_KEY]
             unusable = [o.error for o in objects if o.type == ObjectType.PRIVATE_KEY and o.error]

@@ -207,6 +207,19 @@ def test_import_service_says_the_key_password_is_wrong(password):
         parse_certificate_file(CERT + BOTH_ENC, 'bundle.pem', password)
 
 
+@pytest.mark.parametrize('body', [b'MIIBCgKCAQEA', base64.encodebytes(b'\x30\x03\x02\x01\x00')])
+def test_import_service_says_an_unreadable_key_is_unreadable(app, auth_client, body):
+    from services.import_service import parse_certificate_file
+    from utils.key_codec import MalformedKey
+    pem = b'-----BEGIN PRIVATE KEY-----\n' + body.strip() + b'\n-----END PRIVATE KEY-----\n'
+    with pytest.raises(MalformedKey, match='could not be read'):
+        parse_certificate_file(CERT + pem, 'bundle.pem')
+    r = auth_client.post('/api/v2/certificates/import', data={
+        'pem_content': (CERT + pem).decode(), 'name': f'pq-bad-key-{uuid.uuid4().hex[:8]}'})
+    assert r.status_code == 400, r.data
+    assert get_json(r)['message'] == 'The private key in the file could not be read'
+
+
 def test_import_service_skips_an_encrypted_key_it_was_not_asked_for():
     from services.import_service import parse_certificate_file
     _, key, _ = parse_certificate_file(CERT + BOTH_ENC, 'bundle.pem', 'wrong', import_key=False)
@@ -425,6 +438,19 @@ def test_key_upload_refuses_a_seedless_key_with_its_reason(app, auth_client, tar
         assert 'seed-only' in body['message']
 
 
+@pytest.mark.parametrize('target', ['certificate', 'ca', 'csr'])
+@pytest.mark.parametrize('passphrase, message', [
+    (None, 'The private key is encrypted: give its password'),
+    ('wrong passphrase', 'Invalid password for the private key')])
+def test_key_upload_says_whether_the_password_is_missing_or_wrong(app, auth_client, target,
+                                                                   passphrase, message):
+    with _keyless_rows(app) as rows:
+        _, url, _ = rows[target]
+        r = _post(auth_client, url, BOTH_ENC, passphrase)
+        assert r.status_code == 400, r.data
+        assert get_json(r)['message'] == message
+
+
 def test_key_matcher_matches_a_both_key(auth_client):
     r = auth_client.post('/api/v2/tools/match-keys', data=json.dumps(
         {'certificate': CERT.decode(), 'private_key': BOTH.decode()}), content_type='application/json')
@@ -608,6 +634,22 @@ def test_smart_import_names_a_wrong_password_on_a_der_key():
     [obj] = SmartParser().parse(der, password='wrong-pass')
     assert obj.type.value == 'private_key' and obj.error == WRONG_PASSWORD
     assert SmartParser()._parse_der_key(der, 'wrong-pass').error == WRONG_PASSWORD
+
+
+# Wrong passwords whose CBC padding checks by chance on the sealed fixture: pyca does not name them
+LUCKY_WRONG_PASSWORDS = ('chance-119', 'chance-181')
+
+
+@pytest.mark.parametrize('password', LUCKY_WRONG_PASSWORDS)
+def test_smart_import_names_a_wrong_password_that_unpads_by_chance(password):
+    from cryptography.hazmat.primitives.serialization import load_der_private_key
+    from services.smart_import.parser import WRONG_PASSWORD, SmartParser
+    with pytest.raises(ValueError) as caught:
+        load_der_private_key(SEALED_RSA_DER, password.encode())
+    assert 'password' not in str(caught.value).lower()
+    [obj] = SmartParser().parse(SEALED_RSA_DER, password=password)
+    assert obj.error == WRONG_PASSWORD
+    assert SmartParser()._parse_der_key(SEALED_RSA_DER, password).error == WRONG_PASSWORD
 
 
 def test_converter_refuses_a_wrong_key_password(auth_client):

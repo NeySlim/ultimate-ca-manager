@@ -180,6 +180,58 @@ class TestSmartImportSelection:
         finally:
             self._drop(app, kept, left)
 
+    @pytest.mark.parametrize('selected, status', [([0], 200), ([1], 403), (None, 403)])
+    def test_write_cas_is_asked_only_for_a_selected_ca(self, app, auth_client, selected, status):
+        tag = uuid.uuid4().hex[:6]
+        ca_key = _gen()
+        ca = _cert(f'unselected-ca-{tag}', ca_key, ca=True)
+        leaf = _cert(f'leaf-under-unselected-{tag}', _gen(), issuer_cert=ca, signer=ca_key)
+        r = auth_client.post('/api/v2/account/apikeys', data=json.dumps({
+            'name': f'no-write-cas-{tag}', 'permissions': ['read:certificates', 'write:certificates']}),
+            content_type='application/json')
+        assert r.status_code == 201, r.data
+        options = {'skip_duplicates': False, 'import_cas': True}
+        if selected is not None:
+            options['selected_indices'] = selected
+        try:
+            r = app.test_client().post('/api/v2/import/execute', data=json.dumps({
+                'content': _pem(leaf) + _pem(ca), 'options': options}),
+                content_type='application/json', headers={'X-API-Key': r.get_json()['data']['key']})
+            assert r.status_code == status, r.data
+            if status == 200:
+                assert r.get_json()['data']['cas_imported'] == 0, r.get_json()
+                assert len(self._imported(app, leaf)) == 1
+        finally:
+            self._drop(app, leaf)
+
+    @pytest.mark.parametrize('global_password', [True, False])
+    def test_each_file_password_opens_its_key(self, app, auth_client, global_password):
+        """The form sends one password per file: each is tried on every encrypted key."""
+        tag = uuid.uuid4().hex[:6]
+        content, certs = '', []
+        for i in range(2):
+            key = _gen()
+            cert = _cert(f'per-file-{i}-{tag}', key)
+            certs.append(cert)
+            content += _pem(cert) + key.private_bytes(
+                serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                serialization.BestAvailableEncryption(f'file-pass-{i}'.encode())).decode()
+        body = {'content': content, 'file_passwords': {'0': 'file-pass-0', '1': 'file-pass-1'},
+                **({'password': 'file-pass-0'} if global_password else {})}
+        try:
+            r = auth_client.post('/api/v2/import/analyze', data=json.dumps(body),
+                                 content_type='application/json')
+            assert r.status_code == 200, r.data
+            keys = [o for o in r.get_json()['data']['objects'] if o['type'] == 'private_key']
+            assert len(keys) == 2 and not any(k.get('error') for k in keys), keys
+            r = auth_client.post('/api/v2/import/execute', data=json.dumps(
+                {**body, 'options': {'skip_duplicates': False}}), content_type='application/json')
+            data = r.get_json()['data']
+            assert data['certificates_imported'] == 2 and data['keys_matched'] == 2, data
+            assert all(row.prv for cert in certs for row in self._imported(app, cert))
+        finally:
+            self._drop(app, *certs)
+
     def test_a_key_left_out_is_not_stored(self, app, auth_client):
         key = _gen()
         cert = _cert(f'keyless-{uuid.uuid4().hex[:6]}', key)

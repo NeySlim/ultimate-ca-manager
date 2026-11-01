@@ -84,6 +84,35 @@ def test_issuing_a_full_label_needs_no_key_size(app, auth_client, create_ca, key
         assert isinstance(leaf.public_key(), mldsa.MLDSA65PublicKey)
 
 
+@pytest.mark.parametrize('key_size, error', [(None, None), ('2048', 'name different keys')])
+def test_approval_issues_a_full_label_without_a_key_size(app, create_ca, key_size, error):
+    from api.v2.policies import _issue_approved_certificate
+    from models import User
+    from models.policy import ApprovalRequest, CertificatePolicy
+    from services.policy_service import PolicyEvaluationService
+    ca = create_ca(cn=f'PQ label approval issuer {key_size}')
+    with app.app_context():
+        # Inactive: an active policy would hold every later issuance of the session
+        pol = CertificatePolicy(name=f'pq-label-approval-{key_size}', policy_type='issuance',
+                                requires_approval=True, min_approvers=1, is_active=False)
+        db.session.add(pol)
+        db.session.commit()
+        requester = User.query.filter_by(role='admin').first() or User.query.first()
+        approval = PolicyEvaluationService.create_approval_request(
+            policy=pol, requester_id=requester.id, request_data={
+                'cn': f'approval-label-{key_size}.pq.example.test', 'ca_id': ca['id'],
+                'cert_type': 'server', 'key_type': 'ML-DSA-65', 'validity_days': 30,
+                **({'key_size': key_size} if key_size else {})})
+        approval = db.session.get(ApprovalRequest, approval.id)
+        if error:
+            with pytest.raises(ValueError, match=error):
+                _issue_approved_certificate(approval)
+            return
+        result = _issue_approved_certificate(approval)
+        leaf = _row_cert(db.session.get(Certificate, result['id']))
+    assert isinstance(leaf.public_key(), mldsa.MLDSA65PublicKey)
+
+
 def test_parse_csr_key_type_names_ml_dsa():
     from utils.key_type import parse_csr_key_type
     assert parse_csr_key_type('ML-DSA-65') == 'ml-dsa-65'
