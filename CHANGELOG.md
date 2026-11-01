@@ -35,7 +35,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - ACME: the local server finalizes ML-DSA CSRs, and the ACME client orders ML-DSA-44, ML-DSA-65 and ML-DSA-87 certificate keys outside FIPS mode. A default key type the client cannot generate now fails the order instead of falling back to RSA-2048.
 
-- EST, SCEP and WSTEP enrol ML-DSA keys: SCEP verifies ML-DSA CMS signers as RFC 9882 sets out, and XCEP announces ML-DSA templates in policy schema 3 with the software KSP. EST /serverkeygen still generates RSA-2048 and ignores the request key, ML-DSA included (RFC 7030).
+- EST, SCEP and WSTEP enrol ML-DSA keys: SCEP verifies ML-DSA CMS signers as RFC 9882 sets out, and XCEP announces ML-DSA templates in policy schema 3 with the software KSP and a SHA-512 request hash, which Windows Server 2025 follows to enrol them. EST /serverkeygen still generates RSA-2048 and ignores the request key, ML-DSA included (RFC 7030).
 
 - TSA: a timestamp signer can be ML-DSA-65 or ML-DSA-87 (RFC 9882), issued from the TSA page or as an ML-DSA CA signing directly.
 
@@ -101,6 +101,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Certificates issued through ACME, SCEP, EST, WSTEP and Microsoft CA connections, or renewed, were stored without their key identifiers, or in lower case, so ACME renewalInfo answered 404 and the issuing CA was not found by them; they are now recorded with the certificate.
 
 - Import: a certificate or CA with an encrypted private key and a wrong or missing password, or with a key that could not be read, was imported without its key; the import now answers 400 with the reason. Key uploads say whether a password is missing or wrong, and smart import tries every per-file password the form sends instead of ignoring them. Smart import also ignored the objects left unselected and the Import keys option, and now offers Import CSRs.
+
+- WSTEP: renewing a certificate from Windows (`certreq ... Renew`) was refused for lack of a WS-Security header; Windows authenticates with the certificate being renewed as TLS client certificate, which is now accepted when it signed the request, is current and was issued by the WSTEP CA. It needs mTLS enabled with that CA, or one of its ancestors, trusted.
+
+- WSTEP: a renewal could move to another template and add its Extended Key Usages; it now keeps the template of the certificate it renews with that template's EKUs, and a renewal wrapped in PKCS#7 with a new key has to prove possession of it.
+
+- EST, SCEP and WSTEP: two renewals of one certificate sent at the same time, or two pending SCEP renewals approved in turn, could both be issued; the second is now refused as superseded. WSTEP renewals of a certificate the CA issued, refused ones included, are audited with the old and new serial numbers.
 
 - WSTEP: a request matched to a template by its EKUs could be issued with a key of another kind than the template's; it is now refused with the template's key type.
 
