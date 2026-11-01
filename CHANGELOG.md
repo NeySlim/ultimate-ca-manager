@@ -106,7 +106,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - WSTEP: a renewal could move to another template and add its Extended Key Usages; it now keeps the template of the certificate it renews with that template's EKUs, and a renewal wrapped in PKCS#7 with a new key has to prove possession of it.
 
-- EST, SCEP and WSTEP: two renewals of one certificate sent at the same time, or two pending SCEP renewals approved in turn, could both be issued; the second is now refused as superseded. WSTEP renewals of a certificate the CA issued, refused ones included, are audited with the old and new serial numbers.
+- EST, SCEP and WSTEP: two renewals of one certificate sent at the same time, or two pending SCEP renewals approved in turn, could both be issued; the second is now refused as superseded, and a SCEP renewal approved after the certificate was revoked is refused. WSTEP renewals of a certificate the CA issued, refused ones included, are audited with the old and new serial numbers.
 
 - WSTEP: a request matched to a template by its EKUs could be issued with a key of another kind than the template's; it is now refused with the template's key type.
 
