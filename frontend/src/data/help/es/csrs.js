@@ -31,7 +31,7 @@ export default {
       'Un certificado importado para un CSR generado en UCM completa ese CSR: el registro conserva su clave privada, por lo que el certificado se exporta con ella',
       'Utilice el modo Microsoft CA para firmar CSR a través de AD CS cuando esté conectado a una PKI Windows',
       'Un certificado para una clave ML-DSA conserva solo los bits de firma: keyEncipherment, dataEncipherment y keyAgreement pedidos por la plantilla se eliminan, y el resultado lo indica',
-      'Un CSR generado con related_to (API) nombra un certificado existente A: al firmarlo se emite un certificado vinculado a A (RFC 9763), rechazado si declara un key usage o EKU que A no tenga',
+      'Un CSR generado con related_to (API, requiere read:private_keys) nombra un certificado existente A: al firmarlo se emite un certificado vinculado a A (RFC 9763), rechazado si declara un key usage o EKU que A no tenga',
       'Al firmar, use "EKU adicionales" para añadir Microsoft RDP, smartcard logon, IPsec o cualquier OID: el EKU existente del CSR se reconstruye con el conjunto fusionado',
       'Cuando una política o la expiración de la CA emisora acorta la validez solicitada, el resultado lo indica: "Issued for N day(s) instead of the M requested", con el motivo',
     ],
@@ -69,7 +69,7 @@ Un certificado firmado para una clave **ML-DSA** conserva solo los bits de firma
 
 ### Solicitudes de certificado relacionado (RFC 9763)
 
-Mediante la API, \`related_to\` nombra un certificado existente **A** cuya clave privada conserva UCM: el CSR generado incluye entonces una **relatedCertRequest** firmada por la clave de A. Al firmarlo se emite un certificado vinculado a A, segundo miembro de un par híbrido, que se revoca y renueva junto con A. La firma se rechaza si A está revocado, expirado o no es de entidad final, o si el nuevo certificado declara un key usage o EKU que A no tenga.
+Mediante la API, \`related_to\` nombra un certificado existente **A** cuya clave privada conserva UCM; requiere el permiso \`read:private_keys\` y cada uso de la clave de A queda auditado. El CSR generado incluye entonces una **relatedCertRequest** firmada por la clave de A. Al firmarlo se emite un certificado vinculado a A, segundo miembro de un par híbrido, que se revoca y renueva junto con A. La firma se rechaza si A está revocado, expirado o no es de entidad final, o si el nuevo certificado declara un key usage o EKU que A no tenga.
 
 ## Cargar un CSR
 

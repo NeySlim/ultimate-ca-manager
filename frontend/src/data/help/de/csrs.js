@@ -31,7 +31,7 @@ export default {
       'Ein für einen in UCM generierten CSR importiertes Zertifikat vervollständigt diesen CSR: Der Eintrag behält seinen privaten Schlüssel, sodass das Zertifikat zusammen mit ihm exportiert wird',
       'Verwenden Sie den Microsoft CA-Modus, um CSRs über AD CS zu signieren, wenn eine Verbindung zu einer Windows-PKI besteht',
       'Ein Zertifikat für einen ML-DSA-Schlüssel behält nur Signaturbits: Vom Template angeforderte keyEncipherment, dataEncipherment und keyAgreement werden entfernt, und das Ergebnis weist darauf hin',
-      'Ein mit related_to (API) erzeugter CSR benennt ein vorhandenes Zertifikat A: Seine Signierung stellt ein mit A verknüpftes Zertifikat aus (RFC 9763), abgelehnt, wenn es eine Schlüsselverwendung oder EKU ausweist, die A fehlt',
+      'Ein mit related_to (API, erfordert read:private_keys) erzeugter CSR benennt ein vorhandenes Zertifikat A: Seine Signierung stellt ein mit A verknüpftes Zertifikat aus (RFC 9763), abgelehnt, wenn es eine Schlüsselverwendung oder EKU ausweist, die A fehlt',
       'Beim Signieren über "Extra EKUs" Microsoft RDP, Smartcard-Logon, IPsec oder beliebige OIDs hinzufügen: die vorhandene EKU des CSR wird mit der zusammengeführten Menge neu aufgebaut',
       'Verkürzt eine Richtlinie oder das Ablaufdatum der ausstellenden CA die angeforderte Gültigkeit, nennt das Ergebnis dies samt Grund: "Issued for N day(s) instead of the M requested"',
     ],
@@ -69,7 +69,7 @@ Ein für einen **ML-DSA**-Schlüssel signiertes Zertifikat behält nur Signaturb
 
 ### Anfragen mit verwandtem Zertifikat (RFC 9763)
 
-Über die API benennt \`related_to\` ein vorhandenes Zertifikat **A**, dessen privaten Schlüssel UCM hält: Der erzeugte CSR trägt dann eine vom Schlüssel von A signierte **relatedCertRequest**. Seine Signierung stellt ein mit A verknüpftes Zertifikat aus, das zweite Mitglied eines hybriden Paars, das mit A widerrufen und erneuert wird. Die Signierung wird abgelehnt, wenn A widerrufen, abgelaufen oder kein Endentitätszertifikat ist oder wenn das neue Zertifikat eine Schlüsselverwendung oder EKU ausweist, die A fehlt.
+Über die API benennt \`related_to\` ein vorhandenes Zertifikat **A**, dessen privaten Schlüssel UCM hält; dafür ist die Berechtigung \`read:private_keys\` nötig, und jede Verwendung des Schlüssels von A wird protokolliert. Der erzeugte CSR trägt dann eine vom Schlüssel von A signierte **relatedCertRequest**. Seine Signierung stellt ein mit A verknüpftes Zertifikat aus, das zweite Mitglied eines hybriden Paars, das mit A widerrufen und erneuert wird. Die Signierung wird abgelehnt, wenn A widerrufen, abgelaufen oder kein Endentitätszertifikat ist oder wenn das neue Zertifikat eine Schlüsselverwendung oder EKU ausweist, die A fehlt.
 
 ## CSR hochladen
 

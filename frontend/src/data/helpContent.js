@@ -223,9 +223,9 @@ export const helpContent = {
         content: 'A classical certificate (A) and an ML-DSA one (B) for the same subject, linked: B carries the relatedCertificate extension naming A by its hash. Clients that know ML-DSA check both; the others keep using A.',
         items: [
           { label: 'Issue', text: 'Tick "Issue a hybrid pair" in the Issue Certificate form and choose the classical key and the ML-DSA level; both come from the same CA, with the same subject, names and validity, and B asserts no key usage or EKU that A lacks. Offered only when the policies of the CA allow both, never in FIPS mode. Under the ANSSI, BSI and EU ACM profiles, ML-DSA-65 and ML-DSA-87 are offered in the pair only. A policy that requires approval refuses the pair for now' },
-          { label: 'Linked by request', text: 'A CSR carrying a relatedCertRequest signed by A\'s key (Sign CSR, ACME, EST, WSTEP) issues a B linked to A. A must be held here, valid, unrevoked and an end-entity certificate' },
+          { label: 'Linked by request', text: 'A CSR carrying a relatedCertRequest signed by A\'s key (Sign CSR, ACME, EST, WSTEP) issues a B linked to A. A must be held here, valid, unrevoked and an end-entity certificate; a newer B naming the same A takes over the pair' },
           { label: 'Linked', text: 'Each member carries a Linked badge in the list and in its details, with a link that opens the other member' },
-          { label: 'Revoke', text: 'Revoking one member, alone or in a bulk operation, also revokes the other unless you untick "Also revoke the linked certificate", e.g. to keep A when only the ML-DSA key is compromised; under a policy that requires approval both go together. A warning names the other member when it could not be revoked' },
+          { label: 'Revoke', text: 'Revoking one member, alone or in a bulk operation, also revokes the other unless you untick "Also revoke the linked certificate", e.g. to keep A when only the ML-DSA key is compromised; under a policy that requires approval both go together. A warning names the other member when it could not be revoked. ACME revocation revokes only the certificate presented' },
           { label: 'Renew', text: 'Renewing either member renews both, manually, in bulk or automatically, and the new B names the new A. A member renewed alone, the other being revoked, leaves the pair' },
           { label: 'Export', text: 'The Hybrid bundle format downloads a ZIP of both certificates, and of both keys when you include the key and may export keys' },
         ]
@@ -353,7 +353,7 @@ export const helpContent = {
       'A certificate imported for a CSR generated in UCM completes that CSR: the record keeps its private key, so the certificate exports with it',
       'Use Microsoft CA mode to sign CSRs via AD CS when connected to a Windows PKI',
       'A certificate for an ML-DSA key keeps only signature bits: keyEncipherment, dataEncipherment and keyAgreement asked by the template are removed, and the result says so',
-      'A CSR generated with related_to (API) names an existing certificate A: signing it issues a certificate linked to A (RFC 9763), refused if it asserts a key usage or EKU A lacks',
+      'A CSR generated with related_to (API, needs read:private_keys) names an existing certificate A: signing it issues a certificate linked to A (RFC 9763), refused if it asserts a key usage or EKU A lacks',
       'When signing, use "Extra EKUs" to add Microsoft RDP, smartcard logon, IPsec or any other dotted OID: the CSR\'s existing EKU is rebuilt with the merged set',
       'When a policy or the issuing CA\'s expiry shortens the requested validity, the result says so: "Issued for N day(s) instead of the M requested", with the reason',
     ],

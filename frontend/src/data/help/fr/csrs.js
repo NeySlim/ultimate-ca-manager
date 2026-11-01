@@ -31,7 +31,7 @@ export default {
       'Un certificat importé pour une CSR générée dans UCM complète cette CSR : l\'enregistrement conserve sa clé privée, le certificat s\'exporte donc avec elle',
       'Utilisez le mode Microsoft CA pour signer les CSR via AD CS lorsque vous êtes connecté à une PKI Windows',
       'Un certificat pour une clé ML-DSA ne garde que les bits de signature : keyEncipherment, dataEncipherment et keyAgreement demandés par le template sont retirés, et le résultat l\'indique',
-      'Une CSR générée avec related_to (API) désigne un certificat existant A : la signer émet un certificat lié à A (RFC 9763), refusé s\'il affirme un key usage ou un EKU absent de A',
+      'Une CSR générée avec related_to (API, exige read:private_keys) désigne un certificat existant A : la signer émet un certificat lié à A (RFC 9763), refusé s\'il affirme un key usage ou un EKU absent de A',
       'À la signature, utilisez « EKU supplémentaires » pour ajouter Microsoft RDP, smartcard logon, IPsec ou tout OID : l\'EKU existante du CSR est reconstruite avec le jeu fusionné',
       'Quand une politique ou l\'expiration de la CA émettrice raccourcit la validité demandée, le résultat l\'indique : "Issued for N day(s) instead of the M requested", avec la raison',
     ],
@@ -69,7 +69,7 @@ Un certificat signé pour une clé **ML-DSA** ne garde que les bits de signature
 
 ### Demandes de certificat lié (RFC 9763)
 
-Via l'API, \`related_to\` désigne un certificat existant **A** dont UCM détient la clé privée : la CSR générée porte alors une **relatedCertRequest** signée par la clé de A. La signer émet un certificat lié à A, second membre d'une paire hybride, qui se révoque et se renouvelle avec A. La signature est refusée si A est révoqué, expiré ou n'est pas un certificat d'entité finale, ou si le nouveau certificat affirme un key usage ou un EKU absent de A.
+Via l'API, \`related_to\` désigne un certificat existant **A** dont UCM détient la clé privée ; elle exige la permission \`read:private_keys\`, et chaque usage de la clé de A est audité. La CSR générée porte alors une **relatedCertRequest** signée par la clé de A. La signer émet un certificat lié à A, second membre d'une paire hybride, qui se révoque et se renouvelle avec A. La signature est refusée si A est révoqué, expiré ou n'est pas un certificat d'entité finale, ou si le nouveau certificat affirme un key usage ou un EKU absent de A.
 
 ## Téléverser une CSR
 

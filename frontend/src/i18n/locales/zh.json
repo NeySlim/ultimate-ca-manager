@@ -1165,6 +1165,7 @@
     "rekeyAsCSRDescription": "使用相同的DN字段和SAN生成新的CSR，但使用新的密钥对。",
     "rekeyAsCertDescription": "直接颁发具有相同主题的新证书，由CA签名。",
     "keyRsa2048": "RSA 2048",
+    "keyRsa3072": "RSA 3072",
     "keyRsa4096": "RSA 4096",
     "keyCurveNistP256": "NIST P-256 (ECDSA)",
     "keyCurveNistP384": "NIST P-384 (ECDSA)",
@@ -1669,6 +1670,7 @@
     "renew": "续期",
     "keyType": "证书密钥类型",
     "keyTypeHelper": "颁发证书的算法和密钥大小",
+    "keyTypeUnavailable": "已保存的密钥类型 {{keyType}} 在此服务器上不可用：在您选择其他类型之前，订单将失败。",
     "keySource": "密钥来源",
     "keySourceHelper": "生成新密钥、续期时复用（TLSA/固定）或提供外部 CSR",
     "keySourceGenerate": "生成新密钥",
@@ -5566,6 +5568,7 @@
     "validityInfo": "有效期",
     "caInfo": "CA 信息",
     "selectCa": "选择 SSH CA",
+    "issueNeedsCaRead": "选择 SSH CA 需要 read:ssh_cas 权限，而您的账户没有该权限：请向管理员申请。",
     "issueMode": "签发模式",
     "presets": {
       "1h": "1 小时",

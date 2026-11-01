@@ -32,7 +32,7 @@ export default {
       '使用 Microsoft CA 模式可在连接到 Windows PKI 时通过 AD CS 签署 CSR',
       '签署时使用"额外 EKU"添加 Microsoft RDP、智能卡登录、IPsec 或任何 OID: CSR 现有的 EKU 将以合并集重建',
       'ML-DSA 密钥的证书只保留签名位：模板要求的 keyEncipherment、dataEncipherment 和 keyAgreement 会被移除，结果中会说明',
-      '通过 API 以 related_to 生成的 CSR 会指明现有证书 A：签署后签发与 A 关联的证书（RFC 9763）；若其声明了 A 所没有的密钥用途或 EKU 则被拒绝',
+      '通过 API 以 related_to（需要 read:private_keys）生成的 CSR 会指明现有证书 A：签署后签发与 A 关联的证书（RFC 9763）；若其声明了 A 所没有的密钥用途或 EKU 则被拒绝',
       '当策略或签发 CA 的到期日缩短了请求的有效期时，结果会说明原因：“Issued for N day(s) instead of the M requested”',
     ],
   },
@@ -69,7 +69,7 @@ CSR 和私钥将在 UCM 中创建和存储。CSR 出现在待处理选项卡中�
 
 ### 关联证书请求(RFC 9763)
 
-通过 API,\`related_to\` 指明 UCM 持有其私钥的现有证书 **A**:生成的 CSR 随后携带由 A 的密钥签名的 **relatedCertRequest**。签署后签发与 A 关联的证书,即混合证书对的第二个成员,它与 A 一同吊销和续期。当 A 已吊销、已过期或不是终端实体证书,或新证书声明了 A 所没有的密钥用途或 EKU 时,签署会被拒绝。
+通过 API,\`related_to\` 指明 UCM 持有其私钥的现有证书 **A**;这需要 \`read:private_keys\` 权限,且每次使用 A 的密钥都会被审计。生成的 CSR 随后携带由 A 的密钥签名的 **relatedCertRequest**。签署后签发与 A 关联的证书,即混合证书对的第二个成员,它与 A 一同吊销和续期。当 A 已吊销、已过期或不是终端实体证书,或新证书声明了 A 所没有的密钥用途或 EKU 时,签署会被拒绝。
 
 ## 上传 CSR
 

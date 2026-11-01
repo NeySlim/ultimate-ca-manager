@@ -1165,6 +1165,7 @@
     "rekeyAsCSRDescription": "同じDNフィールドとSANで、新しい鍵ペアを持つ新しいCSRを生成します。",
     "rekeyAsCertDescription": "同じサブジェクトで、CAが署名した新しい証明書を直接発行します。",
     "keyRsa2048": "RSA 2048",
+    "keyRsa3072": "RSA 3072",
     "keyRsa4096": "RSA 4096",
     "keyCurveNistP256": "NIST P-256 (ECDSA)",
     "keyCurveNistP384": "NIST P-384 (ECDSA)",
@@ -1669,6 +1670,7 @@
     "renew": "更新",
     "keyType": "証明書キータイプ",
     "keyTypeHelper": "発行される証明書のアルゴリズムとキーサイズ",
+    "keyTypeUnavailable": "保存済みのキータイプ {{keyType}} はこのサーバーでは利用できません: 別のキータイプを選択するまで注文は失敗します。",
     "keySource": "鍵のソース",
     "keySourceHelper": "新規鍵を生成、更新時に再利用（TLSA/ピン留め）、または外部CSRを提供",
     "keySourceGenerate": "新規鍵を生成",
@@ -5569,6 +5571,7 @@
     "validityInfo": "有効期間",
     "caInfo": "CA情報",
     "selectCa": "SSH CAを選択",
+    "issueNeedsCaRead": "SSH CA を選択するには read:ssh_cas 権限が必要ですが、お使いのアカウントにはありません: 管理者に付与を依頼してください。",
     "issueMode": "発行モード",
     "presets": {
       "1h": "1時間",

@@ -380,6 +380,7 @@
     "renew": "Renouveler",
     "keyType": "Type de clé de certificat",
     "keyTypeHelper": "Algorithme et taille de clé pour les certificats émis",
+    "keyTypeUnavailable": "Le type de clé enregistré {{keyType}} n'est pas disponible sur ce serveur : les commandes échouent tant que vous n'en choisissez pas un autre.",
     "keySource": "Source de clé",
     "keySourceHelper": "Générer une nouvelle clé, réutiliser la même clé au renouvellement (TLSA/pinning), ou fournir une CSR externe",
     "keySourceGenerate": "Générer une nouvelle clé",
@@ -1938,6 +1939,7 @@
     "rekeyAsCSRDescription": "Générer un nouveau CSR avec les mêmes champs DN et SANs mais une nouvelle paire de clés.",
     "rekeyAsCertDescription": "Émettre directement un nouveau certificat avec le même sujet, signé par une CA.",
     "keyRsa2048": "RSA 2048",
+    "keyRsa3072": "RSA 3072",
     "keyRsa4096": "RSA 4096",
     "keyCurveNistP256": "NIST P-256 (ECDSA)",
     "keyCurveNistP384": "NIST P-384 (ECDSA)",
@@ -5569,6 +5571,7 @@
     "validityInfo": "Validité",
     "caInfo": "Informations de la CA",
     "selectCa": "Sélectionner une CA SSH",
+    "issueNeedsCaRead": "Choisir une CA SSH exige la permission read:ssh_cas, que votre compte n'a pas : demandez-la à un administrateur.",
     "issueMode": "Mode d'émission",
     "presets": {
       "1h": "1 heure",
