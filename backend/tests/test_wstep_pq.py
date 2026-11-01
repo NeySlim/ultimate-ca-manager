@@ -208,3 +208,23 @@ def test_certificate_bound_renewal_names_mldsa(app, create_ca, method):
         cert_pem, err = wstep_service.renew(ca, csr_der, header, csr_element, validity_days=30)
     assert cert_pem is None
     assert 'not supported' in err and 'ML-DSA-65' in err
+
+
+def _windows_envelope(name):
+    """CMC request made by Windows Server 2025 (CertEnroll, ML-DSA-65 in the software KSP)."""
+    from services.wstep.rst_parser import _unwrap_pkcs7_csr
+    from tests.pqc_fixtures import fixture_bytes
+    csr_der, _body_part, signed_data = _unwrap_pkcs7_csr(fixture_bytes(name))
+    return x509.load_der_x509_csr(csr_der), signed_data
+
+
+def test_windows_mldsa_request_signed_with_sha512_proves_possession():
+    csr, signed_data = _windows_envelope('windows-mldsa65-cmc-sha512.der')
+    assert isinstance(csr.public_key(), mldsa.MLDSA65PublicKey)
+    assert wstep_service._verify_pkcs7_pop(csr, signed_data) is None
+
+
+def test_windows_mldsa_request_signed_with_sha256_is_refused():
+    """What Windows sends when the template names no hash: RFC 9882 asks for SHA-512."""
+    csr, signed_data = _windows_envelope('windows-mldsa65-cmc-sha256.der')
+    assert 'proof of possession failed' in wstep_service._verify_pkcs7_pop(csr, signed_data)

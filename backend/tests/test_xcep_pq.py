@@ -121,3 +121,22 @@ def test_rsa_template_keeps_a_nil_algorithm_reference(xcep_pq_policies):
     pk = _private_key_attributes(xcep_pq_policies, 'XCEP PQ RSA neighbour')
     assert pk.find(f'{{{XCEP_NS}}}algorithmOIDReference').get(XSI_NIL) == 'true'
     assert pk.find(f'{{{XCEP_NS}}}keySpec').text == '1'
+
+
+def _hash_reference(root, name):
+    for policy in root.findall(f'.//{{{XCEP_NS}}}policy'):
+        if policy.find(f'.//{{{XCEP_NS}}}commonName').text == name:
+            return policy.find(f'{{{XCEP_NS}}}attributes/{{{XCEP_NS}}}hashAlgorithmOIDReference')
+    raise AssertionError(f'{name} not announced')
+
+
+def test_mldsa_templates_ask_for_a_sha512_request_digest(xcep_pq_policies):
+    """RFC 9882: Windows signs its CMS request with the announced hash, SHA-256 when nil."""
+    root = xcep_pq_policies
+    oids = {o.find(f'{{{XCEP_NS}}}oIDReferenceID').text: o
+            for o in root.findall(f'.//{{{XCEP_NS}}}oIDs/{{{XCEP_NS}}}oID')}
+    for label in MLDSA_LABELS:
+        oid = oids[_hash_reference(root, f'XCEP PQ {label}').text]
+        assert oid.find(f'{{{XCEP_NS}}}value').text == '2.16.840.1.101.3.4.2.3', label   # SHA-512
+        assert oid.find(f'{{{XCEP_NS}}}group').text == '1'                                # hash
+    assert _hash_reference(root, 'XCEP PQ RSA neighbour').get(XSI_NIL) == 'true'
