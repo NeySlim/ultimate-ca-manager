@@ -105,4 +105,18 @@ describe('LetsEncryptTab certificate key type', () => {
       await waitFor(() => expect(offered().filter(v => PQ.includes(v))).toEqual([]))
       expect(offered()).toContain('EC-P256')
     })
+
+  it.each([
+    ['ML-DSA-65', { fips: true }, true], ['EC-BP256', { fips: true }, true],
+    ['ML-DSA-65', { ml_dsa: false }, true], ['ML-DSA-65', {}, false], ['EC-P256', { fips: true }, false],
+  ])('flags a saved %s the server no longer offers (%o): %s', async (keyType, effective, flagged) => {
+    getEffective.mockResolvedValue({ data: effective })
+    renderTab({ clientSettings: { key_type: keyType } })
+    await waitFor(() => expect(getEffective).toHaveBeenCalled())
+    if (flagged) expect(await screen.findByText('acme.keyTypeUnavailable')).toBeInTheDocument()
+    else {
+      await new Promise((r) => setTimeout(r, 20))
+      expect(screen.queryByText('acme.keyTypeUnavailable')).toBeNull()
+    }
+  })
 })

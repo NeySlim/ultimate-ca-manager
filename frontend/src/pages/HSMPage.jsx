@@ -893,6 +893,13 @@ export function KeyModal({ provider, onSave, onClose }) {
     purpose: 'signing',
     extractable: false,
   }))
+  // The policy answer can withdraw the group picked before it (ML-DSA in FIPS mode)
+  const groupGone = !groupOptions.some(g => g.value === formData.group)
+  useEffect(() => {
+    if (groupGone) {
+      setFormData(f => ({ ...f, group: groupOptions[0].value, algorithm: algorithmsOf(groupOptions[0].value)[0] }))
+    }
+  }, [groupGone]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = () => {
     onSave({

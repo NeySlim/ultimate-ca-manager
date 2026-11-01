@@ -47,6 +47,9 @@ export default function LetsEncryptTab({
   const { t } = useTranslation()
   const { copy } = useClipboard()
   const platform = useKeyPlatform()
+  const clientKeys = listAlgorithms({ labels: ACME_CLIENT_LABELS, ...platform })
+  // A saved key this server no longer offers (FIPS mode, build without ML-DSA) fails every order
+  const savedKeyUnavailable = !!clientSettings.key_type && !clientKeys.some(a => a.label === clientSettings.key_type)
 
   const proxyAccountId = clientSettings.proxy_acme_account_id ?? null
   const selectedProxyAccount = caAccounts.find(a => a.id === proxyAccountId)
@@ -228,9 +231,15 @@ export default function LetsEncryptTab({
             value={clientSettings.key_type || ACME_CLIENT_LABELS[0]}
             onChange={(val) => onUpdateClientSetting('key_type', val)}
             disabled={!canWrite}
-            options={groupedOptions(listAlgorithms({ labels: ACME_CLIENT_LABELS, ...platform }), t)}
+            options={groupedOptions(clientKeys, t)}
             helperText={t('acme.keyTypeHelper')}
           />
+          {savedKeyUnavailable && (
+            <p className="flex items-start gap-1.5 text-xs text-status-danger" role="alert">
+              <Warning size={14} className="mt-0.5 shrink-0" />
+              <span>{t('acme.keyTypeUnavailable', { keyType: clientSettings.key_type })}</span>
+            </p>
+          )}
           <BrainpoolNotice label={clientSettings.key_type} />
 
           <Select

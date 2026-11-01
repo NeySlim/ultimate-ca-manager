@@ -110,4 +110,24 @@ describe('HSM key generation, from the registry', () => {
         apiClient.get.mockReset(); apiClient.get.mockResolvedValue({ data: [] })
       }
     })
+
+  it('moves an ML-DSA choice made before the policy answer to the first key offered', async () => {
+    let answer
+    apiClient.get.mockImplementation((url) => (String(url).startsWith('/policies/effective')
+      ? new Promise((resolve) => { answer = resolve })
+      : Promise.resolve({ data: [] })))
+    try {
+      const onSave = renderModal('pkcs11')
+      fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: GROUP_PQ } })
+      fireEvent.change(screen.getByLabelText('common.keySize'), { target: { value: 'ML-DSA-65' } })
+      await waitFor(() => expect(answer).toBeTypeOf('function'))
+      answer({ data: { fips: true } })
+      await waitFor(() => expect(offered(screen.getByLabelText('common.keyType'))).not.toContain(GROUP_PQ))
+      const first = listAlgorithms({ generate: true, provider: 'pkcs11', fips: true })[0]
+      await waitFor(() => expect(screen.getByLabelText('common.keyType')).toHaveValue(first.group))
+      expect((await save(onSave)).algorithm).toBe(first.label)
+    } finally {
+      apiClient.get.mockReset(); apiClient.get.mockResolvedValue({ data: [] })
+    }
+  })
 })

@@ -95,6 +95,10 @@ const BRAINPOOL_CSR = {
   id: 23, cn: 'bp.example.test', common_name: 'bp.example.test',
   key_type: 'EC brainpoolP384r1', key_algorithm: 'EC', key_size: 384,
 }
+const RSA_3072_CSR = {
+  id: 24, cn: 'rsa3072.example.test', common_name: 'rsa3072.example.test',
+  key_type: 'RSA 3072', key_algorithm: 'RSA', key_size: 3072,
+}
 const EC_CSR = {
   id: 22, cn: 'ec.example.test', common_name: 'ec.example.test',
   key_type: 'EC secp384r1', key_algorithm: 'EC', key_size: 0,
@@ -154,6 +158,13 @@ describe('CSRsPage re-key key type', () => {
     fireEvent.click(buttons[buttons.length - 1])
     await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
     expect(mocks.create.mock.calls[0][0]).toMatchObject({ key_type: 'ML-DSA-87' })
+  })
+
+  it('re-keys an RSA 3072 CSR as a CSR with RSA 3072', async () => {
+    await openRekey(RSA_3072_CSR)
+    fireEvent.click(screen.getByText('csrs.rekeyAsCSR'))
+    await waitFor(() => expect(screen.getByLabelText('common.keyType')).toHaveValue('RSA 3072'))
+    expect((await submitGenerate()).key_type).toBe('RSA 3072')
   })
 
   it('keeps the curve of an EC CSR re-keyed as a certificate', async () => {

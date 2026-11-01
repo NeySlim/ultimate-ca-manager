@@ -80,7 +80,7 @@ export const KEY_ALGORITHMS = [
 // Mirror of the ACME client's CERT_KEY_TYPES (contracts/acme_client_key_types.json)
 export const ACME_CLIENT_LABELS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384',
   'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']
-export const CSR_LABELS = ['RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521', 'EC-BP256', 'EC-BP384', 'EC-BP512',
+export const CSR_LABELS = ['RSA-2048', 'RSA-3072', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-P521', 'EC-BP256', 'EC-BP384', 'EC-BP512',
   'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87']
 export const TSA_LABELS = ['RSA-3072', 'RSA-2048', 'RSA-4096', 'EC-P256', 'EC-P384', 'EC-BP256', 'EC-BP384',
   'ML-DSA-65', 'ML-DSA-87']

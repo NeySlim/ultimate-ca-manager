@@ -276,6 +276,12 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
       .filter(a => isAllowed(allowedKeyTypes, a.label) && !(pqStandalone && isPostQuantum(a.label))),
     [allowedKeyTypes, hsmProviderType, fips, mldsa, pqStandalone])
   const hsmAlgorithmOptions = useMemo(() => hsmAlgorithms.map(a => a.label), [hsmAlgorithms])
+  // Existing keys pass the same filters; one outside the registry (RSA-8192) is refused only in FIPS mode
+  const usableHsmKeys = useMemo(() => hsmKeys.filter(k => {
+    const row = findAlgorithm(k.algorithm)
+    return isAllowed(allowedKeyTypes, k.algorithm) && (row ? isUsable(row, { fips, mldsa }) : !fips)
+      && !(pqStandalone && isPostQuantum(k.algorithm))
+  }), [hsmKeys, allowedKeyTypes, fips, mldsa, pqStandalone])
   // An HSM key synced from the token may be an RSA size the registry does not list ('RSA-8192')
   const keyIsRsa = keyRow?.family === 'RSA' || /^RSA-\d+$/.test(keyLabel ?? '')
   const pssAvailable = keyIsRsa && (keyStorage === 'local' || PSS_HSM_TYPES.includes(hsmProviderType))
@@ -315,6 +321,11 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
       setCreateFormHsmKeyAlgorithm(hsmAlgorithmOptions[0])
     }
   }, [hsmAlgorithmOptions, createFormHsmKeyAlgorithm])
+  useEffect(() => {
+    if (createFormHsmKeyId && !usableHsmKeys.some(k => String(k.id) === createFormHsmKeyId)) {
+      setCreateFormHsmKeyId('')
+    }
+  }, [usableHsmKeys, createFormHsmKeyId])
 
   const handleCreateCA = async (e) => {
     e.preventDefault()
@@ -651,14 +662,14 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
               )}
 
               {createFormHsmKeyMode === 'existing' && (
-                createFormHsmProviderId && hsmKeys.length === 0 ? (
+                createFormHsmProviderId && usableHsmKeys.length === 0 ? (
                   <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
                     {t('cas.create.hsmNoUnusedKeys')}
                   </div>
                 ) : (
                   <Select
                     label={t('cas.create.hsmExistingKey')}
-                    options={hsmKeys.map(k => ({
+                    options={usableHsmKeys.map(k => ({
                       value: k.id.toString(),
                       label: `${k.label} (${k.algorithm})`
                     }))}
@@ -859,7 +870,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
               creating || policyBlocksCreate || (
               keyStorage === 'hsm' && (
                 hsmProviders.length === 0 ||
-                (createFormHsmKeyMode === 'existing' && !!createFormHsmProviderId && hsmKeys.length === 0)
+                (createFormHsmKeyMode === 'existing' && !!createFormHsmProviderId && usableHsmKeys.length === 0)
               )
               )
             }
