@@ -20,7 +20,7 @@ import { CA_KEY_CHOICES, POLICY_DIGESTS, caKeyLabel, isAllowed, useEffectiveAlgo
 import { PSS_HSM_TYPES } from '../../lib/signatureName'
 import {
   CA_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, defaultDigestFor, defaultKeyChoice, findAlgorithm,
-  groupedOptions, isUsable, keyFamilyOptions, listAlgorithms,
+  groupedOptions, isPostQuantum, isUsable, keyFamilyOptions, listAlgorithms,
 } from '../../lib/keyAlgorithms'
 import { BrainpoolNotice, UntestedKeyNotice } from '../../components/BrainpoolNotice'
 import { COMPLIANCE_PROFILE_NAMES, limitsWithProfile, useComplianceDefault, useComplianceProfiles } from '../../lib/complianceProfiles'
@@ -199,7 +199,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const proposedProfile = COMPLIANCE_PROFILE_NAMES.includes(parentProfile) ? parentProfile : defaultProfile
   const profileName = createFormProfile ?? proposedProfile
   const profile = profiles[profileName]
-  const { allowedKeyTypes, allowedDigests, allowedSchemes, horizons, requireHsm } =
+  const { allowedKeyTypes, allowedDigests, allowedSchemes, horizons, requireHsm, pqStandalone } =
     useMemo(() => limitsWithProfile(policyLimits, profile), [policyLimits, profile])
   // eu-acm: the CA key lives on an HSM
   const keyStorage = requireHsm ? 'hsm' : createFormKeyStorage
@@ -223,8 +223,9 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const { fips, mldsa } = policyLimits
   const allowedLocalKeys = useMemo(
     () => CA_KEY_CHOICES.filter(([algo, size]) => isAllowed(allowedKeyTypes, caKeyLabel(algo, size))
-      && isUsable(findAlgorithm(caKeyLabel(algo, size)), { fips, mldsa })),
-    [allowedKeyTypes, fips, mldsa],
+      && isUsable(findAlgorithm(caKeyLabel(algo, size)), { fips, mldsa })
+      && !(pqStandalone && isPostQuantum(caKeyLabel(algo, size)))),
+    [allowedKeyTypes, fips, mldsa, pqStandalone],
   )
   const allowedDigestChoices = useMemo(
     () => POLICY_DIGESTS.filter(d => isAllowed(allowedDigests, d)), [allowedDigests])
@@ -272,8 +273,8 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   // Brainpool only on a PKCS#11 provider; none shown until a provider is chosen
   const hsmAlgorithms = useMemo(
     () => listAlgorithms({ generate: true, provider: hsmProviderType ?? '', fips, mldsa })
-      .filter(a => isAllowed(allowedKeyTypes, a.label)),
-    [allowedKeyTypes, hsmProviderType, fips, mldsa])
+      .filter(a => isAllowed(allowedKeyTypes, a.label) && !(pqStandalone && isPostQuantum(a.label))),
+    [allowedKeyTypes, hsmProviderType, fips, mldsa, pqStandalone])
   const hsmAlgorithmOptions = useMemo(() => hsmAlgorithms.map(a => a.label), [hsmAlgorithms])
   // An HSM key synced from the token may be an RSA size the registry does not list ('RSA-8192')
   const keyIsRsa = keyRow?.family === 'RSA' || /^RSA-\d+$/.test(keyLabel ?? '')

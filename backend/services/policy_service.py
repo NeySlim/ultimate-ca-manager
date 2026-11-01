@@ -524,7 +524,8 @@ class PolicyEvaluationService:
         """What the policies in scope leave of the signature rules, for a form:
         ``allowed_signature_schemes`` (intersection, None when unrestricted),
         ``key_type_horizons`` and ``key_type_issue_until`` (earliest date per
-        label, ISO strings), ``require_hsm_ca_key`` and ``tsa_signer_key_types``."""
+        label, ISO strings), ``require_hsm_ca_key``, ``tsa_signer_key_types`` and
+        ``pq_standalone`` (a post-quantum key only in a hybrid pair)."""
         return PolicyEvaluationService.signature_rules_of(
             PolicyEvaluationService.applicable_policies(ca_id, template_id))
 
@@ -533,10 +534,11 @@ class PolicyEvaluationService:
         """``effective_signature_rules`` for an explicit list of policies."""
         schemes = None
         horizons, issue_until, tsa = {}, {}, None
-        hsm = False
+        hsm = pq_paired_only = False
         certifications = None
         for policy in policies:
             rules = policy.get_rules() or {}
+            pq_paired_only = pq_paired_only or rules.get('pq_standalone') is True
             allowed = rules.get('allowed_signature_schemes')
             if isinstance(allowed, list) and allowed:
                 keep = [s for s in SIGNATURE_SCHEMES if s in allowed]
@@ -562,6 +564,7 @@ class PolicyEvaluationService:
             'hsm_certifications': ({k: v.isoformat() if v else None for k, v in sorted(certifications.items())}
                                    if certifications is not None else None),
             'tsa_signer_key_types': sorted(tsa) if tsa is not None else None,
+            'pq_standalone': pq_paired_only,
         }
 
     @staticmethod

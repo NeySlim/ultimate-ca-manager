@@ -117,11 +117,7 @@ def test_nothing_is_stored_when_b_cannot_be_issued(app, auth_client, create_ca, 
         assert Certificate.query.filter(Certificate.descr.like(f'{cn}%')).count() == 0
 
 
-def test_the_pair_satisfies_a_profile_that_refuses_ml_dsa_alone(app, auth_client, create_ca, monkeypatch):
-    import compliance_profiles
-    rules = compliance_profiles.PROFILES['anssi']['rules']
-    # The profile's own key list does not name ML-DSA yet: pq_standalone alone is tested here
-    monkeypatch.setitem(rules, 'allowed_key_types', rules['allowed_key_types'] + [PQ])
+def test_the_pair_satisfies_a_profile_that_refuses_ml_dsa_alone(app, auth_client, create_ca):
     ca = create_ca(cn='Pair CA anssi', keyAlgo='EC', keySize='P-256')
     with app.app_context():
         row = db.session.get(CA, ca['id'])
@@ -133,6 +129,12 @@ def test_the_pair_satisfies_a_profile_that_refuses_ml_dsa_alone(app, auth_client
     paired = auth_client.post('/api/v2/certificates', json={
         'cn': 'pq-paired.example.com', 'ca_id': ca['id'], 'validity_days': 90, 'hybrid': HYBRID})
     assert paired.status_code == 201, paired.data
+    weak = auth_client.post('/api/v2/certificates', json={
+        'cn': 'pq-weak.example.com', 'ca_id': ca['id'], 'validity_days': 90,
+        'hybrid': {'classical': CLASSICAL, 'pq': 'ML-DSA-44'}})
+    assert weak.status_code == 400 and b'ML-DSA-44 is not allowed' in weak.data, weak.data
+    effective = json.loads(auth_client.get(f"/api/v2/policies/effective?ca_id={ca['id']}").data)['data']
+    assert effective['pq_standalone'] is True and PQ in effective['allowed_key_types']
 
 
 # ---- revocation (arbitrage 14 a: revoke_related, on by default) ---------------------

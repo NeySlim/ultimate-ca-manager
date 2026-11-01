@@ -76,6 +76,12 @@ class Context:
             return REFUSE
         return ADVISE if advised and label not in advised else None
 
+    def standalone_key_grade(self, label: Optional[str]) -> Optional[str]:
+        """``key_grade`` of a key no pair can hold (a CA, a template, a signer)."""
+        if label and self.rules.get('pq_standalone') is True and key_algorithms.is_post_quantum(label):
+            return REFUSE
+        return self.key_grade(label)
+
     def set_grade(self, rule: str, value: str, normalize=str) -> Optional[str]:
         """REFUSE / ADVISE of *value* against a list rule such as ``allowed_signature_schemes``."""
         allowed = {normalize(v) for v in self.rules.get(rule) or []}
@@ -174,7 +180,7 @@ def _ca_name(ca, detail=None):
         'key cannot be converted.',
         'Certificate authorities whose key type the profile does not recommend')
 def _ca_key_type(ctx):
-    return [(ctx.key_grade(label), _ca_name(ca, label))
+    return [(ctx.standalone_key_grade(label), _ca_name(ca, label))
             for ca, _cert, label in _signing_cas(ctx) if not _is_edwards(label)]
 
 
@@ -299,7 +305,7 @@ def _active_templates():
         'Change the key type of these templates to one the profile allows.',
         'Active templates whose key type the profile does not recommend')
 def _templates_key(ctx):
-    return [(ctx.key_grade(_normalize_key_type_label(r.key_type) or str(r.key_type).upper()),
+    return [(ctx.standalone_key_grade(_normalize_key_type_label(r.key_type) or str(r.key_type).upper()),
              _named(r.name, r.id, r.key_type)) for r in _active_templates() if r.key_type]
 
 
@@ -404,7 +410,7 @@ def _ocsp_responders(ctx):
         if ctx.ca is not None and row.key != f'{RESPONDER_KEY_PREFIX}{ctx.ca.id}':
             continue
         label = stored_label(cert.key_algo, cert.crt)
-        found.append((ctx.key_grade(label), _named(cert.descr or cert.subject_cn, cert.id, label)))
+        found.append((ctx.standalone_key_grade(label), _named(cert.descr or cert.subject_cn, cert.id, label)))
     return found
 
 
@@ -421,7 +427,7 @@ def _tsa_signer(ctx):
         if ctx.ca is not None and cert.caref != ctx.ca.refid:
             continue
         label = stored_label(cert.key_algo, cert.crt)
-        grades = [(ctx.key_grade(label), label)]
+        grades = [(ctx.standalone_key_grade(label), label)]
         for rules, grade in ((ctx.rules, REFUSE), (ctx.advisories, ADVISE)):
             wanted = _label_set(rules.get('tsa_signer_key_types'))
             if wanted and label not in wanted:

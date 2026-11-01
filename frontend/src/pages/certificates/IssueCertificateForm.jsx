@@ -137,16 +137,21 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   }, [initialData])
 
   // Key types the policies of this CA/template allow (#397); the server enforces them regardless
-  const { allowedKeyTypes, fips, mldsa } = useEffectiveAlgorithms({
+  const { allowedKeyTypes, fips, mldsa, pqStandalone } = useEffectiveAlgorithms({
     caId: formData.ca_id, templateId: selectedTemplate, enabled: !!formData.ca_id,
   })
-  const allowedKeys = useMemo(
+  const pairKeys = useMemo(
     () => ISSUE_KEY_CHOICES.filter(([type, size]) => isAllowed(allowedKeyTypes, issueKeyLabel(type, size))
       && isUsable(findAlgorithm(issueKeyLabel(type, size)), { fips, mldsa })),
     [allowedKeyTypes, fips, mldsa],
   )
+  // A post-quantum key the policies refuse alone (pq_standalone) is offered in a hybrid pair only
+  const allowedKeys = useMemo(
+    () => (pqStandalone ? pairKeys.filter(([k, sz]) => !isPostQuantum(issueKeyLabel(k, sz))) : pairKeys),
+    [pairKeys, pqStandalone],
+  )
   const noKeyAllowed = allowedKeys.length === 0
-  const allowedLabels = useMemo(() => allowedKeys.map(([k, sz]) => issueKeyLabel(k, sz)), [allowedKeys])
+  const allowedLabels = useMemo(() => pairKeys.map(([k, sz]) => issueKeyLabel(k, sz)), [pairKeys])
   const hybridClassical = allowedLabels.filter(l => !isPostQuantum(l))
   const hybridPq = allowedLabels.filter(isPostQuantum)
   const hybridAvailable = hybridClassical.length > 0 && hybridPq.length > 0

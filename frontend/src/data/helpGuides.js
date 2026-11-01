@@ -388,11 +388,11 @@ Export formats:
 
 A hybrid pair links a classical certificate (**A**, RSA or EC) and a post-quantum one (**B**, ML-DSA) for the same subject. B carries the non-critical **relatedCertificate** extension, which names A by its hash, so a relying party can require both.
 
-- **Issuing**: tick **Issue a hybrid pair** in the Issue Certificate form (or send \`hybrid\` in \`POST /api/v2/certificates\`) to issue both from the same CA, with the same subject, names and validity. B copies A's extensions with its own key identifier and key usage, and asserts no key usage or EKU that A lacks
+- **Issuing**: tick **Issue a hybrid pair** in the Issue Certificate form (or send \`hybrid\` in \`POST /api/v2/certificates\`) to issue both from the same CA, with the same subject, names and validity. B copies A's extensions with its own key identifier and key usage, and asserts no key usage or EKU that A lacks. Under the ANSSI, BSI and EU ACM compliance profiles, ML-DSA-65 and ML-DSA-87 are accepted only as B: never alone, and ML-DSA-44 not at all
 - **Linking by request**: a CSR carrying a **relatedCertRequest** signed by A's key issues a B linked to A, through Sign CSR, ACME, EST or WSTEP. A must be held by UCM, valid, unrevoked, an end-entity certificate issued by a CA of this instance, and the request must be recent. A certificate given inline in the request's location must be A; other locations are not fetched
-- **Revoking** either member, alone or in bulk, revokes the other unless **Also revoke the linked certificate** is unticked. Under a policy that requires approval, the pair goes together, and two different approval policies on the two members leave the revocation to an administrator
-- **Renewing** either member, by hand, in bulk or automatically, renews both, and the new B names the new A
-- **Exporting**: the **hybrid-bundle** format is a ZIP of both certificates, and of both private keys when the key is included
+- **Revoking** either member, alone or in bulk, revokes the other unless **Also revoke the linked certificate** is unticked. Under a policy that requires approval, the pair goes together, and two different approval policies on the two members leave the revocation to an administrator. If the other member cannot be revoked, the answer says so (\`related_not_revoked\`) and it must be revoked separately
+- **Renewing** either member, by hand, in bulk or automatically, renews both, and the new B names the new A. A member renewed alone, the other being revoked, leaves the pair, as does the other member when one is deleted
+- **Exporting**: the **hybrid-bundle** format is a ZIP of both certificates, and of both private keys when the key is included; it is refused when neither certificate names the other any more
 
 > ⚠ A policy that requires approval refuses to issue a hybrid pair for now: issue it under a policy without approval.
 

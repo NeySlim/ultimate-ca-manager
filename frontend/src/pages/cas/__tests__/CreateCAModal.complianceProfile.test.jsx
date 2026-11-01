@@ -162,6 +162,21 @@ describe('CreateCAModal compliance profile', () => {
     expect(payload.keySize).toBe(3072)
   })
 
+  it('offers no ML-DSA CA key under a profile that keeps ML-DSA to hybrid pairs', async () => {
+    PROFILES[1] = { ...PROFILES[1], allowed_key_types: [...PROFILES[1].allowed_key_types, 'ML-DSA-65'],
+      pq_standalone: true }
+    try {
+      await renderModal()
+      fireEvent.change(profileSelect(), { target: { value: 'bsi' } })
+      await waitFor(() => expect(optionValues('common.keySize')).toEqual(['3072', '4096']))
+      expect(optionValues('common.keyAlgorithm')).not.toContain('ML-DSA')
+      expect(optionValues('common.keyAlgorithm').length).toBeGreaterThan(0)
+    } finally {
+      PROFILES[1] = { ...PROFILES[1], allowed_key_types: PROFILES[1].allowed_key_types.filter(k => k !== 'ML-DSA-65'),
+        pq_standalone: undefined }
+    }
+  })
+
   it('under bsi a key that was RSA-2048 moves to an allowed size', async () => {
     await renderModal()
     fireEvent.change(screen.getByLabelText('common.keySize'), { target: { value: '2048' } })

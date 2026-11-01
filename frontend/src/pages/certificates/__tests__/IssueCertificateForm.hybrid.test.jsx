@@ -107,4 +107,13 @@ describe('IssueCertificateForm hybrid pair', () => {
       CLASSICAL_LABELS.filter(l => ['EC-P384', 'RSA-2048'].includes(l)))
     expect(optionValues('certificates.hybrid.pq')).toEqual(['ML-DSA-87'])
   })
+
+  it('offers ML-DSA in the pair only when the policies refuse it alone', async () => {
+    renderForm({ allowed_key_types: ['EC-P256', 'ML-DSA-65', 'ML-DSA-87'], allowed_digests: null,
+      pq_standalone: true })
+    fireEvent.click(await screen.findByLabelText('certificates.hybrid.toggle'))
+    expect(optionValues('certificates.hybrid.pq')).toEqual(['ML-DSA-65', 'ML-DSA-87'])
+    fireEvent.click(screen.getByLabelText('certificates.hybrid.toggle'))
+    expect(optionValues('common.keyType')).toEqual(['ecdsa'])
+  })
 })

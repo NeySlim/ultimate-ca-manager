@@ -293,3 +293,29 @@ def test_postgres_migration_leaves_existing_cas_without_a_profile():
         conn.commit()
         conn.close()
         engine.dispose()
+
+
+@pytest.mark.parametrize('profile', compliance_profiles.PROFILE_NAMES)
+def test_ml_dsa_65_and_87_only_as_the_post_quantum_member_of_a_pair(profile):
+    policy = [compliance_profiles.profile_policy(profile)]
+
+    def check(label, **kwargs):
+        notices = []
+        violations, _, _ = PolicyEvaluationService.enforce_rules(
+            policy, key_type=label, notify=False, notices=notices, **kwargs)
+        return violations, notices
+
+    for label in ('ML-DSA-65', 'ML-DSA-87'):
+        assert check(label, pq_hybrid=True) == ([], []), (profile, label)
+        alone, _ = check(label)
+        assert len(alone) == 1 and 'alone' in alone[0], (profile, label, alone)
+    weak, _ = check('ML-DSA-44', pq_hybrid=True)
+    assert weak and 'ML-DSA-44 is not allowed' in weak[0], (profile, weak)
+
+
+@pytest.mark.parametrize('profile', compliance_profiles.PROFILE_NAMES)
+def test_the_profile_tells_a_form_that_ml_dsa_goes_in_a_pair(profile):
+    described = compliance_profiles.describe(profile)
+    assert described['pq_standalone'] is True
+    assert {'ML-DSA-65', 'ML-DSA-87'} <= set(described['allowed_key_types'])
+    assert 'ML-DSA-44' not in described['allowed_key_types']

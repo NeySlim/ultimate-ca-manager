@@ -225,12 +225,8 @@ def test_pkilint_finds_nothing_wrong_with_the_extension(app, cert_a):
     assert not [c for c in codes if 'unknown' in c or 'critical' in c], codes
 
 
-def test_the_pair_lifts_the_rule_that_refuses_ml_dsa_alone(app, cert_a, monkeypatch):
-    import compliance_profiles
+def test_the_pair_lifts_the_rule_that_refuses_ml_dsa_alone(app, cert_a):
     row_id, cert, key = cert_a
-    # The profile's own key list does not name ML-DSA yet: pq_standalone alone is tested here
-    rules = compliance_profiles.PROFILES['anssi']['rules']
-    monkeypatch.setitem(rules, 'allowed_key_types', rules['allowed_key_types'] + [PQ_LABEL])
     with app.app_context():
         ca, _ca_cert, _ca_key = _signing_ca(row_id)
         previous, ca.compliance_profile = ca.compliance_profile, 'anssi'
