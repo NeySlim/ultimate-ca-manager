@@ -13,6 +13,7 @@ import errno
 import importlib.util
 import logging
 import pathlib
+import random
 import socket
 import sys
 import threading
@@ -397,12 +398,30 @@ def test_N1_port_zero_disables_the_listener_neg(app, monkeypatch):
     assert srv_mod.start_dns_update_server(app) is None
 
 
+def _ephemeral_low():
+    try:
+        return int(pathlib.Path('/proc/sys/net/ipv4/ip_local_port_range').read_text().split()[0])
+    except (OSError, ValueError, IndexError):
+        return 32768
+
+
 def _free_port():
-    s = socket.socket()
-    s.bind(('127.0.0.1', 0))
-    p = s.getsockname()[1]
-    s.close()
-    return p
+    """A port free in TCP and UDP, below the ephemeral range: the kernel never hands
+    it to another socket between this check and the listener's bind."""
+    rng = random.Random()
+    for _ in range(200):
+        p = rng.randrange(10000, _ephemeral_low())
+        socks = [socket.socket(socket.AF_INET, t) for t in (socket.SOCK_STREAM, socket.SOCK_DGRAM)]
+        try:
+            for s in socks:
+                s.bind(('127.0.0.1', p))
+            return p
+        except OSError:
+            continue
+        finally:
+            for s in socks:
+                s.close()
+    pytest.fail('no port free in both TCP and UDP')
 
 
 def _start_via_env(app, port):
@@ -439,6 +458,7 @@ def test_F8_listener_binds_the_configured_host_pos(app, monkeypatch):
     monkeypatch.setenv('UCM_DNS_UPDATE_PORT', str(port))
     monkeypatch.setenv('UCM_DNS_UPDATE_HOST', '127.0.0.1')
     server = _start_via_env(app, port)
+    assert server is not None, 'listener did not start'
     try:
         assert server._host == '127.0.0.1'
         assert server._tcp.address[0] == '127.0.0.1'
@@ -453,6 +473,7 @@ def test_F8_default_host_is_the_http_host_neg(app, monkeypatch):
     monkeypatch.delenv('UCM_DNS_UPDATE_HOST', raising=False)
     monkeypatch.setenv('HOST', '127.0.0.1')
     server = _start_via_env(app, port)
+    assert server is not None, 'listener did not start'
     try:
         assert server._host == '127.0.0.1'
     finally:
@@ -1046,10 +1067,10 @@ def test_bind_errno_is_none_after_a_success_neg(app):
 
 def test_retry_real_sockets_listener_starts_after_the_port_is_freed_pos(app, monkeypatch, caplog):
     caplog.set_level(logging.DEBUG, logger=srv_mod.logger.name)
+    port = _free_port()  # its UDP twin must be free once the TCP blocker goes
     blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    blocker.bind(('127.0.0.1', 0))
+    blocker.bind(('127.0.0.1', port))
     blocker.listen(1)
-    port = blocker.getsockname()[1]
     monkeypatch.setenv('UCM_DNS_UPDATE_PORT', str(port))
     monkeypatch.setenv('UCM_DNS_UPDATE_HOST', '127.0.0.1')
     monkeypatch.setattr(srv_mod, '_server', None)
