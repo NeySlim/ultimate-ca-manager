@@ -319,19 +319,25 @@ def test_challenge_path_has_its_own_rate_limit_bucket():
 
 
 def test_selfcheck_probes_identifiers_in_parallel_with_a_short_timeout():
-    import time as _time
+    import threading
     timeouts = []
+    # Each probe waits for the four to be in flight at once: sequential probes break the barrier
+    barrier = threading.Barrier(4, timeout=10)
+    met = []
 
-    def slow_get(url, pin, timeout=10):
+    def gathered_get(url, pin, timeout=10):
         timeouts.append(timeout)
-        _time.sleep(0.3)
+        try:
+            barrier.wait()
+            met.append(url)
+        except threading.BrokenBarrierError:
+            pass
         return _Resp(404)
 
     challenges = {f'host{i}.example.com': {'token': f'tok{i}', 'key_authorization': 'k'} for i in range(4)}
-    started = _time.monotonic()
-    with patch.object(http01, '_get', side_effect=slow_get):
+    with patch.object(http01, '_get', side_effect=gathered_get):
         result = http01.wait_for_http01(challenges, 0)
-    assert _time.monotonic() - started < 0.9
+    assert len(met) == 4, 'the probes did not run in parallel'
     assert sorted(result['missing']) == sorted(challenges)
     assert timeouts == [http01.SELFCHECK_TIMEOUT] * 4
 

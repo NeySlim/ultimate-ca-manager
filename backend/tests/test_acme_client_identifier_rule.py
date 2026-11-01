@@ -48,7 +48,14 @@ def _domains_step(report):
     ('localhost', False),
     ('under_score.example.com', False),
 ])
-def test_preflight_and_order_agree(auth_client, domain, acceptable):
+def test_preflight_and_order_agree(auth_client, monkeypatch, domain, acceptable):
+    # The rule is all this compares: no ACME directory is reached
+    calls = []
+
+    def offline(url, *args, **kwargs):
+        calls.append(url)
+        raise ConnectionError('no network in tests')
+    monkeypatch.setattr('utils.ssrf_protection.safe_request_get', offline)
     preflight = auth_client.post(
         '/api/v2/acme/client/preflight',
         json={'domains': [domain], 'mode': 'validate_only'},
@@ -65,3 +72,4 @@ def test_preflight_and_order_agree(auth_client, domain, acceptable):
 
     assert (step['status'] == 'pass') is acceptable
     assert order_refused_the_domain is not acceptable
+    assert calls, 'the preflight no longer asks the directory: drop the stub'

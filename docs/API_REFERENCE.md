@@ -854,7 +854,9 @@ Optional **`invalidity_date`** / **`invalidity_at`** (ISO 8601): RFC 5280 §5.3.
 **`revoke_related`** (JSON boolean, default `true`): revoking a member of a hybrid pair revokes the
 other one too, reported as `related_revoked` (its id). `false` keeps it, except under a policy that
 requires approval, which revokes both: such a request answers `400` for a non-administrator. Two
-different approval policies on the two members answer `409`.
+different approval policies on the two members answer `409`. When the other member could not be
+revoked, the certificate stays revoked and the answer carries `related_not_revoked` (its id) and a
+message asking to revoke it separately.
 
 **Revocation Reasons** (RFC 5280 §5.3.1; an unknown value is rejected with `400`, snake_case spellings such as `key_compromise` are accepted and stored in the canonical form):
 - `unspecified` (default when omitted)
@@ -923,8 +925,10 @@ Content-Type: application/json
 }
 ```
 
-`revoke_related` applies as for a single revocation. Bulk renewal also renews the other member of
-each hybrid pair; a member already renewed or revoked with its pair counts as a success.
+`revoke_related` applies as for a single revocation; the ids of other members that could not be
+revoked are listed in `related_not_revoked`, the certificates themselves counting as successes.
+Bulk renewal also renews the other member of each hybrid pair; a member already renewed or
+revoked with its pair counts as a success.
 
 **Response:**
 ```json
@@ -1628,6 +1632,12 @@ behaviour) and `digest` (`sha256`, `sha384`, `sha512`). The publish interval mus
 not exceed the validity window: publishing more often than the validity gives
 relying parties a grace period. Responses include the computed `next_publish`,
 also present in CRL metadata responses when a cadence is configured.
+
+A CA whose key signs without a separate digest (ML-DSA, Ed25519, Ed448) has
+`crl_digest: null`; a non-empty `digest` is refused with `400` and an empty one
+clears the stored value. A digest stored before that was known is ignored when
+signing and shown in the CA object as `crl_digest_ignored`, so it can be cleared
+(`null` otherwise).
 
 ### OCSP Status
 ```http
@@ -2621,6 +2631,7 @@ GET /api/v2/policies/effective?ca_id=3&template_id=1
     "require_hsm_ca_key": false,
     "hsm_certifications": null,  # {"eucc-high": null, ...} when a policy sets the rule
     "tsa_signer_key_types": ["EC-P256", "EC-P384", "EC-P521"],
+    "pq_standalone": false,      # true: a post-quantum key only as a member of a hybrid pair
     "ml_dsa": true,              # false when this build's OpenSSL has no ML-DSA
     "fips": true                 # only present in FIPS mode
   }
@@ -2934,6 +2945,10 @@ Content-Type: application/json
 `options`: `import_cas`, `import_certs`, `import_csrs`, `import_keys` (each `true` by default),
 `skip_duplicates`, `description_prefix`, and `selected_indices`, the positions in the analysis
 `objects` list to import (all of them when absent; a position outside the list is refused).
+`write:cas` is required only when a CA certificate is among the objects imported.
+
+Both routes also take `file_passwords`, an object or a list of passwords (one per uploaded file,
+32 in all with `password`): each is tried in turn on every encrypted key and PKCS#12 bundle.
 
 ### List Supported Formats
 ```http

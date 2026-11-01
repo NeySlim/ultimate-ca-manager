@@ -21,6 +21,7 @@ def _extract_cn(subject: str) -> str:
 # Server-managed scope rooms; each socket joins those its permissions allow.
 ROOM_CERTIFICATES = 'scope:certificates'
 ROOM_CAS = 'scope:cas'
+ROOM_SSH_CAS = 'scope:ssh-cas'
 ROOM_SYSTEM_ALERTS = 'scope:system-alerts'
 ROOM_AUDIT = 'scope:audit'
 
@@ -289,7 +290,7 @@ def on_ssh_ca_created(ca_id: int, name: str, ca_type: str, created_by: str):
     from websocket.event_types import EventType
     emit_ws_event(EventType.SSH_CA_CREATED, {
         'id': ca_id, 'name': name, 'ca_type': ca_type, 'created_by': created_by,
-    }, ROOM_CAS)
+    }, ROOM_SSH_CAS)
 
 
 def on_ssh_ca_updated(ca_id: int, name: str, updated_by: str):
@@ -297,7 +298,7 @@ def on_ssh_ca_updated(ca_id: int, name: str, updated_by: str):
     from websocket.event_types import EventType
     emit_ws_event(EventType.SSH_CA_UPDATED, {
         'id': ca_id, 'name': name, 'updated_by': updated_by,
-    }, ROOM_CAS)
+    }, ROOM_SSH_CAS)
 
 
 def on_ssh_ca_deleted(ca_id: int, name: str, deleted_by: str):
@@ -305,7 +306,7 @@ def on_ssh_ca_deleted(ca_id: int, name: str, deleted_by: str):
     from websocket.event_types import EventType
     emit_ws_event(EventType.SSH_CA_DELETED, {
         'id': ca_id, 'name': name, 'deleted_by': deleted_by,
-    }, ROOM_CAS)
+    }, ROOM_SSH_CAS)
 
 
 def on_ssh_certificate_issued(cert_id: int, key_id: str, ca_id: int, cert_type: str):

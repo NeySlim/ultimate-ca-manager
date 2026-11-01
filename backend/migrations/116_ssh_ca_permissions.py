@@ -10,13 +10,27 @@ import json
 import logging
 import sqlite3
 
-from auth.permissions import with_ssh_ca_scopes
-
 logger = logging.getLogger(__name__)
 pg_compatible = True
 
 # CustomRole, Group and APIKey, by their __tablename__
 TABLES = ('pro_custom_roles', 'groups', 'api_keys')
+
+# Frozen here: a migration must not follow later edits of auth.permissions
+SSH_CA_SCOPES = {'read:ssh': 'read:ssh_cas', 'write:ssh': 'write:ssh_cas',
+                 'delete:ssh': 'delete:ssh_cas'}
+
+
+def with_ssh_ca_scopes(perms) -> list:
+    """``perms`` with ``X:ssh_cas`` added right after each ``X:ssh`` it holds."""
+    out = []
+    for perm in perms:
+        if perm not in out:
+            out.append(perm)
+        added = SSH_CA_SCOPES.get(perm) if isinstance(perm, str) else None
+        if added and added not in perms and added not in out:
+            out.append(added)
+    return out
 
 
 def _decode(raw):

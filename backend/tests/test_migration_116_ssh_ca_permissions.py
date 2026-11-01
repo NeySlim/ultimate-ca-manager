@@ -39,6 +39,13 @@ def test_the_migration_names_the_model_tables():
     assert set(_migration().TABLES) == set(TABLES)
 
 
+def test_the_migration_keeps_its_own_table_when_the_live_one_changes(monkeypatch):
+    import auth.permissions
+    monkeypatch.setattr(auth.permissions, '_SSH_CA_SCOPES', {})
+    for stored, wanted in CASES:
+        assert _migration().with_ssh_ca_scopes(stored) == wanted
+
+
 def test_sqlite_widens_every_table_and_runs_twice():
     conn = sqlite3.connect(':memory:')
     for table in TABLES:
