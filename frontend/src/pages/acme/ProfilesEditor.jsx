@@ -22,6 +22,7 @@ const toRows = (obj) => Object.entries(obj || {}).map(([name, spec]) => ({
   validity_days: spec?.validity_days ?? 90,
   digest: spec?.digest ?? 'sha256',
   template_id: spec?.template_id ? String(spec.template_id) : '',
+  savedTemplateId: spec?.template_id ? String(spec.template_id) : '',
 }))
 
 const toObject = (rows) => Object.fromEntries(rows.map(r => [r.name, {
@@ -62,10 +63,10 @@ export default function ProfilesEditor({ value, onChange, disabled, templates = 
     id: ++nextRowId, name: '', description: '', validity_days: 90, digest: 'sha256', template_id: '',
   }])
 
-  const templateOptions = [
+  // A deactivated template is refused on binding: only the row that already binds it lists it
+  const templateOptions = (row) => [
     { value: '', label: t('acme.noTemplate') },
-    // A deactivated template is refused on binding: only one a profile already binds stays listed
-    ...templates.filter(tpl => tpl.is_active !== false || rows.some(r => String(r.template_id) === String(tpl.id)))
+    ...templates.filter(tpl => tpl.is_active !== false || String(tpl.id) === row.savedTemplateId)
       .map(tpl => ({ value: String(tpl.id), label: tpl.name })),
   ]
 
@@ -110,7 +111,7 @@ export default function ProfilesEditor({ value, onChange, disabled, templates = 
             disabled={disabled}
           />
           <Select
-            options={templateOptions}
+            options={templateOptions(row)}
             value={row.template_id}
             onChange={(val) => updateRow(row.id, { template_id: val })}
             placeholder={t('acme.noTemplate')}

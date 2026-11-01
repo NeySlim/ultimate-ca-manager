@@ -33,4 +33,14 @@ describe('ManageTemplatePinsModal', () => {
     fireEvent.click(screen.getByText('templates.unpinFromCA'))
     await waitFor(() => expect(mocks.unpinFromCA).toHaveBeenCalledWith(3, 7))
   })
+
+  it('offers no pin for a deactivated template that is not pinned', async () => {
+    mocks.getAllForCA.mockResolvedValue({ data: [
+      { id: 7, name: 'Smartcard Logon', is_pinned: false, is_active: false },
+      { id: 8, name: 'Web Server', is_pinned: false, is_active: true },
+    ] })
+    render(<ManageTemplatePinsModal open onOpenChange={() => {}} ca={{ id: 3, descr: 'Issuing CA' }} t={(k) => k} />)
+    expect(await screen.findByText('Smartcard Logon')).toBeInTheDocument()
+    expect(screen.getAllByText('templates.pinToCA')).toHaveLength(1)
+  })
 })

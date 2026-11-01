@@ -49,7 +49,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - CAs: "Hide from issuance" in the CA details keeps a CA, a root typically, out of the CA lists of Issue Certificate, Sign CSR, bulk CSR signing, user mTLS certificates and the TSA signing certificate; a link under those lists shows it again (#430).
 
-- Templates: a template, a system one included, can be deactivated from its details; the Issue Certificate form and Windows autoenrollment no longer offer it. A system template still cannot be edited: duplicate it to change it.
+- Templates: a template, a system one included, can be deactivated from its details; the Issue Certificate form and Windows autoenrollment no longer offer it, and a CA whose pinned templates are all deactivated offers none. A system template still cannot be edited: duplicate it to change it.
 
 ### Changed
 

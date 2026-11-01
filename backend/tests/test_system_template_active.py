@@ -85,6 +85,7 @@ def test_deactivating_the_only_pinned_template_does_not_widen_a_ca(app, auth_cli
     finally:
         with app.app_context():
             CATemplatePin.query.filter_by(ca_id=ca['id']).delete()
+            db.session.delete(db.session.get(CertificateTemplate, tpl['id']))
             db.session.commit()
 
 
@@ -94,7 +95,10 @@ def test_a_custom_template_takes_a_boolean_only(app, auth_client):
     assert r.status_code == 400
     assert r.get_json()['message'] == 'is_active must be true or false'
     with app.app_context():
-        assert db.session.get(CertificateTemplate, tpl['id']).is_active is True
+        row = db.session.get(CertificateTemplate, tpl['id'])
+        assert row.is_active is True
+        db.session.delete(row)
+        db.session.commit()
 
 
 def test_a_copy_of_a_deactivated_template_is_active(app, auth_client, system_template):
@@ -104,3 +108,15 @@ def test_a_copy_of_a_deactivated_template_is_active(app, auth_client, system_tem
     copy = r.get_json()['data']
     assert (copy['is_system'], copy['is_active']) == (False, True)
     auth_client.delete(f"/api/v2/templates/{copy['id']}")
+
+
+def test_a_disabled_template_cannot_be_pinned(app, auth_client, create_ca):
+    tpl = _custom_template(auth_client, 'Disabled pin template')
+    ca = create_ca(cn='Disabled pin CA')
+    assert _put(auth_client, tpl['id'], {'is_active': False}).status_code == 200
+    r = auth_client.post(f"/api/v2/cas/{ca['id']}/templates/{tpl['id']}/pin")
+    assert r.status_code == 400
+    assert r.get_json()['message'] == "Template 'Disabled pin template' is disabled"
+    with app.app_context():
+        db.session.delete(db.session.get(CertificateTemplate, tpl['id']))
+        db.session.commit()

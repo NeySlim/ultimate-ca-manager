@@ -108,7 +108,7 @@ export default function XcepWstepSection() {
         setKerberosSpnInput(krbRes.data.spn || '')
       }
       const templates = tplRes.data || []
-      setAutoenrollTemplateCount(templates.filter(tpl => tpl.autoenroll_enabled).length)
+      setAutoenrollTemplateCount(templates.filter(tpl => tpl.autoenroll_enabled && tpl.is_active !== false).length)
     } catch (error) {
       showError(error.message || t('messages.errors.loadFailed.generic'))
     } finally {

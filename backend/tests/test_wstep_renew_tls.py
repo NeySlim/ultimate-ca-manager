@@ -685,6 +685,26 @@ def test_legacy_certificate_with_any_eku_renews_at_par(app, templated_ca):
     assert _ekus(x509.load_pem_x509_certificate(pem.encode())) == {ExtendedKeyUsageOID.CLIENT_AUTH}
 
 
+def test_legacy_certificate_is_refused_when_the_ca_offers_no_template(app, templated_ca):
+    """Its pinned templates all deactivated, a CA renews nothing without a template."""
+    ca_id = templated_ca('WSTEP renew legacy deactivated CA', {'Gone': (['clientAuth'], None)})
+    key = _key()
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'legacy-deactivated.example.test')])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    renewed = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+               .serial_number(x509.random_serial_number()).not_valid_before(now)
+               .not_valid_after(now + datetime.timedelta(days=30))
+               .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH]), critical=False)
+               .sign(key, hashes.SHA256()))
+    csr = _eku_csr(renewed, key, ExtendedKeyUsageOID.CLIENT_AUTH)
+    with app.app_context():
+        for pin in CATemplatePin.query.filter_by(ca_id=ca_id):
+            pin.template.is_active = False
+        db.session.commit()
+        _template, _extra, _issued, err = wstep_service._renewal_template(db.session.get(CA, ca_id), renewed, csr)
+    assert err == 'This CA offers no certificate template'
+
+
 def test_renewal_may_ask_for_what_xcep_advertised(app, templated_ca):
     """A request naming a capped EKU of its template is renewed as issuance treats it: without it."""
     ca_id = templated_ca('WSTEP renew advertised CA', {'Stamp': (['clientAuth', 'timeStamping'], None)})

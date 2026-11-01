@@ -104,6 +104,8 @@ export function ManageTemplatePinsModal({ open, onOpenChange, ca, t }) {
                   )}
                 </div>
 
+                {/* A deactivated template can be unpinned, not pinned: the server refuses it */}
+                {(template.is_pinned || template.is_active !== false) && (
                 <Button
                   type="button"
                   size="xs"
@@ -126,6 +128,7 @@ export function ManageTemplatePinsModal({ open, onOpenChange, ca, t }) {
                     </>
                   )}
                 </Button>
+                )}
               </div>
             ))}
           </div>

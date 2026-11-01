@@ -279,7 +279,8 @@ def _match_template(ca, csr):
     refusal when the request's EKUs match only a template of another key kind
     (ML-DSA or not). A template of the other kind that scores 0 is no match:
     the request falls back to no template, which is safe because the Enroll
-    ACL and pinned fields then fall back to every template of the CA.
+    ACL and pinned fields then fall back to every template of the CA (a CA
+    offering none is refused by the callers).
 
     Callers use the matched row two ways: its policy OID (via
     ``policy_builder._policy_oid_for_template``) for the issued cert's
@@ -343,6 +344,8 @@ def _renewal_template(ca, renewed_cert, csr):
         matched, refusal = _match_template(ca, csr)
         if refusal:
             return None, [], None, refusal
+        if matched is None and not _ca_templates(ca):
+            return None, [], None, 'This CA offers no certificate template'
         extra = _template_extra_ekus(matched)
         prior = _eku_oids(renewed_cert)
         if prior is None:
@@ -833,6 +836,9 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     matched_template, refusal = _match_template(ca, csr)
     if refusal:
         return None, refusal
+    # Pins all deactivated: the CA offers nothing, and nothing would carry its Enroll ACL
+    if matched_template is None and not _ca_templates(ca):
+        return None, 'This CA offers no certificate template'
     template_oid = None
     if matched_template is not None:
         from services.xcep.policy_builder import _policy_oid_for_template
