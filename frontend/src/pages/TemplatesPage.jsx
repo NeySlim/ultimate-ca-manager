@@ -9,7 +9,7 @@ import { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import { useTranslation } from 'react-i18next'
 import { 
   FileText, Plus, Copy, Trash, Download, FileArrowUp, PencilSimple,
-  Certificate, ShieldCheck, Clock, Eye, Key, Globe, Warning
+  Certificate, ShieldCheck, Clock, Eye, Key, Globe, Warning, EyeSlash
 } from '@phosphor-icons/react'
 import {
   ResponsiveLayout, ResponsiveDataTable, Badge, Button, Modal, Input, Select, Textarea,
@@ -136,6 +136,19 @@ export default function TemplatesPage() {
     }
   }
 
+  const handleToggleActive = async (template) => {
+    const active = template.is_active === false
+    try {
+      const res = await templatesService.update(template.id, { is_active: active })
+      const updated = res?.data || res
+      showSuccess(t(active ? 'templates.activated' : 'templates.deactivated'))
+      loadData()
+      if (updated?.id) setSelectedTemplate(updated)
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.template'))
+    }
+  }
+
   const handleExportTemplate = async (template) => {
     try {
       const data = await templatesService.export(template.id)
@@ -235,6 +248,11 @@ export default function TemplatesPage() {
               {row.is_system ? <ShieldCheck size={14} weight="duotone" /> : <FileText size={14} weight="duotone" />}
             </div>
             <span className="font-medium truncate">{val || t('common.unnamed')}</span>
+            {row.is_active === false && (
+              <Badge variant="secondary" size="sm" title={t('templates.deactivateTooltip')}>
+                {t('common.inactive')}
+              </Badge>
+            )}
             {row.ad_derived_subject && (
               <Badge variant="violet" size="sm" title={t('templates.adDerivedBadgeTooltip')}>
                 {t('templates.adDerivedBadge')}
@@ -408,6 +426,12 @@ export default function TemplatesPage() {
             </Button>
             <Button type="button" size="sm" variant="secondary" onClick={() => handleDuplicateTemplate(selectedTemplate)}>
               <Copy size={14} /> {t('common.copy')}
+            </Button>
+            <Button type="button" size="sm" variant="secondary" onClick={() => handleToggleActive(selectedTemplate)}
+              title={selectedTemplate.is_active === false ? undefined : t('templates.deactivateTooltip')}>
+              {selectedTemplate.is_active === false
+                ? <><Eye size={14} /> {t('templates.activate')}</>
+                : <><EyeSlash size={14} /> {t('common.deactivate')}</>}
             </Button>
           </>
         )}

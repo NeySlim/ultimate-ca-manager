@@ -1324,7 +1324,11 @@
       "addPds": "Add a disclosure statement",
       "policyOids": "Certificate policy OIDs",
       "policyOidsHint": "Dotted OIDs, one per line, added after the CA's own policy. The buttons add the ETSI QCP policies."
-    }
+    },
+    "activate": "Activate",
+    "activated": "Template activated",
+    "deactivated": "Template deactivated",
+    "deactivateTooltip": "A deactivated template is not offered by the Issue Certificate form nor to Windows autoenrollment. System templates can be deactivated, not edited: duplicate one to change it."
   },
   "users": {
     "securityKeys": {

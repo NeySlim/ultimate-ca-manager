@@ -1324,7 +1324,11 @@
       "addPds": "Añadir una declaración de divulgación",
       "policyOids": "OID de política de certificado",
       "policyOidsHint": "OID con puntos, uno por línea, añadidos después de la política propia de la CA. Los botones añaden las políticas ETSI QCP."
-    }
+    },
+    "activate": "Activar",
+    "activated": "Plantilla activada",
+    "deactivated": "Plantilla desactivada",
+    "deactivateTooltip": "Una plantilla desactivada no se ofrece en el formulario Emitir certificado ni a la autoinscripción de Windows. Las plantillas del sistema se pueden desactivar, no editar: duplique una para modificarla."
   },
   "users": {
     "securityKeys": {

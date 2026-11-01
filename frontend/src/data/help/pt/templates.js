@@ -22,6 +22,7 @@ export default {
           { label: 'Validade', text: 'Período de validade padrão em dias' },
           { label: 'Duplicar', text: 'Clonar um modelo existente e modificá-lo' },
           { label: 'Mostrar sistema', text: 'Oculte os modelos incluídos para trabalhar apenas com os seus. Lembrado por navegador' },
+          { label: 'Desativar', text: 'Um modelo desativado, incluindo os incluídos na instalação, deixa de ser oferecido pelo formulário Emitir certificado e pela autoinscrição do Windows, e mostra um selo Inativo. Ativar o reativa. Um modelo incluído pode ser desativado, mas não editado: duplique-o para o alterar' },
           { label: 'Importar/Exportar', text: 'Compartilhar modelos como arquivos JSON entre instâncias UCM, um modelo ou vários em um só arquivo' },
           { label: 'qcStatements', text: 'Declarações opcionais ETSI EN 319 412-5 adicionadas a cada certificado emitido a partir do modelo: QcCompliance, QcType (assinatura, selo ou sítio web), QcSSCD, QcPDS (URL HTTPS e idioma de duas letras), QcRetentionPeriod, QcLimitValue, QcCClegislation (para um certificado qualificado segundo um quadro jurídico fora da UE) e o identificador de semântica. Não aplicado à emissão EST, WSTEP ou mTLS, e uma extensão qcStatements num CSR é ignorada. QcIdentMethod, QcQSCDlegislation e as declarações PSD2 não são suportados' },
           { label: 'OIDs de política', text: 'OIDs de política de certificado adicionais (por exemplo as políticas ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd e QCP-w), adicionados após a política própria da CA' },

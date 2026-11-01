@@ -1324,7 +1324,11 @@
       "addPds": "Aggiungi una disclosure statement",
       "policyOids": "OID di policy del certificato",
       "policyOidsHint": "OID in notazione puntata, uno per riga, aggiunti dopo la policy della CA stessa. I pulsanti aggiungono le policy ETSI QCP."
-    }
+    },
+    "activate": "Attiva",
+    "activated": "Modello attivato",
+    "deactivated": "Modello disattivato",
+    "deactivateTooltip": "Un modello disattivato non viene offerto dal modulo Emetti certificato né all'autoenrollment di Windows. I modelli di sistema possono essere disattivati, non modificati: duplicane uno per cambiarlo."
   },
   "users": {
     "securityKeys": {

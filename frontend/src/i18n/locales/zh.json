@@ -1324,7 +1324,11 @@
       "addPds": "添加披露声明",
       "policyOids": "证书策略 OID",
       "policyOidsHint": "点分 OID，每行一个，添加在 CA 自身策略之后。按钮用于添加 ETSI QCP 策略。"
-    }
+    },
+    "activate": "激活",
+    "activated": "模板已激活",
+    "deactivated": "模板已停用",
+    "deactivateTooltip": "已停用的模板不会出现在签发证书表单中，也不会提供给 Windows 自动注册。系统模板可以停用，但不能编辑：请复制一份来修改。"
   },
   "users": {
     "securityKeys": {

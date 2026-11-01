@@ -368,6 +368,28 @@ def get_template(template_id):
     return success_response(data=data)
 
 
+def _set_template_active(template, active):
+    template.is_active = active
+    template.updated_by = g.current_user.username
+    template.updated_at = utc_now()
+    try:
+        db.session.commit()
+        AuditService.log_action(
+            action='template_update',
+            resource_type='template',
+            resource_id=str(template.id),
+            resource_name=template.name,
+            details=f"{'Activated' if active else 'Deactivated'} template: {template.name}",
+            success=True
+        )
+        return success_response(data=template.to_dict(),
+                                message=f"Template {template.name} {'activated' if active else 'deactivated'}")
+    except Exception as e:
+        db.session.rollback()
+        logger.error(f'Failed to update template: {e}')
+        return error_response('Failed to update template', 500)
+
+
 @bp.route('/api/v2/templates/<int:template_id>', methods=['PUT'])
 @require_auth(["write:templates"])
 def update_template(template_id):
@@ -385,11 +407,13 @@ def update_template(template_id):
     if not template:
         return error_response('Template not found', 404)
     
-    # Prevent updating system templates
-    if template.is_system:
-        return error_response('Cannot modify system templates', 403)
-    
     data = request.get_json()
+
+    # A system template stays UCM's to update: it can only be switched off and on
+    if template.is_system:
+        if not isinstance(data, dict) or set(data) != {'is_active'} or not isinstance(data['is_active'], bool):
+            return error_response('Cannot modify system templates; duplicate one to change it', 403)
+        return _set_template_active(template, data['is_active'])
 
     # Validate any provided fields (validity bounds + enums)
     ok, err = _validate_template_payload(data, partial=True)

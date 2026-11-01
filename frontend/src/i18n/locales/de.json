@@ -1324,7 +1324,11 @@
       "addPds": "Disclosure Statement hinzufügen",
       "policyOids": "Zertifikatsrichtlinien-OIDs",
       "policyOidsHint": "OIDs in Punktnotation, eine pro Zeile, nach der Richtlinie der CA selbst hinzugefügt. Die Schaltflächen fügen die ETSI-QCP-Richtlinien hinzu."
-    }
+    },
+    "activate": "Aktivieren",
+    "activated": "Vorlage aktiviert",
+    "deactivated": "Vorlage deaktiviert",
+    "deactivateTooltip": "Eine deaktivierte Vorlage wird weder im Formular „Zertifikat ausstellen“ noch für die Windows-Autoregistrierung angeboten. Systemvorlagen können deaktiviert, aber nicht bearbeitet werden: Duplizieren Sie sie für eine eigene Kopie."
   },
   "users": {
     "securityKeys": {

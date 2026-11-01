@@ -98,9 +98,11 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
 
   // Filter templates based on pin status and showAllTemplates toggle
   const filteredTemplates = useMemo(() => {
-    if (!formData.ca_id) return templates
+    // A deactivated template is not offered, unless it is the one already chosen
+    const offered = templates.filter(t => t.is_active !== false || String(t.id) === selectedTemplate)
+    if (!formData.ca_id) return offered
     
-    const pinnedTemplates = templates.filter(t => t.is_pinned)
+    const pinnedTemplates = offered.filter(t => t.is_pinned)
     
     // If there are pinned templates and showAllTemplates is false, show only pinned
     if (pinnedTemplates.length > 0 && !showAllTemplates) {
@@ -108,8 +110,8 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     }
     
     // Otherwise show all templates
-    return templates
-  }, [templates, formData.ca_id, showAllTemplates])
+    return offered
+  }, [templates, formData.ca_id, showAllTemplates, selectedTemplate])
 
   // Check if there are any pinned templates for the current CA
   const hasPinnedTemplates = useMemo(() => {

@@ -1324,7 +1324,11 @@
       "addPds": "Adicionar uma declaração de divulgação",
       "policyOids": "OIDs de política de certificado",
       "policyOidsHint": "OIDs com pontos, um por linha, adicionados após a política própria da CA. Os botões adicionam as políticas ETSI QCP."
-    }
+    },
+    "activate": "Ativar",
+    "activated": "Modelo ativado",
+    "deactivated": "Modelo desativado",
+    "deactivateTooltip": "Um modelo desativado não é oferecido pelo formulário Emitir certificado nem pela autoinscrição do Windows. Os modelos do sistema podem ser desativados, mas não editados: duplique-o para o alterar."
   },
   "users": {
     "securityKeys": {

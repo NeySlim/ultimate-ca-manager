@@ -1324,7 +1324,11 @@
       "addPds": "開示声明を追加",
       "policyOids": "証明書ポリシー OID",
       "policyOidsHint": "ドット表記の OID を1行に1つずつ指定します。CA 自身のポリシーの後に追加されます。ボタンで ETSI QCP ポリシーを追加できます。"
-    }
+    },
+    "activate": "有効化",
+    "activated": "テンプレートを有効化しました",
+    "deactivated": "テンプレートを無効化しました",
+    "deactivateTooltip": "無効化したテンプレートは、証明書の発行フォームにも Windows 自動登録にも提供されません。システムテンプレートは無効化はできますが編集はできません。変更するには複製してください。"
   },
   "users": {
     "securityKeys": {
