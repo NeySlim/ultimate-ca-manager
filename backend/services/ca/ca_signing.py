@@ -25,6 +25,26 @@ class CAOfflineError(Exception):
     pass
 
 
+class AlreadySuperseded(Exception):
+    """The certificate being renewed was superseded by a concurrent renewal."""
+
+
+def _claim_superseded(row):
+    """Archive *row* unless already archived; False when another renewal got there first."""
+    from sqlalchemy import update
+    from sqlalchemy.orm.attributes import set_committed_value
+    result = db.session.execute(
+        update(Certificate)
+        .where(Certificate.id == row.id, Certificate.archived.isnot(True))
+        .values(archived=True)
+        .execution_options(synchronize_session=False)
+    )
+    if result.rowcount != 1:
+        return False
+    set_committed_value(row, 'archived', True)
+    return True
+
+
 class CASigningMixin:
     """CA CSR signing operations"""
 
@@ -58,6 +78,7 @@ class CASigningMixin:
         extra_ekus: list = None,
         supersedes=None,
         policy_template_id: int = None,
+        template_ekus: list = None,
     ) -> Tuple[str, str]:
         """
         Sign a CSR (x509 object) using a CA.
@@ -92,6 +113,8 @@ class CASigningMixin:
             policy_template_id: template scoping the issuance policies (the
                 WSTEP matched template), none for EST; its SAN types bind
                 the request's names.
+            template_ekus: EKUs that replace the CSR's, as a bound template's
+                do (WSTEP renewal); protocol-forbidden ones still dropped.
 
         Returns:
             Tuple of (cert_pem_string, serial_number_string)
@@ -138,6 +161,7 @@ class CASigningMixin:
             override_san=override_san,
             requester_sid=requester_sid,
             extra_ekus=extra_ekus,
+            template_ext={'extended_key_usage': list(template_ekus)} if template_ekus else None,
             policy_scope={'ca_id': ca.id, 'template_id': policy_template_id,
                           'digest_explicit': False},
             san_template=(db.session.get(CertificateTemplate, policy_template_id)
@@ -208,20 +232,22 @@ class CASigningMixin:
             source=source,
         )
         db.session.add(new_cert)
-        if supersedes is not None:
-            # The renewed certificate's row is archived in the same commit:
-            # left as is, it stayed eligible for automatic renewal and was
-            # renewed in place again and again with the device's old key
-            supersedes.archived = True
 
         # Increment CA serial
         ca.serial = (ca.serial or 0) + 1
         try:
             db.session.flush()
+            # The renewed row is archived in the commit that stores its successor,
+            # compare-and-set: of two concurrent renewals, only one stores a certificate
+            if supersedes is not None and not _claim_superseded(supersedes):
+                db.session.rollback()
+                raise AlreadySuperseded('the renewed certificate is already superseded')
             link_issued(new_cert, cert_obj, related_a)
             # RFC 9763: the request binds to this key B in the commit that stores B
             record_request_key(csr.public_bytes(serialization.Encoding.DER), related_a)
             db.session.commit()
+        except AlreadySuperseded:
+            raise
         except Exception as _commit_err:
             db.session.rollback()
             logger.error(f"Commit failed in services/ca/ca_signing.py:168: {_commit_err}", exc_info=True)

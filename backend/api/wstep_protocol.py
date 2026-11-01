@@ -182,16 +182,18 @@ def _cmc_response_der_for(ca, cert, parsed):
         return None
 
 
-def _audit_issuance(action, subject, username):
+def _audit_issuance(action, subject, username, details, success=True, resource_id=None):
     from services.audit.staging import stage_audit_entry
     stage_audit_entry(
         action=action,
         resource_type='certificate',
+        resource_id=resource_id,
         resource_name=subject,
         username=username,
-        details=f'WSTEP enrollment from {client_ip()}',
+        details=details,
+        success=success,
     )
-    safe_commit(logger, "WSTEP enrollment audit commit failed")
+    safe_commit(logger, "WSTEP audit commit failed")
 
 
 def _issue_and_respond(ca, parsed, username, action='certificate.issued', kerberos_principal=None):
@@ -214,15 +216,18 @@ def _issue_and_respond(ca, parsed, username, action='certificate.issued', kerber
 
     try:
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
+        request_id = _request_id_for(cert)
         response_body = build_issue_response(
-            cert, relates_to=parsed.message_id, request_id=_request_id_for(cert),
+            cert, relates_to=parsed.message_id, request_id=request_id,
             cmc_response_der=_cmc_response_der_for(ca, cert, parsed),
         )
     except Exception as e:
         logger.error("WSTEP: failed to build RSTR: %s", e)
         return _fault_response('Internal server error', status=500, relates_to=parsed.message_id)
 
-    _audit_issuance(action, cert.subject.rfc4514_string(), username)
+    _audit_issuance(action, cert.subject.rfc4514_string(), username,
+                    resource_id=str(request_id) if request_id else None,
+                    details=f'WSTEP enrollment from {client_ip()}: serial {cert.serial_number}')
     return Response(response_body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
 
 
@@ -363,30 +368,43 @@ def renew_certificate_bound():
     except RSTParseError as e:
         return _fault_response(f'Malformed request: {e}', status=400)
 
+    audit = {}
     if _carries_xml_signature(parsed.security_header):
+        username = 'wstep-ws-security'
         cert_pem, error = wstep_service.renew(
             ca, parsed.csr_der, parsed.security_header, parsed.csr_element, _validity_days(),
-            require_pop=not parsed.was_pkcs7_wrapped,
+            require_pop=not parsed.was_pkcs7_wrapped, outer_signed_data=parsed.outer_signed_data,
+            audit=audit,
         )
     else:
         # Windows authenticates here with its TLS client certificate, no XML-DSig
+        username = 'wstep-client-cert'
         cert_pem, error = wstep_service.renew_with_client_certificate(
             ca, trusted_client_cert(logger, 'WSTEP'), parsed.csr_der, parsed.outer_signed_data,
-            _validity_days(),
+            _validity_days(), audit=audit,
         )
+    old_serial = audit.get('renewed_serial')
     if error:
         logger.warning("WSTEP renewal rejected: %s", error)
+        _audit_issuance('certificate.renewed', None, username, success=False, details=(
+            f'WSTEP renewal refused from {client_ip()}: {error} (old serial {old_serial})'))
         return _fault_response(error, status=400, relates_to=parsed.message_id)
 
     try:
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
+        request_id = _request_id_for(cert)
         response_body = build_issue_response(
-            cert, relates_to=parsed.message_id, request_id=_request_id_for(cert),
+            cert, relates_to=parsed.message_id, request_id=request_id,
             cmc_response_der=_cmc_response_der_for(ca, cert, parsed),
         )
     except Exception as e:
         logger.error("WSTEP: failed to build RSTR: %s", e)
         return _fault_response('Internal server error', status=500, relates_to=parsed.message_id)
 
-    _audit_issuance('certificate.renewed', cert.subject.rfc4514_string(), 'wstep-client-cert')
+    _audit_issuance(
+        'certificate.renewed', cert.subject.rfc4514_string(), username,
+        resource_id=str(request_id) if request_id else None,
+        details=(f'WSTEP renewal from {client_ip()}: old serial {old_serial}, '
+                 f'new serial {cert.serial_number}'),
+    )
     return Response(response_body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')

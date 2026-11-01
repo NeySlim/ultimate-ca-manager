@@ -74,7 +74,9 @@ def _issue_test_cert(app, ca_data, common_name='wstep-renew.example.test'):
     return cert, key
 
 
-def _build_signed_rst(signing_cert, signing_key, csr, message_id='urn:uuid:renew-1', corrupt_signature=False):
+def _build_signed_rst(signing_cert, signing_key, csr, message_id='urn:uuid:renew-1', corrupt_signature=False,
+                      token_der=None, value_type=None):
+    """``token_der``/``value_type`` replace the PKCS#10 token, e.g. with a CMC request."""
     NSMAP = {'s': SOAP_NS, 'a': ADDRESSING_NS, 'wst': WST_NS, 'wsse': WSSE_NS, 'wsu': WSU_NS}
     envelope = etree.Element('{%s}Envelope' % SOAP_NS, nsmap=NSMAP)
     header = etree.SubElement(envelope, '{%s}Header' % SOAP_NS)
@@ -97,10 +99,10 @@ def _build_signed_rst(signing_cert, signing_key, csr, message_id='urn:uuid:renew
     )
     bst = etree.SubElement(
         rst, '{%s}BinarySecurityToken' % WSSE_NS,
-        ValueType='http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10',
+        ValueType=value_type or 'http://schemas.microsoft.com/windows/pki/2009/01/enrollment#PKCS10',
         EncodingType='base64',
     )
-    bst.text = base64.b64encode(csr.public_bytes(serialization.Encoding.DER)).decode()
+    bst.text = base64.b64encode(token_der or csr.public_bytes(serialization.Encoding.DER)).decode()
 
     sig_node = xmlsec.template.create(
         security, xmlsec.constants.TransformExclC14N, xmlsec.constants.TransformRsaSha256

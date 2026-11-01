@@ -5,6 +5,7 @@ Enrollment over Secure Transport for automated certificate enrollment.
 from flask import Blueprint, request, Response
 from models import db, CA
 from services.ca_service import CAService
+from services.ca.ca_signing import AlreadySuperseded
 from services.policy_service import PolicyViolation
 from services.audit_service import AuditService
 from utils import key_algorithms
@@ -771,6 +772,9 @@ def simple_reenroll(label=None):
         cert = x509.load_pem_x509_certificate(cert_pem.encode(), default_backend())
         return _certs_only_response(cert, ca=ca)
         
+    except AlreadySuperseded:
+        logger.warning('EST reenroll: client certificate superseded by a concurrent renewal')
+        return Response('Client certificate has been superseded by a newer one', status=403)
     except PolicyViolation as e:
         logger.warning(f"EST simplereenroll refused by policy: {e}")
         return Response(f"Policy violation: {e}", status=400)
