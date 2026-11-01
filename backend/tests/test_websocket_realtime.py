@@ -177,14 +177,15 @@ class TestHandshake:
             assert connected[0]['status'] == 'ok'
             assert connected[0]['user_id'] == user['id']
             assert connected[0]['timestamp']
-            # viewer: read:certificates, read:cas and read:ssh_cas, no read:audit nor read:system
+            # viewer: read:certificates, read:cas, read:ssh and read:ssh_cas, no read:audit nor read:system
             assert _rooms(ws) == {f"user:{user['id']}", emitters.ROOM_CERTIFICATES,
-                                  emitters.ROOM_CAS, emitters.ROOM_SSH_CAS}
+                                  emitters.ROOM_CAS, emitters.ROOM_SSH, emitters.ROOM_SSH_CAS}
 
     def test_admin_wildcard_joins_every_scope(self, app, auth_client):
         with _socket(app, auth_client) as ws:
             scopes = {r for r in _rooms(ws) if r.startswith('scope:')}
-            assert scopes == {emitters.ROOM_CERTIFICATES, emitters.ROOM_CAS, emitters.ROOM_SSH_CAS,
+            assert scopes == {emitters.ROOM_CERTIFICATES, emitters.ROOM_CAS, emitters.ROOM_SSH,
+                              emitters.ROOM_SSH_CAS,
                               emitters.ROOM_SYSTEM_ALERTS, emitters.ROOM_AUDIT}
 
     def test_custom_role_permissions_decide_the_rooms(self, app, make_user):
@@ -520,6 +521,20 @@ class TestEmission:
             (event,) = _named(ws_ssh.get_received(), 'event')
             assert event['type'] == 'ssh_ca.created' and event['data']['id'] == 4
 
+    def test_ssh_certificate_events_reach_only_ssh_readers(self, app, make_user):
+        cert_reader = make_user(role_perms=['read:certificates', 'read:ssh_cas'])
+        ssh_reader = make_user(role_perms=['read:certificates', 'read:ssh'])
+        with _socket(app, _session_client(app, cert_reader)) as ws_cert, \
+                _socket(app, _session_client(app, ssh_reader)) as ws_ssh:
+            ws_cert.get_received()
+            ws_ssh.get_received()
+            emitters.on_ssh_certificate_issued(5, 'alice', 4, 'user')
+            emitters.on_ssh_certificate_revoked(5, 'alice', 'keyCompromise', 'admin')
+            emitters.on_ssh_certificate_deleted(5, 'alice', 'admin')
+            assert _named(ws_cert.get_received(), 'event') == []
+            assert [e['type'] for e in _named(ws_ssh.get_received(), 'event')] == [
+                'ssh_certificate.issued', 'ssh_certificate.revoked', 'ssh_certificate.deleted']
+
     def test_audit_critical_only_reaches_audit_readers(self, app, make_user):
         cert_reader = make_user(role_perms=['read:certificates', 'read:cas'])
         auditor = make_user(role_perms=['read:certificates', 'read:audit'])
@@ -536,7 +551,9 @@ class TestEmission:
     @pytest.mark.parametrize('fn,room', [
         (lambda: emitters.on_certificate_revoked(1, 'cn', 'keyCompromise', 'admin'),
          emitters.ROOM_CERTIFICATES),
-        (lambda: emitters.on_ssh_certificate_deleted(1, 'k', 'admin'), emitters.ROOM_CERTIFICATES),
+        (lambda: emitters.on_ssh_certificate_issued(1, 'k', 2, 'user'), emitters.ROOM_SSH),
+        (lambda: emitters.on_ssh_certificate_revoked(1, 'k', 'keyCompromise', 'admin'), emitters.ROOM_SSH),
+        (lambda: emitters.on_ssh_certificate_deleted(1, 'k', 'admin'), emitters.ROOM_SSH),
         (lambda: emitters.on_discovery_new_cert('h', 443, 'CN=h'), emitters.ROOM_CERTIFICATES),
         (lambda: emitters.on_ca_created(1, 'n', 'cn', 'admin'), emitters.ROOM_CAS),
         (lambda: emitters.on_crl_regenerated(1, 'n', '2030', 0), emitters.ROOM_CAS),
