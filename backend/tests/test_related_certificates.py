@@ -824,6 +824,13 @@ def two_level_a(app, auth_client, create_ca, create_cert):
     ('root', lambda e: _replaced(e, x509.BasicConstraints, x509.BasicConstraints(True, 1)), None),
     ('inter', lambda e: _replaced(e, x509.BasicConstraints, x509.BasicConstraints(True, 0)), None),
     ('inter', lambda e: _replaced(e, x509.KeyUsage, _usage(True)), None),
+    # (k) skips the trust anchor: a self-signed root needs keyUsage keyCertSign, not BC
+    ('root', lambda e: [x for x in e if not isinstance(x.value, x509.BasicConstraints)], None),
+    ('root', lambda e: [x for x in e if not isinstance(x.value, (x509.BasicConstraints, x509.KeyUsage))],
+     'is not a CA certificate'),
+    ('root', lambda e: _replaced(e, x509.BasicConstraints, x509.BasicConstraints(False, None)),
+     'is not a CA certificate'),
+    ('root', lambda e: _replaced(e, x509.KeyUsage, _usage(False)), r'may not sign certificates'),
 ])
 def test_the_path_of_a_is_validated_as_rfc_5280_says(app, two_level_a, target, change, message):
     """RFC 5280 §6.1.4 (k)-(n) on A's CA certificates: cA, pathLenConstraint, keyCertSign."""
@@ -840,6 +847,36 @@ def test_the_path_of_a_is_validated_as_rfc_5280_says(app, two_level_a, target, c
                     verify_request(req)
         finally:
             db.session.get(CA, ca_id).crt = previous
+            db.session.commit()
+
+
+def test_a_v1_root_anchors_the_path_of_a(app, two_level_a):
+    """OpenSSL accepts a self-signed v1 root as trust anchor (X509_check_ca returns 3)."""
+    from asn1crypto import x509 as asn1_x509
+    from cryptography.hazmat.primitives.asymmetric import padding, rsa
+    from services.hsm.ca_key_loader import get_ca_signing_key
+    root_id, _inter_id, req = two_level_a
+    with app.app_context():
+        root = db.session.get(CA, root_id)
+        der = x509.load_pem_x509_certificate(base64.b64decode(root.crt)).public_bytes(
+            serialization.Encoding.DER)
+        tbs = asn1_x509.Certificate.load(der)['tbs_certificate']
+        tbs['version'] = 'v1'
+        tbs['extensions'] = None
+        key = get_ca_signing_key(root)
+        signed = tbs.dump(force=True)
+        signature = (key.sign(signed, padding.PKCS1v15(), hashes.SHA256())
+                     if isinstance(key, rsa.RSAPrivateKey) else key.sign(signed, ec.ECDSA(hashes.SHA256())))
+        cert = asn1_x509.Certificate({'tbs_certificate': tbs, 'signature_algorithm': tbs['signature'],
+                                      'signature_value': signature})
+        v1 = x509.load_der_x509_certificate(cert.dump())
+        assert v1.version == x509.Version.v1 and not list(v1.extensions)
+        previous, root.crt = root.crt, base64.b64encode(v1.public_bytes(serialization.Encoding.PEM)).decode()
+        db.session.commit()
+        try:
+            verify_request(req)
+        finally:
+            db.session.get(CA, root_id).crt = previous
             db.session.commit()
 
 

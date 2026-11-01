@@ -23,6 +23,7 @@ from models.related_cert_request import RelatedCertRequestUse
 from services.policy_service import APPROVAL_REQUEST_LIFETIME, PolicyViolation
 from utils import key_algorithms, related_cert
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window
+from utils.cert_issuer import is_self_signed
 from utils.datetime_utils import utc_now
 from utils.leaf_key_usage import key_usage_for_key
 from utils.serial_format import serial_variants
@@ -205,26 +206,32 @@ def _extension(cert, kind):
 def _check_chain(ca, now):
     """RFC 5280 §6.1.3-§6.1.4 on every CA certificate of A's path held here, the root
     included: valid at *now*, cA set (k), within its pathLenConstraint (l, m), and
-    keyCertSign set when it carries keyUsage (n). Certificate policies are not checked."""
+    keyCertSign set when it carries keyUsage (n). (k) does not reach the trust anchor:
+    a self-signed root without basicConstraints passes when it is v1 or carries keyUsage,
+    as OpenSSL's X509_check_ca has it. Certificate policies are not checked."""
     depth = below = 0  # below: CA certificates between this one and A, self-issued ones aside
     while ca is not None and depth <= ca.MAX_CHAIN_DEPTH:
-        cert = row_certificate(ca)
+        cert, issuer = row_certificate(ca), ca.issuing_ca()
         prefix = f'The CA certificate {ca.descr!r} of the related certificate'
         try:
             check_issuer_window(cert, now)
         except IssuerWindowError as e:
             raise RelatedCertificateRefused(f'{prefix} is not valid now') from e
         constraints = _extension(cert, x509.BasicConstraints)
-        if constraints is None or not constraints.ca:
-            raise RelatedCertificateRefused(f'{prefix} is not a CA certificate')
-        if constraints.path_length is not None and below > constraints.path_length:
-            raise RelatedCertificateRefused(f'{prefix} has a path length constraint the path exceeds')
         usage = _extension(cert, x509.KeyUsage)
+        if constraints is None:
+            anchor = issuer is None and is_self_signed(cert)
+            if not (anchor and (cert.version == x509.Version.v1 or usage is not None)):
+                raise RelatedCertificateRefused(f'{prefix} is not a CA certificate')
+        elif not constraints.ca:
+            raise RelatedCertificateRefused(f'{prefix} is not a CA certificate')
+        elif constraints.path_length is not None and below > constraints.path_length:
+            raise RelatedCertificateRefused(f'{prefix} has a path length constraint the path exceeds')
         if usage is not None and not usage.key_cert_sign:
             raise RelatedCertificateRefused(f'{prefix} may not sign certificates (keyUsage)')
         if cert.subject != cert.issuer:
             below += 1
-        ca, depth = ca.issuing_ca(), depth + 1
+        ca, depth = issuer, depth + 1
 
 
 def _check_location(req, cert_a):
