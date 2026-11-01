@@ -32,6 +32,7 @@ import { UploadKeyModal } from './certificates/UploadKeyModal'
 import { soleImported } from '../lib/importResult'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 import { askRenewal } from '../lib/renewalPrompt'
+import { renameCertificate } from '../lib/certificateRename'
 
 // i18n keys for known certificate issuance sources (labelKey pattern: store the
 // KEY at module level, resolve with t() in the component). Options are built
@@ -355,20 +356,11 @@ export default function CertificatesPage() {
   }
 
   // Rename certificate (mutable display name, independent from CN — issue #286)
-  const handleRename = async (row) => {
-    const newName = await showPrompt(t('certificates.renamePrompt'), {
-      title: t('certificates.renameCertificate'),
-      defaultValue: row.descr || row.cn || row.common_name || '',
-      confirmText: t('common.save')
-    })
-    if (!newName || !newName.trim() || newName.trim() === row.descr) return
-    try {
-      await certificatesService.rename(row.id, newName.trim())
-      showSuccess(t('certificates.renameSuccess'))
-      loadData()
-    } catch (error) {
-      showError(error.message || t('certificates.renameFailed'))
-    }
+  const handleRename = async (cert) => {
+    const updated = await renameCertificate(cert, { showPrompt, showSuccess, showError, t })
+    if (!updated) return
+    if (selectedCert?.id === cert.id) setSelectedCert({ ...selectedCert, ...updated })
+    loadData()
   }
 
   // Delete certificate
@@ -507,23 +499,24 @@ export default function CertificatesPage() {
   // Column definitions (extracted to sub-module)
   const columns = useCertificateColumns(t)
 
-  // Row actions
-  const rowActions = useCallback((row) => [
+  // Row actions: same permissions and dialogs as the detail views. Rebuilt on
+  // each render, so the handlers never see a stale list.
+  const rowActions = (row) => [
     { label: t('common.details'), icon: Info, onClick: () => handleSelectCert(row) },
     { label: t('export.title'), icon: Download, onClick: () => setExportRowCert(row) },
     ...(canWrite('certificates') ? [
       { label: t('certificates.rename'), icon: PencilSimple, onClick: () => handleRename(row) }
     ] : []),
     ...(canWrite('certificates') && !row.revoked && (row.has_private_key || row.source === 'msca') ? [
-      { label: t('certificates.renewCertificate').split(' ')[0], icon: ArrowClockwise, onClick: () => handleRenew(row) }
+      { label: t('common.renew'), icon: ArrowClockwise, onClick: () => handleRenew(row) }
     ] : []),
     ...(canWrite('certificates') && !row.revoked ? [
-      { label: t('certificates.revokeCertificate').split(' ')[0], icon: X, variant: 'danger', onClick: () => handleRevoke(row.id) }
+      { label: t('common.revoke'), icon: X, variant: 'danger', onClick: () => handleRevoke(row.id) }
     ] : []),
     ...(canDelete('certificates') ? [
       { label: t('common.delete'), icon: Trash, variant: 'danger', onClick: () => handleDelete(row.id) }
     ] : [])
-  ], [canWrite, canDelete, t])
+  ]
 
   // Export from row via ExportModal
   const handleExportRow = async (format, options = {}) => {
@@ -535,8 +528,8 @@ export default function CertificatesPage() {
         { format, name: cert.common_name || cert.cn || 'certificate' },
       )
       showSuccess(t('messages.success.export.certificate'))
-    } catch {
-      showError(t('messages.errors.exportFailed.certificate'))
+    } catch (err) {
+      showError(err?.status ? err.message : t('messages.errors.exportFailed.certificate'))
     }
   }
 
@@ -656,6 +649,7 @@ export default function CertificatesPage() {
       onRevoke={() => handleRevoke(selectedCert.id)}
       onRenew={(selectedCert.has_private_key || selectedCert.source === 'msca') && !selectedCert.revoked ? () => handleRenew(selectedCert) : null}
       onDelete={() => handleDelete(selectedCert.id)}
+      onRename={() => handleRename(selectedCert)}
       onOpenRelated={(id) => handleSelectCert({ id })}
       onUploadKey={() => setShowKeyModal(true)}
       onAddToTrustStore={handleAddToTrustStore}
@@ -760,6 +754,7 @@ export default function CertificatesPage() {
           sortable
           defaultSort={{ key: 'cn', direction: 'asc' }}
           onSortChange={handleSortChange}
+          rowActions={rowActions}
           pagination={{
             page,
             total,
@@ -855,7 +850,6 @@ export default function CertificatesPage() {
         }}
       />
 
-      {/* Row Export Modal */}
       <RevokeCertificateModal
         open={!!revokingCert}
         onClose={() => { setRevokingCert(null); setDeleteAfterRevoke(false) }}
@@ -863,6 +857,7 @@ export default function CertificatesPage() {
         certificate={revokingCert}
         loading={revoking}
       />
+      {/* Row Export Modal */}
       <ExportModal
         open={!!exportRowCert}
         onClose={() => setExportRowCert(null)}

@@ -6,7 +6,7 @@
  */
 import { useState, useEffect } from 'react'
 import { useTranslation } from 'react-i18next'
-import { Certificate, ShieldCheck, Fingerprint, Trash, X, ArrowsClockwise, ShieldWarning, PushPin, SealCheck, Vault } from '@phosphor-icons/react'
+import { Certificate, ShieldCheck, Fingerprint, Trash, X, ArrowsClockwise, ShieldWarning, PushPin, SealCheck, Vault, PencilSimple } from '@phosphor-icons/react'
 import { FloatingWindow } from './ui/FloatingWindow'
 import { CertificateDetails } from './CertificateDetails'
 import { CertificateLintModal } from './CertificateLintModal'
@@ -31,6 +31,7 @@ import { cn, downloadBlob } from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { askRenewal } from '../lib/renewalPrompt'
+import { renameCertificate } from '../lib/certificateRename'
 import { showNotices } from '../lib/notices'
 
 const ENTITY_CONFIG = {
@@ -234,6 +235,13 @@ export function FloatingDetailWindow({ windowInfo }) {
     }
   }
 
+  const handleRename = async () => {
+    const updated = await renameCertificate(data, { showPrompt, showSuccess, showError, t })
+    if (!updated) return
+    setData((prev) => ({ ...prev, ...updated }))
+    window.dispatchEvent(new CustomEvent('ucm:data-changed', { detail: { type: windowInfo.type } }))
+  }
+
   const handleDelete = async () => {
     // The guard sits here as well as on the button: a surface that offers the
     // action anyway still cannot reach a route that would refuse it.
@@ -351,6 +359,7 @@ export function FloatingDetailWindow({ windowInfo }) {
     onLint: (isCert || isUserCert) ? () => setLintOpen(true) : null,
     onRequestKeyRecovery: (isCert || isUserCert) && hasPrivateKey && hasPermission('write:key_recovery') ? () => setKeyRecoveryOpen(true) : null,
     onRenew: isCert && canWrite('certificates') && !data.revoked && (data.has_private_key || data.source === 'msca') ? handleRenew : null,
+    onRename: isCert && canWrite('certificates') ? handleRename : null,
     onRevoke: ((isCert || isUserCert) && canWrite(resource) && !data.revoked)
       // A CA is revoked by its parent, so it needs one held in UCM (#343)
       || (isCA && canWrite('cas') && !data.revoked && !data.revoked_in_chain && !data.pending && !data.is_root && data.type !== 'root' && !!data.parent_id)
@@ -532,7 +541,7 @@ function DetailContent({ type, data, canWrite, canDelete, hasPermission, onExpor
 /**
  * ActionBar — Toolbar under the window header with labeled action buttons
  */
-function ActionBar({ onExport, hasPrivateKey, keyAlgorithm, canExportKey, entityType, entityName, onLint, onRequestKeyRecovery, onRenew, onRevoke, onUnhold, onOffline, onRestore, onManagePins, onDelete, canExport = true, onDownloadCsr, onUploadCertificate, onRenewCsr, chainVariantsFor, relatedCertificateId, t }) {
+function ActionBar({ onExport, hasPrivateKey, keyAlgorithm, canExportKey, entityType, entityName, onLint, onRequestKeyRecovery, onRename, onRenew, onRevoke, onUnhold, onOffline, onRestore, onManagePins, onDelete, canExport = true, onDownloadCsr, onUploadCertificate, onRenewCsr, chainVariantsFor, relatedCertificateId, t }) {
   const [showExportModal, setShowExportModal] = useState(false)
   const btnBase = 'inline-flex items-center gap-1.5 px-2.5 py-1 rounded-lg text-xs font-medium transition-all duration-150'
 
@@ -592,6 +601,14 @@ function ActionBar({ onExport, hasPrivateKey, keyAlgorithm, canExportKey, entity
         <button onClick={onManagePins} className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary-op10')}>
           <PushPin size={14} weight="duotone" />
           {t('templates.managePins', 'Manage Pins')}
+        </button>
+      )}
+
+      {/* Rename: display name only (#286) */}
+      {onRename && (
+        <button onClick={onRename} className={cn(btnBase, 'text-text-secondary hover:text-accent-primary hover:bg-accent-primary-op10')}>
+          <PencilSimple size={14} weight="duotone" />
+          {t('certificates.rename', 'Rename')}
         </button>
       )}
 

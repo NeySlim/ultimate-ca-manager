@@ -43,7 +43,8 @@ import {
   UploadSimple,
   LinkSimple,
   SealCheck,
-  Stack
+  Stack,
+  PencilSimple
 } from '@phosphor-icons/react'
 import { Badge } from './Badge'
 import { Button } from './Button'
@@ -136,6 +137,7 @@ export function CertificateDetails({
   onRevoke,
   onDelete,
   onRenew,
+  onRename,
   onUploadKey,
   onAddToTrustStore,
   // Opens the other member of a hybrid pair; without it the link navigates
@@ -279,6 +281,11 @@ export function CertificateDetails({
             <SealCheck size={14} /> {t('lint.action')}
           </Button>
           {/* Action buttons */}
+          {onRename && canWrite && (
+            <Button type="button" size="xs" variant="secondary" onClick={onRename} title={t('certificates.renameCertificate')} aria-label={t('certificates.renameCertificate')}>
+              <PencilSimple size={14} />
+            </Button>
+          )}
           {onRenew && canWrite && !cert.revoked && (
             <Button type="button" size="xs" variant="secondary" onClick={onRenew} title={t('certificates.renewCertificate')} aria-label={t('certificates.renewCertificate')}>
               <ArrowsClockwise size={14} />
