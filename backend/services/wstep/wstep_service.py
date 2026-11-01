@@ -123,8 +123,8 @@ def _validate_csr(csr, require_pop=True, allow_naked_subject=False):
       a PKCS#10 CertificationRequest whose own self-signature does not
       reliably verify — proof of possession there comes from the *outer*
       CMS SignedData's signature instead, checked separately by
-      ``_verify_pkcs7_pop`` (``issue()``, and both renewal paths when the
-      key changes).
+      ``_verify_pkcs7_pop`` (``issue()``). A renewal, already authenticated by
+      the old certificate, takes either proof for a new key (``_new_key_proof``).
     - An empty Subject is accepted when the CSR carries a
       SubjectAlternativeName instead (SAN-only identity is standard
       modern TLS practice).
@@ -932,7 +932,7 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
         return None, 'Invalid signing certificate'
 
     db_cert, err = _renewable_certificate(ca, signing_cert)
-    _note_renewed_serial(audit, signing_cert, err)
+    _note_renewed_serial(audit, signing_cert, db_cert)
     if err:
         return None, err
 
@@ -982,7 +982,7 @@ def renew_with_client_certificate(ca, client_cert_pem, csr_der, outer_signed_dat
         return None, 'Invalid client certificate'
 
     db_cert, err = _renewable_certificate(ca, client_cert)
-    _note_renewed_serial(audit, client_cert, err)
+    _note_renewed_serial(audit, client_cert, db_cert)
     if err:
         return None, err
 
@@ -1049,31 +1049,28 @@ def _verify_renewal_signer(outer_signed_data, cert):
     return 'Renewal request is not signed by the certificate being renewed'
 
 
-_UNRECOGNIZED = 'Signing certificate is not recognized'
-
-
-def _note_renewed_serial(audit, cert, err):
-    """Records the serial once ``cert`` is known as issued by the CA, its key proven by
-    the XML signature or the TLS handshake: an unknown certificate is never audited."""
-    if audit is not None and err != _UNRECOGNIZED:
+def _note_renewed_serial(audit, cert, row):
+    """Records the serial once a row holds ``cert`` byte for byte, its key proven by the
+    XML signature or the TLS handshake: a lookalike naming a public serial is never audited."""
+    if audit is not None and row is not None:
         audit['renewed_serial'] = cert.serial_number
 
 
 def _renewable_certificate(ca, cert):
     """(row, None) when ``cert`` is, byte for byte, a certificate this CA issued
-    and still holds; (None, error) otherwise. Serial and subject are public, so
-    a self-signed lookalike must not pass."""
+    and still holds; (row or None, error) otherwise. Serial and subject are
+    public, so a self-signed lookalike must not pass."""
     from services.cert.issued_lookup import (
         OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
     )
     db_cert, status = issued_certificate_status(ca, cert)
     if status != OK:
-        return None, {
+        return db_cert, {
             REVOKED: 'Signing certificate has been revoked',
             EXPIRED: 'Signing certificate has expired',
             NOT_YET_VALID: 'Signing certificate is not yet valid',
             SUPERSEDED: 'Signing certificate has been superseded by a newer one',
-        }.get(status, _UNRECOGNIZED)
+        }.get(status, 'Signing certificate is not recognized')
     return db_cert, None
 
 

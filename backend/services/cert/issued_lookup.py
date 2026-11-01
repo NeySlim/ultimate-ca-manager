@@ -69,7 +69,8 @@ def find_issued_row(ca: CA, cert: x509.Certificate) -> Optional[Certificate]:
 
 
 def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[Certificate], str]:
-    """``(row, status)`` with status one of OK, UNKNOWN, REVOKED, EXPIRED.
+    """``(row, status)`` with status one of OK, UNKNOWN, REVOKED, EXPIRED,
+    NOT_YET_VALID, SUPERSEDED.
 
     A certificate revoked and then deleted keeps its persistent revocation
     record, and answers REVOKED rather than UNKNOWN."""

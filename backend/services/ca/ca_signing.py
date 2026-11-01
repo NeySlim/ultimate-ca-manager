@@ -30,16 +30,22 @@ class AlreadySuperseded(Exception):
 
 
 def _claim_superseded(row):
-    """Archive *row* unless already archived; False when another renewal got there first."""
+    """Archive *row* and every live duplicate of it (a restore may leave two); False
+    when another renewal got there first."""
     from sqlalchemy import update
     from sqlalchemy.orm.attributes import set_committed_value
+    live = [r.id for r in Certificate.query.filter(
+        Certificate.serial_number == row.serial_number, Certificate.crt == row.crt,
+        Certificate.archived.isnot(True)).all()]
+    if row.id not in live:
+        return False
     result = db.session.execute(
         update(Certificate)
-        .where(Certificate.id == row.id, Certificate.archived.isnot(True))
+        .where(Certificate.id.in_(live), Certificate.archived.isnot(True))
         .values(archived=True)
         .execution_options(synchronize_session=False)
     )
-    if result.rowcount != 1:
+    if result.rowcount != len(live):
         return False
     set_committed_value(row, 'archived', True)
     return True

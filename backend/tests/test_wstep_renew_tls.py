@@ -401,6 +401,28 @@ def test_refusal_for_an_unknown_certificate_is_not_audited(client, app, wstep_re
     assert _refusal_count(app) == before
 
 
+def test_lookalike_of_a_revoked_and_deleted_certificate_is_not_audited(client, app, wstep_renew_config):
+    """The persistent revocation record matches a serial only, which anyone can copy."""
+    from models.revoked_serial import RevokedSerial
+    old_cert, _old_key = _issue(app, wstep_renew_config['id'], 'xml-renew-deleted.example.test')
+    with app.app_context():
+        row = Certificate.query.filter_by(serial_number=str(old_cert.serial_number)).one()
+        db.session.add(RevokedSerial(caref=row.caref, serial_number=row.serial_number,
+                                     valid_to=old_cert.not_valid_after_utc.replace(tzinfo=None)))
+        db.session.delete(row)
+        db.session.commit()
+    key = _key()
+    lookalike = (x509.CertificateBuilder().subject_name(old_cert.subject).issuer_name(old_cert.subject)
+                 .public_key(key.public_key()).serial_number(old_cert.serial_number)
+                 .not_valid_before(old_cert.not_valid_before_utc).not_valid_after(old_cert.not_valid_after_utc)
+                 .sign(key, hashes.SHA256()))
+    before = _refusal_count(app)
+    r = _post(client, _build_signed_rst(lookalike, key, _renewal_csr(lookalike, key)))
+    assert r.status_code == 400
+    assert b'revoked' in r.data, r.data
+    assert _refusal_count(app) == before
+
+
 # Concurrent replay: the renewed row is claimed by compare-and-set
 
 def test_second_renewal_loses_the_claim(client, app, wstep_renew_config, monkeypatch):
@@ -684,3 +706,48 @@ def test_template_without_ekus_keeps_the_renewal_within_the_old_ones(app, templa
                        _eku_csr(old_cert, old_key, ExtendedKeyUsageOID.CLIENT_AUTH))
     assert err is None, err
     assert _ekus(cert) == {ExtendedKeyUsageOID.CLIENT_AUTH}
+
+
+def test_two_live_duplicates_are_claimed_together(client, app, wstep_renew_config):
+    """A certificate held twice renews once: the second renewal finds both rows archived."""
+    old_cert, old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-two-live.example.test')
+    with app.app_context():
+        original = Certificate.query.filter_by(serial_number=str(old_cert.serial_number)).one()
+        columns = {c.name: getattr(original, c.name) for c in Certificate.__table__.columns
+                   if c.name not in ('id', 'refid')}
+        db.session.add(Certificate(refid=f'{original.refid}-twin', **columns))
+        db.session.commit()
+    body = _rst(_cmc_renewal(_renewal_csr(old_cert, old_key), [(old_key, old_cert)]))
+    assert _post(client, body, tls_cert=old_cert).status_code == 200
+    r = _post(client, body, tls_cert=old_cert)
+    assert r.status_code == 400
+    assert b'superseded' in r.data, r.data
+    with app.app_context():
+        assert {c.archived for c in Certificate.query.filter_by(
+            serial_number=str(old_cert.serial_number)).all()} == {True}
+
+
+def test_a_twin_claimed_by_another_renewal_loses_the_claim(app, wstep_renew_config, monkeypatch):
+    """One of two live rows archived between the read and the update: the claim fails."""
+    from services.ca.ca_signing import _claim_superseded
+    old_cert, _old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-twin-race.example.test')
+    with app.app_context():
+        original = Certificate.query.filter_by(serial_number=str(old_cert.serial_number)).one()
+        columns = {c.name: getattr(original, c.name) for c in Certificate.__table__.columns
+                   if c.name not in ('id', 'refid')}
+        twin = Certificate(refid=f'{original.refid}-race', **columns)
+        db.session.add(twin)
+        db.session.commit()
+        twin_id = twin.id
+        execute = db.session.execute
+
+        def concurrent_claim_first(statement, *args, **kwargs):
+            if getattr(statement, 'is_update', False):
+                execute(update(Certificate).where(Certificate.id == twin_id).values(archived=True)
+                        .execution_options(synchronize_session=False))
+            return execute(statement, *args, **kwargs)
+
+        monkeypatch.setattr(db.session, 'execute', concurrent_claim_first)
+        assert _claim_superseded(original) is False
+        monkeypatch.undo()
+        db.session.rollback()

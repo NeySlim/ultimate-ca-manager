@@ -282,6 +282,36 @@ def test_a_second_renewal_of_the_same_certificate_is_refused(app, auth_client, c
             _cleanup(app, req_id)
 
 
+def test_a_renewal_of_a_since_revoked_certificate_is_not_approved(app, auth_client, create_ca):
+    from services.cert_service import CertificateService
+    ca = create_ca(cn='SCEP revoked renewal CA')
+    with app.app_context():
+        ca_row = db.session.get(CA, ca['id'])
+        old = CertificateService.create_certificate(
+            descr='revoked.example.test', caref=ca_row.refid, dn={'CN': 'revoked.example.test'},
+            cert_type='server_cert', key_type='2048', validity_days=30, username='admin')
+        db.session.commit()
+        old_id, old_crt, caref = old.id, old.crt, ca_row.refid
+        req = SCEPRequest(transaction_id='txn-renewal-revoked', ca_refid=caref,
+                          csr=base64.b64encode(_csr('revoked.example.test').public_bytes(
+                              serialization.Encoding.DER)).decode(),
+                          status='pending', subject='CN=revoked.example.test', renewal_of=old_crt)
+        db.session.add(req)
+        db.session.commit()
+        req_id = req.id
+        CertificateService.revoke_certificate(old_id, reason='keyCompromise', username='admin')
+        issued = Certificate.query.filter_by(caref=caref).count()
+    try:
+        r = auth_client.post(f'/api/v2/scep/{req_id}/approve', data='{}', content_type='application/json')
+        assert r.status_code == 409, r.get_json()
+        assert 'revoked' in r.get_json()['message'], r.get_json()
+        with app.app_context():
+            assert Certificate.query.filter_by(caref=caref).count() == issued
+            assert db.session.get(Certificate, old_id).archived is not True
+    finally:
+        _cleanup(app, req_id)
+
+
 def test_scep_history_export_carries_the_profile(app, create_ca):
     from services.backup.export_extended import ExportExtendedMixin
     ca = create_ca(cn='SCEP export CA')
