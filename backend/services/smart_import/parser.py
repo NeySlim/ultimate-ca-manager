@@ -99,6 +99,44 @@ def _sealed_key_algorithm(data) -> Optional[bytes]:
     return _sealed_algorithm(raw)
 
 
+_SEALED_LABEL = re.compile(rb'BEGIN\s+ENCRYPTED\s+PRIVATE\s+KEY')
+UNINSPECTED_KEY = 'Password not tried: the encrypted private key could not be inspected'
+
+
+def inspected_key(data, password):
+    """(data, password) to load a key given as PEM or DER with, outside a parse. An encrypted
+    PKCS#8 comes back as the DER whose derivation was costed, refused (PasswordNotTried) when too
+    costly or unreadable here; DER that is not one comes back without the password."""
+    raw = data.encode() if isinstance(data, str) else bytes(data)
+    if not password:
+        return raw, None
+    if _SEALED_LABEL.search(raw):
+        bodies = _SEALED_PEM.findall(raw)
+        if len(bodies) != 1 or len(_SEALED_LABEL.findall(raw)) != 1:
+            raise PasswordNotTried(UNINSPECTED_KEY)
+        try:
+            raw = base64.b64decode(b''.join(bodies[0].split()), validate=True)
+        except ValueError:
+            raise PasswordNotTried(UNINSPECTED_KEY) from None
+        if _sealed_algorithm(raw) is None:
+            raise PasswordNotTried(UNINSPECTED_KEY)
+    elif raw.lstrip().startswith(b'-----'):
+        return raw, password  # PEM encryption (RFC 1421) derives with one MD5 round
+    sealed = _sealed_algorithm(raw)
+    if sealed is None:
+        return raw, None
+    refusal = kdf_refusal(sealed)
+    if refusal:
+        raise PasswordNotTried(refusal)
+    return raw, password
+
+
+def open_pkcs12(data: bytes, password=None):
+    """(key, certificate, additional certificates) of a PKCS#12, outside a parse, each derivation
+    costed and budgeted as a parse would; PasswordNotTried when one is refused."""
+    return _load_pkcs12(data, password, _Attempts())
+
+
 def kdf_refusal(algorithm_der: bytes) -> Optional[str]:
     """Why the key derivation an AlgorithmIdentifier names is too costly to run, else None.
     Parameters this cannot read are left to pyca, which reads them before deriving."""
