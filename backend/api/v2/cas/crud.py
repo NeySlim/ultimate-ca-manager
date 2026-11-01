@@ -23,6 +23,7 @@ import fips_mode
 from fips_mode import FipsRestricted
 from services.ca_service import CAService
 from services.audit_service import AuditService
+from services.smart_import.parser import PasswordNotTried, inspected_key
 import compliance_profiles
 from services.ca.signature_scheme import ca_pss_refusal, normalize_signature_scheme, pss_refusal
 from services.deletion_blockers import ca_deletion_blockers, first_blocker
@@ -1335,12 +1336,15 @@ def restore_ca(ca_id):
         logger.error(f"restore_ca: failed to load encrypted PEM for CA {ca_id}: {e}")
         return error_response('Failed to read encrypted CA key', 500)
 
-    # Verify password by attempting decryption
+    # Verify password by attempting decryption, of the DER whose key derivation was costed
     try:
-        priv = serialization.load_pem_private_key(
-            encrypted_pem, password=password.encode('utf-8'),
-            backend=default_backend()
-        )
+        key_data, key_password = inspected_key(encrypted_pem, password.encode('utf-8'))
+    except PasswordNotTried as e:
+        return error_response(str(e), 400)
+    try:
+        load = (serialization.load_pem_private_key if key_data == encrypted_pem
+                else serialization.load_der_private_key)
+        priv = load(key_data, password=key_password, backend=default_backend())
     except (ValueError, TypeError) as e:
         # cryptography raises ValueError on bad password / malformed PEM
         logger.warning(f"restore_ca: password rejected for CA {ca_id}: {e}")

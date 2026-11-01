@@ -7,6 +7,7 @@ from cryptography.hazmat.backends import default_backend
 
 from auth.unified import require_auth
 from fips_mode import FipsRestricted
+from services.smart_import.parser import PasswordNotTried, open_pkcs12
 from utils.pkcs12_import import refuse_pkcs12_import
 from utils.response import success_response, error_response
 
@@ -94,14 +95,16 @@ def decode_cert():
             if not certs:
                 refuse_pkcs12_import(raw_bytes)
                 try:
-                    from utils.pkcs12_import import load_key_and_certificates
-                    _, cert, chain = load_key_and_certificates(raw_bytes, None)
+                    # Even without a password, the MAC and the layers derive keys: costed first
+                    _, cert, chain = open_pkcs12(raw_bytes, None)
                     if cert:
                         certs = [cert]
                     if chain:
                         certs.extend(chain)
                 except FipsRestricted:
                     raise
+                except PasswordNotTried as e:
+                    return error_response(str(e), 400)
                 except Exception:
                     pass
         else:

@@ -476,7 +476,7 @@ def _synthesize_san_from_subject(subject):
 def _verified_related_certificate(csr, cert_type):
     """Certificate A a CSR's relatedCertRequest names, once verified (RFC 9763 §3.2); None without one."""
     from utils import related_cert
-    from services.cert.related_pair import RelatedCertificateRefused, verify_request
+    from services.cert.related_pair import RelatedCertificateRefused, check_request_key, verify_request
     try:
         req = related_cert.request_from_csr_der(csr.public_bytes(serialization.Encoding.DER))
     except related_cert.RelatedCertError as e:
@@ -485,7 +485,9 @@ def _verified_related_certificate(csr, cert_type):
         return None
     if cert_type == 'intermediate_ca':
         raise RelatedCertificateRefused('Only an end-entity certificate may name a related certificate')
-    return verify_request(req)[1]
+    cert_a = verify_request(req)[1]
+    check_request_key(req, cert_a, csr.public_bytes(serialization.Encoding.DER))
+    return cert_a
 
 
 class CSROperationsMixin:

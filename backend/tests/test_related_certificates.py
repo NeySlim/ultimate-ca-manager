@@ -485,6 +485,166 @@ def test_an_a_that_is_itself_a_b_keeps_its_own_link(app, cert_a):
         assert db.session.get(Certificate, a_id).related_certificate_id == c_id
 
 
+# ---- a request honoured once binds to its key B -----------------------------------
+
+P256_ORDER = 0xffffffff00000000ffffffffffffffffbce6faada7179e84f3b9cac2fc632551
+
+
+def _csr_with(cert_a, key_b, request, cn=None):
+    """A CSR for *key_b* carrying the RequesterCertificate DER *request* as is."""
+    subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, cn)]) if cn else cert_a.subject
+    csr = (x509.CertificateSigningRequestBuilder().subject_name(subject)
+           .add_extension(cert_a.extensions.get_extension_for_class(x509.SubjectAlternativeName).value,
+                          critical=False)
+           .sign(key_b, hashes.SHA256()))
+    return related_cert.csr_with_request(csr, key_b, request)
+
+
+def _request(cert_a, key_a):
+    return related_cert.build_request(cert_a, key_a, related_cert.data_url_for([cert_a]))
+
+
+def _bindings(request, cert_a):
+    from models.related_cert_request import RelatedCertRequestUse
+    from services.cert.related_pair import _request_digest
+    digest = _request_digest(related_cert.parse_request(request), cert_a.public_key())
+    return RelatedCertRequestUse.query.filter_by(request_sha256=digest).all()
+
+
+def test_a_request_replayed_with_another_key_is_refused(app, cert_a):
+    """RFC 9763's signature does not cover B's key: the CA binds the request to the first B."""
+    row_id, cert, key = cert_a
+    request = _request(cert, key)
+    with app.app_context():
+        ca = _signing_ca(row_id)[0]
+        key_b = ec.generate_private_key(ec.SECP256R1())
+        first = _csr_with(cert, key_b, request)
+        b_id = _est_sign(ca, first).id
+        # The same CSR, or another CSR for the same key B, is a retry: honoured again
+        assert _est_sign(ca, first).id != b_id
+        _est_sign(ca, _csr_with(cert, key_b, request, cn='retry.example.test'))
+        before = Certificate.query.count()
+        replayed = _csr_with(cert, ec.generate_private_key(ec.SECP256R1()), request)
+        with pytest.raises(RelatedCertificateRefused, match='already used with another key'):
+            _est_sign(ca, replayed)
+        # Refused before anything is signed
+        with pytest.raises(RelatedCertificateRefused, match='already used with another key'):
+            _sign(row_id, replayed.public_bytes(serialization.Encoding.PEM))
+        assert Certificate.query.count() == before
+        assert len(_bindings(request, cert)) == 1
+
+
+def _sign_route(auth_client, csr, ca_id):
+    r = auth_client.post('/api/v2/csrs/upload', data=json.dumps(
+        {'pem': csr.public_bytes(serialization.Encoding.PEM).decode(), 'name': 'related-b'}),
+        content_type='application/json')
+    assert r.status_code in (200, 201), r.data
+    csr_id = json.loads(r.data)['data']['id']
+    return auth_client.post(f'/api/v2/csrs/{csr_id}/sign', json={'ca_id': ca_id, 'validity_days': 30})
+
+
+def test_the_sign_route_binds_the_request_too(app, auth_client, cert_a):
+    row_id, cert, key = cert_a
+    request = _request(cert, key)
+    with app.app_context():
+        ca_id = _signing_ca(row_id)[0].id
+    r = _sign_route(auth_client, _csr_with(cert, ec.generate_private_key(ec.SECP256R1()), request), ca_id)
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        with pytest.raises(RelatedCertificateRefused, match='already used with another key'):
+            _est_sign(db.session.get(CA, ca_id),
+                      _csr_with(cert, ec.generate_private_key(ec.SECP256R1()), request))
+    r = _sign_route(auth_client, _csr_with(cert, ec.generate_private_key(ec.SECP256R1()), request), ca_id)
+    assert r.status_code == 400 and b'already used with another key' in r.data, r.data
+
+
+def test_a_malleated_ecdsa_signature_names_the_same_request(app, cert_a):
+    """(r, n - s) verifies as well as (r, s): the binding keys on what was signed, not on the signature."""
+    from cryptography.hazmat.primitives.asymmetric.utils import (decode_dss_signature,
+                                                                 encode_dss_signature)
+    row_id, cert, key = cert_a
+    request = _request(cert, key)
+    req = related_cert.parse_request(request)
+    r, s_value = decode_dss_signature(req['signature'].native)
+    twin = related_cert.RequesterCertificate({
+        'cert_id': req['cert_id'], 'request_time': req['request_time'].native,
+        'location_info': req['location_info'],
+        'signature': encode_dss_signature(r, P256_ORDER - s_value)}).dump()
+    assert twin != request
+    with app.app_context():
+        verify_request(related_cert.parse_request(twin))
+        ca = _signing_ca(row_id)[0]
+        _est_sign(ca, _csr_with(cert, ec.generate_private_key(ec.SECP256R1()), request))
+        with pytest.raises(RelatedCertificateRefused, match='already used with another key'):
+            _est_sign(ca, _csr_with(cert, ec.generate_private_key(ec.SECP256R1()), twin))
+
+
+def test_a_failed_signature_does_not_use_the_request(app, cert_a, monkeypatch):
+    row_id, cert, key = cert_a
+    request = _request(cert, key)
+    with app.app_context():
+        ca = _signing_ca(row_id)[0]
+
+        def broken(*args, **kwargs):
+            raise ValueError('signing failed')
+        with monkeypatch.context() as m:
+            m.setattr(x509.CertificateBuilder, 'sign', broken)
+            with pytest.raises(ValueError, match='signing failed'):
+                _est_sign(ca, _csr_with(cert, ec.generate_private_key(ec.SECP256R1()), request))
+        db.session.commit()  # as an audit row written after the failure would
+        assert _bindings(request, cert) == []
+        _est_sign(ca, _csr_with(cert, ec.generate_private_key(ec.SECP256R1()), request))
+        assert len(_bindings(request, cert)) == 1
+
+
+def test_two_concurrent_keys_meet_the_unique_binding(app, cert_a, monkeypatch):
+    """Both requests passed the check before either committed: the second insert loses."""
+    from models.related_cert_request import RelatedCertRequestUse
+    from services.cert import related_pair
+    row_id, cert, key = cert_a
+    request = _request(cert, key)
+    req = related_cert.parse_request(request)
+    with app.app_context():
+        ca = _signing_ca(row_id)[0]
+        link = db.session.get(Certificate, row_id).related_certificate_id
+        db.session.add(RelatedCertRequestUse(request_sha256=related_pair._request_digest(req, cert.public_key()),
+                                             spki_sha256='0' * 64,
+                                             request_time=related_cert.request_time(req)))
+        db.session.commit()
+        real = related_pair._bound_key
+        calls = []
+
+        def unseen_once(digest):
+            calls.append(digest)
+            return None if len(calls) == 1 else real(digest)
+        monkeypatch.setattr(related_pair, 'check_request_key', lambda *a: None)
+        monkeypatch.setattr(related_pair, '_bound_key', unseen_once)
+        before = Certificate.query.count()
+        with pytest.raises(RelatedCertificateRefused, match='already used with another key'):
+            _est_sign(ca, _csr_with(cert, ec.generate_private_key(ec.SECP256R1()), request))
+        assert len(calls) == 2
+        assert Certificate.query.count() == before
+        assert db.session.get(Certificate, row_id).related_certificate_id == link
+        assert [b.spki_sha256 for b in _bindings(request, cert)] == ['0' * 64]
+
+
+def test_bindings_older_than_a_request_may_be_go(app, cert_a):
+    from models.related_cert_request import RelatedCertRequestUse
+    from services.cert.related_pair import REQUEST_MAX_AGE
+    row_id, cert, key = cert_a
+    stale = utc_now() - REQUEST_MAX_AGE - timedelta(minutes=1)
+    with app.app_context():
+        db.session.add(RelatedCertRequestUse(request_sha256='f' * 64, spki_sha256='0' * 64,
+                                             request_time=stale))
+        db.session.add(RelatedCertRequestUse(request_sha256='e' * 64, spki_sha256='0' * 64,
+                                             request_time=stale + timedelta(minutes=2)))
+        db.session.commit()
+        _est_sign(_signing_ca(row_id)[0], _csr_with(cert, ec.generate_private_key(ec.SECP256R1()),
+                                                    _request(cert, key)))
+        left = {b.request_sha256 for b in RelatedCertRequestUse.query.all()}
+        assert 'f' * 64 not in left and 'e' * 64 in left
+
+
 # ---- a B enrolled by a device: A renews alone ---------------------------------------
 
 def _renew(auth_client, row_id, how):
@@ -604,6 +764,119 @@ def test_a_related_certificate_under_an_expired_ca_certificate_is_refused(app, c
         finally:
             ca = db.session.get(CA, ca_id)
             ca.crt = previous
+            db.session.commit()
+
+
+def _resign(ca_id, signer_id, change):
+    """Reissue CA *ca_id*'s certificate with the same key, names and serial, the
+    extensions passed through *change*, signed by CA *signer_id*; returns the old crt."""
+    from services.hsm.ca_key_loader import get_ca_signing_key
+    ca = db.session.get(CA, ca_id)
+    cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+    builder = (x509.CertificateBuilder().subject_name(cert.subject).issuer_name(cert.issuer)
+               .public_key(cert.public_key()).serial_number(cert.serial_number)
+               .not_valid_before(cert.not_valid_before_utc).not_valid_after(cert.not_valid_after_utc))
+    for ext in change(list(cert.extensions)):
+        builder = builder.add_extension(ext.value, critical=ext.critical)
+    signed = builder.sign(get_ca_signing_key(db.session.get(CA, signer_id)), hashes.SHA256())
+    previous, ca.crt = ca.crt, base64.b64encode(signed.public_bytes(serialization.Encoding.PEM)).decode()
+    db.session.commit()
+    return previous
+
+
+def _replaced(extensions, kind, value):
+    return [x509.Extension(e.oid, e.critical, value) if isinstance(e.value, kind) else e
+            for e in extensions]
+
+
+def _usage(key_cert_sign):
+    return x509.KeyUsage(digital_signature=True, content_commitment=False, key_encipherment=False,
+                         data_encipherment=False, key_agreement=False, key_cert_sign=key_cert_sign,
+                         crl_sign=True, encipher_only=False, decipher_only=False)
+
+
+@pytest.fixture
+def two_level_a(app, auth_client, create_ca, create_cert):
+    """A under an intermediate under a root, both held here: ``(root id, inter id, request)``."""
+    from utils.key_codec import load_pem_bytes
+    root_id = create_ca(cn='Related path root')['id']
+    r = auth_client.post('/api/v2/cas', data=json.dumps({
+        'type': 'intermediate', 'parentCAId': root_id, 'commonName': 'Related path inter',
+        'keyAlgo': 'EC', 'keySize': 'P-256', 'validityYears': 5}), content_type='application/json')
+    assert r.status_code in (200, 201), r.data
+    inter_id = json.loads(r.data)['data']['id']
+    data = create_cert(ca_id=inter_id, key_type='ec', key_size='256', cert_type='server')
+    with app.app_context():
+        row = db.session.get(Certificate, data['id'])
+        cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+        key = serialization.load_pem_private_key(load_pem_bytes(row.prv, context='test'), None)
+    return root_id, inter_id, related_cert.parse_request(related_cert.build_request(cert, key, 'u:x'))
+
+
+@pytest.mark.parametrize('target,change,message', [
+    ('inter', lambda e: _replaced(e, x509.BasicConstraints, x509.BasicConstraints(False, None)),
+     'is not a CA certificate'),
+    ('inter', lambda e: [x for x in e if not isinstance(x.value, x509.BasicConstraints)],
+     'is not a CA certificate'),
+    ('inter', lambda e: _replaced(e, x509.KeyUsage, _usage(False)), r'may not sign certificates'),
+    ('root', lambda e: _replaced(e, x509.BasicConstraints, x509.BasicConstraints(True, 0)),
+     'path length constraint'),
+    ('root', lambda e: _replaced(e, x509.BasicConstraints, x509.BasicConstraints(True, 1)), None),
+    ('inter', lambda e: _replaced(e, x509.BasicConstraints, x509.BasicConstraints(True, 0)), None),
+    ('inter', lambda e: _replaced(e, x509.KeyUsage, _usage(True)), None),
+    # (k) skips the trust anchor: a self-signed root needs keyUsage keyCertSign, not BC
+    ('root', lambda e: [x for x in e if not isinstance(x.value, x509.BasicConstraints)], None),
+    ('root', lambda e: [x for x in e if not isinstance(x.value, (x509.BasicConstraints, x509.KeyUsage))],
+     'is not a CA certificate'),
+    ('root', lambda e: _replaced(e, x509.BasicConstraints, x509.BasicConstraints(False, None)),
+     'is not a CA certificate'),
+    ('root', lambda e: _replaced(e, x509.KeyUsage, _usage(False)), r'may not sign certificates'),
+])
+def test_the_path_of_a_is_validated_as_rfc_5280_says(app, two_level_a, target, change, message):
+    """RFC 5280 §6.1.4 (k)-(n) on A's CA certificates: cA, pathLenConstraint, keyCertSign."""
+    root_id, inter_id, req = two_level_a
+    ca_id = inter_id if target == 'inter' else root_id
+    with app.app_context():
+        verify_request(req)
+        previous = _resign(ca_id, root_id, change)
+        try:
+            if message is None:
+                verify_request(req)
+            else:
+                with pytest.raises(RelatedCertificateRefused, match=message):
+                    verify_request(req)
+        finally:
+            db.session.get(CA, ca_id).crt = previous
+            db.session.commit()
+
+
+def test_a_v1_root_anchors_the_path_of_a(app, two_level_a):
+    """OpenSSL accepts a self-signed v1 root as trust anchor (X509_check_ca returns 3)."""
+    from asn1crypto import x509 as asn1_x509
+    from cryptography.hazmat.primitives.asymmetric import padding, rsa
+    from services.hsm.ca_key_loader import get_ca_signing_key
+    root_id, _inter_id, req = two_level_a
+    with app.app_context():
+        root = db.session.get(CA, root_id)
+        der = x509.load_pem_x509_certificate(base64.b64decode(root.crt)).public_bytes(
+            serialization.Encoding.DER)
+        tbs = asn1_x509.Certificate.load(der)['tbs_certificate']
+        tbs['version'] = 'v1'
+        tbs['extensions'] = None
+        key = get_ca_signing_key(root)
+        signed = tbs.dump(force=True)
+        signature = (key.sign(signed, padding.PKCS1v15(), hashes.SHA256())
+                     if isinstance(key, rsa.RSAPrivateKey) else key.sign(signed, ec.ECDSA(hashes.SHA256())))
+        cert = asn1_x509.Certificate({'tbs_certificate': tbs, 'signature_algorithm': tbs['signature'],
+                                      'signature_value': signature})
+        v1 = x509.load_der_x509_certificate(cert.dump())
+        assert v1.version == x509.Version.v1 and not list(v1.extensions)
+        previous, root.crt = root.crt, base64.b64encode(v1.public_bytes(serialization.Encoding.PEM)).decode()
+        db.session.commit()
+        try:
+            verify_request(req)
+        finally:
+            db.session.get(CA, root_id).crt = previous
             db.session.commit()
 
 

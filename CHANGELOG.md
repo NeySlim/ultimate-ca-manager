@@ -31,7 +31,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Hybrid certificate pairs (RFC 9763): the Issue Certificate form and `POST /api/v2/certificates` with `hybrid: {classical, pq}` issue a classical certificate and an ML-DSA one whose relatedCertificate extension names it. The pair is shown linked, revokes together and renews together when the server holds both keys, unless the operator unticks the box, and exports as one `hybrid-bundle` ZIP.
 
-- A CSR carrying a relatedCertRequest (RFC 9763) signed by the key of a certificate held here is checked before signing on Sign CSR, ACME, EST and WSTEP, and the new certificate is linked to it; `POST /api/v2/csrs` builds one with `related_to`, which needs `read:private_keys` and is audited. A newer certificate naming the same A takes over the pair, and ACME revocation revokes only the certificate presented. Such a pair satisfies the `pq_standalone` rule of compliance profiles.
+- A CSR carrying a relatedCertRequest (RFC 9763) signed by the key of a certificate held here is checked before signing on Sign CSR, ACME, EST and WSTEP, and the new certificate is linked to it; `POST /api/v2/csrs` builds one with `related_to`, which needs `read:private_keys` and is audited. A request is bound to the first key it is presented with, and A's chain is checked as RFC 5280 asks. A newer certificate naming the same A takes over the pair, and ACME revocation revokes only the certificate presented. Such a pair satisfies the `pq_standalone` rule of compliance profiles.
 
 - ACME: the local server finalizes ML-DSA CSRs, and the ACME client orders ML-DSA-44, ML-DSA-65 and ML-DSA-87 certificate keys outside FIPS mode. A default key type the client cannot generate now fails the order instead of falling back to RSA-2048.
 
@@ -110,13 +110,17 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - Certificates: a direct `/certificates/{id}` link closed its detail window at once when "Close on navigate" was on.
 
+- Certificates: the row actions of the certificate list (export, rename, renew, revoke, delete) had disappeared, which left renaming unreachable; they are back with the detail view's permissions and revocation dialog, and renaming is also offered in the detail views.
+
+- WebSocket: SSH certificate events reached every holder of `read:certificates`; they now reach holders of `read:ssh` only.
+
 ### Security
 
 - dnspython 2.9.1 (CVE-2026-114605): a DNS message with a long chain of compression pointers, sent to the RFC 2136 listener or returned by a resolver, could hold a CPU. The listener reads compressed names the same way under the new version.
 
 - ACME server: `revoke-cert` signed with a certificate's own key found the stored certificate by serial only, so a self-signed certificate forged with the serial of an issued one revoked it. Revocation now acts only on the stored certificate, byte for byte.
 
-- Smart import: an encrypted key or PKCS#12 file could ask for any number of key-derivation iterations. Costs above 2 million PBKDF2 or PKCS#12 MAC iterations, or scrypt above N=2^20, are now refused without being run, and a request makes at most 64 password attempts.
+- Smart import and the format converter: an encrypted key or PKCS#12 file, including a key sealed in an inner encrypted layer, could ask for any number of key-derivation iterations. Costs above 2 million PBKDF2 or PKCS#12 MAC iterations, or scrypt above N=2^20, are now refused without being run, and a request makes at most 64 password attempts. Certificate and CA import, key uploads, the decoder, the key matcher and offline CA restore apply the same limits.
 
 ## [2.247] - 2026-10-30
 

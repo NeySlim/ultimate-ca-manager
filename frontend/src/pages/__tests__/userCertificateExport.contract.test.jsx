@@ -23,21 +23,26 @@ const serviceMocks = vi.hoisted(() => ({
   delete: vi.fn(),
 }))
 const downloadBlob = vi.hoisted(() => vi.fn())
+// Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
+const stable = vi.hoisted(() => ({
+  i18n: {
+    t: (key, fallback) => (typeof fallback === 'string' ? fallback : key),
+    i18n: { language: 'en', changeLanguage: () => {}, on: () => {}, off: () => {} },
+  },
+  notify: {
+    showSuccess: () => {}, showError: () => {}, showWarning: () => {},
+    showConfirm: () => Promise.resolve(true), showPrompt: () => {},
+  },
+}))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key, fallback) => (typeof fallback === 'string' ? fallback : key),
-    i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() },
-  }),
+  useTranslation: () => stable.i18n,
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
 vi.mock('../../contexts', () => ({
-  useNotification: () => ({
-    showSuccess: vi.fn(), showError: vi.fn(), showWarning: vi.fn(),
-    showConfirm: vi.fn().mockResolvedValue(true), showPrompt: vi.fn(),
-  }),
+  useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
 }))
 

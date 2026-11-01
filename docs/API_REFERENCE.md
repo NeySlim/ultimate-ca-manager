@@ -1151,9 +1151,11 @@ Content-Type: application/json
 
 A CSR carrying a relatedCertRequest (RFC 9763), here or through ACME, EST or WSTEP, issues a
 certificate linked to the A it names. A must be held here, valid, unrevoked and an end-entity
-certificate issued by a CA of this instance whose chain is valid now, the request must be at most
-7 days old and verify with A's key, and the new certificate may assert no key usage or EKU that A
-lacks; otherwise `400`. A's own link moves to the newest such certificate; the previous one keeps
+certificate issued by a CA of this instance whose chain passes RFC 5280 path checks now (validity,
+`cA`, `pathLenConstraint`, `keyCertSign`), the request must be at most 7 days old and verify with
+A's key, and the new certificate may assert no key usage or EKU that A lacks; otherwise `400`.
+A request serves the first key it is presented with: the same key again (a retried enrolment) is
+accepted, another key is refused with `400`. A's own link moves to the newest such certificate; the previous one keeps
 naming A but no longer revokes or renews with it.
 
 ### Delete CSR

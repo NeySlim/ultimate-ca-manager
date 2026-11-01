@@ -23,17 +23,17 @@ from cryptography.x509.oid import ExtensionOID
 from fips_mode import FipsRestricted
 from utils.csr_extensions import csr_extensions
 from utils.key_codec import MalformedKey, load_private_key_any, normalize_private_key_pem
+from utils import pkcs12_layers
 from utils.pkcs12_import import load_key_and_certificates, looks_like_pkcs12, refuse_pkcs12_import
 
 WRONG_PASSWORD = 'Private key could not be decrypted with any of the passwords given'
 NOT_TRIED = 'Password not tried: this import already made too many password attempts'
 
 # Key derivations one parse may run, whatever the number of passwords and encrypted objects
+# (a PKCS#12 PBE derives its key, then its IV: two; a MAC, PBES1 or PBES2 one)
 MAX_PASSWORD_ATTEMPTS = 64
 # Far above what OpenSSL and pyca produce: a costlier derivation is refused, never run
 MAX_KDF_ITERATIONS = 2_000_000
-MAX_SCRYPT_N = 1 << 20
-MAX_SCRYPT_WORK = MAX_SCRYPT_N * 8  # N * r * p
 
 _PBES2 = '1.2.840.113549.1.5.13'
 _PBKDF2 = '1.2.840.113549.1.5.12'
@@ -49,15 +49,16 @@ class PasswordNotTried(Exception):
 
 
 class _Attempts:
-    """The password attempts left to one parse."""
+    """The key derivations left to one parse."""
 
     def __init__(self, left: int = MAX_PASSWORD_ATTEMPTS):
         self.left = left
 
-    def spend(self) -> None:
-        if self.left <= 0:
+    def spend(self, count: int = 1) -> None:
+        """Spend *count* derivations, or none and refuse when fewer are left."""
+        if count > self.left:
             raise PasswordNotTried(NOT_TRIED)
-        self.left -= 1
+        self.left -= count
 
 
 def _is_wrong_password(exc: Exception) -> bool:
@@ -96,6 +97,44 @@ def _sealed_key_algorithm(data) -> Optional[bytes]:
     return _sealed_algorithm(raw)
 
 
+_SEALED_LABEL = re.compile(rb'BEGIN\s+ENCRYPTED\s+PRIVATE\s+KEY')
+UNINSPECTED_KEY = 'Password not tried: the encrypted private key could not be inspected'
+
+
+def inspected_key(data, password):
+    """(data, password) to load a key given as PEM or DER with, outside a parse. An encrypted
+    PKCS#8 comes back as the DER whose derivation was costed, refused (PasswordNotTried) when too
+    costly or unreadable here; DER that is not one comes back without the password."""
+    raw = data.encode() if isinstance(data, str) else bytes(data)
+    if not password:
+        return raw, None
+    if _SEALED_LABEL.search(raw):
+        bodies = _SEALED_PEM.findall(raw)
+        if len(bodies) != 1 or len(_SEALED_LABEL.findall(raw)) != 1:
+            raise PasswordNotTried(UNINSPECTED_KEY)
+        try:
+            raw = base64.b64decode(b''.join(bodies[0].split()), validate=True)
+        except ValueError:
+            raise PasswordNotTried(UNINSPECTED_KEY) from None
+        if _sealed_algorithm(raw) is None:
+            raise PasswordNotTried(UNINSPECTED_KEY)
+    elif b'-----BEGIN ' in raw:
+        return raw, password  # PEM encryption (RFC 1421) derives with one MD5 round
+    sealed = _sealed_algorithm(raw)
+    if sealed is None:
+        return raw, None
+    refusal = kdf_refusal(sealed)
+    if refusal:
+        raise PasswordNotTried(refusal)
+    return raw, password
+
+
+def open_pkcs12(data: bytes, password=None):
+    """(key, certificate, additional certificates) of a PKCS#12, outside a parse, each derivation
+    costed and budgeted as a parse would; PasswordNotTried when one is refused."""
+    return _load_pkcs12(data, password, _Attempts())
+
+
 def kdf_refusal(algorithm_der: bytes) -> Optional[str]:
     """Why the key derivation an AlgorithmIdentifier names is too costly to run, else None.
     Parameters this cannot read are left to pyca, which reads them before deriving."""
@@ -112,7 +151,7 @@ def kdf_refusal(algorithm_der: bytes) -> Optional[str]:
         if oid == _SCRYPT:
             p = decoder.decode(params, asn1Spec=rfc7914.Scrypt_params())[0]
             n = int(p['costParameter'])
-            if n > MAX_SCRYPT_N or n * int(p['blockSize']) * int(p['parallelizationParameter']) > MAX_SCRYPT_WORK:
+            if pkcs12_layers.scrypt_refused(n, int(p['blockSize']), int(p['parallelizationParameter'])):
                 return f'Key derivation refused: scrypt with N={n} costs more than this instance runs'
             return None
         if oid == _PBKDF2:
@@ -148,9 +187,7 @@ def pkcs12_kdf_refusal(data: bytes) -> Optional[str]:
                 algorithms.append(
                     info['content']['encrypted_content_info']['content_encryption_algorithm'].dump())
             elif kind == 'data':
-                algorithms += [bag['bag_value']['encryption_algorithm'].dump()
-                               for bag in asn1_pkcs12.SafeContents.load(info['content'].native)
-                               if bag['bag_id'].native == 'pkcs8_shrouded_key_bag']
+                algorithms += pkcs12_layers.shrouded_algorithms(info['content'].native)
     except Exception:
         return None
     return next((r for r in map(kdf_refusal, algorithms) if r), None)
@@ -196,15 +233,38 @@ def _load_key(data, password, attempts: _Attempts):
 
 def _load_pkcs12(data: bytes, password, attempts: _Attempts):
     """load_key_and_certificates with each candidate password; the last failure when none opens it.
-    Every try spends an attempt: no password still derives the MAC key."""
+    The MAC and the encryptedData layers are opened here first, so a shrouded key inside is costed
+    before pyca derives it; every derivation, here or in pyca (MAC, layers, keys), spends an attempt."""
+    from asn1crypto import pkcs12 as asn1_pkcs12
     if not looks_like_pkcs12(data):  # pyca would refuse it before deriving anything
         raise ValueError('Not a PKCS#12')
     refusal = pkcs12_kdf_refusal(data)
     if refusal:
         raise PasswordNotTried(refusal)
+    try:
+        pfx = asn1_pkcs12.Pfx.load(bytes(data))
+        pkcs12_layers.encrypted_layers(pfx)  # an unreadable AuthenticatedSafe refuses here
+        plain = [alg for contents in pkcs12_layers.plain_safe_contents(pfx)
+                 for alg in pkcs12_layers.shrouded_algorithms(contents)]
+    except pkcs12_layers.LayerUnsupported as e:
+        raise PasswordNotTried(str(e)) from e
+    except Exception as e:  # noqa: BLE001: bags that cannot be inspected are not handed on
+        raise ValueError('Unreadable PKCS#12 bags') from e
     failure = None
     for pwd in _candidates(password):
-        attempts.spend()
+        try:
+            opened = pkcs12_layers.open_pfx(pfx, pwd, attempts.spend)
+            shrouded = plain + [alg for contents in opened.contents
+                                for alg in pkcs12_layers.shrouded_algorithms(contents)]
+        except pkcs12_layers.LayerUnsupported as e:
+            raise PasswordNotTried(str(e)) from e
+        except pkcs12_layers.WrongPassword as e:
+            failure = e
+            continue
+        refusal = next((r for r in map(kdf_refusal, shrouded) if r), None)
+        if refusal:
+            raise PasswordNotTried(refusal)
+        attempts.spend(opened.derivations + sum(map(pkcs12_layers.derivations, shrouded)))
         try:
             return load_key_and_certificates(data, pwd)
         except FipsRestricted:
@@ -318,7 +378,9 @@ class SmartParser:
         re.MULTILINE
     )
 
-    def __init__(self):
+    def __init__(self, shared_budget: bool = False):
+        # shared_budget: every parse() of this parser draws on one budget (one request, several parses)
+        self._shared = shared_budget
         self._attempts = _Attempts()
 
     def parse(self, content: str | bytes, password=None) -> List[ParsedObject]:
@@ -328,12 +390,14 @@ class SmartParser:
         Args:
             content: PEM string, DER bytes, or base64-encoded data
             password: Optional password for encrypted keys/PKCS12, or a list of them tried in turn;
-                at most MAX_PASSWORD_ATTEMPTS tries on encrypted objects per call
+                at most MAX_PASSWORD_ATTEMPTS tries on encrypted objects per call, or per parser
+                built with ``shared_budget``
 
         Returns:
             List of ParsedObject instances
         """
-        self._attempts = _Attempts()
+        if not self._shared:
+            self._attempts = _Attempts()
         objects: List[ParsedObject] = []
 
         # Convert bytes to string if needed (for PEM detection)

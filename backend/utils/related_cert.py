@@ -302,6 +302,14 @@ def request_from_csr_der(csr_der: bytes):
     return parse_request(found[0]['values'][0].dump())
 
 
+def csr_spki_der(csr_der: bytes) -> bytes:
+    """The SubjectPublicKeyInfo of a CSR as encoded, whatever its algorithm."""
+    try:
+        return _RawRequest.load(csr_der)['certification_request_info']['subject_pk_info'].dump()
+    except Exception as e:
+        raise RelatedCertError(f'Unreadable CSR public key: {e}') from e
+
+
 def csr_with_request(csr: x509.CertificateSigningRequest, private_key, request_der: bytes
                      ) -> x509.CertificateSigningRequest:
     """*csr* with the relatedCertRequest attribute added, signed again by its own *private_key*."""

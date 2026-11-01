@@ -12,11 +12,13 @@ from utils.foreign_algorithms import describe_public_key, spki_der
 from fips_mode import FipsRestricted
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
 from utils.key_codec import MalformedKey, load_private_key_any, private_key_to_pem, refuse_eddsa_key
-from utils.pkcs12_import import load_key_and_certificates, refuse_pkcs12_import
+from utils.pkcs12_import import refuse_pkcs12_import
+from services.smart_import.parser import PasswordNotTried, inspected_key, open_pkcs12
 
 
 class KeyPasswordError(ValueError):
-    """The private key in the file is encrypted and the password given does not open it."""
+    """The private key in the file is encrypted and the password given does not open it,
+    or was not tried on it (a derivation too costly to run): the message says which."""
 
 
 def load_import_private_key(key_pem, password=None):
@@ -27,7 +29,9 @@ def load_import_private_key(key_pem, password=None):
     if isinstance(password, str):
         password = password.encode('utf-8')
     try:
-        return load_private_key_any(key_pem, password=password or None)
+        return load_private_key_any(*inspected_key(key_pem, password))
+    except PasswordNotTried as e:
+        raise KeyPasswordError(str(e)) from e
     except (FipsRestricted, MalformedKey):
         raise
     except (TypeError, ValueError) as e:
@@ -108,8 +112,9 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
     elif format_type == 'pkcs12':
         refuse_pkcs12_import()
         try:
-            private_key, cert, chain = load_key_and_certificates(
-                file_data, password.encode() if password else None)
+            private_key, cert, chain = open_pkcs12(file_data, password.encode() if password else None)
+        except PasswordNotTried as e:
+            raise KeyPasswordError(str(e)) from e
         except UnsupportedForKeyAlgorithm:
             raise
         except Exception as e:

@@ -22,6 +22,7 @@ def _extract_cn(subject: str) -> str:
 ROOM_CERTIFICATES = 'scope:certificates'
 ROOM_CAS = 'scope:cas'
 ROOM_SSH_CAS = 'scope:ssh-cas'
+ROOM_SSH = 'scope:ssh'
 ROOM_SYSTEM_ALERTS = 'scope:system-alerts'
 ROOM_AUDIT = 'scope:audit'
 
@@ -314,7 +315,7 @@ def on_ssh_certificate_issued(cert_id: int, key_id: str, ca_id: int, cert_type: 
     from websocket.event_types import EventType
     emit_ws_event(EventType.SSH_CERTIFICATE_ISSUED, {
         'id': cert_id, 'key_id': key_id, 'ca_id': ca_id, 'cert_type': cert_type,
-    }, ROOM_CERTIFICATES)
+    }, ROOM_SSH)
 
 
 def on_ssh_certificate_revoked(cert_id: int, key_id: str, reason: str, revoked_by: str):
@@ -322,7 +323,7 @@ def on_ssh_certificate_revoked(cert_id: int, key_id: str, reason: str, revoked_b
     from websocket.event_types import EventType
     emit_ws_event(EventType.SSH_CERTIFICATE_REVOKED, {
         'id': cert_id, 'key_id': key_id, 'reason': reason, 'revoked_by': revoked_by,
-    }, ROOM_CERTIFICATES)
+    }, ROOM_SSH)
 
 
 def on_ssh_certificate_deleted(cert_id: int, key_id: str, deleted_by: str):
@@ -330,4 +331,4 @@ def on_ssh_certificate_deleted(cert_id: int, key_id: str, deleted_by: str):
     from websocket.event_types import EventType
     emit_ws_event(EventType.SSH_CERTIFICATE_DELETED, {
         'id': cert_id, 'key_id': key_id, 'deleted_by': deleted_by,
-    }, ROOM_CERTIFICATES)
+    }, ROOM_SSH)

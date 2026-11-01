@@ -5,11 +5,19 @@ import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
-vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
+// Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
+const stable = vi.hoisted(() => ({
+  i18n: {
     t: (key, opts) => (opts && typeof opts.count === 'number' ? `${key}:${opts.count}` : key),
-    i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() },
-  }),
+    i18n: { language: 'en', changeLanguage: () => {}, on: () => {}, off: () => {} },
+  },
+  notify: {
+    showSuccess: () => {}, showError: () => {}, showInfo: () => {}, showWarning: () => {},
+  },
+}))
+
+vi.mock('react-i18next', () => ({
+  useTranslation: () => stable.i18n,
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
@@ -18,9 +26,7 @@ let mockCanRead = true
 const openWindow = vi.fn()
 
 vi.mock('../../contexts', () => ({
-  useNotification: () => ({
-    showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn(),
-  }),
+  useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useWindowManager: () => ({
     openWindow, closeWindow: vi.fn(), windows: [],

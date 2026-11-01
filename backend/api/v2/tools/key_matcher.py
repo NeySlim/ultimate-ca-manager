@@ -9,6 +9,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.x509.oid import NameOID
 
 from auth.unified import require_auth
+from services.smart_import.parser import PasswordNotTried, inspected_key
 from utils import key_algorithms
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
 from utils.key_codec import MalformedKey, load_private_key_any
@@ -54,7 +55,7 @@ def match_keys():
             raw = base64.b64decode(data[7:])
         else:
             raw = data if '-----BEGIN' in data else f"-----BEGIN PRIVATE KEY-----\n{data}\n-----END PRIVATE KEY-----"
-        return load_private_key_any(raw, password=pwd_bytes)
+        return load_private_key_any(*inspected_key(raw, pwd_bytes))
 
     def load_csr_any_format(data):
         """Load CSR from PEM or DER"""
@@ -114,6 +115,8 @@ def match_keys():
                     'key_type': key_info,
                     'valid': True
                 })
+            except PasswordNotTried as e:
+                return error_response(str(e), 400)
             except (UnsupportedForKeyAlgorithm, MalformedKey) as e:
                 results['items'].append({'type': 'private_key', 'valid': False, 'error': str(e)})
             except Exception as e:
