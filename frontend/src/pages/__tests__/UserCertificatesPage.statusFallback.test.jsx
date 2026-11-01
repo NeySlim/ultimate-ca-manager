@@ -13,6 +13,14 @@ import { MemoryRouter } from 'react-router-dom'
 
 // `t` keeps its identity across renders, like the real hook: the page loaders
 // list it in their dependencies.
+// Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
+const stable = vi.hoisted(() => ({
+  notify: {
+    showSuccess: () => {}, showError: () => {}, showInfo: () => {}, showWarning: () => {},
+    showConfirm: () => Promise.resolve(false),
+  },
+}))
+
 vi.mock('react-i18next', () => {
   const translation = {
     t: (key, opts) => (opts && typeof opts.count === 'number' ? `${key}:${opts.count}` : key),
@@ -26,10 +34,7 @@ vi.mock('react-i18next', () => {
 })
 
 vi.mock('../../contexts', () => ({
-  useNotification: () => ({
-    showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn(),
-    showConfirm: vi.fn().mockResolvedValue(false),
-  }),
+  useNotification: () => stable.notify,
   useMobile: () => ({
     isMobile: false, isTablet: false, isDesktop: true, isTouch: false, isLargeScreen: true,
     screenWidth: 1280, sidebarOpen: true, setSidebarOpen: vi.fn(),

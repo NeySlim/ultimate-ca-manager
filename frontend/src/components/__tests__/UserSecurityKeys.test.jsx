@@ -11,9 +11,14 @@ const m = vi.hoisted(() => ({
   showConfirm: vi.fn(),
   showError: vi.fn(),
 }))
+// Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
+const stable = vi.hoisted(() => ({
+  i18n: { t: (key) => key, i18n: { language: 'en' } },
+  notify: { showSuccess: () => {}, showError: m.showError, showConfirm: m.showConfirm },
+}))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key) => key, i18n: { language: 'en' } }),
+  useTranslation: () => stable.i18n,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 vi.mock('../../services', () => ({
@@ -24,7 +29,7 @@ vi.mock('../../services', () => ({
   },
 }))
 vi.mock('../../contexts', () => ({
-  useNotification: () => ({ showSuccess: vi.fn(), showError: m.showError, showConfirm: m.showConfirm }),
+  useNotification: () => stable.notify,
 }))
 
 import UserSecurityKeys from '../UserSecurityKeys'

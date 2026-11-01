@@ -15,9 +15,18 @@ const mocks = vi.hoisted(() => ({
   showError: vi.fn(),
   showConfirm: vi.fn(),
 }))
+// Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
+const stable = vi.hoisted(() => ({
+  i18n: { t: (key) => key, i18n: { language: 'en' } },
+  notify: {
+    showSuccess: mocks.showSuccess,
+    showError: mocks.showError,
+    showConfirm: mocks.showConfirm,
+  },
+}))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key) => key }),
+  useTranslation: () => stable.i18n,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
@@ -31,11 +40,7 @@ vi.mock('../../../services', () => ({
 }))
 
 vi.mock('../../../contexts', () => ({
-  useNotification: () => ({
-    showSuccess: mocks.showSuccess,
-    showError: mocks.showError,
-    showConfirm: mocks.showConfirm,
-  }),
+  useNotification: () => stable.notify,
 }))
 
 vi.mock('../../../hooks', () => ({

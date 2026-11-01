@@ -8,10 +8,7 @@ import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter, Routes, Route } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key) => key,
-    i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() },
-  }),
+  useTranslation: () => stable.i18n,
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
@@ -20,12 +17,20 @@ const mocks = vi.hoisted(() => ({
   isMobile: false, openWindow: vi.fn(), create: vi.fn(), getAll: vi.fn(), getById: vi.fn(),
   revoke: vi.fn(), renew: vi.fn(), showSuccess: vi.fn(), showWarning: vi.fn(), revokeOptions: { revokeRelated: false },
 }))
+// Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
+const stable = vi.hoisted(() => ({
+  i18n: {
+    t: (key) => key,
+    i18n: { language: 'en', changeLanguage: () => {}, on: () => {}, off: () => {} },
+  },
+  notify: {
+    showSuccess: mocks.showSuccess, showError: () => {}, showInfo: () => {}, showWarning: mocks.showWarning,
+    showConfirm: () => Promise.resolve(false), showPrompt: () => Promise.resolve(''),
+  },
+}))
 
 vi.mock('../../../contexts', () => ({
-  useNotification: () => ({
-    showSuccess: mocks.showSuccess, showError: vi.fn(), showInfo: vi.fn(), showWarning: mocks.showWarning,
-    showConfirm: vi.fn().mockResolvedValue(false), showPrompt: vi.fn().mockResolvedValue(''),
-  }),
+  useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: mocks.isMobile, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
   useWindowManager: () => ({
     openWindow: mocks.openWindow, closeWindow: vi.fn(), windows: [],

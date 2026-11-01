@@ -9,6 +9,13 @@ const serviceMocks = vi.hoisted(() => ({
   getAll: vi.fn(), getStats: vi.fn(), getById: vi.fn(), export: vi.fn(), revoke: vi.fn(), delete: vi.fn(),
 }))
 const layout = vi.hoisted(() => ({ isMobile: false }))
+// Stable across renders: t and showError are loader dependencies, a fresh one reloads in a loop
+const stable = vi.hoisted(() => ({
+  notify: {
+    showSuccess: () => {}, showError: () => {}, showWarning: () => {},
+    showConfirm: () => Promise.resolve(true), showPrompt: () => {},
+  },
+}))
 
 vi.mock('react-i18next', () => {
   const translation = {
@@ -22,10 +29,7 @@ vi.mock('react-i18next', () => {
   }
 })
 vi.mock('../../contexts', () => ({
-  useNotification: () => ({
-    showSuccess: vi.fn(), showError: vi.fn(), showWarning: vi.fn(),
-    showConfirm: vi.fn().mockResolvedValue(true), showPrompt: vi.fn(),
-  }),
+  useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: layout.isMobile, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
 }))
 vi.mock('../../contexts/WindowManagerContext', () => ({
