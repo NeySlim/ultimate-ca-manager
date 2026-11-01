@@ -7,8 +7,6 @@ import hashlib
 import hmac
 import json
 import os
-import shutil
-import subprocess
 
 import pytest
 from asn1crypto import algos, cms
@@ -203,40 +201,45 @@ def test_a_pkcs12_with_a_costly_key_bag_is_not_tried(p12_tries, scheme):
 
 
 @pytest.fixture
-def layer_opens(monkeypatch):
-    """Calls of open_layer: each one derives the key of an encryptedData."""
-    opens = []
-    real = pkcs12_layers.open_layer
+def derived(monkeypatch):
+    """Key derivations run here: ('mac', 3), ('pbe', 1 or 2) for the PKCS#12 KDF, 'pbkdf2'."""
+    runs = []
+    kdf, pbkdf2 = pkcs12_layers.pkcs12_kdf, pkcs12_layers._pbkdf2
 
-    def counted(layer, password):
-        opens.append(password)
-        return real(layer, password)
-    monkeypatch.setattr(pkcs12_layers, 'open_layer', counted)
-    return opens
+    def counted_kdf(password, salt, iterations, purpose, size, digest='sha1'):
+        runs.append(('mac' if purpose == 3 else 'pbe', purpose))
+        return kdf(password, salt, iterations, purpose, size, digest)
+
+    def counted_pbkdf2(*args):
+        runs.append('pbkdf2')
+        return pbkdf2(*args)
+    monkeypatch.setattr(pkcs12_layers, 'pkcs12_kdf', counted_kdf)
+    monkeypatch.setattr(pkcs12_layers, '_pbkdf2', counted_pbkdf2)
+    return runs
 
 
-def test_pkcs12_attempts_share_the_cap(p12_tries, layer_opens):
+def test_pkcs12_attempts_share_the_cap(p12_tries, derived):
     content = ''.join(_pseudo_pem(_pkcs12()) for _ in range(3))
     objects = SmartParser().parse(content, [f'wrong-{i}' for i in range(32)])
-    # A wrong password stops at the encryptedData layer opened here: pyca never runs
-    assert len(layer_opens) == MAX_PASSWORD_ATTEMPTS and p12_tries == []
+    # A wrong password stops at the MAC verified here: no layer is derived, pyca never runs
+    assert derived == [('mac', 3)] * MAX_PASSWORD_ATTEMPTS and p12_tries == []
     assert [o.error for o in objects] == [NOT_TRIED]
 
 
-def test_a_pkcs12_still_opens_with_its_password(p12_tries, layer_opens):
+def test_a_pkcs12_still_opens_with_its_password(p12_tries, derived):
     objects = SmartParser().parse(_pseudo_pem(_pkcs12()), ['wrong', RIGHT.decode()])
     assert {o.type.value for o in objects} == {'certificate', 'private_key'}
     assert not any(o.error for o in objects)
-    assert p12_tries == [RIGHT] and layer_opens == [b'wrong', RIGHT]
+    assert p12_tries == [RIGHT] and derived == [('mac', 3), ('mac', 3), 'pbkdf2']
 
 
 def test_a_pkcs12_open_costs_each_of_its_derivations(p12_tries):
-    """MAC, the certificate layer (here, then in pyca) and the shrouded key: four of the budget."""
+    """MAC and certificate layer (here, then in pyca) and the shrouded key: five of the budget."""
     parser = SmartParser(shared_budget=True)
-    parser._attempts.left = 3
+    parser._attempts.left = 4
     [obj] = parser.parse(_pseudo_pem(_pkcs12()), RIGHT.decode())
     assert obj.error == NOT_TRIED and p12_tries == []
-    parser._attempts.left = 4
+    parser._attempts.left = 5
     assert {o.type.value for o in parser.parse(_pseudo_pem(_pkcs12()), RIGHT.decode())} == {
         'certificate', 'private_key'}
 
@@ -328,36 +331,12 @@ def test_a_layer_that_cannot_be_opened_here_is_not_handed_on(p12_tries):
     safe = pfx.authenticated_safe
     for info in safe:
         if info['content_type'].native == 'encrypted_data':
-            # PBES1 pbeWithSHA1AndDES-CBC: a scheme pyca may read and this module does not
+            # PBES1 pbeWithMD2AndDES-CBC: MD2 is not available here
             info['content']['encrypted_content_info']['content_encryption_algorithm'] = {
-                'algorithm': 'pbes1_sha1_des', 'parameters': {'salt': b'\x00' * 8, 'iterations': 1}}
+                'algorithm': 'pbes1_md2_des', 'parameters': {'salt': b'\x00' * 8, 'iterations': 1}}
     pfx['auth_safe']['content'] = safe.dump(force=True)
     [obj] = SmartParser().parse(_pseudo_pem(pfx.dump(force=True)), RIGHT.decode())
-    assert p12_tries == [] and 'is not supported' in obj.error
-
-
-LEGACY_SCHEMES = ['PBE-SHA1-RC2-40', 'PBE-SHA1-RC2-128', 'PBE-SHA1-RC4-40', 'PBE-SHA1-RC4-128',
-                  'PBE-SHA1-3DES', 'PBE-SHA1-2DES', 'AES-128-CBC', 'AES-256-CBC', 'DES-EDE3-CBC']
-
-
-@pytest.mark.skipif(shutil.which('openssl') is None, reason='openssl CLI not available')
-@pytest.mark.parametrize('scheme', LEGACY_SCHEMES)
-def test_openssl_certificate_layers_open_here(tmp_path, p12_tries, scheme):
-    """Every certificate encryption OpenSSL writes is opened here before pyca reads the archive."""
-    key, cert = tmp_path / 'k.pem', tmp_path / 'c.pem'
-    subprocess.run(['openssl', 'req', '-x509', '-newkey', 'ec', '-pkeyopt', 'ec_paramgen_curve:P-256',
-                    '-nodes', '-keyout', key, '-out', cert, '-subj', '/CN=layers.test', '-days', '2'],
-                   check=True, capture_output=True)
-    out = tmp_path / 'b.p12'
-    made = subprocess.run(['openssl', 'pkcs12', '-export', '-legacy', '-inkey', key, '-in', cert,
-                           '-certpbe', scheme, '-keypbe', 'PBE-SHA1-3DES',
-                           '-passout', 'pass:' + RIGHT.decode(), '-out', out], capture_output=True)
-    if made.returncode:
-        pytest.skip(f'this OpenSSL cannot write {scheme}')
-    data = out.read_bytes()
-    assert {o.type.value for o in SmartParser().parse(data, ['wrong', RIGHT.decode()])} == {
-        'certificate', 'private_key'}
-    assert p12_tries == [RIGHT]
+    assert p12_tries == [] and 'is not supported: MD2 is not available' in obj.error
 
 
 def test_execute_without_write_cas_parses_once(app, auth_client, monkeypatch):

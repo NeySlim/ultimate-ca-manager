@@ -30,7 +30,7 @@ WRONG_PASSWORD = 'Private key could not be decrypted with any of the passwords g
 NOT_TRIED = 'Password not tried: this import already made too many password attempts'
 
 # Key derivations one parse may run, whatever the number of passwords and encrypted objects
-# (a PKCS#12 costs one per MAC, encryptedData layer and shrouded key, per password)
+# (a PKCS#12 PBE derives its key, then its IV: two; a MAC, PBES1 or PBES2 one)
 MAX_PASSWORD_ATTEMPTS = 64
 # Far above what OpenSSL and pyca produce: a costlier derivation is refused, never run
 MAX_KDF_ITERATIONS = 2_000_000
@@ -235,8 +235,8 @@ def _load_key(data, password, attempts: _Attempts):
 
 def _load_pkcs12(data: bytes, password, attempts: _Attempts):
     """load_key_and_certificates with each candidate password; the last failure when none opens it.
-    The encryptedData layers are opened here first, so a shrouded key inside is costed before
-    pyca derives it; every derivation, here or in pyca (MAC, layers, keys), spends an attempt."""
+    The MAC and the encryptedData layers are opened here first, so a shrouded key inside is costed
+    before pyca derives it; every derivation, here or in pyca (MAC, layers, keys), spends an attempt."""
     from asn1crypto import pkcs12 as asn1_pkcs12
     if not looks_like_pkcs12(data):  # pyca would refuse it before deriving anything
         raise ValueError('Not a PKCS#12')
@@ -245,7 +245,7 @@ def _load_pkcs12(data: bytes, password, attempts: _Attempts):
         raise PasswordNotTried(refusal)
     try:
         pfx = asn1_pkcs12.Pfx.load(bytes(data))
-        layers = pkcs12_layers.encrypted_layers(pfx)
+        pkcs12_layers.encrypted_layers(pfx)  # an unreadable AuthenticatedSafe refuses here
         plain = [alg for contents in pkcs12_layers.plain_safe_contents(pfx)
                  for alg in pkcs12_layers.shrouded_algorithms(contents)]
     except pkcs12_layers.LayerUnsupported as e:
@@ -254,10 +254,9 @@ def _load_pkcs12(data: bytes, password, attempts: _Attempts):
         raise ValueError('Unreadable PKCS#12 bags') from e
     failure = None
     for pwd in _candidates(password):
-        attempts.spend(len(layers))
         try:
-            opened = [pkcs12_layers.open_layer(layer, pwd) for layer in layers]
-            shrouded = plain + [alg for contents in opened
+            opened = pkcs12_layers.open_pfx(pfx, pwd, attempts.spend)
+            shrouded = plain + [alg for contents in opened.contents
                                 for alg in pkcs12_layers.shrouded_algorithms(contents)]
         except pkcs12_layers.LayerUnsupported as e:
             raise PasswordNotTried(str(e)) from e
@@ -267,7 +266,7 @@ def _load_pkcs12(data: bytes, password, attempts: _Attempts):
         refusal = next((r for r in map(kdf_refusal, shrouded) if r), None)
         if refusal:
             raise PasswordNotTried(refusal)
-        attempts.spend(1 + len(layers) + len(shrouded))
+        attempts.spend(opened.derivations + sum(map(pkcs12_layers.derivations, shrouded)))
         try:
             return load_key_and_certificates(data, pwd)
         except FipsRestricted:
