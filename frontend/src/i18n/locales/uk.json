@@ -1098,7 +1098,19 @@
     "restorePasswordHint": "Пароль, що використовувався при переведенні ЦС в офлайн.",
     "namedUrls": "Використовувати назву CA в URL протоколів",
     "namedUrlsHint": "Шляхи CDP/OCSP/AIA використовують слаг з назви CA замість випадкового id. Простіше налаштовувати вручну; розкриває назву CA в URL. Можна також увімкнути пізніше; після увімкнення це незворотно.",
-    "revocationApprovalRequired": "Відкликання ЦС передано на схвалення (політика: {{policy}})"
+    "revocationApprovalRequired": "Відкликання ЦС передано на схвалення (політика: {{policy}})",
+    "issuancePickers": "Списки для видачі",
+    "issuanceListedState": "Показано",
+    "issuanceHiddenState": "Приховано, показується на вимогу",
+    "hideFromIssuance": "Приховати з видачі",
+    "showInIssuance": "Показувати у видачі",
+    "issuanceVisibilityChanged": "Списки для видачі оновлено",
+    "issuanceVisibilityChangeFailed": "Не вдалося оновити списки для видачі",
+    "showHiddenCas_one": "Показати {{count}} прихований ЦС",
+    "showHiddenCas_few": "Показати {{count}} приховані ЦС",
+    "showHiddenCas_many": "Показати {{count}} прихованих ЦС",
+    "showHiddenCas_other": "Показати {{count}} прихованого ЦС",
+    "hideHiddenCas": "Сховати приховані ЦС"
   },
   "csrs": {
     "uploadCSR": "Завантажити CSR",

@@ -1082,7 +1082,17 @@
     "restorePasswordHint": "La password usata quando la CA è stata messa offline.",
     "namedUrls": "Usa il nome della CA negli URL di protocollo",
     "namedUrlsHint": "I percorsi CDP/OCSP/AIA usano uno slug derivato dal nome della CA invece dell'id casuale. Più facile da configurare manualmente; rivela il nome della CA negli URL. Può essere attivato anche in seguito; una volta attivato è irreversibile.",
-    "revocationApprovalRequired": "Revoca della CA inviata per approvazione (politica: {{policy}})"
+    "revocationApprovalRequired": "Revoca della CA inviata per approvazione (politica: {{policy}})",
+    "issuancePickers": "Elenchi di emissione",
+    "issuanceListedState": "Elencata",
+    "issuanceHiddenState": "Nascosta, mostrata su richiesta",
+    "hideFromIssuance": "Nascondi dall'emissione",
+    "showInIssuance": "Elenca per l'emissione",
+    "issuanceVisibilityChanged": "Elenchi di emissione aggiornati",
+    "issuanceVisibilityChangeFailed": "Impossibile aggiornare gli elenchi di emissione",
+    "showHiddenCas_one": "Mostra {{count}} CA nascosta",
+    "showHiddenCas_other": "Mostra {{count}} CA nascoste",
+    "hideHiddenCas": "Nascondi le CA nascoste"
   },
   "csrs": {
     "uploadCSR": "Carica CSR",

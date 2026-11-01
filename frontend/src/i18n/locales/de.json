@@ -1082,7 +1082,17 @@
     "restorePasswordHint": "Das beim Offline-Schalten der CA verwendete Passwort.",
     "namedUrls": "CA Namen in Protokoll URLs verwenden",
     "namedUrlsHint": "CDP/OCSP/AIA-Pfade verwenden einen aus dem CA-Namen abgeleiteten Slug statt der zufälligen ID. Einfacher manuell zu konfigurieren; der CA-Name wird in URLs sichtbar. Kann auch später aktiviert werden; einmal aktiviert, nicht rückgängig zu machen.",
-    "revocationApprovalRequired": "CA-Widerruf zur Genehmigung eingereicht (Richtlinie: {{policy}})"
+    "revocationApprovalRequired": "CA-Widerruf zur Genehmigung eingereicht (Richtlinie: {{policy}})",
+    "issuancePickers": "Auswahllisten für die Ausstellung",
+    "issuanceListedState": "Angezeigt",
+    "issuanceHiddenState": "Ausgeblendet, auf Anfrage sichtbar",
+    "hideFromIssuance": "Aus Ausstellung ausblenden",
+    "showInIssuance": "Für Ausstellung anzeigen",
+    "issuanceVisibilityChanged": "Auswahllisten für die Ausstellung aktualisiert",
+    "issuanceVisibilityChangeFailed": "Auswahllisten für die Ausstellung konnten nicht aktualisiert werden",
+    "showHiddenCas_one": "{{count}} ausgeblendete CA anzeigen",
+    "showHiddenCas_other": "{{count}} ausgeblendete CAs anzeigen",
+    "hideHiddenCas": "Ausgeblendete CAs verbergen"
   },
   "csrs": {
     "uploadCSR": "CSR hochladen",

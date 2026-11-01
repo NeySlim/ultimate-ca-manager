@@ -1082,7 +1082,17 @@
     "restorePasswordHint": "The password used when the CA was taken offline.",
     "namedUrls": "Use CA name in protocol URLs",
     "namedUrlsHint": "CDP/OCSP/AIA paths use a slug from the CA name instead of the random id. Easier to configure manually; reveals the CA name in URLs. Can also be enabled later; once enabled it cannot be undone.",
-    "revocationApprovalRequired": "CA revocation submitted for approval (policy: {{policy}})"
+    "revocationApprovalRequired": "CA revocation submitted for approval (policy: {{policy}})",
+    "issuancePickers": "Issuance pickers",
+    "issuanceListedState": "Listed",
+    "issuanceHiddenState": "Hidden, shown on request",
+    "hideFromIssuance": "Hide from issuance",
+    "showInIssuance": "List for issuance",
+    "issuanceVisibilityChanged": "Issuance pickers updated",
+    "issuanceVisibilityChangeFailed": "Could not update the issuance pickers",
+    "showHiddenCas_one": "Show {{count}} hidden CA",
+    "showHiddenCas_other": "Show {{count}} hidden CAs",
+    "hideHiddenCas": "Hide the hidden CAs"
   },
   "csrs": {
     "uploadCSR": "Upload CSR",

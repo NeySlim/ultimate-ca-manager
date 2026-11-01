@@ -842,6 +842,12 @@ def update_ca(ca_id):
             return error_response(profile_err, 400)
         profile_changed = True
 
+    new_hidden = None
+    if 'issuanceHidden' in data or 'issuance_hidden' in data:
+        new_hidden = data.get('issuanceHidden', data.get('issuance_hidden'))
+        if not isinstance(new_hidden, bool):
+            return error_response('issuanceHidden must be true or false', 400)
+
     # Track which fields actually changed for the audit log
     changed = []
 
@@ -970,6 +976,9 @@ def update_ca(ca_id):
         changed.append(f'compliance_profile {ca.compliance_profile or "none"} -> '
                        f'{new_profile or "none"}')
         ca.compliance_profile = new_profile
+    if new_hidden is not None and new_hidden != bool(ca.issuance_hidden):
+        ca.issuance_hidden = new_hidden
+        changed.append('hidden from issuance pickers' if new_hidden else 'listed in issuance pickers')
     for forbidden in ('offline', 'offline_reason', 'offline_mode'):
         if forbidden in data:
             logger.warning(

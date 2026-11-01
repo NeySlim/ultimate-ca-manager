@@ -24,7 +24,8 @@ import { useNotification, useMobile } from '../contexts'
 import { usePermission } from '../hooks'
 import { formatDate, extractCN, cn , downloadBlob} from '../lib/utils'
 import { soleImported } from '../lib/importResult'
-import { signingCas, unlistedSigningCas } from '../lib/caSelection'
+import { hiddenIssuanceCas, issuanceCas, unlistedSigningCas } from '../lib/caSelection'
+import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 
 const STORAGE_KEY = 'opnsense_config'
@@ -300,6 +301,7 @@ export default function OperationsPage() {
   const [partnersLoading, setPartnersLoading] = useState(false)
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [bulkSignCaId, setBulkSignCaId] = useState('')
+  const [showHiddenCas, setShowHiddenCas] = useState(false)
   const [bulkSignDays, setBulkSignDays] = useState('365')
   const [statusFilter, setStatusFilter] = useState('')
   const [caFilter, setCaFilter] = useState('')
@@ -1234,10 +1236,11 @@ export default function OperationsPage() {
                 className="w-full px-3 py-2 rounded-lg border border-border bg-bg-primary text-text-primary"
               >
                 <option value="">{t('common.selectCA', 'Select CA...')}</option>
-                {signingCas(cas).map(ca => (
+                {issuanceCas(cas, showHiddenCas, bulkSignCaId).map(ca => (
                   <option key={ca.id} value={ca.id}>{ca.descr || ca.subject}</option>
                 ))}
               </select>
+              <HiddenCasToggle count={hiddenIssuanceCas(cas)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
               {unlistedSigningCas(cas) > 0 && (
                 <p className="text-xs text-text-tertiary">{t('cas.notListedForSigning', { count: unlistedSigningCas(cas) })}</p>
               )}

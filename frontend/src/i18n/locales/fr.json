@@ -1041,7 +1041,17 @@
     "restorePasswordHint": "Le mot de passe utilisé lors de la mise hors ligne de l'AC.",
     "namedUrls": "Utiliser le nom de la CA dans les URLs protocole",
     "namedUrlsHint": "Les chemins CDP/OCSP/AIA utilisent un slug issu du nom de la CA au lieu de l'identifiant aléatoire. Plus simple à configurer manuellement ; révèle le nom de la CA dans les URLs. Peut aussi être activé plus tard ; une fois activé, c'est irréversible.",
-    "revocationApprovalRequired": "Révocation de la CA soumise à approbation (politique : {{policy}})"
+    "revocationApprovalRequired": "Révocation de la CA soumise à approbation (politique : {{policy}})",
+    "issuancePickers": "Listes d'émission",
+    "issuanceListedState": "Listée",
+    "issuanceHiddenState": "Masquée, affichée à la demande",
+    "hideFromIssuance": "Masquer à l'émission",
+    "showInIssuance": "Lister à l'émission",
+    "issuanceVisibilityChanged": "Listes d'émission mises à jour",
+    "issuanceVisibilityChangeFailed": "Impossible de mettre à jour les listes d'émission",
+    "showHiddenCas_one": "Afficher {{count}} CA masquée",
+    "showHiddenCas_other": "Afficher {{count}} CA masquées",
+    "hideHiddenCas": "Masquer les CA masquées"
   },
   "certificates": {
     "createCertificate": "Créer un certificat",

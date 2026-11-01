@@ -1082,7 +1082,17 @@
     "restorePasswordHint": "将 CA 设为离线时使用的密码。",
     "namedUrls": "在协议URL中使用CA名称",
     "namedUrlsHint": "CDP/OCSP/AIA 路径使用由 CA 名称生成的短标识替代随机 ID。便于手动配置;但会在 URL 中暴露 CA 名称。也可以稍后启用;一旦启用便无法撤销。",
-    "revocationApprovalRequired": "CA 吊销已提交审批（策略：{{policy}}）"
+    "revocationApprovalRequired": "CA 吊销已提交审批（策略：{{policy}}）",
+    "issuancePickers": "签发选择器",
+    "issuanceListedState": "已列出",
+    "issuanceHiddenState": "已隐藏，按需显示",
+    "hideFromIssuance": "从签发中隐藏",
+    "showInIssuance": "列入签发",
+    "issuanceVisibilityChanged": "签发选择器已更新",
+    "issuanceVisibilityChangeFailed": "无法更新签发选择器",
+    "showHiddenCas_one": "显示 {{count}} 个已隐藏的 CA",
+    "showHiddenCas_other": "显示 {{count}} 个已隐藏的 CA",
+    "hideHiddenCas": "隐藏已隐藏的 CA"
   },
   "csrs": {
     "uploadCSR": "上传CSR",

@@ -1082,7 +1082,17 @@
     "restorePasswordHint": "La contraseña utilizada al poner la CA fuera de línea.",
     "namedUrls": "Usar el nombre de la CA en las URLs de protocolo",
     "namedUrlsHint": "Las rutas CDP/OCSP/AIA usan un slug derivado del nombre de la CA en lugar del id aleatorio. Más fácil de configurar manualmente; revela el nombre de la CA en las URLs. También puede activarse más tarde; una vez activado, es irreversible.",
-    "revocationApprovalRequired": "Revocación de la CA enviada para aprobación (política: {{policy}})"
+    "revocationApprovalRequired": "Revocación de la CA enviada para aprobación (política: {{policy}})",
+    "issuancePickers": "Listas de emisión",
+    "issuanceListedState": "En la lista",
+    "issuanceHiddenState": "Oculta, se muestra a petición",
+    "hideFromIssuance": "Ocultar de la emisión",
+    "showInIssuance": "Incluir en la emisión",
+    "issuanceVisibilityChanged": "Listas de emisión actualizadas",
+    "issuanceVisibilityChangeFailed": "No se pudieron actualizar las listas de emisión",
+    "showHiddenCas_one": "Mostrar {{count}} CA oculta",
+    "showHiddenCas_other": "Mostrar {{count}} CAs ocultas",
+    "hideHiddenCas": "Ocultar las CAs ocultas"
   },
   "csrs": {
     "uploadCSR": "Subir CSR",

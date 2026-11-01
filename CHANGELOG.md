@@ -47,6 +47,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - The "Certificates Only" API key scope now covers SSH certificates (`read:ssh`, `write:ssh`) and reads SSH CAs (thanks @danielrona).
 
+- CAs: "Hide from issuance" in the CA details keeps a CA, a root typically, out of the CA lists of Issue Certificate, Sign CSR and bulk CSR signing; a link under those lists shows it again (#430).
+
 ### Changed
 
 - CRL settings: the CRL digest of an Ed25519, Ed448 or ML-DSA authority is reported as empty and setting one answers 400; the CRL page only offers to clear one saved before.

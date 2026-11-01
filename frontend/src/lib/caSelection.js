@@ -67,3 +67,15 @@ export const holdsNoKey = (ca) => !!ca?.certificate_only && !ca?.pending && !ca?
  */
 export const needsKeyImport = (ca) => holdsNoKey(ca)
   && (ca?.imported_from === 'csr_signed' || ca?.is_root === false || ca?.type === 'intermediate')
+
+/**
+ * The signing CAs a manual issuance picker lists: one its operator hides (#430)
+ * only on request, or when it is the CA already chosen.
+ */
+export const issuanceCas = (cas, showHidden, ...selected) => {
+  const wanted = new Set(selected.filter(Boolean).map(String))
+  return signingCas(cas).filter(ca => showHidden || !ca.issuance_hidden || wanted.has(String(ca.id)))
+}
+
+/** How many signing CAs an issuance picker keeps behind its "show hidden" link (#430). */
+export const hiddenIssuanceCas = (cas) => signingCas(cas).filter(ca => ca.issuance_hidden).length

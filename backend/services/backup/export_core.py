@@ -127,6 +127,7 @@ class ExportCoreMixin:
                 'cps_oid': ca.cps_oid,
                 'signature_scheme': ca.signature_scheme or 'pkcs1v15',
                 'compliance_profile': ca.compliance_profile,
+                'issuance_hidden': bool(ca.issuance_hidden),
                 'imported_from': ca.imported_from,
                 'serial_number': ca.serial_number,
                 'ski': ca.ski,

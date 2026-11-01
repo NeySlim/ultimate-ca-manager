@@ -1082,7 +1082,17 @@
     "restorePasswordHint": "CA をオフラインにしたときに使用したパスワード。",
     "namedUrls": "プロトコルURLにCA名を使用",
     "namedUrlsHint": "CDP/OCSP/AIAパスにランダムIDの代わりにCA名から生成されたスラッグを使用します。手動設定が容易になりますが、URLにCA名が表示されます。後から有効にすることもできますが、一度有効にすると元に戻せません。",
-    "revocationApprovalRequired": "CA の失効を承認に提出しました（ポリシー: {{policy}}）"
+    "revocationApprovalRequired": "CA の失効を承認に提出しました（ポリシー: {{policy}}）",
+    "issuancePickers": "発行時の CA 選択リスト",
+    "issuanceListedState": "表示中",
+    "issuanceHiddenState": "非表示（要求時に表示）",
+    "hideFromIssuance": "発行時の一覧から非表示",
+    "showInIssuance": "発行時の一覧に表示",
+    "issuanceVisibilityChanged": "発行時の CA 選択リストを更新しました",
+    "issuanceVisibilityChangeFailed": "発行時の CA 選択リストを更新できませんでした",
+    "showHiddenCas_one": "非表示の CA を {{count}} 件表示",
+    "showHiddenCas_other": "非表示の CA を {{count}} 件表示",
+    "hideHiddenCas": "非表示の CA を隠す"
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",

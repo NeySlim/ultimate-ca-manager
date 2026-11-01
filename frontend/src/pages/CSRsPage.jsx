@@ -26,7 +26,8 @@ import { extractData, formatDate, cn , downloadBlob} from '../lib/utils'
 import { getSanValidationError, sanRowsToPayload } from '../lib/sanValidate'
 import { daysSinceExpiry, expiryVariant, hasExpiry } from '../lib/expiry'
 import { VALIDITY } from '../constants/config'
-import { signingCas, unlistedSigningCas } from '../lib/caSelection'
+import { hiddenIssuanceCas, issuanceCas, unlistedSigningCas } from '../lib/caSelection'
+import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { soleImported } from '../lib/importResult'
 import { PostQuantumBadge } from '../components/PostQuantumBadge'
 import {
@@ -84,6 +85,7 @@ export default function CSRsPage() {
   const [selectedCSR, setSelectedCSR] = useState(null)
   const [showImportModal, setShowImportModal] = useState(false)
   const [signCA, setSignCA] = useState('')
+  const [showHiddenCas, setShowHiddenCas] = useState(false)
   const [signCertType, setSignCertType] = useState('server')
   const [signExtraEkus, setSignExtraEkus] = useState([])
   // Names added to the request's own at signing (#389)
@@ -1071,12 +1073,13 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
             <>
               <Select
                 label={t('common.certificateAuthority')}
-                options={signingCas(cas).map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
+                options={issuanceCas(cas, showHiddenCas, signCA).map(ca => ({ value: String(ca.id), label: ca.descr || ca.name || ca.common_name }))}
                 value={signCA}
                 onChange={setSignCA}
                 placeholder={t('csrs.selectCA')}
                 helperText={unlistedSigningCas(cas) > 0 ? t('cas.notListedForSigning', { count: unlistedSigningCas(cas) }) : undefined}
               />
+              <HiddenCasToggle count={hiddenIssuanceCas(cas)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
 
               <Select
                 label={t('csrs.certTypeForSign')}

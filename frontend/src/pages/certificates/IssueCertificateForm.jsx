@@ -4,7 +4,8 @@ import { Button, Select, Input, DatePicker, EkuMultiSelect } from '../../compone
 import { templatesService, ekuService } from '../../services'
 import { getSanValidationError, getAutoSansFromCn } from '../../lib/sanValidate'
 import { useNotification } from '../../contexts'
-import { signingCas, unlistedSigningCas } from '../../lib/caSelection'
+import { hiddenIssuanceCas, issuanceCas, unlistedSigningCas } from '../../lib/caSelection'
+import { HiddenCasToggle } from '../../components/cas/HiddenCasToggle'
 import { daysRemaining } from '../../lib/utils'
 import { ISSUE_KEY_CHOICES, issueKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 import {
@@ -29,6 +30,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   const [issuing, setIssuing] = useState(false)
   const issuingRef = useRef(false)
   const [showAllTemplates, setShowAllTemplates] = useState(false)
+  const [showHiddenCas, setShowHiddenCas] = useState(false)
 
   const [formData, setFormData] = useState({
     ca_id: '',
@@ -436,14 +438,17 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
 
       {/* CA + Cert Type row */}
       <div className="grid grid-cols-2 gap-4">
-        <Select
-          label={t('common.certificateAuthority')}
-          value={formData.ca_id}
-          onChange={(val) => update('ca_id', val)}
-          placeholder={t('certificates.selectCA')}
-          options={signingCas(cas).map(ca => ({ value: String(ca.id), label: ca.descr || ca.common_name }))}
-          helperText={unlistedSigningCas(cas) > 0 ? t('cas.notListedForSigning', { count: unlistedSigningCas(cas) }) : undefined}
-        />
+        <div>
+          <Select
+            label={t('common.certificateAuthority')}
+            value={formData.ca_id}
+            onChange={(val) => update('ca_id', val)}
+            placeholder={t('certificates.selectCA')}
+            options={issuanceCas(cas, showHiddenCas, formData.ca_id).map(ca => ({ value: String(ca.id), label: ca.descr || ca.common_name }))}
+            helperText={unlistedSigningCas(cas) > 0 ? t('cas.notListedForSigning', { count: unlistedSigningCas(cas) }) : undefined}
+          />
+          <HiddenCasToggle count={hiddenIssuanceCas(cas)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
+        </div>
         <div>
           <Select
             label={t('certificates.certType')}
