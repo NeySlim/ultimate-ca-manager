@@ -8,7 +8,7 @@ import shutil
 import subprocess
 
 import pytest
-from asn1crypto import cms
+from asn1crypto import algos, cms
 from asn1crypto import pkcs12 as asn1_pkcs12
 from cryptography import x509
 from cryptography.hazmat.decrepit.ciphers.algorithms import TripleDES
@@ -220,6 +220,35 @@ def test_a_pbes2_scrypt_layer_opens_here(p12_tries):  # noqa: F811
         'encryption_scheme': {'algorithm': 'aes256_cbc', 'parameters': iv}}}, encrypt, 128)
     pkcs12.load_key_and_certificates(data, RIGHT.encode())
     assert _opens(data, RIGHT) and p12_tries == [RIGHT.encode()]
+
+
+def test_a_scrypt_layer_above_openssl_memory_is_refused_underived(p12_tries, monkeypatch):  # noqa: F811
+    """N=2^15, r=8 needs 32 MiB and more: PKCS12_parse refuses it, nothing is derived here."""
+    derivations = []
+    monkeypatch.setattr(pkcs12_layers, 'Scrypt', lambda *a: derivations.append(a))
+    salt, iv = os.urandom(16), os.urandom(16)
+    params = pkcs12_layers._ScryptParams({'salt': salt, 'cost_parameter': 1 << 15, 'block_size': 8,
+                                          'parallelization_parameter': 1})
+    data = _resealed({'algorithm': 'pbes2', 'parameters': {
+        'key_derivation_func': {'algorithm': '1.3.6.1.4.1.11591.4.11', 'parameters': params},
+        'encryption_scheme': {'algorithm': 'aes256_cbc', 'parameters': iv}}}, lambda padded: padded, 128)
+    objects = SmartParser().parse(data, RIGHT)
+    assert any('scrypt with N=32768' in (o.error or '') for o in objects)
+    with pytest.raises(pkcs12_layers.LayerUnsupported, match='more memory than OpenSSL allows'):
+        pkcs12_layers.open_pfx(asn1_pkcs12.Pfx.load(data), RIGHT.encode())
+    assert derivations == []
+
+
+def test_a_pbmac1_salt_from_another_source_is_refused_not_crashed(pems):
+    data = _export(pems, '-pbmac1_pbkdf2')
+    pfx = asn1_pkcs12.Pfx.load(data)
+    algorithm = pfx['mac_data']['mac']['digest_algorithm']
+    params = algos.Pbmac1Params.load(algorithm['parameters'].dump())
+    params['key_derivation_func']['parameters']['salt'] = algos.Pbkdf2Salt(
+        name='other_source', value={'algorithm': '1.2.840.113549.1.5.12'})
+    algorithm['parameters'] = params
+    with pytest.raises(pkcs12_layers.LayerUnsupported, match='PBMAC1 salt'):
+        pkcs12_layers.open_pfx(asn1_pkcs12.Pfx.load(pfx.dump(force=True)), RIGHT.encode())
 
 
 # ---- what OpenSSL writes ---------------------------------------------------------------

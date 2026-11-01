@@ -150,8 +150,8 @@ def _scrypt_pbes2(n, r=8, p=1):
     return encoder.encode(alg)
 
 
-@pytest.mark.parametrize('n,r,p,refused', [(1 << 14, 8, 1, False), (1 << 20, 8, 1, False),
-                                           (1 << 21, 1, 1, True), (1 << 20, 8, 2, True)])
+@pytest.mark.parametrize('n,r,p,refused', [(1 << 14, 8, 1, False), (1 << 15, 8, 1, True),
+                                           (1 << 20, 8, 1, True), (2, 1, 1 << 22, True), (3, 8, 1, True)])
 def test_scrypt_is_refused_above_its_cap(n, r, p, refused):
     assert bool(kdf_refusal(_scrypt_pbes2(n, r, p))) is refused
 

@@ -21,6 +21,8 @@ from cryptography.hazmat.primitives.kdf.scrypt import Scrypt
 MAX_NESTING = 4
 # RC2 at 40 or 64 effective bits is decrypted in pure Python: larger layers are refused
 MAX_PYTHON_LAYER = 512 * 1024
+# EVP_PBE_scrypt's default maxmem: OpenSSL refuses a costlier scrypt before deriving
+SCRYPT_MAX_MEM = 32 * 1024 * 1024
 
 _PBKDF2_HASHES = {'sha1': hashes.SHA1, 'sha224': hashes.SHA224, 'sha256': hashes.SHA256,
                   'sha384': hashes.SHA384, 'sha512': hashes.SHA512,
@@ -261,12 +263,18 @@ def _pbes2(algorithm, ciphertext) -> _Scheme:
         if len(iv) != size:
             raise LayerUnsupported(f'PKCS#12 PBES2 {label} with an IV of the wrong size')
     elif oid.startswith(_ARIA_ARC):
-        raise LayerUnsupported(f'PKCS#12 PBES2 encryption ARIA ({oid}) is not supported: '
-                               'pyca has no ARIA cipher')
+        raise LayerUnsupported(f'PKCS#12 PBES2 encryption ARIA ({oid}) is not supported')
     else:
         raise LayerUnsupported(f'PKCS#12 PBES2 encryption {oid} is not supported')
     derive_key = _pbes2_kdf(params['key_derivation_func'], key_size, label)
     return _Scheme(_raw, lambda secret: (derive_key(secret), iv), decrypt, block, 1, ciphertext)
+
+
+def scrypt_refused(n, r, p) -> bool:
+    """True for scrypt parameters OpenSSL refuses or that need more than SCRYPT_MAX_MEM."""
+    if n < 2 or n & (n - 1) or r < 1 or p < 1:
+        return True
+    return 128 * r * (n + 2) + 128 * r * p > SCRYPT_MAX_MEM
 
 
 def _pbes2_kdf(kdf, key_size, label):
@@ -277,6 +285,9 @@ def _pbes2_kdf(kdf, key_size, label):
         declared = p['key_length'].native
         salt, n = p['salt'].native, p['cost_parameter'].native
         r, par = p['block_size'].native, p['parallelization_parameter'].native
+        if scrypt_refused(n, r, par):
+            raise LayerUnsupported(f'PKCS#12 scrypt with N={n}, r={r}, p={par} needs more memory '
+                                   'than OpenSSL allows')
         derive = lambda secret: Scrypt(salt, key_size, n, r, par).derive(secret)  # noqa: E731
     elif kdf['algorithm'].native == 'pbkdf2':
         p = kdf['parameters']
@@ -354,6 +365,8 @@ def _mac(pfx: asn1_pkcs12.Pfx):
             salt, rounds = p['salt'].chosen.native, p['iteration_count'].native
         except Exception as e:  # noqa: BLE001
             raise LayerUnsupported('PKCS#12 PBMAC1 parameters cannot be read') from e
+        if p['salt'].name != 'specified':
+            raise LayerUnsupported('PKCS#12 PBMAC1 salt from another source is not supported')
         if prf is None or kdf['algorithm'].native != 'pbkdf2' or not _hash_available(digest):
             raise LayerUnsupported('PKCS#12 PBMAC1 algorithms are not supported')
         if size is None or not 0 < size <= _MAX_MD_SIZE:

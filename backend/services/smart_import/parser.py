@@ -34,8 +34,6 @@ NOT_TRIED = 'Password not tried: this import already made too many password atte
 MAX_PASSWORD_ATTEMPTS = 64
 # Far above what OpenSSL and pyca produce: a costlier derivation is refused, never run
 MAX_KDF_ITERATIONS = 2_000_000
-MAX_SCRYPT_N = 1 << 20
-MAX_SCRYPT_WORK = MAX_SCRYPT_N * 8  # N * r * p
 
 _PBES2 = '1.2.840.113549.1.5.13'
 _PBKDF2 = '1.2.840.113549.1.5.12'
@@ -120,7 +118,7 @@ def inspected_key(data, password):
             raise PasswordNotTried(UNINSPECTED_KEY) from None
         if _sealed_algorithm(raw) is None:
             raise PasswordNotTried(UNINSPECTED_KEY)
-    elif raw.lstrip().startswith(b'-----'):
+    elif b'-----BEGIN ' in raw:
         return raw, password  # PEM encryption (RFC 1421) derives with one MD5 round
     sealed = _sealed_algorithm(raw)
     if sealed is None:
@@ -153,7 +151,7 @@ def kdf_refusal(algorithm_der: bytes) -> Optional[str]:
         if oid == _SCRYPT:
             p = decoder.decode(params, asn1Spec=rfc7914.Scrypt_params())[0]
             n = int(p['costParameter'])
-            if n > MAX_SCRYPT_N or n * int(p['blockSize']) * int(p['parallelizationParameter']) > MAX_SCRYPT_WORK:
+            if pkcs12_layers.scrypt_refused(n, int(p['blockSize']), int(p['parallelizationParameter'])):
                 return f'Key derivation refused: scrypt with N={n} costs more than this instance runs'
             return None
         if oid == _PBKDF2:

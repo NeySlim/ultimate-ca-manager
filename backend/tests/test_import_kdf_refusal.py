@@ -19,7 +19,7 @@ from cryptography.x509.oid import NameOID
 
 from models import CA, Certificate, db
 from services.import_service import KeyPasswordError, load_import_private_key, parse_certificate_file
-from services.smart_import.parser import MAX_KDF_ITERATIONS, UNINSPECTED_KEY
+from services.smart_import.parser import MAX_KDF_ITERATIONS, UNINSPECTED_KEY, inspected_key
 from tests.conftest import get_json
 from tests.test_smart_import_kdf_budget import RIGHT, _key_sealed_in_a_layer, _pkcs12, _with_iterations
 
@@ -203,6 +203,15 @@ def test_affordable_encrypted_keys_still_open(form):
     assert load_import_private_key(pem, RIGHT).private_numbers() == key.private_numbers()
     with pytest.raises(KeyPasswordError, match='Invalid password'):
         load_import_private_key(pem, b'wrong')
+
+
+def test_a_pem_key_after_bag_attributes_keeps_its_password():
+    """Text before a PEM block (Bag Attributes) still hands the password to RFC 1421 decryption."""
+    pem = ec.generate_private_key(ec.SECP256R1()).private_bytes(
+        serialization.Encoding.PEM, PrivateFormat.TraditionalOpenSSL,
+        serialization.BestAvailableEncryption(RIGHT))
+    data = b'Bag Attributes\n    friendlyName: k\n' + pem
+    assert inspected_key(data, RIGHT) == (data, RIGHT)
 
 
 # ---- tools: certificate decoder, key matcher ------------------------------------
