@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 
 
 from utils.x509_aki import authority_key_identifier_from_issuer
-from services.cert.issued_lookup import find_issued_row, san_identity_matches
+from services.cert.issued_lookup import find_issued_rows, san_identity_matches
 from utils.signing_hash import rsa_padding_for
 
 
@@ -1621,9 +1621,12 @@ class SCEPService:
         if renewal_of is not None:
             # Archive the renewed row in the same transaction so it is not
             # renewed in place again by the scheduler with the old key
-            renewed_row = find_issued_row(self.ca, renewal_of)
-            if renewed_row is not None:
-                renewed_row.archived = True
+            # Claimed once: of two concurrent renewals of one certificate, one issues
+            from services.ca.ca_signing import _claim_superseded
+            rows = find_issued_rows(self.ca, renewal_of)
+            live = next((r for r in rows if not r.archived), None)
+            if rows and (live is None or not _claim_superseded(live)):
+                raise ValueError('Signing certificate has been superseded by a newer one')
 
         Config.CERT_DIR.mkdir(parents=True, exist_ok=True)
         with open(cert_cert_path(cert_obj), "wb") as f:

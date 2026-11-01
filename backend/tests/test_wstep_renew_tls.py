@@ -196,11 +196,18 @@ def test_request_signed_by_another_certificate_is_refused(client, app, wstep_ren
     assert b'not signed by the certificate being renewed' in r.data
 
 
+def _broken_self_signature(csr):
+    der = bytearray(csr.public_bytes(serialization.Encoding.DER))
+    der[-1] ^= 0x01
+    return x509.load_der_x509_csr(bytes(der))
+
+
 def test_new_key_without_its_own_signature_is_refused(client, app, wstep_renew_config):
     """The old certificate vouches for the request, not for a key it never signed with."""
     old_cert, old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-pop.example.test')
     foreign_key = _key()
-    body = _rst(_cmc_renewal(_renewal_csr(old_cert, foreign_key), [(old_key, old_cert)]))
+    csr = _broken_self_signature(_renewal_csr(old_cert, foreign_key))
+    body = _rst(_cmc_renewal(csr, [(old_key, old_cert)]))
     r = _post(client, body, tls_cert=old_cert)
     assert r.status_code == 400
     assert b'does not identify itself by the request key' in r.data
@@ -308,7 +315,8 @@ def test_xml_renewal_with_a_new_key_needs_its_proof(client, app, wstep_renew_con
     old_cert, old_key = _issue(app, wstep_renew_config['id'], 'xml-renew-new-key.example.test')
     foreign = _key()
     before = _issued_count(app)
-    r = _post(client, _xml_cmc(old_cert, old_key, _renewal_csr(old_cert, foreign), [(old_key, old_cert)]))
+    csr = _broken_self_signature(_renewal_csr(old_cert, foreign))
+    r = _post(client, _xml_cmc(old_cert, old_key, csr, [(old_key, old_cert)]))
     assert r.status_code == 400
     assert b'does not identify itself by the request key' in r.data, r.data
     assert _issued_count(app) == before
@@ -320,6 +328,19 @@ def test_xml_renewal_with_a_proven_new_key_is_issued(client, app, wstep_renew_co
     r = _post(client, _xml_cmc(old_cert, old_key, _renewal_csr(old_cert, new_key),
                                [(new_key, None), (old_key, old_cert)]))
     assert r.status_code == 200, r.data
+
+
+@pytest.mark.parametrize('path', ['tls', 'xml'])
+def test_new_key_proven_by_its_own_csr_signature_is_issued(client, app, wstep_renew_config, path):
+    """RFC 5272: the PKCS#10 self-signature proves the new key, without a SignerInfo of its own."""
+    old_cert, old_key = _issue(app, wstep_renew_config['id'], f'{path}-renew-p10-pop.example.test')
+    csr = _renewal_csr(old_cert, _key())
+    if path == 'tls':
+        r = _post(client, _rst(_cmc_renewal(csr, [(old_key, old_cert)])), tls_cert=old_cert)
+    else:
+        r = _post(client, _xml_cmc(old_cert, old_key, csr, [(old_key, old_cert)]))
+    assert r.status_code == 200, r.data
+    assert _issued_from(r).public_key() == csr.public_key()
 
 
 def test_xml_renewal_keeping_the_key_needs_no_other_proof(client, app, wstep_renew_config):
@@ -356,6 +377,28 @@ def test_refused_renewal_is_audited(client, app, wstep_renew_config):
     assert _audit_rows(app, old_cert.serial_number) == [('wstep-ws-security', False, (
         'WSTEP renewal refused from 127.0.0.1: Signing certificate has been revoked '
         f'(old serial {old_cert.serial_number})'))]
+
+
+def _refusal_count(app):
+    with app.app_context():
+        return AuditLog.query.filter(AuditLog.action == 'certificate.renewed',
+                                     AuditLog.details.contains('WSTEP renewal refused')).count()
+
+
+def test_refusal_for_an_unknown_certificate_is_not_audited(client, app, wstep_renew_config):
+    """An anonymous request, or a lookalike naming a real serial, does not write to the audit log."""
+    old_cert, old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-unaudited.example.test')
+    lookalike_key = _key()
+    lookalike = (x509.CertificateBuilder().subject_name(old_cert.subject).issuer_name(old_cert.subject)
+                 .public_key(lookalike_key.public_key()).serial_number(old_cert.serial_number)
+                 .not_valid_before(old_cert.not_valid_before_utc).not_valid_after(old_cert.not_valid_after_utc)
+                 .sign(lookalike_key, hashes.SHA256()))
+    before = _refusal_count(app)
+    body = _rst(_cmc_renewal(_renewal_csr(old_cert, old_key), [(old_key, old_cert)]))
+    assert _post(client, body).status_code == 400
+    signed = _build_signed_rst(lookalike, lookalike_key, _renewal_csr(lookalike, lookalike_key))
+    assert _post(client, signed).status_code == 400
+    assert _refusal_count(app) == before
 
 
 # Concurrent replay: the renewed row is claimed by compare-and-set
@@ -575,4 +618,69 @@ def test_legacy_certificate_takes_a_fitting_template(app, templated_ca):
                        _eku_csr(old_cert, old_key, ExtendedKeyUsageOID.CLIENT_AUTH))
     assert err is None, err
     assert _template_oid(cert) is not None
+    assert _ekus(cert) == {ExtendedKeyUsageOID.CLIENT_AUTH}
+
+
+def test_restored_duplicate_beside_an_archived_original_still_renews(client, app, wstep_renew_config):
+    """The live duplicate answers the status and is the row the renewal claims."""
+    old_cert, old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-duplicate.example.test')
+    with app.app_context():
+        original = Certificate.query.filter_by(serial_number=str(old_cert.serial_number)).one()
+        columns = {c.name: getattr(original, c.name) for c in Certificate.__table__.columns
+                   if c.name not in ('id', 'refid')}
+        duplicate = Certificate(refid=f'{original.refid}-restored', **columns)
+        db.session.add(duplicate)
+        original.archived = True
+        db.session.commit()
+        duplicate_id = duplicate.id
+    body = _rst(_cmc_renewal(_renewal_csr(old_cert, old_key), [(old_key, old_cert)]))
+    r = _post(client, body, tls_cert=old_cert)
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert db.session.get(Certificate, duplicate_id).archived is True
+
+
+def test_legacy_certificate_with_any_eku_renews_at_par(app, templated_ca):
+    """anyExtendedKeyUsage on the renewed certificate (admin Sign-CSR) is never carried over, nor a failure."""
+    ca_id = templated_ca('WSTEP renew legacy any-EKU CA', {'Broad': (['clientAuth', 'emailProtection'], None)})
+    key = _key()
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'legacy-any-eku.example.test')])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    # Only its extensions are read: the template is chosen before the signature
+    renewed = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+               .serial_number(x509.random_serial_number()).not_valid_before(now)
+               .not_valid_after(now + datetime.timedelta(days=30))
+               .add_extension(x509.ExtendedKeyUsage([ExtendedKeyUsageOID.CLIENT_AUTH,
+                                                     ExtendedKeyUsageOID.ANY_EXTENDED_KEY_USAGE]), critical=False)
+               .sign(key, hashes.SHA256()))
+    csr = _eku_csr(renewed, key, ExtendedKeyUsageOID.CLIENT_AUTH)
+    with app.app_context():
+        ca = db.session.get(CA, ca_id)
+        template, extra, issued, err = wstep_service._renewal_template(ca, renewed, csr)
+        assert (template, err) == (None, None)
+        pem, _serial = CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='test',
+                                                      extra_ekus=extra, template_ekus=issued)
+    assert _ekus(x509.load_pem_x509_certificate(pem.encode())) == {ExtendedKeyUsageOID.CLIENT_AUTH}
+
+
+def test_renewal_may_ask_for_what_xcep_advertised(app, templated_ca):
+    """A request naming a capped EKU of its template is renewed as issuance treats it: without it."""
+    ca_id = templated_ca('WSTEP renew advertised CA', {'Stamp': (['clientAuth', 'timeStamping'], None)})
+    old_cert, old_key = _wstep_issued(app, ca_id, 'template-advertised.example.test')
+    csr = _eku_csr(old_cert, old_key, ExtendedKeyUsageOID.CLIENT_AUTH, ExtendedKeyUsageOID.TIME_STAMPING)
+    cert, err = _renew(app, ca_id, 'tls', old_cert, old_key, csr)
+    assert err is None, err
+    assert _ekus(cert) == {ExtendedKeyUsageOID.CLIENT_AUTH}
+
+
+def test_template_without_ekus_keeps_the_renewal_within_the_old_ones(app, templated_ca):
+    ca_id = templated_ca('WSTEP renew bare template CA', {'Bare': ([], None)})
+    old_cert, old_key = _wstep_issued(app, ca_id, 'template-bare.example.test')
+    assert _template_oid(old_cert) is not None
+    wider = _eku_csr(old_cert, old_key, ExtendedKeyUsageOID.CLIENT_AUTH, ExtendedKeyUsageOID.CODE_SIGNING)
+    cert, err = _renew(app, ca_id, 'tls', old_cert, old_key, wider)
+    assert cert is None and err.startswith("Renewal stays on template 'WSTEP renew bare template CA Bare'"), err
+    cert, err = _renew(app, ca_id, 'tls', old_cert, old_key,
+                       _eku_csr(old_cert, old_key, ExtendedKeyUsageOID.CLIENT_AUTH))
+    assert err is None, err
     assert _ekus(cert) == {ExtendedKeyUsageOID.CLIENT_AUTH}

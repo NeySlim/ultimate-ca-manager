@@ -246,6 +246,42 @@ def test_manual_approval_of_a_renewal_archives_the_renewed_certificate(app, auth
             db.session.commit()
 
 
+def test_a_second_renewal_of_the_same_certificate_is_refused(app, auth_client, create_ca):
+    """Two pending RenewalReqs of one certificate: the first approval claims it, the second is refused."""
+    from services.cert_service import CertificateService
+    ca = create_ca(cn='SCEP double renewal CA')
+    with app.app_context():
+        ca_row = db.session.get(CA, ca['id'])
+        old = CertificateService.create_certificate(
+            descr='twice.example.test', caref=ca_row.refid, dn={'CN': 'twice.example.test'},
+            cert_type='server_cert', key_type='2048', validity_days=30, username='admin')
+        db.session.commit()
+        old_id, old_crt, caref = old.id, old.crt, ca_row.refid
+        req_ids = []
+        for n in (1, 2):
+            req = SCEPRequest(transaction_id=f'txn-renewal-twice-{n}', ca_refid=caref,
+                              csr=base64.b64encode(_csr('twice.example.test').public_bytes(
+                                  serialization.Encoding.DER)).decode(),
+                              status='pending', subject='CN=twice.example.test', renewal_of=old_crt)
+            db.session.add(req)
+            db.session.commit()
+            req_ids.append(req.id)
+    try:
+        r = auth_client.post(f'/api/v2/scep/{req_ids[0]}/approve', data='{}', content_type='application/json')
+        assert r.status_code == 200, r.get_json()
+        with app.app_context():
+            issued = Certificate.query.filter_by(caref=caref).count()
+        r = auth_client.post(f'/api/v2/scep/{req_ids[1]}/approve', data='{}', content_type='application/json')
+        assert r.status_code == 409, r.get_json()
+        assert 'superseded' in r.get_json()['message'], r.get_json()
+        with app.app_context():
+            assert Certificate.query.filter_by(caref=caref).count() == issued
+            assert db.session.get(SCEPRequest, req_ids[1]).status == 'pending'
+    finally:
+        for req_id in req_ids:
+            _cleanup(app, req_id)
+
+
 def test_scep_history_export_carries_the_profile(app, create_ca):
     from services.backup.export_extended import ExportExtendedMixin
     ca = create_ca(cn='SCEP export CA')

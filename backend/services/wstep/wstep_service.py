@@ -353,7 +353,7 @@ def _renewal_template(ca, renewed_cert, csr):
         # A broader template is not stamped (the next renewal would inherit its
         # EKUs): the renewal is then at par with the certificate's own EKUs
         if set(extra) - prior or not extra:
-            return None, [oid for oid in extra if oid in prior], sorted(prior), None
+            return None, [oid for oid in extra if oid in prior], _issuable_ekus(prior), None
         return matched, extra, extra, None
 
     from services.xcep.policy_builder import _policy_oid_for_template
@@ -366,12 +366,23 @@ def _renewal_template(ca, renewed_cert, csr):
         return None, [], None, (f"Template '{template.name}' issues {_template_key_label(template)} "
                                 f'keys, not {_csr_key_label(csr)}')
     extra = _template_extra_ekus(template)
-    if csr_eku - set(extra):
+    # The request may name what XCEP advertised (capped EKUs included, dropped at
+    # issuance); a template without EKUs keeps the renewal within the old ones
+    allowed = set(_template_configured_ekus(template)) or _eku_oids(renewed_cert)
+    if allowed is not None and csr_eku - allowed:
         other, _refusal = _match_template(ca, csr)
         asked = (f"template '{other.name}'" if other is not None and other.id != template.id
                  else 'other Extended Key Usages')
         return None, [], None, f"Renewal stays on template '{template.name}'; the request asks for {asked}"
     return template, extra, extra or None, None
+
+
+def _issuable_ekus(prior):
+    """The EKUs of a renewed certificate a renewal may carry over: valid, never a capped one."""
+    from utils.eku_validation import MAX_EKU_COUNT, PROTOCOL_UNBINDABLE_EKU_OIDS, validate_oid
+    kept = [oid for oid in sorted(prior)
+            if oid not in PROTOCOL_UNBINDABLE_EKU_OIDS and validate_oid(oid) is None]
+    return kept[:MAX_EKU_COUNT] or None
 
 
 def _ca_templates(ca):
@@ -428,8 +439,23 @@ def _template_extra_ekus(template):
     it's exactly the admin intent the cap is designed to still allow.
     Returns ``[]`` for ``None``/an unconfigured template.
     """
-    import json
+    from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS
+    # Same cap as the other protocol endpoints, Smartcard Logon excepted:
+    # issuing it is what WSTEP templates are for (AD-bound identities)
+    capped = PROTOCOL_UNBINDABLE_EKU_OIDS - {'1.3.6.1.4.1.311.20.2.2'}
+    oids = []
+    for oid in _template_configured_ekus(template):
+        if oid in capped:
+            logger.warning('WSTEP: template %s EKU %s is never issued to an enrollee; dropped',
+                           template.id, oid)
+            continue
+        oids.append(oid)
+    return oids
 
+
+def _template_configured_ekus(template):
+    """Every EKU OID ``template`` configures, as XCEP advertises them, before the protocol cap."""
+    import json
 
     if template is None:
         return []
@@ -443,10 +469,7 @@ def _template_extra_ekus(template):
     # One resolver for every spelling (the UI writes msSmartcardLogin, the
     # XCEP policy smartcardLogon): a template that issued correctly on the
     # issue form issues the same purposes over WSTEP
-    from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS, normalize_extra_ekus
-    # Same cap as the other protocol endpoints, Smartcard Logon excepted:
-    # issuing it is what WSTEP templates are for (AD-bound identities)
-    capped = PROTOCOL_UNBINDABLE_EKU_OIDS - {'1.3.6.1.4.1.311.20.2.2'}
+    from utils.eku_validation import normalize_extra_ekus
     oids = []
     for name in names:
         if not isinstance(name, str):
@@ -455,10 +478,6 @@ def _template_extra_ekus(template):
         if err or not resolved:
             # An unknown name is dropped, the others still apply
             logger.warning('WSTEP: template %s EKU %r ignored (%s)', template.id, name, err)
-            continue
-        if resolved[0] in capped:
-            logger.warning('WSTEP: template %s EKU %r is never issued to an enrollee; dropped',
-                           template.id, name)
             continue
         if resolved[0] not in oids:
             oids.append(resolved[0])
@@ -911,10 +930,9 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
         signing_cert = x509.load_der_x509_certificate(signing_cert_der)
     except Exception:
         return None, 'Invalid signing certificate'
-    if audit is not None:
-        audit['renewed_serial'] = signing_cert.serial_number
 
     db_cert, err = _renewable_certificate(ca, signing_cert)
+    _note_renewed_serial(audit, signing_cert, err)
     if err:
         return None, err
 
@@ -929,8 +947,8 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
 
 
 def _new_key_proof(csr, renewed_cert, outer_signed_data):
-    """None when the CSR keeps the renewed key or a SignerInfo of its own key
-    proves the new one. Key policy first: an unsupported key cannot be compared."""
+    """None when the CSR keeps the renewed key, or the new key proves itself by the
+    CSR's self-signature or a SignerInfo of its own. Key policy first."""
     err = _validate_csr(csr, require_pop=False)
     if err:
         return err
@@ -940,6 +958,11 @@ def _new_key_proof(csr, renewed_cert, outer_signed_data):
         return 'Unsupported public key'
     if same_key:
         return None
+    try:
+        if csr.is_signature_valid:
+            return None
+    except Exception:
+        pass
     if outer_signed_data is None:
         return 'Renewal with a new key requires its proof of possession'
     return _verify_pkcs7_pop(csr, outer_signed_data)
@@ -957,10 +980,9 @@ def renew_with_client_certificate(ca, client_cert_pem, csr_der, outer_signed_dat
             client_cert_pem.encode() if isinstance(client_cert_pem, str) else client_cert_pem)
     except Exception:
         return None, 'Invalid client certificate'
-    if audit is not None:
-        audit['renewed_serial'] = client_cert.serial_number
 
     db_cert, err = _renewable_certificate(ca, client_cert)
+    _note_renewed_serial(audit, client_cert, err)
     if err:
         return None, err
 
@@ -1027,6 +1049,16 @@ def _verify_renewal_signer(outer_signed_data, cert):
     return 'Renewal request is not signed by the certificate being renewed'
 
 
+_UNRECOGNIZED = 'Signing certificate is not recognized'
+
+
+def _note_renewed_serial(audit, cert, err):
+    """Records the serial once ``cert`` is known as issued by the CA, its key proven by
+    the XML signature or the TLS handshake: an unknown certificate is never audited."""
+    if audit is not None and err != _UNRECOGNIZED:
+        audit['renewed_serial'] = cert.serial_number
+
+
 def _renewable_certificate(ca, cert):
     """(row, None) when ``cert`` is, byte for byte, a certificate this CA issued
     and still holds; (None, error) otherwise. Serial and subject are public, so
@@ -1041,7 +1073,7 @@ def _renewable_certificate(ca, cert):
             EXPIRED: 'Signing certificate has expired',
             NOT_YET_VALID: 'Signing certificate is not yet valid',
             SUPERSEDED: 'Signing certificate has been superseded by a newer one',
-        }.get(status, 'Signing certificate is not recognized')
+        }.get(status, _UNRECOGNIZED)
     return db_cert, None
 
 

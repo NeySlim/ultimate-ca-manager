@@ -89,6 +89,8 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
         # Replaced by a renewal: the holder presents the newer certificate,
         # the replaced one must not go on producing certificates
         return row, SUPERSEDED
+    # A restored duplicate may sit beside the archived original: the live row answers
+    row = next(r for r in rows if not r.archived)
     now = utc_now()
     if cert.not_valid_before_utc.replace(tzinfo=None) > now:
         return row, NOT_YET_VALID

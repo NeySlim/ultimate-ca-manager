@@ -386,8 +386,10 @@ def renew_certificate_bound():
     old_serial = audit.get('renewed_serial')
     if error:
         logger.warning("WSTEP renewal rejected: %s", error)
-        _audit_issuance('certificate.renewed', None, username, success=False, details=(
-            f'WSTEP renewal refused from {client_ip()}: {error} (old serial {old_serial})'))
+        # Audited only for a certificate the CA issued: an anonymous refusal would fill the log
+        if old_serial is not None:
+            _audit_issuance('certificate.renewed', None, username, success=False, details=(
+                f'WSTEP renewal refused from {client_ip()}: {error} (old serial {old_serial})'))
         return _fault_response(error, status=400, relates_to=parsed.message_id)
 
     try:
