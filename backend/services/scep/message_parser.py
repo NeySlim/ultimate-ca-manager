@@ -178,7 +178,8 @@ def _check_mldsa_signer_info(signer_info, public_key, digest_name: str) -> None:
         raise ValueError(f"{label} CMS signatures take a SHA-512 digest, not {digest_name}")
     if sig_alg["algorithm"].dotted != key_algorithms.get(label).oid:
         raise ValueError(f"{label} CMS signature names another algorithm: {sig_alg['algorithm'].dotted}")
-    if sig_alg["parameters"].contents:
+    # Absent, not NULL: a NULL read off the wire has empty contents too
+    if not isinstance(sig_alg["parameters"], asn1crypto.core.Void):
         raise ValueError(f"{label} CMS signature algorithm carries parameters")
 
 

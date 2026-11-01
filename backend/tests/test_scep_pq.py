@@ -102,12 +102,18 @@ class TestRfc9882SignerInfo:
         with pytest.raises(ValueError, match='ML-DSA'):
             verify_cms_signature(sd, cert)
 
-    def test_signature_parameters_are_refused(self):
+    @pytest.mark.parametrize('from_wire', [False, True])
+    def test_signature_parameters_are_refused(self, from_wire):
+        """RFC 9882: parameters MUST be absent, a NULL read off the wire included."""
         sd = _signed_data(fixture_bytes('mldsa65-signed.cms'))
         signer = extract_signer_certificate(sd)
         alg = sd['signer_infos'][0]['signature_algorithm']
         sd['signer_infos'][0]['signature_algorithm'] = {
             'algorithm': alg['algorithm'].dotted, 'parameters': asn1crypto.core.Null()}
+        if from_wire:
+            wire = sd['signer_infos'][0].dump(force=True)
+            sd['signer_infos'] = [asn1crypto.cms.SignerInfo.load(wire)]
+            assert sd['signer_infos'][0]['signature_algorithm'].dump()[-2:] == b'\x05\x00'
         with pytest.raises(ValueError, match='parameters'):
             verify_cms_signature(sd, signer)
 
