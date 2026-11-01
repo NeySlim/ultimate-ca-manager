@@ -1274,15 +1274,17 @@ export default function UsersGroupsPage() {
                 {mtlsTab === 'generate' && (
                   <>
                     <Input label={t('account.mtlsCertName')} value={mtlsForm.name} onChange={(e) => setMtlsForm(prev => ({ ...prev, name: e.target.value }))} placeholder={`${selectedUser.username}@mtls`} />
-                    <Select
-                      label={t('account.mtlsIssuingCA')}
-                      value={mtlsForm.ca_id}
-                      onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
-                      placeholder={t('account.mtlsDefaultCA')}
-                      options={listedForIssuance(pickerCas(cas, mtlsForm.ca_id), showHiddenCas, mtlsForm.ca_id).map(ca => ({ value: ca.refid || String(ca.id), label: ca.descr || ca.subject || ca.refid }))}
-                      helperText={unlistedPickerCas(cas, mtlsForm.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, mtlsForm.ca_id) }) : undefined}
-                    />
-                    <HiddenCasToggle count={hiddenFromIssuance(pickerCas(cas, mtlsForm.ca_id), mtlsForm.ca_id)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
+                    <div>
+                      <Select
+                        label={t('account.mtlsIssuingCA')}
+                        value={mtlsForm.ca_id}
+                        onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
+                        placeholder={t('account.mtlsDefaultCA')}
+                        options={listedForIssuance(pickerCas(cas, mtlsForm.ca_id), showHiddenCas, mtlsForm.ca_id).map(ca => ({ value: ca.refid || String(ca.id), label: ca.descr || ca.subject || ca.refid }))}
+                        helperText={unlistedPickerCas(cas, mtlsForm.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, mtlsForm.ca_id) }) : undefined}
+                      />
+                      <HiddenCasToggle count={hiddenFromIssuance(pickerCas(cas, mtlsForm.ca_id), mtlsForm.ca_id)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
+                    </div>
                     <Input label={t('account.mtlsValidityDays')} type="number" value={mtlsForm.validity_days} onChange={(e) => setMtlsForm(prev => ({ ...prev, validity_days: parseInt(e.target.value) || 365 }))} min="1" max="3650" />
                     <div className="flex justify-end gap-2 pt-4 border-t border-border">
                       <Button type="button" variant="secondary" onClick={handleCloseMtlsModal}>{t('common.cancel')}</Button>

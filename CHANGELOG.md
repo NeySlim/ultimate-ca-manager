@@ -47,7 +47,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - The "Certificates Only" API key scope now covers SSH certificates (`read:ssh`, `write:ssh`) and reads SSH CAs (thanks @danielrona).
 
-- CAs: "Hide from issuance" in the CA details keeps a CA, a root typically, out of the CA lists of Issue Certificate, Sign CSR, bulk CSR signing and user mTLS certificates; a link under those lists shows it again (#430).
+- CAs: "Hide from issuance" in the CA details keeps a CA, a root typically, out of the CA lists of Issue Certificate, Sign CSR, bulk CSR signing, user mTLS certificates and the TSA signing certificate; a link under those lists shows it again (#430).
 
 ### Changed
 

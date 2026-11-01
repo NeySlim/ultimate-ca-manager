@@ -48,6 +48,7 @@ vi.mock('../../services/cas.service', () => ({
       { id: 1, refid: 'ca-sign', name: 'Signing CA', has_private_key: true },
       { id: 2, refid: 'ca-keyless', name: 'Keyless root', certificate_only: true, has_private_key: false },
       { id: 3, refid: 'ca-offline', name: 'Offline CA', has_private_key: true, offline: true },
+      { id: 4, refid: 'ca-root', name: 'Hidden root', has_private_key: true, issuance_hidden: true },
     ] }),
   },
 }))
@@ -99,16 +100,26 @@ describe('TSAPage signing CA pickers (#426)', () => {
     tsaService.getSignerCandidates.mockResolvedValue({ data: [] })
   })
 
-  it('settings picker offers only the CA that can sign and counts the others', async () => {
+  it('settings picker offers only the CAs that can sign, a CA hidden from issuance (#430) included', async () => {
     const field = await openSettings('ca-sign')
-    expect(labels(field)).toEqual(['Signing CA'])
+    expect(labels(field)).toEqual(['Signing CA', 'Hidden root'])
     expect(field).toHaveTextContent('cas.notListedForSigning:2')
   })
 
   it('settings picker keeps the saved CA without a key listed and counts one less', async () => {
     const field = await openSettings('ca-keyless')
-    expect(labels(field)).toEqual(['Signing CA', 'Keyless root'])
+    expect(labels(field)).toEqual(['Signing CA', 'Hidden root', 'Keyless root'])
     expect(field).toHaveTextContent('cas.notListedForSigning:1')
+  })
+
+  it('generation picker keeps a CA hidden from issuance behind its link (#430)', async () => {
+    await openSettings('ca-sign')
+    fireEvent.click(await screen.findByText('tsa.signerGenerate'))
+    await screen.findByText('tsa.signerGenerateModalDesc')
+    const [, field] = screen.getAllByTestId('field-tsa.signingCA')
+    expect(labels(field)).toEqual(['Signing CA'])
+    fireEvent.click(screen.getByText('cas.showHiddenCas:1'))
+    expect(labels(field)).toEqual(['Signing CA', 'Hidden root'])
   })
 
   it('generation picker follows its own selection, not the saved setting', async () => {
