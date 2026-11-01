@@ -57,7 +57,7 @@ class RelatedSignerError(ValueError):
 
 
 def _related_signer(cert_id):
-    """``(certificate, private key)`` of the certificate A a relatedCertRequest names."""
+    """``(row, certificate, private key)`` of the certificate A a relatedCertRequest names."""
     row = db.session.get(Certificate, cert_id)
     if row is None or not row.crt:
         raise RelatedSignerError('Related certificate not found')
@@ -68,7 +68,8 @@ def _related_signer(cert_id):
     cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
     key = serialization.load_pem_private_key(
         load_pem_bytes(row.prv, context=f'certificate {row.id}'), password=None)
-    return cert, key
+    return row, cert, key
+
 
 class CSRMixin:
 
@@ -108,8 +109,8 @@ class CSRMixin:
         """
         # Build subject
         subject = TrustStoreService.build_subject(dn)
-        related_certificate, related_key = (
-            _related_signer(related_to) if related_to is not None else (None, None))
+        related_row, related_certificate, related_key = (
+            _related_signer(related_to) if related_to is not None else (None, None, None))
 
         # Generate CSR
         csr_pem, key_pem = TrustStoreService.generate_csr(
@@ -165,6 +166,11 @@ class CSRMixin:
         # Audit log
         from services.audit_service import AuditService
         AuditService.log_csr('csr_generated', certificate, f'Generated CSR: {descr}')
+        if related_row is not None:
+            AuditService.log_certificate(
+                'certificate_key_used', related_row,
+                f'Private key signed the RFC 9763 relatedCertRequest of CSR #{certificate.id}',
+                username=username)
 
         # Save files
         csr_path = cert_csr_path(certificate)

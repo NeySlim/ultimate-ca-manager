@@ -17,13 +17,15 @@ from cryptography.x509.oid import ExtensionOID
 from models import Certificate, db
 from services.policy_service import APPROVAL_REQUEST_LIFETIME, PolicyViolation
 from utils import key_algorithms, related_cert
+from utils.ca_signing_window import IssuerWindowError, check_issuer_window
 from utils.datetime_utils import utc_now
 from utils.leaf_key_usage import key_usage_for_key
 from utils.serial_format import serial_variants
 
 logger = logging.getLogger(__name__)
 
-# A stored request may wait for its approval as long as approval requests live
+# RFC 9763 §3.2 leaves freshness to local policy: a stored request may wait
+# for its approval as long as approval requests live
 REQUEST_MAX_AGE = APPROVAL_REQUEST_LIFETIME
 REQUEST_CLOCK_SKEW = timedelta(minutes=5)
 
@@ -111,11 +113,24 @@ def verify_request(req, now=None):
         raise RelatedCertificateRefused('The related certificate was not issued by a CA of this instance')
     if ca.revoked_in_chain:
         raise RelatedCertificateRefused('The CA of the related certificate is revoked')
+    _check_chain_validity(ca, now)
     _check_location(req, cert_a)
     if not related_cert.request_signature_valid(req, cert_a.public_key()):
         raise RelatedCertificateRefused(
             'The relatedCertRequest signature does not verify with the related certificate key')
     return row, cert_a
+
+
+def _check_chain_validity(ca, now):
+    """RFC 5280 §6.1.3: every CA certificate of A's path held here is valid at *now*."""
+    depth = 0
+    while ca is not None and depth <= ca.MAX_CHAIN_DEPTH:
+        try:
+            check_issuer_window(row_certificate(ca), now)
+        except IssuerWindowError as e:
+            raise RelatedCertificateRefused(
+                f'The CA certificate {ca.descr!r} of the related certificate is not valid now') from e
+        ca, depth = ca.issuing_ca(), depth + 1
 
 
 def _check_location(req, cert_a):

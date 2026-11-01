@@ -1125,6 +1125,8 @@ UCM generates the key pair and keeps the private key. `key_type` is `RSA 2048`, 
 
 `related_to` (certificate id) adds an RFC 9763 relatedCertRequest signed by the key of that
 certificate A, which UCM must hold; a revoked or unknown A, or one without its key, answers `400`.
+It requires the `read:private_keys` permission (`403` otherwise), and each use of A's key is
+audited as `certificate_key_used` on A.
 
 ### Get CSR Details
 ```http
@@ -1145,8 +1147,9 @@ Content-Type: application/json
 
 A CSR carrying a relatedCertRequest (RFC 9763), here or through ACME, EST or WSTEP, issues a
 certificate linked to the A it names. A must be held here, valid, unrevoked and an end-entity
-certificate issued by a CA of this instance, the request must be recent and verify with A's key,
-and the new certificate may assert no key usage or EKU that A lacks; otherwise `400`.
+certificate issued by a CA of this instance whose chain is valid now, the request must be at most
+7 days old and verify with A's key, and the new certificate may assert no key usage or EKU that A
+lacks; otherwise `400`.
 
 ### Delete CSR
 ```http

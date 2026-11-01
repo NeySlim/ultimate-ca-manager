@@ -403,6 +403,38 @@ def test_the_est_path_links_b_to_a(app, cert_a):
         assert db.session.get(Certificate, row_id).related_certificate_id == b2.id
 
 
+def test_a_related_certificate_under_an_expired_ca_certificate_is_refused(app, create_ca, create_cert):
+    """RFC 9763 §3.2 asks for RFC 5280 path validation of A: its CA must be valid now."""
+    from services.hsm.ca_key_loader import get_ca_signing_key
+    from utils.key_codec import load_pem_bytes
+    ca_id = create_ca(cn='Related expired CA')['id']
+    data = create_cert(ca_id=ca_id, key_type='ec', key_size='256', cert_type='server')
+    with app.app_context():
+        row = db.session.get(Certificate, data['id'])
+        cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+        key = serialization.load_pem_private_key(load_pem_bytes(row.prv, context='test'), None)
+        ca = db.session.get(CA, ca_id)
+        ca_cert = x509.load_pem_x509_certificate(base64.b64decode(ca.crt))
+        ca_key = get_ca_signing_key(ca)
+        now = utc_now()
+        expired = (x509.CertificateBuilder().subject_name(ca_cert.subject).issuer_name(ca_cert.subject)
+                   .public_key(ca_key.public_key()).serial_number(x509.random_serial_number())
+                   .not_valid_before(now - timedelta(days=20)).not_valid_after(now - timedelta(days=10)))
+        for ext in ca_cert.extensions:
+            expired = expired.add_extension(ext.value, critical=ext.critical)
+        expired = expired.sign(ca_key, hashes.SHA256())
+        previous, ca.crt = ca.crt, base64.b64encode(expired.public_bytes(serialization.Encoding.PEM)).decode()
+        db.session.commit()
+        try:
+            req = related_cert.parse_request(related_cert.build_request(cert, key, 'u:x'))
+            with pytest.raises(RelatedCertificateRefused, match='CA certificate .* is not valid now'):
+                verify_request(req)
+        finally:
+            ca = db.session.get(CA, ca_id)
+            ca.crt = previous
+            db.session.commit()
+
+
 # ---- the CSR route takes related_to ------------------------------------------------
 
 def test_the_csr_route_signs_the_attribute_with_a(app, auth_client, cert_a):
@@ -416,6 +448,31 @@ def test_the_csr_route_signs_the_attribute_with_a(app, auth_client, cert_a):
         req = related_cert.request_from_csr_der(csr.public_bytes(serialization.Encoding.DER))
     assert related_cert.requested_serial(req) == cert.serial_number
     assert related_cert.request_signature_valid(req, cert.public_key())
+
+
+def test_using_the_key_of_a_needs_the_private_key_permission(app, auth_client, cert_a, create_user):
+    """An operator holds write:csrs, not read:private_keys: A's key signs nothing for it."""
+    from models import AuditLog
+    row_id, cert, _key = cert_a
+    cn = cert.subject.get_attributes_for_oid(NameOID.COMMON_NAME)[0].value
+    body = {'cn': cn, 'key_type': PQ_LABEL, 'related_to': row_id}
+    user = create_user(role='operator')
+    operator = app.test_client()
+    r = operator.post('/api/v2/auth/login', json={'username': user['username'], 'password': 'TestPass123!'})
+    assert r.status_code == 200, r.data
+
+    def key_uses():
+        with app.app_context():
+            return [e.details for e in AuditLog.query.filter_by(
+                action='certificate_key_used', resource_id=str(row_id)).all()]
+
+    r = operator.post('/api/v2/csrs', json=body)
+    assert r.status_code == 403 and b'read:private_keys' in r.data, r.data
+    assert key_uses() == []
+    r = auth_client.post('/api/v2/csrs', json=body)
+    assert r.status_code == 201, r.data
+    csr_id = json.loads(r.data)['data']['id']
+    assert [f'#{csr_id}' in d for d in key_uses()] == [True]
 
 
 @pytest.mark.parametrize('related_to,message', [('7', b'related_to must be'), (True, b'related_to must be'),

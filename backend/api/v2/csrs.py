@@ -11,7 +11,7 @@ import base64
 import uuid
 from flask import Blueprint, request, jsonify, g, Response
 from sqlalchemy import func, or_
-from auth.unified import require_auth
+from auth.unified import has_permission, require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils import notices as notices_mod
 from utils.pagination import parse_request_pagination
@@ -355,6 +355,12 @@ def create_csr():
         if related_to is not None and (isinstance(related_to, bool) or not isinstance(related_to, int)
                                        or related_to < 1):
             return error_response('related_to must be a certificate id', 400)
+        # Signing with A's stored key is a use of that key: gated like its export
+        if related_to is not None and not has_permission(
+                'read:private_keys', getattr(g, 'permissions', []) or []):
+            return error_response(
+                "Signing with the related certificate's private key requires the "
+                'read:private_keys permission', 403)
 
         # Parse SANs - frontend sends ["DNS:example.com", "IP:1.2.3.4", ...]
         from utils.san_parse import parse_csr_san_entries
@@ -740,7 +746,6 @@ def export_csr(csr_id):
         return error_response('format must be csr or key', 400)
 
     if export_format == 'key':
-        from auth.unified import has_permission
         if not has_permission('read:private_keys', getattr(g, 'permissions', []) or []):
             return error_response(
                 'Private key export requires the read:private_keys permission', 403
@@ -1015,7 +1020,6 @@ def sign_csr(csr_id):
     if backend_cert_type in _CA_CERT_TYPES and extra_san:
         return error_response('Names cannot be added when signing a CA certificate', 400)
     if backend_cert_type in _CA_CERT_TYPES:
-        from auth.unified import has_permission
         if not has_permission('write:cas', getattr(g, 'permissions', []) or []):
             return error_response(
                 'Signing a CSR as an intermediate CA requires the write:cas permission',
