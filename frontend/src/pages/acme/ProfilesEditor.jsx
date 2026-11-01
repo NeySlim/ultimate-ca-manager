@@ -22,7 +22,6 @@ const toRows = (obj) => Object.entries(obj || {}).map(([name, spec]) => ({
   validity_days: spec?.validity_days ?? 90,
   digest: spec?.digest ?? 'sha256',
   template_id: spec?.template_id ? String(spec.template_id) : '',
-  savedTemplateId: spec?.template_id ? String(spec.template_id) : '',
 }))
 
 const toObject = (rows) => Object.fromEntries(rows.map(r => [r.name, {
@@ -35,7 +34,7 @@ const toObject = (rows) => Object.fromEntries(rows.map(r => [r.name, {
 
 const DIGESTS = ['sha256', 'sha384', 'sha512']
 
-export default function ProfilesEditor({ value, onChange, disabled, templates = [] }) {
+export default function ProfilesEditor({ value, onChange, disabled, templates = [], saved = {} }) {
   const { t } = useTranslation()
   const [rows, setRows] = useState(() => toRows(value))
   const lastEmitted = useRef(JSON.stringify(value || {}))
@@ -63,10 +62,10 @@ export default function ProfilesEditor({ value, onChange, disabled, templates = 
     id: ++nextRowId, name: '', description: '', validity_days: 90, digest: 'sha256', template_id: '',
   }])
 
-  // A deactivated template is refused on binding: only the row that already binds it lists it
+  // A deactivated template is refused on binding: listed only for the profile name the server has it bound to
   const templateOptions = (row) => [
     { value: '', label: t('acme.noTemplate') },
-    ...templates.filter(tpl => tpl.is_active !== false || String(tpl.id) === row.savedTemplateId)
+    ...templates.filter(tpl => tpl.is_active !== false || String(tpl.id) === String(saved[row.name]?.template_id ?? ''))
       .map(tpl => ({ value: String(tpl.id), label: tpl.name })),
   ]
 

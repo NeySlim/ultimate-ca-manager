@@ -1,5 +1,5 @@
 /**
- * A deactivated template is listed only on the profile row that already binds it.
+ * A deactivated template is listed only for the profile name the server has it bound to.
  */
 import { render, screen } from '@testing-library/react'
 import { describe, expect, it, vi } from 'vitest'
@@ -27,12 +27,26 @@ describe('ProfilesEditor with a deactivated template', () => {
       bound: { validity_days: 30, digest: 'sha256', template_id: 3 },
       other: { validity_days: 90, digest: 'sha256' },
     }
-    render(<ProfilesEditor value={value} onChange={() => {}} templates={templates} />)
-    // Each row renders a digest select then a template select
-    const templateSelects = screen.getAllByTestId('select').filter(s => s.textContent.includes('acme.noTemplate'))
-    expect(templateSelects).toHaveLength(2)
-    expect(templateSelects[0].textContent).toContain('Retired')
-    expect(templateSelects[1].textContent).not.toContain('Retired')
-    expect(templateSelects[1].textContent).toContain('Strict TLS')
+    render(<ProfilesEditor value={value} saved={value} onChange={() => {}} templates={templates} />)
+    const [bound, other] = templateSelects()
+    expect(bound.textContent).toContain('Retired')
+    expect(other.textContent).not.toContain('Retired')
+    expect(other.textContent).toContain('Strict TLS')
+  })
+
+  it('drops it once the saved binding moved on, or under a new name', () => {
+    const value = {
+      bound: { validity_days: 30, digest: 'sha256', template_id: 3 },
+      renamed: { validity_days: 30, digest: 'sha256', template_id: 3 },
+    }
+    const saved = {
+      bound: { validity_days: 30, digest: 'sha256', template_id: 5 },
+      before: { validity_days: 30, digest: 'sha256', template_id: 3 },
+    }
+    render(<ProfilesEditor value={value} saved={saved} onChange={() => {}} templates={templates} />)
+    for (const select of templateSelects()) expect(select.textContent).not.toContain('Retired')
   })
 })
+
+// Each row renders a digest select then a template select
+const templateSelects = () => screen.getAllByTestId('select').filter(s => s.textContent.includes('acme.noTemplate'))

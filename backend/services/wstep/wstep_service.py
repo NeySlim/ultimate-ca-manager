@@ -836,7 +836,7 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     matched_template, refusal = _match_template(ca, csr)
     if refusal:
         return None, refusal
-    # Pins all deactivated: the CA offers nothing, and nothing would carry its Enroll ACL
+    # No active template offered (pins all off, or none active at all): nothing would carry an Enroll ACL
     if matched_template is None and not _ca_templates(ca):
         return None, 'This CA offers no certificate template'
     template_oid = None
