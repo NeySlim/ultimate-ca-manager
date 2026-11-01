@@ -16,7 +16,7 @@ from models import Certificate, CA, db
 from services.audit_service import AuditService
 from utils.cert_issuer import find_ca_by_ski, private_key_matches, stored_private_key_matches
 from services.import_service import (
-    parse_certificate_file, is_ca_certificate, extract_cert_info,
+    KeyPasswordError, parse_certificate_file, is_ca_certificate, extract_cert_info,
     find_existing_ca_for_import, cross_mode_from, finish_cross_attach,
     find_existing_certificate, find_pending_csr_for_certificate,
     AmbiguousImportTarget, CrossCertificateImport, ImportConflict, update_ca_from_import, install_on_pending_ca, stored_certificate_serial,
@@ -392,7 +392,7 @@ def import_certificate():
     except FipsRestricted:
         db.session.rollback()
         raise  # the app handler answers 400 with the FIPS problem type
-    except MalformedKey as e:
+    except (MalformedKey, KeyPasswordError) as e:
         db.session.rollback()
         return error_response(str(e), 400)
     except ValueError as e:

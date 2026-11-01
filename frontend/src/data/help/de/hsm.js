@@ -35,6 +35,16 @@ export default {
           { label: 'Migration', text: 'Bestehende lokale CAs können nach der Erstellung nicht in einen HSM verschoben werden, bei der Erstellung wählen' },
         ]
       },
+      {
+        title: 'ML-DSA-Schlüssel',
+        content: 'ML-DSA-44-, ML-DSA-65- und ML-DSA-87-Schlüssel (FIPS 204) werden nur bei Anbietern angeboten, die damit signieren. Sie signieren die Daten selbst, daher wird kein Digest gewählt.',
+        items: [
+          { label: 'PKCS#11', text: 'Ein Token, das PKCS#11 3.2 mit den ML-DSA-Mechanismen implementiert' },
+          { label: 'OpenBao / Vault Transit', text: 'Transit-Schlüsseltypen mldsa-44, mldsa-65 und mldsa-87' },
+          { label: 'Google Cloud KMS', text: 'Schlüsselversionen PQ_SIGN_ML_DSA, aus der KMS-API abgebildet, aber noch nicht gegen den Dienst getestet. KMS signiert höchstens 64 KiB Daten, daher kann eine größere CRL nicht signiert werden' },
+          { label: 'Nicht verfügbar', text: 'Die Anbieter Azure Key Vault und AWS CloudHSM halten keinen ML-DSA-Schlüssel, und der FIPS-Modus lehnt ML-DSA bei jedem Anbieter ab' },
+        ]
+      },
 
     ],
     tips: [
@@ -104,6 +114,7 @@ Konfiguration:
 Unterstützte Schlüsseltypen:
 - RSA 2048, 3072, 4096
 - ECDSA P-256, P-384, P-521
+- ML-DSA-44, ML-DSA-65, ML-DSA-87 (Transit-Schlüssel \`mldsa-*\`, bei einer OpenBao-Version, die sie enthält)
 - AES-256-GCM (symmetrisch)
 
 > 💡 OpenBao ist ein Community-Fork von HashiCorp Vault. UCM funktioniert mit beiden.
@@ -136,6 +147,14 @@ Jeder Anbieter zeigt einen Verbindungsstatusindikator:
 5. Klicken Sie auf **Generieren**
 
 Der Schlüssel wird direkt auf dem HSM erstellt. UCM speichert nur eine Referenz.
+
+### ML-DSA-Schlüssel
+ML-DSA-44, ML-DSA-65 und ML-DSA-87 (FIPS 204) werden nur bei Anbietern angeboten, die damit signieren:
+- **PKCS#11**: ein Token, das PKCS#11 3.2 mit den ML-DSA-Mechanismen implementiert
+- **OpenBao / Vault Transit**: Schlüsseltypen \`mldsa-44\`, \`mldsa-65\` und \`mldsa-87\`
+- **Google Cloud KMS**: Schlüsselversionen \`PQ_SIGN_ML_DSA_*\`, aus der KMS-API abgebildet, aber noch nicht gegen den Dienst getestet. KMS signiert höchstens 64 KiB Daten, daher kann eine größere CRL nicht signiert werden
+
+Die Anbieter Azure Key Vault und AWS CloudHSM halten keinen ML-DSA-Schlüssel, und der FIPS-Modus lehnt ML-DSA bei jedem Anbieter ab. Ein ML-DSA-Schlüssel signiert die Daten selbst, daher wird kein Digest gewählt.
 
 ### HSM-Schlüssel verwenden
 Wählen Sie beim Erstellen einer CA einen HSM-Anbieter und -Schlüssel anstatt einen Software-Schlüssel zu generieren. Die Signierungsvorgänge der CA werden auf dem HSM ausgeführt.

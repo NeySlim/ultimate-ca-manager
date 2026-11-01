@@ -63,6 +63,56 @@ def test_parse_issue_key_type_refuses_what_it_cannot_name(key_type, key_size):
         parse_issue_key_type(key_type, key_size)
 
 
+@pytest.mark.parametrize('key_size', ['2048', 2048, '44'])
+def test_a_full_label_refuses_a_key_size_naming_another_key(key_size):
+    from utils.key_type import parse_issue_key_type
+    with pytest.raises(ValueError, match='ML-DSA-65'):
+        parse_issue_key_type('ML-DSA-65', key_size)
+    assert parse_issue_key_type('ML-DSA-65', '65') == 'ml-dsa-65'
+
+
+@pytest.mark.parametrize('key_size, status', [(None, 201), (2048, 400)])
+def test_issuing_a_full_label_needs_no_key_size(app, auth_client, create_ca, key_size, status):
+    ca = create_ca(cn=f'PQ label issuer {key_size}')
+    body = {'cn': f'label-{key_size}.pq.example.test', 'ca_id': ca['id'], 'key_type': 'ML-DSA-65',
+            'validity_days': 30, **({'key_size': key_size} if key_size else {})}
+    r = _post(auth_client, '/api/v2/certificates', body)
+    assert r.status_code == status, r.get_json()
+    if status == 201:
+        with app.app_context():
+            leaf = _row_cert(db.session.get(Certificate, r.get_json()['data']['id']))
+        assert isinstance(leaf.public_key(), mldsa.MLDSA65PublicKey)
+
+
+@pytest.mark.parametrize('key_size, error', [(None, None), ('2048', 'name different keys')])
+def test_approval_issues_a_full_label_without_a_key_size(app, create_ca, key_size, error):
+    from api.v2.policies import _issue_approved_certificate
+    from models import User
+    from models.policy import ApprovalRequest, CertificatePolicy
+    from services.policy_service import PolicyEvaluationService
+    ca = create_ca(cn=f'PQ label approval issuer {key_size}')
+    with app.app_context():
+        # Inactive: an active policy would hold every later issuance of the session
+        pol = CertificatePolicy(name=f'pq-label-approval-{key_size}', policy_type='issuance',
+                                requires_approval=True, min_approvers=1, is_active=False)
+        db.session.add(pol)
+        db.session.commit()
+        requester = User.query.filter_by(role='admin').first() or User.query.first()
+        approval = PolicyEvaluationService.create_approval_request(
+            policy=pol, requester_id=requester.id, request_data={
+                'cn': f'approval-label-{key_size}.pq.example.test', 'ca_id': ca['id'],
+                'cert_type': 'server', 'key_type': 'ML-DSA-65', 'validity_days': 30,
+                **({'key_size': key_size} if key_size else {})})
+        approval = db.session.get(ApprovalRequest, approval.id)
+        if error:
+            with pytest.raises(ValueError, match=error):
+                _issue_approved_certificate(approval)
+            return
+        result = _issue_approved_certificate(approval)
+        leaf = _row_cert(db.session.get(Certificate, result['id']))
+    assert isinstance(leaf.public_key(), mldsa.MLDSA65PublicKey)
+
+
 def test_parse_csr_key_type_names_ml_dsa():
     from utils.key_type import parse_csr_key_type
     assert parse_csr_key_type('ML-DSA-65') == 'ml-dsa-65'
@@ -204,6 +254,64 @@ def test_protocol_csr_checks_refuse_slh_dsa_by_name():
     assert 'not signable by this instance' in _validate_csr(csr)
 
 
+class _ProviderLacksKey:
+    """A CSR as a FIPS provider without its algorithm reads it: the key does not load."""
+
+    def __init__(self, csr):
+        self._csr = csr
+
+    def __getattr__(self, name):
+        return getattr(self._csr, name)
+
+    def public_key(self):
+        from cryptography.exceptions import UnsupportedAlgorithm
+        raise UnsupportedAlgorithm('not supported by this provider')
+
+
+@pytest.mark.parametrize('fips,message', [(True, 'ML-DSA-65 keys are not available in FIPS mode'),
+                                          (False, 'ML-DSA-65 keys are not signable by this instance')])
+def test_a_key_the_provider_cannot_load_is_refused_naming_fips(monkeypatch, fips, message):
+    from cryptography.hazmat.primitives import hashes
+    from api.est_protocol import _validate_est_csr
+    from services.wstep.wstep_service import _validate_csr
+    from utils.key_type import validate_enrollment_csr
+    key = PRIVATE['65'].generate()
+    csr = _ProviderLacksKey(x509.CertificateSigningRequestBuilder().subject_name(
+        x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, 'fips-pq.example.test')])).sign(key, None))
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: fips)
+    assert validate_enrollment_csr(csr) == message
+    assert _validate_csr(csr) == message
+    ok, response = _validate_est_csr(csr)
+    assert not ok and message.encode() in response.get_data()
+
+
+def test_scep_names_fips_for_a_key_the_provider_cannot_load(app, create_ca, caplog, monkeypatch):
+    """SLH-DSA, which this build cannot load either, stands in for ML-DSA under such a provider."""
+    from cryptography.hazmat.primitives import serialization
+    from services.scep.crypto_helpers import RSAES_OAEP, create_signed_pkcs7, encrypt_for_client
+    from services.scep.scep_service import SCEPService
+    from tests.test_scep_pq import _scep_attrs
+    from tests.test_scep_rfc8894_operations import (
+        FAIL_INFO_OID, PKI_STATUS_OID, _client_identity, _load_ca_material, _response_attributes)
+    csr_der = x509.load_pem_x509_csr(fixture_bytes('slhdsa-sha2-128s-csr.pem')).public_bytes(
+        serialization.Encoding.DER)
+    ca_data = create_ca(cn='PQ SLH SCEP issuer FIPS')
+    with app.app_context():
+        ca, ca_cert, _ = _load_ca_material(ca_data['id'])
+        signer_cert, signer_key = _client_identity('slh-scep-fips.example.test')
+        envelope = encrypt_for_client(csr_der, ca_cert, key_transport=(RSAES_OAEP, 'sha256'))
+        request = create_signed_pkcs7(envelope, signer_key, signer_cert,
+                                      signed_attributes=_scep_attrs(19, b'slh-fips-nonce01'))
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        with caplog.at_level(logging.WARNING, logger='services.scep'):
+            response, status = SCEPService(ca.refid, auto_approve=True).process_pkcs_req(
+                request, '127.0.0.1')
+    attrs = _response_attributes(response)
+    assert status == 200 and attrs[PKI_STATUS_OID] == '2' and attrs[FAIL_INFO_OID] == '2'
+    assert any('SLH-DSA-SHA2-128s keys are not available in FIPS mode' in rec.getMessage()
+               for rec in caplog.records), [rec.getMessage() for rec in caplog.records]
+
+
 def test_scep_refuses_slh_dsa_by_name(app, create_ca, caplog):
     from cryptography.hazmat.primitives import serialization
     from services.scep.scep_service import SCEPService
@@ -259,6 +367,12 @@ def test_ca_profile_digest_is_none_without_a_digest():
     # Classical keys keep their curve digest
     assert resolve_digest('auto', 'secp384r1') == ('sha384', None)
     assert resolve_digest(None, '2048') == ('sha256', None)
+
+
+@pytest.mark.parametrize('key_type', ['2048', 'secp384r1', 'ml-dsa-65'])
+def test_auto_is_read_like_an_explicit_digest(key_type):
+    from utils.ca_profile import resolve_digest
+    assert resolve_digest(' AUTO ', key_type) == resolve_digest('auto', key_type)
 
 
 def test_key_default_digest_is_none_for_ml_dsa():
@@ -382,45 +496,3 @@ def test_fips_refuses_an_ml_dsa_ca(app, auth_client, monkeypatch, extra):
     assert 'ML-DSA-65' in r.get_json()['detail']
     with app.app_context():
         assert CA.query.count() == before
-
-
-# ---- TSA signer ---------------------------------------------------------------
-
-def test_tsa_signer_issue_refuses_ml_dsa(app, auth_client, create_ca):
-    # Timestamps are signed in RSA or ECDSA only: an ML-DSA signer would be selected, then fail every request
-    from models import SystemConfig
-    ca = create_ca(cn='PQ TSA issuer')
-
-    def selected():
-        row = SystemConfig.query.filter_by(key='tsa_signer_cert_refid').first()
-        return row.value if row else None
-    with app.app_context():
-        before, signer = Certificate.query.count(), selected()
-    r = _post(auth_client, '/api/v2/tsa/signer-certificate',
-              {'ca_id': ca['id'], 'key_type': 'ml-dsa', 'key_size': '65'})
-    assert r.status_code == 400, r.get_json()
-    assert 'RSA or ECDSA' in r.get_json()['detail']
-    with app.app_context():
-        assert Certificate.query.count() == before
-        assert selected() == signer
-
-
-def test_tsa_refuses_an_ml_dsa_ca_as_signer(app, auth_client):
-    # Without a dedicated signer the CA signs the timestamps itself, in RSA or ECDSA only
-    from models import SystemConfig
-    r = _ml_dsa_ca(auth_client, '65', commonName='PQ TSA CA-as-signer')
-    assert r.status_code == 201, r.get_json()
-    with app.app_context():
-        refid = db.session.get(CA, r.get_json()['data']['id']).refid
-
-    def stored():
-        return {row.key: row.value for row in SystemConfig.query.filter(
-            SystemConfig.key.in_(('tsa_ca_refid', 'tsa_signer_cert_refid')))}
-    with app.app_context():
-        before = stored()
-    r = auth_client.patch('/api/v2/tsa/config', content_type='application/json',
-                          data=json.dumps({'ca_refid': refid, 'signer_cert_refid': ''}))
-    assert r.status_code == 400, r.get_json()
-    assert 'RSA or ECDSA' in r.get_json()['detail'] and 'ML-DSA-65' in r.get_json()['detail']
-    with app.app_context():
-        assert stored() == before

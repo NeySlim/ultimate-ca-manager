@@ -29,11 +29,33 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - The Create CA, Issue Certificate, Generate CSR and template forms offer ML-DSA-44, ML-DSA-65 and ML-DSA-87, and Create CA hides the signature hash when the key that signs takes none. These keys are not offered in FIPS mode or on an HSM.
 
+- Hybrid certificate pairs (RFC 9763): the Issue Certificate form and `POST /api/v2/certificates` with `hybrid: {classical, pq}` issue a classical certificate and an ML-DSA one whose relatedCertificate extension names it. The pair is shown linked, revokes together and renews together when the server holds both keys, unless the operator unticks the box, and exports as one `hybrid-bundle` ZIP.
+
+- A CSR carrying a relatedCertRequest (RFC 9763) signed by the key of a certificate held here is checked before signing on Sign CSR, ACME, EST and WSTEP, and the new certificate is linked to it; `POST /api/v2/csrs` builds one with `related_to`, which needs `read:private_keys` and is audited. A newer certificate naming the same A takes over the pair, and ACME revocation revokes only the certificate presented. Such a pair satisfies the `pq_standalone` rule of compliance profiles.
+
+- ACME: the local server finalizes ML-DSA CSRs, and the ACME client orders ML-DSA-44, ML-DSA-65 and ML-DSA-87 certificate keys outside FIPS mode. A default key type the client cannot generate now fails the order instead of falling back to RSA-2048.
+
+- EST, SCEP and WSTEP enrol ML-DSA keys: SCEP verifies ML-DSA CMS signers as RFC 9882 sets out, and XCEP announces ML-DSA templates in policy schema 3 with the software KSP. EST /serverkeygen still generates RSA-2048 and ignores the request key, ML-DSA included (RFC 7030).
+
+- TSA: a timestamp signer can be ML-DSA-65 or ML-DSA-87 (RFC 9882), issued from the TSA page or as an ML-DSA CA signing directly.
+
+- HSM: ML-DSA-44, ML-DSA-65 and ML-DSA-87 keys can be generated on PKCS#11 3.2 tokens, OpenBao Transit and Google Cloud KMS, and a CA on such a key signs certificates, CRLs and OCSP responses. Google Cloud KMS support follows the KMS API but is not yet tested against the service, and the forms say so; Azure Key Vault and AWS CloudHSM refuse ML-DSA with the reason.
+
+- Compliance profiles: ANSSI, BSI and EU ACM accept ML-DSA-65 and ML-DSA-87 as the post-quantum member of a hybrid pair, never alone.
+
+- The effective policy endpoint reports `ml_dsa`, and key type forms, the ACME client's included, offer ML-DSA only on a build that has it and outside FIPS mode. The FIPS preflight reports ML-DSA CAs under a new `ca.unapproved_algorithm` check and lists ACME client orders whose CSR key FIPS does not approve.
+
+- The "Certificates Only" API key scope now covers SSH certificates (`read:ssh`, `write:ssh`) and reads SSH CAs (thanks @danielrona).
+
 ### Changed
 
-- CRL settings: the CRL digest of an Ed25519, Ed448 or ML-DSA authority is reported as empty, setting one answers 400, and the CRL page no longer offers it.
+- CRL settings: the CRL digest of an Ed25519, Ed448 or ML-DSA authority is reported as empty and setting one answers 400; the CRL page only offers to clear one saved before.
 
 - Issuance: an unknown `keyAlgo` on `POST /api/v2/cas`, or an unknown key type on a certificate, CSR or template, now answers 400 instead of falling back to RSA-2048. SLH-DSA CSRs are refused as not signable by this instance.
+
+- SSH CA routes now require the new `read:ssh_cas`, `write:ssh_cas` and `delete:ssh_cas` scopes, so `write:ssh` no longer creates or edits SSH CAs. Upgrade note: roles, groups and API keys holding an SSH scope receive the matching `ssh_cas` scope on upgrade and when an older backup is restored.
+
+- FIPS mode: the ACME client, EST, SCEP and WSTEP refuse a CSR key FIPS does not approve (RSA under 2048 bits, Brainpool, EdDSA, ML-DSA, SLH-DSA) with a message that names FIPS, before checking the CSR signature.
 
 ### Fixed
 
@@ -50,6 +72,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Smart import: an encrypted private key was kept in its encrypted form and silently dropped on import; the decrypted key is now matched and stored. A wrong key password now stops the import with its reason instead of importing the certificate alone, and a key given with a password it does not need is read.
 
 - Key uploads, the key matcher and the converter: a malformed key now answers 400 with its reason instead of a generic error, or of a 200 that returned the certificate alone.
+
+- Generate CSR now offers RSA-3072, and re-keying an RSA-3072 request keeps that size. Create CA's "Use existing key" lists only the HSM keys the policies, the compliance profile and FIPS mode allow.
+
+- ACME client settings now flag a saved certificate key type this server no longer offers, instead of showing an empty field.
 
 - Template preview: an RSA-2048 template was shown as "RSA-2048 256-bit"; it now shows the key's name.
 
@@ -68,10 +94,29 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Settings: the mTLS trusted CA picker hid CAs without a key, although the trusted CA is the anchor of client certificates; it now lists every CA whose certificate is not revoked, keyless or offline included, and keeps the saved one. The ACME domain form no longer puts a space between two Japanese or Chinese sentences.
 
 - API: an HTTP error without a dedicated handler, such as the login attempt limit or a request whose body is not JSON, answered 500 with a stack trace in the log; it now keeps its own status (429, 415...) and headers. A POST to `/api/v2/auth/methods` answers like the GET, whatever its body.
+- Behind a reverse proxy that sent `Connection: upgrade` on every request, a request with a body, such as the login, hung until the proxy timed out: the server took it for a WebSocket handshake. Only a request with `Upgrade: websocket` is now treated as one.
+
+- ACME server: revoking a certificate with its own key, when that key cannot sign a request (EdDSA, Brainpool, ML-DSA), answered a bare 403; the answer now says to revoke with the ordering account.
+
+- Certificates issued through ACME, SCEP, EST, WSTEP and Microsoft CA connections, or renewed, were stored without their key identifiers, or in lower case, so ACME renewalInfo answered 404 and the issuing CA was not found by them; they are now recorded with the certificate.
+
+- Import: a certificate or CA with an encrypted private key and a wrong or missing password, or with a key that could not be read, was imported without its key; the import now answers 400 with the reason. Key uploads say whether a password is missing or wrong, and smart import tries every per-file password the form sends instead of ignoring them. Smart import also ignored the objects left unselected and the Import keys option, and now offers Import CSRs.
+
+- WSTEP: a request matched to a template by its EKUs could be issued with a key of another kind than the template's; it is now refused with the template's key type.
+
+- HSM: AWS CloudHSM providers accepted Brainpool keys the module cannot generate and failed with a 500; they now answer 400 with the reason. OpenBao no longer signs with a key type it cannot name, and a Google Cloud KMS key version without a digest is refused instead of signed with SHA-256.
+
+- CSRs: re-keying a Brainpool or ML-DSA CSR in FIPS mode sent a key type the server refuses; the form now falls back to the first key type it offers.
+
+- Certificates: a direct `/certificates/{id}` link closed its detail window at once when "Close on navigate" was on.
 
 ### Security
 
 - dnspython 2.9.1 (CVE-2026-114605): a DNS message with a long chain of compression pointers, sent to the RFC 2136 listener or returned by a resolver, could hold a CPU. The listener reads compressed names the same way under the new version.
+
+- ACME server: `revoke-cert` signed with a certificate's own key found the stored certificate by serial only, so a self-signed certificate forged with the serial of an issued one revoked it. Revocation now acts only on the stored certificate, byte for byte.
+
+- Smart import: an encrypted key or PKCS#12 file could ask for any number of key-derivation iterations. Costs above 2 million PBKDF2 or PKCS#12 MAC iterations, or scrypt above N=2^20, are now refused without being run, and a request makes at most 64 password attempts.
 
 ## [2.247] - 2026-10-30
 

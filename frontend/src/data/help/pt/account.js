@@ -123,7 +123,7 @@ X-API-Key: <sua-chave-de-api>
 Ou envie-a como token bearer: \`Authorization: Bearer <sua-chave-de-api>\`.
 
 ### Permissões
-Cada chave tem o escopo escolhido na criação (**Acesso total**, **Somente leitura**, **Leitura e escrita**, **Apenas certificados**) e nunca mais acesso do que sua conta. Uma chave só pode criar ou regenerar uma chave cujas permissões ela própria possui.
+Cada chave tem o escopo escolhido na criação (**Acesso total**, **Somente leitura**, **Leitura e escrita**, **Apenas certificados**) e nunca mais acesso do que sua conta. **Apenas certificados** emite certificados X.509 e SSH e lê as CAs, as CAs SSH e as CRLs, mas não pode criar nem alterar uma CA. Uma chave só pode criar ou regenerar uma chave cujas permissões ela própria possui.
 
 As chaves de API, mesmo as de Acesso total, não podem alterar seu perfil, senha, 2FA, chaves de segurança, certificados mTLS ou sessões, nem alcançar sua própria conta pelas ações de administração de usuários: isso exige uma sessão interativa.
 

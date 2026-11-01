@@ -21,6 +21,7 @@ export default {
           { label: 'CA firmataria', text: 'Seleziona quale CA firma i certificati iscritti tramite SCEP. I dispositivi cifrano la richiesta verso questa CA, che deve quindi avere una chiave RSA in software: le CA EC, basate su HSM, senza chiave, offline e revocate non sono elencate (v2.248)' },
           { label: 'Approvazione automatica', text: 'Approva automaticamente le richieste con challenge password valide' },
           { label: 'Challenge Password', text: 'Segreto condiviso che i dispositivi usano per autenticare l\'iscrizione' },
+          { label: 'Chiavi del dispositivo (v2.248)', text: 'Un dispositivo firma la richiesta con una chiave RSA, ECDSA, Ed25519 o ML-DSA; una firma ML-DSA segue la RFC 9882 (digest SHA-512). Ed448 è rifiutato, e anche ML-DSA in modalità FIPS' },
         ]
       },
       {
@@ -100,6 +101,9 @@ Mostra l'URL dell'endpoint SCEP e le istruzioni di integrazione.
 4. UCM valida la challenge password
 5. Se l'approvazione automatica è attiva, UCM firma e restituisce il certificato
 6. Se l'approvazione automatica è disattivata, un amministratore rivede e approva/rifiuta
+
+### Chiavi del dispositivo
+Il dispositivo firma il proprio PKCSReq con la propria chiave: RSA, ECDSA, Ed25519 o ML-DSA. Una firma ML-DSA viene verificata secondo la RFC 9882 (digest SHA-512, identificatore di algoritmo della chiave stessa, nessun parametro). Le firme Ed448 sono rifiutate, e anche quelle ML-DSA in modalità FIPS. La richiesta resta cifrata verso la CA firmataria RSA.
 
 ## URL SCEP
 

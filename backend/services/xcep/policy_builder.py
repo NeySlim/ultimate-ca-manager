@@ -63,8 +63,9 @@ AUTH_USERNAME_PASSWORD = 4
 AUTH_CLIENT_CERTIFICATE = 8
 
 # oIDs/oID/group -- real MS-XCEP enum values (see module docstring).
-# No group entry for the key algorithm OID: algorithmOIDReference is
-# always nil (real-ADCS trace), so there's no reference to mint.
+# algorithmOIDReference stays nil for RSA and ECDSA (real-ADCS trace); only an
+# ML-DSA template names its key algorithm, by its RFC 9881 OID.
+_GROUP_PUBLIC_KEY = 3  # "Public key identifier"
 _GROUP_POLICY = 9  # "Enrollment object identifier" (the template's own OID)
 _GROUP_EXTENSION = 6  # "Certificate extension or attribute identifier"
 _GROUP_HASH_ALGORITHM = 1  # "Hash algorithm identifier"
@@ -101,7 +102,7 @@ _KEY_USAGE_BITS = {
 }
 
 # Families XCEP can describe to a Windows client (keySpec, provider, length).
-_XCEP_KEY_FAMILIES = ('RSA', 'EC')
+_XCEP_KEY_FAMILIES = ('RSA', 'EC', 'ML-DSA')
 # EC curves with an ECDSA_P<bits> CNG algorithm. Brainpool is left out: a real
 # Windows enrollment over XCEP in Brainpool has not been tested.
 _XCEP_EC_CURVES = ('P256', 'P384', 'P521')
@@ -119,6 +120,10 @@ _RSA_KEY_SPEC = '1'
 _RSA_CRYPTO_PROVIDERS = ('Microsoft Enhanced RSA and AES Cryptographic Provider',)
 # ECDSA, and RSA in FIPS mode: schema 3 + KSP is the only path where Windows honors the request hash.
 _KSP_CRYPTO_PROVIDERS = ('Microsoft Software Key Storage Provider',)
+# ML-DSA signs only (AT_SIGNATURE). The CNG algorithm name a client derives from
+# the OID has not been checked against a real Windows enrollment yet.
+_SIGNATURE_KEY_SPEC = '2'
+_MLDSA_OIDS = {a.label: a.oid for a in key_algorithms.algorithms('ML-DSA')}
 
 # subjectNameFlags: client supplies Subject (0x1) + SubjectAltName (0x10000).
 # Matches how EST/SCEP already accept a client-supplied CSR subject/SAN
@@ -239,6 +244,9 @@ def _key_type_info(key_type):
         return None
     if alg.family == 'EC' and alg.param not in _XCEP_EC_CURVES:
         return None
+    if alg.family == 'ML-DSA':
+        # Refused at enrollment in FIPS mode; no key length (FIPS 204 fixes it per set)
+        return None if fips_mode.enabled() else (alg.label, 0)
     return ('RSA' if alg.family == 'RSA' else f'ECDSA_{alg.param}'), alg.key_size
 
 
@@ -412,10 +420,12 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         cas_el = etree.SubElement(policy, '{%s}cAs' % XCEP_NS)
         etree.SubElement(cas_el, '{%s}cAReference' % XCEP_NS).text = str(ca_ref_id)
 
+        # algorithmOIDReference and a KSP, which an ML-DSA template needs, are v3 attributes
+        mldsa_oid = _MLDSA_OIDS.get(algo_name)
         attributes = etree.SubElement(policy, '{%s}attributes' % XCEP_NS)
         etree.SubElement(attributes, '{%s}commonName' % XCEP_NS).text = template.name
         etree.SubElement(attributes, '{%s}policySchema' % XCEP_NS).text = (
-            '3' if pin_request_hash else '2'
+            '3' if pin_request_hash or mldsa_oid is not None else '2'
         )
 
         validity = etree.SubElement(attributes, '{%s}certificateValidity' % XCEP_NS)
@@ -447,18 +457,25 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         # are required-but-nillable (see _nil_element's docstring), so they
         # must appear even when nil. Outside FIPS mode keySpec and cryptoProviders
         # are populated per the real-ADCS trace referenced in the module
-        # docstring; algorithmOIDReference stays nil (same trace).
+        # docstring; algorithmOIDReference stays nil (same trace) except for ML-DSA.
         is_ecdsa = algo_name.startswith('ECDSA')
-        use_ksp = is_ecdsa or pin_request_hash
+        use_ksp = is_ecdsa or mldsa_oid is not None or pin_request_hash
         pk_attrs = etree.SubElement(attributes, '{%s}privateKeyAttributes' % XCEP_NS)
         etree.SubElement(pk_attrs, '{%s}minimalKeyLength' % XCEP_NS).text = str(min_key_length)
-        if use_ksp:
+        if mldsa_oid is not None:
+            etree.SubElement(pk_attrs, '{%s}keySpec' % XCEP_NS).text = _SIGNATURE_KEY_SPEC
+        elif use_ksp:
             _nil_element(pk_attrs, 'keySpec')
         else:
             etree.SubElement(pk_attrs, '{%s}keySpec' % XCEP_NS).text = _RSA_KEY_SPEC
         _nil_element(pk_attrs, 'keyUsageProperty')
         _nil_element(pk_attrs, 'permissions')
-        _nil_element(pk_attrs, 'algorithmOIDReference')
+        if mldsa_oid is not None:
+            # Without it the client would generate the default (RSA) key
+            algo_ref = oids.ref(mldsa_oid, group=_GROUP_PUBLIC_KEY, default_name=algo_name)
+            etree.SubElement(pk_attrs, '{%s}algorithmOIDReference' % XCEP_NS).text = str(algo_ref)
+        else:
+            _nil_element(pk_attrs, 'algorithmOIDReference')
         crypto_providers = etree.SubElement(pk_attrs, '{%s}cryptoProviders' % XCEP_NS)
         provider_names = _KSP_CRYPTO_PROVIDERS if use_ksp else _RSA_CRYPTO_PROVIDERS
         for provider_name in provider_names:

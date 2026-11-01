@@ -74,7 +74,7 @@ export const helpContent = {
           { label: 'Chain Repair', text: 'Fix broken parent-child relationships automatically' },
           { label: 'Import private key', text: 'Attach the private key of a CA that holds only its certificate, so it can sign' },
           { label: 'Key and validity', text: 'RSA-3072 by default, local or HSM. Validity of 1, 2, 3, 5, 10, 15 or 20 years, or Custom (days) up to 50 years. An RSA-2048 CA that would outlive 2030 is flagged: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026' },
-          { label: 'Post-quantum (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 or ML-DSA-87 (FIPS 204, NIST levels 2, 3 and 5), generated in software only, never on an HSM, and hidden in FIPS mode. An ML-DSA key signs without a separate digest, so the CA, its CRLs and its OCSP responses have no digest to choose. An ML-DSA CA can sign RSA or EC certificates, and an RSA or EC CA can sign an ML-DSA intermediate. Renewal keeps the same level' },
+          { label: 'Post-quantum (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 or ML-DSA-87 (FIPS 204, NIST levels 2, 3 and 5), generated in software or on an HSM provider that holds ML-DSA, and hidden in FIPS mode. An ML-DSA key signs without a separate digest, so the CA, its CRLs and its OCSP responses have no digest to choose. An ML-DSA CA can sign RSA or EC certificates, and an RSA or EC CA can sign an ML-DSA intermediate. Renewal keeps the same level' },
           { label: 'Name constraints', text: 'Advanced Constraints (RFC 5280): permitted and excluded subtrees (DNS, IP range, email) limit the names the CA may certify. For an externally-signed CA they are set by the signing CA' },
           { label: 'RSA signature scheme', text: 'PKCS#1 v1.5 by default, or RSA-PSS (salt as long as the hash) for an RSA CA with a local, PKCS#11 or OpenBao key. It applies to the certificates, CRLs, OCSP responses and SCEP replies the CA signs; timestamps stay PKCS#1 v1.5, the scheme openssl ts -verify checks. "Sign with RSA-PSS" in the CA details switches an existing CA either way: certificates already issued keep their signature' },
           { label: 'Compliance profile', text: 'ANSSI, BSI or EU ACM: rules aligned with a reference text bind what the CA issues (key types, digests, RSA scheme, date horizons, and for EU ACM an HSM-held CA key). Pick one at creation (an intermediate CA is offered its parent profile, otherwise the default set in Settings, About). On an existing CA, the field in the details attaches, changes or removes it: the profile check runs on that CA first, its findings are listed, and you confirm that the rules apply to future issuance only, nothing already issued is re-signed. Needs write:cas, and admin:system to attach or change' },
@@ -218,6 +218,19 @@ export const helpContent = {
         ]
       },
       {
+        title: 'Hybrid certificate pairs (RFC 9763)',
+        icon: Stack,
+        content: 'A classical certificate (A) and an ML-DSA one (B) for the same subject, linked: B carries the relatedCertificate extension naming A by its hash. Clients that know ML-DSA check both; the others keep using A.',
+        items: [
+          { label: 'Issue', text: 'Tick "Issue a hybrid pair" in the Issue Certificate form and choose the classical key and the ML-DSA level; both come from the same CA, with the same subject, names and validity, and B asserts no key usage or EKU that A lacks. Offered only when the policies of the CA allow both, never in FIPS mode. Under the ANSSI, BSI and EU ACM profiles, ML-DSA-65 and ML-DSA-87 are offered in the pair only. A policy that requires approval refuses the pair for now' },
+          { label: 'Linked by request', text: 'A CSR carrying a relatedCertRequest signed by A\'s key (Sign CSR, ACME, EST, WSTEP) issues a B linked to A. A must be held here, valid, unrevoked and an end-entity certificate; a newer B naming the same A takes over the pair' },
+          { label: 'Linked', text: 'Each member carries a Linked badge in the list and in its details, with a link that opens the other member' },
+          { label: 'Revoke', text: 'Revoking one member, alone or in a bulk operation, also revokes the other unless you untick "Also revoke the linked certificate", e.g. to keep A when only the ML-DSA key is compromised; under a policy that requires approval both go together. A warning names the other member when it could not be revoked. ACME revocation revokes only the certificate presented' },
+          { label: 'Renew', text: 'Renewing either member renews both, manually, in bulk or automatically, and the new B names the new A. A member renewed alone, the other being revoked, leaves the pair' },
+          { label: 'Export', text: 'The Hybrid bundle format downloads a ZIP of both certificates, and of both keys when you include the key and may export keys' },
+        ]
+      },
+      {
         title: 'On-disk certificate files (v2.140)',
         icon: HardDrive,
         items: [
@@ -340,6 +353,7 @@ export const helpContent = {
       'A certificate imported for a CSR generated in UCM completes that CSR: the record keeps its private key, so the certificate exports with it',
       'Use Microsoft CA mode to sign CSRs via AD CS when connected to a Windows PKI',
       'A certificate for an ML-DSA key keeps only signature bits: keyEncipherment, dataEncipherment and keyAgreement asked by the template are removed, and the result says so',
+      'A CSR generated with related_to (API, needs read:private_keys) names an existing certificate A: signing it issues a certificate linked to A (RFC 9763), refused if it asserts a key usage or EKU A lacks',
       'When signing, use "Extra EKUs" to add Microsoft RDP, smartcard logon, IPsec or any other dotted OID: the CSR\'s existing EKU is rebuilt with the merged set',
       'When a policy or the issuing CA\'s expiry shortens the requested validity, the result says so: "Issued for N day(s) instead of the M requested", with the reason',
     ],
@@ -414,6 +428,7 @@ export const helpContent = {
           { label: 'CRL deployment', text: 'Attach an SSH/SFTP target to push every regenerated CRL automatically. Each binding selects PEM or DER, its destination path, optional parent CRLs and its own reload command' },
           { label: 'CDP URL', text: 'CRL Distribution Point URL to embed in certificates' },
           { label: 'Validity', text: 'Per-CA CRL validity from 1 day up to 5 years (90d/180d/1y/3y/5y for offline CAs that cannot re-sign on schedule). A warning appears past one year, relying parties may keep stale revocation data for the whole window' },
+          { label: 'Signature digest', text: 'SHA-256, SHA-384 or SHA-512 for an RSA or EC CA. An Ed25519, Ed448 or ML-DSA CA signs without one: a digest stored for it earlier is shown as ignored, with a Clear button' },
           { label: 'External CRL', text: 'Key-less/offline CAs cannot self-sign a CRL, upload one generated next to the offline key from the CA detail view; it is validated (signature, issuer, monotonicity) and served at the same CDP URL (v2.215)' },
         ]
       },
@@ -463,6 +478,7 @@ export const helpContent = {
           { label: 'Signing CA', text: 'Select which CA signs SCEP-enrolled certificates. Devices encrypt their request to this CA, so it must hold an RSA key in software: EC, HSM-backed, keyless, offline and revoked CAs are not listed (v2.248)' },
           { label: 'Auto-Approve', text: 'Automatically approve requests with valid challenge passwords' },
           { label: 'Challenge Password', text: 'Shared secret that devices use to authenticate enrollment' },
+          { label: 'Device keys (v2.248)', text: 'A device signs its request with an RSA, ECDSA, Ed25519 or ML-DSA key; an ML-DSA signature follows RFC 9882 (SHA-512 digest). Ed448 is refused, and ML-DSA too in FIPS mode' },
         ]
       },
       {
@@ -522,7 +538,7 @@ export const helpContent = {
           { label: '/simpleenroll', text: 'Submit a CSR and receive a signed certificate' },
           { label: '/simplereenroll', text: 'Renew an existing certificate (requires mTLS)' },
           { label: '/csrattrs', text: 'Get CSR attributes recommended by the server' },
-          { label: '/serverkeygen', text: 'Server generates the key pair and returns certificate + key' },
+          { label: '/serverkeygen', text: 'Server generates an RSA-2048 key pair and returns certificate + key; the key in the request, ML-DSA included, is ignored (RFC 7030)' },
         ]
       },
     ],
@@ -561,7 +577,7 @@ export const helpContent = {
           { label: 'Policy OID', text: 'Object Identifier for the TSA policy (e.g., 1.2.3.4.1): included in every timestamp response' },
           { label: 'Enable/Disable', text: 'Toggle the TSA endpoint on or off without losing configuration' },
           { label: 'Require dedicated certificate', text: 'Opt-in: refuse to sign timestamps with the CA certificate itself, requires a dedicated end-entity signing certificate with a critical timeStamping EKU (RFC 3161)' },
-                  { label: 'Signing certificate (v2.217)', text: 'Sign tokens with a dedicated end-entity certificate picked from issued certificates (timeStamping EKU, RSA or ECDSA key held by UCM; Ed25519 and Ed448 certificates are not offered). Renewals are followed automatically; an expired or revoked signer fails requests with 503 and never falls back to the CA certificate' },
+                  { label: 'Signing certificate (v2.217)', text: 'Sign tokens with a dedicated end-entity certificate picked from issued certificates (timeStamping EKU, RSA, ECDSA or ML-DSA key held by UCM; Ed25519 and Ed448 certificates are not offered, nor ML-DSA in FIPS mode). Renewals are followed automatically; an expired or revoked signer fails requests with 503 and never falls back to the CA certificate' },
                   { label: 'Generate a signing certificate (v2.218)', text: 'One-click issuance of a purpose-built RFC 3161 signer: CA:FALSE, KeyUsage digitalSignature only, and a critical exclusive timeStamping EKU, the shape strict verifiers (openssl ts -verify) require. Issued from the configured TSA CA and selected automatically when no usable signer is set. The certificate has source "manual": add "manual" to the auto-renewal sources or renew it yourself before expiry' },
         ]
       },
@@ -571,7 +587,7 @@ export const helpContent = {
         items: [
           { label: 'Create Request', text: 'openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq' },
           { label: 'Send to TSA', text: 'curl -H "Content-Type: application/timestamp-query" --data-binary @request.tsq https://your-server/tsa -o response.tsr' },
-          { label: 'Verify', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem' },
+          { label: 'Verify', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem (RSA and ECDSA signers). An ML-DSA token fails openssl ts -verify: check its signature with openssl cms -verify (OpenSSL 3.5 or later), then compare the message imprint with the hash of the file' },
         ]
       },
     ],
@@ -612,7 +628,8 @@ export const helpContent = {
           { label: 'External CA Accounts', text: 'One or more accounts per CA, several accounts can share the same CA directory URL (e.g. two Let\'s Encrypt accounts for administrative separation); an empty Directory URL defaults to Let\'s Encrypt Production' },
           { label: 'Custom Server', text: 'Set a custom ACME directory URL to use any RFC 8555-compliant CA' },
           { label: 'EAB', text: 'External Account Binding support for CAs that require pre-registration (ZeroSSL, HARICA, etc.)' },
-          { label: 'Key Types', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384 for certificate keys' },
+          { label: 'Key Types', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384, ML-DSA-44, ML-DSA-65 or ML-DSA-87 for certificate keys; ML-DSA is not offered in FIPS mode or on a build without it. A configured default this instance cannot generate fails the order instead of falling back to RSA-2048 (v2.248)' },
+          { label: 'Reused key in FIPS mode', text: 'Reusing the key of a source certificate is refused when FIPS mode does not approve that key, ML-DSA included (v2.248)' },
           { label: 'Account Keys', text: 'ES256 (P-256), ES384 (P-384), or RS256 algorithms for ACME account keys' },
           { label: 'DNS Providers', text: 'Configure DNS-01 challenge providers (Cloudflare, Route53, Tencent DNSPod, Plesk, etc.). Plesk goes through its XML API; Verify TLS Certificate can be turned off for a self-signed panel and a DNS propagation delay added' },
           { label: 'Custom Command', text: 'DNS provider type running admin-configured local commands for TXT create/delete, record details passed via DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION environment variables. Absolute binary path required, no shell, configurable timeout' },
@@ -632,6 +649,7 @@ export const helpContent = {
                   { label: 'Local orders (v2.217)', text: 'The Local orders tab lists the built-in server orders with a status filter, per-order delete and a purge action; expired non-issued orders are purged automatically every 6 hours, and a default signing digest applies to orders without a profile. Since v2.218 the purge also removes leftover pending sibling challenges of already-validated authorizations' },
                   { label: 'Profiles and templates (v2.221)', text: 'Certificate profiles (draft-ietf-acme-profiles) are advertised in the directory and selected by the client per order. Each profile sets validity and digest and can bind a certificate template, whose key usage and extended key usage then govern the issued certificate' },
                   { label: 'Default profile', text: 'Most clients request no profile. The default profile, chosen under the profiles, applies to their orders; without one they get 90 days and the default digest' },
+                  { label: 'Revocation (v2.248)', text: 'The certificate a client sends to revoke must match the stored one byte for byte. Only an RSA or EC P-256, P-384 or P-521 certificate key can sign the request itself: revoke an ML-DSA, EdDSA or Brainpool certificate with the account that ordered it' },
         ]
       },
       {
@@ -1092,6 +1110,7 @@ export const helpContent = {
           { label: 'Kerberos/SPNEGO', text: 'Binds the Kerberos-authenticated endpoints used for silent GPO autoenrollment (requires an SPN and a keytab from the domain controller)' },
           { label: 'Setup checklist', text: 'The tab shows a live checklist of what is configured versus still needed, for both manual and unattended enrollment' },
           { label: 'AD-derived subjects', text: 'Templates can opt into deriving their subject/SAN from Active Directory (via the AD Connector) for unattended enrollment' },
+          { label: 'ML-DSA templates (v2.248)', text: 'Announced by their key algorithm OID with the Microsoft Software Key Storage Provider, not yet tested with a real Windows client, and hidden in FIPS mode. Certificate-based renewal cannot use an ML-DSA certificate (XML-DSig has no ML-DSA signature): enroll a new one' },
         ]
       },
       {
@@ -1334,6 +1353,17 @@ export const helpContent = {
           { label: 'Export restrictions', text: 'PKCS#12, JKS and key-only exports are disabled for HSM-backed CAs (only the public certificate / chain can be exported)' },
           { label: 'CRL & OCSP', text: 'Both work transparently with HSM-backed CAs (signed via HSM)' },
           { label: 'Migration', text: 'Existing local CAs cannot be moved to an HSM after creation, choose at creation time' },
+        ]
+      },
+      {
+        title: 'ML-DSA keys',
+        icon: Key,
+        content: 'ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) keys are offered only on providers that sign with them. They sign the data itself, so no digest is chosen.',
+        items: [
+          { label: 'PKCS#11', text: 'A token implementing PKCS#11 3.2 with the ML-DSA mechanisms' },
+          { label: 'OpenBao / Vault Transit', text: 'Transit key types mldsa-44, mldsa-65 and mldsa-87' },
+          { label: 'Google Cloud KMS', text: 'PQ_SIGN_ML_DSA key versions, mapped from the KMS API but not yet tested against the service. KMS signs at most 64 KiB of data, so a CRL larger than that cannot be signed' },
+          { label: 'Not available', text: 'Azure Key Vault and AWS CloudHSM providers hold no ML-DSA key, and FIPS mode refuses ML-DSA on every provider' },
         ]
       },
     ],

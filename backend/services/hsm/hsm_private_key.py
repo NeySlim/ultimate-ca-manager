@@ -1,7 +1,7 @@
 """
 HSM-backed Private Key Wrappers.
 
-Provides RSA/EC private-key wrapper objects that are accepted by the
+Provides RSA/EC/ML-DSA private-key wrapper objects that are accepted by the
 ``cryptography`` library's CertificateBuilder/CertificateRevocationListBuilder
 ``.sign(private_key, ...)`` API but that delegate the actual signing operation
 to a remote HSM via :class:`services.hsm.HsmService`.
@@ -21,6 +21,7 @@ when signing X.509 / CRL structures:
   * ``key_size`` (RSA) / ``curve`` (EC)
   * ``sign(data, padding, algorithm)``     (RSA — PKCS1v15 with SHA-256/384/512)
   * ``sign(data, signature_algorithm)``    (EC  — ECDSA with SHA-256/384/512)
+  * ``sign(data, context=None)``           (ML-DSA — pure, no digest)
 
 For the underlying HSM call we pass the raw ``data`` (the to-be-signed
 bytes that ``cryptography`` already prepared) along with the *key
@@ -40,6 +41,7 @@ from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec, padding, rsa
 from models import db
+from utils import key_algorithms
 
 logger = logging.getLogger(__name__)
 
@@ -220,16 +222,77 @@ class HsmECPrivateKey:
         return f"<HsmECPrivateKey hsm_key_id={self._hsm_key_id}>"
 
 
+class HsmMLDSAPrivateKey:
+    """Wraps an HSM-resident ML-DSA key. One subclass per parameter set, each
+    registered as the pyca class of that set: the builders read the signature
+    OID from the class, so a wrapper of another level would mislabel it."""
+
+    LABEL: Optional[str] = None
+
+    def __init__(self, hsm_key_id: int, public_key, key_algorithm: Optional[str] = None):
+        self._hsm_key_id = hsm_key_id
+        self._public_key = public_key
+        self._key_algorithm = key_algorithm or self.LABEL
+
+    def public_key(self):
+        return self._public_key
+
+    def sign(self, data: bytes, context: Optional[bytes] = None) -> bytes:
+        """Pure ML-DSA over ``data``, no digest; X.509 uses the empty context (RFC 9881)."""
+        from services.hsm import HsmService
+
+        if context:
+            raise UnsupportedAlgorithm('HSM ML-DSA signing takes no context')
+        signature = HsmService.sign(self._hsm_key_id, data, self._key_algorithm)
+        try:
+            self._public_key.verify(signature, data)
+        except InvalidSignature:
+            raise ValueError('The HSM returned an ML-DSA signature that does not verify '
+                             '(another key, parameter set or pre-hash)') from None
+        return signature
+
+    def sign_mu(self, *args, **kwargs):
+        raise NotImplementedError("HSM ML-DSA signing over mu not implemented")
+
+    def private_bytes(self, *args, **kwargs):
+        raise NotImplementedError("HSM-resident ML-DSA key cannot be exported")
+
+    def private_bytes_raw(self):
+        raise NotImplementedError("HSM-resident ML-DSA key cannot be exported")
+
+    def __repr__(self) -> str:
+        return f"<{type(self).__name__} hsm_key_id={self._hsm_key_id}>"
+
+
+class HsmMLDSA44PrivateKey(HsmMLDSAPrivateKey):
+    LABEL = 'ML-DSA-44'
+
+
+class HsmMLDSA65PrivateKey(HsmMLDSAPrivateKey):
+    LABEL = 'ML-DSA-65'
+
+
+class HsmMLDSA87PrivateKey(HsmMLDSAPrivateKey):
+    LABEL = 'ML-DSA-87'
+
+
+_ML_DSA_WRAPPERS = {cls.LABEL: cls for cls in (
+    HsmMLDSA44PrivateKey, HsmMLDSA65PrivateKey, HsmMLDSA87PrivateKey)}
+
 # Register as virtual subclasses so isinstance() in cryptography succeeds.
 rsa.RSAPrivateKey.register(HsmRSAPrivateKey)
 ec.EllipticCurvePrivateKey.register(HsmECPrivateKey)
+# Each ML-DSA wrapper takes the pyca class the registry gives its level
+for _alg in key_algorithms.algorithms('ML-DSA'):
+    _alg.private_class.register(_ML_DSA_WRAPPERS[_alg.label])
 
 
 def load_hsm_private_key(hsm_key_id: int):
     """Build the right wrapper for the given HSM key id.
 
-    Detects RSA vs EC from the cached/published public key and returns
-    either an :class:`HsmRSAPrivateKey` or :class:`HsmECPrivateKey`.
+    Picks the wrapper from the family of the cached/published public key:
+    :class:`HsmRSAPrivateKey`, :class:`HsmECPrivateKey` or the
+    :class:`HsmMLDSAPrivateKey` subclass of its parameter set.
 
     Raises :class:`ValueError` when the key id is invalid or the key
     type is not supported.
@@ -256,10 +319,14 @@ def load_hsm_private_key(hsm_key_id: int):
         backend=default_backend(),
     )
 
-    if isinstance(public_key, rsa.RSAPublicKey):
+    family = key_algorithms.family_for_public_key(public_key)
+    if family == 'RSA':
         return HsmRSAPrivateKey(hsm_key_id, public_key, hsm_key.algorithm)
-    if isinstance(public_key, ec.EllipticCurvePublicKey):
+    if family == 'EC':
         return HsmECPrivateKey(hsm_key_id, public_key, hsm_key.algorithm)
+    if family == 'ML-DSA':
+        label = key_algorithms.label_for_public_key(public_key)
+        return _ML_DSA_WRAPPERS[label](hsm_key_id, public_key, label)
 
     raise ValueError(
         f"Unsupported HSM public key type {type(public_key).__name__} "
@@ -269,4 +336,4 @@ def load_hsm_private_key(hsm_key_id: int):
 
 def is_hsm_private_key(obj) -> bool:
     """True if ``obj`` is one of our HSM wrapper instances."""
-    return isinstance(obj, (HsmRSAPrivateKey, HsmECPrivateKey))
+    return isinstance(obj, (HsmRSAPrivateKey, HsmECPrivateKey, HsmMLDSAPrivateKey))

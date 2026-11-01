@@ -4,6 +4,8 @@ import path from 'path'
 
 export default defineConfig({
   plugins: [react()],
+  // Per checkout: node_modules may be a link shared by several checkouts
+  cacheDir: path.resolve(__dirname, '.vite'),
   define: {
     __APP_VERSION__: JSON.stringify('test'),
   },

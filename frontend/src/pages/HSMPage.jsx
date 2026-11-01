@@ -20,9 +20,9 @@ import { usePermission, useClipboard, usePersistedState } from '../hooks'
 import { hsmService } from '../services'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
 import { secretInputProps } from '../lib/secretTarget'
-import { KEY_GROUPS, isPostQuantum, listAlgorithms } from '../lib/keyAlgorithms'
-import { useFipsMode } from '../lib/policyAlgorithms'
-import { BrainpoolNotice } from '../components/BrainpoolNotice'
+import { KEY_GROUPS, listAlgorithms } from '../lib/keyAlgorithms'
+import { useFipsMode, useKeyPlatform } from '../lib/policyAlgorithms'
+import { BrainpoolNotice, UntestedKeyNotice } from '../components/BrainpoolNotice'
 
 const PROVIDER_TYPES = [
   { value: 'pkcs11', label: 'PKCS#11 (Local HSM)', icon: HardDrive },
@@ -875,11 +875,9 @@ const AES_GROUP = 'aes'
 
 export function KeyModal({ provider, onSave, onClose }) {
   const { t } = useTranslation()
-  const fips = useFipsMode()
+  const platform = useKeyPlatform()
   const providerType = provider?.provider_type ?? ''
-  // A post-quantum row is held only by the providers it names: providers null means none here
-  const asymmetric = listAlgorithms({ generate: true, provider: providerType, fips })
-    .filter(a => !isPostQuantum(a.label) || a.providers?.includes(providerType))
+  const asymmetric = listAlgorithms({ generate: true, provider: providerType, ...platform })
   const groupOptions = [
     ...KEY_GROUPS.filter(g => asymmetric.some(a => a.group === g.id)).map(g => ({ value: g.id, label: t(g.labelKey) })),
     { value: AES_GROUP, label: t('common.keyGroups.aes') },
@@ -895,6 +893,13 @@ export function KeyModal({ provider, onSave, onClose }) {
     purpose: 'signing',
     extractable: false,
   }))
+  // The policy answer can withdraw the group picked before it (ML-DSA in FIPS mode)
+  const groupGone = !groupOptions.some(g => g.value === formData.group)
+  useEffect(() => {
+    if (groupGone) {
+      setFormData(f => ({ ...f, group: groupOptions[0].value, algorithm: algorithmsOf(groupOptions[0].value)[0] }))
+    }
+  }, [groupGone]) // eslint-disable-line react-hooks/exhaustive-deps
 
   const handleSubmit = () => {
     onSave({
@@ -930,6 +935,7 @@ export function KeyModal({ provider, onSave, onClose }) {
         />
       </div>
       <BrainpoolNotice label={formData.algorithm} />
+      <UntestedKeyNotice label={formData.algorithm} provider={providerType} />
       <Select label={t('common.purpose')} value={formData.purpose} onChange={value => setFormData({...formData, purpose: value})} options={[{ value: 'signing', label: t('hsm.purposes.caSigning') }, { value: 'encryption', label: t('common.smtpEncryption') }, { value: 'wrapping', label: t('hsm.purposes.general') }, { value: 'all', label: t('common.all') }]} />
     </FormModal>
   )

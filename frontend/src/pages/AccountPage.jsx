@@ -22,6 +22,7 @@ import { formatDate , downloadBlob} from '../lib/utils'
 import { canExportPrivateKey } from '../lib/exportPermissions'
 import { downloadExport } from '../lib/exportDownload'
 import { reportSilentFailure } from '../lib/silentFailure'
+import { apiKeyScopePermissions } from '../lib/apiKeyScopes'
 
 export default function AccountPage() {
   const { t } = useTranslation()
@@ -293,13 +294,6 @@ export default function AccountPage() {
   }
 
   // API Key handlers
-  const SCOPE_PERMISSIONS = {
-    full: ['*'],
-    read: ['read:*'],
-    readwrite: ['read:*', 'write:*'],
-    certificates: ['read:certificates', 'write:certificates', 'read:cas', 'read:crl'],
-  }
-
   const handleCreateApiKey = async (e) => {
     e?.preventDefault()
     if (!apiKeyForm.name.trim()) {
@@ -314,7 +308,7 @@ export default function AccountPage() {
         : null
       const payload = {
         name: apiKeyForm.name.trim(),
-        permissions: SCOPE_PERMISSIONS[apiKeyForm.scope] || ['*'],
+        permissions: apiKeyScopePermissions(apiKeyForm.scope, hasPermission),
         expires_days: expiresDays,
       }
       const response = await accountService.createApiKey(payload)
@@ -957,7 +951,7 @@ export default function AccountPage() {
               ]}
             />
             <p className="text-xs text-text-tertiary font-mono px-1">
-              {(SCOPE_PERMISSIONS[apiKeyForm.scope] || ['*']).join(', ')}
+              {apiKeyScopePermissions(apiKeyForm.scope, hasPermission).join(', ')}
             </p>
             <Input
               label={t('account.expiresInDays')}

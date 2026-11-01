@@ -1,6 +1,6 @@
 import { useMemo } from 'react'
 import {
-  Certificate, X, Info, CheckCircle, Clock, XCircle, LinkBreak, Archive
+  Certificate, X, Info, CheckCircle, Clock, XCircle, LinkBreak, Archive, LinkSimple
 } from '@phosphor-icons/react'
 import { Badge, KeyIndicator } from '../../components'
 import { formatDate, extractCN, cn, joinCertificateName } from '../../lib/utils'
@@ -36,6 +36,18 @@ export function useCertificateColumns(t) {
     return <Badge variant={source.variant} size={size} dot>{source.label}</Badge>
   }
 
+  // Member of a hybrid pair (RFC 9763), titled with its role
+  const getLinkedBadge = (row) => {
+    if (row.related_certificate_id == null) return null
+    const roleKey = { classical: 'certificates.hybrid.roleClassical', pq: 'certificates.hybrid.rolePq' }[row.hybrid_role]
+    return (
+      <Badge variant="info" size="sm" icon={LinkSimple} data-testid="hybrid-linked-badge"
+        title={t(roleKey || 'certificates.hybrid.relatedCertificate')}>
+        {t('certificates.hybrid.linked')}
+      </Badge>
+    )
+  }
+
   const columns = useMemo(() => [
     {
       key: 'cn',
@@ -59,6 +71,7 @@ export function useCertificateColumns(t) {
           {row.isOrphan && <Badge variant="warning" size="sm" icon={LinkBreak} title={t('certificates.orphanDescription')}>{t('certificates.orphan')}</Badge>}
           {row.archived && <Badge variant="secondary" size="sm" icon={Archive} title={t('certificates.archivedDescription')}>{t('certificates.archived')}</Badge>}
           {getSourceBadge(row, 'sm')}
+          {getLinkedBadge(row)}
         </div>
       ),
       // Mobile: Icon + CN left + status badge right
@@ -185,6 +198,13 @@ export function useCertificateColumns(t) {
           {formatDate(val)}
         </span>
       )
+    },
+    {
+      key: 'related_certificate_id',
+      header: t('certificates.hybrid.column'),
+      hideOnMobile: true,
+      sortable: false,
+      render: (val, row) => getLinkedBadge(row) || <span className="text-xs text-text-tertiary">—</span>,
     },
     {
       key: 'key_type',

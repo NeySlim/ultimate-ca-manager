@@ -1065,21 +1065,6 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
         except cx509.ExtensionNotFound:
             pass
 
-        # Extract AKI/SKI
-        cert_aki, cert_ski = None, None
-        try:
-            aki_ext = cert_obj.extensions.get_extension_for_class(cx509.AuthorityKeyIdentifier)
-            if aki_ext.value.key_identifier:
-                cert_aki = ':'.join(f'{b:02x}' for b in aki_ext.value.key_identifier)
-        except cx509.ExtensionNotFound:
-            pass
-        try:
-            ski_ext = cert_obj.extensions.get_extension_for_class(cx509.SubjectKeyIdentifier)
-            if ski_ext.value.digest:
-                cert_ski = ':'.join(f'{b:02x}' for b in ski_ext.value.digest)
-        except cx509.ExtensionNotFound:
-            pass
-
         # Store as base64-encoded PEM (UCM standard format)
         cert_pem_bytes = cert_obj.public_bytes(encoding=Encoding.PEM)
         cert_pem_b64 = base64.b64encode(cert_pem_bytes).decode('utf-8')
@@ -1095,6 +1080,7 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
         # If a CSR record exists, UPDATE it in-place into a full certificate.
         # This avoids creating a duplicate Certificate row (one CSR + one cert).
         # The CSR's id is reused so existing references (links, audit) stay valid.
+        # aki/ski come from the crt listener, in the form CA lookups match
         if csr is not None:
             csr.crt = cert_pem_b64
             csr.descr = csr.descr or f"MSCA: {cn} ({template})"
@@ -1103,8 +1089,6 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
             csr.subject_cn = cn
             csr.issuer = cert_obj.issuer.rfc4514_string()
             csr.serial_number = serial_hex
-            csr.aki = cert_aki
-            csr.ski = cert_ski
             csr.valid_from = valid_from
             csr.valid_to = valid_to
             # Refresh SANs from issued cert (MS CA may have added/changed entries)
@@ -1131,8 +1115,6 @@ def _import_signed_cert(csr, cert_pem, msca, template, msca_request_id):
                 subject_cn=cn,
                 issuer=cert_obj.issuer.rfc4514_string(),
                 serial_number=serial_hex,
-                aki=cert_aki,
-                ski=cert_ski,
                 valid_from=valid_from,
                 valid_to=valid_to,
                 san_dns=json.dumps(san_dns) if san_dns else None,

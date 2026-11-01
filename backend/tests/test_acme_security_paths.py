@@ -1470,3 +1470,69 @@ class TestARefusedRevocationRevokesNothing:
             assert listed is None, (
                 'the serial reached the revocation list on a revocation the '
                 'server refused')
+
+
+class TestRevocationByAForgedCertificate:
+    """revoke-cert acts on the stored certificate only when the one sent is it, byte for byte."""
+
+    CAREF = 'revoke-forge-ca'
+
+    @pytest.fixture(autouse=True)
+    def _cleaned_up(self, app):
+        yield
+        from models import Certificate, RevokedSerial
+        with app.app_context():
+            RevokedSerial.query.filter_by(caref=self.CAREF).delete(synchronize_session=False)
+            Certificate.query.filter_by(caref=self.CAREF).delete(synchronize_session=False)
+            db.session.commit()
+
+    @staticmethod
+    def _self_signed(key, serial):
+        now = utc_now()
+        name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'revoke-forge.example')])
+        return (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+                .public_key(key.public_key()).serial_number(serial)
+                .not_valid_before(now - timedelta(days=1))
+                .not_valid_after(now + timedelta(days=30))
+                .sign(key, hashes.SHA256()))
+
+    def _victim(self, app):
+        from models import Certificate
+        key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        cert = self._self_signed(key, x509.random_serial_number())
+        with app.app_context():
+            row = Certificate(
+                refid=uuid.uuid4().hex[:13], descr='revoke-forge.example', caref=self.CAREF,
+                serial_number=format(cert.serial_number, 'X'),
+                crt=b64.b64encode(cert.public_bytes(serialization.Encoding.PEM)).decode())
+            db.session.add(row)
+            db.session.commit()
+            return row.id, key, cert
+
+    def _revoke_with(self, client, key, cert):
+        pub = key.public_key().public_numbers()
+        jwk = {'kty': 'RSA', 'n': _int_to_b64(pub.n), 'e': _int_to_b64(pub.e)}
+        der = cert.public_bytes(serialization.Encoding.DER)
+        path = '/acme/revoke-cert'
+        return _post_jws(client, path, _build_jws(
+            f'http://localhost{path}',
+            {'certificate': b64.urlsafe_b64encode(der).rstrip(b'=').decode(), 'reason': 1},
+            key, jwk=jwk, nonce=_nonce(client)))
+
+    def test_a_forged_certificate_with_the_same_serial_revokes_nothing(self, app, client):
+        from models import Certificate
+        cert_id, _, victim = self._victim(app)
+        attacker = rsa.generate_private_key(public_exponent=65537, key_size=2048)
+        forged = self._self_signed(attacker, victim.serial_number)
+        r = self._revoke_with(client, attacker, forged)
+        assert r.status_code == 404, r.get_json()
+        with app.app_context():
+            assert not db.session.get(Certificate, cert_id).revoked
+
+    def test_the_key_of_the_stored_certificate_still_revokes_it(self, app, client):
+        from models import Certificate
+        cert_id, key, cert = self._victim(app)
+        r = self._revoke_with(client, key, cert)
+        assert r.status_code == 200, r.get_json()
+        with app.app_context():
+            assert db.session.get(Certificate, cert_id).revoked

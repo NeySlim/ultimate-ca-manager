@@ -9,7 +9,7 @@ import { daysRemaining } from '../../lib/utils'
 import { ISSUE_KEY_CHOICES, issueKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
 import {
   ISSUE_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmName, defaultKeyChoice, findAlgorithm, groupedOptions,
-  isFipsApproved, keyFamilyOptions,
+  isPostQuantum, isUsable, keyFamilyOptions,
 } from '../../lib/keyAlgorithms'
 import { BrainpoolNotice } from '../../components/BrainpoolNotice'
 
@@ -47,6 +47,10 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
     expiry_date: '',
     ocsp_must_staple: false,
     extra_ekus: [],
+    // Hybrid pair (RFC 9763): two linked certificates, one classical, one ML-DSA
+    hybrid: false,
+    hybrid_classical: '',
+    hybrid_pq: '',
   })
 
   const [knownEkus, setKnownEkus] = useState([])
@@ -133,15 +137,32 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
   }, [initialData])
 
   // Key types the policies of this CA/template allow (#397); the server enforces them regardless
-  const { allowedKeyTypes, fips } = useEffectiveAlgorithms({
+  const { allowedKeyTypes, fips, mldsa, pqStandalone } = useEffectiveAlgorithms({
     caId: formData.ca_id, templateId: selectedTemplate, enabled: !!formData.ca_id,
   })
-  const allowedKeys = useMemo(
+  const pairKeys = useMemo(
     () => ISSUE_KEY_CHOICES.filter(([type, size]) => isAllowed(allowedKeyTypes, issueKeyLabel(type, size))
-      && (!fips || isFipsApproved(issueKeyLabel(type, size)))),
-    [allowedKeyTypes, fips],
+      && isUsable(findAlgorithm(issueKeyLabel(type, size)), { fips, mldsa })),
+    [allowedKeyTypes, fips, mldsa],
+  )
+  // A post-quantum key the policies refuse alone (pq_standalone) is offered in a hybrid pair only
+  const allowedKeys = useMemo(
+    () => (pqStandalone ? pairKeys.filter(([k, sz]) => !isPostQuantum(issueKeyLabel(k, sz))) : pairKeys),
+    [pairKeys, pqStandalone],
   )
   const noKeyAllowed = allowedKeys.length === 0
+  const allowedLabels = useMemo(() => pairKeys.map(([k, sz]) => issueKeyLabel(k, sz)), [pairKeys])
+  const hybridClassical = allowedLabels.filter(l => !isPostQuantum(l))
+  const hybridPq = allowedLabels.filter(isPostQuantum)
+  const hybridAvailable = hybridClassical.length > 0 && hybridPq.length > 0
+  // Each side keeps its choice while allowed, else the form's default key, else the first allowed
+  const pickHybrid = (current, allowed) => (allowed.includes(current) ? current
+    : ISSUE_DEFAULT_LABELS.find(l => allowed.includes(l)) ?? allowed[0] ?? '')
+  const hybridChoice = {
+    classical: pickHybrid(formData.hybrid_classical, hybridClassical),
+    pq: pickHybrid(formData.hybrid_pq, hybridPq),
+  }
+  const isHybrid = formData.hybrid && hybridAvailable
   // The family's default key when allowed, else its first allowed one
   const sizeForType = (type) => {
     const preferred = defaultKeyChoice('issue', type, ISSUE_DEFAULT_LABELS)?.[1]
@@ -323,6 +344,11 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
       email: formData.email || undefined,
       key_type: formData.key_type,
       key_size: formData.key_size,
+      ...(isHybrid && {
+        key_type: findAlgorithm(hybridChoice.classical).issue[0],
+        key_size: findAlgorithm(hybridChoice.classical).issue[1],
+        hybrid: { classical: hybridChoice.classical, pq: hybridChoice.pq },
+      }),
       validity_days,
       ...(san_dns.length && { san_dns }),
       ...(san_ip.length && { san_ip }),
@@ -584,6 +610,41 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
         </Button>
       </div>
 
+      {/* Hybrid pair (RFC 9763): offered when the policies allow a classical and an ML-DSA key */}
+      {hybridAvailable && (
+        <div className="flex items-start gap-3">
+          <input
+            type="checkbox"
+            id="hybrid_pair"
+            checked={formData.hybrid}
+            onChange={(e) => update('hybrid', e.target.checked)}
+            className="w-4 h-4 mt-0.5 rounded border-border accent-accent-primary"
+          />
+          <div>
+            <label htmlFor="hybrid_pair" className="text-sm text-text-secondary cursor-pointer">
+              {t('certificates.hybrid.toggle')}
+            </label>
+            <p className="text-xs text-text-tertiary">{t('certificates.hybrid.toggleHint')}</p>
+          </div>
+        </div>
+      )}
+
+      {isHybrid ? (
+        <div className="grid grid-cols-2 gap-4">
+          <Select
+            label={t('certificates.hybrid.classical')}
+            value={hybridChoice.classical}
+            onChange={(val) => update('hybrid_classical', val)}
+            options={groupedOptions(hybridClassical.map(findAlgorithm), t, k => algorithmName(k, t))}
+          />
+          <Select
+            label={t('certificates.hybrid.pq')}
+            value={hybridChoice.pq}
+            onChange={(val) => update('hybrid_pq', val)}
+            options={groupedOptions(hybridPq.map(findAlgorithm), t, k => algorithmName(k, t))}
+          />
+        </div>
+      ) : (<>
       {/* Key Settings */}
       <div className="grid grid-cols-2 gap-4">
         <Select
@@ -609,6 +670,7 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
       {noKeyAllowed && (
         <p className="text-xs text-status-danger" role="alert">{t('certificates.noKeyTypeAllowedByPolicy')}</p>
       )}
+      </>)}
 
       {/* Validity — days or calendar */}
       <div className="space-y-2">

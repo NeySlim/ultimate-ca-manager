@@ -13,6 +13,7 @@ describe('limitsWithProfile', () => {
   it('leaves the policy limits alone without a profile', () => {
     expect(limitsWithProfile({ allowedKeyTypes: ['RSA-2048'], allowedDigests: null }, undefined)).toEqual({
       allowedKeyTypes: ['RSA-2048'], allowedDigests: null, allowedSchemes: null, horizons: {}, requireHsm: false,
+      pqStandalone: false,
     })
   })
 
@@ -30,6 +31,12 @@ describe('limitsWithProfile', () => {
       { allowedKeyTypes: ['RSA-2048', 'RSA-3072', 'EC-P384'], allowedDigests: ['sha384', 'sha512'] }, BSI)
     expect(limits.allowedKeyTypes).toEqual(['RSA-3072'])
     expect(limits.allowedDigests).toEqual(['sha384'])
+  })
+
+  it('says when a post-quantum key goes in a hybrid pair only', () => {
+    expect(limitsWithProfile({ allowedKeyTypes: null }, { ...BSI, pq_standalone: true }).pqStandalone).toBe(true)
+    expect(limitsWithProfile({ allowedKeyTypes: null, pqStandalone: true }, BSI).pqStandalone).toBe(true)
+    expect(limitsWithProfile({ allowedKeyTypes: null }, BSI).pqStandalone).toBe(false)
   })
 
   it('an empty intersection allows nothing instead of everything', () => {

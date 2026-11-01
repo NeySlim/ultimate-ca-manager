@@ -139,6 +139,37 @@ class TestRenewalInfoEndpoint:
         )
         assert end <= datetime.now(timezone.utc)
 
+    def test_a_csr_signed_as_acme_does_answers_at_once(self, app, client, create_ca):
+        """CertificateService.sign_csr (ACME finalize) stores the AKI: no wait for the backfill."""
+        from cryptography import x509
+        from cryptography.hazmat.primitives import hashes, serialization
+        from cryptography.hazmat.primitives.asymmetric import ec
+        from cryptography.x509.oid import NameOID
+        from models import CA
+        from services.cert_service import CertificateService
+        ca = create_ca(cn='ARI sign_csr CA')
+        key = ec.generate_private_key(ec.SECP256R1())
+        csr = (x509.CertificateSigningRequestBuilder()
+               .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'ari-csr.example.com')]))
+               .add_extension(x509.SubjectAlternativeName([x509.DNSName('ari-csr.example.com')]),
+                              critical=False)
+               .sign(key, hashes.SHA256()))
+        with app.app_context():
+            caref = db.session.get(CA, ca['id']).refid
+            row = Certificate(refid=f'ari-csr-{ca["id"]}', descr='ari-csr.example.com', caref=caref,
+                              csr=base64.b64encode(csr.public_bytes(serialization.Encoding.PEM)).decode())
+            db.session.add(row)
+            db.session.commit()
+            signed = CertificateService.sign_csr(cert_id=row.id, caref=caref, validity_days=30,
+                                                 username='acme')
+            leaf = x509.load_pem_x509_certificate(base64.b64decode(signed.crt))
+            assert signed.ski == leaf.extensions.get_extension_for_class(
+                x509.SubjectKeyIdentifier).value.key_identifier.hex(':').upper()
+        aki = leaf.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier).value.key_identifier
+        n = leaf.serial_number
+        r = client.get(f'/acme/renewalInfo/{_b64url(aki)}.{_b64url(n.to_bytes((n.bit_length() + 7) // 8, "big"))}')
+        assert r.status_code == 200, r.data
+
     def test_malformed_certid(self, client):
         r = client.get('/acme/renewalInfo/not-a-valid-certid')
         assert r.status_code == 400

@@ -398,3 +398,37 @@ def test_the_core_is_what_fips_preflight_runs_on(session):
     assert fips_preflight.DETECTORS is not compliance_preflight.DETECTORS
     broken = preflight_core.Detector('x.broken', 'blocker', 't', 'r', lambda: 1 / 0)
     assert fips_preflight.run([broken])['errors'][0]['id'] == 'x.broken'
+
+
+def _mldsa_ca(descr):
+    from utils import key_algorithms
+    key = key_algorithms.generate('ML-DSA-65')
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, descr)])
+    now = datetime.now(timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name)
+            .public_key(key.public_key()).serial_number(x509.random_serial_number())
+            .not_valid_before(now - timedelta(days=1)).not_valid_after(now + timedelta(days=365))
+            .sign(key, None))
+    ca = CA(refid=str(uuid.uuid4()), descr=descr, crt=_stored(cert), prv='key',
+            valid_to=utc_now() + timedelta(days=365))
+    db.session.add(ca)
+    db.session.flush()
+    return ca
+
+
+@pytest.mark.parametrize('profile', compliance_profiles.PROFILE_NAMES)
+def test_ml_dsa_is_refused_where_it_would_stand_alone(session, profile):
+    from utils import key_algorithms
+    if not key_algorithms.mldsa_supported():
+        pytest.skip('this build has no ML-DSA')
+    session.add(CertificateTemplate(name='mldsa-tpl', template_type='custom', key_type='ML-DSA-65',
+                                    extensions_template='{}'))
+    session.add(CertificatePolicy(name='paired', rules=json.dumps(
+        {'allowed_key_types': ['EC-P384', 'ML-DSA-65']})))
+    _mldsa_ca('mldsa-root')
+    session.flush()
+    report = _report(profile)
+    _assert(report, 'templates.key_type', 'blocker', 'mldsa-tpl', count=1)
+    _assert(report, 'ca.key_type', 'blocker', 'mldsa-root', count=1)
+    # A policy may allow ML-DSA: the pair is what it is for
+    assert _finding(report, 'policies.key_type') is None

@@ -8,6 +8,7 @@ Supports Google Cloud HSM (Cloud HSM) and software-backed keys.
 import logging
 from typing import Dict, List, Optional, Any
 
+from utils import key_algorithms
 from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo,
     HsmConnectionError, HsmOperationError, HsmKeyNotFoundError, HsmConfigError
@@ -20,6 +21,12 @@ GCP_AVAILABLE = False
 ALGORITHM_TO_GCP = {}
 PURPOSE_TO_GCP = {}
 GCP_ALGORITHM_NAMES = {}
+# Mapped from the KMS API, not run against the service (google-cloud-kms 3.4+ names them)
+UNTESTED_ALGORITHMS = frozenset({'ML-DSA-44', 'ML-DSA-65', 'ML-DSA-87'})
+# AsymmetricSignRequest.data is capped at 64 KiB (the gcloud CLI enforces 65536 bytes):
+# an ML-DSA version signs the data itself, so a CRL past that size cannot be signed.
+KMS_SIGN_DATA_MAX = 64 * 1024
+ML_DSA_VERSIONS = {}  # KMS algorithm -> label, versions that sign the data itself
 
 try:
     from google.cloud import kms_v1
@@ -54,6 +61,14 @@ try:
         kms_types.CryptoKeyVersion.CryptoKeyVersionAlgorithm.RSA_DECRYPT_OAEP_3072_SHA256: 'RSA-3072',
         kms_types.CryptoKeyVersion.CryptoKeyVersionAlgorithm.RSA_DECRYPT_OAEP_4096_SHA512: 'RSA-4096',
     }
+
+    for _label in sorted(UNTESTED_ALGORITHMS):
+        _version = getattr(kms_types.CryptoKeyVersion.CryptoKeyVersionAlgorithm,
+                           f"PQ_SIGN_{_label.replace('-', '_')}", None)
+        if _version is not None:
+            ALGORITHM_TO_GCP[_label] = _version
+            GCP_ALGORITHM_NAMES[_version] = _label
+            ML_DSA_VERSIONS[_version] = _label
 except ImportError:
     kms_v1 = None
     kms_types = None
@@ -72,6 +87,9 @@ class GcpKmsProvider(BaseHsmProvider):
         protection_level: 'HSM' or 'SOFTWARE' (default: 'HSM')
     """
     
+    SIGNS_ML_DSA = bool(ML_DSA_VERSIONS)
+    ML_DSA_LIBRARY = 'google-cloud-kms 3.11.0'
+
     def __init__(self, config: Dict[str, Any]):
         if not GCP_AVAILABLE:
             raise HsmConfigError(
@@ -248,7 +266,7 @@ class GcpKmsProvider(BaseHsmProvider):
         extractable: bool = False
     ) -> HsmKeyInfo:
         """Generate a new key in GCP KMS"""
-        self.refuse_unsupported_curve(algorithm)
+        self.refuse_unsupported_algorithm(algorithm)
         if not self._client:
             raise HsmOperationError("Not connected")
         
@@ -318,9 +336,20 @@ class GcpKmsProvider(BaseHsmProvider):
                 return None
             
             version_name = f"{crypto_key_name}/cryptoKeyVersions/{crypto_key.primary.name.split('/')[-1]}"
-            
-            public_key = self._client.get_public_key(name=version_name)
-            return public_key.pem
+
+            label = ML_DSA_VERSIONS.get(getattr(crypto_key.primary, 'algorithm', None))
+            if label is None:
+                return self._client.get_public_key(name=version_name).pem
+            # KMS serves no PEM for a post-quantum version: the raw FIPS 204 key, as SPKI here
+            public_key = self._client.get_public_key(request={
+                'name': version_name,
+                'public_key_format': kms_types.PublicKey.PublicKeyFormat.NIST_PQC})
+            registered = key_algorithms.get(label)
+            if registered is None:
+                raise HsmOperationError(f'{label} keys are not available on this build')
+            from cryptography.hazmat.primitives import serialization
+            return registered.public_class.from_public_bytes(bytes(public_key.public_key.data)).public_bytes(
+                serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
             
         except Exception as e:
             logger.warning(f"Failed to get public key: {e}")
@@ -364,15 +393,18 @@ class GcpKmsProvider(BaseHsmProvider):
             raise HsmOperationError(f"Failed to get public key: {str(e)}")
     
     @staticmethod
-    def _digest_of_version(version) -> str:
+    def _digest_of_version(version) -> Optional[str]:
         """The digest a KMS key version signs with, from its algorithm name
-        (RSA_SIGN_PKCS1_3072_SHA256 signs with SHA-256, not SHA-384)."""
+        (RSA_SIGN_PKCS1_3072_SHA256 signs with SHA-256, not SHA-384); None
+        for ML-DSA, which signs the data itself. A name with neither is refused."""
         algorithm = getattr(version, 'algorithm', None)
+        if algorithm in ML_DSA_VERSIONS:
+            return None
         name = getattr(algorithm, 'name', '') or str(algorithm or '')
         for digest in ('sha512', 'sha384', 'sha256'):
             if digest.upper() in name.upper():
                 return digest
-        return 'sha256'
+        raise HsmOperationError(f"KMS key version {name or '?'} names no digest UCM signs with")
 
     def hash_for_key(self, key_identifier, key_algorithm, requested='sha256'):
         """KMS binds the digest to the key version: the signature must name
@@ -383,7 +415,7 @@ class GcpKmsProvider(BaseHsmProvider):
         if not crypto_key.primary:
             raise HsmOperationError("Key has no primary version")
         version_name = f"{key_identifier}/cryptoKeyVersions/{crypto_key.primary.name.split('/')[-1]}"
-        return self._digest_of_version(self._client.get_crypto_key_version(name=version_name))
+        return self._digest_of_version(self._client.get_crypto_key_version(name=version_name)) or requested
 
     def sign(
         self,
@@ -406,16 +438,25 @@ class GcpKmsProvider(BaseHsmProvider):
             
             # Get version to determine algorithm
             version = self._client.get_crypto_key_version(name=version_name)
-            # Hash the data with the digest the key version is bound to
-            import hashlib
             digest_name = self._digest_of_version(version)
-            digest = {digest_name: hashlib.new(digest_name, data).digest()}
-            
-            # Sign
-            response = self._client.asymmetric_sign(
-                name=version_name,
-                digest=digest
-            )
+            if digest_name is None:
+                # ML-DSA: KMS signs the data itself, pure with an empty context
+                if hash_algorithm:
+                    raise HsmOperationError("ML-DSA signs the data itself: no digest applies")
+                if len(data) > KMS_SIGN_DATA_MAX:
+                    raise HsmOperationError(
+                        f"Google Cloud KMS signs at most 64 KiB with ML-DSA, which signs the data "
+                        f"itself; this request carries {len(data)} bytes (a CRL this large needs "
+                        f"another provider)")
+                response = self._client.asymmetric_sign(name=version_name, data=data)
+            else:
+                # Hash the data with the digest the key version is bound to
+                import hashlib
+                digest = {digest_name: hashlib.new(digest_name, data).digest()}
+                response = self._client.asymmetric_sign(
+                    name=version_name,
+                    digest=digest
+                )
             
             logger.debug(f"Signed {len(data)} bytes with key {key_identifier}")
             return response.signature

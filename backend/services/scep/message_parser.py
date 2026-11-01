@@ -11,15 +11,16 @@ import asn1crypto.x509
 from cryptography.hazmat.primitives.ciphers import Cipher, algorithms, modes
 from cryptography.hazmat.decrepit.ciphers.algorithms import TripleDES
 from cryptography import x509
-from cryptography.exceptions import InvalidSignature
+from cryptography.exceptions import InvalidSignature, UnsupportedAlgorithm
 from cryptography.hazmat.backends import default_backend
 from cryptography.hazmat.primitives import hashes, serialization
-from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed25519, rsa
+from cryptography.hazmat.primitives.asymmetric import dsa, ec, ed448, ed25519, rsa
 from cryptography.hazmat.primitives.asymmetric import padding
 
 import fips_mode
 from fips_mode import FipsRestricted
 from services.scep.crypto_helpers import oaep_padding
+from utils import key_algorithms
 
 logger = logging.getLogger(__name__)
 
@@ -169,6 +170,19 @@ def _pss_padding(params, digest_name: str) -> padding.PSS:
     return padding.PSS(mgf=padding.MGF1(hash_cls()), salt_length=params["salt_length"].native)
 
 
+def _check_mldsa_signer_info(signer_info, public_key, digest_name: str) -> None:
+    """RFC 9882: SHA-512 digest, the key's own OID as signatureAlgorithm, no parameters."""
+    label = key_algorithms.label_for_public_key(public_key)
+    sig_alg = signer_info["signature_algorithm"]
+    if digest_name != "sha512":
+        raise ValueError(f"{label} CMS signatures take a SHA-512 digest, not {digest_name}")
+    if sig_alg["algorithm"].dotted != key_algorithms.get(label).oid:
+        raise ValueError(f"{label} CMS signature names another algorithm: {sig_alg['algorithm'].dotted}")
+    # Absent, not NULL: a NULL read off the wire has empty contents too
+    if not isinstance(sig_alg["parameters"], asn1crypto.core.Void):
+        raise ValueError(f"{label} CMS signature algorithm carries parameters")
+
+
 def verify_cms_signature(signed_data, signer_cert) -> None:
     """Verify the CMS SignerInfo signature against signer_cert's public key.
 
@@ -219,11 +233,14 @@ def verify_cms_signature(signed_data, signer_cert) -> None:
     else:
         signed_bytes = b"\x31" + raw[1:]
 
-    public_key = (
-        signer_cert.public_key()
-        if isinstance(signer_cert, x509.Certificate)
-        else signer_cert
-    )
+    try:
+        public_key = (
+            signer_cert.public_key()
+            if isinstance(signer_cert, x509.Certificate)
+            else signer_cert
+        )
+    except UnsupportedAlgorithm as exc:  # a key this provider cannot load, e.g. ML-DSA on a FIPS build
+        raise ValueError(f"Unsupported CMS signer public key type: {exc}") from exc
     if isinstance(public_key, rsa.RSAPublicKey) and sig_alg == "rsassa_pss":
         public_key.verify(
             bytes(signature), signed_bytes,
@@ -250,6 +267,13 @@ def verify_cms_signature(signed_data, signer_cert) -> None:
     elif isinstance(public_key, ed25519.Ed25519PublicKey):
         if sig_alg != "ed25519" or digest_name != "sha512":
             raise ValueError(f"Unsupported Ed25519 CMS algorithms: {sig_alg}")
+        public_key.verify(bytes(signature), signed_bytes)
+    elif isinstance(public_key, ed448.Ed448PublicKey):
+        raise ValueError("Ed448 CMS signatures are not supported")
+    elif key_algorithms.family_for_public_key(public_key) == "ML-DSA":
+        # Outside the FIPS module UCM ships; refused whatever key the CSR carries
+        fips_mode.refuse(f"{key_algorithms.label_for_public_key(public_key)} CMS signatures")
+        _check_mldsa_signer_info(signer_info, public_key, digest_name)
         public_key.verify(bytes(signature), signed_bytes)
     else:
         raise ValueError("Unsupported CMS signer public key type")

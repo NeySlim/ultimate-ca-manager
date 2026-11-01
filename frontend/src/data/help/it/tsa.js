@@ -18,7 +18,7 @@ export default {
           { label: 'Policy OID', text: 'Object Identifier per la policy TSA (es. 1.2.3.4.1): incluso in ogni risposta timestamp' },
           { label: 'Abilita/Disabilita', text: 'Attiva o disattiva l\'endpoint TSA senza perdere la configurazione' },
           { label: 'Richiedi certificato dedicato', text: 'Opt-in: rifiuta di firmare le marche temporali con il certificato della CA stessa, richiede un certificato di firma end-entity dedicato con EKU timeStamping critico (RFC 3161)' },
-                  { label: 'Certificato di firma (v2.217)', text: 'Firma i token con un certificato finale dedicato scelto tra i certificati emessi (EKU timeStamping, chiave RSA o ECDSA detenuta da UCM; i certificati Ed25519 ed Ed448 non vengono proposti). I rinnovi vengono seguiti automaticamente; un firmatario scaduto o revocato fa fallire le richieste con 503 e non ricade mai sul certificato della CA' },
+                  { label: 'Certificato di firma (v2.217)', text: 'Firma i token con un certificato finale dedicato scelto tra i certificati emessi (EKU timeStamping, chiave RSA, ECDSA o ML-DSA detenuta da UCM; i certificati Ed25519 ed Ed448 non vengono proposti, né ML-DSA in modalità FIPS). I rinnovi vengono seguiti automaticamente; un firmatario scaduto o revocato fa fallire le richieste con 503 e non ricade mai sul certificato della CA' },
           { label: 'Genera un certificato di firma (v2.218)', text: 'Emissione in un clic di un firmatario RFC 3161 dedicato: CA:FALSE, KeyUsage con solo digitalSignature e un EKU timeStamping esclusivo e critico, la forma richiesta dai verificatori rigorosi (openssl ts -verify). Emesso dalla CA TSA configurata e selezionato automaticamente quando non è impostato alcun firmatario utilizzabile. Il certificato ha origine "manual": aggiungi "manual" alle origini del rinnovo automatico oppure rinnovalo manualmente prima della scadenza' },
         ]
       },
@@ -27,7 +27,7 @@ export default {
         items: [
           { label: 'Crea richiesta', text: 'openssl ts -query -data file.txt -sha256 -no_nonce -out request.tsq' },
           { label: 'Invia al TSA', text: 'curl -H "Content-Type: application/timestamp-query" --data-binary @request.tsq https://your-server/tsa -o response.tsr' },
-          { label: 'Verifica', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem' },
+          { label: 'Verifica', text: 'openssl ts -verify -data file.txt -in response.tsr -CAfile ca-chain.pem (firmatari RSA ed ECDSA). Un token ML-DSA non supera openssl ts -verify: verifica la sua firma con openssl cms -verify (OpenSSL 3.5 o successivo), poi confronta il message imprint con l\'hash del file' },
         ]
       },
     ],
@@ -113,6 +113,8 @@ curl -s -H "Content-Type: application/timestamp-query" \\
 openssl ts -verify -data file.txt -in response.tsr \\
   -CAfile ca-chain.pem
 \`\`\`
+
+\`openssl ts -verify\` controlla solo i token RSA ed ECDSA. Un token ML-DSA si verifica con \`openssl cms -verify\` (OpenSSL 3.5 o successivo); poi confronta il suo message imprint con l'hash del file.
 
 ### Firma del codice con marche temporali
 

@@ -21,6 +21,7 @@ export default {
           { label: 'Signierende CA', text: 'Auswählen, welche CA SCEP-registrierte Zertifikate signiert. Geräte verschlüsseln ihre Anfrage an diese CA, daher muss sie einen RSA-Schlüssel in Software besitzen: EC-, HSM-gestützte, schlüssellose, Offline- und widerrufene CAs werden nicht aufgelistet (v2.248)' },
           { label: 'Auto-Genehmigung', text: 'Anfragen mit gültigem Challenge-Passwort automatisch genehmigen' },
           { label: 'Challenge-Passwort', text: 'Gemeinsames Geheimnis, das Geräte zur Authentifizierung der Registrierung verwenden' },
+          { label: 'Geräteschlüssel (v2.248)', text: 'Ein Gerät signiert seine Anfrage mit einem RSA-, ECDSA-, Ed25519- oder ML-DSA-Schlüssel; eine ML-DSA-Signatur folgt RFC 9882 (SHA-512-Digest). Ed448 wird abgelehnt, ML-DSA im FIPS-Modus ebenfalls' },
         ]
       },
       {
@@ -100,6 +101,9 @@ Zeigt die SCEP-Endpunkt-URL und Integrationsanweisungen an.
 4. UCM validiert das Challenge-Passwort
 5. Wenn Auto-Genehmigung aktiv ist, signiert UCM das Zertifikat und gibt es zurück
 6. Wenn Auto-Genehmigung deaktiviert ist, prüft ein Admin die Anfrage und genehmigt/lehnt ab
+
+### Geräteschlüssel
+Das Gerät signiert seine PKCSReq mit seinem eigenen Schlüssel: RSA, ECDSA, Ed25519 oder ML-DSA. Eine ML-DSA-Signatur wird nach RFC 9882 geprüft (SHA-512-Digest, die eigene Algorithmenkennung des Schlüssels, keine Parameter). Ed448-Signaturen werden abgelehnt, ML-DSA-Signaturen im FIPS-Modus ebenfalls. Die Anfrage wird weiterhin an die signierende RSA-CA verschlüsselt.
 
 ## SCEP-URLs
 

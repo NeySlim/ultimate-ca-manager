@@ -20,10 +20,10 @@ def _register_providers():
     
     # PKCS#11 Provider (SoftHSM, Thales, nCipher, AWS CloudHSM)
     try:
-        from .pkcs11_provider import Pkcs11Provider, is_available
+        from .pkcs11_provider import AwsCloudHsmProvider, Pkcs11Provider, is_available
         if is_available():
             HsmService.register_provider('pkcs11', Pkcs11Provider)
-            HsmService.register_provider('aws-cloudhsm', Pkcs11Provider)  # AWS CloudHSM uses PKCS#11
+            HsmService.register_provider('aws-cloudhsm', AwsCloudHsmProvider)
     except ImportError:
         pass
     

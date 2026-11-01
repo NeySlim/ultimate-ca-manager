@@ -65,10 +65,10 @@ ldap3>=2.9.1
 python3-saml>=1.16.0
 
 # HSM Support (PKCS#11, Azure Key Vault, Google Cloud KMS)
-python-pkcs11>=0.7.0
+python-pkcs11>=0.9.5
 azure-keyvault-keys>=4.9.0
 azure-identity>=1.25
-google-cloud-kms>=2.21.0
+google-cloud-kms>=3.11.0
 
 # PostgreSQL support (for HA / multi-node deployments)
 # Pre-built binary wheel — no compilation toolchain needed at install time.

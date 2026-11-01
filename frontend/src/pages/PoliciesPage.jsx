@@ -17,8 +17,8 @@ import { policiesService, casService, groupsService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate, cn } from '../lib/utils'
-import { useFipsMode } from '../lib/policyAlgorithms'
-import { KEY_ALGORITHMS, KEY_GROUPS, isBrainpool } from '../lib/keyAlgorithms'
+import { useKeyPlatform } from '../lib/policyAlgorithms'
+import { KEY_ALGORITHMS, KEY_GROUPS, isBrainpool, isUsable } from '../lib/keyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 
 // Operations a policy governs: labels resolved via t() inside component
@@ -92,15 +92,16 @@ export default function PoliciesPage() {
   // Resolve i18n labels for module-level option arrays
   const policyTypeOptions = useMemo(() => POLICY_TYPES.map(o => ({ value: o.value, label: t(o.labelKey) })), [t])
   // FIPS mode puts a read-only system policy ahead of these, without EdDSA keys
-  const fipsActive = useFipsMode()
+  const platform = useKeyPlatform()
+  const fipsActive = platform.fips
   const keyTypeOptions = useMemo(
     () => KEY_ALGORITHMS.map(a => ({
       value: a.label,
       label: a.i18nKey ? t(a.i18nKey) : a.display,
       group: t(KEY_GROUPS.find(g => g.id === a.group).labelKey),
-      fips: a.fips,
+      usable: isUsable(a, platform),
     })),
-    [t],
+    [t, platform],
   )
 
   // cas/groups must be declared before loadFn (loadFn sets them as side effects)
@@ -131,8 +132,8 @@ export default function PoliciesPage() {
 
   // Modal state (page-specific)
   const [formData, setFormData] = useState({ ...DEFAULT_FORM })
-  // In FIPS mode a key the module does not approve shows only while ticked, so it can be removed
-  const shownKeyTypes = keyTypeOptions.filter(opt => !fipsActive || opt.fips
+  // A key this server cannot use (FIPS mode, no ML-DSA) shows only while ticked, so it can be removed
+  const shownKeyTypes = keyTypeOptions.filter(opt => opt.usable
     || formData.rules.allowed_key_types?.includes(opt.value))
   const [emailsText, setEmailsText] = useState('')
   const parsedEmails = parseEmails(emailsText)

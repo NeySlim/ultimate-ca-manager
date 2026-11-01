@@ -1,17 +1,9 @@
 /** HSM key generation reads its asymmetric algorithms from the key registry, per provider type. */
 import { describe, it, expect, vi } from 'vitest'
-import { render, screen, fireEvent, waitFor } from '@testing-library/react'
+import { cleanup, render, screen, fireEvent, waitFor } from '@testing-library/react'
 import './pageRenderingSetup.jsx'
 import { GROUP_PQ, KEY_ALGORITHMS, listAlgorithms } from '../../lib/keyAlgorithms'
-
-// ML-DSA rows made generable, one held by PKCS#11: the modal alone must keep the others out
-vi.mock('../../lib/keyAlgorithms', async (importOriginal) => {
-  const actual = await importOriginal()
-  for (const row of actual.KEY_ALGORITHMS.filter(a => a.group === actual.GROUP_PQ)) {
-    Object.assign(row, { generate: true, providers: row.label === 'ML-DSA-87' ? ['pkcs11'] : null })
-  }
-  return actual
-})
+import { apiClient } from '../../services/apiClient'
 
 vi.mock('../../components', async (importOriginal) => ({
   ...(await importOriginal()),
@@ -74,15 +66,68 @@ describe('HSM key generation, from the registry', () => {
     expect(aes.textContent).toBe('common.keyGroups.aes')
   })
 
-  it.each(PROVIDERS.filter(p => p !== 'pkcs11'))('offers no ML-DSA key on %s, which no row names', (type) => {
-    expect(KEY_ALGORITHMS.find(a => a.label === 'ML-DSA-65')).toMatchObject({ generate: true, providers: null })
+  // The registry rows name the HSM types that hold ML-DSA; the modal adds no rule of its own
+  const PQ_LABELS = KEY_ALGORITHMS.filter(a => a.group === GROUP_PQ).map(a => a.label)
+  const holders = PROVIDERS.filter(p => listAlgorithms({ generate: true, provider: p }).some(a => a.group === GROUP_PQ))
+
+  it('names PKCS#11, OpenBao and Google Cloud KMS as the ML-DSA holders', () => {
+    expect(holders).toEqual(['pkcs11', 'openbao', 'google-kms'])
+  })
+
+  it.each(['pkcs11', 'openbao', 'google-kms'])('offers the three ML-DSA levels on %s and sends the label', async (type) => {
+    const onSave = renderModal(type)
+    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: GROUP_PQ } })
+    expect(offered(screen.getByLabelText('common.keySize'))).toEqual(PQ_LABELS)
+    fireEvent.change(screen.getByLabelText('common.keySize'), { target: { value: 'ML-DSA-87' } })
+    expect((await save(onSave)).algorithm).toBe('ML-DSA-87')
+  })
+
+  it('says ML-DSA on Google Cloud KMS is untested, and only there', () => {
+    for (const type of ['google-kms', 'pkcs11']) {
+      renderModal(type)
+      fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: GROUP_PQ } })
+      expect(screen.queryAllByText('hsm.mldsaUntestedGoogleKms')).toHaveLength(type === 'google-kms' ? 1 : 0)
+      fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'rsa' } })
+      expect(screen.queryByText('hsm.mldsaUntestedGoogleKms')).toBeNull()
+      cleanup()
+    }
+  })
+
+  it.each(['azure-keyvault', 'aws-cloudhsm'])('offers no ML-DSA key on %s', (type) => {
     renderModal(type)
     expect(offered(screen.getByLabelText('common.keyType'))).not.toContain(GROUP_PQ)
   })
 
-  it('offers on PKCS#11 only the ML-DSA row that names it', () => {
-    renderModal('pkcs11')
-    fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: GROUP_PQ } })
-    expect(offered(screen.getByLabelText('common.keySize'))).toEqual(['ML-DSA-87'])
+  it.each([['on a build without it', { ml_dsa: false }], ['in FIPS mode', { fips: true }]])(
+    'offers no ML-DSA key %s', async (_name, effective) => {
+      apiClient.get.mockImplementation((url) => Promise.resolve(
+        { data: String(url).startsWith('/policies/effective') ? effective : [] }))
+      try {
+        renderModal('pkcs11')
+        await waitFor(() => expect(offered(screen.getByLabelText('common.keyType'))).not.toContain(GROUP_PQ))
+        expect(offered(screen.getByLabelText('common.keyType'))).toContain('rsa')
+      } finally {
+        apiClient.get.mockReset(); apiClient.get.mockResolvedValue({ data: [] })
+      }
+    })
+
+  it('moves an ML-DSA choice made before the policy answer to the first key offered', async () => {
+    let answer
+    apiClient.get.mockImplementation((url) => (String(url).startsWith('/policies/effective')
+      ? new Promise((resolve) => { answer = resolve })
+      : Promise.resolve({ data: [] })))
+    try {
+      const onSave = renderModal('pkcs11')
+      fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: GROUP_PQ } })
+      fireEvent.change(screen.getByLabelText('common.keySize'), { target: { value: 'ML-DSA-65' } })
+      await waitFor(() => expect(answer).toBeTypeOf('function'))
+      answer({ data: { fips: true } })
+      await waitFor(() => expect(offered(screen.getByLabelText('common.keyType'))).not.toContain(GROUP_PQ))
+      const first = listAlgorithms({ generate: true, provider: 'pkcs11', fips: true })[0]
+      await waitFor(() => expect(screen.getByLabelText('common.keyType')).toHaveValue(first.group))
+      expect((await save(onSave)).algorithm).toBe(first.label)
+    } finally {
+      apiClient.get.mockReset(); apiClient.get.mockResolvedValue({ data: [] })
+    }
   })
 })

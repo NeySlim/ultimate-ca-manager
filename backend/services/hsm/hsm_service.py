@@ -8,13 +8,15 @@ from datetime import datetime
 import json
 import logging
 
+from cryptography.hazmat.primitives import serialization
+
 import fips_mode
 from models import db
 from models.hsm import HsmProvider, HsmKey
 from services import compliance_signer
 from services.hsm.ecdsa_signature import coordinate_bytes, ecdsa_to_der
 from services.hsm.base_provider import (
-    BaseHsmProvider, HsmKeyInfo, brainpool_refusal,
+    BaseHsmProvider, HsmKeyInfo, brainpool_refusal, mldsa_refusal,
     HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
 )
 from utils import key_algorithms
@@ -23,6 +25,14 @@ from utils import hsm_check, pkcs11_config
 
 logger = logging.getLogger(__name__)
 
+
+
+def _parses_as_spki(pem) -> bool:
+    try:
+        serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)
+        return True
+    except Exception:
+        return False
 
 
 def _spki_from_pkcs1_pem(pem):
@@ -77,6 +87,19 @@ class HsmService:
         provider_class = cls._provider_registry.get(provider_type)
         supported = bool(provider_class and provider_class.SIGNS_BRAINPOOL)
         return brainpool_refusal(f"provider type '{provider_type}'", algorithm, supported)
+
+    @classmethod
+    def mldsa_refusal(cls, provider_type: str, algorithm: Optional[str]) -> Optional[str]:
+        """Why this provider type cannot hold an ML-DSA *algorithm* key, or None."""
+        provider_class = cls._provider_registry.get(provider_type)
+        supported = bool(provider_class and provider_class.SIGNS_ML_DSA)
+        library = getattr(provider_class, 'ML_DSA_LIBRARY', None)
+        return mldsa_refusal(f"provider type '{provider_type}'", algorithm, supported, library)
+
+    @classmethod
+    def algorithm_refusal(cls, provider_type: str, algorithm: Optional[str]) -> Optional[str]:
+        """Why this provider type cannot hold an *algorithm* key (Brainpool, ML-DSA), or None."""
+        return cls.brainpool_refusal(provider_type, algorithm) or cls.mldsa_refusal(provider_type, algorithm)
 
     @classmethod
     def get_available_providers(cls) -> List[str]:
@@ -395,10 +418,13 @@ class HsmService:
         # Validate algorithm
         if algorithm not in HsmKey.VALID_ALGORITHMS:
             raise ValueError(f"Invalid algorithm: {algorithm}")
-        refusal = cls.brainpool_refusal(provider.type, algorithm)
+        refusal = cls.algorithm_refusal(provider.type, algorithm)
         if refusal:
             raise HsmOperationError(refusal)
         registered = key_algorithms.get(algorithm)
+        if registered is None and key_algorithms.is_post_quantum(algorithm):
+            raise ValueError(f'{algorithm} keys are not available on this build: '
+                             'they need OpenSSL 3.5 or later')
         if registered is not None and not registered.fips_approved:
             fips_mode.refuse(f'{registered.display} keys')
         
@@ -558,6 +584,17 @@ class HsmService:
         cls._signing_hash_cache[cache_key] = name
         return name
 
+    @staticmethod
+    def _registered_algorithm(key: HsmKey):
+        """Registry entry of *key*, read off its public key before its stored label."""
+        try:
+            pem = key.public_key_pem
+            public = serialization.load_pem_public_key(pem.encode() if isinstance(pem, str) else pem)
+            label = key_algorithms.label_for_public_key(public)
+        except Exception:
+            label = None
+        return key_algorithms.get(label) or key_algorithms.get(key.algorithm)
+
     @classmethod
     def sign(cls, key_id: int, data: bytes, algorithm: Optional[str] = None,
              hash_algorithm: Optional[str] = None, padding: Optional[str] = None) -> bytes:
@@ -581,6 +618,10 @@ class HsmService:
         
         if key.purpose not in ('signing', 'all'):
             raise ValueError(f"Key {key.label} is not for signing")
+        registered = cls._registered_algorithm(key)
+        pure = registered is not None and not registered.needs_digest
+        if pure and (hash_algorithm or padding):
+            raise ValueError(f"{registered.label} signs the data itself: no digest or padding applies")
         
         provider = key.provider
         try:
@@ -595,8 +636,9 @@ class HsmService:
                                      hash_algorithm=hash_algorithm, **extra)
 
             # PKCS#11 and Azure return ECDSA as raw r || s; X.509 needs DER (#366).
-            signature = ecdsa_to_der(
-                signature, coordinate_bytes(key.algorithm, key.public_key_pem))
+            if not pure:
+                signature = ecdsa_to_der(
+                    signature, coordinate_bytes(key.algorithm, key.public_key_pem))
 
             logger.debug(f"Signed data with HSM key: {key.label}")
             return signature
@@ -611,6 +653,17 @@ class HsmService:
     # Sync keys from HSM
     # =========================================================================
     
+    @classmethod
+    def _refresh_reading(cls, known: HsmKey, key_info: HsmKeyInfo) -> None:
+        """Take a valid label and a public key the row could not parse from a newer
+        listing; an UNKNOWN reading never overwrites what the row holds."""
+        if key_info.algorithm in HsmKey.VALID_ALGORITHMS and key_info.algorithm != known.algorithm:
+            known.algorithm = key_info.algorithm
+            cls.forget_signing_hash(known.id)
+        if key_info.public_key_pem and not _parses_as_spki(known.public_key_pem) \
+                and _parses_as_spki(key_info.public_key_pem):
+            known.public_key_pem = key_info.public_key_pem
+
     @classmethod
     def sync_keys(cls, provider_id: int) -> Dict[str, int]:
         """
@@ -661,10 +714,11 @@ class HsmService:
                     db.session.add(key)
                     added += 1
                 else:
+                    known = db_keys[key_info.key_identifier]
                     level = (key_info.metadata or {}).get('protection_level')
                     if level:
-                        known = db_keys[key_info.key_identifier]
                         known.set_metadata({**known.get_metadata(), 'protection_level': level})
+                    cls._refresh_reading(known, key_info)
                     unchanged += 1
             
             # A partial listing proves nothing missing; a referenced key is never dropped

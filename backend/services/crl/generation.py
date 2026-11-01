@@ -177,7 +177,7 @@ def _crl_signature_hash(ca: CA) -> Optional[hashes.HashAlgorithm]:
     name = ca.effective_crl_digest()
     if name is None:
         if ca.crl_digest:
-            logger.info(f"CRL: CA {ca.id}: {notices.digest_ignored(ca.crl_digest, ca.key_type)}")
+            logger.debug(f"CRL: CA {ca.id}: {notices.digest_ignored(ca.crl_digest, ca.key_type)}")
         return None
     name = name.lower().strip()
     if name not in CRL_DIGESTS:

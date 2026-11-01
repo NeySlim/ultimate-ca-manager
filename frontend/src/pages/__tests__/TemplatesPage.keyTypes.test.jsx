@@ -5,7 +5,8 @@
 import { afterEach, describe, it, expect, vi } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import './pageRenderingSetup.jsx'
-import { GROUP_PQ, KEY_ALGORITHMS, listAlgorithms } from '../../lib/keyAlgorithms'
+import { GROUP_PQ, KEY_ALGORITHMS, isBrainpool, listAlgorithms } from '../../lib/keyAlgorithms'
+import { apiClient } from '../../services/apiClient'
 
 vi.mock('../../services/eku.service', () => ({
   ekuService: { getKnown: vi.fn().mockResolvedValue({ data: { ekus: [] } }) },
@@ -38,6 +39,12 @@ const submit = async (onSubmit, name) => {
   return onSubmit.mock.calls[0][0]
 }
 
+// The server's effective policy, as the form reads it
+function serverReports(effective) {
+  apiClient.get.mockImplementation((url) => Promise.resolve(
+    { data: String(url).startsWith('/policies/effective') ? effective : [] }))
+}
+
 // Lets a test see the form once the registry generates ML-DSA keys
 function generatePq() {
   const saved = PQ_ROWS.map(a => a.generate)
@@ -47,7 +54,10 @@ function generatePq() {
 
 describe('TemplateForm key types', () => {
   let restore = () => {}
-  afterEach(() => { restore(); restore = () => {} })
+  afterEach(() => {
+    restore(); restore = () => {}
+    apiClient.get.mockReset(); apiClient.get.mockResolvedValue({ data: [] })
+  })
 
   it('has ML-DSA rows to offer', () => {
     expect(PQ_ROWS.map(a => a.label)).toContain(PQ_LABEL)
@@ -86,5 +96,28 @@ describe('TemplateForm key types', () => {
     const body = await submit(onSubmit, 'common.update')
     expect(body.key_type).toBe(PQ_LABEL)
     expect(body.digest).toBe('sha256')
+  })
+
+  it('offers no ML-DSA or Brainpool key in FIPS mode', async () => {
+    serverReports({ fips: true })
+    render(<TemplateForm template={template('RSA-2048')} onSubmit={vi.fn()} onCancel={() => {}} />)
+    await waitFor(() => expect(keyOptions()).not.toContain(PQ_LABEL))
+    expect(keyOptions()).toEqual(listAlgorithms({ generate: true, fips: true }).map(a => a.label))
+    expect(keyOptions().some(isBrainpool)).toBe(false)
+  })
+
+  it('keeps an ML-DSA template on its key in FIPS mode', async () => {
+    serverReports({ fips: true })
+    render(<TemplateForm template={template(PQ_LABEL)} onSubmit={vi.fn()} onCancel={() => {}} />)
+    await waitFor(() => expect(keyOptions()).not.toContain(PQ_ROWS[0].label))
+    expect(keyOptions()).toContain(PQ_LABEL)
+    expect(screen.getByLabelText('common.keyType')).toHaveValue(PQ_LABEL)
+  })
+
+  it('offers no ML-DSA key on a build without it', async () => {
+    serverReports({ ml_dsa: false })
+    render(<TemplateForm template={template('RSA-2048')} onSubmit={vi.fn()} onCancel={() => {}} />)
+    await waitFor(() => expect(keyOptions()).not.toContain(PQ_LABEL))
+    expect(keyOptions()).toEqual(listAlgorithms({ generate: true }).filter(a => a.group !== GROUP_PQ).map(a => a.label))
   })
 })

@@ -31,9 +31,9 @@ import { soleImported } from '../lib/importResult'
 import { PostQuantumBadge } from '../components/PostQuantumBadge'
 import {
   CSR_LABELS, ISSUE_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, findAlgorithm,
-  groupedOptions, keyAlgorithmLabel, listAlgorithms,
+  groupedOptions, isUsable, keyAlgorithmLabel, listAlgorithms,
 } from '../lib/keyAlgorithms'
-import { useFipsMode } from '../lib/policyAlgorithms'
+import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { useOpenEntity } from '../hooks/useOpenEntity'
 
@@ -123,7 +123,12 @@ export default function CSRsPage() {
   const [genState, setGenState] = useState('')
   const [genLocality, setGenLocality] = useState('')
   const [genKeyType, setGenKeyType] = useState(DEFAULT_CSR_KEY_TYPE)
-  const fips = useFipsMode()
+  const platform = useKeyPlatform()
+  const csrKeys = useMemo(() => listAlgorithms({ labels: CSR_LABELS, ...platform }), [platform])
+  // Only a key this server refuses (ML-DSA or Brainpool in FIPS mode) gives way to the first offered
+  useEffect(() => {
+    if (!isUsable(KEY_ALGORITHMS.find(k => k.csr === genKeyType), platform)) setGenKeyType(csrKeys[0].csr)
+  }, [csrKeys, genKeyType, platform])
   const [genSans, setGenSans] = useState([{ type: 'DNS', value: '' }])
   const [generating, setGenerating] = useState(false)
   
@@ -1253,7 +1258,7 @@ MIICijCCAXICAQAwRTELMAkGA1UEBhMCVVMx...
           {/* Key Type */}
           <Select
             label={t('common.keyType')}
-            options={groupedOptions(listAlgorithms({ labels: CSR_LABELS, fips }), t,
+            options={groupedOptions(csrKeys, t,
               k => algorithmName(k, t, 'csrKey'), k => k.csr)}
             value={genKeyType}
             onChange={setGenKeyType}

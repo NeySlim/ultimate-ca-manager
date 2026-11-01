@@ -45,6 +45,11 @@ class MTLSWebSocketHandler(WebSocketHandler, PyWSGIHandler):
 
     def get_environ(self):
         env = super().get_environ()
+        # gevent hands the raw socket to any request with "Connection: upgrade"; outside a
+        # real WebSocket handshake, a body read then waits for the proxy to close the connection
+        if env.get('HTTP_UPGRADE', '').lower() != 'websocket':
+            env['wsgi.input'] = self.wsgi_input
+            env['wsgi.input_terminated'] = True
         # Extract client certificate from SSL socket (mTLS)
         sock = self.socket
         if isinstance(sock, ssl.SSLSocket):

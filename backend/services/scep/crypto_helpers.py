@@ -17,6 +17,7 @@ from cryptography.hazmat.primitives.asymmetric import padding as asym_padding
 from cryptography.hazmat.primitives.kdf.pbkdf2 import PBKDF2HMAC
 
 import fips_mode
+from utils import key_algorithms
 from utils.randomness import csp_bytes
 from utils.signing_hash import pss_algorithm_identifier, pss_padding, signs_pss
 
@@ -172,7 +173,8 @@ def create_signed_pkcs7(
         elif isinstance(signer_key, dsa.DSAPrivateKey):
             signature_algorithm = {'algorithm': 'sha256_dsa'}
         else:
-            raise ValueError("Unsupported CMS signer key type")
+            label = key_algorithms.label_for_private_key(signer_key) or type(signer_key).__name__
+            raise ValueError(f"Unsupported CMS signer key type: {label}")
 
     digest = hashes.Hash(digest_algorithm)
     digest.update(data or b'')

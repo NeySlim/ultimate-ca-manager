@@ -23,6 +23,7 @@ from .manifest import SECTIONS
 from .restore.apply import apply_columns, apply_section, relink_references
 from .restore.replace import replace_sections
 from .restore.settings import restore_encrypted_settings
+from .restore_rbac import upgrade_archived_permissions
 
 logger = logging.getLogger(__name__)
 
@@ -238,6 +239,7 @@ class RestoreCoreMixin:
         # holding fewer rows than the archive says it holds, must not be
         # discovered halfway through a restore.
         self._check_payload_schema(backup_data)
+        upgrade_archived_permissions(backup_data)
 
         # An archive of metadata alone restores nothing. Announcing it as a
         # success made the caller revoke every session and ask for a restart

@@ -7,6 +7,7 @@ import base64
 import json
 import uuid
 from contextlib import contextmanager
+from pathlib import Path
 
 import pytest
 from cryptography import x509
@@ -197,6 +198,47 @@ def test_import_service_still_reports_a_wrong_pkcs12_password():
     from services.import_service import parse_certificate_file
     with pytest.raises(ValueError, match='Invalid password'):
         parse_certificate_file(fixture_bytes('mldsa65.p12'), 'k.p12', 'wrong')
+
+
+@pytest.mark.parametrize('password', ['wrong', None], ids=['wrong', 'missing'])
+def test_import_service_says_the_key_password_is_wrong(password):
+    from services.import_service import KeyPasswordError, parse_certificate_file
+    with pytest.raises(KeyPasswordError, match='password'):
+        parse_certificate_file(CERT + BOTH_ENC, 'bundle.pem', password)
+
+
+@pytest.mark.parametrize('body', [b'MIIBCgKCAQEA', base64.encodebytes(b'\x30\x03\x02\x01\x00')])
+def test_import_service_says_an_unreadable_key_is_unreadable(app, auth_client, body):
+    from services.import_service import parse_certificate_file
+    from utils.key_codec import MalformedKey
+    pem = b'-----BEGIN PRIVATE KEY-----\n' + body.strip() + b'\n-----END PRIVATE KEY-----\n'
+    with pytest.raises(MalformedKey, match='could not be read'):
+        parse_certificate_file(CERT + pem, 'bundle.pem')
+    r = auth_client.post('/api/v2/certificates/import', data={
+        'pem_content': (CERT + pem).decode(), 'name': f'pq-bad-key-{uuid.uuid4().hex[:8]}'})
+    assert r.status_code == 400, r.data
+    assert get_json(r)['message'] == 'The private key in the file could not be read'
+
+
+def test_import_service_skips_an_encrypted_key_it_was_not_asked_for():
+    from services.import_service import parse_certificate_file
+    _, key, _ = parse_certificate_file(CERT + BOTH_ENC, 'bundle.pem', 'wrong', import_key=False)
+    assert key is None
+
+
+@pytest.mark.parametrize('url', ['/api/v2/certificates/import', '/api/v2/cas/import'])
+def test_import_routes_answer_a_wrong_key_password(app, auth_client, url):
+    cert, sealed, _ = _rsa_leaf_and_encrypted_key(P12_PASSWORD.decode())
+    subject = x509.load_pem_x509_certificate(cert).subject.rfc4514_string()
+    try:
+        r = auth_client.post(url, data={'pem_content': (cert + sealed).decode(), 'password': 'wrong'})
+        assert r.status_code == 400, r.data
+        assert 'password' in get_json(r)['message'], r.data
+    finally:
+        with app.app_context():
+            Certificate.query.filter_by(subject=subject).delete()
+            CA.query.filter_by(subject=subject).delete()
+            db.session.commit()
 
 
 def test_smart_import_keeps_the_repaired_key():
@@ -396,6 +438,19 @@ def test_key_upload_refuses_a_seedless_key_with_its_reason(app, auth_client, tar
         assert 'seed-only' in body['message']
 
 
+@pytest.mark.parametrize('target', ['certificate', 'ca', 'csr'])
+@pytest.mark.parametrize('passphrase, message', [
+    (None, 'The private key is encrypted: give its password'),
+    ('wrong passphrase', 'Invalid password for the private key')])
+def test_key_upload_says_whether_the_password_is_missing_or_wrong(app, auth_client, target,
+                                                                   passphrase, message):
+    with _keyless_rows(app) as rows:
+        _, url, _ = rows[target]
+        r = _post(auth_client, url, BOTH_ENC, passphrase)
+        assert r.status_code == 400, r.data
+        assert get_json(r)['message'] == message
+
+
 def test_key_matcher_matches_a_both_key(auth_client):
     r = auth_client.post('/api/v2/tools/match-keys', data=json.dumps(
         {'certificate': CERT.decode(), 'private_key': BOTH.decode()}), content_type='application/json')
@@ -555,14 +610,46 @@ def test_smart_import_execute_refuses_a_wrong_key_password(app, auth_client, kin
         assert (CA.query.count(), Certificate.query.count()) == before
 
 
+# An RSA-2048 PKCS#8 sealed once with b'right-pass' (AES-256-CBC), picked so that
+# b'wrong-pass' fails the CBC padding check: a fresh salt unpads by chance once in ~250.
+SEALED_RSA_DER = (Path(__file__).parent / 'fixtures' / 'rsa2048-pkcs8-aes256.der').read_bytes()
+
+
+def _sealed_rsa(encoding):
+    if encoding == 'DER':
+        return SEALED_RSA_DER
+    return (b'-----BEGIN ENCRYPTED PRIVATE KEY-----\n' + base64.encodebytes(SEALED_RSA_DER)
+            + b'-----END ENCRYPTED PRIVATE KEY-----\n')
+
+
+@pytest.mark.parametrize('encoding', ['PEM', 'DER'])
+def test_the_sealed_rsa_fixture_opens_with_its_password(encoding):
+    from utils.key_codec import load_private_key_any
+    assert isinstance(load_private_key_any(_sealed_rsa(encoding), b'right-pass'), rsa.RSAPrivateKey)
+
+
 def test_smart_import_names_a_wrong_password_on_a_der_key():
     from services.smart_import.parser import WRONG_PASSWORD, SmartParser
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    der = key.private_bytes(serialization.Encoding.DER, serialization.PrivateFormat.PKCS8,
-                            serialization.BestAvailableEncryption(b'right-pass'))
+    der = SEALED_RSA_DER
     [obj] = SmartParser().parse(der, password='wrong-pass')
     assert obj.type.value == 'private_key' and obj.error == WRONG_PASSWORD
     assert SmartParser()._parse_der_key(der, 'wrong-pass').error == WRONG_PASSWORD
+
+
+# Wrong passwords whose CBC padding checks by chance on the sealed fixture: pyca does not name them
+LUCKY_WRONG_PASSWORDS = ('chance-119', 'chance-181')
+
+
+@pytest.mark.parametrize('password', LUCKY_WRONG_PASSWORDS)
+def test_smart_import_names_a_wrong_password_that_unpads_by_chance(password):
+    from cryptography.hazmat.primitives.serialization import load_der_private_key
+    from services.smart_import.parser import WRONG_PASSWORD, SmartParser
+    with pytest.raises(ValueError) as caught:
+        load_der_private_key(SEALED_RSA_DER, password.encode())
+    assert 'password' not in str(caught.value).lower()
+    [obj] = SmartParser().parse(SEALED_RSA_DER, password=password)
+    assert obj.error == WRONG_PASSWORD
+    assert SmartParser()._parse_der_key(SEALED_RSA_DER, password).error == WRONG_PASSWORD
 
 
 def test_converter_refuses_a_wrong_key_password(auth_client):
@@ -576,8 +663,5 @@ def test_converter_refuses_a_wrong_key_password(auth_client):
 @pytest.mark.parametrize('encoding', ['PEM', 'DER'])
 def test_the_retry_without_password_never_hides_a_wrong_one(encoding):
     from utils.key_codec import load_private_key_any
-    key = rsa.generate_private_key(public_exponent=65537, key_size=2048)
-    sealed = key.private_bytes(getattr(serialization.Encoding, encoding), serialization.PrivateFormat.PKCS8,
-                               serialization.BestAvailableEncryption(b'right-pass'))
     with pytest.raises(ValueError, match='(?i)incorrect password'):
-        load_private_key_any(sealed, b'wrong-pass')
+        load_private_key_any(_sealed_rsa(encoding), b'wrong-pass')

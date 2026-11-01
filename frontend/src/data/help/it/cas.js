@@ -24,7 +24,7 @@ export default {
           { label: 'Ripara catena', text: 'Correggi automaticamente le relazioni padre-figlio interrotte' },
           { label: 'Importa chiave privata', text: 'Collegare la chiave privata di una CA che possiede solo il proprio certificato, perché possa firmare' },
           { label: 'Chiave e validità', text: 'RSA-3072 per impostazione predefinita, locale o HSM. Validità di 1, 2, 3, 5, 10, 15 o 20 anni, oppure Personalizzata (giorni) fino a 50 anni. Una CA RSA-2048 che sopravvivrebbe al 2030 viene segnalata: l\'ANSSI accetta RSA-2048 fino alla fine del 2030, ETSI TS 119 312 fino alla fine del 2026' },
-          { label: 'Post-quantistica (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 o ML-DSA-87 (FIPS 204, livelli NIST 2, 3 e 5), generate solo via software, mai su un HSM, e nascoste in modalità FIPS. Una chiave ML-DSA firma senza un digest separato, quindi per la CA, le sue CRL e le sue risposte OCSP non c\'è alcun digest da scegliere. Una CA ML-DSA può firmare certificati RSA o EC, e una CA RSA o EC può firmare una intermedia ML-DSA. Il rinnovo mantiene lo stesso livello' },
+          { label: 'Post-quantistica (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 o ML-DSA-87 (FIPS 204, livelli NIST 2, 3 e 5), generate via software o su un provider HSM che supporta ML-DSA, e nascoste in modalità FIPS. Una chiave ML-DSA firma senza un digest separato, quindi per la CA, le sue CRL e le sue risposte OCSP non c\'è alcun digest da scegliere. Una CA ML-DSA può firmare certificati RSA o EC, e una CA RSA o EC può firmare una intermedia ML-DSA. Il rinnovo mantiene lo stesso livello' },
           { label: 'Vincoli sui nomi', text: 'Vincoli avanzati (RFC 5280): i sottoalberi consentiti ed esclusi (DNS, intervallo IP, email) limitano i nomi che la CA può certificare. Per una CA firmata esternamente sono impostati dalla CA firmataria' },
           { label: 'Schema di firma RSA', text: 'PKCS#1 v1.5 per impostazione predefinita, oppure RSA-PSS (salt lungo quanto l\'hash) per una CA RSA con chiave locale, PKCS#11 o OpenBao. Si applica ai certificati, alle CRL, alle risposte OCSP e alle risposte SCEP firmati dalla CA; le marche temporali restano in PKCS#1 v1.5, lo schema che openssl ts -verify controlla. "Firma con RSA-PSS" nei dettagli della CA fa passare una CA esistente da uno schema all\'altro: i certificati già emessi mantengono la loro firma' },
           { label: 'Profilo di conformità', text: 'ANSSI, BSI o EU ACM: regole allineate a un testo di riferimento vincolano ciò che la CA emette (tipi di chiave, hash, schema RSA, orizzonti di data e, per EU ACM, una chiave della CA custodita su HSM). Scegline uno alla creazione (a una CA intermedia viene proposto il profilo della CA padre, altrimenti quello predefinito impostato in Impostazioni, Informazioni). Su una CA esistente, il campo nei dettagli lo associa, lo cambia o lo rimuove: la verifica del profilo viene eseguita prima su quella CA, i rilievi sono elencati e confermi che le regole si applicano solo alle emissioni future, nulla di già emesso viene firmato di nuovo. Richiede write:cas, e admin:system per associare o cambiare' },
@@ -155,7 +155,7 @@ Raggruppa le CA per il campo Organizzazione (O). Utile per configurazioni multi-
 Il modulo segnala una CA RSA-2048 che sopravvivrebbe al 2030: l'ANSSI accetta RSA-2048 fino alla fine del 2030, ETSI TS 119 312 fino alla fine del 2026. Scegli RSA-3072 o superiore. Sotto **Vincoli avanzati (RFC 5280)**, i sottoalberi consentiti ed esclusi (DNS, intervallo IP, email) limitano i nomi che la CA può certificare.
 
 ### CA post-quantistiche (ML-DSA)
-**ML-DSA-44**, **ML-DSA-65** e **ML-DSA-87** (FIPS 204) sono elencati con il loro livello di sicurezza NIST (2, 3 e 5). La chiave è generata via software, mai su un HSM, e l'algoritmo è nascosto in modalità FIPS.
+**ML-DSA-44**, **ML-DSA-65** e **ML-DSA-87** (FIPS 204) sono elencati con il loro livello di sicurezza NIST (2, 3 e 5). La chiave è generata via software, oppure su un provider HSM che supporta ML-DSA (vedi CA su HSM), e l'algoritmo è nascosto in modalità FIPS.
 
 - Una chiave ML-DSA firma senza un digest separato: il campo digest scompare e un digest inviato tramite l'API viene ignorato con un avviso. Le CRL e le risposte OCSP della CA seguono la stessa regola.
 - Le gerarchie possono essere miste: una root ML-DSA può firmare una intermedia RSA o EC, e una CA RSA o EC può firmare una intermedia ML-DSA, che usa poi il digest del padre.
@@ -273,7 +273,7 @@ UCM può memorizzare la chiave di firma di una CA su un modulo di sicurezza hard
 3. In **Archiviazione chiave**, passa da *Locale* a **HSM**
 4. Scegli il provider HSM
 5. Scegli una modalità chiave:
-   - **Genera nuova chiave**: fornisci un'etichetta (lettere/cifre/_/-) e scegli l'algoritmo (RSA-2048/3072/4096 o EC-P256/P384/P521, RSA-3072 per impostazione predefinita)
+   - **Genera nuova chiave**: fornisci un'etichetta (lettere/cifre/_/-) e scegli l'algoritmo (RSA-2048/3072/4096 o EC-P256/P384/P521, RSA-3072 per impostazione predefinita; Brainpool su PKCS#11, ML-DSA sui provider elencati in Gestione HSM)
    - **Usa chiave esistente**: scegli una chiave di firma inutilizzata già presente sull'HSM
 6. Invia. UCM crea il certificato CA e lo collega alla chiave HSM.
 

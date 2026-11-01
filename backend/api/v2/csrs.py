@@ -11,7 +11,7 @@ import base64
 import uuid
 from flask import Blueprint, request, jsonify, g, Response
 from sqlalchemy import func, or_
-from auth.unified import require_auth
+from auth.unified import has_permission, require_auth
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils import notices as notices_mod
 from utils.pagination import parse_request_pagination
@@ -20,6 +20,7 @@ from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.sanitize import sanitize_filename
 from models import db, Certificate, CA
 from services.cert_service import CertificateService
+from services.cert.mixins.csr import RelatedSignerError
 from services.deletion_blockers import parse_bulk_ids
 from services.policy_service import PolicyViolation
 from utils.csr_extensions import csr_extensions
@@ -38,7 +39,8 @@ from utils.datetime_utils import utc_now
 from utils.db_transaction import safe_commit
 from utils.cert_status import (
     awaits_certificate, pending_requests, signed_requests)
-from utils.key_codec import MalformedKey, load_private_key_any, private_key_to_pem
+from services.import_service import KeyPasswordError, load_import_private_key
+from utils.key_codec import MalformedKey, private_key_to_pem
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
 
 bp = Blueprint('csrs_v2', __name__)
@@ -349,6 +351,18 @@ def create_csr():
         except ValueError as exc:
             return error_response(str(exc), 400)
 
+        # RFC 9763: the id of a certificate A whose stored key signs a relatedCertRequest
+        related_to = data.get('related_to')
+        if related_to is not None and (isinstance(related_to, bool) or not isinstance(related_to, int)
+                                       or related_to < 1):
+            return error_response('related_to must be a certificate id', 400)
+        # Signing with A's stored key is a use of that key: gated like its export
+        if related_to is not None and not has_permission(
+                'read:private_keys', getattr(g, 'permissions', []) or []):
+            return error_response(
+                "Signing with the related certificate's private key requires the "
+                'read:private_keys permission', 403)
+
         # Parse SANs - frontend sends ["DNS:example.com", "IP:1.2.3.4", ...]
         from utils.san_parse import parse_csr_san_entries
         san_buckets, san_error = parse_csr_san_entries(data.get('sans', []))
@@ -367,7 +381,8 @@ def create_csr():
             san_email=san_buckets['san_email'] or None,
             san_uri=san_buckets['san_uri'] or None,
             san_upn=san_buckets['san_upn'] or None,
-            username=getattr(g, 'current_user', None) and g.current_user.username or 'system'
+            username=getattr(g, 'current_user', None) and g.current_user.username or 'system',
+            related_to=related_to,
         )
         
         AuditService.log_action(
@@ -389,6 +404,8 @@ def create_csr():
         )
     except FipsRestricted:
         raise
+    except RelatedSignerError as e:
+        return error_response(str(e), 400)
     except Exception as e:
         logger.error(f"Failed to create CSR: {e}")
         return error_response('Failed to create CSR', 500)
@@ -730,7 +747,6 @@ def export_csr(csr_id):
         return error_response('format must be csr or key', 400)
 
     if export_format == 'key':
-        from auth.unified import has_permission
         if not has_permission('read:private_keys', getattr(g, 'permissions', []) or []):
             return error_response(
                 'Private key export requires the read:private_keys permission', 403
@@ -874,14 +890,12 @@ def upload_csr_private_key(csr_id):
         password = passphrase.encode('utf-8') if passphrase else None
         
         try:
-            private_key = load_private_key_any(key_bytes, password=password)
+            private_key = load_import_private_key(key_bytes, password)
         except UnsupportedForKeyAlgorithm:
             raise
-        except MalformedKey as e:
+        except (MalformedKey, KeyPasswordError) as e:
             return error_response(str(e), 400)
         except Exception as e:
-            if 'password' in str(e).lower() or 'decrypt' in str(e).lower():
-                return error_response('Private key is encrypted - please provide passphrase', 400)
             logger.error(f"Invalid private key for CSR: {e}")
             return error_response('Invalid private key format', 400)
 
@@ -1005,7 +1019,6 @@ def sign_csr(csr_id):
     if backend_cert_type in _CA_CERT_TYPES and extra_san:
         return error_response('Names cannot be added when signing a CA certificate', 400)
     if backend_cert_type in _CA_CERT_TYPES:
-        from auth.unified import has_permission
         if not has_permission('write:cas', getattr(g, 'permissions', []) or []):
             return error_response(
                 'Signing a CSR as an intermediate CA requires the write:cas permission',

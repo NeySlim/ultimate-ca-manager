@@ -100,6 +100,9 @@ class CASigningMixin:
 
         # Convert CSR object to PEM bytes
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)
+        # RFC 9763: A is found before signing, so linking after it cannot fail
+        from services.cert.related_pair import link_issued, requested_by_csr
+        related_a = requested_by_csr(csr.public_bytes(serialization.Encoding.DER))
 
         # Load CA cert and key (local or HSM-backed)
         ca_cert_pem = get_ca_cert_pem(ca)
@@ -169,22 +172,6 @@ class CASigningMixin:
 
         cert_pem_raw = cert_pem_bytes if isinstance(cert_pem_bytes, bytes) else cert_pem_bytes.encode()
 
-        # Extract AKI/SKI
-        cert_aki = ''
-        cert_ski = ''
-        try:
-            aki_ext = cert_obj.extensions.get_extension_for_oid(x509.oid.ExtensionOID.AUTHORITY_KEY_IDENTIFIER)
-            if aki_ext.value.key_identifier:
-                cert_aki = ':'.join(f'{b:02x}' for b in aki_ext.value.key_identifier)
-        except x509.ExtensionNotFound:
-            pass
-        try:
-            ski_ext = cert_obj.extensions.get_extension_for_oid(x509.oid.ExtensionOID.SUBJECT_KEY_IDENTIFIER)
-            if ski_ext.value.digest:
-                cert_ski = ':'.join(f'{b:02x}' for b in ski_ext.value.digest)
-        except x509.ExtensionNotFound:
-            pass
-
         # Extract SANs
         from utils.upn_san import extract_upns_from_san_list
         san_dns, san_ip, san_email, san_upn = [], [], [], []
@@ -211,8 +198,7 @@ class CASigningMixin:
             subject_cn=cn,
             issuer=cert_obj.issuer.rfc4514_string(),
             serial_number=serial_decimal,
-            aki=cert_aki,
-            ski=cert_ski,
+            # aki/ski come from the crt listener, in the form CA lookups match
             valid_from=not_before,
             valid_to=not_after,
             san_dns=json.dumps(san_dns) if san_dns else None,
@@ -231,6 +217,8 @@ class CASigningMixin:
         # Increment CA serial
         ca.serial = (ca.serial or 0) + 1
         try:
+            db.session.flush()
+            link_issued(new_cert, cert_obj, related_a)
             db.session.commit()
         except Exception as _commit_err:
             db.session.rollback()

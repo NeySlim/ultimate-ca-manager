@@ -18,7 +18,8 @@ from auth.unified import require_auth
 from utils.db_transaction import safe_commit
 from utils.response import success_response, error_response
 from utils.cert_issuer import private_key_matches
-from utils.key_codec import MalformedKey, load_private_key_any, private_key_to_pem
+from services.import_service import KeyPasswordError, load_import_private_key
+from utils.key_codec import MalformedKey, private_key_to_pem
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
 from services.audit_service import AuditService
 from models import CA, db
@@ -65,15 +66,12 @@ def import_ca_private_key(ca_id):
     if 'PRIVATE KEY' not in key_data:
         return error_response('Invalid private key format', 400)
     try:
-        private_key = load_private_key_any(
-            key_data.encode('utf-8'), password=passphrase.encode('utf-8') if passphrase else None)
+        private_key = load_import_private_key(key_data.encode('utf-8'), passphrase)
     except UnsupportedForKeyAlgorithm:
         raise
-    except MalformedKey as e:
+    except (MalformedKey, KeyPasswordError) as e:
         return error_response(str(e), 400)
     except Exception as e:
-        if 'password' in str(e).lower() or 'decrypt' in str(e).lower():
-            return error_response('Private key is encrypted - please provide passphrase', 400)
         logger.warning(f"CA {ca_id} key import: invalid key: {e}")
         return error_response('Invalid private key format', 400)
     if isinstance(private_key, (ed25519.Ed25519PrivateKey, ed448.Ed448PrivateKey)):

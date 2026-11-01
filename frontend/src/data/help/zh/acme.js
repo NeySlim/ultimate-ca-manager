@@ -21,7 +21,8 @@ export default {
           { label: '外部 CA 账户', text: '每个 CA 可以有多个账户,, 多个账户可以共享同一个目录 URL（例如两个 Let\'s Encrypt 账户用于管理分离）；目录 URL 留空默认为 Let\'s Encrypt 生产环境' },
           { label: '自定义服务器', text: '设置自定义 ACME 目录 URL 以使用任何符合 RFC 8555 的 CA' },
           { label: 'EAB', text: '支持外部账户绑定，用于需要预注册的 CA（ZeroSSL、HARICA 等）' },
-          { label: '密钥类型', text: '证书密钥支持 RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384' },
+          { label: '密钥类型', text: '证书密钥支持 RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384、Brainpool P-256 或 P-384、ML-DSA-44、ML-DSA-65 或 ML-DSA-87；FIPS 模式下或不含 ML-DSA 的构建中不提供 ML-DSA。已配置但本实例无法生成的默认类型会使订单失败，而不是回退到 RSA-2048 (v2.248)' },
+          { label: 'FIPS 模式下重用密钥', text: '当 FIPS 模式不认可源证书的密钥（包括 ML-DSA）时，拒绝重用该密钥 (v2.248)' },
           { label: '账户密钥', text: 'ACME 账户密钥支持 ES256 (P-256)、ES384 (P-384) 或 RS256 算法' },
           { label: 'DNS 提供商', text: '配置 DNS-01 挑战提供商（Cloudflare、Route53、Tencent DNSPod、Plesk 等）。Plesk 通过其 XML API；对于自签名面板可关闭 Verify TLS Certificate，并可添加 DNS 传播延迟' },
           { label: '自定义命令', text: '运行管理员配置的本地命令来创建/删除 TXT 记录的 DNS 提供商类型,, 记录详情通过 DOMAIN、RECORD_NAME、RECORD_VALUE、TTL、ACTION 环境变量传递。要求二进制文件绝对路径，不经过 shell，超时可配置' },
@@ -40,6 +41,7 @@ export default {
                   { label: '本地订单 (v2.217)', text: 'Local orders 标签页列出内置服务器的订单，支持状态过滤、单个删除和清理；过期未签发的订单每 6 小时自动清理，无配置文件的订单使用默认签名摘要。自 v2.218 起，清理还会移除已验证授权中残留的 pending 同级质询' },
                   { label: '配置文件与模板 (v2.221)', text: '证书配置文件（draft-ietf-acme-profiles）在目录中公布，由客户端在每个订单中选择。每个配置文件设定有效期和摘要，并可绑定证书模板，绑定后模板的密钥用法和扩展密钥用法将决定签发的证书' },
                   { label: '默认配置文件', text: '大多数客户端不请求任何配置文件。在配置文件下方选择的默认配置文件会应用于这些订单；未设置时，它们获得 90 天有效期和默认摘要' },
+                  { label: '吊销 (v2.248)', text: '客户端发送用于吊销的证书必须与存储的证书逐字节一致。只有 RSA 或 EC P-256、P-384、P-521 证书密钥可以自行签署请求：ML-DSA、EdDSA 或 Brainpool 证书请使用下单的账户吊销' },
         ]
       },
       {
@@ -165,7 +167,7 @@ UCM 支持两种 ACME（自动化证书管理环境）模式：
 - **环境**: 测试（staging）或生产（正式证书）
 - **联系邮箱**: 账户注册时必填
 - **自动续期**: 在证书到期前自动续期
-- **证书密钥类型**: RSA-2048、RSA-4096、ECDSA P-256 或 ECDSA P-384
+- **证书密钥类型**: RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384、Brainpool P-256 或 P-384、ML-DSA-44、ML-DSA-65 或 ML-DSA-87。FIPS 模式下或不含 ML-DSA 的构建中不提供 ML-DSA。已配置但本实例无法生成的类型会使订单失败，而不是回退到 RSA-2048
 - **账户密钥算法**: ES256、ES384 或 RS256 用于 ACME 账户签名
 
 ### 自定义 ACME 服务器
@@ -215,6 +217,8 @@ ECDSA 密钥推荐用于现代部署:, 更小、更快且同样安全。
 - **生成新密钥** *(默认)*: UCM 为每个订单创建全新密钥对
 - **续期时重用密钥**: 在多次续期间保持同一私钥（DANE/TLSA 记录和密钥固定所必需）；首次签发生成密钥，续期时重新加载
 - **提供外部 CSR**: 粘贴在外部生成的 PEM CSR；UCM 在 finalize 时提交，私钥永不进入 UCM。CSR 的域名必须与订单标识符完全一致
+
+在 FIPS 模式下，当 FIPS 不认可源证书的密钥（包括 ML-DSA）时，拒绝重用该密钥。
 
 ### 预检（试运行）
 在申请表单上**运行预检**，可针对 Let's Encrypt **staging** 目录验证整个请求，而不消耗生产环境速率限制：
@@ -441,6 +445,9 @@ certbot、acme.sh 或 Caddy 等客户端使用此 URL 来发现 ACME 端点。
 - 请求的域名
 - 使用的签名 CA
 - 签发时间戳
+
+### 吊销
+客户端使用其账户密钥或证书自身的密钥吊销，且发送的证书必须与存储的证书逐字节一致：仅凭序列号永远不够。只有 RSA 或 EC P-256、P-384、P-521 密钥可以签署 ACME 请求，因此 ML-DSA、EdDSA 或 Brainpool 证书需使用下单的账户吊销；UCM 会在拒绝信息中说明这一点。
 
 ## IP 地址证书 (RFC 8738)
 

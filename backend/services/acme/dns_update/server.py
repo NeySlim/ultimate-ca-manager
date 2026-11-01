@@ -36,6 +36,8 @@ _retry = None   # greenlet of a pending bind retry, if any
 # Bind retry after a reload: the old worker holds the port until it exits (seconds).
 RETRY_FIRST_DELAY = 0.25
 RETRY_MAX_DELAY = 1.0
+# Binds tried when port 0 asks for any port free in both UDP and TCP.
+ANY_PORT_TRIES = 16
 
 
 def _sleep(seconds: float) -> None:
@@ -173,8 +175,9 @@ class DnsUpdateServer:
     # -- lifecycle -----------------------------------------------------------------
 
     def start(self, quiet: bool = False) -> bool:
-        """Bind UDP and TCP on the same port. Call it in the thread that runs the
-        gevent hub. Returns False (never raises) when a bind fails. ``quiet`` logs
+        """Bind UDP and TCP on the same port (port 0: any port free in both).
+        Call it in the thread that runs the gevent hub. Returns False (never raises)
+        when a bind fails. ``quiet`` logs
         a busy port (EADDRINUSE) at debug level (for the bind retry). Any other
         bind error is always logged at error level, with the exception text."""
         import gevent
@@ -186,28 +189,35 @@ class DnsUpdateServer:
             from services.acme.dns_update.handler import DnsUpdateHandler
             self._handler = DnsUpdateHandler()
         self.bind_errno = None
-        try:
-            tcp = StreamServer((self._host, self._port), self._handle_tcp,
-                               spawn=Pool(self._limits.tcp_pool))
-            tcp.start()
-            self._tcp = tcp
-            port = tcp.address[1]
-            udp = _udp_server_class()((self._host, port), self._handle_udp,
-                                      spawn=Pool(self._limits.udp_pool))
-            udp.start()
-            self._udp = udp
-        except OSError as exc:
-            self.bind_errno = exc.errno
-            busy = exc.errno == errno.EADDRINUSE
-            logger.log(logging.DEBUG if quiet and busy else logging.ERROR,
-                       "Cannot start DNS UPDATE listener on %s port %d: %s",
-                       self._host, self._port, exc)
-            self._close_servers()
-            return False
-        except Exception as exc:
-            logger.warning("DNS UPDATE listener startup failed: %s", type(exc).__name__)
-            self._close_servers()
-            return False
+        # Port 0: the kernel picks the TCP port, and its UDP twin may belong to another
+        # socket. Draw again instead of failing.
+        tries = ANY_PORT_TRIES if self._port == 0 else 1
+        for attempt in range(1, tries + 1):
+            try:
+                tcp = StreamServer((self._host, self._port), self._handle_tcp,
+                                   spawn=Pool(self._limits.tcp_pool))
+                tcp.start()
+                self._tcp = tcp
+                port = tcp.address[1]
+                udp = _udp_server_class()((self._host, port), self._handle_udp,
+                                          spawn=Pool(self._limits.udp_pool))
+                udp.start()
+                self._udp = udp
+                break
+            except OSError as exc:
+                self._close_servers()
+                busy = exc.errno == errno.EADDRINUSE
+                if busy and attempt < tries:
+                    continue
+                self.bind_errno = exc.errno
+                logger.log(logging.DEBUG if quiet and busy else logging.ERROR,
+                           "Cannot start DNS UPDATE listener on %s port %d: %s",
+                           self._host, self._port, exc)
+                return False
+            except Exception as exc:
+                logger.warning("DNS UPDATE listener startup failed: %s", type(exc).__name__)
+                self._close_servers()
+                return False
         self._port = port
         self._hub = gevent.get_hub()
         self._stopped = Event()

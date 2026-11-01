@@ -12,6 +12,7 @@ from types import SimpleNamespace
 from unittest.mock import patch
 
 import pytest
+from cryptography.hazmat.primitives import serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
 from services.hsm.base_provider import HsmKeyInfo
@@ -288,6 +289,43 @@ class TestSyncKeys:
             _sync(app, pid, _ListingProvider([listed]))
             with app.app_context():
                 assert db.session.get(HsmKey, ids['a']).get_metadata()['protection_level'] == 'HSM'
+
+    def test_a_known_key_takes_the_label_and_spki_the_provider_now_reads(self, app):
+        """A row synced before its type was named (raw label, unparsable public key)."""
+        from models import db
+        from models.hsm import HsmKey
+        public = ec.generate_private_key(ec.SECP384R1()).public_key()
+        spki = public.public_bytes(serialization.Encoding.PEM,
+                                   serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+        with _provider_with_keys(app, 'refresh', ['a']) as (pid, ids, _ca):
+            with app.app_context():
+                row = db.session.get(HsmKey, ids['a'])
+                row.algorithm, row.public_key_pem = 'ecdsa-p384', 'cmF3IGJ5dGVz'
+                db.session.commit()
+            listed = _info('a')
+            listed.algorithm, listed.public_key_pem = 'EC-P384', spki
+            _sync(app, pid, _ListingProvider([listed]))
+            with app.app_context():
+                row = db.session.get(HsmKey, ids['a'])
+                assert (row.algorithm, row.public_key_pem) == ('EC-P384', spki)
+
+    def test_a_key_keeps_its_label_and_spki_against_an_unknown_reading(self, app):
+        from models import db
+        from models.hsm import HsmKey
+        spki = ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+        other = ec.generate_private_key(ec.SECP256R1()).public_key().public_bytes(
+            serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+        with _provider_with_keys(app, 'keep', ['a']) as (pid, ids, _ca):
+            with app.app_context():
+                db.session.get(HsmKey, ids['a']).public_key_pem = spki
+                db.session.commit()
+            listed = _info('a')
+            listed.algorithm, listed.public_key_pem = 'UNKNOWN', other
+            _sync(app, pid, _ListingProvider([listed]))
+            with app.app_context():
+                row = db.session.get(HsmKey, ids['a'])
+                assert (row.algorithm, row.public_key_pem) == ('EC-P256', spki)
 
     def test_an_unreferenced_missing_key_is_still_removed(self, app):
         with _provider_with_keys(app, 'clean', ['a', 'gone']) as (pid, _ids, _ca):

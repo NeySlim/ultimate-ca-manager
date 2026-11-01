@@ -89,7 +89,7 @@ class TestActor:
     def test_scheduler_queues_approval_under_the_actor(self, app, svc, cert_id, monkeypatch):
         seen = []
         monkeypatch.setattr('services.approval_gate.queue_renewal',
-                            lambda user, cert, scheduled_by=None: seen.append(scheduled_by) or (None, None))
+                            lambda user, cert, scheduled_by=None, **_kw: seen.append(scheduled_by) or (None, None))
         with app.app_context():
             cert = db.session.get(Certificate, cert_id)
             assert svc.AutoRenewalService._held_for_approval(cert, already_queued=False) is None

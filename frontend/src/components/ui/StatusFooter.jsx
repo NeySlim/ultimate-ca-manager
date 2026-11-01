@@ -15,10 +15,14 @@ import {
 import { useWindowManager } from '../../contexts/WindowManagerContext'
 import { cn } from '../../lib/utils'
 
+// A detail URL (/certificates/12) belongs to its list page: opening one is no page change
+const pageOf = (pathname) => pathname.replace(/\/\d+\/?$/, '') || '/'
+
 export function StatusFooter() {
   const { t } = useTranslation()
   const location = useLocation()
-  const prevPath = useRef(location.pathname)
+  const page = pageOf(location.pathname)
+  const prevPage = useRef(page)
   const {
     windowCount, closeAll, tileWindows, stackWindows,
     sameWindow, closeOnNav, toggleSameWindow, toggleCloseOnNav,
@@ -26,11 +30,11 @@ export function StatusFooter() {
 
   // Close windows on navigation if option enabled
   useEffect(() => {
-    if (closeOnNav && prevPath.current !== location.pathname && windowCount > 0) {
+    if (closeOnNav && prevPage.current !== page && windowCount > 0) {
       closeAll()
     }
-    prevPath.current = location.pathname
-  }, [location.pathname, closeOnNav, closeAll, windowCount])
+    prevPage.current = page
+  }, [page, closeOnNav, closeAll, windowCount])
 
   return (
     <div className={cn(

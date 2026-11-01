@@ -71,3 +71,48 @@ def mldsa_ca_row(app):
             Certificate.query.filter_by(caref=refid).delete()
             CA.query.filter_by(refid=refid).delete()
             db.session.commit()
+
+
+def scep_wstep_mldsa_signed_cms(data, key, cert=None, attrs=(), digest='sha512',
+                                sid='issuer_and_serial', with_certificate=True):
+    """CMS SignedData signed the RFC 9882 way: messageDigest, pure ML-DSA over the DER
+    SignedAttrs, the key's OID as signatureAlgorithm with no parameters. ``sid='ski'``
+    names the signer by the SKI of *key*, as Windows "Full PKCS#7" requests do."""
+    import asn1crypto.cms
+    import asn1crypto.core
+    import asn1crypto.x509
+    from cryptography.hazmat.primitives import hashes
+    from utils import key_algorithms
+
+    h = hashes.Hash({'sha512': hashes.SHA512, 'sha256': hashes.SHA256}[digest]())
+    h.update(data)
+    signed_attrs = asn1crypto.cms.CMSAttributes([
+        *attrs,
+        {'type': 'content_type', 'values': ['data']},
+        {'type': 'message_digest', 'values': [asn1crypto.core.OctetString(h.finalize())]},
+    ])
+    signature = key.sign(b'\x31' + signed_attrs.dump()[1:])
+    cert_asn1 = (asn1crypto.x509.Certificate.load(cert.public_bytes(serialization.Encoding.DER))
+                 if cert is not None else None)
+    if sid == 'ski':
+        signer_id = {'subject_key_identifier':
+                     x509.SubjectKeyIdentifier.from_public_key(key.public_key()).digest}
+    else:
+        signer_id = {'issuer_and_serial_number': {'issuer': cert_asn1.issuer,
+                                                  'serial_number': cert_asn1.serial_number}}
+    oid = next(a.oid for a in key_algorithms.algorithms('ML-DSA') if a.matches_key(key))
+    version = 'v3' if sid == 'ski' else 'v1'
+    signer_info = asn1crypto.cms.SignerInfo({
+        'version': version, 'sid': signer_id,
+        'digest_algorithm': {'algorithm': digest}, 'signed_attrs': signed_attrs,
+        'signature_algorithm': {'algorithm': oid},
+        'signature': asn1crypto.core.OctetString(signature),
+    })
+    content = {
+        'version': version, 'digest_algorithms': [{'algorithm': digest}],
+        'encap_content_info': {'content_type': 'data', 'content': data},
+        'signer_infos': [signer_info],
+    }
+    if with_certificate and cert_asn1 is not None:
+        content['certificates'] = [cert_asn1]
+    return asn1crypto.cms.ContentInfo({'content_type': 'signed_data', 'content': content}).dump()

@@ -66,6 +66,9 @@ CERT_KEY_TYPES = {
     # Certificate keys only: an ACME account key has no Brainpool JWS algorithm
     'EC-BP256': lambda: key_algorithms.generate('EC-BP256'),
     'EC-BP384': lambda: key_algorithms.generate('EC-BP384'),
+    # Certificate keys only, registered when this build has ML-DSA; FIPS mode refuses them
+    **{label: (lambda label=label: key_algorithms.generate(label))
+       for label in key_algorithms.labels('ML-DSA')},
 }
 
 
@@ -75,6 +78,26 @@ def fips_key_type_refusal(label):
     if alg is not None and not alg.fips_approved and fips_mode.enabled():
         return f'{alg.display} keys not available in FIPS mode'
     return None
+
+
+def fips_private_key_refusal(private_key):
+    """Why FIPS mode refuses signing with *private_key* (a reused key), or None."""
+    return fips_key_type_refusal(key_algorithms.label_for_private_key(private_key))
+
+
+def fips_csr_refusal(csr):
+    """Why FIPS mode refuses an external CSR's key, or None; read without loading the key."""
+    if not fips_mode.enabled():
+        return None
+    from services.fips_preflight import certificate_key
+    name, approved = certificate_key(csr)
+    if approved:
+        return None
+    oid = csr.public_key_algorithm_oid.dotted_string
+    if name == f'unreadable key ({oid})':
+        return (f'The CSR key (algorithm {oid}) cannot be read; FIPS mode accepts RSA 2048+ '
+                'and ECDSA P-256, P-384 or P-521 keys')
+    return f'{name} keys not available in FIPS mode'
 
 
 def csr_identifiers_match_order(
@@ -1503,6 +1526,9 @@ class AcmeClientService:
                         cert_key = load_private_key_from_certificate(src_cert)
                     except ValueError as exc:
                         return False, str(exc), None
+                    refusal = fips_private_key_refusal(cert_key)
+                    if refusal:
+                        return False, refusal, None
                     csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
             else:
                 cert_key, key_error = self._generate_cert_key(order)
@@ -1652,15 +1678,29 @@ class AcmeClientService:
     # Configuration Helpers
     # =========================================================================
     
-    def _get_default_key_type(self) -> str:
-        """Get the default certificate key type from settings"""
+    @staticmethod
+    def _get_default_key_type() -> str:
+        """The certificate key type setting, RSA-2048 when unset; ValueError when this
+        instance cannot generate the configured type, FIPS mode included (never another
+        type in its place)."""
         cfg = SystemConfig.query.filter_by(key='acme.client.key_type').first()
-        kt = cfg.value if cfg else 'RSA-2048'
-        return kt if kt in CERT_KEY_TYPES else 'RSA-2048'
+        kt = (cfg.value or '').strip() if cfg else ''
+        if not kt:
+            return 'RSA-2048'
+        if kt not in CERT_KEY_TYPES:
+            raise ValueError(f'Configured ACME certificate key type {kt} is not supported here '
+                             f'(one of {", ".join(CERT_KEY_TYPES)})')
+        refusal = fips_key_type_refusal(kt)
+        if refusal:
+            raise ValueError(refusal)
+        return kt
 
     def _generate_cert_key(self, order):
         """A new key of the order's type: ``(key, None)``, or ``(None, error)`` when unsupported."""
-        key_type = getattr(order, 'key_type', None) or self._get_default_key_type()
+        try:
+            key_type = getattr(order, 'key_type', None) or self._get_default_key_type()
+        except ValueError as exc:
+            return None, str(exc)
         generator = CERT_KEY_TYPES.get(key_type)
         if generator is None:
             return None, f'Unsupported certificate key type on order: {key_type}'

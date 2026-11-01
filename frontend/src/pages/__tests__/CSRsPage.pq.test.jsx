@@ -5,7 +5,7 @@
 import { describe, it, expect, vi, beforeEach, beforeAll } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
-import { CSR_LABELS, GROUP_PQ, KEY_ALGORITHMS } from '../../lib/keyAlgorithms'
+import { CSR_LABELS, GROUP_PQ, KEY_ALGORITHMS, findAlgorithm, isBrainpool } from '../../lib/keyAlgorithms'
 
 beforeAll(() => {
   global.ResizeObserver = global.ResizeObserver || class { observe() {} unobserve() {} disconnect() {} }
@@ -24,7 +24,7 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
-const mocks = vi.hoisted(() => ({ navigate: vi.fn(), create: vi.fn(), row: null }))
+const mocks = vi.hoisted(() => ({ navigate: vi.fn(), create: vi.fn(), row: null, effective: {} }))
 
 vi.mock('react-router-dom', async () => {
   const actual = await vi.importActual('react-router-dom')
@@ -70,7 +70,16 @@ vi.mock('../../services', () => ({
   templatesService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
   mscaService: { getEnabled: vi.fn().mockResolvedValue({ data: [] }) },
   ekuService: { getKnown: vi.fn().mockResolvedValue({ data: { ekus: [] } }) },
-  policiesService: { getEffective: vi.fn().mockResolvedValue({ data: {} }) },
+  policiesService: { getEffective: vi.fn(() => Promise.resolve({ data: mocks.effective })) },
+}))
+// A native select exposes the options the real one renders in a portal
+vi.mock('../../components', async (orig) => ({
+  ...(await orig()),
+  Select: ({ label, options = [], value, onChange }) => (
+    <select aria-label={label} value={value ?? ''} onChange={(e) => onChange?.(e.target.value)}>
+      {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
+    </select>
+  ),
 }))
 vi.mock('../../components/SmartImport', () => ({ SmartImportModal: () => null }))
 
@@ -82,9 +91,36 @@ const ML_DSA_CSR = {
   id: 21, cn: 'pq.example.test', common_name: 'pq.example.test',
   key_type: 'ML-DSA-87', key_algorithm: 'ML-DSA-87', key_size: null, security_level: 5,
 }
+const BRAINPOOL_CSR = {
+  id: 23, cn: 'bp.example.test', common_name: 'bp.example.test',
+  key_type: 'EC brainpoolP384r1', key_algorithm: 'EC', key_size: 384,
+}
+const RSA_3072_CSR = {
+  id: 24, cn: 'rsa3072.example.test', common_name: 'rsa3072.example.test',
+  key_type: 'RSA 3072', key_algorithm: 'RSA', key_size: 3072,
+}
 const EC_CSR = {
   id: 22, cn: 'ec.example.test', common_name: 'ec.example.test',
   key_type: 'EC secp384r1', key_algorithm: 'EC', key_size: 0,
+}
+
+// Key types the Generate CSR form offers, as the API spells them
+const offeredKeys = () => [...screen.getByLabelText('common.keyType').querySelectorAll('option')].map(o => o.value)
+const csrOf = (labels) => labels.map(l => findAlgorithm(l).csr)
+
+async function openGenerate() {
+  mocks.row = EC_CSR
+  render(<MemoryRouter initialEntries={['/csrs']}><CSRsPage /></MemoryRouter>)
+  await screen.findByText(EC_CSR.cn)
+  fireEvent.click(screen.getAllByText('csrs.generateCSR')[0])
+  await screen.findByLabelText('common.keyType')
+}
+
+async function submitGenerate() {
+  const buttons = await screen.findAllByText('csrs.generateCSR')
+  fireEvent.click(buttons[buttons.length - 1])
+  await waitFor(() => expect(mocks.create).toHaveBeenCalledTimes(1))
+  return mocks.create.mock.calls[0][0]
 }
 
 async function openRekey(row) {
@@ -99,6 +135,7 @@ async function openRekey(row) {
 describe('CSRsPage re-key key type', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    mocks.effective = {}
     mocks.create.mockResolvedValue({ data: { id: 99 } })
   })
 
@@ -123,9 +160,53 @@ describe('CSRsPage re-key key type', () => {
     expect(mocks.create.mock.calls[0][0]).toMatchObject({ key_type: 'ML-DSA-87' })
   })
 
+  it('re-keys an RSA 3072 CSR as a CSR with RSA 3072', async () => {
+    await openRekey(RSA_3072_CSR)
+    fireEvent.click(screen.getByText('csrs.rekeyAsCSR'))
+    await waitFor(() => expect(screen.getByLabelText('common.keyType')).toHaveValue('RSA 3072'))
+    expect((await submitGenerate()).key_type).toBe('RSA 3072')
+  })
+
   it('keeps the curve of an EC CSR re-keyed as a certificate', async () => {
     await openRekey(EC_CSR)
     fireEvent.click(screen.getByText('csrs.rekeyAsCert'))
     expect(mocks.navigate.mock.calls[0][1].state.prefill).toMatchObject({ key_type: 'ecdsa', key_size: '384' })
   })
+})
+
+describe('CSRsPage Generate CSR key types on this server', () => {
+  beforeEach(() => {
+    vi.clearAllMocks()
+    mocks.create.mockResolvedValue({ data: { id: 99 } })
+  })
+
+  it('offers every CSR key outside FIPS mode', async () => {
+    mocks.effective = {}
+    await openGenerate()
+    expect(offeredKeys()).toEqual(csrOf(CSR_LABELS))
+  })
+
+  it('offers no ML-DSA or Brainpool key in FIPS mode', async () => {
+    mocks.effective = { fips: true }
+    await openGenerate()
+    await waitFor(() => expect(offeredKeys()).toEqual(csrOf(CSR_LABELS.filter(l => findAlgorithm(l).fips))))
+    expect(CSR_LABELS.some(isBrainpool)).toBe(true)
+  })
+
+  it('offers no ML-DSA key on a build without it', async () => {
+    mocks.effective = { ml_dsa: false }
+    await openGenerate()
+    await waitFor(() => expect(offeredKeys()).toEqual(
+      csrOf(CSR_LABELS.filter(l => findAlgorithm(l).group !== GROUP_PQ))))
+  })
+
+  it.each([['ML-DSA', ML_DSA_CSR], ['Brainpool', BRAINPOOL_CSR]])(
+    're-keys a %s CSR in FIPS mode with the first key offered', async (_name, row) => {
+      mocks.effective = { fips: true }
+      await openRekey(row)
+      fireEvent.click(screen.getByText('csrs.rekeyAsCSR'))
+      const first = findAlgorithm(CSR_LABELS.find(l => findAlgorithm(l).fips)).csr
+      await waitFor(() => expect(screen.getByLabelText('common.keyType')).toHaveValue(first))
+      expect((await submitGenerate()).key_type).toBe(first)
+    })
 })

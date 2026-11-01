@@ -59,5 +59,7 @@ export function limitsWithProfile(base, profile) {
     allowedSchemes: profile?.allowed_signature_schemes ?? null,
     horizons: profile?.key_type_horizons ?? {},
     requireHsm: profile?.require_hsm_ca_key === true,
+    // A post-quantum key only in a hybrid pair, so never as a CA key
+    pqStandalone: base.pqStandalone === true || profile?.pq_standalone === true,
   }
 }

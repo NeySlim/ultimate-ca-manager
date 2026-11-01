@@ -840,7 +840,22 @@
     "deleteNeedsRevoke": "This certificate is still valid, so it cannot be deleted on its own: deleting it would remove it from UCM while it stays trusted by every client that does not check revocation. Revoke it first, so the CRL and the OCSP responder carry the withdrawal, and it is then deleted.",
     "revokeThenDelete": "Revoke, then delete",
     "noKeyTypeAllowedByPolicy": "No key type is allowed by the policies of this CA and template.",
-    "revocationApprovalRequired": "Revocation submitted for approval (policy: {{policy}})"
+    "revocationApprovalRequired": "Revocation submitted for approval (policy: {{policy}})",
+    "hybrid": {
+      "toggle": "Issue a hybrid pair (RFC 9763)",
+      "toggleHint": "Two linked certificates for the same subject: one with a classical key, one with an ML-DSA key that references the first.",
+      "classical": "Classical key",
+      "pq": "Post-quantum key",
+      "column": "Linked",
+      "linked": "Linked",
+      "roleClassical": "Classical member of a hybrid pair",
+      "rolePq": "Post-quantum member of a hybrid pair",
+      "relatedCertificate": "Linked certificate",
+      "openRelated": "Open linked certificate #{{id}}",
+      "pairIssued": "Hybrid pair issued: certificates #{{classical}} and #{{pq}}",
+      "renewedWithRelated": "Certificate renewed, with its linked certificate #{{id}}",
+      "bulkRelatedRenewed": "{{count}} linked certificates renewed with the selection"
+    }
   },
   "cas": {
     "chainRevoked": "Revoked upstream",
@@ -1150,6 +1165,7 @@
     "rekeyAsCSRDescription": "Generate a new CSR with the same DN fields and SANs but a fresh key pair.",
     "rekeyAsCertDescription": "Issue a new certificate directly with the same subject, signed by a CA.",
     "keyRsa2048": "RSA 2048",
+    "keyRsa3072": "RSA 3072",
     "keyRsa4096": "RSA 4096",
     "keyCurveNistP256": "NIST P-256 (ECDSA)",
     "keyCurveNistP384": "NIST P-384 (ECDSA)",
@@ -1654,6 +1670,7 @@
     "renew": "Renew",
     "keyType": "Certificate Key Type",
     "keyTypeHelper": "Algorithm and key size for issued certificates",
+    "keyTypeUnavailable": "The saved key type {{keyType}} is not available on this server: orders fail until you choose another one.",
     "keySource": "Key Source",
     "keySourceHelper": "Generate a new key, reuse the same key on renewal (TLSA/pinning), or provide an external CSR",
     "keySourceGenerate": "Generate new key",
@@ -2162,6 +2179,8 @@
     "crlPublishInterval": "Publish every",
     "crlPublishAuto": "Auto (near expiry)",
     "crlDigest": "Signature digest",
+    "crlDigestIgnored": "Stored digest {{digest}} is ignored: this key signs without a separate digest",
+    "crlDigestClear": "Clear",
     "crlScheduleNote": "Publishing more often than the validity window gives relying parties a grace period if a publication is missed.",
     "nextPublish": "Next Publish",
     "namedUrlsTitle": "Named URLs",
@@ -3208,8 +3227,12 @@
           "remedy": "Create an RSA or ECDSA (P-256/P-384/P-521) authority and move issuance to it before the switch; an authority key cannot be converted."
         },
         "ca_weak_key": {
-          "title": "Certificate authorities with a DSA or ML-DSA key, RSA under 2048 bits or a curve other than P-256/384/521",
+          "title": "Certificate authorities with a DSA key, RSA under 2048 bits or a curve other than P-256/384/521",
           "remedy": "Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it."
+        },
+        "ca_unapproved_algorithm": {
+          "title": "Certificate authorities with an ML-DSA key: the FIPS module UCM ships does not provide ML-DSA, so they cannot sign in FIPS mode",
+          "remedy": "Create an RSA 2048+ or ECDSA P-256/P-384/P-521 authority and move issuance to it before the switch, or keep FIPS mode off while ML-DSA issuance is needed."
         },
         "ssh_ca_eddsa_key": {
           "title": "SSH certificate authorities with an Ed25519 key: they cannot sign in FIPS mode",
@@ -3484,7 +3507,8 @@
       "trustStore": "Trust Store",
       "hsmManagement": "HSM Management",
       "singleSignOn": "Single Sign-On",
-      "ssh": "SSH Certificates"
+      "ssh": "SSH Certificates",
+      "sshCas": "SSH Certificate Authorities"
     },
     "stats": {},
     "subtitle_one": "{{count}} role",
@@ -3502,12 +3526,18 @@
     "noDescription": "No description",
     "roleDetails": "Role Details",
     "permissions": {
-      "readSsh": "View SSH CAs & certificates",
-      "writeSsh": "Create & manage SSH CAs & certificates",
-      "deleteSsh": "Delete SSH CAs & certificates",
-      "read:ssh": "View SSH CAs and certificates",
-      "write:ssh": "Create and sign SSH certificates",
-      "delete:ssh": "Delete SSH CAs and certificates"
+      "readSsh": "View SSH certificates",
+      "writeSsh": "Sign, import & revoke SSH certificates",
+      "deleteSsh": "Delete SSH certificates",
+      "read:ssh": "View SSH certificates",
+      "write:ssh": "Sign, import and revoke SSH certificates",
+      "delete:ssh": "Delete SSH certificates",
+      "readSshCas": "View SSH CAs",
+      "writeSshCas": "Create, import & edit SSH CAs",
+      "deleteSshCas": "Delete SSH CAs",
+      "read:ssh_cas": "View SSH CAs, their public keys, KRLs and setup scripts",
+      "write:ssh_cas": "Create, import and edit SSH CAs",
+      "delete:ssh_cas": "Delete SSH CAs"
     },
     "ignoredPermissions": "Ignored permissions",
     "ignoredPermissionsHint": "Stored on this role but not applied: reserved for administrators or unknown. They are kept as they are."
@@ -3538,6 +3568,7 @@
     "generateHsmKey": "Generate HSM Key",
     "keyLabel": "Key Label",
     "keyLabelPlaceholder": "my-signing-key",
+    "mldsaUntestedGoogleKms": "ML-DSA on Google Cloud KMS follows the KMS API but has not been tested against the service yet.",
     "purposes": {
       "general": "General Purpose",
       "caSigning": "CA Signing"
@@ -3889,7 +3920,16 @@
       "certificateHold": "Temporary suspension that can be lifted later with Remove hold.",
       "privilegeWithdrawn": "A privilege granted by the certificate was withdrawn.",
       "aACompromise": "An attribute authority's key was compromised."
-    }
+    },
+    "revokeRelated": "Also revoke the linked certificate",
+    "revokeRelatedHint": "Untick to keep the other member of the hybrid pair valid.",
+    "revokedWithRelated": "Certificate revoked, with its linked certificate #{{id}}",
+    "relatedNotRevoked": "The linked certificate was not revoked: it does not name this certificate as its pair, or it was already revoked.",
+    "relatedRevokeFailed": "Certificate revoked, but its linked certificate #{{id}} could not be revoked: revoke it separately.",
+    "revokeRelatedBulk": "Also revoke the linked certificates",
+    "revokeRelatedBulkHint": "Selected members of a hybrid pair take the other member with them. Untick to keep the other members valid.",
+    "bulkRelatedRevoked": "{{count}} linked certificates revoked with the selection",
+    "bulkRelatedRevokeFailed": "{{count}} linked certificates could not be revoked with the selection ({{ids}}): revoke them separately"
   },
   "details": {
     "pemCertificate": "PEM Certificate",
@@ -4039,6 +4079,7 @@
     "importCAs": "Import CAs",
     "importCertificates": "Import certificates",
     "importKeys": "Import keys",
+    "importCSRs": "Import CSRs",
     "importObjects": "Import {{count}} Object(s)",
     "importingObjects": "Importing objects...",
     "importComplete": "Import Complete",
@@ -4766,7 +4807,8 @@
     "legacyPkcs12Desc": "For Android 15 and earlier, macOS 14 and earlier, Windows Server 2016 and earlier, Java before 8u301 / 11.0.1: they reject the default AES-256 archive as a wrong password. Protects the file less well; choose it per export.",
     "formatKeyDesc": "PEM-encoded private key only",
     "formats": {
-      "privateKey": "Private Key"
+      "privateKey": "Private Key",
+      "hybridBundle": "Hybrid bundle"
     },
     "formatOptions": {
       "pemOnly": "PEM (Certificate only)",
@@ -4781,7 +4823,9 @@
     "unavailableForKeyAlgorithm": "Not available for {{algorithm}} keys: UCM cannot yet write a post-quantum key into PKCS#12 or JKS. Export PEM with the private key instead.",
     "jksNote": "JKS always includes the private key",
     "pkcs12Title": "Export PKCS#12",
-    "pkcs12PasswordPrompt": "Enter password for PKCS#12 file"
+    "pkcs12PasswordPrompt": "Enter password for PKCS#12 file",
+    "formatHybridBundleDesc": "ZIP with both certificates of the pair",
+    "bundleRelatedHasNoKey": "The related certificate has no private key: the bundle holds the certificates only"
   },
   "userCertificates": {
     "title": "User Certificates",
@@ -5388,6 +5432,7 @@
     "signerGenerateCn": "Common name",
     "signerGenerateValidity": "Validity (days)",
     "signerGenerateKeyType": "Key type",
+    "signerMldsaVerifyNote": "ML-DSA timestamps verify with openssl cms -verify (OpenSSL 3.5 or later), not with openssl ts -verify; check the message imprint separately.",
     "signerGenerated": "TSA signing certificate issued.",
     "signerGeneratedSelected": "TSA signing certificate issued and selected as the dedicated signer.",
     "signerGenerateFailed": "Failed to generate the TSA signing certificate.",
@@ -5526,6 +5571,7 @@
     "validityInfo": "Validity",
     "caInfo": "CA Information",
     "selectCa": "Select SSH CA",
+    "issueNeedsCaRead": "Choosing an SSH CA needs the read:ssh_cas permission, which your account lacks: ask an administrator for it.",
     "issueMode": "Issue Mode",
     "presets": {
       "1h": "1 Hour",

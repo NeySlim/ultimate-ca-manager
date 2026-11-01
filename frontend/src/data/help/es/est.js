@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'Enviar un CSR y recibir un certificado firmado' },
           { label: '/simplereenroll', text: 'Renovar un certificado existente (requiere mTLS)' },
           { label: '/csrattrs', text: 'Obtener los atributos de CSR recomendados por el servidor' },
-          { label: '/serverkeygen', text: 'El servidor genera el par de claves y devuelve el certificado + clave' },
+          { label: '/serverkeygen', text: 'El servidor genera un par de claves RSA-2048 y devuelve el certificado + clave; la clave de la solicitud, ML-DSA incluida, se ignora (RFC 7030)' },
         ]
       },
     ],
@@ -124,6 +124,8 @@ Obtener los atributos de CSR (OID) recomendados por el servidor.
 
 ### POST /serverkeygen
 El servidor genera un par de claves y devuelve el certificado junto con la clave privada. Útil cuando el cliente no puede generar claves localmente.
+
+Las claves generadas son RSA-2048. Una solicitud cuyo CSR lleve una clave poscuántica se rechaza con \`400\` y un mensaje: genere la clave ML-DSA en el dispositivo y use \`/simpleenroll\`.
 
 ## Pestaña de Información
 

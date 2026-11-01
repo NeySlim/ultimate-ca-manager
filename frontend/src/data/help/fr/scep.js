@@ -21,6 +21,7 @@ export default {
           { label: 'CA de signature', text: 'Sélectionner quelle CA signe les certificats inscrits via SCEP. Les appareils chiffrent leur requête pour cette CA, elle doit donc détenir une clé RSA logicielle : les CA EC, adossées à un HSM, sans clé, hors ligne ou révoquées ne sont pas listées (v2.248)' },
           { label: 'Approbation automatique', text: 'Approuver automatiquement les requêtes avec des mots de passe de défi valides' },
           { label: 'Mot de passe de défi', text: 'Secret partagé que les appareils utilisent pour authentifier l\'inscription' },
+          { label: 'Clés des appareils (v2.248)', text: 'Un appareil signe sa requête avec une clé RSA, ECDSA, Ed25519 ou ML-DSA ; une signature ML-DSA suit la RFC 9882 (condensat SHA-512). Ed448 est refusé, ML-DSA aussi en mode FIPS' },
         ]
       },
       {
@@ -100,6 +101,9 @@ Affiche l'URL du point de terminaison SCEP et les instructions d'intégration.
 4. UCM valide le mot de passe de défi
 5. Si l'approbation automatique est activée, UCM signe et retourne le certificat
 6. Si l'approbation automatique est désactivée, un administrateur examine et approuve/rejette
+
+### Clés des appareils
+L'appareil signe son PKCSReq avec sa propre clé : RSA, ECDSA, Ed25519 ou ML-DSA. Une signature ML-DSA est vérifiée selon la RFC 9882 (condensat SHA-512, identifiant d'algorithme propre à la clé, sans paramètres). Les signatures Ed448 sont refusées, et ML-DSA aussi en mode FIPS. La requête reste chiffrée pour la CA de signature RSA.
 
 ## URL SCEP
 

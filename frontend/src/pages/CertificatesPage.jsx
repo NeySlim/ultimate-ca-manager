@@ -265,8 +265,9 @@ export default function CertificatesPage() {
         { format, name: selectedCert.common_name || 'certificate' },
       )
       showSuccess(t('messages.success.export.certificate'))
-    } catch {
-      showError(t('messages.errors.exportFailed.certificate'))
+    } catch (err) {
+      // The server's refusal says why (a bundle member without a key); a network failure does not
+      showError(err?.status ? err.message : t('messages.errors.exportFailed.certificate'))
     }
   }
 
@@ -282,12 +283,12 @@ export default function CertificatesPage() {
     const cert = certificates.find(c => c.id === id) || (selectedCert?.id === id ? selectedCert : null)
     setRevokingCert(cert || { id })
   }
-  const handleRevokeConfirm = async (reason) => {
+  const handleRevokeConfirm = async (reason, options) => {
     if (!revokingCert) return
     setRevoking(true)
     try {
       muteToasts()
-      const res = await certificatesService.revoke(revokingCert.id, reason)
+      const res = await certificatesService.revoke(revokingCert.id, reason, options)
       if (res?.data?.approval_required) {
         // Queued by a revocation policy: nothing is revoked, so nothing is deleted
         showWarning(t('certificates.revocationApprovalRequired', { policy: res.data.policy_name }))
@@ -297,7 +298,13 @@ export default function CertificatesPage() {
         return
       }
       const alsoDelete = deleteAfterRevoke ? revokingCert.id : null
-      showSuccess(t('messages.success.other.revoked'))
+      const relatedRevoked = res?.data?.related_revoked
+      showSuccess(relatedRevoked != null
+        ? t('revocation.revokedWithRelated', { id: relatedRevoked })
+        : t('messages.success.other.revoked'))
+      if (res?.data?.related_not_revoked != null) {
+        showWarning(t('revocation.relatedRevokeFailed', { id: res.data.related_not_revoked }))
+      } else if (options?.revokeRelated && relatedRevoked == null) showWarning(t('revocation.relatedNotRevoked'))
       setRevokingCert(null)
       setDeleteAfterRevoke(false)
       if (alsoDelete) {
@@ -331,8 +338,11 @@ export default function CertificatesPage() {
         setSelectedCert(null)
         return
       }
+      const relatedRenewed = res?.data?.related_renewed
       if (res?.meta?.msca_status === 'pending') {
         showSuccess(t('certificates.renewPendingMsca', 'Renewal submitted to the Microsoft CA: pending approval'))
+      } else if (relatedRenewed?.length) {
+        showSuccess(t('certificates.hybrid.renewedWithRelated', { id: relatedRenewed.join(', #') }))
       } else {
         showSuccess(t('notifications.certificateIssued', { name: '' }).replace(': ', ''))
       }
@@ -646,6 +656,7 @@ export default function CertificatesPage() {
       onRevoke={() => handleRevoke(selectedCert.id)}
       onRenew={(selectedCert.has_private_key || selectedCert.source === 'msca') && !selectedCert.revoked ? () => handleRenew(selectedCert) : null}
       onDelete={() => handleDelete(selectedCert.id)}
+      onOpenRelated={(id) => handleSelectCert({ id })}
       onUploadKey={() => setShowKeyModal(true)}
       onAddToTrustStore={handleAddToTrustStore}
       canWrite={canWrite('certificates')}
@@ -784,18 +795,23 @@ export default function CertificatesPage() {
             try {
               muteToasts()
               const response = await certificatesService.create(data)
+              // A hybrid pair answers { certificate: classical, related: ML-DSA }
+              const pair = response?.data?.certificate ? response.data : null
+              const issued = pair ? pair.certificate : response?.data
               if (response?.data?.approval_required) {
                 showWarning(t('certificates.approvalRequired', { policy: response.data.policy_name }))
               } else {
-                showSuccess(t('messages.success.create.certificate'))
+                showSuccess(pair
+                  ? t('certificates.hybrid.pairIssued', { classical: pair.certificate.id, pq: pair.related?.id })
+                  : t('messages.success.create.certificate'))
                 showNotices(response, showWarning)
               }
               setShowIssueModal(false)
               setIssueInitialData(null)
               loadData()
               // Straight to what was just issued; a request awaiting approval has no id
-              if (response?.data?.id) {
-                handleSelectCert(response.data)
+              if (issued?.id) {
+                handleSelectCert(issued)
               }
             } catch (error) {
               showError(error.message || t('common.operationFailed'))
@@ -854,6 +870,7 @@ export default function CertificatesPage() {
         entityName={exportRowCert?.common_name || exportRowCert?.subject || ''}
         hasPrivateKey={!!exportRowCert?.has_private_key}
         keyAlgorithm={exportRowCert?.key_algorithm || exportRowCert?.key_type}
+        relatedCertificateId={exportRowCert?.related_certificate_id ?? null}
         canExportKey={canExportKey}
         onExport={handleExportRow}
         chainVariantsFor={exportRowCert ? { type: 'certificate', id: exportRowCert.id } : undefined}

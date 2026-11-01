@@ -59,11 +59,15 @@ def stored_label_approved(text) -> bool:
     return bool(match) and int(match.group(1)) >= 2048
 
 
-def certificate_key(cert: x509.Certificate) -> Tuple[str, bool]:
-    """(display, approved) of a certificate's key; EdDSA is told by its OID, unloaded."""
+def certificate_key(cert) -> Tuple[str, bool]:
+    """(display, approved) of a certificate's or CSR's key; EdDSA and post-quantum
+    keys are told by their OID, unloaded."""
     oid = cert.public_key_algorithm_oid.dotted_string
     if oid in _EDDSA_OIDS:
         return _EDDSA_OIDS[oid], False
+    post_quantum = key_algorithms.post_quantum_info(oid)
+    if post_quantum is not None:
+        return post_quantum.label, False
     try:
         public_key = cert.public_key()
     except Exception:
@@ -166,12 +170,27 @@ def _ca_eddsa():
             if name in _EDDSA_OIDS.values()]
 
 
+def _is_mldsa(name) -> bool:
+    # Named whether or not this build can use ML-DSA: the registry holds it only when it can
+    info = key_algorithms.post_quantum_info(name)
+    return info is not None and info.family == 'ML-DSA'
+
+
 @detector('ca.weak_key', BLOCKER,
-          'Certificate authorities with a DSA or ML-DSA key, RSA under 2048 bits or a curve other than P-256/384/521',
+          'Certificate authorities with a DSA key, RSA under 2048 bits or a curve other than P-256/384/521',
           'Create an authority with RSA 2048+ or ECDSA P-256/P-384/P-521 and move issuance to it.')
 def _ca_weak():
     return [_named(ca.descr, ca.id, name) for ca, (name, approved) in _ca_keys()
-            if not approved and name not in _EDDSA_OIDS.values()]
+            if not approved and name not in _EDDSA_OIDS.values() and not _is_mldsa(name)]
+
+
+@detector('ca.unapproved_algorithm', BLOCKER,
+          'Certificate authorities with an ML-DSA key: the FIPS module UCM ships does not provide '
+          'ML-DSA, so they cannot sign in FIPS mode',
+          'Create an RSA 2048+ or ECDSA P-256/P-384/P-521 authority and move issuance to it '
+          'before the switch, or keep FIPS mode off while ML-DSA issuance is needed.')
+def _ca_unapproved_algorithm():
+    return [_named(ca.descr, ca.id, name) for ca, (name, _) in _ca_keys() if _is_mldsa(name)]
 
 
 def _ssh_eddsa(key_type, public_key) -> Optional[str]:
@@ -320,12 +339,13 @@ def _policies():
     return found
 
 
-def _csr_eddsa(csr_pem) -> Optional[str]:
+def _csr_unapproved_key(csr_pem) -> Optional[str]:
     try:
         csr = x509.load_pem_x509_csr(csr_pem.encode() if isinstance(csr_pem, str) else csr_pem)
-        return _EDDSA_OIDS.get(csr.public_key_algorithm_oid.dotted_string)
     except Exception:
         return None
+    name, approved = certificate_key(csr)
+    return None if approved else name
 
 
 @detector('acme_client.unapproved_key_type', WARNING,
@@ -346,7 +366,7 @@ def _acme_client():
                 display, approved = _stored_cert_key(cert.key_algo, cert.crt)
                 name = None if approved else display
         elif order.key_source == 'csr' and order.csr_pem:
-            name = _csr_eddsa(order.csr_pem)
+            name = _csr_unapproved_key(order.csr_pem)
         elif order.key_type and not stored_label_approved(order.key_type):
             name = order.key_type
         if name:

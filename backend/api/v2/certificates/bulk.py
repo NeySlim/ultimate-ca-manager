@@ -13,9 +13,14 @@ from models import db, Certificate
 from utils.cert_status import issued_certificates
 from utils.p7b import p7b_from_pems
 from services.cert_service import CertificateService
-from services.cert.renewal import RenewalError, check_renewable, renew_certificate_in_place
+from services.cert.renewal import (
+    RenewalError, check_renewable, renew_certificate_in_place, renewal_partner,
+)
 from services.msca.propagation import propagate_revocation, PROPAGATED
-from services.approval_gate import queue_revocation
+from services.approval_gate import PairApprovalConflict, queue_revocation
+from services.cert.related_pair import mutual_partner
+from api.v2.certificates.cert_lifecycle import _related_choice_refusal
+from utils.export_options import json_boolean
 from services.audit_service import AuditService
 from services.deletion_blockers import (
     certificate_deletion_blockers, first_blocker, parse_bulk_ids,
@@ -40,9 +45,17 @@ def bulk_revoke_certificates():
     reason = normalize_revocation_reason(data.get('reason', 'unspecified'))
     if reason is None:
         return error_response(invalid_reason_message(data.get('reason')), 400)
+    try:
+        revoke_related = json_boolean(data, 'revoke_related', True)
+    except ValueError as e:
+        return error_response(str(e), 400)
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
 
     results = {'success': [], 'failed': []}
+    # Members of a related pair revoked with the other one earlier in the batch
+    revoked_with_pair = set()
+    # Partners covered by a request queued earlier in the batch: id -> that pending entry
+    queued_with_pair = {}
     # A certificate issued through a Microsoft CA connection has no caref, so
     # UCM publishes neither a CRL entry nor an OCSP answer for it: the
     # Windows CA is the only place its revocation can become visible. The
@@ -51,15 +64,32 @@ def bulk_revoke_certificates():
     msca_local_only = []
     for cert_id in ids:
         try:
+            if cert_id in queued_with_pair:
+                results['pending_approval'].append(dict(queued_with_pair[cert_id], id=cert_id))
+                continue
             cert = db.session.get(Certificate, cert_id)
             if not cert:
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
                 continue
             if cert.revoked:
-                results['failed'].append({'id': cert_id, 'error': 'Already revoked'})
+                if cert_id in revoked_with_pair:
+                    results['success'].append(cert_id)
+                else:
+                    results['failed'].append({'id': cert_id, 'error': 'Already revoked'})
+                continue
+            partner = mutual_partner(cert)
+            partner_id = partner.id if partner is not None and not partner.revoked else None
+            refusal = _related_choice_refusal(cert, partner_id, revoke_related)
+            if refusal is not None:
+                results['failed'].append({'id': cert_id, 'error': refusal[0]})
                 continue
             try:
-                policy, approval = queue_revocation(g.current_user, cert, reason=reason)
+                policy, approval = queue_revocation(
+                    g.current_user, cert, reason=reason,
+                    partner=partner if revoke_related and partner_id else None)
+            except PairApprovalConflict as e:
+                results['failed'].append({'id': cert_id, 'error': str(e)})
+                continue
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Policy evaluation failed for revocation of {cert_id}: {e}", exc_info=True)
@@ -68,9 +98,17 @@ def bulk_revoke_certificates():
             if approval is not None:
                 results.setdefault('pending_approval', []).append(
                     {'id': cert_id, 'approval_id': approval.id, 'policy_name': policy.name})
+                if revoke_related and partner_id:
+                    queued_with_pair[partner_id] = results['pending_approval'][-1]
                 continue
             cert = CertificateService.revoke_certificate(
-                cert_id=cert_id, reason=reason, username=username)
+                cert_id=cert_id, reason=reason, username=username, revoke_related=revoke_related)
+            if revoke_related and partner_id:
+                left = db.session.get(Certificate, partner_id)
+                if left is None or left.revoked:
+                    revoked_with_pair.add(partner_id)
+                else:
+                    results.setdefault('related_not_revoked', []).append(partner_id)
             if cert is not None and cert.source == 'msca':
                 outcome, _detail = propagate_revocation(cert, reason)
                 if outcome != PROPAGATED:
@@ -115,9 +153,19 @@ def bulk_renew_certificates():
     username, actor_user_id = _actor()
     # CAs that renewed at least one certificate: one CRL each, after the loop
     renewed_ca_ids = []
+    # Members of a related pair renewed with the other one earlier in the batch
+    renewed_with_pair = set()
+    # Partners covered by a request queued earlier in the batch: id -> that pending entry
+    queued_with_pair = {}
 
     for cert_id in ids:
         try:
+            if cert_id in renewed_with_pair:
+                results['success'].append(cert_id)
+                continue
+            if cert_id in queued_with_pair:
+                results['pending_approval'].append(dict(queued_with_pair[cert_id], id=cert_id))
+                continue
             cert = db.session.get(Certificate, cert_id)
             if not cert:
                 results['failed'].append({'id': cert_id, 'error': 'Not found'})
@@ -125,6 +173,9 @@ def bulk_renew_certificates():
             check_renewable(cert)  # RenewalError → reported per item below
             try:
                 policy, approval = _approval_for_renewal(g.current_user, cert, data)
+            except PairApprovalConflict as e:
+                results['failed'].append({'id': cert_id, 'error': str(e)})
+                continue
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Policy evaluation failed for renewal of {cert_id}: {e}", exc_info=True)
@@ -133,13 +184,18 @@ def bulk_renew_certificates():
             if approval is not None:
                 results.setdefault('pending_approval', []).append(
                     {'id': cert_id, 'approval_id': approval.id, 'policy_name': policy.name})
+                partner = renewal_partner(cert)
+                if partner is not None:
+                    queued_with_pair[partner.id] = results['pending_approval'][-1]
                 continue
             outcome = renew_certificate_in_place(
                 cert, username=username, actor_user_id=actor_user_id, rekey=True,
                 regenerate_crl=False, trigger='bulk')
             results['success'].append(cert_id)
-            if outcome.get('ca_id') is not None and outcome['ca_id'] not in renewed_ca_ids:
-                renewed_ca_ids.append(outcome['ca_id'])
+            for done in [outcome] + list(outcome.get('related') or []):
+                renewed_with_pair.add(done['cert_id'])
+                if done.get('ca_id') is not None and done['ca_id'] not in renewed_ca_ids:
+                    renewed_ca_ids.append(done['ca_id'])
         except RenewalError as refusal:
             db.session.rollback()
             logger.info("Bulk renewal of certificate %s refused: %s", cert_id, refusal.message)

@@ -8,7 +8,10 @@ from utils.response import success_response, error_response, no_content_response
 from models import Certificate, CA, db
 from utils.revocation_reasons import normalize_revocation_reason, invalid_reason_message
 from services.cert_service import CertificateService
-from services.approval_gate import approval_payload, queue_revocation
+from services.approval_gate import (PairApprovalConflict, approval_payload, queue_revocation,
+                                    revocation_policy_for)
+from services.cert.related_pair import mutual_partner
+from utils.export_options import json_boolean
 from services.deletion_blockers import certificate_deletion_blockers, first_blocker
 from services.ocsp_service import OCSPService
 from services.audit_service import AuditService
@@ -83,12 +86,26 @@ def revoke_certificate(cert_id):
     if cert.revoked:
         return error_response('Certificate already revoked', 400)
 
-    # A policy that requires approval for revocations queues the request
-    # (administrators bypass); fail closed on any evaluation error
+    # The other member of a related pair falls with it unless the request says otherwise
+    try:
+        revoke_related = json_boolean(data or {}, 'revoke_related', True)
+    except ValueError as e:
+        return error_response(str(e), 400)
+    partner = mutual_partner(cert)
+    partner_id = partner.id if partner is not None and not partner.revoked else None
+    refusal = _related_choice_refusal(cert, partner_id, revoke_related)
+    if refusal:
+        return error_response(*refusal)
+
+    # A policy that requires approval for revoking either member queues the
+    # request (administrators bypass); fail closed on any evaluation error
     try:
         policy, approval = queue_revocation(
             g.current_user, cert, reason=reason, invalidity_at=invalidity_at,
-            comment=(data or {}).get('approval_comment'))
+            comment=(data or {}).get('approval_comment'),
+            partner=partner if revoke_related and partner_id else None)
+    except PairApprovalConflict as e:
+        return error_response(str(e), 409)
     except Exception as e:
         logger.error(f"Policy evaluation failed for revocation of {cert_id}: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the certificate was not revoked', 500)
@@ -106,6 +123,7 @@ def revoke_certificate(cert_id):
             reason=reason,
             username=username,
             invalidity_at=invalidity_at,
+            revoke_related=revoke_related,
         )
 
         # A cert issued through a Microsoft CA connection: try to propagate the
@@ -115,16 +133,41 @@ def revoke_certificate(cert_id):
         if cert.source == 'msca':
             return _revoke_msca_on_ca(cert, reason)
 
-        return success_response(
-            data=cert.to_dict(),
-            message='Certificate revoked successfully'
-        )
+        cert_dict = cert.to_dict()
+        partner = db.session.get(Certificate, partner_id) if revoke_related and partner_id else None
+        message = 'Certificate revoked successfully'
+        if partner is not None and partner.revoked:
+            cert_dict['related_revoked'] = partner_id
+        elif partner is not None:
+            # This one stays revoked; the other member's failure is said, not hidden
+            cert_dict['related_not_revoked'] = partner_id
+            message = (f'Certificate revoked; its related certificate #{partner_id} was not '
+                       'revoked, revoke it separately')
+        return success_response(data=cert_dict, message=message)
     except ValueError as e:
         logger.error(f"Certificate revocation validation error: {e}")
         return error_response('Validation failed', 400)
     except Exception as e:
         logger.error(f"Failed to revoke certificate: {e}")
         return error_response('Failed to revoke certificate', 500)
+
+
+def _related_choice_refusal(cert, partner_id, revoke_related):
+    """``(message, status)`` when keeping the other member cannot be honoured: an
+    approved revocation takes the pair with it, so such a request is refused, not queued."""
+    if revoke_related or not partner_id:
+        return None
+    if getattr(getattr(g, 'current_user', None), 'role', None) == 'admin':
+        return None
+    try:
+        policy = revocation_policy_for(cert)
+    except Exception as e:
+        logger.error(f"Policy evaluation failed for revocation of {cert.id}: {e}", exc_info=True)
+        return 'Policy evaluation failed; the certificate was not revoked', 500
+    if policy is None:
+        return None
+    return (f'Policy "{policy.name}" requires approval, which revokes both certificates of a '
+            'related pair; request it with revoke_related left on', 400)
 
 
 def _revoke_msca_on_ca(cert, reason):

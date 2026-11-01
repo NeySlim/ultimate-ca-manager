@@ -278,10 +278,12 @@ class IssuanceMixin:
                 cert = db.session.get(Certificate, prev_order.certificate_id)
                 if cert and not cert.revoked:
                     try:
+                        # The replaced certificate only: its pair partner may be the new one
                         CertificateService.revoke_certificate(
                             cert_id=cert.id,
                             reason='superseded',
-                            username='system'
+                            username='system',
+                            revoke_related=False,
                         )
                         logger.info(f"Auto-superseded certificate {cert.id} (replaced by {new_cert_id})")
                     except Exception as e:

@@ -137,6 +137,7 @@ export default {
           { label: 'Kerberos/SPNEGO', text: "Associa gli endpoint autenticati tramite Kerberos utilizzati per l'iscrizione automatica GPO silenziosa (richiede uno SPN e un keytab dal controller di dominio)" },
           { label: 'Elenco di controllo per la configurazione', text: "La scheda mostra un elenco di controllo in tempo reale di ciò che è configurato rispetto a ciò che manca ancora, sia per l'iscrizione manuale sia per quella non presidiata" },
           { label: 'Soggetti derivati da AD', text: "I modelli possono scegliere di derivare il proprio soggetto/SAN da Active Directory (tramite il connettore AD) per l'iscrizione non presidiata" },
+          { label: 'Modelli ML-DSA (v2.248)', text: 'Pubblicizzati tramite l\'OID del loro algoritmo di chiave con il Microsoft Software Key Storage Provider, non ancora testati con un vero client Windows e nascosti in modalità FIPS. Il rinnovo con certificato non può usare un certificato ML-DSA (XML-DSig non ha firma ML-DSA): iscrivi un nuovo certificato' },
         ]
       },
       {
@@ -445,6 +446,8 @@ La scheda tiene traccia di ciò che è configurato rispetto a ciò che manca anc
 - **Autorità di certificazione**: La CA i cui modelli vengono pubblicizzati e che emette certificati tramite questa configurazione
 - **Validità (giorni)**: Validità dei certificati emessi tramite WSTEP quando la richiesta non corrisponde a nessun modello; altrimenti si applica la validità del modello corrispondente
 
+Un modello con tipo di chiave **ML-DSA** è pubblicizzato tramite l'OID del suo algoritmo di chiave, con il Microsoft Software Key Storage Provider e un key spec di sola firma. È nascosto in modalità FIPS e l'iscrizione da un vero client Windows non è ancora stata testata.
+
 ### Kerberos / SPNEGO
 
 Associa gli endpoint XCEP/WSTEP autenticati tramite Kerberos utilizzati per l'iscrizione automatica GPO silenziosa, in modo che macchine e utenti vengano autenticati tramite il proprio ticket Kerberos anziché con una richiesta di credenziali:
@@ -461,6 +464,8 @@ Associa gli endpoint XCEP/WSTEP autenticati tramite Kerberos utilizzati per l'is
 ### Vincolo di rinnovo con certificato
 
 Oltre a Nome utente/Password e Kerberos, WSTEP supporta il **rinnovo con certificato client**, rispecchiando i veri endpoint CES di ADCS: la richiesta di rinnovo (RST) deve essere firmata XML-DSig con la chiave privata di un certificato **emesso dallo stesso UCM**. Il certificato presentato viene confrontato **byte per byte** con il certificato memorizzato per la CA configurata, il numero di serie o il soggetto da soli non bastano mai. Questo consente ai client Windows di rinnovare in modo non presidiato usando il certificato attuale, senza credenziali né ticket Kerberos.
+
+XML-DSig non ha un metodo di firma ML-DSA, quindi un certificato **ML-DSA** non può rinnovarsi in questo modo: UCM nomina la chiave nel rifiuto e il client iscrive invece un nuovo certificato.
 
 ### Estensione di sicurezza SID (KB5014754)
 

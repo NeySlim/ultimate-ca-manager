@@ -1,7 +1,7 @@
 /**
  * TSAPage signer key choices read the key registry: every offered key is sent the
- * way the issue API names it (the row's `issue` pair), and ML-DSA stays out of the
- * list while the timestamp CMS is signed in RSA or ECDSA only.
+ * way the issue API names it (the row's `issue` pair), ML-DSA-65 and ML-DSA-87
+ * included, and FIPS mode hides what the module does not approve.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
 import { render, screen, fireEvent, waitFor } from '@testing-library/react'
@@ -13,6 +13,13 @@ vi.mock('../../lib/keyAlgorithms', async (importOriginal) => {
   return { ...actual, TSA_LABELS: [...actual.TSA_LABELS, 'ED25519'] }
 })
 const { GROUP_PQ, KEY_ALGORITHMS, TSA_LABELS, findAlgorithm } = await vi.importActual('../../lib/keyAlgorithms')
+
+let fipsMode = false
+let mldsaBuild = true
+vi.mock('../../lib/policyAlgorithms', async (importOriginal) => ({
+  ...(await importOriginal()),
+  useKeyPlatform: () => ({ fips: fipsMode, mldsa: mldsaBuild }),
+}))
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
@@ -93,6 +100,8 @@ function submit() {
 describe('TSAPage signer key, from the registry', () => {
   beforeEach(() => {
     vi.clearAllMocks()
+    fipsMode = false
+    mldsaBuild = true
     tsaService.getConfig.mockResolvedValue({
       data: { enabled: true, ca_refid: 'ca-tsa', signer_cert_refid: '', signer: { configured: false } },
     })
@@ -124,9 +133,37 @@ describe('TSAPage signer key, from the registry', () => {
     expect(offered).toEqual(TSA_LABELS)
   })
 
-  it('TSA_LABELS holds no ML-DSA key while the timestamp is signed in RSA or ECDSA only', () => {
+  it('offers ML-DSA-65 and ML-DSA-87, not ML-DSA-44', async () => {
     const pq = KEY_ALGORITHMS.filter(a => a.group === GROUP_PQ).map(a => a.label)
-    expect(pq).toEqual(expect.arrayContaining(['ML-DSA-65', 'ML-DSA-87']))
-    expect(TSA_LABELS.filter(l => pq.includes(l))).toEqual([])
+    expect(TSA_LABELS.filter(l => pq.includes(l))).toEqual(['ML-DSA-65', 'ML-DSA-87'])
+    const select = await openGenerateModal()
+    const offered = Array.from(select.options).map(o => o.value)
+    expect(offered).toEqual(expect.arrayContaining(['ML-DSA-65', 'ML-DSA-87']))
+    expect(offered).not.toContain('ML-DSA-44')
+  })
+
+  it('says how ML-DSA tokens verify while an ML-DSA key is picked', async () => {
+    const select = await openGenerateModal()
+    fireEvent.change(select, { target: { value: 'RSA-2048' } })
+    expect(screen.queryByText('tsa.signerMldsaVerifyNote')).toBeNull()
+    fireEvent.change(select, { target: { value: 'ML-DSA-87' } })
+    expect(screen.getByText('tsa.signerMldsaVerifyNote')).toBeTruthy()
+  })
+
+  it('hides ML-DSA in FIPS mode', async () => {
+    fipsMode = true
+    const select = await openGenerateModal()
+    const offered = Array.from(select.options).map(o => o.value)
+    expect(offered.length).toBeGreaterThan(0)
+    expect(offered.filter(l => findAlgorithm(l)?.group === GROUP_PQ)).toEqual([])
+    expect(offered).toEqual(TSA_LABELS.filter(l => findAlgorithm(l)?.fips))
+  })
+
+  it('hides ML-DSA on a build without it', async () => {
+    mldsaBuild = false
+    const select = await openGenerateModal()
+    const offered = Array.from(select.options).map(o => o.value)
+    expect(offered).toEqual(TSA_LABELS.filter(l => findAlgorithm(l)?.group !== GROUP_PQ && findAlgorithm(l)?.generate))
+    expect(offered).toContain('EC-BP256')
   })
 })

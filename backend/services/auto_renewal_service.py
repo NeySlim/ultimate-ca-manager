@@ -256,20 +256,20 @@ class AutoRenewalService:
 
     @staticmethod
     def _held_for_approval(cert, *, already_queued: bool):
-        """Why a renewal policy holds ``cert``: 'queued' (a request is
-        queued now or already waits), 'declined' (its renewal was rejected),
-        or None when no policy requires approval."""
-        from services.approval_gate import certificate_scope, queue_renewal
-        from services.policy_service import PolicyEvaluationService
-        declined = not already_queued and AutoRenewalService._declined(cert)
+        """Why a renewal policy holds ``cert`` (or the partner renewed with it):
+        'queued' (a request is queued now or already waits), 'declined' (its
+        renewal was rejected), or None when no policy requires approval."""
+        from services.approval_gate import pair_policy, queue_renewal, renewal_policy_for
+        from services.cert.renewal import renewal_partner
+        partner = renewal_partner(cert)
+        members = [cert] + ([partner] if partner is not None else [])
+        declined = not already_queued and any(AutoRenewalService._declined(m) for m in members)
         if already_queued or declined:
-            ca_id, template_id, cn, dns = certificate_scope(cert)
-            if PolicyEvaluationService.check_approval_required(
-                    ca_id=ca_id, template_id=template_id, cn=cn, san_list=dns,
-                    operation='renewal') is None:
+            if pair_policy(renewal_policy_for(cert, 'renewal'),
+                           renewal_policy_for(partner, 'renewal') if partner is not None else None) is None:
                 return None
             return 'declined' if declined else 'queued'
-        _policy, approval = queue_renewal(None, cert, scheduled_by=AUTO_RENEWAL_ACTOR)
+        _policy, approval = queue_renewal(None, cert, scheduled_by=AUTO_RENEWAL_ACTOR, partner=partner)
         if approval is None:
             return None
         logger.info(f"Auto-renewal of cert {cert.id} queued for approval (request #{approval.id})")
@@ -304,11 +304,18 @@ class AutoRenewalService:
         # scheduler does not pre-empt, as long as that decision (or the
         # request's expiry) comes before the certificate expires; the
         # certificate is picked up again once the request is resolved
-        from services.approval_gate import expire_stale_requests, pending_target_ids
+        from services.approval_gate import (PairApprovalConflict, expire_stale_requests,
+                                            pending_target_ids)
+        from services.cert.renewal import renewal_partner
         expire_stale_requests()
         awaiting_approval = pending_target_ids('renewal', 'certificate_id')
+        # Members of a related pair already renewed or queued with the other one: stats key
+        done_with_pair = {}
 
         for cert_id, listed_serial in listed:
+            if cert_id in done_with_pair:
+                stats[done_with_pair[cert_id]] += 1
+                continue
             # Read again from the database, not from the identity map: the
             # first row of the batch is not expired yet, and a row deleted
             # meanwhile would otherwise be found as listed
@@ -321,9 +328,15 @@ class AutoRenewalService:
                 stats['skipped'] += 1
                 continue
             common_name = cert.common_name
-            deadline = awaiting_approval.get(str(cert.id))
+            try:
+                partner = renewal_partner(cert)
+            except Exception:  # the renewal itself then reports what is wrong with the row
+                logger.warning(f"Auto-renewal: related certificate of {cert_id} not read", exc_info=True)
+                partner = None
+            pair_ids = [str(cert.id)] + ([str(partner.id)] if partner is not None else [])
+            deadlines = [awaiting_approval[i] for i in pair_ids if i in awaiting_approval]
             valid_to = to_naive_utc(cert.valid_to)
-            if deadline is not None and valid_to is not None and deadline < valid_to:
+            if valid_to is not None and any(d < valid_to for d in deadlines):
                 logger.info(f"Auto-renewal skipped cert {cert.id}: renewal awaiting approval")
                 stats['skipped'] += 1
                 continue
@@ -331,7 +344,13 @@ class AutoRenewalService:
             # too: the renewal is queued once, and performed on approval only
             try:
                 held = AutoRenewalService._held_for_approval(
-                    cert, already_queued=str(cert.id) in awaiting_approval)
+                    cert, already_queued=bool(deadlines))
+            except PairApprovalConflict as e:
+                db.session.rollback()
+                AutoRenewalService._log_failure(cert_id, common_name, str(e))
+                stats['failed'] += 1
+                stats['errors'].append({'cert_id': cert_id, 'common_name': common_name, 'error': str(e)})
+                continue
             except Exception as e:
                 db.session.rollback()
                 logger.error(f"Auto-renewal policy evaluation failed for cert {cert_id}: {e}",
@@ -347,8 +366,11 @@ class AutoRenewalService:
                 continue
             if held:
                 stats['queued'] += 1
+                if partner is not None:
+                    done_with_pair[partner.id] = 'queued'
                 continue
 
+            partner_id = partner.id if partner is not None else None
             success, result = AutoRenewalService.renew_certificate(cert, regenerate_crl=False, known_serial=listed_serial)
 
             if success:
@@ -356,8 +378,11 @@ class AutoRenewalService:
                 # The renewal links the row to the CA that really signed it
                 # (resolved by signature when the row named none): that CA's
                 # CRL is the one carrying the superseded serial
-                if cert.caref:
-                    renewed_carefs.add(cert.caref)
+                for row in (cert, db.session.get(Certificate, partner_id) if partner_id else None):
+                    if row is not None and row.caref:
+                        renewed_carefs.add(row.caref)
+                if partner_id is not None:
+                    done_with_pair[partner_id] = 'renewed'
             elif success is None:
                 stats['skipped'] += 1
             else:

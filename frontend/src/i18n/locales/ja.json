@@ -840,7 +840,22 @@
     "deleteNeedsRevoke": "この証明書はまだ有効なため、単独では削除できません。削除すると UCM からは消えますが、失効を確認しないクライアントからは引き続き信頼されます。まず失効させて CRL と OCSP レスポンダに反映させ、そのうえで削除します。",
     "revokeThenDelete": "失効させてから削除",
     "noKeyTypeAllowedByPolicy": "この CA とテンプレートのポリシーで許可されている鍵タイプはありません。",
-    "revocationApprovalRequired": "失効を承認に提出しました（ポリシー: {{policy}}）"
+    "revocationApprovalRequired": "失効を承認に提出しました（ポリシー: {{policy}}）",
+    "hybrid": {
+      "toggle": "ハイブリッドペアを発行（RFC 9763）",
+      "toggleHint": "同一サブジェクトに対するリンクされた 2 つの証明書：従来型の鍵のものと、最初の証明書を参照する ML-DSA 鍵のものです。",
+      "classical": "従来型の鍵",
+      "pq": "ポスト量子鍵",
+      "column": "リンク",
+      "linked": "リンク",
+      "roleClassical": "ハイブリッドペアの従来型メンバー",
+      "rolePq": "ハイブリッドペアのポスト量子メンバー",
+      "relatedCertificate": "リンクされた証明書",
+      "openRelated": "リンクされた証明書 #{{id}} を開く",
+      "pairIssued": "ハイブリッドペアを発行しました：証明書 #{{classical}} と #{{pq}}",
+      "renewedWithRelated": "証明書を更新しました（リンクされた証明書 #{{id}} も更新）",
+      "bulkRelatedRenewed": "選択した証明書と共に、リンクされた証明書 {{count}} 件を更新しました"
+    }
   },
   "cas": {
     "chainRevoked": "上位で失効",
@@ -1150,6 +1165,7 @@
     "rekeyAsCSRDescription": "同じDNフィールドとSANで、新しい鍵ペアを持つ新しいCSRを生成します。",
     "rekeyAsCertDescription": "同じサブジェクトで、CAが署名した新しい証明書を直接発行します。",
     "keyRsa2048": "RSA 2048",
+    "keyRsa3072": "RSA 3072",
     "keyRsa4096": "RSA 4096",
     "keyCurveNistP256": "NIST P-256 (ECDSA)",
     "keyCurveNistP384": "NIST P-384 (ECDSA)",
@@ -1654,6 +1670,7 @@
     "renew": "更新",
     "keyType": "証明書キータイプ",
     "keyTypeHelper": "発行される証明書のアルゴリズムとキーサイズ",
+    "keyTypeUnavailable": "保存済みのキータイプ {{keyType}} はこのサーバーでは利用できません: 別のキータイプを選択するまで注文は失敗します。",
     "keySource": "鍵のソース",
     "keySourceHelper": "新規鍵を生成、更新時に再利用（TLSA/ピン留め）、または外部CSRを提供",
     "keySourceGenerate": "新規鍵を生成",
@@ -2162,6 +2179,8 @@
     "crlPublishInterval": "公開間隔",
     "crlPublishAuto": "自動（期限前）",
     "crlDigest": "署名ダイジェスト",
+    "crlDigestIgnored": "保存済みのダイジェスト {{digest}} は無視されます：この鍵は別個のダイジェストなしで署名します",
+    "crlDigestClear": "クリア",
     "crlScheduleNote": "有効期間より短い間隔で公開すると、公開が失敗した場合でも検証側に猶予期間が与えられます。",
     "nextPublish": "次回公開",
     "namedUrlsTitle": "名前付きURL",
@@ -3207,8 +3226,12 @@
           "remedy": "切り替え前に RSA または ECDSA（P-256/P-384/P-521）の認証局を作成し、発行をそちらへ移行してください。認証局の鍵は変換できません。"
         },
         "ca_weak_key": {
-          "title": "DSA または ML-DSA 鍵、2048 ビット未満の RSA、または P-256/384/521 以外の曲線を使う認証局",
+          "title": "DSA 鍵、2048 ビット未満の RSA、または P-256/384/521 以外の曲線を使う認証局",
           "remedy": "RSA 2048 以上または ECDSA P-256/P-384/P-521 の認証局を作成し、発行をそちらへ移行してください。"
+        },
+        "ca_unapproved_algorithm": {
+          "title": "ML-DSA 鍵を持つ認証局：UCM が同梱する FIPS モジュールは ML-DSA を提供しないため、FIPS モードでは署名できません",
+          "remedy": "切り替え前に RSA 2048 以上または ECDSA P-256/P-384/P-521 の認証局を作成し、発行をそちらへ移行してください。ML-DSA での発行が必要な間は FIPS モードをオフのままにしてください。"
         },
         "ssh_ca_eddsa_key": {
           "title": "Ed25519 鍵を持つ SSH 認証局：FIPS モードでは署名できません",
@@ -3484,7 +3507,8 @@
       "trustStore": "トラストストア",
       "hsmManagement": "HSM管理",
       "singleSignOn": "シングルサインオン",
-      "ssh": "SSH証明書"
+      "ssh": "SSH証明書",
+      "sshCas": "SSH認証局"
     },
     "stats": {},
     "subtitle_one": "{{count}} 件のロール",
@@ -3502,12 +3526,18 @@
     "noDescription": "説明なし",
     "roleDetails": "ロール詳細",
     "permissions": {
-      "readSsh": "SSH CAと証明書を表示",
-      "writeSsh": "SSH CAと証明書を作成・管理",
-      "deleteSsh": "SSH CAと証明書を削除",
-      "read:ssh": "SSH CAと証明書を表示",
-      "write:ssh": "SSH証明書を作成・署名",
-      "delete:ssh": "SSH CAと証明書を削除"
+      "readSsh": "SSH証明書を表示",
+      "writeSsh": "SSH証明書の署名・インポート・失効",
+      "deleteSsh": "SSH証明書を削除",
+      "read:ssh": "SSH証明書を表示",
+      "write:ssh": "SSH証明書の署名、インポート、失効",
+      "delete:ssh": "SSH証明書を削除",
+      "readSshCas": "SSH CAを表示",
+      "writeSshCas": "SSH CAの作成・インポート・編集",
+      "deleteSshCas": "SSH CAを削除",
+      "read:ssh_cas": "SSH CA、その公開鍵、KRL、セットアップスクリプトを表示",
+      "write:ssh_cas": "SSH CAの作成、インポート、編集",
+      "delete:ssh_cas": "SSH CAを削除"
     },
     "ignoredPermissions": "無視される権限",
     "ignoredPermissionsHint": "このロールに保存されていますが適用されません（管理者専用または不明な権限）。そのまま保持されます。"
@@ -3538,6 +3568,7 @@
     "generateHsmKey": "HSMキーの生成",
     "keyLabel": "キーラベル",
     "keyLabelPlaceholder": "my-signing-key",
+    "mldsaUntestedGoogleKms": "Google Cloud KMS 上の ML-DSA は KMS API に準拠していますが、まだこのサービスでテストされていません。",
     "purposes": {
       "general": "一般用途",
       "caSigning": "CA署名"
@@ -3889,7 +3920,16 @@
       "certificateHold": "一時的な停止で、後で「停止解除」により解除できます。",
       "privilegeWithdrawn": "証明書で付与された権限が取り消されました。",
       "aACompromise": "属性認証局の鍵が危殆化しました。"
-    }
+    },
+    "revokeRelated": "リンクされた証明書も失効させる",
+    "revokeRelatedHint": "チェックを外すと、ハイブリッドペアのもう一方は有効なまま残ります。",
+    "revokedWithRelated": "証明書を失効させました（リンクされた証明書 #{{id}} も失効）",
+    "relatedNotRevoked": "リンクされた証明書は失効しませんでした：この証明書をペアとして指していないか、すでに失効済みです。",
+    "relatedRevokeFailed": "証明書を失効させましたが、リンクされた証明書 #{{id}} を失効できませんでした：個別に失効させてください。",
+    "revokeRelatedBulk": "リンクされた証明書も失効させる",
+    "revokeRelatedBulkHint": "選択したハイブリッドペアのメンバーは、もう一方も一緒に失効します。チェックを外すと、他のメンバーは有効なまま残ります。",
+    "bulkRelatedRevoked": "選択した証明書と共に、リンクされた証明書 {{count}} 件を失効させました",
+    "bulkRelatedRevokeFailed": "選択した証明書と共に、リンクされた証明書 {{count}} 件を失効できませんでした（{{ids}}）：個別に失効させてください"
   },
   "details": {
     "pemCertificate": "PEM証明書",
@@ -4039,6 +4079,7 @@
     "importCAs": "CAのインポート",
     "importCertificates": "証明書のインポート",
     "importKeys": "キーのインポート",
+    "importCSRs": "CSR のインポート",
     "importObjects": "{{count}} 個のオブジェクトをインポート",
     "importingObjects": "オブジェクトをインポート中...",
     "importComplete": "インポート完了",
@@ -4766,7 +4807,8 @@
     "legacyPkcs12Desc": "Android 15 以前、macOS 14 以前、Windows Server 2016 以前、8u301 / 11.0.1 より前の Java 向け。これらは既定の AES-256 アーカイブを「パスワードが違う」として拒否します。ファイルの保護は弱くなるため、エクスポートごとに選択してください。",
     "formatKeyDesc": "PEM形式の秘密鍵のみ",
     "formats": {
-      "privateKey": "秘密鍵"
+      "privateKey": "秘密鍵",
+      "hybridBundle": "ハイブリッドバンドル"
     },
     "formatOptions": {
       "pemOnly": "PEM（証明書のみ）",
@@ -4781,7 +4823,9 @@
     "unavailableForKeyAlgorithm": "{{algorithm}} 鍵では使用できません。UCM はまだ耐量子鍵を PKCS#12 や JKS に書き出せません。代わりに秘密鍵付きの PEM でエクスポートしてください。",
     "jksNote": "JKSには常に秘密鍵が含まれます",
     "pkcs12Title": "PKCS#12をエクスポート",
-    "pkcs12PasswordPrompt": "PKCS#12 ファイルのパスワードを入力してください"
+    "pkcs12PasswordPrompt": "PKCS#12 ファイルのパスワードを入力してください",
+    "formatHybridBundleDesc": "ペアの両方の証明書を含む ZIP",
+    "bundleRelatedHasNoKey": "関連証明書には秘密鍵がありません：バンドルには証明書のみが含まれます"
   },
   "userCertificates": {
     "title": "ユーザー証明書",
@@ -5388,6 +5432,7 @@
     "signerGenerateCn": "共通名 (CN)",
     "signerGenerateValidity": "有効期間（日）",
     "signerGenerateKeyType": "鍵タイプ",
+    "signerMldsaVerifyNote": "ML-DSA のタイムスタンプは openssl ts -verify ではなく openssl cms -verify（OpenSSL 3.5 以降）で検証します。メッセージインプリントは別途確認してください。",
     "signerGenerated": "TSA 署名証明書を発行しました。",
     "signerGeneratedSelected": "TSA 署名証明書を発行し、専用署名者として選択しました。",
     "signerGenerateFailed": "TSA 署名証明書の生成に失敗しました。",
@@ -5526,6 +5571,7 @@
     "validityInfo": "有効期間",
     "caInfo": "CA情報",
     "selectCa": "SSH CAを選択",
+    "issueNeedsCaRead": "SSH CA を選択するには read:ssh_cas 権限が必要ですが、お使いのアカウントにはありません: 管理者に付与を依頼してください。",
     "issueMode": "発行モード",
     "presets": {
       "1h": "1時間",

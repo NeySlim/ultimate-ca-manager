@@ -13,6 +13,7 @@ export default {
           { label: 'CRL-Bereitstellung', text: 'Ein SSH-/SFTP-Ziel verknüpfen, um jede neu erzeugte CRL automatisch zu übertragen. Jede Verknüpfung legt Format, Zielpfad, übergeordnete CRLs und einen optionalen Reload-Befehl fest' },
           { label: 'CDP-URL', text: 'CRL Distribution Point-URL zum Einbetten in Zertifikate' },
           { label: 'Gültigkeit', text: 'CRL-Gültigkeit pro CA von 1 Tag bis zu 5 Jahren (90d/180d/1y/3y/5y für Offline-CAs, die nicht planmäßig neu signieren können). Ab einem Jahr erscheint eine Warnung, vertrauende Parteien können veraltete Widerrufsdaten für das gesamte Zeitfenster behalten' },
+          { label: 'Signatur-Digest', text: 'SHA-256, SHA-384 oder SHA-512 für eine RSA- oder EC-CA. Eine Ed25519-, Ed448- oder ML-DSA-CA signiert ohne Digest: Ein früher dafür gespeicherter Digest wird als ignoriert angezeigt, mit einer Schaltfläche Löschen' },
           { label: 'Externe CRL', text: 'CAs ohne Schlüssel bzw. Offline-CAs können keine CRL selbst signieren, laden Sie aus der CA-Detailansicht eine neben dem Offline-Schlüssel erzeugte CRL hoch; sie wird validiert (Signatur, Aussteller, Monotonie) und unter derselben CDP-URL ausgeliefert (v2.215)' },
         ]
       },

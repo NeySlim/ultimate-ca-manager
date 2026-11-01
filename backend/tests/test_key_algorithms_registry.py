@@ -190,6 +190,15 @@ class TestRegistry:
         assert not ka.fips_approved('RSA-1024')
         assert not ka.fips_approved(None)
 
+    def test_fips_approved_for_key(self):
+        rsa2560 = rsa.generate_private_key(65537, 2560)
+        assert ka.fips_approved_for_key(rsa2560) and ka.fips_approved_for_key(rsa2560.public_key())
+        assert not ka.fips_approved_for_key(rsa.generate_private_key(65537, 1024).public_key())
+        assert ka.fips_approved_for_key(ec.generate_private_key(ec.SECP256R1()).public_key())
+        assert not ka.fips_approved_for_key(ec.generate_private_key(ec.SECP256K1()).public_key())
+        assert not ka.fips_approved_for_key(ed25519.Ed25519PrivateKey.generate())
+        assert not ka.fips_approved_for_key(None)
+
     @pytest.mark.parametrize('value', [None, '', '  ', 'RSA-1024', 'secp256k1', 'EdDSA', 'ML-DSA-66', 'SLH-DSA-SHA2-128s', True, 1024])
     def test_unknown_is_none(self, value):
         assert ka.get(value) is None

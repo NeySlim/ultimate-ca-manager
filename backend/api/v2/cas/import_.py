@@ -18,7 +18,7 @@ from utils.response import success_response, error_response, created_response
 from utils.file_validation import validate_upload, CERT_EXTENSIONS
 from utils.cert_issuer import private_key_matches
 from services.import_service import (
-    parse_certificate_file, extract_cert_info, find_existing_ca_for_import, cross_mode_from, finish_cross_attach, AmbiguousImportTarget, CrossCertificateImport, ImportConflict, update_ca_from_import,
+    KeyPasswordError, parse_certificate_file, extract_cert_info, find_existing_ca_for_import, cross_mode_from, finish_cross_attach, AmbiguousImportTarget, CrossCertificateImport, ImportConflict, update_ca_from_import,
     install_on_pending_ca, find_pending_csr_for_certificate,
     serialize_cert_to_pem, serialize_key_to_pem
 )
@@ -228,7 +228,7 @@ def import_ca():
     except FipsRestricted:
         db.session.rollback()
         raise  # the app handler answers 400 with the FIPS problem type
-    except MalformedKey as e:
+    except (MalformedKey, KeyPasswordError) as e:
         db.session.rollback()
         return error_response(str(e), 400)
     except ValueError as e:

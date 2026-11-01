@@ -21,8 +21,8 @@ import { useNotification, useMobile } from '../contexts'
 import { usePermission, usePersistedState, useCRUDPage } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
 import { VALIDITY } from '../constants/config'
-import { KEY_ALGORITHMS, listAlgorithms, groupedOptions } from '../lib/keyAlgorithms'
-import { useFipsMode } from '../lib/policyAlgorithms'
+import { KEY_ALGORITHMS, isUsable, listAlgorithms, groupedOptions } from '../lib/keyAlgorithms'
+import { useKeyPlatform } from '../lib/policyAlgorithms'
 import { BrainpoolNotice } from '../components/BrainpoolNotice'
 import { ekuService } from '../services/eku.service'
 import {
@@ -799,12 +799,12 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
   const [formData, setFormData] = useState(() => buildInitialState(template))
   const [loading, setLoading] = useState(false)
   const [ekuOptions, setEkuOptions] = useState(EXT_KEY_USAGE_FALLBACK)
-  const fips = useFipsMode()
+  const platform = useKeyPlatform()
   // The key already on the template stays listed, so FIPS mode or a key not generated yet never blanks the field.
   // ML-DSA is offered: the digest is the issuing CA's signing hash, not the leaf key's.
   const keyTypeOptions = useMemo(() => groupedOptions(
-    KEY_ALGORITHMS.filter(a => (a.generate && (!fips || a.fips)) || a.label === formData.key_type),
-    t, a => a.label), [fips, t, formData.key_type])
+    KEY_ALGORITHMS.filter(a => (a.generate && isUsable(a, platform)) || a.label === formData.key_type),
+    t, a => a.label), [platform, t, formData.key_type])
 
   useEffect(() => {
     let cancelled = false

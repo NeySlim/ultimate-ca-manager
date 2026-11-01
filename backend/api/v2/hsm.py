@@ -496,7 +496,7 @@ def generate_key(provider_id):
             400
         )
     
-    refusal = HsmService.brainpool_refusal(provider.type, algorithm)
+    refusal = HsmService.algorithm_refusal(provider.type, algorithm)
     if refusal:
         return error_response(refusal, 400)
 
@@ -525,8 +525,9 @@ def generate_key(provider_id):
     except FipsRestricted:
         raise
     except ValueError as e:
+        # Only the service's own checks raise ValueError (provider failures become HsmError)
         logger.warning(f"HSM key generation validation error: {e}")
-        return error_response('Invalid key parameters', 400)
+        return error_response(str(e), 400)
     except HsmError as e:
         logger.error(f"HSM key generation error: {e}")
         return error_response('HSM key generation error', 500)

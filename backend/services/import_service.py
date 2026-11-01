@@ -9,9 +9,33 @@ import base64
 from datetime import datetime, timezone
 from utils.cert_issuer import cas_by_ski, is_self_signed
 from utils.foreign_algorithms import describe_public_key, spki_der
+from fips_mode import FipsRestricted
 from utils.algorithm_refusal import UnsupportedForKeyAlgorithm
 from utils.key_codec import MalformedKey, load_private_key_any, private_key_to_pem, refuse_eddsa_key
 from utils.pkcs12_import import load_key_and_certificates, refuse_pkcs12_import
+
+
+class KeyPasswordError(ValueError):
+    """The private key in the file is encrypted and the password given does not open it."""
+
+
+def load_import_private_key(key_pem, password=None):
+    """Private key of an imported PEM block. An encrypted block the password does not
+    open, or none was given for, raises KeyPasswordError saying which."""
+    if isinstance(key_pem, str):
+        key_pem = key_pem.encode('utf-8')
+    if isinstance(password, str):
+        password = password.encode('utf-8')
+    try:
+        return load_private_key_any(key_pem, password=password or None)
+    except (FipsRestricted, MalformedKey):
+        raise
+    except (TypeError, ValueError) as e:
+        # A wrong password can also unpad by chance: a decoding failure on an encrypted key is the password's
+        if b'ENCRYPTED' in key_pem:
+            raise KeyPasswordError('Invalid password for the private key' if password
+                                   else 'The private key is encrypted: give its password') from e
+        raise
 
 
 def parse_certificate_file(file_data, filename, password=None, import_key=True):
@@ -62,12 +86,11 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
             key_match = re.search(b'-----BEGIN.*?PRIVATE KEY-----.+?-----END.*?PRIVATE KEY-----', file_data, re.DOTALL)
             if key_match:
                 try:
-                    private_key = load_private_key_any(
-                        key_match.group(0), password=password.encode() if password else None)
-                except (UnsupportedForKeyAlgorithm, MalformedKey):
+                    private_key = load_import_private_key(key_match.group(0), password)
+                except (FipsRestricted, MalformedKey, KeyPasswordError):
                     raise
-                except Exception:
-                    pass
+                except Exception as e:  # an unreadable key is said, never dropped
+                    raise MalformedKey('The private key in the file could not be read') from e
                 
     elif format_type == 'der':
         try:
@@ -91,7 +114,7 @@ def parse_certificate_file(file_data, filename, password=None, import_key=True):
             raise
         except Exception as e:
             if 'password' in str(e).lower() or 'mac' in str(e).lower():
-                raise ValueError('Invalid password for PKCS12 file')
+                raise KeyPasswordError('Invalid password for PKCS12 file')
             raise
     
     elif format_type == 'pkcs7':

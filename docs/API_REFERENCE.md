@@ -468,7 +468,9 @@ GET /api/v2/cas?page=1&per_page=20
 for EC and `null` for a post-quantum key), `security_level` (NIST level `2`, `3` or `5` for ML-DSA-44/65/87,
 `null` otherwise), `post_quantum` (boolean) and `verifiable` (`false` for an SLH-DSA
 signature, which UCM reads but cannot check). An ML-DSA CA reports `signature_algorithm`
-as its parameter set, e.g. `"ML-DSA-65"`.
+as its parameter set, e.g. `"ML-DSA-65"`. A certificate in a hybrid pair (RFC 9763) also
+reports `related_certificate_id` (the other member) and `hybrid_role` (`"classical"` or `"pq"`);
+both are `null` otherwise.
 
 ### Get CA Hierarchy (Tree View)
 ```http
@@ -526,7 +528,8 @@ or 87, required). A full label such as `RSA-3072`, `EC-P384` or `ML-DSA-65` is a
 and `keyType` is an alias of `keyAlgo`. An unknown `keyAlgo`, or a `keySize` that does not
 belong to it, answers `400`. Without `keySize`, `RSA` gives RSA-2048 and `ECDSA` P-256; a request
 without any key field gets RSA-2048. ML-DSA needs
-OpenSSL 3.5 or later, is generated in software only (no HSM), and is refused in FIPS mode.
+OpenSSL 3.5 or later and is refused in FIPS mode; `keyAlgo` generates it in software, and
+an HSM-held ML-DSA key is chosen with `hsm_key_algorithm` on a provider that has it (see [HSM](#hsm)).
 An ML-DSA key signs without a separate digest: a `digest` sent for it is ignored and named
 in `meta.notices`. An intermediate under an ML-DSA parent likewise takes no digest; an
 ML-DSA intermediate under an RSA or EC parent uses its parent's digest.
@@ -746,6 +749,14 @@ both at once. Without them, the template's key type applies. An unknown key type
 `meta.notices`. ML-DSA private keys cannot be exported as PKCS#12 or JKS: those exports
 answer `400` with the reason `unsupported_for_key_algorithm`; PEM and DER work.
 
+**Hybrid pair (RFC 9763).** `"hybrid": {"classical": "EC P-256", "pq": "ML-DSA-65"}` issues two
+certificates from the same CA, with the same subject, names and validity: A for the classical key
+and B for the post-quantum key. B carries the non-critical relatedCertificate extension naming A,
+and the two rows name each other through `related_certificate_id`. `key_type` and `key_size`
+are ignored; a `classical` member that is post-quantum, a `pq` member that is not, or an unknown
+key type answers `400`, and so does a policy that requires approval. The response is
+`201` with `data.certificate` (A) and `data.related` (B).
+
 **Response:**
 ```json
 {
@@ -807,6 +818,11 @@ possible; it is read from the JSON body or the query string. The variants of a c
 `chain_status.variants` of `GET /api/v2/certificates/{cert_id}`. An unknown value, or one that is not part of
 the chain, answers 400.
 
+`format=hybrid-bundle` returns a ZIP holding both members of a hybrid pair, named
+`<hybrid_role>-<id>.crt`, plus `<hybrid_role>-<id>.key` with `include_key` (encrypted with
+`password` when one is given). A certificate without a related one answers `400`, and so does
+`include_key` when either member has no private key.
+
 ### Renew Certificate
 ```http
 POST /api/v2/certificates/{cert_id}/renew
@@ -816,6 +832,10 @@ Content-Type: application/json
   "validity_days": 365
 }
 ```
+
+Renewing a member of a hybrid pair renews both, and the new B names the new A; the response
+lists the other member in `related_renewed`. When the two members require approval under
+different policies, the renewal answers `409` and only an administrator can perform it.
 
 ### Revoke Certificate
 ```http
@@ -830,6 +850,13 @@ Content-Type: application/json
 ```
 
 Optional **`invalidity_date`** / **`invalidity_at`** (ISO 8601): RFC 5280 §5.3.2 date on which the certificate became invalid (may precede revocation). Emitted as CRL entry `invalidityDate` when set.
+
+**`revoke_related`** (JSON boolean, default `true`): revoking a member of a hybrid pair revokes the
+other one too, reported as `related_revoked` (its id). `false` keeps it, except under a policy that
+requires approval, which revokes both: such a request answers `400` for a non-administrator. Two
+different approval policies on the two members answer `409`. When the other member could not be
+revoked, the certificate stays revoked and the answer carries `related_not_revoked` (its id) and a
+message asking to revoke it separately.
 
 **Revocation Reasons** (RFC 5280 §5.3.1; an unknown value is rejected with `400`, snake_case spellings such as `key_compromise` are accepted and stored in the canonical form):
 - `unspecified` (default when omitted)
@@ -893,9 +920,15 @@ Content-Type: application/json
 
 {
   "ids": [1, 2, 3],
-  "reason": "keyCompromise"
+  "reason": "keyCompromise",
+  "revoke_related": true
 }
 ```
+
+`revoke_related` applies as for a single revocation; the ids of other members that could not be
+revoked are listed in `related_not_revoked`, the certificates themselves counting as successes.
+Bulk renewal also renews the other member of each hybrid pair; a member already renewed or
+revoked with its pair counts as a success.
 
 **Response:**
 ```json
@@ -1094,6 +1127,11 @@ UCM generates the key pair and keeps the private key. `key_type` is `RSA 2048`, 
 `ML-DSA-65` or `ML-DSA-87`; an unknown value answers `400`. To submit an existing CSR, use
 `POST /api/v2/csrs/upload` below.
 
+`related_to` (certificate id) adds an RFC 9763 relatedCertRequest signed by the key of that
+certificate A, which UCM must hold; a revoked or unknown A, or one without its key, answers `400`.
+It requires the `read:private_keys` permission (`403` otherwise), and each use of A's key is
+audited as `certificate_key_used` on A.
+
 ### Get CSR Details
 ```http
 GET /api/v2/csrs/{csr_id}
@@ -1110,6 +1148,13 @@ Content-Type: application/json
   "template_id": 1
 }
 ```
+
+A CSR carrying a relatedCertRequest (RFC 9763), here or through ACME, EST or WSTEP, issues a
+certificate linked to the A it names. A must be held here, valid, unrevoked and an end-entity
+certificate issued by a CA of this instance whose chain is valid now, the request must be at most
+7 days old and verify with A's key, and the new certificate may assert no key usage or EKU that A
+lacks; otherwise `400`. A's own link moves to the newest such certificate; the previous one keeps
+naming A but no longer revokes or renews with it.
 
 ### Delete CSR
 ```http
@@ -1587,6 +1632,12 @@ behaviour) and `digest` (`sha256`, `sha384`, `sha512`). The publish interval mus
 not exceed the validity window: publishing more often than the validity gives
 relying parties a grace period. Responses include the computed `next_publish`,
 also present in CRL metadata responses when a cadence is configured.
+
+A CA whose key signs without a separate digest (ML-DSA, Ed25519, Ed448) has
+`crl_digest: null`; a non-empty `digest` is refused with `400` and an empty one
+clears the stored value. A digest stored before that was known is ignored when
+signing and shown in the CA object as `crl_digest_ignored`, so it can be cleared
+(`null` otherwise).
 
 ### OCSP Status
 ```http
@@ -2487,7 +2538,7 @@ GET /api/v2/system/fips-preflight
 ```
 
 Check ids: `users.password_scrypt`, `protocols.secret_scrypt`, `ca.eddsa_key`, `ca.weak_key`,
-`ssh_ca.eddsa_key`, `deploy.ssh_eddsa_key`, `tsa.signer_unapproved_key`, `dns.tsig_hmac_md5`,
+`ca.unapproved_algorithm`, `ssh_ca.eddsa_key`, `deploy.ssh_eddsa_key`, `tsa.signer_unapproved_key`, `dns.tsig_hmac_md5`,
 `msca.winrm_ntlm`, `database.postgres_without_tls`, `https.unapproved_key` (blockers);
 `users.backup_codes_scrypt`, `ocsp.responder_unapproved_key`, `templates.unapproved_key_type`,
 `policies.unapproved_key_type`, `acme_client.unapproved_key_type`, `hsm.softhsm`, `hsm.gcp_grpc`,
@@ -2580,6 +2631,8 @@ GET /api/v2/policies/effective?ca_id=3&template_id=1
     "require_hsm_ca_key": false,
     "hsm_certifications": null,  # {"eucc-high": null, ...} when a policy sets the rule
     "tsa_signer_key_types": ["EC-P256", "EC-P384", "EC-P521"],
+    "pq_standalone": false,      # true: a post-quantum key only as a member of a hybrid pair
+    "ml_dsa": true,              # false when this build's OpenSSL has no ML-DSA
     "fips": true                 # only present in FIPS mode
   }
 }
@@ -2889,6 +2942,14 @@ Content-Type: application/json
 }
 ```
 
+`options`: `import_cas`, `import_certs`, `import_csrs`, `import_keys` (each `true` by default),
+`skip_duplicates`, `description_prefix`, and `selected_indices`, the positions in the analysis
+`objects` list to import (all of them when absent; a position outside the list is refused).
+`write:cas` is required only when a CA certificate is among the objects imported.
+
+Both routes also take `file_passwords`, an object or a list of passwords (one per uploaded file,
+32 in all with `password`): each is tried in turn on every encrypted key and PKCS#12 bundle.
+
 ### List Supported Formats
 ```http
 GET /api/v2/import/formats
@@ -3016,6 +3077,13 @@ Content-Type: application/json
   "dns_provider_id": 1
 }
 ```
+
+`key_type` sets the certificate key UCM generates: `RSA-2048`, `RSA-4096`, `EC-P256`,
+`EC-P384`, `EC-BP256`, `EC-BP384`, or `ML-DSA-44`, `ML-DSA-65`, `ML-DSA-87` when this build
+has ML-DSA. Without it the `key_type` client setting applies (RSA-2048 when unset); a value
+this instance cannot generate answers `400` and is never replaced by another type. FIPS mode
+refuses ML-DSA and Brainpool with `400`, both as `key_type` and as the key of
+`source_certificate_id` (`key_source: "reuse"`).
 
 ### Verify Challenge
 ```http
@@ -3348,6 +3416,15 @@ Content-Type: application/json
 }
 ```
 
+`algorithm` also takes `EC-BP256`, `EC-BP384` and `EC-BP512` on a `pkcs11` provider, and
+`ML-DSA-44`, `ML-DSA-65` and `ML-DSA-87` on a provider that signs with them: `pkcs11` (a
+PKCS#11 3.2 token with the ML-DSA mechanisms), `openbao` (Transit `mldsa-*` keys) and
+`google-kms` (`PQ_SIGN_ML_DSA_*` versions, mapped from the KMS API but not tested against the
+service). `azure-keyvault` and `aws-cloudhsm` answer `400` for both families, and FIPS mode
+refuses ML-DSA on every provider. An ML-DSA key signs the data itself: no digest applies.
+Google Cloud KMS signs at most 64 KiB of data with it, so a larger CRL fails with a message
+that says so.
+
 ### Get HSM Key
 ```http
 GET /api/v2/hsm/keys/{key_id}
@@ -3555,7 +3632,7 @@ which signs without a separate digest; use
 
 With `notify_on_violation`, a refusal by the policy's rules or a request held for approval is e-mailed to `notification_emails` (mailbox addresses, checked: `400` otherwise), or when empty to the policy's approvers; the same refusal is reported once per hour.
 
-When a policy requires approval, `POST /certificates/{id}/revoke`, `POST /certificates/bulk/revoke` (under `pending_approval`), `POST /user-certificates/{id}/revoke` and `POST /cas/{id}/revoke` (held by the policies of the parent CA and of the CA itself) answer `approval_required: true` with the `approval_id` and the `request_type` (`revocation` or `ca_revocation`) instead of revoking; the approval revokes with the stored reason and invalidity date. ACME `revokeCert` answers `403 unauthorized` for such a certificate, and removing an mTLS enrolment `409` until its certificate is revoked (administrators bypass). A pending request whose requester performs the action directly, or approves a duplicate, is closed as `cancelled`.
+When a policy requires approval, `POST /certificates/{id}/revoke`, `POST /certificates/bulk/revoke` (under `pending_approval`), `POST /user-certificates/{id}/revoke` and `POST /cas/{id}/revoke` (held by the policies of the parent CA and of the CA itself) answer `approval_required: true` with the `approval_id` and the `request_type` (`revocation` or `ca_revocation`) instead of revoking; the approval revokes with the stored reason and invalidity date. ACME `revokeCert` answers `403 unauthorized` for such a certificate (it revokes the certificate presented and never its related one), and removing an mTLS enrolment `409` until its certificate is revoked (administrators bypass). A pending request whose requester performs the action directly, or approves a duplicate, is closed as `cancelled`.
 
 ### Update Policy
 ```http
@@ -3942,6 +4019,12 @@ Returns 200 if the application process is alive, regardless of dependency status
 | `read:cas` | Read CAs |
 | `write:cas` | Create/update CAs |
 | `delete:cas` | Delete CAs |
+| `read:ssh` | Read SSH certificates |
+| `write:ssh` | Sign, import and revoke SSH certificates |
+| `delete:ssh` | Delete SSH certificates |
+| `read:ssh_cas` | Read SSH CAs, their public keys, KRLs and setup scripts |
+| `write:ssh_cas` | Create, import and update SSH CAs |
+| `delete:ssh_cas` | Delete SSH CAs |
 | `read:users` | Read users |
 | `write:users` | Create/update users |
 | `delete:users` | Delete users |

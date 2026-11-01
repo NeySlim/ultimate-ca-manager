@@ -65,7 +65,11 @@ class TestCaKeyImport:
         key = ec.generate_private_key(ec.SECP256R1())
         ca_id = _keyless_ca(app, key, 'EC Keyless CA')
         r = _post(auth_client, ca_id, {'key': _pem(key, 'pass-phrase')})
-        assert r.status_code == 400 and 'passphrase' in json.loads(r.data)['message']
+        assert r.status_code == 400
+        assert json.loads(r.data)['message'] == 'The private key is encrypted: give its password'
+        r = _post(auth_client, ca_id, {'key': _pem(key, 'pass-phrase'), 'passphrase': 'wrong'})
+        assert r.status_code == 400
+        assert json.loads(r.data)['message'] == 'Invalid password for the private key'
         r = _post(auth_client, ca_id, {'key': _pem(key, 'pass-phrase'), 'passphrase': 'pass-phrase'})
         assert r.status_code == 200, r.data
 

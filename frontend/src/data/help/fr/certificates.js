@@ -52,6 +52,18 @@ export default {
         ]
       },
       {
+        title: 'Paires de certificats hybrides (RFC 9763)',
+        content: 'Un certificat classique (A) et un certificat ML-DSA (B) pour le même sujet, liés : B porte l\'extension relatedCertificate qui désigne A par son empreinte. Les clients qui connaissent ML-DSA vérifient les deux ; les autres continuent d\'utiliser A.',
+        items: [
+          { label: 'Émission', text: 'Cochez « Émettre une paire hybride » dans le formulaire d\'émission et choisissez la clé classique et le niveau ML-DSA ; les deux viennent de la même CA, avec le même sujet, les mêmes noms et la même validité, et B n\'affirme aucun key usage ni EKU absent de A. Proposé seulement quand les politiques de la CA autorisent les deux, jamais en mode FIPS. Sous les profils ANSSI, BSI et EU ACM, ML-DSA-65 et ML-DSA-87 ne sont proposés que dans la paire. Une politique qui exige une approbation refuse la paire pour l\'instant' },
+          { label: 'Lien par requête', text: 'Une CSR portant une relatedCertRequest signée par la clé de A (Signer une CSR, ACME, EST, WSTEP) émet un B lié à A. A doit être détenu ici, valide, non révoqué et être un certificat d\'entité finale ; un B plus récent désignant le même A reprend la paire' },
+          { label: 'Lié', text: 'Chaque membre porte un badge Lié dans la liste et dans ses détails, avec un lien qui ouvre l\'autre membre' },
+          { label: 'Révocation', text: 'Révoquer un membre, seul ou en masse, révoque aussi l\'autre, sauf si vous décochez « Révoquer aussi le certificat lié », par ex. pour garder A quand seule la clé ML-DSA est compromise ; sous une politique qui exige une approbation, les deux partent ensemble. Un avertissement nomme l\'autre membre quand il n\'a pas pu être révoqué. La révocation ACME ne révoque que le certificat présenté' },
+          { label: 'Renouvellement', text: 'Renouveler l\'un des membres renouvelle les deux, manuellement, en masse ou automatiquement, et le nouveau B désigne le nouveau A. Un membre renouvelé seul, l\'autre étant révoqué, quitte la paire' },
+          { label: 'Export', text: 'Le format Lot hybride télécharge un ZIP des deux certificats, et des deux clés quand vous incluez la clé et pouvez exporter les clés' },
+        ]
+      },
+      {
         title: 'Fichiers certificats sur disque (v2.140)',
         items: [
           { label: 'Auto-matérialisés', text: 'Les fichiers .crt / .key sont écrits sous data/certs/ pour chaque chemin de création (UI, signature CSR, ACME, SCEP, import)' },
@@ -169,6 +181,18 @@ Formats d'exportation :
 - **PEM + Chaîne** : Certificat avec ses CA émettrices (**Inclure la chaîne CA**) ; la CA racine n'est ajoutée que si **Inclure l'AC racine** est coché
 - **DER** : Format binaire
 - **PKCS#12** : Certificat + clé + chaîne, protégé par mot de passe
+
+## Paires de certificats hybrides (RFC 9763)
+
+Une paire hybride lie un certificat classique (**A**, RSA ou EC) et un certificat post-quantique (**B**, ML-DSA) pour le même sujet. B porte l'extension non critique **relatedCertificate**, qui désigne A par son empreinte, afin qu'une partie utilisatrice puisse exiger les deux.
+
+- **Émission** : cochez **Émettre une paire hybride** dans le formulaire d'émission (ou envoyez \`hybrid\` dans \`POST /api/v2/certificates\`) pour émettre les deux depuis la même CA, avec le même sujet, les mêmes noms et la même validité. B copie les extensions de A avec son propre identifiant de clé et son propre key usage, et n'affirme aucun key usage ni EKU absent de A. Sous les profils de conformité ANSSI, BSI et EU ACM, ML-DSA-65 et ML-DSA-87 ne sont acceptés que comme B : jamais seuls, et ML-DSA-44 pas du tout
+- **Lien par requête** : une CSR portant une **relatedCertRequest** signée par la clé de A émet un B lié à A, via Signer une CSR, ACME, EST ou WSTEP. A doit être détenu par UCM, valide, non révoqué, être un certificat d'entité finale émis par une CA de cette instance dont la chaîne est valide à cet instant, et la requête ne doit pas avoir plus de 7 jours. Un certificat plus récent qui désigne le même A reprend la paire, et le précédent la quitte. Un certificat fourni en ligne à l'emplacement indiqué par la requête doit être A ; les autres emplacements ne sont pas récupérés
+- **Révoquer** l'un des membres, seul ou en masse, révoque l'autre, sauf si **Révoquer aussi le certificat lié** est décoché. Sous une politique qui exige une approbation, la paire part ensemble, et deux politiques d'approbation différentes sur les deux membres laissent la révocation à un administrateur. Si l'autre membre ne peut pas être révoqué, la réponse l'indique (\`related_not_revoked\`) et il faut le révoquer séparément. ACME revokeCert ne révoque que le certificat présenté (RFC 8555)
+- **Renouveler** l'un des membres, à la main, en masse ou automatiquement, renouvelle les deux, et le nouveau B désigne le nouveau A. Un membre renouvelé seul, l'autre étant révoqué, quitte la paire, tout comme l'autre membre quand l'un est supprimé
+- **Exporter** : le format **hybrid-bundle** est un ZIP des deux certificats, et des deux clés privées quand la clé est incluse ; il est refusé quand aucun des deux certificats ne désigne plus l'autre
+
+> ⚠ Une politique qui exige une approbation refuse pour l'instant d'émettre une paire hybride : émettez-la sous une politique sans approbation.
 
 ## Favoris
 

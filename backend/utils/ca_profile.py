@@ -71,9 +71,9 @@ def resolve_digest(digest: Optional[str], key_type: str) -> Tuple[Optional[str],
     Returns (digest, error_message); the digest is None for a key that takes
     none, a valid requested one being ignored rather than refused.
     """
-    if digest is None or digest == '' or digest == 'auto':
+    normalized = (digest or '').lower().strip()
+    if normalized in ('', 'auto'):
         return default_digest_for_key_type(key_type), None
-    normalized = digest.lower().strip()
     if normalized not in ALLOWED_DIGESTS:
         return '', f'digest must be one of auto, {", ".join(sorted(ALLOWED_DIGESTS))}'
     if _signs_without_digest(key_type):

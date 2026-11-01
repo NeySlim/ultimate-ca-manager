@@ -1117,6 +1117,18 @@ export default function CRLOCSPPage() {
               </select>
             </div>
             )}
+            {/* A digest stored before the key was known to take none: ignored, cleared here */}
+            {selectedCA?.crl_digest_ignored && (
+            <div className="flex items-center gap-2">
+              <span className="text-xs text-text-secondary">
+                {t('crlOcsp.crlDigestIgnored', { digest: selectedCA.crl_digest_ignored.toUpperCase() })}
+              </span>
+              <Button type="button" size="sm" variant="secondary" disabled={!canWrite('crl')}
+                onClick={() => handleCrlScheduleChange(selectedCA, 'digest', null)}>
+                {t('crlOcsp.crlDigestClear')}
+              </Button>
+            </div>
+            )}
           </div>
           <p className="text-xs text-text-tertiary">{t('crlOcsp.crlScheduleNote')}</p>
         </div>

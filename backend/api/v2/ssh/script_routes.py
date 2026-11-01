@@ -18,7 +18,7 @@ from models import db
 
 
 @bp.route('/api/v2/ssh/cas/<int:ca_id>/public-key', methods=['GET'])
-@require_auth(['read:ssh'])
+@require_auth(['read:ssh_cas'])
 def get_ssh_ca_public_key(ca_id):
     """Download the CA's public key in OpenSSH format.
 
@@ -43,7 +43,7 @@ def get_ssh_ca_public_key(ca_id):
 
 
 @bp.route('/api/v2/ssh/cas/<int:ca_id>/setup-script', methods=['GET'])
-@require_auth(['read:ssh'])
+@require_auth(['read:ssh_cas'])
 def get_ssh_ca_setup_script(ca_id):
     """Generate a distro-agnostic server setup script for SSH CA trust."""
     try:

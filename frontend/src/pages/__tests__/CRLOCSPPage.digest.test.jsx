@@ -34,6 +34,8 @@ vi.mock('../../components/CRLDeploySection', () => ({ CRLDeploySection: () => nu
 const CAS = vi.hoisted(() => [
   { id: 1, name: 'RSA Root', descr: 'RSA Root', common_name: 'RSA Root', has_private_key: true, crl_digest: 'sha256' },
   { id: 2, name: 'PQ Root', descr: 'PQ Root', common_name: 'PQ Root', has_private_key: true, crl_digest: null },
+  { id: 3, name: 'Ed Root', descr: 'Ed Root', common_name: 'Ed Root', has_private_key: true, crl_digest: null,
+    crl_digest_ignored: 'sha384' },
 ])
 
 vi.mock('../../services', () => ({
@@ -66,5 +68,14 @@ describe('CRL digest select', () => {
   it('is absent for a CA that signs without a separate digest', async () => {
     await selectCA('PQ Root')
     await waitFor(() => expect(screen.queryByLabelText('crlOcsp.crlDigest')).toBeNull())
+    expect(screen.queryByRole('button', { name: 'crlOcsp.crlDigestClear' })).toBeNull()
+  })
+
+  it('lets a digest the key ignores be cleared', async () => {
+    const { crlService } = await import('../../services')
+    await selectCA('Ed Root')
+    expect(screen.queryByLabelText('crlOcsp.crlDigest')).toBeNull()
+    fireEvent.click(screen.getByRole('button', { name: 'crlOcsp.crlDigestClear' }))
+    await waitFor(() => expect(crlService.configureCrl).toHaveBeenCalledWith(3, { digest: null }))
   })
 })

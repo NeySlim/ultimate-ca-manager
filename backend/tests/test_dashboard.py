@@ -531,18 +531,28 @@ def _set_config(app, key, value):
 
 @pytest.fixture
 def scep_config(app):
-    """Set SCEP config keys for a test, restore the previous values after."""
-    from models import SystemConfig
+    """Set SCEP config keys for a test, restore the previous values after.
+    Profiles other files left enabled count on the tile: they are disabled meanwhile."""
+    from models import SystemConfig, db
+    from models.scep import ScepProfile
     keys = ('scep_enabled', 'scep_ca_id')
     with app.app_context():
         saved = {k: (SystemConfig.query.filter_by(key=k).first() or SystemConfig()).value
                  for k in keys}
+        enabled = [p.id for p in ScepProfile.query.filter_by(enabled=True)]
+        ScepProfile.query.filter(ScepProfile.id.in_(enabled)).update(
+            {ScepProfile.enabled: False}, synchronize_session=False)
+        db.session.commit()
     def _set(**values):
         for k, v in values.items():
             _set_config(app, k, v)
     yield _set
     for k in keys:
         _set_config(app, k, saved[k])
+    with app.app_context():
+        ScepProfile.query.filter(ScepProfile.id.in_(enabled)).update(
+            {ScepProfile.enabled: True}, synchronize_session=False)
+        db.session.commit()
 
 
 @pytest.fixture

@@ -23,7 +23,8 @@ from services.policy_service import PolicyViolation
 from utils.csr_extensions import extensions_of
 from utils.datetime_utils import utc_now
 from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
-from utils.key_type import unsignable_csr_key, validate_enrollment_public_key
+from utils import key_algorithms
+from utils.key_type import validate_enrollment_csr
 from utils.san_parse import is_valid_san_email
 from utils.serial_format import serial_variants
 from utils.upn_san import build_upn_other_name
@@ -136,9 +137,11 @@ def _validate_csr(csr, require_pop=True, allow_naked_subject=False):
 
     Returns an error string, or None if the CSR is acceptable.
     """
-    unsignable = unsignable_csr_key(csr)
-    if unsignable:
-        return unsignable
+    # Key policy before proof of possession: a FIPS provider without ML-DSA
+    # cannot verify such a request, whose refusal must name FIPS, not PoP.
+    key_err = validate_enrollment_csr(csr)
+    if key_err:
+        return key_err
     if require_pop:
         try:
             signature_valid = csr.is_signature_valid
@@ -155,10 +158,6 @@ def _validate_csr(csr, require_pop=True, allow_naked_subject=False):
 
     if not allow_naked_subject and _is_naked_csr(csr):
         return 'CSR subject must include a non-empty CN or a SubjectAltName'
-
-    key_err = validate_enrollment_public_key(csr.public_key())
-    if key_err:
-        return key_err
 
     return None
 
@@ -265,8 +264,12 @@ def _match_template(ca, csr):
     This is a real limitation, not a corner case: two templates can
     legitimately want the same EKU (e.g. "Web Server" and "VPN Server"
     both want serverAuth-only), and ties break on lowest template id —
-    arbitrary but deterministic. Returns the matched ``CertificateTemplate``
-    row, or ``None`` if nothing matches at all.
+    arbitrary but deterministic. Returns ``(template, refusal)``: the matched
+    ``CertificateTemplate`` row or ``None`` if nothing matches at all, and a
+    refusal when the request's EKUs match only a template of another key kind
+    (ML-DSA or not). A template of the other kind that scores 0 is no match:
+    the request falls back to no template, which is safe because the Enroll
+    ACL and pinned fields then fall back to every template of the CA.
 
     Callers use the matched row two ways: its policy OID (via
     ``policy_builder._policy_oid_for_template``) for the issued cert's
@@ -276,17 +279,15 @@ def _match_template(ca, csr):
     EKUs (``_template_extra_ekus``) as ``extra_ekus``.
     """
     try:
-        import json
-
         from models import CertificateTemplate
         from services.xcep.policy_builder import _resolve_templates_for_ca
     except Exception:
-        return None
+        return None, None
 
     all_active = CertificateTemplate.query.filter_by(is_active=True).all()
     candidates = _resolve_templates_for_ca(ca, all_active)
     if not candidates:
-        return None
+        return None, None
 
     try:
         csr_eku = {
@@ -296,23 +297,51 @@ def _match_template(ca, csr):
     except x509.ExtensionNotFound:
         csr_eku = set()
 
+    # An ML-DSA template only takes an ML-DSA key and the others never do: the
+    # match is made among the templates of the request key's kind, and a request
+    # whose EKUs name only a template of the other kind is refused.
+    csr_mldsa = _csr_key_label(csr).startswith('ML-DSA')
+    same = [t for t in candidates if _template_is_mldsa(t) == csr_mldsa]
+    best, _score = _best_eku_match(same, csr_eku)
+    if best is not None:
+        return best, None
+    other, score = _best_eku_match([t for t in candidates if t not in same], csr_eku)
+    if other is not None and score > 0:
+        return None, (f"Template '{other.name}' issues {_template_key_label(other)} keys, "
+                      f'not {_csr_key_label(csr)}')
+    return None, None
+
+
+def _best_eku_match(candidates, csr_eku):
+    """(best template, its score), (None, -1) when none scores 0 or more."""
     best, best_score = None, -1
     for template in candidates:
-        try:
-            parsed = json.loads(template.extensions_template or '{}')
-        except (TypeError, ValueError):
-            parsed = {}
-        names = parsed.get('extended_key_usage') if isinstance(parsed, dict) else None
         # Same resolver as issuance: the template is scored on the purposes
         # it will really issue, whatever spelling it uses
         template_eku = set(_template_extra_ekus(template))
         score = len(csr_eku & template_eku) - len(template_eku - csr_eku)
         if score > best_score or (score == best_score and best is not None and template.id < best.id):
             best, best_score = template, score
+    return (best, best_score) if best is not None and best_score >= 0 else (None, -1)
 
-    if best is None or best_score < 0:
-        return None
-    return best
+
+def _template_key_label(template):
+    alg = key_algorithms.get(template.key_type or 'RSA-2048')
+    return alg.label if alg is not None else str(template.key_type)
+
+
+def _template_is_mldsa(template):
+    alg = key_algorithms.get(template.key_type or 'RSA-2048')
+    return alg is not None and alg.family == 'ML-DSA'
+
+
+def _csr_key_label(csr):
+    info = key_algorithms.post_quantum_info(csr.public_key_algorithm_oid)
+    if info is not None:
+        return info.label
+    public_key = csr.public_key()
+    return (key_algorithms.label_for_public_key(public_key)
+            or key_algorithms.key_algo_for_public_key(public_key))
 
 
 def _template_extra_ekus(template):
@@ -713,7 +742,9 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
         if err:
             return None, err
 
-    matched_template = _match_template(ca, csr)
+    matched_template, refusal = _match_template(ca, csr)
+    if refusal:
+        return None, refusal
     template_oid = None
     if matched_template is not None:
         from services.xcep.policy_builder import _policy_oid_for_template
@@ -839,7 +870,9 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
     if not _san_matches(signing_cert, csr):
         return None, 'CSR SubjectAltName does not match signing certificate'
 
-    matched_template = _match_template(ca, csr)
+    matched_template, refusal = _match_template(ca, csr)
+    if refusal:
+        return None, refusal
     template_oid = None
     if matched_template is not None:
         from services.xcep.policy_builder import _policy_oid_for_template

@@ -22,7 +22,8 @@ from models import CA, AuthCertificate, Certificate, User, db
 from utils.key_codec import load_pem_bytes
 from services.audit_service import AuditService
 from services.cert_service import CertificateService
-from services.approval_gate import approval_payload, queue_revocation
+from services.approval_gate import PairApprovalConflict, approval_payload, queue_revocation
+from services.cert.related_pair import mutual_partner
 from services.mtls_enrollment import remove_enrolment
 from utils.pagination import parse_request_pagination
 from utils.days_remaining import days_remaining as compute_days_remaining
@@ -526,10 +527,14 @@ def revoke_user_certificate(cert_id):
     if reason is None:
         return error_response(invalid_reason_message(data.get('reason')), 400)
 
+    partner = mutual_partner(cert)
     try:
         policy, approval = queue_revocation(user, cert, reason=reason,
                                             comment=data.get('approval_comment'),
-                                            auth_certificate_id=auth_cert.id)
+                                            auth_certificate_id=auth_cert.id,
+                                            partner=partner if partner is not None and not partner.revoked else None)
+    except PairApprovalConflict as e:
+        return error_response(str(e), 409)
     except Exception as e:
         logger.error(f"Policy evaluation failed for revocation of user certificate {cert_id}: {e}",
                      exc_info=True)

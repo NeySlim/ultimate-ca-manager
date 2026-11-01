@@ -15,6 +15,7 @@ from typing import Dict, List, Optional, Any
 import requests
 
 import fips_mode
+from utils import key_algorithms
 from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo,
     HsmConnectionError, HsmOperationError, HsmKeyNotFoundError, HsmConfigError
@@ -30,6 +31,9 @@ ALGORITHM_TO_TRANSIT = {
     'EC-P256': ('ecdsa-p256', 'asymmetric'),
     'EC-P384': ('ecdsa-p384', 'asymmetric'),
     'EC-P521': ('ecdsa-p521', 'asymmetric'),
+    'ML-DSA-44': ('mldsa-44', 'asymmetric'),
+    'ML-DSA-65': ('mldsa-65', 'asymmetric'),
+    'ML-DSA-87': ('mldsa-87', 'asymmetric'),
     'AES-256': ('aes256-gcm96', 'symmetric'),
 }
 
@@ -41,13 +45,19 @@ TRANSIT_TO_ALGORITHM = {
     'ecdsa-p256': 'EC-P256',
     'ecdsa-p384': 'EC-P384',
     'ecdsa-p521': 'EC-P521',
+    'mldsa-44': 'ML-DSA-44',
+    'mldsa-65': 'ML-DSA-65',
+    'mldsa-87': 'ML-DSA-87',
     'aes256-gcm96': 'AES-256',
     'aes128-gcm96': 'AES-128',
     'ed25519': 'Ed25519',
     'chacha20-poly1305': 'ChaCha20',
 }
 # Transit key types outside the FIPS module, left out of the inventory there
-FIPS_UNAPPROVED_TRANSIT = frozenset({'ed25519', 'chacha20-poly1305'})
+FIPS_UNAPPROVED_TRANSIT = frozenset({'ed25519', 'chacha20-poly1305', 'mldsa-44', 'mldsa-65', 'mldsa-87'})
+# Transit keys that sign the input itself (pure ML-DSA, empty context): no hash_algorithm
+PURE_SIGNING_TRANSIT = frozenset({'mldsa-44', 'mldsa-65', 'mldsa-87'})
+_SYMMETRIC_TRANSIT = frozenset({'aes128-gcm96', 'aes256-gcm96', 'chacha20-poly1305'})
 
 # Hash algorithm for signing based on key type
 SIGN_HASH_ALGORITHM = {
@@ -69,6 +79,20 @@ SIGN_ALGORITHM = {
 }
 
 
+def _public_pem(transit_type: str, public_key: Optional[str]) -> Optional[str]:
+    """SubjectPublicKeyInfo PEM of a Transit public key: an ML-DSA one comes as the
+    base64 of the raw FIPS 204 key, turned here into the RFC 9881 SPKI."""
+    if not public_key or transit_type not in PURE_SIGNING_TRANSIT:
+        return public_key
+    registered = key_algorithms.get(TRANSIT_TO_ALGORITHM[transit_type])
+    if registered is None:
+        raise HsmOperationError(f'{TRANSIT_TO_ALGORITHM[transit_type]} keys are not available on this build')
+    from cryptography.hazmat.primitives import serialization
+    key = registered.public_class.from_public_bytes(base64.b64decode(public_key))
+    return key.public_bytes(serialization.Encoding.PEM,
+                            serialization.PublicFormat.SubjectPublicKeyInfo).decode()
+
+
 def is_available() -> bool:
     """OpenBao provider uses requests — always available"""
     return True
@@ -87,6 +111,7 @@ class OpenBaoProvider(BaseHsmProvider):
     """
 
     SIGNS_PSS = True
+    SIGNS_ML_DSA = True
 
     def __init__(self, config: Dict[str, Any]):
         super().__init__(config)
@@ -244,14 +269,14 @@ class OpenBaoProvider(BaseHsmProvider):
                 if transit_type in FIPS_UNAPPROVED_TRANSIT and fips_mode.enabled():
                     continue
                 algorithm = TRANSIT_TO_ALGORITHM.get(transit_type, transit_type)
-                is_symmetric = transit_type in ('aes128-gcm96', 'aes256-gcm96', 'chacha20-poly1305')
+                is_symmetric = transit_type in _SYMMETRIC_TRANSIT
 
                 # Get public key for asymmetric keys
                 public_pem = None
                 if not is_symmetric and data.get('keys'):
                     latest_ver = str(data.get('latest_version', 1))
                     ver_data = data['keys'].get(latest_ver, {})
-                    public_pem = ver_data.get('public_key', None)
+                    public_pem = _public_pem(transit_type, ver_data.get('public_key', None))
 
                 keys.append(HsmKeyInfo(
                     key_identifier=name,
@@ -283,7 +308,7 @@ class OpenBaoProvider(BaseHsmProvider):
         purpose: str = 'signing',
         extractable: bool = False
     ) -> HsmKeyInfo:
-        self.refuse_unsupported_curve(algorithm)
+        self.refuse_unsupported_algorithm(algorithm)
         if algorithm not in ALGORITHM_TO_TRANSIT:
             raise HsmOperationError(
                 f'Unsupported algorithm: {algorithm}. '
@@ -308,7 +333,7 @@ class OpenBaoProvider(BaseHsmProvider):
         if key_class == 'asymmetric' and data.get('keys'):
             latest_ver = str(data.get('latest_version', 1))
             ver_data = data['keys'].get(latest_ver, {})
-            public_pem = ver_data.get('public_key', None)
+            public_pem = _public_pem(transit_type, ver_data.get('public_key', None))
 
         return HsmKeyInfo(
             key_identifier=label,
@@ -344,7 +369,7 @@ class OpenBaoProvider(BaseHsmProvider):
             raise HsmKeyNotFoundError(f'Key {key_identifier} not found')
 
         transit_type = data.get('type', '')
-        if transit_type in ('aes128-gcm96', 'aes256-gcm96', 'chacha20-poly1305'):
+        if transit_type in _SYMMETRIC_TRANSIT:
             raise HsmOperationError(f'Key {key_identifier} is symmetric, no public key')
 
         latest_ver = str(data.get('latest_version', 1))
@@ -354,7 +379,7 @@ class OpenBaoProvider(BaseHsmProvider):
         if not pem:
             raise HsmOperationError(f'No public key available for {key_identifier}')
 
-        return pem
+        return _public_pem(transit_type, pem)
 
     def sign(
         self,
@@ -364,25 +389,29 @@ class OpenBaoProvider(BaseHsmProvider):
         hash_algorithm: Optional[str] = None,
         padding: Optional[str] = None
     ) -> bytes:
-        # Determine hash algorithm from key type if not specified
-        hash_alg = None
-        sig_alg = None
-
-        if algorithm and algorithm in SIGN_HASH_ALGORITHM:
-            hash_alg = SIGN_HASH_ALGORITHM[algorithm]
-            sig_alg = SIGN_ALGORITHM.get(algorithm)
-        else:
-            # Read key to determine type
+        # A named algorithm must be one Transit knows; the key type decides how it is asked
+        if algorithm and algorithm not in ALGORITHM_TO_TRANSIT and algorithm not in TRANSIT_TO_ALGORITHM.values():
+            raise HsmOperationError(f'Unsupported algorithm: {algorithm}')
+        transit_type = ALGORITHM_TO_TRANSIT.get(algorithm, (None, None))[0] if algorithm else None
+        if transit_type is None or transit_type in _SYMMETRIC_TRANSIT:
             detail = self._api('GET', f'keys/{key_identifier}')
             key_data = detail.get('data', {})
             if not key_data:
                 raise HsmKeyNotFoundError(f'Key {key_identifier} not found')
-
             transit_type = key_data.get('type', '')
-            ucm_alg = TRANSIT_TO_ALGORITHM.get(transit_type)
-            if ucm_alg:
-                hash_alg = SIGN_HASH_ALGORITHM.get(ucm_alg, 'sha2-256')
-                sig_alg = SIGN_ALGORITHM.get(ucm_alg)
+        ucm_alg = TRANSIT_TO_ALGORITHM.get(transit_type)
+        # An unnamed type would be signed without hash_algorithm: refused, not guessed
+        if ucm_alg is None or transit_type in _SYMMETRIC_TRANSIT:
+            raise HsmOperationError(f'OpenBao key {key_identifier} of type {transit_type!r} cannot sign here')
+
+        if transit_type in PURE_SIGNING_TRANSIT:
+            if hash_algorithm or padding:
+                raise HsmOperationError(f'{ucm_alg} signs the data itself: no digest or padding applies')
+            payload = {'input': base64.b64encode(data).decode('ascii')}
+            return self._signature(self._api('POST', f'sign/{key_identifier}', json=payload))
+
+        hash_alg = SIGN_HASH_ALGORITHM.get(ucm_alg, 'sha2-256')
+        sig_alg = SIGN_ALGORITHM.get(ucm_alg)
 
         # The digest the caller declares in the signature wins over the
         # key-size default: a certificate saying sha256WithRSA must have been
@@ -402,7 +431,10 @@ class OpenBaoProvider(BaseHsmProvider):
         if sig_alg:
             payload['signature_algorithm'] = sig_alg
 
-        result = self._api('POST', f'sign/{key_identifier}', json=payload)
+        return self._signature(self._api('POST', f'sign/{key_identifier}', json=payload))
+
+    @staticmethod
+    def _signature(result: Dict[str, Any]) -> bytes:
         signature_str = result.get('data', {}).get('signature', '')
 
         # Transit returns "vault:v1:<base64>" format

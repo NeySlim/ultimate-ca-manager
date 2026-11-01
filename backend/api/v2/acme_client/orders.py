@@ -26,7 +26,9 @@ from services.acme.acme_client_service import (
     AUTHZ_INVALID_USER_MSG,
     CERT_KEY_TYPES,
     csr_identifiers_match_order,
+    fips_csr_refusal,
     fips_key_type_refusal,
+    fips_private_key_refusal,
 )
 from services.audit_service import AuditService
 from services.acme.http01 import wait_for_http01
@@ -241,6 +243,10 @@ def request_certificate():
             csr = load_pem_csr(csr_pem)
         except ValueError as exc:
             return error_response(str(exc), 400)
+        # Before the signature: a FIPS provider cannot verify the keys it refuses
+        refusal = fips_csr_refusal(csr)
+        if refusal:
+            return error_response(refusal, 400)
         if not csr.is_signature_valid:
             return error_response('CSR signature is invalid', 400)
         match_ok, match_msg = csr_identifiers_match_order(csr, domains)
@@ -258,6 +264,23 @@ def request_certificate():
         src_cert = db.session.get(Certificate, src_id)
         if not src_cert or not src_cert.prv:
             return error_response('source_certificate_id must reference a certificate with a stored private key', 400)
+        from cryptography.exceptions import UnsupportedAlgorithm
+        from utils.acme_csr import load_private_key_from_certificate
+        try:
+            refusal = fips_private_key_refusal(load_private_key_from_certificate(src_cert))
+        except (ValueError, UnsupportedAlgorithm) as exc:
+            return error_response(str(exc), 400)
+        if refusal:
+            return error_response(refusal, 400)
+
+    # Only a key UCM generates has a type to record; the setting is the default.
+    generates_key = key_source == 'generate' or (
+        key_source == 'reuse' and not data.get('source_certificate_id'))
+    if generates_key and not key_type:
+        try:
+            key_type = AcmeClientService._get_default_key_type()
+        except ValueError as exc:
+            return error_response(str(exc), 400)
 
     # Create order
     try:
@@ -276,10 +299,7 @@ def request_certificate():
 
         # Persist key options on order
         order.key_source = key_source
-        # Only a key UCM generates has a type to record; the setting is the default.
-        generates_key = key_source == 'generate' or (
-            key_source == 'reuse' and not data.get('source_certificate_id'))
-        order.key_type = (key_type or client._get_default_key_type()) if generates_key else None
+        order.key_type = key_type if generates_key else None
         if key_source == 'csr':
             order.csr_pem = csr_pem.strip() + '\n'
         if key_source == 'reuse' and data.get('source_certificate_id'):

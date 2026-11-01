@@ -23,6 +23,20 @@ bp = Blueprint('smart_import', __name__)
 # 50 MB global cap. A real certificate bundle is far smaller; 5 MB matches the
 # CSV-upload ceiling and is generous for any legitimate PEM/PKCS12 blob.
 MAX_IMPORT_CONTENT_BYTES = 5 * 1024 * 1024
+# Each password costs a key derivation per encrypted object
+MAX_IMPORT_PASSWORDS = 32
+
+
+def _passwords(data):
+    """`password` then the `file_passwords` the import form sends per file, tried in turn
+    on each encrypted object: the content arrives as one blob, files no longer told apart."""
+    passwords = [data.get('password')]
+    per_file = data.get('file_passwords')
+    if isinstance(per_file, dict):
+        passwords.extend(per_file[k] for k in sorted(per_file, key=str))
+    elif isinstance(per_file, list):
+        passwords.extend(per_file)
+    return [p for p in passwords if isinstance(p, str) and p]
 
 
 def _content_too_large(content) -> bool:
@@ -38,8 +52,9 @@ def analyze_import():
     """
     Analyze content for import without actually importing.
 
-    Request body: `content` (PEM/PKCS#12/JKS text or base64) and an optional
-    `password` for encrypted content.
+    Request body: `content` (PEM/PKCS#12/JKS text or base64), an optional
+    `password` for encrypted content and optional `file_passwords` (an object
+    or a list of passwords, each tried in turn on every encrypted object).
 
     Response `data` carries `objects`, `chains`, `matching`, `validation`
     and `summary`.
@@ -62,7 +77,9 @@ def analyze_import():
     if _content_too_large(content):
         return error_response("Content exceeds maximum import size", 413)
 
-    password = data.get('password')
+    password = _passwords(data)
+    if len(password) > MAX_IMPORT_PASSWORDS:
+        return error_response(f'At most {MAX_IMPORT_PASSWORDS} passwords per import', 400)
     
     try:
         importer = SmartImporter()
@@ -83,9 +100,11 @@ def execute_import():
     """
     Execute the smart import.
 
-    Request body: `content`, an optional `password`, and `options` with
-    `import_cas`, `import_certs`, `import_csrs`, `skip_duplicates` and
-    `description_prefix`.
+    Request body: `content`, an optional `password` and `file_passwords` (as
+    for the analysis), and `options` with
+    `import_cas`, `import_certs`, `import_csrs`, `import_keys`, `skip_duplicates`,
+    `description_prefix` and `selected_indices` (positions in the analysis
+    `objects` list; all of them when absent).
 
     Response `data` carries the counts (`certificates_imported`,
     `cas_imported`, `keys_matched`, `csrs_imported`), plus `errors`,
@@ -105,17 +124,18 @@ def execute_import():
     if _content_too_large(content):
         return error_response("Content exceeds maximum import size", 413)
 
-    password = data.get('password')
+    password = _passwords(data)
+    if len(password) > MAX_IMPORT_PASSWORDS:
+        return error_response(f'At most {MAX_IMPORT_PASSWORDS} passwords per import', 400)
     options = data.get('options', {})
     username = g.current_user.username if hasattr(g, 'current_user') else 'system'
 
     try:
         importer = SmartImporter()
-        import_cas = options.get('import_cas', True)
-        if import_cas and not has_permission('write:cas', g.permissions):
-            analysis = importer.analyze(content, password)
-            if analysis.summary.get('cas', 0) > 0:
-                return error_response('write:cas permission required to import CAs', 403)
+        # Only a CA the import keeps needs write:cas, not one the preview left out
+        if (not has_permission('write:cas', g.permissions)
+                and importer.imports_cas(content, password, options)):
+            return error_response('write:cas permission required to import CAs', 403)
 
         result = importer.execute(content, password, options, username)
         

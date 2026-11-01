@@ -118,6 +118,54 @@ def test_crl_config_still_refuses_an_empty_digest_for_an_rsa_ca(auth_client, rsa
     assert r.status_code == 400
 
 
+@pytest.fixture(params=['Ed25519', 'Ed448', 'ML-DSA-65'])
+def digestless_ca_with_a_stored_digest(request, app):
+    """A CA row whose key takes no digest, holding a crl_digest stored before that rule."""
+    import datetime
+    from cryptography.hazmat.primitives.asymmetric import ed448, ed25519, mldsa
+    from cryptography.x509.oid import NameOID
+    key = {'Ed25519': ed25519.Ed25519PrivateKey, 'Ed448': ed448.Ed448PrivateKey,
+           'ML-DSA-65': mldsa.MLDSA65PrivateKey}[request.param].generate()
+    name = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, f'Stale digest {uuid.uuid4().hex[:6]}')])
+    now = datetime.datetime.now(datetime.timezone.utc)
+    cert = (x509.CertificateBuilder().subject_name(name).issuer_name(name).public_key(key.public_key())
+            .serial_number(x509.random_serial_number()).not_valid_before(now)
+            .not_valid_after(now + datetime.timedelta(days=30))
+            .add_extension(x509.BasicConstraints(ca=True, path_length=None), critical=True)
+            .sign(key, None))
+    with app.app_context():
+        row = CA(refid=str(uuid.uuid4()), descr=request.param, serial=0,
+                 crt=base64.b64encode(_pem(cert)).decode(),
+                 subject=name.rfc4514_string(), issuer=name.rfc4514_string(), crl_digest='sha384')
+        db.session.add(row)
+        db.session.commit()
+        ca_id = row.id
+    yield ca_id
+    with app.app_context():
+        db.session.delete(db.session.get(CA, ca_id))
+        db.session.commit()
+
+
+def test_a_stale_crl_digest_is_shown_and_can_be_cleared(app, auth_client, digestless_ca_with_a_stored_digest):
+    ca_id = digestless_ca_with_a_stored_digest
+    data = auth_client.get(f'/api/v2/cas/{ca_id}').get_json()['data']
+    assert (data['crl_digest'], data['crl_digest_ignored']) == (None, 'sha384')
+    r = _post(auth_client, f'/api/v2/crl/{ca_id}/config', {'digest': None})
+    assert r.status_code == 200, r.get_json()
+    data = auth_client.get(f'/api/v2/cas/{ca_id}').get_json()['data']
+    assert data['crl_digest_ignored'] is None
+    with app.app_context():
+        assert db.session.get(CA, ca_id).crl_digest is None
+
+
+def test_a_stale_crl_digest_is_not_logged_at_info_on_every_crl(app, caplog, digestless_ca_with_a_stored_digest):
+    from services.crl.generation import _crl_signature_hash
+    with app.app_context(), caplog.at_level(logging.INFO, logger='services.crl'):
+        for _ in range(3):
+            assert _crl_signature_hash(db.session.get(CA, digestless_ca_with_a_stored_digest)) is None
+    assert [r.getMessage() for r in caplog.records if r.levelno >= logging.INFO] == []
+
+
 @pytest.fixture
 def pending_mldsa_ca(app):
     """A CA still awaiting its certificate: the key is only in the ML-DSA-65 CSR."""
@@ -157,11 +205,11 @@ def test_ml_dsa_crl_verifies_with_openssl(app, auth_client, create_cert, mldsa65
     r = _post(auth_client, f"/api/v2/certificates/{leaf['id']}/revoke", {'reason': 'keyCompromise'})
     assert r.status_code == 200, r.get_json()
     with app.app_context():
-        # A digest stored before the CA could refuse it is ignored, and said so
+        # A digest stored before the CA could refuse it is ignored, said at DEBUG
         db.session.get(CA, mldsa65_ca['id']).crl_digest = 'sha384'
         db.session.commit()
     try:
-        with caplog.at_level(logging.INFO, logger='services.crl.generation'):
+        with caplog.at_level(logging.DEBUG, logger='services.crl.generation'):
             r = auth_client.post(f"/api/v2/crl/{mldsa65_ca['id']}/regenerate")
         assert r.status_code == 200, r.get_json()
         assert any('sha384 ignored' in m and 'ML-DSA-65' in m for m in caplog.messages), caplog.messages

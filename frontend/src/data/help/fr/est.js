@@ -26,7 +26,7 @@ export default {
           { label: '/simpleenroll', text: 'Soumettre une CSR et recevoir un certificat signé' },
           { label: '/simplereenroll', text: 'Renouveler un certificat existant (nécessite mTLS)' },
           { label: '/csrattrs', text: 'Obtenir les attributs CSR recommandés par le serveur' },
-          { label: '/serverkeygen', text: 'Le serveur génère la paire de clés et retourne le certificat + la clé' },
+          { label: '/serverkeygen', text: 'Le serveur génère une paire de clés RSA-2048 et retourne le certificat + la clé ; la clé de la requête, ML-DSA compris, est ignorée (RFC 7030)' },
         ]
       },
     ],
@@ -124,6 +124,8 @@ Obtenir les attributs CSR (OID) recommandés par le serveur.
 
 ### POST /serverkeygen
 Le serveur génère une paire de clés et retourne le certificat accompagné de la clé privée. Utile lorsque le client ne peut pas générer de clés localement.
+
+Les clés générées sont en RSA-2048. Une requête dont la CSR porte une clé post-quantique est refusée avec \`400\` et un message : générez la clé ML-DSA sur l'appareil et utilisez \`/simpleenroll\`.
 
 ## Onglet Informations
 

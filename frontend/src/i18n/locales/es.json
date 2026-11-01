@@ -840,7 +840,22 @@
     "deleteNeedsRevoke": "Este certificado sigue siendo válido, por lo que no puede eliminarse por sí solo: se retiraría de UCM mientras sigue siendo de confianza para cualquier cliente que no compruebe la revocación. Revóquelo primero, para que la CRL y el respondedor OCSP reflejen la retirada, y luego se eliminará.",
     "revokeThenDelete": "Revocar y luego eliminar",
     "noKeyTypeAllowedByPolicy": "Ningún tipo de clave está permitido por las políticas de esta CA y de esta plantilla.",
-    "revocationApprovalRequired": "Revocación enviada para aprobación (política: {{policy}})"
+    "revocationApprovalRequired": "Revocación enviada para aprobación (política: {{policy}})",
+    "hybrid": {
+      "toggle": "Emitir un par híbrido (RFC 9763)",
+      "toggleHint": "Dos certificados vinculados para el mismo sujeto: uno con clave clásica y otro con clave ML-DSA que hace referencia al primero.",
+      "classical": "Clave clásica",
+      "pq": "Clave poscuántica",
+      "column": "Vinculado",
+      "linked": "Vinculado",
+      "roleClassical": "Miembro clásico de un par híbrido",
+      "rolePq": "Miembro poscuántico de un par híbrido",
+      "relatedCertificate": "Certificado vinculado",
+      "openRelated": "Abrir el certificado vinculado n.º {{id}}",
+      "pairIssued": "Par híbrido emitido: certificados n.º {{classical}} y n.º {{pq}}",
+      "renewedWithRelated": "Certificado renovado, junto con su certificado vinculado n.º {{id}}",
+      "bulkRelatedRenewed": "{{count}} certificados vinculados renovados con la selección"
+    }
   },
   "cas": {
     "chainRevoked": "Revocada aguas arriba",
@@ -1150,6 +1165,7 @@
     "rekeyAsCSRDescription": "Generar un nuevo CSR con los mismos campos DN y SANs pero un nuevo par de claves.",
     "rekeyAsCertDescription": "Emitir directamente un nuevo certificado con el mismo sujeto, firmado por una CA.",
     "keyRsa2048": "RSA 2048",
+    "keyRsa3072": "RSA 3072",
     "keyRsa4096": "RSA 4096",
     "keyCurveNistP256": "NIST P-256 (ECDSA)",
     "keyCurveNistP384": "NIST P-384 (ECDSA)",
@@ -1654,6 +1670,7 @@
     "renew": "Renovar",
     "keyType": "Tipo de clave de certificado",
     "keyTypeHelper": "Algoritmo y tamaño de clave para certificados emitidos",
+    "keyTypeUnavailable": "El tipo de clave guardado {{keyType}} no está disponible en este servidor: los pedidos fallan hasta que elija otro.",
     "keySource": "Origen de clave",
     "keySourceHelper": "Generar clave nueva, reutilizar en renovación (TLSA/pinning) o proporcionar CSR externa",
     "keySourceGenerate": "Generar clave nueva",
@@ -2162,6 +2179,8 @@
     "crlPublishInterval": "Publicar cada",
     "crlPublishAuto": "Auto (antes de expirar)",
     "crlDigest": "Resumen de firma",
+    "crlDigestIgnored": "El resumen almacenado {{digest}} se ignora: esta clave firma sin un resumen aparte",
+    "crlDigestClear": "Borrar",
     "crlScheduleNote": "Publicar con más frecuencia que la ventana de validez da a los clientes un período de gracia si se pierde una publicación.",
     "nextPublish": "Próxima publicación",
     "namedUrlsTitle": "URLs con nombre",
@@ -3207,8 +3226,12 @@
           "remedy": "Cree una autoridad RSA o ECDSA (P-256/P-384/P-521) y traslade la emisión a ella antes del cambio; la clave de una autoridad no se puede convertir."
         },
         "ca_weak_key": {
-          "title": "Autoridades de certificación con una clave DSA o ML-DSA, RSA de menos de 2048 bits o una curva distinta de P-256/384/521",
+          "title": "Autoridades de certificación con una clave DSA, RSA de menos de 2048 bits o una curva distinta de P-256/384/521",
           "remedy": "Cree una autoridad con RSA 2048+ o ECDSA P-256/P-384/P-521 y traslade la emisión a ella."
+        },
+        "ca_unapproved_algorithm": {
+          "title": "Autoridades de certificación con una clave ML-DSA: el módulo FIPS que incluye UCM no ofrece ML-DSA, por lo que no pueden firmar en modo FIPS",
+          "remedy": "Cree una autoridad RSA 2048+ o ECDSA P-256/P-384/P-521 y traslade la emisión a ella antes del cambio, o mantenga el modo FIPS desactivado mientras necesite emitir con ML-DSA."
         },
         "ssh_ca_eddsa_key": {
           "title": "Autoridades de certificación SSH con clave Ed25519: no pueden firmar en modo FIPS",
@@ -3483,7 +3506,8 @@
       "trustStore": "Almacén de confianza",
       "hsmManagement": "Gestión de HSM",
       "singleSignOn": "Inicio de sesión único",
-      "ssh": "Certificados SSH"
+      "ssh": "Certificados SSH",
+      "sshCas": "Autoridades de certificación SSH"
     },
     "subtitle_one": "{{count}} rol",
     "subtitle_other": "{{count}} roles",
@@ -3500,12 +3524,18 @@
     "noDescription": "Sin descripción",
     "roleDetails": "Detalles del rol",
     "permissions": {
-      "readSsh": "Ver CAs y certificados SSH",
-      "writeSsh": "Crear y gestionar CAs y certificados SSH",
-      "deleteSsh": "Eliminar CAs y certificados SSH",
-      "read:ssh": "Ver CAs y certificados SSH",
-      "write:ssh": "Crear y firmar certificados SSH",
-      "delete:ssh": "Eliminar CAs y certificados SSH"
+      "readSsh": "Ver certificados SSH",
+      "writeSsh": "Firmar, importar y revocar certificados SSH",
+      "deleteSsh": "Eliminar certificados SSH",
+      "read:ssh": "Ver certificados SSH",
+      "write:ssh": "Firmar, importar y revocar certificados SSH",
+      "delete:ssh": "Eliminar certificados SSH",
+      "readSshCas": "Ver CAs SSH",
+      "writeSshCas": "Crear, importar y editar CAs SSH",
+      "deleteSshCas": "Eliminar CAs SSH",
+      "read:ssh_cas": "Ver CAs SSH, sus claves públicas, KRLs y scripts de configuración",
+      "write:ssh_cas": "Crear, importar y editar CAs SSH",
+      "delete:ssh_cas": "Eliminar CAs SSH"
     },
     "ignoredPermissions": "Permisos ignorados",
     "ignoredPermissionsHint": "Guardados en este rol pero no aplicados: reservados a los administradores o desconocidos. Se conservan tal cual."
@@ -3536,6 +3566,7 @@
     "generateHsmKey": "Generar HSM Clave",
     "keyLabel": "Clave Label",
     "keyLabelPlaceholder": "my-signing-clave",
+    "mldsaUntestedGoogleKms": "ML-DSA en Google Cloud KMS sigue la API de KMS, pero aún no se ha probado con el servicio.",
     "purposes": {
       "general": "Propósito general",
       "caSigning": "Firma de CA"
@@ -3886,7 +3917,16 @@
       "certificateHold": "Suspensión temporal que puede levantarse después con Quitar suspensión.",
       "privilegeWithdrawn": "Se retiró un privilegio otorgado por el certificado.",
       "aACompromise": "La clave de una autoridad de atributos fue comprometida."
-    }
+    },
+    "revokeRelated": "Revocar también el certificado vinculado",
+    "revokeRelatedHint": "Desmarque para mantener válido el otro miembro del par híbrido.",
+    "revokedWithRelated": "Certificado revocado, junto con su certificado vinculado n.º {{id}}",
+    "relatedNotRevoked": "El certificado vinculado no se revocó: no nombra a este certificado como su pareja, o ya estaba revocado.",
+    "relatedRevokeFailed": "Certificado revocado, pero no se pudo revocar su certificado vinculado n.º {{id}}: revóquelo por separado.",
+    "revokeRelatedBulk": "Revocar también los certificados vinculados",
+    "revokeRelatedBulkHint": "Los miembros seleccionados de un par híbrido arrastran al otro miembro. Desmarque para mantener válidos los demás miembros.",
+    "bulkRelatedRevoked": "{{count}} certificados vinculados revocados con la selección",
+    "bulkRelatedRevokeFailed": "No se pudieron revocar {{count}} certificados vinculados con la selección ({{ids}}): revóquelos por separado"
   },
   "details": {
     "pemCertificate": "PEM Certificado",
@@ -4036,6 +4076,7 @@
     "importCAs": "Importar CAs",
     "importCertificates": "Importar certificados",
     "importKeys": "Importar claves",
+    "importCSRs": "Importar CSR",
     "importObjects": "Importar {{count}} Object(s)",
     "importingObjects": "Importaring objects...",
     "importComplete": "Importar Complete",
@@ -4763,7 +4804,8 @@
     "legacyPkcs12Desc": "Para Android 15 y anteriores, macOS 14 y anteriores, Windows Server 2016 y anteriores, Java anterior a 8u301 / 11.0.1: rechazan el archivo AES-256 por defecto como contraseña incorrecta. Protege menos el archivo; elíjalo en cada exportación.",
     "formatKeyDesc": "Solo la clave privada en formato PEM",
     "formats": {
-      "privateKey": "Clave privada"
+      "privateKey": "Clave privada",
+      "hybridBundle": "Paquete híbrido"
     },
     "formatOptions": {
       "pemOnly": "PEM (Solo certificado)",
@@ -4778,7 +4820,9 @@
     "unavailableForKeyAlgorithm": "No disponible para claves {{algorithm}}: UCM aún no puede escribir una clave poscuántica en PKCS#12 ni en JKS. Exporte en PEM con la clave privada.",
     "jksNote": "JKS siempre incluye la clave privada",
     "pkcs12Title": "Exportar PKCS#12",
-    "pkcs12PasswordPrompt": "Ingrese la contraseña para el archivo PKCS#12"
+    "pkcs12PasswordPrompt": "Ingrese la contraseña para el archivo PKCS#12",
+    "formatHybridBundleDesc": "ZIP con los dos certificados del par",
+    "bundleRelatedHasNoKey": "El certificado relacionado no tiene clave privada: el paquete contiene solo los certificados"
   },
   "userCertificates": {
     "title": "Certificados de Usuario",
@@ -5385,6 +5429,8 @@
     "signerGenerateCn": "Nombre común",
     "signerGenerateValidity": "Validez (días)",
     "signerGenerateKeyType": "Tipo de clave",
+    "signerMldsaVerifyNote": "Las marcas de tiempo ML-DSA se verifican con openssl cms -verify (OpenSSL 3.5 o posterior), no con openssl ts -verify; compruebe la huella del mensaje por separado.",
+    "signerMldsaVerifyNote": "Las marcas de tiempo ML-DSA se verifican con openssl cms -verify (OpenSSL 3.5 o posterior), no con openssl ts -verify; compruebe la huella del mensaje por separado.",
     "signerGenerated": "Certificado de firma TSA emitido.",
     "signerGeneratedSelected": "Certificado de firma TSA emitido y seleccionado como firmante dedicado.",
     "signerGenerateFailed": "No se pudo generar el certificado de firma TSA.",
@@ -5523,6 +5569,7 @@
     "validityInfo": "Validez",
     "caInfo": "Información de la CA",
     "selectCa": "Seleccionar CA SSH",
+    "issueNeedsCaRead": "Elegir una CA SSH requiere el permiso read:ssh_cas, que su cuenta no tiene: solicítelo a un administrador.",
     "issueMode": "Modo de emisión",
     "presets": {
       "1h": "1 hora",

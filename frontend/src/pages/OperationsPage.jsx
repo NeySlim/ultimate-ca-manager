@@ -257,7 +257,7 @@ function useResourceTypes(t) {
 
 export default function OperationsPage() {
   const { t } = useTranslation()
-  const { showSuccess, showError, showWarning } = useNotification()
+  const { showSuccess, showError, showWarning, showInfo } = useNotification()
   const { isMobile } = useMobile()
   const { isAdmin } = usePermission()
   const openEntity = useOpenEntity()
@@ -296,6 +296,8 @@ export default function OperationsPage() {
   const [selectedIds, setSelectedIds] = useState(new Set())
   const [bulkAction, setBulkAction] = useState(null)
   const [bulkRevokeReason, setBulkRevokeReason] = useState('unspecified')  // RFC 5280 reason (#334)
+  const [bulkRevokeRelated, setBulkRevokeRelated] = useState(true)  // other member of a hybrid pair
+  const [partnersLoading, setPartnersLoading] = useState(false)
   const [bulkProcessing, setBulkProcessing] = useState(false)
   const [bulkSignCaId, setBulkSignCaId] = useState('')
   const [bulkSignDays, setBulkSignDays] = useState('365')
@@ -503,18 +505,55 @@ export default function OperationsPage() {
   }
 
   // ===== BULK ACTION HANDLERS =====
+  const relatedOf = (id) => seenItemsRef.current.get(id)?.related_certificate_id
+  // The other member the server revokes or renews with id: it names id back and is not
+  // revoked. null when there is none, undefined when it could not be read.
+  const livePartner = (id) => {
+    const other = relatedOf(id)
+    if (other == null) return null
+    const item = seenItemsRef.current.get(other)
+    if (!item) return undefined
+    return item.related_certificate_id === id && !item.revoked ? other : null
+  }
+  const pairAction = bulkResourceType === 'certificates' && (bulkAction === 'revoke' || bulkAction === 'renew')
+  const selectionHasPairs = bulkResourceType === 'certificates'
+    && [...selectedIds].some(id => livePartner(id) !== null)
+  // A fresh choice for every bulk revocation
+  useEffect(() => { if (bulkAction === 'revoke') setBulkRevokeRelated(true) }, [bulkAction])
+  // Other members off the loaded pages are read before the dialog asks or reports about them
+  useEffect(() => {
+    if (!pairAction) return undefined
+    const missing = [...new Set([...selectedIds].map(relatedOf))]
+      .filter(other => other != null && !seenItemsRef.current.has(other))
+    if (!missing.length) return undefined
+    let live = true
+    setPartnersLoading(true)
+    Promise.allSettled(missing.map(other => certificatesService.getById(other))).then(results => {
+      results.forEach(r => {
+        const item = r.status === 'fulfilled' ? (r.value?.data ?? r.value) : null
+        if (item?.id != null) seenItemsRef.current.set(item.id, item)
+      })
+      if (live) setPartnersLoading(false)
+    })
+    return () => { live = false; setPartnersLoading(false) }
+  }, [pairAction, selectedIds])
+
   const executeBulkAction = async () => {
-    if (selectedIds.size === 0) return
+    if (selectedIds.size === 0 || partnersLoading) return
     setBulkProcessing(true)
     const ids = Array.from(selectedIds)
+    // Read before the request: a refresh during it would show the partners already revoked
+    const partnerBefore = new Map(pairAction ? ids.map(id => [id, livePartner(id)]) : [])
     try {
       let result
       switch (`${bulkResourceType}:${bulkAction}`) {
         case 'certificates:revoke':
-          result = await certificatesService.bulkRevoke(ids, bulkRevokeReason)
+          result = await certificatesService.bulkRevoke(ids, bulkRevokeReason, {
+            relatedOf, ...(selectionHasPairs && { revokeRelated: bulkRevokeRelated }),
+          })
           break
         case 'certificates:renew':
-          result = await certificatesService.bulkRenew(ids)
+          result = await certificatesService.bulkRenew(ids, { relatedOf })
           break
         case 'certificates:delete':
           result = await certificatesService.bulkDelete(ids)
@@ -548,6 +587,20 @@ export default function OperationsPage() {
           count: failedCount,
           defaultValue: `${failedCount} items failed`
         }))
+      }
+      // Other members of pairs revoked or renewed outside the selection, which the answer omits
+      const notRevoked = data?.related_not_revoked || []
+      const pairedOutside = new Set((data?.success || [])
+        .map(id => partnerBefore.get(id))
+        .filter(other => other != null && !selectedIds.has(other) && !notRevoked.includes(other)))
+      if (notRevoked.length > 0) {
+        showWarning(t('revocation.bulkRelatedRevokeFailed', { count: notRevoked.length, ids: notRevoked.map(id => `#${id}`).join(', ') }))
+      }
+      if (pairedOutside.size > 0 && bulkAction === 'revoke' && !(selectionHasPairs && !bulkRevokeRelated)) {
+        showWarning(t('revocation.bulkRelatedRevoked', { count: pairedOutside.size }))
+      }
+      if (pairedOutside.size > 0 && bulkAction === 'renew') {
+        showInfo(t('certificates.hybrid.bulkRelatedRenewed', { count: pairedOutside.size }))
       }
       const pendingCount = data?.pending_approval?.length || 0
       if (pendingCount > 0) {
@@ -1141,11 +1194,28 @@ export default function OperationsPage() {
               </select>
               <p className="text-xs text-text-tertiary">{t(`revocation.hints.${bulkRevokeReason}`)} {t('revocation.bulkReasonHelp')}</p>
             </div>
+            {selectionHasPairs && (
+              <div className="flex items-start gap-2.5">
+                <input
+                  type="checkbox"
+                  id="bulk-revoke-related"
+                  checked={bulkRevokeRelated}
+                  onChange={(e) => setBulkRevokeRelated(e.target.checked)}
+                  className="w-4 h-4 mt-0.5 rounded accent-accent-primary"
+                />
+                <div>
+                  <label htmlFor="bulk-revoke-related" className="text-sm text-text-primary cursor-pointer">
+                    {t('revocation.revokeRelatedBulk')}
+                  </label>
+                  <p className="text-xs text-text-tertiary">{t('revocation.revokeRelatedBulkHint')}</p>
+                </div>
+              </div>
+            )}
           </div>
         ) : getConfirmMessage()}
         confirmLabel={bulkAction === 'delete' ? t('common.delete') : t('common.confirm', 'Confirm')}
         variant={bulkAction === 'delete' || bulkAction === 'revoke' ? 'danger' : 'primary'}
-        loading={bulkProcessing}
+        loading={bulkProcessing || partnersLoading}
       />
 
       {/* Sign CSR modal (needs CA selection) */}

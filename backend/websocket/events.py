@@ -24,7 +24,7 @@ from auth.password_change_gate import password_change_pending
 from auth.twofa_enforcement import ENROLL_SESSION_KEY
 from auth.unified import AuthManager, has_permission
 from config.settings import redis_url as config_redis_url
-from .emitters import ROOM_AUDIT, ROOM_CAS, ROOM_CERTIFICATES, ROOM_SYSTEM_ALERTS
+from .emitters import ROOM_AUDIT, ROOM_CAS, ROOM_CERTIFICATES, ROOM_SSH_CAS, ROOM_SYSTEM_ALERTS
 from .event_types import EventType
 from utils.datetime_utils import utc_isoformat, utc_now
 
@@ -85,6 +85,7 @@ MIN_PERMISSION = 'read:certificates'
 SCOPE_ROOMS = {
     'read:certificates': ROOM_CERTIFICATES,
     'read:cas': ROOM_CAS,
+    'read:ssh_cas': ROOM_SSH_CAS,
     'read:system': ROOM_SYSTEM_ALERTS,
     'read:audit': ROOM_AUDIT,
 }

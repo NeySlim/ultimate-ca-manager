@@ -10,13 +10,9 @@ from utils.response import success_response, error_response
 from models import db, SystemConfig, CA, Certificate, AuditLog
 from services.audit_service import AuditService
 from services.settings_registry import effective
-from services.tsa_service import describe_configured_signer
+from services.tsa_service import describe_configured_signer, tsa_signer_key_problem
 import logging
 import re
-
-from cryptography.hazmat.primitives.asymmetric import ec, rsa
-
-from utils import key_algorithms
 
 logger = logging.getLogger(__name__)
 
@@ -64,9 +60,7 @@ def _signer_candidate_view(cert):
         eku_oids = {oid.dotted_string for oid in eku.value}
         if _TIME_STAMPING_OID not in eku_oids:
             return None
-        # The timestamp CMS is signed in RSA PKCS#1 v1.5 or ECDSA only
-        from cryptography.hazmat.primitives.asymmetric import ec, rsa
-        if not isinstance(parsed.public_key(), (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)):
+        if tsa_signer_key_problem(parsed.public_key()):
             return None
 
         now = utc_now()
@@ -108,11 +102,18 @@ def _ca_signer_refusal(ca):
         return None
     if public is None:
         return None
-    # The timestamp CMS is signed in RSA or ECDSA only (tsa_service._build_signed_response)
-    if not isinstance(public, (rsa.RSAPublicKey, ec.EllipticCurvePublicKey)):
-        label = key_algorithms.label_for_public_key(public) or type(public).__name__
-        return f'A TSA signer key must be RSA or ECDSA, not {label}'
-    return _tsa_policy_refusal(ca, public)
+    return tsa_signer_key_problem(public) or _tsa_policy_refusal(ca, public)
+
+
+def _stored_key_problem(cert):
+    """Why the key of stored *cert* cannot sign timestamps, None when it can or is unreadable."""
+    try:
+        import base64
+        from cryptography import x509
+        public_key = x509.load_pem_x509_certificate(base64.b64decode(cert.crt)).public_key()
+    except Exception:
+        return None
+    return tsa_signer_key_problem(public_key)
 
 
 def _validate_signer_refid(refid):
@@ -123,8 +124,9 @@ def _validate_signer_refid(refid):
     view = _signer_candidate_view(cert)
     if view is None:
         return (
+            _stored_key_problem(cert) or
             'The selected certificate cannot be a TSA signer: it must be a '
-            'non-revoked, unexpired certificate with an RSA or ECDSA key that UCM '
+            'non-revoked, unexpired certificate with an RSA, ECDSA or ML-DSA key that UCM '
             'holds and that carries the timeStamping EKU', None
         )
     # "Can decrypt" is the operative requirement — actually try it.

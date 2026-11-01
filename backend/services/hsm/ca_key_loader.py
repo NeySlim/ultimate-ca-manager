@@ -39,9 +39,8 @@ def get_ca_signing_key(ca, *, allow_revoked: bool = False):
     """Return a signing key usable with ``cryptography``'s builders.
 
     For HSM-backed CAs returns an :class:`HsmRSAPrivateKey` /
-    :class:`HsmECPrivateKey` wrapper.  Otherwise returns a real
-    ``RSAPrivateKey`` / ``EllipticCurvePrivateKey`` decoded from
-    ``ca.prv``.
+    :class:`HsmECPrivateKey` / ``HsmMLDSAPrivateKey`` wrapper.  Otherwise
+    returns the real private key decoded from ``ca.prv``.
 
     Raises :class:`ValueError` if neither key source is available, or when
     the CA (or an ancestor) is revoked (#343): every issuance path loads the

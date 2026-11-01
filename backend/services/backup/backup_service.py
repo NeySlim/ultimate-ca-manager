@@ -27,6 +27,7 @@ except ImportError:
     _ARGON2_AVAILABLE = False
 
 import fips_mode
+from auth.permissions import PERMISSIONS_REVISION
 from models import db
 from config.settings import Config
 from utils.datetime_utils import utc_now, utc_isoformat
@@ -371,6 +372,7 @@ class BackupService(ExportCoreMixin, ExportExtendedMixin, DecryptMixin,
         return {
             'schema_version': self.SCHEMA_VERSION,
             'min_reader_schema_version': self.MIN_READER_SCHEMA_VERSION,
+            'permissions_revision': PERMISSIONS_REVISION,
             'database_dialect': self._database_dialect(),
             'sections': sections,
             'section_digests': self._section_digests(backup_data),

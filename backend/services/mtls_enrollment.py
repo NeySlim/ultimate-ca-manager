@@ -109,14 +109,22 @@ def certificate_row_for(auth_cert) -> Optional[Certificate]:
     enrolled_der = enrolled.public_bytes(serialization.Encoding.DER) if enrolled else None
     fingerprint = normalized_fingerprint(auth_cert.cert_fingerprint)
 
+    readings = []
     for base in (10, 16):
         try:
             serial = int(raw, base)
         except ValueError:
             continue
-        rows = Certificate.query.filter(
-            Certificate.serial_number.in_(serial_variants(serial))
-        ).all()
+        readings.append((serial, serial_variants(serial)))
+    if not readings:
+        return None
+    # Both readings in one query, then split back so decimal still wins
+    candidates = Certificate.query.filter(
+        Certificate.serial_number.in_(set().union(*(v for _, v in readings)))
+    ).order_by(Certificate.id).all()
+
+    for serial, variants in readings:
+        rows = [row for row in candidates if row.serial_number in variants]
         if not rows:
             continue
         for row in rows:
@@ -188,8 +196,10 @@ def remove_enrolment(auth_cert, username: str = 'system', actor=None):
                 'request its revocation, then remove the enrolment once it is revoked', 409)
     if needs_revoking:
         try:
+            # The enrolled certificate only: its pair partner is not part of the enrolment
             CertificateService.revoke_certificate(
-                cert_id=certificate_id, reason=REMOVAL_REASON, username=username)
+                cert_id=certificate_id, reason=REMOVAL_REASON, username=username,
+                revoke_related=False)
         except Exception as error:
             # An authority that cannot sign right now is not a reason to make
             # the certificate disappear without a trace; say so instead.

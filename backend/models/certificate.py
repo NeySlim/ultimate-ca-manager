@@ -85,6 +85,10 @@ class Certificate(db.Model):
     # No access control reads it; kept for older databases and backups
     owner_group_id = db.Column(db.Integer, db.ForeignKey('groups.id'), nullable=True)
     owner_group = db.relationship('Group', backref='owned_certificates')
+
+    # RFC 9763: on B, the A its id-pe-relatedCert names; on A, B once the pair is mutual
+    related_certificate_id = db.Column(db.Integer, nullable=True, index=True)
+    hybrid_role = db.Column(db.String(16), nullable=True)  # 'classical' or 'pq'
     
     # Relationships
     ca = db.relationship("CA", back_populates="certificates")
@@ -463,6 +467,9 @@ class Certificate(db.Model):
             "template_id": self.template_id,
             "template_name": self.template.name if self.template_id and self.template else None,
             "template_overrides": self.template_overrides_list,
+            # Related certificate pair (RFC 9763)
+            "related_certificate_id": self.related_certificate_id,
+            "hybrid_role": self.hybrid_role,
             # PEM for display/copy
             "pem": self._decode_pem(self.crt),
         }
@@ -493,19 +500,29 @@ def key_algo_for_certificate(cert):
     return key_algo_for_public_key(cert.public_key())
 
 
-def key_algo_from_crt(crt):
-    """The ``key_algo`` spelling for a stored certificate (base64 of PEM), None if unreadable."""
+@event.listens_for(Certificate.crt, 'set')
+def _key_fields_follow_crt(target, value, oldvalue, initiator):
+    # Every issuance path sets crt; key_algo (sorting, compliance) and the
+    # AKI/SKI columns (ACME ARI, chain lookups) follow it
+    if not value:
+        return
     import base64
     from cryptography import x509
+    from utils.cert_issuer import authority_key_identifier_hex
     try:
-        return key_algo_for_certificate(x509.load_pem_x509_certificate(base64.b64decode(crt)))
+        cert = x509.load_pem_x509_certificate(base64.b64decode(value))
     except Exception:
-        return None
-
-
-@event.listens_for(Certificate.crt, 'set')
-def _key_algo_follows_crt(target, value, oldvalue, initiator):
-    # Every issuance path sets crt; key_algo (sorting, compliance) follows it
-    if value:
-        target.key_algo = key_algo_from_crt(value) or target.key_algo
+        return
+    try:
+        target.key_algo = key_algo_for_certificate(cert) or target.key_algo
+    except Exception:
+        pass
+    try:
+        target.aki = authority_key_identifier_hex(cert)
+        target.ski = cert.extensions.get_extension_for_class(
+            x509.SubjectKeyIdentifier).value.key_identifier.hex(':').upper()
+    except x509.ExtensionNotFound:
+        target.ski = None
+    except Exception:
+        pass  # extensions pyca cannot parse: the backfill leaves them unset too
 

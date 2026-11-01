@@ -126,7 +126,7 @@ Groups CAs by their Organization (O) field. Useful for multi-tenant setups where
 The form flags an RSA-2048 CA that would outlive 2030: ANSSI accepts RSA-2048 until the end of 2030, ETSI TS 119 312 until the end of 2026. Choose RSA-3072 or larger. Under **Advanced Constraints (RFC 5280)**, permitted and excluded subtrees (DNS, IP range, email) limit the names the CA may certify.
 
 ### Post-quantum CAs (ML-DSA)
-**ML-DSA-44**, **ML-DSA-65** and **ML-DSA-87** (FIPS 204) are listed with their NIST security level (2, 3 and 5). The key is generated in software, never on an HSM, and the algorithm is hidden in FIPS mode.
+**ML-DSA-44**, **ML-DSA-65** and **ML-DSA-87** (FIPS 204) are listed with their NIST security level (2, 3 and 5). The key is generated in software, or on an HSM provider that holds ML-DSA (see HSM-backed CAs), and the algorithm is hidden in FIPS mode.
 
 - An ML-DSA key signs without a separate digest: the digest field disappears, and a digest sent through the API is ignored with a notice. CRLs and OCSP responses of the CA follow the same rule.
 - Hierarchies can mix: an ML-DSA root can sign an RSA or EC intermediate, and an RSA or EC CA can sign an ML-DSA intermediate, which then uses its parent's digest.
@@ -244,7 +244,7 @@ UCM can store a CA's signing key on an external Hardware Security Module instead
 3. In **Key Storage**, switch from *Local* to **HSM**
 4. Pick the HSM provider
 5. Choose a key mode:
-   - **Generate new key**: provide a label (letters/digits/_/-) and pick the algorithm (RSA-2048/3072/4096 or EC-P256/P384/P521, RSA-3072 by default)
+   - **Generate new key**: provide a label (letters/digits/_/-) and pick the algorithm (RSA-2048/3072/4096 or EC-P256/P384/P521, RSA-3072 by default; Brainpool on PKCS#11, ML-DSA on the providers listed under HSM Management)
    - **Use existing key**: pick an unused signing key already present on the HSM
 6. Submit. UCM creates the CA certificate and binds it to the HSM key.
 
@@ -384,6 +384,18 @@ Export formats:
 
 > ⚠ Exporting the **private key** (PKCS#12/PFX, JKS, or key file) requires the admin-only **read:private_keys** permission. Roles without it, including the built-in Operator role, must retrieve archived keys through the approval-gated **Key Recovery** workflow instead.
 
+## Hybrid Certificate Pairs (RFC 9763)
+
+A hybrid pair links a classical certificate (**A**, RSA or EC) and a post-quantum one (**B**, ML-DSA) for the same subject. B carries the non-critical **relatedCertificate** extension, which names A by its hash, so a relying party can require both.
+
+- **Issuing**: tick **Issue a hybrid pair** in the Issue Certificate form (or send \`hybrid\` in \`POST /api/v2/certificates\`) to issue both from the same CA, with the same subject, names and validity. B copies A's extensions with its own key identifier and key usage, and asserts no key usage or EKU that A lacks. Under the ANSSI, BSI and EU ACM compliance profiles, ML-DSA-65 and ML-DSA-87 are accepted only as B: never alone, and ML-DSA-44 not at all
+- **Linking by request**: a CSR carrying a **relatedCertRequest** signed by A's key issues a B linked to A, through Sign CSR, ACME, EST or WSTEP. A must be held by UCM, valid, unrevoked, an end-entity certificate issued by a CA of this instance whose chain is valid now, and the request must be at most 7 days old. A newer certificate that names the same A takes over the pair, and the previous one leaves it. A certificate given inline in the request's location must be A; other locations are not fetched
+- **Revoking** either member, alone or in bulk, revokes the other unless **Also revoke the linked certificate** is unticked. Under a policy that requires approval, the pair goes together, and two different approval policies on the two members leave the revocation to an administrator. If the other member cannot be revoked, the answer says so (\`related_not_revoked\`) and it must be revoked separately. ACME revokeCert revokes only the certificate presented (RFC 8555)
+- **Renewing** either member, by hand, in bulk or automatically, renews both, and the new B names the new A. A member renewed alone, the other being revoked, leaves the pair, as does the other member when one is deleted
+- **Exporting**: the **hybrid-bundle** format is a ZIP of both certificates, and of both private keys when the key is included; it is refused when neither certificate names the other any more
+
+> ⚠ A policy that requires approval refuses to issue a hybrid pair for now: issue it under a policy without approval.
+
 ## Favorites
 
 Star ⭐ important certificates to bookmark them. Favorites appear first in filtered views and are accessible from the favorites filter.
@@ -517,6 +529,10 @@ The CSR and private key are created and stored in UCM. The CSR appears in the Pe
 > 💡 This is convenient when you want UCM to manage the entire lifecycle. CSR, signing, and key storage.
 
 A certificate signed for an **ML-DSA** key keeps only signature bits: keyEncipherment, dataEncipherment and keyAgreement asked by the template are removed, and the result names what was removed.
+
+### Related certificate requests (RFC 9763)
+
+Through the API, \`related_to\` names an existing certificate **A** whose private key UCM holds; it needs the \`read:private_keys\` permission, and each use of A's key is audited. The generated CSR then carries a **relatedCertRequest** signed by A's key. Signing it issues a certificate linked to A, the second member of a hybrid pair, which revokes and renews with A. Signing is refused when A is revoked, expired or not an end-entity certificate, or when the new certificate asserts a key usage or EKU that A lacks.
 
 ## Uploading a CSR
 
@@ -855,6 +871,9 @@ Displays the SCEP endpoint URL and integration instructions.
 5. If auto-approve is on, UCM signs and returns the certificate
 6. If auto-approve is off, an admin reviews and approves/rejects
 
+### Device keys
+The device signs its PKCSReq with its own key: RSA, ECDSA, Ed25519 or ML-DSA. An ML-DSA signature is checked per RFC 9882 (SHA-512 digest, the key's own algorithm identifier, no parameters). Ed448 signatures are refused, and ML-DSA ones too in FIPS mode. The request is still encrypted to the RSA signing CA.
+
 ## SCEP URLs
 
 \`\`\`
@@ -918,7 +937,7 @@ Manage your ACME client configuration:
 - **Environment**: Staging (testing) or Production (live certificates)
 - **Contact Email**: Required for account registration
 - **Auto-Renewal**: Automatically renew certificates before expiry
-- **Certificate Key Type**: RSA-2048, RSA-4096, ECDSA P-256, or ECDSA P-384
+- **Certificate Key Type**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 or P-384, ML-DSA-44, ML-DSA-65 or ML-DSA-87. ML-DSA is not offered in FIPS mode or on a build without it. A configured type this instance cannot generate fails the order instead of falling back to RSA-2048
 - **Account Key Algorithm**: ES256, ES384, or RS256 for ACME account signing
 
 ### Custom ACME Server
@@ -968,6 +987,8 @@ When requesting a certificate, choose where the private key comes from:
 - **Generate new key** *(default)*: UCM creates a fresh key pair for each order
 - **Reuse key on renewal**: keep the same private key across renewals (needed for DANE/TLSA records and key pinning); the first issuance generates the key, renewals reload it
 - **Provide external CSR**: paste a PEM CSR generated elsewhere; UCM submits it at finalize and the private key never enters UCM. CSR domains must exactly match the order identifiers
+
+In FIPS mode, reusing the key of a source certificate is refused when FIPS does not approve that key (ML-DSA included).
 
 ### Preflight (dry run)
 **Run Preflight** on the request form validates the whole request against the Let's Encrypt **staging** directory, without consuming production rate limits:
@@ -1194,6 +1215,9 @@ Browse all certificate issuance orders:
 - Signing CA used
 - Issuance timestamp
 
+### Revocation
+A client revokes with its account key or with the certificate's own key, and the certificate it sends must match the stored one byte for byte: a serial number alone is never enough. Only an RSA or EC P-256, P-384 or P-521 key can sign an ACME request, so an ML-DSA, EdDSA or Brainpool certificate is revoked with the account that ordered it; UCM says so in the refusal.
+
 ## IP Address Certificates (RFC 8738)
 
 The local ACME server can issue certificates for **IP addresses** (IPv4 and IPv6), not only DNS names. This is useful for internal services, appliances, and hosts addressed directly by IP.
@@ -1372,6 +1396,8 @@ Get the CSR attributes (OIDs) recommended by the server.
 ### POST /serverkeygen
 Server generates a key pair and returns the certificate along with the private key. Useful when the client cannot generate keys locally.
 
+Generated keys are RSA-2048. A request whose CSR carries a post-quantum key is refused with \`400\` and a message: generate the ML-DSA key on the device and use \`/simpleenroll\`.
+
 ## Information Tab
 
 The Information tab displays:
@@ -1503,6 +1529,8 @@ curl -s -H "Content-Type: application/timestamp-query" \\
 openssl ts -verify -data file.txt -in response.tsr \\
   -CAfile ca-chain.pem
 \`\`\`
+
+\`openssl ts -verify\` checks RSA and ECDSA tokens only. An ML-DSA token verifies with \`openssl cms -verify\` (OpenSSL 3.5 or later); then compare its message imprint with the hash of the file.
 
 ### Code Signing with Timestamps
 
@@ -2175,6 +2203,8 @@ The tab tracks what's configured versus what's still needed, for both manual and
 - **Certificate Authority**: The CA whose templates are advertised and that issues certificates through this configuration
 - **Validity (days)**: Validity of certificates issued via WSTEP when the request matches no template; a matched template's own validity applies otherwise
 
+A template with an **ML-DSA** key type is announced by its key algorithm OID, with the Microsoft Software Key Storage Provider and a signature-only key spec. It is hidden in FIPS mode, and enrollment from a real Windows client has not been tested yet.
+
 ### Kerberos / SPNEGO
 
 Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoenrollment, so machines and users are authenticated by their Kerberos ticket instead of a credential prompt:
@@ -2191,6 +2221,8 @@ Binds the Kerberos-authenticated XCEP/WSTEP endpoints used for silent GPO autoen
 ### Certificate Renewal Binding
 
 Besides Username/Password and Kerberos, WSTEP supports **client-certificate renewal**, mirroring real ADCS CES endpoints: the renewal request (RST) must be XML-DSig-signed with the private key of a certificate **UCM itself issued**. The presented certificate is matched **byte-for-byte** against the stored certificate for the configured CA, serial number or subject alone are never enough. This lets Windows clients renew unattended using their current certificate, without credentials or a Kerberos ticket.
+
+XML-DSig has no ML-DSA signature method, so an **ML-DSA** certificate cannot renew this way: UCM names the key in its refusal, and the client enrolls a new certificate instead.
 
 ### SID Security Extension (KB5014754)
 
@@ -2281,7 +2313,7 @@ X-API-Key: <your-api-key>
 Or send it as a bearer token: \`Authorization: Bearer <your-api-key>\`.
 
 ### Permissions
-Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. A key can create or regenerate only a key whose permissions it holds itself.
+Each key carries the scope chosen at creation (**Full Access**, **Read Only**, **Read & Write**, **Certificates Only**) and never more access than your account. **Certificates Only** issues X.509 and SSH certificates and reads the CAs, SSH CAs and CRLs, but cannot create or change a CA. A key can create or regenerate only a key whose permissions it holds itself.
 
 API keys, even Full Access ones, cannot change your profile, password, 2FA, security keys, mTLS certificates or sessions, nor reach your own account through the user administration actions: these need an interactive session.
 
@@ -2558,6 +2590,7 @@ Configuration:
 Supported key types:
 - RSA 2048, 3072, 4096
 - ECDSA P-256, P-384, P-521
+- ML-DSA-44, ML-DSA-65, ML-DSA-87 (Transit \`mldsa-*\` keys, on an OpenBao release that has them)
 - AES-256-GCM (symmetric)
 
 > 💡 OpenBao is a community-maintained fork of HashiCorp Vault. UCM works with both OpenBao and Vault.
@@ -2592,6 +2625,14 @@ Each provider shows a connection status indicator:
 5. Click **Generate**
 
 The key is created directly on the HSM. UCM stores only a reference.
+
+### ML-DSA keys
+ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) are offered only on providers that sign with them:
+- **PKCS#11**: a token implementing PKCS#11 3.2 with the ML-DSA mechanisms
+- **OpenBao / Vault Transit**: key types \`mldsa-44\`, \`mldsa-65\` and \`mldsa-87\`
+- **Google Cloud KMS**: \`PQ_SIGN_ML_DSA_*\` key versions, mapped from the KMS API but not yet tested against the service. KMS signs at most 64 KiB of data, so a CRL larger than that cannot be signed
+
+Azure Key Vault and AWS CloudHSM providers hold no ML-DSA key, and FIPS mode refuses ML-DSA on every provider. An ML-DSA key signs the data itself, so no digest is chosen.
 
 ### Using HSM Keys
 When creating a CA, select an HSM provider and key instead of generating a software key. The CA's signing operations are performed on the HSM.

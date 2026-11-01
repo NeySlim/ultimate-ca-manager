@@ -21,7 +21,8 @@ export default {
           { label: 'Externe CA-Konten', text: 'Ein oder mehrere Konten pro CA, mehrere Konten können dieselbe Verzeichnis-URL teilen (z. B. zwei Let\'s-Encrypt-Konten zur administrativen Trennung); eine leere Verzeichnis-URL steht für Let\'s Encrypt Production' },
           { label: 'Benutzerdefinierter Server', text: 'Eine benutzerdefinierte ACME-Directory-URL festlegen, um eine beliebige RFC 8555-konforme CA zu verwenden' },
           { label: 'EAB', text: 'External Account Binding-Unterstützung für CAs, die eine Vorregistrierung erfordern (ZeroSSL, HARICA, usw.)' },
-          { label: 'Schlüsseltypen', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384 für Zertifikatsschlüssel' },
+          { label: 'Schlüsseltypen', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 oder P-384, ML-DSA-44, ML-DSA-65 oder ML-DSA-87 für Zertifikatsschlüssel; ML-DSA wird im FIPS-Modus oder in einem Build ohne ML-DSA nicht angeboten. Ein konfigurierter Standard, den diese Instanz nicht erzeugen kann, lässt die Order fehlschlagen, statt auf RSA-2048 zurückzufallen (v2.248)' },
+          { label: 'Wiederverwendeter Schlüssel im FIPS-Modus', text: 'Die Wiederverwendung des Schlüssels eines Quellzertifikats wird abgelehnt, wenn der FIPS-Modus diesen Schlüssel nicht zulässt, ML-DSA eingeschlossen (v2.248)' },
           { label: 'Kontoschlüssel', text: 'ES256 (P-256), ES384 (P-384) oder RS256-Algorithmen für ACME-Kontoschlüssel' },
           { label: 'DNS-Anbieter', text: 'DNS-01-Challenge-Anbieter konfigurieren (Cloudflare, Route53, Tencent DNSPod, Plesk, usw.). Plesk läuft über seine XML-API; Verify TLS Certificate kann für ein selbstsigniertes Panel deaktiviert und eine DNS-Propagationsverzögerung hinzugefügt werden' },
           { label: 'Custom Command', text: 'DNS-Anbietertyp, der vom Admin konfigurierte lokale Befehle zum Erstellen/Löschen von TXT-Einträgen ausführt, Eintragsdetails werden über die Umgebungsvariablen DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION übergeben. Absoluter Binärpfad erforderlich, keine Shell, konfigurierbares Timeout' },
@@ -40,6 +41,7 @@ export default {
                   { label: 'Lokale Orders (v2.217)', text: 'Der Tab Local orders listet die Orders des eingebauten Servers mit Statusfilter, Einzellöschung und Bereinigung; abgelaufene, nicht ausgestellte Orders werden alle 6 Stunden automatisch bereinigt, und ein Standard-Signatur-Digest gilt für Orders ohne Profil. Seit v2.218 entfernt die Bereinigung auch übrig gebliebene ausstehende Geschwister-Challenges bereits validierter Autorisierungen' },
                   { label: 'Profile und Vorlagen (v2.221)', text: 'Zertifikatsprofile (draft-ietf-acme-profiles) werden im Directory veröffentlicht und vom Client pro Order gewählt. Jedes Profil legt Gültigkeit und Digest fest und kann eine Zertifikatsvorlage binden, deren KU/EKU dann das ausgestellte Zertifikat bestimmen' },
                   { label: 'Standardprofil', text: 'Die meisten Clients fordern kein Profil an. Das unter den Profilen gewählte Standardprofil gilt für ihre Bestellungen; ohne Standardprofil erhalten sie 90 Tage und den Standard-Digest' },
+                  { label: 'Widerruf (v2.248)', text: 'Das Zertifikat, das ein Client zum Widerrufen sendet, muss Byte für Byte mit dem gespeicherten übereinstimmen. Nur ein RSA- oder EC-P-256-, P-384- oder P-521-Zertifikatsschlüssel kann die Anfrage selbst signieren: ein ML-DSA-, EdDSA- oder Brainpool-Zertifikat mit dem Konto widerrufen, das es bestellt hat' },
         ]
       },
       {
@@ -165,7 +167,7 @@ Verwalten Sie Ihre ACME-Client-Konfiguration:
 - **Umgebung**: Staging (Test) oder Produktion (Live-Zertifikate)
 - **Kontakt-E-Mail**: Erforderlich für die Kontoregistrierung
 - **Auto-Erneuerung**: Zertifikate automatisch vor Ablauf erneuern
-- **Zertifikatsschlüsseltyp**: RSA-2048, RSA-4096, ECDSA P-256 oder ECDSA P-384
+- **Zertifikatsschlüsseltyp**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 oder P-384, ML-DSA-44, ML-DSA-65 oder ML-DSA-87. ML-DSA wird im FIPS-Modus oder in einem Build ohne ML-DSA nicht angeboten. Ein konfigurierter Typ, den diese Instanz nicht erzeugen kann, lässt die Order fehlschlagen, statt auf RSA-2048 zurückzufallen
 - **Kontoschlüssel-Algorithmus**: ES256, ES384 oder RS256 für die ACME-Kontosignierung
 
 ### Benutzerdefinierter ACME-Server
@@ -215,6 +217,8 @@ Wählen Sie bei einer Zertifikatsanforderung, woher der private Schlüssel stamm
 - **Neuen Schlüssel erzeugen** *(Standard)*: UCM erstellt für jede Order ein neues Schlüsselpaar
 - **Schlüssel bei Erneuerung wiederverwenden**: derselbe private Schlüssel über Erneuerungen hinweg (nötig für DANE/TLSA und Key Pinning); die Erstausstellung erzeugt den Schlüssel, Erneuerungen laden ihn erneut
 - **Externen CSR bereitstellen**: fügen Sie einen extern erzeugten PEM-CSR ein; UCM reicht ihn beim Finalize ein, der private Schlüssel gelangt nie in UCM. Die CSR-Domänen müssen exakt den Order-Identifiern entsprechen
+
+Im FIPS-Modus wird die Wiederverwendung des Schlüssels eines Quellzertifikats abgelehnt, wenn FIPS diesen Schlüssel nicht zulässt (ML-DSA eingeschlossen).
 
 ### Preflight (Testlauf)
 **Preflight ausführen** im Anforderungsformular validiert die gesamte Anfrage gegen das **Staging**-Verzeichnis von Let's Encrypt, ohne Produktions-Ratenlimits zu verbrauchen:
@@ -441,6 +445,9 @@ Alle Zertifikatsausstellungsaufträge durchsuchen:
 - Angeforderte Domänennamen
 - Verwendete signierende CA
 - Ausstellungszeitpunkt
+
+### Widerruf
+Ein Client widerruft mit seinem Konto-Schlüssel oder mit dem eigenen Schlüssel des Zertifikats, und das gesendete Zertifikat muss Byte für Byte mit dem gespeicherten übereinstimmen: eine Seriennummer allein genügt nie. Nur ein RSA- oder EC-P-256-, P-384- oder P-521-Schlüssel kann eine ACME-Anfrage signieren, daher wird ein ML-DSA-, EdDSA- oder Brainpool-Zertifikat mit dem Konto widerrufen, das es bestellt hat; UCM nennt das in der Ablehnung.
 
 ## Zertifikate für IP-Adressen (RFC 8738)
 

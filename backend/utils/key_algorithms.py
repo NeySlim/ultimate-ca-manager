@@ -447,5 +447,13 @@ def fips_approved(label) -> bool:
     return bool(alg and alg.fips_approved)
 
 
+def fips_approved_for_key(key) -> bool:
+    """Whether a public or private *key* is FIPS approved; any RSA modulus of 2048+ bits counts."""
+    for alg in _REGISTRY.algorithms:
+        if alg.matches_key(key):
+            return alg.fips_approved
+    return isinstance(key, (rsa.RSAPublicKey, rsa.RSAPrivateKey)) and key.key_size >= 2048
+
+
 def fips_approved_labels() -> tuple[str, ...]:
     return tuple(a.label for a in _REGISTRY.algorithms if a.fips_approved)

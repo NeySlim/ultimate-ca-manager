@@ -121,6 +121,7 @@ def _revoke_replaced_certificate(acme_client, certificate):
             cert_id=certificate.id,
             reason='superseded',
             username='system',
+            revoke_related=False,
         )
         logger.info(f"Revoked superseded certificate {certificate.id}")
     except Exception as exc:

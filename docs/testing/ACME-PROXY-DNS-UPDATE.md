@@ -248,6 +248,7 @@ Every ID in a test name, in the module docstring of `handler.py` and in its comm
 | F6 | An SOA query looks only at the rows of its own zone. With nested zones the deepest zone wins. The row index is built again only for a new snapshot. | — | `test_dns_update_handler.py` |
 | F8 | The listener binds `UCM_DNS_UPDATE_HOST`. Without it, it binds the HTTP host. | — | `test_dns_update_server.py` |
 | F11 | `repr` of a key and of a TSIG result hides the secret and the MAC. | — | `test_dns_update_tsig.py` |
+| F12 | With port 0, a TCP port whose UDP twin is held by another socket is let go and another is drawn, up to 16 times. A configured port that is busy still fails at once. | — | `test_dns_update_server.py` |
 
 ### Scenarios of the review round
 

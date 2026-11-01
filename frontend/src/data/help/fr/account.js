@@ -123,7 +123,7 @@ X-API-Key: <votre-cle-api>
 Ou envoyez-la comme jeton bearer : \`Authorization: Bearer <votre-cle-api>\`.
 
 ### Permissions
-Chaque clé porte le périmètre choisi à sa création (**Accès complet**, **Lecture seule**, **Lecture et écriture**, **Certificats uniquement**) et jamais plus d'accès que votre compte. Une clé ne peut créer ou régénérer qu'une clé dont elle détient elle-même les permissions.
+Chaque clé porte le périmètre choisi à sa création (**Accès complet**, **Lecture seule**, **Lecture et écriture**, **Certificats uniquement**) et jamais plus d'accès que votre compte. **Certificats uniquement** émet des certificats X.509 et SSH et lit les CA, les CA SSH et les CRL, mais ne peut ni créer ni modifier une CA. Une clé ne peut créer ou régénérer qu'une clé dont elle détient elle-même les permissions.
 
 Les clés API, même à accès complet, ne peuvent pas modifier votre profil, mot de passe, 2FA, clés de sécurité, certificats mTLS ou sessions, ni atteindre votre propre compte via les actions d'administration des utilisateurs : celles-ci exigent une session interactive.
 

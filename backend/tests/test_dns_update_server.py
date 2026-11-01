@@ -13,6 +13,7 @@ import errno
 import importlib.util
 import logging
 import pathlib
+import random
 import socket
 import sys
 import threading
@@ -333,6 +334,61 @@ def test_N3_free_port_listens_and_stop_clears_pos(app):
         socket.create_connection(('127.0.0.1', r.port), timeout=1)
 
 
+# -- F12: port 0 and a UDP twin held by another socket ---------------------------------------------
+
+def _udp_twin_taken(monkeypatch, times):
+    """The first `times` UDP binds find their port already held by another socket.
+    Returns (held sockets, ports tried)."""
+    real = srv_mod._udp_server_class()
+    held, tried = [], []
+
+    class TwinTaken(real):
+        def __init__(self, listener, *a, **k):
+            tried.append(listener[1])
+            if len(tried) <= times:
+                b = socket.socket(socket.AF_INET, socket.SOCK_DGRAM)
+                try:
+                    b.bind(listener)
+                    held.append(b)
+                except OSError:
+                    b.close()  # already held by some other socket: just as taken
+            super().__init__(listener, *a, **k)
+
+    monkeypatch.setattr(srv_mod, '_udp_server_class', lambda: TwinTaken)
+    return held, tried
+
+
+def test_F12_port_zero_draws_again_when_the_udp_twin_is_taken_pos(app, monkeypatch):
+    held, tried = _udp_twin_taken(monkeypatch, 1)
+    r = Running(app, FakeHandler(), ServerLimits(**OPEN))
+    try:
+        assert r.ok is True
+        assert len(tried) >= 2 and r.port != tried[0]
+        assert udp_ask(r, b'u', wait=5.0) == b'Ru'
+        s = tcp(r)
+        s.sendall(frame(b't'))
+        assert read_frame(s) == b'Rt'
+        s.close()
+    finally:
+        r.stop()
+        for b in held:
+            b.close()
+
+
+def test_F12_port_zero_gives_up_after_the_bounded_tries_neg(app, monkeypatch):
+    status.set_listening(False)
+    held, tried = _udp_twin_taken(monkeypatch, srv_mod.ANY_PORT_TRIES)
+    try:
+        r = Running(app, FakeHandler(), ServerLimits(**OPEN))
+        assert r.ok is False
+        assert r.server.bind_errno == errno.EADDRINUSE
+        assert len(tried) == srv_mod.ANY_PORT_TRIES
+        assert status.is_listening() is False
+    finally:
+        for b in held:
+            b.close()
+
+
 # -- N1: start and bind host -----------------------------------------------------------------------
 
 def test_N1_port_zero_disables_the_listener_neg(app, monkeypatch):
@@ -342,12 +398,30 @@ def test_N1_port_zero_disables_the_listener_neg(app, monkeypatch):
     assert srv_mod.start_dns_update_server(app) is None
 
 
+def _ephemeral_low():
+    try:
+        return int(pathlib.Path('/proc/sys/net/ipv4/ip_local_port_range').read_text().split()[0])
+    except (OSError, ValueError, IndexError):
+        return 32768
+
+
 def _free_port():
-    s = socket.socket()
-    s.bind(('127.0.0.1', 0))
-    p = s.getsockname()[1]
-    s.close()
-    return p
+    """A port free in TCP and UDP, below the ephemeral range: the kernel never hands
+    it to another socket between this check and the listener's bind."""
+    rng = random.Random()
+    for _ in range(200):
+        p = rng.randrange(10000, _ephemeral_low())
+        socks = [socket.socket(socket.AF_INET, t) for t in (socket.SOCK_STREAM, socket.SOCK_DGRAM)]
+        try:
+            for s in socks:
+                s.bind(('127.0.0.1', p))
+            return p
+        except OSError:
+            continue
+        finally:
+            for s in socks:
+                s.close()
+    pytest.fail('no port free in both TCP and UDP')
 
 
 def _start_via_env(app, port):
@@ -384,6 +458,7 @@ def test_F8_listener_binds_the_configured_host_pos(app, monkeypatch):
     monkeypatch.setenv('UCM_DNS_UPDATE_PORT', str(port))
     monkeypatch.setenv('UCM_DNS_UPDATE_HOST', '127.0.0.1')
     server = _start_via_env(app, port)
+    assert server is not None, 'listener did not start'
     try:
         assert server._host == '127.0.0.1'
         assert server._tcp.address[0] == '127.0.0.1'
@@ -398,6 +473,7 @@ def test_F8_default_host_is_the_http_host_neg(app, monkeypatch):
     monkeypatch.delenv('UCM_DNS_UPDATE_HOST', raising=False)
     monkeypatch.setenv('HOST', '127.0.0.1')
     server = _start_via_env(app, port)
+    assert server is not None, 'listener did not start'
     try:
         assert server._host == '127.0.0.1'
     finally:
@@ -991,10 +1067,10 @@ def test_bind_errno_is_none_after_a_success_neg(app):
 
 def test_retry_real_sockets_listener_starts_after_the_port_is_freed_pos(app, monkeypatch, caplog):
     caplog.set_level(logging.DEBUG, logger=srv_mod.logger.name)
+    port = _free_port()  # its UDP twin must be free once the TCP blocker goes
     blocker = socket.socket(socket.AF_INET, socket.SOCK_STREAM)
-    blocker.bind(('127.0.0.1', 0))
+    blocker.bind(('127.0.0.1', port))
     blocker.listen(1)
-    port = blocker.getsockname()[1]
     monkeypatch.setenv('UCM_DNS_UPDATE_PORT', str(port))
     monkeypatch.setenv('UCM_DNS_UPDATE_HOST', '127.0.0.1')
     monkeypatch.setattr(srv_mod, '_server', None)

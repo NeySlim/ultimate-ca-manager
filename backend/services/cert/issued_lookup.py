@@ -36,9 +36,18 @@ def find_issued_rows(ca: CA, cert: x509.Certificate) -> list:
     holding exactly ``cert`` (normally one; a duplicate left by an inconsistent
     restore still counts)."""
     from utils.cert_issuer import same_key_refids
+    return _rows_holding(cert, Certificate.caref.in_(same_key_refids(ca)))
+
+
+def find_stored_rows(cert: x509.Certificate) -> list:
+    """Every row, under any issuer, holding exactly ``cert``: its serial alone is public."""
+    return _rows_holding(cert)
+
+
+def _rows_holding(cert: x509.Certificate, *criteria) -> list:
     presented = cert.public_bytes(Encoding.DER)
     candidates = Certificate.query.filter(
-        Certificate.caref.in_(same_key_refids(ca)),
+        *criteria,
         Certificate.serial_number.in_(serial_variants(cert.serial_number)),
         Certificate.crt.isnot(None),
     ).all()

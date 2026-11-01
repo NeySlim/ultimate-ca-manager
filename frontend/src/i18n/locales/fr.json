@@ -380,6 +380,7 @@
     "renew": "Renouveler",
     "keyType": "Type de clé de certificat",
     "keyTypeHelper": "Algorithme et taille de clé pour les certificats émis",
+    "keyTypeUnavailable": "Le type de clé enregistré {{keyType}} n'est pas disponible sur ce serveur : les commandes échouent tant que vous n'en choisissez pas un autre.",
     "keySource": "Source de clé",
     "keySourceHelper": "Générer une nouvelle clé, réutiliser la même clé au renouvellement (TLSA/pinning), ou fournir une CSR externe",
     "keySourceGenerate": "Générer une nouvelle clé",
@@ -1203,7 +1204,22 @@
     "deleteNeedsRevoke": "Ce certificat est encore valide, il ne peut donc pas être supprimé seul : le supprimer le retirerait d'UCM alors qu'il reste approuvé par tout client qui ne vérifie pas la révocation. Révoquez-le d'abord, pour que la CRL et le répondeur OCSP portent le retrait, puis il sera supprimé.",
     "revokeThenDelete": "Révoquer, puis supprimer",
     "noKeyTypeAllowedByPolicy": "Aucun type de clé n'est autorisé par les politiques de cette CA et de ce modèle.",
-    "revocationApprovalRequired": "Révocation soumise à approbation (politique : {{policy}})"
+    "revocationApprovalRequired": "Révocation soumise à approbation (politique : {{policy}})",
+    "hybrid": {
+      "toggle": "Émettre une paire hybride (RFC 9763)",
+      "toggleHint": "Deux certificats liés pour le même sujet : l'un avec une clé classique, l'autre avec une clé ML-DSA qui référence le premier.",
+      "classical": "Clé classique",
+      "pq": "Clé post-quantique",
+      "column": "Lié",
+      "linked": "Lié",
+      "roleClassical": "Membre classique d'une paire hybride",
+      "rolePq": "Membre post-quantique d'une paire hybride",
+      "relatedCertificate": "Certificat lié",
+      "openRelated": "Ouvrir le certificat lié n°{{id}}",
+      "pairIssued": "Paire hybride émise : certificats n°{{classical}} et n°{{pq}}",
+      "renewedWithRelated": "Certificat renouvelé, avec son certificat lié n°{{id}}",
+      "bulkRelatedRenewed": "{{count}} certificats liés renouvelés avec la sélection"
+    }
   },
   "common": {
     "saved": "Paramètres enregistrés",
@@ -1760,6 +1776,8 @@
     "crlPublishInterval": "Publier toutes les",
     "crlPublishAuto": "Auto (avant expiration)",
     "crlDigest": "Empreinte de signature",
+    "crlDigestIgnored": "L'empreinte enregistrée {{digest}} est ignorée : cette clé signe sans empreinte séparée",
+    "crlDigestClear": "Effacer",
     "crlScheduleNote": "Publier plus souvent que la fenêtre de validité offre une période de grâce aux clients si une publication est manquée.",
     "nextPublish": "Prochaine publication",
     "namedUrlsTitle": "URLs nommées",
@@ -1921,6 +1939,7 @@
     "rekeyAsCSRDescription": "Générer un nouveau CSR avec les mêmes champs DN et SANs mais une nouvelle paire de clés.",
     "rekeyAsCertDescription": "Émettre directement un nouveau certificat avec le même sujet, signé par une CA.",
     "keyRsa2048": "RSA 2048",
+    "keyRsa3072": "RSA 3072",
     "keyRsa4096": "RSA 4096",
     "keyCurveNistP256": "NIST P-256 (ECDSA)",
     "keyCurveNistP384": "NIST P-384 (ECDSA)",
@@ -2031,7 +2050,16 @@
       "certificateHold": "Suspension temporaire, levable ensuite avec « Lever la suspension ».",
       "privilegeWithdrawn": "Un privilège accordé par le certificat a été retiré.",
       "aACompromise": "La clé d'une autorité d'attributs a été compromise."
-    }
+    },
+    "revokeRelated": "Révoquer aussi le certificat lié",
+    "revokeRelatedHint": "Décochez pour conserver valide l'autre membre de la paire hybride.",
+    "revokedWithRelated": "Certificat révoqué, avec son certificat lié n°{{id}}",
+    "relatedNotRevoked": "Le certificat lié n'a pas été révoqué : il ne désigne pas ce certificat comme son pair, ou il était déjà révoqué.",
+    "relatedRevokeFailed": "Certificat révoqué, mais son certificat lié n°{{id}} n'a pas pu être révoqué : révoquez-le séparément.",
+    "revokeRelatedBulk": "Révoquer aussi les certificats liés",
+    "revokeRelatedBulkHint": "Les membres sélectionnés d'une paire hybride entraînent l'autre membre. Décochez pour conserver valides les autres membres.",
+    "bulkRelatedRevoked": "{{count}} certificats liés révoqués avec la sélection",
+    "bulkRelatedRevokeFailed": "{{count}} certificats liés n'ont pas pu être révoqués avec la sélection ({{ids}}) : révoquez-les séparément"
   },
   "details": {
     "pemCertificate": "Certificat PEM",
@@ -2176,6 +2204,7 @@
     "generateHsmKey": "Générer une clé HSM",
     "keyLabel": "Étiquette de clé",
     "keyLabelPlaceholder": "ma-clé-signature",
+    "mldsaUntestedGoogleKms": "ML-DSA sur Google Cloud KMS suit l'API KMS mais n'a pas encore été testé avec le service.",
     "purposes": {
       "general": "Usage général",
       "caSigning": "Signature CA"
@@ -2277,6 +2306,7 @@
     "importCAs": "Importer les CAs",
     "importCertificates": "Importer les certificats",
     "importKeys": "Importer les clés",
+    "importCSRs": "Importer les CSR",
     "importObjects": "Importer {{count}} objet(s)",
     "importingObjects": "Importation en cours...",
     "importComplete": "Importation terminée",
@@ -2502,7 +2532,8 @@
       "trustStore": "Magasin de confiance",
       "hsmManagement": "Gestion HSM",
       "singleSignOn": "Authentification unique",
-      "ssh": "Certificats SSH"
+      "ssh": "Certificats SSH",
+      "sshCas": "Autorités de certification SSH"
     },
     "stats": {},
     "subtitle_one": "{{count}} rôle",
@@ -2520,12 +2551,18 @@
     "noDescription": "Aucune description",
     "roleDetails": "Détails du rôle",
     "permissions": {
-      "readSsh": "Voir les CA et certificats SSH",
-      "writeSsh": "Créer et gérer les CA et certificats SSH",
-      "deleteSsh": "Supprimer les CA et certificats SSH",
-      "read:ssh": "Voir les CA et certificats SSH",
-      "write:ssh": "Créer et signer des certificats SSH",
-      "delete:ssh": "Supprimer les CA et certificats SSH"
+      "readSsh": "Voir les certificats SSH",
+      "writeSsh": "Signer, importer et révoquer les certificats SSH",
+      "deleteSsh": "Supprimer les certificats SSH",
+      "read:ssh": "Voir les certificats SSH",
+      "write:ssh": "Signer, importer et révoquer des certificats SSH",
+      "delete:ssh": "Supprimer les certificats SSH",
+      "readSshCas": "Voir les CA SSH",
+      "writeSshCas": "Créer, importer et modifier les CA SSH",
+      "deleteSshCas": "Supprimer les CA SSH",
+      "read:ssh_cas": "Voir les CA SSH, leurs clés publiques, KRL et scripts d'installation",
+      "write:ssh_cas": "Créer, importer et modifier des CA SSH",
+      "delete:ssh_cas": "Supprimer des CA SSH"
     },
     "ignoredPermissions": "Permissions ignorées",
     "ignoredPermissionsHint": "Enregistrées sur ce rôle mais non appliquées : réservées aux administrateurs ou inconnues. Elles sont conservées telles quelles."
@@ -3332,8 +3369,12 @@
           "remedy": "Créez une CA RSA ou ECDSA (P-256/P-384/P-521) et déplacez-y l'émission avant la bascule ; la clé d'une CA ne peut pas être convertie."
         },
         "ca_weak_key": {
-          "title": "CA avec une clé DSA ou ML-DSA, une clé RSA de moins de 2048 bits ou une courbe autre que P-256/384/521",
+          "title": "CA avec une clé DSA, une clé RSA de moins de 2048 bits ou une courbe autre que P-256/384/521",
           "remedy": "Créez une CA en RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission."
+        },
+        "ca_unapproved_algorithm": {
+          "title": "CA avec une clé ML-DSA : le module FIPS fourni par UCM ne gère pas ML-DSA, elles ne peuvent donc pas signer en mode FIPS",
+          "remedy": "Créez une CA RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission avant la bascule, ou laissez le mode FIPS désactivé tant que l'émission ML-DSA est nécessaire."
         },
         "ssh_ca_eddsa_key": {
           "title": "CA SSH avec une clé Ed25519 : elles ne peuvent plus signer en mode FIPS",
@@ -4766,7 +4807,8 @@
     "legacyPkcs12Desc": "Pour Android 15 et antérieur, macOS 14 et antérieur, Windows Server 2016 et antérieur, Java avant 8u301 / 11.0.1 : ils refusent l'archive AES-256 par défaut comme un mot de passe incorrect. Protège moins bien le fichier ; à choisir export par export.",
     "formatKeyDesc": "Clé privée seule au format PEM",
     "formats": {
-      "privateKey": "Clé privée"
+      "privateKey": "Clé privée",
+      "hybridBundle": "Lot hybride"
     },
     "formatOptions": {
       "pemOnly": "PEM (Certificat uniquement)",
@@ -4781,7 +4823,9 @@
     "unavailableForKeyAlgorithm": "Indisponible pour les clés {{algorithm}} : UCM ne sait pas encore écrire une clé post-quantique dans un PKCS#12 ou un JKS. Exportez plutôt en PEM avec la clé privée.",
     "jksNote": "JKS inclut toujours la clé privée",
     "pkcs12Title": "Exporter PKCS#12",
-    "pkcs12PasswordPrompt": "Entrez le mot de passe pour le fichier PKCS#12"
+    "pkcs12PasswordPrompt": "Entrez le mot de passe pour le fichier PKCS#12",
+    "formatHybridBundleDesc": "ZIP avec les deux certificats de la paire",
+    "bundleRelatedHasNoKey": "Le certificat lié n'a pas de clé privée : le lot ne contient que les certificats"
   },
   "userCertificates": {
     "title": "Certificats Utilisateurs",
@@ -5388,6 +5432,7 @@
     "signerGenerateCn": "Nom commun",
     "signerGenerateValidity": "Validité (jours)",
     "signerGenerateKeyType": "Type de clé",
+    "signerMldsaVerifyNote": "Les horodatages ML-DSA se vérifient avec openssl cms -verify (OpenSSL 3.5 ou ultérieur), pas avec openssl ts -verify ; vérifiez l'empreinte du message séparément.",
     "signerGenerated": "Certificat de signature TSA émis.",
     "signerGeneratedSelected": "Certificat de signature TSA émis et sélectionné comme signataire dédié.",
     "signerGenerateFailed": "Échec de la génération du certificat de signature TSA.",
@@ -5526,6 +5571,7 @@
     "validityInfo": "Validité",
     "caInfo": "Informations de la CA",
     "selectCa": "Sélectionner une CA SSH",
+    "issueNeedsCaRead": "Choisir une CA SSH exige la permission read:ssh_cas, que votre compte n'a pas : demandez-la à un administrateur.",
     "issueMode": "Mode d'émission",
     "presets": {
       "1h": "1 heure",

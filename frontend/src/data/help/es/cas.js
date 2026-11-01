@@ -24,7 +24,7 @@ export default {
           { label: 'Reparar cadena', text: 'Corrige automáticamente las relaciones padre-hijo rotas' },
           { label: 'Importar clave privada', text: 'Adjuntar la clave privada de una CA que solo tiene su certificado para que pueda firmar' },
           { label: 'Clave y validez', text: 'RSA-3072 por defecto, local o HSM. Validez de 1, 2, 3, 5, 10, 15 o 20 años, o Personalizada (días) hasta 50 años. Se señala una CA RSA-2048 que sobreviviría a 2030: la ANSSI acepta RSA-2048 hasta finales de 2030, ETSI TS 119 312 hasta finales de 2026' },
-          { label: 'Poscuántico (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 o ML-DSA-87 (FIPS 204, niveles NIST 2, 3 y 5), generadas solo en software, nunca en un HSM, y ocultas en modo FIPS. Una clave ML-DSA firma sin un hash aparte, por lo que la CA, sus CRL y sus respuestas OCSP no tienen hash que elegir. Una CA ML-DSA puede firmar certificados RSA o EC, y una CA RSA o EC puede firmar una intermedia ML-DSA. La renovación conserva el mismo nivel' },
+          { label: 'Poscuántico (ML-DSA)', text: 'ML-DSA-44, ML-DSA-65 o ML-DSA-87 (FIPS 204, niveles NIST 2, 3 y 5), generadas en software o en un proveedor HSM que admita ML-DSA, y ocultas en modo FIPS. Una clave ML-DSA firma sin un hash aparte, por lo que la CA, sus CRL y sus respuestas OCSP no tienen hash que elegir. Una CA ML-DSA puede firmar certificados RSA o EC, y una CA RSA o EC puede firmar una intermedia ML-DSA. La renovación conserva el mismo nivel' },
           { label: 'Restricciones de nombre', text: 'Restricciones avanzadas (RFC 5280): los subárboles permitidos y excluidos (DNS, rango IP, correo) limitan los nombres que la CA puede certificar. En una CA firmada externamente los fija la CA firmante' },
           { label: 'Esquema de firma RSA', text: 'PKCS#1 v1.5 por defecto, o RSA-PSS (sal tan larga como el hash) para una CA RSA con clave local, PKCS#11 u OpenBao. Se aplica a los certificados, CRL, respuestas OCSP y respuestas SCEP que firma la CA; las marcas de tiempo siguen en PKCS#1 v1.5, el esquema que verifica openssl ts -verify. «Firmar con RSA-PSS» en los detalles de la CA cambia una CA existente en ambos sentidos: los certificados ya emitidos conservan su firma' },
           { label: 'Perfil de cumplimiento', text: 'ANSSI, BSI o EU ACM: reglas alineadas con un texto de referencia limitan lo que emite la CA (tipos de clave, hashes, esquema RSA, horizontes de fechas y, para EU ACM, una clave de CA almacenada en un HSM). Elíjalo al crear la CA (a una CA intermedia se le propone el perfil de su CA padre; si no, el predeterminado definido en Ajustes, Acerca de). En una CA existente, el campo de los detalles lo asocia, lo cambia o lo quita: primero se ejecuta la comprobación del perfil sobre esa CA, se enumeran sus hallazgos y usted confirma que las reglas se aplican solo a las emisiones futuras, sin volver a firmar nada de lo ya emitido. Requiere write:cas, y admin:system para asociar o cambiar' },
@@ -155,7 +155,7 @@ Agrupa las CAs por su campo Organización (O). Útil para configuraciones multi-
 El formulario señala una CA RSA-2048 que sobreviviría a 2030: la ANSSI acepta RSA-2048 hasta finales de 2030, ETSI TS 119 312 hasta finales de 2026. Elige RSA-3072 o superior. En **Restricciones avanzadas (RFC 5280)**, los subárboles permitidos y excluidos (DNS, rango IP, correo) limitan los nombres que la CA puede certificar.
 
 ### CAs poscuánticas (ML-DSA)
-**ML-DSA-44**, **ML-DSA-65** y **ML-DSA-87** (FIPS 204) aparecen con su nivel de seguridad NIST (2, 3 y 5). La clave se genera en software, nunca en un HSM, y el algoritmo se oculta en modo FIPS.
+**ML-DSA-44**, **ML-DSA-65** y **ML-DSA-87** (FIPS 204) aparecen con su nivel de seguridad NIST (2, 3 y 5). La clave se genera en software, o en un proveedor HSM que admita ML-DSA (véase CAs respaldadas por HSM), y el algoritmo se oculta en modo FIPS.
 
 - Una clave ML-DSA firma sin un hash aparte: el campo de hash desaparece, y un hash enviado por la API se ignora con un aviso. Las CRL y las respuestas OCSP de la CA siguen la misma regla.
 - Las jerarquías pueden mezclarse: una raíz ML-DSA puede firmar una intermedia RSA o EC, y una CA RSA o EC puede firmar una intermedia ML-DSA, que entonces usa el hash de su CA padre.
@@ -273,7 +273,7 @@ UCM puede almacenar la clave de firma de una CA en un módulo de seguridad de ha
 3. En **Almacenamiento de clave**, cambie de *Local* a **HSM**
 4. Elija el proveedor HSM
 5. Elija un modo de clave:
-   - **Generar clave nueva**: proporcione una etiqueta (letras/dígitos/_/-) y elija el algoritmo (RSA-2048/3072/4096 o EC-P256/P384/P521, RSA-3072 por defecto)
+   - **Generar clave nueva**: proporcione una etiqueta (letras/dígitos/_/-) y elija el algoritmo (RSA-2048/3072/4096 o EC-P256/P384/P521, RSA-3072 por defecto; Brainpool en PKCS#11, ML-DSA en los proveedores indicados en Gestión de HSM)
    - **Usar clave existente**: elija una clave de firma no utilizada ya presente en el HSM
 6. Envíe. UCM crea el certificado de CA y lo vincula a la clave HSM.
 

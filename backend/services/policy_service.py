@@ -447,7 +447,7 @@ class PolicyEvaluationService:
     @staticmethod
     def checked_signing_hash(policies: list, ca_key, digest=None, *, explicit=True,
                              key_type=None, context=None, validity_days=None, not_after=None,
-                             tsa_signer=False, notices=None, ca_id=None):
+                             tsa_signer=False, notices=None, ca_id=None, pq_hybrid=False):
         """``(hash for builder.sign(), violations)``. An implicit *digest* yields
         to the weakest one the policies allow; the hash the key really signs
         with (HSM-bound, None for Ed25519, Ed448 and ML-DSA) is then checked with *key_type*,
@@ -472,7 +472,7 @@ class PolicyEvaluationService:
             policies, key_type=key_type,
             digest=sign_hash.name if sign_hash is not None else None, context=context,
             signer=ca_key, validity_days=validity_days, not_after=not_after,
-            tsa_signer=tsa_signer, notices=notices, ca_id=ca_id)
+            tsa_signer=tsa_signer, notices=notices, ca_id=ca_id, pq_hybrid=pq_hybrid)
         return sign_hash, violations
 
     @staticmethod
@@ -524,7 +524,8 @@ class PolicyEvaluationService:
         """What the policies in scope leave of the signature rules, for a form:
         ``allowed_signature_schemes`` (intersection, None when unrestricted),
         ``key_type_horizons`` and ``key_type_issue_until`` (earliest date per
-        label, ISO strings), ``require_hsm_ca_key`` and ``tsa_signer_key_types``."""
+        label, ISO strings), ``require_hsm_ca_key``, ``tsa_signer_key_types`` and
+        ``pq_standalone`` (a post-quantum key only in a hybrid pair)."""
         return PolicyEvaluationService.signature_rules_of(
             PolicyEvaluationService.applicable_policies(ca_id, template_id))
 
@@ -533,10 +534,11 @@ class PolicyEvaluationService:
         """``effective_signature_rules`` for an explicit list of policies."""
         schemes = None
         horizons, issue_until, tsa = {}, {}, None
-        hsm = False
+        hsm = pq_paired_only = False
         certifications = None
         for policy in policies:
             rules = policy.get_rules() or {}
+            pq_paired_only = pq_paired_only or rules.get('pq_standalone') is True
             allowed = rules.get('allowed_signature_schemes')
             if isinstance(allowed, list) and allowed:
                 keep = [s for s in SIGNATURE_SCHEMES if s in allowed]
@@ -562,6 +564,7 @@ class PolicyEvaluationService:
             'hsm_certifications': ({k: v.isoformat() if v else None for k, v in sorted(certifications.items())}
                                    if certifications is not None else None),
             'tsa_signer_key_types': sorted(tsa) if tsa is not None else None,
+            'pq_standalone': pq_paired_only,
         }
 
     @staticmethod

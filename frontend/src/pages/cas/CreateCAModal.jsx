@@ -20,9 +20,9 @@ import { CA_KEY_CHOICES, POLICY_DIGESTS, caKeyLabel, isAllowed, useEffectiveAlgo
 import { PSS_HSM_TYPES } from '../../lib/signatureName'
 import {
   CA_DEFAULT_LABELS, KEY_ALGORITHMS, algorithmForKeyType, algorithmName, defaultDigestFor, defaultKeyChoice, findAlgorithm,
-  groupedOptions, keyFamilyOptions, listAlgorithms,
+  groupedOptions, isPostQuantum, isUsable, keyFamilyOptions, listAlgorithms,
 } from '../../lib/keyAlgorithms'
-import { BrainpoolNotice } from '../../components/BrainpoolNotice'
+import { BrainpoolNotice, UntestedKeyNotice } from '../../components/BrainpoolNotice'
 import { COMPLIANCE_PROFILE_NAMES, limitsWithProfile, useComplianceDefault, useComplianceProfiles } from '../../lib/complianceProfiles'
 
 const CA_FAMILY_OPTIONS = keyFamilyOptions('ca')
@@ -130,7 +130,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const [createFormHsmProviderId, setCreateFormHsmProviderId] = useState('')
   const [createFormHsmKeyMode, setCreateFormHsmKeyMode] = useState('generate') // 'generate' | 'existing'
   const [createFormHsmKeyLabel, setCreateFormHsmKeyLabel] = useState('')
-  const [createFormHsmKeyAlgorithm, setCreateFormHsmKeyAlgorithm] = useState('RSA-3072')
+  const [createFormHsmKeyAlgorithm, setCreateFormHsmKeyAlgorithm] = useState(CA_DEFAULT_LABELS[0])
   const [createFormHsmKeyId, setCreateFormHsmKeyId] = useState('')
   const [hsmProviders, setHsmProviders] = useState([])
   const [hsmKeys, setHsmKeys] = useState([])
@@ -180,7 +180,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
     setCreateFormHsmProviderId('')
     setCreateFormHsmKeyMode('generate')
     setCreateFormHsmKeyLabel('')
-    setCreateFormHsmKeyAlgorithm('RSA-3072')
+    setCreateFormHsmKeyAlgorithm(CA_DEFAULT_LABELS[0])
     setCreateFormHsmKeyId('')
   }, [open])
 
@@ -199,7 +199,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const proposedProfile = COMPLIANCE_PROFILE_NAMES.includes(parentProfile) ? parentProfile : defaultProfile
   const profileName = createFormProfile ?? proposedProfile
   const profile = profiles[profileName]
-  const { allowedKeyTypes, allowedDigests, allowedSchemes, horizons, requireHsm } =
+  const { allowedKeyTypes, allowedDigests, allowedSchemes, horizons, requireHsm, pqStandalone } =
     useMemo(() => limitsWithProfile(policyLimits, profile), [policyLimits, profile])
   // eu-acm: the CA key lives on an HSM
   const keyStorage = requireHsm ? 'hsm' : createFormKeyStorage
@@ -208,27 +208,35 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   // asked for: a serverAuth-only issuing CA invalidates every clientAuth
   // leaf beneath it for OpenSSL-based validators (the v2.196 API default).
   // An ML-DSA root keeps digitalSignature, as the API gives it by default (RFC 9881).
-  const mldsaKey = keyStorage === 'local' && createFormKeyAlgo === 'ML-DSA'
+  // The new CA's key: the local choice, the HSM key to generate, or the existing one picked
+  const keyLabel = keyStorage === 'local'
+    ? caKeyLabel(createFormKeyAlgo, createFormKeySize)
+    : createFormHsmKeyMode === 'generate'
+      ? createFormHsmKeyAlgorithm
+      : hsmKeys.find(k => String(k.id) === createFormHsmKeyId)?.algorithm
+  const keyRow = findAlgorithm(keyLabel)
+  const mldsaKey = keyRow?.family === 'ML-DSA'
   useEffect(() => {
     setCreateFormKeyUsage(createFormType === 'root' && !mldsaKey ? ROOT_KEY_USAGE : INTERMEDIATE_KEY_USAGE)
     setCreateFormEkuServerAuth(false)
   }, [createFormType, mldsaKey])
-  const fips = policyLimits.fips
+  const { fips, mldsa } = policyLimits
   const allowedLocalKeys = useMemo(
     () => CA_KEY_CHOICES.filter(([algo, size]) => isAllowed(allowedKeyTypes, caKeyLabel(algo, size))
-      && (!fips || listAlgorithms({ labels: [caKeyLabel(algo, size)], fips: true }).length > 0)),
-    [allowedKeyTypes, fips],
+      && isUsable(findAlgorithm(caKeyLabel(algo, size)), { fips, mldsa })
+      && !(pqStandalone && isPostQuantum(caKeyLabel(algo, size)))),
+    [allowedKeyTypes, fips, mldsa, pqStandalone],
   )
   const allowedDigestChoices = useMemo(
     () => POLICY_DIGESTS.filter(d => isAllowed(allowedDigests, d)), [allowedDigests])
   const noKeyAllowed = allowedLocalKeys.length === 0
-  const localKeyRow = findAlgorithm(caKeyLabel(createFormKeyAlgo, createFormKeySize))
   // The parent signs an intermediate: its key decides whether a digest applies (ML-DSA takes none)
   const parentKeyType = createFormType === 'intermediate'
     ? (cas || []).find(c => String(c.id) === String(createFormParentCAId))?.key_type
     : null
   const parentKeyRow = algorithmForKeyType(parentKeyType)
-  const childHasDigest = keyStorage !== 'local' || localKeyRow?.digest !== null
+  // A key outside the registry (an HSM's RSA-8192) takes a digest
+  const childHasDigest = keyRow?.digest !== null
   // A parent key outside the registry (RSA-8192) takes a digest, as on the server
   const keyHasDigest = parentKeyType ? parentKeyRow?.digest !== null : childHasDigest
   const noDigestAllowed = keyHasDigest && allowedDigestChoices.length === 0
@@ -264,14 +272,18 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
   const hsmProviderType = hsmProviders.find(p => String(p.id) === createFormHsmProviderId)?.provider_type
   // Brainpool only on a PKCS#11 provider; none shown until a provider is chosen
   const hsmAlgorithms = useMemo(
-    () => listAlgorithms({ generate: true, provider: hsmProviderType ?? '', fips })
-      .filter(a => isAllowed(allowedKeyTypes, a.label)),
-    [allowedKeyTypes, hsmProviderType, fips])
+    () => listAlgorithms({ generate: true, provider: hsmProviderType ?? '', fips, mldsa })
+      .filter(a => isAllowed(allowedKeyTypes, a.label) && !(pqStandalone && isPostQuantum(a.label))),
+    [allowedKeyTypes, hsmProviderType, fips, mldsa, pqStandalone])
   const hsmAlgorithmOptions = useMemo(() => hsmAlgorithms.map(a => a.label), [hsmAlgorithms])
-  const keyLabel = keyStorage === 'local' || createFormHsmKeyMode === 'generate'
-    ? horizonLabel : hsmKeys.find(k => String(k.id) === createFormHsmKeyId)?.algorithm
+  // Existing keys pass the same filters; one outside the registry (RSA-8192) is refused only in FIPS mode
+  const usableHsmKeys = useMemo(() => hsmKeys.filter(k => {
+    const row = findAlgorithm(k.algorithm)
+    return isAllowed(allowedKeyTypes, k.algorithm) && (row ? isUsable(row, { fips, mldsa }) : !fips)
+      && !(pqStandalone && isPostQuantum(k.algorithm))
+  }), [hsmKeys, allowedKeyTypes, fips, mldsa, pqStandalone])
   // An HSM key synced from the token may be an RSA size the registry does not list ('RSA-8192')
-  const keyIsRsa = findAlgorithm(keyLabel)?.family === 'RSA' || /^RSA-\d+$/.test(keyLabel ?? '')
+  const keyIsRsa = keyRow?.family === 'RSA' || /^RSA-\d+$/.test(keyLabel ?? '')
   const pssAvailable = keyIsRsa && (keyStorage === 'local' || PSS_HSM_TYPES.includes(hsmProviderType))
   // The schemes the profile leaves: PSS imposed under bsi
   const schemeChoices = [
@@ -309,6 +321,11 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
       setCreateFormHsmKeyAlgorithm(hsmAlgorithmOptions[0])
     }
   }, [hsmAlgorithmOptions, createFormHsmKeyAlgorithm])
+  useEffect(() => {
+    if (createFormHsmKeyId && !usableHsmKeys.some(k => String(k.id) === createFormHsmKeyId)) {
+      setCreateFormHsmKeyId('')
+    }
+  }, [usableHsmKeys, createFormHsmKeyId])
 
   const handleCreateCA = async (e) => {
     e.preventDefault()
@@ -637,19 +654,22 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
                   />
                 </div>
               )}
+              {createFormHsmKeyMode === 'generate' && (
+                <UntestedKeyNotice label={createFormHsmKeyAlgorithm} provider={hsmProviderType} />
+              )}
               {createFormHsmKeyMode === 'generate' && hsmAlgorithmOptions.length === 0 && (
                 <p className="text-xs text-status-danger" role="alert">{t('cas.create.noKeyTypeAllowedByPolicy')}</p>
               )}
 
               {createFormHsmKeyMode === 'existing' && (
-                createFormHsmProviderId && hsmKeys.length === 0 ? (
+                createFormHsmProviderId && usableHsmKeys.length === 0 ? (
                   <div className="px-3 py-2 rounded-lg border border-status-warning bg-status-warning-op10 text-xs text-status-warning">
                     {t('cas.create.hsmNoUnusedKeys')}
                   </div>
                 ) : (
                   <Select
                     label={t('cas.create.hsmExistingKey')}
-                    options={hsmKeys.map(k => ({
+                    options={usableHsmKeys.map(k => ({
                       value: k.id.toString(),
                       label: `${k.label} (${k.algorithm})`
                     }))}
@@ -850,7 +870,7 @@ export function CreateCAModal({ open, onClose, cas, onSuccess }) {
               creating || policyBlocksCreate || (
               keyStorage === 'hsm' && (
                 hsmProviders.length === 0 ||
-                (createFormHsmKeyMode === 'existing' && !!createFormHsmProviderId && hsmKeys.length === 0)
+                (createFormHsmKeyMode === 'existing' && !!createFormHsmProviderId && usableHsmKeys.length === 0)
               )
               )
             }

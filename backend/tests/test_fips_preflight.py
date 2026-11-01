@@ -213,10 +213,30 @@ needs_mldsa = pytest.mark.skipif(not mldsa_supported(), reason='this build has n
 
 
 @needs_mldsa
-def test_ca_mldsa_key_is_named_by_the_weak_key_check(session):
+def test_ca_mldsa_key_is_an_unapproved_algorithm_not_a_weak_key(session):
     _ca(mldsa.MLDSA65PrivateKey.generate(), 'PQ Root')
-    finding = _assert_found('ca.weak_key', 1, 'PQ Root (#', 'ML-DSA-65')
-    assert 'ML-DSA' in finding['title']
+    _ca(rsa.generate_private_key(public_exponent=65537, key_size=1024), 'Short RSA Root')
+    finding = _assert_found('ca.unapproved_algorithm', 1, 'PQ Root (#', 'ML-DSA-65')
+    assert 'ML-DSA' in finding['title'] and 'weak' not in finding['title'].lower()
+    weak = _assert_found('ca.weak_key', 1, 'Short RSA Root (#')
+    assert not any('ML-DSA' in example for example in weak['examples'])
+    assert 'ML-DSA' not in weak['title']
+
+
+@needs_mldsa
+def test_ca_mldsa_key_is_named_on_a_build_without_mldsa(session):
+    """The registry holds ML-DSA only when the build can use it: the CA is still told by name."""
+    from unittest.mock import patch
+    from utils import key_algorithms
+    _ca(mldsa.MLDSA65PrivateKey.generate(), 'PQ Root Old Build')
+    try:
+        with patch.object(key_algorithms, 'mldsa_supported', lambda: False):
+            key_algorithms._load()
+            assert key_algorithms.get('ML-DSA-65') is None
+            _assert_found('ca.unapproved_algorithm', 1, 'PQ Root Old Build (#', 'ML-DSA-65')
+            assert fips_preflight._ca_weak() == []
+    finally:
+        key_algorithms._load()
 
 
 @needs_mldsa
@@ -356,6 +376,28 @@ def test_acme_client_unapproved_key_type(session):
     session.add(AcmeClientOrder(domains=json.dumps(['fresh.example']), key_type='EC-P256'))
     session.flush()
     _assert_found('acme_client.unapproved_key_type', 2, 'acme.client.key_type', 'reuse.example')
+
+
+def _csr_pem(key):
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'csr.example')]))
+           .sign(key, None if isinstance(key, (ed25519.Ed25519PrivateKey, mldsa.MLDSA65PrivateKey))
+                 else hashes.SHA256()))
+    return csr.public_bytes(serialization.Encoding.PEM).decode()
+
+
+@pytest.mark.skipif(not mldsa_supported(), reason='this build has no ML-DSA')
+def test_acme_client_external_csr_keys(session):
+    for domain, key in (('ed-csr.example', _ed25519()),
+                        ('mldsa-csr.example', mldsa.MLDSA65PrivateKey.generate()),
+                        ('rsa-csr.example', _rsa(2048))):
+        session.add(AcmeClientOrder(domains=json.dumps([domain]), key_source='csr',
+                                    csr_pem=_csr_pem(key)))
+    session.flush()
+    finding = _assert_found('acme_client.unapproved_key_type', 2,
+                            'ed-csr.example', 'mldsa-csr.example (#')
+    assert any(e.endswith(': ML-DSA-65') for e in finding['examples']), finding['examples']
+    assert not any('rsa-csr.example' in e for e in finding['examples'])
 
 
 def test_hsm_softhsm(session):

@@ -4,6 +4,7 @@ from flask import request, g
 from auth.unified import require_auth
 from utils.response import success_response, error_response
 from models import db, Certificate
+from services.approval_gate import PairApprovalConflict
 from services.audit_service import AuditService
 from services.cert.renewal import RenewalError, renew_certificate_in_place, check_renewable
 from utils import notices as notices_mod
@@ -28,8 +29,9 @@ def _approval_for_renewal(user, cert, data, validity_days=None):
     """Queue the renewal for approval when a policy requires it: ``(policy,
     approval)`` or ``(None, None)``. Raises on evaluation error."""
     from services.approval_gate import queue_renewal
+    from services.cert.renewal import renewal_partner
     return queue_renewal(user, cert, validity_days=validity_days,
-                         comment=(data or {}).get('approval_comment'))
+                         comment=(data or {}).get('approval_comment'), partner=renewal_partner(cert))
 
 
 @bp.route('/api/v2/certificates/<int:cert_id>/renew', methods=['POST'])
@@ -67,6 +69,8 @@ def renew_certificate(cert_id):
         return error_response(refusal.message, refusal.status, problem_type=refusal.problem_type)
     try:
         policy, approval = _approval_for_renewal(g.current_user, cert, data, validity_days)
+    except PairApprovalConflict as e:
+        return error_response(str(e), 409)
     except Exception as e:
         logger.error(f"Policy evaluation failed for renewal of {cert_id}: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the certificate was not renewed', 500)
@@ -88,8 +92,10 @@ def renew_certificate(cert_id):
         logger.error(f"Failed to renew certificate {cert_id}: {e}", exc_info=True)
         return error_response('Failed to renew certificate', 500)
 
-    renewed = db.session.get(Certificate, outcome['cert_id'])
-    return success_response(data=renewed.to_dict(), message='Certificate renewed successfully',
+    renewed = db.session.get(Certificate, outcome['cert_id']).to_dict()
+    if outcome.get('related'):
+        renewed['related_renewed'] = [r['cert_id'] for r in outcome['related']]
+    return success_response(data=renewed, message='Certificate renewed successfully',
                             meta=notices_mod.meta_with_notices(outcome.get('notices')))
 
 

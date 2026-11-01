@@ -21,7 +21,8 @@ export default {
           { label: 'Comptes CA externes', text: 'Un ou plusieurs comptes par CA, plusieurs comptes peuvent partager la même URL de répertoire (ex. deux comptes Let\'s Encrypt pour une séparation administrative) ; une URL de répertoire vide vaut Let\'s Encrypt Production' },
           { label: 'Serveur personnalisé', text: 'Définir une URL de répertoire ACME personnalisée pour utiliser tout CA conforme RFC 8555' },
           { label: 'EAB', text: 'Prise en charge de la liaison de compte externe pour les CA nécessitant une pré-inscription (ZeroSSL, HARICA, etc.)' },
-          { label: 'Types de clés', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384 pour les clés de certificat' },
+          { label: 'Types de clés', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87 pour les clés de certificat ; ML-DSA n\'est pas proposé en mode FIPS ni sur un build qui ne l\'inclut pas. Un défaut configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048 (v2.248)' },
+          { label: 'Clé réutilisée en mode FIPS', text: 'Réutiliser la clé d\'un certificat source est refusé quand le mode FIPS n\'approuve pas cette clé, ML-DSA compris (v2.248)' },
           { label: 'Clés de compte', text: 'Algorithmes ES256 (P-256), ES384 (P-384) ou RS256 pour les clés de compte ACME' },
           { label: 'Fournisseurs DNS', text: 'Configurer les fournisseurs de défi DNS-01 (Cloudflare, Route53, Tencent DNSPod, Plesk, etc.). Plesk passe par son API XML ; Verify TLS Certificate peut être désactivé pour un panneau auto-signé et un délai de propagation DNS ajouté' },
           { label: 'Custom Command', text: 'Type de fournisseur DNS exécutant des commandes locales configurées par l\'admin pour créer/supprimer les TXT, détails de l\'enregistrement passés via les variables d\'environnement DOMAIN, RECORD_NAME, RECORD_VALUE, TTL, ACTION. Chemin binaire absolu requis, sans shell, timeout configurable' },
@@ -40,6 +41,7 @@ export default {
                   { label: 'Orders locaux (v2.217)', text: 'L\'onglet Local orders liste les orders du serveur intégré avec filtre de statut, suppression unitaire et purge ; les orders expirés non émis sont purgés automatiquement toutes les 6 h, et un digest de signature par défaut s\'applique aux orders sans profil. Depuis la v2.218, la purge supprime aussi les défis frères résiduels encore pending des autorisations déjà validées' },
                   { label: 'Profils et templates (v2.221)', text: 'Les profils de certificat (draft-ietf-acme-profiles) sont publiés dans le directory et choisis par le client à chaque order. Chaque profil fixe validité et digest et peut lier un template de certificat, dont les KU/EKU gouvernent alors le certificat émis' },
                   { label: 'Profil par défaut', text: 'La plupart des clients ne demandent aucun profil. Le profil par défaut, choisi sous les profils, s\'applique à leurs commandes ; sans lui, elles reçoivent 90 jours et le digest par défaut' },
+                  { label: 'Révocation (v2.248)', text: 'Le certificat envoyé par un client pour le révoquer doit correspondre octet pour octet à celui stocké. Seule une clé de certificat RSA ou EC P-256, P-384 ou P-521 peut signer la requête elle-même : révoquez un certificat ML-DSA, EdDSA ou Brainpool avec le compte qui l\'a commandé' },
         ]
       },
       {
@@ -165,7 +167,7 @@ Gérez la configuration de votre client ACME :
 - **Environnement** : Staging (test) ou Production (certificats réels)
 - **E-mail de contact** : Requis pour l'enregistrement du compte
 - **Renouvellement automatique** : Renouveler automatiquement les certificats avant l'expiration
-- **Type de clé de certificat** : RSA-2048, RSA-4096, ECDSA P-256 ou ECDSA P-384
+- **Type de clé de certificat** : RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87. ML-DSA n'est pas proposé en mode FIPS ni sur un build qui ne l'inclut pas. Un type configuré que cette instance ne sait pas générer fait échouer la commande au lieu de retomber sur RSA-2048
 - **Algorithme de clé de compte** : ES256, ES384 ou RS256 pour la signature du compte ACME
 
 ### Serveur ACME personnalisé
@@ -215,6 +217,8 @@ Lors d'une demande de certificat, choisissez d'où vient la clé privée :
 - **Générer une nouvelle clé** *(défaut)* : UCM crée une paire de clés à chaque ordre
 - **Réutiliser la clé au renouvellement** : conserve la même clé privée d'un renouvellement à l'autre (nécessaire pour DANE/TLSA et le key pinning) ; la première émission génère la clé, les renouvellements la rechargent
 - **Fournir un CSR externe** : collez un CSR PEM généré ailleurs ; UCM le soumet au finalize et la clé privée n'entre jamais dans UCM. Les domaines du CSR doivent correspondre exactement aux identifiants de l'ordre
+
+En mode FIPS, réutiliser la clé d'un certificat source est refusé quand FIPS n'approuve pas cette clé (ML-DSA compris).
 
 ### Preflight (test à blanc)
 **Lancer le preflight** sur le formulaire de demande valide toute la requête contre le répertoire **staging** de Let's Encrypt, sans consommer les limites de production :
@@ -441,6 +445,9 @@ Parcourir toutes les commandes d'émission de certificats :
 - Noms de domaine demandés
 - CA de signature utilisée
 - Horodatage d'émission
+
+### Révocation
+Un client révoque avec la clé de son compte ou avec la clé du certificat lui-même, et le certificat envoyé doit correspondre octet pour octet à celui stocké : un numéro de série seul ne suffit jamais. Seule une clé RSA ou EC P-256, P-384 ou P-521 peut signer une requête ACME ; un certificat ML-DSA, EdDSA ou Brainpool se révoque donc avec le compte qui l'a commandé, et UCM l'indique dans son refus.
 
 ## Certificats d'adresse IP (RFC 8738)
 

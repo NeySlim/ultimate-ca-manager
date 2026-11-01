@@ -2,7 +2,7 @@
  * CreateCAModal compliance profile: a selector, the parent's profile (else the
  * global default) proposed, and the choices cut down to what the profile allows.
  */
-import { describe, it, expect, vi, beforeEach } from 'vitest'
+import { describe, it, expect, vi, beforeEach, afterEach } from 'vitest'
 import { render, screen, fireEvent, waitFor, within } from '@testing-library/react'
 
 const mocks = vi.hoisted(() => ({
@@ -11,6 +11,7 @@ const mocks = vi.hoisted(() => ({
   getEffective: vi.fn(),
   getProfiles: vi.fn(),
   getSettings: vi.fn(),
+  getSigningKeys: vi.fn(),
 }))
 
 vi.mock('react-i18next', () => ({
@@ -19,7 +20,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../../services', () => ({
   casService: { create: mocks.create },
-  hsmService: { getProviders: mocks.getProviders, getSigningKeys: vi.fn() },
+  hsmService: { getProviders: mocks.getProviders, getSigningKeys: mocks.getSigningKeys },
   policiesService: { getEffective: mocks.getEffective },
   systemService: { getComplianceProfiles: mocks.getProfiles },
   settingsService: { getAll: mocks.getSettings },
@@ -78,10 +79,10 @@ const optionValues = (label) =>
   within(screen.getByLabelText(label)).getAllByRole('option').map((o) => o.value)
 const profileSelect = () => screen.getByLabelText('cas.complianceProfile')
 
-async function renderModal({ cas = [], defaultProfile = '', providers = [] } = {}) {
+async function renderModal({ cas = [], defaultProfile = '', providers = [], effective = {} } = {}) {
   mocks.getProviders.mockResolvedValue({ data: providers })
   mocks.create.mockResolvedValue({ data: { id: 1 } })
-  mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, allowed_digests: null } })
+  mocks.getEffective.mockResolvedValue({ data: { allowed_key_types: null, allowed_digests: null, ...effective } })
   mocks.getProfiles.mockResolvedValue({ data: PROFILES })
   mocks.getSettings.mockResolvedValue({ data: { compliance_profile_default: defaultProfile } })
   render(<CreateCAModal open onClose={vi.fn()} cas={cas} onSuccess={vi.fn()} />)
@@ -162,6 +163,21 @@ describe('CreateCAModal compliance profile', () => {
     expect(payload.keySize).toBe(3072)
   })
 
+  it('offers no ML-DSA CA key under a profile that keeps ML-DSA to hybrid pairs', async () => {
+    PROFILES[1] = { ...PROFILES[1], allowed_key_types: [...PROFILES[1].allowed_key_types, 'ML-DSA-65'],
+      pq_standalone: true }
+    try {
+      await renderModal()
+      fireEvent.change(profileSelect(), { target: { value: 'bsi' } })
+      await waitFor(() => expect(optionValues('common.keySize')).toEqual(['3072', '4096']))
+      expect(optionValues('common.keyAlgorithm')).not.toContain('ML-DSA')
+      expect(optionValues('common.keyAlgorithm').length).toBeGreaterThan(0)
+    } finally {
+      PROFILES[1] = { ...PROFILES[1], allowed_key_types: PROFILES[1].allowed_key_types.filter(k => k !== 'ML-DSA-65'),
+        pq_standalone: undefined }
+    }
+  })
+
   it('under bsi a key that was RSA-2048 moves to an allowed size', async () => {
     await renderModal()
     fireEvent.change(screen.getByLabelText('common.keySize'), { target: { value: '2048' } })
@@ -189,6 +205,74 @@ describe('CreateCAModal compliance profile', () => {
     const payload = await submittedPayload()
     expect(payload.hsmProviderId).toBe(2)
     expect(payload.complianceProfile).toBe('eu-acm')
+  })
+
+  describe('under an HSM profile that keeps ML-DSA to hybrid pairs', () => {
+    const PKCS11 = [{ id: 2, name: 'token', provider_type: 'pkcs11', enabled: true }]
+    const original = PROFILES[2]
+    beforeEach(() => {
+      PROFILES[2] = { ...original, allowed_key_types: ['RSA-3072', 'EC-P384', 'EC-BP384', 'ML-DSA-65'],
+        pq_standalone: true }
+    })
+    afterEach(() => { PROFILES[2] = original })
+
+    async function pickProfile(effective) {
+      await renderModal({ providers: PKCS11, effective })
+      await waitFor(() => expect(optionValues('cas.complianceProfile')).toContain('eu-acm'))
+      fireEvent.change(profileSelect(), { target: { value: 'eu-acm' } })
+      await waitFor(() => expect(screen.getByLabelText('cas.create.hsmProvider')).toBeTruthy())
+      fireEvent.change(screen.getByLabelText('cas.create.hsmProvider'), { target: { value: '2' } })
+    }
+
+    it('offers no ML-DSA key to generate on the HSM', async () => {
+      await pickProfile()
+      await waitFor(() => expect(optionValues('cas.create.hsmKeyAlgorithm')).toEqual(['RSA-3072', 'EC-P384', 'EC-BP384']))
+    })
+
+    it('lists only the existing HSM keys the profile and the server allow', async () => {
+      mocks.getSigningKeys.mockResolvedValue({ data: [
+        { id: 1, label: 'rsa2k', algorithm: 'RSA-2048' },
+        { id: 2, label: 'rsa3k', algorithm: 'RSA-3072' },
+        { id: 3, label: 'bp', algorithm: 'EC-BP384' },
+        { id: 4, label: 'pq', algorithm: 'ML-DSA-65' },
+      ] })
+      await pickProfile()
+      fireEvent.click(screen.getByLabelText('cas.create.hsmKeyModeExisting'))
+      await waitFor(() => expect(optionValues('cas.create.hsmExistingKey')).toEqual(['2', '3']))
+    })
+
+  })
+
+  it.each([[false, ['2', '3', '5']], [true, ['2']]])(
+    'with fips=%s lists the existing HSM keys this server can use', async (fips, ids) => {
+      mocks.getSigningKeys.mockResolvedValue({ data: [
+        { id: 2, label: 'rsa3k', algorithm: 'RSA-3072' },
+        { id: 3, label: 'bp', algorithm: 'EC-BP384' },
+        { id: 5, label: 'big', algorithm: 'RSA-8192' },
+      ] })
+      await renderModal({ providers: [{ id: 2, name: 'token', provider_type: 'pkcs11', enabled: true }],
+        effective: { fips } })
+      fireEvent.click(screen.getByLabelText('cas.create.keyStorageHsm'))
+      await waitFor(() => expect(screen.getByLabelText('cas.create.hsmProvider')).toBeTruthy())
+      fireEvent.change(screen.getByLabelText('cas.create.hsmProvider'), { target: { value: '2' } })
+      fireEvent.click(screen.getByLabelText('cas.create.hsmKeyModeExisting'))
+      await waitFor(() => expect(optionValues('cas.create.hsmExistingKey')).toEqual(ids))
+    })
+
+  it('drops a picked HSM key the profile then refuses', async () => {
+    mocks.getSigningKeys.mockResolvedValue({ data: [{ id: 5, label: 'big', algorithm: 'RSA-8192' }] })
+    await renderModal({ providers: [{ id: 2, name: 'token', provider_type: 'pkcs11', enabled: true }] })
+    fireEvent.click(screen.getByLabelText('cas.create.keyStorageHsm'))
+    await waitFor(() => expect(screen.getByLabelText('cas.create.hsmProvider')).toBeTruthy())
+    fireEvent.change(screen.getByLabelText('cas.create.hsmProvider'), { target: { value: '2' } })
+    fireEvent.click(screen.getByLabelText('cas.create.hsmKeyModeExisting'))
+    await waitFor(() => expect(optionValues('cas.create.hsmExistingKey')).toEqual(['5']))
+    fireEvent.change(screen.getByLabelText('cas.create.hsmExistingKey'), { target: { value: '5' } })
+    fireEvent.change(profileSelect(), { target: { value: 'bsi' } })
+    await waitFor(() => expect(screen.getByText('cas.create.hsmNoUnusedKeys')).toBeTruthy())
+    fireEvent.submit(screen.getByText('common.createCA').closest('form'))
+    await new Promise((r) => setTimeout(r, 50))
+    expect(mocks.create).not.toHaveBeenCalled()
   })
 
   it('warns when the CA would outlive the profile horizon for its key', async () => {

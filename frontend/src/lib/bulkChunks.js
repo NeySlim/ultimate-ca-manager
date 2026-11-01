@@ -7,12 +7,39 @@
  */
 export const MAX_BULK_IDS = 100
 
-export function chunkIds(ids, size = MAX_BULK_IDS) {
+// relatedOf(id) names the other member of a pair: both selected members go in one
+// batch, since the server only knows what it did with a pair within one request.
+export function chunkIds(ids, size = MAX_BULK_IDS, relatedOf = null) {
   const list = Array.isArray(ids) ? ids : []
-  const chunks = []
-  for (let start = 0; start < list.length; start += size) {
-    chunks.push(list.slice(start, start + size))
+  if (!relatedOf) {
+    const chunks = []
+    for (let start = 0; start < list.length; start += size) {
+      chunks.push(list.slice(start, start + size))
+    }
+    return chunks
   }
+  const selected = new Set(list)
+  const partner = new Map()
+  for (const id of list) {
+    const other = relatedOf(id)
+    // Only a mutual link is a pair to the server: a one-way link must not claim a member
+    if (other == null || other === id || !selected.has(other) || relatedOf(other) !== id) continue
+    partner.set(id, other)
+  }
+  const chunks = []
+  const placed = new Set()
+  let current = []
+  for (const id of list) {
+    if (placed.has(id)) continue
+    const other = partner.get(id)
+    const group = other != null && !placed.has(other) ? [id, other] : [id]
+    if (current.length && current.length + group.length > size) {
+      chunks.push(current)
+      current = []
+    }
+    for (const member of group) { current.push(member); placed.add(member) }
+  }
+  if (current.length) chunks.push(current)
   return chunks
 }
 
@@ -24,8 +51,8 @@ export function chunkIds(ids, size = MAX_BULK_IDS) {
  * pair dropped it, so a selection over the cap looked like zero approvals
  * raised while the server had created them.
  */
-export async function runInBatches(ids, send) {
-  const batches = chunkIds(ids)
+export async function runInBatches(ids, send, { relatedOf } = {}) {
+  const batches = chunkIds(ids, MAX_BULK_IDS, relatedOf)
   if (batches.length <= 1) return send(batches[0] || [])
 
   const merged = {}

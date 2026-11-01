@@ -12,15 +12,46 @@ sections declares one, so nothing is ever resolved and an empty plan answers
 everything `apply_columns` asks; the parameter is there so the restore can
 hand its own down the day one of them does.
 """
+import json
 import logging
-from typing import Dict, Optional
+from typing import Any, Dict, Optional
 
+from auth.permissions import PERMISSIONS_REVISION, with_ssh_ca_scopes
 from models import db
 
 from .restore import RestorePlan
 from .restore.apply import apply_columns
 
 logger = logging.getLogger(__name__)
+
+# Sections whose rows carry a `permissions` list (JSON text for API keys).
+_PERMISSION_SECTIONS = ('groups', 'custom_roles', 'api_keys')
+
+
+def upgrade_archived_permissions(backup_data: Dict[str, Any]) -> int:
+    """Grant an older archive's SSH scopes their ssh_cas twin, as migration 116 did.
+
+    Returns the number of rows widened; a current archive is left as it is.
+    """
+    metadata = backup_data.get('metadata')
+    revision = metadata.get('permissions_revision', 0) if isinstance(metadata, dict) else 0
+    if isinstance(revision, int) and not isinstance(revision, bool) and revision >= PERMISSIONS_REVISION:
+        return 0
+    widened = 0
+    for section in _PERMISSION_SECTIONS:
+        for row in backup_data.get(section) or []:
+            raw = row.get('permissions') if isinstance(row, dict) else None
+            try:
+                perms = json.loads(raw) if isinstance(raw, str) else raw
+            except ValueError:
+                continue
+            if not isinstance(perms, list):
+                continue
+            upgraded = with_ssh_ca_scopes(perms)
+            if any(p not in perms for p in upgraded):
+                row['permissions'] = json.dumps(upgraded) if isinstance(raw, str) else upgraded
+                widened += 1
+    return widened
 
 
 class RestoreRbacMixin:

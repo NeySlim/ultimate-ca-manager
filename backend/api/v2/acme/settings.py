@@ -80,7 +80,7 @@ def _revoke_superseded_certificates():
     for cert in superseded:
         try:
             CertificateService.revoke_certificate(
-                cert_id=cert.id, reason='superseded', username='system'
+                cert_id=cert.id, reason='superseded', username='system', revoke_related=False
             )
             revoked_count += 1
         except Exception as e:
