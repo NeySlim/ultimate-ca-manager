@@ -500,19 +500,29 @@ def key_algo_for_certificate(cert):
     return key_algo_for_public_key(cert.public_key())
 
 
-def key_algo_from_crt(crt):
-    """The ``key_algo`` spelling for a stored certificate (base64 of PEM), None if unreadable."""
+@event.listens_for(Certificate.crt, 'set')
+def _key_fields_follow_crt(target, value, oldvalue, initiator):
+    # Every issuance path sets crt; key_algo (sorting, compliance) and the
+    # AKI/SKI columns (ACME ARI, chain lookups) follow it
+    if not value:
+        return
     import base64
     from cryptography import x509
+    from utils.cert_issuer import authority_key_identifier_hex
     try:
-        return key_algo_for_certificate(x509.load_pem_x509_certificate(base64.b64decode(crt)))
+        cert = x509.load_pem_x509_certificate(base64.b64decode(value))
     except Exception:
-        return None
-
-
-@event.listens_for(Certificate.crt, 'set')
-def _key_algo_follows_crt(target, value, oldvalue, initiator):
-    # Every issuance path sets crt; key_algo (sorting, compliance) follows it
-    if value:
-        target.key_algo = key_algo_from_crt(value) or target.key_algo
+        return
+    try:
+        target.key_algo = key_algo_for_certificate(cert) or target.key_algo
+    except Exception:
+        pass
+    try:
+        target.aki = authority_key_identifier_hex(cert)
+        target.ski = cert.extensions.get_extension_for_class(
+            x509.SubjectKeyIdentifier).value.key_identifier.hex(':').upper()
+    except x509.ExtensionNotFound:
+        target.ski = None
+    except Exception:
+        pass  # extensions pyca cannot parse: the backfill leaves them unset too
 

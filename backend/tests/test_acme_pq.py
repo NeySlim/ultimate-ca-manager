@@ -204,10 +204,6 @@ class TestFinalizeMldsaRequest:
         aki = leaf.extensions.get_extension_for_class(x509.AuthorityKeyIdentifier).value
         n = leaf.serial_number
         certid = f'{_b64u(aki.key_identifier)}.{_b64u(n.to_bytes((n.bit_length() + 7) // 8, "big"))}'
-        # sign_csr leaves the AKI column to the scheduled backfill, whatever the key
-        from services.ski_aki_backfill import backfill_ski_aki
-        with app.app_context():
-            backfill_ski_aki()
         r = client.get(f'/acme/renewalInfo/{certid}')
         assert r.status_code == 200, r.data
         assert set(r.get_json()['suggestedWindow']) == {'start', 'end'}
