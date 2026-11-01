@@ -593,8 +593,8 @@ class LifecycleMixin:
 
         # A related pair loses its link with the row (SQLite may hand the id out again)
         try:
-            Certificate.query.filter(Certificate.related_certificate_id == cert_id).update(
-                {Certificate.related_certificate_id: None}, synchronize_session='fetch')
+            from services.cert.related_pair import unlink_rows_naming
+            unlink_rows_naming(cert_id)
         except Exception as e:
             logger.error(f"Certificate {cert_id}: related certificate links not cleared: {e}")
 

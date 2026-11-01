@@ -342,6 +342,23 @@ def test_a_member_whose_partner_is_revoked_renews_alone_without_the_link(app, au
     (_sa, times_a, _ca), (_sb, times_b, new_b) = _state(app, a['id'], b['id'])
     assert (times_a, times_b) == (0, 1)
     assert related_cert.read_related_certificate(new_b) is None
+    # The rows say what the certificates are: no pair left on either side
+    for row in (_row(app, b['id']), _row(app, a['id'])):
+        assert (row['related_certificate_id'], row['hybrid_role']) == (None, None), row['id']
+    r = auth_client.get(f"/api/v2/certificates/{b['id']}/export?format=hybrid-bundle")
+    assert r.status_code == 400, r.data
+
+
+def test_the_bundle_refuses_members_that_no_longer_name_each_other(app, auth_client, create_ca):
+    a, b = _pair(auth_client, create_ca, 'pair-export-broken.example.com')
+    other, _ = _pair(auth_client, create_ca, 'pair-export-other.example.com')
+    with app.app_context():
+        # A stale link: B's certificate names A, not the row it is pointed at
+        b_row, o_row = db.session.get(Certificate, b['id']), db.session.get(Certificate, other['id'])
+        b_row.related_certificate_id, o_row.related_certificate_id = other['id'], b['id']
+        db.session.commit()
+    r = auth_client.get(f"/api/v2/certificates/{b['id']}/export?format=hybrid-bundle")
+    assert r.status_code == 400 and b'no longer form a pair' in r.data, r.data
 
 
 def test_an_approved_renewal_renews_the_pair(app, auth_client, create_ca, create_user):
@@ -427,7 +444,18 @@ def test_deleting_a_member_unlinks_the_other(app, auth_client, create_ca):
     assert r.status_code == 200, r.data
     r = auth_client.delete(f"/api/v2/certificates/{a['id']}")
     assert r.status_code == 204, r.data
-    assert _row(app, b['id'])['related_certificate_id'] is None
+    row = _row(app, b['id'])
+    assert (row['related_certificate_id'], row['hybrid_role']) == (None, None)
+
+
+def test_deleting_b_takes_a_out_of_the_pair(app, auth_client, create_ca):
+    a, b = _pair(auth_client, create_ca, 'pair-delete-b.example.com')
+    r = auth_client.post(f"/api/v2/certificates/{b['id']}/revoke", json={'revoke_related': False})
+    assert r.status_code == 200, r.data
+    r = auth_client.delete(f"/api/v2/certificates/{b['id']}")
+    assert r.status_code == 204, r.data
+    row = _row(app, a['id'])
+    assert (row['related_certificate_id'], row['hybrid_role']) == (None, None)
 
 
 # ---- automatic callers revoke the replaced member only ----------------------------

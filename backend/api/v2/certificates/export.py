@@ -35,6 +35,8 @@ from utils.cert_issuer import (
 )
 from utils.export_options import json_boolean, query_boolean
 from services.key_export_audit import audit_key_export
+from services.cert.related_pair import row_certificate
+from utils import related_cert
 from . import bp
 
 logger = logging.getLogger(__name__)
@@ -61,6 +63,10 @@ def _hybrid_bundle(certificate, include_key, password):
                if certificate.related_certificate_id else None)
     if partner is None or not partner.crt:
         return error_response('This certificate has no related certificate to bundle with', 400)
+    cert, other = row_certificate(certificate), row_certificate(partner)
+    if not (related_cert.references(cert, other) or related_cert.references(other, cert)):
+        return error_response(
+            'This certificate and its related certificate no longer form a pair: neither names the other', 400)
     members = [certificate, partner]
     if include_key:
         missing = [row.id for row in members if not row.prv]

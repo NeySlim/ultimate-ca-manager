@@ -244,3 +244,43 @@ def hand_over_link(revoked_row):
             a_row.related_certificate_id = b_row.id
             return b_row
     return None
+
+
+def _readable(row):
+    """``row_certificate`` that names nothing for an unreadable row instead of raising."""
+    try:
+        return row_certificate(row)
+    except Exception:
+        return None
+
+
+def _relink_or_leave(row, gone_id):
+    """*row* was linked to *gone_id*: its way back moves to the newest unrevoked
+    certificate still naming it, else it leaves its pair (no link, no role)."""
+    cert = _readable(row)
+    for b_row in (Certificate.query.filter(Certificate.related_certificate_id == row.id,
+                                           Certificate.id.notin_([row.id, gone_id]),
+                                           Certificate.revoked.isnot(True),
+                                           Certificate.crt.isnot(None))
+                  .order_by(Certificate.id.desc()).all()):
+        b_cert = _readable(b_row)
+        if cert is not None and b_cert is not None and related_cert.references(b_cert, cert):
+            row.related_certificate_id = b_row.id
+            return
+    row.related_certificate_id = None
+    row.hybrid_role = None
+
+
+def unlink_rows_naming(row_id):
+    """Rows linked to *row_id*, whose certificate is gone or replaced, relink or leave their pair."""
+    for other in Certificate.query.filter(Certificate.related_certificate_id == row_id,
+                                          Certificate.id != row_id).all():
+        _relink_or_leave(other, row_id)
+
+
+def leave_pair(row):
+    """*row* now holds a certificate that names none and none names: link and role
+    go, and the rows linked to it relink or leave their pair."""
+    row.related_certificate_id = None
+    row.hybrid_role = None
+    unlink_rows_naming(row.id)

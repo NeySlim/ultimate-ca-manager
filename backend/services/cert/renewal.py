@@ -233,6 +233,10 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
             if pair and index == 0:
                 renewed_a = x509.load_pem_x509_certificate(staged_member['cert_pem'])
             staged_all.append(staged_member)
+        if not pair and related_to is None:
+            # Renewed alone and naming none: the row leaves its pair, as its certificate has
+            from services.cert.related_pair import leave_pair
+            leave_pair(staged_all[0]['cert'])
     except Exception:
         db.session.rollback()
         raise
