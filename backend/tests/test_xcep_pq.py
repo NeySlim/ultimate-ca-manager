@@ -103,6 +103,20 @@ def test_get_policies_announces_every_mldsa_template(xcep_pq_policies):
     assert len(values) == len(set(values))
 
 
+def _policy_schema(root, name):
+    for policy in root.findall(f'.//{{{XCEP_NS}}}policy'):
+        if policy.find(f'.//{{{XCEP_NS}}}commonName').text == name:
+            return policy.find(f'.//{{{XCEP_NS}}}policySchema').text
+    raise AssertionError(f'{name} not announced')
+
+
+def test_mldsa_templates_are_announced_in_schema_3(xcep_pq_policies):
+    """algorithmOIDReference and a KSP are version 3 template attributes (MS-XCEP)."""
+    for label in MLDSA_LABELS:
+        assert _policy_schema(xcep_pq_policies, f'XCEP PQ {label}') == '3', label
+    assert _policy_schema(xcep_pq_policies, 'XCEP PQ RSA neighbour') == '2'
+
+
 def test_rsa_template_keeps_a_nil_algorithm_reference(xcep_pq_policies):
     pk = _private_key_attributes(xcep_pq_policies, 'XCEP PQ RSA neighbour')
     assert pk.find(f'{{{XCEP_NS}}}algorithmOIDReference').get(XSI_NIL) == 'true'

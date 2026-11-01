@@ -420,10 +420,12 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         cas_el = etree.SubElement(policy, '{%s}cAs' % XCEP_NS)
         etree.SubElement(cas_el, '{%s}cAReference' % XCEP_NS).text = str(ca_ref_id)
 
+        # algorithmOIDReference and a KSP, which an ML-DSA template needs, are v3 attributes
+        mldsa_oid = _MLDSA_OIDS.get(algo_name)
         attributes = etree.SubElement(policy, '{%s}attributes' % XCEP_NS)
         etree.SubElement(attributes, '{%s}commonName' % XCEP_NS).text = template.name
         etree.SubElement(attributes, '{%s}policySchema' % XCEP_NS).text = (
-            '3' if pin_request_hash else '2'
+            '3' if pin_request_hash or mldsa_oid is not None else '2'
         )
 
         validity = etree.SubElement(attributes, '{%s}certificateValidity' % XCEP_NS)
@@ -457,7 +459,6 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         # are populated per the real-ADCS trace referenced in the module
         # docstring; algorithmOIDReference stays nil (same trace) except for ML-DSA.
         is_ecdsa = algo_name.startswith('ECDSA')
-        mldsa_oid = _MLDSA_OIDS.get(algo_name)
         use_ksp = is_ecdsa or mldsa_oid is not None or pin_request_hash
         pk_attrs = etree.SubElement(attributes, '{%s}privateKeyAttributes' % XCEP_NS)
         etree.SubElement(pk_attrs, '{%s}minimalKeyLength' % XCEP_NS).text = str(min_key_length)

@@ -147,7 +147,7 @@ class TestWstep:
             with app.app_context():
                 ca = db.session.get(CA, ca_data['id'])
                 assert wstep_service._match_template(
-                    ca, _wstep_csr(_rsa(2048), 'probe.policy.test')).id == tid
+                    ca, _wstep_csr(_rsa(2048), 'probe.policy.test'))[0].id == tid
                 cert_pem, err = wstep_service.issue(
                     ca, _wstep_csr(_rsa(2048), 'wstep-weak.policy.test')
                     .public_bytes(serialization.Encoding.DER), validity_days=30)
