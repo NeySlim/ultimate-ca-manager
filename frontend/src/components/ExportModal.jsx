@@ -23,7 +23,8 @@ import { Download, Lock, Certificate, ShieldCheck } from '@phosphor-icons/react'
 import { Modal } from './Modal'
 import { Button } from './Button'
 import { ChainVariantSelect } from './ChainVariantSelect'
-import { cn } from '../lib/utils'
+import { cn, extractData } from '../lib/utils'
+import { certificatesService } from '../services'
 import { fetchChainVariants } from '../lib/crossCertificates'
 import { exportPasswordPolicy, isExportPasswordValid, loadExportPasswordPolicy } from '../lib/exportPassword'
 import { isExportFormatAllowed } from '../lib/keyAlgorithms'
@@ -69,6 +70,18 @@ export function ExportModal({
 
   const isAllowed = (key) => isExportFormatAllowed(keyAlgorithm, key)
 
+  // The bundle carries both keys: it offers them only when the related certificate has one too (null: unknown)
+  const [relatedHasKey, setRelatedHasKey] = useState(null)
+  useEffect(() => {
+    setRelatedHasKey(null)
+    if (!open || relatedCertificateId == null || !hasPrivateKey || !canExportKey) return undefined
+    let cancelled = false
+    certificatesService.getById(relatedCertificateId)
+      .then((res) => { if (!cancelled) setRelatedHasKey(extractData(res)?.has_private_key === true) })
+      .catch(() => {})
+    return () => { cancelled = true }
+  }, [open, relatedCertificateId, hasPrivateKey, canExportKey])
+
   // Reset state when modal opens
   useEffect(() => {
     if (open) {
@@ -98,7 +111,8 @@ export function ExportModal({
   const isJks = format === 'jks'
   const isKeyOnly = format === 'key'
   const isBundle = format === 'hybrid-bundle'
-  const effectiveIncludeKey = (isPkcs12 || isJks || isKeyOnly) ? true : includeKey
+  const keyOffered = hasPrivateKey && canExportKey && (!isBundle || relatedHasKey === true)
+  const effectiveIncludeKey = (isPkcs12 || isJks || isKeyOnly) ? true : includeKey && keyOffered
   const needsPassword = isPkcs12 || isJks
   const showPasswordField = isPkcs12 || isJks
 
@@ -260,7 +274,7 @@ export function ExportModal({
           </>)}
 
           {/* Include private key — only if key exists AND user has permission */}
-          {hasPrivateKey && canExportKey && !isPkcs12 && !isJks && (
+          {keyOffered && !isPkcs12 && !isJks && (
             <label className="flex items-center gap-2.5 px-3 py-2 rounded-lg hover:bg-bg-secondary transition-colors cursor-pointer">
               <input
                 type="checkbox"
@@ -273,6 +287,13 @@ export function ExportModal({
                 <div className="text-xs text-text-tertiary">{t('export.includeKeyDesc', 'Attach the private key to the export')}</div>
               </div>
             </label>
+          )}
+
+          {isBundle && hasPrivateKey && canExportKey && relatedHasKey === false && (
+            <div className="flex items-center gap-2 px-3 py-1.5 text-xs text-text-secondary">
+              <Lock size={14} className="shrink-0" />
+              {t('export.bundleRelatedHasNoKey')}
+            </div>
           )}
 
           {/* PKCS12 note */}

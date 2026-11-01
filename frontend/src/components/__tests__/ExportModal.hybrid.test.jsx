@@ -20,6 +20,10 @@ vi.mock('react-i18next', () => ({
   Trans: ({ children }) => children,
 }))
 
+// The related certificate, as the detail endpoint returns it
+const related = vi.hoisted(() => ({ getById: vi.fn() }))
+vi.mock('../../services', () => ({ certificatesService: { getById: (...a) => related.getById(...a) } }))
+
 import { ExportModal } from '../ExportModal'
 
 const bundleLabel = en.export.formats.hybridBundle
@@ -46,12 +50,27 @@ describe('ExportModal hybrid bundle', () => {
   })
 
   it('carries both keys only when the operator may export keys', async () => {
+    related.getById.mockResolvedValue({ data: { id: 12, has_private_key: true } })
     const onExport = renderModal({ relatedCertificateId: 12, hasPrivateKey: true, canExportKey: true })
     fireEvent.click(screen.getByText(bundleLabel).closest('button'))
-    fireEvent.click(screen.getByText(en.export.includeKey).closest('label').querySelector('input'))
+    fireEvent.click((await screen.findByText(en.export.includeKey)).closest('label').querySelector('input'))
     submit()
     await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1))
     expect(onExport.mock.calls[0]).toEqual(['hybrid-bundle', expect.objectContaining({ includeKey: true })])
+  })
+
+  it('offers no keys in the bundle when the related certificate has none', async () => {
+    related.getById.mockResolvedValue({ data: { id: 12, has_private_key: false } })
+    const onExport = renderModal({ relatedCertificateId: 12, hasPrivateKey: true, canExportKey: true })
+    expect(screen.getByText(en.export.includeKey)).toBeInTheDocument()
+    fireEvent.click(screen.getByText(en.export.includeKey).closest('label').querySelector('input'))
+    fireEvent.click(screen.getByText(bundleLabel).closest('button'))
+    await waitFor(() => expect(related.getById).toHaveBeenCalledWith(12))
+    expect(await screen.findByText(en.export.bundleRelatedHasNoKey)).toBeInTheDocument()
+    expect(screen.queryByText(en.export.includeKey)).toBeNull()
+    submit()
+    await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1))
+    expect(onExport.mock.calls[0][1]).toMatchObject({ includeKey: false })
   })
 
   it('promises no CA chain the bundle does not carry', async () => {

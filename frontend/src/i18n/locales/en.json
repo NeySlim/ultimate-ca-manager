@@ -4820,7 +4820,8 @@
     "jksNote": "JKS always includes the private key",
     "pkcs12Title": "Export PKCS#12",
     "pkcs12PasswordPrompt": "Enter password for PKCS#12 file",
-    "formatHybridBundleDesc": "ZIP with both certificates of the pair"
+    "formatHybridBundleDesc": "ZIP with both certificates of the pair",
+    "bundleRelatedHasNoKey": "The related certificate has no private key: the bundle holds the certificates only"
   },
   "userCertificates": {
     "title": "User Certificates",

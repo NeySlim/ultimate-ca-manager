@@ -113,4 +113,14 @@ describe('FloatingDetailWindow of a hybrid pair member', () => {
     fireEvent.submit(screen.getByTestId('revoke-form'))
     await waitFor(() => expect(mocks.notify.showWarning).toHaveBeenCalledWith('revocation.relatedNotRevoked'))
   })
+
+  it('shows why the server refused the bundle', async () => {
+    const reason = 'Certificate 5 has no private key; export the bundle without keys'
+    mocks.certificatesService.export.mockRejectedValue(Object.assign(new Error(reason), { status: 400 }))
+    await open()
+    fireEvent.click(screen.getByText('Export'))
+    fireEvent.click(screen.getByText('export.formats.hybridBundle').closest('button'))
+    fireEvent.submit(screen.getByText('PEM').closest('form'))
+    await waitFor(() => expect(mocks.notify.showError).toHaveBeenCalledWith(reason))
+  })
 })

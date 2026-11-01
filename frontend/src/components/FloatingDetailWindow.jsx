@@ -134,7 +134,8 @@ export function FloatingDetailWindow({ windowInfo }) {
       await downloadExport(service.export(id, format, options), { format, name })
       showSuccess(t('common.exported'))
     } catch (err) {
-      showError(t('common.exportFailed'))
+      // The server's refusal says why (a bundle member without a key); a network failure does not
+      showError(err?.status ? err.message : t('common.exportFailed'))
     }
   }
 

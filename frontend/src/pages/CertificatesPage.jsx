@@ -265,8 +265,9 @@ export default function CertificatesPage() {
         { format, name: selectedCert.common_name || 'certificate' },
       )
       showSuccess(t('messages.success.export.certificate'))
-    } catch {
-      showError(t('messages.errors.exportFailed.certificate'))
+    } catch (err) {
+      // The server's refusal says why (a bundle member without a key); a network failure does not
+      showError(err?.status ? err.message : t('messages.errors.exportFailed.certificate'))
     }
   }
 
