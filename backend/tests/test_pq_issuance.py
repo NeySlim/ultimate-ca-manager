@@ -254,6 +254,64 @@ def test_protocol_csr_checks_refuse_slh_dsa_by_name():
     assert 'not signable by this instance' in _validate_csr(csr)
 
 
+class _ProviderLacksKey:
+    """A CSR as a FIPS provider without its algorithm reads it: the key does not load."""
+
+    def __init__(self, csr):
+        self._csr = csr
+
+    def __getattr__(self, name):
+        return getattr(self._csr, name)
+
+    def public_key(self):
+        from cryptography.exceptions import UnsupportedAlgorithm
+        raise UnsupportedAlgorithm('not supported by this provider')
+
+
+@pytest.mark.parametrize('fips,message', [(True, 'ML-DSA-65 keys are not available in FIPS mode'),
+                                          (False, 'ML-DSA-65 keys are not signable by this instance')])
+def test_a_key_the_provider_cannot_load_is_refused_naming_fips(monkeypatch, fips, message):
+    from cryptography.hazmat.primitives import hashes
+    from api.est_protocol import _validate_est_csr
+    from services.wstep.wstep_service import _validate_csr
+    from utils.key_type import validate_enrollment_csr
+    key = PRIVATE['65'].generate()
+    csr = _ProviderLacksKey(x509.CertificateSigningRequestBuilder().subject_name(
+        x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, 'fips-pq.example.test')])).sign(key, None))
+    monkeypatch.setattr(fips_mode, 'enabled', lambda: fips)
+    assert validate_enrollment_csr(csr) == message
+    assert _validate_csr(csr) == message
+    ok, response = _validate_est_csr(csr)
+    assert not ok and message.encode() in response.get_data()
+
+
+def test_scep_names_fips_for_a_key_the_provider_cannot_load(app, create_ca, caplog, monkeypatch):
+    """SLH-DSA, which this build cannot load either, stands in for ML-DSA under such a provider."""
+    from cryptography.hazmat.primitives import serialization
+    from services.scep.crypto_helpers import RSAES_OAEP, create_signed_pkcs7, encrypt_for_client
+    from services.scep.scep_service import SCEPService
+    from tests.test_scep_pq import _scep_attrs
+    from tests.test_scep_rfc8894_operations import (
+        FAIL_INFO_OID, PKI_STATUS_OID, _client_identity, _load_ca_material, _response_attributes)
+    csr_der = x509.load_pem_x509_csr(fixture_bytes('slhdsa-sha2-128s-csr.pem')).public_bytes(
+        serialization.Encoding.DER)
+    ca_data = create_ca(cn='PQ SLH SCEP issuer FIPS')
+    with app.app_context():
+        ca, ca_cert, _ = _load_ca_material(ca_data['id'])
+        signer_cert, signer_key = _client_identity('slh-scep-fips.example.test')
+        envelope = encrypt_for_client(csr_der, ca_cert, key_transport=(RSAES_OAEP, 'sha256'))
+        request = create_signed_pkcs7(envelope, signer_key, signer_cert,
+                                      signed_attributes=_scep_attrs(19, b'slh-fips-nonce01'))
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        with caplog.at_level(logging.WARNING, logger='services.scep'):
+            response, status = SCEPService(ca.refid, auto_approve=True).process_pkcs_req(
+                request, '127.0.0.1')
+    attrs = _response_attributes(response)
+    assert status == 200 and attrs[PKI_STATUS_OID] == '2' and attrs[FAIL_INFO_OID] == '2'
+    assert any('SLH-DSA-SHA2-128s keys are not available in FIPS mode' in rec.getMessage()
+               for rec in caplog.records), [rec.getMessage() for rec in caplog.records]
+
+
 def test_scep_refuses_slh_dsa_by_name(app, create_ca, caplog):
     from cryptography.hazmat.primitives import serialization
     from services.scep.scep_service import SCEPService

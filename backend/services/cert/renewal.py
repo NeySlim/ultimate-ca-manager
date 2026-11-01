@@ -270,13 +270,14 @@ def renew_certificate_in_place(cert: Certificate, ca=None, *, username: str = 's
 
 
 def _renewal_members(cert):
-    """``[cert]``, or both members of its related pair with A first."""
+    """``[cert]``, or both members of its related pair with A first. A partner whose key
+    the server does not hold (enrolled by a device) renews through its own protocol, never here."""
     from services.cert.related_pair import anchor_first, mutual_partner
     try:
         partner = mutual_partner(cert)
     except InvalidRequestError:  # deleted since the caller read it: _reread answers 404
         return [cert]
-    if partner is None or partner.revoked or not cert.crt or not partner.crt:
+    if partner is None or partner.revoked or not cert.crt or not partner.crt or not partner.prv:
         return [cert]
     return list(anchor_first(cert, partner))
 
@@ -590,10 +591,6 @@ def _take_serial(cert_id, old_serial, new_serial, trigger) -> None:
         raise RenewalError(_renewed_meanwhile_message(trigger), 409)
 
 
-def _hex_id(value: bytes) -> str:
-    return value.hex(':')
-
-
 def _write_row(cert, ca, ca_cert, renewed, cert_pem, key_pem, new_serial, now) -> None:
     cert.crt = b64encode(cert_pem).decode('utf-8')
     if key_pem is not None:
@@ -602,10 +599,6 @@ def _write_row(cert, ca, ca_cert, renewed, cert_pem, key_pem, new_serial, now) -
     cert.key_algo = key_algo_for_public_key(renewed.public_key())
     cert.caref = ca.refid
     cert.issuer = ca_cert.subject.rfc4514_string()
-    cert.ski = _hex_id(renewed.extensions.get_extension_for_class(
-        x509.SubjectKeyIdentifier).value.digest)
-    cert.aki = _hex_id(renewed.extensions.get_extension_for_class(
-        x509.AuthorityKeyIdentifier).value.key_identifier or b'') or None
     cert.valid_from = renewed.not_valid_before_utc.replace(tzinfo=None)
     cert.valid_to = renewed.not_valid_after_utc.replace(tzinfo=None)
 

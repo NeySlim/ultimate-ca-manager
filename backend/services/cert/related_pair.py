@@ -2,8 +2,8 @@
 
 ``related_certificate_id`` on B names A; on A it names B once the pair is
 mutual (the hybrid issue form, or the newest B a request ties to A through
-Sign CSR, ACME, EST or WSTEP). The pair revokes and renews together only when
-the link is mutual.
+Sign CSR, ACME, EST or WSTEP). The pair revokes together only when the link is
+mutual, and renews together only when the server also holds both keys.
 """
 import base64
 import logging
@@ -85,8 +85,8 @@ def find_requested(req):
 
 
 def verify_request(req, now=None):
-    """Certificate A of a relatedCertRequest, once found, valid, unrevoked,
-    issued by a CA held here, fresh and signed by A's key (RFC 9763 §3.2)."""
+    """Certificate A of a relatedCertRequest, once found, signed by A's key, valid,
+    unrevoked, issued by a CA held here and fresh (RFC 9763 §3.2)."""
     from services.cert.renewal import resolve_issuing_ca
     from utils.cert_issuer import certificate_signed_by
     now = now or utc_now()
@@ -96,6 +96,10 @@ def verify_request(req, now=None):
     if now - asked_at > REQUEST_MAX_AGE:
         raise RelatedCertificateRefused('The relatedCertRequest is too old; sign a new one')
     row, cert_a = find_requested(req)
+    # Proof of A's key first: what follows names A's state and its CA, for its holder only
+    if not related_cert.request_signature_valid(req, cert_a.public_key()):
+        raise RelatedCertificateRefused(
+            'The relatedCertRequest signature does not verify with the related certificate key')
     if row.revoked:
         raise RelatedCertificateRefused('The related certificate is revoked')
     if cert_a.not_valid_after_utc.replace(tzinfo=None) < now:
@@ -115,9 +119,6 @@ def verify_request(req, now=None):
         raise RelatedCertificateRefused('The CA of the related certificate is revoked')
     _check_chain_validity(ca, now)
     _check_location(req, cert_a)
-    if not related_cert.request_signature_valid(req, cert_a.public_key()):
-        raise RelatedCertificateRefused(
-            'The relatedCertRequest signature does not verify with the related certificate key')
     return row, cert_a
 
 
@@ -255,20 +256,28 @@ def link_issued(b_row, cert_b, requested):
     return a_row
 
 
+def _live_rows_linked_to(row_id, *excluded):
+    """Rows linked to *row_id* whose certificate is still current (unrevoked, unarchived,
+    unexpired), newest first."""
+    return (Certificate.query.filter(Certificate.related_certificate_id == row_id,
+                                     Certificate.id.notin_([row_id, *excluded]),
+                                     Certificate.revoked.isnot(True),
+                                     Certificate.archived.isnot(True),
+                                     Certificate.valid_to > utc_now(),
+                                     Certificate.crt.isnot(None))
+            .order_by(Certificate.id.desc()).all())
+
+
 def hand_over_link(revoked_row):
-    """When *revoked_row* was the B of a valid A, A's link moves to the newest
-    unrevoked B naming A (a superseded B revoked alone); the moved-to row or None."""
+    """When *revoked_row*, the newest B of a valid A, is revoked alone, A returns to
+    the newest older B still current and naming A; the moved-to row or None."""
     a_row = mutual_partner(revoked_row)
     if a_row is None or a_row.revoked:
         return None
     cert_a = row_certificate(a_row)
     if not related_cert.references(row_certificate(revoked_row), cert_a):
         return None
-    for b_row in (Certificate.query.filter(Certificate.related_certificate_id == a_row.id,
-                                           Certificate.id != revoked_row.id,
-                                           Certificate.revoked.isnot(True),
-                                           Certificate.crt.isnot(None))
-                  .order_by(Certificate.id.desc()).all()):
+    for b_row in _live_rows_linked_to(a_row.id, revoked_row.id):
         if related_cert.references(row_certificate(b_row), cert_a):
             a_row.related_certificate_id = b_row.id
             return b_row
@@ -284,14 +293,10 @@ def _readable(row):
 
 
 def _relink_or_leave(row, gone_id):
-    """*row* was linked to *gone_id*: its way back moves to the newest unrevoked
+    """*row* was linked to *gone_id*: its way back moves to the newest current
     certificate still naming it, else it leaves its pair (no link, no role)."""
     cert = _readable(row)
-    for b_row in (Certificate.query.filter(Certificate.related_certificate_id == row.id,
-                                           Certificate.id.notin_([row.id, gone_id]),
-                                           Certificate.revoked.isnot(True),
-                                           Certificate.crt.isnot(None))
-                  .order_by(Certificate.id.desc()).all()):
+    for b_row in _live_rows_linked_to(row.id, gone_id):
         b_cert = _readable(b_row)
         if cert is not None and b_cert is not None and related_cert.references(b_cert, cert):
             row.related_certificate_id = b_row.id

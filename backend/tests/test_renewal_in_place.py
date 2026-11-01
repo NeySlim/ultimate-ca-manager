@@ -282,9 +282,9 @@ class TestInPlace:
             assert row.issuer == ca_cert.subject.rfc4514_string()
             ski = cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value.digest
             assert ski == x509.SubjectKeyIdentifier.from_public_key(cert.public_key()).digest
-            assert row.ski == ski.hex(':')
+            assert row.ski == ski.hex(':').upper()  # as the crt listener and CA.ski store it
             issuer_ski = ca_cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value.digest
-            assert row.aki == issuer_ski.hex(':')
+            assert row.aki == issuer_ski.hex(':').upper()
             assert row.valid_from == cert.not_valid_before_utc.replace(tzinfo=None)
             assert row.valid_to == cert.not_valid_after_utc.replace(tzinfo=None)
 

@@ -271,14 +271,17 @@ def validate_enrollment_public_key(public_key) -> str | None:
 
 
 def unsignable_csr_key(csr) -> str | None:
-    """Refusal for a CSR whose key this build cannot load (SLH-DSA), None otherwise.
+    """Refusal for a CSR whose key this build or the FIPS provider cannot load (SLH-DSA), None otherwise.
     Checked before ``is_signature_valid``, which raises on such a key."""
     try:
         csr.public_key()
     except UnsupportedAlgorithm:
         oid = csr.public_key_algorithm_oid
         info = key_algorithms.post_quantum_info(oid)
-        return f'{info.label if info else oid.dotted_string} keys are not signable by this instance'
+        name = info.label if info else oid.dotted_string
+        if fips_mode.enabled():  # the FIPS provider, not the build, lacks the algorithm
+            return f'{name} keys are not available in FIPS mode'
+        return f'{name} keys are not signable by this instance'
     return None
 
 

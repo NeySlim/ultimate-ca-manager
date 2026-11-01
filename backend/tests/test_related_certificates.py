@@ -179,6 +179,8 @@ def test_a_revoked_a_is_refused(app, auth_client, cert_a):
     with app.app_context():
         with pytest.raises(RelatedCertificateRefused, match='revoked'):
             _sign(row_id, csr_pem)
+        with pytest.raises(RelatedCertificateRefused, match='signature does not verify'):
+            _sign(row_id, _csr_b(cert, ec.generate_private_key(ec.SECP256R1())))
 
 
 def test_an_expired_a_is_refused(app, cert_a):
@@ -325,6 +327,29 @@ def test_revoking_the_newest_b_alone_hands_the_link_to_the_previous_one(app, aut
         assert mutual_partner(db.session.get(Certificate, row_id)).id == b1
 
 
+@pytest.mark.parametrize('state', ['archived', 'expired'])
+def test_a_never_returns_to_a_b_that_is_no_longer_current(app, auth_client, cert_a, state):
+    row_id = cert_a[0]
+    b1, b2 = _sign_b(app, auth_client, row_id), _sign_b(app, auth_client, row_id)
+    with app.app_context():
+        old = db.session.get(Certificate, b1)
+        if state == 'archived':
+            old.archived = True
+        else:
+            old.valid_to = utc_now() - timedelta(days=1)
+        db.session.commit()
+    r = auth_client.post(f'/api/v2/certificates/{b2}/revoke',
+                         json={'reason': 'superseded', 'revoke_related': False})
+    assert r.status_code == 200, r.data
+    with app.app_context():
+        assert db.session.get(Certificate, row_id).related_certificate_id == b2
+    r = auth_client.delete(f'/api/v2/certificates/{b2}')
+    assert r.status_code == 204, r.data
+    with app.app_context():
+        row = db.session.get(Certificate, row_id)
+        assert (row.related_certificate_id, row.hybrid_role) == (None, None)
+
+
 def test_revoking_a_alone_moves_no_link(app, auth_client, cert_a):
     row_id = cert_a[0]
     b1, b2 = _sign_b(app, auth_client, row_id), _sign_b(app, auth_client, row_id)
@@ -460,6 +485,62 @@ def test_an_a_that_is_itself_a_b_keeps_its_own_link(app, cert_a):
         assert db.session.get(Certificate, a_id).related_certificate_id == c_id
 
 
+# ---- a B enrolled by a device: A renews alone ---------------------------------------
+
+def _renew(auth_client, row_id, how):
+    if how == 'bulk':
+        r = auth_client.post('/api/v2/certificates/bulk/renew', json={'ids': [row_id]})
+        assert r.status_code == 200, r.data
+        assert json.loads(r.data)['data']['failed'] == [], r.data
+        return
+    r = auth_client.post(f'/api/v2/certificates/{row_id}/renew', json={})
+    assert r.status_code == 200, r.data
+    assert 'related_renewed' not in json.loads(r.data)['data'], r.data
+
+
+def _links(*ids):
+    db.session.expire_all()
+    return [(db.session.get(Certificate, i).related_certificate_id,
+             db.session.get(Certificate, i).hybrid_role) for i in ids]
+
+
+@pytest.mark.parametrize('how', ['single', 'bulk'])
+def test_a_renews_alone_when_its_b_was_enrolled_by_a_device(app, auth_client, cert_a, how):
+    row_id, cert, key = cert_a
+    with app.app_context():
+        b_row = _est_sign(_signing_ca(row_id)[0], _csr_naming(cert, key, key_algorithms.generate(PQ_LABEL)))
+        b_id, b_serial = b_row.id, b_row.serial_number
+        assert not b_row.prv and _links(row_id) == [(b_id, 'classical')]
+    _renew(auth_client, row_id, how)
+    with app.app_context():
+        a_row, b_row = db.session.get(Certificate, row_id), db.session.get(Certificate, b_id)
+        assert a_row.renewed_times == 1 and b_row.serial_number == b_serial and not b_row.revoked
+        # B names the A that was replaced: neither row is left pointing at the other
+        assert _links(row_id, b_id) == [(None, None), (None, None)]
+
+
+def test_a_form_pair_renews_a_alone_once_a_device_enrols_a_newer_b(app, auth_client, create_ca):
+    from utils.key_codec import load_pem_bytes
+    ca = create_ca(cn='Device B CA')
+    r = auth_client.post('/api/v2/certificates', json={
+        'cn': 'device-b.example.com', 'ca_id': ca['id'], 'validity_days': 90,
+        'hybrid': {'classical': next(l for l in key_algorithms.labels('EC') if l.endswith('P256')),
+                   'pq': PQ_LABEL}})
+    assert r.status_code == 201, r.data
+    a_id, form_id = (json.loads(r.data)['data'][k]['id'] for k in ('certificate', 'related'))
+    with app.app_context():
+        a_row = db.session.get(Certificate, a_id)
+        cert = x509.load_pem_x509_certificate(base64.b64decode(a_row.crt))
+        key = serialization.load_pem_private_key(load_pem_bytes(a_row.prv, context='test'), None)
+        b2_id = _est_sign(_signing_ca(a_id)[0],
+                          _csr_naming(cert, key, key_algorithms.generate(PQ_LABEL))).id
+        assert _links(a_id)[0][0] == b2_id
+    _renew(auth_client, a_id, 'single')
+    with app.app_context():
+        assert [db.session.get(Certificate, i).renewed_times or 0 for i in (a_id, form_id, b2_id)] == [1, 0, 0]
+        assert _links(a_id, form_id, b2_id) == [(None, None)] * 3
+
+
 @pytest.mark.parametrize('path', ['est', 'sign_route'])
 def test_b_is_stored_and_linked_when_a_changes_after_signing(app, auth_client, cert_a, monkeypatch, path):
     """A is found before signing: a lookup after it could lose a signed certificate."""
@@ -514,6 +595,12 @@ def test_a_related_certificate_under_an_expired_ca_certificate_is_refused(app, c
             req = related_cert.parse_request(related_cert.build_request(cert, key, 'u:x'))
             with pytest.raises(RelatedCertificateRefused, match='CA certificate .* is not valid now'):
                 verify_request(req)
+            # Who does not hold A's key learns nothing of its CA
+            forged = related_cert.parse_request(related_cert.build_request(
+                cert, ec.generate_private_key(ec.SECP256R1()), 'u:x'))
+            with pytest.raises(RelatedCertificateRefused, match='signature does not verify') as refused:
+                verify_request(forged)
+            assert 'Related expired CA' not in str(refused.value)
         finally:
             ca = db.session.get(CA, ca_id)
             ca.crt = previous

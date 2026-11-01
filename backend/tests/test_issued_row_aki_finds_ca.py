@@ -81,3 +81,16 @@ def test_msca_import_row_aki_finds_its_ca(app, create_ca):
         _import_signed_cert(pending, cert.public_bytes(serialization.Encoding.PEM).decode(),
                             msca, 'WebServer', None)
         _assert_finds(db.session.get(Certificate, pending.id), ca, cert)
+
+
+def test_renewed_row_aki_finds_its_ca(app, create_ca, create_cert):
+    from services.cert.renewal import renew_certificate_in_place
+    ca_data = create_ca(cn='AKI lookup CA (renewal)')
+    cert_id = create_cert(ca_id=ca_data['id'], cn='aki-renew.example.test')['id']
+    with app.app_context():
+        renew_certificate_in_place(db.session.get(Certificate, cert_id))
+        db.session.expire_all()
+        row = db.session.get(Certificate, cert_id)
+        assert row.renewed_times == 1
+        cert = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+        _assert_finds(row, db.session.get(CA, ca_data['id']), cert)
