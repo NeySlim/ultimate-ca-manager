@@ -21,7 +21,7 @@ export default {
           { label: 'Contas CA externas', text: 'Uma ou mais contas por CA, várias contas podem partilhar o mesmo URL de diretório (ex.: duas contas Let\'s Encrypt para separação administrativa); um URL de diretório vazio equivale a Let\'s Encrypt Production' },
           { label: 'Servidor Personalizado', text: 'Definir uma URL de diretório ACME personalizada para usar qualquer CA compatível com RFC 8555' },
           { label: 'EAB', text: 'Suporte a External Account Binding para CAs que requerem pré-registro (ZeroSSL, HARICA, etc.)' },
-          { label: 'Tipos de Chave', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384 para chaves de certificado; ML-DSA-44, ML-DSA-65 e ML-DSA-87 apenas pela API, nunca em modo FIPS. Um padrão configurado que esta instância não consegue gerar faz o pedido falhar em vez de recorrer a RSA-2048 (v2.248)' },
+          { label: 'Tipos de Chave', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87 para chaves de certificado; ML-DSA não é oferecido em modo FIPS nem numa compilação sem ele. Um padrão configurado que esta instância não consegue gerar faz o pedido falhar em vez de recorrer a RSA-2048 (v2.248)' },
           { label: 'Chave reutilizada em modo FIPS', text: 'A reutilização da chave de um certificado de origem é recusada quando o modo FIPS não aprova essa chave, ML-DSA incluído (v2.248)' },
           { label: 'Chaves de Conta', text: 'Algoritmos ES256 (P-256), ES384 (P-384) ou RS256 para chaves de conta ACME' },
           { label: 'Provedores DNS', text: 'Configurar provedores de desafio DNS-01 (Cloudflare, Route53, Tencent DNSPod, Plesk, etc.). O Plesk usa sua API XML; Verify TLS Certificate pode ser desativado para um painel autoassinado e um atraso de propagação DNS pode ser adicionado' },
@@ -167,7 +167,7 @@ Gerencie a configuração do seu cliente ACME:
 - **Ambiente**: Staging (testes) ou Produção (certificados reais)
 - **E-mail de Contato**: Obrigatório para registro da conta
 - **Renovação Automática**: Renovar automaticamente certificados antes da expiração
-- **Tipo de Chave do Certificado**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384. ML-DSA-44, ML-DSA-65 e ML-DSA-87 são aceitos pela API (\`key_type\` no pedido ou nas configurações), nunca em modo FIPS. Um tipo configurado que esta instância não consegue gerar faz o pedido falhar em vez de recorrer a RSA-2048
+- **Tipo de Chave do Certificado**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 ou P-384, ML-DSA-44, ML-DSA-65 ou ML-DSA-87. ML-DSA não é oferecido em modo FIPS nem numa compilação sem ele. Um tipo configurado que esta instância não consegue gerar faz o pedido falhar em vez de recorrer a RSA-2048
 - **Algoritmo de Chave da Conta**: ES256, ES384 ou RS256 para assinatura da conta ACME
 
 ### Servidor ACME Personalizado

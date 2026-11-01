@@ -35,6 +35,16 @@ export default {
           { label: 'Migração', text: 'CAs locais existentes não podem ser movidas para um HSM após a criação, escolher na criação' },
         ]
       },
+      {
+        title: 'Chaves ML-DSA',
+        content: 'As chaves ML-DSA-44, ML-DSA-65 e ML-DSA-87 (FIPS 204) são oferecidas apenas nos provedores que assinam com elas. Assinam os próprios dados, por isso não se escolhe digest.',
+        items: [
+          { label: 'PKCS#11', text: 'Um token que implemente PKCS#11 3.2 com os mecanismos ML-DSA' },
+          { label: 'OpenBao / Vault Transit', text: 'Tipos de chave Transit mldsa-44, mldsa-65 e mldsa-87' },
+          { label: 'Google Cloud KMS', text: 'Versões de chave PQ_SIGN_ML_DSA, mapeadas a partir da API do KMS mas ainda não testadas no serviço. O KMS assina no máximo 64 KiB de dados, por isso uma CRL maior não pode ser assinada' },
+          { label: 'Indisponível', text: 'Os provedores Azure Key Vault e AWS CloudHSM não guardam chaves ML-DSA, e o modo FIPS recusa ML-DSA em todos os provedores' },
+        ]
+      },
 
     ],
     tips: [
@@ -104,6 +114,7 @@ Configuração:
 Tipos de chave suportados:
 - RSA 2048, 3072, 4096
 - ECDSA P-256, P-384, P-521
+- ML-DSA-44, ML-DSA-65, ML-DSA-87 (chaves Transit \`mldsa-*\`, numa versão do OpenBao que as inclua)
 - AES-256-GCM (simétrico)
 
 > 💡 OpenBao é um fork comunitário do HashiCorp Vault. O UCM funciona com ambos.
@@ -136,6 +147,14 @@ Cada provedor mostra um indicador de status de conexão:
 5. Clique em **Gerar**
 
 A chave é criada diretamente no HSM. O UCM armazena apenas uma referência.
+
+### Chaves ML-DSA
+As chaves ML-DSA-44, ML-DSA-65 e ML-DSA-87 (FIPS 204) são oferecidas apenas nos provedores que assinam com elas:
+- **PKCS#11**: um token que implemente PKCS#11 3.2 com os mecanismos ML-DSA
+- **OpenBao / Vault Transit**: tipos de chave \`mldsa-44\`, \`mldsa-65\` e \`mldsa-87\`
+- **Google Cloud KMS**: versões de chave \`PQ_SIGN_ML_DSA_*\`, mapeadas a partir da API do KMS mas ainda não testadas no serviço. O KMS assina no máximo 64 KiB de dados, por isso uma CRL maior não pode ser assinada
+
+Os provedores Azure Key Vault e AWS CloudHSM não guardam chaves ML-DSA, e o modo FIPS recusa ML-DSA em todos os provedores. Uma chave ML-DSA assina os próprios dados, por isso não se escolhe digest.
 
 ### Usando Chaves HSM
 Ao criar uma CA, selecione um provedor HSM e uma chave em vez de gerar uma chave de software. As operações de assinatura da CA são realizadas no HSM.

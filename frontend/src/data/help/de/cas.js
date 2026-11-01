@@ -155,7 +155,7 @@ Gruppiert CAs nach ihrem Organisation-Feld (O). Nützlich für Multi-Mandanten-S
 Das Formular markiert eine RSA-2048-CA, die 2030 überdauern würde: Die ANSSI akzeptiert RSA-2048 bis Ende 2030, ETSI TS 119 312 bis Ende 2026. Wählen Sie RSA-3072 oder größer. Unter **Erweiterte Einschränkungen (RFC 5280)** begrenzen erlaubte und ausgeschlossene Teilbäume (DNS, IP-Bereich, E-Mail) die Namen, die die CA zertifizieren darf.
 
 ### Post-Quanten-CAs (ML-DSA)
-**ML-DSA-44**, **ML-DSA-65** und **ML-DSA-87** (FIPS 204) werden mit ihrer NIST-Sicherheitsstufe (2, 3 und 5) aufgeführt. Der Schlüssel wird in Software erzeugt, nie auf einem HSM, und der Algorithmus ist im FIPS-Modus ausgeblendet.
+**ML-DSA-44**, **ML-DSA-65** und **ML-DSA-87** (FIPS 204) werden mit ihrer NIST-Sicherheitsstufe (2, 3 und 5) aufgeführt. Der Schlüssel wird in Software oder bei einem HSM-Anbieter erzeugt, der ML-DSA unterstützt (siehe HSM-gestützte CAs), und der Algorithmus ist im FIPS-Modus ausgeblendet.
 
 - Ein ML-DSA-Schlüssel signiert ohne separaten Digest: Das Digest-Feld entfällt, und ein über die API gesendeter Digest wird mit einem Hinweis ignoriert. CRLs und OCSP-Antworten der CA folgen derselben Regel.
 - Hierarchien können gemischt sein: Eine ML-DSA-Root kann eine RSA- oder EC-Intermediate signieren, und eine RSA- oder EC-CA kann eine ML-DSA-Intermediate signieren, die dann den Digest ihrer übergeordneten CA verwendet.
@@ -273,7 +273,7 @@ UCM kann den Signaturschlüssel einer CA auf einem externen Hardware-Sicherheits
 3. Wechseln Sie unter **Schlüsselspeicher** von *Lokal* zu **HSM**
 4. Wählen Sie den HSM-Anbieter
 5. Wählen Sie einen Schlüsselmodus:
-   - **Neuen Schlüssel generieren**: Bezeichnung angeben (Buchstaben/Ziffern/_/-) und Algorithmus wählen (RSA-2048/3072/4096 oder EC-P256/P384/P521, standardmäßig RSA-3072)
+   - **Neuen Schlüssel generieren**: Bezeichnung angeben (Buchstaben/Ziffern/_/-) und Algorithmus wählen (RSA-2048/3072/4096 oder EC-P256/P384/P521, standardmäßig RSA-3072; Brainpool bei PKCS#11, ML-DSA bei den unter HSM-Verwaltung genannten Anbietern)
    - **Vorhandenen Schlüssel verwenden**: einen ungenutzten Signaturschlüssel auf dem HSM auswählen
 6. Absenden. UCM erstellt das CA-Zertifikat und bindet es an den HSM-Schlüssel.
 

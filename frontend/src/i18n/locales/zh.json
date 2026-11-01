@@ -2177,6 +2177,8 @@
     "crlPublishInterval": "发布间隔",
     "crlPublishAuto": "自动（到期前）",
     "crlDigest": "签名摘要",
+    "crlDigestIgnored": "已存储的摘要 {{digest}} 被忽略：此密钥签名时不使用单独的摘要",
+    "crlDigestClear": "清除",
     "crlScheduleNote": "发布频率高于有效期窗口，可在发布失败时为依赖方提供宽限期。",
     "nextPublish": "下次发布",
     "namedUrlsTitle": "命名 URL",
@@ -3222,8 +3224,12 @@
           "remedy": "请在切换前创建 RSA 或 ECDSA（P-256/P-384/P-521）颁发机构并将签发迁移过去；颁发机构密钥无法转换。"
         },
         "ca_weak_key": {
-          "title": "使用 DSA 或 ML-DSA 密钥、2048 位以下 RSA 或 P-256/384/521 以外曲线的证书颁发机构",
+          "title": "使用 DSA 密钥、2048 位以下 RSA 或 P-256/384/521 以外曲线的证书颁发机构",
           "remedy": "请创建使用 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521 的颁发机构，并将签发迁移过去。"
+        },
+        "ca_unapproved_algorithm": {
+          "title": "使用 ML-DSA 密钥的证书颁发机构：UCM 附带的 FIPS 模块不提供 ML-DSA，因此它们无法在 FIPS 模式下签名",
+          "remedy": "请在切换前创建 RSA 2048 位及以上或 ECDSA P-256/P-384/P-521 的颁发机构并将签发迁移过去；若仍需签发 ML-DSA，请保持 FIPS 模式关闭。"
         },
         "ssh_ca_eddsa_key": {
           "title": "使用 Ed25519 密钥的 SSH 证书颁发机构：在 FIPS 模式下无法签名",
@@ -3916,7 +3922,9 @@
     "relatedNotRevoked": "关联证书未被吊销：它没有将本证书指明为其配对证书，或已被吊销。",
     "revokeRelatedBulk": "同时吊销关联证书",
     "revokeRelatedBulkHint": "所选的混合证书对成员会连同另一成员一起吊销。取消勾选可使其他成员保持有效。",
-    "bulkRelatedRevoked": "已随所选项一并吊销 {{count}} 张关联证书"
+    "relatedRevokeFailed": "证书已吊销，但其关联证书 #{{id}} 无法吊销：请单独吊销。",
+    "bulkRelatedRevoked": "已随所选项一并吊销 {{count}} 张关联证书",
+    "bulkRelatedRevokeFailed": "有 {{count}} 张关联证书无法随所选项一并吊销（#{{ids}}）：请单独吊销"
   },
   "details": {
     "pemCertificate": "PEM 证书",
@@ -4066,6 +4074,7 @@
     "importCAs": "导入 CA",
     "importCertificates": "导入证书",
     "importKeys": "导入密钥",
+    "importCSRs": "导入 CSR",
     "importObjects": "导入 {{count}} 个对象",
     "importingObjects": "正在导入对象...",
     "importComplete": "导入完成",
@@ -4810,7 +4819,8 @@
     "jksNote": "JKS 始终包含私钥",
     "pkcs12Title": "导出 PKCS#12",
     "pkcs12PasswordPrompt": "请输入 PKCS#12 文件的密码",
-    "formatHybridBundleDesc": "包含该证书对中两张证书的 ZIP"
+    "formatHybridBundleDesc": "包含该证书对中两张证书的 ZIP",
+    "bundleRelatedHasNoKey": "关联证书没有私钥：该包仅包含证书"
   },
   "userCertificates": {
     "title": "用户证书",

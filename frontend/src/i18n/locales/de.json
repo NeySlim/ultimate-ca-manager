@@ -2177,6 +2177,8 @@
     "crlPublishInterval": "Veröffentlichen alle",
     "crlPublishAuto": "Auto (vor Ablauf)",
     "crlDigest": "Signatur Digest",
+    "crlDigestIgnored": "Gespeicherter Digest {{digest}} wird ignoriert: Dieser Schlüssel signiert ohne separaten Digest",
+    "crlDigestClear": "Löschen",
     "crlScheduleNote": "Häufigeres Veröffentlichen als das Gültigkeitsfenster gibt den Clients eine Karenzzeit, falls eine Veröffentlichung ausfällt.",
     "nextPublish": "Nächste Veröffentlichung",
     "namedUrlsTitle": "Benannte URLs",
@@ -3222,8 +3224,12 @@
           "remedy": "Vor dem Umschalten eine RSA- oder ECDSA-Zertifizierungsstelle (P-256/P-384/P-521) erstellen und die Ausstellung dorthin verlagern; ein CA-Schlüssel lässt sich nicht umwandeln."
         },
         "ca_weak_key": {
-          "title": "Zertifizierungsstellen mit einem DSA- oder ML-DSA-Schlüssel, RSA unter 2048 Bit oder einer anderen Kurve als P-256/384/521",
+          "title": "Zertifizierungsstellen mit einem DSA-Schlüssel, RSA unter 2048 Bit oder einer anderen Kurve als P-256/384/521",
           "remedy": "Eine Zertifizierungsstelle mit RSA 2048+ oder ECDSA P-256/P-384/P-521 erstellen und die Ausstellung dorthin verlagern."
+        },
+        "ca_unapproved_algorithm": {
+          "title": "Zertifizierungsstellen mit ML-DSA-Schlüssel: Das mitgelieferte FIPS-Modul von UCM bietet kein ML-DSA, daher können sie im FIPS-Modus nicht signieren",
+          "remedy": "Vor dem Umschalten eine RSA-2048+- oder ECDSA-P-256/P-384/P-521-Zertifizierungsstelle erstellen und die Ausstellung dorthin verlagern, oder den FIPS-Modus ausgeschaltet lassen, solange ML-DSA-Ausstellung nötig ist."
         },
         "ssh_ca_eddsa_key": {
           "title": "SSH-Zertifizierungsstellen mit Ed25519-Schlüssel: Sie können im FIPS-Modus nicht signieren",
@@ -3914,9 +3920,11 @@
     "revokeRelatedHint": "Deaktivieren, damit das andere Mitglied des hybriden Paars gültig bleibt.",
     "revokedWithRelated": "Zertifikat widerrufen, zusammen mit seinem verknüpften Zertifikat #{{id}}",
     "relatedNotRevoked": "Das verknüpfte Zertifikat wurde nicht widerrufen: Es nennt dieses Zertifikat nicht als sein Paar oder wurde bereits widerrufen.",
+    "relatedRevokeFailed": "Zertifikat widerrufen, aber das verknüpfte Zertifikat #{{id}} konnte nicht widerrufen werden: Widerrufen Sie es separat.",
     "revokeRelatedBulk": "Auch die verknüpften Zertifikate widerrufen",
     "revokeRelatedBulkHint": "Ausgewählte Mitglieder eines hybriden Paars ziehen das andere Mitglied mit. Deaktivieren, damit die anderen Mitglieder gültig bleiben.",
-    "bulkRelatedRevoked": "{{count}} verknüpfte Zertifikate zusammen mit der Auswahl widerrufen"
+    "bulkRelatedRevoked": "{{count}} verknüpfte Zertifikate zusammen mit der Auswahl widerrufen",
+    "bulkRelatedRevokeFailed": "{{count}} verknüpfte Zertifikate konnten nicht zusammen mit der Auswahl widerrufen werden (#{{ids}}): Widerrufen Sie sie separat"
   },
   "details": {
     "pemCertificate": "PEM-Zertifikat",
@@ -4066,6 +4074,7 @@
     "importCAs": "CAs importieren",
     "importCertificates": "Zertifikate importieren",
     "importKeys": "Schlüssel importieren",
+    "importCSRs": "CSRs importieren",
     "importObjects": "{{count}} Objekt(e) importieren",
     "importingObjects": "Objekte werden importiert...",
     "importComplete": "Import abgeschlossen",
@@ -4810,7 +4819,8 @@
     "jksNote": "JKS enthält immer den privaten Schlüssel",
     "pkcs12Title": "PKCS#12 exportieren",
     "pkcs12PasswordPrompt": "Passwort für PKCS#12-Datei eingeben",
-    "formatHybridBundleDesc": "ZIP mit beiden Zertifikaten des Paars"
+    "formatHybridBundleDesc": "ZIP mit beiden Zertifikaten des Paars",
+    "bundleRelatedHasNoKey": "Das verknüpfte Zertifikat hat keinen privaten Schlüssel: Das Bundle enthält nur die Zertifikate"
   },
   "userCertificates": {
     "title": "Benutzerzertifikate",

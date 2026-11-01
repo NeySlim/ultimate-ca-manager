@@ -55,11 +55,11 @@ export default {
         title: 'Pares de certificados híbridos (RFC 9763)',
         content: 'Um certificado clássico (A) e um ML-DSA (B) para o mesmo sujeito, ligados: B contém a extensão relatedCertificate que designa A pelo seu hash. Os clientes que conhecem ML-DSA verificam ambos; os outros continuam a usar A.',
         items: [
-          { label: 'Emitir', text: 'Marque "Emitir um par híbrido (RFC 9763)" no formulário de emissão de certificado e escolha a chave clássica e o nível ML-DSA; ambos vêm da mesma CA, com o mesmo sujeito, nomes e validade, e B não declara nenhum key usage nem EKU que A não tenha. Oferecido apenas quando as políticas da CA permitem ambos, nunca em modo FIPS. Uma política que exija aprovação recusa o par por enquanto' },
+          { label: 'Emitir', text: 'Marque "Emitir um par híbrido (RFC 9763)" no formulário de emissão de certificado e escolha a chave clássica e o nível ML-DSA; ambos vêm da mesma CA, com o mesmo sujeito, nomes e validade, e B não declara nenhum key usage nem EKU que A não tenha. Oferecido apenas quando as políticas da CA permitem ambos, nunca em modo FIPS. Nos perfis ANSSI, BSI e EU ACM, ML-DSA-65 e ML-DSA-87 são oferecidos apenas no par. Uma política que exija aprovação recusa o par por enquanto' },
           { label: 'Ligação por pedido', text: 'Um CSR com um relatedCertRequest assinado pela chave de A (Assinar CSR, ACME, EST, WSTEP) emite um B ligado a A. A deve estar guardado aqui, válido, não revogado e ser um certificado de entidade final' },
           { label: 'Ligado', text: 'Cada membro mostra um selo Ligado na lista e nos seus detalhes, com uma ligação que abre o outro membro' },
-          { label: 'Revogar', text: 'Revogar um membro, isoladamente ou em lote, revoga também o outro, a menos que desmarque "Revogar também o certificado ligado", por exemplo para manter A quando só a chave ML-DSA foi comprometida; sob uma política que exija aprovação, ambos seguem juntos' },
-          { label: 'Renovar', text: 'Renovar um dos membros renova ambos, manualmente, em lote ou automaticamente, e o novo B designa o novo A' },
+          { label: 'Revogar', text: 'Revogar um membro, isoladamente ou em lote, revoga também o outro, a menos que desmarque "Revogar também o certificado ligado", por exemplo para manter A quando só a chave ML-DSA foi comprometida; sob uma política que exija aprovação, ambos seguem juntos. Um aviso indica o outro membro quando não pôde ser revogado' },
+          { label: 'Renovar', text: 'Renovar um dos membros renova ambos, manualmente, em lote ou automaticamente, e o novo B designa o novo A. Um membro renovado isoladamente, estando o outro revogado, sai do par' },
           { label: 'Exportar', text: 'O formato Pacote híbrido descarrega um ZIP com os dois certificados e, se incluir a chave e puder exportar chaves, as duas chaves' },
         ]
       },
@@ -186,11 +186,11 @@ Formatos de exportação:
 
 Um par híbrido liga um certificado clássico (**A**, RSA ou EC) e um pós-quântico (**B**, ML-DSA) para o mesmo sujeito. B contém a extensão não crítica **relatedCertificate**, que designa A pelo seu hash, para que uma parte confiante possa exigir ambos.
 
-- **Emissão**: marque **Emitir um par híbrido (RFC 9763)** no formulário de emissão de certificado (ou envie \`hybrid\` em \`POST /api/v2/certificates\`) para emitir ambos a partir da mesma CA, com o mesmo sujeito, nomes e validade. B copia as extensões de A com o seu próprio identificador de chave e key usage, e não declara nenhum key usage nem EKU que A não tenha
+- **Emissão**: marque **Emitir um par híbrido (RFC 9763)** no formulário de emissão de certificado (ou envie \`hybrid\` em \`POST /api/v2/certificates\`) para emitir ambos a partir da mesma CA, com o mesmo sujeito, nomes e validade. B copia as extensões de A com o seu próprio identificador de chave e key usage, e não declara nenhum key usage nem EKU que A não tenha. Nos perfis de conformidade ANSSI, BSI e EU ACM, ML-DSA-65 e ML-DSA-87 são aceites apenas como B: nunca isolados, e ML-DSA-44 de todo
 - **Ligação por pedido**: um CSR com um **relatedCertRequest** assinado pela chave de A emite um B ligado a A, via Assinar CSR, ACME, EST ou WSTEP. A deve estar guardado no UCM, válido, não revogado, ser um certificado de entidade final emitido por uma CA desta instância, e o pedido deve ser recente. Um certificado fornecido inline na localização do pedido deve ser A; outras localizações não são obtidas
-- **Revogação** de um dos membros, isoladamente ou em lote, revoga o outro, a menos que **Revogar também o certificado ligado** esteja desmarcado. Sob uma política que exija aprovação, o par segue junto, e duas políticas de aprovação diferentes nos dois membros deixam a revogação a um administrador
-- **Renovação** de um dos membros, manual, em lote ou automática, renova ambos, e o novo B designa o novo A
-- **Exportação**: o formato **hybrid-bundle** é um ZIP com os dois certificados e, se a chave for incluída, as duas chaves privadas
+- **Revogação** de um dos membros, isoladamente ou em lote, revoga o outro, a menos que **Revogar também o certificado ligado** esteja desmarcado. Sob uma política que exija aprovação, o par segue junto, e duas políticas de aprovação diferentes nos dois membros deixam a revogação a um administrador. Se o outro membro não puder ser revogado, a resposta indica-o (\`related_not_revoked\`) e ele deve ser revogado separadamente
+- **Renovação** de um dos membros, manual, em lote ou automática, renova ambos, e o novo B designa o novo A. Um membro renovado isoladamente, estando o outro revogado, sai do par, tal como o outro membro quando um é eliminado
+- **Exportação**: o formato **hybrid-bundle** é um ZIP com os dois certificados e, se a chave for incluída, as duas chaves privadas; é recusado quando nenhum dos certificados designa já o outro
 
 > ⚠ Uma política que exija aprovação recusa por enquanto emitir um par híbrido: emita-o sob uma política sem aprovação.
 

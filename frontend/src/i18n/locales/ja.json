@@ -2177,6 +2177,8 @@
     "crlPublishInterval": "公開間隔",
     "crlPublishAuto": "自動（期限前）",
     "crlDigest": "署名ダイジェスト",
+    "crlDigestIgnored": "保存済みのダイジェスト {{digest}} は無視されます：この鍵は別個のダイジェストなしで署名します",
+    "crlDigestClear": "クリア",
     "crlScheduleNote": "有効期間より短い間隔で公開すると、公開が失敗した場合でも検証側に猶予期間が与えられます。",
     "nextPublish": "次回公開",
     "namedUrlsTitle": "名前付きURL",
@@ -3222,8 +3224,12 @@
           "remedy": "切り替え前に RSA または ECDSA（P-256/P-384/P-521）の認証局を作成し、発行をそちらへ移行してください。認証局の鍵は変換できません。"
         },
         "ca_weak_key": {
-          "title": "DSA または ML-DSA 鍵、2048 ビット未満の RSA、または P-256/384/521 以外の曲線を使う認証局",
+          "title": "DSA 鍵、2048 ビット未満の RSA、または P-256/384/521 以外の曲線を使う認証局",
           "remedy": "RSA 2048 以上または ECDSA P-256/P-384/P-521 の認証局を作成し、発行をそちらへ移行してください。"
+        },
+        "ca_unapproved_algorithm": {
+          "title": "ML-DSA 鍵を持つ認証局：UCM が同梱する FIPS モジュールは ML-DSA を提供しないため、FIPS モードでは署名できません",
+          "remedy": "切り替え前に RSA 2048 以上または ECDSA P-256/P-384/P-521 の認証局を作成し、発行をそちらへ移行してください。ML-DSA での発行が必要な間は FIPS モードをオフのままにしてください。"
         },
         "ssh_ca_eddsa_key": {
           "title": "Ed25519 鍵を持つ SSH 認証局：FIPS モードでは署名できません",
@@ -3917,9 +3923,11 @@
     "revokeRelatedHint": "チェックを外すと、ハイブリッドペアのもう一方は有効なまま残ります。",
     "revokedWithRelated": "証明書を失効させました（リンクされた証明書 #{{id}} も失効）",
     "relatedNotRevoked": "リンクされた証明書は失効しませんでした：この証明書をペアとして指していないか、すでに失効済みです。",
+    "relatedRevokeFailed": "証明書を失効させましたが、リンクされた証明書 #{{id}} を失効できませんでした：個別に失効させてください。",
     "revokeRelatedBulk": "リンクされた証明書も失効させる",
     "revokeRelatedBulkHint": "選択したハイブリッドペアのメンバーは、もう一方も一緒に失効します。チェックを外すと、他のメンバーは有効なまま残ります。",
-    "bulkRelatedRevoked": "選択した証明書と共に、リンクされた証明書 {{count}} 件を失効させました"
+    "bulkRelatedRevoked": "選択した証明書と共に、リンクされた証明書 {{count}} 件を失効させました",
+    "bulkRelatedRevokeFailed": "選択した証明書と共に、リンクされた証明書 {{count}} 件を失効できませんでした（#{{ids}}）：個別に失効させてください"
   },
   "details": {
     "pemCertificate": "PEM証明書",
@@ -4069,6 +4077,7 @@
     "importCAs": "CAのインポート",
     "importCertificates": "証明書のインポート",
     "importKeys": "キーのインポート",
+    "importCSRs": "CSR のインポート",
     "importObjects": "{{count}} 個のオブジェクトをインポート",
     "importingObjects": "オブジェクトをインポート中...",
     "importComplete": "インポート完了",
@@ -4813,7 +4822,8 @@
     "jksNote": "JKSには常に秘密鍵が含まれます",
     "pkcs12Title": "PKCS#12をエクスポート",
     "pkcs12PasswordPrompt": "PKCS#12 ファイルのパスワードを入力してください",
-    "formatHybridBundleDesc": "ペアの両方の証明書を含む ZIP"
+    "formatHybridBundleDesc": "ペアの両方の証明書を含む ZIP",
+    "bundleRelatedHasNoKey": "関連証明書には秘密鍵がありません：バンドルには証明書のみが含まれます"
   },
   "userCertificates": {
     "title": "ユーザー証明書",

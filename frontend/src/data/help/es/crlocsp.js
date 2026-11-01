@@ -13,6 +13,7 @@ export default {
           { label: 'Despliegue de CRL', text: 'Asociar un destino SSH/SFTP para enviar automáticamente cada CRL regenerada. Cada vinculación define el formato PEM o DER, la ruta de destino, las CRL padre opcionales y su propio comando de recarga' },
           { label: 'CDP URL', text: 'URL del punto de distribución de CRL para incluir en los certificados' },
           { label: 'Validez', text: 'Validez de la CRL por CA desde 1 día hasta 5 años (90d/180d/1y/3y/5y para CAs sin conexión que no pueden volver a firmar según el calendario). Aparece una advertencia pasado un año, las partes que confían pueden conservar datos de revocación obsoletos durante toda la ventana' },
+          { label: 'Resumen de firma', text: 'SHA-256, SHA-384 o SHA-512 para una CA RSA o EC. Una CA Ed25519, Ed448 o ML-DSA firma sin resumen: un resumen almacenado antes se muestra como ignorado, con un botón Borrar' },
           { label: 'CRL externa', text: 'Las CAs sin clave o sin conexión no pueden autofirmar una CRL, suba una generada junto a la clave sin conexión desde el panel de detalles de la CA; se valida (firma, emisor, monotonía) y se sirve en la misma URL de CDP (v2.215)' },
         ]
       },

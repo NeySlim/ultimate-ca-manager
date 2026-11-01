@@ -1775,6 +1775,8 @@
     "crlPublishInterval": "Publier toutes les",
     "crlPublishAuto": "Auto (avant expiration)",
     "crlDigest": "Empreinte de signature",
+    "crlDigestIgnored": "L'empreinte enregistrée {{digest}} est ignorée : cette clé signe sans empreinte séparée",
+    "crlDigestClear": "Effacer",
     "crlScheduleNote": "Publier plus souvent que la fenêtre de validité offre une période de grâce aux clients si une publication est manquée.",
     "nextPublish": "Prochaine publication",
     "namedUrlsTitle": "URLs nommées",
@@ -2051,9 +2053,11 @@
     "revokeRelatedHint": "Décochez pour conserver valide l'autre membre de la paire hybride.",
     "revokedWithRelated": "Certificat révoqué, avec son certificat lié n°{{id}}",
     "relatedNotRevoked": "Le certificat lié n'a pas été révoqué : il ne désigne pas ce certificat comme son pair, ou il était déjà révoqué.",
+    "relatedRevokeFailed": "Certificat révoqué, mais son certificat lié n°{{id}} n'a pas pu être révoqué : révoquez-le séparément.",
     "revokeRelatedBulk": "Révoquer aussi les certificats liés",
     "revokeRelatedBulkHint": "Les membres sélectionnés d'une paire hybride entraînent l'autre membre. Décochez pour conserver valides les autres membres.",
-    "bulkRelatedRevoked": "{{count}} certificats liés révoqués avec la sélection"
+    "bulkRelatedRevoked": "{{count}} certificats liés révoqués avec la sélection",
+    "bulkRelatedRevokeFailed": "{{count}} certificats liés n'ont pas pu être révoqués avec la sélection (n°{{ids}}) : révoquez-les séparément"
   },
   "details": {
     "pemCertificate": "Certificat PEM",
@@ -2300,6 +2304,7 @@
     "importCAs": "Importer les CAs",
     "importCertificates": "Importer les certificats",
     "importKeys": "Importer les clés",
+    "importCSRs": "Importer des CSR",
     "importObjects": "Importer {{count}} objet(s)",
     "importingObjects": "Importation en cours...",
     "importComplete": "Importation terminée",
@@ -3362,8 +3367,12 @@
           "remedy": "Créez une CA RSA ou ECDSA (P-256/P-384/P-521) et déplacez-y l'émission avant la bascule ; la clé d'une CA ne peut pas être convertie."
         },
         "ca_weak_key": {
-          "title": "CA avec une clé DSA ou ML-DSA, une clé RSA de moins de 2048 bits ou une courbe autre que P-256/384/521",
+          "title": "CA avec une clé DSA, une clé RSA de moins de 2048 bits ou une courbe autre que P-256/384/521",
           "remedy": "Créez une CA en RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission."
+        },
+        "ca_unapproved_algorithm": {
+          "title": "CA avec une clé ML-DSA : le module FIPS fourni par UCM ne gère pas ML-DSA, elles ne peuvent donc pas signer en mode FIPS",
+          "remedy": "Créez une CA RSA 2048+ ou ECDSA P-256/P-384/P-521 et déplacez-y l'émission avant la bascule, ou laissez le mode FIPS désactivé tant que l'émission ML-DSA est nécessaire."
         },
         "ssh_ca_eddsa_key": {
           "title": "CA SSH avec une clé Ed25519 : elles ne peuvent plus signer en mode FIPS",
@@ -4813,7 +4822,8 @@
     "jksNote": "JKS inclut toujours la clé privée",
     "pkcs12Title": "Exporter PKCS#12",
     "pkcs12PasswordPrompt": "Entrez le mot de passe pour le fichier PKCS#12",
-    "formatHybridBundleDesc": "ZIP avec les deux certificats de la paire"
+    "formatHybridBundleDesc": "ZIP avec les deux certificats de la paire",
+    "bundleRelatedHasNoKey": "Le certificat lié n'a pas de clé privée : le lot ne contient que les certificats"
   },
   "userCertificates": {
     "title": "Certificats Utilisateurs",

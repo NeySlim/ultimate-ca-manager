@@ -21,7 +21,7 @@ export default {
           { label: '外部 CA 账户', text: '每个 CA 可以有多个账户,, 多个账户可以共享同一个目录 URL（例如两个 Let\'s Encrypt 账户用于管理分离）；目录 URL 留空默认为 Let\'s Encrypt 生产环境' },
           { label: '自定义服务器', text: '设置自定义 ACME 目录 URL 以使用任何符合 RFC 8555 的 CA' },
           { label: 'EAB', text: '支持外部账户绑定，用于需要预注册的 CA（ZeroSSL、HARICA 等）' },
-          { label: '密钥类型', text: '证书密钥支持 RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384、Brainpool P-256 或 P-384；ML-DSA-44、ML-DSA-65 和 ML-DSA-87 仅通过 API 提供，FIPS 模式下不可用。已配置但本实例无法生成的默认类型会使订单失败，而不是回退到 RSA-2048 (v2.248)' },
+          { label: '密钥类型', text: '证书密钥支持 RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384、Brainpool P-256 或 P-384、ML-DSA-44、ML-DSA-65 或 ML-DSA-87；FIPS 模式下或不含 ML-DSA 的构建中不提供 ML-DSA。已配置但本实例无法生成的默认类型会使订单失败，而不是回退到 RSA-2048 (v2.248)' },
           { label: 'FIPS 模式下重用密钥', text: '当 FIPS 模式不认可源证书的密钥（包括 ML-DSA）时，拒绝重用该密钥 (v2.248)' },
           { label: '账户密钥', text: 'ACME 账户密钥支持 ES256 (P-256)、ES384 (P-384) 或 RS256 算法' },
           { label: 'DNS 提供商', text: '配置 DNS-01 挑战提供商（Cloudflare、Route53、Tencent DNSPod、Plesk 等）。Plesk 通过其 XML API；对于自签名面板可关闭 Verify TLS Certificate，并可添加 DNS 传播延迟' },
@@ -167,7 +167,7 @@ UCM 支持两种 ACME（自动化证书管理环境）模式：
 - **环境**: 测试（staging）或生产（正式证书）
 - **联系邮箱**: 账户注册时必填
 - **自动续期**: 在证书到期前自动续期
-- **证书密钥类型**: RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384、Brainpool P-256 或 P-384。ML-DSA-44、ML-DSA-65 和 ML-DSA-87 可通过 API 使用（请求或设置中的 \`key_type\`），FIPS 模式下不可用。已配置但本实例无法生成的类型会使订单失败，而不是回退到 RSA-2048
+- **证书密钥类型**: RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384、Brainpool P-256 或 P-384、ML-DSA-44、ML-DSA-65 或 ML-DSA-87。FIPS 模式下或不含 ML-DSA 的构建中不提供 ML-DSA。已配置但本实例无法生成的类型会使订单失败，而不是回退到 RSA-2048
 - **账户密钥算法**: ES256、ES384 或 RS256 用于 ACME 账户签名
 
 ### 自定义 ACME 服务器

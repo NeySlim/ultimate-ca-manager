@@ -2177,6 +2177,8 @@
     "crlPublishInterval": "Publicar a cada",
     "crlPublishAuto": "Auto (antes de expirar)",
     "crlDigest": "Resumo da assinatura",
+    "crlDigestIgnored": "O resumo armazenado {{digest}} é ignorado: esta chave assina sem um resumo separado",
+    "crlDigestClear": "Limpar",
     "crlScheduleNote": "Publicar com mais frequência do que a janela de validade dá aos clientes um período de tolerância se uma publicação for perdida.",
     "nextPublish": "Próxima publicação",
     "namedUrlsTitle": "URLs nomeadas",
@@ -3222,8 +3224,12 @@
           "remedy": "Crie uma autoridade RSA ou ECDSA (P-256/P-384/P-521) e passe a emissão para ela antes da mudança; a chave de uma autoridade não pode ser convertida."
         },
         "ca_weak_key": {
-          "title": "Autoridades de certificação com uma chave DSA ou ML-DSA, RSA abaixo de 2048 bits ou uma curva diferente de P-256/384/521",
+          "title": "Autoridades de certificação com uma chave DSA, RSA abaixo de 2048 bits ou uma curva diferente de P-256/384/521",
           "remedy": "Crie uma autoridade com RSA 2048+ ou ECDSA P-256/P-384/P-521 e passe a emissão para ela."
+        },
+        "ca_unapproved_algorithm": {
+          "title": "Autoridades de certificação com uma chave ML-DSA: o módulo FIPS fornecido pelo UCM não oferece ML-DSA, por isso não podem assinar em modo FIPS",
+          "remedy": "Crie uma autoridade RSA 2048+ ou ECDSA P-256/P-384/P-521 e passe a emissão para ela antes da mudança, ou mantenha o modo FIPS desativado enquanto precisar de emissão ML-DSA."
         },
         "ssh_ca_eddsa_key": {
           "title": "Autoridades de certificação SSH com chave Ed25519: não conseguem assinar no modo FIPS",
@@ -3914,9 +3920,11 @@
     "revokeRelatedHint": "Desmarque para manter válido o outro membro do par híbrido.",
     "revokedWithRelated": "Certificado revogado, com o certificado ligado #{{id}}",
     "relatedNotRevoked": "O certificado ligado não foi revogado: não designa este certificado como seu par, ou já estava revogado.",
+    "relatedRevokeFailed": "Certificado revogado, mas o certificado ligado #{{id}} não pôde ser revogado: revogue-o separadamente.",
     "revokeRelatedBulk": "Revogar também os certificados ligados",
     "revokeRelatedBulkHint": "Os membros selecionados de um par híbrido levam o outro membro consigo. Desmarque para manter válidos os outros membros.",
-    "bulkRelatedRevoked": "{{count}} certificados ligados revogados com a seleção"
+    "bulkRelatedRevoked": "{{count}} certificados ligados revogados com a seleção",
+    "bulkRelatedRevokeFailed": "{{count}} certificados ligados não puderam ser revogados com a seleção (#{{ids}}): revogue-os separadamente"
   },
   "details": {
     "pemCertificate": "Certificado PEM",
@@ -4066,6 +4074,7 @@
     "importCAs": "Importar CAs",
     "importCertificates": "Importar certificados",
     "importKeys": "Importar chaves",
+    "importCSRs": "Importar CSRs",
     "importObjects": "Importar {{count}} Object(s)",
     "importingObjects": "a importar objects...",
     "importComplete": "Importar Concluído",
@@ -4810,7 +4819,8 @@
     "jksNote": "JKS sempre inclui a chave privada",
     "pkcs12Title": "Exportar PKCS#12",
     "pkcs12PasswordPrompt": "Digite a senha para o arquivo PKCS#12",
-    "formatHybridBundleDesc": "ZIP com os dois certificados do par"
+    "formatHybridBundleDesc": "ZIP com os dois certificados do par",
+    "bundleRelatedHasNoKey": "O certificado relacionado não tem chave privada: o pacote contém apenas os certificados"
   },
   "userCertificates": {
     "title": "Certificados de Utilizador",

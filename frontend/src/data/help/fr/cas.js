@@ -156,7 +156,7 @@ Regroupe les CA par leur champ Organisation (O). Utile pour les configurations m
 Le formulaire signale une CA RSA-2048 qui dépasserait 2030 : l'ANSSI accepte RSA-2048 jusqu'à fin 2030, l'ETSI TS 119 312 jusqu'à fin 2026. Choisissez RSA-3072 ou plus. Sous **Contraintes avancées (RFC 5280)**, les sous-arbres permis et exclus (DNS, plage IP, e-mail) limitent les noms que la CA peut certifier.
 
 ### CA post-quantiques (ML-DSA)
-**ML-DSA-44**, **ML-DSA-65** et **ML-DSA-87** (FIPS 204) sont listées avec leur niveau de sécurité NIST (2, 3 et 5). La clé est générée en logiciel, jamais sur un HSM, et l'algorithme est masqué en mode FIPS.
+**ML-DSA-44**, **ML-DSA-65** et **ML-DSA-87** (FIPS 204) sont listées avec leur niveau de sécurité NIST (2, 3 et 5). La clé est générée en logiciel, ou sur un fournisseur HSM qui gère ML-DSA (voir CA adossées HSM), et l'algorithme est masqué en mode FIPS.
 
 - Une clé ML-DSA signe sans digest séparé : le champ digest disparaît, et un digest envoyé par l'API est ignoré avec un avertissement. Les CRL et les réponses OCSP de la CA suivent la même règle.
 - Les hiérarchies peuvent se mélanger : une racine ML-DSA peut signer une intermédiaire RSA ou EC, et une CA RSA ou EC peut signer une intermédiaire ML-DSA, qui utilise alors le digest de sa parente.
@@ -274,7 +274,7 @@ UCM peut stocker la clé de signature d'une CA sur un module matériel de sécur
 3. Dans **Stockage de la clé**, basculez de *Local* à **HSM**
 4. Choisissez le fournisseur HSM
 5. Choisissez un mode de clé :
-   - **Générer une nouvelle clé** : fournissez une étiquette (lettres/chiffres/_/-) et choisissez l'algorithme (RSA-2048/3072/4096 ou EC-P256/P384/P521, RSA-3072 par défaut)
+   - **Générer une nouvelle clé** : fournissez une étiquette (lettres/chiffres/_/-) et choisissez l'algorithme (RSA-2048/3072/4096 ou EC-P256/P384/P521, RSA-3072 par défaut ; Brainpool sur PKCS#11, ML-DSA sur les fournisseurs listés dans la gestion HSM)
    - **Utiliser une clé existante** : choisissez une clé de signature inutilisée déjà présente sur le HSM
 6. Validez. UCM crée le certificat de CA et le lie à la clé HSM.
 

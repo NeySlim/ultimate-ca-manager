@@ -21,7 +21,7 @@ export default {
           { label: '外部 CA アカウント', text: 'CA ごとに複数のアカウントを登録可能, 同じディレクトリ URL を共有できます（例: 管理分離のための 2 つの Let\'s Encrypt アカウント）。ディレクトリ URL が空欄の場合は Let\'s Encrypt Production になります' },
           { label: 'カスタムサーバー', text: 'カスタムACMEディレクトリURLを設定して、任意のRFC 8555準拠CAを使用します' },
           { label: 'EAB', text: '事前登録が必要なCA（ZeroSSL、HARICAなど）のための外部アカウントバインディングサポート' },
-          { label: 'キータイプ', text: '証明書キー用のRSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384、Brainpool P-256 または P-384。ML-DSA-44、ML-DSA-65、ML-DSA-87 は API 経由のみで、FIPS モードでは使用できません。設定された既定値をこのインスタンスで生成できない場合、RSA-2048 にフォールバックせずオーダーが失敗します (v2.248)' },
+          { label: 'キータイプ', text: '証明書キー用のRSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384、Brainpool P-256 または P-384、ML-DSA-44、ML-DSA-65、ML-DSA-87。ML-DSA は FIPS モードや、ML-DSA 非対応のビルドでは使用できません。設定された既定値をこのインスタンスで生成できない場合、RSA-2048 にフォールバックせずオーダーが失敗します (v2.248)' },
           { label: 'FIPS モードでの鍵の再利用', text: '元の証明書の鍵を再利用する場合、その鍵（ML-DSA を含む）が FIPS モードで承認されていなければ拒否されます (v2.248)' },
           { label: 'アカウントキー', text: 'ACMEアカウントキー用のES256 (P-256)、ES384 (P-384)、またはRS256アルゴリズム' },
           { label: 'DNSプロバイダー', text: 'DNS-01チャレンジプロバイダーの設定（Cloudflare、Route53、Tencent DNSPod、Pleskなど）。Plesk は XML API を使用します。自己署名のパネル向けに Verify TLS Certificate をオフにでき、DNS 伝播の待機時間を追加できます' },
@@ -167,7 +167,7 @@ ACMEクライアント設定を管理します：
 - **環境**: ステージング（テスト）またはプロダクション（本番証明書）
 - **連絡先メール**: アカウント登録に必要です
 - **自動更新**: 有効期限前に証明書を自動的に更新します
-- **証明書キータイプ**: RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384、Brainpool P-256 または P-384。ML-DSA-44、ML-DSA-65、ML-DSA-87 は API（リクエストまたは設定の \`key_type\`）経由で受け付けられ、FIPS モードでは使用できません。設定されたタイプをこのインスタンスで生成できない場合、RSA-2048 にフォールバックせずオーダーが失敗します
+- **証明書キータイプ**: RSA-2048、RSA-4096、ECDSA P-256、ECDSA P-384、Brainpool P-256 または P-384、ML-DSA-44、ML-DSA-65、ML-DSA-87。ML-DSA は FIPS モードや、ML-DSA 非対応のビルドでは使用できません。設定されたタイプをこのインスタンスで生成できない場合、RSA-2048 にフォールバックせずオーダーが失敗します
 - **アカウントキーアルゴリズム**: ACMEアカウント署名用のES256、ES384、またはRS256
 
 ### カスタムACMEサーバー

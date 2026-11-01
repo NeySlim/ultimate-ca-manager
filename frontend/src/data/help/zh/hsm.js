@@ -35,7 +35,16 @@ export default {
           { label: '迁移', text: '现有本地 CA 在创建后无法移至 HSM, 在创建时选择' },
         ]
       },
-
+      {
+        title: 'ML-DSA 密钥',
+        content: 'ML-DSA-44、ML-DSA-65 和 ML-DSA-87（FIPS 204）密钥仅在能用其签名的提供商上提供。它们直接对数据签名，因此无需选择摘要。',
+        items: [
+          { label: 'PKCS#11', text: '实现 PKCS#11 3.2 并支持 ML-DSA 机制的令牌' },
+          { label: 'OpenBao / Vault Transit', text: 'Transit 密钥类型 mldsa-44、mldsa-65 和 mldsa-87' },
+          { label: 'Google Cloud KMS', text: 'PQ_SIGN_ML_DSA 密钥版本，已按 KMS API 映射，但尚未针对该服务测试。KMS 最多签署 64 KiB 数据，因此更大的 CRL 无法签名' },
+          { label: '不可用', text: 'Azure Key Vault 和 AWS CloudHSM 提供商不持有 ML-DSA 密钥，FIPS 模式在所有提供商上都拒绝 ML-DSA' },
+        ]
+      },
     ],
     tips: [
       '在部署物理 HSM 前，使用 SoftHSM 进行测试',
@@ -104,6 +113,7 @@ OpenBao 或 HashiCorp Vault Transit Secrets Engine。密钥通过 Transit API �
 支持的密钥类型：
 - RSA 2048、3072、4096
 - ECDSA P-256、P-384、P-521
+- ML-DSA-44、ML-DSA-65、ML-DSA-87（Transit \`mldsa-*\` 密钥，需 OpenBao 版本支持）
 - AES-256-GCM（对称）
 
 > 💡 OpenBao 是 HashiCorp Vault 的社区分支。UCM 两者都支持。
@@ -136,6 +146,14 @@ OpenBao 或 HashiCorp Vault Transit Secrets Engine。密钥通过 Transit API �
 5. 点击**生成**
 
 密钥直接在 HSM 上创建。UCM 仅存储引用。
+
+### ML-DSA 密钥
+ML-DSA-44、ML-DSA-65 和 ML-DSA-87（FIPS 204）仅在能用其签名的提供商上提供：
+- **PKCS#11**: 实现 PKCS#11 3.2 并支持 ML-DSA 机制的令牌
+- **OpenBao / Vault Transit**: 密钥类型 \`mldsa-44\`、\`mldsa-65\` 和 \`mldsa-87\`
+- **Google Cloud KMS**: \`PQ_SIGN_ML_DSA_*\` 密钥版本，已按 KMS API 映射，但尚未针对该服务测试。KMS 最多签署 64 KiB 数据，因此更大的 CRL 无法签名
+
+Azure Key Vault 和 AWS CloudHSM 提供商不持有 ML-DSA 密钥，FIPS 模式在所有提供商上都拒绝 ML-DSA。ML-DSA 密钥直接对数据签名，因此无需选择摘要。
 
 ### 使用 HSM 密钥
 创建 CA 时，选择 HSM 提供商和密钥而非生成软件密钥。CA 的签名操作将在 HSM 上执行。

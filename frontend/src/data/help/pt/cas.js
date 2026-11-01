@@ -155,7 +155,7 @@ Agrupa CAs pelo campo Organização (O). Útil para configurações multi-tenant
 O formulário sinaliza uma CA RSA-2048 que sobreviveria a 2030: a ANSSI aceita RSA-2048 até o fim de 2030, a ETSI TS 119 312 até o fim de 2026. Escolha RSA-3072 ou maior. Em **Restrições avançadas (RFC 5280)**, subárvores permitidas e excluídas (DNS, faixa de IP, e-mail) limitam os nomes que a CA pode certificar.
 
 ### CAs pós-quânticas (ML-DSA)
-**ML-DSA-44**, **ML-DSA-65** e **ML-DSA-87** (FIPS 204) são listados com o seu nível de segurança NIST (2, 3 e 5). A chave é gerada em software, nunca num HSM, e o algoritmo fica oculto no modo FIPS.
+**ML-DSA-44**, **ML-DSA-65** e **ML-DSA-87** (FIPS 204) são listados com o seu nível de segurança NIST (2, 3 e 5). A chave é gerada em software, ou num provedor HSM que guarde ML-DSA (ver CAs respaldadas por HSM), e o algoritmo fica oculto no modo FIPS.
 
 - Uma chave ML-DSA assina sem um digest separado: o campo de digest desaparece, e um digest enviado pela API é ignorado com um aviso. As CRLs e as respostas OCSP da CA seguem a mesma regra.
 - As hierarquias podem ser mistas: uma raiz ML-DSA pode assinar uma intermédia RSA ou EC, e uma CA RSA ou EC pode assinar uma intermédia ML-DSA, que usa então o digest da CA superior.
@@ -273,7 +273,7 @@ O UCM pode armazenar a chave de assinatura de uma CA em um módulo de segurança
 3. Em **Armazenamento de chave**, mude de *Local* para **HSM**
 4. Escolha o provedor HSM
 5. Escolha um modo de chave:
-   - **Gerar nova chave**: forneça um rótulo (letras/dígitos/_/-) e escolha o algoritmo (RSA-2048/3072/4096 ou EC-P256/P384/P521, RSA-3072 por padrão)
+   - **Gerar nova chave**: forneça um rótulo (letras/dígitos/_/-) e escolha o algoritmo (RSA-2048/3072/4096 ou EC-P256/P384/P521, RSA-3072 por padrão; Brainpool em PKCS#11, ML-DSA nos provedores listados em Gestão de HSM)
    - **Usar chave existente**: escolha uma chave de assinatura não utilizada já presente no HSM
 6. Envie. O UCM cria o certificado CA e o vincula à chave HSM.
 

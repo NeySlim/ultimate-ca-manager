@@ -21,7 +21,7 @@ export default {
           { label: 'Externe CA-Konten', text: 'Ein oder mehrere Konten pro CA, mehrere Konten können dieselbe Verzeichnis-URL teilen (z. B. zwei Let\'s-Encrypt-Konten zur administrativen Trennung); eine leere Verzeichnis-URL steht für Let\'s Encrypt Production' },
           { label: 'Benutzerdefinierter Server', text: 'Eine benutzerdefinierte ACME-Directory-URL festlegen, um eine beliebige RFC 8555-konforme CA zu verwenden' },
           { label: 'EAB', text: 'External Account Binding-Unterstützung für CAs, die eine Vorregistrierung erfordern (ZeroSSL, HARICA, usw.)' },
-          { label: 'Schlüsseltypen', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 oder P-384 für Zertifikatsschlüssel; ML-DSA-44, ML-DSA-65 und ML-DSA-87 nur über die API, nie im FIPS-Modus. Ein konfigurierter Standard, den diese Instanz nicht erzeugen kann, lässt die Order fehlschlagen, statt auf RSA-2048 zurückzufallen (v2.248)' },
+          { label: 'Schlüsseltypen', text: 'RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 oder P-384, ML-DSA-44, ML-DSA-65 oder ML-DSA-87 für Zertifikatsschlüssel; ML-DSA wird im FIPS-Modus oder in einem Build ohne ML-DSA nicht angeboten. Ein konfigurierter Standard, den diese Instanz nicht erzeugen kann, lässt die Order fehlschlagen, statt auf RSA-2048 zurückzufallen (v2.248)' },
           { label: 'Wiederverwendeter Schlüssel im FIPS-Modus', text: 'Die Wiederverwendung des Schlüssels eines Quellzertifikats wird abgelehnt, wenn der FIPS-Modus diesen Schlüssel nicht zulässt, ML-DSA eingeschlossen (v2.248)' },
           { label: 'Kontoschlüssel', text: 'ES256 (P-256), ES384 (P-384) oder RS256-Algorithmen für ACME-Kontoschlüssel' },
           { label: 'DNS-Anbieter', text: 'DNS-01-Challenge-Anbieter konfigurieren (Cloudflare, Route53, Tencent DNSPod, Plesk, usw.). Plesk läuft über seine XML-API; Verify TLS Certificate kann für ein selbstsigniertes Panel deaktiviert und eine DNS-Propagationsverzögerung hinzugefügt werden' },
@@ -167,7 +167,7 @@ Verwalten Sie Ihre ACME-Client-Konfiguration:
 - **Umgebung**: Staging (Test) oder Produktion (Live-Zertifikate)
 - **Kontakt-E-Mail**: Erforderlich für die Kontoregistrierung
 - **Auto-Erneuerung**: Zertifikate automatisch vor Ablauf erneuern
-- **Zertifikatsschlüsseltyp**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 oder P-384. ML-DSA-44, ML-DSA-65 und ML-DSA-87 werden über die API akzeptiert (\`key_type\` in der Anfrage oder in den Einstellungen), nie im FIPS-Modus. Ein konfigurierter Typ, den diese Instanz nicht erzeugen kann, lässt die Order fehlschlagen, statt auf RSA-2048 zurückzufallen
+- **Zertifikatsschlüsseltyp**: RSA-2048, RSA-4096, ECDSA P-256, ECDSA P-384, Brainpool P-256 oder P-384, ML-DSA-44, ML-DSA-65 oder ML-DSA-87. ML-DSA wird im FIPS-Modus oder in einem Build ohne ML-DSA nicht angeboten. Ein konfigurierter Typ, den diese Instanz nicht erzeugen kann, lässt die Order fehlschlagen, statt auf RSA-2048 zurückzufallen
 - **Kontoschlüssel-Algorithmus**: ES256, ES384 oder RS256 für die ACME-Kontosignierung
 
 ### Benutzerdefinierter ACME-Server

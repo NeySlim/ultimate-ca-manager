@@ -35,6 +35,16 @@ export default {
           { label: 'マイグレーション', text: '既存のローカル CA は作成後に HSM へ移動できません, 作成時に選択' },
         ]
       },
+      {
+        title: 'ML-DSA 鍵',
+        content: 'ML-DSA-44、ML-DSA-65、ML-DSA-87（FIPS 204）鍵は、それらで署名できるプロバイダーでのみ利用できます。データ自体に署名するため、ダイジェストは選択しません。',
+        items: [
+          { label: 'PKCS#11', text: 'ML-DSA メカニズムを備えた PKCS#11 3.2 実装のトークン' },
+          { label: 'OpenBao / Vault Transit', text: 'Transit 鍵タイプ mldsa-44、mldsa-65、mldsa-87' },
+          { label: 'Google Cloud KMS', text: 'PQ_SIGN_ML_DSA 鍵バージョン。KMS API からマッピングされていますが、サービスに対する検証は未実施です。KMS が署名できるデータは最大 64 KiB のため、それより大きい CRL には署名できません' },
+          { label: '利用不可', text: 'Azure Key Vault と AWS CloudHSM のプロバイダーは ML-DSA 鍵を保持せず、FIPS モードではすべてのプロバイダーで ML-DSA が拒否されます' },
+        ]
+      },
 
     ],
     tips: [
@@ -104,6 +114,7 @@ OpenBaoまたはHashiCorp Vault Transit Secrets Engine。鍵はTransit APIを介
 サポートされている鍵タイプ：
 - RSA 2048、3072、4096
 - ECDSA P-256、P-384、P-521
+- ML-DSA-44、ML-DSA-65、ML-DSA-87（Transit の \`mldsa-*\` 鍵、対応する OpenBao リリースの場合）
 - AES-256-GCM（対称）
 
 > 💡 OpenBaoはHashiCorp Vaultのコミュニティフォークです。UCMは両方で動作します。
@@ -136,6 +147,14 @@ OpenBaoまたはHashiCorp Vault Transit Secrets Engine。鍵はTransit APIを介
 5. **生成**をクリック
 
 鍵はHSM上で直接作成されます。UCMは参照のみを保存します。
+
+### ML-DSA 鍵
+ML-DSA-44、ML-DSA-65、ML-DSA-87（FIPS 204）は、それらで署名できるプロバイダーでのみ利用できます：
+- **PKCS#11**: ML-DSA メカニズムを備えた PKCS#11 3.2 実装のトークン
+- **OpenBao / Vault Transit**: 鍵タイプ \`mldsa-44\`、\`mldsa-65\`、\`mldsa-87\`
+- **Google Cloud KMS**: \`PQ_SIGN_ML_DSA_*\` 鍵バージョン。KMS API からマッピングされていますが、サービスに対する検証は未実施です。KMS が署名できるデータは最大 64 KiB のため、それより大きい CRL には署名できません
+
+Azure Key Vault と AWS CloudHSM のプロバイダーは ML-DSA 鍵を保持せず、FIPS モードではすべてのプロバイダーで ML-DSA が拒否されます。ML-DSA 鍵はデータ自体に署名するため、ダイジェストは選択しません。
 
 ### HSM鍵の使用
 CAを作成する際、ソフトウェアキーを生成する代わりにHSMプロバイダーと鍵を選択します。CAの署名操作はHSM上で実行されます。

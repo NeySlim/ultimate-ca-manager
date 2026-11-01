@@ -155,7 +155,7 @@ Agrupa las CAs por su campo Organización (O). Útil para configuraciones multi-
 El formulario señala una CA RSA-2048 que sobreviviría a 2030: la ANSSI acepta RSA-2048 hasta finales de 2030, ETSI TS 119 312 hasta finales de 2026. Elige RSA-3072 o superior. En **Restricciones avanzadas (RFC 5280)**, los subárboles permitidos y excluidos (DNS, rango IP, correo) limitan los nombres que la CA puede certificar.
 
 ### CAs poscuánticas (ML-DSA)
-**ML-DSA-44**, **ML-DSA-65** y **ML-DSA-87** (FIPS 204) aparecen con su nivel de seguridad NIST (2, 3 y 5). La clave se genera en software, nunca en un HSM, y el algoritmo se oculta en modo FIPS.
+**ML-DSA-44**, **ML-DSA-65** y **ML-DSA-87** (FIPS 204) aparecen con su nivel de seguridad NIST (2, 3 y 5). La clave se genera en software, o en un proveedor HSM que admita ML-DSA (véase CAs respaldadas por HSM), y el algoritmo se oculta en modo FIPS.
 
 - Una clave ML-DSA firma sin un hash aparte: el campo de hash desaparece, y un hash enviado por la API se ignora con un aviso. Las CRL y las respuestas OCSP de la CA siguen la misma regla.
 - Las jerarquías pueden mezclarse: una raíz ML-DSA puede firmar una intermedia RSA o EC, y una CA RSA o EC puede firmar una intermedia ML-DSA, que entonces usa el hash de su CA padre.
@@ -273,7 +273,7 @@ UCM puede almacenar la clave de firma de una CA en un módulo de seguridad de ha
 3. En **Almacenamiento de clave**, cambie de *Local* a **HSM**
 4. Elija el proveedor HSM
 5. Elija un modo de clave:
-   - **Generar clave nueva**: proporcione una etiqueta (letras/dígitos/_/-) y elija el algoritmo (RSA-2048/3072/4096 o EC-P256/P384/P521, RSA-3072 por defecto)
+   - **Generar clave nueva**: proporcione una etiqueta (letras/dígitos/_/-) y elija el algoritmo (RSA-2048/3072/4096 o EC-P256/P384/P521, RSA-3072 por defecto; Brainpool en PKCS#11, ML-DSA en los proveedores indicados en Gestión de HSM)
    - **Usar clave existente**: elija una clave de firma no utilizada ya presente en el HSM
 6. Envíe. UCM crea el certificado de CA y lo vincula a la clave HSM.
 
