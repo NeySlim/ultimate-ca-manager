@@ -62,11 +62,13 @@ export default function ProfilesEditor({ value, onChange, disabled, templates = 
     id: ++nextRowId, name: '', description: '', validity_days: 90, digest: 'sha256', template_id: '',
   }])
 
-  // A deactivated template is refused on binding: listed only for the profile name the server has it bound to
+  // A deactivated template is refused on a new binding: offered only under the name the server has it bound to,
+  // and kept visible, marked, on a row that still carries it
   const templateOptions = (row) => [
     { value: '', label: t('acme.noTemplate') },
-    ...templates.filter(tpl => tpl.is_active !== false || String(tpl.id) === String(saved[row.name]?.template_id ?? ''))
-      .map(tpl => ({ value: String(tpl.id), label: tpl.name })),
+    ...templates.filter(tpl => tpl.is_active !== false || String(tpl.id) === row.template_id
+      || String(tpl.id) === String(saved[row.name]?.template_id ?? ''))
+      .map(tpl => ({ value: String(tpl.id), label: tpl.is_active === false ? `${tpl.name} (${t('common.inactive')})` : tpl.name })),
   ]
 
   return (

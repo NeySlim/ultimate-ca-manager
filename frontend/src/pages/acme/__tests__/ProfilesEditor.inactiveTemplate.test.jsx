@@ -22,29 +22,33 @@ const templates = [
 ]
 
 describe('ProfilesEditor with a deactivated template', () => {
-  it('lists it on the row that binds it only', () => {
-    const value = {
-      bound: { validity_days: 30, digest: 'sha256', template_id: 3 },
-      other: { validity_days: 90, digest: 'sha256' },
-    }
-    render(<ProfilesEditor value={value} saved={value} onChange={() => {}} templates={templates} />)
-    const [bound, other] = templateSelects()
-    expect(bound.textContent).toContain('Retired')
+  const spec = (template_id) => ({ validity_days: 30, digest: 'sha256', ...(template_id ? { template_id } : {}) })
+  const render1 = (value, saved) => {
+    render(<ProfilesEditor value={value} saved={saved} onChange={() => {}} templates={templates} />)
+    return templateSelects()
+  }
+
+  it('lists it, marked, on the profile it is bound to only', () => {
+    const value = { bound: spec(3), other: spec() }
+    const [bound, other] = render1(value, value)
+    expect(bound.textContent).toContain('Retired (common.inactive)')
     expect(other.textContent).not.toContain('Retired')
     expect(other.textContent).toContain('Strict TLS')
   })
 
-  it('drops it once the saved binding moved on, or under a new name', () => {
-    const value = {
-      bound: { validity_days: 30, digest: 'sha256', template_id: 3 },
-      renamed: { validity_days: 30, digest: 'sha256', template_id: 3 },
-    }
-    const saved = {
-      bound: { validity_days: 30, digest: 'sha256', template_id: 5 },
-      before: { validity_days: 30, digest: 'sha256', template_id: 3 },
-    }
-    render(<ProfilesEditor value={value} saved={saved} onChange={() => {}} templates={templates} />)
-    for (const select of templateSelects()) expect(select.textContent).not.toContain('Retired')
+  it('keeps it offered to go back to the saved binding', () => {
+    const [bound] = render1({ bound: spec(5) }, { bound: spec(3) })
+    expect(bound.textContent).toContain('Retired')
+  })
+
+  it('drops it once the saved binding moved on', () => {
+    const [bound] = render1({ bound: spec(5) }, { bound: spec(5) })
+    expect(bound.textContent).not.toContain('Retired')
+  })
+
+  it('keeps it visible on a renamed row that still carries it', () => {
+    const [renamed] = render1({ renamed: spec(3) }, { before: spec(3) })
+    expect(renamed.textContent).toContain('Retired (common.inactive)')
   })
 })
 
