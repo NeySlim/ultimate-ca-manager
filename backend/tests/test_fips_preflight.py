@@ -224,6 +224,22 @@ def test_ca_mldsa_key_is_an_unapproved_algorithm_not_a_weak_key(session):
 
 
 @needs_mldsa
+def test_ca_mldsa_key_is_named_on_a_build_without_mldsa(session):
+    """The registry holds ML-DSA only when the build can use it: the CA is still told by name."""
+    from unittest.mock import patch
+    from utils import key_algorithms
+    _ca(mldsa.MLDSA65PrivateKey.generate(), 'PQ Root Old Build')
+    try:
+        with patch.object(key_algorithms, 'mldsa_supported', lambda: False):
+            key_algorithms._load()
+            assert key_algorithms.get('ML-DSA-65') is None
+            _assert_found('ca.unapproved_algorithm', 1, 'PQ Root Old Build (#', 'ML-DSA-65')
+            assert fips_preflight._ca_weak() == []
+    finally:
+        key_algorithms._load()
+
+
+@needs_mldsa
 def test_policies_allowing_mldsa_are_named(session):
     session.add(CertificatePolicy(name='pq', rules=json.dumps(
         {'allowed_key_types': ['RSA-2048', 'ML-DSA-65']})))

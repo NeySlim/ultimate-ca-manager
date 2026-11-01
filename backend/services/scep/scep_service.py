@@ -433,12 +433,14 @@ class SCEPService:
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
                 ), 200
 
-            # ---- 5. Verify CSR self-signature (proof of possession) ----
-            from utils.key_type import unsignable_csr_key
-            unsignable = unsignable_csr_key(csr)
-            if unsignable:
+            # ---- 5. Key policy, then CSR self-signature (proof of possession) ----
+            # A FIPS provider without ML-DSA cannot verify such a request: its refusal names FIPS.
+            from utils.key_type import validate_enrollment_csr
+            key_err = validate_enrollment_csr(csr)
+            if key_err:
+                logger.warning("SCEP: rejecting enrollment key: %s", key_err)
                 return self._create_error_response(
-                    self.FAIL_BAD_REQUEST, unsignable,
+                    self.FAIL_BAD_REQUEST, key_err,
                     transaction_id=transaction_id, recipient_nonce=sender_nonce,
                 ), 200
             if not csr.is_signature_valid:
@@ -454,15 +456,6 @@ class SCEPService:
 
             logger.debug(f"SCEP: CSR parsed, subject={csr.subject.rfc4514_string()}")
 
-            # ---- 5b. Key-strength policy — refuse weak/exotic enrollment keys ----
-            from utils.key_type import validate_enrollment_public_key
-            key_err = validate_enrollment_public_key(csr.public_key())
-            if key_err:
-                logger.warning("SCEP: rejecting weak enrollment key: %s", key_err)
-                return self._create_error_response(
-                    self.FAIL_BAD_REQUEST, key_err,
-                    transaction_id=transaction_id, recipient_nonce=sender_nonce,
-                ), 200
             # Issuance policies (key type, signature hash), before anything is stored
             _, policy_violations = self._policy_signing_hash(csr)
             if policy_violations:

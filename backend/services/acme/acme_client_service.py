@@ -91,7 +91,13 @@ def fips_csr_refusal(csr):
         return None
     from services.fips_preflight import certificate_key
     name, approved = certificate_key(csr)
-    return None if approved else f'{name} keys not available in FIPS mode'
+    if approved:
+        return None
+    oid = csr.public_key_algorithm_oid.dotted_string
+    if name == f'unreadable key ({oid})':
+        return (f'The CSR key (algorithm {oid}) cannot be read; FIPS mode accepts RSA 2048+ '
+                'and ECDSA P-256, P-384 or P-521 keys')
+    return f'{name} keys not available in FIPS mode'
 
 
 def csr_identifiers_match_order(

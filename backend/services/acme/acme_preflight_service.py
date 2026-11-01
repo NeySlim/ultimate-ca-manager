@@ -12,7 +12,7 @@ from typing import Any, Dict, List, Optional, Tuple
 from models import db, DnsProvider, SystemConfig
 from models.acme_client_account import AcmeClientAccount
 from models.acme_models import AcmeClientOrder
-from services.acme.acme_client_service import AcmeClientService
+from services.acme.acme_client_service import AcmeClientService, fips_csr_refusal
 from utils.dns_txt_lookup import txt_record_present
 
 logger = logging.getLogger(__name__)
@@ -125,7 +125,12 @@ class AcmePreflightService:
                 try:
                     from utils.acme_csr import load_pem_csr, csr_domains_match_order
                     csr = load_pem_csr(csr_pem)
-                    match_ok, match_msg = csr_domains_match_order(csr, domains)
+                    # The refusal the order route gives a new request; existing orders are not checked here
+                    refusal = fips_csr_refusal(csr)
+                    if refusal:
+                        match_ok, match_msg = False, refusal
+                    else:
+                        match_ok, match_msg = csr_domains_match_order(csr, domains)
                     steps.append(_step('csr', 'External CSR', match_ok, match_msg))
                     overall_ok = overall_ok and match_ok
                 except ValueError as exc:

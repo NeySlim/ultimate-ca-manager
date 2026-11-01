@@ -24,7 +24,7 @@ from services.scep.scep_service import SCEPService
 from tests.pqc_fixtures import fixture_bytes, load_mldsa_key, scep_wstep_mldsa_signed_cms
 from tests.test_scep_rfc8894_operations import (
     MESSAGE_TYPE_OID, PKI_STATUS_OID, SENDER_NONCE_OID, TRANSACTION_ID_OID,
-    _decrypt_password_response, _load_ca_material, _response_attributes,
+    _client_identity, _decrypt_password_response, _load_ca_material, _response_attributes,
 )
 from utils import key_algorithms
 
@@ -229,6 +229,36 @@ class TestMldsaClientEnrollment:
             assert attrs['2.16.840.1.113733.1.9.4'] == '0'   # badAlg
         else:
             assert attrs[PKI_STATUS_OID] == '0', attrs
+
+
+@pytest.mark.parametrize('tampered', [False, True])
+def test_fips_mode_refuses_an_mldsa_request_before_its_signature(app, create_ca, monkeypatch,
+                                                                 caplog, tampered):
+    """A FIPS provider without ML-DSA cannot verify the CSR: the refusal names FIPS, not PoP."""
+    ca_data = create_ca(cn=f'SCEP RSA CA for FIPS ML-DSA {tampered}')
+    csr = (x509.CertificateSigningRequestBuilder()
+           .subject_name(x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, 'fips-pq-scep.example')]))
+           .add_attribute(AttributeOID.CHALLENGE_PASSWORD, CHALLENGE.encode())
+           .sign(load_mldsa_key(), None))
+    der = bytearray(csr.public_bytes(serialization.Encoding.DER))
+    if tampered:
+        der[-1] ^= 0x01
+    signer_cert, signer_key = _client_identity('SCEP FIPS RSA signer')
+    with app.app_context():
+        ca, ca_cert, _ = _load_ca_material(ca_data['id'])
+        envelope = encrypt_for_client(bytes(der), ca_cert, key_transport=(RSAES_OAEP, 'sha256'))
+        request = create_signed_pkcs7(envelope, signer_key, signer_cert,
+                                      signed_attributes=_scep_attrs(19, b'pq-fips-nonce-01'))
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        with caplog.at_level('WARNING'):
+            response, status = SCEPService(ca.refid, challenge_password=CHALLENGE,
+                                           auto_approve=True).process_pkcs_req(request, '127.0.0.1')
+    attrs = _response_attributes(response)
+    assert status == 200
+    assert attrs[PKI_STATUS_OID] == '2', attrs
+    assert attrs['2.16.840.1.113733.1.9.4'] == '2'   # badRequest, not badMessageCheck
+    assert 'ML-DSA-65 keys are not available in FIPS mode' in caplog.text
+    assert 'proof of possession' not in caplog.text
 
 
 # --- an ML-DSA CA cannot serve SCEP ---------------------------------------------------

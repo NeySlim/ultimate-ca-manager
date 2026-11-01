@@ -171,8 +171,9 @@ def _ca_eddsa():
 
 
 def _is_mldsa(name) -> bool:
-    alg = key_algorithms.get(name)
-    return alg is not None and alg.family == 'ML-DSA'
+    # Named whether or not this build can use ML-DSA: the registry holds it only when it can
+    info = key_algorithms.post_quantum_info(name)
+    return info is not None and info.family == 'ML-DSA'
 
 
 @detector('ca.weak_key', BLOCKER,

@@ -24,7 +24,7 @@ from utils.csr_extensions import extensions_of
 from utils.datetime_utils import utc_now
 from utils.csr_diagnostics import WEAK_CSR_HASH_ALGORITHMS, weak_csr_hash_algorithm
 from utils import key_algorithms
-from utils.key_type import unsignable_csr_key, validate_enrollment_public_key
+from utils.key_type import validate_enrollment_csr
 from utils.san_parse import is_valid_san_email
 from utils.serial_format import serial_variants
 from utils.upn_san import build_upn_other_name
@@ -137,9 +137,11 @@ def _validate_csr(csr, require_pop=True, allow_naked_subject=False):
 
     Returns an error string, or None if the CSR is acceptable.
     """
-    unsignable = unsignable_csr_key(csr)
-    if unsignable:
-        return unsignable
+    # Key policy before proof of possession: a FIPS provider without ML-DSA
+    # cannot verify such a request, whose refusal must name FIPS, not PoP.
+    key_err = validate_enrollment_csr(csr)
+    if key_err:
+        return key_err
     if require_pop:
         try:
             signature_valid = csr.is_signature_valid
@@ -156,10 +158,6 @@ def _validate_csr(csr, require_pop=True, allow_naked_subject=False):
 
     if not allow_naked_subject and _is_naked_csr(csr):
         return 'CSR subject must include a non-empty CN or a SubjectAltName'
-
-    key_err = validate_enrollment_public_key(csr.public_key())
-    if key_err:
-        return key_err
 
     return None
 
@@ -269,7 +267,9 @@ def _match_template(ca, csr):
     arbitrary but deterministic. Returns ``(template, refusal)``: the matched
     ``CertificateTemplate`` row or ``None`` if nothing matches at all, and a
     refusal when the request's EKUs match only a template of another key kind
-    (ML-DSA or not).
+    (ML-DSA or not). A template of the other kind that scores 0 is no match:
+    the request falls back to no template, which is safe because the Enroll
+    ACL and pinned fields then fall back to every template of the CA.
 
     Callers use the matched row two ways: its policy OID (via
     ``policy_builder._policy_oid_for_template``) for the issued cert's

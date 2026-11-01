@@ -52,6 +52,22 @@ def test_bare_mldsa_csr_is_issued(app, create_ca):
     assert isinstance(cert.public_key(), mldsa.MLDSA65PublicKey)
 
 
+@pytest.mark.parametrize('tampered', [False, True])
+def test_fips_mode_refuses_an_mldsa_request_before_its_signature(app, create_ca, monkeypatch, tampered):
+    """A FIPS provider without ML-DSA cannot verify the CSR: the refusal names FIPS, not PoP."""
+    import fips_mode
+    der = bytearray(_csr(load_mldsa_key(), 'wstep-fips.pq.example.test')
+                    .public_bytes(serialization.Encoding.DER))
+    if tampered:
+        der[-1] ^= 0x01
+    with app.app_context():
+        ca = _ca(app, create_ca, f'WSTEP RSA CA for FIPS ML-DSA {tampered}')
+        monkeypatch.setattr(fips_mode, 'enabled', lambda: True)
+        cert_pem, err = wstep_service.issue(ca, bytes(der), validity_days=30)
+    assert cert_pem is None
+    assert err == 'ML-DSA-65 keys are not available in FIPS mode'
+
+
 class TestPkcs7ProofOfPossession:
     def test_mldsa_envelope_proves_possession(self):
         key = load_mldsa_key()
