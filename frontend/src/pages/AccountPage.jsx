@@ -15,7 +15,8 @@ import {
   LoadingSpinner, ExportModal
 } from '../components'
 import { accountService, casService, userCertificatesService } from '../services'
-import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
+import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
+import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { useAuth, useNotification, useMobile } from '../contexts'
 import { useClipboard, usePermission } from '../hooks'
 import { formatDate , downloadBlob} from '../lib/utils'
@@ -68,6 +69,7 @@ export default function AccountPage() {
   const [mtlsP12Legacy, setMtlsP12Legacy] = useState(false)  // PKCS#12 3DES/SHA-1 profile (#331)
   const [mtlsP12Downloading, setMtlsP12Downloading] = useState(false)
   const [mtlsForm, setMtlsForm] = useState({ name: '', validity_days: 365, ca_id: '' })
+  const [showHiddenCas, setShowHiddenCas] = useState(false)
   const [mtlsTab, setMtlsTab] = useState('generate')
   const [mtlsImportForm, setMtlsImportForm] = useState({ name: '', pem: '' })
   const [exportCert, setExportCert] = useState(null) // { id, name, hasPrivateKey, keyAlgorithm }
@@ -403,6 +405,7 @@ export default function AccountPage() {
     setMtlsP12Legacy(false)
     setMtlsP12Downloading(false)
     setMtlsForm({ name: '', validity_days: 365, ca_id: '' })
+    setShowHiddenCas(false)
     setMtlsImportForm({ name: '', pem: '' })
     setMtlsTab('generate')
     setSelectedAssignCert(null)
@@ -1269,17 +1272,20 @@ export default function AccountPage() {
                       write:cas server-side, without it, only the configured
                       default is issuable, so offer no choice that would 403. */}
                   {canChooseMtlsCa && (
-                    <Select
-                      label={t('account.mtlsIssuingCA')}
-                      value={mtlsForm.ca_id}
-                      onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
-                      placeholder={t('account.mtlsDefaultCA')}
-                      options={pickerCas(cas, mtlsForm.ca_id).map(ca => ({
-                        value: ca.refid || String(ca.id),
-                        label: ca.descr || ca.subject || ca.refid,
-                      }))}
-                      helperText={unlistedPickerCas(cas, mtlsForm.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, mtlsForm.ca_id) }) : undefined}
-                    />
+                    <div>
+                      <Select
+                        label={t('account.mtlsIssuingCA')}
+                        value={mtlsForm.ca_id}
+                        onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
+                        placeholder={t('account.mtlsDefaultCA')}
+                        options={listedForIssuance(pickerCas(cas, mtlsForm.ca_id), showHiddenCas, mtlsForm.ca_id).map(ca => ({
+                          value: ca.refid || String(ca.id),
+                          label: ca.descr || ca.subject || ca.refid,
+                        }))}
+                        helperText={unlistedPickerCas(cas, mtlsForm.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, mtlsForm.ca_id) }) : undefined}
+                      />
+                      <HiddenCasToggle count={hiddenFromIssuance(pickerCas(cas, mtlsForm.ca_id), mtlsForm.ca_id)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
+                    </div>
                   )}
                   <Input
                     label={t('account.mtlsValidityDays')}

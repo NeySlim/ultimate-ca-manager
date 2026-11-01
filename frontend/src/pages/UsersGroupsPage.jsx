@@ -19,7 +19,8 @@ import {
   CompactSection, CompactGrid, CompactField, CompactHeader
 } from '../components'
 import { usersService, groupsService, rolesService, casService, accountService, ssoService } from '../services'
-import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
+import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
+import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import UserSecurityKeys from '../components/UserSecurityKeys'
 import UserApiKeys from '../components/UserApiKeys'
 import { useNotification, useMobile } from '../contexts'
@@ -90,6 +91,7 @@ export default function UsersGroupsPage() {
   const [mtlsCreating, setMtlsCreating] = useState(false)
   const [mtlsResult, setMtlsResult] = useState(null)
   const [mtlsForm, setMtlsForm] = useState({ name: '', validity_days: 365, ca_id: '' })
+  const [showHiddenCas, setShowHiddenCas] = useState(false)
   const [mtlsImportForm, setMtlsImportForm] = useState({ name: '', pem: '' })
   const [cas, setCas] = useState([])
   const [availableCerts, setAvailableCerts] = useState([])
@@ -405,6 +407,7 @@ export default function UsersGroupsPage() {
     setMtlsTab('generate')
     setMtlsResult(null)
     setMtlsForm({ name: `${selectedUser?.username || 'user'}@mtls`, validity_days: 365, ca_id: '' })
+    setShowHiddenCas(false)
     setMtlsImportForm({ name: '', pem: '' })
     setShowMtlsModal(true)
   }
@@ -1276,9 +1279,10 @@ export default function UsersGroupsPage() {
                       value={mtlsForm.ca_id}
                       onChange={(val) => setMtlsForm(prev => ({ ...prev, ca_id: val }))}
                       placeholder={t('account.mtlsDefaultCA')}
-                      options={pickerCas(cas, mtlsForm.ca_id).map(ca => ({ value: ca.refid || String(ca.id), label: ca.descr || ca.subject || ca.refid }))}
+                      options={listedForIssuance(pickerCas(cas, mtlsForm.ca_id), showHiddenCas, mtlsForm.ca_id).map(ca => ({ value: ca.refid || String(ca.id), label: ca.descr || ca.subject || ca.refid }))}
                       helperText={unlistedPickerCas(cas, mtlsForm.ca_id) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, mtlsForm.ca_id) }) : undefined}
                     />
+                    <HiddenCasToggle count={hiddenFromIssuance(pickerCas(cas, mtlsForm.ca_id), mtlsForm.ca_id)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
                     <Input label={t('account.mtlsValidityDays')} type="number" value={mtlsForm.validity_days} onChange={(e) => setMtlsForm(prev => ({ ...prev, validity_days: parseInt(e.target.value) || 365 }))} min="1" max="3650" />
                     <div className="flex justify-end gap-2 pt-4 border-t border-border">
                       <Button type="button" variant="secondary" onClick={handleCloseMtlsModal}>{t('common.cancel')}</Button>

@@ -78,6 +78,7 @@ vi.mock('../../services/cas.service', () => ({
         { id: 1, refid: 'ca-sign', descr: 'Signing CA', has_private_key: true },
         { id: 2, refid: 'ca-keyless', descr: 'Keyless root', certificate_only: true, has_private_key: false },
         { id: 3, refid: 'ca-offline', descr: 'Offline CA', has_private_key: true, offline: true },
+        { id: 4, refid: 'ca-root', descr: 'Hidden root', has_private_key: true, issuance_hidden: true },
       ],
     }),
   },
@@ -131,5 +132,12 @@ describe('AccountPage mTLS issuing CA picker (#426)', () => {
     fireEvent.click(within(field).getByText('choose-keyless'))
     expect(labels(field)).toEqual(['Signing CA', 'Keyless root'])
     expect(field).toHaveTextContent('cas.notListedForSigning:1')
+  })
+
+  it('keeps a CA hidden from issuance behind its link (#430)', async () => {
+    const field = await openPicker()
+    expect(labels(field)).toEqual(['Signing CA'])
+    fireEvent.click(screen.getByText('cas.showHiddenCas:1'))
+    expect(labels(field)).toEqual(['Signing CA', 'Hidden root'])
   })
 })

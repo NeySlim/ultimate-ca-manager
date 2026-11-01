@@ -558,8 +558,6 @@ class RestoreCoreMixin:
             ca.signature_scheme = ca_data['signature_scheme']
         if is_valid_profile(ca_data.get('compliance_profile')):
             ca.compliance_profile = ca_data['compliance_profile']
-        if isinstance(ca_data.get('issuance_hidden'), bool):
-            ca.issuance_hidden = ca_data['issuance_hidden']
         for column, setter in (('cdp_urls', 'set_cdp_urls'), ('ocsp_urls', 'set_ocsp_urls'),
                                ('aia_ca_issuers_urls', 'set_aia_urls')):
             if column in ca_data and isinstance(ca_data.get(column), list):

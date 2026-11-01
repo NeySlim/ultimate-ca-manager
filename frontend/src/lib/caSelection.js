@@ -68,14 +68,22 @@ export const holdsNoKey = (ca) => !!ca?.certificate_only && !ca?.pending && !ca?
 export const needsKeyImport = (ca) => holdsNoKey(ca)
   && (ca?.imported_from === 'csr_signed' || ca?.is_root === false || ca?.type === 'intermediate')
 
-/**
- * The signing CAs a manual issuance picker lists: one its operator hides (#430)
- * only on request, or when it is the CA already chosen.
- */
-export const issuanceCas = (cas, showHidden, ...selected) => {
+const isChosen = (selected) => {
   const wanted = new Set(selected.filter(Boolean).map(String))
-  return signingCas(cas).filter(ca => showHidden || !ca.issuance_hidden || wanted.has(String(ca.id)))
+  return (ca) => wanted.has(String(ca.id)) || (!!ca.refid && wanted.has(String(ca.refid)))
 }
 
-/** How many signing CAs an issuance picker keeps behind its "show hidden" link (#430). */
-export const hiddenIssuanceCas = (cas) => signingCas(cas).filter(ca => ca.issuance_hidden).length
+/**
+ * What a manual issuance picker lists out of ``list``: a CA its operator hides
+ * (#430) only on request, or when it is the CA already chosen (by id or refid).
+ */
+export const listedForIssuance = (list, showHidden, ...selected) => {
+  const chosen = isChosen(selected)
+  return (list || []).filter(ca => showHidden || !ca.issuance_hidden || chosen(ca))
+}
+
+/** How many CAs of ``list`` an issuance picker keeps behind its "show hidden" link (#430). */
+export const hiddenFromIssuance = (list, ...selected) => {
+  const chosen = isChosen(selected)
+  return (list || []).filter(ca => ca.issuance_hidden && !chosen(ca)).length
+}

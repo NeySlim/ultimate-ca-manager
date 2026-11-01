@@ -50,23 +50,14 @@ def test_the_change_is_audited(app, auth_client, create_ca):
     assert 'CA Issuance audited CA updated: hidden from issuance pickers' in details, details
 
 
-def test_backups_keep_the_flag(app, auth_client, create_ca):
+def test_backups_export_the_flag(app, auth_client, create_ca):
+    """The generic column restore brings it back (test_backup_manifest covers the columns)."""
     from services.backup.backup_service import BackupService
-    from services.backup.restore_core import RestoreCoreMixin as RestoreCore
     ca = create_ca(cn='Issuance backup CA')
     _patch(auth_client, ca['id'], issuanceHidden=True)
     with app.app_context():
         exported = next(r for r in BackupService()._export_cas(True) if r['refid'] == ca['refid'])
-        assert exported['issuance_hidden'] is True
-        row = db.session.get(CA, ca['id'])
-        row.issuance_hidden = False
-        RestoreCore._apply_ca_fields(row, {'refid': row.refid, 'issuance_hidden': True})
-        assert row.issuance_hidden is True
-        # An older backup without the field, or a value that is not a boolean, changes nothing
-        RestoreCore._apply_ca_fields(row, {'refid': row.refid})
-        RestoreCore._apply_ca_fields(row, {'refid': row.refid, 'issuance_hidden': 'no'})
-        assert row.issuance_hidden is True
-        db.session.commit()
+    assert exported['issuance_hidden'] is True
 
 
 def test_sqlite_migration_lists_existing_cas():

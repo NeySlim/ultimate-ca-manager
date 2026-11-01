@@ -4,7 +4,7 @@ import { Button, Select, Input, DatePicker, EkuMultiSelect } from '../../compone
 import { templatesService, ekuService } from '../../services'
 import { getSanValidationError, getAutoSansFromCn } from '../../lib/sanValidate'
 import { useNotification } from '../../contexts'
-import { hiddenIssuanceCas, issuanceCas, unlistedSigningCas } from '../../lib/caSelection'
+import { hiddenFromIssuance, listedForIssuance, signingCas, unlistedSigningCas } from '../../lib/caSelection'
 import { HiddenCasToggle } from '../../components/cas/HiddenCasToggle'
 import { daysRemaining } from '../../lib/utils'
 import { ISSUE_KEY_CHOICES, issueKeyLabel, isAllowed, useEffectiveAlgorithms } from '../../lib/policyAlgorithms'
@@ -444,10 +444,10 @@ export function IssueCertificateForm({ cas, initialData, onSubmit, onCancel, t }
             value={formData.ca_id}
             onChange={(val) => update('ca_id', val)}
             placeholder={t('certificates.selectCA')}
-            options={issuanceCas(cas, showHiddenCas, formData.ca_id).map(ca => ({ value: String(ca.id), label: ca.descr || ca.common_name }))}
+            options={listedForIssuance(signingCas(cas), showHiddenCas, formData.ca_id).map(ca => ({ value: String(ca.id), label: ca.descr || ca.common_name }))}
             helperText={unlistedSigningCas(cas) > 0 ? t('cas.notListedForSigning', { count: unlistedSigningCas(cas) }) : undefined}
           />
-          <HiddenCasToggle count={hiddenIssuanceCas(cas)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
+          <HiddenCasToggle count={hiddenFromIssuance(signingCas(cas), formData.ca_id)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
         </div>
         <div>
           <Select
