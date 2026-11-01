@@ -16,11 +16,14 @@ vi.mock('react-i18next', () => ({
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
+// One object for every render: a fresh one each time re-runs the page's load effect in a loop
+const notify = vi.hoisted(() => ({
+  showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn(),
+  showConfirm: vi.fn(() => Promise.resolve(false)),
+}))
+
 vi.mock('../../contexts', () => ({
-  useNotification: () => ({
-    showSuccess: vi.fn(), showError: vi.fn(), showInfo: vi.fn(), showWarning: vi.fn(),
-    showConfirm: vi.fn().mockResolvedValue(false),
-  }),
+  useNotification: () => notify,
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
 }))
 

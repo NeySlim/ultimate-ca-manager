@@ -308,7 +308,7 @@ export default function AccountPage() {
         : null
       const payload = {
         name: apiKeyForm.name.trim(),
-        permissions: apiKeyScopePermissions(apiKeyForm.scope),
+        permissions: apiKeyScopePermissions(apiKeyForm.scope, hasPermission),
         expires_days: expiresDays,
       }
       const response = await accountService.createApiKey(payload)
@@ -951,7 +951,7 @@ export default function AccountPage() {
               ]}
             />
             <p className="text-xs text-text-tertiary font-mono px-1">
-              {apiKeyScopePermissions(apiKeyForm.scope).join(', ')}
+              {apiKeyScopePermissions(apiKeyForm.scope, hasPermission).join(', ')}
             </p>
             <Input
               label={t('account.expiresInDays')}

@@ -12,7 +12,10 @@ export const API_KEY_SCOPES = {
   ],
 }
 
-/** Permissions of a preset; an unknown one means full access. */
-export function apiKeyScopePermissions(scope) {
-  return API_KEY_SCOPES[scope] || ['*']
+/**
+ * Permissions of a preset (an unknown one means full access), cut down to those
+ * `holds(permission)` grants; wildcard entries are left to the server.
+ */
+export function apiKeyScopePermissions(scope, holds = () => true) {
+  return (API_KEY_SCOPES[scope] || ['*']).filter(p => p.includes('*') || holds(p))
 }

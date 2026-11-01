@@ -2,26 +2,31 @@
  * The SSH CA list needs read:ssh_cas: without it the certificates still load.
  */
 import { describe, it, expect, vi, beforeEach } from 'vitest'
-import { render, screen, waitFor } from '@testing-library/react'
+import { render, screen, waitFor, fireEvent } from '@testing-library/react'
 import { MemoryRouter } from 'react-router-dom'
 
 const authState = vi.hoisted(() => ({ permissions: [] }))
 const showError = vi.hoisted(() => vi.fn())
+// Stable across renders: t and showError are loadData dependencies, a fresh one reloads in a loop
+const stable = vi.hoisted(() => ({
+  i18n: {
+    t: (key) => key,
+    i18n: { language: 'en', changeLanguage: () => {}, on: () => {}, off: () => {} },
+  },
+  notify: {
+    showSuccess: () => {}, showError: (...a) => showError(...a), showInfo: () => {}, showWarning: () => {},
+    showConfirm: () => Promise.resolve(false),
+  },
+}))
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({
-    t: (key) => key,
-    i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() },
-  }),
+  useTranslation: () => stable.i18n,
   Trans: ({ children }) => children,
   initReactI18next: { type: '3rdParty', init: vi.fn() },
 }))
 
 vi.mock('../../contexts', () => ({
-  useNotification: () => ({
-    showSuccess: vi.fn(), showError, showInfo: vi.fn(), showWarning: vi.fn(),
-    showConfirm: vi.fn().mockResolvedValue(false),
-  }),
+  useNotification: () => stable.notify,
   useMobile: () => ({ isMobile: false, isTablet: false, sidebarOpen: true, setSidebarOpen: vi.fn() }),
 }))
 
@@ -72,6 +77,31 @@ describe('SSHCertificatesPage without the SSH CA scope', () => {
   it('asks for the CAs with read:ssh_cas', async () => {
     casGetAll.mockResolvedValue({ data: [] })
     await renderPage(['read:ssh', 'read:ssh_cas'])
+    await waitFor(() => expect(casGetAll).toHaveBeenCalled())
+  })
+
+  it('says why the issue form has no CA to offer', async () => {
+    await renderPage(['read:ssh', 'write:ssh'])
+    fireEvent.click((await screen.findAllByText('sshCertificates.issueCertificate'))[0])
+    expect(await screen.findByText('sshCertificates.issueNeedsCaRead')).toBeInTheDocument()
+  })
+
+  it('shows no such notice to an account that can list the CAs', async () => {
+    casGetAll.mockResolvedValue({ data: [] })
+    await renderPage(['read:ssh', 'write:ssh', 'read:ssh_cas'])
+    fireEvent.click((await screen.findAllByText('sshCertificates.issueCertificate'))[0])
+    await screen.findAllByText('sshCertificates.selectCa')
+    expect(screen.queryByText('sshCertificates.issueNeedsCaRead')).toBeNull()
+  })
+
+  it('loads the CAs once read:ssh_cas is granted', async () => {
+    authState.permissions = ['read:ssh']
+    const { rerender } = render(<MemoryRouter><SSHCertificatesPage /></MemoryRouter>)
+    await waitFor(() => expect(getAll).toHaveBeenCalled())
+    expect(casGetAll).not.toHaveBeenCalled()
+    casGetAll.mockResolvedValue({ data: [] })
+    authState.permissions = ['read:ssh', 'read:ssh_cas']
+    rerender(<MemoryRouter><SSHCertificatesPage /></MemoryRouter>)
     await waitFor(() => expect(casGetAll).toHaveBeenCalled())
   })
 })

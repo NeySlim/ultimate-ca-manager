@@ -5571,6 +5571,7 @@
     "validityInfo": "Validity",
     "caInfo": "CA Information",
     "selectCa": "Select SSH CA",
+    "issueNeedsCaRead": "Choosing an SSH CA needs the read:ssh_cas permission, which your account lacks: ask an administrator for it.",
     "issueMode": "Issue Mode",
     "presets": {
       "1h": "1 Hour",

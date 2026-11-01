@@ -71,6 +71,8 @@ export default function SSHCertificatesPage() {
   const { id: urlCertId } = useParams()
   const { showSuccess, showError, showConfirm } = useNotification()
   const { canRead, canWrite, canDelete } = usePermission()
+  // A boolean, not canRead itself: usePermission hands out a new function on every render
+  const canListSshCas = canRead('ssh_cas')
   const { copy: clipboardCopy } = useClipboard()
   const { muteToasts } = useWebSocket()
 
@@ -126,7 +128,7 @@ export default function SSHCertificatesPage() {
       const [certsRes, casRes, statsRes] = await Promise.all([
         sshCertificatesService.getAll(params),
         // The CA list is behind read:ssh_cas; without it, only the CA filter and picker are empty
-        canRead('ssh_cas') ? sshCasService.getAll() : Promise.resolve({ data: [] }),
+        canListSshCas ? sshCasService.getAll() : Promise.resolve({ data: [] }),
         sshCertificatesService.getStats(),
       ])
 
@@ -145,7 +147,7 @@ export default function SSHCertificatesPage() {
       if (seq === requestSeq.current) setLoading(false)
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [page, perPage, sortBy, sortOrder, JSON.stringify(filterStatus), JSON.stringify(filterType), JSON.stringify(filterCA), searchValue, showError, t])
+  }, [page, perPage, sortBy, sortOrder, JSON.stringify(filterStatus), JSON.stringify(filterType), JSON.stringify(filterCA), searchValue, canListSshCas, showError, t])
 
   useEffect(() => {
     loadData()
@@ -746,6 +748,7 @@ export default function SSHCertificatesPage() {
       >
         <IssueCertificateForm
           cas={cas}
+          canListCas={canListSshCas}
           onSubmit={handleIssueSubmit}
           onCancel={() => setShowIssueModal(false)}
         />
@@ -792,7 +795,7 @@ export default function SSHCertificatesPage() {
 
 // ============= ISSUE CERTIFICATE FORM =============
 
-function IssueCertificateForm({ cas, onSubmit, onCancel }) {
+function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
   const { t } = useTranslation()
   const [loading, setLoading] = useState(false)
   const [result, setResult] = useState(null)
@@ -948,6 +951,9 @@ function IssueCertificateForm({ cas, onSubmit, onCancel }) {
           options={caOptions}
           placeholder={t('sshCertificates.selectCa')}
         />
+        {!canListCas && (
+          <p className="mt-1 text-xs text-status-danger" role="alert">{t('sshCertificates.issueNeedsCaRead')}</p>
+        )}
       </div>
 
       {/* Certificate Type */}
