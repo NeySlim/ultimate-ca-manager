@@ -40,7 +40,8 @@ def convert_certificate():
         return error_response('Input data is required', 400)
 
     try:
-        parser = SmartParser()
+        # The parses below share one password budget: they all serve this one request
+        parser = SmartParser(shared_budget=True)
 
         # Decode binary input if BASE64: prefixed (from file upload)
         is_binary = input_data.startswith('BASE64:')
