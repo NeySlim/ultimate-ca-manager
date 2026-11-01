@@ -146,6 +146,16 @@ class SmartImporter:
         self.validator = ImportValidator()
         self._pending_audit = []
         self._attached_cross = []
+        self._parsed = None
+
+    def _parse(self, content, password) -> List[ParsedObject]:
+        """The parse of *content*, run once for ``imports_cas`` then ``execute``: each costs key derivations."""
+        if self._parsed is not None and self._parsed[0] is content and self._parsed[1] == password:
+            objects = self._parsed[2]
+        else:
+            objects = self.parser.parse(content, password)
+        self._parsed = None
+        return objects
     
     def analyze(self, content: str | bytes, password=None) -> AnalysisResult:
         """
@@ -204,7 +214,9 @@ class SmartImporter:
         options = options or {}
         if not options.get("import_cas", True):
             return False
-        objects = _selected(self.parser.parse(content, password), options) or []
+        objects = self.parser.parse(content, password)
+        self._parsed = (content, password, objects)
+        objects = _selected(objects, options) or []
         return any(o.type == ObjectType.CERTIFICATE and _is_ca_import_target(o) for o in objects)
 
     def execute(
@@ -246,7 +258,7 @@ class SmartImporter:
 
         try:
             # Parse
-            objects = self.parser.parse(content, password)
+            objects = self._parse(content, password)
             objects = _selected(objects, options)
             if objects is None:
                 result.success = False
