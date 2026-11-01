@@ -30,9 +30,9 @@ class AlreadySuperseded(Exception):
 
 
 def _claim_superseded(row):
-    """Archive every live row holding *row*'s certificate, as the issued lookup finds
-    them; False when another renewal got there first. One row at a time in id order,
-    so two concurrent claims never lock in opposite orders."""
+    """Archive every live row holding *row*'s certificate (same DER, under any CA: it is
+    replaced everywhere); False when another renewal got there first. One row at a time
+    in id order, so two concurrent claims never lock in opposite orders."""
     from sqlalchemy import update
     from sqlalchemy.orm.attributes import set_committed_value
     from services.cert.issued_lookup import _rows_holding
@@ -258,7 +258,7 @@ class CASigningMixin:
             raise
         except Exception as _commit_err:
             db.session.rollback()
-            logger.error(f"Commit failed in services/ca/ca_signing.py:168: {_commit_err}", exc_info=True)
+            logger.error(f"Storing the certificate signed via {source} failed: {_commit_err}", exc_info=True)
             raise
 
         logger.info(f"Signed CSR via {source}: CN={cn}, serial={serial}, CA={ca.descr}")
