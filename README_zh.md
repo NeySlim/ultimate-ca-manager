@@ -1,4 +1,8 @@
 [English](README.md) | [简体中文](README_zh.md)
+
+**翻译说明**：
+本文档基于英文原版 `v2.247` 版本（2026年11月）翻译，目前正在翻译。
+由于项目功能迭代较快，部分最新细节可能未及时同步。如需查看最新特性，请参考 [英文原版 README](README.md)。
 # Ultimate Certificate Manager
 
 ![Version](https://img.shields.io/github/v/release/NeySlim/ultimate-ca-manager?label=version&color=brightgreen)
@@ -21,7 +25,7 @@
 ## 功能特性
 
 ### PKI 核心
-- **CA 管理** -- 根 CA 和中间 CA、层级视图、导入/导出， **中间 CA 吊销** （吊销状态通过父 CA 的 CRL 和 OCSP 响应发布， 下级证书因上级 CA 被吊销而失效）， **certificate-only CAs** (a CA signed from an external request, its private key imported later), **HSM-backed signing keys** （私钥永不离开 HSM）， **可配置的 RFC 5280 证书配置文件** （签名摘要算法， Key Usage, EKU）， 默认采用 Let's Encrypt 风格配置，并可选支持 **RSA-PSS** 签名方案， 与 ANSSI、BSI 及欧盟商定机制对齐的**合规配置文件**， **外部签发的 CA** （UCM 生成密钥对和 CA 类型的 CSR，由离线/外部根 CA 签名；私钥永不离开 UCM，并支持同密钥 CSR 续期）， **交叉签名的 CA 证书** （可在 CA 自身证书旁附加或交叉签名一个证书，在根证书轮换期间将其作为默认证书链提供，按导出或部署选择证书链，并查看哪些证书仍能链到旧根）， **RFC 5280 名称约束** 在创建时设置 （允许和排除的 DNS、IP 范围与电子邮件子树，并在每条签发路径上强制执行）， 有效期可设为 1 年或任意天数，最长 50 年。
+- **CA 管理** -- 根 CA 和中间 CA、层级视图、导入/导出， **中间 CA 吊销** （吊销状态通过父 CA 的 CRL 和 OCSP 响应发布， 下级证书因上级 CA 被吊销而失效）， **仅证书 CA** (根据外部请求签发、私钥稍后导入的 CA), **HSM-backed signing keys** （私钥永不离开 HSM）， **可配置的 RFC 5280 证书配置文件** （签名摘要算法， Key Usage, EKU）， 默认采用 Let's Encrypt 风格配置，并可选支持 **RSA-PSS** 签名方案， 与 ANSSI、BSI 及欧盟商定机制对齐的**合规配置文件**， **外部签发的 CA** （UCM 生成密钥对和 CA 类型的 CSR，由离线/外部根 CA 签名；私钥永不离开 UCM，并支持同密钥 CSR 续期）， **交叉签名的 CA 证书** （可在 CA 自身证书旁附加或交叉签名一个证书，在根证书轮换期间将其作为默认证书链提供，按导出或部署选择证书链，并查看哪些证书仍能链到旧根）， **RFC 5280 名称约束** 在创建时设置 （允许和排除的 DNS、IP 范围与电子邮件子树，并在每条签发路径上强制执行）， 有效期可设为 1 年或任意天数，最长 50 年。
 - **Certificate Lifecycle** -- Issue, sign, revoke (with the RFC 5280 reason, from every revoke dialog and in bulk), renew (**in-place**: stable IDs across renewals, superseded serials stay on CRL/OCSP until their original expiry, with a chosen validity still capped by policy), rename (mutable display name, covers CN-less certificates), export (PEM, DER, PKCS#12 with a 3DES/SHA-1 compatibility mode for Android 15 and earlier, macOS 14 and earlier, older Windows and Java, JKS; the chain omits the self-signed root by default, with an **Include Root CA** option where a packaging or import target needs it), bulk operations, filter by status / issuer / source (ACME, SCEP, EST, AD CS, import…), including the records **archived** by a renewal or a re-enrolment and kept for history
 - **Conformance Linting** -- per-certificate checks against RFC 5280, CA/Browser Forum Baseline Requirements and ETSI EN 319 412 via pkilint (and zlint when available), informative-only
 - **CSR Management** -- Create, import, sign Certificate Signing Requests with **custom Extra EKU OIDs** (RFC 5280 §4.2.1.12), **typed SAN validation** (DNS / IP / Email / URI / UPN), NIST P-256 / P-384 / P-521 and Brainpool P256r1 / P384r1 / P512r1 curves, and an **external CA return path**: a certificate issued elsewhere for a CSR generated in UCM completes that CSR on import and keeps its private key; **names added at signing** (the email address of an S/MIME request from a smart card that carries only a CN, under the same name constraints, policies and approval) and **sign again** from the history, for devices that cannot produce their request twice
