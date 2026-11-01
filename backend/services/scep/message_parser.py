@@ -183,7 +183,7 @@ def _check_mldsa_signer_info(signer_info, public_key, digest_name: str) -> None:
         raise ValueError(f"{label} CMS signature algorithm carries parameters")
 
 
-def verify_cms_signature(signed_data, signer_cert) -> None:
+def verify_cms_signature(signed_data, signer_cert, signer_info=None) -> None:
     """Verify the CMS SignerInfo signature against signer_cert's public key.
 
     This is the *outer* signature wrapping the SCEP envelope. RFC 8894 §3.1
@@ -205,7 +205,9 @@ def verify_cms_signature(signed_data, signer_cert) -> None:
     signer_infos = signed_data["signer_infos"]
     if len(signer_infos) == 0:
         raise ValueError("SCEP CMS message has no SignerInfo")
-    signer_info = signer_infos[0]
+    # The first SignerInfo unless the caller picked one (a WSTEP renewal carries two)
+    if signer_info is None:
+        signer_info = signer_infos[0]
 
     digest_name = signer_info["digest_algorithm"]["algorithm"].native
     sig_alg = signer_info["signature_algorithm"]["algorithm"].native

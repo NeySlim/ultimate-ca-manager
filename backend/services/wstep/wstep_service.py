@@ -178,10 +178,9 @@ def _verify_pkcs7_pop(csr, outer_signed_data):
     certificate the way SCEP's equivalent check does.
 
     Without this, ``issue()``'s UsernamePassword/Kerberos-bound paths
-    (the only ones that call this — ``renew()`` doesn't: a renewal RST is
-    already WS-Security-signed by an existing, UCM-trusted certificate)
-    had no cryptographic proof at all that a PKCS#7-wrapped CSR's
-    submitter controlled the CSR's private key. A holder of the shared
+    (and ``renew_with_client_certificate`` for a new key; the XML-DSig
+    ``renew()`` doesn't call it) had no cryptographic proof at all that a
+    PKCS#7-wrapped CSR's submitter controlled the CSR's private key. A holder of the shared
     UsernamePassword credential could submit any public key — one they
     don't control — and receive a UCM-issued certificate binding it to
     whatever subject the CSR (or an AD-derived override) requested.
@@ -841,14 +840,102 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
     except Exception:
         return None, 'Invalid signing certificate'
 
-    # Serial number and subject are both public, so matching on them alone
-    # (as this used to) lets an attacker forge a self-signed lookalike and
-    # renew under a victim's identity. Require a byte-for-byte match against
-    # a certificate UCM itself issued from this same CA.
+    db_cert, err = _renewable_certificate(ca, signing_cert)
+    if err:
+        return None, err
+
+    csr, err = _load_csr(csr_der)
+    if err:
+        return None, err
+    return _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop)
+
+
+def renew_with_client_certificate(ca, client_cert_pem, csr_der, outer_signed_data, validity_days,
+                                  source='wstep'):
+    """Renewal on the Certificate binding as Windows sends it: authenticated by the
+    TLS client certificate, which must also sign the CMS request (MS-WSTEP, RFC 5272).
+    Returns (cert_pem, error)."""
+    if not client_cert_pem:
+        return None, 'Renewal requires the certificate being renewed as TLS client certificate'
+    try:
+        client_cert = x509.load_pem_x509_certificate(
+            client_cert_pem.encode() if isinstance(client_cert_pem, str) else client_cert_pem)
+    except Exception:
+        return None, 'Invalid client certificate'
+
+    db_cert, err = _renewable_certificate(ca, client_cert)
+    if err:
+        return None, err
+
+    if outer_signed_data is None:
+        return None, 'Renewal request is not signed by the certificate being renewed'
+    err = _verify_renewal_signer(outer_signed_data, client_cert)
+    if err:
+        return None, err
+
+    csr, err = _load_csr(csr_der)
+    if err:
+        return None, err
+    # A new key proves itself with its own SignerInfo; the same key is proven above
+    if csr.public_key() != client_cert.public_key():
+        err = _verify_pkcs7_pop(csr, outer_signed_data)
+        if err:
+            return None, err
+    return _sign_renewal(ca, client_cert, db_cert, csr, validity_days, source, require_pop=False)
+
+
+def _verify_renewal_signer(outer_signed_data, cert):
+    """None when a SignerInfo naming ``cert`` (issuer and serial, or key
+    identifier) verifies with its key, else an error string."""
+    from asn1crypto import x509 as asn1_x509
+
+    from fips_mode import FipsRestricted
+    from services.scep.message_parser import verify_cms_signature
+
+    cert_der = cert.public_bytes(Encoding.DER)
+    issuer = asn1_x509.Certificate.load(cert_der).issuer.dump()
+    key_ids = {x509.SubjectKeyIdentifier.from_public_key(cert.public_key()).digest}
+    try:
+        key_ids.add(cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value.digest)
+    except x509.ExtensionNotFound:
+        pass
+
+    try:
+        signer_infos = list(outer_signed_data['signer_infos'])
+    except Exception:
+        return 'Invalid PKCS#7 envelope'
+    for signer_info in signer_infos:
+        try:
+            sid = signer_info['sid']
+            if sid.name == 'issuer_and_serial_number':
+                names_cert = (sid.chosen['issuer'].dump() == issuer
+                              and sid.chosen['serial_number'].native == cert.serial_number)
+            else:
+                names_cert = sid.chosen.native in key_ids
+        except Exception:
+            return 'Invalid PKCS#7 envelope'
+        if not names_cert:
+            continue
+        try:
+            verify_cms_signature(outer_signed_data, cert, signer_info=signer_info)
+        except FipsRestricted as e:
+            logger.warning("WSTEP: renewal envelope refused in FIPS mode: %s", e)
+            return f'PKCS#7 envelope refused: {e}'
+        except Exception as e:
+            logger.warning("WSTEP: renewal envelope signature check failed: %s", e)
+            return 'Renewal request signature invalid (proof of possession failed)'
+        return None
+    return 'Renewal request is not signed by the certificate being renewed'
+
+
+def _renewable_certificate(ca, cert):
+    """(row, None) when ``cert`` is, byte for byte, a certificate this CA issued
+    and still holds; (None, error) otherwise. Serial and subject are public, so
+    a self-signed lookalike must not pass."""
     from services.cert.issued_lookup import (
         OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
     )
-    db_cert, status = issued_certificate_status(ca, signing_cert)
+    db_cert, status = issued_certificate_status(ca, cert)
     if status != OK:
         return None, {
             REVOKED: 'Signing certificate has been revoked',
@@ -856,11 +943,11 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
             NOT_YET_VALID: 'Signing certificate is not yet valid',
             SUPERSEDED: 'Signing certificate has been superseded by a newer one',
         }.get(status, 'Signing certificate is not recognized')
+    return db_cert, None
 
-    csr, err = _load_csr(csr_der)
-    if err:
-        return None, err
 
+def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop):
+    """Issue the renewal once the caller has authenticated ``signing_cert``."""
     err = _validate_csr(csr, require_pop=require_pop)
     if err:
         return None, err

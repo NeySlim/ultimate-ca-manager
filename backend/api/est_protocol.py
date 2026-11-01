@@ -8,6 +8,7 @@ from services.ca_service import CAService
 from services.policy_service import PolicyViolation
 from services.audit_service import AuditService
 from utils import key_algorithms
+from utils.client_cert import trusted_client_cert
 from utils.trusted_proxy import client_ip
 from utils.db_transaction import safe_commit
 from utils.est_cms import build_server_generated_key_cms
@@ -389,74 +390,8 @@ def _resolve_est_ca(label=None):
 
 
 def _trusted_client_cert():
-    """
-    Return the PEM client certificate ONLY when it can be trusted.
-
-    Sources:
-      - request.environ['peercert'] (native gunicorn TLS) — always safe.
-      - SSL_CLIENT_CERT / SSL_CLIENT_VERIFY (reverse proxy) — only when
-        the immediate peer is a trusted proxy AND verify == 'SUCCESS'.
-
-    Without this gate any attacker who can reach gunicorn directly (or
-    poison the header through a mis-configured proxy) can forge an
-    arbitrary client certificate and obtain a signed cert from the EST
-    CA.
-    """
-    # Native TLS: gunicorn populates request.environ['peercert'] only after
-    # validating the chain against the configured CA — safe to trust.
-    # The worker stores it as DER (getpeercert(binary_form=True)) while every
-    # caller here parses PEM, so a DER value is converted.
-    peercert = request.environ.get('peercert')
-    if peercert:
-        if isinstance(peercert, (bytes, bytearray)) and not bytes(peercert).lstrip().startswith(b'-----'):
-            return x509.load_der_x509_certificate(bytes(peercert)).public_bytes(
-                _crypto_serialization.Encoding.PEM).decode('ascii')
-        return peercert
-
-    from utils.trusted_proxy import immediate_peer_addr, is_request_from_trusted_proxy
-    if not is_request_from_trusted_proxy():
-        # Untrusted peer is sending SSL_CLIENT_CERT — likely a spoof.
-        if request.environ.get('SSL_CLIENT_CERT') or request.headers.get('X-SSL-Client-Cert'):
-            logger.warning(
-                "EST: ignoring SSL_CLIENT_CERT from untrusted peer %s",
-                immediate_peer_addr(),
-            )
-        return None
-
-    verify = (
-        request.environ.get('SSL_CLIENT_VERIFY')
-        or request.headers.get('X-SSL-Client-Verify')
-        or ''
-    ).upper()
-    presented = (
-        request.environ.get('SSL_CLIENT_CERT')
-        or request.headers.get('X-SSL-Client-Cert')
-    )
-    # Fail closed: a missing SSL_CLIENT_VERIFY is not evidence of a verified
-    # peer. Treating absent-as-OK meant a trusted proxy that forwarded the
-    # certificate but not the verify result would have its client certs
-    # accepted unvalidated. Only WARN when a certificate was actually
-    # presented, though — an ordinary Basic-auth request through a trusted
-    # proxy that forwards no SSL_CLIENT_* variables (e.g. the sample nginx
-    # config in docs/installation/docker.md) carries no client cert, and
-    # logging "refusing client cert" on its success path is a false alarm
-    # on every request (twice per serverkeygen).
-    if verify != 'SUCCESS':
-        if presented:
-            logger.warning(
-                "EST: SSL_CLIENT_VERIFY=%r, refusing client cert",
-                verify or '<missing>',
-            )
-        else:
-            logger.debug(
-                "EST: no client certificate presented (SSL_CLIENT_VERIFY=%r); "
-                "falling through to other authentication",
-                verify or '<missing>',
-            )
-        return None
-
-    from services.certificate_parser import decode_forwarded_pem
-    return decode_forwarded_pem(presented)
+    """PEM of the trusted client certificate, or None (see ``utils.client_cert``)."""
+    return trusted_client_cert(logger, 'EST')
 
 
 def _presented_certificate_refusal(ca):
