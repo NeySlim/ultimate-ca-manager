@@ -708,23 +708,30 @@ def test_template_without_ekus_keeps_the_renewal_within_the_old_ones(app, templa
     assert _ekus(cert) == {ExtendedKeyUsageOID.CLIENT_AUTH}
 
 
-def test_two_live_duplicates_are_claimed_together(client, app, wstep_renew_config):
-    """A certificate held twice renews once: the second renewal finds both rows archived."""
-    old_cert, old_key = _issue(app, wstep_renew_config['id'], 'tls-renew-two-live.example.test')
+@pytest.mark.parametrize('twin', ['same', 'hex_serial', 'crlf_pem'])
+def test_two_live_duplicates_are_claimed_together(client, app, wstep_renew_config, twin):
+    """A certificate held twice renews once, however the twin stores its serial or PEM."""
+    old_cert, old_key = _issue(app, wstep_renew_config['id'], f'tls-renew-two-live-{twin}.example.test')
     with app.app_context():
         original = Certificate.query.filter_by(serial_number=str(old_cert.serial_number)).one()
         columns = {c.name: getattr(original, c.name) for c in Certificate.__table__.columns
                    if c.name not in ('id', 'refid')}
-        db.session.add(Certificate(refid=f'{original.refid}-twin', **columns))
+        if twin == 'hex_serial':
+            columns['serial_number'] = format(old_cert.serial_number, 'X')
+        elif twin == 'crlf_pem':
+            pem = old_cert.public_bytes(serialization.Encoding.PEM).replace(b'\n', b'\r\n')
+            columns['crt'] = base64.b64encode(pem).decode()
+        twin_row = Certificate(refid=f'{original.refid}-twin', **columns)
+        db.session.add(twin_row)
         db.session.commit()
+        ids = (original.id, twin_row.id)
     body = _rst(_cmc_renewal(_renewal_csr(old_cert, old_key), [(old_key, old_cert)]))
     assert _post(client, body, tls_cert=old_cert).status_code == 200
     r = _post(client, body, tls_cert=old_cert)
     assert r.status_code == 400
     assert b'superseded' in r.data, r.data
     with app.app_context():
-        assert {c.archived for c in Certificate.query.filter_by(
-            serial_number=str(old_cert.serial_number)).all()} == {True}
+        assert [db.session.get(Certificate, i).archived for i in ids] == [True, True]
 
 
 def test_a_twin_claimed_by_another_renewal_loses_the_claim(app, wstep_renew_config, monkeypatch):

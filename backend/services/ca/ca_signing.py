@@ -30,23 +30,25 @@ class AlreadySuperseded(Exception):
 
 
 def _claim_superseded(row):
-    """Archive *row* and every live duplicate of it (a restore may leave two); False
-    when another renewal got there first."""
+    """Archive every live row holding *row*'s certificate, as the issued lookup finds
+    them; False when another renewal got there first. One row at a time in id order,
+    so two concurrent claims never lock in opposite orders."""
     from sqlalchemy import update
     from sqlalchemy.orm.attributes import set_committed_value
-    live = [r.id for r in Certificate.query.filter(
-        Certificate.serial_number == row.serial_number, Certificate.crt == row.crt,
-        Certificate.archived.isnot(True)).all()]
+    from services.cert.issued_lookup import _rows_holding
+    held = x509.load_pem_x509_certificate(base64.b64decode(row.crt))
+    live = sorted(r.id for r in _rows_holding(held, Certificate.archived.isnot(True)))
     if row.id not in live:
         return False
-    result = db.session.execute(
-        update(Certificate)
-        .where(Certificate.id.in_(live), Certificate.archived.isnot(True))
-        .values(archived=True)
-        .execution_options(synchronize_session=False)
-    )
-    if result.rowcount != len(live):
-        return False
+    for row_id in live:
+        result = db.session.execute(
+            update(Certificate)
+            .where(Certificate.id == row_id, Certificate.archived.isnot(True))
+            .values(archived=True)
+            .execution_options(synchronize_session=False)
+        )
+        if result.rowcount != 1:
+            return False
     set_committed_value(row, 'archived', True)
     return True
 
