@@ -10,7 +10,8 @@ import { MemoryRouter } from 'react-router-dom'
 
 vi.mock('react-i18next', () => ({
   useTranslation: () => ({
-    t: (key, opts) => (opts && typeof opts.count === 'number' ? `${key}:${opts.count}` : key),
+    t: (key, opts) => (opts && typeof opts.count === 'number'
+      ? `${key}:${opts.count}${opts.ids ? `:${opts.ids}` : ''}` : key),
     i18n: { language: 'en', changeLanguage: vi.fn(), on: vi.fn(), off: vi.fn() },
   }),
   Trans: ({ children }) => children,
@@ -146,10 +147,10 @@ describe('OperationsPage bulk revocation of hybrid pair members', () => {
   })
 
   it('says which other members could not be revoked', async () => {
-    mocks.bulkRevoke.mockResolvedValue({ data: { success: [1], failed: [], related_not_revoked: [2] } })
+    mocks.bulkRevoke.mockResolvedValue({ data: { success: [1], failed: [], related_not_revoked: [2, 7] } })
     const dialog = await openBulk('common.revoke')
     confirm(dialog)
-    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('revocation.bulkRelatedRevokeFailed:1'))
+    await waitFor(() => expect(mocks.showWarning).toHaveBeenCalledWith('revocation.bulkRelatedRevokeFailed:2:#2, #7'))
     expect(mocks.showWarning).not.toHaveBeenCalledWith(expect.stringMatching(/bulkRelatedRevoked/))
   })
 

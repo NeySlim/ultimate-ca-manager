@@ -594,7 +594,7 @@ export default function OperationsPage() {
         .map(id => partnerBefore.get(id))
         .filter(other => other != null && !selectedIds.has(other) && !notRevoked.includes(other)))
       if (notRevoked.length > 0) {
-        showWarning(t('revocation.bulkRelatedRevokeFailed', { count: notRevoked.length, ids: notRevoked.join(', ') }))
+        showWarning(t('revocation.bulkRelatedRevokeFailed', { count: notRevoked.length, ids: notRevoked.map(id => `#${id}`).join(', ') }))
       }
       if (pairedOutside.size > 0 && bulkAction === 'revoke' && !(selectionHasPairs && !bulkRevokeRelated)) {
         showWarning(t('revocation.bulkRelatedRevoked', { count: pairedOutside.size }))

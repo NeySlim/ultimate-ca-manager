@@ -40,6 +40,8 @@ const FORMATS = [
   { key: 'hybrid-bundle', labelKey: 'export.formats.hybridBundle', description: 'export.formatHybridBundleDesc', ext: '.zip', requiresRelated: true },
 ]
 
+const RELATED_KEY_UNKNOWN = 'unknown'
+
 export function ExportModal({
   open,
   onClose,
@@ -70,7 +72,8 @@ export function ExportModal({
 
   const isAllowed = (key) => isExportFormatAllowed(keyAlgorithm, key)
 
-  // The bundle carries both keys: it offers them only when the related certificate has one too (null: unknown)
+  // The bundle carries both keys: offered when the related certificate has one too (null: loading).
+  // A failed lookup leaves the option on: the server refuses a bundle with a missing key.
   const [relatedHasKey, setRelatedHasKey] = useState(null)
   useEffect(() => {
     setRelatedHasKey(null)
@@ -78,7 +81,7 @@ export function ExportModal({
     let cancelled = false
     certificatesService.getById(relatedCertificateId)
       .then((res) => { if (!cancelled) setRelatedHasKey(extractData(res)?.has_private_key === true) })
-      .catch(() => {})
+      .catch(() => { if (!cancelled) setRelatedHasKey(RELATED_KEY_UNKNOWN) })
     return () => { cancelled = true }
   }, [open, relatedCertificateId, hasPrivateKey, canExportKey])
 
@@ -111,7 +114,8 @@ export function ExportModal({
   const isJks = format === 'jks'
   const isKeyOnly = format === 'key'
   const isBundle = format === 'hybrid-bundle'
-  const keyOffered = hasPrivateKey && canExportKey && (!isBundle || relatedHasKey === true)
+  const keyOffered = hasPrivateKey && canExportKey
+    && (!isBundle || relatedHasKey === true || relatedHasKey === RELATED_KEY_UNKNOWN)
   const effectiveIncludeKey = (isPkcs12 || isJks || isKeyOnly) ? true : includeKey && keyOffered
   const needsPassword = isPkcs12 || isJks
   const showPasswordField = isPkcs12 || isJks

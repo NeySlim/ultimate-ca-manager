@@ -3924,7 +3924,7 @@
     "revokeRelatedBulkHint": "所选的混合证书对成员会连同另一成员一起吊销。取消勾选可使其他成员保持有效。",
     "relatedRevokeFailed": "证书已吊销，但其关联证书 #{{id}} 无法吊销：请单独吊销。",
     "bulkRelatedRevoked": "已随所选项一并吊销 {{count}} 张关联证书",
-    "bulkRelatedRevokeFailed": "有 {{count}} 张关联证书无法随所选项一并吊销（#{{ids}}）：请单独吊销"
+    "bulkRelatedRevokeFailed": "有 {{count}} 张关联证书无法随所选项一并吊销（{{ids}}）：请单独吊销"
   },
   "details": {
     "pemCertificate": "PEM 证书",

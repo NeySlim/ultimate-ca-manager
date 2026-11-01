@@ -2057,7 +2057,7 @@
     "revokeRelatedBulk": "Révoquer aussi les certificats liés",
     "revokeRelatedBulkHint": "Les membres sélectionnés d'une paire hybride entraînent l'autre membre. Décochez pour conserver valides les autres membres.",
     "bulkRelatedRevoked": "{{count}} certificats liés révoqués avec la sélection",
-    "bulkRelatedRevokeFailed": "{{count}} certificats liés n'ont pas pu être révoqués avec la sélection (n°{{ids}}) : révoquez-les séparément"
+    "bulkRelatedRevokeFailed": "{{count}} certificats liés n'ont pas pu être révoqués avec la sélection ({{ids}}) : révoquez-les séparément"
   },
   "details": {
     "pemCertificate": "Certificat PEM",
@@ -2304,7 +2304,7 @@
     "importCAs": "Importer les CAs",
     "importCertificates": "Importer les certificats",
     "importKeys": "Importer les clés",
-    "importCSRs": "Importer des CSR",
+    "importCSRs": "Importer les CSR",
     "importObjects": "Importer {{count}} objet(s)",
     "importingObjects": "Importation en cours...",
     "importComplete": "Importation terminée",

@@ -3924,7 +3924,7 @@
     "revokeRelatedBulk": "Revocar también los certificados vinculados",
     "revokeRelatedBulkHint": "Los miembros seleccionados de un par híbrido arrastran al otro miembro. Desmarque para mantener válidos los demás miembros.",
     "bulkRelatedRevoked": "{{count}} certificados vinculados revocados con la selección",
-    "bulkRelatedRevokeFailed": "No se pudieron revocar {{count}} certificados vinculados con la selección (n.º {{ids}}): revóquelos por separado"
+    "bulkRelatedRevokeFailed": "No se pudieron revocar {{count}} certificados vinculados con la selección ({{ids}}): revóquelos por separado"
   },
   "details": {
     "pemCertificate": "PEM Certificado",

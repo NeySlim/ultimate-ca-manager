@@ -3924,7 +3924,7 @@
     "revokeRelatedBulk": "Auch die verknüpften Zertifikate widerrufen",
     "revokeRelatedBulkHint": "Ausgewählte Mitglieder eines hybriden Paars ziehen das andere Mitglied mit. Deaktivieren, damit die anderen Mitglieder gültig bleiben.",
     "bulkRelatedRevoked": "{{count}} verknüpfte Zertifikate zusammen mit der Auswahl widerrufen",
-    "bulkRelatedRevokeFailed": "{{count}} verknüpfte Zertifikate konnten nicht zusammen mit der Auswahl widerrufen werden (#{{ids}}): Widerrufen Sie sie separat"
+    "bulkRelatedRevokeFailed": "{{count}} verknüpfte Zertifikate konnten nicht zusammen mit der Auswahl widerrufen werden ({{ids}}): Widerrufen Sie sie separat"
   },
   "details": {
     "pemCertificate": "PEM-Zertifikat",

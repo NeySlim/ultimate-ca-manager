@@ -73,6 +73,18 @@ describe('ExportModal hybrid bundle', () => {
     expect(onExport.mock.calls[0][1]).toMatchObject({ includeKey: false })
   })
 
+  it('keeps the key option when the related certificate cannot be read: the server decides', async () => {
+    related.getById.mockRejectedValue(new Error('403'))
+    const onExport = renderModal({ relatedCertificateId: 12, hasPrivateKey: true, canExportKey: true })
+    fireEvent.click(screen.getByText(bundleLabel).closest('button'))
+    await waitFor(() => expect(related.getById).toHaveBeenCalledWith(12))
+    fireEvent.click((await screen.findByText(en.export.includeKey)).closest('label').querySelector('input'))
+    expect(screen.queryByText(en.export.bundleRelatedHasNoKey)).toBeNull()
+    submit()
+    await waitFor(() => expect(onExport).toHaveBeenCalledTimes(1))
+    expect(onExport.mock.calls[0]).toEqual(['hybrid-bundle', expect.objectContaining({ includeKey: true })])
+  })
+
   it('promises no CA chain the bundle does not carry', async () => {
     const onExport = renderModal({ relatedCertificateId: 12 })
     expect(screen.getByText(en.export.includeChain)).toBeInTheDocument()
