@@ -35,6 +35,7 @@ from models.ad_connector import ADConnectorConfig
 from models.discovered_certificate import ScanProfile, ScanRun, DiscoveredCertificate
 from models.ca_template_pin import CATemplatePin
 from models.ca_cross_certificate import CACrossCertificate
+from models.related_cert_request import RelatedCertRequestUse
 from models.webhook_delivery import WebhookDelivery
 from models.key_recovery import KeyRecoveryRequest
 from models.revoked_serial import RevokedSerial

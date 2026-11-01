@@ -284,7 +284,7 @@ class CSRMixin:
             raise ValueError(f"Failed to verify CSR signature: {e}")
 
         # RFC 9763: A is found before signing, so linking after it cannot fail
-        from services.cert.related_pair import link_issued, requested_by_csr
+        from services.cert.related_pair import link_issued, record_request_key, requested_by_csr
         related_a = requested_by_csr(csr_obj.public_bytes(serialization.Encoding.DER))
 
         # Sign CSR
@@ -473,6 +473,8 @@ class CSRMixin:
             db.session.delete(certificate)
 
         try:
+            # RFC 9763: the request binds to this key B in the commit that stores B
+            record_request_key(csr_obj.public_bytes(serialization.Encoding.DER), related_a)
             db.session.commit()
         except Exception as _commit_err:
             db.session.rollback()

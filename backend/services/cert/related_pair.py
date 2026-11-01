@@ -6,15 +6,20 @@ Sign CSR, ACME, EST or WSTEP). The pair revokes together only when the link is
 mutual, and renews together only when the server also holds both keys.
 """
 import base64
+import hashlib
 import logging
 from datetime import timedelta
 
 from asn1crypto import x509 as asn1_x509
 from cryptography import x509
 from cryptography.hazmat.primitives import hashes
+from cryptography.hazmat.primitives.asymmetric import ec, rsa
+from cryptography.hazmat.primitives.asymmetric.utils import decode_dss_signature
 from cryptography.x509.oid import ExtensionOID
+from sqlalchemy.exc import IntegrityError
 
 from models import Certificate, db
+from models.related_cert_request import RelatedCertRequestUse
 from services.policy_service import APPROVAL_REQUEST_LIFETIME, PolicyViolation
 from utils import key_algorithms, related_cert
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window
@@ -117,20 +122,108 @@ def verify_request(req, now=None):
         raise RelatedCertificateRefused('The related certificate was not issued by a CA of this instance')
     if ca.revoked_in_chain:
         raise RelatedCertificateRefused('The CA of the related certificate is revoked')
-    _check_chain_validity(ca, now)
+    _check_chain(ca, now)
     _check_location(req, cert_a)
     return row, cert_a
 
 
-def _check_chain_validity(ca, now):
-    """RFC 5280 §6.1.3: every CA certificate of A's path held here is valid at *now*."""
-    depth = 0
-    while ca is not None and depth <= ca.MAX_CHAIN_DEPTH:
+REPLAYED = ('This relatedCertRequest was already used with another key; '
+            'sign a new one with the related certificate')
+
+
+def _request_digest(req, public_key) -> str:
+    """SHA-256 of what the requester signed and of its signature in a form only A's key
+    can vary: r alone for ECDSA, as (r, n - s) verifies too, the integer for RSA."""
+    signature = req['signature'].native
+    if isinstance(public_key, ec.EllipticCurvePublicKey):
+        signature = _integer_bytes(decode_dss_signature(signature)[0])
+    elif isinstance(public_key, rsa.RSAPublicKey):
+        signature = _integer_bytes(int.from_bytes(signature, 'big'))
+    digest = hashlib.sha256(related_cert.signed_content(req['cert_id'], req['request_time'].native))
+    digest.update(signature)
+    return digest.hexdigest()
+
+
+def _integer_bytes(value: int) -> bytes:
+    return value.to_bytes((value.bit_length() + 7) // 8 or 1, 'big')
+
+
+def _key_digest(csr_der) -> str:
+    try:
+        return hashlib.sha256(related_cert.csr_spki_der(csr_der)).hexdigest()
+    except related_cert.RelatedCertError as e:
+        raise RelatedCertificateRefused(str(e)) from e
+
+
+def _bound_key(digest):
+    row = RelatedCertRequestUse.query.filter_by(request_sha256=digest).first()
+    return row.spki_sha256 if row is not None else None
+
+
+def check_request_key(req, cert_a, csr_der) -> None:
+    """Refuse a request already honoured for another key B; the same key (a retry) passes."""
+    bound = _bound_key(_request_digest(req, cert_a.public_key()))
+    if bound is not None and bound != _key_digest(csr_der):
+        raise RelatedCertificateRefused(REPLAYED)
+
+
+def record_request_key(csr_der, requested) -> None:
+    """Bind the CSR's relatedCertRequest (naming *requested*, from ``requested_by_csr``) to
+    its key B in the caller's transaction, which commits it with the certificate; a
+    concurrent binding to another key refuses."""
+    if requested is None:
+        return
+    try:
+        req = related_cert.request_from_csr_der(csr_der)
+    except related_cert.RelatedCertError as e:
+        raise RelatedCertificateRefused(str(e)) from e
+    digest, key = _request_digest(req, requested[1].public_key()), _key_digest(csr_der)
+    # Requests older than this are refused anyway: their bindings are dropped as we go
+    RelatedCertRequestUse.query.filter(
+        RelatedCertRequestUse.request_time < utc_now() - REQUEST_MAX_AGE
+    ).delete(synchronize_session=False)
+    bound = _bound_key(digest)
+    if bound is None:
         try:
-            check_issuer_window(row_certificate(ca), now)
+            with db.session.begin_nested():
+                db.session.add(RelatedCertRequestUse(request_sha256=digest, spki_sha256=key,
+                                                     request_time=related_cert.request_time(req)))
+            return
+        except IntegrityError:
+            bound = _bound_key(digest)
+    if bound != key:
+        raise RelatedCertificateRefused(REPLAYED)
+
+
+def _extension(cert, kind):
+    try:
+        return cert.extensions.get_extension_for_class(kind).value
+    except x509.ExtensionNotFound:
+        return None
+
+
+def _check_chain(ca, now):
+    """RFC 5280 §6.1.3-§6.1.4 on every CA certificate of A's path held here, the root
+    included: valid at *now*, cA set (k), within its pathLenConstraint (l, m), and
+    keyCertSign set when it carries keyUsage (n). Certificate policies are not checked."""
+    depth = below = 0  # below: CA certificates between this one and A, self-issued ones aside
+    while ca is not None and depth <= ca.MAX_CHAIN_DEPTH:
+        cert = row_certificate(ca)
+        prefix = f'The CA certificate {ca.descr!r} of the related certificate'
+        try:
+            check_issuer_window(cert, now)
         except IssuerWindowError as e:
-            raise RelatedCertificateRefused(
-                f'The CA certificate {ca.descr!r} of the related certificate is not valid now') from e
+            raise RelatedCertificateRefused(f'{prefix} is not valid now') from e
+        constraints = _extension(cert, x509.BasicConstraints)
+        if constraints is None or not constraints.ca:
+            raise RelatedCertificateRefused(f'{prefix} is not a CA certificate')
+        if constraints.path_length is not None and below > constraints.path_length:
+            raise RelatedCertificateRefused(f'{prefix} has a path length constraint the path exceeds')
+        usage = _extension(cert, x509.KeyUsage)
+        if usage is not None and not usage.key_cert_sign:
+            raise RelatedCertificateRefused(f'{prefix} may not sign certificates (keyUsage)')
+        if cert.subject != cert.issuer:
+            below += 1
         ca, depth = ca.issuing_ca(), depth + 1
 
 

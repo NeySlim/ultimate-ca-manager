@@ -101,7 +101,7 @@ class CASigningMixin:
         # Convert CSR object to PEM bytes
         csr_pem = csr.public_bytes(serialization.Encoding.PEM)
         # RFC 9763: A is found before signing, so linking after it cannot fail
-        from services.cert.related_pair import link_issued, requested_by_csr
+        from services.cert.related_pair import link_issued, record_request_key, requested_by_csr
         related_a = requested_by_csr(csr.public_bytes(serialization.Encoding.DER))
 
         # Load CA cert and key (local or HSM-backed)
@@ -219,6 +219,8 @@ class CASigningMixin:
         try:
             db.session.flush()
             link_issued(new_cert, cert_obj, related_a)
+            # RFC 9763: the request binds to this key B in the commit that stores B
+            record_request_key(csr.public_bytes(serialization.Encoding.DER), related_a)
             db.session.commit()
         except Exception as _commit_err:
             db.session.rollback()

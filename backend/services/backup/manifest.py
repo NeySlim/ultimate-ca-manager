@@ -510,6 +510,7 @@ EXCLUDED_TABLES: Dict[str, str] = {
     'pro_sso_sessions': 'live SSO sessions',
     'pro_sso_saml_message_ids': 'pending SAML request ids and a replay cache, valid for minutes',
     'webauthn_challenges': 'single-use registration and login challenges',
+    'related_cert_requests': 'a replay cache of relatedCertRequests, each honoured for at most 7 days',
     'schema_migrations': 'migration bookkeeping of the target, never of the source',
     'alembic_version': 'migration bookkeeping of the target',
 }
