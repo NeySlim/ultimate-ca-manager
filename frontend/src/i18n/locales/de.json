@@ -5519,7 +5519,9 @@
       "keySizeLabel": "Schlüsselgröße (nur RSA)",
       "principalsHelperText": "Kommagetrennte Liste erlaubter Principals",
       "allowAnyPrincipal": "Beliebigen Principal erlauben",
-      "allowAnyPrincipalHelp": "Wenn kein Principal aufgeführt ist, für jeden Namen signieren, einschließlich root. Ohne diese Option signiert eine CA mit leerer Liste nichts."
+      "allowAnyPrincipalHelp": "Wenn kein Principal aufgeführt ist, für jeden Namen signieren, einschließlich root. Ohne diese Option signiert eine CA mit leerer Liste nichts.",
+      "allowCustomKeyId": "Anfragenden die Wahl der Schlüssel-ID erlauben",
+      "allowCustomKeyIdHelp": "sshd protokolliert die Schlüssel-ID als Identität des Inhabers. Ohne diese Option benennt die CA jedes Zertifikat principals@CA-Name."
     },
     "searchPlaceholder": "SSH-CAs durchsuchen...",
     "downloadSetupScript": "Einrichtungsskript herunterladen",
@@ -5537,7 +5539,9 @@
     "downloadSetupScriptLinux": ".sh herunterladen (Linux/macOS)",
     "downloadSetupScriptWindows": ".ps1 herunterladen (Windows)",
     "anyPrincipal": "Beliebiger Principal",
-    "noPrincipalSignsNothing": "Kein Principal aufgeführt: Diese CA signiert nichts"
+    "noPrincipalSignsNothing": "Kein Principal aufgeführt: Diese CA signiert nichts",
+    "keyIdSetByCa": "Schlüssel-ID von der CA festgelegt: principals@CA-Name",
+    "keyIdChosenByRequester": "Schlüssel-ID vom Anfragenden gewählt"
   },
   "sshCertificates": {
     "title": "SSH-Zertifikate",
@@ -5602,6 +5606,8 @@
     },
     "modal": {
       "keyIdPlaceholder": "z.B. benutzer@hostname",
+      "keyIdSetByCa": "Von der CA festgelegt: {{keyId}}",
+      "keyIdSetByCaPending": "Von der CA aus den Principals festgelegt: principals@CA-Name",
       "publicKeyPlaceholder": "OpenSSH öffentlichen Schlüssel einfügen (ssh-ed25519 AAAA...)",
       "principalsPlaceholder": "z.B. root,admin,deploy (kommagetrennt)"
     },

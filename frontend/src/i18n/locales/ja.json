@@ -5522,7 +5522,9 @@
       "keySizeLabel": "鍵サイズ（RSAのみ）",
       "principalsHelperText": "許可されたPrincipalのカンマ区切りリスト",
       "allowAnyPrincipal": "任意のプリンシパルを許可",
-      "allowAnyPrincipalHelp": "プリンシパルが一つも指定されていない場合、root を含む任意の名前に署名します。このオプションがなければ、リストが空の CA は何も署名しません。"
+      "allowAnyPrincipalHelp": "プリンシパルが一つも指定されていない場合、root を含む任意の名前に署名します。このオプションがなければ、リストが空の CA は何も署名しません。",
+      "allowCustomKeyId": "リクエスタによる鍵IDの指定を許可",
+      "allowCustomKeyIdHelp": "sshdは鍵IDを所有者のIDとしてログに記録します。オフの場合、CAはすべての証明書に principals@CA名 という名前を付けます。"
     },
     "searchPlaceholder": "SSH CAを検索...",
     "downloadSetupScript": "セットアップスクリプトをダウンロード",
@@ -5540,7 +5542,9 @@
     "downloadSetupScriptLinux": ".sh をダウンロード (Linux/macOS)",
     "downloadSetupScriptWindows": ".ps1 をダウンロード (Windows)",
     "anyPrincipal": "任意のプリンシパル",
-    "noPrincipalSignsNothing": "プリンシパル未指定：この CA は何も署名しません"
+    "noPrincipalSignsNothing": "プリンシパル未指定：この CA は何も署名しません",
+    "keyIdSetByCa": "鍵IDはCAが設定: principals@CA名",
+    "keyIdChosenByRequester": "鍵IDはリクエスタが指定"
   },
   "sshCertificates": {
     "title": "SSH証明書",
@@ -5605,6 +5609,8 @@
     },
     "modal": {
       "keyIdPlaceholder": "例: user@hostname",
+      "keyIdSetByCa": "CAが設定: {{keyId}}",
+      "keyIdSetByCaPending": "CAがprincipalから設定: principals@CA名",
       "publicKeyPlaceholder": "OpenSSH公開鍵を貼り付け（ssh-ed25519 AAAA...）",
       "principalsPlaceholder": "例: root,admin,deploy（カンマ区切り）"
     },

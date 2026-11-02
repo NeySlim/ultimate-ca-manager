@@ -14,7 +14,7 @@ export default {
       {
         title: 'Campos del certificado',
         items: [
-          { label: 'Key ID', text: 'Identificador único del certificado. Aparece en los registros SSH para auditoría.' },
+          { label: 'Key ID', text: 'Identificador que sshd registra para el titular. La CA lo define como principals@nombre de la CA, salvo que permita a los solicitantes elegirlo.' },
           { label: 'Principals', text: 'Nombres de usuario (certificado de usuario) o nombres de host (certificado de host) para los que este certificado es válido. Separados por comas.' },
           { label: 'Validez', text: 'Tiempo de vida del certificado. Elija una opción predefinida (1h, 8h, 24h, 7d, 30d, 90d, 365d) o establezca una duración personalizada en segundos.' },
           { label: 'Extensions', text: 'Extensiones SSH como permit-pty, permit-agent-forwarding. Solo aplicables a certificados de usuario.' },
@@ -39,7 +39,7 @@ export default {
     tips: [
       'Use certificados efímeros (8h–24h) para el acceso de usuarios, minimizando el impacto de una clave comprometida.',
       'El modo firma es preferible: la clave privada del usuario nunca sale de su máquina.',
-      'Los Key ID deben ser descriptivos (ej.: «jdoe-prod-2025») para facilitar la auditoría de registros.',
+      'Cuando una CA permite a los solicitantes definir el key ID, manténgalo descriptivo (ej.: «jdoe-prod-2025») para facilitar la auditoría de registros.',
       'Para certificados de host, el principal debe coincidir con el nombre de host que usan los clientes para conectarse.',
     ],
     warnings: [
@@ -94,9 +94,11 @@ UCM genera tanto el par de claves como el certificado. Úselo cuando necesite pr
 ## Campos del certificado
 
 ### Key ID
-Un identificador único incorporado en el certificado. Aparece en los registros del servidor SSH cuando se utiliza el certificado, lo que lo hace esencial para la auditoría.
+Un identificador incorporado en el certificado. El servidor SSH lo registra cuando se utiliza el certificado, como identidad del titular.
 
-**Buenos ejemplos de Key ID:** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
+La CA lo define como \`principals@nombre de la CA\` (p. ej. \`deploy@Production User CA\`). Un solicitante solo puede elegir otro en una CA donde esté marcada la opción **Permitir que los solicitantes definan el ID de clave**; en las demás, esa solicitud se rechaza.
+
+**Buenos ejemplos de Key ID, donde se permite:** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
 
 ### Principals
 Los principals definen **quién** (certificados de usuario) o **qué** (certificados de host) autoriza el certificado:

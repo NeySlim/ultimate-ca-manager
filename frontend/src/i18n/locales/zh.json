@@ -5519,7 +5519,9 @@
       "keySizeLabel": "密钥大小（仅限 RSA）",
       "principalsHelperText": "以逗号分隔的允许 Principal 列表",
       "allowAnyPrincipal": "允许任意主体",
-      "allowAnyPrincipalHelp": "未列出任何主体时，为任意名称签名，包括 root。未启用此选项时，列表为空的 CA 不会签署任何证书。"
+      "allowAnyPrincipalHelp": "未列出任何主体时，为任意名称签名，包括 root。未启用此选项时，列表为空的 CA 不会签署任何证书。",
+      "allowCustomKeyId": "允许请求者设置密钥 ID",
+      "allowCustomKeyIdHelp": "sshd 会将密钥 ID 记录为持有者的身份。未启用此选项时，CA 会将每个证书命名为 principals@CA 名称。"
     },
     "searchPlaceholder": "搜索 SSH CA...",
     "downloadSetupScript": "下载配置脚本",
@@ -5537,7 +5539,9 @@
     "downloadSetupScriptLinux": "下载 .sh (Linux/macOS)",
     "downloadSetupScriptWindows": "下载 .ps1 (Windows)",
     "anyPrincipal": "任意主体",
-    "noPrincipalSignsNothing": "未列出任何主体：此 CA 不会签署任何证书"
+    "noPrincipalSignsNothing": "未列出任何主体：此 CA 不会签署任何证书",
+    "keyIdSetByCa": "密钥 ID 由 CA 设置：principals@CA 名称",
+    "keyIdChosenByRequester": "密钥 ID 由请求者选择"
   },
   "sshCertificates": {
     "title": "SSH 证书",
@@ -5602,6 +5606,8 @@
     },
     "modal": {
       "keyIdPlaceholder": "例如：user@hostname",
+      "keyIdSetByCa": "由 CA 设置：{{keyId}}",
+      "keyIdSetByCaPending": "由 CA 根据 principal 设置：principals@CA 名称",
       "publicKeyPlaceholder": "粘贴 OpenSSH 公钥（ssh-ed25519 AAAA...）",
       "principalsPlaceholder": "例如：root,admin,deploy（逗号分隔）"
     },

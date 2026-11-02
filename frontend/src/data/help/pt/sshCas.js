@@ -52,6 +52,14 @@ export default {
           { label: 'Atualização', text: 'As CAs criadas antes da 2.245 sem lista continuam assinando para qualquer principal: a atualização marca a opção para elas.' },
         ]
       },
+      {
+        title: 'Key ID',
+        items: [
+          { label: 'Definido pela CA', text: 'O sshd registra o key ID como a identidade do titular. Por padrão, a CA nomeia cada certificado principals@nome da CA, e uma solicitação que define outro key ID é recusada.' },
+          { label: 'Permitir que os solicitantes definam o ID da chave', text: 'Marque para que os solicitantes escolham o seu próprio, ex. um ticket ou número de funcionário.' },
+          { label: 'Atualização', text: 'A partir da 2.249, as CAs existentes também começam com a opção desmarcada.' },
+        ]
+      },
     ],
     tips: [
       'Use CAs separadas para certificados de usuário e de host: nunca misture.',
@@ -110,6 +118,10 @@ Uma Host CA assina certificados que autenticam **servidores para os clientes**. 
 O campo **Principals permitidos** restringe os nomes para os quais a CA assina, como padrões separados por vírgula (\`deploy\`, \`team-*\`, \`web??.example.com\`). Todo principal de uma solicitação deve corresponder a um deles.
 
 Uma CA com lista vazia não assina nada, a menos que **Permitir qualquer principal** esteja marcado: ela então assina para qualquer nome, \`root\` incluído. As CAs criadas antes da 2.245 sem lista se comportavam assim de forma implícita; a atualização marca a opção para elas, que continuam funcionando.
+
+### Key ID
+
+O sshd registra o key ID de um certificado como a identidade do titular. A CA o define como \`principals@nome da CA\` e recusa uma solicitação que defina outro, a menos que **Permitir que os solicitantes definam o ID da chave** esteja marcado. A opção fica desmarcada em todas as CAs, inclusive nas existentes desde a 2.249.
 
 ### Formatos de TTL
 

@@ -14,7 +14,7 @@ export default {
       {
         title: 'Campi del certificato',
         items: [
-          { label: 'Key ID', text: 'Identificativo univoco del certificato. Appare nei log SSH per finalità di audit.' },
+          { label: 'Key ID', text: 'Identificativo che sshd registra per il titolare. La CA lo imposta a principals@nome CA, a meno che consenta ai richiedenti di sceglierlo.' },
           { label: 'Principals', text: 'Nomi utente (certificato utente) o nomi host (certificato host) per i quali il certificato è valido. Separati da virgola.' },
           { label: 'Validità', text: 'Durata del certificato. Scegli un valore preimpostato (1h, 8h, 24h, 7g, 30g, 90g, 365g) oppure imposta una durata personalizzata in secondi.' },
           { label: 'Extensions', text: 'Estensioni SSH come permit-pty, permit-agent-forwarding. Applicabili solo ai certificati utente.' },
@@ -39,7 +39,7 @@ export default {
     tips: [
       'Usa certificati a breve scadenza (8h–24h) per l\'accesso utente, così da minimizzare l\'impatto di una chiave compromessa.',
       'La modalità firma è preferibile: la chiave privata dell\'utente non lascia mai la sua macchina.',
-      'I Key ID devono essere descrittivi (es.: «jdoe-prod-2025») per facilitare l\'analisi dei log.',
+      'Dove una CA consente ai richiedenti di impostare il key ID, mantienilo descrittivo (es.: «jdoe-prod-2025») per facilitare l\'analisi dei log.',
       'Per i certificati host, il principal deve corrispondere al nome host usato dai client per la connessione.',
     ],
     warnings: [
@@ -94,9 +94,11 @@ UCM genera sia la coppia di chiavi che il certificato. Usare questa modalità qu
 ## Campi del certificato
 
 ### Key ID
-Un identificativo univoco incorporato nel certificato. Appare nei log del server SSH quando il certificato viene utilizzato, rendendolo indispensabile per l'audit.
+Un identificativo incorporato nel certificato. Il server SSH lo registra quando il certificato viene utilizzato, come identità del titolare.
 
-**Buoni esempi di Key ID:** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
+La CA lo imposta a \`principals@nome CA\` (es. \`deploy@Production User CA\`). Un richiedente può sceglierne un altro solo su una CA in cui **Consenti ai richiedenti di impostare l'ID chiave** è selezionato; altrove la richiesta viene rifiutata.
+
+**Buoni esempi di Key ID, dove consentito:** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
 
 ### Principals
 I principals definiscono **chi** (certificati utente) o **cosa** (certificati host) il certificato autorizza:

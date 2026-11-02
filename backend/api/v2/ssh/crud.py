@@ -26,11 +26,11 @@ def _allowed_principals(data):
     return [p.strip() for p in value]
 
 
-def _allow_any_principal(data):
-    """The explicit opt-in to sign for any principal, a JSON boolean."""
-    value = data.get('allow_any_principal', False)
+def _opt_in(data, name):
+    """An explicit opt-in, a JSON boolean that defaults to off."""
+    value = data.get(name, False)
     if not isinstance(value, bool):
-        raise ValueError('allow_any_principal must be a boolean')
+        raise ValueError(f'{name} must be a boolean')
     return value
 
 
@@ -111,7 +111,8 @@ def import_ssh_ca():
             max_ttl=data.get('max_ttl', 0),
             comment=data.get('comment'),
             allowed_principals=_allowed_principals(data),
-            allow_any_principal=_allow_any_principal(data),
+            allow_any_principal=_opt_in(data, 'allow_any_principal'),
+            allow_custom_key_id=_opt_in(data, 'allow_custom_key_id'),
         )
 
         AuditService.log_action(
@@ -183,7 +184,8 @@ def create_ssh_ca():
             max_ttl=data.get('max_ttl', 0),
             default_extensions=data.get('default_extensions'),
             allowed_principals=_allowed_principals(data),
-            allow_any_principal=_allow_any_principal(data),
+            allow_any_principal=_opt_in(data, 'allow_any_principal'),
+            allow_custom_key_id=_opt_in(data, 'allow_custom_key_id'),
             comment=data.get('comment'),
         )
 
@@ -240,8 +242,9 @@ def update_ssh_ca(ca_id):
             kwargs['default_extensions'] = data['default_extensions']
         if 'allowed_principals' in data:
             kwargs['allowed_principals'] = _allowed_principals(data)
-        if 'allow_any_principal' in data:
-            kwargs['allow_any_principal'] = _allow_any_principal(data)
+        for flag in ('allow_any_principal', 'allow_custom_key_id'):
+            if flag in data:
+                kwargs[flag] = _opt_in(data, flag)
 
         ca = SSHCAService.update_ca(ca_id, **kwargs)
 

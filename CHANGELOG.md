@@ -9,6 +9,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Security
+
+- SSH: a requester could set any key ID, which sshd logs as the certificate holder's identity. Each SSH CA now names its certificates `principals@CA name` and refuses another key ID unless **Let requesters set the key ID** (`allow_custom_key_id`) is ticked (#432, reported by @danielrona).
+
+### Upgrade notes
+
+- SSH: the option is off for every CA, existing ones included. A client that sends `key_id` gets a 400 until the option is ticked on its CA; sending the CA's own `principals@CA name` is still accepted.
+
 ## [2.248] - 2026-11-01
 
 ### Added

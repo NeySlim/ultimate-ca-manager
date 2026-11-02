@@ -5524,7 +5524,9 @@
       "keySizeLabel": "Key Size (RSA only)",
       "principalsHelperText": "Comma-separated list of allowed principals",
       "allowAnyPrincipal": "Allow any principal",
-      "allowAnyPrincipalHelp": "When no principal is listed, sign for any name, root included. Without it, a CA with an empty list signs nothing."
+      "allowAnyPrincipalHelp": "When no principal is listed, sign for any name, root included. Without it, a CA with an empty list signs nothing.",
+      "allowCustomKeyId": "Let requesters set the key ID",
+      "allowCustomKeyIdHelp": "sshd logs the key ID as the holder's identity. Without this, the CA names every certificate principals@CA name."
     },
     "searchPlaceholder": "Search SSH CAs...",
     "quickInstall": "Quick Install",
@@ -5540,7 +5542,9 @@
     "downloadSetupScriptLinux": "Download .sh (Linux/macOS)",
     "downloadSetupScriptWindows": "Download .ps1 (Windows)",
     "anyPrincipal": "Any principal",
-    "noPrincipalSignsNothing": "No principal listed: this CA signs nothing"
+    "noPrincipalSignsNothing": "No principal listed: this CA signs nothing",
+    "keyIdSetByCa": "Key ID set by the CA: principals@CA name",
+    "keyIdChosenByRequester": "Key ID chosen by the requester"
   },
   "sshCertificates": {
     "title": "SSH Certificates",
@@ -5605,6 +5609,8 @@
     },
     "modal": {
       "keyIdPlaceholder": "e.g. user@hostname",
+      "keyIdSetByCa": "Set by the CA: {{keyId}}",
+      "keyIdSetByCaPending": "Set by the CA from the principals: principals@CA name",
       "publicKeyPlaceholder": "Paste OpenSSH public key (ssh-ed25519 AAAA...)",
       "principalsPlaceholder": "e.g. root,admin,deploy (comma-separated)"
     },

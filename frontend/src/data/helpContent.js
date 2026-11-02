@@ -1890,6 +1890,15 @@ export const helpContent = {
           { label: 'Upgrade', text: 'CAs created before 2.245 without a list keep signing for any principal: the upgrade ticks the option for them.' },
         ]
       },
+      {
+        title: 'Key ID',
+        icon: Key,
+        items: [
+          { label: 'Set by the CA', text: 'sshd logs the key ID as the holder\'s identity. By default the CA names every certificate principals@CA name, and a request that sets another key ID is refused.' },
+          { label: 'Let requesters set the key ID', text: 'Tick it to let requesters choose their own, e.g. a ticket or employee number.' },
+          { label: 'Upgrade', text: 'From 2.249, existing CAs start with the option off too.' },
+        ]
+      },
     ],
     tips: [
       'Use separate CAs for user and host certificates, never mix them.',
@@ -1921,7 +1930,7 @@ export const helpContent = {
         title: 'Certificate Fields',
         icon: FileText,
         items: [
-          { label: 'Key ID', text: 'Unique identifier for the certificate. Appears in SSH logs for auditing.' },
+          { label: 'Key ID', text: 'Identifier sshd logs for the holder. The CA sets it to principals@CA name, unless it lets requesters choose it.' },
           { label: 'Principals', text: 'Usernames (user cert) or hostnames (host cert) this certificate is valid for. Comma-separated.' },
           { label: 'Validity', text: 'Certificate lifetime. Choose a preset (1h, 8h, 24h, 7d, 30d, 90d, 365d) or set custom seconds.' },
           { label: 'Extensions', text: 'SSH extensions like permit-pty, permit-agent-forwarding. Only applicable to user certificates.' },
@@ -1948,7 +1957,7 @@ export const helpContent = {
     tips: [
       'Use short-lived certificates (8h–24h) for user access to minimize the impact of key compromise.',
       'Sign mode is preferred: the user\'s private key never leaves their machine.',
-      'Key IDs should be descriptive (e.g. "jdoe-prod-2025") for easy log auditing.',
+      'Where a CA lets requesters set the key ID, keep it descriptive (e.g. "jdoe-prod-2025") for easy log auditing.',
       'For host certificates, the principal must match the hostname clients use to connect.',
     ],
     warnings: [

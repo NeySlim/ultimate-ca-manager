@@ -57,6 +57,8 @@ class SSHCertificateAuthority(db.Model if db else object):
     allowed_principals = db.Column(db.Text)
     # An empty list signs for nothing unless this says any principal will do
     allow_any_principal = db.Column(db.Boolean, default=False, nullable=False)
+    # Off: the CA names every certificate principals@CA, as sshd will log it
+    allow_custom_key_id = db.Column(db.Boolean, default=False, nullable=False)
 
     # Comment / notes
     comment = db.Column(db.Text)
@@ -151,6 +153,7 @@ class SSHCertificateAuthority(db.Model if db else object):
             'default_extensions': self.get_default_extensions(),
             'allowed_principals': self.get_allowed_principals(),
             'allow_any_principal': bool(self.allow_any_principal),
+            'allow_custom_key_id': bool(self.allow_custom_key_id),
             'comment': self.comment,
             'created_at': utc_isoformat(self.created_at),
             'created_by': self.created_by,

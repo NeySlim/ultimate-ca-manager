@@ -3423,6 +3423,10 @@ The **Allowed Principals** field restricts the names a CA signs for, as comma-se
 
 A CA with an empty list signs nothing unless **Allow any principal** is ticked: it then signs for any name, \`root\` included. CAs created before 2.245 without a list behaved that way implicitly; the upgrade ticks the option for them, so they keep working.
 
+### Key ID
+
+sshd logs a certificate's key ID as the holder's identity. The CA sets it to \`principals@CA name\`, and refuses a request that sets another one, unless **Let requesters set the key ID** is ticked. The option is off for every CA, existing ones included since 2.249.
+
 ### TTL Formats
 
 The **Default TTL** and **Max TTL** fields accept human-readable durations:
@@ -3556,9 +3560,11 @@ UCM generates both the key pair and the certificate. Use this when you need to p
 ## Certificate Fields
 
 ### Key ID
-A unique identifier embedded in the certificate. It appears in SSH server logs when the certificate is used, making it essential for auditing.
+An identifier embedded in the certificate. The SSH server logs it when the certificate is used, as the holder's identity.
 
-**Good key IDs:** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
+The CA sets it to \`principals@CA name\` (e.g. \`deploy@Production User CA\`). A requester can choose another one only on a CA where **Let requesters set the key ID** is ticked; elsewhere such a request is refused.
+
+**Good key IDs, where allowed:** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
 
 ### Principals
 Principals define **who** (user certs) or **what** (host certs) the certificate is valid for:

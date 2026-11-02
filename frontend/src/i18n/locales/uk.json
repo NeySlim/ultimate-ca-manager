@@ -5583,7 +5583,9 @@
       "keySizeLabel": "Розмір ключа (лише RSA)",
       "principalsHelperText": "Список дозволених Principal через кому",
       "allowAnyPrincipal": "Дозволити будь-який principal",
-      "allowAnyPrincipalHelp": "Якщо жодного principal не вказано, підписувати для будь-якого імені, включно з root. Без цього параметра CA з порожнім списком нічого не підписує."
+      "allowAnyPrincipalHelp": "Якщо жодного principal не вказано, підписувати для будь-якого імені, включно з root. Без цього параметра CA з порожнім списком нічого не підписує.",
+      "allowCustomKeyId": "Дозволити запитувачам задавати ID ключа",
+      "allowCustomKeyIdHelp": "sshd записує ID ключа в журнал як ідентичність власника. Без цього параметра CA називає кожен сертифікат principals@назва CA."
     },
     "searchPlaceholder": "Шукати SSH CA...",
     "downloadSetupScript": "Завантажити скрипт налаштування",
@@ -5601,7 +5603,9 @@
     "downloadSetupScriptLinux": "Завантажити .sh (Linux/macOS)",
     "downloadSetupScriptWindows": "Завантажити .ps1 (Windows)",
     "anyPrincipal": "Будь-який principal",
-    "noPrincipalSignsNothing": "Жодного principal не вказано: цей CA нічого не підписує"
+    "noPrincipalSignsNothing": "Жодного principal не вказано: цей CA нічого не підписує",
+    "keyIdSetByCa": "ID ключа задає CA: principals@назва CA",
+    "keyIdChosenByRequester": "ID ключа обрав запитувач"
   },
   "sshCertificates": {
     "title": "SSH-сертифікати",
@@ -5668,6 +5672,8 @@
     },
     "modal": {
       "keyIdPlaceholder": "напр. user@hostname",
+      "keyIdSetByCa": "Задано CA: {{keyId}}",
+      "keyIdSetByCaPending": "Задається CA з principals: principals@назва CA",
       "publicKeyPlaceholder": "Вставте публічний ключ OpenSSH (ssh-ed25519 AAAA...)",
       "principalsPlaceholder": "напр. root,admin,deploy (через кому)"
     },
