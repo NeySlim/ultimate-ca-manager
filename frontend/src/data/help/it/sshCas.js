@@ -56,7 +56,7 @@ export default {
         title: 'Key ID',
         items: [
           { label: 'Impostato dalla CA', text: 'sshd registra il key ID come identità del titolare. Per impostazione predefinita la CA assegna a ogni certificato il nome principals@nome CA e rifiuta una richiesta che imposta un altro key ID.' },
-          { label: 'Consenti ai richiedenti di impostare l'ID chiave', text: 'Selezionala per lasciare ai richiedenti la scelta del proprio, ad esempio un ticket o un numero di dipendente.' },
+          { label: 'Consenti ai richiedenti di impostare l\'ID chiave', text: 'Selezionala per lasciare ai richiedenti la scelta del proprio, ad esempio un ticket o un numero di dipendente.' },
           { label: 'Aggiornamento', text: 'Dalla 2.249, anche le CA esistenti partono con l\'opzione disattivata.' },
         ]
       },

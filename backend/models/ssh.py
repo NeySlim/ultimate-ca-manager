@@ -182,8 +182,8 @@ class SSHCertificate(db.Model if db else object):
     # Certificate type: 'user' (1) or 'host' (2)
     cert_type = db.Column(db.String(10), nullable=False, index=True)
 
-    # OpenSSH certificate key_id field
-    key_id = db.Column(db.String(255), nullable=False)
+    # OpenSSH certificate key_id field; principals@CA name has no fixed bound
+    key_id = db.Column(db.Text, nullable=False)
 
     # The subject's public key (OpenSSH format)
     public_key = db.Column(db.Text, nullable=False)

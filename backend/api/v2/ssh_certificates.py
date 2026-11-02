@@ -71,6 +71,9 @@ def _validate_ssh_sign_payload(data, *, require_pubkey):
             return None, error_response('Invalid principal', 400)
         if len(p) > _MAX_PRINCIPAL_LEN:
             return None, error_response('Principal name too long', 400)
+        # The default key ID joins principals with commas: one must not hold a comma
+        if ',' in p:
+            return None, error_response('A principal cannot contain a comma', 400)
 
     validity_seconds = data.get('validity_seconds')
     if validity_seconds is not None:

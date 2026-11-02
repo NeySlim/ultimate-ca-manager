@@ -128,12 +128,18 @@ def test_postgresql_turns_the_setting_off_for_existing_cas_and_runs_twice():
         try:
             with engine.begin() as connection:
                 connection.execute(text("CREATE TABLE ssh_cas (id SERIAL PRIMARY KEY, descr VARCHAR(80))"))
+                connection.execute(text("CREATE TABLE ssh_certificates (id SERIAL PRIMARY KEY, "
+                                        "key_id VARCHAR(255) NOT NULL)"))
                 connection.execute(text("INSERT INTO ssh_cas (descr) VALUES ('a'), ('b')"))
                 _migration().upgrade(connection)
                 connection.execute(text("UPDATE ssh_cas SET allow_custom_key_id = TRUE WHERE descr = 'b'"))
                 _migration().upgrade(connection)
                 got = dict(connection.execute(text("SELECT descr, allow_custom_key_id FROM ssh_cas")).all())
                 assert got == {'a': False, 'b': True}
+                # principals@CA name has no fixed bound: eight 32-character hosts exceed 255
+                long_id = ','.join(f'host{n}.' + 'x' * 26 for n in range(8)) + '@Production Host CA'
+                assert len(long_id) > 255
+                connection.execute(text("INSERT INTO ssh_certificates (key_id) VALUES (:k)"), {'k': long_id})
         finally:
             engine.dispose()
 
@@ -153,3 +159,18 @@ def test_a_backup_carries_the_setting(app, auth_client):
         svc.restore_backup(blob, PASSWORD, mode='merge')
         db.session.expire_all()
         assert db.session.get(SSHCertificateAuthority, ca['id']).allow_custom_key_id is True
+
+
+def test_a_principal_cannot_forge_a_list_in_the_key_id(auth_client):
+    r = post_json(auth_client, '/api/v2/ssh/cas', {'descr': 'KeyID comma CA', 'ca_type': 'user',
+                                                  'key_type': 'ed25519', 'allowed_principals': ['alice*']})
+    assert r.status_code == 201, r.data
+    r = _sign(auth_client, r.get_json()['data']['id'], principals=['alice,root'])
+    assert r.status_code == 400
+    assert 'comma' in r.get_json()['message']
+
+
+def test_the_refusal_names_the_option(auth_client):
+    ca = _ca(auth_client, 'KeyID message CA')
+    r = _sign(auth_client, ca['id'], key_id='mine')
+    assert 'Let requesters set the key ID' in r.get_json()['message']

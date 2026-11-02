@@ -64,7 +64,7 @@ class SSHCertificateSigningMixin:
         if key_id and key_id != default_key_id and not ca.allow_custom_key_id:
             raise ValueError(
                 "This SSH CA sets the key ID itself: leave key_id out, "
-                "or allow custom key IDs on the CA"
+                "or tick \"Let requesters set the key ID\" on the CA"
             )
         key_id = key_id or default_key_id
 
