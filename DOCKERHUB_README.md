@@ -85,7 +85,7 @@ volumes:
 - **Deploy hooks** -- Push an issued or renewed certificate to the host that serves it over SSH/SFTP, and run its reload command
 - **Key protection** -- Private keys encrypted at rest, key archival and dual-control recovery under four eyes
 - **HSM** -- SoftHSM included, PKCS#11, Azure Key Vault, Google Cloud KMS, OpenBao/Vault Transit
-- **FIPS mode (preview)** -- `-fips` image on the OpenSSL FIPS Provider 3.1.2 that refuses non-approved algorithms; UCM itself is not FIPS validated
+- **FIPS mode (preview)** -- `-fips` image on the OpenSSL FIPS Provider 3.1.2 that, with `UCM_FIPS=1`, refuses non-approved algorithms; UCM itself is not FIPS validated
 - **Authentication** -- Password, WebAuthn/FIDO2, TOTP, mTLS, API keys
 - **SSO** -- LDAP/Active Directory, OAuth2 (Google, GitHub, Azure AD), SAML 2.0, with role mapping
 - **RBAC** -- Four built-in roles plus custom roles, and groups that grant extra permissions
@@ -129,7 +129,7 @@ volumes:
 - Version tags (e.g. `2.248`)
 - `latest-fips` and `<version>-fips` -- FIPS variant on the OpenSSL FIPS Provider, run with `UCM_FIPS=1`
 
-Release candidates are published under their own `X.Y-rcN` tag and never move `latest`.
+Release candidates are published under their own `X.Y-rcN` (and `X.Y-rcN-fips`) tag and never move `latest` or `latest-fips`.
 
 ## Image Details
 
