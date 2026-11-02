@@ -118,7 +118,8 @@ describe('CreateCAModal ML-DSA', () => {
   it('creates an ML-DSA-87 CA when it is all the policies allow, even with no hash allowed', async () => {
     renderModal({ allowed_key_types: ['ML-DSA-87'], allowed_digests: [] })
     await waitFor(() => expect(optionValues('common.keyAlgorithm')).toEqual(['ML-DSA']))
-    expect(optionValues('common.keySize')).toEqual(['87'])
+    // The algorithm switches in an effect, one render after the options narrow
+    await waitFor(() => expect(optionValues('common.keySize')).toEqual(['87']))
     expect(screen.queryByText('cas.create.noDigestAllowedByPolicy')).toBeNull()
     expect(screen.getByText('common.createCA').closest('button').disabled).toBe(false)
     expect(await submit()).toMatchObject({ keyAlgo: 'ML-DSA', keySize: 87 })
