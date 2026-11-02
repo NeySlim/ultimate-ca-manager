@@ -61,14 +61,11 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install bandit safety
-      
+          pip install bandit==1.9.4 safety
+
       - name: Run Bandit security scan
-        run: |
-          # Outside the checkout: Trivy scans it next and flags the test fixtures it quotes
-          bandit -r backend/ -f json -o "$RUNNER_TEMP/bandit-report.json" || true
-          bandit -r backend/ -ll
-        continue-on-error: true
+        # Blocks on HIGH only; a deliberate use carries a justified `# nosec`
+        run: bandit -r backend/ -lll
       
       - name: Run Trivy vulnerability scanner
         # Pinned to a release SHA: @master is a mutable ref, so a compromise of

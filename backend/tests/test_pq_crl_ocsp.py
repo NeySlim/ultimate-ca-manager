@@ -404,9 +404,9 @@ def test_issuer_key_hash_of_an_ml_dsa_ca_is_over_the_bit_string(app, mldsa65_ca)
     ca_cert = _cert_of(app, CA, mldsa65_ca['id'])
     bits = _bit_string(ca_cert)
     assert len(bits) == 1952  # ML-DSA-65 public key, FIPS 204 table 2
-    name_hash = hashlib.sha1(ca_cert.subject.public_bytes()).digest()
+    name_hash = hashlib.sha1(ca_cert.subject.public_bytes(), usedforsecurity=False).digest()
     with app.app_context():
-        found = _find_ca_by_issuer_hash(name_hash, hashlib.sha1(bits).digest(), hashes.SHA1())
+        found = _find_ca_by_issuer_hash(name_hash, hashlib.sha1(bits, usedforsecurity=False).digest(), hashes.SHA1())
         assert found is not None and found.id == mldsa65_ca['id']
 
 

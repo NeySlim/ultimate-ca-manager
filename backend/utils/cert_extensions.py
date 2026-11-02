@@ -279,7 +279,7 @@ def parse_certificate_info(pem_data):
     # Fingerprints
     der_data = cert.public_bytes(serialization.Encoding.DER)
     info['fingerprint_sha256'] = hashlib.sha256(der_data).hexdigest()
-    info['fingerprint_sha1'] = hashlib.sha1(der_data).hexdigest()
+    info['fingerprint_sha1'] = hashlib.sha1(der_data, usedforsecurity=False).hexdigest()
 
     return info
 

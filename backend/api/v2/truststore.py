@@ -56,7 +56,7 @@ def parse_certificate(pem_data):
         # Calculate fingerprints
         cert_der = cert.public_bytes(serialization.Encoding.DER)
         fp_sha256 = hashlib.sha256(cert_der).hexdigest()
-        fp_sha1 = hashlib.sha1(cert_der).hexdigest()
+        fp_sha1 = hashlib.sha1(cert_der, usedforsecurity=False).hexdigest()
         
         return {
             'subject': subject,
