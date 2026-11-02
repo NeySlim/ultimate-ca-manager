@@ -29,7 +29,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install flake8 black isort pylint bandit
+          pip install flake8 black isort pylint
       
       - name: Run Flake8
         run: |
@@ -61,7 +61,7 @@ jobs:
       - name: Install dependencies
         run: |
           pip install --upgrade pip
-          pip install bandit==1.9.4 safety
+          pip install bandit==1.9.4
 
       - name: Run Bandit security scan
         # Blocks on HIGH only; a deliberate use carries a justified `# nosec`

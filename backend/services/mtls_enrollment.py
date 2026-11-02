@@ -43,7 +43,8 @@ def normalized_fingerprint(value) -> Optional[Tuple[str, str]]:
 def _fingerprint(der: bytes, algorithm: str) -> str:
     # SHA-1 only to match what a proxy presents; the DER is compared first when stored
     if algorithm == 'sha1':
-        return hashlib.sha1(der).hexdigest().upper()  # nosec B324
+        digest = hashlib.sha1(der)  # nosec B324
+        return digest.hexdigest().upper()
     return hashlib.sha256(der).hexdigest().upper()
 
 
