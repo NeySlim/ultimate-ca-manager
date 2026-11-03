@@ -32,7 +32,7 @@
 - **证书模板** -- 提供适用于服务器、客户端、代码签名、电子邮件和 Windows 智能卡登录的预定义模板；支持 RSA-2048/3072/4096, EC P-256/P-384/P-521 and Brainpool 密钥类型，支持 **qcStatements (ETSI EN 319 412-5) 和证书策略 OID**， 以及预先填充主题默认值（包括电子邮件地址）；支持通过 JSON 格式导出和导入模板，完整保留所有配置项，每个文件可包含一个或多个模板。
 - **证书发现** -- 网络扫描、扫描配置、定时扫描、证书导入。
 - **信任库** -- 管理受信任的根 CA 证书，支持到期提醒与批量移除。
-- **Chain Repair** -- AKI/SKI-based chain validation with automatic repair scheduler
+- **证书链修复** -- 基于 AKI/SKI 的证书链验证，并支持自动调度修复。
 - **SSH Certificates** -- SSH Certificate Authority management, sign host/user certificates, import CAs and certs, curl-friendly setup scripts
 
 ### Protocols
