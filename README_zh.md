@@ -31,7 +31,7 @@
 - **CSR 管理** -- 创建、导入、签发证书签名请求，支持 **自定义额外的 EKU OID** （RFC 5280 §4.2.1.12）， **分类型 SAN 验证** （DNS / IP / Email / URI / UPN），支持 NIST P-256 / P-384 / P-521 和 Brainpool P256r1 / P384r1 / P512r1 曲线，并提供 **外部 CA 回传路径**:对于在 UCM 中生成 CSR，由外部 CA 签发的证书可在导入该证书后即可完成对应 CSR 的签发流程，同时保留原有私钥； **在签发时添加名称** （对于来自智能卡的 S/MIME 证书申请，如果智能卡生成的请求中仅包含 CN， 为其添加电子邮件地址，且遵循相同的名称约束、策略和审批流程），并支持从历史记录中再次签发，以适用于那些无法重复生成请求的设备。
 - **证书模板** -- 提供适用于服务器、客户端、代码签名、电子邮件和 Windows 智能卡登录的预定义模板；支持 RSA-2048/3072/4096, EC P-256/P-384/P-521 and Brainpool 密钥类型，支持 **qcStatements (ETSI EN 319 412-5) 和证书策略 OID**， 以及预先填充主题默认值（包括电子邮件地址）；支持通过 JSON 格式导出和导入模板，完整保留所有配置项，每个文件可包含一个或多个模板。
 - **证书发现** -- 网络扫描、扫描配置、定时扫描、证书导入。
-- **Trust Store** -- Manage trusted root CA certificates with expiry alerts and bulk removal
+- **信任库** -- 管理受信任的根 CA 证书，支持到期提醒与批量移除。
 - **Chain Repair** -- AKI/SKI-based chain validation with automatic repair scheduler
 - **SSH Certificates** -- SSH Certificate Authority management, sign host/user certificates, import CAs and certs, curl-friendly setup scripts
 
