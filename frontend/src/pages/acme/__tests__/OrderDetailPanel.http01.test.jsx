@@ -101,3 +101,25 @@ describe('OrderDetailPanel HTTP-01 challenge', () => {
       .toBe('http://[2001:db8::1]/.well-known/acme-challenge/tok-123')
   })
 })
+
+describe('OrderDetailPanel Renew', () => {
+  const renewButtons = (fields) => {
+    renderPanel({ ...order('dns-01', {}), ...fields })
+    return screen.queryAllByText('acme.renewNow')
+  }
+
+  it('stays offered on a valid order whose certificate could not be imported', () => {
+    expect(renewButtons({ status: 'valid', certificate_id: null })).toHaveLength(1)
+  })
+
+  it('appears once when the order holds its certificate', () => {
+    expect(renewButtons({ status: 'issued', certificate_id: 7 })).toHaveLength(1)
+  })
+
+  it.each([
+    [{ status: 'pending', certificate_id: null }],
+    [{ status: 'valid', certificate_id: null, is_proxy_order: true }],
+  ])('is not offered for %j', (fields) => {
+    expect(renewButtons(fields)).toHaveLength(0)
+  })
+})

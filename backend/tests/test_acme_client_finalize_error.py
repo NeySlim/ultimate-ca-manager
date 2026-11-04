@@ -6,6 +6,7 @@ from unittest.mock import patch
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
 
+from api.v2.acme_client import orders as orders_module
 from models import Certificate, db
 from models.acme_models import AcmeClientOrder
 from services.acme.acme_client_service import AcmeClientService
@@ -66,13 +67,19 @@ def _service_that_imports_with(import_certificate):
     return svc
 
 
-def test_a_refused_import_is_recorded_and_the_order_can_be_renewed(app, auth_client):
-    def import_swallows_its_failed_flush(**_kwargs):
-        try:
-            _failed_flush()
-        except Exception:
-            return None
+def import_swallows_its_failed_flush(**_kwargs):
+    try:
+        _failed_flush()
+    except Exception:
+        return None
 
+
+def _renew_answer(auth_client, order_id):
+    with patch('services.acme_renewal_service.renew_certificate', return_value=(True, 'renewed')):
+        return auth_client.post(f'/api/v2/acme/client/orders/{order_id}/renew').status_code
+
+
+def test_a_refused_import_is_recorded_and_the_order_can_be_renewed(app, auth_client):
     with app.app_context():
         order = _order()
         order_id = order.id
@@ -80,9 +87,27 @@ def test_a_refused_import_is_recorded_and_the_order_can_be_renewed(app, auth_cli
         assert not ok and cert_id is None
         stored = _stored(order_id)
         assert stored.status == 'valid' and stored.error_message == msg == 'Certificate obtained but import failed'
-    with patch('services.acme_renewal_service.renew_certificate', return_value=(True, 'renewed')):
-        renewed = auth_client.post(f'/api/v2/acme/client/orders/{order_id}/renew')
-    assert renewed.status_code == 200
+    assert _renew_answer(auth_client, order_id) == 200
+
+
+def test_the_automatic_path_keeps_the_order_renewable(app, auth_client, monkeypatch):
+    # A DNS-01 request finalizes in the background, then writes its own status over the result
+    monkeypatch.setattr(orders_module, '_dns_propagation_timeout', lambda: 0)
+    monkeypatch.setattr(orders_module.time, 'sleep', lambda _seconds: None)
+    with app.app_context():
+        order = _order()
+        order.set_challenges_dict({'flush.example.com': {'dns_txt_value': 'token'}})
+        db.session.commit()
+        order_id = order.id
+        svc = _service_that_imports_with(import_swallows_its_failed_flush)
+        svc.verify_challenge = lambda _order, _domain: (True, 'submitted')
+        svc.get_poll_settings = lambda: {'order_poll_timeout_sec': 30, 'order_poll_interval_sec': 3}
+        svc.find_invalid_authorization = lambda _order: None
+        result = orders_module._auto_poll_and_finalize(svc, order)
+        assert result['error'] == 'Certificate obtained but import failed'
+        stored = _stored(order_id)
+        assert stored.status == 'valid' and stored.error_message == result['error']
+    assert _renew_answer(auth_client, order_id) == 200
 
 
 def test_a_later_success_clears_the_old_error(app):

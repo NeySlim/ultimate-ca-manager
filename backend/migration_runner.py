@@ -173,7 +173,7 @@ def mark_all_applied():
     """
     db_url = _get_db_url()
     is_pg = _is_postgres(db_url)
-    engine = create_engine(sqlalchemy_url(db_url))
+    engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True)
     try:
         _ensure_tracking_table(engine, is_pg)
         _mark_applied(engine, _list_migration_names(), is_pg)
@@ -193,7 +193,7 @@ def run_all_migrations(dry_run: bool = False, verbose: bool = False) -> bool:
     backend = "PostgreSQL" if is_pg else "SQLite"
 
     try:
-        engine = create_engine(sqlalchemy_url(db_url))
+        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True)
     except Exception as exc:
         say(f"✗ Could not connect to database ({backend}): {exc}")
         return False
@@ -397,7 +397,7 @@ def show_status():
     say(f"Backend: {'PostgreSQL' if is_pg else 'SQLite'}")
     say(f"URL:     {db_url.split('@')[-1] if '@' in db_url else db_url}")
     try:
-        engine = create_engine(sqlalchemy_url(db_url))
+        engine = create_engine(sqlalchemy_url(db_url), hide_parameters=True)
     except Exception as e:
         say(f"✗ Cannot connect: {e}")
         return

@@ -777,7 +777,8 @@ def _auto_poll_and_finalize(client, order) -> dict:
                 else:
                     result['error'] = fin_msg
                     logger.warning(f'Auto-finalize failed: {fin_msg}')
-                    _set_status('pending', fin_msg)
+                    # The CA holds it as valid, and only a valid order can be renewed
+                    _set_status('valid' if order.status == 'valid' else 'pending', fin_msg)
                 break
 
             if le_status == 'invalid':

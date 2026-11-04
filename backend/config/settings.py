@@ -170,7 +170,8 @@ class Config:
         "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
         "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
     } if _db_url else {}
-    # A database error's text would otherwise quote the row, private keys included
+    # A database error's text would otherwise quote bound values, private keys included
+    # (PostgreSQL's own DETAIL line stays: it holds at most the value it refused)
     SQLALCHEMY_ENGINE_OPTIONS["hide_parameters"] = True
     
     
