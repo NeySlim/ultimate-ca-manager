@@ -13,6 +13,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - SSH: a requester could set any key ID, which sshd logs as the certificate holder's identity. Each SSH CA now names its certificates `principals@CA name` and refuses another key ID unless **Let requesters set the key ID** (`allow_custom_key_id`) is ticked (#432, reported by @danielrona). A principal can no longer contain a comma, which would read as two in that name.
 
+### Fixed
+
+- Public endpoints: with the HTTP protocol port set to 0 (built-in listener disabled behind a reverse proxy) and a Protocol Base URL without a port, CRL, OCSP and AIA URLs were issued as `http://host:0/...`. They now use the default port 80 (#433).
+
 ### Upgrade notes
 
 - SSH: the option is off for every CA, existing ones included. A client that sends `key_id` gets a 400 until the option is ticked on its CA; sending the CA's own `principals@CA name` is still accepted.

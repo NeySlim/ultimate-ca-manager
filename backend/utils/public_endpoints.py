@@ -556,7 +556,11 @@ def get_protocol_effective_url() -> Optional[str]:
     if raw:
         parsed = parse_public_url(raw, default_scheme='http')
         if parsed:
-            port = _effective_port_for_stored_url(raw, 'http', http_port)
+            # Port 0 means the built-in listener is disabled (reverse proxy
+            # serves the protocol vhost), so there is no listen port to
+            # substitute: advertise the scheme default instead of ':0'.
+            fallback_port = http_port if http_port > 0 else 80
+            port = _effective_port_for_stored_url(raw, 'http', fallback_port)
             return _format_public_origin('http', parsed.host, port)
     admin_host = get_admin_public_host()
     if http_port > 0 and admin_host:

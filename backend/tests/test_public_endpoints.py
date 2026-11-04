@@ -410,6 +410,26 @@ class TestDeploymentPorts:
         with app.app_context():
             assert get_protocol_effective_url() == 'http://pki.ucm.example.com:8080'
 
+    def test_protocol_effective_never_emits_port_zero_when_listener_disabled(self, app, monkeypatch):
+        # Listener disabled (HTTP protocol port 0) behind a reverse proxy: the
+        # advertised CDP/OCSP base must not become http://host:0 (discussion #433).
+        monkeypatch.setenv('HTTP_PROTOCOL_PORT', '0')
+        _set_config(app, 'protocol_base_url', 'http://pki.ucm.example.com')
+        with app.app_context():
+            assert get_protocol_effective_url() == 'http://pki.ucm.example.com'
+
+    def test_protocol_effective_keeps_explicit_port_when_listener_disabled(self, app, monkeypatch):
+        monkeypatch.setenv('HTTP_PROTOCOL_PORT', '0')
+        _set_config(app, 'protocol_base_url', 'http://pki.ucm.example.com:8081')
+        with app.app_context():
+            assert get_protocol_effective_url() == 'http://pki.ucm.example.com:8081'
+
+    def test_protocol_effective_none_when_listener_disabled_and_no_base_url(self, app, monkeypatch):
+        monkeypatch.setenv('HTTP_PROTOCOL_PORT', '0')
+        _set_config(app, 'protocol_base_url', '')
+        with app.app_context():
+            assert ':0' not in (get_protocol_effective_url() or '')
+
     def test_explicit_port_in_stored_url_is_preserved(self, app, monkeypatch):
         monkeypatch.setenv('HTTPS_PORT', '8443')
         _set_config(app, 'base_url', 'https://admin.ucm.example.com:9443')
