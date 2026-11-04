@@ -129,7 +129,7 @@ export default function OrderDetailPanel({ order, onDownloadCert, onViewCertific
         </CompactSection>
       )}
       
-      {(order.status === 'valid' || order.status === 'issued') && !order.certificate_id && !order.is_proxy_order && (
+      {(order.status === 'issued' || (order.status === 'valid' && order.error_message)) && !order.certificate_id && !order.is_proxy_order && (
         <CompactSection title={t('acme.certificateActions')}>
           <Button type="button" size="sm" variant="secondary" onClick={() => onRenewCertificate(order)}>
             <ArrowsClockwise size={12} />

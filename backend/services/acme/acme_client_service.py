@@ -1463,7 +1463,9 @@ class AcmeClientService:
             resp = self._post(order.order_url, "")  # POST-as-GET
             if resp.status_code == 200:
                 data = resp.json()
-                order.status = data.get('status', order.status)
+                # Issued means imported here, which the CA cannot know: the renewal scheduler needs it
+                if order.status != 'issued':
+                    order.status = data.get('status', order.status)
                 if data.get('certificate'):
                     order.certificate_url = data['certificate']
                 db.session.commit()
@@ -1611,8 +1613,7 @@ class AcmeClientService:
                 return True, "Certificate issued and imported successfully", cert_id
             else:
                 message = "Certificate obtained but import failed"
-                # The CA issued it: the order stays valid, which is what Renew accepts
-                self._record_finalize_failure(order, message, status='valid')
+                self._record_finalize_failure(order, message)
                 return False, message, None
 
         except Exception as e:
@@ -1623,11 +1624,15 @@ class AcmeClientService:
             return False, message, None
 
     @staticmethod
-    def _record_finalize_failure(order, message: str, status: str = 'error') -> None:
-        """Keep the failure on the order; a failed flush refuses every statement until rollback."""
+    def _record_finalize_failure(order, message: str) -> None:
+        """Keep the failure on the order; a failed flush refuses every statement until rollback.
+
+        What the CA last said outlives a failure here: only a valid order can be renewed.
+        """
         try:
             db.session.rollback()
-            order.status = status
+            if order.status not in ('valid', 'invalid'):
+                order.status = 'error'
             order.error_message = message
             db.session.commit()
         except Exception as commit_err:

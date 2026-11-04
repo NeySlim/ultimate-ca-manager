@@ -109,7 +109,7 @@ describe('OrderDetailPanel Renew', () => {
   }
 
   it('stays offered on a valid order whose certificate could not be imported', () => {
-    expect(renewButtons({ status: 'valid', certificate_id: null })).toHaveLength(1)
+    expect(renewButtons({ status: 'valid', certificate_id: null, error_message: 'refused' })).toHaveLength(1)
   })
 
   it('appears once when the order holds its certificate', () => {
@@ -118,7 +118,9 @@ describe('OrderDetailPanel Renew', () => {
 
   it.each([
     [{ status: 'pending', certificate_id: null }],
-    [{ status: 'valid', certificate_id: null, is_proxy_order: true }],
+    [{ status: 'valid', certificate_id: null, error_message: 'refused', is_proxy_order: true }],
+    // Still being imported: a second order here would replace a certificate about to arrive
+    [{ status: 'valid', certificate_id: null }],
   ])('is not offered for %j', (fields) => {
     expect(renewButtons(fields)).toHaveLength(0)
   })

@@ -170,8 +170,8 @@ class Config:
         "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
         "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
     } if _db_url else {}
-    # A database error's text would otherwise quote bound values, private keys included
-    # (PostgreSQL's own DETAIL line stays: it holds at most the value it refused)
+    # SQLAlchemy would otherwise quote bound values in its errors, private keys included.
+    # PostgreSQL's DETAIL line stays: a duplicate key in full, or a refused row's columns up to 64 bytes
     SQLALCHEMY_ENGINE_OPTIONS["hide_parameters"] = True
     
     

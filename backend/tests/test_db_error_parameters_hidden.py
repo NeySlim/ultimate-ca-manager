@@ -1,4 +1,4 @@
-"""A database error's text quotes no bound value: private keys pass through these engines."""
+"""SQLAlchemy's error text quotes no bound value: private keys pass through these engines."""
 from types import SimpleNamespace
 from unittest.mock import patch
 

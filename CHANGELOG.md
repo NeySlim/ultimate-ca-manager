@@ -17,8 +17,9 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - HSM: generating a key under a name OpenBao or Azure Key Vault already held adopted that name, whatever the requested algorithm, and deleting it then destroyed the key of a live CA. The API now answers 409; bring an existing key in with a sync.
 - HSM: two generations at once under one name could both find it free, and a key whose row could not be stored stayed in the HSM. Generations now take turns per provider (409 after 60 s), and such a key is removed unless a row holds its name.
-- Database errors quoted bound values in logs and API messages, an unencrypted private key included. They are now hidden, except the value PostgreSQL itself names in a DETAIL line.
-- ACME client: a finalization that failed on a database error or a refused import did not record the error on the order. It now does, without the SQL text, and a later success clears it.
+- Database errors quoted bound values in logs and API messages, an unencrypted private key included. They are now hidden, except what PostgreSQL itself quotes in a DETAIL line: a duplicate key in full, or each column of a refused row up to 64 bytes.
+- ACME client: a status check replaced `issued` with the CA's `valid`, which took the order out of automatic renewal. An issued order now stays issued.
+- ACME client: a finalization that failed on a database error or a refused import did not record the error on the order. It now does, without the SQL text and keeping a status the CA reported as valid, so the order can still be renewed.
 - HSM: a CA whose creation failed after its key was generated left that key in the HSM and in the key list. It is now removed, where the provider allows it.
 - HSM: `extractable` sent as text, such as `"false"`, generated an exportable key. The API now answers 400.
 - XCEP: a CA with no template to announce sent empty policy and OID collections, which Windows clients refuse with `WS_E_INVALID_FORMAT`. Both are now nil, and the client sees a policy server with no templates.

@@ -110,6 +110,61 @@ def test_the_automatic_path_keeps_the_order_renewable(app, auth_client, monkeypa
     assert _renew_answer(auth_client, order_id) == 200
 
 
+def _download_fails(*_args):
+    raise ConnectionError('CA unreachable')
+
+
+def test_a_failure_after_the_ca_said_valid_keeps_the_order_renewable(app, auth_client):
+    with app.app_context():
+        order = _order()
+        order_id = order.id
+        svc = _service_that_imports_with(lambda **_kwargs: 4242)
+        svc._select_certificate_chain = _download_fails
+        ok, msg, _cert_id = svc.finalize_order(order)
+        assert not ok and msg == 'CA unreachable'
+        stored = _stored(order_id)
+        assert stored.status == 'valid' and stored.error_message == msg
+    assert _renew_answer(auth_client, order_id) == 200
+
+
+def test_the_automatic_path_keeps_an_invalid_order_invalid(app, monkeypatch):
+    monkeypatch.setattr(orders_module, '_dns_propagation_timeout', lambda: 0)
+    monkeypatch.setattr(orders_module.time, 'sleep', lambda _seconds: None)
+    with app.app_context():
+        order = _order()
+        order.set_challenges_dict({'flush.example.com': {'dns_txt_value': 'token'}})
+        db.session.commit()
+        order_id = order.id
+
+        def finalize_sees_invalid(target):
+            target.status = 'invalid'
+            db.session.commit()
+            return False, 'Order became invalid during finalization', None
+
+        client = SimpleNamespace(
+            verify_challenge=lambda _order, _domain: (True, 'submitted'),
+            get_poll_settings=lambda: {'order_poll_timeout_sec': 30, 'order_poll_interval_sec': 3},
+            find_invalid_authorization=lambda _order: None,
+            check_order_status=lambda _order: ('ready', {}),
+            finalize_order=finalize_sees_invalid)
+        orders_module._auto_poll_and_finalize(client, order)
+        assert _stored(order_id).status == 'invalid'
+
+
+@pytest.mark.parametrize('before, after', [('issued', 'issued'), ('validating', 'valid')])
+def test_a_status_check_does_not_undo_an_import(app, before, after):
+    with app.app_context():
+        order = _order()
+        order.status = before
+        db.session.commit()
+        order_id = order.id
+        svc = object.__new__(AcmeClientService)
+        svc._post = lambda *_args: SimpleNamespace(status_code=200, json=lambda: {'status': 'valid'})
+        status, _data = svc.check_order_status(order)
+        assert status == 'valid'
+        assert _stored(order_id).status == after
+
+
 def test_a_later_success_clears_the_old_error(app):
     with app.app_context():
         order = _order()
