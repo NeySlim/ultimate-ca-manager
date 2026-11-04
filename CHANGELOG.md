@@ -15,7 +15,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- Public endpoints: with the HTTP protocol port set to 0 (built-in listener disabled behind a reverse proxy) and a Protocol Base URL without a port, CRL, OCSP and AIA URLs were issued as `http://host:0/...`. They now use the default port 80 (#433).
+- Public endpoints: with the HTTP protocol port set to 0 (built-in listener disabled behind a reverse proxy) and a Protocol Base URL without a port, CRL, OCSP and AIA URLs were issued as `http://host:0/...`. They now use the default port 80 (discussion #433, reported by @avdpas, by @Hemsby).
 
 ### Upgrade notes
 
