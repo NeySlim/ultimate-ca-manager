@@ -547,6 +547,17 @@ def get_admin_canonical_origin() -> Optional[str]:
     return _format_public_origin('https', host, _https_port())
 
 
+def _protocol_port_for_stored_url(raw: str) -> int:
+    """Port advertised for a stored Protocol Base URL (80 when the listener is off)."""
+    from protocol_http_server import get_http_protocol_port
+
+    http_port = get_http_protocol_port()
+    # Port 0 means the built-in listener is disabled (reverse proxy serves the
+    # protocol vhost), so there is no listen port to substitute: advertise the
+    # scheme default instead of ':0'.
+    return _effective_port_for_stored_url(raw, 'http', http_port if http_port > 0 else 80)
+
+
 def get_protocol_effective_url() -> Optional[str]:
     """Effective HTTP base URL for CDP/OCSP (honours HTTP_PROTOCOL_PORT / http_protocol_port)."""
     from protocol_http_server import get_http_protocol_port
@@ -556,12 +567,7 @@ def get_protocol_effective_url() -> Optional[str]:
     if raw:
         parsed = parse_public_url(raw, default_scheme='http')
         if parsed:
-            # Port 0 means the built-in listener is disabled (reverse proxy
-            # serves the protocol vhost), so there is no listen port to
-            # substitute: advertise the scheme default instead of ':0'.
-            fallback_port = http_port if http_port > 0 else 80
-            port = _effective_port_for_stored_url(raw, 'http', fallback_port)
-            return _format_public_origin('http', parsed.host, port)
+            return _format_public_origin('http', parsed.host, _protocol_port_for_stored_url(raw))
     admin_host = get_admin_public_host()
     if http_port > 0 and admin_host:
         return _format_public_origin('http', admin_host, http_port)
@@ -957,8 +963,7 @@ def run_preflight_checks() -> dict:
     if proto_raw:
         pp = parse_public_url(proto_raw, default_scheme='http')
         if pp:
-            from protocol_http_server import get_http_protocol_port
-            proto_port = _effective_port_for_stored_url(proto_raw, 'http', get_http_protocol_port())
+            proto_port = _protocol_port_for_stored_url(proto_raw)
             _check_dns('protocol', pp.host)
             if proto_port > 0:
                 _check_http('protocol', pp.host, proto_port)

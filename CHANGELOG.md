@@ -15,10 +15,11 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- Public endpoints: with the HTTP protocol port set to 0 (built-in listener disabled behind a reverse proxy) and a Protocol Base URL without a port, CRL, OCSP and AIA URLs were issued as `http://host:0/...`. They now use the default port 80 (discussion #433, reported by @avdpas, by @Hemsby).
+- Public endpoints: with the HTTP protocol port set to 0 (built-in listener disabled behind a reverse proxy) and a Protocol Base URL without a port, CRL, OCSP and AIA URLs were issued as `http://host:0/...`. They now use the default port 80, and the preflight check probes that port as well. Migration 120 removes `:0` from the CDP, OCSP and AIA URLs already stored on a CA (discussion #433, reported by @avdpas, by @Hemsby).
 
 ### Upgrade notes
 
+- Public endpoints: certificates issued before this update keep a `:0` in their CRL, OCSP and AIA URLs; reissue them. The URLs stored on each CA are corrected by migration 120.
 - SSH: the option is off for every CA, existing ones included. A client that sends `key_id` gets a 400 until the option is ticked on its CA; sending the CA's own `principals@CA name` is still accepted.
 
 ## [2.248] - 2026-11-01
