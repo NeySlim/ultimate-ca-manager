@@ -300,6 +300,8 @@ def renew_certificate(order) -> tuple:
         if not success:
             raise Exception(f"Order creation failed: {message}")
     
+    # The original order keeps the schedule: a second one would renew these names again
+    new_order.renewal_enabled = False
     # Preserve key source across renewals (#161)
     new_order.key_source = order.key_source or 'generate'
     new_order.key_type = order.key_type
