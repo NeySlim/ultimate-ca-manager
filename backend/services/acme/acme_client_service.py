@@ -1612,9 +1612,11 @@ class AcmeClientService:
                 
         except Exception as e:
             logger.error(f"Finalization error: {e}")
-            order.status = 'error'
-            order.error_message = str(e)
             try:
+                # A failed flush refuses every statement until this
+                db.session.rollback()
+                order.status = 'error'
+                order.error_message = str(e)
                 db.session.commit()
             except Exception as commit_err:
                 db.session.rollback()

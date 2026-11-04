@@ -1,4 +1,7 @@
 """A new HSM key never takes over a name the HSM holds, and a CA that fails takes its new key with it."""
+import threading
+import time
+from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
@@ -6,6 +9,7 @@ import pytest
 from cryptography.hazmat.primitives import hashes, serialization
 from cryptography.hazmat.primitives.asymmetric import ec
 
+from config.settings import Config
 from models import CA, db
 from models.hsm import HsmKey, HsmProvider
 from services.hsm import azure_provider
@@ -215,3 +219,111 @@ def test_a_failed_rollback_does_not_hide_the_original_error(app):
                 pytest.raises(ValueError, match='the real reason'):
             with _discarding_new_hsm_key(1, SimpleNamespace(id=999999)):
                 raise ValueError('the real reason')
+
+
+def _row_refused(real_commit):
+    def refuse():
+        if any(isinstance(row, HsmKey) for row in db.session.new):
+            raise RuntimeError('database gone')
+        real_commit()
+    return refuse
+
+
+def test_a_key_whose_row_cannot_be_stored_leaves_the_hsm(app, hsm_provider):
+    from services.hsm import HsmService
+    fake = _Fake()
+    with app.app_context():
+        with patch('services.hsm.HsmService._get_provider_instance', return_value=fake), \
+                patch.object(db.session, 'commit', side_effect=_row_refused(db.session.commit)), \
+                pytest.raises(HsmOperationError):
+            HsmService.generate_key(hsm_provider, 'unrecorded', 'EC-P256')
+    assert fake.deleted == ['unrecorded']
+
+
+def test_a_key_another_row_names_is_not_deleted(app, hsm_provider):
+    # OpenBao: the identifier is the name, and the row belongs to another request
+    from services.hsm import HsmService
+    fake = _Fake()
+    with app.app_context():
+        db.session.add(HsmKey(provider_id=hsm_provider, key_identifier='shared', label='shared',
+                              algorithm='EC-P256', key_type='asymmetric', purpose='signing'))
+        db.session.commit()
+        with patch('services.hsm.HsmService._get_provider_instance', return_value=fake), \
+                pytest.raises(HsmOperationError):
+            HsmService.generate_key(hsm_provider, 'shared', 'EC-P256')
+    assert fake.deleted == []
+
+
+def test_a_generation_holds_the_providers_lock_while_it_runs(app, hsm_provider):
+    # Observed from a thread: the test database's one connection cannot race two generations
+    from services.hsm import HsmService
+    from utils.process_lock import LockBusyError, process_lock
+    fake, answers = _Fake(), []
+    plain = fake.generate_key
+    path = Path(Config.DATA_DIR) / f'.ucm_hsm_generate_{hsm_provider}.lock'
+
+    def try_the_lock():
+        try:
+            with process_lock(path):
+                answers.append('free')
+        except LockBusyError:
+            answers.append('held')
+
+    def generate_while_probing(label, algorithm, purpose='signing', extractable=False):
+        probe = threading.Thread(target=try_the_lock)
+        probe.start()
+        probe.join(10)
+        return plain(label, algorithm, purpose, extractable)
+
+    fake.generate_key = generate_while_probing
+    with app.app_context(), patch('services.hsm.HsmService._get_provider_instance', return_value=fake):
+        HsmService.generate_key(hsm_provider, 'locked', 'EC-P256')
+    assert answers == ['held']
+
+
+@pytest.mark.postgres
+def test_two_generations_under_one_name_take_turns(app):
+    # Each checks the name, then creates it: at the same time, both would find it free
+    from services.hsm import HsmService
+    from tests.test_crl_persistent_revocations import _PG_URL, _on_postgresql
+    if not _PG_URL:
+        pytest.skip('UCM_TEST_PG_URL not set; skipping the PostgreSQL target')
+    created, results = [], []
+    fake = _Fake()
+    plain = fake.generate_key
+
+    def check_then_create(label, algorithm, purpose='signing', extractable=False):
+        if created:
+            raise HsmKeyExistsError(f'Key already exists: {label}')
+        time.sleep(0.3)
+        created.append(label)
+        return plain(label, algorithm, purpose, extractable)
+
+    fake.generate_key = check_then_create
+
+    with _on_postgresql(app):
+        with app.app_context():
+            provider = HsmProvider(name='Fake raced', type='openbao', config='{}')
+            db.session.add(provider)
+            db.session.commit()
+            provider_id = provider.id
+
+        def generate():
+            with app.app_context():
+                try:
+                    results.append(HsmService.generate_key(provider_id, 'raced', 'EC-P256').label)
+                except HsmKeyExistsError as e:
+                    results.append(type(e).__name__)
+                except Exception as e:  # noqa: BLE001: named by the assertion below
+                    results.append(repr(e))
+                finally:
+                    db.session.remove()
+
+        with patch('services.hsm.HsmService._get_provider_instance', return_value=fake):
+            threads = [threading.Thread(target=generate) for _ in range(2)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(30)
+    assert created == ['raced']
+    assert sorted(results) == ['HsmKeyExistsError', 'raced']

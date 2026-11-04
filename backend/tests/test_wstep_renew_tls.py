@@ -6,6 +6,9 @@ import base64
 import contextlib
 import datetime
 import json
+import threading
+import uuid
+from unittest.mock import patch
 
 import pytest
 from asn1crypto import cms, core
@@ -469,6 +472,69 @@ def test_supersede_is_a_compare_and_set(app, backend):
         with pytest.raises(AlreadySuperseded):
             CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='test', supersedes=stale)
         assert Certificate.query.filter_by(caref=ca.refid).count() == 2
+
+
+@pytest.mark.postgres
+def test_two_claims_never_lock_in_opposite_orders(app):
+    """Listed in opposite orders, two claims still lock by id: one wins, neither deadlocks."""
+    from services.ca.ca_signing import _claim_superseded
+    from services.cert import issued_lookup
+    from tests.test_crl_persistent_revocations import _PG_URL, _make_ca, _on_postgresql
+    if not _PG_URL:
+        pytest.skip('UCM_TEST_PG_URL not set; skipping the PostgreSQL target')
+    listed = issued_lookup._rows_holding
+    both_hold_one = threading.Barrier(2, timeout=3)
+    local, results, errors = threading.local(), [], []
+
+    def rows_in_this_threads_order(*args, **kwargs):
+        rows = sorted(listed(*args, **kwargs), key=lambda r: r.id)
+        return rows if local.first else rows[::-1]
+
+    with _on_postgresql(app):
+        with app.app_context():
+            ca, _ca_key, _ca_cert = _make_ca()
+            csr = _eku_csr('claim-order.example.test', _key(), ExtendedKeyUsageOID.CLIENT_AUTH)
+            CAService.sign_csr_from_crypto(ca=ca, csr=csr, validity_days=30, source='test')
+            row = Certificate.query.filter_by(caref=ca.refid).one()
+            columns = {c.name: getattr(row, c.name) for c in Certificate.__table__.columns
+                       if c.name not in ('id', 'refid')}
+            twin = Certificate(refid=str(uuid.uuid4()), **columns)
+            db.session.add(twin)
+            db.session.commit()
+            row_id = row.id
+            real_execute = db.session.execute
+
+        def execute_then_meet(*args, **kwargs):
+            result = real_execute(*args, **kwargs)
+            if not getattr(local, 'met', False):
+                local.met = True
+                try:
+                    both_hold_one.wait()
+                except threading.BrokenBarrierError:
+                    pass  # the other one is waiting for this lock, as it should
+            return result
+
+        def claim(first):
+            local.first = first
+            with app.app_context():
+                try:
+                    results.append(_claim_superseded(db.session.get(Certificate, row_id)))
+                    db.session.commit()
+                except Exception as e:
+                    db.session.rollback()
+                    errors.append(repr(e)[:200])
+                finally:
+                    db.session.remove()
+
+        with patch.object(issued_lookup, '_rows_holding', rows_in_this_threads_order), \
+                patch.object(db.session, 'execute', execute_then_meet):
+            threads = [threading.Thread(target=claim, args=(first,)) for first in (True, False)]
+            for thread in threads:
+                thread.start()
+            for thread in threads:
+                thread.join(60)
+    assert errors == []
+    assert sorted(results) == [False, True]
 
 
 # Template of the renewed certificate (MS-CRTD certificateTemplate, as AD CS)
