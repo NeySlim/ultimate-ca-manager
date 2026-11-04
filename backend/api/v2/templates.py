@@ -763,6 +763,9 @@ def import_template():
             if not ok:
                 skipped.append(f"{tpl_data['name']} ({err})")
                 continue
+            if 'is_active' in tpl_data and not isinstance(tpl_data['is_active'], bool):
+                skipped.append(f"{tpl_data['name']} (is_active must be true or false)")
+                continue
 
             # Check for existing
             existing = CertificateTemplate.query.filter_by(name=tpl_data['name']).first()

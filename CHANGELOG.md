@@ -13,6 +13,16 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - SSH: a requester could set any key ID, which sshd logs as the certificate holder's identity. Each SSH CA now names its certificates `principals@CA name` and refuses another key ID unless **Let requesters set the key ID** (`allow_custom_key_id`) is ticked (#432, reported by @danielrona). A principal can no longer contain a comma, which would read as two in that name.
 
+### Fixed
+
+- Template import: an `is_active` that is not true or false was stored as given. The template is now skipped, with the reason.
+- ACME profiles: renaming a profile bound to a disabled template was refused as a new binding. A rename now keeps the binding, and a second profile on that template is still refused.
+- Google Cloud KMS: the notice for ML-DSA keys now says that KMS signs at most 64 KiB, which rules out a larger CRL.
+
+### Changed
+
+- Certificates: `serial_number` and `caref` are indexed, so renewal, revocation and protocol lookups no longer scan the table (migration 120).
+
 ### Upgrade notes
 
 - SSH: the option is off for every CA, existing ones included. A client that sends `key_id` gets a 400 until the option is ticked on its CA; sending the CA's own `principals@CA name` is still accepted.

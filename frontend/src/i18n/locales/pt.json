@@ -3580,7 +3580,7 @@
     "generateHsmKey": "Gerar HSM Chave",
     "keyLabel": "Chave Etiqueta",
     "keyLabelPlaceholder": "a-minha-chave-de-assinatura",
-    "mldsaUntestedGoogleKms": "O ML-DSA no Google Cloud KMS segue a API do KMS, mas ainda não foi testado com o serviço.",
+    "mldsaUntestedGoogleKms": "O ML-DSA no Google Cloud KMS segue a API do KMS, mas ainda não foi testado com o serviço. O KMS assina no máximo 64 KiB, por isso uma CRL maior precisa de outro fornecedor.",
     "purposes": {
       "general": "Geral Finalidade",
       "caSigning": "AC Signing"

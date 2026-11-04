@@ -246,6 +246,51 @@ def test_manual_approval_of_a_renewal_archives_the_renewed_certificate(app, auth
             db.session.commit()
 
 
+@pytest.mark.parametrize('twin', ['hex_serial', 'crlf_pem'])
+def test_approving_a_renewal_archives_a_twin_row_too(app, auth_client, create_ca, twin):
+    """A certificate stored twice is replaced once, however the twin stores its serial or PEM."""
+    from services.cert_service import CertificateService
+    ca = create_ca(cn=f'SCEP renewal twin {twin} CA')
+    cn = f'twin-{twin.replace("_", "-")}.example.test'
+    with app.app_context():
+        ca_row = db.session.get(CA, ca['id'])
+        old = CertificateService.create_certificate(
+            descr=cn, caref=ca_row.refid, dn={'CN': cn},
+            cert_type='server_cert', key_type='2048', validity_days=30, username='admin')
+        db.session.commit()
+        held = x509.load_pem_x509_certificate(base64.b64decode(old.crt))
+        columns = {c.name: getattr(old, c.name) for c in Certificate.__table__.columns
+                   if c.name not in ('id', 'refid')}
+        if twin == 'hex_serial':
+            columns['serial_number'] = format(held.serial_number, 'X')
+        else:
+            pem = held.public_bytes(serialization.Encoding.PEM).replace(b'\n', b'\r\n')
+            columns['crt'] = base64.b64encode(pem).decode()
+        twin_row = Certificate(refid=f'{old.refid}-twin', **columns)
+        db.session.add(twin_row)
+        db.session.commit()
+        ids, old_crt = (old.id, twin_row.id), old.crt
+        req = SCEPRequest(transaction_id=f'txn-{cn}', ca_refid=ca_row.refid,
+                          csr=base64.b64encode(_csr(cn).public_bytes(serialization.Encoding.DER)).decode(),
+                          status='pending', subject=f'CN={cn}', renewal_of=old_crt)
+        db.session.add(req)
+        db.session.commit()
+        req_id = req.id
+    try:
+        r = auth_client.post(f'/api/v2/scep/{req_id}/approve', data='{}', content_type='application/json')
+        assert r.status_code == 200, r.get_json()
+        with app.app_context():
+            assert [db.session.get(Certificate, i).archived for i in ids] == [True, True]
+    finally:
+        _cleanup(app, req_id)
+        with app.app_context():
+            for row_id in ids:
+                row = db.session.get(Certificate, row_id)
+                if row:
+                    db.session.delete(row)
+            db.session.commit()
+
+
 def test_a_second_renewal_of_the_same_certificate_is_refused(app, auth_client, create_ca):
     """Two pending RenewalReqs of one certificate: the first approval claims it, the second is refused."""
     from services.cert_service import CertificateService

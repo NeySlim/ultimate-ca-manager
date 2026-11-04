@@ -3582,7 +3582,7 @@
     "generateHsmKey": "Generate HSM Key",
     "keyLabel": "Key Label",
     "keyLabelPlaceholder": "my-signing-key",
-    "mldsaUntestedGoogleKms": "ML-DSA on Google Cloud KMS follows the KMS API but has not been tested against the service yet.",
+    "mldsaUntestedGoogleKms": "ML-DSA on Google Cloud KMS follows the KMS API but has not been tested against the service yet. KMS signs at most 64 KiB, so a larger CRL needs another provider.",
     "purposes": {
       "general": "General Purpose",
       "caSigning": "CA Signing"

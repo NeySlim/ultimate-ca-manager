@@ -112,3 +112,61 @@ def test_scep_profile_keeps_a_binding_made_while_active(app, auth_client, create
         assert r.status_code == 200, r.get_json()
     finally:
         auth_client.delete(f'/api/v2/scep/profiles/{profile_id}')
+
+
+def test_acme_profile_rename_keeps_the_binding_but_a_copy_is_new(app, disabled_template):
+    with app.app_context():
+        row = SystemConfig(key=acme_profiles.CONFIG_KEY,
+                           value=json.dumps({'tls': {'template_id': disabled_template}}))
+        db.session.add(row)
+        db.session.commit()
+        try:
+            renamed = {'server': {'template_id': disabled_template}}
+            assert acme_profiles.validate_config(renamed) == (True, None)
+            copied = {'tls': {'template_id': disabled_template},
+                      'server': {'template_id': disabled_template}}
+            ok, err = acme_profiles.validate_config(copied)
+            assert not ok and 'disabled' in err
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+@pytest.mark.parametrize('update_existing', [False, True])
+@pytest.mark.parametrize('value', ['false', 0, None, []])
+def test_import_refuses_an_is_active_that_is_not_a_boolean(app, auth_client, update_existing, value):
+    name = f'import-active-{uuid.uuid4().hex[:8]}'
+    if update_existing:
+        with app.app_context():
+            db.session.add(CertificateTemplate(name=name, template_type='custom', key_type='RSA-2048',
+                                               validity_days=30, digest='sha256', is_active=True,
+                                               dn_template='{}', extensions_template='{}'))
+            db.session.commit()
+    try:
+        r = auth_client.post('/api/v2/templates/import', data={
+            'json_content': json.dumps([{'name': name, 'template_type': 'custom', 'is_active': value}]),
+            'update_existing': str(update_existing).lower()}, content_type='multipart/form-data')
+        assert r.status_code in (200, 201), r.data
+        assert any('is_active' in entry for entry in r.get_json()['data']['skipped_items'])
+        with app.app_context():
+            row = CertificateTemplate.query.filter_by(name=name).first()
+            assert (row is not None and row.is_active is True) if update_existing else row is None
+    finally:
+        with app.app_context():
+            CertificateTemplate.query.filter_by(name=name).delete()
+            db.session.commit()
+
+
+def test_import_keeps_a_boolean_is_active(app, auth_client):
+    name = f'import-active-{uuid.uuid4().hex[:8]}'
+    try:
+        r = auth_client.post('/api/v2/templates/import', data={
+            'json_content': json.dumps([{'name': name, 'template_type': 'custom', 'is_active': False}])},
+            content_type='multipart/form-data')
+        assert r.status_code in (200, 201), r.data
+        with app.app_context():
+            assert CertificateTemplate.query.filter_by(name=name).one().is_active is False
+    finally:
+        with app.app_context():
+            CertificateTemplate.query.filter_by(name=name).delete()
+            db.session.commit()

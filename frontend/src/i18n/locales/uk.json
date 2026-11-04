@@ -3626,7 +3626,7 @@
     "generateHsmKey": "Generate HSM Ключ",
     "keyLabel": "Ключ Label",
     "keyLabelPlaceholder": "мій-ключ-підпису",
-    "mldsaUntestedGoogleKms": "ML-DSA у Google Cloud KMS відповідає API KMS, але ще не перевірявся з цим сервісом.",
+    "mldsaUntestedGoogleKms": "ML-DSA у Google Cloud KMS відповідає API KMS, але ще не перевірявся з цим сервісом. KMS підписує щонайбільше 64 КіБ, тому більший CRL потребує іншого постачальника.",
     "purposes": {
       "general": "Загальне призначення",
       "caSigning": "Підписання CA"
