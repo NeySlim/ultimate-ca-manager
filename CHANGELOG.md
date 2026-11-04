@@ -17,7 +17,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - HSM: generating a key under a name OpenBao or Azure Key Vault already held adopted that name, whatever the requested algorithm, and deleting it then destroyed the key of a live CA. The API now answers 409; bring an existing key in with a sync.
 - HSM: two generations at once under one name could both find it free, and a key whose row could not be stored stayed in the HSM. Generations now take turns per provider (409 after 60 s), and such a key is removed unless a row holds its name.
-- ACME client: a finalization that failed on a database error or a refused import did not record the error on the order. It now does, without the SQL text.
+- Database errors could quote the row in logs and API messages, an unencrypted private key included. Their parameters are now hidden.
+- ACME client: a finalization that failed on a database error or a refused import did not record the error on the order. It now does, without the SQL text, and a later success clears it.
 - HSM: a CA whose creation failed after its key was generated left that key in the HSM and in the key list. It is now removed, where the provider allows it.
 - HSM: `extractable` sent as text, such as `"false"`, generated an exportable key. The API now answers 400.
 - XCEP: a CA with no template to announce sent empty policy and OID collections, which Windows clients refuse with `WS_E_INVALID_FORMAT`. Both are now nil, and the client sees a policy server with no templates.

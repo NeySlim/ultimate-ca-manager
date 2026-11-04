@@ -87,7 +87,7 @@ def consistent_source(snapshot) -> Iterator[Tuple[object, str, bool]]:
         # Read-only URI: a copy must not be able to write to the artefact it
         # would be rolled back to, not even by an accidental PRAGMA.
         url = f"sqlite:///{read_only_uri(snapshot.path)}&uri=true"
-        engine = create_engine(url)
+        engine = create_engine(url, hide_parameters=True)
         try:
             with engine.connect() as conn:
                 yield conn, f"read-only snapshot {snapshot.path.name}", False

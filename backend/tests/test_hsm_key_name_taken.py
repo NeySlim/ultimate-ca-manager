@@ -258,7 +258,7 @@ def test_a_key_another_row_names_is_not_deleted(app, hsm_provider):
     assert fake.deleted == []
 
 
-def test_a_row_under_the_same_name_keeps_the_key_under_another_id(app, hsm_provider):
+def test_a_row_under_the_same_name_keeps_the_key_under_another_id(app, hsm_provider, caplog):
     # Azure: identifiers differ by version, the deletion goes by name
     from services.hsm import HsmService
     fake = _Fake()
@@ -271,6 +271,7 @@ def test_a_row_under_the_same_name_keeps_the_key_under_another_id(app, hsm_provi
                 pytest.raises(HsmOperationError):
             HsmService.generate_key(hsm_provider, 'same', 'EC-P256')
     assert fake.deleted == []
+    assert 'kept: another row holds its name' in caplog.text
 
 
 def test_a_generation_still_queued_after_the_wait_answers_409(app, auth_client, hsm_provider):
@@ -315,9 +316,14 @@ def test_a_queued_generation_holds_no_database_connection(app, backend):
         provider = HsmProvider(name=f'Fake queued {uuid.uuid4().hex[:8]}', type='openbao', config='{}')
         db.session.add(provider)
         db.session.commit()
-        with patch('services.hsm.HsmService._get_provider_instance', return_value=_Fake()), \
-                patch.object(hsm_service, 'process_lock', probing_lock):
-            HsmService.generate_key(provider.id, 'queued', 'EC-P256')
+        try:
+            with patch('services.hsm.HsmService._get_provider_instance', return_value=_Fake()), \
+                    patch.object(hsm_service, 'process_lock', probing_lock):
+                HsmService.generate_key(provider.id, 'queued', 'EC-P256')
+        finally:
+            HsmKey.query.filter_by(provider_id=provider.id).delete()
+            db.session.delete(provider)
+            db.session.commit()
     assert seen == ([False, 0] if backend == 'postgresql' else [False])
 
 

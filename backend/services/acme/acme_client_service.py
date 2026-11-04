@@ -1590,6 +1590,7 @@ class AcmeClientService:
             if cert_id:
                 order.certificate_id = cert_id
                 order.status = 'issued'
+                order.error_message = None
                 # RFC 8555 §7.1.3: order.expires is the *order resource* expiry
                 # (~7 days for Let's Encrypt), NOT the certificate's notAfter.
                 # The renewal scheduler compares expires_at against `now + threshold`,
@@ -1610,7 +1611,8 @@ class AcmeClientService:
                 return True, "Certificate issued and imported successfully", cert_id
             else:
                 message = "Certificate obtained but import failed"
-                self._record_finalize_failure(order, message)
+                # The CA issued it: the order stays valid, which is what Renew accepts
+                self._record_finalize_failure(order, message, status='valid')
                 return False, message, None
 
         except Exception as e:
@@ -1621,11 +1623,11 @@ class AcmeClientService:
             return False, message, None
 
     @staticmethod
-    def _record_finalize_failure(order, message: str) -> None:
+    def _record_finalize_failure(order, message: str, status: str = 'error') -> None:
         """Keep the failure on the order; a failed flush refuses every statement until rollback."""
         try:
             db.session.rollback()
-            order.status = 'error'
+            order.status = status
             order.error_message = message
             db.session.commit()
         except Exception as commit_err:

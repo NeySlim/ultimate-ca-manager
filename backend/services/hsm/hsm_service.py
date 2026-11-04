@@ -499,6 +499,8 @@ class HsmService:
                 or_(HsmKey.key_identifier == key_info.key_identifier, HsmKey.label == key_info.label),
             ).first()
             if held:
+                logger.warning("HSM key %s has no row of its own, kept: another row holds its name",
+                               key_info.key_identifier)
                 return
             with cls._get_provider_instance(provider) as hsm:
                 hsm.delete_key(key_info.key_identifier)
