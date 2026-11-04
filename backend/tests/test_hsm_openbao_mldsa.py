@@ -41,10 +41,14 @@ class _Transit:
         self.requests.append((method, path, body))
         kind, _, name = path.partition('/')
         if method == 'POST' and kind == 'keys' and '/' not in name:
-            cls = next(c for t, c in LEVELS.values() if t == body['type'])
-            self.add(name, body['type'], cls.generate())
+            # A name it already holds answers success and keeps that key
+            if name not in self.keys:
+                cls = next(c for t, c in LEVELS.values() if t == body['type'])
+                self.add(name, body['type'], cls.generate())
             return {}
         if method == 'GET' and kind == 'keys':
+            if name not in self.keys:
+                return {}  # what the provider's _api makes of a 404
             transit_type, key = self.keys[name]
             public = (base64.b64encode(key.public_key().public_bytes_raw()).decode()
                       if transit_type.startswith('mldsa') else None)
@@ -74,10 +78,21 @@ def _spki(pem):
 def test_generation_asks_for_the_transit_type_and_returns_spki(label):
     provider, transit = _provider()
     info = provider.generate_key(f'pq-{label}', label)
-    assert transit.requests[0][2]['type'] == LEVELS[label][0]
+    assert [r[2]['type'] for r in transit.requests if r[0] == 'POST'] == [LEVELS[label][0]]
     assert (info.algorithm, info.key_type) == (label, 'asymmetric')
     assert key_algorithms.label_for_public_key(_spki(info.public_key_pem)) == label
     assert _spki(provider.get_public_key(info.key_identifier)) == _spki(info.public_key_pem)
+
+
+@pytest.mark.parametrize('existing', ['ML-DSA-65', 'ML-DSA-44'])
+def test_generation_refuses_a_name_transit_already_holds(existing):
+    provider, transit = _provider()
+    held = LEVELS[existing][1].generate()
+    transit.add('taken', LEVELS[existing][0], held)
+    with pytest.raises(HsmOperationError, match='already exists'):
+        provider.generate_key('taken', 'ML-DSA-65')
+    assert transit.keys['taken'] == (LEVELS[existing][0], held)
+    assert not [r for r in transit.requests if r[0] == 'POST']
 
 
 @pytest.mark.parametrize('label', sorted(LEVELS))
@@ -152,5 +167,22 @@ def test_real_openbao_generates_exports_and_signs(label):
             assert key_algorithms.label_for_public_key(public) == label
             assert _spki(info.public_key_pem) == public
             public.verify(provider.sign(name, b'tbs', label), b'tbs')
+        finally:
+            provider.delete_key(name)
+
+
+@pytest.mark.skipif(not BENCH_URL, reason='no OpenBao bench (set UCM_TEST_OPENBAO_URL, '
+                    'UCM_TEST_OPENBAO_TOKEN and optionally UCM_TEST_OPENBAO_MOUNT)')
+def test_real_openbao_keeps_a_key_whose_name_is_asked_again():
+    provider = OpenBaoProvider({'url': BENCH_URL, 'token': os.environ['UCM_TEST_OPENBAO_TOKEN'],
+                                'mount_path': os.environ.get('UCM_TEST_OPENBAO_MOUNT', 'transit')})
+    name = f'ucm-pq-test-taken-{uuid.uuid4().hex[:8]}'
+    with provider:
+        info = provider.generate_key(name, 'ML-DSA-65')
+        try:
+            for asked in ('ML-DSA-65', 'EC-P256'):
+                with pytest.raises(HsmOperationError, match='already exists'):
+                    provider.generate_key(name, asked)
+            assert _spki(provider.get_public_key(name)) == _spki(info.public_key_pem)
         finally:
             provider.delete_key(name)

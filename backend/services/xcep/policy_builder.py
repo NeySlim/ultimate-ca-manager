@@ -518,6 +518,10 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
 
         _build_extensions_element(attributes, extensions, oids)
 
+    # PolicyCollection needs one policy: Windows refuses it empty (WS_E_INVALID_FORMAT), accepts nil.
+    if len(policies) == 0:
+        policies.set('{%s}nil' % XSI_NS, 'true')
+
     # GetPoliciesResponse's own sequence is response, cAs, oIDs (in that
     # order) -- an xs:sequence violation here produces WS_E_INVALID_FORMAT
     # on a real client even though every individual element is well-formed.
@@ -553,6 +557,9 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         etree.SubElement(oid_el, '{%s}group' % XCEP_NS).text = str(meta['group'])
         etree.SubElement(oid_el, '{%s}oIDReferenceID' % XCEP_NS).text = str(meta['id'])
         etree.SubElement(oid_el, '{%s}defaultName' % XCEP_NS).text = meta['default_name']
+    # Same rule as PolicyCollection; nil on only one of the two still fails on Windows.
+    if len(oids_el) == 0:
+        oids_el.set('{%s}nil' % XSI_NS, 'true')
 
     return build_envelope(response_root, action=ACTION_GET_POLICIES_RESPONSE, relates_to=message_id)
 

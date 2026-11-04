@@ -381,30 +381,36 @@ class CACreationMixin:
             raise
 
         # Create CA certificate
-        cert_pem, generated_key_pem = TrustStoreService.create_ca_certificate(
-            subject=subject,
-            private_key=private_key,
-            issuer=issuer,
-            issuer_private_key=issuer_private_key,
-            issuer_cert=parent_cert,
-            validity_days=validity_days,
-            digest=digest,
-            ocsp_uris=parent_ocsp_urls,
-            cdp_urls=parent_cdp_urls,
-            aia_ca_issuers_urls=parent_aia_urls,
-            cps_uri=parent_cps_uri,
-            cps_oid=parent_cps_oid,
-            path_length=path_length,
-            name_constraints_permitted=name_constraints_permitted,
-            name_constraints_excluded=name_constraints_excluded,
-            policy_constraints_require=policy_constraints_require,
-            policy_constraints_inhibit=policy_constraints_inhibit,
-            inhibit_any_policy=inhibit_any_policy,
-            sia_urls=sia_urls,
-            key_usage=key_usage,
-            extended_key_usage=extended_key_usage,
-            not_valid_after_max=parent_not_after,
-        )
+        try:
+            cert_pem, generated_key_pem = TrustStoreService.create_ca_certificate(
+                subject=subject,
+                private_key=private_key,
+                issuer=issuer,
+                issuer_private_key=issuer_private_key,
+                issuer_cert=parent_cert,
+                validity_days=validity_days,
+                digest=digest,
+                ocsp_uris=parent_ocsp_urls,
+                cdp_urls=parent_cdp_urls,
+                aia_ca_issuers_urls=parent_aia_urls,
+                cps_uri=parent_cps_uri,
+                cps_oid=parent_cps_oid,
+                path_length=path_length,
+                name_constraints_permitted=name_constraints_permitted,
+                name_constraints_excluded=name_constraints_excluded,
+                policy_constraints_require=policy_constraints_require,
+                policy_constraints_inhibit=policy_constraints_inhibit,
+                inhibit_any_policy=inhibit_any_policy,
+                sia_urls=sia_urls,
+                key_usage=key_usage,
+                extended_key_usage=extended_key_usage,
+                not_valid_after_max=parent_not_after,
+            )
+        except Exception:
+            # The key generated for this CA would stay in the HSM with its row
+            if hsm_provider_id and hsm_key is not None:
+                _discard_generated_hsm_key(hsm_key.id)
+            raise
 
         # If using local key, use the generated key PEM
         if not use_hsm and generated_key_pem:
@@ -465,6 +471,8 @@ class CACreationMixin:
         except Exception as e:
             db.session.rollback()
             logger.error(f"Failed to persist CA: {e}")
+            if hsm_provider_id and hsm_key is not None:
+                _discard_generated_hsm_key(hsm_key.id)
             raise
 
         # Auto-enable CDP if protocol base URL is configured

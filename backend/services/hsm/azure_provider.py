@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Any
 
 from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo,
-    HsmConnectionError, HsmOperationError, HsmKeyNotFoundError, HsmConfigError
+    HsmConnectionError, HsmOperationError, HsmKeyExistsError, HsmKeyNotFoundError, HsmConfigError
 )
 
 from utils.key_algorithms import label_for_curve_name
@@ -267,6 +267,14 @@ class AzureKeyVaultProvider(BaseHsmProvider):
         key_type, param = ALGORITHM_TO_AZURE[algorithm]
         
         try:
+            # Key Vault adds a version to a name it holds, and deleting a key deletes all of them
+            try:
+                self._key_client.get_key(label)
+            except ResourceNotFoundError:
+                pass
+            else:
+                raise HsmKeyExistsError(f"Key already exists: {label}")
+
             # Determine key operations
             key_ops = []
             if purpose in ('signing', 'all'):
