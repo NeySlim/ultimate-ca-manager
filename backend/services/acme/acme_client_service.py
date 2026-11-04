@@ -1463,9 +1463,11 @@ class AcmeClientService:
             resp = self._post(order.order_url, "")  # POST-as-GET
             if resp.status_code == 200:
                 data = resp.json()
-                # Issued means imported here, which the CA cannot know: the renewal scheduler needs it
-                if order.status != 'issued':
-                    order.status = data.get('status', order.status)
+                # Issued means imported here, which the CA cannot know and the scheduler needs.
+                # Tested in the write: the background finalize may import during this round trip
+                AcmeClientOrder.query.filter(
+                    AcmeClientOrder.id == order.id, AcmeClientOrder.status != 'issued',
+                ).update({'status': data.get('status', order.status)}, synchronize_session=False)
                 if data.get('certificate'):
                     order.certificate_url = data['certificate']
                 db.session.commit()
@@ -1568,7 +1570,9 @@ class AcmeClientService:
             cert_resp = self._post(cert_url, "")
             
             if cert_resp.status_code != 200:
-                return False, "Failed to download certificate", None
+                message = "Failed to download certificate"
+                self._record_finalize_failure(order, message)
+                return False, message, None
 
             cert_pem = self._select_certificate_chain(cert_resp)
 

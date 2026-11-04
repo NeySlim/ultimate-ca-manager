@@ -600,6 +600,14 @@ def cancel_order(order_id):
             pass  # Best effort cleanup
 
     order_domains = ', '.join([d.get('value', '') for d in (order.identifiers_list if hasattr(order, 'identifiers_list') else [])]) or f'Order {order_id}'
+    if order.renewal_enabled and order.certificate_id:
+        # A renewal's order holds the same certificate: it takes over the schedule
+        heir = AcmeClientOrder.query.filter(
+            AcmeClientOrder.id != order.id,
+            AcmeClientOrder.certificate_id == order.certificate_id,
+        ).order_by(AcmeClientOrder.id.desc()).first()
+        if heir:
+            heir.renewal_enabled = True
     db.session.delete(order)
     ok, _err = safe_commit(logger, "Failed to cancel ACME order")
     if not ok:

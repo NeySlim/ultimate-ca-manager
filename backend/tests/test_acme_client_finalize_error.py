@@ -5,6 +5,7 @@ from unittest.mock import patch
 
 import pytest
 from cryptography.hazmat.primitives.asymmetric import ec
+from sqlalchemy import text
 
 from api.v2.acme_client import orders as orders_module
 from models import Certificate, db
@@ -163,6 +164,43 @@ def test_a_status_check_does_not_undo_an_import(app, before, after):
         status, _data = svc.check_order_status(order)
         assert status == 'valid'
         assert _stored(order_id).status == after
+
+
+def test_a_download_the_ca_refuses_is_recorded(app):
+    with app.app_context():
+        order = _order()
+        order_id = order.id
+        svc = _service_that_imports_with(lambda **_kwargs: 4242)
+        responses = iter([
+            SimpleNamespace(status_code=200, json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'}),
+            SimpleNamespace(status_code=500),
+        ])
+        svc._post = lambda *_args: next(responses)
+        ok, msg, _cert_id = svc.finalize_order(order)
+        assert not ok and msg == 'Failed to download certificate'
+        stored = _stored(order_id)
+        assert stored.status == 'valid' and stored.error_message == msg
+
+
+def test_a_status_check_loses_to_an_import_during_its_round_trip(app):
+    with app.app_context():
+        order = _order()
+        order.status = 'processing'
+        db.session.commit()
+        order_id = order.id
+        assert order.status == 'processing'
+
+        def background_import_meanwhile(*_args):
+            # This session's copy of the order still says processing
+            db.session.execute(text(f"UPDATE {AcmeClientOrder.__tablename__} SET status = 'issued' "
+                                    f"WHERE id = {order_id}"))
+            return SimpleNamespace(status_code=200, json=lambda: {'status': 'valid'})
+
+        svc = object.__new__(AcmeClientService)
+        svc._post = background_import_meanwhile
+        status, _data = svc.check_order_status(order)
+        assert status == 'valid'
+        assert _stored(order_id).status == 'issued'
 
 
 def test_a_later_success_clears_the_old_error(app):

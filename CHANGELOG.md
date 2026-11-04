@@ -18,8 +18,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - HSM: generating a key under a name OpenBao or Azure Key Vault already held adopted that name, whatever the requested algorithm, and deleting it then destroyed the key of a live CA. The API now answers 409; bring an existing key in with a sync.
 - HSM: two generations at once under one name could both find it free, and a key whose row could not be stored stayed in the HSM. Generations now take turns per provider (409 after 60 s), and such a key is removed unless a row holds its name.
 - Database errors quoted bound values in logs and API messages, an unencrypted private key included. They are now hidden, except what PostgreSQL itself quotes in a DETAIL line: a duplicate key in full, or each column of a refused row up to 64 bytes.
-- ACME client: every successful renewal left a second order on the schedule, so the orders doubled at each cycle. A renewal's order no longer renews on its own, and the upgrade takes the existing ones off.
-- ACME client: a status check replaced `issued` with the CA's `valid`, which took the order out of automatic renewal. An issued order now stays issued.
+- ACME client: every successful renewal left a second order on the schedule, so the orders doubled at each cycle. The renewed order alone keeps it, the upgrade takes the existing leftovers off, and deleting that order hands the schedule to its leftover.
+- ACME client: a status check replaced `issued` with the CA's `valid`, which took the order out of automatic renewal. An issued order now stays issued, and the upgrade puts back those holding a certificate that has not expired, proxy orders excepted.
 - ACME client: a finalization that failed on a database error or a refused import did not record the error on the order. It now does, without the SQL text and keeping a status the CA reported as valid, so the order can still be renewed.
 - HSM: a CA whose creation failed after its key was generated left that key in the HSM and in the key list. It is now removed, where the provider allows it.
 - HSM: `extractable` sent as text, such as `"false"`, generated an exportable key. The API now answers 400.
@@ -35,7 +35,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
-- ACME client: pairs of orders that have already renewed apart can no longer be told from two wanted orders, so both stay on the schedule. Turn renewal off on the one you do not want.
+- ACME client: the upgrade puts orders back on the renewal schedule if a status check had taken them off, so a certificate you had stopped relying on can renew: delete its order if you do not want that. Two orders for the same names that have already renewed apart cannot be told from two wanted orders, so both keep renewing: delete the one you do not want.
 - Templates: the API and import accept only true or false for `is_active`, `enforce_san_types`, `ad_derived_subject` and `autoenroll_enabled`; 0 and 1 are refused.
 - SSH: the option is off for every CA, existing ones included. A client that sends `key_id` gets a 400 until the option is ticked on its CA; sending the CA's own `principals@CA name` is still accepted.
 

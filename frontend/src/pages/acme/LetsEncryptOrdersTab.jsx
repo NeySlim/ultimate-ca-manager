@@ -184,7 +184,7 @@ export default function LetsEncryptOrdersTab({
                           {t('common.download')}
                         </Button>
                       )}
-                      {!order.is_proxy_order && ['valid', 'issued'].includes(order.status) && onRenewCertificate && (
+                      {!order.is_proxy_order && (order.status === 'issued' || (order.status === 'valid' && (order.certificate_id || order.error_message))) && onRenewCertificate && (
                         <Button type="button" variant="secondary" size="sm" onClick={(event) => { event.stopPropagation(); onRenewCertificate(order) }}>
                           <ArrowsClockwise size={12} />
                           {t('acme.renew')}
