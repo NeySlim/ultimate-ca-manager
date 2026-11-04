@@ -15,7 +15,7 @@ class Certificate(db.Model):
     id = db.Column(db.Integer, primary_key=True)
     refid = db.Column(db.String(36), unique=True, nullable=False, index=True)
     descr = db.Column(db.String(255), nullable=False)
-    caref = db.Column(db.String(36), db.ForeignKey("certificate_authorities.refid"))
+    caref = db.Column(db.String(36), db.ForeignKey("certificate_authorities.refid"), index=True)
     crt = db.Column(db.Text)  # Nullable - CSR doesn't have cert yet
     csr = db.Column(db.Text)  # Base64 encoded CSR
     prv = db.Column(db.Text)  # Base64 encoded private key
@@ -25,7 +25,7 @@ class Certificate(db.Model):
     subject = db.Column(db.Text)
     subject_cn = db.Column(db.String(255))  # Extracted CN for sorting
     issuer = db.Column(db.Text)
-    serial_number = db.Column(db.String(100))
+    serial_number = db.Column(db.String(100), index=True)
     aki = db.Column(db.String(200))  # Authority Key Identifier (hex, colon-separated)
     ski = db.Column(db.String(200))  # Subject Key Identifier (hex, colon-separated)
     valid_from = db.Column(db.DateTime)
