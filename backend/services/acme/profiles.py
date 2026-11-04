@@ -106,7 +106,7 @@ def _coerce_template_id(value):
         return None
     try:
         value = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):  # json reads Infinity as a float
         return None
     return value if value > 0 else None
 
@@ -250,7 +250,7 @@ def _sanitize(name, spec):
     validity = spec.get('validity_days', DEFAULT_VALIDITY_DAYS)
     try:
         validity = int(validity)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         validity = DEFAULT_VALIDITY_DAYS
     if validity < 1:
         validity = DEFAULT_VALIDITY_DAYS

@@ -15,7 +15,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
-- Template import: an `is_active` that is not true or false was stored as given. The template is now skipped, with the reason.
+- Templates: a switch sent as text, such as `"autoenroll_enabled": "false"`, was stored as on, and a bad `is_active` failed a whole import. The API now answers 400, and an import skips only that template, with the reason.
+- Restore: text in a boolean column, such as `"is_active": "false"`, turned the setting on. The archive is now refused.
 - ACME profiles: renaming a profile bound to a disabled template was refused as a new binding. A rename now keeps the binding, and a second profile on that template is still refused.
 - Google Cloud KMS: the notice for ML-DSA keys now says that KMS signs at most 64 KiB, which rules out a larger CRL.
 
@@ -25,6 +26,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
+- Templates: the API and import accept only true or false for `is_active`, `enforce_san_types`, `ad_derived_subject` and `autoenroll_enabled`; 0 and 1 are refused.
 - SSH: the option is off for every CA, existing ones included. A client that sends `key_id` gets a 400 until the option is ticked on its CA; sending the CA's own `principals@CA name` is still accepted.
 
 ## [2.248] - 2026-11-01

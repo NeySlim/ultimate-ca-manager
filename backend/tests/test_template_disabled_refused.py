@@ -132,9 +132,13 @@ def test_acme_profile_rename_keeps_the_binding_but_a_copy_is_new(app, disabled_t
             db.session.commit()
 
 
+BOOLEAN_FIELDS = ('is_active', 'enforce_san_types', 'ad_derived_subject', 'autoenroll_enabled')
+
+
 @pytest.mark.parametrize('update_existing', [False, True])
+@pytest.mark.parametrize('field', BOOLEAN_FIELDS)
 @pytest.mark.parametrize('value', ['false', 0, None, []])
-def test_import_refuses_an_is_active_that_is_not_a_boolean(app, auth_client, update_existing, value):
+def test_import_refuses_a_switch_that_is_not_a_boolean(app, auth_client, update_existing, field, value):
     name = f'import-active-{uuid.uuid4().hex[:8]}'
     if update_existing:
         with app.app_context():
@@ -144,10 +148,10 @@ def test_import_refuses_an_is_active_that_is_not_a_boolean(app, auth_client, upd
             db.session.commit()
     try:
         r = auth_client.post('/api/v2/templates/import', data={
-            'json_content': json.dumps([{'name': name, 'template_type': 'custom', 'is_active': value}]),
+            'json_content': json.dumps([{'name': name, 'template_type': 'custom', field: value}]),
             'update_existing': str(update_existing).lower()}, content_type='multipart/form-data')
         assert r.status_code in (200, 201), r.data
-        assert any('is_active' in entry for entry in r.get_json()['data']['skipped_items'])
+        assert any(field in entry for entry in r.get_json()['data']['skipped_items'])
         with app.app_context():
             row = CertificateTemplate.query.filter_by(name=name).first()
             assert (row is not None and row.is_active is True) if update_existing else row is None
@@ -170,3 +174,52 @@ def test_import_keeps_a_boolean_is_active(app, auth_client):
         with app.app_context():
             CertificateTemplate.query.filter_by(name=name).delete()
             db.session.commit()
+
+
+@pytest.mark.parametrize('field', BOOLEAN_FIELDS)
+def test_create_and_update_refuse_a_switch_sent_as_text(app, auth_client, field):
+    name = f'switch-text-{uuid.uuid4().hex[:8]}'
+    base = {'name': name, 'template_type': 'custom', 'key_type': 'RSA-2048', 'validity_days': 30}
+    refused = auth_client.post('/api/v2/templates', json={**base, field: 'false'})
+    assert refused.status_code == 400 and field in refused.get_json()['message']
+    created = auth_client.post('/api/v2/templates', json=base)
+    assert created.status_code in (200, 201), created.data
+    tid = created.get_json()['data']['id']
+    try:
+        before = auth_client.get(f'/api/v2/templates/{tid}').get_json()['data'][field]
+        r = auth_client.put(f'/api/v2/templates/{tid}', json={field: 'false'})
+        assert r.status_code == 400 and field in r.get_json()['message']
+        assert auth_client.get(f'/api/v2/templates/{tid}').get_json()['data'][field] is before
+        r = auth_client.put(f'/api/v2/templates/{tid}', json={field: not before})
+        assert r.status_code == 200, r.data
+        assert auth_client.get(f'/api/v2/templates/{tid}').get_json()['data'][field] is (not before)
+    finally:
+        auth_client.delete(f'/api/v2/templates/{tid}')
+
+
+def test_acme_profile_validation_survives_a_stored_infinity(app):
+    # A hand-edited value json.loads reads as a float: a save must still be able to repair it
+    with app.app_context():
+        row = SystemConfig(key=acme_profiles.CONFIG_KEY,
+                           value='{"bad": {"template_id": Infinity, "validity_days": Infinity}}')
+        db.session.add(row)
+        db.session.commit()
+        try:
+            assert acme_profiles.validate_config({'tls': {'description': 'x'}}) == (True, None)
+            assert acme_profiles.get_profiles()['bad']['validity_days'] == acme_profiles.DEFAULT_VALIDITY_DAYS
+        finally:
+            db.session.delete(row)
+            db.session.commit()
+
+
+@pytest.mark.parametrize('value', ['false', 'true', '0'])
+def test_restore_refuses_text_in_a_boolean_column(value):
+    from services.backup.restore.apply import _coerce, RestoreValidationError
+    with pytest.raises(RestoreValidationError, match='templates.is_active'):
+        _coerce(value, CertificateTemplate.__table__.c.is_active, 'templates.is_active')
+
+
+@pytest.mark.parametrize('value,expected', [(True, True), (False, False), (1, True), (0, False), (None, None)])
+def test_restore_keeps_booleans_and_numbers_from_older_archives(value, expected):
+    from services.backup.restore.apply import _coerce
+    assert _coerce(value, CertificateTemplate.__table__.c.is_active, 'templates.is_active') is expected

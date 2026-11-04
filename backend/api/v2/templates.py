@@ -104,11 +104,18 @@ def _coerce_json_object_fields(tpl_data):
     return None
 
 
+# bool("false") is True: a switch sent as text would silently turn on
+_BOOLEAN_FIELDS = ('is_active', 'enforce_san_types', 'ad_derived_subject', 'autoenroll_enabled')
+
+
 def _validate_template_payload(data, *, partial=False):
     """Returns (ok, err_msg). Sanitises validity_days/key_type/digest/template_type."""
     err = _coerce_json_object_fields(data)
     if err:
         return False, err
+    for field in _BOOLEAN_FIELDS:
+        if field in data and not isinstance(data[field], bool):
+            return False, f'{field} must be true or false'
     if 'pinned_subject_fields' in data:
         cleaned, err = _clean_pinned_subject_fields(data['pinned_subject_fields'])
         if err:
@@ -453,8 +460,6 @@ def update_template(template_id):
         template.extensions_template = json.dumps(data['extensions_template'])
     
     if 'is_active' in data:
-        if not isinstance(data['is_active'], bool):
-            return error_response('is_active must be true or false', 400)
         template.is_active = data['is_active']
 
     if 'enforce_san_types' in data:
@@ -762,9 +767,6 @@ def import_template():
             ok, err = _validate_template_payload(tpl_data, partial=True)
             if not ok:
                 skipped.append(f"{tpl_data['name']} ({err})")
-                continue
-            if 'is_active' in tpl_data and not isinstance(tpl_data['is_active'], bool):
-                skipped.append(f"{tpl_data['name']} (is_active must be true or false)")
                 continue
 
             # Check for existing

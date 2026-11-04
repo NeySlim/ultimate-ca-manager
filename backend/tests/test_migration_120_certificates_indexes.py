@@ -36,16 +36,20 @@ def test_the_model_declares_the_same_indexes():
 @pytest.mark.postgres
 @pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
 def test_postgresql_upgrade_is_idempotent():
+    schema = f"migtest_120_{os.getenv('PYTEST_XDIST_WORKER', 'main')}"
     engine = create_engine(PG_URL)
-    with engine.begin() as conn:
-        conn.execute(text(f"CREATE SCHEMA IF NOT EXISTS mig120"))
-        conn.execute(text("SET search_path TO mig120"))
-        conn.execute(text(f"CREATE TABLE {TABLE} (id SERIAL PRIMARY KEY, serial_number TEXT, caref TEXT)"))
-        _migration().upgrade(conn)
-        _migration().upgrade(conn)
-        names = {r[0] for r in conn.execute(text(
-            "SELECT indexname FROM pg_indexes WHERE schemaname = 'mig120'"))}
-        assert NAMES <= names
-    with engine.begin() as conn:
-        conn.execute(text("DROP SCHEMA mig120 CASCADE"))
-    engine.dispose()
+    try:
+        with engine.begin() as conn:
+            conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+            conn.execute(text(f"CREATE SCHEMA {schema}"))
+            conn.execute(text(f"SET search_path TO {schema}"))
+            conn.execute(text(f"CREATE TABLE {TABLE} (id SERIAL PRIMARY KEY, serial_number TEXT, caref TEXT)"))
+            _migration().upgrade(conn)
+            _migration().upgrade(conn)
+            names = {r[0] for r in conn.execute(
+                text("SELECT indexname FROM pg_indexes WHERE schemaname = :s"), {'s': schema})}
+            assert NAMES <= names
+    finally:
+        with engine.begin() as conn:
+            conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))
+        engine.dispose()

@@ -1,4 +1,4 @@
-"""A label that names its own parameter takes no default size, on the routes that fill one in."""
+"""Only RSA and EC take a default key size, on the routes that fill one in."""
 import base64
 
 import pytest

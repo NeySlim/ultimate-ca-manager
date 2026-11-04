@@ -1,6 +1,7 @@
 """EST simplereenroll claims the renewed row by compare-and-set: of two concurrent
 re-enrollments with the same certificate, only one is issued."""
 import base64
+import uuid
 
 import pytest
 from cryptography.hazmat.primitives import serialization
@@ -19,7 +20,7 @@ def _twin_row(original, cert, twin):
     else:
         pem = cert.public_bytes(serialization.Encoding.PEM).replace(b'\n', b'\r\n')
         columns['crt'] = base64.b64encode(pem).decode()
-    row = Certificate(refid=f'{original.refid}-twin', **columns)
+    row = Certificate(refid=str(uuid.uuid4()), **columns)
     db.session.add(row)
     db.session.commit()
     return row

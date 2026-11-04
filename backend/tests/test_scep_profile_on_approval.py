@@ -4,6 +4,7 @@ auto-approval does, instead of the CA defaults."""
 import base64
 import datetime
 import json
+import uuid
 
 import pytest
 from cryptography import x509
@@ -266,7 +267,7 @@ def test_approving_a_renewal_archives_a_twin_row_too(app, auth_client, create_ca
         else:
             pem = held.public_bytes(serialization.Encoding.PEM).replace(b'\n', b'\r\n')
             columns['crt'] = base64.b64encode(pem).decode()
-        twin_row = Certificate(refid=f'{old.refid}-twin', **columns)
+        twin_row = Certificate(refid=str(uuid.uuid4()), **columns)
         db.session.add(twin_row)
         db.session.commit()
         ids, old_crt = (old.id, twin_row.id), old.crt
