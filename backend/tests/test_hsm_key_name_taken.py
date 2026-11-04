@@ -1,6 +1,10 @@
 """A new HSM key never takes over a name the HSM holds, and a CA that fails takes its new key with it."""
+import fcntl
+import os
 import threading
 import time
+import uuid
+from contextlib import contextmanager, nullcontext
 from pathlib import Path
 from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
@@ -252,6 +256,69 @@ def test_a_key_another_row_names_is_not_deleted(app, hsm_provider):
                 pytest.raises(HsmOperationError):
             HsmService.generate_key(hsm_provider, 'shared', 'EC-P256')
     assert fake.deleted == []
+
+
+def test_a_row_under_the_same_name_keeps_the_key_under_another_id(app, hsm_provider):
+    # Azure: identifiers differ by version, the deletion goes by name
+    from services.hsm import HsmService
+    fake = _Fake()
+    with app.app_context():
+        db.session.add(HsmKey(provider_id=hsm_provider, key_identifier='https://vault/keys/same/v1',
+                              label='same', algorithm='EC-P256', key_type='asymmetric', purpose='signing'))
+        db.session.commit()
+        with patch('services.hsm.HsmService._get_provider_instance', return_value=fake), \
+                patch.object(db.session, 'commit', side_effect=_row_refused(db.session.commit)), \
+                pytest.raises(HsmOperationError):
+            HsmService.generate_key(hsm_provider, 'same', 'EC-P256')
+    assert fake.deleted == []
+
+
+def test_a_generation_still_queued_after_the_wait_answers_409(app, auth_client, hsm_provider):
+    fake = _Fake()
+    holder = os.open(Path(Config.DATA_DIR) / f'.ucm_hsm_generate_{hsm_provider}.lock', os.O_CREAT | os.O_RDWR)
+    fcntl.flock(holder, fcntl.LOCK_EX)
+    try:
+        with patch('services.hsm.HsmService._get_provider_instance', return_value=fake) as provider, \
+                patch('services.hsm.hsm_service.GENERATE_LOCK_TIMEOUT', 0):
+            key = auth_client.post(f'/api/v2/hsm/providers/{hsm_provider}/keys',
+                                   json={'label': 'busy', 'algorithm': 'EC-P256', 'purpose': 'signing'})
+            ca = auth_client.post('/api/v2/cas', json=_ca_body(hsm_provider, 'busy'))
+    finally:
+        os.close(holder)
+    for answer in (key, ca):
+        assert answer.status_code == 409
+        assert 'generating an HSM key was not started' in answer.get_json()['message']
+        assert '.lock' not in answer.get_json()['message']
+    provider.assert_not_called()
+    with app.app_context():
+        assert not HsmKey.query.filter_by(provider_id=hsm_provider).count()
+
+
+@pytest.mark.parametrize('backend', ['sqlite', pytest.param('postgresql', marks=pytest.mark.postgres)])
+def test_a_queued_generation_holds_no_database_connection(app, backend):
+    from services.hsm import HsmService, hsm_service
+    from tests.test_crl_persistent_revocations import _PG_URL, _on_postgresql
+    if backend == 'postgresql' and not _PG_URL:
+        pytest.skip('UCM_TEST_PG_URL not set; skipping the PostgreSQL target')
+    seen = []
+    real_lock = hsm_service.process_lock
+
+    @contextmanager
+    def probing_lock(*args, **kwargs):
+        seen.append(db.session().in_transaction())
+        if backend == 'postgresql':
+            seen.append(db.engine.pool.checkedout())
+        with real_lock(*args, **kwargs):
+            yield
+
+    with (_on_postgresql(app) if backend == 'postgresql' else nullcontext()), app.app_context():
+        provider = HsmProvider(name=f'Fake queued {uuid.uuid4().hex[:8]}', type='openbao', config='{}')
+        db.session.add(provider)
+        db.session.commit()
+        with patch('services.hsm.HsmService._get_provider_instance', return_value=_Fake()), \
+                patch.object(hsm_service, 'process_lock', probing_lock):
+            HsmService.generate_key(provider.id, 'queued', 'EC-P256')
+    assert seen == ([False, 0] if backend == 'postgresql' else [False])
 
 
 def test_a_generation_holds_the_providers_lock_while_it_runs(app, hsm_provider):

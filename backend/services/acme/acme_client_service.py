@@ -16,6 +16,7 @@ from email.utils import parsedate_to_datetime
 from typing import Dict, Any, Optional, Tuple, List, Union, TYPE_CHECKING
 
 import requests
+from sqlalchemy.exc import SQLAlchemyError
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding, utils as asym_utils
 from cryptography.hazmat.backends import default_backend
@@ -1608,21 +1609,29 @@ class AcmeClientService:
                 logger.info(f"Certificate issued for {domains}, ID: {cert_id}, expires_at={order.expires_at}")
                 return True, "Certificate issued and imported successfully", cert_id
             else:
-                return False, "Certificate obtained but import failed", None
-                
+                message = "Certificate obtained but import failed"
+                self._record_finalize_failure(order, message)
+                return False, message, None
+
         except Exception as e:
             logger.error(f"Finalization error: {e}")
-            try:
-                # A failed flush refuses every statement until this
-                db.session.rollback()
-                order.status = 'error'
-                order.error_message = str(e)
-                db.session.commit()
-            except Exception as commit_err:
-                db.session.rollback()
-                logger.error(f"Failed to save order error state: {commit_err}")
-            return False, str(e), None
-    
+            # A database error's text carries the statement and its values
+            message = 'Database error during finalization' if isinstance(e, SQLAlchemyError) else str(e)
+            self._record_finalize_failure(order, message)
+            return False, message, None
+
+    @staticmethod
+    def _record_finalize_failure(order, message: str) -> None:
+        """Keep the failure on the order; a failed flush refuses every statement until rollback."""
+        try:
+            db.session.rollback()
+            order.status = 'error'
+            order.error_message = message
+            db.session.commit()
+        except Exception as commit_err:
+            db.session.rollback()
+            logger.error(f"Failed to save order error state: {commit_err}")
+
     def _import_certificate(
         self, 
         cert_pem: str, 

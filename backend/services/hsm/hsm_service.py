@@ -10,6 +10,7 @@ import json
 import logging
 
 from cryptography.hazmat.primitives import serialization
+from sqlalchemy import or_
 
 import fips_mode
 from config.settings import Config
@@ -23,7 +24,7 @@ from services.hsm.base_provider import (
 )
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
-from utils.process_lock import process_lock
+from utils.process_lock import LockBusyError, process_lock
 from utils import hsm_check, pkcs11_config
 
 logger = logging.getLogger(__name__)
@@ -442,10 +443,12 @@ class HsmService:
         key_type = 'symmetric' if algorithm.startswith('AES') else 'asymmetric'
         
         try:
+            # A request queued behind another must not hold a database connection while it waits
+            db.session.commit()
             # Providers check a name, then create it: one generation at a time per provider,
             # or two requests both find the name free (one instance; Key Vault cannot do better)
             with process_lock(Path(Config.DATA_DIR) / f'.ucm_hsm_generate_{provider_id}.lock',
-                              timeout=GENERATE_LOCK_TIMEOUT, purpose='generate an HSM key',
+                              timeout=GENERATE_LOCK_TIMEOUT, purpose='generating an HSM key',
                               subject='HSM key generation'):
                 hsm = cls._get_provider_instance(provider)
                 with hsm:
@@ -473,31 +476,35 @@ class HsmService:
                     db.session.add(key)
                     db.session.commit()
                 except Exception:
-                    cls._drop_unrecorded_key(provider, key_info.key_identifier)
+                    cls._drop_unrecorded_key(provider, key_info)
                     raise
 
             logger.info(f"Generated HSM key: {label} ({algorithm}) in {provider.name}")
             return key
 
-        except HsmError:
+        except (HsmError, LockBusyError):
             raise
         except Exception as e:
             logger.exception(f"Failed to generate HSM key: {label}")
             raise HsmOperationError(f"Failed to generate key: {str(e)}")
     
     @classmethod
-    def _drop_unrecorded_key(cls, provider, key_identifier) -> None:
-        """A key whose row could not be stored leaves the HSM, unless a row names it:
-        where the identifier is the name, that key is someone else's."""
+    def _drop_unrecorded_key(cls, provider, key_info) -> None:
+        """A key whose row could not be stored leaves the HSM, unless a row holds its name:
+        deleting by name would then take someone else's key (Azure ids differ by version)."""
         try:
             db.session.rollback()
-            if HsmKey.query.filter_by(provider_id=provider.id, key_identifier=key_identifier).first():
+            held = HsmKey.query.filter(
+                HsmKey.provider_id == provider.id,
+                or_(HsmKey.key_identifier == key_info.key_identifier, HsmKey.label == key_info.label),
+            ).first()
+            if held:
                 return
             with cls._get_provider_instance(provider) as hsm:
-                hsm.delete_key(key_identifier)
+                hsm.delete_key(key_info.key_identifier)
         except Exception:
-            logger.warning("HSM key %s has no row and could not be deleted",
-                           key_identifier, exc_info=True)
+            logger.warning("HSM key %s was not recorded and could not be deleted",
+                           key_info.key_identifier, exc_info=True)
 
     @classmethod
     def delete_key(cls, key_id: int) -> bool:

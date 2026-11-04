@@ -15,6 +15,7 @@ from utils.secret_target import MASKS, changed_targets, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
 from services import compliance_signer
 from services.hsm import HsmService
+from utils.process_lock import LockBusyError
 from services.hsm.base_provider import HsmError, HsmKeyExistsError, HsmConnectionError, HsmOperationError, HsmConfigError
 from models import db, CA
 from models.hsm import HsmProvider, HsmKey
@@ -532,7 +533,7 @@ def generate_key(provider_id):
         # Only the service's own checks raise ValueError (provider failures become HsmError)
         logger.warning(f"HSM key generation validation error: {e}")
         return error_response(str(e), 400)
-    except HsmKeyExistsError as e:
+    except (HsmKeyExistsError, LockBusyError) as e:
         return error_response(str(e), 409)
     except HsmError as e:
         logger.error(f"HSM key generation error: {e}")

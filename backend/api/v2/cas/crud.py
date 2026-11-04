@@ -16,6 +16,7 @@ from utils.response import success_response, error_response, created_response, n
 from utils.pagination import paginate
 from utils.dn_validation import validate_dn_field, validate_dn
 from services.hsm.base_provider import HsmKeyExistsError
+from utils.process_lock import LockBusyError
 from utils.protocol_url import get_protocol_base_url
 from utils.decorators import require_json_body
 from utils.validity import coerce_validity_days
@@ -714,7 +715,7 @@ def create_ca():
         # Validation errors (HSM key conflicts, missing fields, etc.) -- surface to user
         logger.info(f"CA creation validation error: {e}")
         return error_response(str(e), 400)
-    except HsmKeyExistsError as e:
+    except (HsmKeyExistsError, LockBusyError) as e:
         return error_response(str(e), 409)
     except Exception as e:
         logger.error(f"Failed to create CA: {e}")
