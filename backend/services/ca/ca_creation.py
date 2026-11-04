@@ -96,11 +96,15 @@ def _planned_certification(hsm_key_id, hsm_provider_id):
 
 def _discard_generated_hsm_key(key_id):
     from services.hsm import HsmService
-    db.session.rollback()
     try:
+        db.session.rollback()
+        # Its CA's commit may have gone through unseen, or another request may have bound it
+        if CA.query.filter_by(hsm_key_id=key_id).first():
+            logger.warning("HSM key %s is held by a CA: kept", key_id)
+            return
         HsmService.delete_key(key_id)
     except Exception:
-        logger.warning("HSM key %s generated for a refused CA could not be deleted",
+        logger.warning("HSM key %s generated for a failed CA could not be deleted",
                        key_id, exc_info=True)
 
 

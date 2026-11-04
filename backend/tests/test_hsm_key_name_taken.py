@@ -1,4 +1,5 @@
 """A new HSM key never takes over a name the HSM holds, and a CA that fails takes its new key with it."""
+from types import SimpleNamespace
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -179,3 +180,38 @@ def test_extractable_must_be_a_boolean(app, auth_client, hsm_provider, value):
     assert r.status_code == 400 and 'extractable' in r.get_json()['message']
     with app.app_context():
         assert not HsmKey.query.filter_by(provider_id=hsm_provider).count()
+
+
+def test_a_key_whose_ca_was_stored_after_all_is_kept(app, auth_client, hsm_provider):
+    # The commit went through and only its answer was lost: the CA holds the key
+    fake = _Fake()
+    fake.sign = lambda key_identifier, data, *a, **k: fake.key.sign(data, ec.ECDSA(hashes.SHA256()))
+    real_commit = db.session.commit
+
+    def commit_then_lose_the_answer():
+        lost = any(isinstance(row, CA) for row in db.session.new)
+        real_commit()
+        if lost:
+            raise RuntimeError('connection lost')
+
+    with patch('services.hsm.HsmService._get_provider_instance', return_value=fake), \
+            patch.object(db.session, 'commit', side_effect=commit_then_lose_the_answer):
+        r = auth_client.post('/api/v2/cas', json=_ca_body(hsm_provider, 'stored-ca'))
+    assert r.status_code == 500, r.data
+    assert fake.deleted == []
+    with app.app_context():
+        ca = CA.query.filter_by(descr='stored-ca').one()
+        try:
+            assert ca.hsm_key_id == HsmKey.query.filter_by(provider_id=hsm_provider).one().id
+        finally:
+            db.session.delete(ca)
+            db.session.commit()
+
+
+def test_a_failed_rollback_does_not_hide_the_original_error(app):
+    from services.ca.ca_creation import _discarding_new_hsm_key
+    with app.app_context():
+        with patch.object(db.session, 'rollback', side_effect=RuntimeError('database gone')), \
+                pytest.raises(ValueError, match='the real reason'):
+            with _discarding_new_hsm_key(1, SimpleNamespace(id=999999)):
+                raise ValueError('the real reason')
