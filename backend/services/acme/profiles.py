@@ -302,7 +302,7 @@ def validate_config(obj):
         if 'validity_days' in spec:
             try:
                 validity = int(spec['validity_days'])
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 return False, f"profile '{name}': validity_days must be an integer"
             if validity < 1 or validity > _MAX_VALIDITY_DAYS:
                 return False, (

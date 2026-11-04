@@ -496,6 +496,10 @@ def generate_key(provider_id):
             400
         )
     
+    # bool("false") is True: text would make the key exportable
+    if not isinstance(extractable, bool):
+        return error_response('extractable must be true or false', 400)
+
     refusal = HsmService.algorithm_refusal(provider.type, algorithm)
     if refusal:
         return error_response(refusal, 400)
@@ -506,7 +510,7 @@ def generate_key(provider_id):
             label=label,
             algorithm=algorithm,
             purpose=purpose,
-            extractable=bool(extractable)
+            extractable=extractable
         )
         
         AuditService.log_action(

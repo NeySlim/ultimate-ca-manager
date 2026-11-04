@@ -206,6 +206,8 @@ def test_acme_profile_validation_survives_a_stored_infinity(app):
         db.session.commit()
         try:
             assert acme_profiles.validate_config({'tls': {'description': 'x'}}) == (True, None)
+            ok, err = acme_profiles.validate_config({'tls': {'validity_days': float('inf')}})
+            assert not ok and 'validity_days' in err
             assert acme_profiles.get_profiles()['bad']['validity_days'] == acme_profiles.DEFAULT_VALIDITY_DAYS
         finally:
             db.session.delete(row)

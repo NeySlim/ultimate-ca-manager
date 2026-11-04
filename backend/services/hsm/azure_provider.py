@@ -34,7 +34,7 @@ try:
     from azure.keyvault.keys import KeyClient, KeyType, KeyCurveName
     from azure.keyvault.keys.crypto import CryptographyClient, SignatureAlgorithm
     from azure.identity import DefaultAzureCredential, ClientSecretCredential
-    from azure.core.exceptions import AzureError, ResourceNotFoundError
+    from azure.core.exceptions import AzureError, ResourceExistsError, ResourceNotFoundError
     AZURE_AVAILABLE = True
     
     # Algorithm mappings (only defined if azure is available)
@@ -318,6 +318,8 @@ class AzureKeyVaultProvider(BaseHsmProvider):
                 metadata={'protection_level': 'HSM'}  # hardware_protected=True above
             )
             
+        except ResourceExistsError:
+            raise HsmKeyExistsError(f"A deleted key still holds this name: {label}; recover or purge it")
         except AzureError as e:
             raise HsmOperationError(f"Failed to generate key: {str(e)}")
     

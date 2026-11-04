@@ -1,6 +1,7 @@
 """
 CA creation and import operations
 """
+from contextlib import contextmanager
 import base64
 import logging
 import uuid
@@ -103,6 +104,19 @@ def _discard_generated_hsm_key(key_id):
                        key_id, exc_info=True)
 
 
+@contextmanager
+def _discarding_new_hsm_key(hsm_provider_id, hsm_key):
+    """A key generated for a CA does not outlive that CA's failed creation; the id is read
+    up front, since a failed flush leaves the row unreadable. Only for a key made here."""
+    key_id = hsm_key.id if hsm_provider_id and hsm_key is not None else None
+    try:
+        yield
+    except Exception:
+        if key_id is not None:
+            _discard_generated_hsm_key(key_id)
+        raise
+
+
 def _refuse_on_violations(violations):
     from services.policy_service import PolicyViolation
     if violations:
@@ -177,7 +191,8 @@ class CACreationMixin:
                 purpose='signing',
             )
 
-        return load_hsm_private_key(hsm_key.id), None, hsm_key
+        with _discarding_new_hsm_key(hsm_provider_id, hsm_key):
+            return load_hsm_private_key(hsm_key.id), None, hsm_key
 
     @staticmethod
     def _encode_private_key(key_pem: Optional[bytes]) -> Optional[str]:
@@ -267,7 +282,7 @@ class CACreationMixin:
         """
         from services.hsm.ca_key_loader import bind_signature_scheme, get_ca_signing_key
         from services.policy_service import (
-            PolicyEvaluationService, PolicyViolation, key_label_for_public_key)
+            PolicyEvaluationService, key_label_for_public_key)
 
         # Issuance policies, checked before a key is generated (an HSM key is
         # created on the device), then again on the real key and signer below
@@ -362,26 +377,21 @@ class CACreationMixin:
         private_key, key_pem, hsm_key = CACreationMixin._resolve_signing_key(
             key_type, hsm_provider_id, hsm_key_id, hsm_key_label, hsm_key_algorithm
         )
-        use_hsm = hsm_key is not None
-        if not caref:
-            private_key = bind_signature_scheme(private_key, signature_scheme)
-        subject = TrustStoreService.build_subject(dn)
-        if caref:
-            parent_ca.serial = (parent_ca.serial or 0) + 1
+        with _discarding_new_hsm_key(hsm_provider_id, hsm_key):
+            use_hsm = hsm_key is not None
+            if not caref:
+                private_key = bind_signature_scheme(private_key, signature_scheme)
+            subject = TrustStoreService.build_subject(dn)
+            if caref:
+                parent_ca.serial = (parent_ca.serial or 0) + 1
 
-        try:
+            # A root's new HSM key may sign with a provider-bound hash
             _refuse_on_violations(PolicyEvaluationService.checked_signing_hash(
                 policies, issuer_private_key or private_key, digest,
                 key_type=key_label_for_public_key(private_key.public_key()),
                 context=rule_context)[1])
-        except PolicyViolation:
-            # A root's new HSM key may sign with a provider-bound hash: drop the key
-            if hsm_provider_id and hsm_key is not None:
-                _discard_generated_hsm_key(hsm_key.id)
-            raise
 
-        # Create CA certificate
-        try:
+            # Create CA certificate
             cert_pem, generated_key_pem = TrustStoreService.create_ca_certificate(
                 subject=subject,
                 private_key=private_key,
@@ -406,74 +416,67 @@ class CACreationMixin:
                 extended_key_usage=extended_key_usage,
                 not_valid_after_max=parent_not_after,
             )
-        except Exception:
-            # The key generated for this CA would stay in the HSM with its row
-            if hsm_provider_id and hsm_key is not None:
-                _discard_generated_hsm_key(hsm_key.id)
-            raise
 
-        # If using local key, use the generated key PEM
-        if not use_hsm and generated_key_pem:
-            key_pem = generated_key_pem
+            # If using local key, use the generated key PEM
+            if not use_hsm and generated_key_pem:
+                key_pem = generated_key_pem
 
-        # Parse certificate for details
-        cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
+            # Parse certificate for details
+            cert = x509.load_pem_x509_certificate(cert_pem, default_backend())
 
-        # Encrypt private key if encryption is enabled (local keys only)
-        prv_encoded = CACreationMixin._encode_private_key(key_pem)
+            # Encrypt private key if encryption is enabled (local keys only)
+            prv_encoded = CACreationMixin._encode_private_key(key_pem)
 
-        # Extract SKI from generated cert
-        ca_ski = None
-        try:
-            ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
-            ca_ski = ext.value.key_identifier.hex(':').upper()
-        except Exception:
-            pass
+            # Extract SKI from generated cert
+            ca_ski = None
+            try:
+                ext = cert.extensions.get_extension_for_oid(ExtensionOID.SUBJECT_KEY_IDENTIFIER)
+                ca_ski = ext.value.key_identifier.hex(':').upper()
+            except Exception:
+                pass
 
-        # Create CA record
-        ca = CA(
-            refid=str(uuid.uuid4()),
-            url_slug=CACreationMixin._unique_url_slug(descr) if named_urls else None,
-            descr=descr,
-            crt=base64.b64encode(cert_pem).decode('utf-8'),
-            prv=prv_encoded,
-            serial=0,
-            serial_number=str(cert.serial_number),
-            caref=caref,
-            subject=cert.subject.rfc4514_string(),
-            issuer=cert.issuer.rfc4514_string(),
-            ski=ca_ski,
-            valid_from=cert.not_valid_before_utc,
-            valid_to=cert.not_valid_after_utc,
-            imported_from='generated',
-            created_by=username,
-            path_length=path_length,
-            policy_constraints_require=policy_constraints_require,
-            policy_constraints_inhibit=policy_constraints_inhibit,
-            inhibit_any_policy=inhibit_any_policy,
-            hsm_key_id=hsm_key.id if hsm_key else None,
-            signature_scheme=signature_scheme,
-            compliance_profile=compliance_profile,
-        )
+            # Create CA record
+            ca = CA(
+                refid=str(uuid.uuid4()),
+                url_slug=CACreationMixin._unique_url_slug(descr) if named_urls else None,
+                descr=descr,
+                crt=base64.b64encode(cert_pem).decode('utf-8'),
+                prv=prv_encoded,
+                serial=0,
+                serial_number=str(cert.serial_number),
+                caref=caref,
+                subject=cert.subject.rfc4514_string(),
+                issuer=cert.issuer.rfc4514_string(),
+                ski=ca_ski,
+                valid_from=cert.not_valid_before_utc,
+                valid_to=cert.not_valid_after_utc,
+                imported_from='generated',
+                created_by=username,
+                path_length=path_length,
+                policy_constraints_require=policy_constraints_require,
+                policy_constraints_inhibit=policy_constraints_inhibit,
+                inhibit_any_policy=inhibit_any_policy,
+                hsm_key_id=hsm_key.id if hsm_key else None,
+                signature_scheme=signature_scheme,
+                compliance_profile=compliance_profile,
+            )
 
-        # Store JSON-serialized constraints
-        if name_constraints_permitted:
-            ca.set_name_constraints_permitted(name_constraints_permitted)
-        if name_constraints_excluded:
-            ca.set_name_constraints_excluded(name_constraints_excluded)
-        if sia_urls:
-            ca.sia_enabled = True
-            ca.set_sia_urls(sia_urls)
+            # Store JSON-serialized constraints
+            if name_constraints_permitted:
+                ca.set_name_constraints_permitted(name_constraints_permitted)
+            if name_constraints_excluded:
+                ca.set_name_constraints_excluded(name_constraints_excluded)
+            if sia_urls:
+                ca.sia_enabled = True
+                ca.set_sia_urls(sia_urls)
 
-        db.session.add(ca)
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to persist CA: {e}")
-            if hsm_provider_id and hsm_key is not None:
-                _discard_generated_hsm_key(hsm_key.id)
-            raise
+            db.session.add(ca)
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Failed to persist CA: {e}")
+                raise
 
         # Auto-enable CDP if protocol base URL is configured
         try:
@@ -633,44 +636,45 @@ class CACreationMixin:
         private_key, key_pem, hsm_key = CACreationMixin._resolve_signing_key(
             key_type, hsm_provider_id, hsm_key_id, hsm_key_label, hsm_key_algorithm
         )
+        with _discarding_new_hsm_key(hsm_provider_id, hsm_key):
 
-        _refuse_on_violations(PolicyEvaluationService.enforce_rules(
-            policies, key_type=key_label_for_public_key(private_key.public_key()),
-            context=rule_context)[0])
+            _refuse_on_violations(PolicyEvaluationService.enforce_rules(
+                policies, key_type=key_label_for_public_key(private_key.public_key()),
+                context=rule_context)[0])
 
-        from services.hsm.ca_key_loader import bind_signature_scheme
-        subject = TrustStoreService.build_subject(dn)
-        csr_pem = TrustStoreService.generate_ca_csr(
-            subject, bind_signature_scheme(private_key, signature_scheme),
-            digest=digest or _key_default_digest(private_key),
-            path_length=path_length, key_usage=key_usage,
-        )
+            from services.hsm.ca_key_loader import bind_signature_scheme
+            subject = TrustStoreService.build_subject(dn)
+            csr_pem = TrustStoreService.generate_ca_csr(
+                subject, bind_signature_scheme(private_key, signature_scheme),
+                digest=digest or _key_default_digest(private_key),
+                path_length=path_length, key_usage=key_usage,
+            )
 
-        ca = CA(
-            refid=str(uuid.uuid4()),
-            url_slug=CACreationMixin._unique_url_slug(descr) if named_urls else None,
-            descr=descr,
-            crt='',  # pending sentinel — awaiting the external certificate
-            csr=base64.b64encode(csr_pem).decode('utf-8'),
-            prv=CACreationMixin._encode_private_key(key_pem),
-            serial=0,
-            caref=None,
-            subject=subject.rfc4514_string(),
-            imported_from='external_csr',
-            created_by=username,
-            path_length=path_length,
-            hsm_key_id=hsm_key.id if hsm_key else None,
-            signature_scheme=signature_scheme,
-            compliance_profile=compliance_profile,
-        )
+            ca = CA(
+                refid=str(uuid.uuid4()),
+                url_slug=CACreationMixin._unique_url_slug(descr) if named_urls else None,
+                descr=descr,
+                crt='',  # pending sentinel — awaiting the external certificate
+                csr=base64.b64encode(csr_pem).decode('utf-8'),
+                prv=CACreationMixin._encode_private_key(key_pem),
+                serial=0,
+                caref=None,
+                subject=subject.rfc4514_string(),
+                imported_from='external_csr',
+                created_by=username,
+                path_length=path_length,
+                hsm_key_id=hsm_key.id if hsm_key else None,
+                signature_scheme=signature_scheme,
+                compliance_profile=compliance_profile,
+            )
 
-        db.session.add(ca)
-        try:
-            db.session.commit()
-        except Exception as e:
-            db.session.rollback()
-            logger.error(f"Failed to persist pending external CA: {e}")
-            raise
+            db.session.add(ca)
+            try:
+                db.session.commit()
+            except Exception as e:
+                db.session.rollback()
+                logger.error(f"Failed to persist pending external CA: {e}")
+                raise
 
         hsm_note = f' (HSM key: {hsm_key.label})' if hsm_key else ''
         AuditService.log_ca(

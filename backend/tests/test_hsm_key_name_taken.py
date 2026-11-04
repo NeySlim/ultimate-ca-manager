@@ -29,6 +29,14 @@ def test_azure_refuses_a_name_it_holds_and_adds_no_version(algorithm):
     provider._key_client.create_ec_key.assert_not_called()
 
 
+def test_azure_names_a_soft_deleted_key():
+    exceptions = pytest.importorskip('azure.core.exceptions')
+    provider = _azure(found=False)
+    provider._key_client.create_ec_key.side_effect = exceptions.ResourceExistsError('soft deleted')
+    with pytest.raises(HsmKeyExistsError, match='deleted'):
+        provider.generate_key('held', 'EC-P256')
+
+
 def test_azure_creates_a_free_name():
     provider = _azure(found=False)
     with patch.object(provider, '_export_public_key', return_value='pem'):
@@ -40,8 +48,9 @@ def test_azure_creates_a_free_name():
 class _Fake:
     """Generates a real key; refuses to sign when told to, as a token without sign rights does."""
 
-    def __init__(self, exists=False):
-        self.exists, self.deleted, self.key = exists, [], ec.generate_private_key(ec.SECP256R1())
+    def __init__(self, exists=False, public_key=True):
+        self.exists, self.public_key, self.deleted = exists, public_key, []
+        self.key = ec.generate_private_key(ec.SECP256R1())
 
     def __enter__(self):
         return self
@@ -55,7 +64,8 @@ class _Fake:
         pem = self.key.public_key().public_bytes(
             serialization.Encoding.PEM, serialization.PublicFormat.SubjectPublicKeyInfo).decode()
         return HsmKeyInfo(key_identifier=label, label=label, algorithm=algorithm,
-                          key_type='asymmetric', purpose=purpose, public_key_pem=pem)
+                          key_type='asymmetric', purpose=purpose,
+                          public_key_pem=pem if self.public_key else None)
 
     def hash_for_key(self, key_identifier, key_algorithm, requested='sha256'):
         return requested
@@ -83,8 +93,8 @@ def hsm_provider(app):
         db.session.commit()
 
 
-def _ca_body(provider_id, label):
-    return {'type': 'root', 'commonName': label, 'organization': 'T', 'country': 'US',
+def _ca_body(provider_id, label, kind='root'):
+    return {'type': kind, 'commonName': label, 'organization': 'T', 'country': 'US',
             'keyAlgo': 'EC', 'curve': 'P-256', 'validityYears': 1, 'hashAlgorithm': 'sha256',
             'hsm_provider_id': provider_id, 'hsm_key_label': label, 'hsm_key_algorithm': 'EC-P256'}
 
@@ -101,17 +111,19 @@ def test_a_taken_name_answers_409_with_the_reason(app, auth_client, hsm_provider
         assert not HsmKey.query.filter_by(provider_id=hsm_provider).count()
 
 
-def test_a_ca_whose_signature_fails_removes_its_new_key(app, auth_client, hsm_provider):
+@pytest.mark.parametrize('kind', ['root', 'external'])
+def test_a_ca_whose_signature_fails_removes_its_new_key(app, auth_client, hsm_provider, kind):
     fake = _Fake()
     with patch('services.hsm.HsmService._get_provider_instance', return_value=fake):
-        r = auth_client.post('/api/v2/cas', json=_ca_body(hsm_provider, 'unsigned-ca'))
+        r = auth_client.post('/api/v2/cas', json=_ca_body(hsm_provider, 'unsigned-ca', kind))
     assert r.status_code == 500, r.data
     assert fake.deleted == ['unsigned-ca']
     with app.app_context():
         assert not HsmKey.query.filter_by(provider_id=hsm_provider).count()
 
 
-def test_a_ca_that_cannot_be_stored_removes_its_new_key(app, auth_client, hsm_provider):
+@pytest.mark.parametrize('kind', ['root', 'external'])
+def test_a_ca_that_cannot_be_stored_removes_its_new_key(app, auth_client, hsm_provider, kind):
     fake = _Fake()
     fake.sign = lambda key_identifier, data, *a, **k: fake.key.sign(data, ec.ECDSA(hashes.SHA256()))
     real_commit = db.session.commit
@@ -123,9 +135,47 @@ def test_a_ca_that_cannot_be_stored_removes_its_new_key(app, auth_client, hsm_pr
 
     with patch('services.hsm.HsmService._get_provider_instance', return_value=fake), \
             patch.object(db.session, 'commit', side_effect=refuse_the_ca):
-        r = auth_client.post('/api/v2/cas', json=_ca_body(hsm_provider, 'unstored-ca'))
+        r = auth_client.post('/api/v2/cas', json=_ca_body(hsm_provider, 'unstored-ca', kind))
     assert r.status_code == 500, r.data
     assert fake.deleted == ['unstored-ca']
     with app.app_context():
         assert not HsmKey.query.filter_by(provider_id=hsm_provider).count()
         assert not CA.query.filter_by(descr='unstored-ca').count()
+
+
+@pytest.mark.parametrize('kind', ['root', 'external'])
+def test_a_new_key_that_cannot_be_loaded_is_removed(app, auth_client, hsm_provider, kind):
+    fake = _Fake(public_key=False)
+    with patch('services.hsm.HsmService._get_provider_instance', return_value=fake):
+        r = auth_client.post('/api/v2/cas', json=_ca_body(hsm_provider, 'unloaded-ca', kind))
+    assert r.status_code >= 400, r.data
+    assert fake.deleted == ['unloaded-ca']
+    with app.app_context():
+        assert not HsmKey.query.filter_by(provider_id=hsm_provider).count()
+
+
+def test_an_existing_key_survives_a_failed_ca(app, auth_client, hsm_provider):
+    fake = _Fake()
+    with patch('services.hsm.HsmService._get_provider_instance', return_value=fake):
+        made = auth_client.post(f'/api/v2/hsm/providers/{hsm_provider}/keys',
+                                json={'label': 'kept', 'algorithm': 'EC-P256', 'purpose': 'signing'})
+        assert made.status_code == 201, made.data
+        body = _ca_body(hsm_provider, 'kept-ca')
+        for field in ('hsm_provider_id', 'hsm_key_label', 'hsm_key_algorithm'):
+            body.pop(field)
+        r = auth_client.post('/api/v2/cas', json={**body, 'hsm_key_id': made.get_json()['data']['id']})
+    assert r.status_code == 500, r.data
+    assert fake.deleted == []
+    with app.app_context():
+        assert HsmKey.query.filter_by(provider_id=hsm_provider).count() == 1
+
+
+@pytest.mark.parametrize('value', ['false', 0, None, []])
+def test_extractable_must_be_a_boolean(app, auth_client, hsm_provider, value):
+    fake = _Fake()
+    with patch('services.hsm.HsmService._get_provider_instance', return_value=fake):
+        r = auth_client.post(f'/api/v2/hsm/providers/{hsm_provider}/keys', json={
+            'label': 'text-switch', 'algorithm': 'EC-P256', 'purpose': 'signing', 'extractable': value})
+    assert r.status_code == 400 and 'extractable' in r.get_json()['message']
+    with app.app_context():
+        assert not HsmKey.query.filter_by(provider_id=hsm_provider).count()

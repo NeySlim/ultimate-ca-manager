@@ -16,7 +16,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Fixed
 
 - HSM: generating a key under a name OpenBao or Azure Key Vault already held adopted that name, whatever the requested algorithm, and deleting it then destroyed the key of a live CA. The API now answers 409; bring an existing key in with a sync.
-- HSM: a CA whose creation failed after its key was generated left that key in the HSM and in the key list. It is now removed.
+- HSM: a CA whose creation failed after its key was generated left that key in the HSM and in the key list. It is now removed, where the provider allows it.
+- HSM: `extractable` sent as text, such as `"false"`, generated an exportable key. The API now answers 400.
 - XCEP: a CA with no template to announce sent empty policy and OID collections, which Windows clients refuse with `WS_E_INVALID_FORMAT`. Both are now nil, and the client sees a policy server with no templates.
 - Templates: a switch sent as text, such as `"autoenroll_enabled": "false"`, was stored as on, and a bad `is_active` failed a whole import. The API now answers 400, and an import skips only that template, with the reason.
 - Restore: text in a boolean column, such as `"is_active": "false"`, turned the setting on. The archive is now refused.
