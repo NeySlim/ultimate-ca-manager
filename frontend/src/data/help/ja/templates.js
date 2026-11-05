@@ -26,6 +26,7 @@ export default {
           { label: 'インポート/エクスポート', text: 'UCMインスタンス間でテンプレートをJSONファイルとして共有。テンプレート1件、または複数件をまとめた1つのファイル' },
           { label: 'qcStatements', text: 'テンプレートから発行されるすべての証明書に付加される、ETSI EN 319 412-5 の任意のステートメントです。QcCompliance、QcType (署名、シール、ウェブサイト)、QcSSCD、QcPDS (HTTPS の URL と2文字の言語コード)、QcRetentionPeriod、QcLimitValue、QcCClegislation (EU 域外の法的枠組みで適格とされる証明書用)、セマンティクス識別子に対応します。EST、WSTEP、mTLS の発行には適用されず、CSR に含まれる qcStatements 拡張は無視されます。QcIdentMethod、QcQSCDlegislation、PSD2 ステートメントには対応していません' },
           { label: 'ポリシー OID', text: '追加の証明書ポリシー OID (例: ETSI の QCP-n、QCP-l、QCP-n-qscd、QCP-l-qscd、QCP-w ポリシー)。CA 自身のポリシーの後に追加されます' },
+          { label: 'カスタム拡張', text: 'UCM がモデル化していない拡張で、それぞれ OID、クリティカルフラグ、DER 値の 16 進表記からなり、テンプレートから発行されるすべての証明書にそのまま追加されます (発行フォーム、CSR 署名、ACME、SCEP、WSTEP、承認。更新でも保持されます)。発行フォームでは追加したり、同じ OID のものを置き換えたりできます。UCM 自身が設定する拡張は拒否されます: それぞれの設定を使ってください。クリティカルな拡張を認識できないクライアントは証明書を拒否します' },
           { label: '鍵タイプ', text: 'RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384、EC-P521。ダイジェストは SHA-256、SHA-384、SHA-512。または ML-DSA-44、ML-DSA-65、ML-DSA-87。ダイジェストは葉の鍵ではなく発行 CA の署名ハッシュです。RSA や EC の CA の下の ML-DSA の葉にも適用され、ML-DSA の CA は無視します' },
           { label: 'Brainpool', text: 'EC-BP256、EC-BP384、EC-BP512 (RFC 5639)。鍵タイプの一覧では Brainpool の下に表示され、FIPS モードでは非表示になります。OpenSSL と Windows はそのチェーンと署名を読み取れますが、Chrome、Firefox、Go、rustls、GnuTLS、Bouncy Castle を使わない Java は TLS で拒否し、Windows Schannel もデフォルトでは有効にしていません。HSM では、PKCS#11 プロバイダーのみがこれらを保持できます' },
         ]

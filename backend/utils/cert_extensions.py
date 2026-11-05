@@ -15,6 +15,16 @@ from utils.foreign_algorithms import describe_public_key
 from utils.key_facts import key_facts
 from utils.signature_label import signature_algorithm_label
 from utils.qc_statements import QC_STATEMENTS_OID, describe_qc_extension
+from utils.custom_extensions import describe_other_extensions
+
+# Extensions the sections of parse_certificate_extensions render
+SHOWN_EXTENSION_OIDS = frozenset({
+    ExtensionOID.BASIC_CONSTRAINTS, ExtensionOID.KEY_USAGE, ExtensionOID.EXTENDED_KEY_USAGE,
+    ExtensionOID.SUBJECT_ALTERNATIVE_NAME, ExtensionOID.SUBJECT_KEY_IDENTIFIER,
+    ExtensionOID.AUTHORITY_KEY_IDENTIFIER, ExtensionOID.CRL_DISTRIBUTION_POINTS,
+    ExtensionOID.AUTHORITY_INFORMATION_ACCESS, ExtensionOID.CERTIFICATE_POLICIES,
+    ExtensionOID.NAME_CONSTRAINTS, ExtensionOID.PRECERT_SIGNED_CERTIFICATE_TIMESTAMPS,
+})
 
 logger = logging.getLogger(__name__)
 
@@ -228,6 +238,12 @@ def parse_certificate_extensions(pem_data):
             }
     except x509.ExtensionNotFound:
         pass
+
+    # Everything else, custom extensions included: OID, criticality and raw value
+    shown = set(SHOWN_EXTENSION_OIDS) | ({QC_STATEMENTS_OID} if 'qc_statements' in extensions else set())
+    other = describe_other_extensions(cert.extensions, shown)
+    if other:
+        extensions['other_extensions'] = other
 
     return extensions
 

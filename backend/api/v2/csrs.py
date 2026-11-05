@@ -315,8 +315,20 @@ def get_csr(csr_id):
             data['csr_pem'] = base64.b64decode(cert.csr).decode('utf-8')
         except Exception:
             data['csr_pem'] = cert.csr
+    data['other_extensions'] = _csr_other_extensions(cert.csr)
     
     return success_response(data=data)
+
+
+def _csr_other_extensions(stored):
+    """The extensions a request asks for that are not names, usages or constraints."""
+    from utils.cert_extensions import SHOWN_EXTENSION_OIDS
+    from utils.custom_extensions import describe_other_extensions
+    try:
+        pem = stored.encode() if stored.startswith('-----BEGIN') else base64.b64decode(stored)
+        return describe_other_extensions(csr_extensions(x509.load_pem_x509_csr(pem)), SHOWN_EXTENSION_OIDS)
+    except (ValueError, TypeError):
+        return []
 
 @bp.route('/api/v2/csrs', methods=['POST'])
 @require_auth(['write:csrs'])

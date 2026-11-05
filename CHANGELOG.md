@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Added
+
+- Certificates: templates and the issue form can add custom X.509 extensions, each an OID, a critical flag and its DER value in hex, and the certificate and CA details list the extensions UCM has no section for, with their raw value (#437, requested by @Faraphel).
+
 ### Fixed
 
 - Docker: the images lacked pyspnego's Kerberos backend, which the DEB and RPM installs can add, so the Kerberos binding of Windows autoenrollment could not work in a container. Both images now ship it, at the pyspnego version the requirements resolve (#435, thanks @JPromi).
@@ -23,6 +27,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - DNS providers, ACME CA accounts and webhooks: the upgrade renames duplicate names to `name (2)`, `name (3)`, oldest first, then makes the name unique (migration 124).
 - ACME client: a renewal now keeps the certificate's id and refid, and `/renew` and the renewal logs no longer announce a new certificate id. Certificates that past renewals imported as new rows stay in the inventory: archive or delete them by hand.
 - ACME client: a backup carries neither the pending key nor the renewal link of an order being renewed, so after a restore that order is not resumed and its next renewal opens a new order at the CA.
+- Templates: the upgrade adds the `custom_extensions` column, empty for every existing template (migration 127).
 
 ## [2.249] - 2026-11-05
 

@@ -763,6 +763,8 @@ are ignored; a `classical` member that is post-quantum, a `pq` member that is no
 key type answers `400`, and so does a policy that requires approval. The response is
 `201` with `data.certificate` (A) and `data.related` (B).
 
+**Custom extensions.** `custom_extensions` takes the list described under [Templates](#templates). They join the template's; an entry with the OID of one of the template's replaces it. An invalid list answers `400` before anything is issued or queued for approval. A renewal keeps the extensions of the certificate it renews, the template's current entries replacing those of the same OID and joining the others; one the template no longer lists stays, since UCM cannot tell it from one the request added.
+
 **Response:**
 ```json
 {
@@ -783,6 +785,8 @@ key type answers `400`, and so does a policy that requires approval. The respons
 ```http
 GET /api/v2/certificates/{cert_id}
 ```
+
+`extensions.other_extensions` lists the extensions without a section of their own, custom ones included: `[{oid, name, critical, value_hex}]`, `name` being null for an OID UCM cannot name. `GET /api/v2/cas/{ca_id}` returns the same under `extensions`, and `GET /api/v2/csrs/{csr_id}` the extensions a request asks for under `other_extensions`.
 
 ### Export Certificate
 ```http
@@ -1155,6 +1159,8 @@ Content-Type: application/json
 }
 ```
 
+`custom_extensions` adds extensions to the template's, as on `POST /api/v2/certificates`; the template's apply to end-entity certificates only. Extensions the CSR itself asks for outside the usual ones are not copied.
+
 A CSR carrying a relatedCertRequest (RFC 9763), here or through ACME, EST or WSTEP, issues a
 certificate linked to the A it names. A must be held here, valid, unrevoked and an end-entity
 certificate issued by a CA of this instance whose chain passes RFC 5280 path checks now (validity,
@@ -1309,6 +1315,20 @@ ML-DSA key under an RSA or EC CA, and an ML-DSA CA ignores it.
 - `certificate_policies`: up to 20 dotted OIDs, added after the CA's CPS policy.
 - `qc_statements`: `compliance` is QcCompliance and `cc_legislation` (ISO 3166 country codes, QcCClegislation) names the non-EU legal framework of a qualified certificate, left out for an EU one; `type` is `esign`, `eseal` or `web`; `pds` entries need an `https` URL and a two-letter language, at most one per language, and an EU qualified certificate (QcCompliance without QcCClegislation) needs one in English; `semantics` is `natural`, `legal`, `eidas-natural` or `eidas-legal` (RFC 3739 semantics identifier). Unknown keys are refused.
 - Certificates issued from the UI, Sign CSR (single and bulk), ACME, SCEP and approvals carry both; renewals keep them. EST, WSTEP and mTLS enrollment do not add them. `GET /api/v2/certificates/{id}` decodes the extension under `extensions.qc_statements`, and `GET /api/v2/certificates/{id}/lint?profile=etsi` runs the ETSI EN 319 412 checks.
+
+**Custom extensions (#437).** `custom_extensions` adds extensions UCM does not model, each given by its OID and the DER bytes of its value:
+
+```json
+"custom_extensions": [
+  {"oid": "1.3.6.1.4.1.99999.1", "critical": false, "value": "0c0568656c6c6f"}
+]
+```
+
+- `value` is the DER encoding of the extension value (the content of `extnValue`) in hex; colons and spaces are ignored. `value_base64` may be given instead. UCM copies the bytes as they are and never parses them. Stored and returned as lowercase hex in `value`.
+- `critical` defaults to `false`. A client that does not recognise a critical extension must reject the certificate (RFC 5280, section 4.2): mark one critical only when every relying party understands it.
+- `400` for an OID that is not dotted (`1.2.840...`), an empty value, a value above 4096 bytes, more than 20 entries, the same OID twice, or an extension UCM sets itself or parses (basic constraints, key usage, extended key usage, names, key identifiers, CRL distribution points, authority and subject information access, certificate policies, name constraints, TLS feature, OCSP no-check, SCT, qcStatements, relatedCertificate, the Microsoft template and SID extensions...): those keep their dedicated settings.
+- `[]` clears the list. Duplicate, export, import and backups carry it.
+- Certificates issued from the template carry the list: issue form, Sign CSR (single and bulk, end-entity certificates only), ACME profiles bound to the template, SCEP profiles, WSTEP (the matched template) and approvals. EST and mTLS enrollment use no template and add none.
 
 ### Get Template
 ```http

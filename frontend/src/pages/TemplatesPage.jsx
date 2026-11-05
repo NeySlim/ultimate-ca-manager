@@ -29,6 +29,8 @@ import {
   buildExtensionsTemplate, qcFormFromStored, emptyQcForm, parsePolicyOids,
   QC_TYPES, QC_SEMANTICS, ETSI_POLICY_PRESETS
 } from '../lib/templateExtensions'
+import { customExtensionsPayload, rowsFromStored, truncateHex } from '../lib/customExtensions'
+import { CustomExtensionsEditor } from '../components/CustomExtensionsEditor'
 const SHOW_SYSTEM_KEY = 'ucm-templates-show-system'
 
 export default function TemplatesPage() {
@@ -554,6 +556,20 @@ export default function TemplatesPage() {
           </div>
         </CompactSection>
       )}
+
+      {selectedTemplate.custom_extensions?.length > 0 && (
+        <CompactSection title={t('customExtensions.title')} icon={ShieldCheck} collapsible defaultOpen={false}>
+          <div className="space-y-1">
+            {selectedTemplate.custom_extensions.map(e => (
+              <div key={e.oid} className="flex flex-wrap items-center gap-2 text-2xs font-mono text-text-secondary">
+                <span>{e.oid}</span>
+                {e.critical && <Badge variant="danger" size="sm">{t('customExtensions.critical')}</Badge>}
+                <span className="break-all" title={e.value}>{truncateHex(e.value)}</span>
+              </div>
+            ))}
+          </div>
+        </CompactSection>
+      )}
     </div>
   )
 
@@ -788,7 +804,8 @@ function buildInitialState(template) {
       allowed_ad_group: '',
       pinned_subject_fields: { O: '', OU: '', C: '', ST: '', L: '' },
       qc: emptyQcForm(),
-      policy_oids: ''
+      policy_oids: '',
+      custom_extensions: []
     }
   }
   const dn = template.dn_template || {}
@@ -819,7 +836,8 @@ function buildInitialState(template) {
       ST: pinned.ST || '', L: pinned.L || ''
     },
     qc: qcFormFromStored(ext.qc_statements),
-    policy_oids: Array.isArray(ext.certificate_policies) ? ext.certificate_policies.join('\n') : ''
+    policy_oids: Array.isArray(ext.certificate_policies) ? ext.certificate_policies.join('\n') : '',
+    custom_extensions: rowsFromStored(template.custom_extensions)
   }
 }
 
@@ -873,9 +891,11 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
     })
   }
 
+  const customExt = customExtensionsPayload(formData.custom_extensions)
+
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!formData.name.trim()) return
+    if (!formData.name.trim() || !customExt.valid) return
     setLoading(true)
     try {
       await onSubmit({
@@ -895,7 +915,8 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
           Object.entries(formData.pinned_subject_fields)
             .map(([k, v]) => [k, v.trim()])
             .filter(([, v]) => v)
-        )
+        ),
+        custom_extensions: customExt.entries
       })
     } finally {
       setLoading(false)
@@ -1178,11 +1199,17 @@ export function TemplateForm({ template, onSubmit, onCancel }) {
         </div>
       </div>
 
+      {/* Custom extensions (#437) */}
+      <div className="border-t border-border pt-4 space-y-2">
+        <h4 className={sectionTitle}>{t('customExtensions.title')}</h4>
+        <CustomExtensionsEditor rows={formData.custom_extensions} onChange={(rows) => set('custom_extensions', rows)} />
+      </div>
+
       <div className="flex justify-end gap-2 pt-4 border-t border-border">
         <Button type="button" variant="secondary" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
-        <Button type="submit" disabled={loading || !formData.name.trim()}>
+        <Button type="submit" disabled={loading || !formData.name.trim() || !customExt.valid}>
           {loading ? <LoadingSpinner size="sm" /> : (template ? t('common.update') : t('common.create'))}
         </Button>
       </div>

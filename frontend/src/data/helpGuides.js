@@ -679,6 +679,17 @@ A template can **pin** the organizational subject fields: **C, ST, L, O, OU**: f
 
 Use this to guarantee a uniform organizational identity (e.g. a fixed \`O\` and \`C\`) across an autoenrolled fleet, regardless of what each Windows client submits.
 
+## Custom Extensions
+
+A template can add extensions UCM has no setting for. Each one is an **OID**, a **Critical** flag and the **value**: the DER encoding of the extension value, in hex. UCM copies the bytes as given and never parses them, so check the encoding with your own tools first.
+
+- Every certificate issued from the template carries them: issue form, Sign CSR, ACME profiles bound to the template, SCEP profiles, WSTEP and approvals. Renewals keep them
+- The issue form can add more for one certificate; an entry with the OID of one of the template's replaces it
+- Extensions UCM sets itself (key usage, EKU, names, key identifiers, CRL and OCSP pointers, policies, name constraints, qcStatements...) are refused: use their own settings
+- A client that does not recognise a **critical** extension must reject the certificate (RFC 5280, section 4.2). Leave it non-critical unless every relying party understands it
+
+The certificate and CA detail panels list such extensions under **Other extensions**, with their OID, name when known, criticality and value.
+
 ## Duplicating Templates
 
 Click **Duplicate** to create a copy of an existing template. Modify the copy without affecting the original.

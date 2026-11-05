@@ -4001,6 +4001,8 @@
       "policies": "Políticas del certificado",
       "nameConstraints": "Restricciones de nombre",
       "sct": "Marcas de tiempo de certificados firmados (SCT)",
+      "otherExtensions": "Otras extensiones",
+      "copyValue": "Copiar el valor",
       "qcStatements": "Declaraciones de certificado cualificado",
       "qc": {
         "compliance": "QcCompliance",
@@ -5863,5 +5865,20 @@
     "notServable": "revocado, caducado o aún no válido",
     "exportHint": "Un certificado cruzado permite a los clientes que confían en otra raíz construir una ruta hasta esta CA.",
     "deployHint": "La cadena escrita en el archivo de cadena completa. Un certificado cruzado revocado, caducado o aún no válido nunca se envía."
+  },
+  "customExtensions": {
+    "title": "Extensiones personalizadas",
+    "hint": "Se añaden al certificado tal cual: un OID y su valor codificado en DER, en hexadecimal. UCM no analiza el valor. Las extensiones que UCM establece por sí mismo (uso de clave, nombres, políticas...) mantienen sus propios ajustes.",
+    "requestHint": "Se suman a las de la plantilla; una entrada con el mismo OID sustituye a la de la plantilla.",
+    "oid": "OID",
+    "value": "Valor (DER, hexadecimal)",
+    "critical": "Crítica",
+    "add": "Añadir extensión",
+    "criticalWarning": "Un cliente que no reconoce una extensión crítica debe rechazar el certificado (RFC 5280, sección 4.2). Márquela como crítica solo si todas las partes que confían en él la entienden.",
+    "invalidOid": "No es un OID en notación con puntos (por ejemplo 1.3.6.1.4.1.99999.1)",
+    "invalidHex": "El valor debe tener un número par de dígitos hexadecimales",
+    "emptyValue": "El valor está vacío",
+    "duplicateOid": "Este OID ya figura en la lista",
+    "fixErrors": "Corrija primero las extensiones personalizadas"
   }
 }
