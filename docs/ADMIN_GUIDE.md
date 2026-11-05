@@ -35,6 +35,7 @@ Native installs (DEB/RPM) read `/etc/ucm/ucm.env`; the Docker image reads the `U
 | `DATABASE_URL` | `DATABASE_URL` | (unset → SQLite) | SQLAlchemy URL. Set to `postgresql://user:pass@host:5432/dbname` to use PostgreSQL. When unset, UCM uses SQLite at `DATA_DIR/ucm.db`. |
 | `UCM_ADMIN_ALLOWED_NETWORKS` | `UCM_ADMIN_ALLOWED_NETWORKS` | (unset) | Comma-separated IP addresses or CIDR networks allowed to reach the web interface and the management API. When set, it wins over the setting in Settings > Security, which becomes read-only. See [Admin access allowlist](#admin-access-allowlist) |
 | `UCM_ADMIN_ALLOWLIST_DISABLE` | `UCM_ADMIN_ALLOWLIST_DISABLE` | (unset) | `1` turns the admin access allowlist off (recovery after a lock-out); a warning is logged at startup |
+| `BACKUP_MAX_UPLOAD_MB` | `BACKUP_MAX_UPLOAD_MB` | `512` | Largest archive the restore upload accepts, in MB. Every other request keeps the 50 MB limit. Creating a larger archive succeeds with a warning |
 
 ### Systemd Service
 
@@ -278,6 +279,8 @@ sudo systemctl start ucm
 2. Click **Restore Backup**
 3. Upload `.ucmbkp` file
 4. Enter encryption password
+
+The upload accepts archives up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default); a reverse proxy in front of UCM applies its own body limit.
 
 ### Backup Contents
 

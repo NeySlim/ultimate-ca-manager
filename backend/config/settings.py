@@ -143,6 +143,8 @@ class Config:
     
     # File Upload Limits (security)
     MAX_CONTENT_LENGTH = 50 * 1024 * 1024  # 50MB max (base64 inflates ~33%)
+    # The restore routes alone accept an archive up to this size, in MiB
+    BACKUP_MAX_UPLOAD_MB = max(1, int(os.getenv("BACKUP_MAX_UPLOAD_MB", "512")))
     
     # Database
     # Supports SQLite (default) or PostgreSQL for high availability

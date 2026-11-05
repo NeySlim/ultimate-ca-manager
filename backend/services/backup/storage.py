@@ -321,6 +321,26 @@ def new_archive_filename() -> str:
             f"_{uuid4().hex[:12]}.ucmbkp")
 
 
+# Room for the multipart envelope around the archive: the password, the mode
+# and the boundaries.
+RESTORE_FORM_MARGIN = 1024 * 1024
+
+
+def restore_upload_limit() -> int:
+    """Bytes of archive a restore route accepts (`BACKUP_MAX_UPLOAD_MB`)."""
+    return int(Config.BACKUP_MAX_UPLOAD_MB) * 1024 * 1024
+
+
+def restore_limit_warning(size: int):
+    """What to tell whoever created an archive no restore route accepts, or None."""
+    limit = restore_upload_limit()
+    if size <= limit:
+        return None
+    return (f"This archive is {size / (1024 * 1024):.1f} MB, more than the "
+            f"{limit // (1024 * 1024)} MB a restore accepts: raise BACKUP_MAX_UPLOAD_MB "
+            "on the server that will restore it.")
+
+
 def create_archive(data: bytes, backup_dir=None) -> tuple:
     """Publish archive bytes under a new name, validated.
 

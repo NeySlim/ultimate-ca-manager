@@ -47,8 +47,8 @@ from services.backup.restore_completion import (
     request_restart as _request_restart_after_restore,
     restore_message,
 )
-# Upload ceiling for a restore, and the bounds of a listing or a bulk request.
-MAX_RESTORE_UPLOAD_BYTES = 100 * 1024 * 1024
+# Bounds of a listing or a bulk request; a restore's upload ceiling is
+# `storage.restore_upload_limit()`.
 LIST_DEFAULT_PER_PAGE = 20
 LIST_MAX_PER_PAGE = 100
 MAX_BULK_DELETE = 1000
@@ -176,15 +176,18 @@ def create_backup():
     )
 
     size = len(backup_bytes)
-    return success_response(
-        data={
-            'filename': filename,
-            'size': _format_size(size),
-            'size_bytes': size,
-            'download_url': f'/api/v2/system/backup/{filename}/download',
-        },
-        message='Backup created successfully',
-    )
+    data = {
+        'filename': filename,
+        'size': _format_size(size),
+        'size_bytes': size,
+        'download_url': f'/api/v2/system/backup/{filename}/download',
+    }
+    message = 'Backup created successfully'
+    warning = storage.restore_limit_warning(size)
+    if warning:
+        data['restore_limit_warning'] = warning
+        message = f'{message}. {warning}'
+    return success_response(data=data, message=message)
 
 
 @bp.route('/api/v2/system/backups', methods=['GET'])
@@ -391,6 +394,9 @@ def restore_backup():
     Only restore archives you produced yourself: a replacing restore puts back
     users, private keys and secrets exactly as the archive holds them.
     """
+    limit = storage.restore_upload_limit()
+    # Before anything reads the body: this route's ceiling, not the global one
+    request.max_content_length = limit + storage.RESTORE_FORM_MARGIN
     if 'file' not in request.files:
         return error_response('No backup file provided', 400)
     file = request.files['file']
@@ -408,7 +414,7 @@ def restore_backup():
     try:
         try:
             backup_bytes, _ = validate_upload(
-                file, BACKUP_EXTENSIONS, max_size=MAX_RESTORE_UPLOAD_BYTES)
+                file, BACKUP_EXTENSIONS, max_size=limit)
         except ValueError as exc:
             logger.warning('Backup upload refused: %s', exc)
             return error_response('Invalid backup file', 400)
