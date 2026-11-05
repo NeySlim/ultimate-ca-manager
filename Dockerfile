@@ -33,6 +33,7 @@ COPY backend/requirements.txt /tmp/requirements.txt
 # Install Python dependencies
 RUN pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir -r /tmp/requirements.txt && \
+    pip install --no-cache-dir "pyspnego[kerberos]==$(pip show pyspnego | sed -n 's/^Version: //p')" && \
     pip install --no-cache-dir --no-deps pyjks==20.0.0
 
 # FIPS variant builder: same requirements, psycopg2-binary swapped for psycopg2,
@@ -64,6 +65,8 @@ RUN --mount=type=cache,target=/root/.cargo/registry \
     pip install --no-cache-dir --upgrade pip setuptools wheel && \
     pip install --no-cache-dir --no-binary cryptography,psycopg2,lxml,xmlsec \
         -r /tmp/requirements-fips.txt && \
+    pip install --no-cache-dir --no-binary gssapi \
+        "pyspnego[kerberos]==$(pip show pyspnego | sed -n 's/^Version: //p')" && \
     pip install --no-cache-dir --no-deps pyjks==20.0.0
 # Fails the build if any of them still carries its own OpenSSL or libxml2
 RUN set -eu; \
@@ -121,6 +124,7 @@ RUN apt-get update && apt-get install -y --no-install-recommends \
     openssh-client \
     softhsm2 \
     libkrb5-3 \
+    libgssapi-krb5-2 \
     postgresql-client \
     $([ "$UCM_FIPS_BUILD" = 1 ] && echo libpq5 libxml2 libxslt1.1 libxmlsec1t64-openssl) \
     && rm -rf /var/lib/apt/lists/*

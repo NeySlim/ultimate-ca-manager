@@ -23,7 +23,7 @@ This guide covers all installation methods for Ultimate Certificate Manager.
 
 ### Optional: Kerberos/SPNEGO support
 
-Windows Autoenrollment's Kerberos binding (silent GPO autoenrollment via MS-XCEP/MS-WSTEP) needs an extra dependency that none of the methods above install by default, since it requires a C compiler and the system's Kerberos headers to build:
+Windows Autoenrollment's Kerberos binding (silent GPO autoenrollment via MS-XCEP/MS-WSTEP) needs an extra dependency. The Docker images ship it; the DEB, RPM and source installs do not install it by default, since it requires a C compiler and the system's Kerberos headers to build:
 
 ```bash
 # Debian/Ubuntu
