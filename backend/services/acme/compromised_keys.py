@@ -7,6 +7,7 @@ from cryptography.hazmat.primitives import serialization
 from sqlalchemy.orm import load_only
 
 from models import Certificate, RevokedSerial
+from models.compromised_key import CompromisedKeyRecord
 from utils.revocation_reasons import normalize_revocation_reason
 from utils.spki_digest import public_key_sha256
 
@@ -37,8 +38,11 @@ def key_revoked_as_compromised(public_key) -> bool:
     """Whether any row holding this key was revoked as compromised: a key reused along
     renewals sits on several certificates, and only one of them may carry the revocation."""
     wanted = public_key.public_bytes(*_SPKI)
-    # The revocation records first: they outlive a deleted certificate
-    records = RevokedSerial.query.filter_by(public_key_sha256=public_key_sha256(public_key)).all()
+    digest = public_key_sha256(public_key)
+    # The compromised keys first, then the revocation records: both outlive a deleted certificate
+    if CompromisedKeyRecord.query.filter_by(public_key_sha256=digest).first() is not None:
+        return True
+    records = RevokedSerial.query.filter_by(public_key_sha256=digest).all()
     if any(normalize_revocation_reason(r.revoke_reason) == 'keyCompromise' for r in records):
         return True
     rows = Certificate.query.options(load_only(Certificate.id, Certificate.crt, Certificate.revoked,

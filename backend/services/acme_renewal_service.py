@@ -13,6 +13,7 @@ from sqlalchemy.exc import SQLAlchemyError
 
 from models import CA, Certificate, DnsProvider, RevokedSerial, SystemConfig, db
 from models.acme_models import AcmeClientOrder
+from models.compromised_key import remember_compromised_key
 from services.acme import dns_providers
 from services.acme.acme_client_service import ACCOUNT_GONE, AcmeClientService
 from services.acme.compromised_keys import refuse_compromised_csr
@@ -152,7 +153,8 @@ def _replaced_snapshot(certificate):
     return SimpleNamespace(id=certificate.id, pem=base64.b64decode(certificate.crt),
                            serial=certificate.serial_number, valid_to=certificate.valid_to,
                            caref=certificate.caref, revoked=bool(certificate.revoked),
-                           revoke_reason=certificate.revoke_reason)
+                           revoke_reason=certificate.revoke_reason, revoked_at=certificate.revoked_at,
+                           refid=certificate.refid, subject=certificate.subject)
 
 
 def _record_replaced_serial(replaced):
@@ -174,6 +176,16 @@ def _record_replaced_serial(replaced):
     commit_or_rollback(logger, f"Revocation record of serial {replaced.serial} not saved")
 
 
+def _remember_replaced_if_compromised(replaced):
+    """A renewal in place overwrites the revoked row: its compromised key is kept first."""
+    if not replaced.revoked or reason_code(replaced.revoke_reason) != 1:
+        return
+    digest = certificate_key_sha256(base64.b64encode(replaced.pem))
+    if remember_compromised_key(digest, 'acme_client', revoked_at=replaced.revoked_at,
+                                cert_refid=replaced.refid, subject=replaced.subject):
+        commit_or_rollback(logger, f"Compromised key of certificate {replaced.id} not saved")
+
+
 def _revoke_replaced_certificate(acme_client, replaced, in_place, order=None):
     """Best-effort local and upstream revocation after successful renewal.
 
@@ -181,6 +193,7 @@ def _revoke_replaced_certificate(acme_client, replaced, in_place, order=None):
     and the CA is sent the old certificate as it was before the renewal. A revocation the CA
     does not confirm is kept on ``order`` and sent again by the next passes.
     """
+    _remember_replaced_if_compromised(replaced)
     try:
         revoke_setting = SystemConfig.query.filter_by(
             key='acme.revoke_on_renewal'

@@ -492,6 +492,8 @@ def _seed_source():
     add('revoked_serials', caref='xinst-ca-b', serial_number='xinst-revoked-serial',
         certificate_id=leaves[1].id, valid_to=now + timedelta(days=30),
         revoked_at=now)
+    add('compromised_keys', public_key_sha256='c0' * 32, revoked_at=now, source='acme_client',
+        cert_refid='xinst-gone-cert', subject='CN=xinst-gone.example.test')
 
     policies = [add('certificate_policies', name=f'xinst-policy-{suffix}')
                 for suffix in 'ab']
@@ -728,7 +730,7 @@ RESTORABLE_SECTIONS = tuple(
     name for name in (
         'users', 'groups', 'custom_roles', 'sso_providers',
         'certificate_templates', 'certificate_authorities', 'certificates',
-        'revoked_serials', 'hsm_providers', 'hsm_keys', 'api_keys',
+        'revoked_serials', 'compromised_keys', 'hsm_providers', 'hsm_keys', 'api_keys',
         'auth_certificates', 'certificate_policies', 'approval_requests',
         'dns_providers', 'acme_accounts', 'acme_eab_credentials',
         'acme_domains', 'acme_local_domains', 'acme_client_accounts',
@@ -1257,7 +1259,7 @@ class TestWhatARestoreUsedToDropWithoutSayingSo:
 
     @pytest.mark.parametrize('section_name',
                              ['msca_requests', 'scan_runs',
-                              'discovered_certificates'])
+                              'discovered_certificates', 'compromised_keys'])
     def test_the_section_is_restored_and_not_merely_announced(
             self, app, restored_on_sqlite, section_name):
         assert len(restored_on_sqlite.archived(section_name)) == 1, \

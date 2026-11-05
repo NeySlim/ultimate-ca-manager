@@ -120,6 +120,11 @@ SECTIONS: Dict[str, Section] = {
         references={'certificate_id': 'certificates'},
         custom=True,
     ),
+    'compromised_keys': Section(
+        model='models.compromised_key:CompromisedKeyRecord',
+        identity=('public_key_sha256',),
+        exclude={**_SURROGATE},
+    ),
     'groups': Section(
         model='models.group:Group',
         identity=('name',),
