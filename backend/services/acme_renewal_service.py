@@ -397,6 +397,8 @@ def renew_certificate(order) -> tuple:
                 commit_or_rollback(logger, "Could not persist HTTP-01 self-check failure")
                 raise RenewalBlocked(new_order.error_message)
             new_order.error_message = None  # left by an earlier blocked attempt
+            # Before the CA is called: a pending write would hold the database's write lock
+            commit_or_rollback(logger, "Could not clear the HTTP-01 self-check failure")
 
         # Submit challenges for validation
         for domain in challenges.keys():

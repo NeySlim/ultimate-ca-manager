@@ -11,6 +11,7 @@ from api.v2.acme_client import orders as orders_module
 from models import Certificate, db
 from models.acme_models import AcmeClientOrder
 from services.acme.acme_client_service import AcmeClientService
+from tests.db_write_probe import watching_writes
 
 
 @pytest.fixture(autouse=True)
@@ -263,25 +264,24 @@ def test_the_automatic_path_loses_to_an_import_during_its_own_failure(app, monke
         assert stored.status == 'issued' and stored.error_message is None
 
 
-def test_no_write_is_pending_during_the_download(app):
+def test_no_write_is_pending_during_any_call_to_the_ca(app):
     # A pending write would hold the database's write lock for the whole network call
-    with app.app_context():
+    with app.app_context(), watching_writes() as pending_writes:
         order = _order()
         svc = _service_that_imports_with(lambda **_kwargs: 4242)
-        pending = []
-
-        def download(*_args):
-            pending.append(list(db.session.dirty))
-            return SimpleNamespace(status_code=500)
-
+        seen = []
         responses = iter([
-            lambda *_args: SimpleNamespace(
-                status_code=200, json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'}),
-            download,
+            SimpleNamespace(status_code=200, json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'}),
+            SimpleNamespace(status_code=500),
         ])
-        svc._post = lambda *args: next(responses)(*args)
+
+        def call_the_ca(*_args):
+            seen.append(pending_writes())
+            return next(responses)
+
+        svc._post = call_the_ca
         svc.finalize_order(order)
-        assert pending == [[]]
+        assert seen == [[], []]
 
 
 def test_a_second_finalize_does_not_undo_the_first_ones_import(app):
