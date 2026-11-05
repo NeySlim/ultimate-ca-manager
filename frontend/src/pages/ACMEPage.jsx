@@ -663,7 +663,6 @@ export default function ACMEPage() {
     window.location.href = `/certificates?id=${order.certificate_id}`
   }
   
-  // Manual renewal
   const handleToggleOrderRenewal = async (order, enabled) => {
     try {
       await acmeService.updateOrder(order.id, { renewal_enabled: enabled })
@@ -674,6 +673,7 @@ export default function ACMEPage() {
     }
   }
 
+  // Manual renewal
   const handleRenewCertificate = async (order) => {
     try {
       await acmeService.renewOrder(order.id)

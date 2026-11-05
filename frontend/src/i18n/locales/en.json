@@ -5675,6 +5675,7 @@
     "skipped": "Skipped: {{reason}}",
     "skipReasons": {
       "disabled": "automatic backups are off",
+      "acme_renewal_off": "ACME auto-renewal is off",
       "not_due": "not due yet",
       "unknown": "no reason given"
     },

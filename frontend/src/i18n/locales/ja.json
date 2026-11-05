@@ -5675,6 +5675,7 @@
     "skipped": "スキップ: {{reason}}",
     "skipReasons": {
       "disabled": "自動バックアップが無効です",
+      "acme_renewal_off": "ACME 自動更新はオフです",
       "not_due": "まだ実行時期ではありません",
       "unknown": "理由は記録されていません"
     },

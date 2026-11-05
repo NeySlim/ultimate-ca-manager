@@ -5672,6 +5672,7 @@
     "skipped": "Ignorata: {{reason}}",
     "skipReasons": {
       "disabled": "i backup automatici sono disattivati",
+      "acme_renewal_off": "il rinnovo automatico ACME è disattivato",
       "not_due": "non ancora prevista",
       "unknown": "nessun motivo indicato"
     },

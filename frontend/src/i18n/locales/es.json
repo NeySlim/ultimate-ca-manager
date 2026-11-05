@@ -5672,6 +5672,7 @@
     "skipped": "Omitida: {{reason}}",
     "skipReasons": {
       "disabled": "las copias de seguridad automáticas están desactivadas",
+      "acme_renewal_off": "la renovación automática ACME está desactivada",
       "not_due": "aún no corresponde",
       "unknown": "sin motivo indicado"
     },

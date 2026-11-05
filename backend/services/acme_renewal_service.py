@@ -270,7 +270,7 @@ def scheduled_acme_renewal():
     switch = SystemConfig.query.filter_by(key='acme.client.renewal_enabled').first()
     if switch is not None and str(switch.value).lower() != 'true':
         logger.info("ACME auto-renewal is turned off")
-        return {'status': 'skipped', 'reason': 'ACME auto-renewal is turned off'}
+        return {'status': 'skipped', 'reason': 'acme_renewal_off'}
 
     try:
         renewal_days = _configured_renewal_days()

@@ -5672,6 +5672,7 @@
     "skipped": "Übersprungen: {{reason}}",
     "skipReasons": {
       "disabled": "automatische Sicherungen sind deaktiviert",
+      "acme_renewal_off": "die automatische ACME-Erneuerung ist ausgeschaltet",
       "not_due": "noch nicht fällig",
       "unknown": "kein Grund angegeben"
     },

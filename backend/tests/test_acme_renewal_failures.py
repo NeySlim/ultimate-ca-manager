@@ -382,7 +382,7 @@ def test_a_pass_with_renewal_turned_off_is_skipped(make, renewal_switch):
     renewal_switch.value = 'false'
     db.session.commit()
     outcome = renew_mod.scheduled_acme_renewal()
-    assert outcome['status'] == 'skipped' and 'turned off' in outcome['reason']
+    assert outcome == {'status': 'skipped', 'reason': 'acme_renewal_off'}
 
 
 def test_a_pass_that_breaks_is_failed(make):
