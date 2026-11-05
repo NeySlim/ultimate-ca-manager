@@ -172,7 +172,19 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'scep_requests': 'history, carried only when asked for',
     'discovery_scan_runs': 'history, carried only when asked for',
     'discovered_certificates': 'history, carried only when asked for',
+    'key_recovery_requests': 'history, carried only when asked for',
+    'revoked_serials': 'a revocation outlives its certificate; the serial stays revoked',
 }
+
+# Integer links the schema holds without a foreign key, handled as if it had one:
+# SQLite hands a removed row's id to the next row inserted.
+SOFT_LINKS = (
+    ('revoked_serials', 'certificate_id', 'certificates', 'id'),
+    ('key_recovery_requests', 'cert_id', 'certificates', 'id'),
+)
+
+# A request still open on a removed certificate is closed, never repointed.
+CLOSED_WITH_TARGET = {('key_recovery_requests', 'cert_id')}
 
 # Links whose row goes with the row it names although the column allows none:
 # an approval of a certificate that is gone, as deleting the certificate does.
@@ -189,11 +201,16 @@ def _foreign_keys_into(table_name: str) -> List[Tuple[Any, Any, Any]]:
         from services.database_admin.helpers import _force_register_all_models
         _force_register_all_models()
         index: Dict[str, List[Tuple[Any, Any, Any]]] = {}
-        for table in db.metadata.tables.values():
+        tables = db.metadata.tables
+        for table in tables.values():
             for column in table.columns:
                 for foreign_key in column.foreign_keys:
                     index.setdefault(foreign_key.column.table.name, []).append(
                         (table, column, foreign_key.column))
+        for name, column, target, key in SOFT_LINKS:
+            if name in tables and target in tables:
+                index.setdefault(target, []).append(
+                    (tables[name], tables[name].c[column], tables[target].c[key]))
         _FOREIGN_KEYS_INTO = index
     return _FOREIGN_KEYS_INTO.get(table_name, [])
 
@@ -231,10 +248,12 @@ class Replacement:
     removed: Dict[str, int] = field(default_factory=dict)
     cleared: Dict[str, int] = field(default_factory=dict)
     unlinked: Dict[str, int] = field(default_factory=dict)
+    closed: Dict[str, int] = field(default_factory=dict)
 
     def report(self) -> Dict[str, Any]:
         return {'removed': dict(self.removed), 'cleared_dependents': dict(self.cleared),
-                'unlinked_dependents': dict(self.unlinked)}
+                'unlinked_dependents': dict(self.unlinked),
+                'closed_dependents': dict(self.closed)}
 
 
 def plan_replacement(backup_data: Dict[str, Any], plan: RestorePlan, sections: Set[str], *,
@@ -299,8 +318,8 @@ def remove_after_writes(replacement: Replacement) -> Replacement:
                 holder = next(key for key, value in _select([primary, named], named, [row[1]]))
                 raise RestoreConflictError(
                     f"Refusing to restore: {describe_row(dependent_section, row[0])} "
-                    f"still points at {describe_row(name, holder)}, which the archive "
-                    "does not carry. Nothing has been changed.")
+                    f"still points at {describe_row(name, holder)}, which the restore "
+                    "removes. Nothing has been changed.")
         _delete(replacement, name, waiting)
     db.session.expire_all()
     return replacement
@@ -315,8 +334,9 @@ def _defer_what_kept_rows_need(replacement: Replacement) -> None:
         for dependent, column, named in _foreign_keys_into(table.name):
             dependent_section = _SECTION_OF_TABLE.get(dependent.name)
             if (dependent_section not in replacement.pruned or column.nullable
-                    or _primary(dependent) is None):
-                continue
+                    or _primary(dependent) is None
+                    or (dependent.name, column.name) in CLOSED_WITH_TARGET):
+                continue    # a carried recovery request keeps its status from the archive
             by_value = defaultdict(set)
             for key, value in _select([primary, named], primary, ids):
                 by_value[value].add(key)
@@ -389,6 +409,9 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
                 f"Refusing to restore: the archive removes {describe_row(owner, holder)}, "
                 f"which {len(pointing)} row(s) of '{dependent.name}' still point at, and "
                 "this archive does not carry that table. Nothing has been changed.")
+        if (dependent.name, column.name) in CLOSED_WITH_TARGET:
+            _close_requests(replacement, dependent, column, values)
+            continue
         if column.nullable and (dependent.name, column.name) not in REMOVED_WITH_TARGET:
             for chunk in _chunks(values):
                 result = db.session.execute(update(dependent).where(column.in_(chunk))
@@ -404,6 +427,20 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
         for chunk in _chunks(values):
             result = db.session.execute(delete(dependent).where(column.in_(chunk)))
             _count(replacement.cleared, dependent.name, result.rowcount)
+
+
+def _close_requests(replacement: Replacement, table, column, values) -> None:
+    """Open key recovery requests on a removed certificate are cancelled, with a note."""
+    from models.key_recovery import STATUS_APPROVED, STATUS_CANCELLED, STATUS_PENDING
+    from utils.datetime_utils import utc_now
+
+    for chunk in _chunks(values):
+        result = db.session.execute(
+            update(table).where(column.in_(chunk),
+                                table.c.status.in_([STATUS_PENDING, STATUS_APPROVED]))
+            .values(status=STATUS_CANCELLED, decided_by='restore', decided_at=utc_now(),
+                    decision_note='Cancelled by a restore that removed the certificate'))
+        _count(replacement.closed, table.name, result.rowcount)
 
 
 def _delete(replacement: Replacement, name: str, ids: Set[Any]) -> None:

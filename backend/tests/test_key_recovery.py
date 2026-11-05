@@ -116,6 +116,38 @@ class TestRecover:
         assert again.status_code == 409  # already recovered
 
 
+class TestANumberNowHeldByAnotherCertificate:
+    """A request names its certificate by number and by refid: both must agree."""
+
+    @staticmethod
+    def _repoint(app, rid, cert_id):
+        with app.app_context():
+            db.session.get(KeyRecoveryRequest, rid).cert_id = cert_id
+            db.session.commit()
+
+    def test_approval_is_refused(self, app, auth_client, archived_cert, create_cert):
+        _set_dual_control(app, False)
+        rid = _open_request(auth_client, archived_cert)
+        self._repoint(app, rid, create_cert(cn='escrow-other.example.com')['id'])
+        r = auth_client.post(f'/api/v2/key-recovery/{rid}/approve',
+                             data=json.dumps({}), content_type='application/json')
+        assert r.status_code == 410, r.data
+        with app.app_context():
+            assert db.session.get(KeyRecoveryRequest, rid).status == 'pending'
+
+    def test_recovery_is_refused(self, app, auth_client, archived_cert, create_cert):
+        _set_dual_control(app, False)
+        rid = _open_request(auth_client, archived_cert)
+        auth_client.post(f'/api/v2/key-recovery/{rid}/approve',
+                         data=json.dumps({}), content_type='application/json')
+        self._repoint(app, rid, create_cert(cn='escrow-other.example.com')['id'])
+        r = auth_client.post(f'/api/v2/key-recovery/{rid}/recover',
+                             data=json.dumps({'password': 'recover-pw-123'}),
+                             content_type='application/json')
+        assert r.status_code == 410, r.data
+        assert r.headers['Content-Type'] != 'application/x-pkcs12'
+
+
 class TestReject:
     def test_reject(self, app, auth_client, archived_cert):
         rid = _open_request(auth_client, archived_cert)

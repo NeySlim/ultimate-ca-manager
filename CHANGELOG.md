@@ -9,6 +9,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Security
+
+- Key recovery: a request named its certificate by number, and SQLite gives a deleted certificate's number to the next one created, so an approved request could export another certificate's private key, after a replacing restore in particular. Approval and recovery now answer 410 unless the number still names the certificate the request was opened on, and a replacing restore cancels the open requests on the certificates it removes.
+
 ### Fixed
 
 - Restore: two DNS providers, ACME CA accounts or webhooks of the same name were merged into one row, and one credential was lost. A clashing row is now restored as `name (2)`, and the restore result lists it; an account is matched by its account URL and a webhook by its URL first.
@@ -23,7 +27,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Upgrade notes
 
 - DNS providers, ACME CA accounts and webhooks: the upgrade renames duplicate names to `name (2)`, `name (3)`, oldest first, then makes the name unique (migration 124).
-- Restore: a replacing restore now removes the CRLs, cached OCSP responses and sessions that point at a removed row, and detaches ACME client orders from the certificates, DNS providers and accounts it removes.
+- Restore: a replacing restore now removes the CRLs, cached OCSP responses, sessions, in-flight ACME server orders, approval requests and Microsoft CA requests that point at a removed row, detaches ACME client orders, discovery results and revocation records from it, and cancels the key recovery requests still open on a removed certificate. The restore message lists them.
 - Restore: `BACKUP_MAX_UPLOAD_MB` (default 512) is the restore upload's own ceiling; a reverse proxy in front of UCM keeps its own body limit.
 
 ## [2.249] - 2026-11-05

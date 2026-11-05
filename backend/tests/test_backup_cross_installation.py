@@ -469,6 +469,7 @@ def _seed_source():
         keys[refid], issued[refid] = key, certificate
     leaves[1].template_id = templates[1].id
     leaves[1].owner_group_id = groups[1].id
+    leaves[0].related_certificate_id = leaves[1].id     # a hybrid pair
     db.session.flush()
 
     # -- the rows that point at them ---------------------------------------

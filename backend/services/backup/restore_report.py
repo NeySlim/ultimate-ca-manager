@@ -97,6 +97,16 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
         message += _clause(f'{len(renamed)} {rows} {were} restored under another '
                            f'name: {listing}')
 
+    cleared = (results or {}).get('cleared_dependents') or {}
+    if cleared:
+        message += _clause('Rows that depended on a removed row were deleted: '
+                           + _listing([f'{name} ({count})' for name, count in sorted(cleared.items())]))
+
+    closed = (results or {}).get('closed_dependents') or {}
+    if closed:
+        message += _clause('Open requests on a removed row were cancelled: '
+                           + _listing([f'{name} ({count})' for name, count in sorted(closed.items())]))
+
     unlinked = (results or {}).get('unlinked_dependents') or {}
     if unlinked:
         message += _clause('Rows the archive does not carry lost their link to a removed row: '

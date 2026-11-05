@@ -17,7 +17,9 @@ from sqlalchemy import exists, select
 from models import db
 from services.backup.errors import BackupSchemaError
 from services.backup.manifest import SECTIONS
-from services.backup.restore.replace import DEPENDENT_TABLES, _foreign_keys_into
+from services.backup.restore.replace import (
+    CLOSED_WITH_TARGET, DEPENDENT_TABLES, _foreign_keys_into,
+)
 from services.backup.export_generic import load_model
 from tests.test_backup_cross_installation import (
     PASSWORD, Keys, _authority, _installation, _leaf, _only, _service,
@@ -103,9 +105,12 @@ def _snapshot(*sections):
 
 
 def _orphans():
-    """Every row whose foreign key names a row that does not exist."""
+    """Every row whose foreign key names a row that does not exist.
+
+    A closed recovery request keeps its certificate's number for the audit trail.
+    """
     found = []
-    seen = set()
+    seen = set(CLOSED_WITH_TARGET)
     for referred in list(db.metadata.tables):
         for dependent, column, named in _foreign_keys_into(referred):
             if (dependent.name, column.name) in seen:
@@ -175,6 +180,11 @@ def test_what_points_at_a_removed_row_is_cleared_or_unlinked_never_orphaned(targ
     assert {'crl_metadata', 'ocsp_responses', 'user_sessions', 'pro_sso_sessions',
             'approval_requests'} <= set(results['cleared_dependents'])
     assert _orphans() == []
+
+    from services.backup.restore_report import with_restore_warnings
+    message = with_restore_warnings('Restored', results)
+    assert 'were deleted: ' in message and 'approval_requests (1)' in message
+    assert 'acme_client_orders.certificate_id (1)' in message
 
 
 def test_a_kept_row_that_names_a_removed_one_is_pointed_elsewhere_first(target):
@@ -354,3 +364,111 @@ def test_a_row_still_needed_after_the_writes_is_refused_not_orphaned(target):
     assert 'api_keys key_hash=replace-hash' in str(refused.value)
     assert 'users username=replace-still-needed' in str(refused.value)
     assert db.session.get(type(user), user.id) is not None
+
+
+# -- integer links without a foreign key --------------------------------------
+
+def test_a_reused_certificate_number_reaches_no_request(target):
+    """SQLite hands a removed certificate's number to the next one inserted."""
+    from api.v2.key_recovery import _requested_certificate
+    from models import Certificate
+    from models.key_recovery import KeyRecoveryRequest
+
+    _user('replace-admin')
+    issuer = _authority_row('replace-kr-ca')
+    first = _certificate_row('replace-kr-a', issuer)
+    second = _certificate_row('replace-kr-b', issuer)
+    blob = _snapshot()
+
+    number = second.id
+    db.session.delete(second)
+    db.session.flush()
+    other = _certificate_row('replace-kr-x', issuer)
+    db.session.add(KeyRecoveryRequest(cert_id=other.id, cert_refid=other.refid,
+                                      reason='offboarding', status='approved',
+                                      requested_by='replace-admin', requested_at=utc_now()))
+    db.session.commit()
+    if target == 'sqlite':
+        assert other.id == number
+
+    results = _restore(blob)
+
+    request = KeyRecoveryRequest.query.one()
+    if target == 'sqlite':
+        assert db.session.get(Certificate, request.cert_id).refid == 'replace-kr-b'
+    assert request.status == 'cancelled'
+    assert results['closed_dependents'] == {'key_recovery_requests': 1}
+    from services.backup.restore_report import with_restore_warnings
+    assert 'were cancelled: key_recovery_requests (1)' in with_restore_warnings('Restored', results)
+    assert _requested_certificate(request) is None
+    assert _orphans() == []
+
+
+def test_a_request_on_a_certificate_gone_before_the_export_does_not_hold_the_restore(target):
+    """Its number now names a row the restore removes: the request keeps its archived state."""
+    from models.key_recovery import KeyRecoveryRequest
+
+    _user('replace-admin')
+    issuer = _authority_row('replace-gone-ca')
+    gone = _certificate_row('replace-gone-early', issuer)
+    db.session.add(KeyRecoveryRequest(cert_id=gone.id, cert_refid=gone.refid,
+                                      reason='offboarding', status='rejected',
+                                      requested_by='replace-admin', requested_at=utc_now()))
+    db.session.flush()
+    number = gone.id
+    db.session.delete(gone)
+    blob = _snapshot('users', 'certificate_authorities', 'certificates', 'key_recovery_requests')
+
+    other = _certificate_row('replace-gone-x', issuer)
+    db.session.commit()
+    if target == 'sqlite':
+        assert other.id == number
+
+    _restore(blob)
+
+    from models import Certificate
+    assert Certificate.query.filter_by(refid='replace-gone-x').first() is None
+    assert KeyRecoveryRequest.query.one().status == 'rejected'
+
+
+def test_a_hybrid_partner_is_found_by_refid_not_by_number(target):
+    from models import Certificate
+
+    _user('replace-admin')
+    issuer = _authority_row('replace-pair-ca')
+    classical = _certificate_row('replace-pair-a', issuer)
+    pq = _certificate_row('replace-pair-b', issuer)
+    classical.related_certificate_id, pq.related_certificate_id = pq.id, classical.id
+    blob = _snapshot()
+
+    db.session.delete(pq)
+    db.session.flush()
+    _certificate_row('replace-pair-x', issuer)
+    db.session.commit()
+
+    _restore(blob, mode='merge')
+
+    restored = Certificate.query.filter_by(refid='replace-pair-a').one()
+    partner = db.session.get(Certificate, restored.related_certificate_id)
+    assert partner.refid == 'replace-pair-b'
+    assert db.session.get(Certificate, partner.related_certificate_id).refid == 'replace-pair-a'
+
+
+def test_a_revocation_record_outlives_its_removed_certificate(target):
+    from models.revoked_serial import RevokedSerial
+
+    _user('replace-admin')
+    issuer = _authority_row('replace-rs-ca')
+    blob = _snapshot('users', 'certificate_authorities', 'certificates')
+
+    gone = _certificate_row('replace-rs-gone', issuer)
+    db.session.add(RevokedSerial(caref=issuer[0].refid, serial_number=gone.serial_number,
+                                 valid_to=gone.valid_to, certificate_id=gone.id))
+    db.session.commit()
+
+    results = _restore(blob)
+
+    record = RevokedSerial.query.one()
+    assert record.certificate_id is None
+    assert results['unlinked_dependents'] == {'revoked_serials.certificate_id': 1}
+
