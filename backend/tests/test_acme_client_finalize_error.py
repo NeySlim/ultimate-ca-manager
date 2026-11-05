@@ -259,7 +259,30 @@ def test_the_automatic_path_loses_to_an_import_during_its_own_failure(app, monke
             check_order_status=lambda _order: ('ready', {}),
             finalize_order=finalize_fails_after_the_import)
         orders_module._auto_poll_and_finalize(client, order)
-        assert _stored(order_id).status == 'issued'
+        stored = _stored(order_id)
+        assert stored.status == 'issued' and stored.error_message is None
+
+
+def test_a_second_finalize_does_not_undo_the_first_ones_import(app):
+    # Finalize clicked during the background one: the CA answers valid, the download then fails
+    with app.app_context():
+        order = _order()
+        order_id = order.id
+
+        def imported_meanwhile(*_args):
+            db.session.execute(text(f"UPDATE {AcmeClientOrder.__tablename__} SET status = 'issued' "
+                                    f"WHERE id = {order_id}"))
+            db.session.commit()
+            return SimpleNamespace(status_code=200,
+                                   json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'})
+
+        svc = _service_that_imports_with(lambda **_kwargs: 4242)
+        responses = iter([imported_meanwhile, lambda *_args: SimpleNamespace(status_code=500)])
+        svc._post = lambda *args: next(responses)(*args)
+        ok, _msg, _cert_id = svc.finalize_order(order)
+        assert not ok
+        stored = _stored(order_id)
+        assert stored.status == 'issued' and stored.error_message is None
 
 
 def test_a_later_success_clears_the_old_error(app):
@@ -272,3 +295,4 @@ def test_a_later_success_clears_the_old_error(app):
         assert ok and cert_id == 4242
         stored = _stored(order_id)
         assert stored.status == 'issued' and stored.error_message is None
+        assert stored.certificate_url == 'https://ca.example/cert'

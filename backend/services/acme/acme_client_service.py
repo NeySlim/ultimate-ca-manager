@@ -1453,13 +1453,15 @@ class AcmeClientService:
             listener.stop()
 
     @staticmethod
-    def write_order_status(order, status: str) -> None:
+    def write_order_status(order, status: str) -> bool:
         """Write a status, unless the order is issued: that means imported here, which the CA
         cannot know and the scheduler needs. Tested in the write, as a background finalize may
-        import at any moment. The caller commits, and sees the outcome after that."""
-        AcmeClientOrder.query.filter(
+        import at any moment. The caller commits, and sees the outcome after that.
+
+        Returns False when an import won: the caller's failure is then no longer the order's."""
+        return AcmeClientOrder.query.filter(
             AcmeClientOrder.id == order.id, AcmeClientOrder.status != 'issued',
-        ).update({'status': status}, synchronize_session=False)
+        ).update({'status': status}, synchronize_session=False) > 0
 
     def check_order_status(self, order: AcmeClientOrder) -> Tuple[str, Dict]:
         """
@@ -1558,7 +1560,7 @@ class AcmeClientService:
             
             # Poll for certificate
             order_data = resp.json()
-            order.status = order_data.get('status', 'processing')
+            self.write_order_status(order, order_data.get('status', 'processing'))
             db.session.commit()
             
             # Wait for certificate (poll up to 30 seconds)
@@ -1575,6 +1577,7 @@ class AcmeClientService:
             
             # Download certificate
             cert_url = order_data['certificate']
+            order.certificate_url = cert_url
             cert_resp = self._post(cert_url, "")
             
             if cert_resp.status_code != 200:
@@ -1643,6 +1646,8 @@ class AcmeClientService:
         """
         try:
             db.session.rollback()
+            if order.status == 'issued':
+                return
             if order.status not in ('valid', 'invalid'):
                 AcmeClientService.write_order_status(order, 'error')
             order.error_message = message

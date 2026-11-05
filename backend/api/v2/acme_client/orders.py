@@ -668,8 +668,8 @@ def _auto_poll_and_finalize(client, order) -> dict:
     def _set_status(status, error_message=None):
         """Persist a status transition on the order (best-effort)."""
         try:
-            AcmeClientService.write_order_status(order, status)
-            if error_message is not None:
+            written = AcmeClientService.write_order_status(order, status)
+            if written and error_message is not None:
                 order.error_message = error_message
             db.session.commit()
         except Exception as e:
