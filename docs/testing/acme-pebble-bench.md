@@ -62,7 +62,7 @@ export UCM_IMAGE=ucm-pebble-ucm:bench BENCH_WORKDIR=/tmp/ucm-pebble-bench/work
 free -h                                       # the stack needs about 1.5 GiB
 bash bench/acme-pebble-bench.sh build ctx     # about 2 min from a cold cache
 bash bench/acme-pebble-bench.sh up            # about 15 s
-python3 bench/acme_pebble_bench.py --report report.json   # about 8 min, exit 0 when all pass
+python3 bench/acme_pebble_bench.py --report report.json   # about 20 min, exit 0 when all pass
 bash bench/acme-pebble-bench.sh down
 docker rmi "$UCM_IMAGE" && rm -rf /tmp/ucm-pebble-bench
 ```
@@ -93,17 +93,19 @@ replaces the initial password with this one).
 | s1 | Issuance through `POST /acme/client/request` (auto-poll) | order `issued`, one certificate, serial known to Pebble, stored key matches |
 | s3 | `Retry-After` on finalize | next order poll after Retry-After (main), at the poll timeout (slow), both issued |
 | s7 | First name longer than 64 characters | order issued; the CSR UCM builds has an empty subject and a critical SAN |
-| s2 | Scheduled renewal (`acme_auto_renewal`) of a due order | Pebble ARI override makes s1 due; one new certificate, one order, nothing on a second run |
+| s2 | Scheduled renewal (`acme_auto_renewal`) of a due order | Pebble ARI override makes s1 due; the same certificate row gets a new serial Pebble knows and the stored key matches, one order, nothing on a second run |
 | s6 | ARI (reported with s2) | Pebble answers 200 to UCM's CertID; the renewal's `replaces` is accepted |
+| s8 | Deployment binding on a renewed certificate | a `DeployBinding` on the certificate: after the renewal the row keeps its id, the binding still names it and `deploy_deliveries` holds a `certificate.renewed` delivery for it |
 | s4a | Invalid order on issuance | wrong TXT: order `invalid` with Pebble's detail, no certificate, no other order |
 | s4b | Invalid order on renewal | a due order whose DNS-01 now fails, renewed twice: failure counted, no order left behind |
-| s5 | Crash between `finalize` and download | UCM killed during the Retry-After sleep after the finalize POST; on restart, `finalize` answers *not ready (status: valid)* and the certificate Pebble issued is never imported |
-| s5b | Same crash during a scheduled renewal | the scheduler's first pass after the restart renews again: Pebble refuses `replaces` (`alreadyReplaced`), UCM retries without it |
+| s5 | Crash between `finalize` and download | UCM killed during the Retry-After sleep after the finalize POST; on restart the order holds its pending key and a manual finalize answers 409 (the dead process's lease) |
+| s5b | Same crash during a scheduled renewal | on restart the renewal's order holds the key, the scheduler's first pass skips the leased order, the certificate row is unchanged |
+| s5r | Resume of s5 | once the lease runs out, a status check imports the certificate Pebble issued before the kill, with its key; Pebble issued nothing else |
+| s5br | Resume of s5b | once the lease runs out, the next renewal imports that certificate into the same row without a new order (no `alreadyReplaced`) |
 
-`s5` and `s5b` document a known defect (key held only in memory until import): they report
-`REPRODUCED` while the defect is present. `s5b` also reports whether the `replaces` fallback worked.
-Scenarios run in the order `s1 s3 s7 s2 s4 s5 s5b`: `s3` and `s2` reuse the order made by `s1`,
-`s4` deletes its due order so that `s5b` finds a single due order.
+Scenarios run in the order `s1 s3 s7 s2 s8 s4 s5 s5b s5r s5br`: `s3` and `s2` reuse the order made by `s1`,
+`s4` deletes its due order so that `s5b` finds a single due order. A lease left by a killed process
+lasts 10 minutes, so `s5r` and `s5br` wait for it: the whole run takes about 20 minutes.
 
 Pebble's management API is used for evidence only: `/cert-status-by-serial/<hex>` and
 `/set-renewal-info/` (an ARI window in the past, so a renewal is due without waiting).
