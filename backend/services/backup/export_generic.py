@@ -11,7 +11,7 @@ import importlib
 import logging
 from datetime import date, datetime
 from decimal import Decimal
-from typing import Any, Dict, List
+from typing import Any, Dict, List, Optional
 
 from sqlalchemy import inspect as sa_inspect
 
@@ -24,6 +24,9 @@ logger = logging.getLogger(__name__)
 # Suffix carrying the stable identity of a referenced row, next to the
 # numeric foreign key the source happened to use.
 REFERENCE_SUFFIX = '_ref'
+
+
+_TRANSIENT_KEY = ('AcmeClientOrder', '_pending_key')
 
 
 def _key_material_columns():
@@ -81,7 +84,8 @@ class IdentityIndex:
         return index
 
 
-def export_section(section_name: str, index: IdentityIndex) -> List[Dict[str, Any]]:
+def export_section(section_name: str, index: IdentityIndex,
+                   warnings: Optional[List[str]] = None) -> List[Dict[str, Any]]:
     """Read one section: every column, the secrets in the clear, the
     references carried by identity as well as by number."""
     section = SECTIONS[section_name]
@@ -118,13 +122,18 @@ def export_section(section_name: str, index: IdentityIndex) -> List[Dict[str, An
                     "model does not hold")
             stored = getattr(row, stored_attr)
             if (model.__name__, stored_attr) in _key_material_columns():
-                # Base64 key material under the master key, carried as the PEM. Transient (an
-                # order's pending key): one this key cannot open is left out, not the whole backup
+                # Base64 key material under the master key, carried as the PEM
                 try:
                     data[secret] = as_pem(decrypt_stored_key(stored, label=label), label=label) if stored else None
                 except BackupExportError as exc:
-                    logger.warning("Backup: %s (id %s) leaves its %s out: %s",
-                                   section_name, getattr(row, 'id', '?'), secret, exc)
+                    if (model.__name__, stored_attr) != _TRANSIENT_KEY:
+                        raise
+                    # A finalization's key: one this key cannot open is left out, not the backup
+                    message = (f"ACME order {getattr(row, 'id', '?')}: its pending key could not "
+                               "be read and is not in the archive")
+                    logger.warning("Backup: %s (%s)", message, exc)
+                    if warnings is not None:
+                        warnings.append(message)
                     data[secret] = None
                 continue
             decrypt = decrypt_stored_fields if section.stored.get(secret) == 'fields' else decrypt_stored_secret

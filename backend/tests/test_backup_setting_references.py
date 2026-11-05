@@ -276,3 +276,19 @@ def test_an_older_archive_of_this_database_takes_no_number_another_row_holds(tar
     assert CA.query.filter_by(refid='settings-ca-a').one().id != number or target != 'sqlite'
     assert _setting('scep_ca_id') == ''
     assert any('scep_ca_id was emptied' in w for w in results['warnings'])
+
+
+def test_a_setting_the_archive_writes_again_is_not_announced_as_emptied(target):
+    _user('settings-admin')
+    archived, _key, _cert = _authority_row('settings-archived')
+    _setting('scep_ca_id', str(archived.id))
+    blob = _snapshot()
+    later = _authority_row('settings-later')[0]
+    _setting('scep_ca_id', str(later.id))
+    db.session.commit()
+
+    results = _restore(blob)
+
+    from models import CA
+    assert _setting('scep_ca_id') == str(CA.query.filter_by(refid='settings-archived').one().id)
+    assert not any(w.startswith('setting scep_ca_id') for w in results['warnings'])

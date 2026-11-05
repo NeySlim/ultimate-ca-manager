@@ -471,4 +471,84 @@ def test_an_unreadable_pending_key_does_not_stop_the_backup(target, caplog):
     data = _payload(_snapshot())
 
     assert data['acme_client_orders'][0]['pending_key'] is None
-    assert f'acme_client_orders (id {order.id}) leaves its pending_key out' in caplog.text
+    assert f'ACME order {order.id}: its pending key could not be read' in caplog.text
+
+
+def test_an_archive_further_along_than_a_finalization_here_wins_a_merge(target):
+    """Issued in the archive, processing here with a key: the archive is ahead."""
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    _user('orders-admin')
+    order = _order(order_url='https://ca.example.test/order/i', status='issued')
+    blob = _snapshot()
+    order.status = 'processing'
+    order.pending_key = ec.generate_private_key(ec.SECP256R1()).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption()).decode()
+    db.session.commit()
+
+    results = _restore(blob, mode='merge')
+
+    assert _orders()[0].status == 'issued'
+    assert not any('finaliz' in w for w in results['warnings'])
+
+
+def test_an_archived_finalization_comes_back_over_a_pending_order(target):
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    pem = ec.generate_private_key(ec.SECP256R1()).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption()).decode()
+    _user('orders-admin')
+    order = _order(order_url='https://ca.example.test/order/p', status='processing')
+    order.pending_key = pem
+    blob = _snapshot()
+    order.status, order.pending_key = 'pending', None
+    db.session.commit()
+
+    _restore(blob, mode='merge')
+
+    assert (_orders()[0].status, _orders()[0].pending_key) == ('processing', pem)
+
+
+@pytest.mark.parametrize('mode', ['merge', 'replace'])
+def test_a_finalization_without_a_key_says_nothing_of_a_key(target, mode):
+    """`key_source=csr`: the order finalizes with no key held here."""
+    _user('orders-admin')
+    order = _order(order_url='https://ca.example.test/order/csr', status='pending', key_source='csr')
+    blob = _snapshot()
+    order.status = 'processing'
+    db.session.commit()
+
+    results = _restore(blob, mode=mode)
+
+    warning = next(w for w in results['warnings'] if 'finaliz' in w)
+    assert 'key' not in warning
+
+
+def test_a_replacement_names_the_revocations_it_drops(target):
+    blob, archived_serial, _renewed = _renewal_scene()
+    mother = _orders()[0]
+    mother.upstream_revocations_list = mother.upstream_revocations_list + [
+        {'serial': 'deadbeef01', 'attempts': 2}]
+    db.session.commit()
+
+    results = _restore(blob)
+
+    warning = next(w for w in results['warnings'] if 'renewed here' in w)
+    assert 'deadbeef01' in warning and archived_serial not in warning.split('serial')[-1]
+
+
+def test_an_unreadable_pending_key_reaches_the_backup_result(target):
+    from services.backup_service import BackupService
+
+    _user('orders-admin')
+    order = _order(order_url='https://ca.example.test/order/w', status='processing')
+    order._pending_key = 'bm90IGEga2V5'
+    db.session.commit()
+    service = BackupService()
+    service.create_backup(PASSWORD)
+
+    assert any(f'order {order.id}' in w for w in service.last_export_warnings)

@@ -151,7 +151,7 @@ def _number_here(plan, by_key, carried, key, part, section_name, named, form):
     return row.id, None
 
 
-def prune_doomed_settings(replacement, plan) -> int:
+def prune_doomed_settings(replacement, plan, rewritten=frozenset()) -> int:
     """Settings naming a row a replacing restore removes: dropped when the number is in
     their key, emptied when it is their value. Run before the removal, while the rows exist."""
     from models import SystemConfig
@@ -181,14 +181,16 @@ def prune_doomed_settings(replacement, plan) -> int:
         reference, match = found
         if reference.key and names_doomed(reference.key, match.group(1), 'id'):
             db.session.delete(row)
-            plan.warnings.append(f"setting {row.key} was removed with the {reference.key} "
-                                 "row it belongs to")
+            if row.key not in rewritten:    # the archive's own value follows
+                plan.warnings.append(f"setting {row.key} was removed with the {reference.key} "
+                                     "row it belongs to")
             touched += 1
             continue
         form = _value_names_a_row(reference.value, row.value) if reference.value else None
         if form and names_doomed(reference.value, row.value, form):
-            plan.warnings.append(f"setting {row.key} was emptied: the {reference.value} row it "
-                                 "named is removed by the restore")
+            if row.key not in rewritten:
+                plan.warnings.append(f"setting {row.key} was emptied: the {reference.value} row "
+                                     "it named is removed by the restore")
             row.value = ''
             touched += 1
     if touched:

@@ -138,6 +138,9 @@ def create_backup():
     message = 'Backup created successfully' + (' - SAVE THE PASSWORD!' if generated_password else '')
     if warning:
         message += (' ' if message.endswith('!') else '. ') + warning
+    if service.last_export_warnings:
+        response_data['export_warnings'] = list(service.last_export_warnings)
+        message += (' ' if message.endswith('!') else '. ') + '; '.join(service.last_export_warnings)
     return success_response(data=response_data, message=message)
 
 

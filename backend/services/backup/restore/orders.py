@@ -1,13 +1,14 @@
 """ACME client orders this installation moved on with after the archive was taken.
 
 Merge: the order here wins when it is further along, renewed since (with its
-certificate, its owed revocations and the archived renewal children) or
-finalizing with a key held. Replacement: the archive wins, and says what it gives up.
+certificate, its owed revocations and the archived renewal children) or finalizing
+where the archive is still before that. Replacement: the archive wins, and says what it gives up.
 """
 from datetime import datetime
 from typing import Any, Dict, List, Optional
 
 from models import db
+from utils.datetime_utils import to_naive_utc
 
 from ..export_generic import REFERENCE_SUFFIX
 from ..manifest import SECTIONS
@@ -23,7 +24,7 @@ def _instant(value) -> Optional[datetime]:
         parsed = datetime.fromisoformat(str(value).replace('Z', '+00:00'))
     except ValueError:
         return None
-    return parsed.replace(tzinfo=None) if parsed.tzinfo else parsed
+    return to_naive_utc(parsed)
 
 
 def _utc(moment: datetime) -> str:
@@ -51,7 +52,17 @@ def _finalizing_here(order, row) -> bool:
     if not (order._pending_key or order.status in _FINALIZING):
         return False
     status = row.get('status')
-    return status not in _FINALIZING + ('issued',) or (bool(order._pending_key) and not row.get('pending_key'))
+    return status not in _FINALIZING + ('issued',) or (
+        status in _FINALIZING and bool(order._pending_key) and not row.get('pending_key'))
+
+
+def _archived_serial(backup_data, row) -> Optional[str]:
+    """Serial of the certificate the archive restores for this order."""
+    refid = (row.get(f'certificate_id{REFERENCE_SUFFIX}') or {}).get('refid')
+    for certificate in backup_data.get('certificates') or []:
+        if isinstance(certificate, dict) and refid and certificate.get('refid') == refid:
+            return certificate.get('serial_number')
+    return None
 
 
 def keep_newer_orders(backup_data: Dict[str, Any], mode: str) -> List[str]:
@@ -86,22 +97,30 @@ def keep_newer_orders(backup_data: Dict[str, Any], mode: str) -> List[str]:
                 with db.session.no_autoflush:
                     issued = db.session.get(Certificate, order.certificate_id) if order.certificate_id else None
                 serial = getattr(issued, 'serial_number', None) or 'unknown'
-                warnings.append(
+                warning = (
                     f"ACME order {names} was renewed here on {when}, after the archive was taken: "
                     f"the archived order and certificate replace it. The certificate issued here "
                     f"(serial {serial}) is still valid at the CA and no longer known to UCM, and the "
                     "restored one may have been revoked at the CA on renewal: renew the order")
+                restored = _archived_serial(backup_data, row)
+                owed = [entry.get('serial') for entry in order.upstream_revocations_list
+                        if entry.get('serial') and entry.get('serial') != restored]
+                if owed:
+                    warning += f". Revocations owed at the CA are dropped: {', '.join(owed)}"
+                warnings.append(warning)
         elif _finalizing_here(order, row):
+            held = bool(order._pending_key)
             if mode == 'merge':
                 dropped.add(index)
                 warnings.append(
-                    f"ACME order {names} is being finalized here ({order.status}): "
-                    "kept as it is, with the key it holds")
+                    f"ACME order {names} is being finalized here ({order.status}): kept as it is"
+                    + (", with the key it holds" if held else ""))
             else:
                 warnings.append(
                     f"ACME order {names} was being finalized here ({order.status}): the archived "
-                    "order replaces it and the key held for it is dropped; the CA may have issued "
-                    "a certificate UCM cannot import, place the order again")
+                    "order replaces it"
+                    + (" and the key held for it is dropped; the CA may have issued a certificate "
+                       "UCM cannot import, place the order again" if held else ""))
     if mode == 'merge' and dropped:
         # A renewal child of an order renewed here: that renewal is over
         for index, row in enumerate(rows):

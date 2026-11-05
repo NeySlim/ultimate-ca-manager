@@ -345,7 +345,9 @@ class RestoreCoreMixin:
                 if mode == 'replace':
                     # Removed before the writes, so what they free is free
                     replacement = plan_replacement(backup_data, plan, pruned, displaced=displaced)
-                    prune_doomed_settings(replacement, plan)
+                    prune_doomed_settings(replacement, plan, deferred_keys(
+                        backup_data.get('configuration') if isinstance(
+                            backup_data.get('configuration'), dict) else {}))
                     replacement = remove_before_writes(replacement)
                     plan.refresh()
 

@@ -495,6 +495,8 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
                                                 service.last_payload_containers)
         if warning:
             logger.warning("Scheduled backup %s: %s", filename, warning)
+        for left_out in service.last_export_warnings:
+            logger.warning("Scheduled backup %s: %s", filename, left_out)
         _audit_scheduled_backup(filename, f'Scheduled backup: {filename}',
                                 success=True)
 
