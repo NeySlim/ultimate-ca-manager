@@ -251,26 +251,34 @@ def purge_ca_dependents(ca) -> str:
     return ''
 
 
-def acme_account_deletion_blockers(acct) -> Iterator[DeletionBlocker]:
-    """Why this ACME CA account may not be deleted: issued orders it renews."""
+def acme_account_deletion_blockers(acct, deactivate=False) -> Iterator[DeletionBlocker]:
+    """Why this ACME CA account may not be deleted, or deactivated: issued orders it renews.
+
+    Deactivation acts at the CA on ``account_url``, so it also counts the orders that
+    renew through another row holding the same account."""
     from sqlalchemy import false, or_
+    from models.acme_client_account import AcmeClientAccount
     from models.acme_models import AcmeClientOrder
     from services.acme.acme_client_service import AcmeClientService
 
+    same_account = {acct.id}
+    if deactivate and acct.account_url:
+        same_account |= {row.id for row in AcmeClientAccount.query.filter_by(account_url=acct.account_url)}
     names = AcmeClientOrder.account_url == acct.account_url if acct.account_url else false()
     candidates = AcmeClientOrder.query.filter(
         AcmeClientOrder.status == 'issued',
         AcmeClientOrder.renewal_enabled == True,  # noqa: E712
-        or_(AcmeClientOrder.acme_client_account_id == acct.id, names),
+        or_(AcmeClientOrder.acme_client_account_id.in_(same_account), names),
     ).order_by(AcmeClientOrder.id).all()
     # The account each order renews under, resolved as the renewal resolves it
     domains = [o.primary_domain or f'order {o.id}' for o in candidates
-               if getattr(AcmeClientService.order_account(o), 'id', None) == acct.id]
+               if getattr(AcmeClientService.order_account(o), 'id', None) in same_account]
     if domains:
+        verb = 'deactivate' if deactivate else 'delete'
         shown = ', '.join(domains[:5]) + (f' and {len(domains) - 5} more' if len(domains) > 5 else '')
         yield DeletionBlocker(
             409,
-            f'Cannot delete the ACME account: {len(domains)} issued order(s) renew through it '
-            f'({shown}). Turn off their renewal or delete them first.',
+            f'Cannot {verb} the ACME account: {len(domains)} issued order(s) renew through it '
+            f'({shown}). Turn off their automatic renewal in the order list, or delete them, first.',
             f'{len(domains)} issued order(s) renew through it',
         )

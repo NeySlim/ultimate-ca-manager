@@ -436,7 +436,7 @@ def deactivate_ca_account(account_id):
             'Account is not registered with the CA: use Delete to remove it locally', 400
         )
     # Before the CA is told: deactivation cannot be undone
-    blocker = first_blocker(acme_account_deletion_blockers(acct))
+    blocker = first_blocker(acme_account_deletion_blockers(acct, deactivate=True))
     if blocker:
         return error_response(blocker.message, blocker.status)
 

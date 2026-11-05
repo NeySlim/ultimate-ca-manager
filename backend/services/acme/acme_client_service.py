@@ -63,6 +63,10 @@ ACCOUNT_KEY_TYPES = {
     'ES384': {'alg': 'ES384', 'generate': lambda: key_algorithms.generate('EC-P384')},
 }
 
+ACCOUNT_GONE = ('The ACME CA account this order was issued under no longer exists, and another '
+                'account could be at another CA. Request a new certificate for these names '
+                'with the account to use, then delete this order.')
+
 CERT_KEY_TYPES = {
     'RSA-2048': lambda: key_algorithms.generate('RSA-2048'),
     'RSA-4096': lambda: key_algorithms.generate('RSA-4096'),
@@ -370,8 +374,18 @@ class AcmeClientService:
             if acct:
                 return acct
         if order.account_url:
-            return AcmeClientAccount.query.filter_by(account_url=order.account_url).first()
+            return (AcmeClientAccount.query.filter_by(account_url=order.account_url)
+                    .order_by(AcmeClientAccount.id).first())
         return None
+
+    @classmethod
+    def for_existing_order(cls, order: 'AcmeClientOrder') -> Optional['AcmeClientService']:
+        """:meth:`for_order`, or None when the order names a CA account that no longer exists:
+        another account, maybe at another CA, would answer in its place."""
+        named = order.acme_client_account_id or order.account_url
+        if named and cls.order_account(order) is None:
+            return None
+        return cls.for_order(order)
 
     def _sync_legacy_eab_to_account(self) -> bool:
         """Copy legacy EAB keys (``acme.client.eab_*``) onto the account row.
@@ -1964,10 +1978,9 @@ class AcmeClientService:
     # Cleanup
     # =========================================================================
     
-    def cleanup_dns_challenge(self, order: AcmeClientOrder) -> Tuple[bool, str]:
-        """
-        Clean up DNS records after certificate issuance.
-        """
+    @staticmethod
+    def cleanup_dns_challenge(order: AcmeClientOrder) -> Tuple[bool, str]:
+        """Clean up DNS records after certificate issuance; needs no CA account."""
         if order.challenge_type != 'dns-01' or not order.dns_provider_id:
             return True, "No cleanup needed"
         

@@ -94,6 +94,33 @@ describe('LetsEncryptOrdersTab', () => {
     expect(screen.queryByText('acme.renewalFailures')).not.toBeInTheDocument()
   })
 
+  it('turns an order\'s automatic renewal off', () => {
+    const onToggleRenewal = vi.fn()
+    const order = { id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production', renewal_enabled: true }
+    renderTab({ clientOrders: [order], selectedClientOrder: order, onToggleRenewal, canWrite: true })
+    const toggle = screen.getByRole('switch')
+    expect(toggle).toHaveAttribute('aria-checked', 'true')
+    fireEvent.click(toggle)
+    expect(onToggleRenewal).toHaveBeenCalledWith(order, false)
+    expect(noop).not.toHaveBeenCalled()  // the card stays selected
+  })
+
+  it('keeps the switch read-only without write permission', () => {
+    const order = { id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production', renewal_enabled: false }
+    renderTab({ clientOrders: [order], selectedClientOrder: order, onToggleRenewal: vi.fn() })
+    expect(screen.getByRole('switch')).toBeDisabled()
+    expect(screen.getByRole('switch')).toHaveAttribute('aria-checked', 'false')
+  })
+
+  it.each([
+    [{ opened_by_renewal: true }],
+    [{ is_proxy_order: true }],
+  ])('offers no switch on %j', (fields) => {
+    const order = { id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production', ...fields }
+    renderTab({ clientOrders: [order], selectedClientOrder: order, onToggleRenewal: vi.fn(), canWrite: true })
+    expect(screen.queryByRole('switch')).not.toBeInTheDocument()
+  })
+
   it('refreshes from the dedicated view', () => {
     const onRefresh = vi.fn()
     renderTab({ onRefresh })

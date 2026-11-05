@@ -1579,6 +1579,8 @@
     "renewalFailures": "Renewal failures: {{count}}",
     "renewalLastFailure": "Last failure: {{date}}",
     "renewalRetryDaily": "Renewal keeps failing: now attempted once a day",
+    "orderAutoRenew": "Automatic renewal",
+    "orderRenewalUpdated": "Automatic renewal updated",
     "dnsPropagationTimeout": "DNS propagation timeout (s)",
     "dnsPropagationTimeoutHelper": "Seconds to poll the DNS-01 TXT record before CA validation (auto DNS). 0 = skip propagation wait (auto and manual Verify submit to the CA without polling). Positive values: the background auto-poll waits up to this limit; manual Verify polls at most 30s, then reports not-ready so you can retry. Proceeds once every authoritative nameserver serves the record (or the configured resolver confirms it); the 9.9.9.9 / 8.8.8.8 / 1.1.1.1 lines are informational only.",
     "dnsPropagationDelay": "DNS propagation delay (s)",

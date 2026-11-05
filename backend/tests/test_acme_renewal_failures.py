@@ -28,6 +28,8 @@ def make(app):
                       challenge_type='dns-01', status='issued', renewal_enabled=True, key_type='EC-P256')
         values.update(fields)
         row = AcmeClientOrder(**values)
+        if row.challenges_data is None:
+            row.set_challenges_dict({'x.example.com': {'token': 'secret-token', 'dns_txt_value': 'txt'}})
         db.session.add(row)
         db.session.commit()
         made['orders'].append(row.id)
@@ -111,6 +113,7 @@ def test_each_failure_is_counted_and_announced(make):
     assert payload['order']['id'] == order.id
     assert payload['renewal_failures'] == 5 and payload['error'] == 'CA unreachable'
     assert payload['retry_daily'] is True
+    assert 'challenges' not in payload['order']  # tokens and TXT values stay out of webhooks
 
 
 def test_the_event_says_when_the_rhythm_is_unchanged(make):
@@ -252,3 +255,150 @@ def test_deactivation_is_refused_before_the_ca_is_told(make, auth_client):
                              data='{}', content_type='application/json')
     assert r.status_code == 409 and 'renew through it' in r.get_json()['message']
     deactivate.assert_not_called()
+
+
+def test_deactivation_counts_a_twin_row_of_the_same_account(make, auth_client):
+    # The CA knows one account: deactivating it through a twin row kills the other's renewals
+    other = make.account()
+    twin = make.account(account_url=other.account_url)
+    make.order(acme_client_account_id=other.id, account_url=other.account_url)
+    with patch('services.acme.acme_client_service.AcmeClientService.deactivate_account') as deactivate:
+        r = auth_client.post(f'/api/v2/acme/client/accounts/{twin.id}/deactivate',
+                             data='{}', content_type='application/json')
+    assert r.status_code == 409 and r.get_json()['message'].startswith('Cannot deactivate')
+    deactivate.assert_not_called()
+
+
+def test_the_refusal_names_the_action_and_the_way_out(make, auth_client):
+    account = make.account()
+    make.order(acme_client_account_id=account.id)
+    message = auth_client.delete(f'/api/v2/acme/client/accounts/{account.id}').get_json()['message']
+    assert message.startswith('Cannot delete') and 'Turn off their automatic renewal' in message
+
+
+# --- per-order renewal switch -------------------------------------------------
+
+def _patch(client, order_id, body):
+    return client.patch(f'/api/v2/acme/client/orders/{order_id}', data=json.dumps(body),
+                        content_type='application/json')
+
+
+def test_turning_renewal_off_frees_the_account(make, auth_client):
+    account = make.account()
+    order = make.order(acme_client_account_id=account.id)
+    r = _patch(auth_client, order.id, {'renewal_enabled': False})
+    assert r.status_code == 200 and r.get_json()['data']['renewal_enabled'] is False
+    db.session.expire_all()
+    assert db.session.get(AcmeClientOrder, order.id).renewal_enabled is False
+    assert auth_client.delete(f'/api/v2/acme/client/accounts/{account.id}').status_code == 200
+    assert _patch(auth_client, order.id, {'renewal_enabled': True}).status_code == 200
+    db.session.expire_all()
+    assert db.session.get(AcmeClientOrder, order.id).renewal_enabled is True
+
+
+@pytest.mark.parametrize('body', [{'renewal_enabled': 'false'}, {'renewal_enabled': 0}, {},
+                                  {'renewal_enabled': False, 'status': 'pending'}, ['renewal_enabled']])
+def test_the_switch_takes_a_strict_boolean_only(make, auth_client, body):
+    order = make.order()
+    assert _patch(auth_client, order.id, body).status_code == 400
+    db.session.expire_all()
+    assert db.session.get(AcmeClientOrder, order.id).renewal_enabled is True
+
+
+def test_the_switch_is_refused_on_an_order_a_renewal_opened(make, auth_client):
+    parent = make.order()
+    child = make.order(status='ready', renewal_enabled=False, renewal_of_order_id=parent.id)
+    r = _patch(auth_client, child.id, {'renewal_enabled': True})
+    assert r.status_code == 409 and str(parent.id) in r.get_json()['message']
+    db.session.expire_all()
+    assert db.session.get(AcmeClientOrder, child.id).renewal_enabled is False
+
+
+def test_the_switch_is_refused_on_a_proxy_order(make, auth_client):
+    order = make.order(is_proxy_order=True)
+    assert _patch(auth_client, order.id, {'renewal_enabled': False}).status_code == 409
+
+
+# --- orders whose account is gone, outside renewal --------------------------
+
+def test_deleting_an_order_whose_account_is_gone_creates_no_account(make, auth_client):
+    from models import DnsProvider
+    provider = DnsProvider(name=f'gone-{uuid.uuid4().hex[:8]}', provider_type='manual', credentials='{}')
+    db.session.add(provider)
+    db.session.commit()
+    try:
+        order = make.order(account_url='https://ca.example/acct/deleted', dns_provider_id=provider.id)
+        accounts = AcmeClientAccount.query.count()
+        assert auth_client.delete(f'/api/v2/acme/client/orders/{order.id}').status_code == 200
+        assert AcmeClientAccount.query.count() == accounts
+    finally:
+        db.session.delete(db.session.get(DnsProvider, provider.id))
+        db.session.commit()
+
+
+@pytest.mark.parametrize('method, suffix', [('get', 'status'), ('post', 'finalize'), ('post', 'verify')])
+def test_acting_on_an_order_whose_account_is_gone_says_so(make, auth_client, method, suffix):
+    order = make.order(status='pending', account_url='https://ca.example/acct/deleted')
+    accounts = AcmeClientAccount.query.count()
+    kwargs = {} if method == 'get' else {'data': '{}', 'content_type': 'application/json'}
+    r = getattr(auth_client, method)(f'/api/v2/acme/client/orders/{order.id}/{suffix}', **kwargs)
+    assert r.status_code == 409 and 'no longer exists' in r.get_json()['message']
+    assert AcmeClientAccount.query.count() == accounts
+
+
+def test_auto_poll_of_an_order_whose_account_is_gone_stops_with_the_reason(make, app):
+    from api.v2.acme_client.orders import _run_auto_poll_background
+    order = make.order(status='processing', account_url='https://ca.example/acct/deleted')
+    accounts = AcmeClientAccount.query.count()
+    with app.test_request_context():
+        _run_auto_poll_background(order.id, 'production')
+    db.session.expire_all()
+    order = db.session.get(AcmeClientOrder, order.id)
+    assert order.status == 'pending' and 'no longer exists' in order.error_message
+    assert AcmeClientAccount.query.count() == accounts
+
+
+# --- what the scheduler is told ----------------------------------------------
+
+@pytest.fixture
+def renewal_switch(app):
+    key = 'acme.client.renewal_enabled'
+    from models import SystemConfig
+    row = SystemConfig.query.filter_by(key=key).first()
+    saved = row.value if row else None
+    if row is None:
+        row = SystemConfig(key=key, value='true')
+        db.session.add(row)
+    yield row
+    row = SystemConfig.query.filter_by(key=key).first()
+    if saved is None:
+        db.session.delete(row)
+    else:
+        row.value = saved
+    db.session.commit()
+
+
+def test_a_pass_with_renewal_turned_off_is_skipped(make, renewal_switch):
+    renewal_switch.value = 'false'
+    db.session.commit()
+    outcome = renew_mod.scheduled_acme_renewal()
+    assert outcome['status'] == 'skipped' and 'turned off' in outcome['reason']
+
+
+def test_a_pass_that_breaks_is_failed(make):
+    with patch.object(renew_mod, '_configured_renewal_days', side_effect=RuntimeError('database gone')):
+        outcome = renew_mod.scheduled_acme_renewal()
+    assert outcome == {'status': 'failed', 'reason': 'database gone'}
+
+
+def test_metrics_show_a_warning(app):
+    from services import metrics_service, scheduler_service
+    scheduler = SchedulerService()
+    scheduler.register_task('warns', lambda: {'status': 'warning', 'reason': 'x'}, 60)
+    scheduler.register_task('fine', lambda: None, 60)
+    scheduler.run_task_now('warns')
+    scheduler.run_task_now('fine')
+    with patch.object(scheduler_service, '_scheduler', scheduler):
+        out = metrics_service.render_metrics()
+    assert 'ucm_scheduler_task_warning{task="warns"} 1' in out
+    assert 'ucm_scheduler_task_warning{task="fine"} 0' in out

@@ -18,14 +18,14 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: the key of a finalization lived only in memory, so a restart or a failed import after the CA had issued lost the certificate. The key is now stored encrypted on the order before the request, and a status check, a finalization or the next renewal imports the certificate the CA already issued (migration 123).
 - ACME client: a manual and a scheduled renewal of one order could run at once and obtain two certificates. Each renewal or finalization now holds a lease on its order, which a stopped process leaves for 10 minutes: a second one gets a 409, and the scheduler skips the order.
 - ACME client: after 5 failed scheduled renewals an order was never renewed again, silently. It is now retried once a day, each failure emits the `acme_order.renewal_failed` webhook event, the order list shows the failure count and last error, and the scheduler task reports a warning.
-- ACME client: an order whose CA account had been deleted renewed under another account, possibly at another CA. The renewal now stops with a message saying what to do, and deleting or deactivating an account is refused (409) while issued orders with renewal on use it.
+- ACME client: an order whose CA account had been deleted renewed under another account, possibly at another CA. The renewal and the order's other actions now stop with a message saying what to do, and deleting or deactivating an account is refused (409) while issued orders renew through it; each order's automatic renewal can now be turned off from the order list (`PATCH /api/v2/acme/client/orders/<id>`).
 
 ### Upgrade notes
 
 - DNS providers, ACME CA accounts and webhooks: the upgrade renames duplicate names to `name (2)`, `name (3)`, oldest first, then makes the name unique (migration 124).
 - ACME client: a renewal now keeps the certificate's id and refid, and `/renew` and the renewal logs no longer announce a new certificate id. Certificates that past renewals imported as new rows stay in the inventory: archive or delete them by hand.
 - ACME client: a backup carries neither the pending key nor the renewal link of an order being renewed, so after a restore that order is not resumed and its next renewal opens a new order at the CA.
-- ACME client: orders stopped by the old limit of 5 failed renewals resume at one attempt a day. Delete an order you no longer want renewed.
+- ACME client: orders stopped by the old limit of 5 failed renewals resume at one attempt a day, and orders with no failure count recorded, which were skipped, are renewed again. Turn off the automatic renewal of an order you no longer want renewed, or delete it.
 
 ## [2.249] - 2026-11-05
 

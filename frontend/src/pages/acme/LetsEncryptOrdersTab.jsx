@@ -5,6 +5,7 @@ import {
   MagnifyingGlass, Play, Trash,
 } from '@phosphor-icons/react'
 import { Badge, Button, EmptyState, FilterSelect } from '../../components'
+import { ToggleSwitch } from '../../components/ui/ToggleSwitch'
 import { cn, formatDate } from '../../lib/utils'
 
 const ORDER_STATUSES = [
@@ -30,7 +31,9 @@ export default function LetsEncryptOrdersTab({
   onDownloadCertificate,
   onRenewCertificate,
   onDeleteOrder,
+  onToggleRenewal,
   canDelete = false,
+  canWrite = false,
 }) {
   const { t } = useTranslation()
   const [status, setStatus] = useState('')
@@ -159,6 +162,17 @@ export default function LetsEncryptOrdersTab({
                     )}
                     {order.is_proxy_order && (
                       <p className="text-xs text-text-tertiary">{t('acme.proxyOrderClientDriven')}</p>
+                    )}
+                    {!order.is_proxy_order && !order.opened_by_renewal && onToggleRenewal && (
+                      <div onClick={(event) => event.stopPropagation()}>
+                        <ToggleSwitch
+                          size="sm"
+                          label={t('acme.orderAutoRenew')}
+                          checked={order.renewal_enabled !== false}
+                          disabled={!canWrite}
+                          onChange={(enabled) => onToggleRenewal(order, enabled)}
+                        />
+                      </div>
                     )}
                     <div className="flex flex-wrap gap-2 pt-1">
                       {!order.is_proxy_order && ['pending', 'processing'].includes(order.status) && onVerifyChallenge && (

@@ -3072,6 +3072,19 @@ GET /api/v2/acme/client/orders?status=pending&environment=production
 GET /api/v2/acme/client/orders/{order_id}
 ```
 
+### Turn Automatic Renewal On or Off
+```http
+PATCH /api/v2/acme/client/orders/{order_id}
+Content-Type: application/json
+
+{
+  "renewal_enabled": false
+}
+```
+
+Takes a JSON boolean only (`400` otherwise). Refused with `409` on a proxy order and on an
+order a renewal opened.
+
 ### Request Certificate
 ```http
 POST /api/v2/acme/client/request

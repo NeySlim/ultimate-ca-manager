@@ -558,6 +558,7 @@ class AcmeClientOrder(db.Model):
             'dns_provider_name': self.dns_provider.name if self.dns_provider else None,
             'certificate_id': self.certificate_id,
             'renewal_enabled': self.renewal_enabled,
+            'opened_by_renewal': self.renewal_of_order_id is not None,
             'renewal_failures': self.renewal_failures or 0,
             'renewal_retry_daily': self.renewal_retry_daily,
             'last_renewal_at': utc_isoformat(self.last_renewal_at),
