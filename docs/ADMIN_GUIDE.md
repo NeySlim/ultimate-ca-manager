@@ -265,12 +265,15 @@ When SMTP is configured, enable automatic certificate expiry alerts:
 3. Enter encryption password
 4. Download `.ucmbkp` file
 
-**Via command line:**
+Backups, retention and restores take the same lock, so an archive never holds half of a restore: a manual backup started meanwhile waits up to 30 seconds, then answers 409; the scheduled one runs at the next minute.
+
+**Via command line (SQLite):**
 ```bash
 sudo systemctl stop ucm
 sudo cp /opt/ucm/data/ucm.db ~/ucm-backup-$(date +%Y%m%d).db
 sudo systemctl start ucm
 ```
+On PostgreSQL, use `pg_dump` instead. A copy of the database is not a `.ucmbkp` archive: the private keys stay under this installation's key-encryption key.
 
 ### Restoring Backups
 
@@ -280,18 +283,29 @@ sudo systemctl start ucm
 3. Upload `.ucmbkp` file
 4. Enter encryption password
 
-The upload accepts archives up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), their decompressed content up to four times that, and one JSON object per 100 bytes of it; a reverse proxy in front of UCM applies its own body limit. A restore holds the whole archive in memory: plan for a peak of several times its size, more for an archive dominated by the audit log.
+A restore **replaces** the instance with the archive: for every section the archive carries, the rows it does not hold are removed. Sections the archive left out are not touched, and an archive whose user list is empty is refused. `POST /api/v2/system/restore` also takes `mode=merge`, which adds and updates the archived rows and removes nothing.
+
+- The restore is one transaction: on any error nothing is changed, the answer names the row the database refused, and no file on disk is touched. The certificate, CSR and key files are published once the rows are in, and those of the removed rows are deleted with them.
+- A row of a table the archive does not carry that points at a removed row loses the link where it is optional, and goes with it in a regenerable table (CRL metadata, OCSP cache, sessions, in-flight ACME server orders); any other refuses the restore, named.
+- Rows are matched by identity (name, refid, fingerprint), never by number. Each archive carries the identifier of the database it was taken from, and row numbers are trusted only when restoring onto that same database.
+- An archive written by an older version is repaired as the migrations repaired the source: legacy EAB keys, dead and `ldap_*` settings, SAML providers, group permissions, duplicated ACME renewal orders.
+- ACME client orders: a merge keeps the order here when it is further along, was renewed or is being finalized since the archive was taken; a replacement restores the archived one and names the certificate it gives up.
+- Every session is revoked and a restart is requested. A restore is refused (409) while a backend migration, another restore or a backup is running.
+
+The upload accepts archives up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), their decompressed content up to four times that, and one JSON object per 100 bytes of it; a reverse proxy in front of UCM applies its own body limit. A restore holds the whole archive in memory: plan for a peak of several times its size. Creating a backup larger than the limit warns that it cannot be restored as is.
 
 ### Backup Contents
 
 - All certificates and private keys
-- CA hierarchy
-- Users and settings
-- Audit logs (optional)
-- Templates
+- CA hierarchy, cross-certificates and revocation records
+- Users, groups, roles, API keys, client certificates and settings
+- Templates, policies, SSO, HSM, SMTP, notification, deployment, webhook and ACME configuration
+- SSH CAs and certificates, Microsoft CA connections, SCEP profiles and Intune apps, DNS providers, discovery profiles
 - ACME client orders, with the key of a finalization in progress, approval requests and key recovery requests
+- The HTTPS certificate and key the server presents
 - Settings that name a CA, a certificate or an ACME account carry that row's identity, and are renumbered on restore. One whose row is not on the target is emptied, or left out when the number is in its name (`scep_challenge_<n>`, `ocsp_responder_cert_<n>`, `cert_scts_<n>`), with a warning
-- An ACME order renewed or being finalized on the target since the archive was taken: a merge keeps it as it is, a replacement restores the archived one and names the certificate it gives up
+
+Secrets travel decrypted inside the encrypted archive and are encrypted again with the target's keys. Histories (audit log, discovery scans and results, SCEP and Microsoft CA request logs) are not in the archives UCM writes, and a restore leaves them as they are. Live state is not carried either: lockout counters, sessions, CRL and OCSP caches, delivery queues.
 
 ---
 
