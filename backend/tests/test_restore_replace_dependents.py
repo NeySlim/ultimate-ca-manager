@@ -313,6 +313,71 @@ def test_a_homonym_replacing_the_row_here_keeps_its_name(target):
     assert _orphans() == []
 
 
+def test_a_homonym_a_kept_domain_still_needs_is_suffixed(target):
+    """The domain here points at the homonym until the writes: its name is not handed over."""
+    from models.acme_models import AcmeDomain, DnsProvider
+
+    _user('replace-admin')
+    archived = DnsProvider(name='replace-dns', provider_type='cloudflare')
+    db.session.add(archived)
+    db.session.flush()
+    db.session.add(AcmeDomain(domain='replace.example.test', dns_provider_id=archived.id))
+    blob = _snapshot()
+
+    here = DnsProvider(name='replace-dns-here', provider_type='route53')
+    db.session.add(here)
+    db.session.flush()
+    AcmeDomain.query.one().dns_provider_id = here.id
+    db.session.flush()
+    db.session.delete(archived)
+    db.session.flush()
+    here.name = 'replace-dns'
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert [(p.name, p.provider_type) for p in DnsProvider.query.all()] == [
+        ('replace-dns (2)', 'cloudflare')]
+    assert AcmeDomain.query.one().dns_provider.provider_type == 'cloudflare'
+    assert [entry['to'] for entry in results['renamed']] == ['replace-dns (2)']
+    assert _orphans() == []
+
+
+def test_a_homonym_account_a_kept_tsig_key_still_needs_is_suffixed(target):
+    from models.acme_client_account import AcmeClientAccount
+    from models.acme_dns_update import AcmeDnsUpdateKey
+
+    _user('replace-admin')
+    archived = AcmeClientAccount(label='replace-acct', email='a@example.test',
+                                 directory_url='https://archived.example.test/directory')
+    db.session.add(archived)
+    db.session.flush()
+    key = AcmeDnsUpdateKey(acme_client_account_id=archived.id, name='replace-key.example.test.')
+    key.secret = 'c2VjcmV0LXNlY3JldC1zZWNyZXQtc2VjcmV0'
+    db.session.add(key)
+    blob = _snapshot()
+
+    here = AcmeClientAccount(label='replace-acct-here', email='h@example.test',
+                             directory_url='https://here.example.test/directory')
+    db.session.add(here)
+    db.session.flush()
+    key.acme_client_account_id = here.id
+    db.session.flush()
+    db.session.delete(archived)
+    db.session.flush()
+    here.label = 'replace-acct'
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert [(a.label, a.directory_url) for a in AcmeClientAccount.query.all()] == [
+        ('replace-acct (2)', 'https://archived.example.test/directory')]
+    kept = AcmeDnsUpdateKey.query.one()
+    assert db.session.get(AcmeClientAccount, kept.acme_client_account_id).label == 'replace-acct (2)'
+    assert [entry['to'] for entry in results['renamed']] == ['replace-acct (2)']
+    assert _orphans() == []
+
+
 def test_merging_the_same_homonym_still_suffixes_it(target):
     from models.acme_models import DnsProvider
 
