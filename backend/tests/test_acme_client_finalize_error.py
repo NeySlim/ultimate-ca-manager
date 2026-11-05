@@ -263,6 +263,27 @@ def test_the_automatic_path_loses_to_an_import_during_its_own_failure(app, monke
         assert stored.status == 'issued' and stored.error_message is None
 
 
+def test_no_write_is_pending_during_the_download(app):
+    # A pending write would hold the database's write lock for the whole network call
+    with app.app_context():
+        order = _order()
+        svc = _service_that_imports_with(lambda **_kwargs: 4242)
+        pending = []
+
+        def download(*_args):
+            pending.append(list(db.session.dirty))
+            return SimpleNamespace(status_code=500)
+
+        responses = iter([
+            lambda *_args: SimpleNamespace(
+                status_code=200, json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'}),
+            download,
+        ])
+        svc._post = lambda *args: next(responses)(*args)
+        svc.finalize_order(order)
+        assert pending == [[]]
+
+
 def test_a_second_finalize_does_not_undo_the_first_ones_import(app):
     # Finalize clicked during the background one: the CA answers valid, the download then fails
     with app.app_context():

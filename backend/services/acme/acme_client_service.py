@@ -1577,7 +1577,6 @@ class AcmeClientService:
             
             # Download certificate
             cert_url = order_data['certificate']
-            order.certificate_url = cert_url
             cert_resp = self._post(cert_url, "")
             
             if cert_resp.status_code != 200:
@@ -1606,6 +1605,7 @@ class AcmeClientService:
             
             if cert_id:
                 order.certificate_id = cert_id
+                order.certificate_url = cert_url
                 order.status = 'issued'
                 order.error_message = None
                 # RFC 8555 §7.1.3: order.expires is the *order resource* expiry
@@ -1646,11 +1646,13 @@ class AcmeClientService:
         """
         try:
             db.session.rollback()
-            if order.status == 'issued':
-                return
+            values = {'error_message': message}
             if order.status not in ('valid', 'invalid'):
-                AcmeClientService.write_order_status(order, 'error')
-            order.error_message = message
+                values['status'] = 'error'
+            # A failure that lost to an import is no longer the order's
+            AcmeClientOrder.query.filter(
+                AcmeClientOrder.id == order.id, AcmeClientOrder.status != 'issued',
+            ).update(values, synchronize_session=False)
             db.session.commit()
         except Exception as commit_err:
             db.session.rollback()
