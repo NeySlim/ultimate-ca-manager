@@ -678,7 +678,9 @@ def _renewal_parent(order):
 
 def _resumable_here(client, order) -> bool:
     """A finalization the CA completed and UCM never imported, which this order can finish."""
-    if order.status == 'issued' or order.is_proxy_order or _renewal_parent(order) is not None:
+    # An order naming a certificate imported it already: its own import is not cut short
+    if (order.status == 'issued' or order.is_proxy_order or order.certificate_id is not None
+            or _renewal_parent(order) is not None):
         return False
     _key, key_error = client.held_finalize_key(order)
     return key_error is None

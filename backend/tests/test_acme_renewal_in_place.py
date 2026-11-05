@@ -99,18 +99,38 @@ class Bench:
     def _create_order(self, **_kwargs):
         return True, 'ok', self.child()
 
-    def renew(self, **kwargs):
+    def renew(self, parent_id=None, wait=None, **kwargs):
         dns = MagicMock()
         dns.create_txt_record.return_value = (True, 'ok')
         dns.delete_txt_record.return_value = (True, 'ok')
+        waited = wait or (lambda *_a, **_k: {'ok': True, 'missing': [], 'waited': 0})
         with patch('services.acme.dns_providers.create_provider', return_value=dns), \
                 patch('services.acme.acme_client_service.AcmeClientService.for_order', return_value=self.client), \
                 patch('services.acme.acme_client_service.time.sleep', return_value=None), \
-                patch.object(renew_mod, 'wait_for_challenges', return_value={'ok': True, 'missing': [], 'waited': 0}):
-            return renew_mod.renew_certificate(self.parent(), **kwargs)
+                patch.object(renew_mod, 'wait_for_challenges', side_effect=waited):
+            return renew_mod.renew_certificate(self.parent(parent_id), **kwargs)
 
-    def parent(self):
-        return db.session.get(AcmeClientOrder, self.parent_id)
+    def parent(self, parent_id=None):
+        return db.session.get(AcmeClientOrder, parent_id or self.parent_id)
+
+    def second_parent(self):
+        """Another issued order for the same names, with a certificate and a key of its own."""
+        key = ec.generate_private_key(ec.SECP256R1())
+        pem = self.ca.issue(key.public_key(), [self.name])
+        leaf_pem, chain_pem = pem.split('-----END CERTIFICATE-----\n', 1)
+        row = CertificateService.import_certificate(
+            descr=self.name, cert_pem=leaf_pem + '-----END CERTIFICATE-----\n', key_pem=key_pem(key),
+            chain_pem=chain_pem, username='system', source='acme_client')
+        url = self.ca.order(f'{self.ca.base}/order/{uuid.uuid4().hex[:8]}', [self.name], pem=pem)
+        order = AcmeClientOrder(domains=names_json([self.name]), environment='production', challenge_type='dns-01',
+                                status='issued', renewal_enabled=True, dns_provider_id=self.provider.id,
+                                order_url=url, certificate_id=row.id, key_source='generate',
+                                key_type='EC-P256', expires_at=row.valid_to)
+        db.session.add(order)
+        db.session.commit()
+        self.extra_orders.append(order.id)
+        self.extra_certs.append(row.id)
+        return order, row.id
 
     def row(self):
         db.session.expire_all()
@@ -121,7 +141,8 @@ class Bench:
         ids = [self.parent_id] + self.extra_orders
         AcmeClientOrder.query.filter(AcmeClientOrder.id.in_(ids)).delete(synchronize_session=False)
         names = f'%{self.name}%'
-        cert_ids = [c.id for c in Certificate.query.filter(Certificate.descr == self.name)] + [self.cert_id]
+        cert_ids = ([c.id for c in Certificate.query.filter(Certificate.descr == self.name)]
+                    + [self.cert_id] + [c for c in self.extra_certs if c])
         binding_ids = [b.id for b in DeployBinding.query.filter(DeployBinding.certificate_id.in_(cert_ids))]
         target_ids = [b.target_id for b in DeployBinding.query.filter(DeployBinding.id.in_(binding_ids))]
         DeployDelivery.query.filter(DeployDelivery.binding_id.in_(binding_ids)).delete(synchronize_session=False)
@@ -257,22 +278,45 @@ def test_the_key_is_committed_before_the_finalize_request(app, bench):
         bench.ca.on_finalize = at_finalize
         ok, _msg, cert_id = bench.client.finalize_order(order)
     assert ok
-    assert seen['writes'] == [] and seen['stored'] and seen['stored'].startswith('gAAAAA')
+    assert seen['writes'] == [] and seen['stored']
     stored = db.session.get(AcmeClientOrder, order.id)
     assert stored.pending_key is None and stored.certificate_id == cert_id
     bench.extra_certs.append(cert_id)
 
 
-def test_the_pending_key_is_encrypted_and_never_shown(app, bench):
+def _raw_pending_key(order_id):
+    return db.session.execute(text(f'SELECT pending_key FROM {AcmeClientOrder.__tablename__} WHERE id = :i'),
+                              {'i': order_id}).scalar()
+
+
+def test_the_pending_key_is_stored_like_a_certificate_key_and_never_shown(app, bench, encryption_enabled):
     order = bench.child()
     pem = key_pem(ec.generate_private_key(ec.SECP256R1()))
     order.pending_key = pem
     db.session.commit()
-    raw = db.session.execute(text(f'SELECT pending_key FROM {AcmeClientOrder.__tablename__} WHERE id = :i'),
-                             {'i': order.id}).scalar()
-    assert raw != pem and 'PRIVATE KEY' not in raw
+    raw = _raw_pending_key(order.id)
+    assert encryption_enabled.key_encryption.is_encrypted(raw)
+    assert load_pem_bytes(raw, context='test').decode() == pem
+    db.session.expire_all()
     assert db.session.get(AcmeClientOrder, order.id).pending_key == pem
-    assert not any('pending' in k or 'claimed' in k for k in order.to_dict())
+    assert not any('pending' in k or 'claimed' in k or 'renewal_of' in k for k in order.to_dict())
+
+
+def test_enabling_encryption_encrypts_a_pending_key_kept_before(app, bench, encryption_enabled, monkeypatch):
+    order = bench.child()
+    pem = key_pem(ec.generate_private_key(ec.SECP256R1()))
+    with patch.object(encryption_enabled.key_encryption, '_enabled', False):  # written before the key existed
+        order.pending_key = pem
+        db.session.commit()
+    assert not encryption_enabled.key_encryption.is_encrypted(_raw_pending_key(order.id))
+    every = encryption_enabled.master_key_values
+    monkeypatch.setattr(encryption_enabled, 'master_key_values',
+                        lambda: (v for v in every() if isinstance(v[1], AcmeClientOrder) and v[1].id == order.id))
+    encrypted, _skipped, errors = encryption_enabled.encrypt_all_keys(dry_run=False)
+    assert (encrypted, errors) == (1, [])
+    assert encryption_enabled.key_encryption.is_encrypted(_raw_pending_key(order.id))
+    db.session.expire_all()
+    assert db.session.get(AcmeClientOrder, order.id).pending_key == pem
 
 
 class _Killed(BaseException):
@@ -417,7 +461,7 @@ def test_the_next_renewal_imports_what_the_interrupted_one_left(bench):
 
 @pytest.mark.parametrize('state', ['invalid', 'gone', 'pending'])
 def test_an_order_the_ca_will_not_complete_is_dropped_for_a_new_one(bench, state):
-    kept = bench.child(status='processing', renewal_enabled=False)
+    kept = bench.child(status='processing', renewal_enabled=False, renewal_of_order_id=bench.parent_id)
     bench.ca.orders[kept.order_url]['status'] = state
     ok, _message = bench.renew()
     assert ok
@@ -510,7 +554,7 @@ def test_a_status_check_imports_a_finalization_a_restart_cut_short(app, auth_cli
 
 
 def test_a_renewal_order_is_finalized_through_its_renewal_only(app, auth_client, bench):
-    order = bench.child(status='processing', renewal_enabled=False)
+    order = bench.child(status='processing', renewal_enabled=False, renewal_of_order_id=bench.parent_id)
     answer = auth_client.post(f'/api/v2/acme/client/orders/{order.id}/finalize')
     assert answer.status_code == 409 and str(bench.parent_id) in answer.get_json()['message']
 
@@ -565,3 +609,134 @@ def test_the_lease_the_kept_order_and_the_renewal_in_place_on_postgresql(app):
         row = bench.row()
         assert (row.id, row.refid) == (bench.cert_id, bench.refid) and row.serial_number != bench.old_serial
         assert _pub(_stored_key(row)) == _pub(leaf_of(base64.b64decode(row.crt).decode()))
+
+
+# ---- a renewal's order is named by its link, never guessed -------------------------------
+
+def _csr_for(key, name):
+    from cryptography import x509
+    from cryptography.hazmat.primitives import hashes
+    from cryptography.x509.oid import NameOID
+    return x509.CertificateSigningRequestBuilder().subject_name(
+        x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, name)])).sign(key, hashes.SHA256())
+
+
+def test_a_status_check_leaves_an_order_that_already_imported_its_certificate(app, auth_client, bench):
+    order = bench.child(status='valid', key_source='reuse', source_certificate_id=bench.cert_id,
+                        certificate_id=bench.cert_id, renewal_enabled=False)
+    bench.ca.orders[order.order_url].update(status='valid', pem=bench.ca.issue(bench.key.public_key(), [bench.name]))
+    with patch('services.acme.acme_client_service.AcmeClientService.for_order', return_value=bench.client):
+        answer = auth_client.get(f'/api/v2/acme/client/orders/{order.id}/status')
+    assert answer.status_code == 200
+    db.session.expire_all()
+    stored = db.session.get(AcmeClientOrder, order.id)
+    assert stored.status != 'issued' and stored.renewal_enabled is False
+    assert f'{order.order_url}/cert' not in [url for url, _payload in bench.ca.posts]
+
+
+def test_a_renewal_of_an_order_without_account_is_still_its_renewal(app, auth_client, bench):
+    from models import AcmeClientAccount
+    account = AcmeClientAccount(directory_url=f'https://{uuid.uuid4().hex[:8]}.example/directory',
+                                label='link', email='ops@example.com', account_key='k')
+    db.session.add(account)
+    db.session.commit()
+    try:
+        # A legacy parent has no account; the renewal ran under the resolved one
+        order = bench.child(status='processing', renewal_enabled=False, renewal_of_order_id=bench.parent_id,
+                            acme_client_account_id=account.id)
+        assert renew_mod.renewal_parent(order).id == bench.parent_id
+        answer = auth_client.post(f'/api/v2/acme/client/orders/{order.id}/finalize')
+        assert answer.status_code == 409
+    finally:
+        AcmeClientOrder.query.filter(AcmeClientOrder.id.in_(bench.extra_orders)).delete(synchronize_session=False)
+        db.session.delete(db.session.get(AcmeClientAccount, account.id))
+        db.session.commit()
+
+
+def test_a_renewal_never_takes_the_order_of_another_order_for_the_same_names(bench):
+    other, other_cert = bench.second_parent()
+    stray = ec.generate_private_key(ec.SECP256R1())
+    # Left by a renewal of the bench's order, created after the other one
+    kept = bench.child(status='valid', renewal_enabled=False, renewal_of_order_id=bench.parent_id,
+                       key_source='csr', csr_pem=_csr_for(stray, bench.name).public_bytes(serialization.Encoding.PEM).decode())
+    bench.ca.orders[kept.order_url].update(pem=bench.ca.issue(stray.public_key(), [bench.name]))
+    ok, _message = bench.renew(parent_id=other.id)
+    assert ok
+    bench.client.create_order.assert_called_once()
+    assert db.session.get(AcmeClientOrder, kept.id) is not None
+    row = db.session.get(Certificate, other_cert)
+    assert _pub(_stored_key(row)) == _pub(leaf_of(base64.b64decode(row.crt).decode()))
+
+
+def test_a_certificate_without_a_key_of_its_own_must_match_the_row_key(bench):
+    stray = ec.generate_private_key(ec.SECP256R1())
+    kept = bench.child(status='valid', renewal_enabled=False, renewal_of_order_id=bench.parent_id,
+                       key_source='csr', csr_pem=_csr_for(stray, bench.name).public_bytes(serialization.Encoding.PEM).decode())
+    issued = bench.ca.issue(stray.public_key(), [bench.name])
+    bench.ca.orders[kept.order_url].update(pem=issued)
+    ok, _message = bench.renew()
+    assert ok
+    # Refused, dropped and replaced by an order of its own: never a pair that does not match
+    assert db.session.get(AcmeClientOrder, kept.id) is None
+    bench.client.create_order.assert_called_once()
+    row = bench.row()
+    assert _pub(_stored_key(row)) == _pub(leaf_of(base64.b64decode(row.crt).decode())) != _pub(stray)
+
+
+def test_a_kept_order_issued_for_another_key_is_replaced_by_a_new_order(bench, caplog):
+    kept = bench.child(status='valid', renewal_enabled=False, renewal_of_order_id=bench.parent_id)
+    kept.pending_key = key_pem(ec.generate_private_key(ec.SECP256R1()))
+    db.session.commit()
+    bench.ca.orders[kept.order_url].update(pem=bench.ca.issue(ec.generate_private_key(ec.SECP256R1()).public_key(),
+                                                              [bench.name]))
+    with caplog.at_level('WARNING', logger=renew_mod.logger.name):
+        ok, _message = bench.renew()
+    assert ok and db.session.get(AcmeClientOrder, kept.id) is None
+    bench.client.create_order.assert_called_once()
+    assert 'does not match the key kept for it' in caplog.text
+    assert bench.parent().renewal_failures == 0
+
+
+# ---- what follows the commit, the lease, the messages -------------------------------------
+
+def test_a_snapshot_that_fails_after_the_commit_leaves_the_renewal_done(bench):
+    with patch.object(Certificate, 'to_dict', side_effect=RuntimeError('snapshot')):
+        ok, _message = bench.renew()
+    assert ok and bench.row().serial_number != bench.old_serial
+
+
+def test_a_lease_lost_during_the_dns_wait_submits_no_challenge(bench):
+    bench.client.verify_challenge = MagicMock(return_value=(True, 'submitted'))
+
+    def stolen(*_args, **_kwargs):
+        AcmeClientOrder.query.filter_by(id=bench.parent_id).update({'renewal_claimed_at': utc_now()})
+        db.session.commit()
+        return {'ok': True, 'missing': [], 'waited': 0}
+
+    lease = OrderLease.take(bench.parent_id)
+    with pytest.raises(renew_mod.RenewalInProgress):
+        bench.renew(wait=stolen, lease=lease)
+    bench.client.verify_challenge.assert_not_called()
+    assert AcmeClientOrder.query.filter(AcmeClientOrder.id.in_(bench.extra_orders)).count() == 0
+
+
+def test_a_ca_that_does_not_answer_is_named(bench):
+    order = bench.child(status='processing')
+    order.pending_key = key_pem(ec.generate_private_key(ec.SECP256R1()))
+    db.session.commit()
+    bench.client.check_order_status = lambda _order: ('processing', {})
+    ok, message, _cert = bench.client.finalize_order(order)
+    assert not ok and 'did not answer' in message
+
+
+def test_a_revoked_row_renewed_into_a_new_one_is_not_revoked_again(bench, revoke_on_renewal, caplog):
+    row = bench.row()
+    row.revoked, row.revoke_reason = True, 'keyCompromise'
+    db.session.commit()
+    with patch.object(renew_mod.CertificateService, 'revoke_certificate') as local, \
+            caplog.at_level('WARNING', logger=renew_mod.logger.name):
+        ok, _message = bench.renew()
+    assert ok
+    local.assert_not_called()
+    assert 'Failed to revoke' not in caplog.text
+    assert bench.row().revoke_reason == 'keyCompromise'

@@ -17,7 +17,7 @@ from utils.datetime_utils import utc_now
 logger = logging.getLogger(__name__)
 
 LEASE_DURATION = timedelta(minutes=10)
-LEASE_LOST = 'Another finalization of this order took over'
+LEASE_LOST = 'Another renewal or finalization of this order took over'
 BUSY = 'A renewal or finalization of this order is already running: try again later'
 
 

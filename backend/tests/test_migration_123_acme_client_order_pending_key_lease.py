@@ -1,4 +1,5 @@
-"""Migration 123 adds the pending key and the renewal lease to ACME client orders, idempotently."""
+"""Migration 123 adds the pending key, the renewal lease and the renewal link to ACME client
+orders, idempotently."""
 import importlib
 import os
 import sqlite3
@@ -10,7 +11,7 @@ from models.acme_models import AcmeClientOrder
 
 PG_URL = os.getenv('UCM_TEST_PG_URL')
 TABLE = AcmeClientOrder.__tablename__
-COLUMNS = {'pending_key', 'renewal_claimed_at'}
+COLUMNS = {'pending_key', 'renewal_claimed_at', 'renewal_of_order_id'}
 
 
 def _migration():
@@ -31,6 +32,14 @@ def test_sqlite_adds_the_columns_and_keeps_rows():
     assert (types['pending_key'], types['renewal_claimed_at']) == ('TEXT', 'DATETIME')
     assert conn.execute(f"SELECT domains, pending_key, renewal_claimed_at FROM {TABLE}"
                         ).fetchall() == [('["a.example"]', None, None)]
+    assert types['renewal_of_order_id'] == 'INTEGER'
+    assert any(row[2] == 'renewal_of_order_id' for row in conn.execute(f"PRAGMA index_list({TABLE})")
+               for row in conn.execute(f"PRAGMA index_info({row[1]})"))
+    # The link goes with the order it names
+    conn.execute("PRAGMA foreign_keys = ON")
+    conn.execute(f"INSERT INTO {TABLE} (id, domains, renewal_of_order_id) VALUES (2, 'x', 1)")
+    conn.execute(f"DELETE FROM {TABLE} WHERE id = 1")
+    assert conn.execute(f"SELECT renewal_of_order_id FROM {TABLE}").fetchall() == [(None,)]
 
 
 def test_sqlite_without_the_table_is_a_no_op():
@@ -58,6 +67,13 @@ def test_postgres_adds_the_columns_and_keeps_rows():
         conn.execute(text(f"UPDATE {TABLE} SET renewal_claimed_at = now()"))
         assert conn.execute(text(f"SELECT domains, pending_key FROM {TABLE}")
                             ).fetchall() == [('["a.example"]', None)]
+        assert types['renewal_of_order_id'] == 'INTEGER'
+        assert any(i['column_names'] == ['renewal_of_order_id']
+                   for i in inspect(conn).get_indexes(TABLE, schema=schema))
+        first = conn.execute(text(f"SELECT id FROM {TABLE}")).scalar()
+        conn.execute(text(f"INSERT INTO {TABLE} (domains, renewal_of_order_id) VALUES ('x', :p)"), {'p': first})
+        conn.execute(text(f"DELETE FROM {TABLE} WHERE id = :p"), {'p': first})
+        assert conn.execute(text(f"SELECT renewal_of_order_id FROM {TABLE}")).fetchall() == [(None,)]
     finally:
         conn.rollback()
         conn.execute(text(f"DROP SCHEMA IF EXISTS {schema} CASCADE"))

@@ -14,6 +14,7 @@ from services.acme import dns_providers
 from services.acme.acme_client_service import AcmeClientService
 from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challenges
 from services.acme.http01 import wait_for_http01
+from services.acme.client_certificates import KEY_MISMATCH
 from services.acme.order_lease import BUSY, LEASE_LOST, OrderLease, RenewalInProgress
 from services.audit.staging import stage_audit_entry
 from services.cert_service import CertificateService
@@ -120,7 +121,7 @@ def _replaced_snapshot(certificate):
         return None
     return SimpleNamespace(id=certificate.id, pem=base64.b64decode(certificate.crt),
                            serial=certificate.serial_number, valid_to=certificate.valid_to,
-                           caref=certificate.caref)
+                           caref=certificate.caref, revoked=bool(certificate.revoked))
 
 
 def _record_replaced_serial(replaced):
@@ -159,14 +160,15 @@ def _revoke_replaced_certificate(acme_client, replaced, in_place):
     try:
         if in_place:
             _record_replaced_serial(replaced)
-        else:
+            logger.info(f"Revoked superseded certificate {replaced.id} (serial {replaced.serial})")
+        elif not replaced.revoked:  # a revoked row keeps the revocation it has
             CertificateService.revoke_certificate(
                 cert_id=replaced.id,
                 reason='superseded',
                 username='system',
                 revoke_related=False,
             )
-        logger.info(f"Revoked superseded certificate {replaced.id} (serial {replaced.serial})")
+            logger.info(f"Revoked superseded certificate {replaced.id} (serial {replaced.serial})")
     except Exception as exc:
         logger.warning(
             "Failed to revoke old certificate %s locally: %s",
@@ -331,32 +333,26 @@ _RESUMABLE = ('validating', 'ready', 'processing', 'valid', 'error')
 
 
 def _kept_renewal_order(order, account_id):
-    """The newest order an earlier renewal of ``order`` opened and left behind, or None."""
-    wanted = sorted(order.domains_list)
-    candidates = AcmeClientOrder.query.filter(
-        AcmeClientOrder.id > order.id,
-        AcmeClientOrder.renewal_enabled == False,  # noqa: E712 - what a renewal's order carries
+    """The newest order whose ``renewal_of_order_id`` names ``order``, opened under this
+    account and still resumable, or None."""
+    return AcmeClientOrder.query.filter(
+        AcmeClientOrder.renewal_of_order_id == order.id,
         AcmeClientOrder.status.in_(_RESUMABLE),
         AcmeClientOrder.acme_client_account_id == account_id,
-        AcmeClientOrder.environment == order.environment,
-    ).order_by(AcmeClientOrder.id.desc()).all()
-    return next((c for c in candidates
-                 if not c.is_proxy_order and sorted(c.domains_list) == wanted), None)
+    ).order_by(AcmeClientOrder.id.desc()).first()
 
 
 def renewal_parent(order):
-    """The order whose renewal opened ``order``, None when ``order`` is no renewal's."""
-    if order.renewal_enabled is not False or order.status == 'issued' or order.is_proxy_order:
+    """The order ``order.renewal_of_order_id`` names while ``order`` is unfinished, else None."""
+    if order.renewal_of_order_id is None or order.status == 'issued':
         return None
-    wanted = sorted(order.domains_list)
-    candidates = AcmeClientOrder.query.filter(
-        AcmeClientOrder.id < order.id,
-        AcmeClientOrder.renewal_enabled == True,  # noqa: E712
-        AcmeClientOrder.acme_client_account_id == order.acme_client_account_id,
-        AcmeClientOrder.environment == order.environment,
-    ).order_by(AcmeClientOrder.id.desc()).all()
-    return next((c for c in candidates
-                 if not c.is_proxy_order and sorted(c.domains_list) == wanted), None)
+    return db.session.get(AcmeClientOrder, order.renewal_of_order_id)
+
+
+def _drop_kept_order(kept):
+    db.session.delete(kept)
+    if not commit_or_rollback(logger, f"Could not remove the stale renewal order {kept.id}"):
+        raise RuntimeError(f"Could not remove the stale renewal order {kept.id}")
 
 
 def _resume_kept_order(acme_client, order, account_id, lease):
@@ -372,13 +368,18 @@ def _resume_kept_order(acme_client, order, account_id, lease):
         ok, message, cert_id = acme_client.finalize_order(kept, renews=order, lease=lease)
         if message == LEASE_LOST:
             raise RenewalInProgress(LEASE_LOST)
+        if not ok and message == KEY_MISMATCH:
+            # Retrying cannot change what the CA issued: a new order replaces this one
+            logger.warning("Renewal of order %s drops order %s: the certificate the CA issued "
+                           "for it does not match the key kept for it; a new order is opened",
+                           order.id, kept.id)
+            _drop_kept_order(kept)
+            return None
         if not ok:
             raise Exception(f"Order finalization failed: {message}")
         return cert_id
     logger.info("Renewal of order %s drops order %s (%s at the CA)", order.id, kept.id, state)
-    db.session.delete(kept)
-    if not commit_or_rollback(logger, f"Could not remove the stale renewal order {kept.id}"):
-        raise RuntimeError(f"Could not remove the stale renewal order {kept.id}")
+    _drop_kept_order(kept)
     return None
 
 
@@ -439,8 +440,9 @@ def _renew_with_new_order(acme_client, order, account_id, old_certificate, lease
         )
         if not success:
             raise Exception(f"Order creation failed: {message}")
-        # Marks the order as this renewal's: never renewed itself, resumed by the next renewal
+        # This renewal's order: never renewed itself, resumed by the next renewal of ``order``
         new_order.renewal_enabled = False
+        new_order.renewal_of_order_id = order.id
     
     # Preserve key source across renewals (#161)
     new_order.key_source = order.key_source or 'generate'

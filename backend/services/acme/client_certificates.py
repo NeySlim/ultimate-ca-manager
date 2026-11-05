@@ -36,6 +36,9 @@ def load_leaf(cert_pem: str) -> x509.Certificate:
     return x509.load_pem_x509_certificate(end_entity.encode())
 
 
+KEY_MISMATCH = 'The certificate the CA issued does not match the key held for this order'
+
+
 def check_key(leaf: x509.Certificate, key_pem: Optional[str]) -> None:
     """ValueError when the key held for the order is not the certificate's."""
     if key_pem is None:
@@ -43,7 +46,7 @@ def check_key(leaf: x509.Certificate, key_pem: Optional[str]) -> None:
     from cryptography.hazmat.primitives import serialization
     key = serialization.load_pem_private_key(key_pem.encode(), password=None)
     if not certificate_matches_private_key(leaf, key):
-        raise ValueError('The certificate the CA issued does not match the key held for this order')
+        raise ValueError(KEY_MISMATCH)
 
 
 def write_renewed(row, cert_pem: str, key_pem: Optional[str], now) -> x509.Certificate:
@@ -53,6 +56,10 @@ def write_renewed(row, cert_pem: str, key_pem: Optional[str], now) -> x509.Certi
 
     end_entity, chain = split_chain(cert_pem)
     leaf = load_leaf(cert_pem)
+    if key_pem is None and row.prv:
+        # No key sent (external CSR): the row's own key must still be the certificate's
+        from utils.key_codec import load_pem_bytes
+        check_key(leaf, load_pem_bytes(row.prv, context=f'certificate {row.id}').decode())
     check_key(leaf, key_pem)
     full = end_entity.strip() + '\n' + chain.strip() if chain else end_entity
     row.crt = base64.b64encode(full.encode()).decode()  # key_algo, AKI and SKI follow crt
@@ -75,8 +82,12 @@ def write_renewed(row, cert_pem: str, key_pem: Optional[str], now) -> x509.Certi
 
 def after_renewal_commit(row, cert_pem: str, key_pem: Optional[str], old_serial) -> None:
     """Files, audit and certificate.renewed for a row renewed in place; failures are logged only."""
-    snapshot = row.to_dict()  # before any subscriber's commit expires the row
-    cert_id, caref, name = row.id, row.caref, row.descr or row.subject
+    try:
+        snapshot = row.to_dict()  # before any subscriber's commit expires the row
+        cert_id, caref, name = row.id, row.caref, row.descr or row.subject
+    except Exception as exc:
+        logger.warning("Renewed certificate not read back after its commit: %s", exc)
+        return
     try:
         from services.file_regen_service import mirror_private_key
         from utils.file_naming import cert_cert_path, cert_key_path

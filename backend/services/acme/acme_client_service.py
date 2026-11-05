@@ -1668,8 +1668,8 @@ class AcmeClientService:
             primary_domain = domains[0]
 
             if status in ('processing', 'valid'):
-                if not data:  # the CA did not answer
-                    return False, f"Order not ready for finalization (status: {status})", None
+                if not data:
+                    return False, 'The CA did not answer about this order: try again later', None
                 key_pem, key_error = self.held_finalize_key(order)
                 if key_error:
                     return False, key_error, None
@@ -1776,6 +1776,11 @@ class AcmeClientService:
         old_serial = row.serial_number if in_place else None
         from utils.datetime_utils import utc_now
         now = utc_now()
+        try:
+            client_certificates.check_key(client_certificates.load_leaf(cert_pem), key_pem)
+        except ValueError as exc:
+            self._record_finalize_failure(order, str(exc))
+            return False, str(exc), None
         if in_place:
             try:
                 client_certificates.write_renewed(row, cert_pem, key_pem, now)
