@@ -1923,6 +1923,7 @@
     "editEmailCaveat": "RFC 8555 では contact は ACME クライアントに属します。クライアントの次回のアカウント更新でこの値が上書きされる可能性があります。",
     "emailUpdated": "アカウントのメールを更新しました",
     "letsEncryptOrders": "Let's Encrypt の注文",
+    "ordersListPartial": "一部のみ表示: {{total}} 件中 {{loaded}} 件の注文を読み込みました。再読み込みして再試行してください。",
     "dnsUpdate": {
       "title": "DNS UPDATE キー (RFC 2136)",
       "manage": "DNS UPDATE キー (RFC 2136)",

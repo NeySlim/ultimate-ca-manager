@@ -2,7 +2,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest'
 import { fireEvent, render, screen } from '@testing-library/react'
 
 vi.mock('react-i18next', () => ({
-  useTranslation: () => ({ t: (key) => key }),
+  useTranslation: () => ({ t: (key, vars) => (vars?.total !== undefined ? `${key} ${JSON.stringify(vars)}` : key) }),
 }))
 
 vi.mock('../../../components', () => ({
@@ -126,5 +126,16 @@ describe('LetsEncryptOrdersTab', () => {
     renderTab({ onRefresh })
     fireEvent.click(screen.getByRole('button', { name: 'common.refresh' }))
     expect(onRefresh).toHaveBeenCalledOnce()
+  })
+
+  it('says when the list is partial', () => {
+    renderTab({ partial: { loaded: 2, total: 300 } })
+    expect(screen.getByRole('status')).toHaveTextContent('acme.ordersListPartial {"loaded":2,"total":300}')
+    expect(screen.getByText('a.example.com')).toBeInTheDocument()
+  })
+
+  it('shows no notice for a complete list', () => {
+    renderTab()
+    expect(screen.queryByRole('status')).not.toBeInTheDocument()
   })
 })

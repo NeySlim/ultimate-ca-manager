@@ -42,6 +42,14 @@ const HTTP_ERROR_MESSAGES = {
  * Build a user-friendly error message from an HTTP response.
  * Priority: backend message > status-code message > generic fallback.
  */
+// Retry-After in seconds (RFC 9110 §10.2.3: delay or HTTP date), undefined when absent
+export function parseRetryAfter(value) {
+  if (!value) return undefined
+  if (/^\d+$/.test(value.trim())) return Number(value.trim())
+  const date = Date.parse(value)
+  return Number.isNaN(date) ? undefined : Math.max(0, Math.ceil((date - Date.now()) / 1000))
+}
+
 function buildErrorMessage(status, data, fallback = 'Request failed') {
   // Backend errors are an RFC 7807 problem document that also carries the
   // legacy keys: `message` (legacy) and `detail` (7807) hold the same text.
@@ -136,6 +144,7 @@ class APIClient {
         const error = new Error(msg)
         error.status = response.status
         error.data = data
+        error.retryAfter = parseRetryAfter(response.headers.get('retry-after'))
         if (import.meta.env.DEV) {
           console.error(`❌ API error ${response.status}:`, error.message)
         }

@@ -1923,6 +1923,7 @@
     "editEmailCaveat": "Secondo la RFC 8555 il contatto appartiene al client ACME: il suo prossimo aggiornamento dell'account può sovrascrivere questo valore.",
     "emailUpdated": "E-mail dell'account aggiornata",
     "letsEncryptOrders": "Ordini Let's Encrypt",
+    "ordersListPartial": "Elenco parziale: {{loaded}} ordini caricati su {{total}}. Aggiorna per riprovare.",
     "dnsUpdate": {
       "title": "Chiavi DNS UPDATE (RFC 2136)",
       "manage": "Chiavi DNS UPDATE (RFC 2136)",

@@ -1923,6 +1923,7 @@
     "editEmailCaveat": "根据 RFC 8555，contact 属于 ACME 客户端：其下一次账户更新可能会覆盖此值。",
     "emailUpdated": "账户邮箱已更新",
     "letsEncryptOrders": "Let's Encrypt 订单",
+    "ordersListPartial": "列表不完整：已加载 {{total}} 个订单中的 {{loaded}} 个。请刷新重试。",
     "dnsUpdate": {
       "title": "DNS UPDATE 密钥 (RFC 2136)",
       "manage": "DNS UPDATE 密钥 (RFC 2136)",
