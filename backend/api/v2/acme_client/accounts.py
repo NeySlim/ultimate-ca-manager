@@ -209,6 +209,8 @@ def create_ca_account():
         return error_response('label is required', 400)
     if len(label) > 100:
         return error_response('label too long (max 100 chars)', 400)
+    if _label_taken(label):
+        return error_response(f'An ACME account labelled {label!r} already exists', 409)
     if not email:
         return error_response('email is required', 400)
     if len(email) > 254:
@@ -286,6 +288,14 @@ def create_ca_account():
     return success_response(data=acct.to_dict(), status=201)
 
 
+def _label_taken(label, except_id=None):
+    """Labels are unique (migration 124): accounts sharing a directory URL are told apart by it."""
+    query = AcmeClientAccount.query.filter(AcmeClientAccount.label == label)
+    if except_id is not None:
+        query = query.filter(AcmeClientAccount.id != except_id)
+    return db.session.query(query.exists()).scalar()
+
+
 @bp.route('/api/v2/acme/client/accounts/<int:account_id>', methods=['PATCH'])
 @require_auth(['write:acme'])
 def update_ca_account(account_id):
@@ -306,6 +316,8 @@ def update_ca_account(account_id):
         label = (data.get('label') or '').strip()
         if not label or len(label) > 100:
             return error_response('label is required (max 100 chars)', 400)
+        if _label_taken(label, acct.id):
+            return error_response(f'An ACME account labelled {label!r} already exists', 409)
         acct.label = label
     if 'email' in data:
         email = (data.get('email') or '').strip()

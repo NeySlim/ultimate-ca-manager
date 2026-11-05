@@ -8,6 +8,7 @@ plaintext rows written before the fix).
 from __future__ import annotations
 
 import json
+import uuid
 
 from models import db
 from models.acme_models import DnsProvider
@@ -15,7 +16,7 @@ from models.acme_models import DnsProvider
 
 def _make(app, creds):
     with app.app_context():
-        dp = DnsProvider(name='cf', provider_type='cloudflare')
+        dp = DnsProvider(name=f'cf-{uuid.uuid4().hex[:8]}', provider_type='cloudflare')
         dp.credentials = json.dumps(creds)
         db.session.add(dp)
         db.session.commit()
@@ -44,7 +45,7 @@ class TestCredentialEncryption:
         # Simulate a pre-fix row: raw plaintext JSON written straight to the column
         creds = {'api_key': 'legacy-plain'}
         with app.app_context():
-            dp = DnsProvider(name='legacy', provider_type='route53')
+            dp = DnsProvider(name=f'legacy-{uuid.uuid4().hex[:8]}', provider_type='route53')
             dp._credentials = json.dumps(creds)  # bypass the encrypting setter
             db.session.add(dp)
             db.session.commit()
@@ -59,7 +60,7 @@ class TestCredentialEncryption:
         secret = 'ctor-kwarg-secret'
         with app.app_context():
             dp = DnsProvider(
-                name='ctor', provider_type='cloudflare',
+                name=f'ctor-{uuid.uuid4().hex[:8]}', provider_type='cloudflare',
                 credentials=json.dumps({'api_token': secret}),
             )
             db.session.add(dp)
@@ -73,7 +74,7 @@ class TestCredentialEncryption:
 
     def test_none_credentials(self, app):
         with app.app_context():
-            dp = DnsProvider(name='empty', provider_type='manual')
+            dp = DnsProvider(name=f'empty-{uuid.uuid4().hex[:8]}', provider_type='manual')
             dp.credentials = None
             db.session.add(dp)
             db.session.commit()

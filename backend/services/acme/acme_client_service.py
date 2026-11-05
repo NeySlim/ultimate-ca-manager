@@ -271,9 +271,12 @@ class AcmeClientService:
         alg_cfg = SystemConfig.query.filter_by(key='acme.client.account_key_type').first()
         algorithm = (alg_cfg.value if alg_cfg and alg_cfg.value in ACCOUNT_KEY_TYPES else 'ES256')
 
+        # Labels are unique (migration 124): an operator's account may hold this one.
+        from utils.unique_names import first_free
+        taken = {label for (label,) in db.session.query(AcmeClientAccount.label)}
         new_account = AcmeClientAccount(
             directory_url=target_url,
-            label=target_label,
+            label=first_free(target_label, taken),
             email=email,
             account_key_algorithm=algorithm,
             is_default=(AcmeClientAccount.query.count() == 0),

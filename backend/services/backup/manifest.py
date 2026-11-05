@@ -270,16 +270,11 @@ SECTIONS: Dict[str, Section] = {
     ),
     'acme_client_accounts': Section(
         model='models.acme_client_account:AcmeClientAccount',
-        # The label is part of the identity because the pair
-        # (directory_url, email) is not one: migration 077 dropped the
-        # uniqueness of `directory_url` on purpose (#276), so an
-        # administrator may hold several accounts at the same authority,
-        # under the same shared mailbox, told apart only by what they called
-        # them. Identified by the pair alone, the two collapsed into one
-        # index entry: the second archived account overwrote the first, and
-        # an order restored beside them was attached to whichever of the two
-        # the index had kept.
-        identity=('directory_url', 'email', 'label'),
+        # Several accounts may share a directory URL and a mailbox (#276):
+        # the label tells them apart, unique since migration 124. Before the
+        # plan, restore/names.py matches an archived account by
+        # (directory_url, account_url) and renames it when its label clashes.
+        identity=('label',),
         exclude={**_SURROGATE},
         secrets=('account_key', 'eab_hmac_key'),
         stored={'account_key': 'master'},

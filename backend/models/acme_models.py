@@ -277,6 +277,8 @@ class AcmeNonce(db.Model):
 class DnsProvider(db.Model):
     """DNS Provider for automated DNS-01 challenge validation"""
     __tablename__ = 'dns_providers'
+    # Unique since migration 124: a restore tells providers apart by name.
+    __table_args__ = (db.Index('uq_dns_providers_name', 'name', unique=True),)
     
     id = db.Column(db.Integer, primary_key=True)
     name = db.Column(db.String(100), nullable=False)

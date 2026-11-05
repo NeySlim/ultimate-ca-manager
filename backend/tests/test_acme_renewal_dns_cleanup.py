@@ -1,4 +1,5 @@
 """Renewal DNS TXT cleanup on failure paths (LOT A review fix)."""
+import uuid
 from unittest.mock import MagicMock, patch
 
 import pytest
@@ -11,7 +12,7 @@ def renewal_order(app):
 
     with app.app_context():
         provider = DnsProvider(
-            name='test-gandi',
+            name=f'test-gandi-{uuid.uuid4().hex[:8]}',
             provider_type='gandi',
             credentials='{}',
         )

@@ -54,6 +54,8 @@ def _safe_custom_headers(custom: dict) -> dict:
 class WebhookEndpoint(db.Model):
     """Webhook endpoint configuration"""
     __tablename__ = 'webhook_endpoints'
+    # Unique since migration 124: a restore tells endpoints apart by name.
+    __table_args__ = (db.Index('uq_webhook_endpoints_name', 'name', unique=True),)
 
     VALID_AUTH_TYPES = ('none', 'bearer', 'basic', 'api_key', 'custom')
 

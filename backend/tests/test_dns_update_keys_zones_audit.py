@@ -41,7 +41,7 @@ def env(app):
         e.app = app
 
         def make_account(enabled=True):
-            a = AcmeClientAccount(directory_url='https://u.example/dir', label='t',
+            a = AcmeClientAccount(directory_url='https://u.example/dir', label=f't-{uuid.uuid4().hex[:8]}',
                                   email='t@example.com', proxy_enabled=enabled)
             db.session.add(a)
             db.session.commit()
@@ -72,7 +72,7 @@ def env(app):
         def make_domain(name):
             p = DnsProvider.query.first()
             if p is None:
-                p = DnsProvider(name='dnsupd-test-provider', provider_type='cloudflare')
+                p = DnsProvider(name=f'dnsupd-test-provider-{uuid.uuid4().hex[:8]}', provider_type='cloudflare')
                 db.session.add(p)
                 db.session.commit()
             db.session.add(AcmeDomain(domain=name, dns_provider_id=p.id))

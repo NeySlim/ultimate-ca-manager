@@ -74,6 +74,16 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
             f'{len(fallbacks)} deploy {bindings} pinned to a cross-certificate '
             f'absent from this installation {were} reset to the automatic chain')
 
+    renamed = (results or {}).get('renamed') or []
+    if renamed:
+        shown = [f"{entry['from']} as {entry['to']}" for entry in renamed[:5]]
+        listing = ', '.join(shown)
+        if len(renamed) > len(shown):
+            listing += f' and {len(renamed) - len(shown)} more'
+        rows, were = ('row', 'was') if len(renamed) == 1 else ('rows', 'were')
+        message += _clause(f'{len(renamed)} {rows} {were} restored under another '
+                           f'name: {listing}')
+
     if (results or {}).get('admin_allowlist_cleared'):
         message += _clause('The admin access allowlist from the archive would '
                            'have locked out this session and was cleared; set '

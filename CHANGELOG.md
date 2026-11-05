@@ -35,6 +35,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME profiles: renaming a profile bound to a disabled template was refused as a new binding. A rename now keeps the binding, and a second profile on that template is still refused.
 - Public endpoints: with the HTTP protocol port set to 0 and a Protocol Base URL without a port, CRL, OCSP and AIA URLs were issued as `http://host:0/...`. They now use port 80, the preflight check probes it, and the upgrade corrects the URLs stored on each CA (discussion #433, reported by @avdpas, thanks @Hemsby).
 - Google Cloud KMS: the notice for ML-DSA keys now says that KMS signs at most 64 KiB, which rules out a larger CRL.
+- Restore: two DNS providers, ACME CA accounts or webhooks of the same name were merged into one row, and one credential was lost. A clashing row is now restored as `name (2)`, and the restore result lists it; an account is matched by its account URL and a webhook by its URL first.
+- DNS providers, ACME CA accounts and webhooks: the API accepted a name already in use. It now answers 409, on creation and on rename.
 
 ### Changed
 
@@ -46,6 +48,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: two orders for the same names that have already renewed apart cannot be told from two wanted orders, so both keep renewing: delete the one you do not want.
 - Templates: the API and import accept only true or false for `is_active`, `enforce_san_types`, `ad_derived_subject` and `autoenroll_enabled`; 0 and 1 are refused.
 - Public endpoints: certificates issued before this update keep a `:0` in their CRL, OCSP and AIA URLs: reissue them.
+- DNS providers, ACME CA accounts and webhooks: the upgrade renames duplicate names to `name (2)`, `name (3)`, oldest first, then makes the name unique (migration 124).
 - SSH: the option is off for every CA, existing ones included. A client that sends `key_id` gets a 400 until the option is ticked on its CA; sending the CA's own `principals@CA name` is still accepted.
 
 ## [2.248] - 2026-11-01
