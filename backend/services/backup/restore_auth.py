@@ -167,8 +167,10 @@ class RestoreAuthMixin:
             ac = (AuthCertificate.query.filter_by(cert_fingerprint=fingerprint).first()
                   if fingerprint else None)
             if ac is None:
-                # The row of that serial, when its fingerprint is empty or the same one spelled otherwise
-                same_serial = AuthCertificate.query.filter_by(cert_serial=ac_data['cert_serial']).first()
+                # The row of that (issuer, serial), when its fingerprint is empty or the same one spelled otherwise
+                from services.mtls_enrollment import enrolments_of
+                same_serial = next((row for row in enrolments_of(ac_data['cert_serial'], ac_data.get('cert_issuer'))
+                                    if row.cert_serial == ac_data['cert_serial']), None)
                 if same_serial is not None and (not fingerprint or not same_serial.cert_fingerprint or
                                                 _digest(same_serial.cert_fingerprint) == _digest(fingerprint)):
                     ac = same_serial

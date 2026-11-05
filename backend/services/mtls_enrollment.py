@@ -40,6 +40,70 @@ def normalized_fingerprint(value) -> Optional[Tuple[str, str]]:
     return None
 
 
+def serial_forms(raw) -> set:
+    """Every stored form of a serial (decimal, hex): one certificate is one
+    enrolment whatever route recorded it."""
+    forms = {str(raw)}
+    for base in (10, 16):
+        try:
+            forms |= serial_variants(int(str(raw), base))
+        except (TypeError, ValueError):
+            continue
+    return forms
+
+
+def issuer_key(dn) -> str:
+    """An issuer DN compared across spellings: RFC 4514, or OpenSSL's ``/C=../CN=..``."""
+    text = str(dn or '').strip()
+    if text.startswith('/'):
+        text = ','.join(reversed([part for part in text.split('/') if part]))
+    return ','.join(part.strip() for part in text.split(',')).casefold()
+
+
+def _rank(row, serial, wanted):
+    # Same issuer before an unrecorded one, the serial as spelled before another form
+    same_issuer = wanted is None or (row.cert_issuer and issuer_key(row.cert_issuer) == wanted)
+    return (0 if same_issuer else 1), (0 if row.cert_serial == str(serial) else 1)
+
+
+def enrolments_of(serial, issuer=None) -> list:
+    """The enrolments of certificate (``issuer``, ``serial``), best match first.
+
+    A serial is unique per issuer only: an enrolment under another issuer is
+    another certificate. One that recorded no issuer may be of any; without
+    ``issuer``, every enrolment of that serial is returned.
+    """
+    from models.auth_certificate import AuthCertificate
+    if serial in (None, ''):
+        return []
+    rows = AuthCertificate.query.filter(
+        AuthCertificate.cert_serial.in_(serial_forms(serial))
+    ).order_by(AuthCertificate.id).all()
+    wanted = issuer_key(issuer) if issuer else None
+    if wanted is not None:
+        rows = [row for row in rows if not row.cert_issuer or issuer_key(row.cert_issuer) == wanted]
+    return sorted(rows, key=lambda row: _rank(row, serial, wanted))
+
+
+def presented_enrolment(serial, issuer=None, fingerprint=None):
+    """The enrolment a presented certificate names, or None.
+
+    The fingerprint tells same-serial enrolments apart; failing it, the best
+    match must be the only one of its rank, never a guess between two.
+    """
+    rows = enrolments_of(serial, issuer)
+    presented = normalized_fingerprint(fingerprint)
+    if presented:
+        for row in rows:
+            if normalized_fingerprint(row.cert_fingerprint) == presented:
+                return row
+    if not rows:
+        return None
+    wanted = issuer_key(issuer) if issuer else None
+    best = [row for row in rows if _rank(row, serial, wanted) == _rank(rows[0], serial, wanted)]
+    return best[0] if len(best) == 1 else None
+
+
 def _fingerprint(der: bytes, algorithm: str) -> str:
     # SHA-1 only to match what a proxy presents; the DER is compared first when stored
     if algorithm == 'sha1':

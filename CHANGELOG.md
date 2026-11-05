@@ -57,6 +57,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Restore: an archive older than migrations 101 to 105 put back what they had cleaned (legacy EAB keys, dead and `ldap_*` settings, SAML providers signing requests, group permissions stored as text). Those repairs are now replayed on the rows the restore writes.
 - CAs and certificates: deleting a CA left its SCEP challenge and OCSP responder settings, and deleting a certificate its SCTs, which SQLite could hand to the next row given that number. They now go with the row.
 - Database migration: a role inheriting from a role created after it made the copy to PostgreSQL fail when the database role cannot disable foreign keys. A link to a row of the same table is now written once the whole table is in.
+- mTLS: a client certificate could not be enrolled, imported or assigned when an enrolled certificate of another CA had the same serial number, legitimate in X.509. An enrolment is now identified by its issuer and serial, at login and by a restore too (migration 130).
 
 ### Upgrade notes
 
@@ -72,6 +73,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Restore: a replacing restore now removes the CRLs, cached OCSP responses, sessions, in-flight ACME server orders, approval requests (from an archive without them), Microsoft CA requests, SAML replay entries and webhook or deployment deliveries (history included) that point at a removed row, detaches ACME client orders, SCEP requests, discovery results and revocation records from it, and cancels the key recovery requests still open on a removed certificate. The restore message and its audit entry list them.
 - Restore: `BACKUP_MAX_UPLOAD_MB` (default 512) is the restore upload's own ceiling, the decompressed content may be four times that, and the archive may hold one JSON object per 100 bytes of it; a reverse proxy in front of UCM keeps its own body limit. A restore holds the archive in memory, with a peak of several times its size.
 - Templates: the upgrade adds the `custom_extensions` column, empty for every existing template (migration 127).
+- mTLS: migration 130 makes client certificate enrolments unique per issuer and serial instead of serial alone, first filling a missing issuer from the stored certificate.
 
 ## [2.249] - 2026-11-05
 
