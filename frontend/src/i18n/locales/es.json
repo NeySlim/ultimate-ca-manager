@@ -5451,7 +5451,6 @@
     "signerGenerateValidity": "Validez (días)",
     "signerGenerateKeyType": "Tipo de clave",
     "signerMldsaVerifyNote": "Las marcas de tiempo ML-DSA se verifican con openssl cms -verify (OpenSSL 3.5 o posterior), no con openssl ts -verify; compruebe la huella del mensaje por separado.",
-    "signerMldsaVerifyNote": "Las marcas de tiempo ML-DSA se verifican con openssl cms -verify (OpenSSL 3.5 o posterior), no con openssl ts -verify; compruebe la huella del mensaje por separado.",
     "signerGenerated": "Certificado de firma TSA emitido.",
     "signerGeneratedSelected": "Certificado de firma TSA emitido y seleccionado como firmante dedicado.",
     "signerGenerateFailed": "No se pudo generar el certificado de firma TSA.",
