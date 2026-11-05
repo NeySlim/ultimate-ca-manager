@@ -107,7 +107,8 @@ RESTORED_SECTIONS = set(GENERIC_SECTIONS) | {
     'dns_providers', 'acme_domains', 'acme_local_domains', 'ssh_cas',
     'ssh_certificates', 'microsoft_cas', 'msca_requests', 'scan_profiles',
     'scan_runs', 'discovered_certificates', 'approval_requests',
-    'scep_requests', 'acme_client_orders', 'audit_logs', 'https_server',
+    'scep_requests', 'acme_client_orders', 'key_recovery_requests', 'audit_logs',
+    'https_server',
 }
 
 

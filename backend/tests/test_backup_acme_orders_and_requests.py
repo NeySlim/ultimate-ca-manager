@@ -325,6 +325,7 @@ def test_carried_sections_are_replaced_like_any_other(target):
     assert 'acme_client_orders.certificate_id' not in results['unlinked_dependents']
     assert 'approval_requests' not in results['cleared_dependents']
     assert not results['closed_dependents']
+    assert not set(CARRIED) & set(results['sections_not_restored'])
     assert _orphans() == []
 
 
