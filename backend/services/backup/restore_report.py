@@ -102,6 +102,17 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
         message += _clause('Rows the archive does not carry lost their link to a removed row: '
                            + _listing([f'{name} ({count})' for name, count in sorted(unlinked.items())]))
 
+    left_out = (results or {}).get('left_out') or []
+    if left_out:
+        rows, were = ('row', 'was') if len(left_out) == 1 else ('rows', 'were')
+        message += _clause(f'{len(left_out)} {rows} of an older archive {were} left out: '
+                           + _listing(left_out))
+
+    dropped = (results or {}).get('dropped_secrets') or []
+    if dropped:
+        message += _clause('Secrets encrypted under another installation\'s key were '
+                           'left out, enter them again: ' + _listing(dropped))
+
     if (results or {}).get('admin_allowlist_cleared'):
         message += _clause('The admin access allowlist from the archive would '
                            'have locked out this session and was cleared; set '

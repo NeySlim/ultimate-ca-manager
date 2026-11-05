@@ -28,7 +28,7 @@ from .restore.names import rename_clashing_rows
 from .restore.conflict import conflict_from_integrity_error
 from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
 from .restore.settings import restore_encrypted_settings
-from .restore_rbac import upgrade_archived_permissions
+from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
 
 logger = logging.getLogger(__name__)
 
@@ -352,6 +352,8 @@ class RestoreCoreMixin:
 
                 if replacement is not None:
                     results.update(remove_after_writes(replacement).report())
+                results['left_out'] = list(plan.left_out)
+                results['dropped_secrets'] = list(plan.dropped_fields)
 
                 # Published inside the transaction, so a file that cannot be
                 # placed rolls the database back with it. The window that
@@ -460,7 +462,7 @@ class RestoreCoreMixin:
         self._regenerate_files(staged)
 
         # RBAC restores
-        self._restore_groups(backup_data, results)
+        self._restore_groups(backup_data, results, plan)
         self._restore_custom_roles(backup_data, results, plan)
         self._restore_templates(backup_data, results)
         # Settings came back before the templates: point the ACME profile
@@ -542,6 +544,11 @@ class RestoreCoreMixin:
             if not carried_hash:
                 existing.password_hash = previous_hash
             results['users'] += 1
+
+        db.session.flush()
+        nested = restore_nested_webauthn(backup_data, plan)
+        if nested:
+            results['webauthn_credentials'] = nested
 
     @staticmethod
     def _apply_ca_revocation(ca, ca_data: Dict) -> None:

@@ -142,8 +142,8 @@ class RestoreAuthMixin:
                             name=ak_data.get('name', 'restored'),
                             permissions=ak_data.get('permissions', '[]'))
                 db.session.add(ak)
-            apply_columns(ak, 'api_keys', ak_data, plan)
-            results['api_keys'] += 1
+            if apply_columns(ak, 'api_keys', ak_data, plan):
+                results['api_keys'] += 1
 
     def _restore_auth_certificates(self, backup_data: Dict, results: Dict,
                                    plan: Optional[RestorePlan] = None) -> None:
@@ -172,5 +172,5 @@ class RestoreAuthMixin:
                     user_id=ac_data.get('user_id', 1),
                     cert_subject=ac_data.get('cert_subject', ''))
                 db.session.add(ac)
-            apply_columns(ac, 'auth_certificates', row, plan)
-            results['auth_certificates'] += 1
+            if apply_columns(ac, 'auth_certificates', row, plan):
+                results['auth_certificates'] += 1

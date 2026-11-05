@@ -50,6 +50,10 @@ class RestorePlan:
         self._archived_by_identity: Dict[str, Dict[Tuple, Dict[str, Any]]] = {}
         # Source row numbers mean something here only on the same database.
         self.same_installation = False
+        # Rows an older archive cannot place, and secrets it carries under a
+        # key this installation does not hold: both told in the result.
+        self.left_out: List[str] = []
+        self.dropped_fields: List[str] = []
 
     # -- building ---------------------------------------------------------
 

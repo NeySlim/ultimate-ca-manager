@@ -57,8 +57,12 @@ def _mapping_of(model):
     return cached
 
 
+class UnplaceableLegacyRow(RestoreValidationError):
+    """A required link an older archive names by its source number alone."""
+
+
 def apply_columns(instance, section_name: str, row: Dict[str, Any],
-                  plan: RestorePlan) -> None:
+                  plan: RestorePlan) -> bool:
     """Put every column the archive carries for this row onto `instance`.
 
     This is the whole of "restoring a row", and it is deliberately the same
@@ -70,10 +74,30 @@ def apply_columns(instance, section_name: str, row: Dict[str, Any],
     The columns the manifest marks `handled` are left out: a dedicated
     restorer owns them because it is the one holding the archive's master key
     (the PEMs and the private key). Everything else comes from here.
+
+    Returns False when the row is left out (`UnplaceableLegacyRow`): a new
+    row leaves the session again, and `plan.left_out` says why.
     """
     section = SECTIONS[section_name]
     columns, attribute_of = _mapping_of(type(instance))
-    _apply_row(section_name, section, instance, row, columns, attribute_of, plan)
+    return _apply_or_leave_out(section_name, section, instance, row, columns,
+                               attribute_of, plan)
+
+
+def _apply_or_leave_out(section_name, section, instance, row, columns, attribute_of, plan) -> bool:
+    state = sa_inspect(instance)
+    new = state.transient or state.pending
+    try:
+        _apply_row(section_name, section, instance, row, columns, attribute_of, plan)
+    except UnplaceableLegacyRow as left_out:
+        if new and state.persistent:
+            db.session.delete(instance)
+        elif new and state.pending:
+            db.session.expunge(instance)
+        plan.left_out.append(str(left_out))
+        logger.warning("Restore: %s", left_out)
+        return False
+    return True
 
 
 def apply_section(section_name: str, rows: List[Dict[str, Any]],
@@ -119,8 +143,9 @@ def apply_section(section_name: str, rows: List[Dict[str, Any]],
             instance = model()
             db.session.add(instance)
 
-        _apply_row(section_name, section, instance, row, columns, attribute_of, plan)
-        applied += 1
+        if _apply_or_leave_out(section_name, section, instance, row, columns,
+                               attribute_of, plan):
+            applied += 1
 
     db.session.flush()
     return applied
@@ -205,12 +230,16 @@ def _apply_row(section_name, section, instance, row, columns, attribute_of, plan
         if name in section.references:
             resolved = plan.resolve(section_name, row, name)
             if resolved is None and row.get(name) is not None:
-                _unplaceable_reference(section_name, section, name, row, column)
+                if _unplaceable_reference(section_name, section, name, row, column,
+                                          instance, attribute_of.get(name, name)):
+                    continue      # an existing row keeps the link it has
             setattr(instance, attribute_of.get(name, name), resolved)
             continue
 
         if name in section.secrets:
-            setattr(instance, name, _secret_as_stored(section, name, value))
+            setattr(instance, name, _secret_as_stored(
+                section, name, value, label=_row_label(section_name, section, row),
+                dropped=plan.dropped_fields))
             continue
 
         if section_name == 'deploy_bindings' and name == 'chain_variant':
@@ -242,7 +271,13 @@ def _restored_chain_variant(row, value, plan):
     return f'cross:{target.id}'
 
 
-def _unplaceable_reference(section_name, section, name, row, column) -> None:
+def _row_label(section_name, section, row) -> str:
+    values = [str(row.get(field)) for field in section.identity if row.get(field) not in (None, '')]
+    return f"{section_name} {'/'.join(values)}".strip()
+
+
+def _unplaceable_reference(section_name, section, name, row, column,
+                           instance=None, attribute=None) -> bool:
     """A reference the archive carries and this installation cannot place.
 
     Left alone, a column that requires a value took `None` and the insert
@@ -255,10 +290,24 @@ def _unplaceable_reference(section_name, section, name, row, column) -> None:
     A column that accepts an empty value keeps its silence: the reference may
     point at a row a later section of this same restore creates, and
     `relink_references` resolves it again once everything exists.
+
+    An archive older than the identities (before 2.230) names the row by the
+    source's number alone. The archive is still restored: an existing row
+    keeps its link (True is returned), a new one is left out.
     """
     if column.nullable:
-        return
+        return False
     identity = row.get(f'{name}{REFERENCE_SUFFIX}')
+    if not identity:
+        state = sa_inspect(instance) if instance is not None else None
+        if state is not None and state.persistent and getattr(instance, attribute, None) is not None:
+            return True
+        why = ("an archive older than 2.230" if f'{name}{REFERENCE_SUFFIX}' not in row
+               else "the row it named was gone when the archive was written")
+        raise UnplaceableLegacyRow(
+            f"{_row_label(section_name, section, row)} was left out: its "
+            f"{section.references[name]} link is a number from another database "
+            f"({why}), and the row cannot exist without it")
     raise RestoreValidationError(
         f"Invalid backup: {section_name}.{name} points at a "
         f"{section.references[name]} row this installation does not have "
@@ -266,7 +315,7 @@ def _unplaceable_reference(section_name, section, name, row, column) -> None:
         "the column requires one; nothing has been changed")
 
 
-def _fields_as_stored(value: Any) -> Any:
+def _fields_as_stored(value: Any, label: str = 'HSM provider', dropped=None) -> Any:
     """HSM configuration: each sensitive value under this installation's key. A value in the
     source's ciphertext only that key opens: dropped, so the provider shows it as missing."""
     from models.hsm import HsmProvider, _is_sensitive_key
@@ -281,15 +330,18 @@ def _fields_as_stored(value: Any) -> Any:
         if (_is_sensitive_key(field) and isinstance(secret, str) and secret
                 and is_encrypted(secret) and not decrypt_value(secret)):
             del fields[field]
-            logger.warning("A restored HSM provider lost field %s, encrypted under another "
-                           "installation's key: enter it again", field)
+            logger.warning("Restore: %s lost field %s, encrypted under another "
+                           "installation's key: enter it again", label, field)
+            if dropped is not None:
+                dropped.append(f"{label}: {field}")
     # Never added to the session: only its encoding of the column is wanted
     provider = HsmProvider()
     provider.set_config(fields)
     return provider.config
 
 
-def _secret_as_stored(section, name: str, value: Any) -> Any:
+def _secret_as_stored(section, name: str, value: Any, *, label: str = 'HSM provider',
+                      dropped=None) -> Any:
     """The archive's cleartext, in the shape the column holds it here.
 
     A secret is assigned by its manifest name, which is the model's own
@@ -314,7 +366,7 @@ def _secret_as_stored(section, name: str, value: Any) -> Any:
     if not value or layer is None:
         return value
     if layer == 'fields':
-        return _fields_as_stored(value)
+        return _fields_as_stored(value, label, dropped)
     if layer == 'master':
         from security.encryption import encrypt_text
         return encrypt_text(value)
@@ -390,11 +442,7 @@ def relink_references(backup_data: Dict[str, Any], plan: RestorePlan) -> Dict[st
             continue
 
         model = load_model(section)
-        mapper = sa_inspect(model)
-        attribute_of = {}
-        for prop in mapper.column_attrs:
-            for column in prop.columns:
-                attribute_of[column.key] = prop.key
+        columns, attribute_of = _mapping_of(model)
 
         changed = 0
         for row in rows:
@@ -411,6 +459,8 @@ def relink_references(backup_data: Dict[str, Any], plan: RestorePlan) -> Dict[st
                     continue
                 resolved = plan.resolve(section_name, row, column)
                 attribute = attribute_of.get(column, column)
+                if resolved is None and column in columns and not columns[column].nullable:
+                    continue      # kept, as `_unplaceable_reference` keeps it
                 if getattr(instance, attribute, None) != resolved:
                     setattr(instance, attribute, resolved)
                     changed += 1
