@@ -19,7 +19,7 @@ class CompromisedKeyRecord(db.Model):
     # SHA-256 of the SubjectPublicKeyInfo (utils/spki_digest.py)
     public_key_sha256 = db.Column(db.String(64), nullable=False, unique=True, index=True)
     revoked_at = db.Column(db.DateTime, nullable=False, default=utc_now)
-    # Issuer family of the certificate: local, acme_client or msca
+    # Issuer of the certificate: local (a CA held here), acme_client, msca or external
     source = db.Column(db.String(20), nullable=False)
     cert_refid = db.Column(db.String(36))
     subject = db.Column(db.Text)
@@ -55,13 +55,18 @@ def remember_compromised_key(digest, source, *, revoked_at=None, cert_refid=None
         return False
 
 
-def remember_if_compromised(certificate, digest=None) -> None:
-    """Keep the key of a certificate row revoked as compromised; never raises."""
+def key_source(certificate) -> str:
+    if certificate.caref:
+        return 'local'
+    return certificate.source if certificate.source in ('acme_client', 'msca') else 'external'
+
+
+def remember_if_compromised(certificate, digest=None) -> bool:
+    """Keep the key of a certificate row revoked as compromised; True once recorded, never raises."""
     from utils.revocation_reasons import normalize_revocation_reason
     from utils.spki_digest import certificate_key_sha256
     if not certificate.revoked or normalize_revocation_reason(certificate.revoke_reason) != 'keyCompromise':
-        return
-    source = certificate.source if certificate.source in ('acme_client', 'msca') else 'local'
-    remember_compromised_key(digest or certificate_key_sha256(certificate.crt), source,
-                             revoked_at=certificate.revoked_at, cert_refid=certificate.refid,
-                             subject=certificate.subject)
+        return False
+    return remember_compromised_key(digest or certificate_key_sha256(certificate.crt), key_source(certificate),
+                                    revoked_at=certificate.revoked_at, cert_refid=certificate.refid,
+                                    subject=certificate.subject)

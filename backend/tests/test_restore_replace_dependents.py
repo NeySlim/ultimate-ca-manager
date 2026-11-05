@@ -600,6 +600,22 @@ def test_a_revocation_record_outlives_its_removed_certificate(target):
     assert results['unlinked_dependents'] == {'revoked_serials.certificate_id': 1}
 
 
+def test_a_compromised_key_known_here_survives_a_replacement(target):
+    from models.compromised_key import CompromisedKeyRecord
+
+    _user('replace-admin')
+    db.session.add(CompromisedKeyRecord(public_key_sha256='a' * 64, source='external'))
+    blob = _snapshot('users', 'compromised_keys')
+    CompromisedKeyRecord.query.delete()
+    db.session.add(CompromisedKeyRecord(public_key_sha256='b' * 64, source='acme_client'))
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert {r.public_key_sha256 for r in CompromisedKeyRecord.query} == {'a' * 64, 'b' * 64}
+    assert 'compromised_keys' not in results.get('removed', {})
+
+
 # -- what a refusal quotes ----------------------------------------------------
 
 class _Orig(Exception):

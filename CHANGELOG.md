@@ -52,7 +52,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Upgrade notes
 
-- Revocation: migration 129 adds the `compromised_keys` table and fills it from the revocation records that already hold a compromised key's digest. A certificate of another CA revoked as compromised before this version adds its key when it is deleted or renewed.
+- Revocation: migration 129 adds the `compromised_keys` table and fills it from the certificates revoked as compromised and from the revocation records holding such a key's digest. A replacing restore adds the archived keys and never removes one known here.
 - Revocation records written before migration 128 carry no key digest: they learn it when their certificate is deleted, and until then the certificate row itself answers.
 - ACME client: the renewal task now removes the orders left `pending` for more than 7 days whose order at the CA has expired or whose expiry is unknown, with their TXT records, and audits each removal.
 - DNS providers, ACME CA accounts and webhooks: the upgrade renames duplicate names to `name (2)`, `name (3)`, oldest first, then makes the name unique (migration 124).

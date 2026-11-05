@@ -87,6 +87,37 @@ def test_a_renewal_in_place_keeps_the_compromised_key_it_overwrites(bench):
     assert compromised_keys.key_revoked_as_compromised(bench.key.public_key())
 
 
+def test_a_renewal_keeps_the_compromised_key_before_the_ca_is_asked(bench):
+    row = db.session.get(Certificate, bench.cert_id)
+    row.revoked, row.revoke_reason = True, 'keyCompromise'
+    db.session.commit()
+    bench.client.create_order = MagicMock(return_value=(False, 'rate limited by the CA', None))
+    try:
+        bench.renew()
+    except Exception:
+        pass
+    assert _record(bench).source == 'acme_client'
+
+
+@pytest.mark.parametrize('caref, source, kept', [(True, 'acme_client', 'local'), (False, 'manual', 'external'),
+                                                 (False, 'acme_client', 'acme_client'), (False, 'msca', 'msca')])
+def test_the_source_says_who_issued_the_certificate(bench, create_ca, caref, source, kept):
+    row = db.session.get(Certificate, bench.cert_id)
+    row.source = source
+    if caref:
+        row.caref = create_ca()['refid']
+    db.session.commit()
+    CertificateService.revoke_certificate(bench.cert_id, reason='keyCompromise', username='admin')
+    assert _record(bench).source == kept
+
+
+def test_a_replacing_restore_never_prunes_the_compromised_keys():
+    from services.backup.manifest import SECTIONS
+    from services.backup.restore.replace import DEPENDENT_TABLES, MERGED_ONLY
+    assert set(MERGED_ONLY) <= set(SECTIONS) and all(MERGED_ONLY.values())
+    assert 'compromised_keys' in MERGED_ONLY and 'compromised_keys' not in DEPENDENT_TABLES
+
+
 @pytest.mark.parametrize('reason', ['superseded', 'certificateHold', 'unspecified'])
 def test_another_reason_records_nothing(bench, reason):
     CertificateService.revoke_certificate(bench.cert_id, reason=reason, username='admin')
