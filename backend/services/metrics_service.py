@@ -79,6 +79,7 @@ def _scheduler(doc):
     doc_help_runs = "Total executions of a scheduler task"
     doc_help_dur = "Last execution duration of a scheduler task (ms)"
     doc_help_fail = "1 if the task's last run errored, else 0"
+    doc_help_warn = "1 if the task's last run ended with a warning, else 0"
     for name, st in statuses.items():
         doc.metric('ucm_scheduler_task_runs_total', st.get('run_count', 0),
                    mtype='counter', help_text=doc_help_runs, task=name)
@@ -86,6 +87,8 @@ def _scheduler(doc):
                    help_text=doc_help_dur, task=name)
         doc.metric('ucm_scheduler_task_failed', 1 if st.get('last_error') else 0,
                    help_text=doc_help_fail, task=name)
+        doc.metric('ucm_scheduler_task_warning', 1 if st.get('last_status') == 'warning' else 0,
+                   help_text=doc_help_warn, task=name)
 
 
 def _webhooks(doc):

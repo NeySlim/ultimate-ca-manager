@@ -262,6 +262,7 @@ class WebhookService:
     TEMPLATE_UPDATED = 'template.updated'
     # ACME client
     ACME_PREFLIGHT = 'acme.preflight'
+    ACME_RENEWAL_FAILED = 'acme_order.renewal_failed'
     # System updates (#301)
     UPDATE_AVAILABLE = 'system.update_available'
     # Trigger written, watcher will install on restart (#301 review R-01)
@@ -276,7 +277,7 @@ class WebhookService:
         CA_CREATED, CA_UPDATED, CA_DELETED,
         CSR_SUBMITTED, CSR_APPROVED, CSR_REJECTED,
         TEMPLATE_CREATED, TEMPLATE_UPDATED,
-        ACME_PREFLIGHT,
+        ACME_PREFLIGHT, ACME_RENEWAL_FAILED,
         UPDATE_AVAILABLE, UPDATE_INITIATED, UPDATE_INSTALLED, UPDATE_FAILED,
     ]
 
@@ -585,6 +586,15 @@ def emit_acme_preflight(
         },
         None,
         _meta(actor),
+    )
+
+
+def emit_acme_renewal_failed(order: dict, failures: int, error: str, retry_daily: bool):
+    _emit(
+        WebhookService.ACME_RENEWAL_FAILED,
+        {'order': order, 'renewal_failures': failures, 'error': error, 'retry_daily': retry_daily},
+        None,
+        _meta('system'),
     )
 
 

@@ -13,7 +13,7 @@ from sqlalchemy import or_
 from models import CA, Certificate, DnsProvider, RevokedSerial, SystemConfig, db
 from models.acme_models import AcmeClientOrder
 from services.acme import dns_providers
-from services.acme.acme_client_service import AcmeClientService
+from services.acme.acme_client_service import ACCOUNT_GONE, AcmeClientService
 from services.acme.dns_selfcheck import dns_propagation_timeout, wait_for_challenges
 from services.acme.http01 import wait_for_http01
 from services.acme import client_certificates
@@ -21,6 +21,7 @@ from services.acme.client_certificates import KEY_MISMATCH
 from services.acme.order_lease import BUSY, LEASE_LOST, OrderLease, RenewalInProgress
 from services.audit.staging import stage_audit_entry
 from services.cert_service import CertificateService
+from services.webhook_service import emit_acme_renewal_failed
 from utils.acme_debug import acme_log
 from utils.datetime_utils import utc_now
 from utils.san_parse import strip_wildcard
@@ -31,7 +32,9 @@ logger = logging.getLogger(__name__)
 
 # Default: renew 30 days before expiry
 DEFAULT_RENEWAL_DAYS = 30
-MAX_RENEWAL_FAILURES = 5
+# From this many failures on, an order is still renewed, once a day
+MAX_RENEWAL_FAILURES = AcmeClientOrder.RENEWAL_FAILURES_BEFORE_DAILY
+DAILY_RETRY = timedelta(days=1)
 # UCM serves its own HTTP-01 tokens, so the file is there at once or not at all.
 HTTP01_RENEWAL_WAIT = 10
 
@@ -45,6 +48,17 @@ class RenewalBlocked(Exception):
 _ARI_CACHE = {}
 
 
+def renewal_client(order):
+    """The client of the CA account ``order`` was issued under.
+
+    RenewalBlocked when the order names an account that is gone; an order that names
+    none (older than per-order accounts) still resolves by environment."""
+    client = AcmeClientService.for_existing_order(order)
+    if client is None:
+        raise RenewalBlocked(ACCOUNT_GONE)
+    return client
+
+
 def _cached_renewal_info(order, certificate, now):
     """Return upstream ARI data while honoring Retry-After."""
     cache_key = (order.acme_client_account_id, certificate.id)
@@ -52,7 +66,7 @@ def _cached_renewal_info(order, certificate, now):
     if cached and cached.get('retry_after') and now < cached['retry_after']:
         return cached['info']
 
-    client = AcmeClientService.for_order(order)
+    client = renewal_client(order)
     info = client.get_renewal_info(certificate)
     if info and info.get('retry_after') and info['retry_after'] > now:
         _ARI_CACHE[cache_key] = {
@@ -207,6 +221,44 @@ def _configured_renewal_days():
     return min(60, max(1, days))
 
 
+def _attempt_allowed(order, now):
+    """Every pass below the failure threshold; past it, a day after the last failure."""
+    if not order.renewal_retry_daily or order.last_error_at is None:
+        return True
+    return now - order.last_error_at >= DAILY_RETRY
+
+
+def _record_scheduled_failure(order, error):
+    """Count, audit and announce one failed scheduled renewal of ``order``."""
+    order.renewal_failures = (order.renewal_failures or 0) + 1
+    order.last_error_at = utc_now()
+    order.error_message = str(error)
+    stage_audit_entry(
+        action='acme_order.auto_renewal_failed',
+        resource_type='acme_order',
+        resource_id=str(order.id),
+        resource_name=order.primary_domain,
+        details=f'Auto-renewal failed: {error}',
+        success=False,
+    )
+    if commit_or_rollback(logger, f"Failed to persist renewal failure for order {order.id}"):
+        payload = order.to_dict()
+        payload.pop('challenges', None)  # tokens and TXT values stay out of webhooks
+        emit_acme_renewal_failed(payload, order.renewal_failures, str(error), order.renewal_retry_daily)
+
+
+def _pass_outcome(failed, daily):
+    """The scheduler's status for a pass: a warning while renewals fail or run once a day."""
+    if not failed and not daily:
+        return None
+    parts = []
+    if failed:
+        parts.append(f'{failed} renewal(s) failed in this run')
+    if daily:
+        parts.append(f'{daily} order(s) retried once a day after {MAX_RENEWAL_FAILURES} failures')
+    return {'status': 'warning', 'reason': '; '.join(parts)}
+
+
 def scheduled_acme_renewal():
     """
     Scheduled task to check and renew ACME certificates.
@@ -218,7 +270,7 @@ def scheduled_acme_renewal():
     switch = SystemConfig.query.filter_by(key='acme.client.renewal_enabled').first()
     if switch is not None and str(switch.value).lower() != 'true':
         logger.info("ACME auto-renewal is turned off")
-        return
+        return {'status': 'skipped', 'reason': 'acme_renewal_off'}
 
     try:
         renewal_days = _configured_renewal_days()
@@ -232,19 +284,20 @@ def scheduled_acme_renewal():
         eligible_orders = AcmeClientOrder.query.filter(
             AcmeClientOrder.renewal_enabled == True,
             AcmeClientOrder.status == 'issued',
-            AcmeClientOrder.renewal_failures < MAX_RENEWAL_FAILURES,
         ).all()
+        daily_ids = {order.id for order in eligible_orders if order.renewal_retry_daily}
         orders_to_renew = [
             order for order in eligible_orders
-            if _order_is_due(order, now, threshold_date)
+            if _attempt_allowed(order, now) and _order_is_due(order, now, threshold_date)
         ]
         
         if not orders_to_renew:
             logger.info("No certificates need renewal")
-            return
+            return _pass_outcome(0, len(daily_ids))
         
         logger.info(f"Found {len(orders_to_renew)} certificate(s) to renew")
         
+        failed = 0
         for order in orders_to_renew:
             order_id = order.id
             lease = OrderLease.take(order_id)
@@ -253,32 +306,24 @@ def scheduled_acme_renewal():
                 continue
             try:
                 renew_certificate(order, lease=lease)
+                daily_ids.discard(order_id)
             except RenewalInProgress as e:
                 logger.info("Order %s left to another renewal: %s", order_id, e)
             except Exception as e:
                 logger.error(f"Failed to renew order {order_id}: {e}")
-                order.renewal_failures += 1
-                order.last_error_at = utc_now()
-                order.error_message = str(e)
-                stage_audit_entry(
-                    action='acme_order.auto_renewal_failed',
-                    resource_type='acme_order',
-                    resource_id=str(order_id),
-                    resource_name=order.primary_domain,
-                    details=f'Auto-renewal failed: {e}',
-                    success=False,
-                )
-                commit_or_rollback(
-                    logger,
-                    f"Failed to persist renewal failure for order {order_id}",
-                )
+                failed += 1
+                _record_scheduled_failure(order, e)
+                if order.renewal_retry_daily:
+                    daily_ids.add(order_id)
             finally:
                 lease.release()
         
         logger.info("ACME auto-renewal check completed")
+        return _pass_outcome(failed, len(daily_ids))
         
     except Exception as e:
         logger.error(f"ACME auto-renewal task failed: {e}")
+        return {'status': 'failed', 'reason': str(e)}
 
 
 def renew_certificate(order, lease=None) -> tuple:
@@ -318,7 +363,7 @@ def _renew(order, lease) -> tuple:
             raise RenewalBlocked(refusal)
 
     # Initialize ACME client for the same CA that issued the original order
-    acme_client = AcmeClientService.for_order(order)
+    acme_client = renewal_client(order)
     # The resolved account, not the old order's column: legacy rows have none.
     account_id = getattr(acme_client.account, 'id', None)
 

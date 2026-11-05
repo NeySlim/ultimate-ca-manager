@@ -1576,6 +1576,11 @@
     "autoRenewalDesc": "Renovar automáticamente los certificados antes de que caduquen",
     "renewalDays": "Días antes del vencimiento",
     "renewalDaysHelper": "Renovar con esta antelación en días (1 a 60) cuando la CA no sugiere una ventana de renovación (ARI).",
+    "renewalFailures": "Renovaciones fallidas: {{count}}",
+    "renewalLastFailure": "Último fallo: {{date}}",
+    "renewalRetryDaily": "La renovación sigue fallando: ahora se intenta una vez al día",
+    "orderAutoRenew": "Renovación automática",
+    "orderRenewalUpdated": "Renovación automática actualizada",
     "dnsPropagationTimeout": "Tiempo de propagación DNS (s)",
     "dnsPropagationTimeoutHelper": "Segundos de sondeo del TXT DNS-01 antes de la validación CA (DNS auto). 0 = omitir espera de propagación (auto y verificación manual envían a la CA sin sondeo). Valores positivos: el sondeo automático en segundo plano espera hasta ese límite; la verificación manual sondea 30 s como máximo y luego indica «no listo» para reintentar. Continúa cuando todos los servidores de nombres autoritativos sirven el registro (o el resolver configurado lo confirma); las líneas 9.9.9.9 / 8.8.8.8 / 1.1.1.1 son solo informativas.",
     "dnsPropagationDelay": "Retraso de propagación DNS (s)",
@@ -4135,7 +4140,9 @@
       "systemUpdateAvailable": "Actualización disponible",
       "systemUpdateInitiated": "Actualización iniciada",
       "systemUpdateInstalled": "Actualización instalada",
-      "systemUpdateFailed": "Actualización fallida"
+      "systemUpdateFailed": "Actualización fallida",
+      "acmePreflight": "Comprobación previa ACME",
+      "acmeOrderRenewalFailed": "Renovación ACME fallida"
     },
     "title": "Webhooks",
     "subtitle": "Enviar notificaciones HTTP cuando ocurran eventos de certificados",
@@ -5444,7 +5451,6 @@
     "signerGenerateValidity": "Validez (días)",
     "signerGenerateKeyType": "Tipo de clave",
     "signerMldsaVerifyNote": "Las marcas de tiempo ML-DSA se verifican con openssl cms -verify (OpenSSL 3.5 o posterior), no con openssl ts -verify; compruebe la huella del mensaje por separado.",
-    "signerMldsaVerifyNote": "Las marcas de tiempo ML-DSA se verifican con openssl cms -verify (OpenSSL 3.5 o posterior), no con openssl ts -verify; compruebe la huella del mensaje por separado.",
     "signerGenerated": "Certificado de firma TSA emitido.",
     "signerGeneratedSelected": "Certificado de firma TSA emitido y seleccionado como firmante dedicado.",
     "signerGenerateFailed": "No se pudo generar el certificado de firma TSA.",
@@ -5666,6 +5672,7 @@
     "skipped": "Omitida: {{reason}}",
     "skipReasons": {
       "disabled": "las copias de seguridad automáticas están desactivadas",
+      "acme_renewal_off": "la renovación automática ACME está desactivada",
       "not_due": "aún no corresponde",
       "unknown": "sin motivo indicado"
     },

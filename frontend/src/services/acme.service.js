@@ -215,6 +215,10 @@ export const acmeService = {
     return apiClient.delete(`/acme/client/orders/${orderId}`)
   },
 
+  async updateOrder(orderId, data) {
+    return apiClient.patch(`/acme/client/orders/${orderId}`, data)
+  },
+
   async renewOrder(orderId) {
     return apiClient.post(`/acme/client/orders/${orderId}/renew`)
   },

@@ -663,6 +663,16 @@ export default function ACMEPage() {
     window.location.href = `/certificates?id=${order.certificate_id}`
   }
   
+  const handleToggleOrderRenewal = async (order, enabled) => {
+    try {
+      await acmeService.updateOrder(order.id, { renewal_enabled: enabled })
+      showSuccess(t('acme.orderRenewalUpdated'))
+      loadData()
+    } catch (error) {
+      showError(error.message || t('messages.errors.updateFailed.generic'))
+    }
+  }
+
   // Manual renewal
   const handleRenewCertificate = async (order) => {
     try {
@@ -1232,7 +1242,9 @@ export default function ACMEPage() {
             onDownloadCertificate={handleDownloadCertificate}
             onRenewCertificate={handleRenewCertificate}
             onDeleteOrder={handleDeleteClientOrder}
+            onToggleRenewal={handleToggleOrderRenewal}
             canDelete={canDelete('acme')}
+            canWrite={canWrite('acme')}
           />
         )}
         {activeTab === 'dns' && (

@@ -22,6 +22,7 @@ from utils.response import success_response, error_response
 from utils.db_transaction import safe_commit
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import (
+    ACCOUNT_GONE,
     AcmeClientService,
     AUTHZ_INVALID_USER_MSG,
     CERT_KEY_TYPES,
@@ -115,6 +116,39 @@ def get_order(order_id):
     if not order:
         return error_response('Order not found', 404)
 
+    return success_response(data=order.to_dict())
+
+
+@bp.route('/api/v2/acme/client/orders/<int:order_id>', methods=['PATCH'])
+@require_auth(['write:acme'])
+def update_order(order_id):
+    """Turn an order's automatic renewal on or off: ``{"renewal_enabled": bool}``."""
+    order = db.session.get(AcmeClientOrder, order_id)
+    if not order:
+        return error_response('Order not found', 404)
+    data = request.get_json(silent=True)
+    if not isinstance(data, dict) or set(data) != {'renewal_enabled'} \
+            or not isinstance(data['renewal_enabled'], bool):
+        return error_response('Expected {"renewal_enabled": true|false}', 400)
+    if order.is_proxy_order:
+        return error_response('A proxy order is renewed by the ACME client that placed it', 409)
+    if order.renewal_of_order_id is not None:
+        return error_response(
+            f'This order belongs to a renewal of order {order.renewal_of_order_id}: change that order', 409)
+
+    enabled = data['renewal_enabled']
+    order.renewal_enabled = enabled
+    ok, err = safe_commit(logger, 'Failed to update ACME order')
+    if not ok:
+        return err
+    AuditService.log_action(
+        action='acme_order_update',
+        resource_type='acme_order',
+        resource_id=str(order_id),
+        resource_name=order.primary_domain,
+        details=f"Automatic renewal turned {'on' if enabled else 'off'} for ACME order {order_id}",
+        success=True,
+    )
     return success_response(data=order.to_dict())
 
 
@@ -412,7 +446,9 @@ def verify_challenges(order_id):
     force = bool(data.get('force'))
 
     try:
-        client = AcmeClientService.for_order(order)
+        client = AcmeClientService.for_existing_order(order)
+        if client is None:
+            return error_response(ACCOUNT_GONE, 409)
 
         results = {}
         challenges = order.challenges_dict
@@ -518,7 +554,9 @@ def check_order_status(order_id):
         return error_response('Order not found', 404)
 
     try:
-        client = AcmeClientService.for_order(order)
+        client = AcmeClientService.for_existing_order(order)
+        if client is None:
+            return error_response(ACCOUNT_GONE, 409)
         status, data = client.check_order_status(order)
         if status == 'valid' and data and _resumable_here(client, order):
             status = _resume_finalization(client, order) or status
@@ -561,7 +599,9 @@ def finalize_order(order_id):
     if lease is None:
         return error_response(BUSY, 409)
     try:
-        client = AcmeClientService.for_order(order)
+        client = AcmeClientService.for_existing_order(order)
+        if client is None:
+            return error_response(ACCOUNT_GONE, 409)
         success, message, cert_id = client.finalize_order(order, lease=lease)
 
         if success:
@@ -605,8 +645,7 @@ def cancel_order(order_id):
     # Clean up DNS if needed
     if order.challenge_type == 'dns-01' and order.dns_provider_id:
         try:
-            client = AcmeClientService.for_order(order)
-            client.cleanup_dns_challenge(order)
+            AcmeClientService.cleanup_dns_challenge(order)  # no CA account: it may be gone
         except Exception:
             pass  # Best effort cleanup
 
@@ -906,7 +945,12 @@ def _run_auto_poll_background(order_id: int, environment: str) -> None:
                 if order.status in ('issued', 'invalid', 'expired'):
                     logger.info(f'Auto-poll background: order {order_id} already {order.status}, skipping')
                     return
-                client = AcmeClientService.for_order(order)
+                client = AcmeClientService.for_existing_order(order)
+                if client is None:
+                    order.status = 'pending'
+                    order.error_message = ACCOUNT_GONE
+                    db.session.commit()
+                    return
                 _auto_poll_and_finalize(client, order)
             except Exception as e:
                 logger.error(f'Auto-poll background failed for order {order_id}: {e}', exc_info=True)

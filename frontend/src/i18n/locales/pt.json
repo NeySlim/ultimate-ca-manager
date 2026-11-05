@@ -1576,6 +1576,11 @@
     "autoRenewalDesc": "Renovar automaticamente os certificados antes de expirarem",
     "renewalDays": "Dias antes da expiração",
     "renewalDaysHelper": "Renovar com esta antecedência em dias (1 a 60) quando a CA não sugere uma janela de renovação (ARI).",
+    "renewalFailures": "Falhas de renovação: {{count}}",
+    "renewalLastFailure": "Última falha: {{date}}",
+    "renewalRetryDaily": "A renovação continua a falhar: agora uma tentativa por dia",
+    "orderAutoRenew": "Renovação automática",
+    "orderRenewalUpdated": "Renovação automática atualizada",
     "dnsPropagationTimeout": "Tempo de propagação DNS (s)",
     "dnsPropagationTimeoutHelper": "Segundos de verificação do TXT DNS-01 antes da validação CA (DNS auto). 0 = ignorar espera de propagação (auto e verificação manual enviam à CA sem polling). Valores positivos: o auto-poll em segundo plano aguarda até esse limite; a verificação manual sonda no máximo 30 s e depois indica «não pronto» para tentar novamente. Prossegue quando todos os servidores de nomes autoritativos servirem o registo (ou o resolver configurado o confirmar); as linhas 9.9.9.9 / 8.8.8.8 / 1.1.1.1 são apenas informativas.",
     "dnsPropagationDelay": "Atraso de propagação DNS (s)",
@@ -4135,7 +4140,9 @@
       "systemUpdateAvailable": "Atualização disponível",
       "systemUpdateInitiated": "Atualização iniciada",
       "systemUpdateInstalled": "Atualização instalada",
-      "systemUpdateFailed": "Atualização falhou"
+      "systemUpdateFailed": "Atualização falhou",
+      "acmePreflight": "Verificação prévia ACME",
+      "acmeOrderRenewalFailed": "Renovação ACME falhou"
     },
     "title": "Webhooks",
     "subtitle": "Enviar notificações HTTP quando ocorrem eventos de certificados",
@@ -5665,6 +5672,7 @@
     "skipped": "Ignorada: {{reason}}",
     "skipReasons": {
       "disabled": "as cópias de segurança automáticas estão desativadas",
+      "acme_renewal_off": "a renovação automática ACME está desativada",
       "not_due": "ainda não está prevista",
       "unknown": "sem motivo indicado"
     },

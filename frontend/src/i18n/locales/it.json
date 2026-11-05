@@ -1576,6 +1576,11 @@
     "autoRenewalDesc": "Rinnova automaticamente i certificati prima della scadenza",
     "renewalDays": "Giorni prima della scadenza",
     "renewalDaysHelper": "Rinnova con questo anticipo in giorni (da 1 a 60) quando la CA non suggerisce una finestra di rinnovo (ARI).",
+    "renewalFailures": "Rinnovi non riusciti: {{count}}",
+    "renewalLastFailure": "Ultimo errore: {{date}}",
+    "renewalRetryDaily": "Il rinnovo continua a non riuscire: ora un tentativo al giorno",
+    "orderAutoRenew": "Rinnovo automatico",
+    "orderRenewalUpdated": "Rinnovo automatico aggiornato",
     "dnsPropagationTimeout": "Timeout di propagazione DNS (s)",
     "dnsPropagationTimeoutHelper": "Secondi di polling del TXT DNS-01 prima della validazione CA (DNS auto). 0 = salta l'attesa di propagazione (auto e Verifica manuale inviano alla CA senza polling). Valori positivi: l'auto-poll in background attende fino a questo limite; la Verifica manuale esegue il polling per massimo 30 s, poi segnala «non pronto» per riprovare. Procede quando ogni nameserver autoritativo serve il record (o il resolver configurato lo conferma); i log 9.9.9.9 / 8.8.8.8 / 1.1.1.1 sono solo informativi.",
     "dnsPropagationDelay": "Ritardo di propagazione DNS (s)",
@@ -4135,7 +4140,9 @@
       "systemUpdateAvailable": "Aggiornamento disponibile",
       "systemUpdateInitiated": "Aggiornamento avviato",
       "systemUpdateInstalled": "Aggiornamento installato",
-      "systemUpdateFailed": "Aggiornamento non riuscito"
+      "systemUpdateFailed": "Aggiornamento non riuscito",
+      "acmePreflight": "Verifica preliminare ACME",
+      "acmeOrderRenewalFailed": "Rinnovo ACME non riuscito"
     },
     "title": "Webhook",
     "subtitle": "Invia notifiche HTTP quando si verificano eventi certificato",
@@ -5665,6 +5672,7 @@
     "skipped": "Ignorata: {{reason}}",
     "skipReasons": {
       "disabled": "i backup automatici sono disattivati",
+      "acme_renewal_off": "il rinnovo automatico ACME è disattivato",
       "not_due": "non ancora prevista",
       "unknown": "nessun motivo indicato"
     },

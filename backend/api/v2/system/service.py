@@ -66,7 +66,7 @@ def get_scheduler_tasks():
             st['label'] = _TASK_LABELS.get(name, (st.get('description') or name.replace('_', ' ').title()))
             tasks.append(st)
         tasks.sort(key=lambda t: t['label'].lower())
-        warnings = sum(1 for t in tasks if t.get('last_error'))
+        warnings = sum(1 for t in tasks if t.get('last_error') or t.get('last_status') == 'warning')
         return success_response(data={
             'tasks': tasks,
             'total': len(tasks),
