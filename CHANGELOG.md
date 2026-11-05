@@ -58,6 +58,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - CAs and certificates: deleting a CA left its SCEP challenge and OCSP responder settings, and deleting a certificate its SCTs, which SQLite could hand to the next row given that number. They now go with the row.
 - Database migration: a role inheriting from a role created after it made the copy to PostgreSQL fail when the database role cannot disable foreign keys. A link to a row of the same table is now written once the whole table is in.
 - mTLS: a client certificate could not be enrolled, imported or assigned when an enrolled certificate of another CA had the same serial number, legitimate in X.509. An enrolment is now identified by its issuer and serial, at login and by a restore too (migration 130).
+- Backups: a webhook's authentication token was archived twice, in the clear and encrypted under the source's key, which no other installation can read. The archive now carries it in the clear only, and a restore ignores the encrypted copy of an older archive.
 
 ### Upgrade notes
 

@@ -405,6 +405,7 @@ SECTIONS: Dict[str, Section] = {
             'last_success': 'delivery statistic',
             'last_failure': 'delivery statistic',
             'failure_count': 'delivery statistic',
+            '_auth_token': "under this installation's key; the token travels in the clear as auth_token",
         },
         secrets=('secret', 'auth_token'),
         stored={'secret': 'database'},
