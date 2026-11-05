@@ -47,6 +47,7 @@ def orders(app):
 
 def _client(child_id, waited=('ready', {}), finalize=None):
     client = MagicMock()
+    client.account = None  # the CA account resolved by for_order
     child = db.session.get(AcmeClientOrder, child_id)
     client.create_order.return_value = (True, 'ok', child)
     client.verify_challenge.return_value = (True, 'ok')
@@ -115,7 +116,7 @@ def test_an_order_still_pending_at_the_deadline_fails_with_its_status_and_is_rem
 def test_an_order_the_ca_may_still_complete_is_kept(app, orders, status):
     parent_id, child_id, _ = orders
 
-    def _finalize(order):
+    def _finalize(order, **_kwargs):
         order.status = status
         db.session.commit()
         return False, 'Certificate not ready after polling', None

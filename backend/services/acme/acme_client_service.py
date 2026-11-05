@@ -45,6 +45,7 @@ from utils.ca_profile import default_digest_for_key_type
 from utils.signing_hash import HASH_BY_NAME, signing_hash_for
 from utils.san_parse import strip_wildcard
 from services.acme.dns_txt_lock import txt_record_lock
+from services.acme.order_lease import LEASE_LOST
 
 if TYPE_CHECKING:
     from models.acme_client_account import AcmeClientAccount
@@ -1493,6 +1494,15 @@ class AcmeClientService:
         finally:
             listener.stop()
 
+    def fetch_order_state(self, order: AcmeClientOrder) -> str:
+        """The order's status at the CA, written nowhere; 'gone' when the CA no longer has it."""
+        resp = self._post(order.order_url, "")  # POST-as-GET
+        if resp.status_code in (404, 410):
+            return 'gone'
+        if resp.status_code != 200:
+            raise RuntimeError(f"Status of order {order.id} unavailable: HTTP {resp.status_code}")
+        return resp.json().get('status') or 'gone'
+
     @staticmethod
     def write_order_status(order, status: str) -> bool:
         """Write a status, unless the order is issued: that means imported here, which the CA
@@ -1555,88 +1565,142 @@ class AcmeClientService:
                 return True
         return False
 
-    def finalize_order(self, order: AcmeClientOrder) -> Tuple[bool, str, Optional[int]]:
-        """
-        Finalize order and download certificate.
-        Supports configurable key types (RSA-2048/4096, ECDSA P-256/P-384),
-        external CSR (key_source=csr), and private key reuse on renewal
-        (key_source=reuse).
+    def held_finalize_key(self, order: AcmeClientOrder) -> Tuple[Optional[str], Optional[str]]:
+        """The PEM key an order the CA already finalized was certified with: ``(pem, None)``,
+        ``(None, None)`` for an external CSR, ``(None, error)`` when the key is not held."""
+        pending = order.pending_key
+        if pending:
+            return pending, None
+        key_source = (order.key_source or 'generate').lower()
+        if key_source == 'csr':
+            return None, None
+        src_id = order.source_certificate_id or order.certificate_id
+        if key_source == 'reuse' and src_id:
+            # The key the request carried, even if revoked since: it is the certificate's
+            src_cert = db.session.get(Certificate, src_id)
+            if src_cert is None or not src_cert.prv:
+                return None, 'The certificate holding the key to reuse no longer exists'
+            from utils.key_codec import load_pem_bytes
+            return load_pem_bytes(src_cert.prv, context=f'certificate {src_id}').decode(), None
+        return None, ('The key this order was finalized with was not kept: '
+                      'the certificate cannot be imported, request a new one')
 
-        Returns:
-            Tuple of (success, message, certificate_id)
+    def _finalize_key(self, order, domains, primary_domain):
+        """``(key or None, CSR b64url, key to keep as pending, error)`` for a finalize request."""
+        key_source = (getattr(order, 'key_source', None) or 'generate').lower()
+        pending = order.pending_key
+        if pending:
+            # A request that may never have reached the CA: sent again with the same key
+            cert_key = serialization.load_pem_private_key(pending.encode(), password=None)
+            return cert_key, self._build_csr_b64(cert_key, domains, primary_domain), True, None
+
+        if key_source == 'csr':
+            if not order.csr_pem:
+                return None, None, False, 'External CSR not stored on order'
+            from utils.acme_csr import load_pem_csr, csr_to_b64url_der
+            try:
+                csr = load_pem_csr(order.csr_pem)
+            except ValueError as exc:
+                return None, None, False, str(exc)
+            match_ok, match_msg = csr_identifiers_match_order(csr, domains)
+            if not match_ok:
+                return None, None, False, match_msg
+            if self._key_revoked_as_compromised(csr.public_key()):
+                return None, None, False, 'The key of this CSR was revoked as compromised: submit a new CSR'
+            return None, csr_to_b64url_der(csr), False, None
+
+        cert_key = None
+        if key_source == 'reuse':
+            from utils.acme_csr import load_private_key_from_certificate
+            src_id = order.source_certificate_id or order.certificate_id
+            src_cert = db.session.get(Certificate, src_id) if src_id else None
+            if src_id and src_cert is None:
+                return None, None, False, 'The certificate holding the key to reuse no longer exists'
+            if src_cert is not None and not self._revoked_as_compromised(src_cert):
+                try:
+                    cert_key = load_private_key_from_certificate(src_cert)
+                except ValueError as exc:
+                    return None, None, False, str(exc)
+                refusal = fips_private_key_refusal(cert_key)
+                if refusal:
+                    return None, None, False, refusal
+                if self._key_revoked_as_compromised(cert_key.public_key()):
+                    cert_key = None
+            if src_cert is not None and cert_key is None:
+                logger.warning("Order %s does not reuse the key of certificate %s, revoked as "
+                               "compromised: a new key is generated", order.id, src_id)
+            if cert_key is not None:
+                return cert_key, self._build_csr_b64(cert_key, domains, primary_domain), False, None
+        # First issuance of a reuse order, or a key that must not be certified again
+        cert_key, key_error = self._generate_cert_key(order)
+        if key_error:
+            return None, None, False, key_error
+        return cert_key, self._build_csr_b64(cert_key, domains, primary_domain), True, None
+
+    @staticmethod
+    def _keep_before_request(lease) -> bool:
+        """Commit what the finalize request depends on; False when ``lease`` was lost."""
+        if lease is not None:
+            return lease.refresh()
+        db.session.commit()
+        return True
+
+    def finalize_order(self, order: AcmeClientOrder, *, renews: Optional[AcmeClientOrder] = None,
+                       lease=None) -> Tuple[bool, str, Optional[int]]:
+        """Finalize ``order``, download its certificate and import it: ``(success, message, certificate_id)``.
+
+        First issuance (``renews`` None): the certificate goes into a new row, which ``order``
+        then names. Renewal: ``order`` is the one the renewal opened and ``renews`` the order
+        it renews. The certificate is written into the row ``renews`` names, which keeps its
+        id and refid (a new row only when that one is gone or revoked); ``renews`` takes over
+        the order and certificate URLs and ``order`` is deleted, in one commit, then
+        certificate.renewed is emitted.
+
+        A key generated here is stored on the order and committed before the finalize
+        request, and removed with the import. An order the CA already took (processing or
+        valid) is resumed with that key, the external CSR (key_source csr) or the key of the
+        source certificate (reuse). ``lease`` is refreshed before the request and before the
+        import: once lost, this finalization stops and leaves the order to its new holder.
         """
         try:
-            # Check order is ready
             status, data = self.check_order_status(order)
-            if status != 'ready':
-                return False, f"Order not ready for finalization (status: {status})", None
-
             domains = order.domains_list
             primary_domain = domains[0]
-            key_source = (getattr(order, 'key_source', None) or 'generate').lower()
-            cert_key = None
-            csr_b64 = None
 
-            if key_source == 'csr':
-                if not order.csr_pem:
-                    return False, 'External CSR not stored on order', None
-                from utils.acme_csr import load_pem_csr, csr_to_b64url_der
-                try:
-                    csr = load_pem_csr(order.csr_pem)
-                except ValueError as exc:
-                    return False, str(exc), None
-                match_ok, match_msg = csr_identifiers_match_order(csr, domains)
-                if not match_ok:
-                    return False, match_msg, None
-                if self._key_revoked_as_compromised(csr.public_key()):
-                    return False, 'The key of this CSR was revoked as compromised: submit a new CSR', None
-                csr_b64 = csr_to_b64url_der(csr)
-            elif key_source == 'reuse':
-                from utils.acme_csr import load_private_key_from_certificate
-                from models import Certificate
-                src_id = order.source_certificate_id or order.certificate_id
-                src_cert = db.session.get(Certificate, src_id) if src_id else None
-                if src_id and src_cert is None:
-                    return False, 'The certificate holding the key to reuse no longer exists', None
-                if src_cert is not None and not self._revoked_as_compromised(src_cert):
-                    try:
-                        cert_key = load_private_key_from_certificate(src_cert)
-                    except ValueError as exc:
-                        return False, str(exc), None
-                    refusal = fips_private_key_refusal(cert_key)
-                    if refusal:
-                        return False, refusal, None
-                    if self._key_revoked_as_compromised(cert_key.public_key()):
-                        cert_key = None
-                if src_cert is not None and cert_key is None:
-                    logger.warning("Order %s does not reuse the key of certificate %s, revoked as "
-                                   "compromised: a new key is generated", order.id, src_id)
-                if cert_key is None:
-                    # First issuance: generate a key; renewals reuse it via source_certificate_id.
-                    cert_key, key_error = self._generate_cert_key(order)
-                    if key_error:
-                        return False, key_error, None
-                csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
-            else:
-                cert_key, key_error = self._generate_cert_key(order)
+            if status in ('processing', 'valid'):
+                if not data:  # the CA did not answer
+                    return False, f"Order not ready for finalization (status: {status})", None
+                key_pem, key_error = self.held_finalize_key(order)
                 if key_error:
                     return False, key_error, None
-                csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
+                order_data = data
+            elif status != 'ready':
+                return False, f"Order not ready for finalization (status: {status})", None
+            else:
+                cert_key, csr_b64, keep, key_error = self._finalize_key(order, domains, primary_domain)
+                if key_error:
+                    return False, key_error, None
+                key_pem = cert_key.private_bytes(
+                    encoding=Encoding.PEM,
+                    format=serialization.PrivateFormat.PKCS8,
+                    encryption_algorithm=serialization.NoEncryption()
+                ).decode() if cert_key is not None else None
+                if keep:
+                    order.pending_key = key_pem
+                if not self._keep_before_request(lease):
+                    return False, LEASE_LOST, None
 
-            # Submit CSR to finalize URL
-            resp = self._post(order.finalize_url, {"csr": csr_b64})
-            
-            if resp.status_code not in [200, 201]:
-                error = resp.json()
-                return False, f"Finalization failed: {error.get('detail', 'Unknown error')}", None
-            
-            # Poll for certificate
-            order_data = resp.json()
-            self.write_order_status(order, order_data.get('status', 'processing'))
-            db.session.commit()
-            
+                resp = self._post(order.finalize_url, {"csr": csr_b64})
+                if resp.status_code not in [200, 201]:
+                    error = resp.json()
+                    return False, f"Finalization failed: {error.get('detail', 'Unknown error')}", None
+                order_data = resp.json()
+                self.write_order_status(order, order_data.get('status', 'processing'))
+                db.session.commit()
+                if not order_data.get('certificate'):
+                    self._note_retry_after(resp)
+
             if not order_data.get('certificate'):
-                self._note_retry_after(resp)
                 deadline, interval = self._order_poll_limits()
                 while not order_data.get('certificate'):
                     if not self._sleep_before_next_poll(deadline, interval):
@@ -1644,62 +1708,46 @@ class AcmeClientService:
                     status, order_data = self.check_order_status(order)
                     if status == 'invalid':
                         return False, "Order became invalid during finalization", None
-            
-            # Download certificate
+
+            if lease is not None and not lease.refresh():
+                return False, LEASE_LOST, None
+
             cert_url = order_data['certificate']
             cert_resp = self._post(cert_url, "")
-            
             if cert_resp.status_code != 200:
                 message = "Failed to download certificate"
                 self._record_finalize_failure(order, message)
                 return False, message, None
-
             cert_pem = self._select_certificate_chain(cert_resp)
 
-            # Store private key (not available for external CSR-only issuance)
-            key_pem = None
-            if cert_key is not None:
-                key_pem = cert_key.private_bytes(
-                    encoding=Encoding.PEM,
-                    format=serialization.PrivateFormat.PKCS8,
-                    encryption_algorithm=serialization.NoEncryption()
-                ).decode()
+            if renews is not None:
+                return self._complete_renewal(order, renews, cert_pem, key_pem, cert_url)
 
-            # Import into UCM certificate store
             cert_id = self._import_certificate(
                 cert_pem=cert_pem,
                 key_pem=key_pem,
                 domains=domains,
                 source='acme_client'
             )
-            
-            if cert_id:
-                order.certificate_id = cert_id
-                order.certificate_url = cert_url
-                order.status = 'issued'
-                order.error_message = None
-                # RFC 8555 §7.1.3: order.expires is the *order resource* expiry
-                # (~7 days for Let's Encrypt), NOT the certificate's notAfter.
-                # The renewal scheduler compares expires_at against `now + threshold`,
-                # so we must replace the order expiry with the cert's notAfter,
-                # otherwise the cert will be renewed on every scheduler tick (issue #74).
-                try:
-                    # cert_pem is a chain; the leaf certificate is the first PEM block.
-                    leaf_pem = cert_pem.split('-----END CERTIFICATE-----')[0] + '-----END CERTIFICATE-----\n'
-                    leaf = x509.load_pem_x509_certificate(leaf_pem.encode(), default_backend())
-                    not_after = leaf.not_valid_after_utc if hasattr(leaf, 'not_valid_after_utc') else leaf.not_valid_after
-                    # Strip tzinfo for SQLite-naive datetime column consistency
-                    order.expires_at = not_after.replace(tzinfo=None) if not_after.tzinfo else not_after
-                except Exception as parse_err:
-                    logger.warning(f"Could not parse cert notAfter for order {order.id}: {parse_err}")
-                db.session.commit()
-
-                logger.info(f"Certificate issued for {domains}, ID: {cert_id}, expires_at={order.expires_at}")
-                return True, "Certificate issued and imported successfully", cert_id
-            else:
+            if not cert_id:
                 message = "Certificate obtained but import failed"
                 self._record_finalize_failure(order, message)
                 return False, message, None
+
+            order.certificate_id = cert_id
+            order.certificate_url = cert_url
+            order.status = 'issued'
+            order.error_message = None
+            order.pending_key = None
+            # RFC 8555 §7.1.3: order.expires is the order resource's expiry, not the
+            # certificate's; the scheduler compares expires_at with its threshold (issue #74).
+            not_after = self._not_after(cert_pem, order)
+            if not_after is not None:
+                order.expires_at = not_after
+            db.session.commit()
+
+            logger.info(f"Certificate issued for {domains}, ID: {cert_id}, expires_at={order.expires_at}")
+            return True, "Certificate issued and imported successfully", cert_id
 
         except Exception as e:
             logger.error(f"Finalization error: {e}")
@@ -1707,6 +1755,69 @@ class AcmeClientService:
             message = 'Database error during finalization' if isinstance(e, SQLAlchemyError) else str(e)
             self._record_finalize_failure(order, message)
             return False, message, None
+
+    @staticmethod
+    def _not_after(cert_pem: str, order) -> Optional[datetime]:
+        """The leaf's notAfter, naive UTC; None when it cannot be read."""
+        try:
+            from services.acme.client_certificates import load_leaf
+            return load_leaf(cert_pem).not_valid_after_utc.replace(tzinfo=None)
+        except Exception as parse_err:
+            logger.warning(f"Could not parse cert notAfter for order {order.id}: {parse_err}")
+            return None
+
+    def _complete_renewal(self, order, renews, cert_pem, key_pem, cert_url):
+        """The renewal half of finalize_order: certificate written, ``renews`` updated and
+        ``order`` deleted in one commit."""
+        from services.acme import client_certificates
+
+        row = db.session.get(Certificate, renews.certificate_id) if renews.certificate_id else None
+        in_place = row is not None and bool(row.crt) and not row.revoked
+        old_serial = row.serial_number if in_place else None
+        from utils.datetime_utils import utc_now
+        now = utc_now()
+        if in_place:
+            try:
+                client_certificates.write_renewed(row, cert_pem, key_pem, now)
+            except ValueError as exc:
+                db.session.rollback()
+                self._record_finalize_failure(order, str(exc))
+                return False, str(exc), None
+            cert_id = row.id
+        else:
+            # Gone or revoked: a revoked row keeps its revocation, the certificate gets a new one
+            cert_id = self._import_certificate(cert_pem=cert_pem, key_pem=key_pem,
+                                               domains=order.domains_list, source='acme_client')
+            if not cert_id:
+                message = "Certificate obtained but import failed"
+                self._record_finalize_failure(order, message)
+                return False, message, None
+
+        renews.certificate_id = cert_id
+        renews.order_url = order.order_url
+        renews.certificate_url = cert_url
+        # Renewed from whatever status: the order that fetched the certificate has nothing
+        # of its own left and goes, or it would renew these names again
+        renews.status = 'issued'
+        renews.last_renewal_at = now
+        renews.renewal_failures = 0
+        renews.error_message = None
+        renews.last_error_at = None
+        not_after = self._not_after(cert_pem, order)
+        if not_after is not None:
+            renews.expires_at = not_after
+        db.session.delete(order)
+        try:
+            db.session.commit()
+        except SQLAlchemyError as exc:
+            logger.error(f"Renewed certificate not saved: {exc}")
+            self._record_finalize_failure(order, 'Database error during finalization')
+            return False, 'Database error during finalization', None
+
+        if in_place:
+            client_certificates.after_renewal_commit(row, cert_pem, key_pem, old_serial)
+        logger.info(f"Certificate renewed for {renews.domains_list}, ID: {cert_id}")
+        return True, "Certificate renewed and imported successfully", cert_id
 
     @staticmethod
     def _record_finalize_failure(order, message: str) -> None:
@@ -1735,52 +1846,43 @@ class AcmeClientService:
         domains: List[str],
         source: str = 'acme_client'
     ) -> Optional[int]:
-        """
-        Import certificate into UCM store using CertificateService.
-        
-        Let's Encrypt returns a full chain (end-entity + intermediates).
-        We split it and pass the chain separately for proper storage.
-        
-        Returns:
-            Certificate ID or None
+        """Import a certificate the CA issued into a new row; its id, None on failure.
+
+        The chain goes with the end-entity certificate. A row of the same ``source`` already
+        holding this certificate is returned as it is: a resumed finalization may follow an
+        import whose order update was never saved.
         """
         try:
             from services.cert_service import CertificateService
-            
-            # Split PEM chain: first cert = end-entity, rest = chain
-            pem_blocks = []
-            current_block = []
-            for line in cert_pem.strip().splitlines():
-                current_block.append(line)
-                if line.strip() == '-----END CERTIFICATE-----':
-                    pem_blocks.append('\n'.join(current_block))
-                    current_block = []
-            
-            if not pem_blocks:
+            from services.acme.client_certificates import check_key, load_leaf, split_chain
+
+            end_entity_pem, chain_pem = split_chain(cert_pem)
+            if end_entity_pem is None:
                 logger.error("No PEM certificates found in ACME response")
                 return None
-            
-            end_entity_pem = pem_blocks[0]
-            chain_pem = '\n'.join(pem_blocks[1:]) if len(pem_blocks) > 1 else None
-            
-            # Use domain as description (no "Let's Encrypt:" prefix)
-            primary_domain = domains[0]
-            
+            leaf = load_leaf(cert_pem)
+            check_key(leaf, key_pem)
+            existing = Certificate.query.filter_by(
+                serial_number=str(leaf.serial_number), issuer=leaf.issuer.rfc4514_string(),
+                source=source).first()
+            if existing is not None:
+                return existing.id
+
             cert_record = CertificateService.import_certificate(
-                descr=primary_domain,
+                descr=domains[0],
                 cert_pem=end_entity_pem,
                 key_pem=key_pem,
                 chain_pem=chain_pem,
                 username='system',
                 source=source
             )
-            
             return cert_record.id if cert_record else None
-            
+
         except Exception as e:
             logger.error(f"Certificate import error: {e}")
             return None
     
+
     # =========================================================================
     # Configuration Helpers
     # =========================================================================

@@ -73,6 +73,7 @@ def test_renewal_submits_upstream_when_propagation_not_ready(app, renewal_order)
         db.session.commit()
 
         mock_client = MagicMock()
+        mock_client.account = None  # the CA account resolved by for_order
         mock_client.create_order.return_value = (True, 'ok', new_order)
         mock_client.verify_challenge.return_value = (True, 'ok')
         mock_client.wait_for_order.return_value = ('ready', {})
@@ -159,6 +160,7 @@ def test_renewal_deletes_txt_when_create_fails_on_second_domain(app, renewal_ord
         db.session.commit()
 
         mock_client = MagicMock()
+        mock_client.account = None  # the CA account resolved by for_order
         mock_client.create_order.return_value = (True, 'ok', new_order)
 
         order = db.session.get(AcmeClientOrder, order_id)
@@ -207,6 +209,7 @@ def test_renewal_writes_and_cleans_up_txt_under_the_name_lock(app, renewal_order
         db.session.add(new_order)
         db.session.commit()
         mock_client = MagicMock()
+        mock_client.account = None  # the CA account resolved by for_order
         mock_client.create_order.return_value = (True, 'ok', new_order)
         mock_client.verify_challenge.side_effect = RuntimeError('STOP')
         order = db.session.get(AcmeClientOrder, order_id)

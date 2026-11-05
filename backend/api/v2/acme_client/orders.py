@@ -32,6 +32,7 @@ from services.acme.acme_client_service import (
 )
 from services.audit_service import AuditService
 from services.acme.http01 import wait_for_http01
+from services.acme.order_lease import BUSY, OrderLease
 from services.acme.dns_selfcheck import (
     dns_propagation_delay,
     dns_propagation_timeout as _shared_dns_propagation_timeout,
@@ -519,6 +520,8 @@ def check_order_status(order_id):
     try:
         client = AcmeClientService.for_order(order)
         status, data = client.check_order_status(order)
+        if status == 'valid' and data and _resumable_here(client, order):
+            status = _resume_finalization(client, order) or status
 
         return success_response(data={
             'status': status,
@@ -546,9 +549,20 @@ def finalize_order(order_id):
     if order.status == 'issued':
         return error_response('Order already issued', 400)
 
+    parent = _renewal_parent(order)
+    if parent is not None:
+        return error_response(f'This order belongs to a renewal of order {parent.id}: renew that order', 409)
+
+    try:
+        lease = OrderLease.take(order_id)
+    except Exception as e:
+        logger.error(f'ACME order finalization failed: {e}')
+        return error_response('Finalization failed', 500)
+    if lease is None:
+        return error_response(BUSY, 409)
     try:
         client = AcmeClientService.for_order(order)
-        success, message, cert_id = client.finalize_order(order)
+        success, message, cert_id = client.finalize_order(order, lease=lease)
 
         if success:
             # Clean up DNS records
@@ -576,6 +590,8 @@ def finalize_order(order_id):
     except Exception as e:
         logger.error(f'ACME order finalization failed: {e}')
         return error_response('Finalization failed', 500)
+    finally:
+        lease.release()
 
 
 @bp.route('/api/v2/acme/client/orders/<int:order_id>', methods=['DELETE'])
@@ -627,7 +643,7 @@ def renew_order(order_id):
     if order.status not in ('valid', 'issued'):
         return error_response('Only valid/issued orders can be renewed', 400)
 
-    from services.acme_renewal_service import RenewalBlocked, renew_certificate
+    from services.acme_renewal_service import RenewalBlocked, RenewalInProgress, renew_certificate
 
     try:
         success, message = renew_certificate(order)
@@ -648,11 +664,48 @@ def renew_order(order_id):
         else:
             return error_response(message, 400)
 
-    except RenewalBlocked as e:
+    except (RenewalBlocked, RenewalInProgress) as e:
         return error_response(str(e), 409)
     except Exception as e:
         logger.error(f'ACME certificate renewal failed: {e}')
         return error_response('Renewal failed', 500)
+
+
+def _renewal_parent(order):
+    from services.acme_renewal_service import renewal_parent
+    return renewal_parent(order)
+
+
+def _resumable_here(client, order) -> bool:
+    """A finalization the CA completed and UCM never imported, which this order can finish."""
+    if order.status == 'issued' or order.is_proxy_order or _renewal_parent(order) is not None:
+        return False
+    _key, key_error = client.held_finalize_key(order)
+    return key_error is None
+
+
+def _resume_finalization(client, order):
+    """Import the certificate of a finalization a restart cut short; 'issued' on success."""
+    lease = OrderLease.take(order.id)
+    if lease is None:
+        return None  # the finalization is still running elsewhere
+    try:
+        ok, message, cert_id = client.finalize_order(order, lease=lease)
+    finally:
+        lease.release()
+    if not ok:
+        logger.warning(f'Resumed finalization of order {order.id} failed: {message}')
+        return None
+    try:
+        client.cleanup_dns_challenge(order)
+    except Exception as cleanup_err:
+        logger.warning(f'DNS cleanup after resumed finalization: {cleanup_err}')
+    AuditService.log_action(
+        action='acme_finalize', resource_type='acme_order', resource_id=str(order.id),
+        resource_name=f'Order {order.id}',
+        details=f'Resumed the finalization of ACME order {order.id}, certificate ID: {cert_id}',
+        success=True)
+    return 'issued'
 
 
 def _auto_poll_and_finalize(client, order) -> dict:
@@ -759,7 +812,14 @@ def _auto_poll_and_finalize(client, order) -> dict:
 
             if le_status in ('ready', 'valid'):
                 # 4. Auto-finalize (finalize_order sets status='issued' on success)
-                fin_success, fin_msg, cert_id = client.finalize_order(order)
+                lease = OrderLease.take(order.id)
+                if lease is None:  # a manual finalization runs: it owns the outcome
+                    result['error'] = BUSY
+                    break
+                try:
+                    fin_success, fin_msg, cert_id = client.finalize_order(order, lease=lease)
+                finally:
+                    lease.release()
                 if fin_success:
                     result['finalized'] = True
                     result['certificate_id'] = cert_id

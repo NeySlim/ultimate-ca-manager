@@ -138,7 +138,7 @@ def test_the_automatic_path_keeps_an_invalid_order_invalid(app, monkeypatch):
         db.session.commit()
         order_id = order.id
 
-        def finalize_sees_invalid(target):
+        def finalize_sees_invalid(target, **_kwargs):
             target.status = 'invalid'
             db.session.commit()
             return False, 'Order became invalid during finalization', None
@@ -248,7 +248,7 @@ def test_the_automatic_path_loses_to_an_import_during_its_own_failure(app, monke
         db.session.commit()
         order_id = order.id
 
-        def finalize_fails_after_the_import(_order):
+        def finalize_fails_after_the_import(_order, **_kwargs):
             db.session.execute(text(f"UPDATE {AcmeClientOrder.__tablename__} SET status = 'issued' "
                                     f"WHERE id = {order_id}"))
             return False, 'Order not ready for finalization (status: processing)', None
