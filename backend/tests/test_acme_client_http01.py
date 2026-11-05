@@ -204,6 +204,7 @@ def _renew(app, order_id, new_order_id, probe_response, client=None):
             client.account = None
         client.create_order.return_value = (True, 'ok', new_order)
         client.verify_challenge.return_value = (True, 'ok')
+        client.wait_for_order.return_value = ('ready', {})
         client.finalize_order.side_effect = RuntimeError('STOP_AFTER_SUBMIT')
         client._fetch_directory.return_value = {}
         with patch.object(renew_mod.AcmeClientService, 'for_order', return_value=client), \
@@ -397,6 +398,7 @@ def test_reused_order_drops_the_earlier_block_message(app, make_order, acme_emai
         client = MagicMock()
         client.account = None
         client.verify_challenge.return_value = (True, 'ok')
+        client.wait_for_order.return_value = ('ready', {})
         client.finalize_order.side_effect = RuntimeError('STOP_AFTER_SUBMIT')
         with patch.object(renew_mod.AcmeClientService, 'for_order', return_value=client), \
              patch.object(http01, '_get', return_value=_Resp(200, f'{token}.thumbprint')), \

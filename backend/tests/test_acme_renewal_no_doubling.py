@@ -56,6 +56,7 @@ def _renew(parent_id, child_id, finalize=_issued):
     client = MagicMock()
     client.create_order.return_value = (True, 'ok', db.session.get(AcmeClientOrder, child_id))
     client.verify_challenge.return_value = (True, 'ok')
+    client.wait_for_order.return_value = ('ready', {})
     client.finalize_order.side_effect = finalize
     dns = MagicMock()
     dns.create_txt_record.return_value = (True, 'ok')
@@ -92,19 +93,27 @@ def test_a_renewal_leaves_one_order_and_it_comes_up_again(orders, status):
     assert parent_id in _next_cycle()
 
 
-def test_a_failed_renewal_leaves_the_other_order_alone(orders):
-    # A pending HTTP-01 order picked for reuse may be one the operator asked for
+def test_a_failed_renewal_removes_its_order_and_leaves_the_original_alone(orders):
+    # The order this renewal opened has nothing to keep; a reused HTTP-01 one is another test's case
     parent_id, child_id, _provider = orders
     with pytest.raises(Exception, match='refused'):
         _renew(parent_id, child_id, finalize=lambda _order: (False, 'refused', None))
-    child = db.session.get(AcmeClientOrder, child_id)
-    assert child is not None and child.renewal_enabled is True
-    assert db.session.get(AcmeClientOrder, parent_id).order_url == URLS[0]
+    assert db.session.get(AcmeClientOrder, child_id) is None
+    parent = db.session.get(AcmeClientOrder, parent_id)
+    assert parent.order_url == URLS[0] and parent.status == 'issued'
 
 
 def test_a_failed_save_keeps_both_orders_and_the_original_retries(orders):
     parent_id, child_id, _provider = orders
-    with patch.object(renew_mod, 'commit_or_rollback', side_effect=lambda *_args: db.session.rollback() or False), \
+    real = renew_mod.commit_or_rollback
+
+    def _only_the_final_save_fails(log, message):
+        if 'persist renewed' in message:
+            db.session.rollback()
+            return False
+        return real(log, message)
+
+    with patch.object(renew_mod, 'commit_or_rollback', side_effect=_only_the_final_save_fails), \
             pytest.raises(RuntimeError, match='persist renewed'):
         _renew(parent_id, child_id)
     db.session.expire_all()

@@ -75,6 +75,7 @@ def test_renewal_submits_upstream_when_propagation_not_ready(app, renewal_order)
         mock_client = MagicMock()
         mock_client.create_order.return_value = (True, 'ok', new_order)
         mock_client.verify_challenge.return_value = (True, 'ok')
+        mock_client.wait_for_order.return_value = ('ready', {})
         # Stop the flow right after challenge submission so we don't need to mock
         # the full finalize/cert-import path; the pre-check must be behind us by then.
         mock_client.finalize_order.side_effect = RuntimeError('STOP_AFTER_SUBMIT')

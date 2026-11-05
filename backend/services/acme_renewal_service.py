@@ -295,7 +295,8 @@ def renew_certificate(order) -> tuple:
     # The resolved account, not the old order's column: legacy rows have none.
     account_id = getattr(acme_client.account, 'id', None)
     new_order = _pending_http01_order(order, account_id) if challenge_type == 'http-01' else None
-    if new_order is not None:
+    reused_order = new_order is not None  # maybe the operator's own: never removed here
+    if reused_order:
         logger.info("Renewal of order %s reuses pending order %s", order.id, new_order.id)
     else:
         success, message, new_order = acme_client.create_order(
@@ -416,7 +417,13 @@ def renew_certificate(order) -> tuple:
 
         # Wait for validation
         logger.info("Waiting for ACME validation...")
-        acme_client.wait_for_order(new_order)
+        status, order_data = acme_client.wait_for_order(new_order)
+        if status == 'invalid':
+            raise Exception(
+                f"Order became invalid: {_order_invalid_detail(acme_client, new_order, order_data)}"
+            )
+        if status != 'ready':
+            raise Exception(f"Order not ready after polling (status: {status})")
 
         # Finalize order — finalize_order handles CSR generation, cert download, and import
         success_fin, message_fin, cert_id = acme_client.finalize_order(new_order)
@@ -463,6 +470,43 @@ def renew_certificate(order) -> tuple:
             _revoke_replaced_certificate(acme_client, old_certificate)
 
         return True, f"Successfully renewed (new certificate ID: {cert_id})"
+    except RenewalBlocked:
+        raise  # a blocked HTTP-01 order stays pending: the next attempt reuses it
+    except Exception:
+        if not reused_order:
+            _discard_failed_renewal_order(new_order)
+        raise
     finally:
         if dns_txt_created:
             _cleanup_dns_txt_records()
+
+
+def _order_invalid_detail(acme_client, order, order_data) -> str:
+    """The CA's reason for an invalid order: the order's error, else the failed authorization's."""
+    error = (order_data or {}).get('error') or {}
+    detail = error.get('detail') if isinstance(error, dict) else None
+    if detail:
+        return str(detail)
+    for domain in order.challenges_dict:
+        status, authz = acme_client.check_authorization_status(order, domain)
+        if status == 'invalid':
+            return f"{domain}: {AcmeClientService._authz_error_detail(authz) or 'authorization invalid'}"
+    return 'no detail from the CA'
+
+
+# Statuses a renewal order can hold before its finalize request is sent.
+_NOTHING_ISSUED = ('pending', 'validating', 'ready', 'invalid')
+
+
+def _discard_failed_renewal_order(new_order) -> None:
+    """A renewal that failed before its finalize was sent leaves no order behind.
+
+    Any other status is kept: the CA may still issue, and the order holds the way back to it.
+    """
+    try:
+        if new_order.status not in _NOTHING_ISSUED:
+            return
+        db.session.delete(new_order)
+        commit_or_rollback(logger, f"Could not remove the failed renewal order {new_order.id}")
+    except Exception as exc:  # never hide the renewal's own error
+        logger.warning("Could not remove the failed renewal order: %s", exc)
