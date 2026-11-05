@@ -75,10 +75,10 @@ def _order_is_due(order, now, fallback_threshold):
 
     if not order.expires_at:
         return False
-    # A threshold as long as the certificate's life would renew it at every pass
+    # A threshold near the certificate's whole life would renew it again and again
     if certificate is not None and certificate.valid_from and certificate.valid_to:
         lifetime = certificate.valid_to - certificate.valid_from
-        if fallback_threshold - now >= lifetime:
+        if (fallback_threshold - now) * 3 > lifetime * 2:
             fallback_threshold = now + lifetime / 3
     return order.expires_at <= fallback_threshold
 

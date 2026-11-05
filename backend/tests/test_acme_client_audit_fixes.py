@@ -205,6 +205,43 @@ def test_a_key_revoked_as_compromised_is_not_certified_again(app, clock, order):
     assert key_certified_with('key_compromise') != original
 
 
+def test_a_compromised_key_on_an_earlier_certificate_of_the_chain_is_not_reused(app, clock, order):
+    # A was revoked, B carries the same key and is not: B would certify it at every renewal
+    key = ec.generate_private_key(ec.SECP256R1())
+    pem = key.private_bytes(serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+                            serialization.NoEncryption())
+
+    def stored(refid, serial, reason=None):
+        der = _cert_with_serial(serial, key).public_bytes(serialization.Encoding.PEM)
+        row = Certificate(refid=refid, descr='audit', crt=base64.b64encode(der).decode(),
+                          prv=base64.b64encode(pem).decode(), revoked=bool(reason), revoke_reason=reason)
+        db.session.add(row)
+        db.session.commit()
+        return row
+
+    def reused_from(source):
+        order.key_source = 'reuse'
+        order.source_certificate_id = source.id
+        db.session.commit()
+        svc = _finalizing_service([], _response(200, {'status': 'valid', 'certificate': 'https://ca.example/cert'}))
+        seen = {}
+        svc._build_csr_b64 = lambda cert_key, *_args: seen.update(key=cert_key) or 'csr'
+        svc.finalize_order(order)
+        return seen['key'].public_key().public_numbers() == key.public_key().public_numbers()
+
+    later = stored('audit-chain-b', 0x1002)
+    earlier = stored('audit-chain-a', 0x1001, 'superseded')
+    try:
+        assert reused_from(later)
+        earlier.revoke_reason = 'keyCompromise'
+        db.session.commit()
+        assert not reused_from(later)
+    finally:
+        db.session.delete(later)
+        db.session.delete(earlier)
+        db.session.commit()
+
+
 def _order_due(valid_days, left_days, threshold_days):
     now = datetime(2026, 11, 5)
     certificate = SimpleNamespace(valid_from=now - timedelta(days=valid_days - left_days),
@@ -219,7 +256,9 @@ def _order_due(valid_days, left_days, threshold_days):
     (20, 20, 30, False),  # just issued, under a threshold longer than its life
     (20, 6, 30, True),  # the last third
     (20, 7, 30, False),
-    (90, 45, 60, True),  # a threshold shorter than the life is the operator's
+    (31, 30, 30, False),  # still nearly all of its life ahead
+    (31, 10, 30, True),
+    (90, 45, 60, True),  # a threshold up to two thirds of the life is the operator's
     (90, 61, 60, False),
 ])
 def test_a_threshold_longer_than_the_life_keeps_a_last_third(valid, left, threshold, due):
@@ -251,8 +290,21 @@ def test_only_a_registration_needs_the_email(app, order, account_url, renews):
     assert client.create_order.called is renews
 
 
-@pytest.mark.parametrize('status, retried', [(400, True), (404, True), (409, True), (429, False), (500, False)])
-def test_a_refused_replaces_is_dropped_but_not_on_a_rate_limit(app, status, retried):
+@pytest.mark.parametrize('value', ['99999999999999', 'Fri, 31 Dec 9999 23:59:59 -2359', 'soon', '-5'])
+def test_an_absurd_retry_after_falls_back_to_the_interval(clock, order, value):
+    svc = _service()
+    _poll_settings(svc)
+    answers = iter([_response(200, {'status': 'pending'}, retry_after=value), _response(200, {'status': 'ready'})])
+    svc._post = lambda *_args: next(answers)
+    status, data = svc.wait_for_order(order)
+    assert status == 'ready' and data == {'status': 'ready'} and clock.sleeps == [3]
+
+
+@pytest.mark.parametrize('status, detail, retried', [
+    (400, 'no', True), (404, 'no', True), (409, 'no', True), (429, 'no', False), (500, 'no', False),
+    (429, 'too many replacements', False), (500, 'cannot replace', True),
+])
+def test_a_refused_replaces_is_dropped_but_not_on_a_rate_limit(app, status, detail, retried):
     svc = _service()
     svc.environment = 'staging'
     svc.account = None
@@ -262,7 +314,7 @@ def test_a_refused_replaces_is_dropped_but_not_on_a_rate_limit(app, status, retr
 
     def post(_url, payload):
         sent.append(dict(payload))
-        return _response(status, {'type': 'urn:ietf:params:acme:error:malformed', 'detail': 'no'})
+        return _response(status, {'type': 'urn:ietf:params:acme:error:malformed', 'detail': detail})
 
     svc._post = post
     ok, _message, _order = svc.create_order(['audit.example.com'], 'a@example.com', replaces='x.y')

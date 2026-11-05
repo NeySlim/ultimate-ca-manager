@@ -267,9 +267,9 @@ def _unplaceable_reference(section_name, section, name, row, column) -> None:
 
 
 def _fields_as_stored(value: Any) -> Any:
-    """HSM configuration: each sensitive value under this installation's key. An archive from
-    before this rule holds the source's ciphertext, which only that key opens."""
-    from models.hsm import HsmProvider
+    """HSM configuration: each sensitive value under this installation's key. A value in the
+    source's ciphertext only that key opens: dropped, so the provider shows it as missing."""
+    from models.hsm import HsmProvider, _is_sensitive_key
     from utils.encryption import decrypt_value, is_encrypted
     try:
         fields = json.loads(value)
@@ -277,9 +277,12 @@ def _fields_as_stored(value: Any) -> Any:
         return value
     if not isinstance(fields, dict):
         return value
-    if any(isinstance(v, str) and v and is_encrypted(v) and not decrypt_value(v) for v in fields.values()):
-        logger.warning("A restored HSM provider holds a secret encrypted under another "
-                       "installation's key: enter it again")
+    for field, secret in list(fields.items()):
+        if (_is_sensitive_key(field) and isinstance(secret, str) and secret
+                and is_encrypted(secret) and not decrypt_value(secret)):
+            del fields[field]
+            logger.warning("A restored HSM provider lost field %s, encrypted under another "
+                           "installation's key: enter it again", field)
     # Never added to the session: only its encoding of the column is wanted
     provider = HsmProvider()
     provider.set_config(fields)

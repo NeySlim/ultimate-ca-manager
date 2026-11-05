@@ -132,8 +132,10 @@ def decrypt_stored_secret(stored, *, label: str):
 
 
 def decrypt_stored_fields(stored, *, label: str):
-    """A JSON object whose values are encrypted one by one, in cleartext: as a whole it looks
-    unencrypted, and the archive would carry ciphertext only this installation can open."""
+    """A JSON object whose sensitive values are encrypted one by one, in cleartext: as a whole it
+    looks unencrypted, and the archive would carry ciphertext only this installation can open.
+    A value this key cannot open stays as it is: it does not stop the backup of everything else."""
+    from models.hsm import _is_sensitive_key
     from utils.encryption import decrypt_value, is_encrypted
 
     opened = decrypt_stored_secret(stored, label=label)
@@ -144,12 +146,12 @@ def decrypt_stored_fields(stored, *, label: str):
     if not isinstance(fields, dict):
         return opened
     for name, value in fields.items():
-        if isinstance(value, str) and value and is_encrypted(value):
-            fields[name] = decrypt_value(value)
-            if not fields[name]:
-                raise BackupExportError(
-                    f"The stored secret of {label} could not be decrypted "
-                    "(wrong or missing database encryption key)")
+        if _is_sensitive_key(name) and isinstance(value, str) and value and is_encrypted(value):
+            cleartext = decrypt_value(value)
+            if cleartext:
+                fields[name] = cleartext
+            else:
+                logger.warning("%s: field %s is encrypted under another key, enter it again", label, name)
     return json.dumps(fields)
 
 

@@ -6,7 +6,6 @@ from cryptography.fernet import Fernet
 
 from models import db
 from models.hsm import HsmProvider
-from services.backup.errors import BackupExportError
 from services.backup.key_material import decrypt_stored_fields
 from services.backup.manifest import SECTIONS
 from services.backup.restore.apply import _secret_as_stored
@@ -47,12 +46,23 @@ def test_the_pin_reads_back_under_another_key_and_stays_encrypted(app, under_key
     assert json.loads(restored.config)['pin'].startswith('gAAAA')
 
 
-def test_an_export_refuses_a_field_it_cannot_open(app, under_key):
+def test_a_field_it_cannot_open_does_not_stop_the_backup(app, under_key, caplog):
     under_key(Fernet.generate_key())
-    stored = _stored_config({'pin': '1234'})
+    stored = _stored_config({'pin': '1234', 'slot': 3})
     under_key(Fernet.generate_key())
-    with pytest.raises(BackupExportError):
-        decrypt_stored_fields(stored, label='hsm')
+    assert json.loads(decrypt_stored_fields(stored, label='hsm')) == json.loads(stored)
+    assert 'field pin is encrypted under another key' in caplog.text
+
+
+def test_only_a_sensitive_field_is_a_secret(app, under_key, caplog):
+    # A label may look like a token: get_config would never decrypt it
+    lookalike = 'gAAAAA' + 'x' * 60
+    under_key(Fernet.generate_key())
+    assert json.loads(decrypt_stored_fields(json.dumps({'token_label': lookalike}), label='hsm')) == \
+        {'token_label': lookalike}
+    assert 'another key' not in caplog.text
+    restored = _secret_as_stored(SECTIONS['hsm_providers'], 'config', json.dumps({'token_label': lookalike}))
+    assert json.loads(restored) == {'token_label': lookalike}
 
 
 def test_an_older_archive_restores_on_its_own_key_and_warns_on_another(app, under_key, caplog):
@@ -64,8 +74,8 @@ def test_an_older_archive_restores_on_its_own_key_and_warns_on_another(app, unde
     assert 'another' not in caplog.text
 
     under_key(Fernet.generate_key())
-    assert _restored(archived).get_config()['pin'] is None
-    assert "another installation's key" in caplog.text
+    assert _restored(archived).get_config() == {}
+    assert "lost field pin" in caplog.text
 
 
 @pytest.mark.parametrize('value', ['not json', '["a"]'])

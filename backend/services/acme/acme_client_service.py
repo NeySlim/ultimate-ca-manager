@@ -37,6 +37,8 @@ from utils.acme_ip import (
     TlsAlpn01Listener,
 )
 import fips_mode
+from cryptography.exceptions import UnsupportedAlgorithm
+from utils.revocation_reasons import normalize_revocation_reason
 from utils import key_algorithms, ssrf_protection
 from utils.ca_profile import default_digest_for_key_type
 from utils.signing_hash import HASH_BY_NAME, signing_hash_for
@@ -442,7 +444,7 @@ class AcmeClientService:
 
     def wait_for_order(self, order: AcmeClientOrder) -> Tuple[str, Dict]:
         """Poll until the authorizations are settled: the order leaves `pending`, or the per-CA
-        poll timeout runs out. The caller reads the status it gets back."""
+        poll timeout runs out. Returns the last status and body."""
         deadline, interval = self._order_poll_limits()
         while True:
             status, data = self.check_order_status(order)
@@ -467,7 +469,7 @@ class AcmeClientService:
         """Keep the seconds asked by this response; none or unreadable leaves the interval."""
         try:
             retry_at = self._parse_retry_after(response.headers.get('Retry-After'))
-        except ValueError:
+        except (ValueError, OverflowError):
             retry_at = None
         wait = (retry_at - datetime.now(timezone.utc).replace(tzinfo=None)).total_seconds() if retry_at else 0
         self._order_retry_after = wait if wait > 0 else None
@@ -1156,7 +1158,7 @@ class AcmeClientService:
                     err_body = {}
                 err_text = f"{err_body.get('type', '')} {err_body.get('detail', '')}".lower()
                 # A CA may reject the field however it likes. A rate limit is not about it.
-                if (400 <= resp.status_code < 500 and resp.status_code != 429) or 'replace' in err_text:
+                if resp.status_code != 429 and (400 <= resp.status_code < 500 or 'replace' in err_text):
                     logger.warning(
                         "newOrder with replaces rejected (%s); retrying without "
                         "replaces: %s", resp.status_code, err_body.get('detail'),
@@ -1528,6 +1530,27 @@ class AcmeClientService:
     # Finalization
     # =========================================================================
     
+    @staticmethod
+    def _revoked_as_compromised(certificate) -> bool:
+        return bool(certificate.revoked
+                    and normalize_revocation_reason(certificate.revoke_reason) == 'keyCompromise')
+
+    @classmethod
+    def _key_revoked_as_compromised(cls, public_key) -> bool:
+        """Whether any row holding this key was revoked as compromised: a key reused along
+        renewals sits on several certificates, and only one of them may carry the revocation."""
+        wanted = public_key.public_bytes(Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
+        for row in Certificate.query.filter(Certificate.revoked.is_(True)).all():
+            if not row.crt or not cls._revoked_as_compromised(row):
+                continue
+            try:
+                held = cls._load_x509_certificate(row).public_key()
+            except (ValueError, UnsupportedAlgorithm):
+                continue  # a row this build cannot read says nothing about this key
+            if held.public_bytes(Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo) == wanted:
+                return True
+        return False
+
     def finalize_order(self, order: AcmeClientOrder) -> Tuple[bool, str, Optional[int]]:
         """
         Finalize order and download certificate.
@@ -1564,22 +1587,10 @@ class AcmeClientService:
                 csr_b64 = csr_to_b64url_der(csr)
             elif key_source == 'reuse':
                 from utils.acme_csr import load_private_key_from_certificate
-                from utils.revocation_reasons import normalize_revocation_reason
                 from models import Certificate
                 src_id = order.source_certificate_id or order.certificate_id
                 src_cert = db.session.get(Certificate, src_id) if src_id else None
-                compromised = (src_cert is not None and src_cert.revoked
-                               and normalize_revocation_reason(src_cert.revoke_reason) == 'keyCompromise')
-                if compromised:
-                    logger.warning("Order %s does not reuse the key of certificate %s, revoked as "
-                                   "compromised: a new key is generated", order.id, src_id)
-                if not src_id or compromised:
-                    # First issuance: generate a key; renewals reuse it via source_certificate_id.
-                    cert_key, key_error = self._generate_cert_key(order)
-                    if key_error:
-                        return False, key_error, None
-                    csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
-                else:
+                if src_cert is not None and not self._revoked_as_compromised(src_cert):
                     try:
                         cert_key = load_private_key_from_certificate(src_cert)
                     except ValueError as exc:
@@ -1587,7 +1598,17 @@ class AcmeClientService:
                     refusal = fips_private_key_refusal(cert_key)
                     if refusal:
                         return False, refusal, None
-                    csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
+                    if self._key_revoked_as_compromised(cert_key.public_key()):
+                        cert_key = None
+                if src_cert is not None and cert_key is None:
+                    logger.warning("Order %s does not reuse the key of certificate %s, revoked as "
+                                   "compromised: a new key is generated", order.id, src_id)
+                if cert_key is None:
+                    # First issuance: generate a key; renewals reuse it via source_certificate_id.
+                    cert_key, key_error = self._generate_cert_key(order)
+                    if key_error:
+                        return False, key_error, None
+                csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
             else:
                 cert_key, key_error = self._generate_cert_key(order)
                 if key_error:
