@@ -242,10 +242,51 @@ def test_a_compromised_key_on_an_earlier_certificate_of_the_chain_is_not_reused(
         db.session.commit()
 
 
-def _order_due(valid_days, left_days, threshold_days):
+def test_a_csr_whose_key_was_revoked_as_compromised_never_reaches_the_ca(app, clock, order):
+    key = ec.generate_private_key(ec.SECP256R1())
+    name = x509.Name([x509.NameAttribute(x509.NameOID.COMMON_NAME, 'audit.example.com')])
+    san = x509.SubjectAlternativeName([x509.DNSName('audit.example.com')])
+    csr = x509.CertificateSigningRequestBuilder().subject_name(name).add_extension(san, critical=False) \
+        .sign(key, hashes.SHA256())
+    pem = _cert_with_serial(0x1003, key).public_bytes(serialization.Encoding.PEM)
+    revoked = Certificate(refid='audit-csr', descr='audit', crt=base64.b64encode(pem).decode(),
+                          revoked=True, revoke_reason='keyCompromise')
+    order.key_source = 'csr'
+    order.csr_pem = csr.public_bytes(serialization.Encoding.PEM).decode()
+    db.session.add(revoked)
+    db.session.commit()
+    posted = []
+    svc = _finalizing_service([], _response(200, {'status': 'valid', 'certificate': 'https://ca.example/cert'}))
+    answer = svc._post
+    svc._post = lambda url, payload: posted.append(url) or answer(url, payload)
+    try:
+        ok, message, _cert = svc.finalize_order(order)
+        assert not ok and 'revoked as compromised' in message
+        assert f'{ORDER_URL}/finalize' not in posted
+        revoked.revoke_reason = 'superseded'
+        db.session.commit()
+        svc._post = lambda url, payload: posted.append(url) or (
+            _response(200, {'status': 'ready'}) if url == ORDER_URL else answer(url, payload))
+        svc.finalize_order(order)
+        assert f'{ORDER_URL}/finalize' in posted
+    finally:
+        db.session.delete(revoked)
+        db.session.commit()
+
+
+def test_a_reuse_whose_source_is_gone_says_so(app, clock, order):
+    order.key_source = 'reuse'
+    order.source_certificate_id = 987654
+    db.session.commit()
+    svc = _finalizing_service([], _response(200, {'status': 'valid', 'certificate': 'https://ca.example/cert'}))
+    ok, message, _cert = svc.finalize_order(order)
+    assert not ok and message == 'The certificate holding the key to reuse no longer exists'
+
+
+def _order_due(valid_days, left_days, threshold_days, short_of_a_second=False):
     now = datetime(2026, 11, 5)
     certificate = SimpleNamespace(valid_from=now - timedelta(days=valid_days - left_days),
-                                  valid_to=now + timedelta(days=left_days))
+                                  valid_to=now + timedelta(days=left_days, seconds=-short_of_a_second))
     row = SimpleNamespace(id=1, certificate_id=1, expires_at=certificate.valid_to)
     with patch.object(renew_mod, '_cached_renewal_info', return_value=None), \
             patch.object(renew_mod.db.session, 'get', return_value=certificate):
@@ -259,10 +300,16 @@ def _order_due(valid_days, left_days, threshold_days):
     (31, 30, 30, False),  # still nearly all of its life ahead
     (31, 10, 30, True),
     (90, 45, 60, True),  # a threshold up to two thirds of the life is the operator's
+    (45, 29, 30, True),
     (90, 61, 60, False),
 ])
 def test_a_threshold_longer_than_the_life_keeps_a_last_third(valid, left, threshold, due):
     assert _order_due(valid, left, threshold) is due
+
+
+def test_a_threshold_of_two_thirds_holds_on_notafter_one_second_short():
+    # How public CAs issue: the validity period counts both of its ends
+    assert _order_due(90, 45, 60, short_of_a_second=True) is True
 
 
 @pytest.mark.parametrize('account_url, renews', [('https://ca.example/acct/1', True), (None, False)])
@@ -303,6 +350,7 @@ def test_an_absurd_retry_after_falls_back_to_the_interval(clock, order, value):
 @pytest.mark.parametrize('status, detail, retried', [
     (400, 'no', True), (404, 'no', True), (409, 'no', True), (429, 'no', False), (500, 'no', False),
     (429, 'too many replacements', False), (500, 'cannot replace', True),
+    (403, 'urn:ietf:params:acme:error:rateLimited', False),
 ])
 def test_a_refused_replaces_is_dropped_but_not_on_a_rate_limit(app, status, detail, retried):
     svc = _service()
@@ -314,7 +362,8 @@ def test_a_refused_replaces_is_dropped_but_not_on_a_rate_limit(app, status, deta
 
     def post(_url, payload):
         sent.append(dict(payload))
-        return _response(status, {'type': 'urn:ietf:params:acme:error:malformed', 'detail': detail})
+        kind = detail if detail.startswith('urn:') else 'urn:ietf:params:acme:error:malformed'
+        return _response(status, {'type': kind, 'detail': detail})
 
     svc._post = post
     ok, _message, _order = svc.create_order(['audit.example.com'], 'a@example.com', replaces='x.y')

@@ -3,7 +3,8 @@
 An archive that is missing a section, or that carries a key nobody can
 decrypt, is not a backup: it is a file that will only reveal what it lost on
 the day it is restored. Every such condition aborts the backup with one of
-these errors instead of being downgraded to a log line.
+these errors instead of being downgraded to a log line. The one exception is
+an HSM field this installation itself cannot open: see `decrypt_stored_fields`.
 """
 
 

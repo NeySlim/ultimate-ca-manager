@@ -17,6 +17,7 @@ from typing import Dict, Any, Optional, Tuple, List, Union, TYPE_CHECKING
 
 import requests
 from sqlalchemy.exc import SQLAlchemyError
+from sqlalchemy.orm import load_only
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding, utils as asym_utils
 from cryptography.hazmat.backends import default_backend
@@ -1157,8 +1158,10 @@ class AcmeClientService:
                 except Exception:
                     err_body = {}
                 err_text = f"{err_body.get('type', '')} {err_body.get('detail', '')}".lower()
-                # A CA may reject the field however it likes. A rate limit is not about it.
-                if resp.status_code != 429 and (400 <= resp.status_code < 500 or 'replace' in err_text):
+                # A CA may reject the field however it likes. A rate limit is not about it,
+                # whatever its status: RFC 8555 §6.6 names it by type.
+                rate_limited = resp.status_code == 429 or 'ratelimited' in err_text
+                if not rate_limited and (400 <= resp.status_code < 500 or 'replace' in err_text):
                     logger.warning(
                         "newOrder with replaces rejected (%s); retrying without "
                         "replaces: %s", resp.status_code, err_body.get('detail'),
@@ -1540,7 +1543,8 @@ class AcmeClientService:
         """Whether any row holding this key was revoked as compromised: a key reused along
         renewals sits on several certificates, and only one of them may carry the revocation."""
         wanted = public_key.public_bytes(Encoding.DER, serialization.PublicFormat.SubjectPublicKeyInfo)
-        for row in Certificate.query.filter(Certificate.revoked.is_(True)).all():
+        rows = Certificate.query.options(load_only(Certificate.crt, Certificate.revoked, Certificate.revoke_reason))
+        for row in rows.filter(Certificate.revoked.is_(True)).all():
             if not row.crt or not cls._revoked_as_compromised(row):
                 continue
             try:
@@ -1584,12 +1588,16 @@ class AcmeClientService:
                 match_ok, match_msg = csr_identifiers_match_order(csr, domains)
                 if not match_ok:
                     return False, match_msg, None
+                if self._key_revoked_as_compromised(csr.public_key()):
+                    return False, 'The key of this CSR was revoked as compromised: submit a new CSR', None
                 csr_b64 = csr_to_b64url_der(csr)
             elif key_source == 'reuse':
                 from utils.acme_csr import load_private_key_from_certificate
                 from models import Certificate
                 src_id = order.source_certificate_id or order.certificate_id
                 src_cert = db.session.get(Certificate, src_id) if src_id else None
+                if src_id and src_cert is None:
+                    return False, 'The certificate holding the key to reuse no longer exists', None
                 if src_cert is not None and not self._revoked_as_compromised(src_cert):
                     try:
                         cert_key = load_private_key_from_certificate(src_cert)

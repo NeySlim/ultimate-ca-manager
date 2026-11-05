@@ -3,7 +3,8 @@
 The exporters used to fall back to the value stored in the database when
 decryption failed, which archives the at-rest ciphertext in the field that a
 restore treats as a PEM: the backup succeeds, and the restored key is
-unusable. Decryption failures abort the backup here instead.
+unusable. Decryption failures abort the backup here instead, but for an HSM
+field already unreadable here: see `decrypt_stored_fields`.
 """
 import base64
 import json

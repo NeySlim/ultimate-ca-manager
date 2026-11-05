@@ -77,7 +77,8 @@ def _order_is_due(order, now, fallback_threshold):
         return False
     # A threshold near the certificate's whole life would renew it again and again
     if certificate is not None and certificate.valid_from and certificate.valid_to:
-        lifetime = certificate.valid_to - certificate.valid_from
+        # notAfter is inclusive (RFC 5280 §4.1.2.5): a 90-day certificate ends one second short
+        lifetime = certificate.valid_to - certificate.valid_from + timedelta(seconds=1)
         if (fallback_threshold - now) * 3 > lifetime * 2:
             fallback_threshold = now + lifetime / 3
     return order.expires_at <= fallback_threshold
