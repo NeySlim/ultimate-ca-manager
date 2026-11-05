@@ -249,3 +249,28 @@ def purge_ca_dependents(ca) -> str:
         return (f"Deleted {crl_count} CRL(s), {ocsp_count} OCSP response(s), "
                 f"{rs_count} revoked serial(s) and {scep_count} SCEP request(s)")
     return ''
+
+
+def acme_account_deletion_blockers(acct) -> Iterator[DeletionBlocker]:
+    """Why this ACME CA account may not be deleted: issued orders it renews."""
+    from sqlalchemy import false, or_
+    from models.acme_models import AcmeClientOrder
+    from services.acme.acme_client_service import AcmeClientService
+
+    names = AcmeClientOrder.account_url == acct.account_url if acct.account_url else false()
+    candidates = AcmeClientOrder.query.filter(
+        AcmeClientOrder.status == 'issued',
+        AcmeClientOrder.renewal_enabled == True,  # noqa: E712
+        or_(AcmeClientOrder.acme_client_account_id == acct.id, names),
+    ).order_by(AcmeClientOrder.id).all()
+    # The account each order renews under, resolved as the renewal resolves it
+    domains = [o.primary_domain or f'order {o.id}' for o in candidates
+               if getattr(AcmeClientService.order_account(o), 'id', None) == acct.id]
+    if domains:
+        shown = ', '.join(domains[:5]) + (f' and {len(domains) - 5} more' if len(domains) > 5 else '')
+        yield DeletionBlocker(
+            409,
+            f'Cannot delete the ACME account: {len(domains)} issued order(s) renew through it '
+            f'({shown}). Turn off their renewal or delete them first.',
+            f'{len(domains)} issued order(s) renew through it',
+        )

@@ -48,6 +48,22 @@ class RenewalBlocked(Exception):
 _ARI_CACHE = {}
 
 
+ACCOUNT_GONE = ('The ACME CA account this order was issued under no longer exists, and renewing '
+                'under another account could change CA. Request a new certificate for these names '
+                'with the account to use, then delete this order.')
+
+
+def renewal_client(order):
+    """The client of the CA account ``order`` was issued under.
+
+    RenewalBlocked when the order names an account that is gone; an order that names
+    none (older than per-order accounts) still resolves by environment."""
+    named = order.acme_client_account_id or order.account_url
+    if named and AcmeClientService.order_account(order) is None:
+        raise RenewalBlocked(ACCOUNT_GONE)
+    return AcmeClientService.for_order(order)
+
+
 def _cached_renewal_info(order, certificate, now):
     """Return upstream ARI data while honoring Retry-After."""
     cache_key = (order.acme_client_account_id, certificate.id)
@@ -55,7 +71,7 @@ def _cached_renewal_info(order, certificate, now):
     if cached and cached.get('retry_after') and now < cached['retry_after']:
         return cached['info']
 
-    client = AcmeClientService.for_order(order)
+    client = renewal_client(order)
     info = client.get_renewal_info(certificate)
     if info and info.get('retry_after') and info['retry_after'] > now:
         _ARI_CACHE[cache_key] = {
@@ -350,7 +366,7 @@ def _renew(order, lease) -> tuple:
             raise RenewalBlocked(refusal)
 
     # Initialize ACME client for the same CA that issued the original order
-    acme_client = AcmeClientService.for_order(order)
+    acme_client = renewal_client(order)
     # The resolved account, not the old order's column: legacy rows have none.
     account_id = getattr(acme_client.account, 'id', None)
 

@@ -18,6 +18,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: the key of a finalization lived only in memory, so a restart or a failed import after the CA had issued lost the certificate. The key is now stored encrypted on the order before the request, and a status check, a finalization or the next renewal imports the certificate the CA already issued (migration 123).
 - ACME client: a manual and a scheduled renewal of one order could run at once and obtain two certificates. Each renewal or finalization now holds a lease on its order, which a stopped process leaves for 10 minutes: a second one gets a 409, and the scheduler skips the order.
 - ACME client: after 5 failed scheduled renewals an order was never renewed again, silently. It is now retried once a day, each failure emits the `acme_order.renewal_failed` webhook event, the order list shows the failure count and last error, and the scheduler task reports a warning.
+- ACME client: an order whose CA account had been deleted renewed under another account, possibly at another CA. The renewal now stops with a message saying what to do, and deleting or deactivating an account is refused (409) while issued orders with renewal on use it.
 
 ### Upgrade notes
 

@@ -11,7 +11,7 @@ Routes (all under /api/v2):
   POST   /acme/client/accounts              create (optional external key import)
   GET    /acme/client/accounts/<id>         detail
   PATCH  /acme/client/accounts/<id>         update
-  DELETE /acme/client/accounts/<id>         delete (detaches orders)
+  DELETE /acme/client/accounts/<id>         delete (409 while issued orders renew through it)
   POST   /acme/client/accounts/<id>/register  register with the CA
   POST   /acme/client/accounts/<id>/default   mark as default
   POST   /acme/client/accounts/<id>/deactivate deactivate upstream (RFC 8555 §7.3.6) + remove
@@ -34,6 +34,7 @@ from services.acme.acme_client_service import AcmeClientService, ACCOUNT_KEY_TYP
 from services.acme.dns_update import records as dns_update_records
 from services.acme.dns_update.keys import invalidate_keys
 from services.audit_service import AuditService
+from services.deletion_blockers import acme_account_deletion_blockers, first_blocker
 
 logger = logging.getLogger(__name__)
 
@@ -388,11 +389,14 @@ def _remove_account_row(acct: AcmeClientAccount) -> None:
 @bp.route('/api/v2/acme/client/accounts/<int:account_id>', methods=['DELETE'])
 @require_auth(['delete:acme'])
 def delete_ca_account(account_id):
-    """Delete a CA account. Orders pinned to it are detached (set NULL) so they
-    fall back to the default account on the next renewal."""
+    """Delete a CA account: 409 while issued orders renew through it; other orders
+    pinned to it are detached (set NULL)."""
     acct = db.session.get(AcmeClientAccount, account_id)
     if not acct:
         return error_response('ACME account not found', 404)
+    blocker = first_blocker(acme_account_deletion_blockers(acct))
+    if blocker:
+        return error_response(blocker.message, blocker.status)
 
     label = acct.label
     _remove_account_row(acct)
@@ -431,6 +435,10 @@ def deactivate_ca_account(account_id):
         return error_response(
             'Account is not registered with the CA: use Delete to remove it locally', 400
         )
+    # Before the CA is told: deactivation cannot be undone
+    blocker = first_blocker(acme_account_deletion_blockers(acct))
+    if blocker:
+        return error_response(blocker.message, blocker.status)
 
     label = acct.label
     try:

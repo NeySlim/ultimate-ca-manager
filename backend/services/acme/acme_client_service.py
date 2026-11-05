@@ -355,18 +355,23 @@ class AcmeClientService:
         keeps its CA even if ``acme.client.directory_url`` was changed/cleared
         after creation), then falls back to :meth:`for_issuance`.
         """
+        account = cls.order_account(order) if order else None
+        if account is not None:
+            return cls(account=account)
+        return cls.for_issuance(environment=order.environment if order else None)
+
+    @staticmethod
+    def order_account(order: 'AcmeClientOrder'):
+        """The CA account the order names, by id then by ``account_url``; None when neither resolves."""
         from models.acme_client_account import AcmeClientAccount
 
-        if order and order.acme_client_account_id:
+        if order.acme_client_account_id:
             acct = db.session.get(AcmeClientAccount, order.acme_client_account_id)
             if acct:
-                return cls(account=acct)
-        if order and order.account_url:
-            account = AcmeClientAccount.query.filter_by(
-                account_url=order.account_url).first()
-            if account:
-                return cls(account=account)
-        return cls.for_issuance(environment=order.environment if order else None)
+                return acct
+        if order.account_url:
+            return AcmeClientAccount.query.filter_by(account_url=order.account_url).first()
+        return None
 
     def _sync_legacy_eab_to_account(self) -> bool:
         """Copy legacy EAB keys (``acme.client.eab_*``) onto the account row.

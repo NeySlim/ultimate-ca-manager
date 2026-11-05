@@ -1,4 +1,5 @@
-"""Failed scheduled renewals slow to one a day and say so."""
+"""Failed scheduled renewals slow to one a day and say so; an order whose CA account is gone
+is not renewed under another, and that account cannot be deleted while orders renew through it."""
 import json
 import uuid
 from datetime import timedelta
@@ -161,3 +162,93 @@ def test_the_scheduler_page_counts_a_warning(app, auth_client):
     with patch.object(scheduler_service, '_scheduler', scheduler):
         data = auth_client.get('/api/v2/system/scheduler').get_json()['data']
     assert data['warnings'] == 1
+
+
+# --- the order's CA account -------------------------------------------------
+
+def test_an_order_whose_account_was_deleted_is_not_renewed_elsewhere(make):
+    gone = make.order(account_url='https://ca.example/acct/deleted')
+    accounts = AcmeClientAccount.query.count()
+    with pytest.raises(renew_mod.RenewalBlocked, match='no longer exists'):
+        renew_mod.renew_certificate(gone)
+    assert AcmeClientAccount.query.count() == accounts  # no placeholder account either
+
+
+def test_an_order_pinned_to_a_missing_account_row_is_blocked(make):
+    order = make.order(acme_client_account_id=987654321)
+    with pytest.raises(renew_mod.RenewalBlocked, match='no longer exists'):
+        renew_mod.renewal_client(order)
+
+
+def test_an_order_that_names_no_account_still_resolves(make):
+    # Older than per-order accounts: resolved by environment, as before
+    order = make.order()
+    with patch.object(renew_mod.AcmeClientService, 'for_order', return_value='client') as for_order:
+        assert renew_mod.renewal_client(order) == 'client'
+    for_order.assert_called_once()
+
+
+def test_an_order_found_by_its_account_url_still_resolves(make):
+    account = make.account()
+    order = make.order(account_url=account.account_url)
+    assert renew_mod.renewal_client(order).account.id == account.id
+
+
+def test_the_renewal_window_lookup_creates_no_account(make):
+    order = make.order(account_url='https://ca.example/acct/deleted')
+    accounts = AcmeClientAccount.query.count()
+    with pytest.raises(renew_mod.RenewalBlocked):
+        renew_mod._cached_renewal_info(order, type('Cert', (), {'id': -1})(), utc_now())
+    assert AcmeClientAccount.query.count() == accounts
+
+
+def test_an_account_orders_renew_through_cannot_be_deleted(make, auth_client):
+    account = make.account()
+    pinned = make.order(acme_client_account_id=account.id)
+    legacy = make.order(account_url=account.account_url)  # no id column, found by its URL
+    r = auth_client.delete(f'/api/v2/acme/client/accounts/{account.id}')
+    assert r.status_code == 409
+    message = r.get_json()['message']
+    assert '2 issued order(s)' in message
+    assert pinned.primary_domain in message and legacy.primary_domain in message
+    db.session.expire_all()
+    assert db.session.get(AcmeClientAccount, account.id) is not None
+    assert db.session.get(AcmeClientOrder, pinned.id).acme_client_account_id == account.id
+
+
+def test_the_message_lists_five_domains_and_counts_the_rest(make, auth_client):
+    account = make.account()
+    for _ in range(7):
+        make.order(acme_client_account_id=account.id)
+    message = auth_client.delete(f'/api/v2/acme/client/accounts/{account.id}').get_json()['message']
+    assert '7 issued order(s)' in message and 'and 2 more' in message
+
+
+@pytest.mark.parametrize('fields', [
+    {'renewal_enabled': False},
+    {'status': 'pending'},
+])
+def test_an_account_no_issued_renewal_needs_can_go(make, auth_client, fields):
+    account = make.account()
+    order = make.order(acme_client_account_id=account.id, **fields)
+    assert auth_client.delete(f'/api/v2/acme/client/accounts/{account.id}').status_code == 200
+    db.session.expire_all()
+    assert db.session.get(AcmeClientOrder, order.id).acme_client_account_id is None
+
+
+def test_an_order_pinned_elsewhere_does_not_hold_an_account_of_the_same_url(make, auth_client):
+    # Two rows may share an account URL: an order pinned to the other one does not block this one
+    other = make.account()
+    account = make.account(account_url=other.account_url)
+    make.order(acme_client_account_id=other.id, account_url=other.account_url)
+    assert auth_client.delete(f'/api/v2/acme/client/accounts/{account.id}').status_code == 200
+
+
+def test_deactivation_is_refused_before_the_ca_is_told(make, auth_client):
+    account = make.account()
+    make.order(acme_client_account_id=account.id)
+    with patch('services.acme.acme_client_service.AcmeClientService.deactivate_account') as deactivate:
+        r = auth_client.post(f'/api/v2/acme/client/accounts/{account.id}/deactivate',
+                             data='{}', content_type='application/json')
+    assert r.status_code == 409 and 'renew through it' in r.get_json()['message']
+    deactivate.assert_not_called()
