@@ -168,6 +168,8 @@ class AcmeClientService:
     LE_STAGING = "https://acme-staging-v02.api.letsencrypt.org/directory"
     LE_PRODUCTION = "https://acme-v02.api.letsencrypt.org/directory"
 
+    _order_retry_after = None
+
     def __init__(self, environment: str = None, directory_url: str = None,
                  account: 'AcmeClientAccount' = None,
                  tls_alpn_port: Optional[int] = None):
@@ -437,6 +439,38 @@ class AcmeClientService:
             'order_poll_interval_sec': AcmeClientAccount.DEFAULT_ORDER_POLL_INTERVAL_SEC,
             'http_timeout_sec': AcmeClientAccount.DEFAULT_HTTP_TIMEOUT_SEC,
         }
+
+    def wait_for_order(self, order: AcmeClientOrder) -> Tuple[str, Dict]:
+        """Poll until the authorizations are settled: the order leaves `pending`, or the per-CA
+        poll timeout runs out. The caller reads the status it gets back."""
+        deadline, interval = self._order_poll_limits()
+        while True:
+            status, data = self.check_order_status(order)
+            if status != 'pending' or not self._sleep_before_next_poll(deadline, interval):
+                return status, data
+
+    def _order_poll_limits(self) -> Tuple[float, int]:
+        poll = self.get_poll_settings()
+        return (time.monotonic() + max(1, int(poll['order_poll_timeout_sec'])),
+                max(1, int(poll['order_poll_interval_sec'])))
+
+    def _sleep_before_next_poll(self, deadline: float, interval: int) -> bool:
+        """Wait as long as the CA's last Retry-After asks (RFC 8555 §7.4), or the interval.
+        False when the deadline has passed: nothing more to poll."""
+        remaining = deadline - time.monotonic()
+        if remaining <= 0:
+            return False
+        time.sleep(min(self._order_retry_after or interval, remaining))
+        return True
+
+    def _note_retry_after(self, response) -> None:
+        """Keep the seconds asked by this response; none or unreadable leaves the interval."""
+        try:
+            retry_at = self._parse_retry_after(response.headers.get('Retry-After'))
+        except ValueError:
+            retry_at = None
+        wait = (retry_at - datetime.now(timezone.utc).replace(tzinfo=None)).total_seconds() if retry_at else 0
+        self._order_retry_after = wait if wait > 0 else None
 
     # =========================================================================
     # Directory & Nonce
@@ -785,7 +819,8 @@ class AcmeClientService:
         if not aki:
             raise ValueError("Certificate has no Authority Key Identifier")
 
-        serial_length = max(1, (cert_obj.serial_number.bit_length() + 7) // 8)
+        # The value bytes of the DER INTEGER: a leading 1 bit takes a zero byte (RFC 9773 §4.1)
+        serial_length = cert_obj.serial_number.bit_length() // 8 + 1
         serial_bytes = cert_obj.serial_number.to_bytes(serial_length, 'big')
         return f"{cls._b64url(aki)}.{cls._b64url(serial_bytes)}"
 
@@ -1120,7 +1155,8 @@ class AcmeClientService:
                 except Exception:
                     err_body = {}
                 err_text = f"{err_body.get('type', '')} {err_body.get('detail', '')}".lower()
-                if (resp.status_code == 409 or 'replace' in err_text):
+                # A CA may reject the field however it likes. A rate limit is not about it.
+                if (400 <= resp.status_code < 500 and resp.status_code != 429) or 'replace' in err_text:
                     logger.warning(
                         "newOrder with replaces rejected (%s); retrying without "
                         "replaces: %s", resp.status_code, err_body.get('detail'),
@@ -1472,6 +1508,7 @@ class AcmeClientService:
         """
         try:
             resp = self._post(order.order_url, "")  # POST-as-GET
+            self._note_retry_after(resp)
             if resp.status_code == 200:
                 data = resp.json()
                 self.write_order_status(order, data.get('status', order.status))
@@ -1527,16 +1564,22 @@ class AcmeClientService:
                 csr_b64 = csr_to_b64url_der(csr)
             elif key_source == 'reuse':
                 from utils.acme_csr import load_private_key_from_certificate
+                from utils.revocation_reasons import normalize_revocation_reason
                 from models import Certificate
                 src_id = order.source_certificate_id or order.certificate_id
-                if not src_id:
+                src_cert = db.session.get(Certificate, src_id) if src_id else None
+                compromised = (src_cert is not None and src_cert.revoked
+                               and normalize_revocation_reason(src_cert.revoke_reason) == 'keyCompromise')
+                if compromised:
+                    logger.warning("Order %s does not reuse the key of certificate %s, revoked as "
+                                   "compromised: a new key is generated", order.id, src_id)
+                if not src_id or compromised:
                     # First issuance: generate a key; renewals reuse it via source_certificate_id.
                     cert_key, key_error = self._generate_cert_key(order)
                     if key_error:
                         return False, key_error, None
                     csr_b64 = self._build_csr_b64(cert_key, domains, primary_domain)
                 else:
-                    src_cert = db.session.get(Certificate, src_id)
                     try:
                         cert_key = load_private_key_from_certificate(src_cert)
                     except ValueError as exc:
@@ -1563,17 +1606,15 @@ class AcmeClientService:
             self.write_order_status(order, order_data.get('status', 'processing'))
             db.session.commit()
             
-            # Wait for certificate (poll up to 30 seconds)
-            for _ in range(10):
-                if order_data.get('certificate'):
-                    break
-                time.sleep(3)
-                status, order_data = self.check_order_status(order)
-                if status == 'invalid':
-                    return False, "Order became invalid during finalization", None
-            
             if not order_data.get('certificate'):
-                return False, "Certificate not ready after polling", None
+                self._note_retry_after(resp)
+                deadline, interval = self._order_poll_limits()
+                while not order_data.get('certificate'):
+                    if not self._sleep_before_next_poll(deadline, interval):
+                        return False, "Certificate not ready after polling", None
+                    status, order_data = self.check_order_status(order)
+                    if status == 'invalid':
+                        return False, "Order became invalid during finalization", None
             
             # Download certificate
             cert_url = order_data['certificate']
@@ -1755,9 +1796,9 @@ class AcmeClientService:
             requested = HASH_BY_NAME[default_digest_for_key_type(cert_key.curve.name)]()
         hash_alg = signing_hash_for(cert_key, requested)
 
-        subject = x509.Name([
-            x509.NameAttribute(NameOID.COMMON_NAME, primary_domain),
-        ])
+        # A CN holds 64 characters (RFC 5280), a DNS name 253: the SAN carries the names anyway
+        has_cn = len(primary_domain) <= 64
+        subject = x509.Name([x509.NameAttribute(NameOID.COMMON_NAME, primary_domain)] if has_cn else [])
         san_list = []
         for identifier in domains:
             normalized_ip = normalize_ip_for_identifier(identifier)
@@ -1769,7 +1810,7 @@ class AcmeClientService:
             subject
         ).add_extension(
             x509.SubjectAlternativeName(san_list),
-            critical=False,
+            critical=not has_cn,
         ).sign(cert_key, hash_alg, default_backend())
 
         csr_der = csr.public_bytes(Encoding.DER)

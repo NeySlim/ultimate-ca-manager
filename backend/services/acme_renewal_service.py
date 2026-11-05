@@ -4,7 +4,6 @@ Automatically renews Let's Encrypt certificates before expiry.
 """
 import json
 import logging
-import time
 from datetime import timedelta
 
 from models import Certificate, DnsProvider, SystemConfig, db
@@ -74,7 +73,14 @@ def _order_is_due(order, now, fallback_threshold):
                 exc,
             )
 
-    return bool(order.expires_at and order.expires_at <= fallback_threshold)
+    if not order.expires_at:
+        return False
+    # A threshold as long as the certificate's life would renew it at every pass
+    if certificate is not None and certificate.valid_from and certificate.valid_to:
+        lifetime = certificate.valid_to - certificate.valid_from
+        if fallback_threshold - now >= lifetime:
+            fallback_threshold = now + lifetime / 3
+    return order.expires_at <= fallback_threshold
 
 
 def _pending_http01_order(order, account_id):
@@ -268,7 +274,8 @@ def renew_certificate(order) -> tuple:
     # Get email from settings (same source as manual order creation)
     email_cfg = SystemConfig.query.filter_by(key='acme.client.email').first()
     email = email_cfg.value if email_cfg else None
-    if not email:
+    # Only a registration uses it: an account that exists renews without
+    if not email and not acme_client._get_account_url():
         raise Exception("ACME client email not configured: cannot renew")
     
     # RFC 9773 §5: identify the certificate being replaced when the CA
@@ -408,7 +415,7 @@ def renew_certificate(order) -> tuple:
 
         # Wait for validation
         logger.info("Waiting for ACME validation...")
-        time.sleep(20)
+        acme_client.wait_for_order(new_order)
 
         # Finalize order — finalize_order handles CSR generation, cert download, and import
         success_fin, message_fin, cert_id = acme_client.finalize_order(new_order)

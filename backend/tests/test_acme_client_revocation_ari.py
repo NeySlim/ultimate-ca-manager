@@ -124,7 +124,8 @@ class TestAcmeClientAri:
         )
 
         info = service.get_renewal_info(cert)
-        cert_id = f'{_b64url(aki)}.{_b64url(serial.to_bytes(3, "big"))}'
+        # 0xA1 starts with a 1 bit: DER puts a zero byte before it (RFC 9773 §4.1)
+        cert_id = f'{_b64url(aki)}.{_b64url(serial.to_bytes(4, "big"))}'
 
         assert captured['url'] == f'https://ca.example/acme/renewal-info/{cert_id}'
         assert info['cert_id'] == cert_id

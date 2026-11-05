@@ -30,6 +30,8 @@ of a worker and there is no rollback between them.
 import base64
 from datetime import date, datetime
 
+import json
+
 import pytest
 from sqlalchemy import inspect as sa_inspect, text as sa_text
 from sqlalchemy.types import (
@@ -84,7 +86,7 @@ EMPTIED_BEFORE_RESTORE = {
 
 # The secrets whose model exposes a property that encrypts: these are the ones
 # a restore must not be able to leave in the clear. `hsm_providers.config` is
-# a plain column with no such property and is deliberately not here.
+# encrypted field by field, without such a property: not here.
 SECRETS_WITH_A_PROPERTY = (
     ('sso_providers', 'oauth2_client_secret'),
     ('sso_providers', 'ldap_bind_password'),
@@ -367,7 +369,8 @@ def restored(app):
             measured[(section_name, column)] = {
                 'raw': _raw_secret(instance, column),
                 'column': getattr(instance, _stored_attribute(type(instance), column)),
-                'readable': getattr(instance, column),
+                'readable': (json.dumps(instance.get_config()) if section_name == 'hsm_providers'
+                             else getattr(instance, column)),
                 'before': before[(section_name, column)],
             }
 

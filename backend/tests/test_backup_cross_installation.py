@@ -38,6 +38,7 @@ the archive holds nothing but the rows these tests write and the shared
 database is never touched -- which matters, because every other file of this
 worker reads it.
 """
+import json
 import base64
 import os
 from contextlib import contextmanager
@@ -328,6 +329,8 @@ def _write_secret(row, section_name, column, value):
     model = type(row)
     if _has_encrypting_property(model, column):
         setattr(row, column, value)          # the property encrypts, its way
+    elif (section_name, column) == ('hsm_providers', 'config'):
+        row.set_config(json.loads(value))    # each sensitive value on its own
     elif (section_name, column) in WRAPPED_WITH_THE_MASTER_KEY:
         setattr(row, _secret_attribute(model, column), encrypt_text(value))
     else:
@@ -359,6 +362,8 @@ def _readable_secret(row, column, section_name=None):
              if section_name else None)
     if layer == 'master':
         return decrypt_text(stored) if stored else stored
+    if layer == 'fields':
+        return json.dumps(row.get_config())
     return decrypt_if_needed(stored)
 
 
@@ -1315,13 +1320,11 @@ AT_REST_AFTER_A_RESTORE = {
     ('smtp_config', 'smtp_oauth_refresh_token'): 'database key',
 
     # Readable in the column, which is where the application reads them: the
-    # MFA secret is handed straight to pyotp, the HSM configuration straight
-    # to json.loads. The restore puts back what the source held.
+    # MFA secret is handed straight to pyotp. The restore puts back what the source held.
     ('users', 'backup_codes'): 'the clear',
     ('users', 'totp_secret'): 'the clear',
 
-    # Readable in the column, which is where the application reads it: the
-    # HSM configuration goes straight to json.loads.
+    # A JSON object in the clear, its sensitive values each under the database key.
     ('hsm_providers', 'config'): 'the clear',
 
     # Plain columns, so no property re-encrypted them, and the restore wrote

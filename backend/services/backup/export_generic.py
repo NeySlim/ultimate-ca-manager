@@ -16,7 +16,7 @@ from typing import Any, Dict, List
 from sqlalchemy import inspect as sa_inspect
 
 from .errors import BackupExportError
-from .key_material import decrypt_stored_secret
+from .key_material import decrypt_stored_fields, decrypt_stored_secret
 from .manifest import SECTIONS, Section
 
 logger = logging.getLogger(__name__)
@@ -110,8 +110,8 @@ def export_section(section_name: str, index: IdentityIndex) -> List[Dict[str, An
                 raise BackupExportError(
                     f"Section '{section_name}' declares a secret {secret!r} the "
                     "model does not hold")
-            data[secret] = decrypt_stored_secret(
-                getattr(row, stored_attr), label=f"{label} ({secret})")
+            decrypt = decrypt_stored_fields if section.stored.get(secret) == 'fields' else decrypt_stored_secret
+            data[secret] = decrypt(getattr(row, stored_attr), label=f"{label} ({secret})")
 
         for column, target in section.references.items():
             data[f'{column}{REFERENCE_SUFFIX}'] = index.of(

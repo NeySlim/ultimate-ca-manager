@@ -15,6 +15,8 @@ archive, removes the row, restores it, and asks two questions of the column:
 what the application reads out of it, and whether the cleartext is sitting
 there.
 """
+import json
+
 import pytest
 
 from models import db
@@ -95,12 +97,27 @@ def _deploy_target(secret):
 
 
 # (section, column, how the row is made, how the application reads the column)
+def _hsm_provider(cleartext):
+    from models.hsm import HsmProvider
+    row = HsmProvider(name=f'{MARK}-hsm', type='openbao')
+    row.set_config({'token': cleartext})
+    return HsmProvider, row, HsmProvider.name == f'{MARK}-hsm'
+
+
+def _read_hsm_token(stored):
+    from utils.encryption import decrypt_value, is_encrypted
+    token = json.loads(stored)['token']
+    assert is_encrypted(token)
+    return decrypt_value(token)
+
+
 CASES = [
     ('acme_client_accounts', 'account_key', _acme_client_account, _read_master),
     ('scep_profiles', 'challenge_password', _scep_challenge, _read_master),
     ('intune_apps', 'client_secret', _intune_app, _read_database),
     ('webhook_endpoints', 'secret', _webhook, _read_database),
     ('deploy_targets', 'private_key', _deploy_target, _read_master),
+    ('hsm_providers', 'config', _hsm_provider, _read_hsm_token),
 ]
 
 

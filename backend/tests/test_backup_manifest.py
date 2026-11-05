@@ -118,8 +118,6 @@ READ_IN_THE_CLEAR = {
         "handed straight to pyotp, which cannot verify a ciphertext",
     ('users', 'backup_codes'):
         "Argon2id hashes, not encryption: they are already one-way",
-    ('hsm_providers', 'config'):
-        "JSON the provider reads with json.loads at every connection",
 }
 
 
@@ -152,7 +150,7 @@ class TestEverySecretSaysHowItGoesBack:
             for column, layer in section.stored.items():
                 assert column in section.secrets, (
                     f'{name}.{column} says how it is stored but is not a secret')
-                assert layer in ('master', 'database'), (
+                assert layer in ('master', 'database', 'fields'), (
                     f'{name}.{column} names the layer {layer!r}, which is not '
                     'one this version writes')
 

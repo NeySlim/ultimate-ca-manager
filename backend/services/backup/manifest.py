@@ -57,11 +57,12 @@ class Section:
     application writes it with is named here:
 
     * `master` for `security.encryption.encrypt_text`, the key-encryption key;
-    * `database` for `utils.encryption.encrypt_if_needed`, the database key.
+    * `database` for `utils.encryption.encrypt_if_needed`, the database key;
+    * `fields` for a JSON object whose sensitive values are each under the database key.
 
     A plain column absent from this mapping is one the application reads
     directly, in the clear: the MFA secret `pyotp` is handed, the Argon2
-    hashes of the backup codes, the JSON configuration of an HSM provider.
+    hashes of the backup codes.
     Encrypting those would hand the application a ciphertext it never
     decrypts. `tests/test_backup_manifest.py` refuses a secret that is
     neither a property, nor named here, nor named there as read in the
@@ -175,6 +176,7 @@ SECTIONS: Dict[str, Section] = {
             'error_message': 'live connection state',
         },
         secrets=('config',),
+        stored={'config': 'fields'},
         references={'created_by': 'users'},
     ),
     'hsm_keys': Section(

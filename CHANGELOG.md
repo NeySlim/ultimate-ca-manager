@@ -15,6 +15,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ### Fixed
 
+- ACME client: the ARI identifier of a certificate dropped the leading zero of a serial whose first bit is set (RFC 9773 §4.1), so renewal windows and `replaces` went wrong for such serials. It now follows the RFC, and `replaces` is dropped on any client error but a rate limit.
+- ACME client: a first name over 64 characters failed at finalization, once the challenges had passed. The name now goes in the SAN alone, marked critical.
+- ACME client: a renewal waited a fixed 20 seconds for validation and finalization gave up after 30. Both now poll to the CA's configured timeout and honour `Retry-After`.
+- ACME client: a renewal with `key_source=reuse` certified again a key revoked as compromised. It now generates a new key.
+- ACME client: a threshold as long as the certificate's life renewed it at every pass. It now renews in the last third, and a renewal no longer asks for an email an existing account does not need.
+- Backups: an HSM provider's PIN or token left in the archive under the source's database key, and read back empty on another installation. The archive now holds it in clear, under its password; an older archive restored under another key logs that the secret must be entered again.
 - HSM: generating a key under a name OpenBao or Azure Key Vault already held adopted that name, whatever the requested algorithm, and deleting it then destroyed the key of a live CA. The API now answers 409; bring an existing key in with a sync.
 - HSM: two generations at once under one name could both find it free, and a key whose row could not be stored stayed in the HSM. Generations now take turns per provider (409 after 60 s), and such a key is removed unless a row holds its name.
 - Database errors quoted bound values in logs and API messages, an unencrypted private key included. They are now hidden, except what PostgreSQL itself quotes in a DETAIL line: a duplicate key in full, or each column of a refused row up to 64 bytes.

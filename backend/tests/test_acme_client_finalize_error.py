@@ -161,7 +161,7 @@ def test_a_status_check_does_not_undo_an_import(app, before, after):
         db.session.commit()
         order_id = order.id
         svc = object.__new__(AcmeClientService)
-        svc._post = lambda *_args: SimpleNamespace(status_code=200, json=lambda: {'status': 'valid'})
+        svc._post = lambda *_args: SimpleNamespace(status_code=200, headers={}, json=lambda: {'status': 'valid'})
         status, _data = svc.check_order_status(order)
         assert status == 'valid'
         assert _stored(order_id).status == after
@@ -173,8 +173,8 @@ def test_a_download_the_ca_refuses_is_recorded(app):
         order_id = order.id
         svc = _service_that_imports_with(lambda **_kwargs: 4242)
         responses = iter([
-            SimpleNamespace(status_code=200, json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'}),
-            SimpleNamespace(status_code=500),
+            SimpleNamespace(status_code=200, headers={}, json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'}),
+            SimpleNamespace(status_code=500, headers={}),
         ])
         svc._post = lambda *_args: next(responses)
         ok, msg, _cert_id = svc.finalize_order(order)
@@ -195,7 +195,7 @@ def test_a_status_check_loses_to_an_import_during_its_round_trip(app):
             # This session's copy of the order still says processing
             db.session.execute(text(f"UPDATE {AcmeClientOrder.__tablename__} SET status = 'issued' "
                                     f"WHERE id = {order_id}"))
-            return SimpleNamespace(status_code=200, json=lambda: {'status': 'valid'})
+            return SimpleNamespace(status_code=200, headers={}, json=lambda: {'status': 'valid'})
 
         svc = object.__new__(AcmeClientService)
         svc._post = background_import_meanwhile
@@ -271,8 +271,8 @@ def test_no_write_is_pending_during_any_call_to_the_ca(app):
         svc = _service_that_imports_with(lambda **_kwargs: 4242)
         seen = []
         responses = iter([
-            SimpleNamespace(status_code=200, json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'}),
-            SimpleNamespace(status_code=500),
+            SimpleNamespace(status_code=200, headers={}, json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'}),
+            SimpleNamespace(status_code=500, headers={}),
         ])
 
         def call_the_ca(*_args):
@@ -294,11 +294,11 @@ def test_a_second_finalize_does_not_undo_the_first_ones_import(app):
             db.session.execute(text(f"UPDATE {AcmeClientOrder.__tablename__} SET status = 'issued' "
                                     f"WHERE id = {order_id}"))
             db.session.commit()
-            return SimpleNamespace(status_code=200,
+            return SimpleNamespace(status_code=200, headers={},
                                    json=lambda: {'status': 'valid', 'certificate': 'https://ca.example/c'})
 
         svc = _service_that_imports_with(lambda **_kwargs: 4242)
-        responses = iter([imported_meanwhile, lambda *_args: SimpleNamespace(status_code=500)])
+        responses = iter([imported_meanwhile, lambda *_args: SimpleNamespace(status_code=500, headers={})])
         svc._post = lambda *args: next(responses)(*args)
         ok, _msg, _cert_id = svc.finalize_order(order)
         assert not ok

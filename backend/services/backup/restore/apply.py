@@ -13,6 +13,7 @@ what re-encrypts them with *this* installation's key, which is what makes an
 archive restorable somewhere else at all.
 """
 import base64
+import json
 import logging
 from datetime import datetime
 from typing import Any, Dict, List
@@ -265,6 +266,26 @@ def _unplaceable_reference(section_name, section, name, row, column) -> None:
         "the column requires one; nothing has been changed")
 
 
+def _fields_as_stored(value: Any) -> Any:
+    """HSM configuration: each sensitive value under this installation's key. An archive from
+    before this rule holds the source's ciphertext, which only that key opens."""
+    from models.hsm import HsmProvider
+    from utils.encryption import decrypt_value, is_encrypted
+    try:
+        fields = json.loads(value)
+    except (json.JSONDecodeError, TypeError):
+        return value
+    if not isinstance(fields, dict):
+        return value
+    if any(isinstance(v, str) and v and is_encrypted(v) and not decrypt_value(v) for v in fields.values()):
+        logger.warning("A restored HSM provider holds a secret encrypted under another "
+                       "installation's key: enter it again")
+    # Never added to the session: only its encoding of the column is wanted
+    provider = HsmProvider()
+    provider.set_config(fields)
+    return provider.config
+
+
 def _secret_as_stored(section, name: str, value: Any) -> Any:
     """The archive's cleartext, in the shape the column holds it here.
 
@@ -276,7 +297,7 @@ def _secret_as_stored(section, name: str, value: Any) -> Any:
 
     * a column the application reads directly gets the cleartext, because
       that is what the application reads: `pyotp.TOTP(user.totp_secret)`,
-      `json.loads(provider.config)`, the Argon2 hashes of the backup codes.
+      the Argon2 hashes of the backup codes.
       Encrypting those would hand the application a ciphertext it never
       decrypts, and a restored account whose MFA can no longer be verified;
     * a column the application keeps encrypted gets it back encrypted, with
@@ -289,6 +310,8 @@ def _secret_as_stored(section, name: str, value: Any) -> Any:
     layer = section.stored.get(name)
     if not value or layer is None:
         return value
+    if layer == 'fields':
+        return _fields_as_stored(value)
     if layer == 'master':
         from security.encryption import encrypt_text
         return encrypt_text(value)

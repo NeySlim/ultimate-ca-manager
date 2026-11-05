@@ -83,7 +83,7 @@ class TestHsmLinkSurvivesNewIds:
 
                 provider_back = HsmProvider.query.filter_by(
                     name='relink-provider').first()
-                assert 'relink-token' in (provider_back.config or ''), \
+                assert provider_back.get_config().get('token') == 'relink-token', \
                     'the provider credentials did not survive the restore'
             finally:
                 ca = CA.query.filter_by(refid=authority['refid']).first()

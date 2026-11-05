@@ -6,6 +6,7 @@ restore treats as a PEM: the backup succeeds, and the restored key is
 unusable. Decryption failures abort the backup here instead.
 """
 import base64
+import json
 
 import logging
 
@@ -128,6 +129,28 @@ def decrypt_stored_secret(stored, *, label: str):
             "(wrong or missing database encryption key)"
         )
     return value
+
+
+def decrypt_stored_fields(stored, *, label: str):
+    """A JSON object whose values are encrypted one by one, in cleartext: as a whole it looks
+    unencrypted, and the archive would carry ciphertext only this installation can open."""
+    from utils.encryption import decrypt_value, is_encrypted
+
+    opened = decrypt_stored_secret(stored, label=label)
+    try:
+        fields = json.loads(opened) if opened else None
+    except (json.JSONDecodeError, TypeError):
+        return opened
+    if not isinstance(fields, dict):
+        return opened
+    for name, value in fields.items():
+        if isinstance(value, str) and value and is_encrypted(value):
+            fields[name] = decrypt_value(value)
+            if not fields[name]:
+                raise BackupExportError(
+                    f"The stored secret of {label} could not be decrypted "
+                    "(wrong or missing database encryption key)")
+    return json.dumps(fields)
 
 
 def key_matches_certificate(pem_key: str, certificate_der_or_pem, *, label: str) -> bool:
