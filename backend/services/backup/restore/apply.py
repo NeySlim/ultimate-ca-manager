@@ -32,7 +32,7 @@ from models import db
 
 from ..export_generic import CHAIN_VARIANT_FINGERPRINT, REFERENCE_SUFFIX, load_model
 from ..manifest import SECTIONS
-from .plan import RestorePlan, RestoreValidationError
+from .plan import RestorePlan, RestoreValidationError, row_label
 
 logger = logging.getLogger(__name__)
 
@@ -228,8 +228,8 @@ def _apply_row(section_name, section, instance, row, columns, attribute_of, plan
             continue          # a column this version does not have
 
         if name in section.references:
-            if not new and f'{name}{REFERENCE_SUFFIX}' not in row:
-                continue      # written before this link carried an identity: the row keeps its own
+            if not new and f'{name}{REFERENCE_SUFFIX}' not in row and row.get(name) is not None:
+                continue      # a link from before identities: the row keeps its own
             resolved = plan.resolve(section_name, row, name)
             if resolved is None and row.get(name) is not None:
                 if _unplaceable_reference(section_name, section, name, row, column,
@@ -273,9 +273,7 @@ def _restored_chain_variant(row, value, plan):
     return f'cross:{target.id}'
 
 
-def _row_label(section_name, section, row) -> str:
-    values = [str(row.get(field)) for field in section.identity if row.get(field) not in (None, '')]
-    return f"{section_name} {'/'.join(values)}".strip()
+_row_label = row_label
 
 
 def _unplaceable_reference(section_name, section, name, row, column,
@@ -457,7 +455,8 @@ def relink_references(backup_data: Dict[str, Any], plan: RestorePlan) -> Dict[st
             if instance is None:
                 continue
             for column in section.references:
-                if column not in row or f'{column}{REFERENCE_SUFFIX}' not in row:
+                if column not in row or (f'{column}{REFERENCE_SUFFIX}' not in row
+                                         and row.get(column) is not None):
                     continue      # no identity to resolve: the first pass decided
                 resolved = plan.resolve(section_name, row, column)
                 attribute = attribute_of.get(column, column)

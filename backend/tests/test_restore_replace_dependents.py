@@ -735,3 +735,180 @@ def test_a_homonym_only_a_removed_row_points_at_keeps_its_name(target):
         ('replace-dns', 'cloudflare')]
     assert AcmeDomain.query.count() == 0
     assert results['renamed'] == []
+
+
+# -- links an archive leaves empty, or carries without an identity ------------
+
+def _old_form(blob, drop_from='certificates', column='related_certificate_id', edit=None):
+    from tests.test_backup_hostile_corpus import _reseal
+    _key, data = _service()._decrypt_framed(blob, PASSWORD)
+    for row in data[drop_from]:
+        if edit is not None:
+            edit(row)
+        else:
+            row.pop(f'{column}_ref')
+    return _reseal(blob, data)
+
+
+def test_a_pair_made_after_an_older_archive_does_not_outlive_its_partner(target):
+    """The archive says unpaired; the partner here is removed: no number is left behind."""
+    from models import Certificate
+
+    _user('replace-admin')
+    issuer = _authority_row('replace-late-pair-ca')
+    _certificate_row('replace-late-pair-a', issuer)
+    blob = _old_form(_snapshot())
+
+    first = Certificate.query.filter_by(refid='replace-late-pair-a').one()
+    partner = _certificate_row('replace-late-pair-b', issuer)
+    first.related_certificate_id, partner.related_certificate_id = partner.id, first.id
+    db.session.commit()
+
+    _restore(blob)
+
+    assert Certificate.query.filter_by(refid='replace-late-pair-b').first() is None
+    assert Certificate.query.filter_by(
+        refid='replace-late-pair-a').one().related_certificate_id is None
+
+
+def test_a_link_kept_from_an_older_archive_is_emptied_when_its_target_goes(target):
+    """Paired elsewhere in the archive, paired with a removed row here: emptied, not kept."""
+    from models import Certificate
+
+    _user('replace-admin')
+    issuer = _authority_row('replace-kept-pair-ca')
+    first = _certificate_row('replace-kept-pair-a', issuer)
+    other = _certificate_row('replace-kept-pair-c', issuer)
+    first.related_certificate_id = other.id
+    blob = _old_form(_snapshot())
+
+    partner = _certificate_row('replace-kept-pair-b', issuer)
+    first.related_certificate_id = partner.id
+    db.session.commit()
+
+    _restore(blob)
+
+    assert Certificate.query.filter_by(refid='replace-kept-pair-b').first() is None
+    assert Certificate.query.filter_by(
+        refid='replace-kept-pair-a').one().related_certificate_id is None
+
+
+def test_an_identity_the_archive_records_as_empty_empties_the_link(target):
+    """A null `_ref` says the partner was gone at export; an absent one says nothing."""
+    from models import Certificate
+
+    _user('replace-admin')
+    issuer = _authority_row('replace-null-ref-ca')
+    first = _certificate_row('replace-null-ref-a', issuer)
+    partner = _certificate_row('replace-null-ref-b', issuer)
+    first.related_certificate_id = partner.id
+
+    def gone_at_export(row):
+        if row['refid'] == 'replace-null-ref-a':
+            row['related_certificate_id_ref'] = None
+    blob = _old_form(_snapshot(), edit=gone_at_export)
+
+    results = _restore(blob, mode='merge')
+
+    assert Certificate.query.filter_by(
+        refid='replace-null-ref-a').one().related_certificate_id is None
+    assert any('replace-null-ref-a' in line and 'gone when the archive was written' in line
+               for line in results['warnings'])
+
+
+def test_a_pending_scep_request_does_not_keep_a_removed_profile_number(target):
+    from models.scep import SCEPRequest
+
+    _user('replace-admin')
+    ca, _key, _cert = _authority_row('replace-scep-req-ca')
+    blob = _snapshot()
+    profile = _scep_profile('replace-scep-gone', 'replace-scep-gone', ca.refid)
+    db.session.add(SCEPRequest(transaction_id='replace-tx', ca_refid=ca.refid, csr='x',
+                               profile_id=profile.id))
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert SCEPRequest.query.one().profile_id is None
+    assert results['unlinked_dependents'] == {'scep_requests.profile_id': 1}
+    assert _orphans() == []
+
+
+def test_a_displaced_row_that_would_wait_for_the_writes_is_refused(target, monkeypatch):
+    """Written over by the archived row, then removed with it: refused instead."""
+    from models.acme_models import DnsProvider
+    from services.backup.restore import replace
+
+    _user('replace-admin')
+    db.session.add(DnsProvider(name='replace-dns', provider_type='cloudflare'))
+    blob = _snapshot()
+    DnsProvider.query.filter_by(name='replace-dns').delete()
+    db.session.add(DnsProvider(name='replace-dns', provider_type='route53'))
+    db.session.commit()
+
+    monkeypatch.setattr(replace, '_defer_what_kept_rows_need', lambda replacement: setattr(
+        replacement, 'deferred', {k: set(v) for k, v in replacement.displaced.items()}))
+    with pytest.raises(BackupSchemaError, match='gives its name up'):
+        _restore(blob)
+    db.session.rollback()
+    assert [p.provider_type for p in DnsProvider.query.all()] == ['route53']
+
+
+def test_every_integer_link_without_a_foreign_key_is_declared(app):
+    """A `*_id` integer the schema does not enforce is a soft link, or excused here."""
+    from sqlalchemy import Integer
+    from services.backup.restore.replace import SOFT_LINKS
+
+    not_links = {
+        ('microsoft_cas', 'last_synced_request_id'): 'a request number of the AD CS server',
+        ('msca_requests', 'request_id'): 'a request number of the AD CS server',
+        ('pro_role_permissions', 'resource_id'): 'scoped by resource_type, set by no code path',
+    }
+    declared = {(table, column) for table, column, _target, _key in SOFT_LINKS}
+    with app.app_context():
+        _foreign_keys_into('certificates')    # registers every model
+        undeclared = sorted(
+            (table.name, column.name)
+            for table in db.metadata.tables.values() for column in table.columns
+            if column.name.endswith('_id') and isinstance(column.type, Integer)
+            and not column.foreign_keys and not column.primary_key
+            and (table.name, column.name) not in declared | set(not_links))
+    assert undeclared == []
+    assert set(not_links).isdisjoint(declared)
+
+
+def test_an_older_archive_that_records_no_partner_unpairs_the_row(target):
+    """The key is absent but the column says null: that is what the archive holds."""
+    from models import Certificate
+
+    _user('replace-admin')
+    issuer = _authority_row('replace-unpaired-ca')
+    first = _certificate_row('replace-unpaired-a', issuer)
+    partner = _certificate_row('replace-unpaired-b', issuer)
+    blob = _old_form(_snapshot())
+    first.related_certificate_id, partner.related_certificate_id = partner.id, first.id
+    db.session.commit()
+
+    _restore(blob, mode='merge')
+
+    assert {c.refid: c.related_certificate_id for c in Certificate.query.filter(
+        Certificate.refid.like('replace-unpaired-%'))} == {
+        'replace-unpaired-a': None, 'replace-unpaired-b': None}
+
+
+def test_an_unenforced_optional_link_is_emptied_in_a_table_the_archive_omits(target):
+    """An EAB credential names its creator by number: the user goes, the credential stays."""
+    from models.acme_models import AcmeEabCredential
+
+    _user('replace-admin')
+    blob = _snapshot('users')
+    creator = _user('replace-eab-creator')
+    credential = AcmeEabCredential(kid='replace-kid', created_by_user_id=creator.id)
+    credential._hmac_key_b64 = 'x'
+    db.session.add(credential)
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert AcmeEabCredential.query.one().created_by_user_id is None
+    assert results['unlinked_dependents'] == {'acme_eab_credentials.created_by_user_id': 1}

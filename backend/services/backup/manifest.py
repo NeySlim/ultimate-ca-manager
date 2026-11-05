@@ -454,6 +454,7 @@ SECTIONS: Dict[str, Section] = {
         model='models.scep:SCEPRequest',
         identity=('transaction_id',),
         exclude={**_SURROGATE},
+        references={'profile_id': 'scep_profiles'},
         optional=True,
     ),
     'key_recovery_requests': Section(

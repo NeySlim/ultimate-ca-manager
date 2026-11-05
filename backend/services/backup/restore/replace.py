@@ -177,17 +177,29 @@ DEPENDENT_TABLES: Dict[str, str] = {
     # Queues: a pending delivery would reach whichever row takes the number
     'webhook_deliveries': 'delivery queue, removed with its endpoint as deleting it does',
     'deploy_deliveries': 'delivery queue, removed with its binding as deleting it does',
+    'pro_sso_saml_message_ids': 'replay cache of SAML message ids',
 }
 
 # Integer links the schema holds without a foreign key, handled as if it had one:
 # SQLite hands a removed row's id to the next row inserted.
 SOFT_LINKS = (
+    ('certificates', 'related_certificate_id', 'certificates', 'id'),
+    ('scep_profiles', 'template_id', 'certificate_templates', 'id'),
+    ('scep_requests', 'profile_id', 'scep_profiles', 'id'),
+    ('acme_eab_credentials', 'created_by_user_id', 'users', 'id'),
+    ('acme_eab_credentials', 'revoked_by_user_id', 'users', 'id'),
+    ('acme_dns_update_keys', 'created_by_user_id', 'users', 'id'),
+    ('acme_proxy_dns_challenges', 'acme_client_account_id', 'acme_client_accounts', 'id'),
+    ('pro_sso_saml_message_ids', 'provider_id', 'pro_sso_providers', 'id'),
     ('revoked_serials', 'certificate_id', 'certificates', 'id'),
     ('key_recovery_requests', 'cert_id', 'certificates', 'id'),
     ('webhook_deliveries', 'endpoint_id', 'webhook_endpoints', 'id'),
     ('deploy_deliveries', 'binding_id', 'deploy_bindings', 'id'),
     ('deploy_deliveries', 'binding_id', 'crl_deploy_bindings', 'id'),
 )
+
+# An optional link the schema never enforced is emptied wherever it lives.
+_SOFT_COLUMNS = {(table, column) for table, column, _target, _key in SOFT_LINKS}
 
 # A link whose column names one table or another, told apart by a second column.
 _SOFT_SCOPE = {
@@ -265,6 +277,8 @@ class Replacement:
     doomed: Dict[str, Set[Any]]
     pruned: Set[str]
     deferred: Dict[str, Set[Any]] = field(default_factory=dict)
+    # Rows that give their name up to an archived row: they must go before the writes
+    displaced: Dict[str, Set[Any]] = field(default_factory=dict)
     removed: Dict[str, int] = field(default_factory=dict)
     cleared: Dict[str, int] = field(default_factory=dict)
     unlinked: Dict[str, int] = field(default_factory=dict)
@@ -291,7 +305,8 @@ def plan_replacement(backup_data: Dict[str, Any], plan: RestorePlan, sections: S
         if ids:
             doomed[name] = ids
     return Replacement(order=[name for name in deletion_order(set(doomed))],
-                       doomed=doomed, pruned=pruned)
+                       doomed=doomed, pruned=pruned,
+                       displaced={name: set(ids) for name, ids in displaced.items() if ids})
 
 
 def remove_before_writes(replacement: Replacement) -> Replacement:
@@ -303,6 +318,14 @@ def remove_before_writes(replacement: Replacement) -> Replacement:
     _index_tables()
     db.session.flush()
     _defer_what_kept_rows_need(replacement)
+    for name, ids in replacement.displaced.items():
+        waiting = ids & replacement.deferred.get(name, set())
+        if waiting:
+            # The archived row would be written over it, and then removed with it
+            raise RestoreConflictError(
+                f"Refusing to restore: {describe_row(name, next(iter(waiting)))} gives its "
+                "name up to an archived row, but a row the restore keeps still points at it. "
+                "Nothing has been changed.")
     for name in replacement.order:
         table = _table_of(name)
         _detach_kept_rows(replacement, name, table)
@@ -424,7 +447,8 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
         pointing = _select([column], column, values, scope)
         if not pointing:
             continue
-        if dependent.name not in DEPENDENT_TABLES:
+        unenforced = (dependent.name, column.name) in _SOFT_COLUMNS and column.nullable
+        if dependent.name not in DEPENDENT_TABLES and not unenforced:
             holder = _select([key_column], named, [pointing[0][0]])[0][0]
             raise RestoreConflictError(
                 f"Refusing to restore: the archive removes {describe_row(owner, holder)}, "

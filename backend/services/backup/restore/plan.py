@@ -195,13 +195,14 @@ class RestorePlan:
 
         identity = row.get(f'{column}{REFERENCE_SUFFIX}')
         if not identity:
-            # An archive written before references carried identities: the
-            # number is all there is, and it means nothing here.
+            # The number alone means nothing here: no link rather than another row's
             if row.get(column) is not None:
+                why = ("an archive older than this link's identity"
+                       if f'{column}{REFERENCE_SUFFIX}' not in row
+                       else "the row it named was gone when the archive was written")
                 self.warnings.append(
-                    f"{section_name}.{column} has no identity in this archive; "
-                    "the reference was dropped rather than pointed at a "
-                    "different row")
+                    f"{row_label(section_name, section, row)}: its {column} link was "
+                    f"left empty ({why})")
             return None
 
         return self._id_of(target, identity, translate=translate)
@@ -381,6 +382,11 @@ def _temporal_identity(section_name: str) -> frozenset:
 def _identified_by_a_reference(section: Section) -> bool:
     """Whether this section's identity holds a number that means nothing here."""
     return any(field in section.references for field in section.identity)
+
+
+def row_label(section_name: str, section: Section, row: Dict[str, Any]) -> str:
+    values = [str(row.get(field)) for field in section.identity if row.get(field) not in (None, '')]
+    return f"{section_name} {'/'.join(values)}".strip()
 
 
 def _normalise(value: Any, temporal: bool = False) -> Any:
