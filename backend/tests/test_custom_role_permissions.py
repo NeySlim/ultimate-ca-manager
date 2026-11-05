@@ -52,6 +52,25 @@ def _issue(client, ca_id, cn):
                        content_type='application/json')
 
 
+@pytest.fixture(autouse=True)
+def _drop_created_roles(app):
+    """Remove the roles a test made, links first: a stored cycle left behind
+    is a row pointing forward, which a copy to PostgreSQL inserts before its parent."""
+    with app.app_context():
+        before = {role_id for (role_id,) in db.session.query(CustomRole.id)}
+    yield
+    with app.app_context():
+        db.session.rollback()
+        made = [role_id for (role_id,) in db.session.query(CustomRole.id) if role_id not in before]
+        if made:
+            User.query.filter(User.custom_role_id.in_(made)).update(
+                {'custom_role_id': None}, synchronize_session=False)
+            CustomRole.query.filter(CustomRole.id.in_(made)).update(
+                {'inherits_from': None}, synchronize_session=False)
+            CustomRole.query.filter(CustomRole.id.in_(made)).delete(synchronize_session=False)
+            db.session.commit()
+
+
 @pytest.fixture
 def issuing_ca(create_ca):
     return create_ca(cn='Custom Role Issuing CA')['id']

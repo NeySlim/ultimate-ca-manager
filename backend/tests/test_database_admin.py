@@ -398,6 +398,39 @@ def test_migrate_sqlite_to_pg_non_superuser_falls_back_to_topological_order(
     eng.dispose()
 
 
+def test_a_row_pointing_at_a_later_row_of_its_table_is_copied(populated_app, pg_target):
+    """A role inheriting from one created after it: without the constraints
+    turned off, the row went in before its parent and the copy was refused."""
+    from models import db
+    from models.rbac import CustomRole
+
+    with populated_app.app_context():
+        heir = CustomRole(name='Forward Heir', permissions=['read:cas'])
+        db.session.add(heir)
+        db.session.flush()
+        parent = CustomRole(name='Forward Parent', permissions=['read:crl'])
+        db.session.add(parent)
+        db.session.flush()
+        heir.inherits_from = parent.id
+        db.session.commit()
+        heir_id, parent_id = heir.id, parent.id
+        try:
+            ok, msg, _stats = svc.migrate_data(pg_target)
+        finally:
+            CustomRole.query.filter(CustomRole.id.in_([heir_id, parent_id])).update(
+                {'inherits_from': None}, synchronize_session=False)
+            CustomRole.query.filter(CustomRole.id.in_([heir_id, parent_id])).delete(
+                synchronize_session=False)
+            db.session.commit()
+
+    assert ok, msg
+    eng = create_engine(pg_target)
+    with eng.connect() as c:
+        assert c.execute(text('SELECT inherits_from FROM pro_custom_roles WHERE id = :i'),
+                         {'i': heir_id}).scalar() == parent_id
+    eng.dispose()
+
+
 def test_bootstrap_to_pg_non_superuser_copies_users(populated_app, pg_target):
     """Same failure class on the switch-without-migration path: a refused
     FK-disable poisoned the per-table transaction and every table was skipped,

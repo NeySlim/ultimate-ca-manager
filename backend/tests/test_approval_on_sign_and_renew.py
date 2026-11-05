@@ -67,7 +67,8 @@ def _drop_rows(app, *ids):
     """Delete the rows and every approval request about them. A request
     may have been attributed to a policy left behind by another test file
     (the gate picks the highest-priority match), and SQLite reuses the id
-    of a deleted row: a request left pending would name the next row."""
+    of a deleted row: a request or a revocation record left behind would
+    name the next row."""
     with app.app_context():
         wanted = {str(rid) for rid in ids}
         for ap in ApprovalRequest.query.all():
@@ -78,11 +79,18 @@ def _drop_rows(app, *ids):
             names = {str(rd.get('csr_id')), str(rd.get('certificate_id')), str(ap.certificate_id)} if isinstance(rd, dict) else {str(ap.certificate_id)}
             if names & wanted:
                 db.session.delete(ap)
-        for rid in ids:
-            row = db.session.get(Certificate, rid)
-            if row:
-                db.session.delete(row)
         db.session.commit()
+        # Through the application's deletion, which unlinks the revocation
+        # records: left pointing at a freed id, they name the next row.
+        from models import RevokedSerial
+        from services.cert_service import CertificateService
+        for rid in ids:
+            if db.session.get(Certificate, rid) is None or CertificateService.delete_certificate(rid):
+                continue
+            # A test that broke the deletion on purpose: unlink by hand
+            RevokedSerial.query.filter_by(certificate_id=rid).update({'certificate_id': None})
+            db.session.delete(db.session.get(Certificate, rid))
+            db.session.commit()
 
 
 class TestSignCsr:

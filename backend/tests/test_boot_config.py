@@ -73,16 +73,19 @@ def postgres_install(tmp_path, monkeypatch):
         pytest.skip('UCM_TEST_PG_URL not set')
     import psycopg2
     monkeypatch.setenv('DATABASE_URL', PG_URL)
-    connection = psycopg2.connect(PG_URL)
-    connection.autocommit = True
-    cursor = connection.cursor()
-    cursor.execute("DROP TABLE IF EXISTS system_config")
-    cursor.execute("DROP TABLE IF EXISTS certificate_authorities")
-    _seed(lambda sql, params=(): cursor.execute(sql, params), '%s')
-    yield str(tmp_path)
-    cursor.execute("DROP TABLE IF EXISTS system_config")
-    cursor.execute("DROP TABLE IF EXISTS certificate_authorities")
-    connection.close()
+    from tests.conftest import pg_bench_exclusive
+    # Tables in the shared bench's public schema, which other files reset
+    with pg_bench_exclusive():
+        connection = psycopg2.connect(PG_URL)
+        connection.autocommit = True
+        cursor = connection.cursor()
+        cursor.execute("DROP TABLE IF EXISTS system_config")
+        cursor.execute("DROP TABLE IF EXISTS certificate_authorities")
+        _seed(lambda sql, params=(): cursor.execute(sql, params), '%s')
+        yield str(tmp_path)
+        cursor.execute("DROP TABLE IF EXISTS system_config")
+        cursor.execute("DROP TABLE IF EXISTS certificate_authorities")
+        connection.close()
 
 
 class TestSqliteInstall:
@@ -132,6 +135,7 @@ class TestSqliteInstall:
         assert wstep_enabled(str(tmp_path)) is False
 
 
+@pytest.mark.postgres
 @pytest.mark.skipif(not PG_URL, reason='UCM_TEST_PG_URL not set')
 class TestPostgresInstall:
     def test_chain_is_read(self, postgres_install):
