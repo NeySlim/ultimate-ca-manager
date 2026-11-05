@@ -52,7 +52,7 @@ class TestAnErrorAtAnyPhaseChangesNothing:
         with app.app_context():
             monkeypatch.setattr(
                 rbac.RestoreRbacMixin, '_restore_groups',
-                lambda self, data, results: (_ for _ in ()).throw(
+                lambda self, data, results, *rest: (_ for _ in ()).throw(
                     RuntimeError('the section could not be applied')))
 
             with pytest.raises(RuntimeError):
@@ -83,7 +83,7 @@ class TestAnErrorAtAnyPhaseChangesNothing:
         import services.backup.restore_core as core
         with app.app_context():
             monkeypatch.setattr(
-                core, 'replace_sections',
+                core, 'remove_before_writes',
                 lambda *args, **kwargs: (_ for _ in ()).throw(
                     RuntimeError('the replacement could not be carried out')))
 

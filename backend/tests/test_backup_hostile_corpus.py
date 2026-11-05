@@ -349,8 +349,9 @@ class TestASectionOfTheWrongTypeIsRefusedByName:
             blob = _forged([SECTION], mutate=mutate)
             before = _census()
 
+            # Merged: what other tests left here must not be pruned first
             with pytest.raises(RestoreValidationError) as refusal:
-                _service().restore_backup(blob, PASSWORD)
+                _service().restore_backup(blob, PASSWORD, mode='merge')
             db.session.rollback()
 
             assert named in str(refusal.value), (

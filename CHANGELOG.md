@@ -14,10 +14,13 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Restore: two DNS providers, ACME CA accounts or webhooks of the same name were merged into one row, and one credential was lost. A clashing row is now restored as `name (2)`, and the restore result lists it; an account is matched by its account URL and a webhook by its URL first.
 - DNS providers, ACME CA accounts and webhooks: the API accepted a name already in use. It now answers 409, on creation and on rename.
 - Restore: a membership, deployment binding, CRL binding, template pin or role permission was matched by the source's row numbers first, and could overwrite another row here. Rows are now matched by what they name; an archive records the database it comes from, and its numbers count only there and only when they still name the same rows.
+- Restore: a replacing restore failed on PostgreSQL as soon as a CRL, a cached OCSP response, a session or an ACME client order pointed at a row it removed, and left such rows pointing at nothing on SQLite. Both engines now clear the regenerable rows, detach orders and drop approvals as deleting the row does, and refuse anything else with the row named.
+- Restore: a replacing restore wrote the archive before removing what it does not carry, so a SCEP slug or a name still held by a removed row failed with a bare 500. Removals now come first, a homonym replacing the row here keeps its name, and a remaining database conflict names the table and the row.
 
 ### Upgrade notes
 
 - DNS providers, ACME CA accounts and webhooks: the upgrade renames duplicate names to `name (2)`, `name (3)`, oldest first, then makes the name unique (migration 124).
+- Restore: a replacing restore now removes the CRLs, cached OCSP responses and sessions that point at a removed row, and detaches ACME client orders from the certificates, DNS providers and accounts it removes.
 
 ## [2.249] - 2026-11-05
 

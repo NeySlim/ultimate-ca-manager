@@ -53,13 +53,18 @@ RULES = {
 
 
 def rename_clashing_rows(backup_data: Dict[str, Any],
-                         warnings: Optional[List[str]] = None) -> List[Dict[str, str]]:
+                         warnings: Optional[List[str]] = None, *,
+                         replacing: frozenset = frozenset(),
+                         displaced: Optional[Dict[str, set]] = None) -> List[Dict[str, str]]:
     """Rename, in the archive, the rows that would land on another row's name.
 
     References carried by identity follow the rename; an ambiguous one is added
-    to `warnings`. Returns one entry per row restored under another name.
+    to `warnings`. Returns one entry per row restored under another name. In a
+    section a replacing restore prunes (`replacing`), a row here that is not
+    the same thing gives its name up instead: its id lands in `displaced`.
     """
     warnings = warnings if warnings is not None else []
+    displaced = displaced if displaced is not None else {}
     renamed = []
     for section_name, rule in RULES.items():
         rows = backup_data.get(section_name)
@@ -70,7 +75,10 @@ def rename_clashing_rows(backup_data: Dict[str, Any],
         if not rows:
             continue
         before = [dict(row) for row in rows]
-        final, reasons = _place(section_name, rule, rows)
+        final, reasons, given_up = _place(section_name, rule, rows,
+                                          section_name in replacing)
+        if given_up:
+            displaced.setdefault(section_name, set()).update(given_up)
         for index, row in enumerate(rows):
             if final[index] != row[rule.column]:
                 renamed.append({'section': section_name, 'from': row[rule.column],
@@ -83,8 +91,9 @@ def rename_clashing_rows(backup_data: Dict[str, Any],
     return renamed
 
 
-def _place(section_name, rule, rows):
-    """The name each archived row is restored under, and why it changed."""
+def _place(section_name, rule, rows, replacing=False):
+    """The name each archived row is restored under, why it changed, and the
+    rows here that give their name up to it."""
     model = load_model(SECTIONS[section_name])
     here = model.query.order_by(model.id).all()
     by_name: Dict[str, list] = {}
@@ -124,12 +133,22 @@ def _place(section_name, rule, rows):
                 reasons[index] = 'same row here under this name'
 
     # Anything else takes its own name if free, else the first free suffix.
+    # A replacing restore removes the rows here nothing claimed: their names are free.
     used = set(final.values())
     originals = {row[rule.column] for row in rows}
+    given_up = set()
     for index, row in enumerate(rows):
         if index in final:
             continue
         wanted = row[rule.column]
+        holders = [t for t in by_name.get(wanted, ()) if t.id not in claimed]
+        if (replacing and wanted not in used and holders
+                and len(holders) == len(by_name[wanted])):
+            given_up.update(t.id for t in holders)
+            claimed.update(t.id for t in holders)
+            final[index] = wanted
+            used.add(wanted)
+            continue
         candidate, number = wanted, 2
         while True:
             if candidate not in used and (candidate == wanted or candidate not in originals):
@@ -142,7 +161,7 @@ def _place(section_name, rule, rows):
                               else 'name held here by a different row')
         final[index] = candidate
         used.add(candidate)
-    return final, reasons
+    return final, reasons, given_up
 
 
 def _length(section_name, rule):

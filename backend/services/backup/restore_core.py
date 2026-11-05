@@ -8,6 +8,7 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List
 
+from sqlalchemy.exc import IntegrityError
 from models import db, CA, Certificate
 from utils.datetime_utils import utc_now
 from compliance_profiles import is_valid as is_valid_profile
@@ -24,7 +25,8 @@ from .restore.files import StagedFiles
 from .manifest import SECTIONS
 from .restore.apply import apply_columns, apply_section, relink_references
 from .restore.names import rename_clashing_rows
-from .restore.replace import replace_sections
+from .restore.conflict import conflict_from_integrity_error
+from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
 from .restore.settings import restore_encrypted_settings
 from .restore_rbac import upgrade_archived_permissions
 
@@ -243,9 +245,17 @@ class RestoreCoreMixin:
         # discovered halfway through a restore.
         self._check_payload_schema(backup_data)
         upgrade_archived_permissions(backup_data)
+        if mode not in ('replace', 'merge'):
+            raise BackupSchemaError(
+                f"Unknown restore mode {mode!r}: use 'replace' (the archive "
+                "becomes the instance) or 'merge' (the archive is added to it)")
+        pruned = (self._sections_the_archive_replaces(backup_data)
+                  if mode == 'replace' else set())
         # Before the plan, which finds these rows again by name.
         ambiguous_references: List[str] = []
-        renamed = rename_clashing_rows(backup_data, ambiguous_references)
+        displaced: Dict[str, set] = {}
+        renamed = rename_clashing_rows(backup_data, ambiguous_references,
+                                       replacing=frozenset(pruned), displaced=displaced)
 
         # An archive of metadata alone restores nothing. Announcing it as a
         # success made the caller revoke every session and ask for a restart
@@ -319,15 +329,18 @@ class RestoreCoreMixin:
         # Files are written to a staging directory during the transaction and
         # published once it has committed, so the database and the files on
         # disk can never disagree about whether the restore happened.
-        if mode not in ('replace', 'merge'):
-            raise BackupSchemaError(
-                f"Unknown restore mode {mode!r}: use 'replace' (the archive "
-                "becomes the instance) or 'merge' (the archive is added to it)")
         results['mode'] = mode
 
         staged = StagedFiles()
         try:
             with single_transaction():
+                replacement = None
+                if mode == 'replace':
+                    # Removed before the writes, so what they free is free
+                    replacement = remove_before_writes(plan_replacement(
+                        backup_data, plan, pruned, displaced=displaced))
+                    plan.refresh()
+
                 self._apply_all(backup_data, results, master_key, plan, staged)
 
                 # Sections are applied in an order that cannot satisfy every
@@ -337,14 +350,19 @@ class RestoreCoreMixin:
                 results['relinked'] = relink_references(backup_data, plan)
                 results['chain_variant_fallbacks'] = list(plan.chain_variant_fallbacks)
 
-                if mode == 'replace':
-                    results['removed'] = self._remove_what_the_archive_omits(
-                        backup_data, plan)
+                if replacement is not None:
+                    results.update(remove_after_writes(replacement).report())
 
                 # Published inside the transaction, so a file that cannot be
                 # placed rolls the database back with it. The window that
                 # remains is the commit itself, and it is compensated below.
                 staged.publish()
+        except IntegrityError as exc:
+            staged.unpublish()
+            staged.discard()
+            conflict = conflict_from_integrity_error(exc)
+            logger.warning("Restore refused by the database: %s", conflict)
+            raise conflict from exc
         except Exception:
             # The commit is the last thing the block does: if it is what
             # failed, the files are already in place and describe a restore
@@ -395,7 +413,7 @@ class RestoreCoreMixin:
         return found
 
     @staticmethod
-    def _remove_what_the_archive_omits(backup_data, plan):
+    def _sections_the_archive_replaces(backup_data):
         """Make the restore a replacement, as the documentation says it is.
 
         Only the sections the archive claims to describe are pruned. An
@@ -421,7 +439,7 @@ class RestoreCoreMixin:
                 "Nothing has been changed."
             )
 
-        return replace_sections(backup_data, plan, sections)
+        return sections
 
     def _apply_all(self, backup_data, results, master_key, plan, staged):
         """Every write of a restore, inside the one transaction."""

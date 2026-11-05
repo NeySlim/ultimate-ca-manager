@@ -17,6 +17,13 @@ _RENAMED_KIND = {'dns_providers': 'DNS provider', 'acme_client_accounts': 'ACME 
                  'webhook_endpoints': 'webhook'}
 
 
+def _listing(entries, shown=5) -> str:
+    listing = '; '.join(str(entry) for entry in entries[:shown])
+    if len(entries) > shown:
+        listing += f' and {len(entries) - shown} more'
+    return listing
+
+
 def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
     """`message`, followed by what the archive had to warn about.
 
@@ -89,6 +96,11 @@ def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
         rows, were = ('row', 'was') if len(renamed) == 1 else ('rows', 'were')
         message += _clause(f'{len(renamed)} {rows} {were} restored under another '
                            f'name: {listing}')
+
+    unlinked = (results or {}).get('unlinked_dependents') or {}
+    if unlinked:
+        message += _clause('Rows the archive does not carry lost their link to a removed row: '
+                           + _listing([f'{name} ({count})' for name, count in sorted(unlinked.items())]))
 
     if (results or {}).get('admin_allowlist_cleared'):
         message += _clause('The admin access allowlist from the archive would '

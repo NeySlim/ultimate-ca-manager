@@ -50,6 +50,13 @@ class TestHsmLinkSurvivesNewIds:
             ca.hsm_key_id = key.id
             db.session.commit()
             key_id_before = key.id
+            # Archived too, so the replacement keeps it and the key cannot
+            # take its old id back
+            filler = HsmKey(provider_id=provider.id, key_identifier='relink-filler',
+                            label='filler', algorithm='rsa', key_type='rsa',
+                            purpose='sign')
+            db.session.add(filler)
+            db.session.commit()
 
             blob = _service().create_backup(
                 PASSWORD,
@@ -60,11 +67,6 @@ class TestHsmLinkSurvivesNewIds:
             ca.hsm_key_id = None
             db.session.commit()
             db.session.delete(key)
-            db.session.commit()
-            filler = HsmKey(provider_id=provider.id, key_identifier='relink-filler',
-                            label='filler', algorithm='rsa', key_type='rsa',
-                            purpose='sign')
-            db.session.add(filler)
             db.session.commit()
 
             try:
