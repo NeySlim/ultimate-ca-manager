@@ -341,7 +341,8 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
         public_key = new_key.public_key()
 
     builder = _builder(original, ca, ca_cert, public_key, not_after,
-                       _template_policy_oids(getattr(cert, 'template_id', None)), related_to)
+                       _template_policy_oids(getattr(cert, 'template_id', None)), related_to,
+                       _template_custom_extensions(getattr(cert, 'template_id', None)))
     renewed = builder.sign(private_key=ca_key, algorithm=sign_hash,
                            rsa_padding=rsa_padding_for(ca_key, sign_hash))
     renewed, scts = _apply_ct(renewed, ca_cert, ca_key)
@@ -529,10 +530,25 @@ def _template_policy_oids(template_id):
     return template_policy_oids(template_extensions(template)) if template is not None else []
 
 
+def _template_custom_extensions(template_id):
+    """The custom extensions the certificate's template lists today ([] without one)."""
+    if not template_id:
+        return []
+    from models.certificate_template import CertificateTemplate
+    from utils.custom_extensions import template_custom_extensions
+    try:
+        return template_custom_extensions(db.session.get(CertificateTemplate, template_id))
+    except ValueError as e:
+        raise RenewalError(str(e), 400) from e
+
+
 def _builder(original, ca, ca_cert, public_key, not_after, template_oids=(),
-             related_to=None) -> x509.CertificateBuilder:
+             related_to=None, template_extensions=()) -> x509.CertificateBuilder:
     """The original's subject and extensions; the issuer's own rebuilt from the CA,
-    and the link to *related_to* (A) from A as it is now."""
+    and the link to *related_to* (A) from A as it is now. The template's custom
+    extensions replace the original's of the same OID and join the others."""
+    from utils.custom_extensions import add_custom_extensions
+    replaced = {e['oid'] for e in template_extensions}
     builder = (
         x509.CertificateBuilder()
         .subject_name(original.subject)
@@ -544,7 +560,7 @@ def _builder(original, ca, ca_cert, public_key, not_after, template_oids=(),
     )
     ekus = []
     for ext in original.extensions:
-        if ext.oid in _ISSUER_OWNED_EXTENSION_OIDS:
+        if ext.oid in _ISSUER_OWNED_EXTENSION_OIDS or ext.oid.dotted_string in replaced:
             continue
         if ext.oid == ExtensionOID.EXTENDED_KEY_USAGE:
             ekus = list(ext.value)
@@ -554,6 +570,7 @@ def _builder(original, ca, ca_cert, public_key, not_after, template_oids=(),
             raise RenewalError(
                 f'Cannot carry extension {ext.oid.dotted_string} over to the renewed '
                 f'certificate: {e}', 400) from e
+    builder = add_custom_extensions(builder, template_extensions)
     builder = add_ca_pointer_extensions(
         builder, ca, carried_policy_oids(original, ca.cps_oid if ca.cps_enabled else None, template_oids))
     builder = builder.add_extension(

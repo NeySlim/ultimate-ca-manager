@@ -226,7 +226,7 @@ def _policy_rule_refusal(ca, cert, template_id, validity_days, extra_dns=()):
 
 
 def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus, validity_notice=None,
-                      extra_san=None):
+                      extra_san=None, custom_extensions=None):
     """Queue the signing for approval when a policy requires it: ``(policy,
     approval)`` or ``(None, None)``. Raises on evaluation error."""
     from services.approval_gate import queue_if_approval_required
@@ -242,6 +242,7 @@ def _approval_for_csr(user, ca, cert, data, validity_days, cert_type, extra_ekus
             'template_id': data.get('template_id'),
             # Names added to the request's own (#389), signed as approved
             'extra_san': extra_san,
+            'custom_extensions': custom_extensions or [],
             # The duration was already capped by policy: the approver is told
             'validity_notice': validity_notice or None,
         },
@@ -962,6 +963,7 @@ def sign_csr(csr_id):
         cert_type: server, client, combined, code_signing, email or intermediate_ca
         extra_ekus: EKU names or OIDs added to the type's own
         san_dns, san_ip, san_email, san_uri: names added to the request's own
+        custom_extensions: [{oid, critical, value (hex)}] added verbatim (#437)
     """
     
     cert = db.session.get(Certificate, csr_id)
@@ -999,7 +1001,12 @@ def sign_csr(csr_id):
     if san_err:
         return error_response(san_err, 400)
     extra_san = extra_san if any(extra_san.values()) else None
-    
+
+    from utils.custom_extensions import validate_custom_extensions
+    custom_extensions, ext_err = validate_custom_extensions(data.get('custom_extensions'))
+    if ext_err:
+        return error_response(ext_err, 400)
+
     # Map frontend cert_type to backend cert_type format
     cert_type_map = {
         'server': 'server_cert',
@@ -1066,7 +1073,7 @@ def sign_csr(csr_id):
     try:
         policy, approval = _approval_for_csr(
             g.current_user, ca, cert, data, validity_days, backend_cert_type, extra_ekus,
-            validity_notice=validity_notice, extra_san=extra_san)
+            validity_notice=validity_notice, extra_san=extra_san, custom_extensions=custom_extensions)
     except Exception as e:
         logger.error(f"Policy evaluation failed for CSR {csr_id}; refusing to sign: {e}", exc_info=True)
         return error_response('Policy evaluation failed; the request was not signed', 500)
@@ -1112,6 +1119,7 @@ def sign_csr(csr_id):
             extra_san=general_names_from_buckets(extra_san) if extra_san else None,
             policy_template_id=data.get('template_id'),
             notices=sign_notices,
+            custom_extensions=custom_extensions,
         )
         
         # Determine if result is a CA or Certificate

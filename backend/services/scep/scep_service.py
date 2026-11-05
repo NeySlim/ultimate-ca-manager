@@ -1570,6 +1570,8 @@ class SCEPService:
             builder, self.ca.cps_uri if self.ca.cps_enabled else None, self.ca.cps_oid,
             template_policy_oids(tpl_ext))
         builder = add_qc_statements(builder, tpl_ext)
+        from utils.custom_extensions import add_custom_extensions, template_custom_extensions
+        builder = add_custom_extensions(builder, template_custom_extensions(self.template))
 
         cert = builder.sign(self.ca_key, sign_hash, default_backend(),
                             rsa_padding=rsa_padding_for(self.ca_key, sign_hash))
