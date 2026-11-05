@@ -32,7 +32,7 @@ Single gunicorn listener; production uses a reverse proxy for SNI/TLS per vhost.
 When the stored URL **omits** an explicit `:port`:
 
 - Admin / CORS / redirects → `HTTPS_PORT` from `/etc/ucm/ucm.env` (lab: `8443`)
-- Protocol → `HTTP_PROTOCOL_PORT` / `http_protocol_port` (lab: `8080`)
+- Protocol → `HTTP_PROTOCOL_PORT` / `http_protocol_port` (lab: `8080`); port 80 when that is 0, the built-in listener being disabled
 - ACME directory → `acme_public_port` or `HTTPS_PORT` if unset
 
 Explicit ports in DB are preserved as-is.

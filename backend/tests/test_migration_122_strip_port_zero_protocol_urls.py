@@ -27,6 +27,10 @@ ROWS = [
     (5, None, None, None, None),
     # the scheme keeps the case it was stored in
     (6, 'HTTP://pki.example.com:0/cdp/e.crl', None, None, None),
+    # the port ends at a query or a fragment too, and ':0' before an '@' is a password
+    (7, 'http://pki.example.com:0?x=1', 'http://pki.example.com:0#y', 'http://user:0@pki.example.com/ca.cer', None),
+    # a URL carrying credentials is the operator's own: left alone
+    (8, 'http://user:p@pki.example.com:0/f.crl', None, None, None),
 ]
 
 EXPECTED = {
@@ -37,6 +41,8 @@ EXPECTED = {
     4: ('http://[2001:db8::1]/cdp/d.crl', 'http://pki.example.com', None, json.dumps(['http://x.example.com:0/repo'])),
     5: (None, None, None, None),
     6: ('HTTP://pki.example.com/cdp/e.crl', None, None, None),
+    7: ('http://pki.example.com?x=1', 'http://pki.example.com#y', 'http://user:0@pki.example.com/ca.cer', None),
+    8: ('http://user:p@pki.example.com:0/f.crl', None, None, None),
 }
 
 

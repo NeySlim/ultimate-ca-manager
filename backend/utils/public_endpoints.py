@@ -965,8 +965,7 @@ def run_preflight_checks() -> dict:
         if pp:
             proto_port = _protocol_port_for_stored_url(proto_raw)
             _check_dns('protocol', pp.host)
-            if proto_port > 0:
-                _check_http('protocol', pp.host, proto_port)
+            _check_http('protocol', pp.host, proto_port)
 
     for entry in results:
         entry.pop('_local_ips', None)

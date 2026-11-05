@@ -6,38 +6,21 @@ http://pki.example.com:0/cdp/x.crl, and copied them into every certificate it
 issued (discussion #433). Dropping ':0' gives the default port, which is what
 the fixed URL builder now produces. Certificates already issued are unchanged.
 """
-import json
-import re
+import logging
 import sqlite3
 
+from utils.port_zero import strip_port_zero_from_stored
+
+logger = logging.getLogger(__name__)
 pg_compatible = True
 
 _COLUMNS = ('cdp_url', 'ocsp_url', 'aia_ca_issuers_url')
 _PATTERN = '%:0%'
-_PORT_ZERO = re.compile(r'^(https?://(?:\[[^\]]*\]|[^/:?#@\[\]]+)):0(?=[/?#]|$)', re.IGNORECASE)
-
-
-def _strip(url):
-    return _PORT_ZERO.sub(r'\1', url) if isinstance(url, str) else url
 
 
 def _fix_value(value):
-    """New column value, or None when nothing changes. Keeps the stored form."""
-    if not value:
-        return None
-    if value.startswith('['):
-        try:
-            urls = json.loads(value)
-        except (json.JSONDecodeError, TypeError):
-            urls = None
-        if isinstance(urls, list):
-            fixed = []
-            for url in urls:
-                url = _strip(url)
-                if url not in fixed:
-                    fixed.append(url)
-            return json.dumps(fixed) if fixed != urls else None
-    new = _strip(value)
+    """New column value, or None when nothing changes."""
+    new = strip_port_zero_from_stored(value)
     return new if new != value else None
 
 
@@ -70,7 +53,7 @@ def _upgrade_sqlite(conn):
         fixed += 1
     conn.commit()
     if fixed:
-        print(f"  Migration 122: removed ':0' from the protocol URLs of {fixed} CA(s)")
+        logger.info("Migration 122: removed ':0' from the protocol URLs of %s CA(s)", fixed)
 
 
 def _upgrade_pg(conn):
@@ -86,7 +69,7 @@ def _upgrade_pg(conn):
                      {**updates, 'id': ca_id})
         fixed += 1
     if fixed:
-        print(f"  Migration 122: removed ':0' from the protocol URLs of {fixed} CA(s)")
+        logger.info("Migration 122: removed ':0' from the protocol URLs of %s CA(s)", fixed)
 
 
 def upgrade(conn):
