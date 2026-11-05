@@ -36,6 +36,7 @@ from utils.x509_aki import authority_key_identifier_from_issuer
 from utils.ca_pointer_extensions import add_ca_pointer_extensions
 from utils.qc_statements import carried_policy_oids, template_policy_oids
 from utils.leaf_key_usage import constrain_builder_key_usage
+from utils.spki_digest import certificate_key_sha256
 from utils.datetime_utils import cert_not_before, utc_isoformat, utc_now
 from utils.ca_signing_window import IssuerWindowError, check_issuer_window, clamp_not_after
 from utils.db_transaction import commit_or_rollback
@@ -348,13 +349,14 @@ def _stage_renewal(cert, ca, *, rekey, trigger, known_serial, validity_days, rel
     renewed, scts = _apply_ct(renewed, ca_cert, ca_key)
 
     old_serial, old_valid_to = cert.serial_number, cert.valid_to
+    old_digest = certificate_key_sha256(cert.crt)  # read before the row takes the new key
     new_serial = format(renewed.serial_number, 'x')
     _take_serial(cert.id, old_serial, new_serial, trigger)
 
     cert_pem = renewed.public_bytes(serialization.Encoding.PEM)
     key_pem = private_key_to_pem(new_key) if new_key is not None else None
     _write_row(cert, ca, ca_cert, renewed, cert_pem, key_pem, new_serial, now)
-    _record_superseded(cert.id, ca, old_serial, old_valid_to, now)
+    _record_superseded(cert.id, ca, old_serial, old_valid_to, now, old_digest)
     _record_scts(cert.id, scts)
     return {
         'cert': cert, 'cert_id': cert.id, 'ca': ca, 'old_serial': old_serial,
@@ -640,7 +642,7 @@ def _write_row(cert, ca, ca_cert, renewed, cert_pem, key_pem, new_serial, now) -
     cert.renewed_times = (cert.renewed_times or 0) + 1
 
 
-def _record_superseded(cert_id, ca, old_serial, old_valid_to, now) -> None:
+def _record_superseded(cert_id, ca, old_serial, old_valid_to, now, old_digest=None) -> None:
     """Keep the replaced serial on the CA's CRL until it would have expired."""
     if not old_serial or ca is None:
         return
@@ -652,6 +654,7 @@ def _record_superseded(cert_id, ca, old_serial, old_valid_to, now) -> None:
     row.revoke_reason = 'superseded'
     row.valid_to = old_valid_to or now + _SUPERSEDED_FALLBACK
     row.certificate_id = cert_id
+    row.public_key_sha256 = old_digest
 
 
 def _record_scts(cert_id, scts) -> None:

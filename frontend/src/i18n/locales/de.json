@@ -1575,7 +1575,7 @@
     "autoRenewal": "Automatische Verlängerung",
     "autoRenewalDesc": "Zertifikate vor ihrem Ablauf automatisch erneuern",
     "renewalDays": "Tage vor Ablauf",
-    "renewalDaysHelper": "So viele Tage vor Ablauf erneuern (1 bis 60), wenn die CA kein Erneuerungsfenster (ARI) vorschlägt.",
+    "renewalDaysHelper": "So viele Tage vor Ablauf erneuern (1 bis 60), wenn die CA kein Erneuerungsfenster (ARI) vorschlägt. Sind das mehr als zwei Drittel der Laufzeit eines Zertifikats, wird es stattdessen im letzten Drittel seiner Laufzeit erneuert.",
     "renewalFailures": "Fehlgeschlagene Erneuerungen: {{count}}",
     "renewalLastFailure": "Letzter Fehlschlag: {{date}}",
     "renewalRetryDaily": "Die Erneuerung schlägt weiterhin fehl: jetzt ein Versuch pro Tag",
@@ -4144,7 +4144,8 @@
       "systemUpdateInstalled": "Update installiert",
       "systemUpdateFailed": "Update fehlgeschlagen",
       "acmePreflight": "ACME-Vorabprüfung",
-      "acmeOrderRenewalFailed": "ACME-Erneuerung fehlgeschlagen"
+      "acmeOrderRenewalFailed": "ACME-Erneuerung fehlgeschlagen",
+      "acmeOrderRevocationFailed": "ACME-Widerruf fehlgeschlagen"
     },
     "title": "Webhooks",
     "subtitle": "HTTP-Benachrichtigungen bei Zertifikatsereignissen senden",

@@ -271,7 +271,7 @@
     "autoRenewal": "Renouvellement automatique",
     "autoRenewalDesc": "Renouveler automatiquement les certificats avant leur expiration",
     "renewalDays": "Jours avant expiration",
-    "renewalDaysHelper": "Renouveler ce nombre de jours avant expiration (1 à 60) quand la CA ne propose pas de fenêtre de renouvellement (ARI).",
+    "renewalDaysHelper": "Renouveler ce nombre de jours avant expiration (1 à 60) quand la CA ne propose pas de fenêtre de renouvellement (ARI). Si cela dépasse les deux tiers de la durée de vie d'un certificat, il est renouvelé dans le dernier tiers de sa durée de vie.",
     "renewalFailures": "Échecs de renouvellement : {{count}}",
     "renewalLastFailure": "Dernier échec : {{date}}",
     "renewalRetryDaily": "Le renouvellement échoue toujours : une tentative par jour désormais",
@@ -4147,7 +4147,8 @@
       "systemUpdateInstalled": "Mise à jour installée",
       "systemUpdateFailed": "Mise à jour échouée",
       "acmePreflight": "Pré-vérification ACME",
-      "acmeOrderRenewalFailed": "Échec du renouvellement ACME"
+      "acmeOrderRenewalFailed": "Échec du renouvellement ACME",
+      "acmeOrderRevocationFailed": "Échec de la révocation ACME"
     },
     "title": "Webhooks",
     "subtitle": "Envoyer des notifications HTTP lors d'événements de certificats",

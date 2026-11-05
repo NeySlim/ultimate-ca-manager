@@ -674,6 +674,8 @@ class RestoreCoreMixin:
                 existing.invalidity_at = invalidity_at
                 existing.valid_to = valid_to
                 existing.certificate_id = certificate_id
+                # An archive older than the column says nothing of the key
+                existing.public_key_sha256 = rs_data.get('public_key_sha256') or existing.public_key_sha256
             else:
                 db.session.add(RevokedSerial(
                     caref=caref,
@@ -683,6 +685,7 @@ class RestoreCoreMixin:
                     invalidity_at=invalidity_at,
                     valid_to=valid_to,
                     certificate_id=certificate_id,
+                    public_key_sha256=rs_data.get('public_key_sha256'),
                 ))
             results['revoked_serials'] += 1
 

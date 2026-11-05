@@ -1575,7 +1575,7 @@
     "autoRenewal": "Renovação automática",
     "autoRenewalDesc": "Renovar automaticamente os certificados antes de expirarem",
     "renewalDays": "Dias antes da expiração",
-    "renewalDaysHelper": "Renovar com esta antecedência em dias (1 a 60) quando a CA não sugere uma janela de renovação (ARI).",
+    "renewalDaysHelper": "Renovar com esta antecedência em dias (1 a 60) quando a CA não sugere uma janela de renovação (ARI). Se ultrapassar dois terços da validade de um certificado, este é renovado no último terço da sua validade.",
     "renewalFailures": "Falhas de renovação: {{count}}",
     "renewalLastFailure": "Última falha: {{date}}",
     "renewalRetryDaily": "A renovação continua a falhar: agora uma tentativa por dia",
@@ -4144,7 +4144,8 @@
       "systemUpdateInstalled": "Atualização instalada",
       "systemUpdateFailed": "Atualização falhou",
       "acmePreflight": "Verificação prévia ACME",
-      "acmeOrderRenewalFailed": "Renovação ACME falhou"
+      "acmeOrderRenewalFailed": "Renovação ACME falhou",
+      "acmeOrderRevocationFailed": "Revogação ACME falhou"
     },
     "title": "Webhooks",
     "subtitle": "Enviar notificações HTTP quando ocorrem eventos de certificados",

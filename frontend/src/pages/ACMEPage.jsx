@@ -35,6 +35,10 @@ import { effectiveDnsUpdatePort, settingsAfterPortSave } from './acme/dnsUpdateP
 import DnsProviderForm from './acme/DnsProviderForm'
 import DomainForm from './acme/DomainForm'
 import LocalDomainForm from './acme/LocalDomainForm'
+import { fetchAllPages } from '../lib/fetchAllPages'
+
+// The order list pages by 100 rows; the tab shows and filters all of them
+const CLIENT_ORDERS_MAX = 5000
 
 export default function ACMEPage() {
   const { t } = useTranslation()
@@ -163,7 +167,8 @@ export default function ACMEPage() {
         acmeService.getSettings(),
         casService.getAll(),
         acmeService.getHistory(),
-        acmeService.getClientOrders().catch(() => ({ data: [] })),
+        fetchAllPages((page) => acmeService.getClientOrders(undefined, undefined, page), { max: CLIENT_ORDERS_MAX })
+          .then((data) => ({ data })).catch(() => ({ data: [] })),
         acmeService.getClientSettings().catch(() => ({ data: {} })),
         acmeService.getDnsProviders().catch(() => ({ data: [] })),
         acmeService.getDnsProviderTypes().catch(() => ({ data: [] })),
@@ -681,6 +686,7 @@ export default function ACMEPage() {
       loadData()
     } catch (error) {
       showError(error.message || t('acme.renewalFailed'))
+      loadData()  // the order now shows the failure
     }
   }
   

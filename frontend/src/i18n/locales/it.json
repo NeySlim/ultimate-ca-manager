@@ -1575,7 +1575,7 @@
     "autoRenewal": "Rinnovo automatico",
     "autoRenewalDesc": "Rinnova automaticamente i certificati prima della scadenza",
     "renewalDays": "Giorni prima della scadenza",
-    "renewalDaysHelper": "Rinnova con questo anticipo in giorni (da 1 a 60) quando la CA non suggerisce una finestra di rinnovo (ARI).",
+    "renewalDaysHelper": "Rinnova con questo anticipo in giorni (da 1 a 60) quando la CA non suggerisce una finestra di rinnovo (ARI). Se supera i due terzi della durata di un certificato, questo viene rinnovato nell'ultimo terzo della sua durata.",
     "renewalFailures": "Rinnovi non riusciti: {{count}}",
     "renewalLastFailure": "Ultimo errore: {{date}}",
     "renewalRetryDaily": "Il rinnovo continua a non riuscire: ora un tentativo al giorno",
@@ -4144,7 +4144,8 @@
       "systemUpdateInstalled": "Aggiornamento installato",
       "systemUpdateFailed": "Aggiornamento non riuscito",
       "acmePreflight": "Verifica preliminare ACME",
-      "acmeOrderRenewalFailed": "Rinnovo ACME non riuscito"
+      "acmeOrderRenewalFailed": "Rinnovo ACME non riuscito",
+      "acmeOrderRevocationFailed": "Revoca ACME non riuscita"
     },
     "title": "Webhook",
     "subtitle": "Invia notifiche HTTP quando si verificano eventi certificato",

@@ -1575,7 +1575,7 @@
     "autoRenewal": "自动续期",
     "autoRenewalDesc": "在证书到期前自动续期",
     "renewalDays": "到期前天数",
-    "renewalDaysHelper": "当 CA 未建议续期窗口 (ARI) 时，在到期前这么多天续期 (1 到 60)。",
+    "renewalDaysHelper": "当 CA 未建议续期窗口 (ARI) 时，在到期前这么多天续期 (1 到 60)。若该天数超过证书有效期的三分之二，则改为在有效期的最后三分之一内续期。",
     "renewalFailures": "续订失败：{{count}} 次",
     "renewalLastFailure": "最近失败：{{date}}",
     "renewalRetryDaily": "续订持续失败：现在每天尝试一次",
@@ -4144,7 +4144,8 @@
       "systemUpdateInstalled": "更新已安装",
       "systemUpdateFailed": "更新失败",
       "acmePreflight": "ACME 预检",
-      "acmeOrderRenewalFailed": "ACME 续订失败"
+      "acmeOrderRenewalFailed": "ACME 续订失败",
+      "acmeOrderRevocationFailed": "ACME 吊销失败"
     },
     "title": "Webhooks",
     "subtitle": "证书事件触发时发送 HTTP 通知",

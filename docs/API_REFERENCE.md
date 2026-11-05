@@ -3071,6 +3071,10 @@ Content-Type: application/json
 }
 ```
 
+`renewal_days` (1 to 60) applies when the CA suggests no renewal window (ARI). When it is more
+than two thirds of a certificate's lifetime, that certificate is renewed in the last third of
+its lifetime instead.
+
 Fields of the DNS UPDATE (RFC 2136) listener of the ACME proxy:
 
 | Field | Method | Description |
@@ -3091,7 +3095,19 @@ Content-Type: application/json
 ```http
 GET /api/v2/acme/client/orders
 GET /api/v2/acme/client/orders?status=pending&environment=production
+GET /api/v2/acme/client/orders?page=2&per_page=100
 ```
+
+Newest first, 100 per page at most (`per_page`, default 100); `meta` gives `total`, `page`
+and `total_pages`. Orders left `pending` for more than 7 days, whose order at the CA has expired
+or whose expiry is unknown, are removed by the renewal task.
+
+Each order carries `renewal_failures`, `renewal_retry_daily`, `last_error_at` and
+`error_message`, and `upstream_revocations_owed`: the replaced certificates whose revocation the
+CA has not confirmed yet (with `acme.revoke_on_renewal`). The renewal task sends them again
+until the certificate expires, and each failure emits the `acme_order.revocation_failed`
+webhook event (`order`, `serial_number`, `error`, `attempts`). Deleting the order abandons them;
+its audit entry says how many.
 
 ### Get Order Details
 ```http
@@ -3124,6 +3140,9 @@ Content-Type: application/json
   "dns_provider_id": 1
 }
 ```
+
+A CSR (`key_source: "csr"`) whose key was revoked as compromised is refused with `409` before
+any order is opened at the CA.
 
 `key_type` sets the certificate key UCM generates: `RSA-2048`, `RSA-4096`, `EC-P256`,
 `EC-P384`, `EC-BP256`, `EC-BP384`, or `ML-DSA-44`, `ML-DSA-65`, `ML-DSA-87` when this build
@@ -3161,6 +3180,11 @@ DELETE /api/v2/acme/client/orders/{order_id}
 ```http
 POST /api/v2/acme/client/orders/{order_id}/renew
 ```
+
+A failure answers `409` when the renewal is blocked before the CA (account gone, key revoked
+as compromised, DNS provider disabled) and `422` otherwise, with the reason; both are counted
+on the order and emit `acme_order.renewal_failed`. `409` also answers while another renewal or
+finalization of the order runs, and that one is not counted.
 
 ### Register ACME Account
 ```http

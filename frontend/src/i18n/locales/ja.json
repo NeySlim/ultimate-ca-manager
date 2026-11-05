@@ -1575,7 +1575,7 @@
     "autoRenewal": "自動更新",
     "autoRenewalDesc": "証明書を期限切れ前に自動更新",
     "renewalDays": "期限切れまでの日数",
-    "renewalDaysHelper": "CA が更新ウィンドウ (ARI) を示さない場合、期限切れのこの日数前に更新します (1〜60)。",
+    "renewalDaysHelper": "CA が更新ウィンドウ (ARI) を示さない場合、期限切れのこの日数前に更新します (1〜60)。この日数が証明書の有効期間の 3 分の 2 を超える場合は、有効期間の最後の 3 分の 1 で更新します。",
     "renewalFailures": "更新失敗: {{count}} 回",
     "renewalLastFailure": "最終失敗: {{date}}",
     "renewalRetryDaily": "更新の失敗が続いています: 現在は 1 日 1 回試行します",
@@ -4147,7 +4147,8 @@
       "systemUpdateInstalled": "アップデート完了",
       "systemUpdateFailed": "アップデート失敗",
       "acmePreflight": "ACME 事前チェック",
-      "acmeOrderRenewalFailed": "ACME 更新失敗"
+      "acmeOrderRenewalFailed": "ACME 更新失敗",
+      "acmeOrderRevocationFailed": "ACME 失効失敗"
     },
     "title": "Webhooks",
     "subtitle": "証明書イベント発生時にHTTP通知を送信",

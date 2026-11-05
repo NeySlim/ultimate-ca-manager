@@ -13,6 +13,8 @@ POST   /api/v2/acme/client/orders/<id>/renew
 
 import logging
 import threading
+
+import requests
 import time
 from flask import request, current_app
 
@@ -23,6 +25,7 @@ from utils.db_transaction import safe_commit
 from models import db, DnsProvider, AcmeClientOrder, SystemConfig
 from services.acme.acme_client_service import (
     ACCOUNT_GONE,
+    ORDER_GONE,
     AcmeClientService,
     AUTHZ_INVALID_USER_MSG,
     CERT_KEY_TYPES,
@@ -32,6 +35,7 @@ from services.acme.acme_client_service import (
     fips_private_key_refusal,
 )
 from services.audit_service import AuditService
+from services.acme.compromised_keys import CompromisedKey, refuse_compromised_csr
 from services.acme.http01 import wait_for_http01
 from services.acme.order_lease import BUSY, OrderLease
 from services.acme.dns_selfcheck import (
@@ -44,6 +48,8 @@ from utils.acme_ip import normalize_ip_for_identifier
 from utils.dns_txt_lookup import txt_record_present
 
 logger = logging.getLogger(__name__)
+
+RENEWAL_CA_UNREACHABLE = 'Renewal failed: the CA could not be reached'
 
 # DNS-01 propagation: poll for the expected TXT record before telling the CA to
 # validate, instead of a fixed sleep (#140). Timeout is configurable (up to
@@ -103,9 +109,10 @@ def list_orders():
     if environment:
         query = query.filter_by(environment=environment)
 
-    orders = query.order_by(AcmeClientOrder.created_at.desc()).limit(100).all()
-
-    return success_response(data=[o.to_dict() for o in orders])
+    from utils.pagination import paginate, parse_request_pagination
+    page, per_page = parse_request_pagination(default_per_page=100, max_per_page=100)
+    result = paginate(query.order_by(AcmeClientOrder.created_at.desc(), AcmeClientOrder.id.desc()), page, per_page)
+    return success_response(data=[o.to_dict() for o in result['items']], meta=result['meta'])
 
 
 @bp.route('/api/v2/acme/client/orders/<int:order_id>', methods=['GET'])
@@ -287,6 +294,10 @@ def request_certificate():
         match_ok, match_msg = csr_identifiers_match_order(csr, domains)
         if not match_ok:
             return error_response(match_msg, 400)
+        try:
+            refuse_compromised_csr(csr)
+        except CompromisedKey as exc:
+            return error_response(str(exc), 409)
     elif csr_pem:
         return error_response('csr_pem is only valid when key_source is csr', 400)
 
@@ -510,7 +521,10 @@ def verify_challenges(order_id):
             # Check if LE has already validated (poll order status)
             try:
                 le_status, _ = client.check_order_status(order)
-                new_status = le_status if le_status in ['ready', 'valid'] else 'validating'
+                if le_status == 'gone':
+                    new_status = 'invalid'  # the check recorded why
+                else:
+                    new_status = le_status if le_status in ['ready', 'valid'] else 'validating'
             except Exception:
                 new_status = 'validating'
             AcmeClientService.write_order_status(order, new_status)
@@ -558,6 +572,8 @@ def check_order_status(order_id):
         if client is None:
             return error_response(ACCOUNT_GONE, 409)
         status, data = client.check_order_status(order)
+        if status == 'gone':
+            status = order.status  # invalid with the reason, or issued as it was
         if status == 'valid' and data and _resumable_here(client, order):
             status = _resume_finalization(client, order) or status
 
@@ -642,18 +658,9 @@ def cancel_order(order_id):
     if not order:
         return error_response('Order not found', 404)
 
-    # Clean up DNS if needed
-    if order.challenge_type == 'dns-01' and order.dns_provider_id:
-        try:
-            AcmeClientService.cleanup_dns_challenge(order)  # no CA account: it may be gone
-        except Exception:
-            pass  # Best effort cleanup
-
     order_domains = ', '.join([d.get('value', '') for d in (order.identifiers_list if hasattr(order, 'identifiers_list') else [])]) or f'Order {order_id}'
-    # SQLite enforces no foreign key: the orders its renewals opened stop naming it here
-    AcmeClientOrder.query.filter_by(renewal_of_order_id=order.id).update(
-        {AcmeClientOrder.renewal_of_order_id: None}, synchronize_session=False)
-    db.session.delete(order)
+    from services.acme.order_housekeeping import delete_order
+    notes = delete_order(order)
     ok, _err = safe_commit(logger, "Failed to cancel ACME order")
     if not ok:
         return _err
@@ -663,7 +670,7 @@ def cancel_order(order_id):
         resource_type='acme_order',
         resource_id=str(order_id),
         resource_name=order_domains,
-        details=f'Cancelled/deleted ACME order {order_id}',
+        details='; '.join([f'Cancelled/deleted ACME order {order_id}'] + notes),
         success=True
     )
 
@@ -685,7 +692,8 @@ def renew_order(order_id):
     if order.status not in ('valid', 'issued'):
         return error_response('Only valid/issued orders can be renewed', 400)
 
-    from services.acme_renewal_service import RenewalBlocked, RenewalInProgress, renew_certificate
+    from services.acme_renewal_service import (
+        RenewalBlocked, RenewalInProgress, record_renewal_failure, renew_certificate)
 
     try:
         success, message = renew_certificate(order)
@@ -706,11 +714,16 @@ def renew_order(order_id):
         else:
             return error_response(message, 400)
 
-    except (RenewalBlocked, RenewalInProgress) as e:
+    except RenewalInProgress as e:
         return error_response(str(e), 409)
+    except (RenewalBlocked, CompromisedKey) as e:
+        return error_response(record_renewal_failure(order, e, manual=True), 409)
     except Exception as e:
         logger.error(f'ACME certificate renewal failed: {e}')
-        return error_response('Renewal failed', 500)
+        message = record_renewal_failure(order, e, manual=True)
+        if isinstance(e, (requests.RequestException, OSError)):
+            message = RENEWAL_CA_UNREACHABLE  # its text names hosts and URLs
+        return error_response(message, 422)
 
 
 def _renewal_parent(order):
@@ -773,6 +786,8 @@ def _auto_poll_and_finalize(client, order) -> dict:
             db.session.rollback()
             logger.error(f'Failed to persist status={status} for order {order.id}: {e}')
 
+    # Set once the TXT records can serve no more: a pending order keeps them for Verify
+    drop_txt = False
     result = {
         'dns_propagation_wait': False,
         'challenge_submitted': False,
@@ -848,11 +863,17 @@ def _auto_poll_and_finalize(client, order) -> dict:
                     result['error'] = msg
                     logger.warning(f'Authorization invalid for {domain} on order {order.id}: {msg}')
                     _set_status('invalid', msg)
+                    drop_txt = True
                     break
 
             le_status, le_data = client.check_order_status(order)
             result['polling_status'] = le_status
             logger.info(f'ACME order {order.id} status after {elapsed}s: {le_status}')
+
+            if le_status == 'gone':  # recorded as invalid by the status check
+                result['error'] = ORDER_GONE
+                drop_txt = True
+                break
 
             if le_status in ('ready', 'valid'):
                 # 4. Auto-finalize (finalize_order sets status='issued' on success)
@@ -878,6 +899,7 @@ def _auto_poll_and_finalize(client, order) -> dict:
                     logger.warning(f'Auto-finalize failed: {fin_msg}')
                     # What the CA last said stays: only a valid order can be renewed
                     _set_status(order.status if order.status in ('valid', 'invalid') else 'pending', fin_msg)
+                    drop_txt = True  # the authorizations were valid already
                 break
 
             if le_status == 'invalid':
@@ -893,6 +915,7 @@ def _auto_poll_and_finalize(client, order) -> dict:
                 else:
                     result['error'] = f'Order became invalid: {order_detail or "Unknown"}'
                 _set_status('invalid', result['error'])
+                drop_txt = True
                 break
 
             if elapsed >= max_wait:
@@ -901,6 +924,7 @@ def _auto_poll_and_finalize(client, order) -> dict:
                     _, msg = invalid
                     result['error'] = msg
                     _set_status('invalid', msg)
+                    drop_txt = True
                 else:
                     result['error'] = f'Timeout after {max_wait}s (status: {le_status})'
                     _set_status('pending', result['error'])
@@ -911,6 +935,12 @@ def _auto_poll_and_finalize(client, order) -> dict:
         logger.error(f'Auto-poll error for order {order.id}: {e}', exc_info=True)
         # Reset to 'pending' so the manual Verify/Finalize path can recover.
         _set_status('pending', result['error'])
+
+    if drop_txt:
+        try:
+            AcmeClientService.cleanup_dns_challenge(order)
+        except Exception as cleanup_err:
+            logger.warning(f'DNS cleanup after the failed auto-poll of order {order.id}: {cleanup_err}')
 
     logger.info(f'Auto-poll result for order {order.id}: status={result.get("polling_status")}, finalized={result["finalized"]}, error={result["error"]}')
 
