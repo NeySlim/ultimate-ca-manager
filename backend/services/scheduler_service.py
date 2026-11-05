@@ -52,7 +52,7 @@ class ScheduledTask:
         self.run_count = 0
         self.last_error: Optional[str] = None
         self.last_duration_ms = 0.0
-        # Outcome of the last run: 'ok', 'skipped' or 'failed'. A task that
+        # Outcome of the last run: 'ok', 'warning', 'skipped' or 'failed'. A task that
         # returns a result dict says which one itself, so a run that produced
         # nothing (backup not due, no password) is no longer indistinguishable
         # from one that did the work.
@@ -247,8 +247,10 @@ class SchedulerService:
             task.run_count += 1
             task.last_run = utc_now()
             task.next_run = utc_now() + __import__('datetime').timedelta(seconds=task.interval)
-            logger.info(
-                f"Task '{task.name}' {'completed successfully' if status == 'ok' else f'skipped ({reason})'} "
+            outcome = {'ok': 'completed successfully', 'warning': f'completed with a warning ({reason})'}
+            log = logger.warning if status == 'warning' else logger.info
+            log(
+                f"Task '{task.name}' {outcome.get(status, f'skipped ({reason})')} "
                 f"(duration: {duration_ms:.1f}ms, runs: {task.run_count})"
             )
         except Exception as e:
@@ -270,11 +272,12 @@ class SchedulerService:
         """Read a task's own report of what it did.
 
         Tasks that return nothing are treated as having done their work; one
-        that returns {'status': 'skipped', 'reason': ...} says so instead.
+        that returns {'status': 'skipped', 'reason': ...} says so instead, and
+        'warning' is a run that did its work with something for the operator to see.
         """
         if isinstance(result, dict):
             status = result.get('status')
-            if status in ('ok', 'skipped', 'failed'):
+            if status in ('ok', 'warning', 'skipped', 'failed'):
                 return status, result.get('reason')
         return 'ok', None
 

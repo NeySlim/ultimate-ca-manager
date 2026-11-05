@@ -91,6 +91,18 @@ export default function LetsEncryptOrdersTab({
                     {order.primary_domain || order.domains?.[0] || t('common.unknown')}
                   </span>
                   <div className="flex items-center gap-2">
+                    {order.renewal_failures > 0 && (
+                      <Badge
+                        variant="warning"
+                        size="sm"
+                        title={[
+                          order.error_message,
+                          order.last_error_at && t('acme.renewalLastFailure', { date: formatDate(order.last_error_at) }),
+                        ].filter(Boolean).join('\n')}
+                      >
+                        {t('acme.renewalFailures', { count: order.renewal_failures })}
+                      </Badge>
+                    )}
                     <Badge variant={order.environment === 'production' ? 'default' : 'secondary'} size="sm">
                       {order.environment}
                     </Badge>
@@ -128,6 +140,11 @@ export default function LetsEncryptOrdersTab({
                   {order.error_message && (
                     <div className="col-span-2 mt-1 pt-1 border-t border-border-op30">
                       <span className="text-xs status-danger-text">{order.error_message}</span>
+                    </div>
+                  )}
+                  {order.renewal_retry_daily && (
+                    <div className="col-span-2">
+                      <span className="text-xs status-warning-text">{t('acme.renewalRetryDaily')}</span>
                     </div>
                   )}
                 </div>

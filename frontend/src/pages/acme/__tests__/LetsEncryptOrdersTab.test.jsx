@@ -7,7 +7,7 @@ vi.mock('react-i18next', () => ({
 
 vi.mock('../../../components', () => ({
   Button: ({ children, ...props }) => <button {...props}>{children}</button>,
-  Badge: ({ children }) => <span>{children}</span>,
+  Badge: ({ children, title }) => <span title={title}>{children}</span>,
   FilterSelect: ({ value, onChange, allLabel, options }) => (
     <select aria-label="status-filter" value={value} onChange={(e) => onChange(e.target.value)}>
       <option value="">{allLabel}</option>
@@ -66,6 +66,32 @@ describe('LetsEncryptOrdersTab', () => {
     const order = { id: 1, primary_domain: 'a.example.com', environment: 'production', ...fields }
     renderTab({ clientOrders: [order], selectedClientOrder: order, onRenewCertificate: noop })
     expect(screen.queryAllByText('acme.renew')).toHaveLength(count)
+  })
+
+  it('shows failed renewals with the last error in the tooltip', () => {
+    const order = {
+      id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production',
+      renewal_failures: 2, error_message: 'CA unreachable', last_error_at: '2026-11-05T10:00:00Z',
+    }
+    renderTab({ clientOrders: [order] })
+    const badge = screen.getByText('acme.renewalFailures')
+    expect(badge.getAttribute('title')).toContain('CA unreachable')
+    expect(badge.getAttribute('title')).toContain('acme.renewalLastFailure')
+    expect(screen.queryByText('acme.renewalRetryDaily')).not.toBeInTheDocument()
+  })
+
+  it('says when renewal is down to once a day', () => {
+    const order = {
+      id: 1, primary_domain: 'a.example.com', status: 'issued', environment: 'production',
+      renewal_failures: 5, renewal_retry_daily: true,
+    }
+    renderTab({ clientOrders: [order] })
+    expect(screen.getByText('acme.renewalRetryDaily')).toBeInTheDocument()
+  })
+
+  it('shows no failure badge on an order that has not failed', () => {
+    renderTab()
+    expect(screen.queryByText('acme.renewalFailures')).not.toBeInTheDocument()
   })
 
   it('refreshes from the dedicated view', () => {

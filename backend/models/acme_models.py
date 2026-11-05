@@ -348,6 +348,9 @@ class DnsProvider(db.Model):
 class AcmeClientOrder(db.Model):
     """ACME Client Order - Orders initiated BY UCM to external ACME (Let's Encrypt)"""
     __tablename__ = 'acme_client_orders'
+
+    # From this many failed scheduled renewals on, one attempt a day
+    RENEWAL_FAILURES_BEFORE_DAILY = 5
     
     id = db.Column(db.Integer, primary_key=True)
     
@@ -498,6 +501,11 @@ class AcmeClientOrder(db.Model):
             self.deactivated_authz_urls = json.dumps(urls + [authz_url])
     
     @property
+    def renewal_retry_daily(self):
+        """True once failed scheduled renewals have slowed to one attempt a day."""
+        return (self.renewal_failures or 0) >= self.RENEWAL_FAILURES_BEFORE_DAILY
+
+    @property
     def primary_domain(self):
         """Get the primary (first) domain"""
         domains = self.domains_list
@@ -550,6 +558,10 @@ class AcmeClientOrder(db.Model):
             'dns_provider_name': self.dns_provider.name if self.dns_provider else None,
             'certificate_id': self.certificate_id,
             'renewal_enabled': self.renewal_enabled,
+            'renewal_failures': self.renewal_failures or 0,
+            'renewal_retry_daily': self.renewal_retry_daily,
+            'last_renewal_at': utc_isoformat(self.last_renewal_at),
+            'last_error_at': utc_isoformat(self.last_error_at),
             'error_message': self.error_message,
             'is_proxy_order': bool(self.is_proxy_order),
             'acme_client_account_id': self.acme_client_account_id,

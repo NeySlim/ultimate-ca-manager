@@ -553,5 +553,6 @@ def list_events():
             'csr.submitted': 'When a CSR is submitted',
             'csr.approved': 'When a CSR is approved',
             'csr.rejected': 'When a CSR is rejected',
+            'acme_order.renewal_failed': 'When a scheduled ACME client renewal fails',
         }
     })
