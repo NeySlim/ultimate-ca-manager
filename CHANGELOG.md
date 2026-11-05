@@ -12,6 +12,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Added
 
 - CAs: Ed25519 and Ed448 keys can be generated for a root, intermediate or external CA, and an EdDSA CA key imported with or after its certificate (`POST /cas/import`, certificate import with its key, `POST /cas/<id>/key`) is accepted instead of a 400 (#436, reported by @Faraphel).
+- Certificates: templates and the issue form can add custom X.509 extensions, each an OID, a critical flag and its DER value in hex, and the certificate and CA details list the extensions UCM has no section for, with their raw value (#437, requested by @Faraphel).
+
 ### Security
 
 - Key recovery: a request named its certificate by number, and SQLite gives a deleted certificate's number to the next one created, so an approved request could export another certificate's private key, after a replacing restore in particular. Approval and recovery now answer 410 unless the number still names the certificate the request was opened on, and a replacing restore cancels the open requests on the certificates it removes.
@@ -42,6 +44,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - ACME client: orders stopped by the old limit of 5 failed renewals resume at one attempt a day, and orders with no failure count recorded, which were skipped, are renewed again. Turn off the automatic renewal of an order you no longer want renewed, or delete it.
 - Restore: a replacing restore now removes the CRLs, cached OCSP responses, sessions, in-flight ACME server orders, approval requests, Microsoft CA requests, SAML replay entries and webhook or deployment deliveries (history included) that point at a removed row, detaches ACME client orders, SCEP requests, discovery results and revocation records from it, and cancels the key recovery requests still open on a removed certificate. The restore message and its audit entry list them.
 - Restore: `BACKUP_MAX_UPLOAD_MB` (default 512) is the restore upload's own ceiling, the decompressed content may be four times that, and the archive may hold one JSON object per 100 bytes of it; a reverse proxy in front of UCM keeps its own body limit. A restore holds the archive in memory, with a peak of several times its size.
+- Templates: the upgrade adds the `custom_extensions` column, empty for every existing template (migration 127).
 
 ## [2.249] - 2026-11-05
 

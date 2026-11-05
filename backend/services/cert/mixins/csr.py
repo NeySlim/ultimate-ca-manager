@@ -200,6 +200,7 @@ class CSRMixin:
         digest_explicit: bool = False,
         policy_template_id: int = None,
         notices: list = None,
+        custom_extensions: list = None,
     ) -> Certificate:
         """
         Sign a CSR with a CA
@@ -221,6 +222,8 @@ class CSRMixin:
             policy_template_id: template that scopes the policies when it is
                 not bound to the issuance (Sign CSR form), else *template_id*
             notices: list that receives what was granted otherwise than asked
+            custom_extensions: the request's own extensions (#437), which win
+                over the template's for the same OID; the template's apply to leaves only
 
         Returns:
             Updated Certificate with signed cert (or new CA record for intermediate_ca)
@@ -315,6 +318,9 @@ class CSRMixin:
         if san_template is None and policy_template_id:
             from models.certificate_template import CertificateTemplate
             san_template = db.session.get(CertificateTemplate, policy_template_id)
+        from utils.custom_extensions import issuance_custom_extensions
+        custom_ext = issuance_custom_extensions(
+            san_template if cert_type != 'intermediate_ca' else None, custom_extensions)
 
         cert_pem = TrustStoreService.sign_csr(
             csr_pem=csr_pem,
@@ -334,6 +340,7 @@ class CSRMixin:
             template_ext=template_ext,
             san_template=san_template,
             qualification_template=san_template,
+            custom_extensions=custom_ext,
             extra_san=extra_san,
             policy_scope={
                 'ca_id': ca.id,

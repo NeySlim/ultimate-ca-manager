@@ -4009,6 +4009,8 @@
       "policies": "Certificate Policies",
       "nameConstraints": "Name Constraints",
       "sct": "Signed Certificate Timestamps (SCT)",
+      "otherExtensions": "Other extensions",
+      "copyValue": "Copy value",
       "qcStatements": "Qualified Certificate Statements",
       "qc": {
         "compliance": "QcCompliance",
@@ -5873,5 +5875,21 @@
     "notServable": "revoked, expired or not yet valid",
     "exportHint": "A cross-certificate lets clients that trust another root build a path to this CA.",
     "deployHint": "The chain written to the full chain file. A revoked, expired or not yet valid cross-certificate is never pushed."
+  },
+  "customExtensions": {
+    "title": "Custom extensions",
+    "hint": "Added to the certificate as given: an OID and its DER-encoded value in hex. UCM does not parse the value. Extensions UCM sets itself (key usage, names, policies...) keep their own settings.",
+    "requestHint": "They join those of the template; an entry with the same OID replaces the template's.",
+    "oid": "OID",
+    "value": "Value (DER, hex)",
+    "critical": "Critical",
+    "add": "Add extension",
+    "criticalWarning": "A client that does not recognise a critical extension must reject the certificate (RFC 5280, section 4.2). Mark it critical only when every relying party understands it.",
+    "invalidOid": "Not a dotted OID (for example 1.3.6.1.4.1.99999.1)",
+    "invalidHex": "The value must be an even number of hex digits",
+    "emptyValue": "The value is empty",
+    "duplicateOid": "This OID is already listed",
+    "fixErrors": "Fix the custom extensions first",
+    "storedInvalid": "The stored custom extensions are invalid: issuance from this template is refused until they are fixed or cleared."
   }
 }

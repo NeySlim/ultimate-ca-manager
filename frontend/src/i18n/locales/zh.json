@@ -4006,6 +4006,8 @@
       "policies": "证书策略",
       "nameConstraints": "名称约束",
       "sct": "签名证书时间戳（SCT）",
+      "otherExtensions": "其他扩展",
+      "copyValue": "复制值",
       "qcStatements": "合格证书声明",
       "qc": {
         "compliance": "QcCompliance",
@@ -5870,5 +5872,21 @@
     "notServable": "已吊销、已过期或尚未生效",
     "exportHint": "交叉证书使信任另一根 CA 的客户端能够构建到此 CA 的路径。",
     "deployHint": "写入完整链文件的链。已吊销、已过期或尚未生效的交叉证书绝不会被推送。"
+  },
+  "customExtensions": {
+    "title": "自定义扩展",
+    "hint": "按原样添加到证书中: 一个 OID 及其 DER 编码值的十六进制表示。UCM 不解析该值。UCM 自身设置的扩展 (密钥用途、名称、策略等) 仍使用各自的设置。",
+    "requestHint": "它们与模板中的扩展合并; OID 相同的条目会替换模板中的条目。",
+    "oid": "OID",
+    "value": "值 (DER, 十六进制)",
+    "critical": "关键",
+    "add": "添加扩展",
+    "criticalWarning": "不识别关键扩展的客户端必须拒绝该证书 (RFC 5280 第 4.2 节)。仅当所有依赖方都能理解该扩展时才将其标记为关键。",
+    "invalidOid": "不是点分格式的 OID (例如 1.3.6.1.4.1.99999.1)",
+    "invalidHex": "值必须是偶数个十六进制数字",
+    "emptyValue": "值为空",
+    "duplicateOid": "该 OID 已在列表中",
+    "fixErrors": "请先修正自定义扩展",
+    "storedInvalid": "已保存的自定义扩展无效: 在修正或清空之前, 将拒绝使用此模板签发证书。"
   }
 }

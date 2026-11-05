@@ -32,6 +32,8 @@ from security.encryption import encrypt_private_key
 from utils.db_transaction import safe_commit
 from . import bp
 from utils.qc_statements import add_certificate_policies, add_qc_statements, template_policy_oids
+from utils.custom_extensions import (TemplateConfigError, add_custom_extensions, merge_custom_extensions,
+                                     template_custom_extensions, validate_custom_extensions)
 from utils import key_algorithms
 from utils.key_codec import private_key_to_pem
 from utils.x509_aki import authority_key_identifier_from_issuer
@@ -120,6 +122,17 @@ def create_certificate():
         san_refusal = bucket_san_refusal(template, data)
         if san_refusal:
             return error_response(san_refusal, 400)
+
+    # The request's own extensions win over the template's for the same OID;
+    # the approval workflow stores the request's alone
+    requested_ext, ext_err = validate_custom_extensions(data.get('custom_extensions'))
+    if ext_err:
+        return error_response(ext_err, 400)
+    data['custom_extensions'] = requested_ext
+    try:
+        custom_ext = merge_custom_extensions(template_custom_extensions(template), requested_ext)
+    except TemplateConfigError as e:
+        return error_response(str(e), 400)
 
     if not ca.has_private_key:
         return error_response('CA private key not available', 400)
@@ -562,6 +575,7 @@ def create_certificate():
             builder, ca.cps_uri if ca.cps_enabled else None, ca.cps_oid,
             template_policy_oids(tpl_ext))
         builder = add_qc_statements(builder, tpl_ext)
+        builder = add_custom_extensions(builder, custom_ext)
 
         # OCSP Must-Staple / TLS Feature (RFC 6066)
         if data.get('ocsp_must_staple'):

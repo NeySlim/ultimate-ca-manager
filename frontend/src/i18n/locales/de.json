@@ -4006,6 +4006,8 @@
       "policies": "Zertifikatsrichtlinien",
       "nameConstraints": "Namenseinschränkungen",
       "sct": "Signierte Zertifikatstimestamps (SCT)",
+      "otherExtensions": "Weitere Erweiterungen",
+      "copyValue": "Wert kopieren",
       "qcStatements": "Qualified Certificate Statements",
       "qc": {
         "compliance": "QcCompliance",
@@ -5870,5 +5872,21 @@
     "notServable": "widerrufen, abgelaufen oder noch nicht gültig",
     "exportHint": "Ein Cross-Zertifikat ermöglicht Clients, die einer anderen Root vertrauen, einen Pfad zu dieser CA aufzubauen.",
     "deployHint": "Die Kette, die in die Datei der vollständigen Kette geschrieben wird. Ein widerrufenes, abgelaufenes oder noch nicht gültiges Cross-Zertifikat wird nie übertragen."
+  },
+  "customExtensions": {
+    "title": "Benutzerdefinierte Erweiterungen",
+    "hint": "Werden unverändert in das Zertifikat übernommen: eine OID und ihr DER-kodierter Wert als Hex. UCM wertet den Wert nicht aus. Erweiterungen, die UCM selbst setzt (Schlüsselverwendung, Namen, Richtlinien...), behalten ihre eigenen Einstellungen.",
+    "requestHint": "Sie ergänzen die der Vorlage; ein Eintrag mit derselben OID ersetzt den der Vorlage.",
+    "oid": "OID",
+    "value": "Wert (DER, Hex)",
+    "critical": "Kritisch",
+    "add": "Erweiterung hinzufügen",
+    "criticalWarning": "Ein Client, der eine kritische Erweiterung nicht kennt, muss das Zertifikat ablehnen (RFC 5280, Abschnitt 4.2). Markieren Sie sie nur als kritisch, wenn alle vertrauenden Parteien sie verstehen.",
+    "invalidOid": "Keine OID in Punktnotation (zum Beispiel 1.3.6.1.4.1.99999.1)",
+    "invalidHex": "Der Wert muss aus einer geraden Anzahl Hex-Ziffern bestehen",
+    "emptyValue": "Der Wert ist leer",
+    "duplicateOid": "Diese OID ist bereits aufgeführt",
+    "fixErrors": "Korrigieren Sie zuerst die benutzerdefinierten Erweiterungen",
+    "storedInvalid": "Die gespeicherten benutzerdefinierten Erweiterungen sind ungültig: Ausstellungen aus dieser Vorlage werden abgelehnt, bis sie korrigiert oder geleert sind."
   }
 }
