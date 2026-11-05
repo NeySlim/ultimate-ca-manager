@@ -774,7 +774,8 @@ class RestoreCoreMixin:
 
             # Every column of the section, references resolved through the
             # plan; the PEMs and the key are `handled` and set right after.
-            apply_columns(cert, 'certificates', cert_data, plan)
+            if not apply_columns(cert, 'certificates', cert_data, plan):
+                continue    # left out, and listed: nothing more is written for it
 
             cert.crt = (
                 base64.b64encode(cert_data['certificate_pem'].encode()).decode()

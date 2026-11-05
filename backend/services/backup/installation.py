@@ -6,9 +6,11 @@ import logging
 import uuid
 from typing import Any, Dict, Optional
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import IntegrityError, SQLAlchemyError
 
 from models import db
+
+from .errors import BackupExportError
 
 logger = logging.getLogger(__name__)
 
@@ -38,6 +40,12 @@ def installation_id(create: bool = False) -> Optional[str]:
         db.session.rollback()
         row = SystemConfig.query.filter_by(key=CONFIG_KEY).first()
         return row.value if row is not None else None
+    except SQLAlchemyError as exc:
+        db.session.rollback()
+        logger.error("Could not store the backup installation id: %s", type(exc).__name__)
+        raise BackupExportError(
+            "Could not record this installation's identifier, which every archive "
+            "carries; check that the database accepts writes") from exc
     return value
 
 

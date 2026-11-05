@@ -537,3 +537,25 @@ def test_a_revocation_record_outlives_its_removed_certificate(target):
     assert record.certificate_id is None
     assert results['unlinked_dependents'] == {'revoked_serials.certificate_id': 1}
 
+
+# -- what a refusal quotes ----------------------------------------------------
+
+class _Orig(Exception):
+    def __init__(self, message, pgcode, detail):
+        super().__init__(message)
+        self.pgcode = pgcode
+        self.diag = type('Diag', (), {'message_detail': detail})()
+
+
+@pytest.mark.parametrize('pgcode, detail, quoted', [
+    ('23505', 'Key (name)=(replace-dns) already exists.', True),
+    ('23502', 'Failing row contains (1, replace-dns, s3cret-token).', False),
+])
+def test_only_a_duplicate_key_detail_is_quoted(pgcode, detail, quoted):
+    from sqlalchemy.exc import IntegrityError
+    from services.backup.restore.conflict import conflict_from_integrity_error
+
+    exc = IntegrityError('INSERT INTO dns_providers (name) VALUES (%(name)s)',
+                         {'name': 'replace-dns'}, _Orig('violation', pgcode, detail))
+    message = str(conflict_from_integrity_error(exc))
+    assert (detail in message) is quoted, message

@@ -168,3 +168,29 @@ def test_an_archive_says_which_database_it_comes_from(here):
     assert installation.same_installation(data)
     data['metadata'][installation.METADATA_KEY] = 'another-database'
     assert not installation.same_installation(data)
+
+
+def test_a_restore_never_writes_another_installation_identifier(here):
+    """Not as a plain setting, nor as one the archive marks encrypted."""
+    from services.backup.restore.settings import restore_encrypted_settings
+
+    mine = installation.installation_id(create=True)
+    db.session.commit()
+    configuration = {'settings': {installation.CONFIG_KEY: 'another-database'},
+                     'encrypted_settings': [installation.CONFIG_KEY]}
+
+    assert restore_encrypted_settings(configuration, configuration['encrypted_settings']) == 0
+    db.session.expire_all()
+    assert installation.installation_id() == mine
+
+
+def test_an_identifier_that_cannot_be_stored_fails_the_export_by_name(here, monkeypatch):
+    from sqlalchemy.exc import OperationalError
+    from services.backup.errors import BackupExportError
+
+    def read_only():
+        raise OperationalError('UPDATE', {}, Exception('attempt to write a readonly database'))
+
+    monkeypatch.setattr(db.session, 'commit', read_only)
+    with pytest.raises(BackupExportError, match='identifier'):
+        installation.installation_id(create=True)

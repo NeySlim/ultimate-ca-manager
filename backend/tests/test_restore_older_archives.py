@@ -2,8 +2,9 @@
 
 Their references are bare source numbers. A required link that cannot be
 placed leaves its row out with a line in the result, never refuses the whole
-archive; nested group members and WebAuthn keys are read by username; an HSM
-secret encrypted under another installation's key is named, provider included.
+archive; nested group members are listed, nested WebAuthn keys are read under
+their user; an HSM secret encrypted under another installation's key is named,
+provider included.
 """
 import base64
 import json
@@ -109,17 +110,6 @@ def test_a_nested_member_named_by_number_never_lands_on_another_account(here):
     assert any('user number' in line for line in results['left_out'])
 
 
-def test_a_nested_member_named_by_username_is_placed(here):
-    from models.group import Group, GroupMember
-
-    alice = _user('older-alice')
-    results = _restore(['groups'], _nested_groups([{'user_id': 9999, 'username': 'older-alice'}]))
-
-    group = Group.query.filter_by(name='older-group').one()
-    assert [m.user_id for m in GroupMember.query.filter_by(group_id=group.id)] == [alice.id]
-    assert results['left_out'] == []
-
-
 def test_nested_webauthn_keys_are_read(here):
     from models import User
     from models.webauthn import WebAuthnCredential
@@ -158,3 +148,29 @@ def test_an_hsm_secret_under_another_key_is_named_in_the_result(here, caplog):
     assert results['dropped_secrets'] == ['hsm_providers older-hsm: pin']
     assert "hsm_providers older-hsm lost field pin" in caplog.text
     assert 'older-hsm' in with_restore_warnings('Restored.', results)
+
+
+# -- a row left out is not counted --------------------------------------------
+
+@pytest.mark.parametrize('module, method, section, row', [
+    ('services.backup.restore_core', '_restore_certificates', 'certificates',
+     {'refid': 'older-left-out', 'descr': 'older'}),
+    ('services.backup.restore_extended', '_restore_acme_client_orders', 'acme_client_orders',
+     {'order_url': 'https://acme.example.test/order/1', 'domains': '[]'}),
+])
+def test_a_row_apply_columns_leaves_out_is_not_counted(here, monkeypatch, module, method,
+                                                       section, row):
+    import importlib
+    from services.backup.restore import RestorePlan
+
+    monkeypatch.setattr(importlib.import_module(module), 'apply_columns',
+                        lambda instance, *args: (db.session.expunge(instance), False)[1])
+    data = {section: [row]}
+    results = {section: 0}
+    restore = getattr(_service(), method)
+    if section == 'certificates':
+        restore(data, results, b'k' * 32, RestorePlan.build(data))
+    else:
+        restore(data, results, RestorePlan.build(data))
+
+    assert results[section] == 0

@@ -55,25 +55,12 @@ def upgrade_archived_permissions(backup_data: Dict[str, Any]) -> int:
 
 
 def _restore_nested_member(group, member: Any, plan) -> None:
-    """A membership an older archive nests in its group, placed by username."""
-    from models import User
-    from models.group import GroupMember
-
+    """A membership an older archive nests in its group names its user by number alone: listed, not placed."""
     member = member if isinstance(member, dict) else {}
-    identity = member.get('user_id_ref')
-    username = member.get('username') or (identity.get('username') if isinstance(identity, dict) else None)
-    user = User.query.filter_by(username=username).first() if username else None
-    if user is None:
-        named = f"user {username!r}" if username else f"user number {member.get('user_id')!r}"
-        plan.left_out.append(
-            f"groups {group.name}: the member {named} was left out, "
-            + ("no such account here" if username else
-               "an archive older than 2.230 names it by a number from another database"))
-        logger.warning("Restore: %s", plan.left_out[-1])
-        return
-    if GroupMember.query.filter_by(group_id=group.id, user_id=user.id).first() is None:
-        db.session.add(GroupMember(group_id=group.id, user_id=user.id,
-                                   role=member.get('role') or 'member'))
+    plan.left_out.append(
+        f"groups {group.name}: the member user number {member.get('user_id')!r} was left out, "
+        "an archive older than 2.230 names it by a number from another database")
+    logger.warning("Restore: %s", plan.left_out[-1])
 
 
 def restore_nested_webauthn(backup_data: Dict[str, Any], plan) -> int:

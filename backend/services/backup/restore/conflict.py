@@ -95,6 +95,16 @@ def _rows(exc, kind: str) -> List[Dict[str, Any]]:
     return rows
 
 
+def _unique_violation_detail(orig):
+    """PostgreSQL's DETAIL for a duplicate key; any other DETAIL can quote a whole row."""
+    if getattr(orig, 'pgcode', None) != _UNIQUE_VIOLATION:
+        return None
+    return getattr(getattr(orig, 'diag', None), 'message_detail', None)
+
+
+_UNIQUE_VIOLATION = '23505'
+
+
 def conflict_from_integrity_error(exc) -> RestoreConflictError:
     """The refusal to hand the operator for a failed restore statement."""
     statement = exc.statement or ''
@@ -102,7 +112,7 @@ def conflict_from_integrity_error(exc) -> RestoreConflictError:
     kind = ' '.join(match.group(1).upper().split()) if match else ''
     table = match.group(2) if match else 'an unknown table'
     reason = str(getattr(exc, 'orig', exc)).strip().splitlines()[0] if str(getattr(exc, 'orig', exc)).strip() else 'a constraint'
-    detail = getattr(getattr(getattr(exc, 'orig', None), 'diag', None), 'message_detail', None)
+    detail = _unique_violation_detail(getattr(exc, 'orig', None))
 
     section_name = _section_of_table(table) if match else None
     rows = _rows(exc, kind) if match else []
