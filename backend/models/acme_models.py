@@ -394,6 +394,11 @@ class AcmeClientOrder(db.Model):
     # Error tracking
     error_message = db.Column(db.Text)
     last_error_at = db.Column(db.DateTime)
+
+    # Key sent in a finalize request, kept until its certificate is imported (``pending_key``)
+    _pending_key = db.Column('pending_key', db.Text)
+    # Lease of the renewal or finalization running on this order (services/acme/order_lease.py)
+    renewal_claimed_at = db.Column(db.DateTime)
     
     # Proxy order fields
     is_proxy_order = db.Column(db.Boolean, default=False)
@@ -421,6 +426,22 @@ class AcmeClientOrder(db.Model):
         'AcmeClientAccount', foreign_keys=[acme_client_account_id]
     )
     
+    @property
+    def pending_key(self):
+        """PEM private key awaiting its certificate, decrypted; None when there is none."""
+        if not self._pending_key:
+            return None
+        from utils.encryption import decrypt_if_needed
+        return decrypt_if_needed(self._pending_key)
+
+    @pending_key.setter
+    def pending_key(self, value):
+        if value:
+            from utils.encryption import encrypt_if_needed
+            self._pending_key = encrypt_if_needed(value)
+        else:
+            self._pending_key = None
+
     @property
     def domains_list(self):
         """Parse domains JSON to list"""
