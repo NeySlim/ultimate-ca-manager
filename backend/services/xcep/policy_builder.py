@@ -120,8 +120,8 @@ _RSA_KEY_SPEC = '1'
 _RSA_CRYPTO_PROVIDERS = ('Microsoft Enhanced RSA and AES Cryptographic Provider',)
 # ECDSA, and RSA in FIPS mode: schema 3 + KSP is the only path where Windows honors the request hash.
 _KSP_CRYPTO_PROVIDERS = ('Microsoft Software Key Storage Provider',)
-# ML-DSA signs only (AT_SIGNATURE). The CNG algorithm name a client derives from
-# the OID has not been checked against a real Windows enrollment yet.
+# ML-DSA signs only (AT_SIGNATURE), as AD CS announces its signing-only CNG templates.
+# Windows then creates the key with the signing usage alone; left nil, it allows all usages.
 _SIGNATURE_KEY_SPEC = '2'
 _MLDSA_OIDS = {a.label: a.oid for a in key_algorithms.algorithms('ML-DSA')}
 
@@ -227,12 +227,11 @@ def _nil_element(parent, local_name):
 
 
 def _resolve_templates_for_ca(ca, all_active_templates):
-    """Templates pinned to this CA, or every active template when none are
-    pinned — mirrors the fallback the Templates UI already uses so XCEP
-    doesn't expose an empty policy set to a CA nobody has curated yet."""
-    pinned = [pin.template for pin in (ca.template_pins or []) if pin.template and pin.template.is_active]
-    if pinned:
-        return pinned
+    """The active templates pinned to this CA, or every active template when it has
+    no pin at all. Deactivating its pinned templates never widens what a CA offers."""
+    pins = [pin for pin in (ca.template_pins or []) if pin.template]
+    if pins:
+        return [pin.template for pin in pins if pin.template.is_active]
     return list(all_active_templates)
 
 
@@ -506,8 +505,10 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
             etree.SubElement(attributes, '{%s}generalFlags' % XCEP_NS).text = str(_GENERAL_MACHINE_TYPE)
         else:
             _nil_element(attributes, 'generalFlags')
-        if pin_request_hash:
-            hash_oid, hash_name = _request_hash(template)
+        if mldsa_oid is not None or pin_request_hash:
+            # RFC 9882 §3.3: an ML-DSA CMS signer digests with SHA-512, the one hash it must support
+            hash_oid, hash_name = (_HASH_ALGORITHM_OIDS['sha512'] if mldsa_oid is not None
+                                   else _request_hash(template))
             hash_ref = oids.ref(hash_oid, group=_GROUP_HASH_ALGORITHM, default_name=hash_name)
             etree.SubElement(attributes, '{%s}hashAlgorithmOIDReference' % XCEP_NS).text = str(hash_ref)
         else:
@@ -516,6 +517,10 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         _nil_element(attributes, 'keyArchivalAttributes')
 
         _build_extensions_element(attributes, extensions, oids)
+
+    # PolicyCollection needs one policy: Windows refuses it empty (WS_E_INVALID_FORMAT), accepts nil.
+    if len(policies) == 0:
+        policies.set('{%s}nil' % XSI_NS, 'true')
 
     # GetPoliciesResponse's own sequence is response, cAs, oIDs (in that
     # order) -- an xs:sequence violation here produces WS_E_INVALID_FORMAT
@@ -552,6 +557,9 @@ def build_get_policies_response(ca, templates, enrollment_uris=(), message_id=No
         etree.SubElement(oid_el, '{%s}group' % XCEP_NS).text = str(meta['group'])
         etree.SubElement(oid_el, '{%s}oIDReferenceID' % XCEP_NS).text = str(meta['id'])
         etree.SubElement(oid_el, '{%s}defaultName' % XCEP_NS).text = meta['default_name']
+    # Same rule as PolicyCollection; nil on only one of the two still fails on Windows.
+    if len(oids_el) == 0:
+        oids_el.set('{%s}nil' % XSI_NS, 'true')
 
     return build_envelope(response_root, action=ACTION_GET_POLICIES_RESPONSE, relates_to=message_id)
 

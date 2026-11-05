@@ -719,7 +719,7 @@ class TestResponderIdRfc6960:
         )
         from asn1crypto import keys as asn1_keys
         loaded = asn1_keys.PublicKeyInfo.load(spki)
-        return hashlib.sha1(loaded['public_key'].contents[1:]).digest()
+        return hashlib.sha1(loaded['public_key'].contents[1:], usedforsecurity=False).digest()
 
     @staticmethod
     def _aki(cert):
@@ -842,7 +842,7 @@ class TestResponderIdRfc6960:
                 _delegated_certificate(ca_cert, ca_key, responder_key), ca_key)
             assert len(point) == 33
             _configure_delegated_responder(ca_obj, _cert_model(first), responder_cert, responder_key)
-            expected = hashlib.sha1(point).digest()
+            expected = hashlib.sha1(point, usedforsecurity=False).digest()
 
             single, _ = OCSPService().generate_response(ca_obj, int(_cert_model(first).serial_number, 16))
             assert self._responder_id_by_key(single) == expected
@@ -889,8 +889,8 @@ class TestResponderIdRfc6960:
         """issuerKeyHash covers the BIT STRING of the CA certificate (RFC 6960 4.1.1)."""
         with app.app_context():
             ca_obj, ca_cert, point = self._compressed_point_ca(create_ca)
-            name_hash = hashlib.sha1(ca_cert.subject.public_bytes(serialization.Encoding.DER)).digest()
-            found = _find_ca_by_issuer_hash(name_hash, hashlib.sha1(point).digest(), hashes.SHA1())
+            name_hash = hashlib.sha1(ca_cert.subject.public_bytes(serialization.Encoding.DER), usedforsecurity=False).digest()
+            found = _find_ca_by_issuer_hash(name_hash, hashlib.sha1(point, usedforsecurity=False).digest(), hashes.SHA1())
             assert found is not None and found.id == ca_obj.id
 
     def test_unknown_serial_cert_id_of_a_compressed_point_ca(self, app, create_ca):
@@ -900,7 +900,7 @@ class TestResponderIdRfc6960:
             assert status == 'unknown'
             rdata = asn1_ocsp.OCSPResponse.load(der)['response_bytes']['response'].parsed['tbs_response_data']
             cert_id = rdata['responses'][0]['cert_id']
-            assert cert_id['issuer_key_hash'].native == hashlib.sha1(point).digest()
+            assert cert_id['issuer_key_hash'].native == hashlib.sha1(point, usedforsecurity=False).digest()
 
 
 class TestDelegatedResponderIssuance:

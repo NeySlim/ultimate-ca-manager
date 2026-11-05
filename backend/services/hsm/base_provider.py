@@ -244,6 +244,11 @@ class HsmOperationError(HsmError):
     pass
 
 
+class HsmKeyExistsError(HsmOperationError):
+    """The name asked for a new key is already taken in the HSM"""
+    pass
+
+
 class HsmKeyNotFoundError(HsmError):
     """HSM key not found"""
     pass

@@ -484,6 +484,9 @@ class TemplateService:
         template = db.session.get(CertificateTemplate, template_id)
         if not template:
             raise ValueError(f"Template with id {template_id} not found")
+        # A disabled pin offers nothing, and as the CA's only pin narrows it to nothing
+        if not template.is_active:
+            raise ValueError(f"Template '{template.name}' is disabled")
         
         # Check if already pinned
         existing = CATemplatePin.query.filter_by(ca_id=ca_id, template_id=template_id).first()

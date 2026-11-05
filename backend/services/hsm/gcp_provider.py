@@ -11,7 +11,7 @@ from typing import Dict, List, Optional, Any
 from utils import key_algorithms
 from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo,
-    HsmConnectionError, HsmOperationError, HsmKeyNotFoundError, HsmConfigError
+    HsmConnectionError, HsmOperationError, HsmKeyExistsError, HsmKeyNotFoundError, HsmConfigError
 )
 
 logger = logging.getLogger(__name__)
@@ -323,7 +323,7 @@ class GcpKmsProvider(BaseHsmProvider):
             )
             
         except gcp_exceptions.AlreadyExists:
-            raise HsmOperationError(f"Key already exists: {label}")
+            raise HsmKeyExistsError(f"Key already exists: {label}")
         except gcp_exceptions.GoogleAPIError as e:
             raise HsmOperationError(f"Failed to generate key: {str(e)}")
     

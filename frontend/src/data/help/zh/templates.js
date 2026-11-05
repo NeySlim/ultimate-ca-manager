@@ -22,6 +22,7 @@ export default {
           { label: '有效期', text: '以天为单位的默认有效期' },
           { label: '复制', text: '克隆现有模板并进行修改' },
           { label: '显示系统模板', text: '隐藏内置模板，只处理您自己的模板。每个浏览器单独记住此选择' },
+          { label: '停用', text: '已停用的模板（包括内置模板）不会出现在签发证书表单中，也不会提供给 Windows 自动注册，并显示「非活跃」徽章。点击「激活」即可恢复。内置模板可以停用，但不能编辑：请复制一份来修改' },
           { label: '导入/导出', text: '在 UCM 实例之间以 JSON 文件共享模板，单个模板或多个模板合并在一个文件中' },
           { label: '密钥类型', text: 'RSA-2048、RSA-3072、RSA-4096、EC-P256、EC-P384 或 EC-P521，搭配 SHA-256、SHA-384 或 SHA-512 摘要，或 ML-DSA-44、ML-DSA-65 或 ML-DSA-87。摘要是签发 CA 的签名哈希，而非叶子密钥的哈希：它仍适用于 RSA 或 EC CA 下的 ML-DSA 叶子证书，而 ML-DSA CA 会忽略它' },
           { label: 'qcStatements', text: '可选的 ETSI EN 319 412-5 声明，添加到使用该模板签发的每个证书：QcCompliance、QcType（签名、印章或网站）、QcSSCD、QcPDS（HTTPS URL 和两位语言代码）、QcRetentionPeriod、QcLimitValue、QcCClegislation（用于依据欧盟以外法律框架认定的合格证书）以及语义标识符。不适用于 EST、WSTEP 或 mTLS 签发，CSR 中的 qcStatements 扩展会被忽略。不支持 QcIdentMethod、QcQSCDlegislation 和 PSD2 声明' },

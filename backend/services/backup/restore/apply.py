@@ -321,6 +321,8 @@ def _coerce(value: Any, column, where: str) -> Any:
                 parsed = parsed.replace(tzinfo=None)
             return parsed.date() if isinstance(kind, Date) and not isinstance(kind, DateTime) else parsed
         if isinstance(kind, Boolean) and not isinstance(value, bool):
+            if isinstance(value, str):  # bool("false") is True
+                raise ValueError('text in a boolean column')
             return bool(value)
         if isinstance(kind, (Integer, Numeric)) and isinstance(value, str):
             # Left alone, "twenty-two" reached SQLite, which stores it, and

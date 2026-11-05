@@ -12,6 +12,7 @@ const mocks = vi.hoisted(() => ({
   notify: { showSuccess: () => {}, showError: () => {}, showConfirm: () => {} },
   getXcep: vi.fn(),
   getWstep: vi.fn(),
+  getTemplates: vi.fn().mockResolvedValue({ data: [] }),
   CAS: [
     { id: 1, descr: 'Signing CA', has_private_key: true },
     { id: 2, descr: 'Keyless root', certificate_only: true, has_private_key: false },
@@ -37,7 +38,7 @@ vi.mock('../../../services', () => ({
   casService: { getAll: vi.fn().mockResolvedValue({ data: mocks.CAS }) },
   adConnectorService: { get: vi.fn().mockResolvedValue({ data: null }) },
   kerberosService: { get: vi.fn().mockResolvedValue({ data: null }) },
-  templatesService: { getAll: vi.fn().mockResolvedValue({ data: [] }) },
+  templatesService: { getAll: mocks.getTemplates },
 }))
 
 // A native select exposes the options and the helper text that the real one hides in a portal.
@@ -90,5 +91,17 @@ describe('XcepWstepSection CA pickers (#426)', () => {
       expect(labels(field)).toEqual(['Signing CA', 'Keyless root'])
       expect(field).toHaveTextContent('cas.notListedForSigning:1')
     }
+  })
+})
+
+describe('XcepWstepSection autoenrollment checklist', () => {
+  it('counts the active autoenrollment templates only', async () => {
+    mocks.getTemplates.mockResolvedValueOnce({ data: [
+      { id: 1, autoenroll_enabled: true, is_active: true },
+      { id: 2, autoenroll_enabled: true, is_active: false },
+      { id: 3, autoenroll_enabled: false, is_active: true },
+    ] })
+    await renderSection({}, {})
+    expect(await screen.findByText('xcepWstep.checklistTemplates:1')).toBeInTheDocument()
   })
 })

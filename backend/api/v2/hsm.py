@@ -15,7 +15,8 @@ from utils.secret_target import MASKS, changed_targets, retarget_error
 from utils.response import success_response, error_response, created_response, no_content_response
 from services import compliance_signer
 from services.hsm import HsmService
-from services.hsm.base_provider import HsmError, HsmConnectionError, HsmOperationError, HsmConfigError
+from utils.process_lock import LockBusyError
+from services.hsm.base_provider import HsmError, HsmKeyExistsError, HsmConnectionError, HsmOperationError, HsmConfigError
 from models import db, CA
 from models.hsm import HsmProvider, HsmKey
 from services.audit_service import AuditService
@@ -496,6 +497,10 @@ def generate_key(provider_id):
             400
         )
     
+    # bool("false") is True: text would make the key exportable
+    if not isinstance(extractable, bool):
+        return error_response('extractable must be true or false', 400)
+
     refusal = HsmService.algorithm_refusal(provider.type, algorithm)
     if refusal:
         return error_response(refusal, 400)
@@ -506,7 +511,7 @@ def generate_key(provider_id):
             label=label,
             algorithm=algorithm,
             purpose=purpose,
-            extractable=bool(extractable)
+            extractable=extractable
         )
         
         AuditService.log_action(
@@ -528,6 +533,8 @@ def generate_key(provider_id):
         # Only the service's own checks raise ValueError (provider failures become HsmError)
         logger.warning(f"HSM key generation validation error: {e}")
         return error_response(str(e), 400)
+    except (HsmKeyExistsError, LockBusyError) as e:
+        return error_response(str(e), 409)
     except HsmError as e:
         logger.error(f"HSM key generation error: {e}")
         return error_response('HSM key generation error', 500)

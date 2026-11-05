@@ -496,6 +496,10 @@ export default function SSHCAsPage() {
           </div>
         )}
 
+        <p className="mt-3 text-xs text-text-secondary">
+          {selectedCA.allow_custom_key_id ? t('sshCas.keyIdChosenByRequester') : t('sshCas.keyIdSetByCa')}
+        </p>
+
         {principalList(selectedCA).length > 0 && (
           <div className="mt-3 space-y-1">
             <div className="text-xs font-semibold text-text-primary">
@@ -687,6 +691,7 @@ function SSHCAModal({ ca, onSave, onClose }) {
       ? ca.allowed_principals.join(', ')
       : (ca?.allowed_principals || ''),
     allow_any_principal: !!ca?.allow_any_principal,
+    allow_custom_key_id: !!ca?.allow_custom_key_id,
   })
 
   const handleChange = (field, value) => setFormData(prev => ({ ...prev, [field]: value }))
@@ -728,6 +733,7 @@ function SSHCAModal({ ca, onSave, onClose }) {
         // An empty list is sent too: on edit, clearing the field must clear it
         allowed_principals: principals,
         allow_any_principal: formData.allow_any_principal,
+        allow_custom_key_id: formData.allow_custom_key_id,
       })
     } finally {
       setLoading(false)
@@ -831,6 +837,19 @@ function SSHCAModal({ ca, onSave, onClose }) {
           {t('sshCas.modal.allowAnyPrincipal')}
         </label>
         <p className="mt-1 text-xs text-text-secondary">{t('sshCas.modal.allowAnyPrincipalHelp')}</p>
+      </div>
+
+      <div>
+        <label className={checkboxCls}>
+          <input
+            type="checkbox"
+            checked={formData.allow_custom_key_id}
+            onChange={e => handleChange('allow_custom_key_id', e.target.checked)}
+            className="accent-accent-primary"
+          />
+          {t('sshCas.modal.allowCustomKeyId')}
+        </label>
+        <p className="mt-1 text-xs text-text-secondary">{t('sshCas.modal.allowCustomKeyIdHelp')}</p>
       </div>
     </FormModal>
   )

@@ -16,6 +16,7 @@ from email.utils import parsedate_to_datetime
 from typing import Dict, Any, Optional, Tuple, List, Union, TYPE_CHECKING
 
 import requests
+from sqlalchemy.exc import SQLAlchemyError
 from cryptography.hazmat.primitives import serialization, hashes
 from cryptography.hazmat.primitives.asymmetric import rsa, ec, padding, utils as asym_utils
 from cryptography.hazmat.backends import default_backend
@@ -1451,6 +1452,17 @@ class AcmeClientService:
         finally:
             listener.stop()
 
+    @staticmethod
+    def write_order_status(order, status: str) -> bool:
+        """Write a status, unless the order is issued: that means imported here, which the CA
+        cannot know and the scheduler needs. Tested in the write, as a background finalize may
+        import at any moment. The caller commits, and sees the outcome after that.
+
+        Returns False when an import won: the caller's failure is then no longer the order's."""
+        return AcmeClientOrder.query.filter(
+            AcmeClientOrder.id == order.id, AcmeClientOrder.status != 'issued',
+        ).update({'status': status}, synchronize_session=False) > 0
+
     def check_order_status(self, order: AcmeClientOrder) -> Tuple[str, Dict]:
         """
         Check current order status from ACME server.
@@ -1462,7 +1474,7 @@ class AcmeClientService:
             resp = self._post(order.order_url, "")  # POST-as-GET
             if resp.status_code == 200:
                 data = resp.json()
-                order.status = data.get('status', order.status)
+                self.write_order_status(order, data.get('status', order.status))
                 if data.get('certificate'):
                     order.certificate_url = data['certificate']
                 db.session.commit()
@@ -1470,6 +1482,9 @@ class AcmeClientService:
             return order.status, {}
         except Exception as e:
             logger.error(f"Status check error: {e}")
+            if isinstance(e, SQLAlchemyError):
+                # Otherwise every later statement of this request fails too
+                db.session.rollback()
             return order.status, {}
     
     # =========================================================================
@@ -1545,7 +1560,7 @@ class AcmeClientService:
             
             # Poll for certificate
             order_data = resp.json()
-            order.status = order_data.get('status', 'processing')
+            self.write_order_status(order, order_data.get('status', 'processing'))
             db.session.commit()
             
             # Wait for certificate (poll up to 30 seconds)
@@ -1565,7 +1580,9 @@ class AcmeClientService:
             cert_resp = self._post(cert_url, "")
             
             if cert_resp.status_code != 200:
-                return False, "Failed to download certificate", None
+                message = "Failed to download certificate"
+                self._record_finalize_failure(order, message)
+                return False, message, None
 
             cert_pem = self._select_certificate_chain(cert_resp)
 
@@ -1588,7 +1605,9 @@ class AcmeClientService:
             
             if cert_id:
                 order.certificate_id = cert_id
+                order.certificate_url = cert_url
                 order.status = 'issued'
+                order.error_message = None
                 # RFC 8555 §7.1.3: order.expires is the *order resource* expiry
                 # (~7 days for Let's Encrypt), NOT the certificate's notAfter.
                 # The renewal scheduler compares expires_at against `now + threshold`,
@@ -1608,19 +1627,37 @@ class AcmeClientService:
                 logger.info(f"Certificate issued for {domains}, ID: {cert_id}, expires_at={order.expires_at}")
                 return True, "Certificate issued and imported successfully", cert_id
             else:
-                return False, "Certificate obtained but import failed", None
-                
+                message = "Certificate obtained but import failed"
+                self._record_finalize_failure(order, message)
+                return False, message, None
+
         except Exception as e:
             logger.error(f"Finalization error: {e}")
-            order.status = 'error'
-            order.error_message = str(e)
-            try:
-                db.session.commit()
-            except Exception as commit_err:
-                db.session.rollback()
-                logger.error(f"Failed to save order error state: {commit_err}")
-            return False, str(e), None
-    
+            # A database error's text carries the statement and its values
+            message = 'Database error during finalization' if isinstance(e, SQLAlchemyError) else str(e)
+            self._record_finalize_failure(order, message)
+            return False, message, None
+
+    @staticmethod
+    def _record_finalize_failure(order, message: str) -> None:
+        """Keep the failure on the order; a failed flush refuses every statement until rollback.
+
+        What the CA last said outlives a failure here: only a valid order can be renewed.
+        """
+        try:
+            db.session.rollback()
+            values = {'error_message': message}
+            if order.status not in ('valid', 'invalid'):
+                values['status'] = 'error'
+            # A failure that lost to an import is no longer the order's
+            AcmeClientOrder.query.filter(
+                AcmeClientOrder.id == order.id, AcmeClientOrder.status != 'issued',
+            ).update(values, synchronize_session=False)
+            db.session.commit()
+        except Exception as commit_err:
+            db.session.rollback()
+            logger.error(f"Failed to save order error state: {commit_err}")
+
     def _import_certificate(
         self, 
         cert_pem: str, 

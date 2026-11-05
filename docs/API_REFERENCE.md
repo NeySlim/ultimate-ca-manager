@@ -565,6 +565,12 @@ Content-Type: application/json
 }
 ```
 
+`issuanceHidden` (`true` or `false`, nothing else) keeps the CA out of the CA lists of the manual
+issuance forms (Issue Certificate, Sign CSR, bulk CSR signing, user mTLS certificates, TSA signing
+certificate), behind a
+"show hidden CAs" link. It is presentation only: the CA still signs whatever it is asked to. The
+CA object reads it back as `issuance_hidden`, and the change is audited.
+
 ### Delete CA
 ```http
 DELETE /api/v2/cas/{ca_id}

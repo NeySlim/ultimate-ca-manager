@@ -135,7 +135,7 @@ class SSHCAService:
     def create_ca(descr, ca_type, key_type=None, username=None,
                   default_ttl=None, max_ttl=0, default_extensions=None,
                   allowed_principals=None, comment=None, owner_group_id=None,
-                  allow_any_principal=False):
+                  allow_any_principal=False, allow_custom_key_id=False):
         """Create a new SSH Certificate Authority.
 
         Args:
@@ -152,6 +152,7 @@ class SSHCAService:
             comment: Optional notes
             owner_group_id: Optional group ownership
             allow_any_principal: Sign for any principal when the list is empty
+            allow_custom_key_id: Let requesters choose the certificate's key ID
 
         Returns:
             SSHCertificateAuthority instance
@@ -204,6 +205,7 @@ class SSHCAService:
         ca.set_default_extensions(default_extensions)
         ca.set_allowed_principals(allowed_principals)
         ca.allow_any_principal = bool(allow_any_principal)
+        ca.allow_custom_key_id = bool(allow_custom_key_id)
 
         try:
             db.session.add(ca)
@@ -219,7 +221,8 @@ class SSHCAService:
     @staticmethod
     def import_ca(descr, ca_type, private_key_pem, username=None,
                   default_ttl=None, max_ttl=0, comment=None, owner_group_id=None,
-                  allowed_principals=None, allow_any_principal=False):
+                  allowed_principals=None, allow_any_principal=False,
+                  allow_custom_key_id=False):
         """Import an existing SSH CA from a private key.
 
         Args:
@@ -233,6 +236,7 @@ class SSHCAService:
             owner_group_id: Optional group ownership
             allowed_principals: List of allowed principal patterns
             allow_any_principal: Sign for any principal when the list is empty
+            allow_custom_key_id: Let requesters choose the certificate's key ID
 
         Returns:
             SSHCertificateAuthority instance
@@ -291,6 +295,7 @@ class SSHCAService:
         ca.set_default_extensions(default_extensions)
         ca.set_allowed_principals(allowed_principals)
         ca.allow_any_principal = bool(allow_any_principal)
+        ca.allow_custom_key_id = bool(allow_custom_key_id)
 
         try:
             db.session.add(ca)
@@ -313,7 +318,8 @@ class SSHCAService:
         if not ca:
             raise ValueError(f"SSH CA not found: {ca_id}")
 
-        allowed_fields = {'descr', 'default_ttl', 'max_ttl', 'comment', 'allow_any_principal'}
+        allowed_fields = {'descr', 'default_ttl', 'max_ttl', 'comment',
+                          'allow_any_principal', 'allow_custom_key_id'}
         for field, value in kwargs.items():
             if field in allowed_fields:
                 # Normalize TTL fields (seconds or duration strings like

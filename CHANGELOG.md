@@ -9,6 +9,41 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 ## [Unreleased]
 
+### Security
+
+- SSH: a requester could set any key ID, which sshd logs as the certificate holder's identity. Each SSH CA now names its certificates `principals@CA name` and refuses another key ID unless **Let requesters set the key ID** (`allow_custom_key_id`) is ticked (#432, reported by @danielrona). A principal can no longer contain a comma, which would read as two in that name.
+
+### Fixed
+
+- HSM: generating a key under a name OpenBao or Azure Key Vault already held adopted that name, whatever the requested algorithm, and deleting it then destroyed the key of a live CA. The API now answers 409; bring an existing key in with a sync.
+- HSM: two generations at once under one name could both find it free, and a key whose row could not be stored stayed in the HSM. Generations now take turns per provider (409 after 60 s), and such a key is removed unless a row holds its name.
+- Database errors quoted bound values in logs and API messages, an unencrypted private key included. They are now hidden, except what PostgreSQL itself quotes in a DETAIL line: a duplicate key in full, or each column of a refused row up to 64 bytes.
+- ACME client: every successful renewal left a second order on the schedule, so the orders doubled at each cycle. The renewed order now absorbs the one that fetched its certificate, and the upgrade removes the existing leftovers.
+- ACME client: a status check replaced `issued` with the CA's `valid`, which took the order out of automatic renewal. An issued order now stays issued, and the upgrade puts back those still holding a valid certificate that no newer order replaced, proxy orders excepted.
+- ACME client: a finalization that failed on a database error, a refused import or a download the CA refused did not record the error on the order. It now does, without the SQL text and keeping a status the CA reported as valid, so the order can still be renewed.
+- HSM: a CA whose creation failed after its key was generated left that key in the HSM and in the key list. It is now removed, where the provider allows it.
+- HSM: `extractable` sent as text, such as `"false"`, generated an exportable key. The API now answers 400.
+- XCEP: a CA with no template to announce sent empty policy and OID collections, which Windows clients refuse with `WS_E_INVALID_FORMAT`. Both are now nil, and the client sees a policy server with no templates.
+- Templates: a switch sent as text, such as `"autoenroll_enabled": "false"`, was stored as on, and a bad `is_active` failed a whole import. The API now answers 400, and an import skips only that template, with the reason.
+- Restore: text in a boolean column, such as `"is_active": "false"`, turned the setting on. The archive is now refused.
+- ACME profiles: renaming a profile bound to a disabled template was refused as a new binding. A rename now keeps the binding, and a second profile on that template is still refused.
+- Public endpoints: with the HTTP protocol port set to 0 and a Protocol Base URL without a port, CRL, OCSP and AIA URLs were issued as `http://host:0/...`. They now use port 80, the preflight check probes it, and the upgrade corrects the URLs stored on each CA (discussion #433, reported by @avdpas, thanks @Hemsby).
+- Google Cloud KMS: the notice for ML-DSA keys now says that KMS signs at most 64 KiB, which rules out a larger CRL.
+
+### Changed
+
+- Certificates: `serial_number` and `caref` are indexed, so renewal, revocation and protocol lookups no longer scan the table (migration 120).
+
+### Upgrade notes
+
+- ACME client: the upgrade removes each order a past renewal left behind, recognised by holding the certificate and order URL of an older order. It also puts orders back on the renewal schedule if a status check had taken them off, so a certificate you had stopped relying on can renew: delete its order if you do not want that.
+- ACME client: two orders for the same names that have already renewed apart cannot be told from two wanted orders, so both keep renewing: delete the one you do not want.
+- Templates: the API and import accept only true or false for `is_active`, `enforce_san_types`, `ad_derived_subject` and `autoenroll_enabled`; 0 and 1 are refused.
+- Public endpoints: certificates issued before this update keep a `:0` in their CRL, OCSP and AIA URLs: reissue them.
+- SSH: the option is off for every CA, existing ones included. A client that sends `key_id` gets a 400 until the option is ticked on its CA; sending the CA's own `principals@CA name` is still accepted.
+
+## [2.248] - 2026-11-01
+
 ### Added
 
 - Keys: ML-DSA-44, ML-DSA-65 and ML-DSA-87 (FIPS 204) are recognised by policies, CSR parsing and key labels when the linked OpenSSL provides them (3.5 or later). They are refused in FIPS mode.
@@ -35,7 +70,7 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 
 - ACME: the local server finalizes ML-DSA CSRs, and the ACME client orders ML-DSA-44, ML-DSA-65 and ML-DSA-87 certificate keys outside FIPS mode. A default key type the client cannot generate now fails the order instead of falling back to RSA-2048.
 
-- EST, SCEP and WSTEP enrol ML-DSA keys: SCEP verifies ML-DSA CMS signers as RFC 9882 sets out, and XCEP announces ML-DSA templates in policy schema 3 with the software KSP. EST /serverkeygen still generates RSA-2048 and ignores the request key, ML-DSA included (RFC 7030).
+- EST, SCEP and WSTEP enrol ML-DSA keys: SCEP verifies ML-DSA CMS signers as RFC 9882 sets out, and XCEP announces ML-DSA templates in policy schema 3 with the software KSP and a SHA-512 request hash, which Windows Server 2025 follows to enrol them. EST /serverkeygen still generates RSA-2048 and ignores the request key, ML-DSA included (RFC 7030).
 
 - TSA: a timestamp signer can be ML-DSA-65 or ML-DSA-87 (RFC 9882), issued from the TSA page or as an ML-DSA CA signing directly.
 
@@ -46,6 +81,10 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - The effective policy endpoint reports `ml_dsa`, and key type forms, the ACME client's included, offer ML-DSA only on a build that has it and outside FIPS mode. The FIPS preflight reports ML-DSA CAs under a new `ca.unapproved_algorithm` check and lists ACME client orders whose CSR key FIPS does not approve.
 
 - The "Certificates Only" API key scope now covers SSH certificates (`read:ssh`, `write:ssh`) and reads SSH CAs (thanks @danielrona).
+
+- CAs: "Hide from issuance" in the CA details keeps a CA, a root typically, out of the CA lists of Issue Certificate, Sign CSR, bulk CSR signing, user mTLS certificates and the TSA signing certificate; a link under those lists shows it again (#430).
+
+- Templates: a template, a system one included, can be deactivated from its details; the Issue Certificate form and Windows autoenrollment no longer offer it, and a CA left with no active template, its pinned ones all deactivated included, offers none. A system template still cannot be edited: duplicate it to change it.
 
 ### Changed
 
@@ -101,6 +140,12 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 - Certificates issued through ACME, SCEP, EST, WSTEP and Microsoft CA connections, or renewed, were stored without their key identifiers, or in lower case, so ACME renewalInfo answered 404 and the issuing CA was not found by them; they are now recorded with the certificate.
 
 - Import: a certificate or CA with an encrypted private key and a wrong or missing password, or with a key that could not be read, was imported without its key; the import now answers 400 with the reason. Key uploads say whether a password is missing or wrong, and smart import tries every per-file password the form sends instead of ignoring them. Smart import also ignored the objects left unselected and the Import keys option, and now offers Import CSRs.
+
+- WSTEP: renewing a certificate from Windows (`certreq ... Renew`) was refused for lack of a WS-Security header; Windows authenticates with the certificate being renewed as TLS client certificate, which is now accepted when it signed the request, is current and was issued by the WSTEP CA. It needs mTLS enabled with that CA, or one of its ancestors, trusted.
+
+- WSTEP: a renewal could move to another template and add its Extended Key Usages; it now keeps the template of the certificate it renews with that template's EKUs, and a renewal wrapped in PKCS#7 with a new key has to prove possession of it.
+
+- EST, SCEP and WSTEP: two renewals of one certificate sent at the same time, or two pending SCEP renewals approved in turn, could both be issued; the second is now refused as superseded, and a SCEP renewal approved after the certificate was revoked is refused. WSTEP renewals of a certificate the CA issued, refused ones included, are audited with the old and new serial numbers.
 
 - WSTEP: a request matched to a template by its EKUs could be issued with a key of another kind than the template's; it is now refused with the template's key type.
 

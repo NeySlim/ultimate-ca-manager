@@ -26,7 +26,7 @@ vi.mock('../../components', () => ({
   DatePicker: () => null,
   EkuMultiSelect: () => null,
   Select: ({ label, options = [], value, onChange }) => (
-    <select aria-label={label} value={value ?? ''} onChange={(e) => onChange?.(e.target.value)}>
+    <select aria-label={label} value={value ?? ''} data-state-value={value ?? ''} onChange={(e) => onChange?.(e.target.value)}>
       {options.map((o) => <option key={o.value} value={o.value}>{o.label}</option>)}
     </select>
   ),
@@ -63,6 +63,9 @@ describe('IssueCertificateForm policy key types (#397)', () => {
   it('switches to the first allowed key and submits it', async () => {
     const onSubmit = renderForm({ allowed_key_types: ['RSA-4096', 'EC-P384'], allowed_digests: null })
     await waitFor(() => expect(optionValues('common.keySize')).toEqual(['4096']))
+    // The options narrow first and the forbidden size switches a render later. A select
+    // shows its first option whatever its value, hence the state read from the mock
+    await waitFor(() => expect(screen.getByLabelText('common.keySize').dataset.stateValue).toBe('4096'))
     fireEvent.change(screen.getByLabelText('common.keyType'), { target: { value: 'ecdsa' } })
     expect(optionValues('common.keySize')).toEqual(['384'])
 

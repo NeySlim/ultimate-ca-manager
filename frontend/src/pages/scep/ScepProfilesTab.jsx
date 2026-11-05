@@ -259,7 +259,9 @@ export default function ScepProfilesTab({ profiles, cas, templates, canWrite, on
             placeholder={t('scep.noTemplate')}
             options={[
               { value: '', label: t('scep.noTemplate') },
-              ...templates.map(tpl => ({ value: String(tpl.id), label: tpl.name })),
+              // A deactivated template is refused on binding: only the one the profile already binds stays listed
+              ...templates.filter(tpl => tpl.is_active !== false || String(tpl.id) === String(editing?.template_id ?? ''))
+                .map(tpl => ({ value: String(tpl.id), label: tpl.name })),
             ]}
           />
           <p className="text-xs text-text-tertiary -mt-2">{t('scep.profileTemplateHelp')}</p>

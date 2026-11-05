@@ -58,6 +58,16 @@ class SSHCertificateSigningMixin:
                         f"Principal '{principal}' is not in the CA's allowed principals list"
                     )
 
+        # sshd logs the key ID as the holder's identity: the CA names it unless told otherwise
+        default_key_id = f"{','.join(principals)}@{ca.descr}"
+        key_id = key_id.strip() if isinstance(key_id, str) else key_id
+        if key_id and key_id != default_key_id and not ca.allow_custom_key_id:
+            raise ValueError(
+                "This SSH CA sets the key ID itself: leave key_id out, "
+                "or tick \"Let requesters set the key ID\" on the CA"
+            )
+        key_id = key_id or default_key_id
+
         public_key = SSHCertificateUtilsMixin._parse_public_key(public_key_data)
         subject_key_type = SSHCertificateUtilsMixin._detect_key_type(public_key)
         subject_fingerprint = SSHCertificateUtilsMixin._compute_fingerprint(public_key)
@@ -75,9 +85,6 @@ class SSHCertificateSigningMixin:
         valid_before = now_ts + validity_seconds
 
         serial = SSHCAService.get_next_serial(ca_id)
-
-        if not key_id:
-            key_id = f"{','.join(principals)}@{ca.descr}"
 
         ca_private_key = SSHCAService.get_private_key_object(ca_id)
 

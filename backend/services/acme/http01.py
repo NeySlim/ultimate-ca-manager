@@ -38,8 +38,8 @@ def _get(url: str, pin, timeout: int = 10):
     if pin is not None:
         host, ips = pin
         with pin_host(host, ips):
-            return requests.get(url, timeout=timeout, allow_redirects=False, verify=False)
-    return requests.get(url, timeout=timeout, allow_redirects=False, verify=False)
+            return requests.get(url, timeout=timeout, allow_redirects=False, verify=False)  # nosec B501
+    return requests.get(url, timeout=timeout, allow_redirects=False, verify=False)  # nosec B501
 
 
 def fetch_following_redirects(url: str, pin, allow_private: bool, timeout: int = 10):

@@ -31,6 +31,7 @@ applied, so a deleted template can never break finalize.
 Unknown keys inside a profile are ignored, so the shape can grow later
 without breaking stored configuration.
 """
+from collections import Counter
 import json
 import logging
 
@@ -105,7 +106,7 @@ def _coerce_template_id(value):
         return None
     try:
         value = int(value)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):  # json reads Infinity as a float
         return None
     return value if value > 0 else None
 
@@ -249,7 +250,7 @@ def _sanitize(name, spec):
     validity = spec.get('validity_days', DEFAULT_VALIDITY_DAYS)
     try:
         validity = int(validity)
-    except (TypeError, ValueError):
+    except (TypeError, ValueError, OverflowError):
         validity = DEFAULT_VALIDITY_DAYS
     if validity < 1:
         validity = DEFAULT_VALIDITY_DAYS
@@ -280,6 +281,10 @@ def validate_config(obj):
     if len(obj) > 50:
         return False, 'too many profiles (max 50)'
 
+    # Bindings already stored, whatever their profile is called: a rename is not a new one
+    bound = Counter(_coerce_template_id(s.get('template_id'))
+                    for s in _raw_config().values() if isinstance(s, dict))
+
     for name, spec in obj.items():
         if not isinstance(name, str) or not name:
             return False, 'profile names must be non-empty strings'
@@ -297,7 +302,7 @@ def validate_config(obj):
         if 'validity_days' in spec:
             try:
                 validity = int(spec['validity_days'])
-            except (TypeError, ValueError):
+            except (TypeError, ValueError, OverflowError):
                 return False, f"profile '{name}': validity_days must be an integer"
             if validity < 1 or validity > _MAX_VALIDITY_DAYS:
                 return False, (
@@ -318,8 +323,10 @@ def validate_config(obj):
             if err:
                 return False, err
             # A disabled template cannot be newly bound; an existing binding stays
-            saved = _coerce_template_id((_raw_config().get(name) or {}).get('template_id'))
-            if spec['template_id'] != saved:
+            template_id = _coerce_template_id(spec['template_id'])
+            if bound[template_id] > 0:
+                bound[template_id] -= 1
+            else:
                 from services.template_service import disabled_template_error
                 err = disabled_template_error(spec['template_id'])
                 if err:

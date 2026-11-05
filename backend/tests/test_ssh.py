@@ -53,13 +53,14 @@ def put_json(client, url, data):
     return client.put(url, data=json.dumps(data), content_type=CONTENT_JSON)
 
 
-def _create_ssh_ca(auth_client, ca_type='user', descr=None, key_type='ed25519'):
+def _create_ssh_ca(auth_client, ca_type='user', descr=None, key_type='ed25519', **extra):
     """Helper to create an SSH CA and return the response data."""
     payload = {
         'descr': descr or f'Test {ca_type.capitalize()} CA',
         'ca_type': ca_type,
         'key_type': key_type,
         'allow_any_principal': True,
+        **extra,
     }
     r = post_json(auth_client, '/api/v2/ssh/cas', payload)
     assert r.status_code == 201, f'Create SSH CA failed ({r.status_code}): {r.data}'
@@ -544,7 +545,7 @@ class TestSignSSHCertificate:
         assert data['valid_to'] is not None
 
     def test_sign_certificate_custom_key_id(self, auth_client):
-        ca = _create_ssh_ca(auth_client, descr='KeyID CA')
+        ca = _create_ssh_ca(auth_client, descr='KeyID CA', allow_custom_key_id=True)
         pub_key = _generate_test_ssh_key()
         payload = {
             'ca_id': ca['id'],
@@ -705,7 +706,7 @@ class TestListSSHCertificates:
             assert cert['cert_type'] == 'user'
 
     def test_list_certificates_search(self, auth_client):
-        ca = _create_ssh_ca(auth_client, descr='Search Cert CA')
+        ca = _create_ssh_ca(auth_client, descr='Search Cert CA', allow_custom_key_id=True)
         pub_key = _generate_test_ssh_key()
         post_json(auth_client, '/api/v2/ssh/certificates', {
             'ca_id': ca['id'], 'public_key': pub_key,

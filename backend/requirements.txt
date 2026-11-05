@@ -29,7 +29,7 @@ qrcode>=7.4
 Pillow>=13.0.0
 
 # SCEP Support (pycryptodome dropped — SCEP now uses pyca/cryptography's ciphers)
-pyasn1==0.6.4
+pyasn1==0.6.5
 pyasn1-modules==0.4.2
 
 # ACME Support

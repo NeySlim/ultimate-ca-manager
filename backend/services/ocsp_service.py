@@ -797,7 +797,8 @@ class OCSPService:
 
             response_data_fields = {
                 'responder_id': {
-                    'by_key': hashlib.sha1(_subject_public_key_bits(signing_cert)).digest()
+                    # RFC 6960 §4.2.1: KeyHash is the SHA-1 of the key, an identifier
+                    'by_key': hashlib.sha1(_subject_public_key_bits(signing_cert), usedforsecurity=False).digest()
                 },
                 'produced_at': self._asn1_time(this_update),
                 'responses': single_responses,

@@ -828,6 +828,12 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
     }
   }, [cas])
 
+  const selectedCa = cas.find(c => String(c.id) === String(caId))
+  const customKeyId = !!selectedCa?.allow_custom_key_id
+  const principalNames = principalsText.split(',').map(p => p.trim()).filter(Boolean)
+  // What the CA writes when the requester sets nothing, as signing.py does
+  const defaultKeyId = selectedCa && principalNames.length ? `${principalNames.join(',')}@${selectedCa.descr}` : ''
+
   // Keep the certificate type in line with the selected CA's ca_type
   useEffect(() => {
     if (!caId) return
@@ -843,12 +849,12 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
 
   const handleSubmit = async (e) => {
     e.preventDefault()
-    if (!keyId.trim() || !caId) return
+    if (!caId) return
     if (mode === 'sign' && !publicKey.trim()) return
 
     setLoading(true)
     try {
-      const principals = principalsText.split(',').map(p => p.trim()).filter(Boolean)
+      const principals = principalNames
 
       // Convert validity preset to seconds for backend
       const preset = VALIDITY_PRESETS.find(p => p.value === validityPreset)
@@ -858,10 +864,11 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
         mode,
         ca_id: parseInt(caId, 10),
         cert_type: certType,
-        key_id: keyId.trim(),
         principals,
         extensions: certType === 'user' ? extensions : [],
       }
+
+      if (customKeyId && keyId.trim()) data.key_id = keyId.trim()
 
       if (validitySeconds) {
         data.validity_seconds = validitySeconds
@@ -971,17 +978,25 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
         />
       </div>
 
-      {/* Key ID */}
+      {/* Key ID: chosen only where the CA allows it, else set by the CA */}
       <div>
         <label className="block text-xs font-medium text-text-primary mb-1">
-          {t('sshCertificates.keyId')} <span className="text-status-danger">*</span>
+          {t('sshCertificates.keyId')}
         </label>
-        <Input
-          value={keyId}
-          onChange={(e) => setKeyId(e.target.value)}
-          placeholder={t('sshCertificates.modal.keyIdPlaceholder')}
-          required
-        />
+        {customKeyId ? (
+          <Input
+            value={keyId}
+            onChange={(e) => setKeyId(e.target.value)}
+            placeholder={defaultKeyId || t('sshCertificates.modal.keyIdPlaceholder')}
+            aria-label={t('sshCertificates.keyId')}
+          />
+        ) : (
+          <p className="text-xs text-text-secondary" data-testid="ssh-key-id-set-by-ca">
+            {defaultKeyId
+              ? t('sshCertificates.modal.keyIdSetByCa', { keyId: defaultKeyId })
+              : t('sshCertificates.modal.keyIdSetByCaPending')}
+          </p>
+        )}
       </div>
 
       {/* Public Key (Sign mode) */}
@@ -1131,7 +1146,7 @@ function IssueCertificateForm({ cas, canListCas = true, onSubmit, onCancel }) {
         <Button type="button" variant="secondary" onClick={onCancel}>
           {t('common.cancel')}
         </Button>
-        <Button type="submit" disabled={loading || !keyId.trim() || !caId || (mode === 'sign' && !publicKey.trim())}>
+        <Button type="submit" disabled={loading || !caId || (mode === 'sign' && !publicKey.trim())}>
           {loading ? (
             <span className="flex items-center gap-2">
               <span className="w-3.5 h-3.5 border-2 border-white/30 border-t-white rounded-full animate-spin" />

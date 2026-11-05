@@ -52,6 +52,14 @@ export default {
           { label: 'Mise à niveau', text: 'Les CA créées avant 2.245 sans liste continuent de signer pour tout principal : la mise à niveau coche l\'option pour elles.' },
         ]
       },
+      {
+        title: 'Key ID',
+        items: [
+          { label: 'Défini par la CA', text: 'sshd journalise le key ID comme identité du titulaire. Par défaut, la CA nomme chaque certificat principals@nom de la CA, et une demande qui définit un autre key ID est refusée.' },
+          { label: 'Laisser les demandeurs définir l\'identifiant de clé', text: 'Cochez cette option pour laisser les demandeurs choisir le leur, par ex. un numéro de ticket ou d\'employé.' },
+          { label: 'Mise à niveau', text: 'À partir de 2.249, les CA existantes démarrent aussi avec l\'option décochée.' },
+        ]
+      },
     ],
     tips: [
       'Utilisez des CA distinctes pour les certificats utilisateur et hôte : ne les mélangez jamais.',
@@ -110,6 +118,10 @@ Une Host CA signe des certificats qui authentifient les **serveurs auprès des c
 Le champ **Principals autorisés** restreint les noms pour lesquels une CA signe, sous forme de motifs séparés par des virgules (\`deploy\`, \`team-*\`, \`web??.example.com\`). Chaque principal d'une demande doit correspondre à l'un d'eux.
 
 Une CA dont la liste est vide ne signe rien, sauf si **Autoriser tout principal** est coché : elle signe alors pour n'importe quel nom, \`root\` compris. Les CA créées avant 2.245 sans liste se comportaient ainsi implicitement ; la mise à niveau coche l'option pour elles, elles continuent donc de fonctionner.
+
+### Key ID
+
+sshd journalise le key ID d'un certificat comme identité du titulaire. La CA le définit à \`principals@nom de la CA\` et refuse une demande qui en définit un autre, sauf si **Laisser les demandeurs définir l'identifiant de clé** est coché. L'option est décochée pour toutes les CA, y compris les existantes depuis 2.249.
 
 ### Formats de TTL
 

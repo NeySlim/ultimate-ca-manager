@@ -68,8 +68,10 @@ class OvhDnsProvider(BaseDnsProvider):
         
         # Signature = SHA1(AS+"+"+CK+"+"+METHOD+"+"+QUERY+"+"+BODY+"+"+TSTAMP)
         to_sign = f"{app_secret}+{consumer_key}+{method}+{url}+{body}+{timestamp}"
-        signature = hashlib.sha1(to_sign.encode('utf-8')).hexdigest()
-        return f"$1${signature}"
+        # The OVH API defines this signature: SHA-1 is not ours to choose
+        payload = to_sign.encode('utf-8')
+        digest = hashlib.sha1(payload)  # nosec B324
+        return f"$1${digest.hexdigest()}"
     
     def _request(self, method: str, path: str, data: Optional[Dict] = None) -> Tuple[bool, Any]:
         """Make authenticated OVH API request"""

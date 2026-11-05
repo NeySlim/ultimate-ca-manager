@@ -410,6 +410,55 @@ class TestDeploymentPorts:
         with app.app_context():
             assert get_protocol_effective_url() == 'http://pki.ucm.example.com:8080'
 
+    def test_protocol_effective_never_emits_port_zero_when_listener_disabled(self, app, monkeypatch):
+        # Listener disabled (HTTP protocol port 0) behind a reverse proxy: the
+        # advertised CDP/OCSP base must not become http://host:0 (discussion #433).
+        monkeypatch.setenv('HTTP_PROTOCOL_PORT', '0')
+        _set_config(app, 'protocol_base_url', 'http://pki.ucm.example.com')
+        with app.app_context():
+            assert get_protocol_effective_url() == 'http://pki.ucm.example.com'
+
+    def test_protocol_effective_keeps_explicit_port_when_listener_disabled(self, app, monkeypatch):
+        monkeypatch.setenv('HTTP_PROTOCOL_PORT', '0')
+        _set_config(app, 'protocol_base_url', 'http://pki.ucm.example.com:8081')
+        with app.app_context():
+            assert get_protocol_effective_url() == 'http://pki.ucm.example.com:8081'
+
+    def test_protocol_effective_none_when_listener_disabled_and_no_base_url(self, app, monkeypatch):
+        # Guard only: this branch already returned None before the #433 fix.
+        monkeypatch.setenv('HTTP_PROTOCOL_PORT', '0')
+        _set_config(app, 'protocol_base_url', '')
+        with app.app_context():
+            assert get_protocol_effective_url() is None
+
+    @pytest.mark.parametrize('stored', ['http://pki.ucm.example.com', 'http://pki.ucm.example.com:80'])
+    def test_preflight_probes_port_80_when_listener_disabled(self, app, monkeypatch, stored):
+        # The preflight must probe the port the effective URL advertises, with or
+        # without the port typed (#433 review).
+        import utils.public_endpoints as pe
+        monkeypatch.setenv('HTTP_PROTOCOL_PORT', '0')
+        _set_config(app, 'base_url', '')
+        _set_config(app, 'acme_public_vhost', '')
+        _set_config(app, 'protocol_base_url', stored)
+        probed = []
+
+        class _Conn:
+            def __enter__(self):
+                return self
+
+            def __exit__(self, *exc):
+                return False
+
+        monkeypatch.setattr(pe, '_resolve_host_ips', lambda host: (['93.184.216.34'], None))
+        monkeypatch.setattr(pe, '_resolve_host_ips_internal', lambda host: ([], None))
+        monkeypatch.setattr(pe, '_resolve_host_ips_public', lambda host: (['93.184.216.34'], None))
+        monkeypatch.setattr(pe.socket, 'create_connection',
+                            lambda addr, timeout=None: probed.append(addr[1]) or _Conn())
+        with app.app_context():
+            pe.run_preflight_checks()
+        assert 80 in probed
+        assert 0 not in probed
+
     def test_explicit_port_in_stored_url_is_preserved(self, app, monkeypatch):
         monkeypatch.setenv('HTTPS_PORT', '8443')
         _set_config(app, 'base_url', 'https://admin.ucm.example.com:9443')

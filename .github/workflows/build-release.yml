@@ -352,6 +352,7 @@ jobs:
           username: ${{ secrets.DOCKERHUB_USERNAME }}
           password: ${{ secrets.DOCKERHUB_TOKEN }}
           repository: neyslim/ultimate-ca-manager
+          short-description: "Self-hosted CA: ACME, SCEP, EST, OCSP, CRL, TSA, SSH, AD CS, post-quantum ML-DSA, FIPS image"
           readme-filepath: ./DOCKERHUB_README.md
 
   # ============================================================

@@ -8,9 +8,10 @@ binding (advertised to clients via XCEP's CAURI mechanism,
 
 - ``/ADCertificateService_CES_UsernamePassword/service.svc`` — initial
   enrollment, HTTP Basic auth (matches EST/XCEP's Basic-Auth pattern).
-- ``/ADCertificateService_CES_Certificate/service.svc`` — renewal, the
-  RST itself is WS-Security signed with the client's current certificate
-  (see ``services/wstep/ws_security.py``); no HTTP-level auth.
+- ``/ADCertificateService_CES_Certificate/service.svc`` — renewal, by the
+  client's current certificate: a WS-Security signature of the RST
+  (``services/wstep/ws_security.py``) or the TLS client certificate, which
+  must also sign the CMS request.
 - ``/ADCertificateService_CES_Kerberos/service.svc`` — initial enrollment
   or renewal for a domain-joined machine (GPO autoenrollment's usual
   path), authenticated via HTTP-transport-level ``Authorization:
@@ -38,7 +39,8 @@ from services.wstep import wstep_service
 from services.wstep.cmc_response import build_cmc_full_pki_response
 from services.wstep.rst_parser import RSTParseError, parse_rst
 from services.wstep.rstr_builder import build_issue_response
-from services.wstep.soap_envelope import build_soap_fault, extract_username_token
+from services.wstep.soap_envelope import DS_NS, build_soap_fault, extract_username_token
+from utils.client_cert import trusted_client_cert
 from utils.db_transaction import safe_commit
 from utils.trusted_proxy import client_ip
 
@@ -180,16 +182,18 @@ def _cmc_response_der_for(ca, cert, parsed):
         return None
 
 
-def _audit_issuance(action, subject, username):
+def _audit_issuance(action, subject, username, details, success=True, resource_id=None):
     from services.audit.staging import stage_audit_entry
     stage_audit_entry(
         action=action,
         resource_type='certificate',
+        resource_id=resource_id,
         resource_name=subject,
         username=username,
-        details=f'WSTEP enrollment from {client_ip()}',
+        details=details,
+        success=success,
     )
-    safe_commit(logger, "WSTEP enrollment audit commit failed")
+    safe_commit(logger, "WSTEP audit commit failed")
 
 
 def _issue_and_respond(ca, parsed, username, action='certificate.issued', kerberos_principal=None):
@@ -212,15 +216,18 @@ def _issue_and_respond(ca, parsed, username, action='certificate.issued', kerber
 
     try:
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
+        request_id = _request_id_for(cert)
         response_body = build_issue_response(
-            cert, relates_to=parsed.message_id, request_id=_request_id_for(cert),
+            cert, relates_to=parsed.message_id, request_id=request_id,
             cmc_response_der=_cmc_response_der_for(ca, cert, parsed),
         )
     except Exception as e:
         logger.error("WSTEP: failed to build RSTR: %s", e)
         return _fault_response('Internal server error', status=500, relates_to=parsed.message_id)
 
-    _audit_issuance(action, cert.subject.rfc4514_string(), username)
+    _audit_issuance(action, cert.subject.rfc4514_string(), username,
+                    resource_id=str(request_id) if request_id else None,
+                    details=f'WSTEP enrollment from {client_ip()}: serial {cert.serial_number}')
     return Response(response_body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')
 
 
@@ -326,12 +333,15 @@ def issue_kerberos():
     return response
 
 
+def _carries_xml_signature(security_header):
+    return security_header is not None and security_header.find(f'{{{DS_NS}}}Signature') is not None
+
+
 @bp.route(CES_CERTIFICATE_PATH, methods=['GET', 'POST', 'HEAD'])
 def renew_certificate_bound():
-    """WSTEP RST over the Certificate-authenticated CES endpoint —
-    renewal, authenticated via WS-Security XML-DSig signing of the RST
-    with the client's current certificate's private key, not HTTP-level
-    auth.
+    """WSTEP RST over the Certificate-authenticated CES endpoint — renewal,
+    authenticated either by a WS-Security XML-DSig of the RST or, as Windows
+    does, by the TLS client certificate that also signs the CMS request.
 
     Accepts GET/HEAD as well as POST — same rationale as the
     UsernamePassword endpoint above, though this binding has no HTTP-level
@@ -358,23 +368,45 @@ def renew_certificate_bound():
     except RSTParseError as e:
         return _fault_response(f'Malformed request: {e}', status=400)
 
-    cert_pem, error = wstep_service.renew(
-        ca, parsed.csr_der, parsed.security_header, parsed.csr_element, _validity_days(),
-        require_pop=not parsed.was_pkcs7_wrapped,
-    )
+    audit = {}
+    if _carries_xml_signature(parsed.security_header):
+        username = 'wstep-ws-security'
+        cert_pem, error = wstep_service.renew(
+            ca, parsed.csr_der, parsed.security_header, parsed.csr_element, _validity_days(),
+            require_pop=not parsed.was_pkcs7_wrapped, outer_signed_data=parsed.outer_signed_data,
+            audit=audit,
+        )
+    else:
+        # Windows authenticates here with its TLS client certificate, no XML-DSig
+        username = 'wstep-client-cert'
+        cert_pem, error = wstep_service.renew_with_client_certificate(
+            ca, trusted_client_cert(logger, 'WSTEP'), parsed.csr_der, parsed.outer_signed_data,
+            _validity_days(), audit=audit,
+        )
+    old_serial = audit.get('renewed_serial')
     if error:
         logger.warning("WSTEP renewal rejected: %s", error)
+        # Audited only for a certificate the CA issued: an anonymous refusal would fill the log
+        if old_serial is not None:
+            _audit_issuance('certificate.renewed', None, username, success=False, details=(
+                f'WSTEP renewal refused from {client_ip()}: {error} (old serial {old_serial})'))
         return _fault_response(error, status=400, relates_to=parsed.message_id)
 
     try:
         cert = x509.load_pem_x509_certificate(cert_pem.encode())
+        request_id = _request_id_for(cert)
         response_body = build_issue_response(
-            cert, relates_to=parsed.message_id, request_id=_request_id_for(cert),
+            cert, relates_to=parsed.message_id, request_id=request_id,
             cmc_response_der=_cmc_response_der_for(ca, cert, parsed),
         )
     except Exception as e:
         logger.error("WSTEP: failed to build RSTR: %s", e)
         return _fault_response('Internal server error', status=500, relates_to=parsed.message_id)
 
-    _audit_issuance('certificate.renewed', cert.subject.rfc4514_string(), 'wstep-client-cert')
+    _audit_issuance(
+        'certificate.renewed', cert.subject.rfc4514_string(), username,
+        resource_id=str(request_id) if request_id else None,
+        details=(f'WSTEP renewal from {client_ip()}: old serial {old_serial}, '
+                 f'new serial {cert.serial_number}'),
+    )
     return Response(response_body, status=200, content_type=f'{SOAP_XML_MIME}; charset=utf-8')

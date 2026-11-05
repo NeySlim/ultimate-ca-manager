@@ -1082,7 +1082,17 @@
     "restorePasswordHint": "CA をオフラインにしたときに使用したパスワード。",
     "namedUrls": "プロトコルURLにCA名を使用",
     "namedUrlsHint": "CDP/OCSP/AIAパスにランダムIDの代わりにCA名から生成されたスラッグを使用します。手動設定が容易になりますが、URLにCA名が表示されます。後から有効にすることもできますが、一度有効にすると元に戻せません。",
-    "revocationApprovalRequired": "CA の失効を承認に提出しました（ポリシー: {{policy}}）"
+    "revocationApprovalRequired": "CA の失効を承認に提出しました（ポリシー: {{policy}}）",
+    "issuancePickers": "発行時の CA 選択リスト",
+    "issuanceListedState": "表示中",
+    "issuanceHiddenState": "非表示（要求時に表示）",
+    "hideFromIssuance": "発行時の一覧から非表示",
+    "showInIssuance": "発行時の一覧に表示",
+    "issuanceVisibilityChanged": "発行時の CA 選択リストを更新しました",
+    "issuanceVisibilityChangeFailed": "発行時の CA 選択リストを更新できませんでした",
+    "showHiddenCas_one": "非表示の CA を {{count}} 件表示",
+    "showHiddenCas_other": "非表示の CA を {{count}} 件表示",
+    "hideHiddenCas": "非表示の CA を隠す"
   },
   "csrs": {
     "uploadCSR": "CSRをアップロード",
@@ -1314,7 +1324,11 @@
       "addPds": "開示声明を追加",
       "policyOids": "証明書ポリシー OID",
       "policyOidsHint": "ドット表記の OID を1行に1つずつ指定します。CA 自身のポリシーの後に追加されます。ボタンで ETSI QCP ポリシーを追加できます。"
-    }
+    },
+    "activate": "有効化",
+    "activated": "テンプレートを有効化しました",
+    "deactivated": "テンプレートを無効化しました",
+    "deactivateTooltip": "無効化したテンプレートは、証明書の発行フォームにも Windows 自動登録にも提供されません。システムテンプレートは無効化はできますが編集はできません。変更するには複製してください。"
   },
   "users": {
     "securityKeys": {
@@ -3568,7 +3582,7 @@
     "generateHsmKey": "HSMキーの生成",
     "keyLabel": "キーラベル",
     "keyLabelPlaceholder": "my-signing-key",
-    "mldsaUntestedGoogleKms": "Google Cloud KMS 上の ML-DSA は KMS API に準拠していますが、まだこのサービスでテストされていません。",
+    "mldsaUntestedGoogleKms": "Google Cloud KMS 上の ML-DSA は KMS API に準拠していますが、まだこのサービスでテストされていません。KMS が署名できるのは最大 64 KiB のため、それより大きい CRL には別のプロバイダーが必要です。",
     "purposes": {
       "general": "一般用途",
       "caSigning": "CA署名"
@@ -5508,7 +5522,9 @@
       "keySizeLabel": "鍵サイズ（RSAのみ）",
       "principalsHelperText": "許可されたPrincipalのカンマ区切りリスト",
       "allowAnyPrincipal": "任意のプリンシパルを許可",
-      "allowAnyPrincipalHelp": "プリンシパルが一つも指定されていない場合、root を含む任意の名前に署名します。このオプションがなければ、リストが空の CA は何も署名しません。"
+      "allowAnyPrincipalHelp": "プリンシパルが一つも指定されていない場合、root を含む任意の名前に署名します。このオプションがなければ、リストが空の CA は何も署名しません。",
+      "allowCustomKeyId": "リクエスタによる鍵IDの指定を許可",
+      "allowCustomKeyIdHelp": "sshdは鍵IDを所有者のIDとしてログに記録します。オフの場合、CAはすべての証明書に principals@CA名 という名前を付けます。"
     },
     "searchPlaceholder": "SSH CAを検索...",
     "downloadSetupScript": "セットアップスクリプトをダウンロード",
@@ -5526,7 +5542,9 @@
     "downloadSetupScriptLinux": ".sh をダウンロード (Linux/macOS)",
     "downloadSetupScriptWindows": ".ps1 をダウンロード (Windows)",
     "anyPrincipal": "任意のプリンシパル",
-    "noPrincipalSignsNothing": "プリンシパル未指定：この CA は何も署名しません"
+    "noPrincipalSignsNothing": "プリンシパル未指定：この CA は何も署名しません",
+    "keyIdSetByCa": "鍵IDはCAが設定: principals@CA名",
+    "keyIdChosenByRequester": "鍵IDはリクエスタが指定"
   },
   "sshCertificates": {
     "title": "SSH証明書",
@@ -5591,6 +5609,8 @@
     },
     "modal": {
       "keyIdPlaceholder": "例: user@hostname",
+      "keyIdSetByCa": "CAが設定: {{keyId}}",
+      "keyIdSetByCaPending": "CAがprincipalから設定: principals@CA名",
       "publicKeyPlaceholder": "OpenSSH公開鍵を貼り付け（ssh-ed25519 AAAA...）",
       "principalsPlaceholder": "例: root,admin,deploy（カンマ区切り）"
     },

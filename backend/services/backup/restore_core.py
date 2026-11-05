@@ -11,6 +11,7 @@ from typing import Any, Dict, List
 from models import db, CA, Certificate
 from utils.datetime_utils import utc_now
 from compliance_profiles import is_valid as is_valid_profile
+from utils.port_zero import strip_port_zero_from_stored
 from utils.signing_hash import SIGNATURE_SCHEMES
 from models.acme_models import AcmeAccount
 from config.settings import Config
@@ -562,6 +563,9 @@ class RestoreCoreMixin:
                                ('aia_ca_issuers_urls', 'set_aia_urls')):
             if column in ca_data and isinstance(ca_data.get(column), list):
                 getattr(ca, setter)(ca_data[column])
+        # An archive from before the upgrade brings back what its migration repaired
+        for column in ('cdp_url', 'ocsp_url', 'aia_ca_issuers_url'):
+            setattr(ca, column, strip_port_zero_from_stored(getattr(ca, column)))
         if 'offline' in ca_data:
             # An offline CA restored as online would hold a passphrase
             # protected key it cannot use and could neither take offline nor

@@ -63,7 +63,7 @@ export function TosPreview({ body }) {
   )
 }
 
-export default function ConfigTab({ acmeSettings, cas, templates = [], updateSetting, onSaveConfig, saving, revokeSuperseded, onRevokeSupersededChange, onToggleRevokeOnRenewal, canWrite }) {
+export default function ConfigTab({ acmeSettings, savedProfiles = {}, cas, templates = [], updateSetting, onSaveConfig, saving, revokeSuperseded, onRevokeSupersededChange, onToggleRevokeOnRenewal, canWrite }) {
   const { t } = useTranslation()
   const [editOpen, setEditOpen] = useState(false)
   const [editTitle, setEditTitle] = useState(acmeSettings.terms_of_service?.title || '')
@@ -126,6 +126,7 @@ export default function ConfigTab({ acmeSettings, cas, templates = [], updateSet
           <p className="text-xs text-text-secondary">{t('acme.profilesDesc')}</p>
           <ProfilesEditor
             value={acmeSettings.profiles || {}}
+            saved={savedProfiles}
             onChange={(profiles) => {
               updateSetting('profiles', profiles)
               // A renamed default follows its new name; a removed one is dropped

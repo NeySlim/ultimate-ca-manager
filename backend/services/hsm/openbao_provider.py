@@ -18,7 +18,7 @@ import fips_mode
 from utils import key_algorithms
 from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo,
-    HsmConnectionError, HsmOperationError, HsmKeyNotFoundError, HsmConfigError
+    HsmConnectionError, HsmOperationError, HsmKeyExistsError, HsmKeyNotFoundError, HsmConfigError
 )
 
 logger = logging.getLogger(__name__)
@@ -316,6 +316,11 @@ class OpenBaoProvider(BaseHsmProvider):
             )
 
         transit_type, key_class = ALGORITHM_TO_TRANSIT[algorithm]
+
+        # Transit answers success for a name it holds and keeps that key: never adopt it,
+        # deleting this row later would destroy a key UCM did not create
+        if self._api('GET', f'keys/{label}').get('data'):
+            raise HsmKeyExistsError(f'Key already exists: {label}')
 
         payload = {
             'type': transit_type,

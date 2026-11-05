@@ -78,6 +78,7 @@ export const helpContent = {
           { label: 'Name constraints', text: 'Advanced Constraints (RFC 5280): permitted and excluded subtrees (DNS, IP range, email) limit the names the CA may certify. For an externally-signed CA they are set by the signing CA' },
           { label: 'RSA signature scheme', text: 'PKCS#1 v1.5 by default, or RSA-PSS (salt as long as the hash) for an RSA CA with a local, PKCS#11 or OpenBao key. It applies to the certificates, CRLs, OCSP responses and SCEP replies the CA signs; timestamps stay PKCS#1 v1.5, the scheme openssl ts -verify checks. "Sign with RSA-PSS" in the CA details switches an existing CA either way: certificates already issued keep their signature' },
           { label: 'Compliance profile', text: 'ANSSI, BSI or EU ACM: rules aligned with a reference text bind what the CA issues (key types, digests, RSA scheme, date horizons, and for EU ACM an HSM-held CA key). Pick one at creation (an intermediate CA is offered its parent profile, otherwise the default set in Settings, About). On an existing CA, the field in the details attaches, changes or removes it: the profile check runs on that CA first, its findings are listed, and you confirm that the rules apply to future issuance only, nothing already issued is re-signed. Needs write:cas, and admin:system to attach or change' },
+          { label: 'Issuance pickers', text: 'Hide from issuance, in the CA details, keeps a CA (a root, typically) out of the CA lists of Issue Certificate, Sign CSR, the bulk signing of CSRs and the user mTLS certificates (My Account, Users & Groups) and the TSA signing certificate. A link under those lists, Show hidden CAs, brings it back when needed, and a CA already chosen stays listed. Protocol settings (ACME, EST, SCEP, XCEP/WSTEP), the parent of a new CA and cross-signing still list it. Needs write:cas' },
         ]
       },
       {
@@ -386,6 +387,7 @@ export const helpContent = {
           { label: 'Validity', text: 'Default validity period in days' },
           { label: 'Duplicate', text: 'Clone an existing template and modify it' },
           { label: 'Show system', text: 'Hide the built-in templates to work with your own only. Remembered per browser' },
+          { label: 'Deactivate', text: 'A deactivated template, built-in ones included, is no longer offered by the Issue Certificate form nor to Windows autoenrollment, and shows an Inactive badge. Activate brings it back. A built-in template can be deactivated, not edited: duplicate it to change it' },
           { label: 'Import/Export', text: 'Share templates as JSON files between UCM instances, one template or several in one file' },
           { label: 'qcStatements', text: 'Optional ETSI EN 319 412-5 statements added to every certificate issued from the template: QcCompliance, QcType (signature, seal or website), QcSSCD, QcPDS (HTTPS URL and two-letter language), QcRetentionPeriod, QcLimitValue, QcCClegislation (for a certificate qualified under a non-EU legal framework) and the semantics identifier. Not applied to EST, WSTEP or mTLS issuance, and a qcStatements extension in a CSR is ignored. QcIdentMethod, QcQSCDlegislation and PSD2 statements are not supported' },
           { label: 'Policy OIDs', text: 'Extra certificate policy OIDs (for example the ETSI QCP-n, QCP-l, QCP-n-qscd, QCP-l-qscd and QCP-w policies), added after the CA\'s own policy' },
@@ -1888,6 +1890,15 @@ export const helpContent = {
           { label: 'Upgrade', text: 'CAs created before 2.245 without a list keep signing for any principal: the upgrade ticks the option for them.' },
         ]
       },
+      {
+        title: 'Key ID',
+        icon: Key,
+        items: [
+          { label: 'Set by the CA', text: 'sshd logs the key ID as the holder\'s identity. By default the CA names every certificate principals@CA name, and a request that sets another key ID is refused.' },
+          { label: 'Let requesters set the key ID', text: 'Tick it to let requesters choose their own, e.g. a ticket or employee number.' },
+          { label: 'Upgrade', text: 'From 2.249, existing CAs start with the option off too.' },
+        ]
+      },
     ],
     tips: [
       'Use separate CAs for user and host certificates, never mix them.',
@@ -1919,7 +1930,7 @@ export const helpContent = {
         title: 'Certificate Fields',
         icon: FileText,
         items: [
-          { label: 'Key ID', text: 'Unique identifier for the certificate. Appears in SSH logs for auditing.' },
+          { label: 'Key ID', text: 'Identifier sshd logs for the holder. The CA sets it to principals@CA name, unless it lets requesters choose it.' },
           { label: 'Principals', text: 'Usernames (user cert) or hostnames (host cert) this certificate is valid for. Comma-separated.' },
           { label: 'Validity', text: 'Certificate lifetime. Choose a preset (1h, 8h, 24h, 7d, 30d, 90d, 365d) or set custom seconds.' },
           { label: 'Extensions', text: 'SSH extensions like permit-pty, permit-agent-forwarding. Only applicable to user certificates.' },
@@ -1946,7 +1957,7 @@ export const helpContent = {
     tips: [
       'Use short-lived certificates (8h–24h) for user access to minimize the impact of key compromise.',
       'Sign mode is preferred: the user\'s private key never leaves their machine.',
-      'Key IDs should be descriptive (e.g. "jdoe-prod-2025") for easy log auditing.',
+      'Where a CA lets requesters set the key ID, keep it descriptive (e.g. "jdoe-prod-2025") for easy log auditing.',
       'For host certificates, the principal must match the hostname clients use to connect.',
     ],
     warnings: [

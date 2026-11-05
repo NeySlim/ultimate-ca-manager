@@ -95,6 +95,9 @@ class CA(db.Model):
                                  server_default='pkcs1v15')
     # Compliance profile binding what this CA issues (compliance_profiles.py); NULL = none
     compliance_profile = db.Column(db.String(16), nullable=True)
+
+    # Kept out of the manual issuance pickers, offered on request only (#430)
+    issuance_hidden = db.Column(db.Boolean, nullable=False, default=False, server_default=db.false())
     
     # OCSP (Online Certificate Status Protocol)
     ocsp_enabled = db.Column(db.Boolean, default=False)
@@ -646,6 +649,7 @@ class CA(db.Model):
             "hash_algorithm": self.hash_algorithm,
             "signature_scheme": self.signature_scheme or 'pkcs1v15',
             "compliance_profile": self.compliance_profile,
+            "issuance_hidden": bool(self.issuance_hidden),
             # CRL/CDP configuration
             "cdp_enabled": self.cdp_enabled,
             "cdp_url": self.get_primary_cdp_url(),

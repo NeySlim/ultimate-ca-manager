@@ -14,6 +14,7 @@ from models.acme_models import AcmeClientOrder, DnsProvider
 from protocol_http_server import ProtocolOnlyMiddleware
 from services import acme_renewal_service as renew_mod
 from services.acme import http01
+from tests.db_write_probe import watching_writes
 
 
 def post_json(client, url, data=None):
@@ -233,6 +234,25 @@ def test_http01_renewal_stops_before_the_ca_when_the_file_is_unreachable(app, ma
         new_order = db.session.get(AcmeClientOrder, new_id)
         assert new_order.status == 'pending'
         assert 'not reachable' in new_order.error_message
+
+
+def test_a_retried_renewal_holds_no_pending_write_when_it_calls_the_ca(app, make_order, acme_email):
+    # The earlier attempt left an error on the order: clearing it must not cross the CA call
+    order_id, _ = make_order(status='issued')
+    pending_id, token = make_order()
+    with pytest.raises(renew_mod.RenewalBlocked):
+        _renew(app, order_id, pending_id, _Resp(404))
+    seen = []
+    client = MagicMock()
+    client.account = None
+    with app.app_context(), watching_writes() as pending_writes:
+        def verify(_order, _domain):
+            seen.append(pending_writes())
+            return True, 'ok'
+
+        client.verify_challenge.side_effect = verify
+        _renew(app, order_id, pending_id, _Resp(200, f'{token}.thumbprint'), client=client)
+    assert seen == [[]]
 
 
 def test_blocked_http01_renewal_reuses_the_pending_order(app, make_order, acme_email):

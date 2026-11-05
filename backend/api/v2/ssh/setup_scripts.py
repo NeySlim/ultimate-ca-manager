@@ -466,7 +466,7 @@ else
     info "    curl -sk -X POST https://<ucm-server>/api/v2/ssh/certificates \\\\"
     info "      -H 'X-API-Key: <api-key>' \\\\"
     info "      -H 'Content-Type: application/json' \\\\"
-    info "      -d '{{\"ca_id\": {ca_id}, \"cert_type\": \"host\", \"key_id\": \"$HOSTNAME\", \"principals\": [\"$HOSTNAME\"], \"public_key\": \"<contents of $HOST_KEY.pub>\"}}'"
+    info "      -d '{{\"ca_id\": {ca_id}, \"cert_type\": \"host\", \"principals\": [\"$HOSTNAME\"], \"public_key\": \"<contents of $HOST_KEY.pub>\"}}'"
     info "    Then save the \"certificate\" field of the JSON response to: $CERT_FILE"
     printf "\\n"
 fi

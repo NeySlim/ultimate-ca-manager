@@ -397,6 +397,8 @@ def renew_certificate(order) -> tuple:
                 commit_or_rollback(logger, "Could not persist HTTP-01 self-check failure")
                 raise RenewalBlocked(new_order.error_message)
             new_order.error_message = None  # left by an earlier blocked attempt
+            # Before the CA is called: a pending write would hold the database's write lock
+            commit_or_rollback(logger, "Could not clear the HTTP-01 self-check failure")
 
         # Submit challenges for validation
         for domain in challenges.keys():
@@ -420,6 +422,11 @@ def renew_certificate(order) -> tuple:
         # Update original order with new certificate reference
         order.certificate_id = cert_id
         order.order_url = new_order_url
+        order.certificate_url = new_order.certificate_url
+        # This order carries on, whatever status it was renewed from. The one that fetched
+        # the certificate has nothing left of its own: kept, it would renew these names again
+        order.status = 'issued'
+        db.session.delete(new_order)
         order.last_renewal_at = utc_now()
         order.renewal_failures = 0
         order.error_message = None

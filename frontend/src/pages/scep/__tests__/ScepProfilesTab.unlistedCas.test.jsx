@@ -72,3 +72,25 @@ describe('ScepProfilesTab CA picker (#426)', () => {
     expect(screen.getByTestId('field-common.certificateAuthority')).toHaveTextContent('cas.notListedForScep:2')
   })
 })
+
+describe('ScepProfilesTab template picker', () => {
+  const TEMPLATES = [{ id: 3, name: 'Retired', is_active: false }, { id: 5, name: 'Device', is_active: true }]
+  const templateLabels = () => within(screen.getByTestId('field-scep.profileTemplate'))
+    .getAllByRole('option').filter((o) => o.value !== '').map((o) => o.textContent)
+
+  it('keeps the deactivated template the profile binds, even once switched away from', async () => {
+    render(<ScepProfilesTab profiles={[{ ...PROFILE('ca-1'), template_id: 3 }]} cas={CAS} templates={TEMPLATES} canWrite onChanged={vi.fn()} />)
+    fireEvent.click(screen.getByLabelText('common.edit'))
+    await screen.findByRole('dialog')
+    expect(templateLabels()).toEqual(['Retired', 'Device'])
+    fireEvent.change(within(screen.getByTestId('field-scep.profileTemplate')).getByRole('combobox'), { target: { value: '5' } })
+    expect(templateLabels()).toEqual(['Retired', 'Device'])
+  })
+
+  it('does not offer a deactivated template to a new profile', async () => {
+    render(<ScepProfilesTab profiles={[]} cas={CAS} templates={TEMPLATES} canWrite onChanged={vi.fn()} />)
+    fireEvent.click(screen.getByText('scep.newProfile'))
+    await screen.findByRole('dialog')
+    expect(templateLabels()).toEqual(['Device'])
+  })
+})

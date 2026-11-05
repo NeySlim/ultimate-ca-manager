@@ -10,7 +10,7 @@ from typing import Dict, List, Optional, Any
 
 from services.hsm.base_provider import (
     BaseHsmProvider, HsmKeyInfo,
-    HsmConnectionError, HsmOperationError, HsmKeyNotFoundError, HsmConfigError
+    HsmConnectionError, HsmOperationError, HsmKeyExistsError, HsmKeyNotFoundError, HsmConfigError
 )
 
 from utils.key_algorithms import label_for_curve_name
@@ -34,7 +34,7 @@ try:
     from azure.keyvault.keys import KeyClient, KeyType, KeyCurveName
     from azure.keyvault.keys.crypto import CryptographyClient, SignatureAlgorithm
     from azure.identity import DefaultAzureCredential, ClientSecretCredential
-    from azure.core.exceptions import AzureError, ResourceNotFoundError
+    from azure.core.exceptions import AzureError, ResourceExistsError, ResourceNotFoundError
     AZURE_AVAILABLE = True
     
     # Algorithm mappings (only defined if azure is available)
@@ -267,6 +267,14 @@ class AzureKeyVaultProvider(BaseHsmProvider):
         key_type, param = ALGORITHM_TO_AZURE[algorithm]
         
         try:
+            # Key Vault adds a version to a name it holds, and deleting a key deletes all of them
+            try:
+                self._key_client.get_key(label)
+            except ResourceNotFoundError:
+                pass
+            else:
+                raise HsmKeyExistsError(f"Key already exists: {label}")
+
             # Determine key operations
             key_ops = []
             if purpose in ('signing', 'all'):
@@ -310,6 +318,8 @@ class AzureKeyVaultProvider(BaseHsmProvider):
                 metadata={'protection_level': 'HSM'}  # hardware_protected=True above
             )
             
+        except ResourceExistsError:
+            raise HsmKeyExistsError(f"A deleted key still holds this name: {label}; recover or purge it")
         except AzureError as e:
             raise HsmOperationError(f"Failed to generate key: {str(e)}")
     

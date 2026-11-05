@@ -89,7 +89,8 @@ describe('IssueCertificateForm ML-DSA', () => {
   it('switches to ML-DSA when it is all the policies allow', async () => {
     const onSubmit = renderForm({ allowed_key_types: ['ML-DSA-44'], allowed_digests: null })
     await waitFor(() => expect(optionValues('common.keyType')).toEqual(['ml-dsa']))
-    expect(optionValues('common.keySize')).toEqual(['44'])
+    // The forbidden key switches in an effect, one render after the options narrow
+    await waitFor(() => expect(optionValues('common.keySize')).toEqual(['44']))
     expect(await submit(onSubmit)).toMatchObject({ key_type: 'ml-dsa', key_size: '44' })
   })
 

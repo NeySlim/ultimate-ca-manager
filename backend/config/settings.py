@@ -170,6 +170,9 @@ class Config:
         "pool_timeout": int(os.getenv("DB_POOL_TIMEOUT", "30")),
         "pool_recycle": int(os.getenv("DB_POOL_RECYCLE", "1800")),
     } if _db_url else {}
+    # SQLAlchemy would otherwise quote bound values in its errors, private keys included.
+    # PostgreSQL's DETAIL line stays: a duplicate key in full, or a refused row's columns up to 64 bytes
+    SQLALCHEMY_ENGINE_OPTIONS["hide_parameters"] = True
     
     
     @classmethod
@@ -281,7 +284,7 @@ class TestingConfig(Config):
     SQLALCHEMY_DATABASE_URI = "sqlite:///:memory:"
     # Inherit Config.SQLALCHEMY_ENGINE_OPTIONS when DATABASE_URL is set in the
     # environment (PG CI job) but force in-memory SQLite — pool_* args are invalid.
-    SQLALCHEMY_ENGINE_OPTIONS = {}
+    SQLALCHEMY_ENGINE_OPTIONS = {"hide_parameters": True}
 
 
 # Configuration dictionary

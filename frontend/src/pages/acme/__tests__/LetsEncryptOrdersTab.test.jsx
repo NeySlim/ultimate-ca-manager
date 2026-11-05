@@ -54,6 +54,20 @@ describe('LetsEncryptOrdersTab', () => {
     expect(screen.queryByText('b.example.com')).not.toBeInTheDocument()
   })
 
+  it.each([
+    [{ status: 'issued' }, 1],
+    [{ status: 'valid', certificate_id: 7 }, 1],
+    [{ status: 'valid', error_message: 'refused' }, 1],
+    // Still being imported: a second order here would replace a certificate about to arrive
+    [{ status: 'valid' }, 0],
+    [{ status: 'valid', certificate_id: 7, is_proxy_order: true }, 0],
+    [{ status: 'pending' }, 0],
+  ])('offers Renew on %j: %i', (fields, count) => {
+    const order = { id: 1, primary_domain: 'a.example.com', environment: 'production', ...fields }
+    renderTab({ clientOrders: [order], selectedClientOrder: order, onRenewCertificate: noop })
+    expect(screen.queryAllByText('acme.renew')).toHaveLength(count)
+  })
+
   it('refreshes from the dedicated view', () => {
     const onRefresh = vi.fn()
     renderTab({ onRefresh })

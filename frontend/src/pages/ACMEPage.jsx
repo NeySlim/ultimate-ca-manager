@@ -48,6 +48,8 @@ export default function ACMEPage() {
   const [orders, setOrders] = useState([])
   const [challenges, setChallenges] = useState([])
   const [acmeSettings, setAcmeSettings] = useState({})
+  // Profiles as the server holds them: its template bindings decide what stays offered
+  const [savedProfiles, setSavedProfiles] = useState({})
   const [cas, setCas] = useState([])
   const [history, setHistory] = useState([])
 
@@ -172,6 +174,7 @@ export default function ACMEPage() {
       ])
       setAccounts(accountsRes.data || accountsRes.accounts || [])
       setAcmeSettings(settingsRes.data || settingsRes || {})
+      setSavedProfiles((settingsRes.data || settingsRes || {}).profiles || {})
       setCas(casRes.data || casRes.cas || [])
       setHistory(historyRes.data || [])
       setClientOrders(clientOrdersRes.data || [])
@@ -224,6 +227,7 @@ export default function ACMEPage() {
     setSaving(true)
     try {
       await acmeService.updateSettings(acmeSettings)
+      setSavedProfiles(acmeSettings.profiles || {})
       showSuccess(t('messages.success.update.settings'))
     } catch (error) {
       showError(error.message || t('messages.errors.updateFailed.settings'))
@@ -1258,6 +1262,7 @@ export default function ACMEPage() {
         {activeTab === 'config' && (
           <ConfigTab
             acmeSettings={acmeSettings}
+            savedProfiles={savedProfiles}
             cas={cas}
             templates={templates}
             updateSetting={updateSetting}

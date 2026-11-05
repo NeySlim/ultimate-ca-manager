@@ -18,7 +18,8 @@ import { tsaService, casService } from '../services'
 import { useNotification } from '../contexts'
 import { usePermission, useClipboard } from '../hooks'
 import { ToggleSwitch } from '../components/ui/ToggleSwitch'
-import { pickerCas, unlistedPickerCas } from '../lib/caSelection'
+import { hiddenFromIssuance, listedForIssuance, pickerCas, unlistedPickerCas } from '../lib/caSelection'
+import { HiddenCasToggle } from '../components/cas/HiddenCasToggle'
 import { certificateLabel } from '../lib/utils'
 import { TSA_LABELS, findAlgorithm, groupedOptions, listAlgorithms } from '../lib/keyAlgorithms'
 import { useKeyPlatform } from '../lib/policyAlgorithms'
@@ -46,6 +47,7 @@ export default function TSAPage() {
   const [generateOpen, setGenerateOpen] = useState(false)
   const [generating, setGenerating] = useState(false)
   const [genForm, setGenForm] = useState(null)
+  const [showHiddenCas, setShowHiddenCas] = useState(false)
   const platform = useKeyPlatform()
 
   useEffect(() => {
@@ -95,6 +97,7 @@ export default function TSAPage() {
       validity_days: 397,
       key_type: TSA_LABELS[0],
     })
+    setShowHiddenCas(false)
     setGenerateOpen(true)
   }
 
@@ -372,16 +375,19 @@ export default function TSAPage() {
               loading={generating}
             >
               <p className="text-xs text-text-secondary">{t('tsa.signerGenerateModalDesc')}</p>
-              <Select
-                label={t('tsa.signingCA')}
-                options={pickerCas(cas, genForm.ca_refid).map(ca => ({
-                  value: ca.refid || ca.id.toString(),
-                  label: ca.name || ca.subject,
-                }))}
-                value={genForm.ca_refid}
-                onChange={(val) => setGenForm({ ...genForm, ca_refid: val })}
-                helperText={unlistedPickerCas(cas, genForm.ca_refid) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, genForm.ca_refid) }) : undefined}
-              />
+              <div>
+                <Select
+                  label={t('tsa.signingCA')}
+                  options={listedForIssuance(pickerCas(cas, genForm.ca_refid), showHiddenCas, genForm.ca_refid).map(ca => ({
+                    value: ca.refid || ca.id.toString(),
+                    label: ca.name || ca.subject,
+                  }))}
+                  value={genForm.ca_refid}
+                  onChange={(val) => setGenForm({ ...genForm, ca_refid: val })}
+                  helperText={unlistedPickerCas(cas, genForm.ca_refid) > 0 ? t('cas.notListedForSigning', { count: unlistedPickerCas(cas, genForm.ca_refid) }) : undefined}
+                />
+                <HiddenCasToggle count={hiddenFromIssuance(pickerCas(cas, genForm.ca_refid), genForm.ca_refid)} shown={showHiddenCas} onToggle={() => setShowHiddenCas(v => !v)} />
+              </div>
               <Input
                 label={t('tsa.signerGenerateCn')}
                 value={genForm.cn}

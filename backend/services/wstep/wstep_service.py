@@ -18,6 +18,7 @@ from cryptography.hazmat.primitives.serialization import Encoding
 from cryptography.x509.oid import NameOID
 
 from models import Certificate
+from services.ca.ca_signing import AlreadySuperseded
 from services.ca_service import CAService
 from services.policy_service import PolicyViolation
 from utils.csr_extensions import extensions_of
@@ -122,8 +123,8 @@ def _validate_csr(csr, require_pop=True, allow_naked_subject=False):
       a PKCS#10 CertificationRequest whose own self-signature does not
       reliably verify — proof of possession there comes from the *outer*
       CMS SignedData's signature instead, checked separately by
-      ``_verify_pkcs7_pop`` (only ``issue()`` calls it — see its
-      docstring for why).
+      ``_verify_pkcs7_pop`` (``issue()``). A renewal, already authenticated by
+      the old certificate, takes either proof for a new key (``_new_key_proof``).
     - An empty Subject is accepted when the CSR carries a
       SubjectAlternativeName instead (SAN-only identity is standard
       modern TLS practice).
@@ -178,10 +179,8 @@ def _verify_pkcs7_pop(csr, outer_signed_data):
     certificate the way SCEP's equivalent check does.
 
     Without this, ``issue()``'s UsernamePassword/Kerberos-bound paths
-    (the only ones that call this — ``renew()`` doesn't: a renewal RST is
-    already WS-Security-signed by an existing, UCM-trusted certificate)
-    had no cryptographic proof at all that a PKCS#7-wrapped CSR's
-    submitter controlled the CSR's private key. A holder of the shared
+    (and both renewal paths for a new key) had no cryptographic proof at all
+    that a PKCS#7-wrapped CSR's submitter controlled the CSR's private key. A holder of the shared
     UsernamePassword credential could submit any public key — one they
     don't control — and receive a UCM-issued certificate binding it to
     whatever subject the CSR (or an AD-derived override) requested.
@@ -192,27 +191,38 @@ def _verify_pkcs7_pop(csr, outer_signed_data):
     from services.scep.message_parser import verify_cms_signature
 
     try:
-        signer_infos = outer_signed_data['signer_infos']
+        signer_infos = list(outer_signed_data['signer_infos'])
     except Exception:
         return 'Invalid PKCS#7 envelope'
-    if len(signer_infos) == 0:
+    if not signer_infos:
         return 'PKCS#7 envelope has no signature'
 
-    sid = signer_infos[0]['sid']
-    if sid.name != 'subject_key_identifier':
-        return 'PKCS#7 envelope does not identify itself by the request key'
-
-    csr_pubkey = csr.public_key()
-    expected_ski = x509.SubjectKeyIdentifier.from_public_key(csr_pubkey).digest
     try:
-        actual_ski = sid.chosen.native
+        csr_pubkey = csr.public_key()
     except Exception:
-        return 'Invalid PKCS#7 envelope'
-    if actual_ski != expected_ski:
+        return 'Unsupported CSR public key'
+    expected_ski = x509.SubjectKeyIdentifier.from_public_key(csr_pubkey).digest
+    # A renewal also carries the renewed certificate's SignerInfo, and DER
+    # sorts a SET OF by encoding: the request key's may come in any position
+    signer_info, named_by_key = None, False
+    for candidate in signer_infos:
+        try:
+            sid = candidate['sid']
+            if sid.name != 'subject_key_identifier':
+                continue
+            named_by_key = True
+            if sid.chosen.native == expected_ski:
+                signer_info = candidate
+                break
+        except Exception:
+            return 'Invalid PKCS#7 envelope'
+    if not named_by_key:
+        return 'PKCS#7 envelope does not identify itself by the request key'
+    if signer_info is None:
         return 'PKCS#7 envelope signer does not match the CSR public key'
 
     try:
-        verify_cms_signature(outer_signed_data, csr_pubkey)
+        verify_cms_signature(outer_signed_data, csr_pubkey, signer_info=signer_info)
     except FipsRestricted as e:
         logger.warning("WSTEP: request envelope refused in FIPS mode: %s", e)
         return f'PKCS#7 envelope refused: {e}'
@@ -269,7 +279,8 @@ def _match_template(ca, csr):
     refusal when the request's EKUs match only a template of another key kind
     (ML-DSA or not). A template of the other kind that scores 0 is no match:
     the request falls back to no template, which is safe because the Enroll
-    ACL and pinned fields then fall back to every template of the CA.
+    ACL and pinned fields then fall back to every template of the CA (a CA
+    offering none is refused by the callers).
 
     Callers use the matched row two ways: its policy OID (via
     ``policy_builder._policy_oid_for_template``) for the issued cert's
@@ -289,13 +300,7 @@ def _match_template(ca, csr):
     if not candidates:
         return None, None
 
-    try:
-        csr_eku = {
-            oid.dotted_string
-            for oid in extensions_of(csr).get_extension_for_class(x509.ExtendedKeyUsage).value
-        }
-    except x509.ExtensionNotFound:
-        csr_eku = set()
+    csr_eku = _eku_oids(csr) or set()
 
     # An ML-DSA template only takes an ML-DSA key and the others never do: the
     # match is made among the templates of the request key's kind, and a request
@@ -310,6 +315,84 @@ def _match_template(ca, csr):
         return None, (f"Template '{other.name}' issues {_template_key_label(other)} keys, "
                       f'not {_csr_key_label(csr)}')
     return None, None
+
+
+def _eku_oids(cert_or_csr):
+    """Dotted EKU OIDs, or None without an ExtendedKeyUsage extension."""
+    try:
+        return {oid.dotted_string
+                for oid in extensions_of(cert_or_csr).get_extension_for_class(x509.ExtendedKeyUsage).value}
+    except x509.ExtensionNotFound:
+        return None
+
+
+def _renewal_template(ca, renewed_cert, csr):
+    """``(template, extra_ekus, issued_ekus, refusal)`` for a renewal. As in AD CS, a
+    renewal keeps the template named in the renewed certificate (MS-CRTD
+    certificateTemplate) and issues its EKUs (``issued_ekus`` replaces the CSR's);
+    a request asking for more is refused."""
+    csr_eku = _eku_oids(csr) or set()
+    try:
+        template_oid = renewed_cert.extensions.get_extension_for_class(
+            x509.MSCertificateTemplate).value.template_id.dotted_string
+    except x509.ExtensionNotFound:
+        template_oid = None
+
+    if template_oid is None:
+        # Older certificate without the extension: matched from the request as
+        # on issuance, but never beyond the EKUs it already carries
+        matched, refusal = _match_template(ca, csr)
+        if refusal:
+            return None, [], None, refusal
+        if matched is None and not _ca_templates(ca):
+            return None, [], None, 'This CA offers no certificate template'
+        extra = _template_extra_ekus(matched)
+        prior = _eku_oids(renewed_cert)
+        if prior is None:
+            return matched, extra, None, None
+        if csr_eku - prior:
+            return None, [], None, ('Renewal cannot add Extended Key Usages the certificate '
+                                    'being renewed does not carry')
+        # A broader template is not stamped (the next renewal would inherit its
+        # EKUs): the renewal is then at par with the certificate's own EKUs
+        if set(extra) - prior or not extra:
+            return None, [oid for oid in extra if oid in prior], _issuable_ekus(prior), None
+        return matched, extra, extra, None
+
+    from services.xcep.policy_builder import _policy_oid_for_template
+    template = next((t for t in _ca_templates(ca)
+                     if _policy_oid_for_template(ca, t) == template_oid), None)
+    if template is None:
+        return None, [], None, ('The certificate template of the certificate being renewed '
+                                'is not offered by this CA')
+    if _template_is_mldsa(template) != _csr_key_label(csr).startswith('ML-DSA'):
+        return None, [], None, (f"Template '{template.name}' issues {_template_key_label(template)} "
+                                f'keys, not {_csr_key_label(csr)}')
+    extra = _template_extra_ekus(template)
+    # The request may name what XCEP advertised (capped EKUs included, dropped at
+    # issuance); a template without EKUs keeps the renewal within the old ones
+    allowed = set(_template_configured_ekus(template)) or _eku_oids(renewed_cert)
+    if allowed is not None and csr_eku - allowed:
+        other, _refusal = _match_template(ca, csr)
+        asked = (f"template '{other.name}'" if other is not None and other.id != template.id
+                 else 'other Extended Key Usages')
+        return None, [], None, f"Renewal stays on template '{template.name}'; the request asks for {asked}"
+    return template, extra, extra or None, None
+
+
+def _issuable_ekus(prior):
+    """The EKUs of a renewed certificate a renewal may carry over: valid, never a capped one."""
+    from utils.eku_validation import MAX_EKU_COUNT, PROTOCOL_UNBINDABLE_EKU_OIDS, validate_oid
+    kept = [oid for oid in sorted(prior)
+            if oid not in PROTOCOL_UNBINDABLE_EKU_OIDS and validate_oid(oid) is None]
+    return kept[:MAX_EKU_COUNT] or None
+
+
+def _ca_templates(ca):
+    """Active templates offered by *ca*, as XCEP advertises them."""
+    from models import CertificateTemplate
+    from services.xcep.policy_builder import _resolve_templates_for_ca
+    return _resolve_templates_for_ca(ca, CertificateTemplate.query.filter_by(is_active=True).all())
 
 
 def _best_eku_match(candidates, csr_eku):
@@ -359,8 +442,23 @@ def _template_extra_ekus(template):
     it's exactly the admin intent the cap is designed to still allow.
     Returns ``[]`` for ``None``/an unconfigured template.
     """
-    import json
+    from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS
+    # Same cap as the other protocol endpoints, Smartcard Logon excepted:
+    # issuing it is what WSTEP templates are for (AD-bound identities)
+    capped = PROTOCOL_UNBINDABLE_EKU_OIDS - {'1.3.6.1.4.1.311.20.2.2'}
+    oids = []
+    for oid in _template_configured_ekus(template):
+        if oid in capped:
+            logger.warning('WSTEP: template %s EKU %s is never issued to an enrollee; dropped',
+                           template.id, oid)
+            continue
+        oids.append(oid)
+    return oids
 
+
+def _template_configured_ekus(template):
+    """Every EKU OID ``template`` configures, as XCEP advertises them, before the protocol cap."""
+    import json
 
     if template is None:
         return []
@@ -374,10 +472,7 @@ def _template_extra_ekus(template):
     # One resolver for every spelling (the UI writes msSmartcardLogin, the
     # XCEP policy smartcardLogon): a template that issued correctly on the
     # issue form issues the same purposes over WSTEP
-    from utils.eku_validation import PROTOCOL_UNBINDABLE_EKU_OIDS, normalize_extra_ekus
-    # Same cap as the other protocol endpoints, Smartcard Logon excepted:
-    # issuing it is what WSTEP templates are for (AD-bound identities)
-    capped = PROTOCOL_UNBINDABLE_EKU_OIDS - {'1.3.6.1.4.1.311.20.2.2'}
+    from utils.eku_validation import normalize_extra_ekus
     oids = []
     for name in names:
         if not isinstance(name, str):
@@ -386,10 +481,6 @@ def _template_extra_ekus(template):
         if err or not resolved:
             # An unknown name is dropped, the others still apply
             logger.warning('WSTEP: template %s EKU %r ignored (%s)', template.id, name, err)
-            continue
-        if resolved[0] in capped:
-            logger.warning('WSTEP: template %s EKU %r is never issued to an enrollee; dropped',
-                           template.id, name)
             continue
         if resolved[0] not in oids:
             oids.append(resolved[0])
@@ -745,6 +836,9 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     matched_template, refusal = _match_template(ca, csr)
     if refusal:
         return None, refusal
+    # No active template offered (pins all off, or none active at all): nothing would carry an Enroll ACL
+    if matched_template is None and not _ca_templates(ca):
+        return None, 'This CA offers no certificate template'
     template_oid = None
     if matched_template is not None:
         from services.xcep.policy_builder import _policy_oid_for_template
@@ -815,14 +909,16 @@ def issue(ca, csr_der, validity_days, source='wstep', require_pop=True, kerberos
     return cert_pem, None
 
 
-def renew(ca, csr_der, security_header, csr_element, validity_days, source='wstep', require_pop=True):
+def renew(ca, csr_der, security_header, csr_element, validity_days, source='wstep', require_pop=True,
+          outer_signed_data=None, audit=None):
     """Certificate-bound renewal: the RST is signed with the client's
     current certificate's private key. Returns (cert_pem, error).
 
     ``require_pop`` — see ``issue()``; renewal RSTs can arrive PKCS#7/CMC-
-    wrapped too, and the outer WS-Security signature already authenticates
-    the caller here, so the inner CSR's own self-signature matters even
-    less than it does for the UsernamePassword-bound issue path.
+    wrapped too. The WS-Security signature proves the current key; a new key
+    in a wrapped request proves itself through ``outer_signed_data``.
+
+    ``audit``: a dict that receives ``renewed_serial`` once the certificate is known.
 
     ``csr_element``: see ``rst_parser.ParsedRST.csr_element`` and
     ``ws_security.SignedContent`` for why this must be checked against
@@ -841,26 +937,151 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
     except Exception:
         return None, 'Invalid signing certificate'
 
-    # Serial number and subject are both public, so matching on them alone
-    # (as this used to) lets an attacker forge a self-signed lookalike and
-    # renew under a victim's identity. Require a byte-for-byte match against
-    # a certificate UCM itself issued from this same CA.
+    db_cert, err = _renewable_certificate(ca, signing_cert)
+    _note_renewed_serial(audit, signing_cert, db_cert)
+    if err:
+        return None, err
+
+    csr, err = _load_csr(csr_der)
+    if err:
+        return None, err
+    if not require_pop:
+        err = _new_key_proof(csr, signing_cert, outer_signed_data)
+        if err:
+            return None, err
+    return _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop)
+
+
+def _new_key_proof(csr, renewed_cert, outer_signed_data):
+    """None when the CSR keeps the renewed key, or the new key proves itself by the
+    CSR's self-signature or a SignerInfo of its own. Key policy first."""
+    err = _validate_csr(csr, require_pop=False)
+    if err:
+        return err
+    try:
+        same_key = csr.public_key() == renewed_cert.public_key()
+    except Exception:
+        return 'Unsupported public key'
+    if same_key:
+        return None
+    try:
+        if csr.is_signature_valid:
+            return None
+    except Exception:
+        pass
+    if outer_signed_data is None:
+        return 'Renewal with a new key requires its proof of possession'
+    return _verify_pkcs7_pop(csr, outer_signed_data)
+
+
+def renew_with_client_certificate(ca, client_cert_pem, csr_der, outer_signed_data, validity_days,
+                                  source='wstep', audit=None):
+    """Renewal on the Certificate binding as Windows sends it: authenticated by the
+    TLS client certificate, which must also sign the CMS request (MS-WSTEP, RFC 5272).
+    Returns (cert_pem, error); ``audit`` as in ``renew()``."""
+    if not client_cert_pem:
+        return None, 'Renewal requires the certificate being renewed as TLS client certificate'
+    try:
+        client_cert = x509.load_pem_x509_certificate(
+            client_cert_pem.encode() if isinstance(client_cert_pem, str) else client_cert_pem)
+    except Exception:
+        return None, 'Invalid client certificate'
+
+    db_cert, err = _renewable_certificate(ca, client_cert)
+    _note_renewed_serial(audit, client_cert, db_cert)
+    if err:
+        return None, err
+
+    if outer_signed_data is None:
+        return None, 'Renewal request is not signed by the certificate being renewed'
+    err = _verify_renewal_signer(outer_signed_data, client_cert)
+    if err:
+        return None, err
+
+    csr, err = _load_csr(csr_der)
+    if err:
+        return None, err
+    # A new key proves itself with its own SignerInfo; the same key is proven above
+    err = _new_key_proof(csr, client_cert, outer_signed_data)
+    if err:
+        return None, err
+    return _sign_renewal(ca, client_cert, db_cert, csr, validity_days, source, require_pop=False)
+
+
+def _verify_renewal_signer(outer_signed_data, cert):
+    """None when a SignerInfo naming ``cert`` (issuer and serial, or key
+    identifier) verifies with its key, else an error string."""
+    from asn1crypto import x509 as asn1_x509
+
+    from fips_mode import FipsRestricted
+    from services.scep.message_parser import verify_cms_signature
+
+    cert_der = cert.public_bytes(Encoding.DER)
+    issuer = asn1_x509.Certificate.load(cert_der).issuer.dump()
+    try:
+        key_ids = {x509.SubjectKeyIdentifier.from_public_key(cert.public_key()).digest}
+    except Exception:
+        return 'Unsupported public key'
+    try:
+        key_ids.add(cert.extensions.get_extension_for_class(x509.SubjectKeyIdentifier).value.digest)
+    except x509.ExtensionNotFound:
+        pass
+
+    try:
+        signer_infos = list(outer_signed_data['signer_infos'])
+    except Exception:
+        return 'Invalid PKCS#7 envelope'
+    for signer_info in signer_infos:
+        try:
+            sid = signer_info['sid']
+            if sid.name == 'issuer_and_serial_number':
+                names_cert = (sid.chosen['issuer'].dump() == issuer
+                              and sid.chosen['serial_number'].native == cert.serial_number)
+            else:
+                names_cert = sid.chosen.native in key_ids
+        except Exception:
+            return 'Invalid PKCS#7 envelope'
+        if not names_cert:
+            continue
+        try:
+            verify_cms_signature(outer_signed_data, cert, signer_info=signer_info)
+        except FipsRestricted as e:
+            logger.warning("WSTEP: renewal envelope refused in FIPS mode: %s", e)
+            return f'PKCS#7 envelope refused: {e}'
+        except Exception as e:
+            logger.warning("WSTEP: renewal envelope signature check failed: %s", e)
+            return 'Renewal request signature invalid (proof of possession failed)'
+        return None
+    return 'Renewal request is not signed by the certificate being renewed'
+
+
+def _note_renewed_serial(audit, cert, row):
+    """Records the serial once a row holds ``cert`` byte for byte, its key proven by the
+    XML signature or the TLS handshake: a lookalike naming a public serial is never audited."""
+    if audit is not None and row is not None:
+        audit['renewed_serial'] = cert.serial_number
+
+
+def _renewable_certificate(ca, cert):
+    """(row, None) when ``cert`` is, byte for byte, a certificate this CA issued
+    and still holds; (row or None, error) otherwise. Serial and subject are
+    public, so a self-signed lookalike must not pass."""
     from services.cert.issued_lookup import (
         OK, REVOKED, EXPIRED, NOT_YET_VALID, SUPERSEDED, issued_certificate_status,
     )
-    db_cert, status = issued_certificate_status(ca, signing_cert)
+    db_cert, status = issued_certificate_status(ca, cert)
     if status != OK:
-        return None, {
+        return db_cert, {
             REVOKED: 'Signing certificate has been revoked',
             EXPIRED: 'Signing certificate has expired',
             NOT_YET_VALID: 'Signing certificate is not yet valid',
             SUPERSEDED: 'Signing certificate has been superseded by a newer one',
         }.get(status, 'Signing certificate is not recognized')
+    return db_cert, None
 
-    csr, err = _load_csr(csr_der)
-    if err:
-        return None, err
 
+def _sign_renewal(ca, signing_cert, db_cert, csr, validity_days, source, require_pop):
+    """Issue the renewal once the caller has authenticated ``signing_cert``."""
     err = _validate_csr(csr, require_pop=require_pop)
     if err:
         return None, err
@@ -870,7 +1091,7 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
     if not _san_matches(signing_cert, csr):
         return None, 'CSR SubjectAltName does not match signing certificate'
 
-    matched_template, refusal = _match_template(ca, csr)
+    matched_template, extra_ekus, issued_ekus, refusal = _renewal_template(ca, signing_cert, csr)
     if refusal:
         return None, refusal
     template_oid = None
@@ -885,9 +1106,12 @@ def renew(ca, csr_der, security_header, csr_element, validity_days, source='wste
             supersedes=db_cert,
             ms_certificate_template_oid=template_oid,
             # See issue()'s matching kwarg for why.
-            extra_ekus=_template_extra_ekus(matched_template),
+            extra_ekus=extra_ekus,
+            template_ekus=issued_ekus,
             policy_template_id=getattr(matched_template, 'id', None),
         )
+    except AlreadySuperseded:
+        return None, 'Signing certificate has been superseded by a newer one'
     except PolicyViolation as e:
         logger.warning('WSTEP renew refused by policy: %s', e)
         return None, f'Policy violation: {e}'

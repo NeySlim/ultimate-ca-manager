@@ -473,21 +473,16 @@ def verify_challenges(order_id):
             # Check if LE has already validated (poll order status)
             try:
                 le_status, _ = client.check_order_status(order)
-                if le_status in ['ready', 'valid']:
-                    order.status = le_status
-                else:
-                    order.status = 'validating'
+                new_status = le_status if le_status in ['ready', 'valid'] else 'validating'
             except Exception:
-                order.status = 'validating'
+                new_status = 'validating'
+            AcmeClientService.write_order_status(order, new_status)
         elif any_failed:
             invalid_hit = any(
                 AUTHZ_INVALID_USER_MSG in (r.get('message') or '')
                 for r in results.values() if not r.get('success')
             )
-            if invalid_hit:
-                order.status = 'invalid'
-            else:
-                order.status = 'pending'
+            AcmeClientService.write_order_status(order, 'invalid' if invalid_hit else 'pending')
             order.error_message = '; '.join(
                 f"{d}: {r['message']}" for d, r in results.items() if not r['success']
             )
@@ -673,8 +668,8 @@ def _auto_poll_and_finalize(client, order) -> dict:
     def _set_status(status, error_message=None):
         """Persist a status transition on the order (best-effort)."""
         try:
-            order.status = status
-            if error_message is not None:
+            written = AcmeClientService.write_order_status(order, status)
+            if written and error_message is not None:
                 order.error_message = error_message
             db.session.commit()
         except Exception as e:
@@ -777,7 +772,8 @@ def _auto_poll_and_finalize(client, order) -> dict:
                 else:
                     result['error'] = fin_msg
                     logger.warning(f'Auto-finalize failed: {fin_msg}')
-                    _set_status('pending', fin_msg)
+                    # What the CA last said stays: only a valid order can be renewed
+                    _set_status(order.status if order.status in ('valid', 'invalid') else 'pending', fin_msg)
                 break
 
             if le_status == 'invalid':

@@ -5,12 +5,15 @@ Factory pattern for provider instantiation and database operations.
 
 from typing import Dict, List, Optional, Any, Type
 from datetime import datetime
+from pathlib import Path
 import json
 import logging
 
 from cryptography.hazmat.primitives import serialization
+from sqlalchemy import or_
 
 import fips_mode
+from config.settings import Config
 from models import db
 from models.hsm import HsmProvider, HsmKey
 from services import compliance_signer
@@ -21,9 +24,13 @@ from services.hsm.base_provider import (
 )
 from utils import key_algorithms
 from utils.datetime_utils import utc_now
+from utils.process_lock import LockBusyError, process_lock
 from utils import hsm_check, pkcs11_config
 
 logger = logging.getLogger(__name__)
+
+# Seconds a key generation waits for another on the same provider (RSA-4096 on a device is slow)
+GENERATE_LOCK_TIMEOUT = 60
 
 
 
@@ -436,41 +443,71 @@ class HsmService:
         key_type = 'symmetric' if algorithm.startswith('AES') else 'asymmetric'
         
         try:
-            # Generate key in HSM
-            hsm = cls._get_provider_instance(provider)
-            with hsm:
-                key_info = hsm.generate_key(
-                    label=label,
-                    algorithm=algorithm,
-                    purpose=purpose,
-                    extractable=extractable
-                )
-            
-            # Save to database
-            key = HsmKey(
-                provider_id=provider_id,
-                key_identifier=key_info.key_identifier,
-                label=key_info.label,
-                algorithm=key_info.algorithm,
-                key_type=key_info.key_type,
-                purpose=key_info.purpose,
-                public_key_pem=key_info.public_key_pem,
-                is_extractable=key_info.is_extractable,
-                extra_data=json.dumps(key_info.metadata) if key_info.metadata else None
-            )
-            
-            db.session.add(key)
+            # A request queued behind another must not hold a database connection while it waits
             db.session.commit()
-            
+            # Providers check a name, then create it: one generation at a time per provider,
+            # or two requests both find the name free (one instance; Key Vault cannot do better)
+            with process_lock(Path(Config.DATA_DIR) / f'.ucm_hsm_generate_{provider_id}.lock',
+                              timeout=GENERATE_LOCK_TIMEOUT, purpose='generating an HSM key',
+                              subject='HSM key generation'):
+                hsm = cls._get_provider_instance(provider)
+                with hsm:
+                    key_info = hsm.generate_key(
+                        label=label,
+                        algorithm=algorithm,
+                        purpose=purpose,
+                        extractable=extractable
+                    )
+
+                # Save to database
+                key = HsmKey(
+                    provider_id=provider_id,
+                    key_identifier=key_info.key_identifier,
+                    label=key_info.label,
+                    algorithm=key_info.algorithm,
+                    key_type=key_info.key_type,
+                    purpose=key_info.purpose,
+                    public_key_pem=key_info.public_key_pem,
+                    is_extractable=key_info.is_extractable,
+                    extra_data=json.dumps(key_info.metadata) if key_info.metadata else None
+                )
+
+                try:
+                    db.session.add(key)
+                    db.session.commit()
+                except Exception:
+                    cls._drop_unrecorded_key(provider, key_info)
+                    raise
+
             logger.info(f"Generated HSM key: {label} ({algorithm}) in {provider.name}")
             return key
-            
-        except HsmError:
+
+        except (HsmError, LockBusyError):
             raise
         except Exception as e:
             logger.exception(f"Failed to generate HSM key: {label}")
             raise HsmOperationError(f"Failed to generate key: {str(e)}")
     
+    @classmethod
+    def _drop_unrecorded_key(cls, provider, key_info) -> None:
+        """A key whose row could not be stored leaves the HSM, unless a row holds its name:
+        deleting by name would then take someone else's key (Azure ids differ by version)."""
+        try:
+            db.session.rollback()
+            held = HsmKey.query.filter(
+                HsmKey.provider_id == provider.id,
+                or_(HsmKey.key_identifier == key_info.key_identifier, HsmKey.label == key_info.label),
+            ).first()
+            if held:
+                logger.warning("HSM key %s has no row of its own, kept: another row holds its name",
+                               key_info.key_identifier)
+                return
+            with cls._get_provider_instance(provider) as hsm:
+                hsm.delete_key(key_info.key_identifier)
+        except Exception:
+            logger.warning("HSM key %s was not recorded and could not be deleted",
+                           key_info.key_identifier, exc_info=True)
+
     @classmethod
     def delete_key(cls, key_id: int) -> bool:
         """

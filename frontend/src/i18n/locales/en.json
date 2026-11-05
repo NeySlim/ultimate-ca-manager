@@ -1082,7 +1082,17 @@
     "restorePasswordHint": "The password used when the CA was taken offline.",
     "namedUrls": "Use CA name in protocol URLs",
     "namedUrlsHint": "CDP/OCSP/AIA paths use a slug from the CA name instead of the random id. Easier to configure manually; reveals the CA name in URLs. Can also be enabled later; once enabled it cannot be undone.",
-    "revocationApprovalRequired": "CA revocation submitted for approval (policy: {{policy}})"
+    "revocationApprovalRequired": "CA revocation submitted for approval (policy: {{policy}})",
+    "issuancePickers": "Issuance pickers",
+    "issuanceListedState": "Listed",
+    "issuanceHiddenState": "Hidden, shown on request",
+    "hideFromIssuance": "Hide from issuance",
+    "showInIssuance": "List for issuance",
+    "issuanceVisibilityChanged": "Issuance pickers updated",
+    "issuanceVisibilityChangeFailed": "Could not update the issuance pickers",
+    "showHiddenCas_one": "Show {{count}} hidden CA",
+    "showHiddenCas_other": "Show {{count}} hidden CAs",
+    "hideHiddenCas": "Hide the hidden CAs"
   },
   "csrs": {
     "uploadCSR": "Upload CSR",
@@ -1314,7 +1324,11 @@
       "addPds": "Add a disclosure statement",
       "policyOids": "Certificate policy OIDs",
       "policyOidsHint": "Dotted OIDs, one per line, added after the CA's own policy. The buttons add the ETSI QCP policies."
-    }
+    },
+    "activate": "Activate",
+    "activated": "Template activated",
+    "deactivated": "Template deactivated",
+    "deactivateTooltip": "A deactivated template is not offered by the Issue Certificate form nor to Windows autoenrollment. System templates can be deactivated, not edited: duplicate one to change it."
   },
   "users": {
     "securityKeys": {
@@ -3568,7 +3582,7 @@
     "generateHsmKey": "Generate HSM Key",
     "keyLabel": "Key Label",
     "keyLabelPlaceholder": "my-signing-key",
-    "mldsaUntestedGoogleKms": "ML-DSA on Google Cloud KMS follows the KMS API but has not been tested against the service yet.",
+    "mldsaUntestedGoogleKms": "ML-DSA on Google Cloud KMS follows the KMS API but has not been tested against the service yet. KMS signs at most 64 KiB, so a larger CRL needs another provider.",
     "purposes": {
       "general": "General Purpose",
       "caSigning": "CA Signing"
@@ -5510,7 +5524,9 @@
       "keySizeLabel": "Key Size (RSA only)",
       "principalsHelperText": "Comma-separated list of allowed principals",
       "allowAnyPrincipal": "Allow any principal",
-      "allowAnyPrincipalHelp": "When no principal is listed, sign for any name, root included. Without it, a CA with an empty list signs nothing."
+      "allowAnyPrincipalHelp": "When no principal is listed, sign for any name, root included. Without it, a CA with an empty list signs nothing.",
+      "allowCustomKeyId": "Let requesters set the key ID",
+      "allowCustomKeyIdHelp": "sshd logs the key ID as the holder's identity. Without this, the CA names every certificate principals@CA name."
     },
     "searchPlaceholder": "Search SSH CAs...",
     "quickInstall": "Quick Install",
@@ -5526,7 +5542,9 @@
     "downloadSetupScriptLinux": "Download .sh (Linux/macOS)",
     "downloadSetupScriptWindows": "Download .ps1 (Windows)",
     "anyPrincipal": "Any principal",
-    "noPrincipalSignsNothing": "No principal listed: this CA signs nothing"
+    "noPrincipalSignsNothing": "No principal listed: this CA signs nothing",
+    "keyIdSetByCa": "Key ID set by the CA: principals@CA name",
+    "keyIdChosenByRequester": "Key ID chosen by the requester"
   },
   "sshCertificates": {
     "title": "SSH Certificates",
@@ -5591,6 +5609,8 @@
     },
     "modal": {
       "keyIdPlaceholder": "e.g. user@hostname",
+      "keyIdSetByCa": "Set by the CA: {{keyId}}",
+      "keyIdSetByCaPending": "Set by the CA from the principals: principals@CA name",
       "publicKeyPlaceholder": "Paste OpenSSH public key (ssh-ed25519 AAAA...)",
       "principalsPlaceholder": "e.g. root,admin,deploy (comma-separated)"
     },

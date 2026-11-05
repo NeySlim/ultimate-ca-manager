@@ -52,6 +52,14 @@ export default {
           { label: 'Upgrade', text: 'Vor 2.245 erstellte CAs ohne Liste signieren weiterhin für jeden Principal: Das Upgrade aktiviert die Option für sie.' },
         ]
       },
+      {
+        title: 'Key ID',
+        items: [
+          { label: 'Von der CA festgelegt', text: 'sshd protokolliert die Key ID als Identität des Inhabers. Standardmäßig benennt die CA jedes Zertifikat principals@CA-Name, eine Anfrage mit anderer Key ID wird abgelehnt.' },
+          { label: 'Anfragenden die Wahl der Schlüssel-ID erlauben', text: 'Aktivieren Sie die Option, damit Anfragende eine eigene wählen dürfen, z. B. eine Ticket- oder Personalnummer.' },
+          { label: 'Upgrade', text: 'Ab 2.249 starten auch bestehende CAs mit deaktivierter Option.' },
+        ]
+      },
     ],
     tips: [
       'Verwenden Sie getrennte CAs für Benutzer- und Host-Zertifikate: mischen Sie diese niemals.',
@@ -110,6 +118,10 @@ Eine Host CA signiert Zertifikate, die **Server gegenüber Clients** authentifiz
 Das Feld **Erlaubte Principals** beschränkt die Namen, für die eine CA signiert, als kommagetrennte Muster (\`deploy\`, \`team-*\`, \`web??.example.com\`). Jeder Principal einer Anfrage muss auf eines davon passen.
 
 Eine CA mit leerer Liste signiert nichts, es sei denn, **Beliebigen Principal erlauben** ist aktiviert: Dann signiert sie für jeden Namen, \`root\` eingeschlossen. Vor 2.245 erstellte CAs ohne Liste verhielten sich implizit so; das Upgrade aktiviert die Option für sie, damit sie weiter funktionieren.
+
+### Key ID
+
+sshd protokolliert die Key ID eines Zertifikats als Identität des Inhabers. Die CA legt sie als \`principals@CA-Name\` fest und lehnt eine Anfrage mit anderer Key ID ab, es sei denn, **Anfragenden die Wahl der Schlüssel-ID erlauben** ist aktiviert. Die Option ist für jede CA deaktiviert, auch für bestehende seit 2.249.
 
 ### TTL-Formate
 

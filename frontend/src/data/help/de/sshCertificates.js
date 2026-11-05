@@ -14,7 +14,7 @@ export default {
       {
         title: 'Zertifikatsfelder',
         items: [
-          { label: 'Key ID', text: 'Eindeutiger Bezeichner des Zertifikats. Erscheint in den SSH-Protokollen zur Auditierung.' },
+          { label: 'Key ID', text: 'Bezeichner, den sshd für den Inhaber protokolliert. Die CA legt ihn als principals@CA-Name fest, sofern sie Anfragenden nicht die Wahl lässt.' },
           { label: 'Principals', text: 'Benutzernamen (Benutzerzertifikat) oder Hostnamen (Host-Zertifikat), für die dieses Zertifikat gültig ist. Kommagetrennt.' },
           { label: 'Gültigkeit', text: 'Lebensdauer des Zertifikats. Wählen Sie eine Vorgabe (1h, 8h, 24h, 7d, 30d, 90d, 365d) oder legen Sie benutzerdefinierte Sekunden fest.' },
           { label: 'Extensions', text: 'SSH-Erweiterungen wie permit-pty, permit-agent-forwarding. Nur für Benutzerzertifikate anwendbar.' },
@@ -39,7 +39,7 @@ export default {
     tips: [
       'Verwenden Sie kurzlebige Zertifikate (8h–24h) für Benutzerzugang, um die Auswirkungen einer Schlüsselkompromittierung zu minimieren.',
       'Der Signaturmodus ist vorzuziehen: der private Schlüssel des Benutzers verlässt nie dessen Gerät.',
-      'Key IDs sollten aussagekräftig sein (z. B. „jdoe-prod-2025") für einfache Protokollauswertung.',
+      'Wo eine CA Anfragenden die Wahl der Key ID lässt, sollte sie aussagekräftig sein (z. B. „jdoe-prod-2025") für einfache Protokollauswertung.',
       'Bei Host-Zertifikaten muss der Principal mit dem Hostnamen übereinstimmen, den Clients zur Verbindung verwenden.',
     ],
     warnings: [
@@ -94,9 +94,11 @@ UCM generiert sowohl das Schlüsselpaar als auch das Zertifikat. Verwenden Sie d
 ## Zertifikatsfelder
 
 ### Key ID
-Ein eindeutiger Bezeichner, der in das Zertifikat eingebettet ist. Er erscheint in den Protokollen des SSH-Servers bei Verwendung des Zertifikats und ist daher unverzichtbar für die Auditierung.
+Ein in das Zertifikat eingebetteter Bezeichner. Der SSH-Server protokolliert ihn bei Verwendung des Zertifikats als Identität des Inhabers.
 
-**Gute Key IDs:** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
+Die CA legt ihn als \`principals@CA-Name\` fest (z. B. \`deploy@Production User CA\`). Eine andere Key ID dürfen Anfragende nur bei einer CA wählen, bei der **Anfragenden die Wahl der Schlüssel-ID erlauben** aktiviert ist; sonst wird die Anfrage abgelehnt.
+
+**Gute Key IDs, wo erlaubt:** \`jdoe-prod-2025\`, \`webserver-01\`, \`deploy-ci-pipeline\`
 
 ### Principals
 Principals definieren, **wer** (Benutzerzertifikate) oder **was** (Host-Zertifikate) durch das Zertifikat autorisiert wird:

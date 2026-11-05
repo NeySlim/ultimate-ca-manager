@@ -579,6 +579,7 @@ class TestEnrollAcl:
             lambda auth_header, connection_key: _authenticated_result(),
         )
         monkeypatch.setattr(ad_lookup, 'is_member_of_group', lambda sam_account_name, group: False)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
 
         try:
             csr, _key = _make_csr()
@@ -587,6 +588,35 @@ class TestEnrollAcl:
                 headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
             )
             assert r.status_code == 400
+            assert b'Requester is not authorized to enroll against this template' in r.data, r.data
+        finally:
+            _clear_acl_template(app)
+
+    def test_pinned_template_deactivated_refuses_instead_of_skipping_the_acl(self, client, app, wstep_kerberos_config, monkeypatch):
+        """The CA's only pinned template switched off: it offers nothing, so no
+        request slips through without a template and its Enroll ACL."""
+        _configure_ad_connector(app)
+        _configure_acl_template(app, 'VPN-Enroll', wstep_kerberos_config['id'])
+        with app.app_context():
+            CertificateTemplate.query.filter_by(name='Test Enroll ACL Template').update({'is_active': False})
+            db.session.commit()
+        monkeypatch.setattr(negotiate_auth, 'is_library_available', lambda: True)
+        monkeypatch.setattr(negotiate_auth, 'is_configured', lambda: True)
+        monkeypatch.setattr(
+            negotiate_auth, 'authenticate_negotiate',
+            lambda auth_header, connection_key: _authenticated_result(),
+        )
+        monkeypatch.setattr(ad_lookup, 'is_member_of_group', lambda sam_account_name, group: False)
+        monkeypatch.setattr(ad_lookup, 'lookup_object_sid', lambda sam_account_name: 'S-1-5-21-1-2-3-1000')
+
+        try:
+            csr, _key = _make_csr()
+            r = client.post(
+                ISSUE_URL, data=_build_rst(csr),
+                headers={'Authorization': 'Negotiate dG9rZW4=', 'Content-Type': 'application/soap+xml'},
+            )
+            assert r.status_code == 400
+            assert b'This CA offers no certificate template' in r.data, r.data
         finally:
             _clear_acl_template(app)
 

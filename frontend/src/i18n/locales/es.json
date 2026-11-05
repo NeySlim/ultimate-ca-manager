@@ -1082,7 +1082,17 @@
     "restorePasswordHint": "La contraseña utilizada al poner la CA fuera de línea.",
     "namedUrls": "Usar el nombre de la CA en las URLs de protocolo",
     "namedUrlsHint": "Las rutas CDP/OCSP/AIA usan un slug derivado del nombre de la CA en lugar del id aleatorio. Más fácil de configurar manualmente; revela el nombre de la CA en las URLs. También puede activarse más tarde; una vez activado, es irreversible.",
-    "revocationApprovalRequired": "Revocación de la CA enviada para aprobación (política: {{policy}})"
+    "revocationApprovalRequired": "Revocación de la CA enviada para aprobación (política: {{policy}})",
+    "issuancePickers": "Listas de emisión",
+    "issuanceListedState": "En la lista",
+    "issuanceHiddenState": "Oculta, se muestra a petición",
+    "hideFromIssuance": "Ocultar de la emisión",
+    "showInIssuance": "Incluir en la emisión",
+    "issuanceVisibilityChanged": "Listas de emisión actualizadas",
+    "issuanceVisibilityChangeFailed": "No se pudieron actualizar las listas de emisión",
+    "showHiddenCas_one": "Mostrar {{count}} CA oculta",
+    "showHiddenCas_other": "Mostrar {{count}} CAs ocultas",
+    "hideHiddenCas": "Ocultar las CAs ocultas"
   },
   "csrs": {
     "uploadCSR": "Subir CSR",
@@ -1314,7 +1324,11 @@
       "addPds": "Añadir una declaración de divulgación",
       "policyOids": "OID de política de certificado",
       "policyOidsHint": "OID con puntos, uno por línea, añadidos después de la política propia de la CA. Los botones añaden las políticas ETSI QCP."
-    }
+    },
+    "activate": "Activar",
+    "activated": "Plantilla activada",
+    "deactivated": "Plantilla desactivada",
+    "deactivateTooltip": "Una plantilla desactivada no se ofrece en el formulario Emitir certificado ni a la autoinscripción de Windows. Las plantillas del sistema se pueden desactivar, no editar: duplique una para modificarla."
   },
   "users": {
     "securityKeys": {
@@ -3566,7 +3580,7 @@
     "generateHsmKey": "Generar HSM Clave",
     "keyLabel": "Clave Label",
     "keyLabelPlaceholder": "my-signing-clave",
-    "mldsaUntestedGoogleKms": "ML-DSA en Google Cloud KMS sigue la API de KMS, pero aún no se ha probado con el servicio.",
+    "mldsaUntestedGoogleKms": "ML-DSA en Google Cloud KMS sigue la API de KMS, pero aún no se ha probado con el servicio. KMS firma como máximo 64 KiB, por lo que una CRL mayor necesita otro proveedor.",
     "purposes": {
       "general": "Propósito general",
       "caSigning": "Firma de CA"
@@ -5506,7 +5520,9 @@
       "keySizeLabel": "Tamaño de clave (solo RSA)",
       "principalsHelperText": "Lista de principals permitidos separados por comas",
       "allowAnyPrincipal": "Permitir cualquier principal",
-      "allowAnyPrincipalHelp": "Si no hay ningún principal en la lista, firmar para cualquier nombre, incluido root. Sin esta opción, una CA con la lista vacía no firma nada."
+      "allowAnyPrincipalHelp": "Si no hay ningún principal en la lista, firmar para cualquier nombre, incluido root. Sin esta opción, una CA con la lista vacía no firma nada.",
+      "allowCustomKeyId": "Permitir que los solicitantes definan el ID de clave",
+      "allowCustomKeyIdHelp": "sshd registra el ID de clave como identidad del titular. Sin esta opción, la CA nombra cada certificado principals@nombre de la CA."
     },
     "searchPlaceholder": "Buscar CAs SSH...",
     "downloadSetupScript": "Descargar script de configuración",
@@ -5524,7 +5540,9 @@
     "downloadSetupScriptLinux": "Descargar .sh (Linux/macOS)",
     "downloadSetupScriptWindows": "Descargar .ps1 (Windows)",
     "anyPrincipal": "Cualquier principal",
-    "noPrincipalSignsNothing": "Ningún principal en la lista: esta CA no firma nada"
+    "noPrincipalSignsNothing": "Ningún principal en la lista: esta CA no firma nada",
+    "keyIdSetByCa": "ID de clave definido por la CA: principals@nombre de la CA",
+    "keyIdChosenByRequester": "ID de clave elegido por el solicitante"
   },
   "sshCertificates": {
     "title": "Certificados SSH",
@@ -5589,6 +5607,8 @@
     },
     "modal": {
       "keyIdPlaceholder": "ej. usuario@hostname",
+      "keyIdSetByCa": "Definido por la CA: {{keyId}}",
+      "keyIdSetByCaPending": "Definido por la CA a partir de los principals: principals@nombre de la CA",
       "publicKeyPlaceholder": "Pegue la clave pública OpenSSH (ssh-ed25519 AAAA...)",
       "principalsPlaceholder": "ej. root,admin,deploy (separados por comas)"
     },

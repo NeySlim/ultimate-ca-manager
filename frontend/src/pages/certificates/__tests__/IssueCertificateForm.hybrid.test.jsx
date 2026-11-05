@@ -101,7 +101,8 @@ describe('IssueCertificateForm hybrid pair', () => {
 
   it('keeps each list to what the policies allow', async () => {
     renderForm({ allowed_key_types: ['EC-P384', 'ML-DSA-87', 'RSA-2048'], allowed_digests: null })
-    await waitFor(() => expect(optionValues('common.keyType')).toContain('ml-dsa'))
+    // The unrestricted lists already offer ml-dsa: wait for the policy itself
+    await waitFor(() => expect(optionValues('common.keySize')).toEqual(['2048']))
     fireEvent.click(screen.getByLabelText('certificates.hybrid.toggle'))
     expect(optionValues('certificates.hybrid.classical')).toEqual(
       CLASSICAL_LABELS.filter(l => ['EC-P384', 'RSA-2048'].includes(l)))

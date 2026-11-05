@@ -69,7 +69,8 @@ def find_issued_row(ca: CA, cert: x509.Certificate) -> Optional[Certificate]:
 
 
 def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[Certificate], str]:
-    """``(row, status)`` with status one of OK, UNKNOWN, REVOKED, EXPIRED.
+    """``(row, status)`` with status one of OK, UNKNOWN, REVOKED, EXPIRED,
+    NOT_YET_VALID, SUPERSEDED.
 
     A certificate revoked and then deleted keeps its persistent revocation
     record, and answers REVOKED rather than UNKNOWN."""
@@ -89,6 +90,8 @@ def issued_certificate_status(ca: CA, cert: x509.Certificate) -> Tuple[Optional[
         # Replaced by a renewal: the holder presents the newer certificate,
         # the replaced one must not go on producing certificates
         return row, SUPERSEDED
+    # A restored duplicate may sit beside the archived original: the live row answers
+    row = next(r for r in rows if not r.archived)
     now = utc_now()
     if cert.not_valid_before_utc.replace(tzinfo=None) > now:
         return row, NOT_YET_VALID

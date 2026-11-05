@@ -63,7 +63,7 @@ logger = logging.getLogger(__name__)
 
 
 from utils.x509_aki import authority_key_identifier_from_issuer
-from services.cert.issued_lookup import find_issued_row, san_identity_matches
+from services.cert.issued_lookup import find_issued_rows, san_identity_matches
 from utils.signing_hash import rsa_padding_for
 
 
@@ -1243,6 +1243,11 @@ class SCEPService:
             raise ValueError("CA is revoked and can no longer sign")
         from utils.ca_signing_window import check_issuer_window
         check_issuer_window(self.ca_cert)
+        if renewal_of is not None:
+            # A manual approval may come after the renewed certificate was revoked
+            from services.cert.issued_lookup import REVOKED, issued_certificate_status
+            if issued_certificate_status(self.ca, renewal_of)[1] == REVOKED:
+                raise ValueError('Signing certificate has been revoked')
 
         # Re-checked here: a manual approval may come after the policies changed
         from services.policy_service import PolicyViolation
@@ -1619,11 +1624,13 @@ class SCEPService:
         )
         db.session.add(cert_obj)
         if renewal_of is not None:
-            # Archive the renewed row in the same transaction so it is not
-            # renewed in place again by the scheduler with the old key
-            renewed_row = find_issued_row(self.ca, renewal_of)
-            if renewed_row is not None:
-                renewed_row.archived = True
+            # Archived in the same transaction, and claimed once: the scheduler
+            # does not renew it again, nor does a concurrent renewal
+            from services.ca.ca_signing import _claim_superseded
+            rows = find_issued_rows(self.ca, renewal_of)
+            live = next((r for r in rows if not r.archived), None)
+            if rows and (live is None or not _claim_superseded(live)):
+                raise ValueError('Signing certificate has been superseded by a newer one')
 
         Config.CERT_DIR.mkdir(parents=True, exist_ok=True)
         with open(cert_cert_path(cert_obj), "wb") as f:

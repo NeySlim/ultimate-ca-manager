@@ -1082,7 +1082,17 @@
     "restorePasswordHint": "将 CA 设为离线时使用的密码。",
     "namedUrls": "在协议URL中使用CA名称",
     "namedUrlsHint": "CDP/OCSP/AIA 路径使用由 CA 名称生成的短标识替代随机 ID。便于手动配置;但会在 URL 中暴露 CA 名称。也可以稍后启用;一旦启用便无法撤销。",
-    "revocationApprovalRequired": "CA 吊销已提交审批（策略：{{policy}}）"
+    "revocationApprovalRequired": "CA 吊销已提交审批（策略：{{policy}}）",
+    "issuancePickers": "签发选择器",
+    "issuanceListedState": "已列出",
+    "issuanceHiddenState": "已隐藏，按需显示",
+    "hideFromIssuance": "从签发中隐藏",
+    "showInIssuance": "列入签发",
+    "issuanceVisibilityChanged": "签发选择器已更新",
+    "issuanceVisibilityChangeFailed": "无法更新签发选择器",
+    "showHiddenCas_one": "显示 {{count}} 个已隐藏的 CA",
+    "showHiddenCas_other": "显示 {{count}} 个已隐藏的 CA",
+    "hideHiddenCas": "隐藏已隐藏的 CA"
   },
   "csrs": {
     "uploadCSR": "上传CSR",
@@ -1314,7 +1324,11 @@
       "addPds": "添加披露声明",
       "policyOids": "证书策略 OID",
       "policyOidsHint": "点分 OID，每行一个，添加在 CA 自身策略之后。按钮用于添加 ETSI QCP 策略。"
-    }
+    },
+    "activate": "激活",
+    "activated": "模板已激活",
+    "deactivated": "模板已停用",
+    "deactivateTooltip": "已停用的模板不会出现在签发证书表单中，也不会提供给 Windows 自动注册。系统模板可以停用，但不能编辑：请复制一份来修改。"
   },
   "users": {
     "securityKeys": {
@@ -3566,7 +3580,7 @@
     "generateHsmKey": "生成 HSM 密钥",
     "keyLabel": "密钥标签",
     "keyLabelPlaceholder": "my-signing-key",
-    "mldsaUntestedGoogleKms": "Google Cloud KMS 上的 ML-DSA 遵循 KMS API，但尚未针对该服务进行测试。",
+    "mldsaUntestedGoogleKms": "Google Cloud KMS 上的 ML-DSA 遵循 KMS API，但尚未针对该服务进行测试。KMS 最多签名 64 KiB，因此更大的 CRL 需要使用其他提供商。",
     "purposes": {
       "general": "通用目的",
       "caSigning": "CA 签名"
@@ -5505,7 +5519,9 @@
       "keySizeLabel": "密钥大小（仅限 RSA）",
       "principalsHelperText": "以逗号分隔的允许 Principal 列表",
       "allowAnyPrincipal": "允许任意主体",
-      "allowAnyPrincipalHelp": "未列出任何主体时，为任意名称签名，包括 root。未启用此选项时，列表为空的 CA 不会签署任何证书。"
+      "allowAnyPrincipalHelp": "未列出任何主体时，为任意名称签名，包括 root。未启用此选项时，列表为空的 CA 不会签署任何证书。",
+      "allowCustomKeyId": "允许请求者设置密钥 ID",
+      "allowCustomKeyIdHelp": "sshd 会将密钥 ID 记录为持有者的身份。未启用此选项时，CA 会将每个证书命名为 principals@CA 名称。"
     },
     "searchPlaceholder": "搜索 SSH CA...",
     "downloadSetupScript": "下载配置脚本",
@@ -5523,7 +5539,9 @@
     "downloadSetupScriptLinux": "下载 .sh (Linux/macOS)",
     "downloadSetupScriptWindows": "下载 .ps1 (Windows)",
     "anyPrincipal": "任意主体",
-    "noPrincipalSignsNothing": "未列出任何主体：此 CA 不会签署任何证书"
+    "noPrincipalSignsNothing": "未列出任何主体：此 CA 不会签署任何证书",
+    "keyIdSetByCa": "密钥 ID 由 CA 设置：principals@CA 名称",
+    "keyIdChosenByRequester": "密钥 ID 由请求者选择"
   },
   "sshCertificates": {
     "title": "SSH 证书",
@@ -5588,6 +5606,8 @@
     },
     "modal": {
       "keyIdPlaceholder": "例如：user@hostname",
+      "keyIdSetByCa": "由 CA 设置：{{keyId}}",
+      "keyIdSetByCaPending": "由 CA 根据 principal 设置：principals@CA 名称",
       "publicKeyPlaceholder": "粘贴 OpenSSH 公钥（ssh-ed25519 AAAA...）",
       "principalsPlaceholder": "例如：root,admin,deploy（逗号分隔）"
     },

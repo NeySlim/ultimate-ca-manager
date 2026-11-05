@@ -15,6 +15,8 @@ from utils.pagination import parse_request_pagination
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.pagination import paginate
 from utils.dn_validation import validate_dn_field, validate_dn
+from services.hsm.base_provider import HsmKeyExistsError
+from utils.process_lock import LockBusyError
 from utils.protocol_url import get_protocol_base_url
 from utils.decorators import require_json_body
 from utils.validity import coerce_validity_days
@@ -713,6 +715,8 @@ def create_ca():
         # Validation errors (HSM key conflicts, missing fields, etc.) -- surface to user
         logger.info(f"CA creation validation error: {e}")
         return error_response(str(e), 400)
+    except (HsmKeyExistsError, LockBusyError) as e:
+        return error_response(str(e), 409)
     except Exception as e:
         logger.error(f"Failed to create CA: {e}")
         return error_response("Failed to create CA", 500)
@@ -842,6 +846,12 @@ def update_ca(ca_id):
             return error_response(profile_err, 400)
         profile_changed = True
 
+    new_hidden = None
+    if 'issuanceHidden' in data or 'issuance_hidden' in data:
+        new_hidden = data.get('issuanceHidden', data.get('issuance_hidden'))
+        if not isinstance(new_hidden, bool):
+            return error_response('issuanceHidden must be true or false', 400)
+
     # Track which fields actually changed for the audit log
     changed = []
 
@@ -970,6 +980,9 @@ def update_ca(ca_id):
         changed.append(f'compliance_profile {ca.compliance_profile or "none"} -> '
                        f'{new_profile or "none"}')
         ca.compliance_profile = new_profile
+    if new_hidden is not None and new_hidden != bool(ca.issuance_hidden):
+        ca.issuance_hidden = new_hidden
+        changed.append('hidden from issuance pickers' if new_hidden else 'listed in issuance pickers')
     for forbidden in ('offline', 'offline_reason', 'offline_mode'):
         if forbidden in data:
             logger.warning(

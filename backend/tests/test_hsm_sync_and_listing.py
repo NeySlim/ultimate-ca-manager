@@ -176,9 +176,13 @@ class TestAzureCurveLabels:
         assert provider._key_to_key_info(soft).metadata == {'protection_level': 'SOFTWARE'}
 
     def test_a_generated_key_is_recorded_as_hsm_protected(self):
+        from azure.core.exceptions import ResourceNotFoundError
         provider = _azure_provider()
+
+        def get_key(name):
+            raise ResourceNotFoundError('no such key')
         provider._key_client = SimpleNamespace(
-            create_ec_key=lambda **kw: _azure_ec_key(azure_keys.KeyCurveName.p_384))
+            get_key=get_key, create_ec_key=lambda **kw: _azure_ec_key(azure_keys.KeyCurveName.p_384))
         assert provider.generate_key('ca', 'EC-P384').metadata == {'protection_level': 'HSM'}
 
     def test_a_key_that_cannot_be_fetched_is_reported(self):

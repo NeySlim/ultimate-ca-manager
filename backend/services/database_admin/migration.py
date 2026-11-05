@@ -328,7 +328,7 @@ def bootstrap_auth_to_target(target_url: str) -> Tuple[bool, str, dict]:
     }
     target_engine = None
     try:
-        target_engine = create_engine(sqlalchemy_url(target_url), pool_pre_ping=True)
+        target_engine = create_engine(sqlalchemy_url(target_url), pool_pre_ping=True, hide_parameters=True)
         target_is_pg = target_url.startswith("postgresql")
 
         if _target_has_users(target_engine):
@@ -420,7 +420,7 @@ def migrate_data(target_url: str) -> Tuple[bool, str, dict]:
 
     target_engine = None
     try:
-        target_engine = create_engine(sqlalchemy_url(target_url), pool_pre_ping=True)
+        target_engine = create_engine(sqlalchemy_url(target_url), pool_pre_ping=True, hide_parameters=True)
         target_is_pg = target_url.startswith("postgresql")
 
         # 1. Nothing is touched until the target is known to be empty.

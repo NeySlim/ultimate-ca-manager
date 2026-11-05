@@ -34,7 +34,7 @@ const toObject = (rows) => Object.fromEntries(rows.map(r => [r.name, {
 
 const DIGESTS = ['sha256', 'sha384', 'sha512']
 
-export default function ProfilesEditor({ value, onChange, disabled, templates = [] }) {
+export default function ProfilesEditor({ value, onChange, disabled, templates = [], saved = {} }) {
   const { t } = useTranslation()
   const [rows, setRows] = useState(() => toRows(value))
   const lastEmitted = useRef(JSON.stringify(value || {}))
@@ -62,9 +62,13 @@ export default function ProfilesEditor({ value, onChange, disabled, templates = 
     id: ++nextRowId, name: '', description: '', validity_days: 90, digest: 'sha256', template_id: '',
   }])
 
-  const templateOptions = [
+  // A deactivated template is refused on a new binding: offered only under the name the server has it bound to,
+  // and kept visible, marked, on a row that still carries it
+  const templateOptions = (row) => [
     { value: '', label: t('acme.noTemplate') },
-    ...templates.map(tpl => ({ value: String(tpl.id), label: tpl.name })),
+    ...templates.filter(tpl => tpl.is_active !== false || String(tpl.id) === row.template_id
+      || String(tpl.id) === String(saved[row.name]?.template_id ?? ''))
+      .map(tpl => ({ value: String(tpl.id), label: tpl.is_active === false ? `${tpl.name} (${t('common.inactive')})` : tpl.name })),
   ]
 
   return (
@@ -108,7 +112,7 @@ export default function ProfilesEditor({ value, onChange, disabled, templates = 
             disabled={disabled}
           />
           <Select
-            options={templateOptions}
+            options={templateOptions(row)}
             value={row.template_id}
             onChange={(val) => updateRow(row.id, { template_id: val })}
             placeholder={t('acme.noTemplate')}
