@@ -7,6 +7,7 @@ from flask import Blueprint, request, g, Response
 import logging
 from auth.unified import require_auth
 from utils.qc_statements import validate_policy_oids, validate_qc_statements
+from utils.custom_extensions import validate_custom_extensions
 from utils.response import success_response, error_response, created_response, no_content_response
 from utils.validity import DEFAULT_TEMPLATE_VALIDITY_DAYS
 from utils.db_transaction import safe_commit
@@ -23,6 +24,11 @@ from services.template_service import TemplateService, template_key_type_label
 from utils.dn_validation import validate_dn_field
 from datetime import datetime
 import traceback
+
+
+def _stored_custom_extensions(entries):
+    """Column value for a validated list: NULL when empty."""
+    return json.dumps(entries) if entries else None
 
 
 def _template_usage_counts():
@@ -121,6 +127,11 @@ def _validate_template_payload(data, *, partial=False):
         if err:
             return False, err
         data['pinned_subject_fields'] = cleaned
+    if 'custom_extensions' in data:
+        cleaned, err = validate_custom_extensions(data['custom_extensions'])
+        if err:
+            return False, err
+        data['custom_extensions'] = cleaned
     if 'validity_days' in data:
         v = coerce_validity_days(data['validity_days'])
         if v is None:
@@ -334,6 +345,7 @@ def create_template():
         autoenroll_enabled=bool(data.get('autoenroll_enabled', False)),
         allowed_ad_group=(data.get('allowed_ad_group') or '').strip()[:255] or None,
         pinned_subject_fields=json.dumps(data.get('pinned_subject_fields') or {}),
+        custom_extensions=_stored_custom_extensions(data.get('custom_extensions')),
         created_by=g.current_user.username
     )
 
@@ -476,6 +488,9 @@ def update_template(template_id):
 
     if 'pinned_subject_fields' in data:
         template.pinned_subject_fields = json.dumps(data['pinned_subject_fields'] or {})
+
+    if 'custom_extensions' in data:
+        template.custom_extensions = _stored_custom_extensions(data['custom_extensions'])
 
     template.updated_by = g.current_user.username
     template.updated_at = utc_now()
@@ -622,6 +637,7 @@ def duplicate_template(template_id):
         autoenroll_enabled=template.autoenroll_enabled,
         allowed_ad_group=template.allowed_ad_group,
         pinned_subject_fields=template.pinned_subject_fields,
+        custom_extensions=template.custom_extensions,
         created_by=g.current_user.username
     )
 
@@ -670,6 +686,7 @@ def _template_export_dict(template):
             json.loads(template.pinned_subject_fields)
             if template.pinned_subject_fields else {}
         ),
+        'custom_extensions': template.custom_extensions_list(),
     }
 
 
@@ -802,6 +819,8 @@ def import_template():
                     existing.allowed_ad_group = (tpl_data['allowed_ad_group'] or '').strip()[:255] or None
                 if 'pinned_subject_fields' in tpl_data:
                     existing.pinned_subject_fields = json.dumps(tpl_data['pinned_subject_fields'] or {})
+                if 'custom_extensions' in tpl_data:
+                    existing.custom_extensions = _stored_custom_extensions(tpl_data['custom_extensions'])
                 updated.append(existing.name)
             else:
                 # Create new — _validate_template_payload already enforced enums + bounds.
@@ -824,6 +843,7 @@ def import_template():
                     autoenroll_enabled=bool(tpl_data.get('autoenroll_enabled', False)),
                     allowed_ad_group=(tpl_data.get('allowed_ad_group') or '').strip()[:255] or None,
                     pinned_subject_fields=json.dumps(tpl_data.get('pinned_subject_fields') or {}),
+                    custom_extensions=_stored_custom_extensions(tpl_data.get('custom_extensions')),
                 )
                 db.session.add(template)
                 imported.append(template.name)

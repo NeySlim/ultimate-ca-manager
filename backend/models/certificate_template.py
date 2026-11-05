@@ -81,12 +81,25 @@ class CertificateTemplate(db.Model):
     # enforced value.
     pinned_subject_fields = db.Column(db.Text)
 
+    # Extensions added verbatim to issued certificates (#437): JSON list of
+    # {oid, critical, value} with the DER value in hex (utils.custom_extensions)
+    custom_extensions = db.Column(db.Text)
+
     # Metadata
     created_at = db.Column(db.DateTime, default=utc_now)
     created_by = db.Column(db.String(80))
     updated_at = db.Column(db.DateTime, onupdate=utc_now)
     updated_by = db.Column(db.String(80))
     
+    def custom_extensions_list(self):
+        """The stored list as is, [] when unset or unreadable."""
+        import json
+        try:
+            value = json.loads(self.custom_extensions) if self.custom_extensions else []
+        except (TypeError, ValueError):
+            return []
+        return value if isinstance(value, list) else []
+
     def to_dict(self):
         """Convert to dictionary"""
         import json
@@ -107,6 +120,7 @@ class CertificateTemplate(db.Model):
             "autoenroll_enabled": bool(self.autoenroll_enabled),
             "allowed_ad_group": self.allowed_ad_group,
             "pinned_subject_fields": json.loads(self.pinned_subject_fields) if self.pinned_subject_fields else {},
+            "custom_extensions": self.custom_extensions_list(),
             "created_at": utc_isoformat(self.created_at),
             "created_by": self.created_by,
             "updated_at": utc_isoformat(self.updated_at),
