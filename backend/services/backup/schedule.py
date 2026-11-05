@@ -491,7 +491,8 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
         _LAST_ATTEMPT['at'] = now
 
         logger.info(f"Scheduled backup created: {filename} ({len(backup_bytes)} bytes)")
-        warning = storage.restore_limit_warning(len(backup_bytes), service.last_payload_size)
+        warning = storage.restore_limit_warning(len(backup_bytes), service.last_payload_size,
+                                                service.last_payload_containers)
         if warning:
             logger.warning("Scheduled backup %s: %s", filename, warning)
         _audit_scheduled_backup(filename, f'Scheduled backup: {filename}',

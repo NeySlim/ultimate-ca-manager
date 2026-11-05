@@ -75,7 +75,7 @@ def rename_clashing_rows(backup_data: Dict[str, Any],
         if not rows:
             continue
         before = [dict(row) for row in rows]
-        final, reasons, given_up = _place(section_name, rule, rows, replacing)
+        final, reasons, given_up = _place(section_name, rule, rows, replacing, backup_data)
         if given_up:
             displaced.setdefault(section_name, set()).update(given_up)
         for index, row in enumerate(rows):
@@ -90,7 +90,7 @@ def rename_clashing_rows(backup_data: Dict[str, Any],
     return renamed
 
 
-def _place(section_name, rule, rows, pruned=frozenset()):
+def _place(section_name, rule, rows, pruned=frozenset(), backup_data=None):
     """The name each archived row is restored under, why it changed, and the
     rows here that give their name up to it."""
     model = load_model(SECTIONS[section_name])
@@ -143,7 +143,8 @@ def _place(section_name, rule, rows, pruned=frozenset()):
         holders = [t for t in by_name.get(wanted, ()) if t.id not in claimed]
         if (section_name in pruned and wanted not in used and holders
                 and len(holders) == len(by_name[wanted])
-                and not _required_by_pruned_rows(model, {t.id for t in holders}, pruned)):
+                and not _required_by_kept_rows(model, {t.id for t in holders}, pruned,
+                                               backup_data or {})):
             given_up.update(t.id for t in holders)
             claimed.update(t.id for t in holders)
             final[index] = wanted
@@ -164,21 +165,32 @@ def _place(section_name, rule, rows, pruned=frozenset()):
     return final, reasons, given_up
 
 
-def _required_by_pruned_rows(model, ids, pruned) -> bool:
-    """Whether a row of a pruned section names one of these through a required column.
-
-    Such a row waits for the writes, so its name cannot be handed over first.
+def _required_by_kept_rows(model, ids, pruned, backup_data) -> bool:
+    """Whether a row the restore keeps, in a pruned section, names one of these
+    through a required column. Such a row waits for the writes, so its name
+    cannot be handed over first; a row the restore removes does not count.
     """
     from models import db
-    from sqlalchemy import exists, select
-    from .replace import _SECTION_OF_TABLE, _foreign_keys_into, _index_tables
+    from sqlalchemy import select
+    from .plan import RestorePlan
+    from .replace import _SECTION_OF_TABLE, _foreign_keys_into, _index_tables, _primary, rows_to_remove
 
     _index_tables()
+    plan = None
     for dependent, column, named in _foreign_keys_into(model.__table__.name):
-        if column.nullable or _SECTION_OF_TABLE.get(dependent.name) not in pruned:
+        dependent_section = _SECTION_OF_TABLE.get(dependent.name)
+        archived = backup_data.get(dependent_section)
+        if (column.nullable or dependent_section not in pruned or _primary(dependent) is None
+                or not isinstance(archived, list)):
             continue
         held = select(named).where(model.__table__.c.id.in_(ids))
-        if db.session.execute(select(exists().where(column.in_(held)))).scalar():
+        pointing = {row[0] for row in db.session.execute(
+            select(_primary(dependent)).where(column.in_(held))).all()}
+        if not pointing:
+            continue
+        if plan is None:
+            plan = RestorePlan.build(backup_data)
+        if pointing - set(rows_to_remove(dependent_section, archived, plan)):
             return True
     return False
 

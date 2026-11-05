@@ -280,7 +280,7 @@ sudo systemctl start ucm
 3. Upload `.ucmbkp` file
 4. Enter encryption password
 
-The upload accepts archives up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), and their decompressed content up to four times that; a reverse proxy in front of UCM applies its own body limit. A restore holds the whole archive in memory: plan for a peak of several times its size, more for an archive dominated by the audit log.
+The upload accepts archives up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), their decompressed content up to four times that, and one JSON object per 100 bytes of it; a reverse proxy in front of UCM applies its own body limit. A restore holds the whole archive in memory: plan for a peak of several times its size, more for an archive dominated by the audit log.
 
 ### Backup Contents
 

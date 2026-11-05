@@ -13,6 +13,7 @@ from fips_mode import FipsRestricted
 from services.backup.decrypt_mixin import BackupDecryptionError
 from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.restore.plan import RestoreValidationError
+from services.backup.restore_report import restore_audit_details
 from services.backup.restore_completion import (
     record_restore, request_restart, restore_message)
 from services.database_admin.lock import (
@@ -124,7 +125,8 @@ def create_backup():
         'download_url': f'/api/v2/settings/backup/{filename}/download',
     }
 
-    warning = storage.restore_limit_warning(len(backup_bytes), service.last_payload_size)
+    warning = storage.restore_limit_warning(len(backup_bytes), service.last_payload_size,
+                                            service.last_payload_containers)
     if warning:
         response_data['restore_limit_warning'] = warning
 
@@ -224,9 +226,7 @@ def restore_backup():
             action='system_restore',
             resource_type='system',
             resource_name=file.filename,
-            details=(f'Restored from backup: {file.filename}' if _carried else
-                     f'Backup carried no data section, nothing was restored: '
-                     f'{file.filename}'),
+            details=restore_audit_details(file.filename, results),
             success=True
         )
 

@@ -250,11 +250,20 @@ class TestPayloadBombsAreRefused:
         with pytest.raises(ContainerError, match='nests deeper'):
             container.json_loads_bounded(payload)
 
-    def test_too_many_objects_are_refused(self, monkeypatch):
-        monkeypatch.setattr(container, 'MAX_JSON_CONTAINERS', 100)
+    def test_too_many_objects_are_refused_naming_the_setting(self, monkeypatch):
+        from services.backup import storage
+        monkeypatch.setattr(storage, 'restore_upload_limit',
+                            lambda: 100 * container.ARCHIVE_BYTES_PER_JSON_CONTAINER)
+        assert container.max_json_containers() == 100
         payload = json.dumps([{} for _ in range(200)]).encode()
-        with pytest.raises(ContainerError, match='more objects'):
+        with pytest.raises(ContainerError, match='more than 100 objects') as refused:
             container.json_loads_bounded(payload)
+        assert 'BACKUP_MAX_UPLOAD_MB' in str(refused.value)
+
+    def test_objects_are_counted_as_the_reader_counts_them(self):
+        payload = {'a': [{}, {'b': []}], 'c': 'x'}
+        text = json.dumps(payload).encode()
+        assert container.count_containers(payload) == text.count(b'{') + text.count(b'[')
 
     def test_braces_inside_strings_do_not_count(self):
         payload = json.dumps({'descr': '{' * 200, 'note': '\\"[[['}).encode()

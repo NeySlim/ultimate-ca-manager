@@ -859,6 +859,17 @@ class TestRestoreUploadCeiling:
         assert response.status_code == 200, response.data
         assert 'decompresses' in response.get_json()['data']['restore_limit_warning']
 
+    @pytest.mark.parametrize('url', ['/api/v2/system/backup', '/api/v2/settings/backup/create'])
+    def test_creating_an_archive_with_too_many_objects_warns(
+            self, auth_client, backup_dir, audit_spy, monkeypatch, url):
+        from services.backup import container
+        monkeypatch.setattr(container, 'ARCHIVE_BYTES_PER_JSON_CONTAINER', 10 ** 12)
+
+        response = _create(auth_client, {'password': PASSWORD}, url=url)
+
+        assert response.status_code == 200, response.data
+        assert 'JSON objects' in response.get_json()['data']['restore_limit_warning']
+
     def test_an_archive_a_restore_accepts_carries_no_warning(
             self, auth_client, backup_dir, audit_spy):
         response = _create(auth_client, {'password': PASSWORD})

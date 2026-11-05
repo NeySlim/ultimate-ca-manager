@@ -24,6 +24,21 @@ def _listing(entries, shown=5) -> str:
     return listing
 
 
+def restore_audit_details(filename: str, results: Dict[str, Any]) -> str:
+    """The `system_restore` audit line, with what a replacing restore removed or cancelled."""
+    results = results or {}
+    if not results.get('sections_carried'):
+        return f'Backup carried no data section, nothing was restored: {filename}'
+    details = f'Restored from backup: {filename}'
+    for key, label in (('removed', 'removed'), ('cleared_dependents', 'deleted with them'),
+                       ('unlinked_dependents', 'unlinked'), ('closed_dependents', 'cancelled')):
+        counts = results.get(key) or {}
+        if counts:
+            details += f'; {label}: ' + ', '.join(
+                f'{name} ({count})' for name, count in sorted(counts.items()))
+    return details
+
+
 def with_restore_warnings(message: str, results: Dict[str, Any]) -> str:
     """`message`, followed by what the archive had to warn about.
 

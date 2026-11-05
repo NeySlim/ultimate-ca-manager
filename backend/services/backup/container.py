@@ -43,11 +43,9 @@ MAX_HEADER_METADATA_BYTES = 4096
 PLAINTEXT_PER_ARCHIVE_BYTE = 4
 MAX_COMPRESSION_RATIO = 100
 MAX_JSON_DEPTH = 64
-# Each parsed object costs a few hundred bytes of interpreter memory, so this
-# is a memory ceiling, not a size one: five million objects is roughly a
-# gigabyte of parsed structures, and well above the largest real archive
-# (an instance exporting its audit log is the case that grows here).
-MAX_JSON_CONTAINERS = 5_000_000
+# Each parsed object costs a few hundred bytes of interpreter memory: one per
+# this many bytes of accepted archive, about five million at the 512 MB default.
+ARCHIVE_BYTES_PER_JSON_CONTAINER = 100
 _INFLATE_CHUNK = 1024 * 1024
 
 # KDF profiles this reader accepts, with the exact shapes each version emits
@@ -114,6 +112,24 @@ def max_container_bytes() -> int:
 
 def max_plaintext_bytes() -> int:
     return PLAINTEXT_PER_ARCHIVE_BYTE * max_container_bytes()
+
+
+def max_json_containers() -> int:
+    return max(1, max_container_bytes() // ARCHIVE_BYTES_PER_JSON_CONTAINER)
+
+
+def count_containers(value: Any) -> int:
+    """Objects and arrays in a payload, as `json_loads_bounded` counts them."""
+    count, pending = 0, [value]
+    while pending:
+        item = pending.pop()
+        if isinstance(item, dict):
+            count += 1
+            pending.extend(item.values())
+        elif isinstance(item, (list, tuple)):
+            count += 1
+            pending.extend(item)
+    return count
 
 
 def refuse_oversized(container: bytes) -> None:
@@ -321,6 +337,7 @@ def json_loads_bounded(payload: bytes) -> Any:
 
     depth = 0
     containers = 0
+    limit = max_json_containers()
     in_string = False
     escaped = False
     for char in text:
@@ -340,10 +357,10 @@ def json_loads_bounded(payload: bytes) -> Any:
             if depth > MAX_JSON_DEPTH:
                 raise ContainerError(
                     f"Refusing backup: its JSON nests deeper than {MAX_JSON_DEPTH} levels")
-            if containers > MAX_JSON_CONTAINERS:
+            if containers > limit:
                 raise ContainerError(
-                    "Refusing backup: its JSON holds more objects than this "
-                    "reader accepts")
+                    f"Refusing backup: its JSON holds more than {limit} objects, one per "
+                    f"{ARCHIVE_BYTES_PER_JSON_CONTAINER} bytes of BACKUP_MAX_UPLOAD_MB")
         elif char in '}]':
             depth -= 1
 

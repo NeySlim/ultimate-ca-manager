@@ -28,8 +28,8 @@ Starting with v2.48, UCM uses Major.Build versioning (e.g., 2.48, 2.49). Earlier
 ### Upgrade notes
 
 - DNS providers, ACME CA accounts and webhooks: the upgrade renames duplicate names to `name (2)`, `name (3)`, oldest first, then makes the name unique (migration 124).
-- Restore: a replacing restore now removes the CRLs, cached OCSP responses, sessions, in-flight ACME server orders, approval requests and Microsoft CA requests that point at a removed row, detaches ACME client orders, discovery results and revocation records from it, and cancels the key recovery requests still open on a removed certificate. The restore message lists them.
-- Restore: `BACKUP_MAX_UPLOAD_MB` (default 512) is the restore upload's own ceiling, and the decompressed content may be four times that; a reverse proxy in front of UCM keeps its own body limit. A restore holds the archive in memory, with a peak of several times its size.
+- Restore: a replacing restore now removes the CRLs, cached OCSP responses, sessions, in-flight ACME server orders, approval requests, Microsoft CA requests and pending webhook or deployment deliveries that point at a removed row, detaches ACME client orders, discovery results and revocation records from it, and cancels the key recovery requests still open on a removed certificate. The restore message and its audit entry list them.
+- Restore: `BACKUP_MAX_UPLOAD_MB` (default 512) is the restore upload's own ceiling, the decompressed content may be four times that, and the archive may hold one JSON object per 100 bytes of it; a reverse proxy in front of UCM keeps its own body limit. A restore holds the archive in memory, with a peak of several times its size.
 
 ## [2.249] - 2026-11-05
 

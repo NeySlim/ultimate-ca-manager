@@ -331,7 +331,7 @@ def restore_upload_limit() -> int:
     return int(Config.BACKUP_MAX_UPLOAD_MB) * 1024 * 1024
 
 
-def restore_limit_warning(size: int, payload_size: int = 0):
+def restore_limit_warning(size: int, payload_size: int = 0, containers: int = 0):
     """What to tell whoever created an archive no restore reads, or None.
 
     Checked against both ceilings: the archive itself, and its decompressed payload.
@@ -349,6 +349,10 @@ def restore_limit_warning(size: int, payload_size: int = 0):
                 f"than the {ceiling // (1024 * 1024)} MB a restore reads "
                 f"({container.PLAINTEXT_PER_ARCHIVE_BYTE} times BACKUP_MAX_UPLOAD_MB): raise "
                 "BACKUP_MAX_UPLOAD_MB on the server that will restore it.")
+    objects = container.max_json_containers()
+    if containers > objects:
+        return (f"This archive holds {containers} JSON objects, more than the {objects} a "
+                "restore reads: raise BACKUP_MAX_UPLOAD_MB on the server that will restore it.")
     return None
 
 

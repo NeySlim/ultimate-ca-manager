@@ -18,7 +18,7 @@ from models import db
 from services.backup.errors import BackupSchemaError
 from services.backup.manifest import SECTIONS
 from services.backup.restore.replace import (
-    CLOSED_WITH_TARGET, DEPENDENT_TABLES, _foreign_keys_into,
+    CLOSED_WITH_TARGET, DEPENDENT_TABLES, _foreign_keys_into, link_scope,
 )
 from services.backup.export_generic import load_model
 from tests.test_backup_cross_installation import (
@@ -110,14 +110,14 @@ def _orphans():
     A closed recovery request keeps its certificate's number for the audit trail.
     """
     found = []
-    seen = set(CLOSED_WITH_TARGET)
+    seen = {(table, column, 'certificates') for table, column in CLOSED_WITH_TARGET}
     for referred in list(db.metadata.tables):
         for dependent, column, named in _foreign_keys_into(referred):
-            if (dependent.name, column.name) in seen:
+            if (dependent.name, column.name, referred) in seen:
                 continue
-            seen.add((dependent.name, column.name))
+            seen.add((dependent.name, column.name, referred))
             query = select(column).where(
-                column.isnot(None),
+                column.isnot(None), link_scope(dependent, column, named),
                 ~exists().where(named == column))
             for row in db.session.execute(query).all():
                 found.append(f'{dependent.name}.{column.name}={row[0]}')
@@ -610,3 +610,128 @@ def test_only_a_duplicate_key_detail_is_quoted(pgcode, detail, quoted):
                          {'name': 'replace-dns'}, _Orig('violation', pgcode, detail))
     message = str(conflict_from_integrity_error(exc))
     assert (detail in message) is quoted, message
+
+
+# -- delivery queues ----------------------------------------------------------
+
+def test_a_pending_delivery_goes_with_its_removed_endpoint(target):
+    """On SQLite the archived endpoint would take the number, and the payload its URL."""
+    from models.webhook_delivery import WebhookDelivery
+    from services.webhook_service import WebhookEndpoint
+
+    _user('replace-admin')
+    archived = WebhookEndpoint(name='replace-hook-archived', url='https://a.example.test/hook')
+    db.session.add(archived)
+    blob = _snapshot()
+
+    db.session.delete(archived)
+    db.session.flush()
+    here = WebhookEndpoint(name='replace-hook-here', url='https://b.example.test/hook')
+    db.session.add(here)
+    db.session.flush()
+    db.session.add(WebhookDelivery(endpoint_id=here.id, event_type='certificate.issued',
+                                   payload='{}', event_timestamp='2026-11-05T00:00:00Z'))
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert WebhookDelivery.query.count() == 0
+    assert results['cleared_dependents'].get('webhook_deliveries') == 1
+    assert _orphans() == []
+
+
+def test_a_crl_delivery_is_not_taken_for_a_certificate_bindings(target):
+    """`binding_id` names a certificate binding or a CRL one, as `binding_type` says."""
+    from models.deploy import DeployBinding, DeployDelivery, DeployTarget
+
+    _user('replace-admin')
+    issuer = _authority_row('replace-deploy-ca')
+    certificate = _certificate_row('replace-deploy-cert', issuer)
+    deploy_target = DeployTarget(name='replace-deploy-target', host='deploy.example.test',
+                                 port=22, username='deploy', private_key='k')
+    db.session.add(deploy_target)
+    db.session.flush()
+    blob = _snapshot()
+
+    binding = DeployBinding(target_id=deploy_target.id, certificate_id=certificate.id)
+    db.session.add(binding)
+    db.session.flush()
+    db.session.add_all([
+        DeployDelivery(binding_id=binding.id, binding_type='certificate', event_type='manual'),
+        DeployDelivery(binding_id=binding.id, binding_type='crl', event_type='manual'),
+    ])
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert DeployBinding.query.count() == 0
+    assert [d.binding_type for d in DeployDelivery.query.all()] == ['crl']
+    assert results['cleared_dependents'].get('deploy_deliveries') == 1
+
+
+# -- recovery requests on what stays ------------------------------------------
+
+def test_only_the_open_requests_on_a_removed_certificate_are_cancelled(target):
+    from models.key_recovery import KeyRecoveryRequest
+
+    _user('replace-admin')
+    issuer = _authority_row('replace-krk-ca')
+    kept = _certificate_row('replace-krk-kept', issuer)
+    blob = _snapshot()
+    gone = _certificate_row('replace-krk-gone', issuer)
+
+    def request(cert, status):
+        row = KeyRecoveryRequest(cert_id=cert.id, cert_refid=cert.refid, reason=status,
+                                 status=status, requested_by='replace-admin',
+                                 requested_at=utc_now())
+        db.session.add(row)
+        return row
+    for status in ('approved', 'pending'):
+        request(kept, status)
+    for status in ('approved', 'recovered'):
+        request(gone, status)
+    db.session.commit()
+
+    results = _restore(blob)
+
+    by_reason = {(r.cert_refid, r.reason): r.status for r in KeyRecoveryRequest.query.all()}
+    assert by_reason == {('replace-krk-kept', 'approved'): 'approved',
+                         ('replace-krk-kept', 'pending'): 'pending',
+                         ('replace-krk-gone', 'approved'): 'cancelled',
+                         ('replace-krk-gone', 'recovered'): 'recovered'}
+    assert results['closed_dependents'] == {'key_recovery_requests': 1}
+
+
+def test_the_audit_line_says_what_the_restore_cancelled():
+    from services.backup.restore_report import restore_audit_details
+
+    details = restore_audit_details('a.ucmbkp', {
+        'sections_carried': ['certificates'], 'removed': {'certificates': 2},
+        'closed_dependents': {'key_recovery_requests': 1}})
+    assert details == ('Restored from backup: a.ucmbkp; removed: certificates (2); '
+                       'cancelled: key_recovery_requests (1)')
+
+
+def test_a_homonym_only_a_removed_row_points_at_keeps_its_name(target):
+    """The domain here goes with the restore: it does not hold the name."""
+    from models.acme_models import AcmeDomain, DnsProvider
+
+    _user('replace-admin')
+    archived = DnsProvider(name='replace-dns', provider_type='cloudflare')
+    db.session.add(archived)
+    blob = _snapshot()
+
+    db.session.delete(archived)
+    db.session.flush()
+    here = DnsProvider(name='replace-dns', provider_type='route53')
+    db.session.add(here)
+    db.session.flush()
+    db.session.add(AcmeDomain(domain='replace-doomed.example.test', dns_provider_id=here.id))
+    db.session.commit()
+
+    results = _restore(blob)
+
+    assert [(p.name, p.provider_type) for p in DnsProvider.query.all()] == [
+        ('replace-dns', 'cloudflare')]
+    assert AcmeDomain.query.count() == 0
+    assert results['renamed'] == []

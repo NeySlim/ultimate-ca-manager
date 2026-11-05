@@ -5,7 +5,7 @@ System Backup Operations
 from services.backup import storage
 from services.backup.locking import BackupBusyError, backup_operation_lock
 from services.backup.restore.plan import RestoreValidationError
-from services.backup.restore_report import with_restore_warnings
+from services.backup.restore_report import restore_audit_details, with_restore_warnings
 from services.database_admin.lock import (
     MigrationBusyError,
     database_migration_lock,
@@ -184,7 +184,8 @@ def create_backup():
         'download_url': f'/api/v2/system/backup/{filename}/download',
     }
     message = 'Backup created successfully'
-    warning = storage.restore_limit_warning(size, service.last_payload_size)
+    warning = storage.restore_limit_warning(size, service.last_payload_size,
+                                            service.last_payload_containers)
     if warning:
         data['restore_limit_warning'] = warning
         message = f'{message}. {warning}'
@@ -439,9 +440,7 @@ def restore_backup():
             action='system_restore',
             resource_type='system',
             resource_name=file.filename,
-            details=(f'Restored from backup: {file.filename}' if carried else
-                     f'Backup carried no data section, nothing was restored: '
-                     f'{file.filename}'),
+            details=restore_audit_details(file.filename, results),
             success=True,
         )
 

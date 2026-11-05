@@ -21,7 +21,7 @@ from collections import defaultdict
 from dataclasses import dataclass, field
 from typing import Any, Dict, Iterable, List, Optional, Set, Tuple
 
-from sqlalchemy import delete, select, update
+from sqlalchemy import delete, select, true, update
 
 from models import db
 
@@ -174,6 +174,9 @@ DEPENDENT_TABLES: Dict[str, str] = {
     'discovered_certificates': 'history, carried only when asked for',
     'key_recovery_requests': 'history, carried only when asked for',
     'revoked_serials': 'a revocation outlives its certificate; the serial stays revoked',
+    # Queues: a pending delivery would reach whichever row takes the number
+    'webhook_deliveries': 'delivery queue, removed with its endpoint as deleting it does',
+    'deploy_deliveries': 'delivery queue, removed with its binding as deleting it does',
 }
 
 # Integer links the schema holds without a foreign key, handled as if it had one:
@@ -181,7 +184,22 @@ DEPENDENT_TABLES: Dict[str, str] = {
 SOFT_LINKS = (
     ('revoked_serials', 'certificate_id', 'certificates', 'id'),
     ('key_recovery_requests', 'cert_id', 'certificates', 'id'),
+    ('webhook_deliveries', 'endpoint_id', 'webhook_endpoints', 'id'),
+    ('deploy_deliveries', 'binding_id', 'deploy_bindings', 'id'),
+    ('deploy_deliveries', 'binding_id', 'crl_deploy_bindings', 'id'),
 )
+
+# A link whose column names one table or another, told apart by a second column.
+_SOFT_SCOPE = {
+    ('deploy_deliveries', 'binding_id', 'deploy_bindings'): ('binding_type', 'certificate'),
+    ('deploy_deliveries', 'binding_id', 'crl_deploy_bindings'): ('binding_type', 'crl'),
+}
+
+
+def link_scope(dependent, column, named):
+    """The condition a row of `dependent` meets to point into `named`'s table."""
+    scope = _SOFT_SCOPE.get((dependent.name, column.name, named.table.name))
+    return dependent.c[scope[0]] == scope[1] if scope else true()
 
 # A request still open on a removed certificate is closed, never repointed.
 CLOSED_WITH_TARGET = {('key_recovery_requests', 'cert_id')}
@@ -230,10 +248,12 @@ def _primary(table):
     return columns[0] if len(columns) == 1 else None
 
 
-def _select(columns, where_column, values) -> List[Tuple]:
+def _select(columns, where_column, values, scope=None) -> List[Tuple]:
     found = []
+    scope = true() if scope is None else scope
     for chunk in _chunks(values):
-        found.extend(db.session.execute(select(*columns).where(where_column.in_(chunk))).all())
+        found.extend(db.session.execute(
+            select(*columns).where(where_column.in_(chunk), scope)).all())
     return found
 
 
@@ -400,7 +420,8 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
         values = [row[0] for row in _select([named], key_column, keys)]
         if not values:
             continue
-        pointing = _select([column], column, values)
+        scope = link_scope(dependent, column, named)
+        pointing = _select([column], column, values, scope)
         if not pointing:
             continue
         if dependent.name not in DEPENDENT_TABLES:
@@ -414,18 +435,18 @@ def _release_dependents(replacement: Replacement, table, key_column, keys, owner
             continue
         if column.nullable and (dependent.name, column.name) not in REMOVED_WITH_TARGET:
             for chunk in _chunks(values):
-                result = db.session.execute(update(dependent).where(column.in_(chunk))
+                result = db.session.execute(update(dependent).where(column.in_(chunk), scope)
                                             .values({column.name: None}))
                 _count(replacement.unlinked, f'{dependent.name}.{column.name}', result.rowcount)
             continue
         # The rows go: first whatever points at them in turn
         dependent_primary = _primary(dependent)
         if dependent_primary is not None:
-            doomed_here = [row[0] for row in _select([dependent_primary], column, values)]
+            doomed_here = [row[0] for row in _select([dependent_primary], column, values, scope)]
             _release_dependents(replacement, dependent, dependent_primary, doomed_here,
                                 dependent.name)
         for chunk in _chunks(values):
-            result = db.session.execute(delete(dependent).where(column.in_(chunk)))
+            result = db.session.execute(delete(dependent).where(column.in_(chunk), scope))
             _count(replacement.cleared, dependent.name, result.rowcount)
 
 
