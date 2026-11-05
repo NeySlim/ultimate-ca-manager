@@ -205,16 +205,6 @@ def _existing_row(section_name: str, identity: Dict[str, Any]):
     return load_model(section).query.filter_by(**identity).first()
 
 
-def _say_when_renewed_here(order, o_data: Dict[str, Any], plan: RestorePlan) -> None:
-    """An order renewed here after the archive was taken: the archive's state wins, said in the result."""
-    archived = _timestamp('ACME order', 'last_renewal_at', o_data.get('last_renewal_at'))
-    if order.last_renewal_at is not None and (archived is None or order.last_renewal_at > archived):
-        plan.warnings.append(
-            f"ACME order {o_data.get('domains')} was renewed here on "
-            f"{order.last_renewal_at.isoformat(timespec='seconds')}, after the archive was taken: "
-            "the archived order and certificate replace the renewed ones, renew it again")
-
-
 class RestoreExtendedMixin:
     def _restore_ssh_cas(self, backup_data: Dict, results: Dict, master_key: bytes,
                          plan: Optional[RestorePlan] = None) -> None:
@@ -588,7 +578,7 @@ class RestoreExtendedMixin:
         An order is found again by what never changes on it (environment, names,
         creation instant). Rows go in by creation, a renewal's parent before it;
         `relink_references` points a child at a parent written after it.
-        The archive wins over an order renewed here since: the result says so.
+        Which side wins over an order this installation moved on with: restore/orders.py.
         """
         from models.acme_models import AcmeClientOrder
 
@@ -600,7 +590,7 @@ class RestoreExtendedMixin:
         plan = plan if plan is not None else RestorePlan.build(backup_data)
         reindex_reference_targets('acme_client_orders', plan)
 
-        dated = []
+        dated, written = [], []
         for position, o_data in enumerate(rows):
             where = f"ACME order {position} ({o_data.get('domains')})"
             dated.append((_timestamp(where, 'created_at', o_data.get('created_at'),
@@ -615,22 +605,22 @@ class RestoreExtendedMixin:
                 # are NOT NULL; all of them are overwritten by apply_columns.
                 order = AcmeClientOrder(domains=o_data.get('domains') or '[]')
                 db.session.add(order)
-            else:
-                _say_when_renewed_here(order, o_data, plan)
 
             if apply_columns(order, 'acme_client_orders',
                              dict(o_data, created_at=created_at), plan):
                 results['acme_client_orders'] += 1
+                written.append(order)
 
         db.session.flush()
+        plan.written.setdefault('acme_client_orders', set()).update(order.id for order in written)
 
     def _restore_key_recovery_requests(self, backup_data: Dict, results: Dict,
                                        plan: Optional[RestorePlan] = None) -> None:
         """Key recovery requests, on the certificate of their refid here.
 
-        The archived `cert_id` is the source's number. An open request whose
-        certificate is not here is cancelled, as a replacing restore cancels one
-        whose certificate it removes; its `cert_id` is then 0, which names no row.
+        The archived `cert_id` is the source's number. A request whose certificate
+        is not here gets `cert_id` 0, which names no row; an open one is also
+        cancelled, as a replacing restore cancels one whose certificate it removes.
         """
         from models import Certificate
         from models.key_recovery import (

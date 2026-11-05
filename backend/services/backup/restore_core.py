@@ -25,10 +25,11 @@ from .restore.files import StagedFiles
 from .manifest import SECTIONS
 from .restore.apply import apply_columns, apply_section, relink_references
 from .restore.names import rename_clashing_rows
+from .restore.orders import keep_newer_orders
 from .restore.repairs import replay_order_repairs
 from .restore.conflict import conflict_from_integrity_error
 from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
-from .restore.setting_refs import deferred_keys, restore_setting_references
+from .restore.setting_refs import deferred_keys, prune_doomed_settings, restore_setting_references
 from .restore.settings import restore_encrypted_settings
 from .restore_rbac import restore_nested_webauthn, upgrade_archived_permissions
 
@@ -324,7 +325,10 @@ class RestoreCoreMixin:
         # Nothing has been written yet, and nothing will be until the plan
         # is built: it decides which row here each archived row is, and what
         # each reference resolves to on this installation.
+        # Orders this installation moved on with: kept in a merge, named in a replacement
+        order_warnings = keep_newer_orders(backup_data, mode)
         plan = RestorePlan.build(backup_data)
+        plan.warnings.extend(order_warnings)
         for warning in plan.warnings:
             logger.warning("Restore: %s", warning)
         built_with = len(plan.warnings)
@@ -340,8 +344,9 @@ class RestoreCoreMixin:
                 replacement = None
                 if mode == 'replace':
                     # Removed before the writes, so what they free is free
-                    replacement = remove_before_writes(plan_replacement(
-                        backup_data, plan, pruned, displaced=displaced))
+                    replacement = plan_replacement(backup_data, plan, pruned, displaced=displaced)
+                    prune_doomed_settings(replacement, plan)
+                    replacement = remove_before_writes(replacement)
                     plan.refresh()
 
                 self._apply_all(backup_data, results, master_key, plan, staged)
@@ -351,8 +356,9 @@ class RestoreCoreMixin:
                 # row exists: this is where an authority finds the HSM key the
                 # same restore has just created.
                 results['relinked'] = relink_references(backup_data, plan)
-                if backup_data.get('acme_client_orders'):
-                    results['acme_client_orders_repaired'] = replay_order_repairs()
+                if plan.written.get('acme_client_orders'):
+                    results['acme_client_orders_repaired'] = replay_order_repairs(
+                        plan.written['acme_client_orders'])
                 results['settings'] += restore_setting_references(
                     backup_data.get('configuration'), plan)
                 results['chain_variant_fallbacks'] = list(plan.chain_variant_fallbacks)

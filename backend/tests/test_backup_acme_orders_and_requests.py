@@ -346,3 +346,129 @@ def test_an_archive_without_them_leaves_them_alone(target, mode):
 
     assert [o.order_url for o in _orders()] == ['https://ca.example.test/order/here']
     assert KeyRecoveryRequest.query.one().status == 'approved'
+
+
+# -- merge: the row here wins when it is further along ------------------------
+
+def _renew_here(leaf, issuer, mother):
+    """What a renewal in place leaves: new PEM and serial, new order URL, a revocation owed."""
+    from tests.test_backup_cross_installation import _leaf, _stored_certificate
+    _ca, ca_key, ca_certificate = issuer
+    old_serial = leaf.serial_number
+    _key, certificate = _leaf('orders-leaf.example.test', ca_key, ca_certificate)
+    leaf.crt = _stored_certificate(certificate)
+    leaf.serial_number = format(certificate.serial_number, 'x')
+    mother.order_url = 'https://ca.example.test/order/renewed'
+    mother.last_renewal_at = utc_now()
+    mother.upstream_revocations_list = [{'serial': old_serial, 'attempts': 1}]
+    db.session.commit()
+    return leaf.serial_number
+
+
+def _renewal_scene():
+    _user('orders-admin')
+    issuer = _authority_row('orders-ca')
+    leaf = _certificate_row('orders-leaf', issuer)
+    mother = _order(order_url='https://ca.example.test/order/m', certificate_id=leaf.id,
+                    status='issued', created_at=utc_now() - timedelta(days=60))
+    _order(order_url='https://ca.example.test/order/c', status='pending',
+           renewal_enabled=False, renewal_of_order_id=mother.id)
+    archived_serial = leaf.serial_number
+    blob = _snapshot()
+    db.session.delete(_orders()[1])     # folded into its mother by the renewal here
+    db.session.flush()
+    return blob, archived_serial, _renew_here(leaf, issuer, mother)
+
+
+def test_a_merge_keeps_an_order_renewed_here_with_its_certificate(target):
+    from models import Certificate
+
+    blob, archived_serial, renewed_serial = _renewal_scene()
+
+    results = _restore(blob, mode='merge')
+
+    [mother] = _orders()
+    assert mother.order_url == 'https://ca.example.test/order/renewed'
+    assert mother.last_renewal_at is not None
+    assert [e['serial'] for e in mother.upstream_revocations_list] == [archived_serial]
+    assert Certificate.query.filter_by(refid='orders-leaf').one().serial_number == renewed_serial
+    assert any('renewed here' in w and 'kept' in w for w in results['warnings'])
+
+
+def test_a_replacement_names_the_certificate_it_gives_up(target):
+    from models import Certificate
+
+    blob, archived_serial, renewed_serial = _renewal_scene()
+
+    results = _restore(blob)
+
+    mother = _orders()[0]
+    assert mother.order_url == 'https://ca.example.test/order/m'
+    assert Certificate.query.filter_by(refid='orders-leaf').one().serial_number == archived_serial
+    warning = next(w for w in results['warnings'] if 'renewed here' in w)
+    assert renewed_serial in warning and ' UTC' in warning and 'revoked at the CA' in warning
+
+
+def _finalizing_scene():
+    from cryptography.hazmat.primitives import serialization
+    from cryptography.hazmat.primitives.asymmetric import ec
+
+    _user('orders-admin')
+    order = _order(order_url='https://ca.example.test/order/f', status='pending')
+    blob = _snapshot()
+    pem = ec.generate_private_key(ec.SECP256R1()).private_bytes(
+        serialization.Encoding.PEM, serialization.PrivateFormat.PKCS8,
+        serialization.NoEncryption()).decode()
+    order.status, order.pending_key = 'processing', pem
+    db.session.commit()
+    return blob, pem
+
+
+def test_a_merge_keeps_an_order_finalizing_here_and_its_key(target):
+    blob, pem = _finalizing_scene()
+
+    results = _restore(blob, mode='merge')
+
+    [order] = _orders()
+    assert (order.status, order.pending_key) == ('processing', pem)
+    assert any('finaliz' in w for w in results['warnings'])
+
+
+def test_a_replacement_says_it_drops_a_key_held_for_a_finalization(target):
+    blob, _pem = _finalizing_scene()
+
+    results = _restore(blob)
+
+    [order] = _orders()
+    assert (order.status, order.pending_key) == ('pending', None)
+    assert any('finaliz' in w and 'key' in w for w in results['warnings'])
+
+
+def test_a_merge_repairs_only_the_orders_it_wrote(target):
+    """Rows here the archive does not carry are left as they are, doubled or not."""
+    _user('orders-admin')
+    issuer = _authority_row('orders-ca')
+    kept = _certificate_row('orders-kept', issuer)
+    _order(domains='["archived.example.test"]', status='issued')
+    blob = _snapshot()
+    start = utc_now() - timedelta(days=60)
+    _order(order_url='https://ca.example.test/order/o', certificate_id=kept.id, status='issued',
+           renewal_enabled=True, last_renewal_at=start, created_at=start)
+    _order(order_url='https://ca.example.test/order/o', certificate_id=kept.id, status='issued',
+           created_at=start + timedelta(days=1))
+    db.session.commit()
+
+    results = _restore(blob, mode='merge')
+
+    assert len(_orders()) == 3
+    assert results['acme_client_orders_repaired'] == {'reissued': 0, 'dropped': 0}
+
+
+def test_an_unreadable_pending_key_does_not_stop_the_backup(target, caplog):
+    _user('orders-admin')
+    order = _order(order_url='https://ca.example.test/order/u', status='processing')
+    order._pending_key = 'bm90IGEga2V5'      # base64 of something that is no PEM
+    data = _payload(_snapshot())
+
+    assert data['acme_client_orders'][0]['pending_key'] is None
+    assert f'acme_client_orders (id {order.id}) leaves its pending_key out' in caplog.text

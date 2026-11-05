@@ -224,3 +224,55 @@ def test_a_renamed_account_keeps_the_proxy_setting(target):
 def test_the_declaration_names_the_numbered_keys_only(key, matches):
     from services.backup.restore.setting_refs import reference_of
     assert (reference_of(key) is not None) is matches
+
+
+def test_a_replacement_drops_the_settings_of_the_rows_it_removes(target):
+    """A CA made after the archive leaves its challenge and responder, and holds SCEP."""
+    from models import CA
+
+    _user('settings-admin')
+    archived, _key, _cert = _authority_row('settings-archived')
+    archived_number = archived.id
+    blob = _snapshot()
+    db.session.delete(archived)
+    db.session.flush()
+    later = _authority_row('settings-later')
+    leaf = _certificate_row('settings-later-leaf', later)
+    number = later[0].id
+    for key, value in {f'scep_challenge_{number}': 'later-challenge',
+                       f'ocsp_responder_cert_{number}': str(leaf.id),
+                       f'cert_scts_{leaf.id}': '[]',
+                       'scep_ca_id': str(number), 'acme.issuing_ca_id': 'settings-later'}.items():
+        _setting(key, value)
+    db.session.commit()
+    if target == 'sqlite':
+        assert number == archived_number    # the archived CA takes that number back
+
+    _restore(blob)
+
+    assert CA.query.filter_by(refid='settings-archived').one()
+    assert _settings('scep_challenge_') == {} and _settings('ocsp_responder_cert_') == {}
+    assert _settings('cert_scts_') == {}
+    assert _setting('scep_ca_id') in ('', None) and _setting('acme.issuing_ca_id') in ('', None)
+
+
+def test_an_older_archive_of_this_database_takes_no_number_another_row_holds(target):
+    from models import CA
+
+    _user('settings-admin')
+    archived, _key, _cert = _authority_row('settings-ca-a')
+    _setting('scep_ca_id', str(archived.id))
+    number = archived.id
+    blob = _edited(_snapshot(), _older)
+    db.session.delete(archived)
+    db.session.flush()
+    intruder = _authority_row('settings-intruder')[0]
+    db.session.commit()
+    if target == 'sqlite':
+        assert intruder.id == number
+
+    results = _restore(blob, mode='merge')
+
+    assert CA.query.filter_by(refid='settings-ca-a').one().id != number or target != 'sqlite'
+    assert _setting('scep_ca_id') == ''
+    assert any('scep_ca_id was emptied' in w for w in results['warnings'])

@@ -118,8 +118,14 @@ def export_section(section_name: str, index: IdentityIndex) -> List[Dict[str, An
                     "model does not hold")
             stored = getattr(row, stored_attr)
             if (model.__name__, stored_attr) in _key_material_columns():
-                # Base64 key material under the master key: carried as the PEM itself
-                data[secret] = as_pem(decrypt_stored_key(stored, label=label), label=label) if stored else None
+                # Base64 key material under the master key, carried as the PEM. Transient (an
+                # order's pending key): one this key cannot open is left out, not the whole backup
+                try:
+                    data[secret] = as_pem(decrypt_stored_key(stored, label=label), label=label) if stored else None
+                except BackupExportError as exc:
+                    logger.warning("Backup: %s (id %s) leaves its %s out: %s",
+                                   section_name, getattr(row, 'id', '?'), secret, exc)
+                    data[secret] = None
                 continue
             decrypt = decrypt_stored_fields if section.stored.get(secret) == 'fields' else decrypt_stored_secret
             data[secret] = decrypt(stored, label=f"{label} ({secret})")

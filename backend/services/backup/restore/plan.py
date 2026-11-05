@@ -54,6 +54,8 @@ class RestorePlan:
         # key this installation does not hold: both told in the result.
         self.left_out: List[str] = []
         self.dropped_fields: List[str] = []
+        # Ids a restorer wrote, per section: what a replayed repair may touch
+        self.written: Dict[str, set] = {}
 
     # -- building ---------------------------------------------------------
 

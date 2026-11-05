@@ -287,10 +287,10 @@ The upload accepts archives up to `BACKUP_MAX_UPLOAD_MB` (512 MB by default), th
 - All certificates and private keys
 - CA hierarchy
 - Users and settings
-- Audit logs
 - Templates
 - ACME client orders, with the key of a finalization in progress, approval requests and key recovery requests
-- Settings that name a CA, a certificate or an ACME account carry that row's identity, and are renumbered on restore; one whose row is not on the target is emptied, with a warning
+- Settings that name a CA, a certificate or an ACME account carry that row's identity, and are renumbered on restore. One whose row is not on the target is emptied, or left out when the number is in its name (`scep_challenge_<n>`, `ocsp_responder_cert_<n>`, `cert_scts_<n>`), with a warning
+- An ACME order renewed or being finalized on the target since the archive was taken: a merge keeps it as it is, a replacement restores the archived one and names the certificate it gives up
 
 ---
 
