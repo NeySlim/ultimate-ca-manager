@@ -262,6 +262,7 @@ def test_a_restart_sets_an_interrupted_auto_poll_back_to_pending(bench):
     OrderLease.take(leased.id)
     stale_lease = bench.child(status='processing', renewal_enabled=True,
                               renewal_claimed_at=utc_now() - timedelta(hours=1))
+    _idle(*bench.extra_orders)
     housekeeping.recover_interrupted_orders()
     db.session.expire_all()
     status = {o.id: (o.status, o.error_message) for o in AcmeClientOrder.query.filter(
@@ -270,6 +271,45 @@ def test_a_restart_sets_an_interrupted_auto_poll_back_to_pending(bench):
     assert status[stale_lease.id] == ('pending', housekeeping.INTERRUPTED)
     for kept in (finalizing, renewal, proxy, leased):
         assert status[kept.id] == ('processing', None)
+
+
+def _idle(*order_ids, minutes=16):
+    AcmeClientOrder.query.filter(AcmeClientOrder.id.in_(order_ids)).update(
+        {'updated_at': utc_now() - timedelta(minutes=minutes)}, synchronize_session=False)
+    db.session.commit()
+
+
+def test_a_restart_leaves_a_processing_order_another_instance_works_on(bench):
+    fresh = bench.child(status='processing', renewal_enabled=True)
+    idle = bench.child(status='processing', renewal_enabled=True)
+    db.session.commit()
+    _idle(fresh.id, minutes=14)
+    _idle(idle.id)
+    housekeeping.recover_interrupted_orders()
+    db.session.expire_all()
+    assert db.session.get(AcmeClientOrder, fresh.id).status == 'processing'
+    assert db.session.get(AcmeClientOrder, idle.id).status == 'pending'
+
+
+def test_the_dns_wait_of_an_auto_poll_keeps_the_order_fresh(bench, monkeypatch):
+    from api.v2.acme_client import orders as orders_module
+    order = bench.child(status='processing', renewal_enabled=True)
+    order.set_challenges_dict({'a.example.com': {'dns_txt_name': '_acme-challenge.a.example.com',
+                                                  'dns_txt_value': 'v'}})
+    db.session.commit()
+    seen = []
+
+    def selfcheck(challenges, timeout, delay=None, on_tick=None):
+        _idle(order.id, minutes=60)  # as after a long wait
+        on_tick()
+        db.session.expire_all()
+        seen.append(db.session.get(AcmeClientOrder, order.id).updated_at)
+        raise RuntimeError('stop after the wait')
+
+    monkeypatch.setattr(orders_module, '_dns_propagation_timeout', lambda: 60)
+    monkeypatch.setattr(orders_module, '_dns_selfcheck', selfcheck)
+    orders_module._auto_poll_and_finalize(bench.client, order)
+    assert seen and seen[0] > utc_now() - timedelta(minutes=1)
 
 
 def test_the_app_recovers_interrupted_orders_at_startup(monkeypatch, tmp_path):

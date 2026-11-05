@@ -46,6 +46,7 @@ from services.acme.dns_selfcheck import (
 from utils.acme_debug import acme_log
 from utils.acme_ip import normalize_ip_for_identifier
 from utils.dns_txt_lookup import txt_record_present
+from utils.datetime_utils import utc_now
 
 logger = logging.getLogger(__name__)
 
@@ -74,7 +75,7 @@ def _txt_present(name: str, expected: str) -> bool:
     return txt_record_present(name, expected)
 
 
-def _dns_selfcheck(challenges: dict, timeout: int, delay=None) -> dict:
+def _dns_selfcheck(challenges: dict, timeout: int, delay=None, on_tick=None) -> dict:
     """Poll DNS until every dns-01 TXT record is visible, or until timeout.
 
     Each poll follows ``acme.dns01_resolver_mode`` (see utils.dns_txt_lookup):
@@ -92,7 +93,7 @@ def _dns_selfcheck(challenges: dict, timeout: int, delay=None) -> dict:
     challenges (no dns_txt_value) are ignored.
     """
     # Keep local wrapper for backwards-compatible tests/imports.
-    return _shared_wait_for_challenges(challenges, timeout, delay)
+    return _shared_wait_for_challenges(challenges, timeout, delay, on_tick=on_tick)
 
 
 @bp.route('/api/v2/acme/client/orders', methods=['GET'])
@@ -786,6 +787,17 @@ def _auto_poll_and_finalize(client, order) -> dict:
             db.session.rollback()
             logger.error(f'Failed to persist status={status} for order {order.id}: {e}')
 
+    def _touch():
+        """Refresh updated_at: a restart elsewhere resumes only idle processing orders."""
+        try:
+            AcmeClientOrder.query.filter(
+                AcmeClientOrder.id == order.id, AcmeClientOrder.status == 'processing',
+            ).update({'updated_at': utc_now()}, synchronize_session=False)
+            db.session.commit()
+        except Exception as e:
+            db.session.rollback()
+            logger.warning(f'Failed to refresh order {order.id} during the DNS wait: {e}')
+
     # Set once the TXT records can serve no more: a pending order keeps them for Verify
     drop_txt = False
     result = {
@@ -822,7 +834,7 @@ def _auto_poll_and_finalize(client, order) -> dict:
             logger.info('DNS propagation pre-check skipped (timeout=0)')
             check = {'ok': True, 'missing': [], 'waited': 0}
         else:
-            check = _dns_selfcheck(challenges, timeout)
+            check = _dns_selfcheck(challenges, timeout, on_tick=_touch)
         if check['ok']:
             logger.info(f'DNS propagation confirmed after {check["waited"]}s')
         else:
