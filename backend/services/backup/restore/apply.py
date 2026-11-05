@@ -224,6 +224,13 @@ def _apply_row(section_name, section, instance, row, columns, attribute_of, plan
         if name == 'id':
             continue          # the target keeps its own key
         column = columns.get(name)
+        if column is None and name in section.secrets and isinstance(
+                getattr(type(instance), name, None), property):
+            # A property over a column of another name (`_auth_token`): its setter encrypts
+            setattr(instance, name, _secret_as_stored(
+                section, name, value, label=_row_label(section_name, section, row),
+                dropped=plan.dropped_fields))
+            continue
         if column is None:
             continue          # a column this version does not have
 

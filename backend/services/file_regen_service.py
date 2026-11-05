@@ -4,9 +4,11 @@ Regenerates certificate/key files on disk from database at startup.
 Ensures filesystem is consistent with database state.
 """
 import base64
+import contextvars
 import logging
 import os
 import tempfile
+from contextlib import contextmanager
 from pathlib import Path
 
 from config.settings import Config
@@ -19,6 +21,24 @@ from utils.file_naming import (
 )
 
 logger = logging.getLogger(__name__)
+
+
+_INSERT_WRITES_SUSPENDED = contextvars.ContextVar('ucm_insert_file_writes_suspended', default=False)
+
+
+@contextmanager
+def insert_file_writes_suspended():
+    """Rows inserted in the block get no files from the insert listeners: a restore
+    stages its own, published only once its transaction holds."""
+    token = _INSERT_WRITES_SUSPENDED.set(True)
+    try:
+        yield
+    finally:
+        _INSERT_WRITES_SUSPENDED.reset(token)
+
+
+def insert_file_writes_enabled() -> bool:
+    return not _INSERT_WRITES_SUSPENDED.get()
 
 
 def mirror_private_key(path: Path, key_pem: bytes, *, context: str) -> bool:

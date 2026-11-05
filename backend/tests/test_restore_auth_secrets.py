@@ -189,8 +189,9 @@ def _seed():
     rows['hsm_providers'] = HsmProvider(
         name=f'{MARK}-hsm', type='openbao', config='{}', status='connected')
 
+    # A list, as the product writes it: JSON text is the shape migration 104 repairs
     rows['groups'] = Group(name=f'{MARK}-group', description='seeded',
-                           permissions='["read:certificates"]')
+                           permissions=['read:certificates'])
 
     rows['custom_roles'] = CustomRole(
         name=f'{MARK}-role', description='seeded',

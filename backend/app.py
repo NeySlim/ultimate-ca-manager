@@ -234,16 +234,18 @@ def create_app(config_name=None):
     @sa_event.listens_for(_Certificate, 'after_insert')
     def _on_cert_insert(mapper, connection, target):
         try:
-            from services.file_regen_service import write_cert_files
-            write_cert_files(target)
+            from services.file_regen_service import insert_file_writes_enabled, write_cert_files
+            if insert_file_writes_enabled():
+                write_cert_files(target)
         except Exception as e:
             app.logger.warning(f"Could not write files for cert {target.refid}: {e}")
 
     @sa_event.listens_for(_CA, 'after_insert')
     def _on_ca_insert(mapper, connection, target):
         try:
-            from services.file_regen_service import write_ca_files
-            write_ca_files(target)
+            from services.file_regen_service import insert_file_writes_enabled, write_ca_files
+            if insert_file_writes_enabled():
+                write_ca_files(target)
         except Exception as e:
             app.logger.warning(f"Could not write files for CA {target.refid}: {e}")
 

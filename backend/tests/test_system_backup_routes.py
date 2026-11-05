@@ -13,7 +13,7 @@ import pytest
 
 import fips_mode
 from config.settings import Config
-from services.backup import manifest
+from services.backup import manifest, storage
 from services.backup.locking import backup_operation_lock
 
 PASSWORD = 'Correct-Horse-Battery-9'
@@ -540,6 +540,55 @@ class TestCreate:
         body = response.get_json()
         assert body['type'] == fips_mode.PROBLEM_TYPE
         assert body['message'] == 'Argon2id backups not available in FIPS mode'
+
+
+class TestOneLockForArchivesAndRestores:
+    """A backup reading the database while a restore commits records half of
+    each; the export and the restore take the same backup lock."""
+
+    @pytest.fixture
+    def quick_export_wait(self, monkeypatch):
+        monkeypatch.setattr(storage, 'EXPORT_LOCK_WAIT', 0.3)
+
+    @pytest.mark.parametrize('url', ['/api/v2/system/backup/create',
+                                     '/api/v2/settings/backup/create'])
+    def test_a_backup_does_not_export_while_the_lock_is_held(
+            self, auth_client, monkeypatch, lock_held_elsewhere, quick_export_wait, url):
+        from services.backup_service import BackupService
+        exported = []
+        monkeypatch.setattr(BackupService, 'create_backup',
+                            lambda self, *a, **k: exported.append(1) or b'UCMB' + b'\x03' * 60)
+
+        response = auth_client.post(url, data=json.dumps({'password': PASSWORD}),
+                                    content_type='application/json')
+
+        assert response.status_code == 409, response.data
+        assert exported == []
+
+    @pytest.mark.parametrize('url', ['/api/v2/system/restore',
+                                     '/api/v2/settings/backup/restore'])
+    def test_a_restore_does_not_start_while_a_backup_holds_the_lock(
+            self, auth_client, fake_restore, lock_held_elsewhere, url):
+        calls, _ = fake_restore
+
+        response = _restore(auth_client, url=url)
+
+        assert response.status_code == 409, response.data
+        assert calls == []
+
+    def test_a_restore_holds_the_lock_it_shares_with_the_backups(
+            self, auth_client, monkeypatch, backup_dir):
+        from services.backup.locking import operation_lock_depth
+        from services.backup_service import BackupService
+        depth = []
+
+        def fake(self, blob, password, **kwargs):
+            depth.append(operation_lock_depth())
+            return {'sections_carried': []}
+        monkeypatch.setattr(BackupService, 'restore_backup', fake)
+
+        assert _restore(auth_client).status_code == 200
+        assert depth == [1]
 
 
 # ---------------------------------------------------------------------------

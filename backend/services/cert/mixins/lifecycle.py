@@ -628,6 +628,8 @@ class LifecycleMixin:
             for responder_ca_id in responder_cas:
                 SystemConfig.query.filter_by(key=f'ocsp_responder_cert_{responder_ca_id}').delete(
                     synchronize_session='fetch')
+            # Kept under the number, the SCTs would belong to the next certificate given it
+            SystemConfig.query.filter_by(key=f'cert_scts_{cert_id}').delete(synchronize_session='fetch')
             db.session.delete(certificate)
             db.session.commit()
         except Exception as e:

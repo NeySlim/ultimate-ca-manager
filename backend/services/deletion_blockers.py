@@ -220,6 +220,19 @@ def intune_app_deletion_blockers(app) -> Iterator[DeletionBlocker]:
         )
 
 
+def numbered_ca_settings(ca_id) -> list:
+    """The stored settings keyed by this CA's number, as the backup manifest declares them."""
+    from models import SystemConfig
+    from services.backup.restore.setting_refs import reference_of
+
+    keys = []
+    for (key,) in SystemConfig.query.with_entities(SystemConfig.key):
+        found = reference_of(key)
+        if found and found[0].key == 'certificate_authorities' and found[1].group(1) == str(ca_id):
+            keys.append(key)
+    return keys
+
+
 def purge_ca_dependents(ca) -> str:
     """Stage the rows that must not outlive a CA, and say what was staged.
 
@@ -244,6 +257,10 @@ def purge_ca_dependents(ca) -> str:
     rs_count = RevokedSerial.query.filter_by(caref=ca.refid).delete()
     # The enrolment history of the authority: same foreign key, same fate.
     scep_count = SCEPRequest.query.filter_by(ca_refid=ca.refid).delete()
+    # Settings named after its number would pass to the next CA given that number
+    from models import SystemConfig
+    SystemConfig.query.filter(SystemConfig.key.in_(numbered_ca_settings(ca.id))).delete(
+        synchronize_session=False)
 
     if crl_count or ocsp_count or rs_count or scep_count:
         return (f"Deleted {crl_count} CRL(s), {ocsp_count} OCSP response(s), "

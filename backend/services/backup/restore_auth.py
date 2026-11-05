@@ -63,6 +63,11 @@ def _archived_client_certificate(ac_data: Dict):
         ) from exc
 
 
+def _digest(fingerprint) -> str:
+    """A fingerprint without the colons and case the enrolment routes disagree on."""
+    return ''.join(ch for ch in str(fingerprint or '') if ch not in ': ').upper()
+
+
 class RestoreAuthMixin:
     def _restore_sso_providers(self, backup_data: Dict, results: Dict,
                                plan: Optional[RestorePlan] = None) -> None:
@@ -157,9 +162,16 @@ class RestoreAuthMixin:
         plan = plan if plan is not None else RestorePlan.build(backup_data)
         reindex_reference_targets('auth_certificates', plan)
         for ac_data in backup_data.get('auth_certificates', []):
-            ac = AuthCertificate.query.filter_by(
-                cert_serial=ac_data['cert_serial']
-            ).first()
+            # By fingerprint, the manifest's identity: a serial is only unique per issuer.
+            fingerprint = ac_data.get('cert_fingerprint')
+            ac = (AuthCertificate.query.filter_by(cert_fingerprint=fingerprint).first()
+                  if fingerprint else None)
+            if ac is None:
+                # The row of that serial, when its fingerprint is empty or the same one spelled otherwise
+                same_serial = AuthCertificate.query.filter_by(cert_serial=ac_data['cert_serial']).first()
+                if same_serial is not None and (not fingerprint or not same_serial.cert_fingerprint or
+                                                _digest(same_serial.cert_fingerprint) == _digest(fingerprint)):
+                    ac = same_serial
 
             row = ac_data
             if 'cert_pem' in ac_data:

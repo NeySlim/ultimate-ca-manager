@@ -476,12 +476,8 @@ def _create_scheduled_backup(sched: dict, now: datetime, password: str) -> dict:
             logger.warning("Scheduled backup KDF is Argon2id, refused in FIPS mode: using PBKDF2")
             kdf = None
         service = BackupService()
-        backup_bytes = service.create_backup(password, kdf=kdf)
-
-        # The same naming as every other archive: a name to the second could
-        # collide with a manual backup taken in the same second, and the
-        # shared helper allocates a unique one and retries if it has to.
-        _path, filename = storage.create_archive(backup_bytes)
+        # The same export and naming as every other archive, under the lock already held
+        backup_bytes, _path, filename = storage.export_archive(service, password, kdf=kdf)
 
         # Only now: the archive exists, it reads back as written, and it is
         # recorded. An export or write that failed before this point leaves

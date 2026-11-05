@@ -356,6 +356,25 @@ def restore_limit_warning(size: int, payload_size: int = 0, containers: int = 0)
     return None
 
 
+# Seconds a manual backup waits for the backup lock before it is refused.
+EXPORT_LOCK_WAIT = 30
+
+
+def export_archive(service, password: str, *, kdf=None, timeout=None) -> tuple:
+    """Export and publish one archive under the backup lock. Returns ``(bytes, path, filename)``.
+
+    The export runs inside the lock too: a restore holds it until it commits, so
+    an archive never reads half of a restore.
+    """
+    from .locking import backup_operation_lock
+
+    wait = EXPORT_LOCK_WAIT if timeout is None else timeout
+    with backup_operation_lock(timeout=wait, purpose='creating a backup'):
+        data = service.create_backup(password, kdf=kdf)
+        path, filename = _create_archive(data)
+    return data, path, filename
+
+
 def create_archive(data: bytes, backup_dir=None) -> tuple:
     """Publish archive bytes under a new name, validated.
 

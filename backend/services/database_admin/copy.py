@@ -137,6 +137,7 @@ def copy_tables(source, target_engine, plan, *, source_is_pg: bool,
     target_tables = set(target_insp.get_table_names())
     json_cols = _detect_json_columns(target_insp, target_tables)
     bool_cols = _detect_boolean_columns(target_insp, target_tables)
+    self_links = _self_links(target_insp, {entry.name for entry in plan} & target_tables)
 
     # SQLite cannot change ``PRAGMA foreign_keys`` inside a transaction, and
     # the pragma belongs to the connection, not to the engine: the switch has
@@ -161,6 +162,7 @@ def copy_tables(source, target_engine, plan, *, source_is_pg: bool,
                         target_is_pg=target_is_pg,
                         json_cols=json_cols.get(entry.name, frozenset()),
                         bool_cols=bool_cols.get(entry.name, frozenset()),
+                        self_link=self_links.get(entry.name),
                     )
                 except Exception as exc:
                     logger.exception("Migration failed on table %s", entry.name)
@@ -182,10 +184,33 @@ def copy_tables(source, target_engine, plan, *, source_is_pg: bool,
     return result
 
 
+def _self_links(inspector, tables) -> Dict[str, Tuple[List[str], List[str]]]:
+    """{table: (primary key, nullable columns naming a row of the same table)}."""
+    links = {}
+    for table in tables:
+        nullable = {c['name'] for c in inspector.get_columns(table) if c.get('nullable', True)}
+        columns = [column for fk in inspector.get_foreign_keys(table)
+                   if fk.get('referred_table') == table
+                   for column in fk.get('constrained_columns') or [] if column in nullable]
+        primary = (inspector.get_pk_constraint(table) or {}).get('constrained_columns') or []
+        if columns and primary:
+            links[table] = (list(primary), sorted(set(columns)))
+    return links
+
+
 def _copy_one(source, dst, entry, *, source_is_pg: bool, target_is_pg: bool,
-              json_cols, bool_cols) -> int:
-    """Stream one table from the source view into the target."""
+              json_cols, bool_cols, self_link=None) -> int:
+    """Stream one table from the source view into the target.
+
+    A link to a row of the same table is written once every row is in: the row
+    it names can come later in the read, and enforced constraints refuse it.
+    """
     columns = list(entry.columns)
+    primary, linked = self_link or ([], [])
+    linked = [c for c in linked if c in columns]
+    if linked and not all(c in columns for c in primary):
+        linked = []
+    pending_links: List[dict] = []
     placeholders = ', '.join(f":{c}" for c in columns)
     column_list = ', '.join(f'"{c}"' for c in columns)
     insert_sql = text(
@@ -209,11 +234,23 @@ def _copy_one(source, dst, entry, *, source_is_pg: bool, target_is_pg: bool,
                 values = _normalize_row(
                     dict(zip(columns, row)),
                     source_is_pg, target_is_pg, json_cols, bool_cols)
-                batch.append({c: values.get(c) for c in columns})
+                row_values = {c: values.get(c) for c in columns}
+                if linked and any(row_values[c] is not None for c in linked):
+                    pending_links.append({**{f'k_{c}': row_values[c] for c in primary},
+                                          **{f'v_{c}': row_values[c] for c in linked}})
+                    row_values.update({c: None for c in linked})
+                batch.append(row_values)
             dst.execute(insert_sql, batch)
             copied += len(batch)
     finally:
         cursor.close()
+
+    if pending_links:
+        assignments = ', '.join(f'"{c}" = :v_{c}' for c in linked)
+        condition = ' AND '.join(f'"{c}" = :k_{c}' for c in primary)
+        update_sql = text(f'UPDATE "{entry.name}" SET {assignments} WHERE {condition}')
+        for start in range(0, len(pending_links), BATCH_SIZE):
+            dst.execute(update_sql, pending_links[start:start + BATCH_SIZE])
 
     return copied
 
