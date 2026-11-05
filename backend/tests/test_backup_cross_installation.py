@@ -1366,14 +1366,9 @@ AT_REST_AFTER_A_RESTORE = {
     ('scep_profiles', 'challenge_password'): 'key-encryption key',
     ('intune_apps', 'client_secret'): 'database key',
     ('webhook_endpoints', 'secret'): 'database key',
-
-    # Never written by the restore at all:
-    #  - _restore_microsoft_cas writes a hand-picked list of columns;
-    #  - webhook_endpoints.auth_token is applied by the manifest-driven path,
-    #    which drops it before it reaches the branch that writes secrets:
-    #    the column is named `_auth_token`, so `columns.get('auth_token')` is
-    #    None and the row is skipped as "a column this version does not have".
-    ('webhook_endpoints', 'auth_token'): 'nothing',
+    # A property over `_auth_token`: dropped as "a column this version does not
+    # have" until the restore wrote secrets through their property
+    ('webhook_endpoints', 'auth_token'): 'database key',
 
     # Both arrived as the source's own ciphertext until the export learned to
     # read the key-encryption layer as well: the product writes them through

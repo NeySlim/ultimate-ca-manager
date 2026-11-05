@@ -65,13 +65,16 @@ class _Staged:
     when the replace happens is what a compensation has to put back.
     """
 
-    __slots__ = ('destination', 'staged_path', 'mode',
+    __slots__ = ('destination', 'staged_path', 'mode', 'remove',
                  'existed', 'previous_data', 'previous_mode', 'published')
 
-    def __init__(self, destination: Path, staged_path: Path, mode: int):
+    def __init__(self, destination: Path, staged_path: Optional[Path], mode: int,
+                 remove: bool = False):
         self.destination = destination
         self.staged_path = staged_path
         self.mode = mode
+        # Published as a removal: the destination goes, and comes back on compensation
+        self.remove = remove
         self.existed = False
         self.previous_data = b''
         self.previous_mode = mode
@@ -139,7 +142,9 @@ class StagedFiles:
 
         for entry in self._entries:
             if entry.destination == destination:
-                entry.mode = mode
+                if entry.staged_path is None:
+                    entry.staged_path = staging / f"{self._entries.index(entry):04d}_{destination.name}"
+                entry.mode, entry.remove = mode, False
                 _write_private(entry.staged_path, data, mode)
                 return entry.staged_path
 
@@ -147,6 +152,18 @@ class StagedFiles:
         _write_private(staged_path, data, mode)
         self._entries.append(_Staged(destination, staged_path, mode))
         return staged_path
+
+    def stage_removal(self, destination) -> None:
+        """Remove ``destination`` at publication, or leave it if the restore fails.
+
+        Replaces whatever was staged for it: a file the restore no longer wants.
+        """
+        destination = Path(destination)
+        for entry in self._entries:
+            if entry.destination == destination:
+                entry.remove = True
+                return
+        self._entries.append(_Staged(destination, None, 0o600, remove=True))
 
     # -- publication ------------------------------------------------------
 
@@ -195,6 +212,12 @@ class StagedFiles:
 
     def _publish(self, entry: _Staged) -> None:
         directory = entry.destination.parent
+        if entry.remove:
+            if entry.existed:
+                entry.destination.unlink()
+                entry.published = True
+                _fsync_directory(directory)
+            return
         directory.mkdir(parents=True, exist_ok=True)
         data = entry.staged_path.read_bytes()
 

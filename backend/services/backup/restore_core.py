@@ -8,15 +8,15 @@ import logging
 from datetime import datetime
 from typing import Any, Dict, List
 
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 from models import db, CA, Certificate
-from utils.datetime_utils import utc_now
+from utils.datetime_utils import to_naive_utc, utc_now
 from compliance_profiles import is_valid as is_valid_profile
 from utils.port_zero import strip_port_zero_from_stored
 from utils.signing_hash import SIGNATURE_SCHEMES
 from models.acme_models import AcmeAccount
 from config.settings import Config
-from services.file_regen_service import mirror_private_key
+from services.file_regen_service import insert_file_writes_suspended
 
 from . import installation
 from .errors import BackupSchemaError
@@ -26,8 +26,8 @@ from .manifest import SECTIONS
 from .restore.apply import apply_columns, apply_section, relink_references
 from .restore.names import rename_clashing_rows
 from .restore.orders import keep_newer_orders
-from .restore.repairs import replay_order_repairs
-from .restore.conflict import conflict_from_integrity_error
+from .restore.repairs import replay_repairs
+from .restore.conflict import conflict_from_integrity_error, is_value_too_long
 from .restore.replace import plan_replacement, remove_after_writes, remove_before_writes
 from .restore.setting_refs import deferred_keys, prune_doomed_settings, restore_setting_references
 from .restore.settings import restore_encrypted_settings
@@ -62,6 +62,39 @@ def _archived_datetime(where: str, column: str, value: Any):
             f"Invalid backup: {where} holds {value!r} as its {column}, which "
             "is not a date. Nothing has been changed."
         ) from exc
+
+
+def _row_file_paths() -> set:
+    """The certificate, CSR and key files the authority and certificate rows name."""
+    from types import SimpleNamespace
+    from utils.file_naming import ca_cert_path, ca_key_path, cert_cert_path, cert_csr_path, cert_key_path
+
+    paths = set()
+    with db.session.no_autoflush:
+        for refid, subject, descr in db.session.query(CA.refid, CA.subject, CA.descr):
+            row = SimpleNamespace(refid=refid, subject=subject, descr=descr)
+            paths.update((ca_cert_path(row), ca_key_path(row)))
+        for refid, subject, descr in db.session.query(
+                Certificate.refid, Certificate.subject, Certificate.descr):
+            row = SimpleNamespace(refid=refid, subject=subject, descr=descr)
+            paths.update((cert_cert_path(row), cert_csr_path(row), cert_key_path(row)))
+    return paths
+
+
+def _stage_key_mirror(staged, path, key_pem: bytes) -> None:
+    """A plaintext key mirror, only while database encryption is off (as mirror_private_key)."""
+    from security.encryption import key_encryption
+    if key_encryption.is_enabled:
+        staged.stage_removal(path)
+    else:
+        staged.stage(path, key_pem, mode=0o600)
+
+
+def _archived_timestamps(row, where: str, data: Dict[str, Any]) -> None:
+    """`created_at` and `updated_at` as the archive has them, for a hand-written restorer."""
+    for column in ('created_at', 'updated_at'):
+        if data.get(column) and hasattr(row, column):
+            setattr(row, column, to_naive_utc(_archived_datetime(where, column, data[column])))
 
 
 # Sections this restore path knows how to apply. The export carries more
@@ -339,8 +372,10 @@ class RestoreCoreMixin:
         results['mode'] = mode
 
         staged = StagedFiles()
+        # What the rows had on disk before: a file no row names afterwards goes with the commit
+        files_before = _row_file_paths()
         try:
-            with single_transaction():
+            with single_transaction(), insert_file_writes_suspended():
                 replacement = None
                 if mode == 'replace':
                     # Removed before the writes, so what they free is free
@@ -358,9 +393,10 @@ class RestoreCoreMixin:
                 # row exists: this is where an authority finds the HSM key the
                 # same restore has just created.
                 results['relinked'] = relink_references(backup_data, plan)
+                results['repairs'] = replay_repairs(backup_data, plan)
                 if plan.written.get('acme_client_orders'):
-                    results['acme_client_orders_repaired'] = replay_order_repairs(
-                        plan.written['acme_client_orders'])
+                    results['acme_client_orders_repaired'] = results['repairs'].get(
+                        '121_acme_renewal_order_duplicates', {'reissued': 0, 'dropped': 0})
                 results['settings'] += restore_setting_references(
                     backup_data.get('configuration'), plan)
                 results['chain_variant_fallbacks'] = list(plan.chain_variant_fallbacks)
@@ -374,13 +410,17 @@ class RestoreCoreMixin:
                 results['warnings'] = list(dict.fromkeys(plan.warnings))
                 results['dropped_secrets'] = list(plan.dropped_fields)
 
+                for path in sorted(files_before - _row_file_paths()):
+                    staged.stage_removal(path)
                 # Published inside the transaction, so a file that cannot be
                 # placed rolls the database back with it. The window that
                 # remains is the commit itself, and it is compensated below.
                 staged.publish()
-        except IntegrityError as exc:
+        except (IntegrityError, DataError) as exc:
             staged.unpublish()
             staged.discard()
+            if isinstance(exc, DataError) and not is_value_too_long(exc):
+                raise
             conflict = conflict_from_integrity_error(exc)
             logger.warning("Restore refused by the database: %s", conflict)
             raise conflict from exc
@@ -832,6 +872,7 @@ class RestoreCoreMixin:
             if not account_id or not jwk_thumbprint or not acme_data.get('jwk'):
                 continue
             existing = AcmeAccount.query.filter_by(account_id=account_id).first()
+            target = existing
             if existing:
                 existing.jwk = acme_data['jwk']
                 existing.jwk_thumbprint = jwk_thumbprint
@@ -850,6 +891,8 @@ class RestoreCoreMixin:
                     external_account_binding=acme_data.get('external_account_binding'),
                 )
                 db.session.add(new_acme)
+                target = new_acme
+            _archived_timestamps(target, f"ACME account {account_id}", acme_data)
             results['acme_accounts'] += 1
 
     def _restore_acme_eab_credentials(self, backup_data: Dict, results: Dict) -> None:
@@ -907,6 +950,7 @@ class RestoreCoreMixin:
                 if limits is not None and not isinstance(limits, str):
                     raise BackupSchemaError(f"{where}: allowed_domains is not JSON text")
                 target._allowed_domains = limits
+            _archived_timestamps(target, where, eab)
             results['acme_eab_credentials'] += 1
 
     def _restore_settings(self, backup_data: Dict, results: Dict) -> None:
@@ -961,14 +1005,12 @@ class RestoreCoreMixin:
         and the instance stays as it was, which is the only outcome that
         matches what the caller is told.
 
-        The certificate and CSR files are staged rather than written in
+        The certificate, CSR and key files are staged rather than written in
         place, and published with the rest once the transaction has
         committed: written directly, a restore that failed afterwards left
         every certificate file holding the archive's content while the rows
-        had gone back to what they were. The key mirrors are the exception
-        and stay a direct write, because mirroring is also a *removal* when
-        database encryption is on, which staging does not express; each one
-        is atomic on its own (see ``mirror_private_key``).
+        had gone back to what they were. With database encryption on, a key
+        mirror is staged as a removal.
 
         Material that cannot be decoded is a warning naming the row, and the
         restore goes on. This walks every authority and certificate in the
@@ -1001,9 +1043,7 @@ class RestoreCoreMixin:
                         "Restore: the stored key of CA %s could not be read "
                         "(%s); it was not mirrored on disk", ca.id, exc)
                 else:
-                    mirror_private_key(
-                        ca_key_path(ca), prv_pem, context=f"restored CA {ca.id}"
-                    )
+                    _stage_key_mirror(staged, ca_key_path(ca), prv_pem)
 
         for cert in Certificate.query.all():
             if cert.crt:
@@ -1040,8 +1080,4 @@ class RestoreCoreMixin:
                         "be read (%s); it was not mirrored on disk",
                         cert.id, exc)
                 else:
-                    mirror_private_key(
-                        cert_key_path(cert),
-                        prv_pem_bytes,
-                        context=f"restored certificate {cert.id}",
-                    )
+                    _stage_key_mirror(staged, cert_key_path(cert), prv_pem_bytes)

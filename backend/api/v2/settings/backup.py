@@ -92,8 +92,10 @@ def create_backup():
 
     try:
         service = BackupService()
-        backup_bytes = service.create_backup(password, kdf=kdf)
-        _filepath, filename = storage.create_archive(backup_bytes)
+        backup_bytes, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
+    except BackupBusyError as busy:
+        logger.info('Settings backup refused: %s', busy)
+        return error_response(str(busy), 409)
     except BackupPasswordError as e:
         return error_response(str(e), 400)
     except BackupExportError as e:
@@ -210,12 +212,15 @@ def restore_backup():
         # same lock so one never sees the other half-done.
         service = BackupService()
         try:
-            with database_migration_lock(purpose='the restore'):
+            with database_migration_lock(purpose='the restore'), \
+                    backup_operation_lock(purpose='the restore'):
                 results = service.restore_backup(backup_bytes, password)
         except MigrationBusyError as busy:
             return error_response(
                 f"{busy} A backend migration or another restore is still "
                 "running.", 409)
+        except BackupBusyError as busy:
+            return error_response(f"{busy} Retry once the backup has finished.", 409)
 
         # Recorded before the archive is judged empty or not, as the system
         # route does: a file that restored nothing was still uploaded and

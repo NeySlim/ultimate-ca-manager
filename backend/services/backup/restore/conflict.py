@@ -1,5 +1,7 @@
 """A restore the database refuses, told with the table and the row's identity.
 
+Constraint violations, and on PostgreSQL a value longer than its column.
+
 Read from the failed statement: once a flush fails, the session holds nothing to ask.
 """
 import re
@@ -72,6 +74,7 @@ def _rows(exc, kind: str) -> List[Dict[str, Any]]:
         return []
     if all(isinstance(item, dict) for item in params):
         rows = []
+        table = (_STATEMENT.match(statement) or [None, None, ''])[2]
         for item in params:
             numbered: Dict[str, Dict[str, Any]] = {}
             for key, value in item.items():
@@ -80,6 +83,10 @@ def _rows(exc, kind: str) -> List[Dict[str, Any]]:
                     numbered.setdefault(index, {})[base] = value
                 else:
                     numbered.setdefault('', {})[key] = value
+            for row in numbered.values():
+                # The ORM binds an UPDATE's primary key as <table>_id
+                if kind == 'UPDATE' and f'{table}_id' in row:
+                    row.setdefault('__key__', row[f'{table}_id'])
             rows.extend(numbered.values())
         return rows
     if all(isinstance(item, (list, tuple)) for item in params):
@@ -103,6 +110,27 @@ def _unique_violation_detail(orig):
 
 
 _UNIQUE_VIOLATION = '23505'
+_STRING_TOO_LONG = '22001'
+
+
+def is_value_too_long(exc) -> bool:
+    """A PostgreSQL refusal of a string longer than its column (SQLite stores it)."""
+    return getattr(getattr(exc, 'orig', None), 'pgcode', None) == _STRING_TOO_LONG
+
+
+def _overlong(table: str, rows: List[Dict[str, Any]]):
+    """(row, column, length, limit) of the first value longer than its column."""
+    from models import db
+    columns = db.metadata.tables.get(table)
+    if columns is None:
+        return None
+    for row in rows:
+        for name, value in row.items():
+            column = columns.c.get(name)
+            limit = getattr(getattr(column, 'type', None), 'length', None)
+            if limit and isinstance(value, str) and len(value) > limit:
+                return row, name, len(value), limit
+    return None
 
 
 def conflict_from_integrity_error(exc) -> RestoreConflictError:
@@ -122,6 +150,12 @@ def conflict_from_integrity_error(exc) -> RestoreConflictError:
         if found:
             column, value = found.group(1).split(',')[0].strip('" '), found.group(2).split(',')[0].strip()
             rows = [row for row in rows if str(row.get(column)) == value] or rows
+
+    overlong = _overlong(table, rows) if is_value_too_long(exc) and match else None
+    if overlong:
+        row, column, length, limit = overlong
+        rows = [row]
+        reason = f"{column} is {length} characters long, the column holds {limit}"
 
     described = []
     if section_name is not None:

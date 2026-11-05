@@ -157,9 +157,12 @@ class RestoreAuthMixin:
         plan = plan if plan is not None else RestorePlan.build(backup_data)
         reindex_reference_targets('auth_certificates', plan)
         for ac_data in backup_data.get('auth_certificates', []):
-            ac = AuthCertificate.query.filter_by(
-                cert_serial=ac_data['cert_serial']
-            ).first()
+            # By fingerprint, the manifest's identity: a serial is only unique per issuer.
+            # A row written before fingerprints were stored has nothing else.
+            fingerprint = ac_data.get('cert_fingerprint')
+            ac = (AuthCertificate.query.filter_by(cert_fingerprint=fingerprint).first()
+                  if fingerprint else
+                  AuthCertificate.query.filter_by(cert_serial=ac_data['cert_serial']).first())
 
             row = ac_data
             if 'cert_pem' in ac_data:

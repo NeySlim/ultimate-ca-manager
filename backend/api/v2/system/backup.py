@@ -149,10 +149,12 @@ def create_backup():
 
     try:
         service = BackupService()
-        backup_bytes = service.create_backup(password, kdf=kdf)
-        _filepath, filename = storage.create_archive(backup_bytes)
+        backup_bytes, _filepath, filename = storage.export_archive(service, password, kdf=kdf)
     except FipsRestricted:
         raise  # the application maps it to its problem type
+    except BackupBusyError as busy:
+        logger.info('Backup refused: %s', busy)
+        return error_response(str(busy), 409)
     except BackupPasswordError as e:
         return error_response(str(e), 400)
     except BackupExportError as e:
@@ -430,13 +432,17 @@ def restore_backup():
             return error_response(pending, 409)
 
         try:
-            with database_migration_lock(purpose='the restore'):
+            # The backup lock too: an archive written meanwhile would read half of the restore
+            with database_migration_lock(purpose='the restore'), \
+                    backup_operation_lock(purpose='the restore'):
                 results = BackupService().restore_backup(
                     backup_bytes, password, mode=mode)
         except MigrationBusyError as busy:
             return error_response(
                 f'{busy} A backend migration or another restore is still '
                 'running.', 409)
+        except BackupBusyError as busy:
+            return error_response(f'{busy} Retry once the backup has finished.', 409)
 
         carried = bool((results or {}).get('sections_carried'))
         _safe_audit_log(
