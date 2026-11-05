@@ -126,6 +126,19 @@ class TestDnsProviders:
         assert {p.id for p in DnsProvider.query.filter(
             DnsProvider.name.like(f'{PREFIX}mig%'))} == set(ids)
 
+    def test_a_reference_two_archived_homonyms_share_is_reported(self, clean):
+        domain = {'domain': f'{PREFIX}amb.example', 'dns_provider_id': 1,
+                  'dns_provider_id_ref': {'name': f'{PREFIX}amb'},
+                  'issuing_ca_id': None, 'issuing_ca_id_ref': None}
+        results = _restore(['dns_providers', 'acme_domains'], dns_providers=[
+            _provider(f'{PREFIX}amb', token='a'), _provider(f'{PREFIX}amb', token='b')],
+            acme_domains=[domain])
+        restored = AcmeDomain.query.filter_by(domain=f'{PREFIX}amb.example').one()
+        assert db.session.get(DnsProvider, restored.dns_provider_id).name == f'{PREFIX}amb'
+        assert [w for w in results['ambiguous_references'] if f'{PREFIX}amb' in w] == [
+            f"acme_domains.dns_provider_id names '{PREFIX}amb', which 2 archived "
+            f"dns_providers rows hold: it now points at the first one, restored as '{PREFIX}amb'"]
+
     def test_a_domain_follows_its_renamed_provider(self, clean):
         here = DnsProvider(name=f'{PREFIX}ref', provider_type='route53')
         _add(here)
@@ -161,6 +174,34 @@ class TestAcmeAccounts:
             'section': 'acme_client_accounts', 'from': f'{PREFIX}relabelled',
             'to': f'{PREFIX}kept', 'reason': 'same row here under this name'}]
 
+    def test_an_unregistered_homonym_never_takes_a_registered_account(self, clean):
+        here_id = _add(AcmeClientAccount(**_account(
+            f'{PREFIX}L', 'https://prod.example/acct/1', 'https://prod.example/dir')))
+        results = _restore(['acme_client_accounts'], acme_client_accounts=[
+            _account(f'{PREFIX}L', None, 'https://staging.example/dir')])
+        kept = db.session.get(AcmeClientAccount, here_id)
+        assert (kept.label, kept.directory_url, kept.account_url) == (
+            f'{PREFIX}L', 'https://prod.example/dir', 'https://prod.example/acct/1')
+        restored = AcmeClientAccount.query.filter_by(label=f'{PREFIX}L (2)').one()
+        assert (restored.directory_url, restored.account_url) == (
+            'https://staging.example/dir', None)
+        assert [e['to'] for e in _ours(results)] == [f'{PREFIX}L (2)']
+
+    def test_an_unregistered_homonym_in_the_same_directory_is_renamed(self, clean):
+        here_id = _add(AcmeClientAccount(**_account(
+            f'{PREFIX}R', 'https://ca.example/acct/9', 'https://ca.example/dir')))
+        results = _restore(['acme_client_accounts'], acme_client_accounts=[
+            _account(f'{PREFIX}R', None, 'https://ca.example/dir')])
+        assert db.session.get(AcmeClientAccount, here_id).account_url == 'https://ca.example/acct/9'
+        assert [e['to'] for e in _ours(results)] == [f'{PREFIX}R (2)']
+
+    def test_an_unregistered_account_of_another_directory_is_renamed(self, clean):
+        here_id = _add(AcmeClientAccount(**_account(f'{PREFIX}U', None, 'https://a.example/dir')))
+        results = _restore(['acme_client_accounts'], acme_client_accounts=[
+            _account(f'{PREFIX}U', None, 'https://b.example/dir')])
+        assert db.session.get(AcmeClientAccount, here_id).directory_url == 'https://a.example/dir'
+        assert [e['to'] for e in _ours(results)] == [f'{PREFIX}U (2)']
+
     def test_an_unregistered_account_is_found_by_its_label(self, clean):
         here_id = _add(AcmeClientAccount(**_account(f'{PREFIX}unreg')))
         results = _restore(['acme_client_accounts'], acme_client_accounts=[
@@ -193,4 +234,5 @@ class TestWebhooks:
 def test_the_restore_message_names_the_renamed_rows():
     message = with_restore_warnings('Restored.', {'renamed': [
         {'section': 'dns_providers', 'from': 'cf', 'to': 'cf (2)', 'reason': 'x'}]})
-    assert message == 'Restored. 1 row was restored under another name: cf as cf (2).'
+    assert message == ('Restored. 1 row was restored under another name: '
+                       'DNS provider cf as cf (2).')

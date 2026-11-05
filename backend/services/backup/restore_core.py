@@ -243,7 +243,8 @@ class RestoreCoreMixin:
         self._check_payload_schema(backup_data)
         upgrade_archived_permissions(backup_data)
         # Before the plan, which finds these rows again by name.
-        renamed = rename_clashing_rows(backup_data)
+        ambiguous_references: List[str] = []
+        renamed = rename_clashing_rows(backup_data, ambiguous_references)
 
         # An archive of metadata alone restores nothing. Announcing it as a
         # success made the caller revoke every session and ask for a restart
@@ -293,6 +294,7 @@ class RestoreCoreMixin:
             'sections_not_restored': not_restored,
             'sections_carried': carried,
             'renamed': renamed,
+            'ambiguous_references': ambiguous_references,
         }
 
         # A key that is not its certificate's was recorded when the archive

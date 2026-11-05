@@ -35,26 +35,31 @@ def _account_key_here(account):
     return (account.directory_url, account.account_url) if account.account_url else None
 
 
+def _same_account(row, here):
+    """Same directory, and the same registration or none on either side."""
+    return (row.get('directory_url') == here.directory_url
+            and (row.get('account_url') or None) == (here.account_url or None))
+
+
 RULES = {
     # A Cloudflare provider and a Route 53 one are two providers.
     'dns_providers': _Rule('name', lambda row, here: row.get('provider_type') == here.provider_type),
-    # By (directory, account URL) once registered, by label before that.
-    'acme_client_accounts': _Rule(
-        'label',
-        lambda row, here: _account_key(row) is None or _account_key(row) == _account_key_here(here),
-        _account_key, _account_key_here),
+    # By (directory, account URL) once registered, by label and directory before that.
+    'acme_client_accounts': _Rule('label', _same_account, _account_key, _account_key_here),
     # By URL, then name.
     'webhook_endpoints': _Rule('name', lambda row, here: row.get('url') == here.url,
                                lambda row: (row.get('url'),), lambda here: (here.url,)),
 }
 
 
-def rename_clashing_rows(backup_data: Dict[str, Any]) -> List[Dict[str, str]]:
+def rename_clashing_rows(backup_data: Dict[str, Any],
+                         warnings: Optional[List[str]] = None) -> List[Dict[str, str]]:
     """Rename, in the archive, the rows that would land on another row's name.
 
-    References carried by identity follow the rename. Returns one entry per
-    row restored under a name other than its own.
+    References carried by identity follow the rename; an ambiguous one is added
+    to `warnings`. Returns one entry per row restored under another name.
     """
+    warnings = warnings if warnings is not None else []
     renamed = []
     for section_name, rule in RULES.items():
         rows = backup_data.get(section_name)
@@ -72,7 +77,7 @@ def rename_clashing_rows(backup_data: Dict[str, Any]) -> List[Dict[str, str]]:
                                 'to': final[index], 'reason': reasons[index]})
                 logger.warning("Restore: %s %r restored as %r (%s)", section_name,
                                row[rule.column], final[index], reasons[index])
-        _follow_references(backup_data, section_name, rule, before, final)
+        _follow_references(backup_data, section_name, rule, before, final, warnings)
         for index, row in enumerate(rows):
             row[rule.column] = final[index]
     return renamed
@@ -145,10 +150,11 @@ def _length(section_name, rule):
     return getattr(column.type, 'length', None) or NAME_MAX_LENGTH
 
 
-def _follow_references(backup_data, section_name, rule, before, final):
+def _follow_references(backup_data, section_name, rule, before, final, warnings):
     """Point each identity carried beside a reference at the row's new name.
 
-    An identity matching several archived rows names the first of them.
+    An identity matching several archived rows names the first of them: the
+    archive does not carry the source id that would tell them apart.
     """
     for name, section in SECTIONS.items():
         columns = [c for c, target in section.references.items() if target == section_name]
@@ -162,7 +168,14 @@ def _follow_references(backup_data, section_name, rule, before, final):
                 identity = row.get(f'{column}{REFERENCE_SUFFIX}')
                 if not isinstance(identity, dict) or rule.column not in identity:
                     continue
-                index = next((i for i, archived in enumerate(before)
-                              if all(archived.get(k) == v for k, v in identity.items())), None)
+                matches = [i for i, archived in enumerate(before)
+                           if all(archived.get(k) == v for k, v in identity.items())]
+                index = matches[0] if matches else None
+                if len(matches) > 1:
+                    warnings.append(
+                        f"{name}.{column} names {identity[rule.column]!r}, which "
+                        f"{len(matches)} archived {section_name} rows hold: it now points "
+                        f"at the first one, restored as {final[index]!r}")
+                    logger.warning("Restore: %s", warnings[-1])
                 if index is not None and final[index] != identity[rule.column]:
                     row[f'{column}{REFERENCE_SUFFIX}'] = {**identity, rule.column: final[index]}

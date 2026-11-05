@@ -57,7 +57,7 @@ def test_a_taken_name_is_refused(app, auth_client, kind):
             db.session.commit()
 
 
-def test_a_placeholder_account_does_not_take_an_operator_label(app):
+def test_a_placeholder_account_does_not_take_an_operator_label(app, caplog):
     from services.acme.acme_client_service import AcmeClientService
 
     directory = f'https://{uuid.uuid4().hex[:12]}.example/directory'
@@ -72,6 +72,7 @@ def test_a_placeholder_account_does_not_take_an_operator_label(app):
             account = AcmeClientService._resolve_account(None, directory, None)
             ids.append(account.id)
             assert (account.label, account.directory_url) == (f'{label} (2)', directory)
+            assert f'Created placeholder ACME account: {label} (2) ({directory})' in caplog.text
         finally:
             db.session.rollback()
             AcmeClientAccount.query.filter(AcmeClientAccount.id.in_(ids)).delete(

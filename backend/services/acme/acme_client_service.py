@@ -291,7 +291,7 @@ class AcmeClientService:
             if existing:
                 return existing
             raise
-        logger.info(f"Created placeholder ACME account: {target_label} ({target_url})")
+        logger.info(f"Created placeholder ACME account: {new_account.label} ({target_url})")
         return new_account
 
     # ------------------------------------------------------------------
