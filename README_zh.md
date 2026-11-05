@@ -41,8 +41,8 @@
 - **EST** -- RFC 7030 安全传输注册，包括服务器端密钥生成 (CMS §4.4) 和 **CA 标签** （§3.2.2: 从一个端点服务多个 CA）。
 - **OCSP** -- RFC 6960 实时证书状态，支持多证书请求， nonce 支持，委托响应器验证并自动续期响应器证书，可配置响应有效期。
 - **TSA (RFC 3161)** -- 时间戳机构，可配置策略 OID；使用 CA 证书或 **专用终端实体签名证书** 签名，该证书可从已签发证书中选择或一键生成（为满足严格验证器，设置关键且排他的 EKU）；要求 timeStamping EKU，自动跟随续期，令牌中嵌入签发者链，严格专用签名者模式，签名者健康状况和到期信息显示在仪表板上。
-- **CRL/CDP** -- Certificate Revocation List distribution with Delta CRL support (RFC 5280 §5.2.4), per-CA schedule (validity decoupled from publish cadence) and configurable signature digest, optional named URLs (CA-name slug in CDP/AIA paths, can be enabled on existing CAs), **externally-signed CRL upload for offline / key-less CAs** (validated against the CA certificate with CRL-number monotonicity, served at the existing CDP endpoint and consulted by OCSP)
-- **AIA CA Issuers** -- Authority Information Access CA certificate download (RFC 5280 §4.2.2.1)
+- **CRL/CDP** -- 证书吊销列表分发，支持增量 CRL (RFC 5280 §5.2.4), 按 CA 的调度（有效期与发布节奏解耦）和可配置签名摘要，可选命名 URL （在 CDP/AIA 路径中使用 CA 名称 slug，可在现有 CA 上启用）， **为离线/无密钥 CA 上传外部签名 CRL** （根据 CA 证书验证，并要求 CRL 编号单调递增，在现有 CDP 端点提供，并由 OCSP 查询）。
+- **AIA CA Issuers** -- 机构信息访问 CA 证书下载（RFC 5280 §4.2.2.1）。
 
 ### Integrations
 - **Microsoft ADCS** -- Full lifecycle over AD CS: CSR signing, template discovery, EOBO (Enroll On Behalf Of), renew/revoke through the connector, and an optional WinRM admin channel for CRL revocation sync, CA inventory import, and pending-request approve/deny with a CA health panel
